@@ -20,6 +20,7 @@ import { setStringAsync } from 'expo-clipboard';
 
 import type { CreqMintSelection } from '@/features/receive/lib/creqMintSelection';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { CopyRequestRow } from '@/shared/ui/composed/CopyRequestCard';
 import { Section } from '@/shared/ui/composed/Section';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -111,22 +112,12 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
   const card = (
     <GradientCard>
       <ListGroup variant="transparent">
-        <PressableFeedback animation={false} onPress={handleCopy}>
-          <PressableFeedback.Scale>
-            <ListGroup.Item disabled>
-              <ListGroup.ItemPrefix>
-                <Icon name="ph:coins" size={20} color={muted} />
-              </ListGroup.ItemPrefix>
-              <ListGroup.ItemContent>
-                <ListGroup.ItemTitle>{truncateMiddle(encodedRequest, 10)}</ListGroup.ItemTitle>
-              </ListGroup.ItemContent>
-              <ListGroup.ItemSuffix>
-                <Icon name="lets-icons:copy" size={20} color={muted} />
-              </ListGroup.ItemSuffix>
-            </ListGroup.Item>
-          </PressableFeedback.Scale>
-          <PressableFeedback.Ripple />
-        </PressableFeedback>
+        <CopyRequestRow
+          icon="ph:coins"
+          display={truncateMiddle(encodedRequest, 10)}
+          muted={muted}
+          onPress={handleCopy}
+        />
         <Separator className="mx-4" />
         {/* The whole row is the toggle target: a HeroSwitch inside a
             ListGroup.ItemSuffix collapses into the grouped AX element and its

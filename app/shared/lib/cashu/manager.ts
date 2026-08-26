@@ -907,43 +907,37 @@ export class CocoManager {
 
       try {
         cashuLog.info('cashu.manager.cleanup_start');
+        const instance = this.instance;
 
-        // Disable watchers in reverse order to prevent conflicts
-        try {
-          await this.instance.disableProofStateWatcher();
-          cashuLog.debug('cashu.manager.proof_watcher_disabled');
-        } catch (error) {
-          cashuLog.warn('cashu.manager.proof_watcher_disable_failed', { error });
-        }
-
-        try {
-          await this.instance.disableMintOperationProcessor();
-          cashuLog.debug('cashu.manager.quote_processor_disabled');
-        } catch (error) {
-          cashuLog.warn('cashu.manager.quote_processor_disable_failed', { error });
-        }
-
-        try {
-          await this.instance.disableMintOperationWatcher();
-          cashuLog.debug('cashu.manager.quote_watcher_disabled');
-        } catch (error) {
-          cashuLog.warn('cashu.manager.quote_watcher_disable_failed', { error });
-        }
-
-        try {
-          await this.instance.disableMeltSettlementProcessor();
-          await this.instance.disableMeltQuoteWatcher();
-          cashuLog.debug('cashu.manager.melt_watchers_disabled');
-        } catch (error) {
-          cashuLog.warn('cashu.manager.melt_watchers_disable_failed', { error });
-        }
-
-        try {
-          await this.instance.dispose();
-          cashuLog.debug('cashu.manager.disposed');
-        } catch (error) {
-          cashuLog.warn('cashu.manager.dispose_failed', { error });
-        }
+        // Disable watchers in reverse order to prevent conflicts. Kept as an
+        // explicit sequence (not disableWatchers()) — this path disables the
+        // quote processor before its watcher, the reverse of that method.
+        await this.teardownStep(
+          'cashu.manager.proof_watcher_disabled',
+          'cashu.manager.proof_watcher_disable_failed',
+          () => instance.disableProofStateWatcher()
+        );
+        await this.teardownStep(
+          'cashu.manager.quote_processor_disabled',
+          'cashu.manager.quote_processor_disable_failed',
+          () => instance.disableMintOperationProcessor()
+        );
+        await this.teardownStep(
+          'cashu.manager.quote_watcher_disabled',
+          'cashu.manager.quote_watcher_disable_failed',
+          () => instance.disableMintOperationWatcher()
+        );
+        await this.teardownStep(
+          'cashu.manager.melt_watchers_disabled',
+          'cashu.manager.melt_watchers_disable_failed',
+          async () => {
+            await instance.disableMeltSettlementProcessor();
+            await instance.disableMeltQuoteWatcher();
+          }
+        );
+        await this.teardownStep('cashu.manager.disposed', 'cashu.manager.dispose_failed', () =>
+          instance.dispose()
+        );
 
         // Close the SQLite connection to prevent "database is locked" on revisit
         if (this.db) {
@@ -1147,37 +1141,51 @@ export class CocoManager {
     }
   }
 
+  /**
+   * Run one teardown step, logging success/failure — teardown must never
+   * throw past a single step. Event names are passed as literals (not
+   * derived) so log-taxonomy greps keep finding them in source.
+   */
+  private static async teardownStep(
+    okEvent: string,
+    failEvent: string,
+    run: () => Promise<void>
+  ): Promise<void> {
+    try {
+      await run();
+      cashuLog.debug(okEvent);
+    } catch (error) {
+      cashuLog.warn(failEvent, { error });
+    }
+  }
+
   /** Safely disable all watchers before tearing down the Manager. */
   private static async disableWatchers(): Promise<void> {
-    if (!this.instance) return;
-    try {
-      await this.instance.disableProofStateWatcher();
-      cashuLog.debug('cashu.manager.proof_watcher_disabled');
-    } catch (error) {
-      cashuLog.warn('cashu.manager.proof_watcher_disable_failed', { error });
-    }
-
-    try {
-      await this.instance.disableMintOperationWatcher();
-      cashuLog.debug('cashu.manager.quote_watcher_disabled');
-    } catch (error) {
-      cashuLog.warn('cashu.manager.quote_watcher_disable_failed', { error });
-    }
-
-    try {
-      await this.instance.disableMintOperationProcessor();
-      cashuLog.debug('cashu.manager.quote_processor_disabled');
-    } catch (error) {
-      cashuLog.warn('cashu.manager.quote_processor_disable_failed', { error });
-    }
-
-    try {
-      await this.instance.disableMeltSettlementProcessor();
-      await this.instance.disableMeltQuoteWatcher();
-      cashuLog.debug('cashu.manager.melt_watchers_disabled');
-    } catch (error) {
-      cashuLog.warn('cashu.manager.melt_watchers_disable_failed', { error });
-    }
+    const instance = this.instance;
+    if (!instance) return;
+    await this.teardownStep(
+      'cashu.manager.proof_watcher_disabled',
+      'cashu.manager.proof_watcher_disable_failed',
+      () => instance.disableProofStateWatcher()
+    );
+    await this.teardownStep(
+      'cashu.manager.quote_watcher_disabled',
+      'cashu.manager.quote_watcher_disable_failed',
+      () => instance.disableMintOperationWatcher()
+    );
+    await this.teardownStep(
+      'cashu.manager.quote_processor_disabled',
+      'cashu.manager.quote_processor_disable_failed',
+      () => instance.disableMintOperationProcessor()
+    );
+    await this.teardownStep(
+      'cashu.manager.melt_watchers_disabled',
+      'cashu.manager.melt_watchers_disable_failed',
+      async () => {
+        await instance.disableMeltSettlementProcessor();
+        await instance.disableMeltQuoteWatcher();
+      }
+    );
   }
 
   /**
@@ -1221,13 +1229,11 @@ export class CocoManager {
   static async completeReset(accountIndexes: number[]): Promise<void> {
     try {
       await this.disableWatchers();
-      if (this.instance) {
-        try {
-          await this.instance.dispose();
-          cashuLog.debug('cashu.manager.disposed');
-        } catch (error) {
-          cashuLog.warn('cashu.manager.dispose_failed', { error });
-        }
+      const instance = this.instance;
+      if (instance) {
+        await this.teardownStep('cashu.manager.disposed', 'cashu.manager.dispose_failed', () =>
+          instance.dispose()
+        );
       }
       this.instance = null;
       this.pendingInit = null;

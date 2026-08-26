@@ -15,7 +15,6 @@ import { setStringAsync } from 'expo-clipboard';
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { useMints } from '@cashu/coco-react';
-import { ListGroup, PressableFeedback } from 'heroui-native';
 
 import {
   useScreenActions,
@@ -40,8 +39,7 @@ import {
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { copyPopup } from '@/shared/lib/popup';
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
-import { Section } from '@/shared/ui/composed/Section';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { CopyRequestCard } from '@/shared/ui/composed/CopyRequestCard';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { HistoryEntryRefresh } from '@/features/transactions';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
@@ -56,7 +54,6 @@ import { ReceiveRailPlaceholder } from '@/features/receive/components/ReceiveRai
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
-import Icon from 'assets/icons';
 
 interface ReceiveHubEntry {
   npcAddress?: FormattedString;
@@ -93,35 +90,16 @@ const ReceiveLightningTab = memo(function ReceiveLightningTab({
   return (
     <>
       <PaymentInfo data={npcAddress.toString()} copyTarget="address" unit="sat" />
-      <View className="mx-4">
-        <Section title="RECEIVE ADDRESS">
-          <GradientCard>
-            <ListGroup variant="transparent">
-              <PressableFeedback
-                animation={false}
-                onPress={async () => {
-                  await EnhancedHaptics.copyHaptic();
-                  await actions.copy.execute({ source: 'npc' });
-                }}>
-                <PressableFeedback.Scale>
-                  <ListGroup.Item disabled>
-                    <ListGroup.ItemPrefix>
-                      <Icon name="mingcute:lightning-fill" size={20} color={muted} />
-                    </ListGroup.ItemPrefix>
-                    <ListGroup.ItemContent>
-                      <ListGroup.ItemTitle>{npcAddress.truncate(6)}</ListGroup.ItemTitle>
-                    </ListGroup.ItemContent>
-                    <ListGroup.ItemSuffix>
-                      <Icon name="lets-icons:copy" size={20} color={muted} />
-                    </ListGroup.ItemSuffix>
-                  </ListGroup.Item>
-                </PressableFeedback.Scale>
-                <PressableFeedback.Ripple />
-              </PressableFeedback>
-            </ListGroup>
-          </GradientCard>
-        </Section>
-      </View>
+      <CopyRequestCard
+        title="RECEIVE ADDRESS"
+        icon="mingcute:lightning-fill"
+        display={npcAddress.truncate(6)}
+        muted={muted}
+        onPress={async () => {
+          await EnhancedHaptics.copyHaptic();
+          await actions.copy.execute({ source: 'npc' });
+        }}
+      />
 
       <HistoryEntryRefresh
         mintInfo={mintInfo}

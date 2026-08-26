@@ -17,7 +17,8 @@ import { withAlpha } from '@/shared/lib/color';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
-import { ListGroup, PressableFeedback } from 'heroui-native';
+import { ListGroup } from 'heroui-native';
+import { CopyRequestRow } from '@/shared/ui/composed/CopyRequestCard';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { nostrLog, useLifecycleLogger } from '@/shared/lib/logger';
 
@@ -157,30 +158,22 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
       <Section title={config.sectionTitle}>
         <GradientCard>
           <ListGroup variant="transparent">
-            <PressableFeedback animation={false} onPress={handleCopy}>
-              <PressableFeedback.Scale>
-                <ListGroup.Item disabled>
-                  <ListGroup.ItemPrefix>
-                    {config.iconCurrency ? (
-                      <CurrencyIcon
-                        colors={[withAlpha(foreground, 0.4)]}
-                        width={20}
-                        currency={config.iconCurrency}
-                      />
-                    ) : config.iconName ? (
-                      <Icon name={config.iconName} size={20} color={withAlpha(foreground, 0.4)} />
-                    ) : undefined}
-                  </ListGroup.ItemPrefix>
-                  <ListGroup.ItemContent>
-                    <ListGroup.ItemTitle>{truncateMiddle(activeData, 10)}</ListGroup.ItemTitle>
-                  </ListGroup.ItemContent>
-                  <ListGroup.ItemSuffix>
-                    <Icon name="lets-icons:copy" size={20} color={withAlpha(foreground, 0.4)} />
-                  </ListGroup.ItemSuffix>
-                </ListGroup.Item>
-              </PressableFeedback.Scale>
-              <PressableFeedback.Ripple />
-            </PressableFeedback>
+            <CopyRequestRow
+              icon={
+                config.iconCurrency ? (
+                  <CurrencyIcon
+                    colors={[withAlpha(foreground, 0.4)]}
+                    width={20}
+                    currency={config.iconCurrency}
+                  />
+                ) : config.iconName ? (
+                  <Icon name={config.iconName} size={20} color={withAlpha(foreground, 0.4)} />
+                ) : undefined
+              }
+              display={truncateMiddle(activeData, 10)}
+              muted={withAlpha(foreground, 0.4)}
+              onPress={handleCopy}
+            />
           </ListGroup>
         </GradientCard>
       </Section>

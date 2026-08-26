@@ -10,15 +10,13 @@
 import React, { memo, useCallback, useRef, useState } from 'react';
 
 import { router } from 'expo-router';
-import { ListGroup, PressableFeedback } from 'heroui-native';
 
 import { getMintMethodCapability, buildBip321OnchainUri, type WalletContext } from 'wallet';
 import { useReusableMintQuote, type UseScreenActionsResult } from 'wallet/react';
 import { paymentLog } from '@/shared/lib/logger';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { CopyRequestCard } from '@/shared/ui/composed/CopyRequestCard';
 import { ReceiveRailPlaceholder } from '@/features/receive/components/ReceiveRailPlaceholder';
-import { Section } from '@/shared/ui/composed/Section';
 import { HistoryEntryRefresh } from '@/features/transactions';
 import { ActionSegmentsCard } from '@/shared/ui/composed/ActionSegmentsCard';
 import { useReceiveMethodMint } from '@/features/receive/hooks/useReceiveMethodMint';
@@ -347,30 +345,13 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
           />
         </View>
       )}
-      <View className="mx-4">
-        <Section title={copy.sectionTitle}>
-          <GradientCard>
-            <ListGroup variant="transparent">
-              <PressableFeedback animation={false} onPress={handleCopy}>
-                <PressableFeedback.Scale>
-                  <ListGroup.Item disabled>
-                    <ListGroup.ItemPrefix>
-                      <Icon name={copy.icon} size={20} color={muted} />
-                    </ListGroup.ItemPrefix>
-                    <ListGroup.ItemContent>
-                      <ListGroup.ItemTitle>{truncateMiddle(request, 10)}</ListGroup.ItemTitle>
-                    </ListGroup.ItemContent>
-                    <ListGroup.ItemSuffix>
-                      <Icon name="lets-icons:copy" size={20} color={muted} />
-                    </ListGroup.ItemSuffix>
-                  </ListGroup.Item>
-                </PressableFeedback.Scale>
-                <PressableFeedback.Ripple />
-              </PressableFeedback>
-            </ListGroup>
-          </GradientCard>
-        </Section>
-      </View>
+      <CopyRequestCard
+        title={copy.sectionTitle}
+        icon={copy.icon}
+        display={truncateMiddle(request, 10)}
+        muted={muted}
+        onPress={handleCopy}
+      />
       <HistoryEntryRefresh
         mintInfo={methodMintInfo}
         historyEntry={{ type: 'receive', mintUrl: methodMint }}

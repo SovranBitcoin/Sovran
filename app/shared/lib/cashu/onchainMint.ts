@@ -199,14 +199,22 @@ export function getMintQuotePaymentValue(entry: HistoryEntry | null | undefined)
   return value;
 }
 
-function getOnchainRequiredConfirmationsFromMintInfo(
+/**
+ * Confirmation count published on a mint's onchain method settings
+ * (`nuts[nutKey].methods[].options.confirmations`) for the given unit —
+ * NUT-04 (mint/receive) and NUT-05 (melt/send) publish the same shape.
+ * Callers log their own event with the nut-specific source string.
+ */
+export function getOnchainMethodConfirmations(
   mintInfo: unknown,
-  unit = 'sat'
+  nutKey: '4' | '5',
+  unit: string
 ): number | null {
   const info = mintInfo && typeof mintInfo === 'object' ? (mintInfo as EntryRecord) : null;
   const nuts = info?.nuts && typeof info.nuts === 'object' ? (info.nuts as EntryRecord) : null;
-  const nut04 = nuts?.['4'] && typeof nuts['4'] === 'object' ? (nuts['4'] as EntryRecord) : null;
-  const methods = Array.isArray(nut04?.methods) ? nut04.methods : [];
+  const nut =
+    nuts?.[nutKey] && typeof nuts[nutKey] === 'object' ? (nuts[nutKey] as EntryRecord) : null;
+  const methods = Array.isArray(nut?.methods) ? nut.methods : [];
 
   for (const method of methods) {
     if (!method || typeof method !== 'object') continue;
@@ -219,17 +227,25 @@ function getOnchainRequiredConfirmationsFromMintInfo(
         ? (methodRecord.options as EntryRecord)
         : null;
     const confirmations = getPositiveInteger(options?.confirmations);
-    if (confirmations != null) {
-      cashuLog.debug('onchain.mint.required_confirmations.mint_info', {
-        unit,
-        source: 'nut04.method.options.confirmations',
-        confirmations,
-      });
-      return confirmations;
-    }
+    if (confirmations != null) return confirmations;
   }
 
   return null;
+}
+
+function getOnchainRequiredConfirmationsFromMintInfo(
+  mintInfo: unknown,
+  unit = 'sat'
+): number | null {
+  const confirmations = getOnchainMethodConfirmations(mintInfo, '4', unit);
+  if (confirmations != null) {
+    cashuLog.debug('onchain.mint.required_confirmations.mint_info', {
+      unit,
+      source: 'nut04.method.options.confirmations',
+      confirmations,
+    });
+  }
+  return confirmations;
 }
 
 export function getOnchainRequiredConfirmations(mintInfo: unknown, unit = 'sat'): number {

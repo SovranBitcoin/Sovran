@@ -165,18 +165,33 @@ export function estimateTurnCostSatsFromPricing(
   pricing: LineupPricing | null,
   imageCount = 0
 ): number | null {
+  return satsFromPricing(pricing, imageCount, TYPICAL_COMPLETION_TOKENS, 1 / 100);
+}
+
+/**
+ * Shared per-turn cost arithmetic for the estimate/reserve pair above and
+ * below — they price the same request shape and differ only in how many
+ * completion tokens they budget and how much of `max_cost` the fallback
+ * charges (see each wrapper's doc for the why).
+ */
+function satsFromPricing(
+  pricing: LineupPricing | null,
+  imageCount: number,
+  completionTokens: number,
+  maxCostScale: number
+): number | null {
   if (!pricing) return null;
   const imageFee = typeof pricing.image === 'number' ? pricing.image * imageCount : 0;
   if (pricing.prompt != null && pricing.completion != null) {
     return (
       (pricing.request ?? 0) +
       pricing.prompt * TYPICAL_PROMPT_TOKENS +
-      pricing.completion * TYPICAL_COMPLETION_TOKENS +
+      pricing.completion * completionTokens +
       imageFee
     );
   }
   if (pricing.max_cost != null) {
-    return pricing.max_cost / 100 + imageFee;
+    return pricing.max_cost * maxCostScale + imageFee;
   }
   return null;
 }
@@ -216,18 +231,7 @@ export function requiredReserveSatsFromPricing(
   pricing: LineupPricing | null,
   imageCount = 0
 ): number | null {
-  if (!pricing) return null;
-  const imageFee = typeof pricing.image === 'number' ? pricing.image * imageCount : 0;
-  if (pricing.prompt != null && pricing.completion != null) {
-    return (
-      (pricing.request ?? 0) +
-      pricing.prompt * TYPICAL_PROMPT_TOKENS +
-      pricing.completion * ROUTSTR_MAX_COMPLETION_TOKENS +
-      imageFee
-    );
-  }
-  if (pricing.max_cost != null) return pricing.max_cost + imageFee;
-  return null;
+  return satsFromPricing(pricing, imageCount, ROUTSTR_MAX_COMPLETION_TOKENS, 1);
 }
 
 /**

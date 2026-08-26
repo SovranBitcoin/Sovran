@@ -3,6 +3,7 @@ import type { HistoryEntry } from '@cashu/coco-core';
 import { entryStateRank, isTerminalFailureState } from 'wallet';
 
 import { cashuLog } from '@/shared/lib/logger';
+import { getOnchainMethodConfirmations } from '@/shared/lib/cashu/onchainMint';
 
 type EntryRecord = Record<string, unknown>;
 
@@ -262,40 +263,22 @@ export function isOnchainMeltSettled(state: string | null | undefined): boolean 
 /** Default target confirmations for an onchain SEND timeline. */
 const DEFAULT_ONCHAIN_MELT_CONFIRMATIONS = 6;
 
-function getPositiveInteger(value: unknown): number | null {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : null;
-}
-
 /**
  * Confirmations to display as the target for an onchain SEND. Mints publish an
  * onchain confirmation count on their NUT-05 (melt) onchain method settings
  * (`nuts['5'].methods[].options.confirmations`) — rarely present today, so this
  * falls back to a sensible default of 6. Mirrors the receive-side
- * `getOnchainRequiredConfirmations` (which reads NUT-04).
+ * `getOnchainRequiredConfirmations` (which reads NUT-04 via the same walker).
  */
 export function getOnchainMeltRequiredConfirmations(mintInfo: unknown, unit = 'sat'): number {
-  const info = mintInfo && typeof mintInfo === 'object' ? (mintInfo as EntryRecord) : null;
-  const nuts = info?.nuts && typeof info.nuts === 'object' ? (info.nuts as EntryRecord) : null;
-  const nut05 = nuts?.['5'] && typeof nuts['5'] === 'object' ? (nuts['5'] as EntryRecord) : null;
-  const methods = Array.isArray(nut05?.methods) ? nut05.methods : [];
-  for (const method of methods) {
-    if (!method || typeof method !== 'object') continue;
-    const methodRecord = method as EntryRecord;
-    if (methodRecord.method !== 'onchain') continue;
-    if (typeof methodRecord.unit === 'string' && methodRecord.unit.toLowerCase() !== unit) continue;
-    const options =
-      methodRecord.options && typeof methodRecord.options === 'object'
-        ? (methodRecord.options as EntryRecord)
-        : null;
-    const confirmations = getPositiveInteger(options?.confirmations);
-    if (confirmations != null) {
-      cashuLog.debug('onchain.melt.required_confirmations.result', {
-        unit,
-        source: 'nut05.method.options.confirmations',
-        confirmations,
-      });
-      return confirmations;
-    }
+  const confirmations = getOnchainMethodConfirmations(mintInfo, '5', unit);
+  if (confirmations != null) {
+    cashuLog.debug('onchain.melt.required_confirmations.result', {
+      unit,
+      source: 'nut05.method.options.confirmations',
+      confirmations,
+    });
+    return confirmations;
   }
   cashuLog.debug('onchain.melt.required_confirmations.result', {
     unit,

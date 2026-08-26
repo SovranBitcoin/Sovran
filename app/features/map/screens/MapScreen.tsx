@@ -219,6 +219,21 @@ export function MapScreen() {
     );
   }
 
+  // Identical prop bag for both platform map views (the ref is the only
+  // per-platform piece — see the comment at the render site).
+  const sharedMapViewProps = {
+    style: StyleSheet.absoluteFill,
+    cameraPosition: {
+      coordinates: { latitude: DEFAULT_LAT, longitude: DEFAULT_LON },
+      zoom: DEFAULT_ZOOM,
+    },
+    properties: { isMyLocationEnabled: false },
+    uiSettings: { compassEnabled: true, myLocationButtonEnabled: false },
+    markers,
+    onMarkerClick: handleMarkerClick,
+    onCameraMove: mapCamera.handleCameraChange,
+  };
+
   return (
     <Log name="MapScreen" style={styles.container}>
       {/* Show a placeholder background immediately while map loads */}
@@ -233,22 +248,14 @@ export function MapScreen() {
 
       {/* Render map only after initial transition. Platform-branched so the
           ref typechecks against each view's concrete type instead of forcing
-          an `any` cast at the union seam. */}
+          an `any` cast at the union seam; everything but the element type is
+          the shared prop bag below. */}
       {isMapReady && Platform.OS === 'ios' && (
         <AppleMaps.View
           ref={(instance) => {
             mapCamera.mapRef.current = instance;
           }}
-          style={StyleSheet.absoluteFill}
-          cameraPosition={{
-            coordinates: { latitude: DEFAULT_LAT, longitude: DEFAULT_LON },
-            zoom: DEFAULT_ZOOM,
-          }}
-          properties={{ isMyLocationEnabled: false }}
-          uiSettings={{ compassEnabled: true, myLocationButtonEnabled: false }}
-          markers={markers}
-          onMarkerClick={handleMarkerClick}
-          onCameraMove={mapCamera.handleCameraChange}
+          {...sharedMapViewProps}
         />
       )}
       {isMapReady && Platform.OS === 'android' && (
@@ -256,16 +263,7 @@ export function MapScreen() {
           ref={(instance) => {
             mapCamera.mapRef.current = instance;
           }}
-          style={StyleSheet.absoluteFill}
-          cameraPosition={{
-            coordinates: { latitude: DEFAULT_LAT, longitude: DEFAULT_LON },
-            zoom: DEFAULT_ZOOM,
-          }}
-          properties={{ isMyLocationEnabled: false }}
-          uiSettings={{ compassEnabled: true, myLocationButtonEnabled: false }}
-          markers={markers}
-          onMarkerClick={handleMarkerClick}
-          onCameraMove={mapCamera.handleCameraChange}
+          {...sharedMapViewProps}
         />
       )}
 

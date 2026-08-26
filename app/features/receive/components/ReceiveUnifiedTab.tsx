@@ -13,16 +13,14 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ListGroup, PressableFeedback } from 'heroui-native';
 import { setStringAsync } from 'expo-clipboard';
 
 import { buildUnifiedBip321Uri, getMintMethodCapability, type WalletContext } from 'wallet';
 import { useReusableMintQuote, type UseStandingPaymentRequestResult } from 'wallet/react';
 import { paymentLog } from '@/shared/lib/logger';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { CopyRequestCard } from '@/shared/ui/composed/CopyRequestCard';
 import { ReceiveRailPlaceholder } from '@/features/receive/components/ReceiveRailPlaceholder';
-import { Section } from '@/shared/ui/composed/Section';
 import { useReceiveMethodMint } from '@/features/receive/hooks/useReceiveMethodMint';
 import type { OnReceiveQrPayload } from '@/features/receive/lib/qrPayload';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
@@ -189,30 +187,13 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
   return (
     <>
       <PaymentInfo data={uri} copyTarget="bip321" unit={unit} />
-      <View className="mx-4">
-        <Section title="BIP-321 URI">
-          <GradientCard>
-            <ListGroup variant="transparent">
-              <PressableFeedback animation={false} onPress={handleCopy}>
-                <PressableFeedback.Scale>
-                  <ListGroup.Item disabled>
-                    <ListGroup.ItemPrefix>
-                      <Icon name="stash:qr-code" size={20} color={muted} />
-                    </ListGroup.ItemPrefix>
-                    <ListGroup.ItemContent>
-                      <ListGroup.ItemTitle>{truncateMiddle(uri, 10)}</ListGroup.ItemTitle>
-                    </ListGroup.ItemContent>
-                    <ListGroup.ItemSuffix>
-                      <Icon name="lets-icons:copy" size={20} color={muted} />
-                    </ListGroup.ItemSuffix>
-                  </ListGroup.Item>
-                </PressableFeedback.Scale>
-                <PressableFeedback.Ripple />
-              </PressableFeedback>
-            </ListGroup>
-          </GradientCard>
-        </Section>
-      </View>
+      <CopyRequestCard
+        title="BIP-321 URI"
+        icon="stash:qr-code"
+        display={truncateMiddle(uri, 10)}
+        muted={muted}
+        onPress={handleCopy}
+      />
     </>
   );
 });
