@@ -13,7 +13,7 @@ import { Badge } from '@/shared/ui/primitives/Badge';
 import Icon from 'assets/icons';
 import { useManager } from '@cashu/coco-react';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
-import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
+import { cashuP2pkPubkeyFromNostrHex, nostrPubkeyHexFromCashuP2pk } from '@/shared/lib/protocolIds';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { actionMenuPopup, copyPopup, staticPopup } from '@/shared/lib/popup';
 import { truncateMiddle } from '@/shared/lib/strings';
@@ -60,7 +60,7 @@ const CurrentKeyItem: React.FC<{
   const isDerived = keypair.derivationIndex !== undefined;
 
   const npubValue = !isDerived
-    ? nip19.npubEncode(keypair.publicKeyHex.replace(/^02/, ''))
+    ? nip19.npubEncode(nostrPubkeyHexFromCashuP2pk(keypair.publicKeyHex))
     : undefined;
 
   const isNpubTab = selectedTab === 'NPUB' && !isDerived;
@@ -168,12 +168,12 @@ const KeyItem: React.FC<{
   const isDerived = keypair.derivationIndex !== undefined;
 
   const displayKey = !isDerived
-    ? nip19.npubEncode(keypair.publicKeyHex.replace(/^02/, ''))
+    ? nip19.npubEncode(nostrPubkeyHexFromCashuP2pk(keypair.publicKeyHex))
     : keypair.publicKeyHex;
 
   const handleShowQR = () => {
     const npubValue = !isDerived
-      ? nip19.npubEncode(keypair.publicKeyHex.replace(/^02/, ''))
+      ? nip19.npubEncode(nostrPubkeyHexFromCashuP2pk(keypair.publicKeyHex))
       : undefined;
 
     router.navigate({

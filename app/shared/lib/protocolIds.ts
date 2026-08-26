@@ -49,6 +49,21 @@ export function asNostrPubkeyHex(value: string): NostrPubkeyHex {
   return value as NostrPubkeyHex;
 }
 
+/**
+ * The reverse bridge: 33-byte compressed P2PK key → x-only nostr hex. Drops
+ * the parity prefix — `02` OR `03`, since both encode the same x coordinate
+ * and NIP-01 carries only x. Inverse of `cashuP2pkPubkeyFromNostrHex`; the
+ * ONLY legal Cashu→Nostr key cast. (The inline `.replace(/^02/, '')` idiom
+ * this replaces was a silent no-op for legitimate `03` SEC1 keys, feeding a
+ * 66-char string into npubEncode.)
+ */
+export function nostrPubkeyHexFromCashuP2pk(value: string): NostrPubkeyHex {
+  if (!CASHU_P2PK_PUBKEY_RE.test(value)) {
+    throw new Error(`not a compressed P2PK pubkey (len ${value.length})`);
+  }
+  return value.slice(2).toLowerCase() as NostrPubkeyHex;
+}
+
 /** NIP-01 event id: sha256 of the serialized event — 64 hex, shape-identical
  * to a pubkey but a DIFFERENT thing; never validate one as the other's type. */
 export type NostrEventId = Brand<string, 'nostr.event.id'>;

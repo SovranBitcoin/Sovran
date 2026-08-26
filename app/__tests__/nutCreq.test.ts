@@ -2,7 +2,11 @@
  * @jest-environment node
  */
 
-import { cashuP2pkPubkeyFromNostrHex, type CashuP2pkPubkey } from '@/shared/lib/protocolIds';
+import {
+  cashuP2pkPubkeyFromNostrHex,
+  nostrPubkeyHexFromCashuP2pk,
+  type CashuP2pkPubkey,
+} from '@/shared/lib/protocolIds';
 import { buildStandingCreq, lockableMintsFromCreq, parseCreq } from '@/shared/lib/nutCreq';
 
 const NOSTR_HEX = 'ab'.repeat(32);
@@ -40,6 +44,16 @@ describe('nutCreq standing payment request', () => {
     expect(PUBKEY_33).toBe(`02${NOSTR_HEX}`);
     expect(() => cashuP2pkPubkeyFromNostrHex('not-hex')).toThrow();
     expect(() => cashuP2pkPubkeyFromNostrHex(`02${NOSTR_HEX}`)).toThrow(); // already 33-byte
+  });
+
+  it('nostrPubkeyHexFromCashuP2pk strips BOTH parity prefixes (inverse of the lift)', () => {
+    expect(nostrPubkeyHexFromCashuP2pk(PUBKEY_33)).toBe(NOSTR_HEX);
+    // 03 keys share the x coordinate — the old `.replace(/^02/,'')` idiom
+    // silently no-opped here and fed 66 chars into npubEncode.
+    expect(nostrPubkeyHexFromCashuP2pk(`03${NOSTR_HEX}`)).toBe(NOSTR_HEX);
+    expect(nostrPubkeyHexFromCashuP2pk(`02${NOSTR_HEX.toUpperCase()}`)).toBe(NOSTR_HEX);
+    expect(() => nostrPubkeyHexFromCashuP2pk(NOSTR_HEX)).toThrow(); // x-only input
+    expect(() => nostrPubkeyHexFromCashuP2pk(`04${NOSTR_HEX}`)).toThrow(); // uncompressed prefix
   });
 
   it('caps the advertised mint list to five', () => {
