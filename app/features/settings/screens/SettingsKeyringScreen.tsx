@@ -13,6 +13,7 @@ import { Badge } from '@/shared/ui/primitives/Badge';
 import Icon from 'assets/icons';
 import { useManager } from '@cashu/coco-react';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
+import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/ids';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { actionMenuPopup, copyPopup, staticPopup } from '@/shared/lib/popup';
 import { truncateMiddle } from '@/shared/lib/strings';
@@ -342,7 +343,7 @@ async function importCurrentNsecImpl(
 
   try {
     io.setIsImportingCurrentNsec(true);
-    const publicKeyHex = `02${getPublicKey(nostrKeys.privateKey)}`;
+    const publicKeyHex = cashuP2pkPubkeyFromNostrHex(getPublicKey(nostrKeys.privateKey));
     const existingKeypairs = await manager.keyring.getAllKeyPairs();
 
     if (existingKeypairs.some((keypair) => keypair.publicKeyHex === publicKeyHex)) {

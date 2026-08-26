@@ -1,12 +1,13 @@
 import type { BLEPeer } from 'bitchat-module';
 
 import { peerAvatarState, peerDisplayName, toLayoutPeer } from '@/features/nearPay/lib/peerProfile';
+import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/ids';
 import { buildStandingCreq } from '@/shared/lib/nutCreq';
 
 const NOSTR_HEX = 'ab'.repeat(32);
 const CREQ = buildStandingCreq({
   mints: ['https://mint.example'],
-  pubkey33: `02${NOSTR_HEX}`,
+  pubkey33: cashuP2pkPubkeyFromNostrHex(NOSTR_HEX),
 })!;
 
 function blePeer(overrides: Partial<BLEPeer> = {}): BLEPeer {

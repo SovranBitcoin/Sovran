@@ -16,6 +16,7 @@ import {
 } from '@/shared/lib/nostr/secureStorage';
 import { NPCPlugin, type NPCAccountApi, type Signer as NpcSigner } from 'coco-cashu-plugin-npc';
 import { createPaymentRequestNostrTransportPlugin } from '@/shared/lib/cashu/paymentRequestNostrTransport';
+import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/ids';
 import {
   NPC_BASE_URL,
   NPC_SYNC_INTERVAL_MS,
@@ -414,7 +415,9 @@ export class CocoManager {
         // in-memory for this manager session and scrubs legacy rows.
         const ephemeralKeyringPubkeys = new Set<string>();
         if (p2pkImportSecretKey) {
-          ephemeralKeyringPubkeys.add(`02${getPublicKey(new Uint8Array(p2pkImportSecretKey))}`);
+          ephemeralKeyringPubkeys.add(
+            cashuP2pkPubkeyFromNostrHex(getPublicKey(new Uint8Array(p2pkImportSecretKey)))
+          );
         }
         cashuLog.info('cashu.manager.repositories.create', {
           dbName,

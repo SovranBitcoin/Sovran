@@ -1,0 +1,42 @@
+/**
+ * Branded identifier types for the protocol domains (Cashu / Nostr), plus the
+ * ONE sanctioned cross-domain cast. Shape-identical hex strings (a Nostr
+ * x-only pubkey, a P2PK lock key, an event id) are different types here, so
+ * cross-domain mixups fail to compile instead of failing at a mint.
+ *
+ * Brands are compile-time only — no runtime shape, no persisted-schema impact.
+ * Dictionary + spec citations: skills/sovran-deslop/references/terminology.md.
+ */
+
+declare const brand: unique symbol;
+type Brand<T, B extends string> = T & { readonly [brand]: B };
+
+/** 32-byte x-only Schnorr pubkey, lowercase hex (NIP-01). 64 hex chars. */
+export type NostrPubkeyHex = Brand<string, 'nostr.pubkey.hex'>;
+
+/**
+ * 33-byte compressed secp256k1 P2PK lock key, hex (NUT-11: "Public keys MUST
+ * use the compressed Secp256k1 public key format"). 66 hex chars, `02`/`03`
+ * prefix. Sovran identity locks are always the `02` form (x-only lift), but a
+ * true SEC1-compressed key from another wallet can legitimately be `03`.
+ */
+export type CashuP2pkPubkey = Brand<string, 'cashu.p2pk.pubkey'>;
+
+export const NOSTR_PUBKEY_HEX_RE = /^[0-9a-f]{64}$/;
+export const CASHU_P2PK_PUBKEY_RE = /^0[23][0-9a-f]{64}$/i;
+
+/**
+ * The only legal Nostr→Cashu key cast: lift a BIP-340 x-only pubkey to the
+ * even-Y compressed point (`02` + x). This is the identity-lock form Nut Drop
+ * and P2PK receives compare against — every `'02' + pubkey` template in the
+ * app must route through here so the invariant has one owner.
+ *
+ * Throws on malformed input: callers hold keys produced by nostr-tools, so a
+ * bad shape is a programmer error, not a data condition.
+ */
+export function cashuP2pkPubkeyFromNostrHex(nostrPubkeyHex: string): CashuP2pkPubkey {
+  if (!NOSTR_PUBKEY_HEX_RE.test(nostrPubkeyHex)) {
+    throw new Error(`not a nostr x-only pubkey hex (len ${nostrPubkeyHex.length})`);
+  }
+  return `02${nostrPubkeyHex}` as CashuP2pkPubkey;
+}

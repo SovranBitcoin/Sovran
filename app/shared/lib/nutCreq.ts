@@ -1,6 +1,7 @@
 import { PaymentRequest, type NUT10Option } from '@cashu/cashu-ts';
 import { decodePaymentRequestInfo, lockableMintsFromRequest } from 'wallet';
 
+import { CASHU_P2PK_PUBKEY_RE, type CashuP2pkPubkey } from '@/shared/lib/ids';
 import { cashuLog } from '@/shared/lib/logger';
 
 /**
@@ -19,26 +20,30 @@ import { cashuLog } from '@/shared/lib/logger';
 
 /** Cap the advertised mint list so the eager-favorite stays a sane size. */
 const MAX_ADVERTISED_MINTS = 5;
-const P2PK_PUBKEY_RE = /^02[0-9a-f]{64}$/i;
 
 /**
- * Build our standing `creq` from the mints we accept + our P2PK key
- * (`02`-prefixed x-only Nostr key). Returns null if we have no mint or the key
- * is malformed (→ caller falls back to no creq, i.e. not advertised).
+ * Build our standing `creq` from the mints we accept + our P2PK key (branded —
+ * produced by `cashuP2pkPubkeyFromNostrHex`, the one owner of the `02`+x-only
+ * lift). Returns null if we have no mint or the key is malformed (→ caller
+ * falls back to no creq, i.e. not advertised). The shape re-check here accepts
+ * the general NUT-11 `02`/`03` compressed form as defense in depth.
  */
-export function buildStandingCreq(params: { mints: string[]; pubkey33: string }): string | null {
+export function buildStandingCreq(params: {
+  mints: string[];
+  pubkey33: CashuP2pkPubkey;
+}): string | null {
   const mints = Array.from(new Set(params.mints.filter(Boolean))).slice(0, MAX_ADVERTISED_MINTS);
   const base = {
     inputMintCount: params.mints.length,
     advertisedMintCount: mints.length,
     pubkeyLength: params.pubkey33.length,
-    pubkeyValid: P2PK_PUBKEY_RE.test(params.pubkey33),
+    pubkeyValid: CASHU_P2PK_PUBKEY_RE.test(params.pubkey33),
   };
   if (mints.length === 0) {
     cashuLog.info('cashu.creq.build.skipped', { ...base, reason: 'no-mints' });
     return null;
   }
-  if (!P2PK_PUBKEY_RE.test(params.pubkey33)) {
+  if (!CASHU_P2PK_PUBKEY_RE.test(params.pubkey33)) {
     cashuLog.warn('cashu.creq.build.skipped', { ...base, reason: 'invalid-p2pk-pubkey' });
     return null;
   }

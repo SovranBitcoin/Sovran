@@ -14,6 +14,7 @@ import { areBLEPeerSnapshotsEquivalent } from '@/features/bitchat/lib/blePeerSna
 import { useBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
 import { useBitchatBLEIdentityMaterial } from '@/features/bitchat/hooks/useBitchatBLEIdentityMaterial';
 import { useBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
+import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/ids';
 import { bitchatLog } from '@/shared/lib/logger';
 import { buildStandingCreq } from '@/shared/lib/nutCreq';
 
@@ -62,7 +63,7 @@ export function useBLEPeers(): UseBLEPeersResult {
     if (!identityMaterial || !mintUrlsKey) return null;
     return buildStandingCreq({
       mints: mintUrlsKey.split(','),
-      pubkey33: `02${identityMaterial.nostrPubkey}`,
+      pubkey33: cashuP2pkPubkeyFromNostrHex(identityMaterial.nostrPubkey),
     });
   }, [mintUrlsKey, identityMaterial]);
   const [peers, setPeers] = useState<BLEPeer[]>(() => getBLEPeers());

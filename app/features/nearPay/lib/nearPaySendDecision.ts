@@ -1,5 +1,6 @@
 import type { BLEPeer } from 'bitchat-module';
 
+import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/ids';
 import { paymentLog } from '@/shared/lib/logger';
 import { creqParseDiagnostics, lockableMintsFromCreq } from '@/shared/lib/nutCreq';
 
@@ -100,7 +101,7 @@ export function planNearPaySend(args: {
   });
   return {
     mode: 'lock',
-    lockPubkey: `02${peer.nostrPubkeyHex}`,
+    lockPubkey: cashuP2pkPubkeyFromNostrHex(peer.nostrPubkeyHex),
     recipientPubkey: peer.nostrPubkeyHex,
     allowedMints: shared,
     identityVerified: false,

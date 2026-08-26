@@ -2,10 +2,11 @@
  * @jest-environment node
  */
 
+import { cashuP2pkPubkeyFromNostrHex, type CashuP2pkPubkey } from '@/shared/lib/ids';
 import { buildStandingCreq, lockableMintsFromCreq, parseCreq } from '@/shared/lib/nutCreq';
 
 const NOSTR_HEX = 'ab'.repeat(32);
-const PUBKEY_33 = `02${NOSTR_HEX}`;
+const PUBKEY_33 = cashuP2pkPubkeyFromNostrHex(NOSTR_HEX);
 const MINTS = ['https://mint.a.example', 'https://mint.b.example'];
 
 describe('nutCreq standing payment request', () => {
@@ -27,10 +28,18 @@ describe('nutCreq standing payment request', () => {
     expect(buildStandingCreq({ mints: [], pubkey33: PUBKEY_33 })).toBeNull();
   });
 
-  it('returns null for a malformed P2PK key', () => {
-    expect(buildStandingCreq({ mints: MINTS, pubkey33: 'not-a-key' })).toBeNull();
-    // x-only (no 02 prefix) is rejected — we always advertise 33-byte keys.
-    expect(buildStandingCreq({ mints: MINTS, pubkey33: NOSTR_HEX })).toBeNull();
+  it('returns null for a malformed P2PK key (defense in depth past the brand)', () => {
+    expect(
+      buildStandingCreq({ mints: MINTS, pubkey33: 'not-a-key' as CashuP2pkPubkey })
+    ).toBeNull();
+    // x-only (no 02/03 prefix) is rejected — we always advertise 33-byte keys.
+    expect(buildStandingCreq({ mints: MINTS, pubkey33: NOSTR_HEX as CashuP2pkPubkey })).toBeNull();
+  });
+
+  it('cashuP2pkPubkeyFromNostrHex owns the 02+x-only lift', () => {
+    expect(PUBKEY_33).toBe(`02${NOSTR_HEX}`);
+    expect(() => cashuP2pkPubkeyFromNostrHex('not-hex')).toThrow();
+    expect(() => cashuP2pkPubkeyFromNostrHex(`02${NOSTR_HEX}`)).toThrow(); // already 33-byte
   });
 
   it('caps the advertised mint list to five', () => {

@@ -3,10 +3,11 @@
  */
 
 import { planNearPaySend } from '@/features/nearPay/lib/nearPaySendDecision';
+import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/ids';
 import { buildStandingCreq } from '@/shared/lib/nutCreq';
 
 const NOSTR_HEX = 'ab'.repeat(32);
-const PUBKEY_33 = `02${NOSTR_HEX}`;
+const PUBKEY_33 = cashuP2pkPubkeyFromNostrHex(NOSTR_HEX);
 const MINT_A = 'https://mint.a.example';
 const MINT_B = 'https://mint.b.example';
 const MINT_C = 'https://mint.c.example';
