@@ -8,7 +8,7 @@
  * full composer (carrying the typed draft + the original post for context).
  * Sticks above the keyboard via `KeyboardStickyView`, like the chat composer.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Keyboard, StyleSheet, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -37,10 +37,9 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useUploadAbortMap } from '@/shared/hooks/useUploadAbortMap';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
-import { uploadMedia } from '@/shared/lib/nostr/media/mediaUpload';
-import { extractOwnedBlobsFromDescriptors } from '@/shared/lib/nostr/media/ownedBlobs';
-import type { MediaDescriptor } from '@/shared/lib/nostr/media/types';
+import { uploadMediaBlocks } from '@/shared/lib/nostr/media/uploadMediaBlocks';
 import { useOwnedMediaStore } from '@/shared/stores/profile/ownedMediaStore';
 import type { ComposerBlock } from '@/features/composer/config/types';
 import { useComposerStore } from '@/features/composer/state/composerStore';
@@ -131,9 +130,7 @@ export function ThreadReplyBar({
   ] as const);
   const ownProfile = useProfileStore((s) => s.getActiveProfile());
   const inputRef = useRef<TextInput>(null);
-  // AbortControllers for in-flight uploads, keyed by media-block id, so removing
-  // a block cancels its upload instead of orphaning a blob on the server.
-  const uploadsRef = useRef<Map<string, AbortController>>(new Map());
+  const uploadsRef = useUploadAbortMap();
   const shift = useShiftLogger('ThreadReplyBar');
 
   const [text, setText] = useState('');
@@ -142,15 +139,6 @@ export function ThreadReplyBar({
   const [posting, setPosting] = useState(false);
   // Synchronous re-entrancy guard for the upload-then-publish post action.
   const postingRef = useRef(false);
-
-  // Abort any upload still running if the bar unmounts mid-post.
-  useEffect(() => {
-    const uploads = uploadsRef.current;
-    return () => {
-      uploads.forEach((controller) => controller.abort());
-      uploads.clear();
-    };
-  }, []);
 
   const replyTarget = useMemo(
     () => (targetEvent ? deriveReplyTarget(targetEvent) : null),
@@ -189,62 +177,21 @@ export function ThreadReplyBar({
     setPosting(true);
 
     // Upload is deferred to here: PUT any media block without a descriptor, then
-    // publish with the resolved descriptors. Abort the reply if any upload fails
-    // so we never post a reply missing one of its images.
+    // publish with the resolved descriptors. The machinery (per-block abort
+    // registration, abort-siblings → allSettled → record-orphans on failure)
+    // is uploadMediaBlocks — shared with PostComposer so the orphan protocol
+    // can't diverge.
     let uploaded: MediaBlock[];
-    // Descriptors that uploaded before any sibling failed — recorded as orphans
-    // if the reply aborts, so the already-uploaded blobs stay deletable.
-    const uploadedDescriptors: MediaDescriptor[] = [];
-    const tasks = mediaBlocks.map(async (block): Promise<MediaBlock> => {
-      if (block.descriptor || !block.localUri) return block;
-      const controller = new AbortController();
-      uploadsRef.current.set(block.id, controller);
-      setMediaBlocks((prev) =>
-        prev.map((b) => (b.id === block.id ? { ...b, uploadProgress: 0 } : b))
-      );
-      const upload = await uploadMedia({
-        ndk,
-        asset: {
-          uri: block.localUri,
-          mimeType: block.mimeType ?? 'image/jpeg',
-          width: block.width,
-          height: block.height,
-        },
-        signal: controller.signal,
-        onProgress: (fraction) =>
-          setMediaBlocks((prev) =>
-            prev.map((b) => (b.id === block.id ? { ...b, uploadProgress: fraction } : b))
-          ),
-      });
-      uploadsRef.current.delete(block.id);
-      if (upload.isErr()) {
-        if (upload.error.type !== 'canceled') {
-          setMediaBlocks((prev) =>
-            prev.map((b) => (b.id === block.id ? { ...b, uploadProgress: undefined } : b))
-          );
-        }
-        throw upload.error;
-      }
-      uploadedDescriptors.push(upload.value);
-      const next: MediaBlock = {
-        ...block,
-        descriptor: upload.value,
-        uploadProgress: undefined,
-      };
-      setMediaBlocks((prev) => prev.map((b) => (b.id === block.id ? next : b)));
-      return next;
-    });
     try {
-      uploaded = await Promise.all(tasks);
+      uploaded = await uploadMediaBlocks({
+        ndk,
+        blocks: mediaBlocks,
+        uploads: uploadsRef.current,
+        patchBlock: (id, patch) =>
+          setMediaBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b))),
+        onOrphans: (orphans) => useOwnedMediaStore.getState().recordBlobs(orphans),
+      });
     } catch {
-      // Abort siblings still in flight, then wait for every task to settle so a
-      // sibling that finished around the failure boundary has pushed its
-      // descriptor before we record orphans.
-      uploadsRef.current.forEach((controller) => controller.abort());
-      uploadsRef.current.clear();
-      await Promise.allSettled(tasks);
-      const orphans = extractOwnedBlobsFromDescriptors(uploadedDescriptors);
-      if (orphans.length > 0) useOwnedMediaStore.getState().recordBlobs(orphans);
       postingRef.current = false;
       setPosting(false);
       return;
@@ -261,7 +208,7 @@ export function ThreadReplyBar({
       inputRef.current?.blur();
       Keyboard.dismiss();
     }
-  }, [ndk, canPost, text, mediaBlocks, replyTarget]);
+  }, [ndk, canPost, text, mediaBlocks, replyTarget, uploadsRef]);
 
   const handleAddMedia = useCallback(async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -288,11 +235,14 @@ export function ThreadReplyBar({
   }, []);
 
   // Cancel any in-flight upload before dropping the block.
-  const handleRemoveMedia = useCallback((id: string) => {
-    uploadsRef.current.get(id)?.abort();
-    uploadsRef.current.delete(id);
-    setMediaBlocks((prev) => prev.filter((b) => b.id !== id));
-  }, []);
+  const handleRemoveMedia = useCallback(
+    (id: string) => {
+      uploadsRef.current.get(id)?.abort();
+      uploadsRef.current.delete(id);
+      setMediaBlocks((prev) => prev.filter((b) => b.id !== id));
+    },
+    [uploadsRef]
+  );
 
   // Hand the current draft + reply context to the full composer.
   const expandToFull = useCallback(
