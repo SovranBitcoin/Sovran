@@ -92,6 +92,19 @@ function pendingZapPostContext(event: FeedEvent, target: ZapTarget, baseSats: nu
   };
 }
 
+/** Melt-target + recipient fields shared by the preset and custom flow starts. */
+function zapRecipientFields(event: FeedEvent, target: ZapTarget) {
+  return {
+    meltTarget: target.meltTarget,
+    recipientPubkey: event.pubkey,
+    recipientProfile: {
+      displayName: target.displayName,
+      avatarUrl: target.avatarUrl ?? null,
+      nip05: target.nip05 ?? null,
+    },
+  };
+}
+
 function showZapUnavailable(): void {
   paramPopup('action-unavailable', {
     title: "Can't zap",
@@ -139,13 +152,7 @@ export function useZap() {
         await machine.enterAmount({ value: preset.sats, unit: 'sat' }, mintUrl, {
           destination: 'meltQuote',
           meltQuoteMethod: 'bolt11',
-          meltTarget: target.meltTarget,
-          recipientPubkey: event.pubkey,
-          recipientProfile: {
-            displayName: target.displayName,
-            avatarUrl: target.avatarUrl ?? null,
-            nip05: target.nip05 ?? null,
-          },
+          ...zapRecipientFields(event, target),
         });
       } catch (error) {
         paymentLog.warn('feed.zap.preset_failed_to_start', {
@@ -179,13 +186,7 @@ export function useZap() {
       try {
         await machine.startSendEcash({
           reset: true,
-          meltTarget: target.meltTarget,
-          recipientPubkey: event.pubkey,
-          recipientProfile: {
-            displayName: target.displayName,
-            avatarUrl: target.avatarUrl ?? null,
-            nip05: target.nip05 ?? null,
-          },
+          ...zapRecipientFields(event, target),
         });
       } catch (error) {
         paymentLog.warn('feed.zap.custom_failed_to_start', {

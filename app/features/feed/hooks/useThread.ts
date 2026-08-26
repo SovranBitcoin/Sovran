@@ -236,39 +236,42 @@ export function useThread(eventId: string): UseThreadResult {
   // The load/audit bodies live in module scope (`loadMoreRepliesImpl`,
   // `fetchThreadImpl`, `runSpamAuditImpl`) — their try/finally and
   // conditionals-inside-try would make the React Compiler skip this whole hook.
-  const loadMoreReplies = useCallback(
-    () =>
-      loadMoreRepliesImpl({
-        eventId,
-        viewerPubkey,
-        replySort,
-        profilesRef,
-        metricsRef,
-        quotedEventsRef,
-        threadSeedRef,
-        replyOrderRef,
-        replyOffsetRef,
-        hasMoreRepliesRef,
-        knownReplyIdsRef,
-        spamAuditStartedRef,
-        allSortedReplyIdsRef,
-        serverHasMoreRef,
-        isInitialFetchingRef,
-        isLoadingMoreRepliesRef,
-        requestGenerationRef,
-        loadMoreAbortControllerRef,
-        setSpamReplies,
-        setIsLoading,
-        setIsFetching,
-        setIsLoadingMoreReplies,
-        setHasMoreReplies,
-        setError,
-        setDataVersion,
-        applyThreadResult,
-        rebuildRepliesFromOrder,
-      }),
+  // One ctx serves both entry points. Refs and setters are stable, so its
+  // identity — and both consumers' refire semantics — keys on the five deps.
+  const loadCtx = useMemo<ThreadLoadCtx>(
+    () => ({
+      eventId,
+      viewerPubkey,
+      replySort,
+      profilesRef,
+      metricsRef,
+      quotedEventsRef,
+      threadSeedRef,
+      replyOrderRef,
+      replyOffsetRef,
+      hasMoreRepliesRef,
+      knownReplyIdsRef,
+      spamAuditStartedRef,
+      allSortedReplyIdsRef,
+      serverHasMoreRef,
+      isInitialFetchingRef,
+      isLoadingMoreRepliesRef,
+      requestGenerationRef,
+      loadMoreAbortControllerRef,
+      setSpamReplies,
+      setIsLoading,
+      setIsFetching,
+      setIsLoadingMoreReplies,
+      setHasMoreReplies,
+      setError,
+      setDataVersion,
+      applyThreadResult,
+      rebuildRepliesFromOrder,
+    }),
     [applyThreadResult, eventId, rebuildRepliesFromOrder, replySort, viewerPubkey]
   );
+
+  const loadMoreReplies = useCallback(() => loadMoreRepliesImpl(loadCtx), [loadCtx]);
 
   useEffect(() => {
     if (!eventId) return;
@@ -342,38 +345,7 @@ export function useThread(eventId: string): UseThreadResult {
     });
 
     const task = InteractionManager.runAfterInteractions(() => {
-      void fetchThreadImpl(
-        {
-          eventId,
-          viewerPubkey,
-          replySort,
-          profilesRef,
-          metricsRef,
-          quotedEventsRef,
-          threadSeedRef,
-          replyOrderRef,
-          replyOffsetRef,
-          hasMoreRepliesRef,
-          knownReplyIdsRef,
-          spamAuditStartedRef,
-          allSortedReplyIdsRef,
-          serverHasMoreRef,
-          isInitialFetchingRef,
-          isLoadingMoreRepliesRef,
-          requestGenerationRef,
-          loadMoreAbortControllerRef,
-          setSpamReplies,
-          setIsLoading,
-          setIsFetching,
-          setIsLoadingMoreReplies,
-          setHasMoreReplies,
-          setError,
-          setDataVersion,
-          applyThreadResult,
-          rebuildRepliesFromOrder,
-        },
-        { seed, generation, controller, isCancelled: () => cancelled }
-      );
+      void fetchThreadImpl(loadCtx, { seed, generation, controller, isCancelled: () => cancelled });
     });
 
     return () => {
@@ -386,7 +358,7 @@ export function useThread(eventId: string): UseThreadResult {
       isLoadingMoreRepliesRef.current = false;
       task.cancel();
     };
-  }, [applyThreadResult, eventId, rebuildRepliesFromOrder, replySort, viewerPubkey]);
+  }, [eventId, loadCtx, replySort, viewerPubkey]);
 
   // Final composition: ignore filters over replies AND the spam bucket, and the
   // "Might be spam" section appears only once the primary list is exhausted.

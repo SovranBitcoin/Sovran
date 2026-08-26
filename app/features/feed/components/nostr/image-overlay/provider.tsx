@@ -489,44 +489,69 @@ export function ImageOverlayProvider({
     ]
   );
 
-  const open = useCallback(
-    (layout: ImageOverlayLayout) => {
+  /**
+   * Shared open/openReplace session bootstrap: bump the session, resolve the
+   * media set, publish the JS-side state, and seed the layout/panel shared
+   * values. When the layout carries a post we start with the sheet closed
+   * (image centered in the viewport, absolute overlay on top); callers differ
+   * only in the fallback aspect ratio and in what they animate afterwards.
+   */
+  const beginOverlaySession = useCallback(
+    (layout: ImageOverlayReplaceLayout, fallbackAspectRatio: number) => {
       openSessionIdRef.current += 1;
       safeTopSv.value = safeTop;
       safeBottomSv.value = safeBottom;
       const hasPanel = !!layout.post;
-      // When hasPanel we start with sheet closed: image centered in viewport (below notch to bottom); absolute overlay sits on top.
       const availableHeight = imageViewportHeight;
-
-      const {
-        urls,
-        mediaTypes: types,
-        initialIndex,
-        aspectRatio,
-        expandedWidth: expW,
-        expandedHeight: expH,
-        // Fall back to the measured thumbnail aspect so the overlay image rect
-        // matches the feed image and the shared-element close lands on it.
-      } = resolveOverlayMedia(layout, screenWidth, availableHeight, layout.width / layout.height);
-      const imageAreaCenterY = safeTop + availableHeight / 2;
-      setActiveUrls(urls);
-      setActiveMediaTypes(types);
-      setActiveIndexState(initialIndex);
-      setActiveAspectRatio(aspectRatio);
+      const media = resolveOverlayMedia(layout, screenWidth, availableHeight, fallbackAspectRatio);
+      setActiveUrls(media.urls);
+      setActiveMediaTypes(media.mediaTypes);
+      setActiveIndexState(media.initialIndex);
+      setActiveAspectRatio(media.aspectRatio);
       setActiveOverlayPost(layout.post ?? null);
 
       screenWidthSv.value = screenWidth;
       screenHeightSv.value = screenHeight;
-      aspectRatioSv.value = aspectRatio;
+      aspectRatioSv.value = media.aspectRatio;
+      panelHeightSv.value = 0; // Sheet closed initially (or no panel at all)
       if (hasPanel) {
         hasPanelSv.value = 1;
-        panelHeightSv.value = 0; // Sheet closed initially; absolute overlay only
-        // Block panel reaction until startOpenPanelImageAnimation runs
+        // Block panel reaction until the caller's open/replace animation runs.
         openAnimationInProgressSv.value = 1;
       } else {
         hasPanelSv.value = 0;
-        panelHeightSv.value = 0;
       }
+      return { ...media, hasPanel, imageAreaCenterY: safeTop + availableHeight / 2 };
+    },
+    [
+      safeTop,
+      safeBottom,
+      imageViewportHeight,
+      screenWidth,
+      screenHeight,
+      safeTopSv,
+      safeBottomSv,
+      screenWidthSv,
+      screenHeightSv,
+      aspectRatioSv,
+      panelHeightSv,
+      hasPanelSv,
+      openAnimationInProgressSv,
+    ]
+  );
+
+  const open = useCallback(
+    (layout: ImageOverlayLayout) => {
+      const {
+        urls,
+        initialIndex,
+        expandedWidth: expW,
+        expandedHeight: expH,
+        hasPanel,
+        imageAreaCenterY,
+        // Fall back to the measured thumbnail aspect so the overlay image rect
+        // matches the feed image and the shared-element close lands on it.
+      } = beginOverlaySession(layout, layout.width / layout.height);
 
       scrollOffsetAtOpen.value = scrollOffsetY.value;
       closeTargetPageX.value = layout.pageX;
@@ -618,13 +643,7 @@ export function ImageOverlayProvider({
       });
     },
     [
-      screenWidth,
-      screenHeight,
-      safeTop,
-      safeBottom,
-      imageViewportHeight,
-      safeTopSv,
-      safeBottomSv,
+      beginOverlaySession,
       screenCenterX,
       screenCenterY,
       scrollOffsetY,
@@ -648,54 +667,28 @@ export function ImageOverlayProvider({
       isClosing,
       openToCenter,
       openRevealUi,
-      hasPanelSv,
       openAnimationInProgressSv,
       panelHeightSv,
-      aspectRatioSv,
-      screenWidthSv,
-      screenHeightSv,
     ]
   );
 
   /** Replace overlay content in-place (e.g. next video post). No open animation; image stays expanded. */
   const openReplace = useCallback(
     (layout: ImageOverlayReplaceLayout, options?: { preserveCloseTarget?: boolean }) => {
-      openSessionIdRef.current += 1;
       const preserveCloseTarget = options?.preserveCloseTarget === true;
-      safeTopSv.value = safeTop;
-      safeBottomSv.value = safeBottom;
-      const hasPanel = !!layout.post;
-      const availableHeight = imageViewportHeight;
-
       const {
         urls,
-        mediaTypes: types,
         initialIndex,
         aspectRatio,
         expandedWidth: expW,
         expandedHeight: expH,
+        hasPanel,
+        imageAreaCenterY,
         // Replace layout carries no measured thumbnail rect, so a single image
         // with no declared aspect ratio falls back to 16:9.
-      } = resolveOverlayMedia(layout, screenWidth, availableHeight, REPLACE_FALLBACK_ASPECT_RATIO);
-      const imageAreaCenterY = safeTop + availableHeight / 2;
+      } = beginOverlaySession(layout, REPLACE_FALLBACK_ASPECT_RATIO);
       const centerX = screenWidth / 2;
       const toCenterY = hasPanel ? imageAreaCenterY : screenCenterY;
-      setActiveUrls(urls);
-      setActiveMediaTypes(types);
-      setActiveIndexState(initialIndex);
-      setActiveAspectRatio(aspectRatio);
-      setActiveOverlayPost(layout.post ?? null);
-
-      screenWidthSv.value = screenWidth;
-      screenHeightSv.value = screenHeight;
-      aspectRatioSv.value = aspectRatio;
-      panelHeightSv.value = 0;
-      if (hasPanel) {
-        hasPanelSv.value = 1;
-        openAnimationInProgressSv.value = 1;
-      } else {
-        hasPanelSv.value = 0;
-      }
 
       const targetX = centerX - expW / 2;
       const targetY = toCenterY - expH / 2;
@@ -757,14 +750,9 @@ export function ImageOverlayProvider({
       }
     },
     [
+      beginOverlaySession,
       screenWidth,
-      screenHeight,
-      safeTop,
-      safeBottom,
-      imageViewportHeight,
       screenCenterY,
-      safeTopSv,
-      safeBottomSv,
       closeTargetPageX,
       closeTargetPageY,
       closeTargetWidth,
@@ -782,12 +770,7 @@ export function ImageOverlayProvider({
       blurIntensity,
       closeBtnOpacity,
       isClosing,
-      hasPanelSv,
-      panelHeightSv,
       openAnimationInProgressSv,
-      screenWidthSv,
-      screenHeightSv,
-      aspectRatioSv,
       startOpenPanelImageAnimation,
     ]
   );

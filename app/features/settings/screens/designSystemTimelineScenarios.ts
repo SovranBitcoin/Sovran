@@ -161,6 +161,22 @@ function onchainObserved(currentConfirmations: number | null): ChainOnchainConfi
   };
 }
 
+/** Both onchain-send scenarios open with the same two pre-mempool frames. */
+function onchainSendOpeningFrames(base: BaseFields): TimelineFrame[] {
+  return [
+    {
+      note: 'Submitting to mint',
+      historyEntry: meltEntry(MeltQuoteState.UNPAID, base),
+      onchainConfirmationProgress: buildOnchainRequiredConfirmationProgress(REQUIRED_CONFIRMATIONS),
+    },
+    {
+      note: 'Broadcasting…',
+      historyEntry: meltEntry('pending', base),
+      onchainConfirmationProgress: buildOnchainRequiredConfirmationProgress(REQUIRED_CONFIRMATIONS),
+    },
+  ];
+}
+
 export function buildTimelineScenarios(createdAt: number): TimelineScenario[] {
   const base: BaseFields = { createdAt };
   const nowSec = Math.floor(createdAt / 1000);
@@ -308,18 +324,7 @@ export function buildTimelineScenarios(createdAt: number): TimelineScenario[] {
       group: 'Onchain',
       variant: 'Send',
       frames: [
-        {
-          note: 'Submitting to mint',
-          historyEntry: meltEntry(MeltQuoteState.UNPAID, base),
-          onchainConfirmationProgress:
-            buildOnchainRequiredConfirmationProgress(REQUIRED_CONFIRMATIONS),
-        },
-        {
-          note: 'Broadcasting…',
-          historyEntry: meltEntry('pending', base),
-          onchainConfirmationProgress:
-            buildOnchainRequiredConfirmationProgress(REQUIRED_CONFIRMATIONS),
-        },
+        ...onchainSendOpeningFrames(base),
         {
           note: 'Detected in mempool',
           historyEntry: meltEntry('pending', base),
@@ -353,18 +358,7 @@ export function buildTimelineScenarios(createdAt: number): TimelineScenario[] {
       group: 'Onchain',
       variant: 'Off-chain',
       frames: [
-        {
-          note: 'Submitting to mint',
-          historyEntry: meltEntry(MeltQuoteState.UNPAID, base),
-          onchainConfirmationProgress:
-            buildOnchainRequiredConfirmationProgress(REQUIRED_CONFIRMATIONS),
-        },
-        {
-          note: 'Broadcasting…',
-          historyEntry: meltEntry('pending', base),
-          onchainConfirmationProgress:
-            buildOnchainRequiredConfirmationProgress(REQUIRED_CONFIRMATIONS),
-        },
+        ...onchainSendOpeningFrames(base),
         {
           note: 'Settled off-chain (no outpoint)',
           historyEntry: meltEntry('PAID', base),
