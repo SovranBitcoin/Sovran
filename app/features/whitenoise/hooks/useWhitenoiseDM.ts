@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import {
@@ -63,41 +63,24 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Tracks the dm-pubkey → groupId map for the active account. Keying the
-  // memo on accountIndex means a future provider re-mount with a different
-  // account creates a fresh index instead of reusing the previous account's
-  // (audit 33.json F-008).
-  const dmIndex = useMemo(() => new WhitenoiseDmIndex(accountIndex), [accountIndex]);
-
   // Post-commit mirror of `group` (write-during-render blocks the compiler).
   // Only read inside the send callback, where post-commit timing is correct;
   // sendDmImpl also writes it directly to bridge the gap between createGroup
   // and the commit of setGroup(created).
   const groupRef = useLatestRef<WnGroup | null>(group);
 
-  // Sorted insertion — ingest is monotonic by createdAt in the steady state,
-  // but local sends carry now() and historical hydration may interleave, so
-  // we still find the right slot. O(n) per upsert vs the previous full sort.
-  // Audit 33.json F-012.
-  const upsertMessage = useCallback((msg: WhitenoiseDmMessage) => {
-    setMessages((prev) => {
-      if (prev.some((m) => m.id === msg.id)) return prev;
-      const next = [...prev];
-      const idx = next.findIndex((m) => m.createdAt > msg.createdAt);
-      if (idx === -1) next.push(msg);
-      else next.splice(idx, 0, msg);
-      return next;
-    });
-  }, []);
-
   // Resolve existing group by counterparty pubkey, hydrate persisted history.
+  // The impls construct their own WhitenoiseDmIndex from accountIndex at call
+  // time, so a provider re-mount with a different account always reads a
+  // fresh index instead of reusing the previous account's (audit 33.json
+  // F-008; same shape as useWhitenoiseRequests' acceptRequestImpl).
   useEffect(() => {
     if (!client || !counterpartyPubkey) {
       setIsLoading(false);
       return;
     }
     let cancelled = false;
-    void loadDmGroupImpl(client, counterpartyPubkey, selfPubkey, dmIndex, () => cancelled, {
+    void loadDmGroupImpl(client, counterpartyPubkey, selfPubkey, accountIndex, () => cancelled, {
       setGroup,
       setMessages,
       setIsLoading,
@@ -106,7 +89,7 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
     return () => {
       cancelled = true;
     };
-  }, [client, counterpartyPubkey, selfPubkey, dmIndex]);
+  }, [client, counterpartyPubkey, selfPubkey, accountIndex]);
 
   // Subscribe to kind-445 events for the group and feed them into ingest.
   // The h-tag uses the *Nostr* group id (from the MarmotGroupData extension),
@@ -121,7 +104,7 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
       try {
         const rumor = deserializeApplicationRumor(bytes);
         if (!selfPubkey) return;
-        upsertMessage(rumorToMessage(rumor, selfPubkey));
+        upsertDmMessage(setMessages, rumorToMessage(rumor, selfPubkey));
       } catch (err) {
         wnLog.warn('whitenoise.dm.deserialize_failed', {
           error: err instanceof Error ? err.message : String(err),
@@ -152,35 +135,32 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
       group.off('applicationMessage', onAppMessage);
       handle.unsubscribe();
     };
-  }, [client, group, relays, selfPubkey, upsertMessage]);
-
-  const sendInner = useCallback(
-    (text: string) =>
-      sendDmImpl(
-        {
-          client,
-          selfPubkey,
-          relays,
-          counterpartyPubkey,
-          dmIndex,
-          groupRef,
-          upsertMessage,
-          setError,
-          setIsCreatingGroup,
-          setGroup,
-          setMessages,
-        },
-        text
-      ),
-    [client, counterpartyPubkey, relays, selfPubkey, upsertMessage, dmIndex, groupRef]
-  );
+  }, [client, group, relays, selfPubkey]);
 
   // The lazy group-creation path is the high-cost double-tap target: a
   // second concurrent call before `groupRef.current` is set re-enters the
   // `!activeGroup` branch, calls `client.createGroup` again, and burns a
   // second key package while orphaning the first group. The `isCreatingGroup`
-  // React flag wasn't enough — it commits one render too late.
-  const send = useSingleFlight(sendInner);
+  // React flag wasn't enough — it commits one render too late. The guard
+  // lives on useSingleFlight's ref, so it holds regardless of callback
+  // identity.
+  const send = useSingleFlight((text: string) =>
+    sendDmImpl(
+      {
+        client,
+        selfPubkey,
+        relays,
+        counterpartyPubkey,
+        accountIndex,
+        groupRef,
+        setError,
+        setIsCreatingGroup,
+        setGroup,
+        setMessages,
+      },
+      text
+    )
+  );
 
   return {
     isClientReady: !!client,
@@ -199,16 +179,35 @@ async function ingestGroupEvent(group: WnGroup, event: unknown): Promise<void> {
   }
 }
 
-// Bodies live at module scope: try/finally (and throw-inside-try) cannot be
-// lowered by the React Compiler and made every consumer of this hook carry an
-// uncompiled hook slot. Verbatim moves — DM plaintext flows exactly as before.
+// Bodies live at module scope: they need nothing from render scope beyond the
+// setters, and keeping them out of the hook keeps its compiled output lean.
+// DM plaintext flows exactly as before.
 type WhitenoiseClient = ReturnType<typeof useWhitenoise>['client'];
+type WhitenoiseAccountIndex = ReturnType<typeof useWhitenoise>['accountIndex'];
+
+// Sorted insertion — ingest is monotonic by createdAt in the steady state,
+// but local sends carry now() and historical hydration may interleave, so
+// we still find the right slot. O(n) per upsert vs the previous full sort.
+// Audit 33.json F-012.
+function upsertDmMessage(
+  setMessages: React.Dispatch<React.SetStateAction<WhitenoiseDmMessage[]>>,
+  msg: WhitenoiseDmMessage
+): void {
+  setMessages((prev) => {
+    if (prev.some((m) => m.id === msg.id)) return prev;
+    const next = [...prev];
+    const idx = next.findIndex((m) => m.createdAt > msg.createdAt);
+    if (idx === -1) next.push(msg);
+    else next.splice(idx, 0, msg);
+    return next;
+  });
+}
 
 async function loadDmGroupImpl(
   client: NonNullable<WhitenoiseClient>,
   counterpartyPubkey: string,
   selfPubkey: string,
-  dmIndex: WhitenoiseDmIndex,
+  accountIndex: WhitenoiseAccountIndex,
   isCancelled: () => boolean,
   io: {
     setGroup: (value: WnGroup | null) => void;
@@ -220,7 +219,7 @@ async function loadDmGroupImpl(
   io.setIsLoading(true);
   try {
     await client.loadAllGroups();
-    const groupIdHex = await dmIndex.get(counterpartyPubkey);
+    const groupIdHex = await new WhitenoiseDmIndex(accountIndex).get(counterpartyPubkey);
     if (!groupIdHex) {
       if (!isCancelled()) {
         io.setGroup(null);
@@ -259,9 +258,8 @@ interface SendDmCtx {
   selfPubkey: string;
   relays: ReturnType<typeof useWhitenoise>['relays'];
   counterpartyPubkey: string;
-  dmIndex: WhitenoiseDmIndex;
+  accountIndex: WhitenoiseAccountIndex;
   groupRef: { current: WnGroup | null };
-  upsertMessage: (msg: WhitenoiseDmMessage) => void;
   setError: (value: string | null) => void;
   setIsCreatingGroup: (value: boolean) => void;
   setGroup: (value: WnGroup | null) => void;
@@ -274,9 +272,8 @@ async function sendDmImpl(ctx: SendDmCtx, text: string): Promise<void> {
     selfPubkey,
     relays,
     counterpartyPubkey,
-    dmIndex,
+    accountIndex,
     groupRef,
-    upsertMessage,
     setError,
     setIsCreatingGroup,
     setGroup,
@@ -319,7 +316,7 @@ async function sendDmImpl(ctx: SendDmCtx, text: string): Promise<void> {
       })) as WnGroup;
       await created.inviteByKeyPackageEvent(keyPackageEvent);
 
-      await dmIndex.set(counterpartyPubkey, bytesToHex(created.id));
+      await new WhitenoiseDmIndex(accountIndex).set(counterpartyPubkey, bytesToHex(created.id));
       activeGroup = created;
       groupRef.current = created;
       setGroup(created);
@@ -339,7 +336,7 @@ async function sendDmImpl(ctx: SendDmCtx, text: string): Promise<void> {
 
   const optimisticId = mintLocalId('pending');
   const nowSec = Math.floor(Date.now() / 1000);
-  upsertMessage({
+  upsertDmMessage(setMessages, {
     id: optimisticId,
     authorPubkey: selfPubkey,
     content: text,

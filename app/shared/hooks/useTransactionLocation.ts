@@ -1,9 +1,9 @@
 /**
  * @fileoverview Stateless utilities for capturing location at transaction time.
  *
- * These are plain async functions, not hooks. Call `getLocationForTransaction()`
+ * These are plain async functions, not hooks. Call `captureAndStoreLocation()`
  * at the moment of transaction creation. If location stamping is enabled and
- * permission is granted, returns coordinates. Otherwise returns null. Never throws.
+ * permission is granted, it captures and stores coordinates. Never throws.
  */
 
 import * as Location from 'expo-location';
@@ -23,7 +23,7 @@ import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnn
  * Guards: checks setting → requests permission → captures position.
  * Returns null on any failure without throwing.
  */
-export async function getLocationForTransaction(): Promise<TransactionCoordinates | null> {
+async function getLocationForTransaction(): Promise<TransactionCoordinates | null> {
   try {
     // Check if location stamping is enabled
     if (!useSettingsStore.getState().sendLocationEnabled) {

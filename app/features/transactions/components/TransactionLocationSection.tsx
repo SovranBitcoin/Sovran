@@ -13,6 +13,7 @@
  * OnchainReceiveScreen, and LightningSendScreen.
  */
 
+import { useState } from 'react';
 import { Platform, StyleSheet } from 'react-native';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -20,7 +21,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { AppleMaps, GoogleMaps } from 'expo-maps';
 import { BlurView } from 'expo-blur';
-import { useTransactionLocationSection } from '@/shared/hooks/useTransactionLocationSection';
+import { useTransactionLocation } from '@/shared/stores/profile/transactionLocationStore';
 import Icon from 'assets/icons';
 import { withAlpha } from '@/shared/lib/color';
 import { MapVignette } from '@/shared/ui/composed/MapVignette';
@@ -210,14 +211,15 @@ function TransactionLocationMap({
  * Returns null if no location data exists (setting disabled or not captured).
  */
 export function TransactionLocationSection({ transactionId }: TransactionLocationSectionProps) {
-  const { location, isRevealed, reveal } = useTransactionLocationSection(transactionId);
+  const location = useTransactionLocation(transactionId);
+  const [isRevealed, setIsRevealed] = useState(false);
 
   if (!transactionId || !location) {
     return null;
   }
 
   if (!isRevealed) {
-    return <LocationPrivacyPlaceholder onReveal={reveal} />;
+    return <LocationPrivacyPlaceholder onReveal={() => setIsRevealed(true)} />;
   }
 
   return (

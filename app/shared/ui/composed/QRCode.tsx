@@ -129,6 +129,10 @@ interface AnimatedQRCodeProps {
  * use UR encoding to split the data into multiple animated frames.
  * Animated QRs show a speed toggle button (Fast / Medium / Slow).
  */
+// Component-identity memo: parents span the receive/send/share screens and
+// their compile state isn't verified, while the subtree (SVG QR re-encode)
+// is genuinely expensive — keep until a pass audits every consumer.
+// ast-grep-ignore: no-manual-memo-tsx
 export const AnimatedQRCode = memo(function AnimatedQRCode({
   padding = 10,
   unit,
@@ -418,6 +422,9 @@ interface QRSpeedControlsProps {
   onCycleDensity: () => void;
 }
 
+// Component-identity memo: same parent-compile-state caveat as AnimatedQRCode
+// above (these two ship together on the animated-QR screens).
+// ast-grep-ignore: no-manual-memo-tsx
 export const QRSpeedControls = memo(function QRSpeedControls({
   speedIndex,
   densityIndex,

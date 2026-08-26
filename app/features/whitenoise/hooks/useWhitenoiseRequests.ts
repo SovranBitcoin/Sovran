@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import type { UnreadInvite } from '@internet-privacy/marmot-ts';
@@ -58,24 +58,17 @@ export function useWhitenoiseRequests(): UseWhitenoiseRequestsState {
     };
   }, [inviteReader]);
 
-  const acceptInner = useCallback(
-    (request: WhitenoiseRequest) =>
-      acceptRequestImpl(client, inviteReader, accountIndex, request, { setBusyId, setError }),
-    [accountIndex, client, inviteReader]
-  );
-
-  const declineInner = useCallback(
-    (request: WhitenoiseRequest) =>
-      declineRequestImpl(inviteReader, request, { setBusyId, setError }),
-    [inviteReader]
-  );
-
   // `busyId` is React state and lands too late to block a rapid second tap.
   // The single-flight guard drops the duplicate before it reaches
   // `joinGroupFromWelcome` (which would consume a second key package and
-  // leave the inviteReader in an inconsistent state).
-  const accept = useSingleFlight(acceptInner);
-  const decline = useSingleFlight(declineInner);
+  // leave the inviteReader in an inconsistent state). The guard lives on
+  // useSingleFlight's ref, so it holds regardless of callback identity.
+  const accept = useSingleFlight((request: WhitenoiseRequest) =>
+    acceptRequestImpl(client, inviteReader, accountIndex, request, { setBusyId, setError })
+  );
+  const decline = useSingleFlight((request: WhitenoiseRequest) =>
+    declineRequestImpl(inviteReader, request, { setBusyId, setError })
+  );
 
   return {
     requests,
@@ -96,8 +89,8 @@ function toRequest(rumor: UnreadInvite): WhitenoiseRequest {
   };
 }
 
-// Bodies live at module scope: try/finally cannot be lowered by the React
-// Compiler and made every consumer of this hook carry an uncompiled hook slot.
+// Bodies live at module scope: they need nothing from render scope beyond the
+// setters, and keeping them out of the hook keeps its compiled output lean.
 type WhitenoiseClient = ReturnType<typeof useWhitenoise>['client'];
 type WhitenoiseInviteReader = ReturnType<typeof useWhitenoise>['inviteReader'];
 type WhitenoiseAccountIndex = ReturnType<typeof useWhitenoise>['accountIndex'];

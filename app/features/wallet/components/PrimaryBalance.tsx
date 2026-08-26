@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import type { GlassVariant } from 'liquid-glass-text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -216,13 +216,13 @@ export function PrimaryBalance({
   const btcPrice = useBtcPrice(displayCurrency);
   const isSatUnit = account.unit === 'sat';
 
-  const toggleUnit = useCallback(async () => {
+  const toggleUnit = async () => {
     // displayBtc cycling re-formats a SAT balance (sat/BTC/⚡ modes); it has
     // no meaning for a fiat-denominated wallet unit.
     if (!isSatUnit) return;
     await EnhancedHaptics.successHaptic();
     setDisplayBtc(((displayBtc + 1) % 4) as DisplayBtcMode);
-  }, [displayBtc, setDisplayBtc, isSatUnit]);
+  };
 
   const balance = mockMode ? mockBalance : breakdown.total;
   const reservedTotal = breakdown.reserved;
@@ -256,7 +256,7 @@ export function PrimaryBalance({
   }, [account.unit, mockMode, pendingTotal, reservedTotal, lockedTotal]);
 
   const displayText = `≈ ${currencyConfig.symbol}${fiatValue}`;
-  const handlePendingPress = useCallback(() => {
+  const handlePendingPress = () => {
     walletLog.info('wallet.pending.press', {
       pendingTotal,
       unit: pendingUnit,
@@ -271,11 +271,13 @@ export function PrimaryBalance({
         filterMintUrl: 'all',
       },
     });
-  }, [router, account.unit, pendingTotal, pendingUnit]);
+  };
 
   // Wrap the menu in a promise so a rapid second tap on the Reserved pill is
-  // dropped by `useSingleFlight` until the first interaction settles.
-  const handleReservedPressInner = useCallback(async () => {
+  // dropped by `useSingleFlight` until the first interaction settles. The
+  // guard lives on useSingleFlight's ref, so it holds regardless of this
+  // callback's identity.
+  const handleReservedPress = useSingleFlight(async () => {
     walletLog.info('wallet.reserved.menu_open', { reservedTotal });
     await new Promise<void>((resolve) => {
       actionMenuPopup({
@@ -297,19 +299,12 @@ export function PrimaryBalance({
         ],
       });
     });
-  }, [reservedTotal]);
-
-  const handleReservedPress = useSingleFlight(handleReservedPressInner);
+  });
 
   // REDEEMING pill: retry redeeming received-but-unswapped ecash. Tapping runs
   // coco's receive recovery sweep, which swaps any `executing` receives once
   // the mint is reachable; on success they leave limbo and join the balance.
-  const handleRedeemingPressInner = useCallback(
-    () => runRedeemingRecovery(lockedTotal),
-    [lockedTotal]
-  );
-
-  const handleRedeemingPress = useSingleFlight(handleRedeemingPressInner);
+  const handleRedeemingPress = useSingleFlight(() => runRedeemingRecovery(lockedTotal));
 
   return (
     <Log name="PrimaryBalance">

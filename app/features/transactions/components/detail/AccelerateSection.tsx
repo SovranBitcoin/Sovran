@@ -9,7 +9,7 @@
  * the card to set it apart from the static detail sections without shouting.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -70,10 +70,10 @@ export function AccelerateSection({ offer, accelerating, onAccelerate }: Acceler
   const [accent, foreground] = useThemeColor(['accent', 'foreground'] as const);
   const [busy, setBusy] = useState(false);
 
-  const handlePress = useCallback(async () => {
+  const handlePress = async () => {
     if (busy) return;
     await runAccelerate(onAccelerate, setBusy);
-  }, [busy, onAccelerate]);
+  };
 
   if (!offer && !accelerating) return null;
 
@@ -144,10 +144,10 @@ function AccelerateSheen({ color }: { color: string }) {
     return () => cancelAnimation(progress);
   }, [progress]);
 
-  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+  const handleLayout = (event: LayoutChangeEvent) => {
     const w = Math.round(event.nativeEvent.layout.width);
     setWidth((prev) => (prev === w ? prev : w));
-  }, []);
+  };
 
   const sheenWidth = Math.max(60, Math.round(width * SHEEN_WIDTH_RATIO));
   const sheenStyle = useAnimatedStyle(() => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { MarmotClient } from '@internet-privacy/marmot-ts';
 import { useWhitenoise } from '../WhitenoiseContext';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
@@ -13,15 +13,14 @@ type WhitenoiseSetupState = {
   isBootstrapping: boolean;
   error: string | null;
   bootstrap: () => Promise<void>;
-  refresh: () => Promise<void>;
 };
 
 async function readCount(client: MarmotClient): Promise<number> {
   return client.keyPackages.count();
 }
 
-// Bodies live at module scope: try/finally cannot be lowered by the React
-// Compiler and made every consumer of this hook carry an uncompiled hook slot.
+// Bodies live at module scope: they need nothing from render scope beyond the
+// setters, and keeping them out of the hook keeps its compiled output lean.
 type WhitenoiseClient = ReturnType<typeof useWhitenoise>['client'];
 type WhitenoiseRelays = ReturnType<typeof useWhitenoise>['relays'];
 
@@ -98,13 +97,8 @@ export function useWhitenoiseSetup(): WhitenoiseSetupState {
   const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(
-    () => refreshImpl(client, { setKeyPackageCount, setIsLoading, setError }),
-    [client]
-  );
-
   useEffect(() => {
-    void refresh();
+    void refreshImpl(client, { setKeyPackageCount, setIsLoading, setError });
     if (!client) return;
     // Listener path updates the count directly. A full `refresh()` here
     // would (a) flash isLoading on every event and disable the action
@@ -118,17 +112,16 @@ export function useWhitenoiseSetup(): WhitenoiseSetupState {
       client.keyPackages.off('keyPackageAdded', onAdded);
       client.keyPackages.off('keyPackageRemoved', onRemoved);
     };
-  }, [client, refresh]);
-
-  const bootstrapInner = useCallback(
-    () => bootstrapImpl(client, relays, { setKeyPackageCount, setIsBootstrapping, setError }),
-    [client, relays]
-  );
+  }, [client]);
 
   // Key-package creation is finite-resource work — a duplicate concurrent
   // bootstrap would publish two key packages per slot and burn relay
-  // round-trips. `isBootstrapping` is React state and lands too late.
-  const bootstrap = useSingleFlight(bootstrapInner);
+  // round-trips. `isBootstrapping` is React state and lands too late; the
+  // guard lives on useSingleFlight's ref, so it holds regardless of this
+  // callback's identity.
+  const bootstrap = useSingleFlight(() =>
+    bootstrapImpl(client, relays, { setKeyPackageCount, setIsBootstrapping, setError })
+  );
 
   return {
     isReady: keyPackageCount >= TARGET_KEY_PACKAGE_COUNT,
@@ -137,6 +130,5 @@ export function useWhitenoiseSetup(): WhitenoiseSetupState {
     isBootstrapping,
     error,
     bootstrap,
-    refresh,
   };
 }
