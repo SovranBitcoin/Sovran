@@ -26,6 +26,7 @@ import { useBitchatBLEIdentityMaterial } from './useBitchatBLEIdentityMaterial';
 import { useBitchatProfileScope } from '../lib/profileScope';
 import { bitchatLog } from '@/shared/lib/logger';
 import { mintLocalId } from '@/shared/lib/id';
+import { asNostrPubkeyHex } from '@/shared/lib/protocolIds';
 
 const MESSAGE_BUFFER_CAP = 500;
 /**
@@ -540,8 +541,13 @@ export function useBitChat(
           if (!dmPeerID) return;
           // NIP-17 gift-wrap DMs don't echo back to the sender via the
           // subscription, so the local row is the only one.
+          // In this transport dmPeerID carries the peer's NOSTR pubkey hex
+          // (from senderPubkey on geohash events) — the checked cast guards
+          // against a BLE peer id / Noise key ever reaching the DM path
+          // (both are hex; a shape-mismatch throw lands in the catch below
+          // as nostr_dm_send_failed).
           await sendWithLocalEcho(content, true, 'bitchat.hook.nostr_dm_send_failed', () =>
-            sendGeohashPrivateMessage(dmPeerID, content)
+            sendGeohashPrivateMessage(asNostrPubkeyHex(dmPeerID), content)
           );
           break;
         }

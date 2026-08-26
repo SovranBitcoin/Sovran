@@ -1,6 +1,6 @@
 import type { BLEPeer } from 'bitchat-module';
 
-import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/ids';
+import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
 import { paymentLog } from '@/shared/lib/logger';
 import { creqParseDiagnostics, lockableMintsFromCreq } from '@/shared/lib/nutCreq';
 

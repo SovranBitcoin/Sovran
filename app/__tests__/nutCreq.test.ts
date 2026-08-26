@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 
-import { cashuP2pkPubkeyFromNostrHex, type CashuP2pkPubkey } from '@/shared/lib/ids';
+import { cashuP2pkPubkeyFromNostrHex, type CashuP2pkPubkey } from '@/shared/lib/protocolIds';
 import { buildStandingCreq, lockableMintsFromCreq, parseCreq } from '@/shared/lib/nutCreq';
 
 const NOSTR_HEX = 'ab'.repeat(32);

@@ -13,7 +13,7 @@ import { Badge } from '@/shared/ui/primitives/Badge';
 import Icon from 'assets/icons';
 import { useManager } from '@cashu/coco-react';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
-import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/ids';
+import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { actionMenuPopup, copyPopup, staticPopup } from '@/shared/lib/popup';
 import { truncateMiddle } from '@/shared/lib/strings';

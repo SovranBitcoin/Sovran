@@ -9,10 +9,10 @@ import Animated, {
   useDerivedValue,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-// ast-grep-ignore: flatlist-outside-list-seam-tsx
 // Horizontal pagingEnabled carousel (5 fixed slides), not a virtualized list:
 // RNGH's FlatList keeps the pager's scroll simultaneous with the screen's
 // drag-up pan gesture, which the FlashList seam doesn't arbitrate.
+// ast-grep-ignore: flatlist-outside-list-seam-tsx
 import { FlatList } from 'react-native-gesture-handler';
 import { scheduleOnRN } from 'react-native-worklets';
 

@@ -14,7 +14,7 @@ import { areBLEPeerSnapshotsEquivalent } from '@/features/bitchat/lib/blePeerSna
 import { useBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
 import { useBitchatBLEIdentityMaterial } from '@/features/bitchat/hooks/useBitchatBLEIdentityMaterial';
 import { useBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
-import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/ids';
+import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
 import { bitchatLog } from '@/shared/lib/logger';
 import { buildStandingCreq } from '@/shared/lib/nutCreq';
 

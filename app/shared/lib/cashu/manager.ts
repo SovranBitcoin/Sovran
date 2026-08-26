@@ -16,7 +16,7 @@ import {
 } from '@/shared/lib/nostr/secureStorage';
 import { NPCPlugin, type NPCAccountApi, type Signer as NpcSigner } from 'coco-cashu-plugin-npc';
 import { createPaymentRequestNostrTransportPlugin } from '@/shared/lib/cashu/paymentRequestNostrTransport';
-import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/ids';
+import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
 import {
   NPC_BASE_URL,
   NPC_SYNC_INTERVAL_MS,

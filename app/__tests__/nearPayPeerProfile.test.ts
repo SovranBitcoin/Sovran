@@ -1,7 +1,7 @@
 import type { BLEPeer } from 'bitchat-module';
 
 import { peerAvatarState, peerDisplayName, toLayoutPeer } from '@/features/nearPay/lib/peerProfile';
-import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/ids';
+import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
 import { buildStandingCreq } from '@/shared/lib/nutCreq';
 
 const NOSTR_HEX = 'ab'.repeat(32);

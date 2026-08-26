@@ -1,7 +1,7 @@
 import { PaymentRequest, type NUT10Option } from '@cashu/cashu-ts';
 import { decodePaymentRequestInfo, lockableMintsFromRequest } from 'wallet';
 
-import { CASHU_P2PK_PUBKEY_RE, type CashuP2pkPubkey } from '@/shared/lib/ids';
+import { CASHU_P2PK_PUBKEY_RE, type CashuP2pkPubkey } from '@/shared/lib/protocolIds';
 import { cashuLog } from '@/shared/lib/logger';
 
 /**

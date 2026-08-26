@@ -8,7 +8,7 @@ import {
 import { classifyMeshToken, meshTokenDedupeKey } from 'wallet';
 
 import { drainNutDropRedeemQueue } from '@/features/nearPay/lib/nutDropAutoRedeem';
-import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/ids';
+import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
 import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';

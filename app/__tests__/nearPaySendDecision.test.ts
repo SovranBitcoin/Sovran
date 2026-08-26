@@ -3,7 +3,7 @@
  */
 
 import { planNearPaySend } from '@/features/nearPay/lib/nearPaySendDecision';
-import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/ids';
+import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
 import { buildStandingCreq } from '@/shared/lib/nutCreq';
 
 const NOSTR_HEX = 'ab'.repeat(32);

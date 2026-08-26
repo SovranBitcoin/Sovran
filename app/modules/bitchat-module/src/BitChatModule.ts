@@ -48,7 +48,7 @@ interface BitChatNativeModule {
   joinGeohash(hash: string): Promise<void>;
   leaveGeohash(): Promise<void>;
   sendGeohashMessage(content: string, nickname: string): Promise<void>;
-  sendGeohashPrivateMessage(recipientPubkey: string, content: string): Promise<void>;
+  sendGeohashPrivateMessage(recipientNostrPubkeyHex: string, content: string): Promise<void>;
   // Events — `event` is unknown at the bridge boundary; typed wrappers below
   // cast to the per-event payload that the native side actually dispatches.
   addListener(eventName: string, listener: (event: unknown) => void): EventSubscription;
@@ -348,9 +348,9 @@ export function sendGeohashMessage(content: string, nickname: string): Promise<v
  * observed on their public geohash messages (`senderPubkey` from
  * `onNostrMessage` events).
  */
-export function sendGeohashPrivateMessage(recipientPubkey: string, content: string): Promise<void> {
+export function sendGeohashPrivateMessage(recipientNostrPubkeyHex: string, content: string): Promise<void> {
   return NativeModule
-    ? NativeModule.sendGeohashPrivateMessage(recipientPubkey, content)
+    ? NativeModule.sendGeohashPrivateMessage(recipientNostrPubkeyHex, content)
     : unavailable();
 }
 

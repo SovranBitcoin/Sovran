@@ -22,8 +22,30 @@ export type NostrPubkeyHex = Brand<string, 'nostr.pubkey.hex'>;
  */
 export type CashuP2pkPubkey = Brand<string, 'cashu.p2pk.pubkey'>;
 
+/**
+ * Curve25519 Noise static key hex (bitchat's own identity, present for every
+ * BLE peer). Shape-identical to `NostrPubkeyHex` — 64 hex — but a DIFFERENT
+ * curve: never use one where the other is expected (no kind-0 lookups by
+ * noise key, no DMs addressed by noise key).
+ */
+export type NoisePubkeyHex = Brand<string, 'bitchat.noise.pubkey'>;
+
 export const NOSTR_PUBKEY_HEX_RE = /^[0-9a-f]{64}$/;
 export const CASHU_P2PK_PUBKEY_RE = /^0[23][0-9a-f]{64}$/i;
+
+/**
+ * Checked cast for hex arriving at runtime boundaries (native events, route
+ * params, transport ids). Throws on shape mismatch — callers sit inside
+ * try/catch send paths or validate-and-log flows. NOTE: shape alone cannot
+ * distinguish a Nostr key from a Noise key; use this only where the SOURCE
+ * guarantees Nostr provenance (e.g. `senderPubkey` from Nostr events).
+ */
+export function asNostrPubkeyHex(value: string): NostrPubkeyHex {
+  if (!NOSTR_PUBKEY_HEX_RE.test(value)) {
+    throw new Error(`not a nostr pubkey hex (len ${value.length})`);
+  }
+  return value as NostrPubkeyHex;
+}
 
 /**
  * The only legal Nostr→Cashu key cast: lift a BIP-340 x-only pubkey to the
