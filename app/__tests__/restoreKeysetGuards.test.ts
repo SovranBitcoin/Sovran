@@ -50,10 +50,43 @@ describe('isAlreadyRecoveredError', () => {
     ).toBe(true);
   });
 
-  it('recognises the ProofOperationError wrapper around it', () => {
+  it('recognises the ProofOperationError wrapper when every cause is a duplicate', () => {
+    const wrapper = new Error('Failed to persist proofs for 1 keyset group(s) [00988f]', {
+      cause: new AggregateError(
+        [new Error('Proof with secret already exists: 038a8dbb')],
+        'Failed to persist proofs for 1 keyset group(s)'
+      ),
+    });
+    expect(isAlreadyRecoveredError(wrapper)).toBe(true);
+  });
+
+  it('does NOT treat a persist failure as already-recovered', () => {
+    // coco wraps every saveProofs rejection in the same message. Misreading a
+    // real write failure as benign reports "Recovery Complete" for a restore
+    // that saved nothing, and permanently clears the restore gate.
+    const diskFull = new Error('Failed to persist proofs for 1 keyset group(s) [00988f]', {
+      cause: new AggregateError(
+        [new Error('SQLITE_FULL: database or disk is full')],
+        'Failed to persist proofs for 1 keyset group(s)'
+      ),
+    });
+    expect(isAlreadyRecoveredError(diskFull)).toBe(false);
+
+    const mixed = new Error('Failed to persist proofs for 2 keyset group(s) [00988f, 00ad12]', {
+      cause: new AggregateError(
+        [
+          new Error('Proof with secret already exists: 038a8dbb'),
+          new Error('SQLITE_BUSY: database is locked'),
+        ],
+        'Failed to persist proofs for 2 keyset group(s)'
+      ),
+    });
+    expect(isAlreadyRecoveredError(mixed)).toBe(false);
+
+    // No readable cause at all — stays a failure rather than passing blind.
     expect(
       isAlreadyRecoveredError(new Error('Failed to persist proofs for 1 keyset group(s) [00988f]'))
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('does not swallow a real restore failure', () => {

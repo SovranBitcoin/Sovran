@@ -339,6 +339,10 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
 
     let allMintUrls = knownMintUrls;
     let probeMintUrls: string[] = [];
+    // Probing calls addMint({ trusted: true }) on EVERY candidate, so the
+    // misses must be untrusted too — they are not in `allMintUrls`, so the
+    // discovered-but-empty cleanup below cannot see them.
+    const probeMissUrls: string[] = [];
 
     beginRecoveryBenchmark({
       knownMints: knownMintUrls.length,
@@ -370,6 +374,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             )
           );
           probeMintUrls.push(...hits.filter((url): url is string => url != null));
+          probeMissUrls.push(...slice.filter((url) => !hits.includes(url)));
           await yieldToEventLoop();
         }
         cashuLog.info('recovery.probe.done', {
@@ -510,9 +515,21 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         const fundsFound = mintBalance > 0;
         const mintMs = Math.round((performance.now() - mintT0) * 100) / 100;
 
+        // A mint whose keysets were ALL screened out was never attempted, so it
+        // is `skipped`, not `done` — otherwise a mint serving only legacy
+        // non-NUT-02 ids (mint.minibits.cash) shows a green check and, in gate
+        // mode, Continue permanently clears the restore gate for funds that
+        // were never looked for.
+        const attemptedKeysets = (recoveryResults[i]!.keysetsTotal ?? 0) - skippedKeysets;
         const restoredSomething = alreadyRecoveredKeysets === 0 || failedKeysets > 0;
         const mintStatus =
-          failedKeysets > 0 ? 'failed' : restoredSomething ? 'done' : 'already-recovered';
+          failedKeysets > 0
+            ? 'failed'
+            : skippedKeysets > 0 && attemptedKeysets === 0
+              ? 'skipped'
+              : restoredSomething
+                ? 'done'
+                : 'already-recovered';
         recordMintBenchmark(
           {
             mintUrl,
@@ -622,19 +639,24 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       // probed URL (see ../coco/packages/core/api/WalletApi.ts), which would
       // otherwise leave attacker-supplied URLs from the audit API permanently
       // in the trusted-mints set used by the routing surface.
-      const discoveredEmpty = recoveryResults.filter((r) => r.isDiscovered && !r.fundsFound);
-      if (discoveredEmpty.length > 0) {
-        setFinalizingLabel(`Tidying up ${discoveredEmpty.length} probed mints`);
+      const untrustUrls = [
+        ...new Set([
+          ...recoveryResults.filter((r) => r.isDiscovered && !r.fundsFound).map((r) => r.mint),
+          ...probeMissUrls,
+        ]),
+      ].filter((url) => !knownMintUrls.includes(url));
+      if (untrustUrls.length > 0) {
+        setFinalizingLabel(`Tidying up ${untrustUrls.length} probed mints`);
         await Promise.allSettled(
-          discoveredEmpty.map(async (r) => {
+          untrustUrls.map(async (mint) => {
             try {
-              await manager.mint.untrustMint(r.mint);
+              await manager.mint.untrustMint(mint);
               cashuLog.info('recovery.cleanup.discovered_mint_untrusted', {
-                ...mintUrlLogFields(r.mint),
+                ...mintUrlLogFields(mint),
               });
             } catch (e) {
               cashuLog.warn('recovery.cleanup.untrust_failed', {
-                ...mintUrlLogFields(r.mint),
+                ...mintUrlLogFields(mint),
                 error: (e as Error)?.message,
               });
             }

@@ -259,6 +259,9 @@ export function isRestorableKeysetId(keysetId: string): boolean {
   return /^[0-9a-fA-F]{16}$|^[0-9a-fA-F]{66}$/.test(keysetId);
 }
 
+const DUPLICATE_SECRET_MESSAGE = 'Proof with secret already exists';
+const PERSIST_FAILURE_MESSAGE = 'Failed to persist proofs';
+
 /**
  * Whether a keyset restore failed only because the proofs were already in the
  * database.
@@ -271,12 +274,27 @@ export function isRestorableKeysetId(keysetId: string): boolean {
  *
  * Matches on the message because coco raises a bare `Error` for the inner cause
  * and wraps it in `ProofOperationError`; there is no error code to key off.
+ *
+ * The wrapper message alone is NOT sufficient. coco puts `Failed to persist
+ * proofs for N keyset group(s)` on EVERY `saveProofs` rejection — SQLITE_BUSY,
+ * disk full, constraint violation — and hangs the real causes off `cause` as an
+ * AggregateError. Treating the wrapper as benign turns a restore that saved
+ * nothing into a green "Recovery Complete" that permanently clears the restore
+ * gate, so only a wrapper whose every cause is a duplicate secret counts.
  */
 export function isAlreadyRecoveredError(error: unknown): boolean {
   const message = errorMessage(error);
+  if (message.includes(DUPLICATE_SECRET_MESSAGE)) return true;
+  if (!message.includes(PERSIST_FAILURE_MESSAGE)) return false;
+
+  // Duck-typed rather than `instanceof AggregateError` so a polyfilled or
+  // cross-realm aggregate still reads. An unreadable cause stays a failure.
+  const cause: unknown = error instanceof Error ? error.cause : undefined;
+  const causes: unknown = (cause as { errors?: unknown } | undefined)?.errors;
   return (
-    message.includes('Proof with secret already exists') ||
-    message.includes('Failed to persist proofs')
+    Array.isArray(causes) &&
+    causes.length > 0 &&
+    causes.every((inner) => errorMessage(inner).includes(DUPLICATE_SECRET_MESSAGE))
   );
 }
 
