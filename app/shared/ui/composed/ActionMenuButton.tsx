@@ -357,6 +357,7 @@ function renderPopoverPortal(
               })();
             }}>
             <SheetMenuRowContent
+              singleLineTitle={false}
               icon={v.iconNode ?? (v.icon ? <Icon name={v.icon} size={18} /> : null)}
               title={v.label}
               description={(v.isDisabled && v.reason ? v.reason : v.description) || undefined}

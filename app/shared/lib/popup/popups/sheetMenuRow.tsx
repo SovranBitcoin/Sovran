@@ -24,9 +24,24 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
  * The rest of heroui's typography (`text-base font-medium text-foreground`)
  * is preserved.
  */
-export function SheetItemTitle({ children }: { children: ReactNode }) {
+export function SheetItemTitle({
+  children,
+  singleLine = true,
+}: {
+  children: ReactNode;
+  /**
+   * The `numberOfLines={1}` half of the defence above is only needed where the
+   * title would otherwise collapse to zero height — a bare `<Menu>` with no
+   * `Menu.Content` host. Inside a real host it just truncates titles that used
+   * to wrap, so those callers opt out.
+   */
+  singleLine?: boolean;
+}) {
   return (
-    <Menu.ItemTitle className="flex-none" numberOfLines={1} style={{ flex: 0 }}>
+    <Menu.ItemTitle
+      className="flex-none"
+      numberOfLines={singleLine ? 1 : undefined}
+      style={{ flex: 0 }}>
       {children}
     </Menu.ItemTitle>
   );
@@ -40,6 +55,8 @@ interface SheetMenuRowContentProps {
   description?: ReactNode;
   /** Trailing accessory (amount, check, capability glyphs …). */
   trailing?: ReactNode;
+  /** See `SheetItemTitle.singleLine`. Hosts inside `Menu.Content` pass false. */
+  singleLineTitle?: boolean;
 }
 
 export function SheetMenuRowContent({
@@ -47,12 +64,13 @@ export function SheetMenuRowContent({
   title,
   description,
   trailing,
+  singleLineTitle = true,
 }: SheetMenuRowContentProps) {
   return (
     <HStack align="center" gap={10} style={{ flex: 1 }}>
       {icon}
       <View style={{ flex: 1 }}>
-        <SheetItemTitle>{title}</SheetItemTitle>
+        <SheetItemTitle singleLine={singleLineTitle}>{title}</SheetItemTitle>
         {description != null ? <Menu.ItemDescription>{description}</Menu.ItemDescription> : null}
       </View>
       {trailing}

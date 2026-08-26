@@ -561,7 +561,13 @@ export function MintAddScreen() {
   // skeleton never returns over content already shown.
   const [resultsSettled, setResultsSettled] = useState(false);
   useEffect(() => {
-    if (resultsSettled) return;
+    // Do not start the quiet timer until there is something to be quiet ABOUT.
+    // Anchored to mount, a discovery round trip slower than the quiet window
+    // (routine on a cold cellular start) leaves `displayMints` unchanged, the
+    // latch closes on an empty list, and the rows then pop in one-by-one as
+    // operator profiles resolve — exactly what the hold exists to prevent.
+    // The ceiling effect below still bounds the worst case.
+    if (resultsSettled || displayMints.length === 0) return;
     const timer = setTimeout(() => setResultsSettled(true), RESULTS_SETTLE_QUIET_MS);
     return () => clearTimeout(timer);
   }, [displayMints, resultsSettled]);
@@ -612,7 +618,10 @@ export function MintAddScreen() {
   // Feed the result List skeleton placeholders during the first search so the
   // loading rows render through the SAME List + ContactRow path as real rows —
   // identical container chrome, no content shift on the data swap.
-  const isInitialLoading = searchLoading || !resultsSettled;
+  // `searchLoading` alone must not blank a populated list: useMintSearch
+  // refetches on a currency-tab change, and the pre-hold behaviour was to keep
+  // the visible rows through that rather than swapping them for skeletons.
+  const isInitialLoading = (searchLoading && displayMints.length === 0) || !resultsSettled;
 
   const renderItem = ({ item }: { item: SearchableMint }) =>
     'isSkeleton' in item ? (

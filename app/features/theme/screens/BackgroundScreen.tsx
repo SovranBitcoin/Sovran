@@ -173,8 +173,16 @@ function AlbumPage({
   const renderWallpaper = ({ item: themeName }: { item: string }) => {
     const entry = catalog.find((w) => w.themeName === themeName);
     const selected = draftUnitTheme === themeName;
+    // No marginRight: FlashList's grid manager enforces a column width of
+    // boundedSize / numColumns and absolutely positions each cell at that
+    // offset, so a right margin overflows its own column instead of becoming
+    // the gutter — which left the columns unevenly spaced and the grid heavier
+    // on the right. `cardWidth` already reserves the gutter, so centring the
+    // card inside its enforced column spaces them evenly. (FlatList wrapped
+    // each row in a flex row and laid cells out in flow, which is why the
+    // margin worked before the seam migration.)
     return (
-      <View style={{ width: cardWidth, marginRight: GRID_GAP, marginBottom: GRID_GAP }}>
+      <View style={{ width: cardWidth, alignSelf: 'center', marginBottom: GRID_GAP }}>
         <WallpaperThumbnail
           themeName={themeName}
           entry={entry}

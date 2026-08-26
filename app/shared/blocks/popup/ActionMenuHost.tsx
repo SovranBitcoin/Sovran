@@ -369,6 +369,7 @@ export function ActionMenuHost() {
         variant={isDanger ? 'danger' : 'default'}
         onPress={() => handleItemPress(button)}>
         <SheetMenuRowContent
+          singleLineTitle={false}
           icon={button.iconNode ?? (button.icon ? <Icon name={button.icon} size={20} /> : null)}
           title={button.text}
           description={descriptionText || undefined}
@@ -433,6 +434,7 @@ export function ActionMenuHost() {
           void handlePrimaryPress(payload.primaryAction!);
         }}>
         <SheetMenuRowContent
+          singleLineTitle={false}
           icon={
             payload.primaryAction.icon ? <Icon name={payload.primaryAction.icon} size={20} /> : null
           }

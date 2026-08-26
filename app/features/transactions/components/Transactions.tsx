@@ -284,6 +284,7 @@ export const Transactions = React.memo(
       lock,
       counterparty,
       hideExpired,
+      zap,
     ]);
 
     // Build unified timeline: mix history entries + swap groups chronologically
