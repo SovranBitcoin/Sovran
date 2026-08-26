@@ -177,10 +177,11 @@ export function ThreadReplyBar({
     setPosting(true);
 
     // Upload is deferred to here: PUT any media block without a descriptor, then
-    // publish with the resolved descriptors. The machinery (per-block abort
-    // registration, abort-siblings → allSettled → record-orphans on failure)
-    // is uploadMediaBlocks — shared with PostComposer so the orphan protocol
-    // can't diverge.
+    // publish with the resolved descriptors. Any upload failure aborts the whole
+    // reply — we never post a reply missing one of its images. The machinery
+    // (per-block abort registration, abort-siblings → allSettled →
+    // record-orphans on failure) is uploadMediaBlocks — shared with
+    // PostComposer so the orphan protocol can't diverge.
     let uploaded: MediaBlock[];
     try {
       uploaded = await uploadMediaBlocks({
