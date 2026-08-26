@@ -1,4 +1,3 @@
-import { useCallback, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { Stack } from 'expo-router';
@@ -45,14 +44,33 @@ function peerHasValidCreq(peer: Pick<BLEPeer, 'creq' | 'nostrPubkeyHex'>): boole
   return lockableMintsFromCreq(peer.creq, peer.nostrPubkeyHex) !== null;
 }
 
+function sortPeersByReadiness(peers: BLEPeer[]): BLEPeer[] {
+  return [...peers].sort((a, b) => {
+    const aLockable = peerHasValidCreq(a);
+    const bLockable = peerHasValidCreq(b);
+    if (aLockable !== bLockable) return aLockable ? -1 : 1;
+    if (a.hasDirectLink !== b.hasDirectLink) return a.hasDirectLink ? -1 : 1;
+    if (a.isConnected !== b.isConnected) return a.isConnected ? -1 : 1;
+    return b.lastSeen - a.lastSeen;
+  });
+}
+
+function peerListSubtitle(total: number, connectedCount: number, directLinkCount: number): string {
+  if (total === 0) return 'Scanning for nearby people...';
+  if (connectedCount === 0) return `${total} nearby · 0 connected`;
+  if (directLinkCount === connectedCount) {
+    return `${connectedCount} connected · ${total} nearby`;
+  }
+  return `${directLinkCount} direct · ${connectedCount - directLinkCount} mesh · ${total} nearby`;
+}
+
+const peerKeyExtractor = (peer: BLEPeer) => peer.peerID;
+
 /** Trailing pill for peers that have not advertised the creq capability yet. */
 function WaitingTag() {
   const [foreground] = useThemeColor(['foreground'] as const);
-  const tagStyle = useMemo(
-    () => [styles.bearerTag, { backgroundColor: withAlpha(foreground, 0.08) }],
-    [foreground]
-  );
-  const tagTextStyle = useMemo(() => ({ color: withAlpha(foreground, 0.55) }), [foreground]);
+  const tagStyle = [styles.bearerTag, { backgroundColor: withAlpha(foreground, 0.08) }];
+  const tagTextStyle = { color: withAlpha(foreground, 0.55) };
 
   return (
     <HStack align="center" gap={4} style={tagStyle}>
@@ -65,25 +83,18 @@ function WaitingTag() {
 }
 
 function NearPayPeerRow({ peer, onSelect }: NearPayPeerRowProps) {
-  const handlePress = useCallback(() => onSelect(peer), [onSelect, peer]);
   // Seed identity from the favorite-exchanged Nostr key when the peer is a
   // Sovran client; stock peers fall back to the noise-key pseudonym. The real
   // face resolves on the radar; this list stays BLE-name.
-  const identity = useMemo(
-    () => bleIdentity({ ...peer, identitySeed: peerIdentitySeed(peer) }),
-    [peer]
-  );
-  const trailing = useMemo(
-    () =>
-      lockableMintsFromCreq(peer.creq, peer.nostrPubkeyHex) !== null ? undefined : <WaitingTag />,
-    [peer.creq, peer.nostrPubkeyHex]
-  );
+  const identity = bleIdentity({ ...peer, identitySeed: peerIdentitySeed(peer) });
+  const trailing =
+    lockableMintsFromCreq(peer.creq, peer.nostrPubkeyHex) !== null ? undefined : <WaitingTag />;
 
   return (
     <ContactRow
       identity={identity}
       trailing={trailing}
-      onPress={handlePress}
+      onPress={() => onSelect(peer)}
       testID={`near-pay-peer-row:${peer.peerID}`}
     />
   );
@@ -102,141 +113,104 @@ export function NearPayPeerListScreen() {
   const peers = useFreshNearbyPeers();
 
   // Token DMs are only enabled after a peer advertises a valid creq capability.
-  const connectedCount = useMemo(() => peers.filter((peer) => peer.isConnected).length, [peers]);
-  const directLinkCount = useMemo(() => peers.filter((peer) => peer.hasDirectLink).length, [peers]);
-  const sortedPeers = useMemo(() => {
-    return [...peers].sort((a, b) => {
-      const aLockable = peerHasValidCreq(a);
-      const bLockable = peerHasValidCreq(b);
-      if (aLockable !== bLockable) return aLockable ? -1 : 1;
-      if (a.hasDirectLink !== b.hasDirectLink) return a.hasDirectLink ? -1 : 1;
-      if (a.isConnected !== b.isConnected) return a.isConnected ? -1 : 1;
-      return b.lastSeen - a.lastSeen;
+  const connectedCount = peers.filter((peer) => peer.isConnected).length;
+  const directLinkCount = peers.filter((peer) => peer.hasDirectLink).length;
+  const sortedPeers = sortPeersByReadiness(peers);
+  const subtitleText = peerListSubtitle(peers.length, connectedCount, directLinkCount);
+
+  const rootStyle = [styles.root, { backgroundColor: background }];
+  const contentStyle = [styles.content, { paddingTop: headerHeight }];
+  const summaryStyle = [styles.summary, { borderBottomColor: withAlpha(foreground, 0.08) }];
+  const summaryTextStyle = { color: withAlpha(foreground, 0.6) };
+  const emptyIconColor = withAlpha(foreground, 0.3);
+  const emptyTitleStyle = { color: withAlpha(foreground, 0.5), textAlign: 'center' as const };
+  const emptyTextStyle = { color: withAlpha(foreground, 0.35), textAlign: 'center' as const };
+
+  const handleSelectPeer = async (peer: BLEPeer) => {
+    const displayName = peerDisplayName(peer);
+    // Decide lock vs offline bearer from the peer's creq (accepted mints +
+    // lock key), our trusted mints, and online status. Delivery is always a
+    // private DM, but only after a valid creq proved the peer is patched.
+    const plan = planNearPaySend({
+      peer,
+      ourMints: walletContext.trustedMintUrls,
+      isOffline,
     });
-  }, [peers]);
-
-  const subtitleText = useMemo(() => {
-    if (peers.length === 0) return 'Scanning for nearby people...';
-    if (connectedCount === 0) return `${peers.length} nearby · 0 connected`;
-    if (directLinkCount === connectedCount) {
-      return `${connectedCount} connected · ${peers.length} nearby`;
+    paymentLog.info('near_pay.peer.tap', {
+      source: 'peer-list',
+      ...nearPayPeerTapLog({ peer, plan, ourMints: walletContext.trustedMintUrls, isOffline }),
+    });
+    // No valid creq ⇒ not confirmed patched; no mint in common ⇒ the
+    // recipient couldn't redeem. Block before any session/navigation state.
+    if (plan.mode === 'block') {
+      if (plan.reason === 'no-shared-mint') {
+        await notifyNoSharedMint(displayName);
+      } else {
+        await notifyNutDropPeerNotReady(displayName);
+      }
+      return;
     }
-    return `${directLinkCount} direct · ${connectedCount - directLinkCount} mesh · ${peers.length} nearby`;
-  }, [connectedCount, directLinkCount, peers.length]);
-
-  const rootStyle = useMemo(() => [styles.root, { backgroundColor: background }], [background]);
-  const contentStyle = useMemo(
-    () => [styles.content, { paddingTop: headerHeight }],
-    [headerHeight]
-  );
-  const summaryStyle = useMemo(
-    () => [styles.summary, { borderBottomColor: withAlpha(foreground, 0.08) }],
-    [foreground]
-  );
-  const summaryTextStyle = useMemo(() => ({ color: withAlpha(foreground, 0.6) }), [foreground]);
-  const emptyIconColor = useMemo(() => withAlpha(foreground, 0.3), [foreground]);
-  const emptyTitleStyle = useMemo(
-    () => ({ color: withAlpha(foreground, 0.5), textAlign: 'center' as const }),
-    [foreground]
-  );
-  const emptyTextStyle = useMemo(
-    () => ({ color: withAlpha(foreground, 0.35), textAlign: 'center' as const }),
-    [foreground]
-  );
-
-  const handleSelectPeer = useCallback(
-    async (peer: BLEPeer) => {
-      const displayName = peerDisplayName(peer);
-      // Decide lock vs offline bearer from the peer's creq (accepted mints +
-      // lock key), our trusted mints, and online status. Delivery is always a
-      // private DM, but only after a valid creq proved the peer is patched.
-      const plan = planNearPaySend({
-        peer,
-        ourMints: walletContext.trustedMintUrls,
-        isOffline,
-      });
-      paymentLog.info('near_pay.peer.tap', {
-        source: 'peer-list',
-        ...nearPayPeerTapLog({ peer, plan, ourMints: walletContext.trustedMintUrls, isOffline }),
-      });
-      // No valid creq ⇒ not confirmed patched; no mint in common ⇒ the
-      // recipient couldn't redeem. Block before any session/navigation state.
-      if (plan.mode === 'block') {
-        if (plan.reason === 'no-shared-mint') {
-          await notifyNoSharedMint(displayName);
-        } else {
-          await notifyNutDropPeerNotReady(displayName);
-        }
+    // Offline bearer downgrade is never silent: confirm before sending an
+    // unlocked (bearer) token. (audit ND-2)
+    if (plan.mode === 'bearer' && plan.requiresConsent) {
+      const proceed = await confirmBearerDowngrade(displayName);
+      if (!proceed) {
+        paymentLog.info('near_pay.peer.bearer_downgrade_declined', { isOffline });
         return;
       }
-      // Offline bearer downgrade is never silent: confirm before sending an
-      // unlocked (bearer) token. (audit ND-2)
-      if (plan.mode === 'bearer' && plan.requiresConsent) {
-        const proceed = await confirmBearerDowngrade(displayName);
-        if (!proceed) {
-          paymentLog.info('near_pay.peer.bearer_downgrade_declined', { isOffline });
-          return;
-        }
+    }
+    const delivery: NearPayDelivery = { locked: plan.mode === 'lock' };
+    useNearPaySessionStore.getState().start({
+      peerID: peer.peerID,
+      nickname: displayName,
+      hasDirectLink: peer.hasDirectLink,
+      lastSeen: peer.lastSeen,
+      creq: peer.creq,
+      delivery,
+    });
+    // Failure paths must only unwind THIS selection — a newer session
+    // started meanwhile must survive a stale failure.
+    const sessionId = useNearPaySessionStore.getState().active?.id ?? null;
+    const clearOwnSession = () => {
+      if (useNearPaySessionStore.getState().active?.id === sessionId) {
+        useNearPaySessionStore.getState().clear();
       }
-      const delivery: NearPayDelivery = { locked: plan.mode === 'lock' };
-      useNearPaySessionStore.getState().start({
-        peerID: peer.peerID,
-        nickname: displayName,
-        hasDirectLink: peer.hasDirectLink,
-        lastSeen: peer.lastSeen,
-        creq: peer.creq,
-        delivery,
-      });
-      // Failure paths must only unwind THIS selection — a newer session
-      // started meanwhile must survive a stale failure.
-      const sessionId = useNearPaySessionStore.getState().active?.id ?? null;
-      const clearOwnSession = () => {
-        if (useNearPaySessionStore.getState().active?.id === sessionId) {
-          useNearPaySessionStore.getState().clear();
-        }
-      };
-      router.back();
-      // The sendComplete handler delivers the finished token as a private Noise
-      // DM to the recipient peer (no public mesh). A locked token is P2PK-locked
-      // to the peer's key + minted from a mint they accept; offline fallback is
-      // bearer from a shared mint. `allowedMints` constrains the source mint.
-      void machine
-        .startSendEcash({
-          reset: true,
-          ...(plan.mode === 'lock'
-            ? { p2pkLockPubkey: plan.lockPubkey, recipientPubkey: plan.recipientPubkey }
-            : {}),
-          ...(plan.allowedMints ? { allowedMints: plan.allowedMints } : {}),
-          recipientProfile: { displayName, avatarUrl: null, nip05: null },
-        })
-        .catch((err) => {
-          clearOwnSession();
-          paymentLog.error('near_pay.peer.list_start_send_failed', {
-            error: err instanceof Error ? err.message : String(err),
-          });
+    };
+    router.back();
+    // The sendComplete handler delivers the finished token as a private Noise
+    // DM to the recipient peer (no public mesh). A locked token is P2PK-locked
+    // to the peer's key + minted from a mint they accept; offline fallback is
+    // bearer from a shared mint. `allowedMints` constrains the source mint.
+    void machine
+      .startSendEcash({
+        reset: true,
+        ...(plan.mode === 'lock'
+          ? { p2pkLockPubkey: plan.lockPubkey, recipientPubkey: plan.recipientPubkey }
+          : {}),
+        ...(plan.allowedMints ? { allowedMints: plan.allowedMints } : {}),
+        recipientProfile: { displayName, avatarUrl: null, nip05: null },
+      })
+      .catch((err) => {
+        clearOwnSession();
+        paymentLog.error('near_pay.peer.list_start_send_failed', {
+          error: err instanceof Error ? err.message : String(err),
         });
-    },
-    [machine, walletContext.trustedMintUrls, isOffline]
-  );
+      });
+  };
 
-  const keyExtractor = useCallback((peer: BLEPeer) => peer.peerID, []);
-  const renderItem = useCallback(
-    ({ item }: { item: BLEPeer }) => <NearPayPeerRow peer={item} onSelect={handleSelectPeer} />,
-    [handleSelectPeer]
+  const renderItem = ({ item }: { item: BLEPeer }) => (
+    <NearPayPeerRow peer={item} onSelect={handleSelectPeer} />
   );
-  const emptyContent = useMemo(
-    () => (
-      <VStack align="center" gap={12} style={styles.emptyState}>
-        <Icon name="mdi:bluetooth" size={32} color={emptyIconColor} />
-        <Text size={16} style={emptyTitleStyle}>
-          No one nearby
-        </Text>
-        <Text size={13} style={emptyTextStyle}>
-          Keep the app open and nearby BitChat users will appear here.
-        </Text>
-      </VStack>
-    ),
-    [emptyIconColor, emptyTextStyle, emptyTitleStyle]
+  const emptyContent = (
+    <VStack align="center" gap={12} style={styles.emptyState}>
+      <Icon name="mdi:bluetooth" size={32} color={emptyIconColor} />
+      <Text size={16} style={emptyTitleStyle}>
+        No one nearby
+      </Text>
+      <Text size={13} style={emptyTextStyle}>
+        Keep the app open and nearby BitChat users will appear here.
+      </Text>
+    </VStack>
   );
 
   return (
@@ -251,7 +225,7 @@ export function NearPayPeerListScreen() {
         </HStack>
         <List
           data={sortedPeers}
-          keyExtractor={keyExtractor}
+          keyExtractor={peerKeyExtractor}
           renderItem={renderItem}
           keyboardDismissMode="on-drag"
           style={styles.list}

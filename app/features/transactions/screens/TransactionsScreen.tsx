@@ -16,7 +16,7 @@
  *   reclaims every visible row, plus per-row swipe-to-cancel.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from '@/shared/ui/primitives/View/View';
 import {
   Transactions,
@@ -121,35 +121,29 @@ export function TransactionsScreen({
   const [visiblePendingEcash, setVisiblePendingEcash] = useState<SendHistoryEntry[]>([]);
   const [isSweeping, setIsSweeping] = useState(false);
 
-  const reclaimOne = useCallback(
-    async (operationId: string): Promise<boolean> => {
-      const { start, succeed, fail } = useRollbackStore.getState();
-      start(operationId);
-      const ok = await attemptRollback(manager, operationId);
-      if (ok) succeed(operationId);
-      else fail(operationId);
-      return ok;
-    },
-    [manager]
-  );
+  const reclaimOne = async (operationId: string): Promise<boolean> => {
+    const { start, succeed, fail } = useRollbackStore.getState();
+    start(operationId);
+    const ok = await attemptRollback(manager, operationId);
+    if (ok) succeed(operationId);
+    else fail(operationId);
+    return ok;
+  };
 
-  const handleCancelOne = useCallback(
-    async (entry: SendHistoryEntry) => {
-      if (useRollbackStore.getState().inFlight.has(entry.operationId)) return;
-      if (isOffline) {
-        staticPopup('cancel-transaction-offline');
-        return;
-      }
-      log.info('transactions.pending.cancel.one', {
-        operationId: entry.operationId,
-        ...mintUrlLogFields(entry.mintUrl),
-      });
-      await reclaimOne(entry.operationId);
-    },
-    [isOffline, reclaimOne]
-  );
+  const handleCancelOne = async (entry: SendHistoryEntry) => {
+    if (useRollbackStore.getState().inFlight.has(entry.operationId)) return;
+    if (isOffline) {
+      staticPopup('cancel-transaction-offline');
+      return;
+    }
+    log.info('transactions.pending.cancel.one', {
+      operationId: entry.operationId,
+      ...mintUrlLogFields(entry.mintUrl),
+    });
+    await reclaimOne(entry.operationId);
+  };
 
-  const handleSweepVisible = useCallback(async () => {
+  const handleSweepVisible = async () => {
     if (isSweeping || visiblePendingEcash.length === 0) return;
     if (isOffline) {
       staticPopup('cancel-transaction-offline');
@@ -177,11 +171,11 @@ export function TransactionsScreen({
     } else {
       paramPopup('rollback-partial', { success, failed, total: targets.length });
     }
-  }, [isOffline, isSweeping, visiblePendingEcash, reclaimOne]);
+  };
 
-  const totalVisiblePendingAmount = useMemo(
-    () => visiblePendingEcash.reduce((sum, tx) => sum + amountToNumber(tx.amount), 0),
-    [visiblePendingEcash]
+  const totalVisiblePendingAmount = visiblePendingEcash.reduce(
+    (sum, tx) => sum + amountToNumber(tx.amount),
+    0
   );
   const visibleUnit = visiblePendingEcash[0]?.unit || selectedCurrency;
 
@@ -198,7 +192,7 @@ export function TransactionsScreen({
   // scrolls. With small pages the very first shot fires while the initial
   // fetch is still in flight, so this is the common path, not an edge case.
   const pendingLoadMoreRef = useRef(false);
-  const handleEndReached = useCallback(() => {
+  const handleEndReached = () => {
     if (!hasMore) return;
     if (isFetching) {
       pendingLoadMoreRef.current = true;
@@ -206,7 +200,7 @@ export function TransactionsScreen({
     }
     log.info('transactions.history.load_more', { loaded: history.length });
     void loadMore();
-  }, [hasMore, isFetching, loadMore, history.length]);
+  };
 
   // Drain a queued load once the in-flight fetch settles.
   useEffect(() => {
@@ -221,13 +215,11 @@ export function TransactionsScreen({
   // remount on every month change would reset the scroll position it tracks.
   const listKey = `${paymentType}-${direction}-${tab}-${selectedCurrency}-${filterMintUrl}`;
 
-  const filteredByTypeHistory = useMemo(() => {
-    return history.filter((historyEntry) => {
-      if (selectedCurrency !== 'all' && historyEntry.unit !== selectedCurrency) return false;
-      if (!matchesTransactionFilters(historyEntry, { paymentType, direction })) return false;
-      return true;
-    });
-  }, [history, selectedCurrency, paymentType, direction]);
+  const filteredByTypeHistory = history.filter((historyEntry) => {
+    if (selectedCurrency !== 'all' && historyEntry.unit !== selectedCurrency) return false;
+    if (!matchesTransactionFilters(historyEntry, { paymentType, direction })) return false;
+    return true;
+  });
 
   const parsedAccount = { unit: selectedCurrency };
 
@@ -245,13 +237,10 @@ export function TransactionsScreen({
     }
   }, [months, selectedMonth, handleMonthChange]);
 
-  const handlePillSelect = useCallback(
-    (key: string | null) => {
-      handleMonthChange(key);
-      if (key) transactionsRef.current?.scrollToMonth(key);
-    },
-    [handleMonthChange]
-  );
+  const handlePillSelect = (key: string | null) => {
+    handleMonthChange(key);
+    if (key) transactionsRef.current?.scrollToMonth(key);
+  };
 
   // A filter/tab change remounts the FlashList (new `listKey`) at the top;
   // jump back to the already-selected month so the viewport lands where the
@@ -266,30 +255,17 @@ export function TransactionsScreen({
   }, [listKey, selectedMonth]);
 
   // Manual scrolling drives the pill highlight via the topmost visible section.
-  const handleVisibleMonthChange = useCallback(
-    (monthKey: string) => {
-      handleMonthChange(monthKey);
-    },
-    [handleMonthChange]
-  );
+  const handleVisibleMonthChange = (monthKey: string) => {
+    handleMonthChange(monthKey);
+  };
 
-  const monthSelectorContent = useMemo(
-    () => (
-      <MonthSelector
-        months={months}
-        selectedMonth={selectedMonth}
-        onMonthChange={handlePillSelect}
-      />
-    ),
-    [months, selectedMonth, handlePillSelect]
+  const monthSelectorContent = (
+    <MonthSelector months={months} selectedMonth={selectedMonth} onMonthChange={handlePillSelect} />
   );
 
   // Reserves the full header height; the wrapper derives it from a frame-0-stable
   // value on iOS, so this spacer no longer reflows on a late header settle.
-  const listHeader = useMemo(
-    () => <View style={{ height: totalHeaderHeight }} />,
-    [totalHeaderHeight]
-  );
+  const listHeader = <View style={{ height: totalHeaderHeight }} />;
 
   // Footer: cancel-all button. Only on the Pending tab — surfacing a sweep
   // action while the user browses 'All' (mostly historical) mixes intents.
@@ -298,34 +274,24 @@ export function TransactionsScreen({
   // button label carries the exact count and amount.
   const showSweepFooter = tab === 'Pending' && visiblePendingEcash.length > 0;
 
-  const sweepFooter = useMemo(() => {
-    if (!showSweepFooter) return undefined;
-    return (
-      <BottomButtons>
-        <ButtonHandler
-          buttons={[
-            {
-              text: isSweeping
-                ? 'Cancelling...'
-                : `Cancel ${visiblePendingEcash.length} pending (${totalVisiblePendingAmount} ${visibleUnit.toUpperCase()})`,
-              variant: 'primary',
-              icon: 'mdi:broom',
-              loading: isSweeping,
-              disabled: isSweeping,
-              onPress: handleSweepVisible,
-            },
-          ]}
-        />
-      </BottomButtons>
-    );
-  }, [
-    showSweepFooter,
-    isSweeping,
-    visiblePendingEcash.length,
-    totalVisiblePendingAmount,
-    visibleUnit,
-    handleSweepVisible,
-  ]);
+  const sweepFooter = showSweepFooter ? (
+    <BottomButtons>
+      <ButtonHandler
+        buttons={[
+          {
+            text: isSweeping
+              ? 'Cancelling...'
+              : `Cancel ${visiblePendingEcash.length} pending (${totalVisiblePendingAmount} ${visibleUnit.toUpperCase()})`,
+            variant: 'primary',
+            icon: 'mdi:broom',
+            loading: isSweeping,
+            disabled: isSweeping,
+            onPress: handleSweepVisible,
+          },
+        ]}
+      />
+    </BottomButtons>
+  ) : undefined;
 
   return (
     <Screen

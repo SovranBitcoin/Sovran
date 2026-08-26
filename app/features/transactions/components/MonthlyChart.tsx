@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { StyleSheet, useWindowDimensions, View as RNView } from 'react-native';
 import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import Svg, { Path, Defs, LinearGradient, Stop, Text as SvgText } from 'react-native-svg';
@@ -121,15 +121,119 @@ const MODE_CONFIG: Record<
   },
 };
 
+function computeMonthlySeries({
+  history,
+  unit,
+  mockMode,
+  config,
+  quoteIdToGroup,
+  drawableWidth,
+  drawableHeight,
+}: {
+  history: HistoryEntry[];
+  unit: string;
+  mockMode: boolean;
+  config: (typeof MODE_CONFIG)[ChartMode];
+  quoteIdToGroup: Record<string, unknown>;
+  drawableWidth: number;
+  drawableHeight: number;
+}) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const daysInMonth = getDaysInMonth(year, month);
+  const todayDay = now.getDate();
+
+  const dailyAmounts = new Array<number>(daysInMonth).fill(0);
+
+  if (mockMode) {
+    for (let i = 0; i < todayDay; i++) {
+      dailyAmounts[i] = Math.round(
+        config.mockBase * config.mockPattern[i % config.mockPattern.length]
+      );
+    }
+  } else {
+    const monthStart = new Date(year, month, 1).getTime();
+    const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999).getTime();
+
+    const matching = history.filter((entry) => {
+      if (entry.unit !== unit) return false;
+      if (entry.createdAt < monthStart || entry.createdAt > monthEnd) return false;
+      if (entry.type === 'mint' || entry.type === 'melt') {
+        const quoteId = (entry as any).quoteId as string | undefined;
+        if (quoteId && quoteIdToGroup[quoteId]) return false;
+      }
+      return config.filter(entry);
+    });
+
+    for (const entry of matching) {
+      const day = new Date(entry.createdAt).getDate();
+      dailyAmounts[day - 1] += amountToNumber(entry.amount);
+    }
+  }
+
+  // Cumulative
+  const cumulative = new Array<number>(daysInMonth).fill(0);
+  cumulative[0] = dailyAmounts[0];
+  for (let i = 1; i < daysInMonth; i++) {
+    cumulative[i] = cumulative[i - 1] + dailyAmounts[i];
+  }
+
+  const totalAmount = cumulative[todayDay - 1];
+  const yesterdayTotal = todayDay > 1 ? cumulative[todayDay - 2] : 0;
+  const dailyChange = totalAmount - yesterdayTotal;
+
+  const avgDaily = todayDay > 0 ? totalAmount / todayDay : 0;
+  const projectedTotal = Math.round(avgDaily * daysInMonth);
+
+  const dayToX = (day: number) =>
+    CHART_PADDING_LEFT + ((day - 1) / (daysInMonth - 1)) * drawableWidth;
+  const yMax = Math.max(projectedTotal, totalAmount, 1);
+  const valueToY = (value: number) =>
+    CHART_PADDING_TOP + drawableHeight - (value / yMax) * drawableHeight;
+
+  const actualPoints: { x: number; y: number }[] = [];
+  for (let day = 1; day <= todayDay; day++) {
+    actualPoints.push({ x: dayToX(day), y: valueToY(cumulative[day - 1]) });
+  }
+
+  const projectedPoints: { x: number; y: number }[] = [];
+  projectedPoints.push({ x: dayToX(todayDay), y: valueToY(totalAmount) });
+  for (let day = todayDay + 1; day <= daysInMonth; day++) {
+    projectedPoints.push({
+      x: dayToX(day),
+      y: valueToY(totalAmount + avgDaily * (day - todayDay)),
+    });
+  }
+
+  return {
+    actualPoints,
+    projectedPoints,
+    totalAmount,
+    projectedTotal,
+    dailyChange,
+    daysInMonth,
+    todayDay,
+  };
+}
+
+function buildXTickPositions(daysInMonth: number, drawableWidth: number) {
+  const dayToX = (day: number) =>
+    CHART_PADDING_LEFT + ((day - 1) / (daysInMonth - 1)) * drawableWidth;
+
+  const ticks = X_TICKS.filter((d) => d <= daysInMonth);
+  if (ticks[ticks.length - 1] !== daysInMonth) {
+    ticks[ticks.length - 1] = daysInMonth;
+  }
+
+  return ticks.map((day) => ({ day, x: dayToX(day) }));
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-const MonthlyChart = React.memo(function MonthlyChart({
-  history,
-  unit = 'sat',
-  mode,
-}: MonthlyChartProps) {
+function MonthlyChart({ history, unit = 'sat', mode }: MonthlyChartProps) {
   const [muted, foreground, dangerColor, successColor] = useThemeColor([
     'muted',
     'foreground',
@@ -142,11 +246,11 @@ const MonthlyChart = React.memo(function MonthlyChart({
 
   const config = MODE_CONFIG[mode];
 
-  const borderColor = useMemo(() => withAlpha(muted, 0.3), [muted]);
+  const borderColor = withAlpha(muted, 0.3);
 
   const actualLineColor = mode === 'spent' ? dangerColor : successColor;
-  const projectedLineColor = useMemo(() => withAlpha(foreground, 0.3), [foreground]);
-  const labelColor = useMemo(() => withAlpha(foreground, 0.66), [foreground]);
+  const projectedLineColor = withAlpha(foreground, 0.3);
+  const labelColor = withAlpha(foreground, 0.66);
 
   // Use a unique gradient ID per mode to avoid SVG collisions when both charts render
   const gradientId = `monthlyGradient-${mode}`;
@@ -169,112 +273,28 @@ const MonthlyChart = React.memo(function MonthlyChart({
     dailyChange,
     daysInMonth,
     todayDay,
-  } = useMemo(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const daysInMonth = getDaysInMonth(year, month);
-    const todayDay = now.getDate();
-
-    const dailyAmounts = new Array<number>(daysInMonth).fill(0);
-
-    if (mockMode) {
-      for (let i = 0; i < todayDay; i++) {
-        dailyAmounts[i] = Math.round(
-          config.mockBase * config.mockPattern[i % config.mockPattern.length]
-        );
-      }
-    } else {
-      const monthStart = new Date(year, month, 1).getTime();
-      const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999).getTime();
-
-      const matching = history.filter((entry) => {
-        if (entry.unit !== unit) return false;
-        if (entry.createdAt < monthStart || entry.createdAt > monthEnd) return false;
-        if (entry.type === 'mint' || entry.type === 'melt') {
-          const quoteId = (entry as any).quoteId as string | undefined;
-          if (quoteId && quoteIdToGroup[quoteId]) return false;
-        }
-        return config.filter(entry);
-      });
-
-      for (const entry of matching) {
-        const day = new Date(entry.createdAt).getDate();
-        dailyAmounts[day - 1] += amountToNumber(entry.amount);
-      }
-    }
-
-    // Cumulative
-    const cumulative = new Array<number>(daysInMonth).fill(0);
-    cumulative[0] = dailyAmounts[0];
-    for (let i = 1; i < daysInMonth; i++) {
-      cumulative[i] = cumulative[i - 1] + dailyAmounts[i];
-    }
-
-    const totalAmount = cumulative[todayDay - 1];
-    const yesterdayTotal = todayDay > 1 ? cumulative[todayDay - 2] : 0;
-    const dailyChange = totalAmount - yesterdayTotal;
-
-    const avgDaily = todayDay > 0 ? totalAmount / todayDay : 0;
-    const projectedTotal = Math.round(avgDaily * daysInMonth);
-
-    const dayToX = (day: number) =>
-      CHART_PADDING_LEFT + ((day - 1) / (daysInMonth - 1)) * drawableWidth;
-    const yMax = Math.max(projectedTotal, totalAmount, 1);
-    const valueToY = (value: number) =>
-      CHART_PADDING_TOP + drawableHeight - (value / yMax) * drawableHeight;
-
-    const actualPoints: { x: number; y: number }[] = [];
-    for (let day = 1; day <= todayDay; day++) {
-      actualPoints.push({ x: dayToX(day), y: valueToY(cumulative[day - 1]) });
-    }
-
-    const projectedPoints: { x: number; y: number }[] = [];
-    projectedPoints.push({ x: dayToX(todayDay), y: valueToY(totalAmount) });
-    for (let day = todayDay + 1; day <= daysInMonth; day++) {
-      projectedPoints.push({
-        x: dayToX(day),
-        y: valueToY(totalAmount + avgDaily * (day - todayDay)),
-      });
-    }
-
-    return {
-      actualPoints,
-      projectedPoints,
-      totalAmount,
-      projectedTotal,
-      dailyChange,
-      daysInMonth,
-      todayDay,
-    };
-  }, [history, unit, mockMode, config, drawableWidth, drawableHeight, quoteIdToGroup]);
+  } = computeMonthlySeries({
+    history,
+    unit,
+    mockMode,
+    config,
+    quoteIdToGroup,
+    drawableWidth,
+    drawableHeight,
+  });
 
   // ---------------------------------------------------------------------------
   // Build SVG paths
   // ---------------------------------------------------------------------------
 
-  const actualPath = useMemo(() => buildSmoothPath(actualPoints), [actualPoints]);
-  const projectedPath = useMemo(() => buildSmoothPath(projectedPoints), [projectedPoints]);
-  const projectedAreaPath = useMemo(
-    () =>
-      buildAreaPath(
-        [...actualPoints, ...projectedPoints.slice(1)],
-        CHART_PADDING_TOP + drawableHeight
-      ),
-    [actualPoints, projectedPoints, drawableHeight]
+  const actualPath = buildSmoothPath(actualPoints);
+  const projectedPath = buildSmoothPath(projectedPoints);
+  const projectedAreaPath = buildAreaPath(
+    [...actualPoints, ...projectedPoints.slice(1)],
+    CHART_PADDING_TOP + drawableHeight
   );
 
-  const xTickPositions = useMemo(() => {
-    const dayToX = (day: number) =>
-      CHART_PADDING_LEFT + ((day - 1) / (daysInMonth - 1)) * drawableWidth;
-
-    const ticks = X_TICKS.filter((d) => d <= daysInMonth);
-    if (ticks[ticks.length - 1] !== daysInMonth) {
-      ticks[ticks.length - 1] = daysInMonth;
-    }
-
-    return ticks.map((day) => ({ day, x: dayToX(day) }));
-  }, [daysInMonth, drawableWidth]);
+  const xTickPositions = buildXTickPositions(daysInMonth, drawableWidth);
 
   const hasData = totalAmount > 0;
 
@@ -413,9 +433,7 @@ const MonthlyChart = React.memo(function MonthlyChart({
       </SquircleView>
     </Log>
   );
-});
-
-MonthlyChart.displayName = 'MonthlyChart';
+}
 
 // ---------------------------------------------------------------------------
 // Convenience wrappers
@@ -426,15 +444,13 @@ interface ChartWrapperProps {
   unit?: string;
 }
 
-export const SpentThisMonth = React.memo(function SpentThisMonth(props: ChartWrapperProps) {
+export function SpentThisMonth(props: ChartWrapperProps) {
   return <MonthlyChart {...props} mode="spent" />;
-});
-SpentThisMonth.displayName = 'SpentThisMonth';
+}
 
-export const ReceivedThisMonth = React.memo(function ReceivedThisMonth(props: ChartWrapperProps) {
+export function ReceivedThisMonth(props: ChartWrapperProps) {
   return <MonthlyChart {...props} mode="received" />;
-});
-ReceivedThisMonth.displayName = 'ReceivedThisMonth';
+}
 
 // ---------------------------------------------------------------------------
 // Styles

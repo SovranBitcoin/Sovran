@@ -4,15 +4,7 @@
  * typed contract and wires the bound actions through.
  */
 
-import { useCallback, useMemo } from 'react';
-import {
-  PixelRatio,
-  type StyleProp,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-  type ViewStyle,
-} from 'react-native';
+import { PixelRatio, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import type { ActionVariant, RecipientProfile, ScreenActionName } from 'wallet';
 import type { BoundAction, QuickSendSuggestion } from 'wallet/react';
@@ -65,6 +57,79 @@ function readAmountEntryFields(entry: Record<string, unknown>) {
     clampedToCap,
     inputCap,
   };
+}
+
+type NextExecuteParams = {
+  recipientPubkey?: string;
+  recipientProfile?: RecipientProfile;
+};
+
+// Map the colada availability variants (ecash/lightning/onchain on
+// send-money flows) into ActionMenuButton's variant shape. Each variant
+// invokes `actions.next.execute({ variantId })`, which routes through the
+// screen-action handler to the machine.
+function buildNextVariants(
+  nextAction: AmountEntryActions['next'],
+  nextExecuteParams: NextExecuteParams,
+  suppress: boolean
+): ActionMenuVariant[] | undefined {
+  if (suppress) return undefined;
+  const raw = nextAction.variants as ActionVariant[] | undefined;
+  if (!raw || raw.length === 0) return undefined;
+  return raw.map((v) => ({
+    id: v.id,
+    label: v.label,
+    description: v.description,
+    icon: v.icon,
+    isDisabled: !v.available,
+    reason: v.reason,
+    isDestructive: v.isDestructive,
+    onPress: async () => {
+      walletLog.info('amount.next.variant', {
+        variantId: v.id,
+        recipientPubkeyPresent: nextExecuteParams.recipientPubkey !== undefined,
+        recipientProfilePresent: nextExecuteParams.recipientProfile !== undefined,
+        recipientDisplayName: nextExecuteParams.recipientProfile?.displayName ?? null,
+      });
+      await nextAction.execute({ variantId: v.id, ...nextExecuteParams });
+    },
+  }));
+}
+
+function buildExtraButtons(
+  paste: AmountEntryActions['paste'],
+  scanQr: AmountEntryActions['scanQr'],
+  suppress: boolean
+): ButtonHandlerProps['buttons'] {
+  if (suppress) return [];
+  const buttons: ButtonHandlerProps['buttons'] = [];
+  if (paste.available) {
+    buttons.push({
+      testID: 'amount-paste',
+      text: 'Paste',
+      icon: 'lets-icons:copy',
+      variant: 'secondary',
+      onPress: async () => {
+        walletLog.info('amount.paste');
+        await paste.execute();
+      },
+      loading: paste.loading,
+    });
+  }
+  if (scanQr.available) {
+    buttons.push({
+      testID: 'amount-scan-qr',
+      text: 'Scan QR',
+      icon: 'stash:qr-code',
+      variant: 'secondary',
+      onPress: async () => {
+        walletLog.info('amount.scan_qr');
+        await scanQr.execute();
+      },
+      loading: scanQr.loading,
+    });
+  }
+  return buttons;
 }
 
 interface AmountSelectorProps {
@@ -126,68 +191,53 @@ export function AmountSelector({
     unitSymbol,
     clampedToCap,
     inputCap,
-  } = useMemo(() => readAmountEntryFields(entry), [entry]);
+  } = readAmountEntryFields(entry);
 
-  const handleKeyPress = useCallback(
-    (value: string) => {
-      walletLog.debug('amount.input.key', { value, inputMode });
-      void actions.setInput.execute({ input: value });
-    },
-    [actions.setInput, inputMode]
-  );
+  const handleKeyPress = (value: string) => {
+    walletLog.debug('amount.input.key', { value, inputMode });
+    void actions.setInput.execute({ input: value });
+  };
 
-  const handleSuggestionTap = useCallback(
-    (suggestion: QuickSendSuggestion) => {
-      walletLog.info('amount.suggestion.tap', {
-        amountValue: suggestion.amount.value,
-        amountUnit: suggestion.amount.unit,
-        label: suggestion.label,
-        mode: suggestion.inputMode,
-      });
-      void actions.setInput.execute({
-        input: suggestion.inputValue,
-        mode: suggestion.inputMode,
-      });
-    },
-    [actions.setInput]
-  );
+  const handleSuggestionTap = (suggestion: QuickSendSuggestion) => {
+    walletLog.info('amount.suggestion.tap', {
+      amountValue: suggestion.amount.value,
+      amountUnit: suggestion.amount.unit,
+      label: suggestion.label,
+      mode: suggestion.inputMode,
+    });
+    void actions.setInput.execute({
+      input: suggestion.inputValue,
+      mode: suggestion.inputMode,
+    });
+  };
 
-  const handleToggle = useCallback(() => {
+  const handleToggle = () => {
     walletLog.info('amount.input.toggle', { fromMode: inputMode });
     void actions.toggle.execute();
-  }, [actions.toggle, inputMode]);
+  };
 
   // Pack recipient identity into the execute params on every `next` call.
   // Spread by the action manager into `ctx`, then read by colada's
   // default `next` handler — undefined values are ignored downstream, so
   // safe to always include.
-  const nextExecuteParams = useMemo(
-    () => ({
-      ...(recipientPubkey ? { recipientPubkey } : {}),
-      ...(recipientProfile ? { recipientProfile } : {}),
-    }),
-    [recipientPubkey, recipientProfile]
-  );
+  const nextExecuteParams: NextExecuteParams = {
+    ...(recipientPubkey ? { recipientPubkey } : {}),
+    ...(recipientProfile ? { recipientProfile } : {}),
+  };
 
-  const handleNext = useCallback(async () => {
+  const handleNext = async () => {
     walletLog.info('amount.next', {
       numericValue,
       inputMode,
       unit,
       transactionType,
-      recipientPubkeyPresent: !!('recipientPubkey' in nextExecuteParams),
-      recipientProfilePresent: !!('recipientProfile' in nextExecuteParams),
-      recipientDisplayName:
-        (nextExecuteParams as { recipientProfile?: { displayName?: string } }).recipientProfile
-          ?.displayName ?? null,
+      recipientPubkeyPresent: nextExecuteParams.recipientPubkey !== undefined,
+      recipientProfilePresent: nextExecuteParams.recipientProfile !== undefined,
+      recipientDisplayName: nextExecuteParams.recipientProfile?.displayName ?? null,
     });
     await actions.next.execute(nextExecuteParams);
-  }, [actions.next, numericValue, inputMode, unit, transactionType, nextExecuteParams]);
+  };
 
-  // Map the colada availability variants (ecash/lightning/onchain on
-  // send-money flows) into ActionMenuButton's variant shape. Each variant
-  // invokes `actions.next.execute({ variantId })`, which routes through the
-  // screen-action handler to the machine.
   // The Send chooser's "Create Ecash" method is a deliberate, recipient-less
   // bearer-token entry: the only sensible action is creating the token.
   // Paste / Scan QR (which re-route the flow to a scanned destination) and
@@ -196,31 +246,11 @@ export function AmountSelector({
   // routstr-top-up suppression precedent below.
   const isCreateEcashEntry = entry?.entrySource === 'createEcash';
 
-  const nextVariants = useMemo<ActionMenuVariant[] | undefined>(() => {
-    if (suppressNextVariants || isCreateEcashEntry) return undefined;
-    const raw = actions.next.variants as ActionVariant[] | undefined;
-    if (!raw || raw.length === 0) return undefined;
-    return raw.map((v) => ({
-      id: v.id,
-      label: v.label,
-      description: v.description,
-      icon: v.icon,
-      isDisabled: !v.available,
-      reason: v.reason,
-      isDestructive: v.isDestructive,
-      onPress: async () => {
-        walletLog.info('amount.next.variant', {
-          variantId: v.id,
-          recipientPubkeyPresent: !!('recipientPubkey' in nextExecuteParams),
-          recipientProfilePresent: !!('recipientProfile' in nextExecuteParams),
-          recipientDisplayName:
-            (nextExecuteParams as { recipientProfile?: { displayName?: string } }).recipientProfile
-              ?.displayName ?? null,
-        });
-        await actions.next.execute({ variantId: v.id, ...nextExecuteParams });
-      },
-    }));
-  }, [actions.next, nextExecuteParams, suppressNextVariants, isCreateEcashEntry]);
+  const nextVariants = buildNextVariants(
+    actions.next,
+    nextExecuteParams,
+    suppressNextVariants || isCreateEcashEntry
+  );
 
   // The AI-credit top-up flow lands on this screen via a hand-rolled
   // navigation (`useRoutstrTopUpStore.start()` → `/(send-flow)/amount`),
@@ -231,37 +261,11 @@ export function AmountSelector({
   // the screen reduces to the keypad + Next button.
   const isRoutstrTopUpActive = useRoutstrTopUpStore((s) => s.active);
 
-  const extraButtons = useMemo((): ButtonHandlerProps['buttons'] => {
-    if (isRoutstrTopUpActive || isCreateEcashEntry) return [];
-    const buttons: ButtonHandlerProps['buttons'] = [];
-    if (actions.paste.available) {
-      buttons.push({
-        testID: 'amount-paste',
-        text: 'Paste',
-        icon: 'lets-icons:copy',
-        variant: 'secondary',
-        onPress: async () => {
-          walletLog.info('amount.paste');
-          await actions.paste.execute();
-        },
-        loading: actions.paste.loading,
-      });
-    }
-    if (actions.scanQr.available) {
-      buttons.push({
-        testID: 'amount-scan-qr',
-        text: 'Scan QR',
-        icon: 'stash:qr-code',
-        variant: 'secondary',
-        onPress: async () => {
-          walletLog.info('amount.scan_qr');
-          await actions.scanQr.execute();
-        },
-        loading: actions.scanQr.loading,
-      });
-    }
-    return buttons;
-  }, [isRoutstrTopUpActive, isCreateEcashEntry, actions.paste, actions.scanQr]);
+  const extraButtons = buildExtraButtons(
+    actions.paste,
+    actions.scanQr,
+    isRoutstrTopUpActive || isCreateEcashEntry
+  );
 
   const nextLoading = machineBusy || actions.next.loading;
   const nextDisabled = !actions.next.available;
@@ -274,18 +278,17 @@ export function AmountSelector({
   const minNoticeText = nextReasonBelowMin ? actions.next.reason : null;
   // Typing hit the cross-method envelope max and was capped — tell the user
   // why the digits stopped. Warning-tinted (the capped amount is valid).
-  const clampNoticeText = useMemo(() => {
-    if (!clampedToCap || !inputCap) return null;
-    const formatted = formatAmount(
-      { amount: inputCap.value, unit: inputCap.unit },
-      // Fiat caps carry their symbol; sats need the explicit unit name.
-      inputCap.unit === 'sat' ? { currencyDisplay: 'name' } : {}
-    );
-    return `Maximum ${formatted}`;
-  }, [clampedToCap, inputCap]);
+  const clampNoticeText =
+    clampedToCap && inputCap
+      ? `Maximum ${formatAmount(
+          { amount: inputCap.value, unit: inputCap.unit },
+          // Fiat caps carry their symbol; sats need the explicit unit name.
+          inputCap.unit === 'sat' ? { currencyDisplay: 'name' } : {}
+        )}`
+      : null;
   // The account/unit indicator replaces the sat account's currency swapper on
   // fiat accounts: it names the receiving account and opens the unit switcher.
-  const unitIndicator = useMemo(() => (unitSymbol ? <UnitSwitcherPill /> : null), [unitSymbol]);
+  const unitIndicator = unitSymbol ? <UnitSwitcherPill /> : null;
   // Over-balance is reported separately from `available`: an ecash send rounds
   // down to the balance and stays available, so it never surfaces as a notice.
   // The amount still reads as a problem (red) when the entry exceeds balance.
@@ -309,27 +312,11 @@ export function AmountSelector({
   //     visible padding inside the SwiftUI liquid-glass button instead
   //     of crowding the avatar + label + chevron row at 48 px.
   const { width: windowWidth } = useWindowDimensions();
-  const mintBottomSlotWidth = useMemo(
-    () => PixelRatio.roundToNearestPixel(windowWidth / 2),
-    [windowWidth]
-  );
-  const mintBottomPillWidth = useMemo(
-    () => Math.max(0, mintBottomSlotWidth - 8),
-    [mintBottomSlotWidth]
-  );
-  const mintBottomPillWrapperStyle = useMemo<StyleProp<ViewStyle>>(() => {
-    return [
-      styles.mintBottomPillWrapper,
-      {
-        width: mintBottomPillWidth,
-        height: 48,
-      },
-    ];
-  }, [mintBottomPillWidth]);
-  const leadingBottomButton = useMemo(() => {
-    if (!showMintBottomButton || !onRequestMintList) return undefined;
-    return (
-      <View style={mintBottomPillWrapperStyle}>
+  const mintBottomSlotWidth = PixelRatio.roundToNearestPixel(windowWidth / 2);
+  const mintBottomPillWidth = Math.max(0, mintBottomSlotWidth - 8);
+  const leadingBottomButton =
+    showMintBottomButton && onRequestMintList ? (
+      <View style={[styles.mintBottomPillWrapper, { width: mintBottomPillWidth, height: 48 }]}>
         <MintSelector
           testID="amount-mint-selector"
           selectedMintUrl={mintUrl}
@@ -339,14 +326,7 @@ export function AmountSelector({
           contentHeight={32}
         />
       </View>
-    );
-  }, [
-    showMintBottomButton,
-    onRequestMintList,
-    mintUrl,
-    mintBottomPillWidth,
-    mintBottomPillWrapperStyle,
-  ]);
+    ) : undefined;
 
   return (
     <Log name="AmountSelector" style={styles.amountSelectorRoot}>

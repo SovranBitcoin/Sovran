@@ -3,7 +3,7 @@
  * instead of `actionMenuPopup` so it stacks above send-flow route modals.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Keyboard,
   type KeyboardEvent,
@@ -69,6 +69,8 @@ function isMentionSearchResult(result: DisplayResult): result is MentionSearchRe
   return !!result.profile && !!result.pubkey && !result.pubkey.startsWith('placeholder-');
 }
 
+const mentionKeyExtractor = (item: MentionSearchResult) => item.pubkey;
+
 function renderMentionScrollComponent(props: ScrollViewProps) {
   // This list is nested inside a fixed-height panel. Avoid BottomSheetScrollView
   // here because its content-size setter can shrink the whole dynamic sheet
@@ -130,60 +132,47 @@ export function SendMemoContent({ payload, close }: SendMemoContentProps): React
     ] as const);
   const [isFocused, setIsFocused] = useState(false);
   const canSubmit = memo.trim().length > 0;
-  const mentionToken = useMemo(
-    () => (selection.start === selection.end ? findActiveMemoMention(memo, selection.start) : null),
-    [memo, selection.end, selection.start]
-  );
+  const mentionToken =
+    selection.start === selection.end ? findActiveMemoMention(memo, selection.start) : null;
 
-  const submit = useCallback(() => {
+  const submit = () => {
     if (!canSubmit) return;
     submitSendMemo(payload.machine, serializeMemoWithMentions(memo, mentionEntities));
     close();
-  }, [canSubmit, close, memo, mentionEntities, payload.machine]);
+  };
 
-  const skip = useCallback(() => {
+  const skip = () => {
     submitSendMemo(payload.machine, undefined);
     close();
-  }, [close, payload.machine]);
+  };
 
-  const handleMemoChange = useCallback(
-    (nextMemo: string) => {
-      setMentionEntities((current) => reconcileMemoMentionEntities(memo, nextMemo, current));
-      setMemo(nextMemo);
-    },
-    [memo]
-  );
+  const handleMemoChange = (nextMemo: string) => {
+    setMentionEntities((current) => reconcileMemoMentionEntities(memo, nextMemo, current));
+    setMemo(nextMemo);
+  };
 
-  const handleSelectionChange = useCallback(
-    (event: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
-      setSelection(event.nativeEvent.selection);
-      setSelectionOverride(undefined);
-    },
-    []
-  );
+  const handleSelectionChange = (
+    event: NativeSyntheticEvent<TextInputSelectionChangeEventData>
+  ) => {
+    setSelection(event.nativeEvent.selection);
+    setSelectionOverride(undefined);
+  };
 
-  const handleChromeLayout = useCallback((event: LayoutChangeEvent) => {
+  const handleChromeLayout = (event: LayoutChangeEvent) => {
     const nextHeight = event.nativeEvent.layout.height;
     setChromeHeight((current) => (Math.abs(current - nextHeight) <= 1 ? current : nextHeight));
-  }, []);
-
-  const handleKeyboardShow = useCallback(
-    (event: KeyboardEvent) => {
-      const screenY = event.endCoordinates?.screenY ?? windowHeight;
-      setKeyboardHeight(Math.max(0, windowHeight - screenY));
-    },
-    [windowHeight]
-  );
-
-  const handleKeyboardHide = useCallback(() => {
-    setKeyboardHeight(0);
-  }, []);
+  };
 
   useEffect(() => {
-    const willShow = Keyboard.addListener('keyboardWillShow', handleKeyboardShow);
-    const didShow = Keyboard.addListener('keyboardDidShow', handleKeyboardShow);
-    const willHide = Keyboard.addListener('keyboardWillHide', handleKeyboardHide);
-    const didHide = Keyboard.addListener('keyboardDidHide', handleKeyboardHide);
+    const onKeyboardShow = (event: KeyboardEvent) => {
+      const screenY = event.endCoordinates?.screenY ?? windowHeight;
+      setKeyboardHeight(Math.max(0, windowHeight - screenY));
+    };
+    const onKeyboardHide = () => setKeyboardHeight(0);
+    const willShow = Keyboard.addListener('keyboardWillShow', onKeyboardShow);
+    const didShow = Keyboard.addListener('keyboardDidShow', onKeyboardShow);
+    const willHide = Keyboard.addListener('keyboardWillHide', onKeyboardHide);
+    const didHide = Keyboard.addListener('keyboardDidHide', onKeyboardHide);
 
     return () => {
       willShow.remove();
@@ -191,64 +180,53 @@ export function SendMemoContent({ payload, close }: SendMemoContentProps): React
       willHide.remove();
       didHide.remove();
     };
-  }, [handleKeyboardHide, handleKeyboardShow]);
+  }, [windowHeight]);
 
-  const mentionPanelHeight = useMemo(() => {
-    return getSendMemoMentionPanelHeight({
-      windowHeight,
-      insetTop: insets.top,
-      keyboardHeight,
-      chromeHeight,
+  const mentionPanelHeight = getSendMemoMentionPanelHeight({
+    windowHeight,
+    insetTop: insets.top,
+    keyboardHeight,
+    chromeHeight,
+  });
+
+  const insertMention = (result: MentionSearchResult) => {
+    if (!mentionToken) return;
+
+    const nprofile = createMemoMentionNprofile(result.pubkey, defaultRelays);
+    const displayName = resolveIdentityName({
+      pubkey: result.pubkey,
+      nostrProfile: result.profile,
     });
-  }, [chromeHeight, insets.top, keyboardHeight, windowHeight]);
+    const next = insertMemoMentionProfile(
+      memo,
+      mentionToken,
+      { displayName, nprofile },
+      mentionEntities
+    );
+    const nextSelection = { start: next.cursor, end: next.cursor };
+    setMemo(next.value);
+    setMentionEntities(next.entities);
+    setSelection(nextSelection);
+    setSelectionOverride(nextSelection);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
 
-  const insertMention = useCallback(
-    (result: MentionSearchResult) => {
-      if (!mentionToken) return;
-
-      const nprofile = createMemoMentionNprofile(result.pubkey, defaultRelays);
-      const displayName = resolveIdentityName({
-        pubkey: result.pubkey,
-        nostrProfile: result.profile,
-      });
-      const next = insertMemoMentionProfile(
-        memo,
-        mentionToken,
-        { displayName, nprofile },
-        mentionEntities
-      );
-      const nextSelection = { start: next.cursor, end: next.cursor };
-      setMemo(next.value);
-      setMentionEntities(next.entities);
-      setSelection(nextSelection);
-      setSelectionOverride(nextSelection);
-      requestAnimationFrame(() => inputRef.current?.focus());
+  const inputStyle = [
+    styles.input,
+    {
+      borderColor: isFocused ? accentBorder : defaultBorder,
+      backgroundColor: defaultBg,
+      color: foreground,
     },
-    [memo, mentionEntities, mentionToken]
-  );
+  ];
 
-  const inputStyle = useMemo(
-    () => [
-      styles.input,
-      {
-        borderColor: isFocused ? accentBorder : defaultBorder,
-        backgroundColor: defaultBg,
-        color: foreground,
-      },
-    ],
-    [accentBorder, defaultBg, defaultBorder, foreground, isFocused]
-  );
-
-  const sendButtonStyle = useMemo(
-    () => [
-      styles.sendButton,
-      {
-        backgroundColor: foreground,
-        opacity: canSubmit ? 1 : 0.5,
-      },
-    ],
-    [canSubmit, foreground]
-  );
+  const sendButtonStyle = [
+    styles.sendButton,
+    {
+      backgroundColor: foreground,
+      opacity: canSubmit ? 1 : 0.5,
+    },
+  ];
 
   const sendIconColor = background;
 
@@ -325,49 +303,40 @@ function MentionSearchResults({
   const [foreground] = useThemeColor(['foreground'] as const);
   const { displayResults, searchLoading, hasSearched } = useContactSearch(query);
   const trimmedQuery = query.trim();
-  const rawResults = useMemo(() => displayResults.filter(isMentionSearchResult), [displayResults]);
-  const resultPubkeys = useMemo(() => rawResults.map((result) => result.pubkey), [rawResults]);
+  const rawResults = displayResults.filter(isMentionSearchResult);
+  const resultPubkeys = rawResults.map((result) => result.pubkey);
   const { metadata: cachedMetadata } = useNostrProfileMetadataMany(resultPubkeys);
-  const results = useMemo(
-    () =>
-      rawResults.map((result) => {
-        const cached = cachedMetadata.get(result.pubkey);
-        if (!cached) return result;
-        return {
-          ...result,
-          profile: {
-            ...result.profile,
-            displayName: cached.displayName ?? result.profile.displayName,
-            name: cached.name ?? result.profile.name,
-            picture: cached.picture ?? result.profile.picture ?? result.profile.image,
-            nip05: cached.nip05 ?? result.profile.nip05,
-            banner: cached.banner ?? result.profile.banner,
-            lud16: cached.lud16 ?? result.profile.lud16,
-            about: cached.about ?? result.profile.about,
-            website: cached.website ?? result.profile.website,
-          },
-        };
-      }),
-    [cachedMetadata, rawResults]
-  );
+  const results = rawResults.map((result) => {
+    const cached = cachedMetadata.get(result.pubkey);
+    if (!cached) return result;
+    return {
+      ...result,
+      profile: {
+        ...result.profile,
+        displayName: cached.displayName ?? result.profile.displayName,
+        name: cached.name ?? result.profile.name,
+        picture: cached.picture ?? result.profile.picture ?? result.profile.image,
+        nip05: cached.nip05 ?? result.profile.nip05,
+        banner: cached.banner ?? result.profile.banner,
+        lud16: cached.lud16 ?? result.profile.lud16,
+        about: cached.about ?? result.profile.about,
+        website: cached.website ?? result.profile.website,
+      },
+    };
+  });
   const isShortQuery = trimmedQuery.length > 0 && trimmedQuery.length < CONTACT_SEARCH_MIN_LENGTH;
   const showSkeletons =
     trimmedQuery.length >= CONTACT_SEARCH_MIN_LENGTH &&
     results.length === 0 &&
     (searchLoading || !hasSearched);
-  const renderResult = useCallback(
-    ({ item }: { item: MentionSearchResult }) => (
-      <ContactRow
-        identity={nostrIdentity(item.pubkey, item.profile)}
-        trailingVariant="none"
-        onPress={() => onSelectResult(item)}
-        testID={`send-memo-mention:${item.pubkey}`}
-      />
-    ),
-    [onSelectResult]
+  const renderResult = ({ item }: { item: MentionSearchResult }) => (
+    <ContactRow
+      identity={nostrIdentity(item.pubkey, item.profile)}
+      trailingVariant="none"
+      onPress={() => onSelectResult(item)}
+      testID={`send-memo-mention:${item.pubkey}`}
+    />
   );
-
-  const keyExtractor = useCallback((item: MentionSearchResult) => item.pubkey, []);
 
   let content: React.ReactNode;
   if (trimmedQuery.length === 0) {
@@ -412,7 +381,7 @@ function MentionSearchResults({
     content = (
       <List<MentionSearchResult>
         data={results}
-        keyExtractor={keyExtractor}
+        keyExtractor={mentionKeyExtractor}
         renderItem={renderResult}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="always"

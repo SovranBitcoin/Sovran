@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 
@@ -74,23 +74,23 @@ export function WalletScreen() {
 
   const [contentHeight, setContentHeight] = useState(0);
 
-  const onContentSizeChange = useCallback((_width: number, height: number) => {
+  const onContentSizeChange = (_width: number, height: number) => {
     setContentHeight(height);
-  }, []);
+  };
 
   // The active mint unit scopes the whole wallet view (balance, machine,
   // history filter, receive/send defaults). Persisted per profile.
   const { unit: activeUnit } = useActiveUnit();
-  const account = useMemo(() => ({ unit: activeUnit }), [activeUnit]);
+  const account = { unit: activeUnit };
 
   // ALL units, unfiltered: the transaction list is shared by every carousel
   // account, so switching accounts never reloads it — which was the
   // remaining content shift on commit (the list re-filtered and re-rendered
   // exactly as the unit landed).
   const { history, refresh } = useHistoryWithMelts(100);
-  const handlePullToAiRefresh = useCallback(() => {
+  const handlePullToAiRefresh = () => {
     void refresh();
-  }, [refresh]);
+  };
   const pullToAi = usePullToAiRefreshControl({ onRefresh: handlePullToAiRefresh });
   useVersionCheck();
 
@@ -105,13 +105,13 @@ export function WalletScreen() {
   // progress" errors. Greying out is the cheapest user-visible indicator.
   const isSwapping = useSwapStatusStore((s) => s.active?.state === 'running');
 
-  const handleReceive = useCallback(() => {
+  const handleReceive = () => {
     walletLog.info('wallet.action.receive', { unit: account.unit });
     clearPaymentContext('wallet.receive');
     void machine.startReceive({ reset: true });
-  }, [machine, account.unit]);
+  };
 
-  const handleScanQR = useCallback(async () => {
+  const handleScanQR = async () => {
     walletLog.info('wallet.action.scan_qr', { unit: account.unit });
     const granted = await handlePermission();
     if (!granted) {
@@ -123,29 +123,29 @@ export function WalletScreen() {
       pathname: '/camera',
       params: { to: 'sendToken', unit: account.unit },
     });
-  }, [handlePermission, account.unit]);
+  };
 
-  const handleSend = useCallback(async () => {
+  const handleSend = async () => {
     walletLog.info('wallet.action.send', { unit: account.unit });
     clearPaymentContext('wallet.send');
     // Destination-first: open the Send method chooser (QR / Create Ecash / NFC
     // / Nut Drop + destination input + contact search) rather than jumping
     // straight to amount entry. The chosen method drives the rest of the flow.
     await machine.startSend({ reset: true });
-  }, [machine, account.unit]);
+  };
 
-  const handleTheme = useCallback(() => {
+  const handleTheme = () => {
     walletLog.info('wallet.theme.tap');
     router.push('/(theme-flow)/preview');
-  }, []);
+  };
 
-  const handleSplit = useCallback(() => {
+  const handleSplit = () => {
     walletLog.info('wallet.swap.tap', { unit: account.unit });
     router.navigate({
       pathname: '/(mint-flow)/distribution',
       params: { unit: account.unit },
     });
-  }, [account.unit]);
+  };
 
   // Android hybrid tap-to-pay: the ambient focus loop owns NFC scanning.
   // The wallet screen no longer has an NFC button (the affordance lives in
@@ -161,29 +161,26 @@ export function WalletScreen() {
   // Secondary wallet actions in priority order. CircleActionRow decides what
   // to render: today's two actions are two circle buttons; a fourth would
   // collapse the tail into "More". NFC and Nut Drop live in the Send modal.
-  const secondaryActions = useMemo<CircleRowAction[]>(
-    () => [
-      {
-        icon: 'mdi:swap-horizontal',
-        systemIcon: 'arrow.left.arrow.right',
-        label: 'Split',
-        menuText: 'Balance split',
-        description: 'Rebalance funds across mints',
-        testID: 'wallet-split',
-        disabled: isSwapping,
-        onPress: handleSplit,
-      },
-      {
-        icon: 'mdi:palette',
-        systemIcon: 'paintpalette',
-        label: 'Theme',
-        description: 'Change wallet appearance',
-        testID: 'wallet-theme',
-        onPress: handleTheme,
-      },
-    ],
-    [isSwapping, handleSplit, handleTheme]
-  );
+  const secondaryActions: CircleRowAction[] = [
+    {
+      icon: 'mdi:swap-horizontal',
+      systemIcon: 'arrow.left.arrow.right',
+      label: 'Split',
+      menuText: 'Balance split',
+      description: 'Rebalance funds across mints',
+      testID: 'wallet-split',
+      disabled: isSwapping,
+      onPress: handleSplit,
+    },
+    {
+      icon: 'mdi:palette',
+      systemIcon: 'paintpalette',
+      label: 'Theme',
+      description: 'Change wallet appearance',
+      testID: 'wallet-theme',
+      onPress: handleTheme,
+    },
+  ];
 
   // Keep BootEntrance and the wallet body mounted across the search toggle so
   // the splash→QR morph never replays and closing search restores this screen.
