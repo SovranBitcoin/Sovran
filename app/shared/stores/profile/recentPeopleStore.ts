@@ -5,10 +5,13 @@ import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import {
+  isNostrPubkeyHex,
+  NostrPubkeyHexSchema,
+  type NostrPubkeyHex,
+} from '@/shared/lib/protocolIds';
 
 export const MAX_RECENT_PEOPLE = 20;
-
-const HEX_PUBKEY_RE = /^[0-9a-f]{64}$/;
 
 /**
  * Why a person is in this store — its provenance. The store owns ONLY the two
@@ -63,9 +66,11 @@ interface RecentPeopleState {
   clearRecentPeople: () => void;
 }
 
-export function normalizeRecentPersonPubkey(pubkey: string | null | undefined): string | null {
+export function normalizeRecentPersonPubkey(
+  pubkey: string | null | undefined
+): NostrPubkeyHex | null {
   const normalized = pubkey?.trim().toLowerCase();
-  if (!normalized || !HEX_PUBKEY_RE.test(normalized)) return null;
+  if (!normalized || !isNostrPubkeyHex(normalized)) return null;
   return normalized;
 }
 
@@ -119,7 +124,7 @@ export function selectRecentPeople(
 const RecentPersonReasonSchema = z.enum(['search', 'peer']).default('search').catch('search');
 
 const PersistedRecentPersonEntry = z.looseObject({
-  pubkey: z.string().regex(HEX_PUBKEY_RE),
+  pubkey: NostrPubkeyHexSchema,
   firstOpenedAt: z.number().int().nonnegative(),
   lastOpenedAt: z.number().int().nonnegative(),
   reason: RecentPersonReasonSchema,

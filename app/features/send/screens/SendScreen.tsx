@@ -61,6 +61,7 @@ import { useQuickPayPeople, type QuickPayPerson } from '@/features/send/hooks/us
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
+import type { NostrPubkeyHex } from '@/shared/lib/protocolIds';
 import { normalizeRecentPersonPubkey } from '@/shared/stores/profile/recentPeopleStore';
 import type { NostrSearchResult } from '@/shared/lib/apiClient';
 import { useNfcSupported } from '@/shared/lib/nfc';
@@ -154,7 +155,7 @@ export function SendScreen({ unit }: { unit: string }) {
     () =>
       freshPeers
         .map((p) => normalizeRecentPersonPubkey(peerNostrPubkey(p)))
-        .filter((key): key is string => !!key),
+        .filter((key): key is NostrPubkeyHex => !!key),
     [freshPeers]
   );
 
@@ -421,7 +422,9 @@ export function SendScreen({ unit }: { unit: string }) {
 
   // Anyone already surfaced in the Nearby tier is dropped from the live People
   // results so they don't appear twice (recents already exclude them in-hook).
-  const pinnedPubkeys = useMemo(() => new Set(livePeerPubkeys), [livePeerPubkeys]);
+  // Set<string> (not the brand): membership is checked against unbranded
+  // wire-row pubkeys; branded values assign into it fine.
+  const pinnedPubkeys = useMemo(() => new Set<string>(livePeerPubkeys), [livePeerPubkeys]);
   // Live search rows: keep placeholder rows (they paint the loading skeletons)
   // but drop real rows already pinned in Nearby.
   const renderedPeople = useMemo(

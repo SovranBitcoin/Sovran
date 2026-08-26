@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { backendConfig } from '@/shared/config/backend';
 import { fetchJson } from '@/shared/lib/apiClient';
+import type { NostrPubkeyHex } from '@/shared/lib/protocolIds';
 import {
   Kind0MetadataSchema,
   type NostrProfileMetadata,
@@ -145,12 +146,12 @@ export async function fetchRecentPeopleProfiles(
   return ok(mapRecentPeopleProfileEvents(result.value.data?.events?.nodes ?? []));
 }
 
-function uniquePubkeys(pubkeys: readonly string[]): string[] {
+function uniquePubkeys(pubkeys: readonly string[]): NostrPubkeyHex[] {
   return Array.from(
     new Set(
       pubkeys
         .map((pubkey) => normalizeRecentPersonPubkey(pubkey))
-        .filter((pubkey): pubkey is string => !!pubkey)
+        .filter((pubkey): pubkey is NostrPubkeyHex => !!pubkey)
     )
   );
 }

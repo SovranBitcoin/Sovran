@@ -24,15 +24,7 @@ export type NostrPubkeyHex = Brand<string, 'nostr.pubkey.hex'>;
  */
 export type CashuP2pkPubkey = Brand<string, 'cashu.p2pk.pubkey'>;
 
-/**
- * Curve25519 Noise static key hex (bitchat's own identity, present for every
- * BLE peer). Shape-identical to `NostrPubkeyHex` — 64 hex — but a DIFFERENT
- * curve: never use one where the other is expected (no kind-0 lookups by
- * noise key, no DMs addressed by noise key).
- */
-export type NoisePubkeyHex = Brand<string, 'bitchat.noise.pubkey'>;
-
-export const NOSTR_PUBKEY_HEX_RE = /^[0-9a-f]{64}$/;
+const NOSTR_PUBKEY_HEX_RE = /^[0-9a-f]{64}$/;
 export const CASHU_P2PK_PUBKEY_RE = /^0[23][0-9a-f]{64}$/i;
 
 /**
@@ -66,7 +58,7 @@ export function nostrPubkeyHexFromCashuP2pk(value: string): NostrPubkeyHex {
 
 /** NIP-01 event id: sha256 of the serialized event — 64 hex, shape-identical
  * to a pubkey but a DIFFERENT thing; never validate one as the other's type. */
-export type NostrEventId = Brand<string, 'nostr.event.id'>;
+type NostrEventId = Brand<string, 'nostr.event.id'>;
 
 // Shared case-tolerant 64-hex runtime check (reads must stay byte-compatible
 // with historically-accepted persisted data — sovran-data; NIP-01 says

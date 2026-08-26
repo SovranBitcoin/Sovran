@@ -1763,10 +1763,7 @@ exports[`persisted schema drift recent-people-store schema matches the golden sn
               "minimum": 0,
               "type": "integer",
             },
-            "pubkey": {
-              "pattern": "^[0-9a-f]{64}$",
-              "type": "string",
-            },
+            "pubkey": {},
             "reason": {
               "default": "search",
               "enum": [

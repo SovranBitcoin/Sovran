@@ -359,7 +359,7 @@ const SUBTITLE_PLACEHOLDER_WIDTHS = [
 /** Cheap, stable, non-cryptographic hash for picking deterministic skeleton
  *  widths from a seed (pubkey, mintUrl, etc.). Same seed → same widths
  *  across re-renders, so the skeletons don't flicker between sizes. */
-function hashSeed(seed: string): number {
+function hashString(seed: string): number {
   let h = 0;
   for (let i = 0; i < seed.length; i++) {
     h = (h * 31 + seed.charCodeAt(i)) | 0;
@@ -369,7 +369,7 @@ function hashSeed(seed: string): number {
 
 function pickPlaceholder(seed: string | undefined, options: readonly string[]): string {
   if (!seed || options.length === 0) return options[0] ?? '';
-  return options[hashSeed(seed) % options.length];
+  return options[hashString(seed) % options.length];
 }
 
 const DEFAULT_STATS_BY_KIND: Record<Identity['kind'], readonly StatKey[]> = {
@@ -394,7 +394,7 @@ function find<K extends Identity['kind']>(
   return ids.find((i): i is Extract<Identity, { kind: K }> => i.kind === kind);
 }
 
-function derivePicture(ids: Identity[]): string | undefined {
+function resolvePicture(ids: Identity[]): string | undefined {
   return (
     find(ids, 'mint')?.iconUrl ??
     find(ids, 'nostr')?.profile?.picture ??
@@ -404,7 +404,7 @@ function derivePicture(ids: Identity[]): string | undefined {
   );
 }
 
-function deriveSeed(ids: Identity[]): string | undefined {
+function resolveAvatarSeed(ids: Identity[]): string | undefined {
   const mint = find(ids, 'mint');
   if (mint) return mint.mintUrl;
   const nostr = find(ids, 'nostr');
@@ -418,7 +418,7 @@ function deriveSeed(ids: Identity[]): string | undefined {
   return undefined;
 }
 
-function deriveName(ids: Identity[]): string | undefined {
+function resolveName(ids: Identity[]): string | undefined {
   const mint = find(ids, 'mint');
   const nostr = find(ids, 'nostr');
   const self = find(ids, 'self');
@@ -434,13 +434,13 @@ function deriveName(ids: Identity[]): string | undefined {
   });
 
   // The helper always returns a string. When the row is a pure-geohash
-  // row with no pubkey or label, return undefined so deriveTitleFallback
+  // row with no pubkey or label, return undefined so resolveTitleFallback
   // can produce the `#geohash` form.
   if (resolved === 'Unknown') return undefined;
   return resolved;
 }
 
-function deriveTitleFallback(ids: Identity[]): string | undefined {
+function resolveTitleFallback(ids: Identity[]): string | undefined {
   const nostr = find(ids, 'nostr');
   if (nostr?.pubkey) return nostr.pubkey.slice(0, 12) + '...';
   const self = find(ids, 'self');
@@ -455,7 +455,7 @@ function deriveTitleFallback(ids: Identity[]): string | undefined {
 /** Default subtitle per kind. Nostr identities leave it empty — their
  *  second line is the NIP-05 pill on the accent row. Mint identities
  *  render balance via AmountFormatter in the component body. */
-function deriveSubtitle(ids: Identity[]): string | undefined {
+function resolveSubtitle(ids: Identity[]): string | undefined {
   const ble = find(ids, 'ble');
   if (ble) {
     if (ble.isConnected === undefined) return undefined;
@@ -676,9 +676,9 @@ export function ContactRow({
 
   // ---- Leading ----------------------------------------------------------
 
-  const picture = derivePicture(identities);
-  const seed = deriveSeed(identities);
-  const name = deriveName(identities);
+  const picture = resolvePicture(identities);
+  const seed = resolveAvatarSeed(identities);
+  const name = resolveName(identities);
   const avatarState = resolvedLoading ? 'loading' : picture ? 'image' : 'fallback';
 
   let leadingNode: ReactNode | undefined;
@@ -715,7 +715,7 @@ export function ContactRow({
   // ---- Title ------------------------------------------------------------
 
   const titleBase = titleOverride ?? name;
-  const titleFallback = deriveTitleFallback(identities);
+  const titleFallback = resolveTitleFallback(identities);
   const isCurrentSelf = !!self?.isActive;
 
   // While loading, keep the title a plain string so ListRow renders the title
@@ -775,7 +775,7 @@ export function ContactRow({
       />
     );
   } else {
-    subtitleNode = deriveSubtitle(identities);
+    subtitleNode = resolveSubtitle(identities);
   }
 
   // ---- Accent (stats + NIP-05) -----------------------------------------
