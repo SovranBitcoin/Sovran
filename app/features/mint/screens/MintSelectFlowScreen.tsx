@@ -53,12 +53,13 @@ export function MintSelectFlowScreen({ flow, mintSelectorEntry }: MintSelectFlow
   const liveSelectMint =
     execution.step === 'selectMint' ? (execution.details as StepDataMap['selectMint']) : null;
   const candidateMintUrls = liveSelectMint?.candidates.map((candidate) => candidate.mintUrl) ?? [];
+  // Optional chain resolved before the callback: React Compiler cannot validate
+  // a dependency that is itself an optional chain, and refuses to preserve the
+  // memo when it sees one.
+  const selectMintScope = liveSelectMint?.scope;
   const refreshMintSelector = useCallback(
-    () =>
-      machine.requestMintSelector(
-        liveSelectMint?.scope ? { scope: liveSelectMint.scope } : undefined
-      ),
-    [liveSelectMint?.scope, machine]
+    () => machine.requestMintSelector(selectMintScope ? { scope: selectMintScope } : undefined),
+    [selectMintScope, machine]
   );
 
   useRefreshMintSelectorOnFocus({

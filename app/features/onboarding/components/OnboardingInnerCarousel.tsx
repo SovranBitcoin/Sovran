@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Platform, useWindowDimensions, ViewToken } from 'react-native';
 
 import Animated, {
@@ -22,6 +22,14 @@ import { OnboardingCarouselProps, OnboardingSlide } from './types';
 import { log, Log } from '@/shared/lib/logger';
 
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList<OnboardingSlide>);
+
+/** A slide counts as viewed only when fully on screen. Constant — it never
+ *  depended on anything, and a `useRef(...).current` read in render is one
+ *  React Compiler skips the carousel for. */
+const VIEWABILITY_CONFIG = {
+  itemVisiblePercentThreshold: 100,
+  minimumViewTime: 0,
+};
 
 const OnboardingInnerCarousel: React.FC<OnboardingCarouselProps> = ({
   setCurrentSlideIndex,
@@ -54,11 +62,6 @@ const OnboardingInnerCarousel: React.FC<OnboardingCarouselProps> = ({
     },
     [setCurrentSlideIndex]
   );
-
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 100,
-    minimumViewTime: 0,
-  }).current;
 
   const handleScrollToIndex = useCallback(
     (index: number) => {
@@ -131,7 +134,7 @@ const OnboardingInnerCarousel: React.FC<OnboardingCarouselProps> = ({
           scrollEventThrottle={16}
           onScroll={scrollHandler}
           onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={viewabilityConfig}
+          viewabilityConfig={VIEWABILITY_CONFIG}
           onEndReached={() => {
             if (Platform.OS === 'android') {
               setTimeout(() => {

@@ -46,7 +46,11 @@ describe('mint flow e2e selectors', () => {
       'trustedMintUrls: trackedTrustedMintUrls ?? walletContext.trustedMintUrls'
     );
     expect(source).toContain('refresh: refreshMintSelector');
-    expect(source).toContain('liveSelectMint?.scope ? { scope: liveSelectMint.scope } : undefined');
+    // The scope is forwarded to the machine so a refresh re-asks for the same
+    // slice of mints; the optional chain is resolved into `selectMintScope`
+    // first because React Compiler cannot validate one used as a dependency.
+    expect(source).toContain('const selectMintScope = liveSelectMint?.scope;');
+    expect(source).toContain('selectMintScope ? { scope: selectMintScope } : undefined');
   });
 
   it('keeps the mint-add search header actions accessible on liquid glass', () => {

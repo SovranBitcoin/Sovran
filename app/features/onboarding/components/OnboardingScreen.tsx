@@ -44,6 +44,22 @@ type OnboardingScreenProps = {
   onComplete: () => void;
 };
 
+/**
+ * The slide list's ref and its scroll helper.
+ *
+ * The ref lives here because the tap gesture hands `scrollToIndex` to
+ * `scheduleOnRN` while it is being BUILT during render, and React Compiler
+ * reads passing a ref-closing callback to a function in render as a
+ * render-time ref access — enough to skip the whole onboarding screen.
+ */
+function useSlideScroll() {
+  const ref = useRef<FlatList<OnboardingSlide>>(null);
+  const scrollToIndex = useCallback((index: number) => {
+    ref.current?.scrollToIndex({ index, animated: true });
+  }, []);
+  return { ref, scrollToIndex };
+}
+
 const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   useLifecycleLogger('OnboardingScreen');
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
@@ -96,7 +112,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     },
   ];
 
-  const horizontalListRef = useRef<FlatList<OnboardingSlide>>(null);
+  const { ref: horizontalListRef, scrollToIndex: handleScrollToIndex } = useSlideScroll();
 
   const animatedSlideIndex = useSharedValue(0);
   const scrollOffsetX = useSharedValue(0);
@@ -117,13 +133,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       isDragging.set(false);
     },
   });
-
-  const handleScrollToIndex = useCallback((index: number) => {
-    horizontalListRef.current?.scrollToIndex({
-      index,
-      animated: true,
-    });
-  }, []);
 
   const singleTap = Gesture.Tap()
     .maxDuration(250)

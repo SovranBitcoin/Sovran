@@ -87,6 +87,14 @@ export function OnchainReceiveScreen({
     mempool.summary,
     requiredConfirmations
   );
+  // KEPT as a manual memo — identity contract, not an optimization. React
+  // Compiler will not preserve it (`observedConfirmationProgress` is a fresh
+  // object whenever the helper has a summary to report, so it cannot prove the
+  // dependency stable) and this screen therefore stays on the bailout list.
+  // Dropping the memo is worse: on the null path the fallback would allocate
+  // every render, re-running the logging effect below and invalidating the
+  // whole timeline model in TimelineCard.
+  // ast-grep-ignore: no-manual-memo-tsx
   const onchainConfirmationProgress = useMemo(
     () =>
       observedConfirmationProgress ??

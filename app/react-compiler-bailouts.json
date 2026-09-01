@@ -53,9 +53,6 @@
     "features/mint/hooks/useStickyMintSelectorItems.ts": [
       "Cannot access refs during render"
     ],
-    "features/mint/screens/MintSelectFlowScreen.tsx": [
-      "Existing memoization could not be preserved"
-    ],
     "features/nearPay/hooks/useNutDropCelebration.ts": [
       "Cannot access refs during render"
     ],
@@ -63,12 +60,6 @@
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ],
     "features/nearPay/screens/NearPayScreen.tsx": [
-      "Cannot access refs during render"
-    ],
-    "features/onboarding/components/OnboardingInnerCarousel.tsx": [
-      "Cannot access refs during render"
-    ],
-    "features/onboarding/components/OnboardingScreen.tsx": [
       "Cannot access refs during render"
     ],
     "features/payments/hooks/useMintContacts.ts": [
@@ -92,9 +83,6 @@
     ],
     "features/transactions/components/detail/timeline/TimelineCard.tsx": [
       "Cannot access refs during render"
-    ],
-    "features/transactions/screens/SwapTransactionScreen.tsx": [
-      "Support value blocks (conditional, logical, optional chaining, etc) within a try/catch statement"
     ],
     "shared/hooks/useNostrProfileMetadata.ts": [
       "Cannot access refs during render",

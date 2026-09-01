@@ -137,6 +137,11 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
   );
   const isPaid = isOnchainMeltSettled(meltState);
   const hasOnchainTx = !!outpoint;
+  // KEPT as a manual memo — identity contract, not an optimization; see the
+  // matching note in OnchainReceiveScreen. React Compiler cannot preserve it,
+  // so this screen stays on the bailout list, but dropping it would allocate a
+  // fresh progress object every render and churn the timeline model.
+  // ast-grep-ignore: no-manual-memo-tsx
   const onchainConfirmationProgress = useMemo<ChainOnchainConfirmationProgress>(
     () =>
       observedProgress ??

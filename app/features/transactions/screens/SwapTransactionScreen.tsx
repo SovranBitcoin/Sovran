@@ -202,6 +202,21 @@ CollapsedLegGroup.displayName = 'CollapsedLegGroup';
 // Main screen
 // -----------------------------------------------------------------------
 
+/**
+ * Name + icon for a mint-info response, or null when there is none.
+ *
+ * At module scope purely so the ternary is not lexically inside the loader's
+ * `try` — React Compiler cannot lower a value block in one, and that skipped
+ * the whole screen. Keeping the property reads in the callee (rather than
+ * hoisting the result out of the try) leaves the original error behaviour
+ * untouched.
+ */
+function toMintInfoSummary(
+  info: { name?: string; icon_url?: string } | null | undefined
+): { name?: string; icon_url?: string } | null {
+  return info ? { name: info.name, icon_url: info.icon_url } : null;
+}
+
 export function SwapTransactionScreen({ groupId }: Props) {
   useLifecycleLogger('SwapTransactionScreen');
   const [foreground, muted, danger, success] = useThemeColor([
@@ -257,8 +272,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
       const map: Record<string, { name?: string; icon_url?: string } | null> = {};
       for (const url of mintUrls) {
         try {
-          const info = await getMintInfo(url);
-          map[url] = info ? { name: info.name, icon_url: (info as any).icon_url } : null;
+          map[url] = toMintInfoSummary(await getMintInfo(url));
         } catch {
           map[url] = null;
         }
