@@ -1,4 +1,4 @@
-import { forwardRef, useCallback } from 'react';
+import { forwardRef } from 'react';
 import {
   Pressable as RNPressable,
   type PressableProps as RNPressableProps,
@@ -79,26 +79,16 @@ export const Pressable = forwardRef<View, SharedPressableProps>(function Pressab
   };
   const shouldFireHaptics = haptics !== false;
 
-  const triggerHaptic = useCallback(
-    async (trigger: 'start' | 'end') => {
-      if (!shouldFireHaptics) return;
-      if (trigger === 'start' && !hapticConfig.onPressStart) return;
-      if (trigger === 'end' && !hapticConfig.onPressEnd) return;
-      try {
-        await fireHaptic(hapticConfig);
-      } catch (error) {
-        log.warn('ui.haptics.not_supported', { type: 'pressable', error });
-      }
-    },
-    [
-      shouldFireHaptics,
-      hapticConfig.onPressStart,
-      hapticConfig.onPressEnd,
-      hapticConfig.type,
-      hapticConfig.impactStyle,
-      hapticConfig.notificationType,
-    ]
-  );
+  const triggerHaptic = async (trigger: 'start' | 'end') => {
+    if (!shouldFireHaptics) return;
+    if (trigger === 'start' && !hapticConfig.onPressStart) return;
+    if (trigger === 'end' && !hapticConfig.onPressEnd) return;
+    try {
+      await fireHaptic(hapticConfig);
+    } catch (error) {
+      log.warn('ui.haptics.not_supported', { type: 'pressable', error });
+    }
+  };
 
   const guardedOnPress = useSingleFlight(async (e: GestureResponderEvent) => {
     if (!onPress) return;
@@ -110,13 +100,10 @@ export const Pressable = forwardRef<View, SharedPressableProps>(function Pressab
     if (result instanceof Promise) await result;
   });
 
-  const handlePressIn = useCallback(
-    async (e: GestureResponderEvent) => {
-      await triggerHaptic('start');
-      onPressIn?.(e);
-    },
-    [triggerHaptic, onPressIn]
-  );
+  const handlePressIn = async (e: GestureResponderEvent) => {
+    await triggerHaptic('start');
+    onPressIn?.(e);
+  };
 
   // Compose the user's style with default opacity-on-press feedback so
   // callers don't have to thread `({pressed})` themselves. `activeOpacity`

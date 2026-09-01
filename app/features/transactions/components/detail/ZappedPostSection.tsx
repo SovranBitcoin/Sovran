@@ -18,7 +18,6 @@
  * from here opened the thread BEHIND the transactions modal.
  */
 
-import { useCallback } from 'react';
 import { StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { withAlpha } from '@/shared/lib/color';
@@ -48,10 +47,10 @@ export function ZappedPostSection({ entry }: ZappedPostSectionProps) {
   const { metadata: cachedProfile } = useCachedNostrProfile(zap?.authorPubkey ?? '');
 
   const eventId = zap?.eventId;
-  const openThread = useCallback(() => {
+  const openThread = () => {
     if (!eventId) return;
     router.push({ pathname: '/(transactions-flow)/thread', params: { eventId } });
-  }, [eventId]);
+  };
 
   if (!zap?.eventId) return null;
 

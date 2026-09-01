@@ -119,14 +119,14 @@ export function GalleryScreen() {
 
 function SectionHeader({ topic, author }: { topic: string; author: AlbumAuthor | null }) {
   const foreground = useThemeColor('foreground');
-  const openProfile = useCallback(() => {
+  const openProfile = () => {
     if (author?.pubkey) {
       router.navigate({
         pathname: '/(user-flow)/profile',
         params: { pubkey: author.pubkey },
       });
     }
-  }, [author?.pubkey]);
+  };
 
   return (
     <HStack
