@@ -45,7 +45,36 @@ import * as babel from '@babel/core';
 
 const APP_DIR = resolve(import.meta.dirname, '..');
 const BASELINE_PATH = resolve(APP_DIR, 'react-compiler-bailouts.json');
-const SRC_GLOB = '{app,features,shared,components}/**/*.{ts,tsx,js,jsx}';
+
+/**
+ * What the sweep must cover: every file babel-preset-expo actually runs the
+ * React Compiler on in a production build. The gate is only as honest as this
+ * set — a component outside it renders unmemoized while the ratchet reports
+ * zero, which is the exact failure the ratchet exists to prevent.
+ *
+ * The rule is production parity, not "all our source". babel-preset-expo
+ * refuses to run the compiler on any file resolved from `node_modules`
+ * (`getReactCompilerPlugin`: `options.isNodeModule` → no plugin). So the local
+ * Expo modules under `modules/` are deliberately NOT swept: they are `file:`
+ * dependencies installed as real copies under `app/node_modules`, which is
+ * where Metro resolves them, so production never compiles them. Sweeping their
+ * `modules/` sources would report a success the app never gets. Same for the
+ * vendored `vendor/marmot-ts`.
+ *
+ * The previous glob — `{app,features,shared,components}` — named `components`,
+ * which has never existed here, and missed three roots the root layout imports
+ * unconditionally on both platforms: `assets/icons` (the `Icon` on every
+ * screen), `navigation` (the native tab bar and every glass header), and
+ * `config` (`flowLayoutOptions`). It also missed the entry file itself.
+ *
+ * `__tests__/reactCompilerGateCoverage.test.ts` fails if a top-level directory
+ * or source file appears that is neither swept nor classified there, so this
+ * set cannot silently rot again.
+ */
+const SOURCE_ROOTS = ['app', 'assets', 'config', 'features', 'navigation', 'shared'];
+const SRC_GLOB = `{${SOURCE_ROOTS.join(',')}}/**/*.{ts,tsx,js,jsx}`;
+/** Bundled source that sits beside the roots rather than inside one. */
+const SOURCE_FILES = ['index.js', 'polyfills.js', 'shim.js', 'themes.ts'];
 
 const shouldUpdate = process.argv.includes('--update');
 
@@ -57,7 +86,10 @@ const COMPILER_OPTIONS = {
 };
 
 function sweep() {
-  const files = [...new Glob(SRC_GLOB).scanSync({ cwd: APP_DIR, absolute: true })]
+  const files = [
+    ...new Glob(SRC_GLOB).scanSync({ cwd: APP_DIR, absolute: true }),
+    ...SOURCE_FILES.map((file) => resolve(APP_DIR, file)),
+  ]
     .filter((file) => !file.includes('/__tests__/') && !file.includes('/__mocks__/'))
     .sort();
 
