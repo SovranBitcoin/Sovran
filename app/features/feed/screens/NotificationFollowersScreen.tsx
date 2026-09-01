@@ -6,7 +6,11 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { withAlpha } from '@/shared/lib/color';
 
 import { tryNpubEncode } from '@/features/feed/components/nostr/feedParse';
-import type { FeedNotification, FeedNotificationsResult } from '@/features/feed/data/feedClient';
+import type {
+  FeedNotification,
+  FeedNotificationsRequest,
+  FeedNotificationsResult,
+} from '@/features/feed/data/feedClient';
 import {
   notificationFollowersCache,
   notificationFollowersKey,
@@ -52,15 +56,125 @@ type FollowFetchResult = {
   hasMore: boolean;
 };
 
+/**
+ * Walk up to {@link FOLLOW_FETCH_MAX_PAGES} pages of the ALL tab, keeping only
+ * the follow notifications, with the feed client disposed whatever happens.
+ *
+ * At module scope: React Compiler cannot lower a `try` with a `finally`, and an
+ * inline body cost this screen its memoization.
+ */
+async function fetchFollowPagesFromRelay({
+  viewerPubkey,
+  policy,
+  replyScope,
+  signal,
+  until,
+  refresh,
+}: {
+  viewerPubkey: string;
+  policy: FeedNotificationsRequest['policy'];
+  replyScope: FeedNotificationsRequest['replyScope'];
+  signal: AbortSignal;
+  until?: number;
+  refresh?: boolean;
+}): Promise<FollowFetchResult | null> {
+  const client = getFeedClient();
+  let cursor = until;
+  let merged = emptyNotificationsResult();
+  let hasMore = false;
+
+  try {
+    for (let pageIndex = 0; pageIndex < FOLLOW_FETCH_MAX_PAGES; pageIndex += 1) {
+      const page = await client.getNotifications({
+        viewerPubkey,
+        tab: 'ALL',
+        policy,
+        replyScope,
+        limit: FOLLOW_PAGE_SIZE,
+        until: cursor,
+        refresh: refresh && pageIndex === 0,
+        // The detail screen needs the full ungrouped follow list, not the
+        // collapsed group the All tab renders.
+        grouped: false,
+        signal,
+      });
+      if (signal.aborted) return null;
+
+      const followPage = filterNotificationsResult(
+        page,
+        (notification) => notification.reason === 'follow'
+      );
+      merged = mergeNotificationsResult(merged, followPage);
+      merged.paginationUntil = page.paginationUntil;
+      hasMore = page.paginationUntil > 0 && page.notifications.length >= FOLLOW_PAGE_SIZE;
+      cursor = page.paginationUntil;
+
+      if (followPage.notifications.length > 0 || !hasMore || cursor <= 0) break;
+    }
+  } finally {
+    client.dispose?.();
+  }
+
+  return { result: merged, hasMore };
+}
+
+/** Append one more page of followers, or log and leave the list as it was. */
+async function appendFollowPage({
+  fetchPage,
+  signal,
+  cursor,
+  sequence,
+  loadSequenceRef,
+  hasMoreRef,
+  paginationUntilRef,
+  setResult,
+  onSettled,
+}: {
+  fetchPage: (args: {
+    signal: AbortSignal;
+    until?: number;
+    refresh?: boolean;
+  }) => Promise<FollowFetchResult | null>;
+  signal: AbortSignal;
+  cursor: number;
+  sequence: number;
+  loadSequenceRef: React.MutableRefObject<number>;
+  hasMoreRef: React.MutableRefObject<boolean>;
+  paginationUntilRef: React.MutableRefObject<number>;
+  setResult: React.Dispatch<React.SetStateAction<FeedNotificationsResult>>;
+  onSettled: () => void;
+}): Promise<void> {
+  try {
+    const page = await fetchPage({ signal, until: cursor, refresh: false });
+    if (!page || signal.aborted || sequence !== loadSequenceRef.current) return;
+
+    paginationUntilRef.current = page.result.paginationUntil;
+    hasMoreRef.current = page.hasMore;
+    setResult((previous) => mergeNotificationsResult(previous, page.result));
+  } catch (error) {
+    if (signal.aborted || sequence !== loadSequenceRef.current) return;
+    const message = error instanceof Error ? error.message : String(error);
+    feedLog.warn('feed.notification_followers.load_more_failed', { message });
+  } finally {
+    onSettled();
+  }
+}
+
 export function NotificationFollowersScreen() {
   useLifecycleLogger('NotificationFollowersScreen', feedLog);
 
   const params = useLocalSearchParams<{ seedId?: string }>();
   const seedId = typeof params.seedId === 'string' ? params.seedId : undefined;
-  const seedRef = useRef<FeedNotificationsResult | null>(null);
-  if (seedRef.current === null) {
-    seedRef.current = takeNotificationFollowersSeed(seedId);
-  }
+  // `takeNotificationFollowersSeed` is a DESTRUCTIVE one-shot read, taken once
+  // per mount by a lazy initializer rather than a ref written in render (which
+  // React Compiler skips the screen for).
+  //
+  // ⚠️ Neither shape survives React StrictMode's initial double render: the
+  // discarded render consumes the seed and the committed one reads empty. That
+  // was equally true of the ref this replaced. StrictMode is off today
+  // (`index.js` hands straight to Expo Router); turning it on means making the
+  // take idempotent per `seedId` first, not reverting this.
+  const [seed] = useState(() => takeNotificationFollowersSeed(seedId));
 
   const { keys: nostrKeys } = useNostrKeysContext();
   const viewerPubkey = nostrKeys?.pubkey;
@@ -74,8 +188,7 @@ export function NotificationFollowersScreen() {
     viewerPubkey && !notificationFollowersCache.isColdStart(notificationFollowersKey(viewerPubkey))
       ? notificationFollowersCache.getEntry(notificationFollowersKey(viewerPubkey))?.data
       : undefined;
-  const initialResult =
-    seedRef.current!.notifications.length > 0 ? seedRef.current! : (warmCached ?? seedRef.current!);
+  const initialResult = seed.notifications.length > 0 ? seed : (warmCached ?? seed);
 
   const [result, setResult] = useState<FeedNotificationsResult>(() => initialResult);
   const [isInitialLoading, setIsInitialLoading] = useState(
@@ -89,7 +202,7 @@ export function NotificationFollowersScreen() {
   // True only for a real seed (fresh from the notifications screen → no fetch on
   // first focus). A warm-cache-derived initialResult stays false so the focus
   // effect runs loadFirstPage and applies the SWR isFresh gate.
-  const seededInitialPageRef = useRef(seedRef.current!.notifications.length > 0);
+  const seededInitialPageRef = useRef(seed.notifications.length > 0);
   const loadingMoreRef = useRef(false);
   const hasMoreRef = useRef(initialResult.paginationUntil > 0);
   const paginationUntilRef = useRef(initialResult.paginationUntil);
@@ -104,12 +217,12 @@ export function NotificationFollowersScreen() {
   const viewerPubkeyRef = useLatestRef(viewerPubkey);
   useEffect(() => {
     const viewer = viewerPubkeyRef.current;
-    if (viewer && seedRef.current && seedRef.current.notifications.length > 0) {
+    if (viewer && seed.notifications.length > 0) {
       const key = notificationFollowersKey(viewer);
-      notificationFollowersCache.setEntry(key, seedRef.current, { viewerKey: viewer });
+      notificationFollowersCache.setEntry(key, seed, { viewerKey: viewer });
       notificationFollowersCache.markTouched(key);
     }
-  }, [viewerPubkeyRef, seedRef]);
+  }, [viewerPubkeyRef, seed]);
   const tabBarPadding = useTabBarBottomPadding();
   const [foreground, surface, separator, muted, surfaceTertiary] = useThemeColor([
     'foreground',
@@ -130,44 +243,14 @@ export function NotificationFollowersScreen() {
       refresh?: boolean;
     }): Promise<FollowFetchResult | null> => {
       if (!viewerPubkey) return null;
-      const client = getFeedClient();
-      let cursor = until;
-      let merged = emptyNotificationsResult();
-      let hasMore = false;
-
-      try {
-        for (let pageIndex = 0; pageIndex < FOLLOW_FETCH_MAX_PAGES; pageIndex += 1) {
-          const page = await client.getNotifications({
-            viewerPubkey,
-            tab: 'ALL',
-            policy,
-            replyScope,
-            limit: FOLLOW_PAGE_SIZE,
-            until: cursor,
-            refresh: refresh && pageIndex === 0,
-            // The detail screen needs the full ungrouped follow list, not the
-            // collapsed group the All tab renders.
-            grouped: false,
-            signal,
-          });
-          if (signal.aborted) return null;
-
-          const followPage = filterNotificationsResult(
-            page,
-            (notification) => notification.reason === 'follow'
-          );
-          merged = mergeNotificationsResult(merged, followPage);
-          merged.paginationUntil = page.paginationUntil;
-          hasMore = page.paginationUntil > 0 && page.notifications.length >= FOLLOW_PAGE_SIZE;
-          cursor = page.paginationUntil;
-
-          if (followPage.notifications.length > 0 || !hasMore || cursor <= 0) break;
-        }
-      } finally {
-        client.dispose?.();
-      }
-
-      return { result: merged, hasMore };
+      return fetchFollowPagesFromRelay({
+        viewerPubkey,
+        policy,
+        replyScope,
+        signal,
+        until,
+        refresh,
+      });
     },
     [policy, replyScope, viewerPubkey]
   );
@@ -296,25 +379,20 @@ export function NotificationFollowersScreen() {
     loadingMoreRef.current = true;
     setIsLoadingMore(true);
 
-    try {
-      const page = await fetchFollowPages({
-        signal: controller.signal,
-        until: cursor,
-        refresh: false,
-      });
-      if (!page || controller.signal.aborted || sequence !== loadSequenceRef.current) return;
-
-      paginationUntilRef.current = page.result.paginationUntil;
-      hasMoreRef.current = page.hasMore;
-      setResult((previous) => mergeNotificationsResult(previous, page.result));
-    } catch (error) {
-      if (controller.signal.aborted || sequence !== loadSequenceRef.current) return;
-      const message = error instanceof Error ? error.message : String(error);
-      feedLog.warn('feed.notification_followers.load_more_failed', { message });
-    } finally {
-      loadingMoreRef.current = false;
-      setIsLoadingMore(false);
-    }
+    await appendFollowPage({
+      fetchPage: fetchFollowPages,
+      signal: controller.signal,
+      cursor,
+      sequence,
+      loadSequenceRef,
+      hasMoreRef,
+      paginationUntilRef,
+      setResult,
+      onSettled: () => {
+        loadingMoreRef.current = false;
+        setIsLoadingMore(false);
+      },
+    });
   }, [fetchFollowPages, isInitialLoading, isRefreshing, viewerPubkey]);
 
   const openProfile = useCallback((notification: FeedNotification) => {

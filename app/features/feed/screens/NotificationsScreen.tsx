@@ -9,6 +9,7 @@ import type {
   AppNotificationsSession,
   FeedNotification,
   FeedNotificationTab,
+  FeedNotificationsRequest,
   FeedNotificationsResult,
 } from '@/features/feed/data/feedClient';
 import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
@@ -106,6 +107,161 @@ function notificationItemBreakdown(items: readonly NotificationListItem[]): Reco
 /** Where an applied page-0 came from — the axis visual inconsistency hides on. */
 type AppliedPageSource = 'network' | 'cache' | 'client-tab' | 'error-reset';
 
+/**
+ * One page of notifications from the feed client, with the client disposed
+ * whatever happens.
+ *
+ * At module scope: React Compiler cannot lower a `try` with a `finally`, and an
+ * inline body would cost this screen — a primary tab — its memoization.
+ */
+async function fetchNotificationsFromRelay({
+  viewerPubkey,
+  tab,
+  policy,
+  replyScope,
+  until,
+  refresh,
+  signal,
+}: Pick<
+  FeedNotificationsRequest,
+  'viewerPubkey' | 'tab' | 'policy' | 'replyScope' | 'until' | 'refresh' | 'signal'
+>) {
+  const client = getFeedClient();
+  try {
+    return await client.getNotifications({
+      viewerPubkey,
+      tab,
+      policy,
+      replyScope,
+      limit: NOTIFICATIONS_PAGE_SIZE,
+      until,
+      refresh,
+      signal,
+    });
+  } finally {
+    client.dispose?.();
+  }
+}
+
+type LoadMoreLogFields = {
+  tab: NotificationTab;
+  policy: FeedNotificationsRequest['policy'];
+  replyScope: FeedNotificationsRequest['replyScope'];
+};
+
+/**
+ * Advance the concurrent session by one page.
+ *
+ * At module scope, like {@link loadMoreFromRelay} and
+ * {@link fetchNotificationsFromRelay}: React Compiler cannot lower a `try` with
+ * a `finally`, and three of them inline cost this screen — a primary tab — its
+ * memoization. `onSettled` carries the caller's `finally`.
+ */
+async function loadMoreFromSession({
+  session,
+  sequence,
+  loadSequenceRef,
+  hasMoreRef,
+  setResult,
+  logFields,
+  onSettled,
+}: {
+  session: AppNotificationsSession;
+  sequence: number;
+  loadSequenceRef: React.MutableRefObject<number>;
+  hasMoreRef: React.MutableRefObject<boolean>;
+  setResult: React.Dispatch<React.SetStateAction<FeedNotificationsResult | null>>;
+  logFields: LoadMoreLogFields;
+  onSettled: () => void;
+}): Promise<void> {
+  try {
+    const page = await session.loadMore();
+    if (sequence !== loadSequenceRef.current) return;
+    hasMoreRef.current = session.hasMore();
+    setResult(page);
+    feedLog.info('feed.notifications.ui.load_more', {
+      ...logFields,
+      transport: 'session',
+      pageResults: page.notifications.length,
+      pending: session.pendingCount(),
+      hasMore: hasMoreRef.current,
+    });
+  } catch (error) {
+    if (sequence !== loadSequenceRef.current) return;
+    const message = error instanceof Error ? error.message : String(error);
+    feedLog.warn('feed.notifications.load_more_failed', {
+      ...logFields,
+      transport: 'session',
+      message,
+    });
+  } finally {
+    onSettled();
+  }
+}
+
+/** Advance the relay-backed list by one page, deduping against `seenKeysRef`. */
+async function loadMoreFromRelay({
+  fetchPage,
+  signal,
+  cursor,
+  sequence,
+  loadSequenceRef,
+  hasMoreRef,
+  paginationUntilRef,
+  seenKeysRef,
+  setResult,
+  logFields,
+  onSettled,
+}: {
+  fetchPage: (args: {
+    signal: AbortSignal;
+    until?: number;
+    refresh?: boolean;
+  }) => Promise<FeedNotificationsResult | null>;
+  signal: AbortSignal;
+  cursor: number;
+  sequence: number;
+  loadSequenceRef: React.MutableRefObject<number>;
+  hasMoreRef: React.MutableRefObject<boolean>;
+  paginationUntilRef: React.MutableRefObject<number>;
+  seenKeysRef: React.MutableRefObject<Set<string>>;
+  setResult: React.Dispatch<React.SetStateAction<FeedNotificationsResult | null>>;
+  logFields: LoadMoreLogFields;
+  onSettled: () => void;
+}): Promise<void> {
+  try {
+    const page = await fetchPage({ signal, until: cursor, refresh: false });
+    if (!page || signal.aborted || sequence !== loadSequenceRef.current) return;
+
+    const newKeys = page.notifications
+      .map(notificationDedupeKey)
+      .filter((key) => !seenKeysRef.current.has(key));
+    const advanced = page.paginationUntil > 0 && page.paginationUntil < cursor;
+    // Stop only when a page adds nothing new or the cursor can't advance —
+    // grouping makes the raw item count an unreliable "has more" signal.
+    hasMoreRef.current = newKeys.length > 0 && advanced;
+    if (advanced) paginationUntilRef.current = page.paginationUntil;
+    if (newKeys.length > 0) {
+      newKeys.forEach((key) => seenKeysRef.current.add(key));
+      setResult((previous) => mergeNotificationsResult(previous, page));
+    }
+    feedLog.info('feed.notifications.ui.load_more', {
+      ...logFields,
+      cursor,
+      pageResults: page.notifications.length,
+      newItems: newKeys.length,
+      advanced,
+      hasMore: hasMoreRef.current,
+    });
+  } catch (error) {
+    if (signal.aborted || sequence !== loadSequenceRef.current) return;
+    const message = error instanceof Error ? error.message : String(error);
+    feedLog.warn('feed.notifications.load_more_failed', { ...logFields, message });
+  } finally {
+    onSettled();
+  }
+}
+
 export function NotificationsScreen() {
   useLifecycleLogger('NotificationsScreen', feedLog);
 
@@ -178,21 +334,15 @@ export function NotificationsScreen() {
     }) => {
       // Client-only tabs (synthetic announcements, mint changelog) never fetch.
       if (!viewerPubkey || isClientTab(activeTab)) return null;
-      const client = getFeedClient();
-      try {
-        return await client.getNotifications({
-          viewerPubkey,
-          tab: activeTab,
-          policy,
-          replyScope,
-          limit: NOTIFICATIONS_PAGE_SIZE,
-          until,
-          refresh,
-          signal,
-        });
-      } finally {
-        client.dispose?.();
-      }
+      return fetchNotificationsFromRelay({
+        viewerPubkey,
+        tab: activeTab,
+        policy,
+        replyScope,
+        until,
+        refresh,
+        signal,
+      });
     },
     [activeTab, policy, replyScope, viewerPubkey]
   );
@@ -386,34 +536,18 @@ export function NotificationsScreen() {
       const sequence = loadSequenceRef.current;
       loadingMoreRef.current = true;
       setIsLoadingMore(true);
-      try {
-        const page = await session.loadMore();
-        if (sequence !== loadSequenceRef.current) return;
-        hasMoreRef.current = session.hasMore();
-        setResult(page);
-        feedLog.info('feed.notifications.ui.load_more', {
-          tab: activeTab,
-          policy,
-          replyScope,
-          transport: 'session',
-          pageResults: page.notifications.length,
-          pending: session.pendingCount(),
-          hasMore: hasMoreRef.current,
-        });
-      } catch (error) {
-        if (sequence !== loadSequenceRef.current) return;
-        const message = error instanceof Error ? error.message : String(error);
-        feedLog.warn('feed.notifications.load_more_failed', {
-          tab: activeTab,
-          policy,
-          replyScope,
-          transport: 'session',
-          message,
-        });
-      } finally {
-        loadingMoreRef.current = false;
-        setIsLoadingMore(false);
-      }
+      await loadMoreFromSession({
+        session,
+        sequence,
+        loadSequenceRef,
+        hasMoreRef,
+        setResult,
+        logFields: { tab: activeTab, policy, replyScope },
+        onSettled: () => {
+          loadingMoreRef.current = false;
+          setIsLoadingMore(false);
+        },
+      });
       return;
     }
 
@@ -434,49 +568,22 @@ export function NotificationsScreen() {
     loadingMoreRef.current = true;
     setIsLoadingMore(true);
 
-    try {
-      const page = await fetchNotificationsPage({
-        signal: controller.signal,
-        until: cursor,
-        refresh: false,
-      });
-      if (!page || controller.signal.aborted || sequence !== loadSequenceRef.current) return;
-
-      const newKeys = page.notifications
-        .map(notificationDedupeKey)
-        .filter((key) => !seenKeysRef.current.has(key));
-      const advanced = page.paginationUntil > 0 && page.paginationUntil < cursor;
-      // Stop only when a page adds nothing new or the cursor can't advance —
-      // grouping makes the raw item count an unreliable "has more" signal.
-      hasMoreRef.current = newKeys.length > 0 && advanced;
-      if (advanced) paginationUntilRef.current = page.paginationUntil;
-      if (newKeys.length > 0) {
-        newKeys.forEach((key) => seenKeysRef.current.add(key));
-        setResult((previous) => mergeNotificationsResult(previous, page));
-      }
-      feedLog.info('feed.notifications.ui.load_more', {
-        tab: activeTab,
-        policy,
-        replyScope,
-        cursor,
-        pageResults: page.notifications.length,
-        newItems: newKeys.length,
-        advanced,
-        hasMore: hasMoreRef.current,
-      });
-    } catch (error) {
-      if (controller.signal.aborted || sequence !== loadSequenceRef.current) return;
-      const message = error instanceof Error ? error.message : String(error);
-      feedLog.warn('feed.notifications.load_more_failed', {
-        tab: activeTab,
-        policy,
-        replyScope,
-        message,
-      });
-    } finally {
-      loadingMoreRef.current = false;
-      setIsLoadingMore(false);
-    }
+    await loadMoreFromRelay({
+      fetchPage: fetchNotificationsPage,
+      signal: controller.signal,
+      cursor,
+      sequence,
+      loadSequenceRef,
+      hasMoreRef,
+      paginationUntilRef,
+      seenKeysRef,
+      setResult,
+      logFields: { tab: activeTab, policy, replyScope },
+      onSettled: () => {
+        loadingMoreRef.current = false;
+        setIsLoadingMore(false);
+      },
+    });
   }, [
     activeTab,
     fetchNotificationsPage,

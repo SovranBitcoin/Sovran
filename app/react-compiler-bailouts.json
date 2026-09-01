@@ -37,14 +37,6 @@
     "features/feed/hooks/useNostrEngagement.ts": [
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ],
-    "features/feed/screens/NotificationFollowersScreen.tsx": [
-      "(BuildHIR::lowerStatement) Handle TryStatement without a catch clause",
-      "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause"
-    ],
-    "features/feed/screens/NotificationsScreen.tsx": [
-      "(BuildHIR::lowerStatement) Handle TryStatement without a catch clause",
-      "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause"
-    ],
     "features/mint/hooks/useMintRebalanceOrchestrator.ts": [
       "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause",
       "(BuildHIR::lowerStatement) Support ThrowStatement inside of try/catch",
