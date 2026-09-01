@@ -9,6 +9,7 @@ import React, {
 import { LayoutChangeEvent, Platform, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import type { BLEPeer } from 'bitchat-module';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Path } from 'react-native-svg';
@@ -1461,13 +1462,20 @@ export function NearPayScreen() {
     () => peers.filter((peer) => peer.hasDirectLink || peer.isConnected).length,
     [peers]
   );
-  const pickerPeersRef = useRef(peers);
+  // Freeze the peer list while the inline amount entry is open so rows cannot
+  // shuffle under the user mid-typing. In STATE, not a ref: this decides render
+  // output, and reading a ref during render both hides the change from React
+  // and made React Compiler skip this screen. The peers are mirrored so the
+  // snapshot effect fires on the open/close transition only, never on every
+  // BLE peer update.
+  const peersRef = useLatestRef(peers);
+  const [frozenPickerPeers, setFrozenPickerPeers] = useState<typeof peers | null>(null);
 
   useEffect(() => {
-    if (!inlineAmountEntry) pickerPeersRef.current = peers;
-  }, [inlineAmountEntry, peers]);
+    setFrozenPickerPeers(inlineAmountEntry ? peersRef.current : null);
+  }, [inlineAmountEntry, peersRef]);
 
-  const pickerPeers = inlineAmountEntry ? pickerPeersRef.current : peers;
+  const pickerPeers = frozenPickerPeers ?? peers;
   const headerBadgeCount = hasInlineAmountEntry ? 0 : reachableCount;
 
   // Lightning effect per sender while a received Nut Drop redeems —
@@ -1821,6 +1829,11 @@ export function NearPayScreen() {
             errorAtMs: 1000,
           }
         );
+      // NOTE: this try/catch keeps the screen on the React Compiler bailout
+      // list — its body is dense with spreads and ternaries, which the compiler
+      // cannot lower. Hoisting it would mean threading the machine, the plan,
+      // the span and six setters through a module-scope function, on the Nut
+      // Drop send path; not a trade worth making for a memoization win.
       try {
         // One path for every peer: enter the amount flow, then the
         // sendComplete handler delivers the finished token as a private Noise
