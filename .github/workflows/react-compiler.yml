@@ -1,4 +1,4 @@
-name: React Compiler
+name: Compiler Bailout Budget
 
 on:
   push:

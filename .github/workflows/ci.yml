@@ -1,4 +1,4 @@
-name: CI
+name: Tests
 
 on:
   push:
@@ -20,13 +20,12 @@ jobs:
         uses: actions/checkout@v6
 
       # Lint, Type Check, Knip, and React Compiler coverage each run in their own
-      # workflow (lint.yml / type-check.yml / knip.yml / react-compiler.yml) so
-      # the README can carry a status badge per check. This job keeps the gates
-      # that don't need a dedicated badge: Prettier and the test suite.
+      # workflow so the README can carry a status badge per check. This workflow
+      # is named for its blocking gate: the test suite.
+      # It also emits non-blocking formatting and structural-review signals.
       #
-      # The behavioral Jest suite GATES the build (a red suite fails CI).
-      # Prettier stays non-blocking (formatting signal), as do the aspirational
-      # structural gates (analyze-structure / react-doctor jobs below).
+      # The behavioral Jest suite gates the workflow. Prettier and the
+      # structural-health PR report remain non-blocking signals.
       - name: Setup Sovran
         uses: ./.github/actions/setup-sovran
         with:

@@ -1,4 +1,4 @@
-name: Bundle Size
+name: Bundle Size Budget
 
 on:
   push:

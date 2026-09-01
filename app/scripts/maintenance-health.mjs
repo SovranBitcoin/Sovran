@@ -94,6 +94,8 @@ const requiredBadges = [
   'react-doctor.yml',
   'styling.yml',
   'bundle-size.yml',
+  'docs.yml',
+  'glass-headers.yml',
 ];
 const readmes = [resolve(REPO_DIR, 'README.md'), resolve(APP_DIR, 'README.md')];
 const missingBadges = readmes.flatMap((readme) => {
