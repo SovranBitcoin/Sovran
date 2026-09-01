@@ -24,8 +24,23 @@
  */
 
 import React from 'react';
-import { BlurView as ExpoBlurView, BlurViewProps as ExpoBlurViewProps } from 'expo-blur';
+import { Platform } from 'react-native';
+import {
+  BlurView as ExpoBlurView,
+  BlurViewProps as ExpoBlurViewProps,
+  type BlurTint,
+} from 'expo-blur';
 import { supportsBlur } from '@/shared/lib/version';
+
+/**
+ * The tint every chrome surface (bottom button bars, scroll edge fades) blurs
+ * with. iOS's system material renders true frosted glass that composes
+ * correctly through a gradient mask; plain `'dark'` is a tinted overlay, not a
+ * blur, and is all Android has. Platform-awareness for blur belongs to this
+ * module, so the constant lives here rather than being re-derived per surface.
+ */
+export const CHROME_BLUR_TINT: BlurTint =
+  Platform.OS === 'ios' ? 'systemChromeMaterialDark' : 'dark';
 
 /**
  * Props for the BlurView component - same as expo-blur's BlurViewProps

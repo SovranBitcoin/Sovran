@@ -77,33 +77,33 @@ export function ThreadEmbedSheet({
       .onStart(() => {
         'worklet';
         if (!sheetTranslateY) return;
-        startY.value = sheetTranslateY.value;
+        startY.set(sheetTranslateY.get());
       })
       .onUpdate((e) => {
         'worklet';
         if (!sheetTranslateY || !scrollY) return;
-        const expandedAtStart = startY.value <= 1;
-        const atTop = scrollY.value <= 1;
+        const expandedAtStart = startY.get() <= 1;
+        const atTop = scrollY.get() <= 1;
         // Drag started while collapsed/mid → it controls the sheet directly.
         // Drag started expanded, at the top, pulling down → begin the collapse.
         // Otherwise the list scrolls (the provider keeps it scrollable only
         // while expanded, so the two never move together).
         if (!expandedAtStart || (atTop && e.translationY > 0)) {
-          sheetTranslateY.value = clamp(startY.value + e.translationY, 0, snapInline);
+          sheetTranslateY.set(clamp(startY.get() + e.translationY, 0, snapInline));
         }
       })
       .onEnd((e) => {
         'worklet';
         if (!sheetTranslateY) return;
-        const target = nearestSnap(sheetTranslateY.value, e.velocityY, snapMiddle, snapInline);
-        if (Math.abs(target - startY.value) > 1) runOnJS(embedHaptic)();
-        sheetTranslateY.value = withSpring(target, SHEET_SPRING);
+        const target = nearestSnap(sheetTranslateY.get(), e.velocityY, snapMiddle, snapInline);
+        if (Math.abs(target - startY.get()) > 1) runOnJS(embedHaptic)();
+        sheetTranslateY.set(withSpring(target, SHEET_SPRING));
       });
   }, [embedActive, nativeGesture, sheetTranslateY, scrollY, snapMiddle, snapInline, startY]);
 
   const sheetStyle = useAnimatedStyle(() => {
-    const ty = sheetTranslateY?.value ?? 0;
-    const p = collapseProgress?.value ?? 0;
+    const ty = sheetTranslateY?.get() ?? 0;
+    const p = collapseProgress?.get() ?? 0;
     const r = interpolate(p, [0, 0.15], [0, SHEET_COLLAPSED_RADIUS], 'clamp');
     return {
       transform: [{ translateY: ty }],

@@ -22,7 +22,7 @@ import { AppleMaps, GoogleMaps } from 'expo-maps';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useInsertionEffect, useRef, useState } from 'react';
 import { InteractionManager, Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
@@ -63,23 +63,25 @@ export function MapScreen() {
   const [category, setCategory] = useState<CategoryFilter>('all');
 
   // Camera and markers form a callback cycle (camera-settle → marker update,
-  // marker click → camera move). Wire useMapCamera first via a ref-forwarder
-  // for onCameraSettle, then update the ref to point at useMapMarkers'
-  // updateMarkersForCamera during render. The ref mutation is safe because
-  // no settle callback fires before the first paint.
+  // marker click → camera move). useMapCamera is wired first through this
+  // forwarder, which the insertion effect below points at useMapMarkers'
+  // updateMarkersForCamera once both hooks have run.
   const onCameraSettleRef = useRef<(lat: number, lon: number, zoom: number) => void>(() => {});
   // KEPT as an explicit useCallback — identity contract, not an optimization.
-  // This file does not compile under the React Compiler (the ref write below
-  // is an Immutability bailout), so nothing memoizes this for us. A fresh
-  // identity each render churns useMapCamera's memoized return object, which
-  // is a dep of the mount-only "get user location" effect — re-running it
-  // re-reads GPS and snaps the camera back while the user is panning.
+  // A fresh identity each render churns useMapCamera's memoized return, which
+  // the mount-only "get user location" effect depends on; re-running it
+  // re-reads GPS and snaps the camera back while the user is panning. The
+  // compiler would hold this identity now that the file compiles, but the
+  // contract is load-bearing enough to state rather than infer.
   // ast-grep-ignore: no-manual-memo-tsx
   const onCameraSettle = useCallback((lat: number, lon: number, zoom: number) => {
     onCameraSettleRef.current(lat, lon, zoom);
   }, []);
 
-  const mapCamera = useMapCamera({
+  // Destructured, not held as `mapCamera.*`: a property load off a hook's
+  // returned object counts as touching a ref during render to React Compiler,
+  // and writing `mapRef.current` counts as mutating an immutable.
+  const { mapRef, getCamera, setCamera, handleCameraChange } = useMapCamera({
     initial: { lat: DEFAULT_LAT, lon: DEFAULT_LON, zoom: DEFAULT_ZOOM },
     aspectRatio,
     onCameraSettle,
@@ -101,10 +103,15 @@ export function MapScreen() {
     category,
     aspectRatio,
     isMapReady,
-    getCamera: mapCamera.getCamera,
+    getCamera: getCamera,
   });
 
-  onCameraSettleRef.current = updateMarkersForCamera;
+  // Close the camera↔markers cycle after commit rather than during render:
+  // writing the ref in render is a Rules-of-React violation, and no settle
+  // callback can fire before the first paint anyway.
+  useInsertionEffect(() => {
+    onCameraSettleRef.current = updateMarkersForCamera;
+  });
 
   const loading = storeLoading || !isClusteringReady;
 
@@ -136,7 +143,7 @@ export function MapScreen() {
         const loc = await Location.getCurrentPositionAsync({});
         // Privacy: offset camera so it doesn't centre on exact position
         const safe = applySafetyOffset(loc.coords.latitude, loc.coords.longitude);
-        mapCamera.setCamera({ lat: safe.latitude, lon: safe.longitude, zoom: 12 });
+        setCamera({ lat: safe.latitude, lon: safe.longitude, zoom: 12 });
         updateMarkersForCamera(safe.latitude, safe.longitude, 12);
       } catch (err) {
         log.error('map.location.error', { error: err });
@@ -144,13 +151,13 @@ export function MapScreen() {
     });
 
     return () => task.cancel();
-  }, [mapCamera, updateMarkersForCamera]);
+  }, [setCamera, updateMarkersForCamera]);
 
   const handleMyLocation = async () => {
     try {
       const loc = await Location.getCurrentPositionAsync({});
       const safe = applySafetyOffset(loc.coords.latitude, loc.coords.longitude);
-      mapCamera.setCamera({ lat: safe.latitude, lon: safe.longitude, zoom: 15 });
+      setCamera({ lat: safe.latitude, lon: safe.longitude, zoom: 15 });
       updateMarkersForCamera(safe.latitude, safe.longitude, 15);
     } catch (err) {
       log.error('map.location.error', { error: err });
@@ -158,16 +165,16 @@ export function MapScreen() {
   };
 
   const handleZoomIn = () => {
-    const { lat, lon, zoom } = mapCamera.getCamera();
+    const { lat, lon, zoom } = getCamera();
     const newZoom = Math.min(zoom + 2, 20);
-    mapCamera.setCamera({ lat, lon, zoom: newZoom });
+    setCamera({ lat, lon, zoom: newZoom });
     updateMarkersForCamera(lat, lon, newZoom);
   };
 
   const handleZoomOut = () => {
-    const { lat, lon, zoom } = mapCamera.getCamera();
+    const { lat, lon, zoom } = getCamera();
     const newZoom = Math.max(zoom - 2, 1);
-    mapCamera.setCamera({ lat, lon, zoom: newZoom });
+    setCamera({ lat, lon, zoom: newZoom });
     updateMarkersForCamera(lat, lon, newZoom);
   };
 
@@ -187,7 +194,7 @@ export function MapScreen() {
         // within Supercluster's maxZoom + 1.
         const expansionZoom = manager.getClusterExpansionZoom(clusterMarker.clusterId);
         const newZoom = Math.min(expansionZoom + 1, 18);
-        mapCamera.setCamera({
+        setCamera({
           lat: clusterMarker.latitude,
           lon: clusterMarker.longitude,
           zoom: newZoom,
@@ -238,7 +245,7 @@ export function MapScreen() {
     uiSettings: { compassEnabled: true, myLocationButtonEnabled: false },
     markers,
     onMarkerClick: handleMarkerClick,
-    onCameraMove: mapCamera.handleCameraChange,
+    onCameraMove: handleCameraChange,
   };
 
   return (
@@ -260,7 +267,7 @@ export function MapScreen() {
       {isMapReady && Platform.OS === 'ios' && (
         <AppleMaps.View
           ref={(instance) => {
-            mapCamera.mapRef.current = instance;
+            mapRef.current = instance;
           }}
           {...sharedMapViewProps}
         />
@@ -268,7 +275,7 @@ export function MapScreen() {
       {isMapReady && Platform.OS === 'android' && (
         <GoogleMaps.View
           ref={(instance) => {
-            mapCamera.mapRef.current = instance;
+            mapRef.current = instance;
           }}
           {...sharedMapViewProps}
         />

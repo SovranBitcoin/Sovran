@@ -29,9 +29,10 @@ export function SearchOverlay({
   emptyPrompt,
   topInset = 0,
   style,
-  testID = `search-overlay-${recentContext}`,
+  testID,
 }: SearchOverlayProps) {
   const { isSearching } = useSearchContext();
+  const resolvedTestID = testID ?? `search-overlay-${recentContext}`;
   const surface = useThemeColor('surface');
   const overlayStyle = useMemo<StyleProp<ViewStyle>>(
     () => [styles.overlay, { backgroundColor: surface, paddingTop: topInset }, style],
@@ -41,7 +42,7 @@ export function SearchOverlay({
   if (!isSearching) return null;
 
   return (
-    <View testID={testID} style={overlayStyle}>
+    <View testID={resolvedTestID} style={overlayStyle}>
       <UnifiedSearch recentContext={recentContext} emptyPrompt={emptyPrompt} />
     </View>
   );

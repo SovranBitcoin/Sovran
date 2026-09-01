@@ -75,10 +75,10 @@ function ProgressRing({
 
   const strokeDashoffset = circumference * (1 - progress);
   const fadeAnim = useSharedValue(0);
-  const fadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value }));
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.get() }));
 
   useEffect(() => {
-    fadeAnim.value = withTiming(1, { duration: 320, easing: Easing.out(Easing.cubic) });
+    fadeAnim.set(withTiming(1, { duration: 320, easing: Easing.out(Easing.cubic) }));
   }, [fadeAnim]);
 
   return (
@@ -142,15 +142,15 @@ function AnimatedAvatar({
     position: 'absolute',
     bottom: -2,
     right: -2,
-    opacity: badgeAnim.value,
-    transform: [{ scale: badgeAnim.value }],
+    opacity: badgeAnim.get(),
+    transform: [{ scale: badgeAnim.get() }],
   }));
 
   const statusBadge = status ? STATUS_BADGE_CONFIG[status] : null;
 
   useEffect(() => {
     if (status && !isLoading) {
-      badgeAnim.value = withDelay(80, withSpring(1, { damping: 14, stiffness: 260 }));
+      badgeAnim.set(withDelay(80, withSpring(1, { damping: 14, stiffness: 260 })));
     }
   }, [status, isLoading, badgeAnim]);
 
@@ -345,13 +345,13 @@ function RatingBarChart({ score }: { score: number }) {
   const fadeAnim = useSharedValue(0);
   const barScaleAnim = useSharedValue(0);
 
-  const fadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value, alignItems: 'center' }));
-  const starFadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value }));
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.get(), alignItems: 'center' }));
+  const starFadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.get() }));
   const barFillStyle = useAnimatedStyle(() => ({
     width: '100%',
     height: '100%',
     borderRadius: 4,
-    transform: [{ scaleX: barScaleAnim.value }],
+    transform: [{ scaleX: barScaleAnim.get() }],
     transformOrigin: 'left center',
   }));
 
@@ -371,13 +371,15 @@ function RatingBarChart({ score }: { score: number }) {
     if (isValidScore && !hasAnimatedRef.current) {
       hasAnimatedRef.current = true;
 
-      fadeAnim.value = 0;
-      barScaleAnim.value = 0;
+      fadeAnim.set(0);
+      barScaleAnim.set(0);
 
-      fadeAnim.value = withTiming(1, { duration: 400 });
-      barScaleAnim.value = withDelay(
-        200,
-        withTiming(goldPercentage, { duration: 800, easing: Easing.out(Easing.cubic) })
+      fadeAnim.set(withTiming(1, { duration: 400 }));
+      barScaleAnim.set(
+        withDelay(
+          200,
+          withTiming(goldPercentage, { duration: 800, easing: Easing.out(Easing.cubic) })
+        )
       );
     }
   }, [isValidScore, goldPercentage, fadeAnim, barScaleAnim]);

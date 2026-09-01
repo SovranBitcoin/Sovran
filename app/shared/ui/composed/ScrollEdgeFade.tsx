@@ -25,6 +25,7 @@
 import { useMemo } from 'react';
 import { Platform, StyleSheet } from 'react-native';
 import { BlurView, type BlurTint } from 'expo-blur';
+import { CHROME_BLUR_TINT } from '@/shared/ui/primitives/BlurView';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { easeGradient } from '@/shared/lib/easeGradient';
@@ -98,7 +99,7 @@ export function ScrollEdgeFade({
   color,
   blur = true,
   blurIntensity = 10,
-  blurTint = Platform.OS === 'ios' ? 'systemChromeMaterialDark' : 'dark',
+  blurTint = CHROME_BLUR_TINT,
   zIndex = 50,
   offset = 0,
 }: ScrollEdgeFadeProps) {

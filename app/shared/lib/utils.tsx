@@ -156,42 +156,24 @@ export const compose = (
     | [React.ComponentType<any>, Record<string, any>]
   )[]
 ): React.FC<{ children: React.ReactNode }> => {
-  const ComposedProvider = providers.reduce((Prev, Curr) => {
-    const ProviderComponent = ({ children }: { children: React.ReactNode }) => {
-      let CurrentProvider: React.FC<{ children: React.ReactNode }>;
+  // Normalise ONCE, at compose time. Deriving the wrapper per render — as this
+  // used to — minted a fresh component type on every parent render, and React
+  // unmounts a subtree whose element type changed: every re-render of the
+  // owning layout tore down and rebuilt the whole provider stack beneath the
+  // first configured provider (relay sockets, wallet, price feed included).
+  const entries = providers.map((provider) =>
+    Array.isArray(provider) && provider.length === 2
+      ? { Component: provider[0], props: provider[1] as Record<string, unknown> }
+      : { Component: provider as React.ComponentType<any>, props: {} }
+  );
 
-      // Handle tuple syntax [Component, props]
-      if (Array.isArray(Curr) && Curr.length === 2) {
-        const [Component, props] = Curr;
-        const ConfiguredProvider = ({ children }: { children: React.ReactNode }) => {
-          const wrappedChildren = React.Children.count(children) > 1 ? <>{children}</> : children;
-          return <Component {...props}>{wrappedChildren}</Component>;
-        };
-        ConfiguredProvider.displayName = `ConfiguredProvider(${Component.displayName || Component.name || 'Unknown'})`;
-        CurrentProvider = ConfiguredProvider;
-      }
-      // Handle direct component reference
-      else if (typeof Curr === 'function' && Curr.length === 1) {
-        CurrentProvider = Curr as React.FC<{ children: React.ReactNode }>;
-      }
-      // Handle configured component (arrow function)
-      else {
-        CurrentProvider = Curr as React.FC<{ children: React.ReactNode }>;
-      }
-
-      if (!Prev) return <CurrentProvider>{children}</CurrentProvider>;
-      return (
-        <Prev>
-          <CurrentProvider>{children}</CurrentProvider>
-        </Prev>
-      );
-    };
-    const componentName = Array.isArray(Curr)
-      ? Curr[0].displayName || Curr[0].name
-      : Curr.displayName || Curr.name;
-    ProviderComponent.displayName = `ProviderWrapper(${componentName || 'Unknown'})`;
-    return ProviderComponent;
-  }, undefined as any);
+  // No Fragment normalisation: `children: React.ReactNode` already accepts a
+  // sibling list, and no provider in either stack uses `Children.only`.
+  const ComposedProvider = ({ children }: { children: React.ReactNode }) =>
+    entries.reduceRight<React.ReactNode>(
+      (tree, { Component, props }) => <Component {...props}>{tree}</Component>,
+      children
+    );
 
   ComposedProvider.displayName = 'ComposedProvider';
   return ComposedProvider;

@@ -285,7 +285,7 @@ function GloveHand({ fg }: { fg: string }) {
 /** Stagger helper — row i samples the shared entrance track 60 ms later. */
 function useMenuRowStyle(t: SharedValue<number>, index: number) {
   return useAnimatedStyle(() => {
-    const v = valueAt(t.value - 60 * index, MENU_ROW_IN, EASINGS);
+    const v = valueAt(t.get() - 60 * index, MENU_ROW_IN, EASINGS);
     return { opacity: v, transform: [{ translateY: (1 - v) * 4 }] };
   });
 }
@@ -293,7 +293,7 @@ function useMenuRowStyle(t: SharedValue<number>, index: number) {
 /** Beat-word pop: the overshoot easing carries v past 1 for the bounce. */
 function useWordStyle(t: SharedValue<number>, track: Track) {
   return useAnimatedStyle(() => {
-    const v = valueAt(t.value, track, EASINGS);
+    const v = valueAt(t.get(), track, EASINGS);
     return {
       opacity: Math.min(v, 1),
       transform: [{ rotate: '-3deg' }, { scale: 0.6 + 0.4 * v }],
@@ -314,15 +314,13 @@ export function PermissionGestureDemo(): React.ReactElement {
   useFocusEffect(
     useCallback(() => {
       if (reducedMotion) return undefined;
-      t.value = 0;
-      t.value = withRepeat(
-        withTiming(CYCLE_MS, { duration: CYCLE_MS, easing: Easing.linear }),
-        -1,
-        false
+      t.set(0);
+      t.set(
+        withRepeat(withTiming(CYCLE_MS, { duration: CYCLE_MS, easing: Easing.linear }), -1, false)
       );
       return () => {
         cancelAnimation(t);
-        t.value = 0;
+        t.set(0);
       };
     }, [reducedMotion, t])
   );
@@ -337,19 +335,19 @@ export function PermissionGestureDemo(): React.ReactElement {
   const gloveStyle = useAnimatedStyle(() => {
     const bob =
       BOB_AMP *
-      Math.sin((2 * Math.PI * t.value) / BOB_PERIOD_MS) *
-      valueAt(t.value, BOB_WEIGHT, EASINGS);
+      Math.sin((2 * Math.PI * t.get()) / BOB_PERIOD_MS) *
+      valueAt(t.get(), BOB_WEIGHT, EASINGS);
     return {
       transform: [
-        { translateX: valueAt(t.value, GLOVE_X, EASINGS) - TIP_X },
-        { translateY: valueAt(t.value, GLOVE_Y, EASINGS) - TIP_Y + bob },
+        { translateX: valueAt(t.get(), GLOVE_X, EASINGS) - TIP_X },
+        { translateY: valueAt(t.get(), GLOVE_Y, EASINGS) - TIP_Y + bob },
         // Pivot sandwich: squash/rotate hinge at the fingertip on BOTH axes,
         // so the tip stays planted on the press point through every pose.
         { translateX: TIP_PIVOT_X },
         { translateY: TIP_PIVOT_Y },
-        { rotate: `${valueAt(t.value, GLOVE_ROTATE_DEG, EASINGS)}deg` },
-        { scaleX: valueAt(t.value, GLOVE_SCALE_X, EASINGS) },
-        { scaleY: valueAt(t.value, GLOVE_SCALE_Y, EASINGS) },
+        { rotate: `${valueAt(t.get(), GLOVE_ROTATE_DEG, EASINGS)}deg` },
+        { scaleX: valueAt(t.get(), GLOVE_SCALE_X, EASINGS) },
+        { scaleY: valueAt(t.get(), GLOVE_SCALE_Y, EASINGS) },
         { translateY: -TIP_PIVOT_Y },
         { translateX: -TIP_PIVOT_X },
       ],
@@ -357,77 +355,77 @@ export function PermissionGestureDemo(): React.ReactElement {
   });
 
   const shadowStyle = useAnimatedStyle(() => ({
-    opacity: valueAt(t.value, SHADOW_OPACITY, EASINGS),
+    opacity: valueAt(t.get(), SHADOW_OPACITY, EASINGS),
     transform: [
-      { translateX: valueAt(t.value, GLOVE_X, EASINGS) - 18 },
-      { scaleX: valueAt(t.value, SHADOW_SCALE_X, EASINGS) },
+      { translateX: valueAt(t.get(), GLOVE_X, EASINGS) - 18 },
+      { scaleX: valueAt(t.get(), SHADOW_SCALE_X, EASINGS) },
     ],
   }));
 
   const rowPlaneStyle = useAnimatedStyle(() => ({
-    opacity: valueAt(t.value, ROW_FADE, EASINGS),
+    opacity: valueAt(t.get(), ROW_FADE, EASINGS),
     transform: [
       { perspective: 800 },
-      { rotateX: `${valueAt(t.value, ROW_RX, EASINGS)}deg` },
-      { rotateY: `${valueAt(t.value, ROW_RY, EASINGS)}deg` },
-      { translateY: valueAt(t.value, ROW_DEPRESS, EASINGS) },
-      { scale: valueAt(t.value, ROW_THUNK_SCALE, EASINGS) },
+      { rotateX: `${valueAt(t.get(), ROW_RX, EASINGS)}deg` },
+      { rotateY: `${valueAt(t.get(), ROW_RY, EASINGS)}deg` },
+      { translateY: valueAt(t.get(), ROW_DEPRESS, EASINGS) },
+      { scale: valueAt(t.get(), ROW_THUNK_SCALE, EASINGS) },
     ],
   }));
 
   // Content floats a hair above the card base: counter-translate vs tilt.
   const rowContentStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: (valueAt(t.value, ROW_RY, EASINGS) - RY_IDLE) * 0.5 },
-      { translateY: (valueAt(t.value, ROW_RX, EASINGS) - RX_IDLE) * 0.4 },
+      { translateX: (valueAt(t.get(), ROW_RY, EASINGS) - RY_IDLE) * 0.5 },
+      { translateY: (valueAt(t.get(), ROW_RX, EASINGS) - RX_IDLE) * 0.4 },
     ],
   }));
 
   const titleBaseStyle = useAnimatedStyle(() => ({
-    opacity: 1 - valueAt(t.value, RED_P, EASINGS),
+    opacity: 1 - valueAt(t.get(), RED_P, EASINGS),
   }));
   const titleDangerStyle = useAnimatedStyle(() => ({
-    opacity: valueAt(t.value, RED_P, EASINGS),
+    opacity: valueAt(t.get(), RED_P, EASINGS),
   }));
   const statusAskStyle = useAnimatedStyle(() => ({
-    opacity: valueAt(t.value, STATUS_ASK, EASINGS),
+    opacity: valueAt(t.get(), STATUS_ASK, EASINGS),
   }));
   const statusAlwaysStyle = useAnimatedStyle(() => ({
-    opacity: valueAt(t.value, STATUS_ALWAYS, EASINGS),
+    opacity: valueAt(t.get(), STATUS_ALWAYS, EASINGS),
   }));
   const statusBlockedStyle = useAnimatedStyle(() => ({
-    opacity: valueAt(t.value, STATUS_BLOCKED, EASINGS),
+    opacity: valueAt(t.get(), STATUS_BLOCKED, EASINGS),
   }));
 
   const switchTrackStyle = useAnimatedStyle(() => {
     const base = interpolateColor(
-      valueAt(t.value, TRACK_ON, EASINGS),
+      valueAt(t.get(), TRACK_ON, EASINGS),
       [0, 1],
       [trackOff, foreground]
     );
     return {
-      backgroundColor: interpolateColor(valueAt(t.value, RED_P, EASINGS), [0, 1], [base, danger]),
+      backgroundColor: interpolateColor(valueAt(t.get(), RED_P, EASINGS), [0, 1], [base, danger]),
     };
   });
 
   const knobStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: valueAt(t.value, KNOB_X, EASINGS) }],
+    transform: [{ translateX: valueAt(t.get(), KNOB_X, EASINGS) }],
   }));
 
   const ringWrapStyle = useAnimatedStyle(() => ({
-    opacity: valueAt(t.value, RING_OPACITY, EASINGS),
-    transform: [{ rotate: '-90deg' }, { scale: valueAt(t.value, RING_SCALE, EASINGS) }],
+    opacity: valueAt(t.get(), RING_OPACITY, EASINGS),
+    transform: [{ rotate: '-90deg' }, { scale: valueAt(t.get(), RING_SCALE, EASINGS) }],
   }));
   const ringProps = useAnimatedProps(() => ({
-    strokeDashoffset: RING_C * (1 - valueAt(t.value, RING_SWEEP, EASINGS)),
+    strokeDashoffset: RING_C * (1 - valueAt(t.get(), RING_SWEEP, EASINGS)),
   }));
 
   const menuStyle = useAnimatedStyle(() => ({
-    opacity: valueAt(t.value, MENU_OPACITY, EASINGS),
+    opacity: valueAt(t.get(), MENU_OPACITY, EASINGS),
     transform: [
       // Pivot toward the press point below the card.
       { translateY: MENU_H / 2 },
-      { scale: valueAt(t.value, MENU_SCALE, EASINGS) },
+      { scale: valueAt(t.get(), MENU_SCALE, EASINGS) },
       { translateY: -MENU_H / 2 },
     ],
   }));
@@ -436,7 +434,7 @@ export function PermissionGestureDemo(): React.ReactElement {
   const menuRow2 = useMenuRowStyle(t, 2);
 
   const blockFlashStyle = useAnimatedStyle(() => ({
-    opacity: valueAt(t.value, BLOCK_FLASH, EASINGS),
+    opacity: valueAt(t.get(), BLOCK_FLASH, EASINGS),
   }));
 
   const wordTap1Style = useWordStyle(t, WORD_TAP_1);

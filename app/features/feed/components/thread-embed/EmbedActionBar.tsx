@@ -71,12 +71,12 @@ export const EmbedActionBar = React.memo(function EmbedActionBar({
   const setActionBarHeight = embed?.setActionBarHeight;
   const startY = useSharedValue(0);
 
-  const fadeStyle = useAnimatedStyle(() => ({ opacity: actionBarOpacity?.value ?? 0 }));
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: actionBarOpacity?.get() ?? 0 }));
 
   // Gate touches + drag so the (invisible) bar is inert while faded out.
   const [interactive, setInteractive] = useState(false);
   useAnimatedReaction(
-    () => (actionBarOpacity?.value ?? 0) > 0.05,
+    () => (actionBarOpacity?.get() ?? 0) > 0.05,
     (next, prev) => {
       if (next !== prev) runOnJS(setInteractive)(next);
     }
@@ -91,19 +91,19 @@ export const EmbedActionBar = React.memo(function EmbedActionBar({
         .onStart(() => {
           'worklet';
           if (!sheetTranslateY) return;
-          startY.value = sheetTranslateY.value;
+          startY.set(sheetTranslateY.get());
         })
         .onUpdate((e) => {
           'worklet';
           if (!sheetTranslateY) return;
-          sheetTranslateY.value = clamp(startY.value + e.translationY, 0, snapInline);
+          sheetTranslateY.set(clamp(startY.get() + e.translationY, 0, snapInline));
         })
         .onEnd((e) => {
           'worklet';
           if (!sheetTranslateY) return;
-          const target = nearestSnap(sheetTranslateY.value, e.velocityY, snapMiddle, snapInline);
-          if (Math.abs(target - startY.value) > 1) runOnJS(embedHaptic)();
-          sheetTranslateY.value = withSpring(target, SHEET_SPRING);
+          const target = nearestSnap(sheetTranslateY.get(), e.velocityY, snapMiddle, snapInline);
+          if (Math.abs(target - startY.get()) > 1) runOnJS(embedHaptic)();
+          sheetTranslateY.set(withSpring(target, SHEET_SPRING));
         }),
     [interactive, sheetTranslateY, snapMiddle, snapInline, startY]
   );

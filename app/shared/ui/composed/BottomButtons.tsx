@@ -2,6 +2,7 @@ import { ReactNode, useCallback, useMemo } from 'react';
 import { LayoutChangeEvent, Platform, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView, BlurTint } from 'expo-blur';
+import { CHROME_BLUR_TINT } from '@/shared/ui/primitives/BlurView';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { easeGradient } from '@/shared/lib/easeGradient';
@@ -80,7 +81,7 @@ export function BottomButtons({
   gradientColor,
   blur = true,
   blurIntensity = 10,
-  blurTint = Platform.OS === 'ios' ? 'systemChromeMaterialDark' : 'dark',
+  blurTint = CHROME_BLUR_TINT,
   onLayout,
 }: BottomButtonsProps) {
   const insets = useSafeAreaInsets();

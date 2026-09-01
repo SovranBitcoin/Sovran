@@ -53,7 +53,7 @@ export function DetailsList({ items, style, camera = false, special, gradient }:
         </Text>
         {titleText !== '' && <Spacer size={8} />}
 
-        {renderValueContent(item, titleText, special)}
+        {renderValueContent(item, titleText, special, { foreground, shade300 })}
       </HStack>
     );
   });
@@ -88,114 +88,132 @@ export function DetailsList({ items, style, camera = false, special, gradient }:
       </ContainerView>
     </Log>
   );
+}
 
-  function renderValueContent(item: DetailsListItem, titleText: string, special?: boolean) {
-    if (React.isValidElement(item.value)) {
-      return (
-        <HStack
-          align="center"
-          style={{
-            flex: 1,
-            justifyContent: item.align === 'left' ? 'flex-start' : 'flex-end',
-          }}>
-          {item.value}
-          {titleText !== '' && <Spacer size={8} />}
-        </HStack>
-      );
-    }
+/**
+ * Row-value renderers. They depend only on their arguments and the two theme
+ * colours, so they live at module scope: declared inside the component (after
+ * its `return`, no less) they were hoisted declarations in unreachable code,
+ * which React Compiler cannot lower — costing the whole list its memoization.
+ */
+type DetailsListColors = { foreground: string; shade300: string };
 
-    const layout = formatDisplayValue(item.value, special === true);
-
-    switch (layout.kind) {
-      case 'email':
-        return (
-          <VStack align="center" className="flex-1" justify="center">
-            <Text size={18} color={withAlpha(foreground, 0.9)} style={{ textAlign: 'center' }}>
-              {truncateMiddle(layout.username, 8)}
-            </Text>
-            <Pressable className="flex-row items-center">
-              <StyledText
-                primary
-                size={24}
-                heavy
-                className="text-shade-200"
-                style={{
-                  textAlign: 'center',
-                  textShadowColor: 'rgba(0, 0, 0, 0.75)',
-                  textShadowOffset: { width: 0, height: 0 },
-                  textShadowRadius: 8,
-                  padding: 4,
-                }}>
-                @{layout.domain}
-              </StyledText>
-            </Pressable>
-            {titleText !== '' && <Spacer size={8} />}
-          </VStack>
-        );
-
-      case 'prefix-split':
-        return renderPrefixedValue(layout.prefix, layout.body, titleText);
-
-      case 'bitcoin-uri':
-        return (
-          <VStack align="center" className="flex-1" justify="center">
-            <Text
-              bold
-              size={12}
-              color={withAlpha(foreground, 0.9)}
-              style={{
-                textAlign: 'left',
-                wordBreak: 'break-all',
-              }}>
-              {layout.value}
-            </Text>
-            {titleText !== '' && <Spacer size={8} />}
-          </VStack>
-        );
-
-      case 'plain':
-      default:
-        return (
-          <View>
-            <Text
-              weight={titleText === '' ? 'regular' : 'bold'}
-              size={titleText === '' ? 12 : 16}
-              color={foreground}
-              style={{
-                textAlign: titleText === '' ? 'left' : item.align === 'left' ? 'left' : 'right',
-                flex: 1,
-              }}>
-              {layout.value}
-            </Text>
-          </View>
-        );
-    }
-  }
-
-  // Helper function to render prefixed values (npub, creqA, etc.)
-  function renderPrefixedValue(prefix: string, value: string, titleText: string) {
+function renderValueContent(
+  item: DetailsListItem,
+  titleText: string,
+  special: boolean | undefined,
+  colors: DetailsListColors
+) {
+  if (React.isValidElement(item.value)) {
     return (
-      <VStack align="center" className="flex-1" justify="center">
-        <Text
-          heavy
-          size={24}
-          color={shade300}
-          style={{
-            textAlign: 'center',
-          }}>
-          {prefix}
-        </Text>
-        <Text
-          bold
-          size={12}
-          color={withAlpha(foreground, 0.9)}
-          style={{
-            textAlign: 'center',
-          }}>
-          {value}
-        </Text>
+      <HStack
+        align="center"
+        style={{
+          flex: 1,
+          justifyContent: item.align === 'left' ? 'flex-start' : 'flex-end',
+        }}>
+        {item.value}
         {titleText !== '' && <Spacer size={8} />}
-      </VStack>
+      </HStack>
     );
   }
+
+  const layout = formatDisplayValue(item.value, special === true);
+
+  switch (layout.kind) {
+    case 'email':
+      return (
+        <VStack align="center" className="flex-1" justify="center">
+          <Text size={18} color={withAlpha(colors.foreground, 0.9)} style={{ textAlign: 'center' }}>
+            {truncateMiddle(layout.username, 8)}
+          </Text>
+          <Pressable className="flex-row items-center">
+            <StyledText
+              primary
+              size={24}
+              heavy
+              className="text-shade-200"
+              style={{
+                textAlign: 'center',
+                textShadowColor: 'rgba(0, 0, 0, 0.75)',
+                textShadowOffset: { width: 0, height: 0 },
+                textShadowRadius: 8,
+                padding: 4,
+              }}>
+              @{layout.domain}
+            </StyledText>
+          </Pressable>
+          {titleText !== '' && <Spacer size={8} />}
+        </VStack>
+      );
+
+    case 'prefix-split':
+      return renderPrefixedValue(layout.prefix, layout.body, titleText, colors);
+
+    case 'bitcoin-uri':
+      return (
+        <VStack align="center" className="flex-1" justify="center">
+          <Text
+            bold
+            size={12}
+            color={withAlpha(colors.foreground, 0.9)}
+            style={{
+              textAlign: 'left',
+              wordBreak: 'break-all',
+            }}>
+            {layout.value}
+          </Text>
+          {titleText !== '' && <Spacer size={8} />}
+        </VStack>
+      );
+
+    case 'plain':
+    default:
+      return (
+        <View>
+          <Text
+            weight={titleText === '' ? 'regular' : 'bold'}
+            size={titleText === '' ? 12 : 16}
+            color={colors.foreground}
+            style={{
+              textAlign: titleText === '' ? 'left' : item.align === 'left' ? 'left' : 'right',
+              flex: 1,
+            }}>
+            {layout.value}
+          </Text>
+        </View>
+      );
+  }
+}
+
+// Helper function to render prefixed values (npub, creqA, etc.)
+function renderPrefixedValue(
+  prefix: string,
+  value: string,
+  titleText: string,
+  colors: DetailsListColors
+) {
+  return (
+    <VStack align="center" className="flex-1" justify="center">
+      <Text
+        heavy
+        size={24}
+        color={colors.shade300}
+        style={{
+          textAlign: 'center',
+        }}>
+        {prefix}
+      </Text>
+      <Text
+        bold
+        size={12}
+        color={withAlpha(colors.foreground, 0.9)}
+        style={{
+          textAlign: 'center',
+        }}>
+        {value}
+      </Text>
+      {titleText !== '' && <Spacer size={8} />}
+    </VStack>
+  );
 }

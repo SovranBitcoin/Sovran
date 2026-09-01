@@ -127,25 +127,24 @@ export function ThreadEmbedProvider({ children }: { children: React.ReactNode })
 
   const sheetTranslateY = useSharedValue(0);
   const scrollY = useSharedValue(0);
-  const snapMiddleSv = useSharedValue(snapMiddle);
-  const snapInlineSv = useSharedValue(snapInline);
-  snapMiddleSv.value = snapMiddle;
-  snapInlineSv.value = snapInline;
-
+  // The snap offsets are plain JS numbers; the derived worklets below capture
+  // them directly. Mirroring them into shared values meant writing to those
+  // values DURING RENDER — a Rules-of-React violation Reanimated warns about,
+  // and the reason this provider rendered unmemoized.
   const collapseProgress = useDerivedValue(() => {
     'worklet';
-    return clamp(sheetTranslateY.value / Math.max(1, snapInlineSv.value), 0, 1);
+    return clamp(sheetTranslateY.get() / Math.max(1, snapInline), 0, 1);
   });
   // Web view appears early in the collapse so it's fully visible by the middle snap.
   const embedOpacity = useDerivedValue(() => {
     'worklet';
-    return clamp(sheetTranslateY.value / Math.max(1, snapMiddleSv.value * 0.5), 0, 1);
+    return clamp(sheetTranslateY.get() / Math.max(1, snapMiddle * 0.5), 0, 1);
   });
   // Action bar fades in (and the in-sheet footer fades out) over rest→middle,
   // so they crossfade rather than both showing at once.
   const actionBarOpacity = useDerivedValue(() => {
     'worklet';
-    return clamp(sheetTranslateY.value / Math.max(1, snapMiddleSv.value), 0, 1);
+    return clamp(sheetTranslateY.get() / Math.max(1, snapMiddle), 0, 1);
   });
   const targetFooterOpacity = useDerivedValue(() => {
     'worklet';
@@ -169,12 +168,12 @@ export function ThreadEmbedProvider({ children }: { children: React.ReactNode })
   const clearEmbed = useCallback(() => setEmbedUrl(null), []);
   const hasCollapsed = useSharedValue(false);
   useAnimatedReaction(
-    () => sheetTranslateY.value,
+    () => sheetTranslateY.get(),
     (ty) => {
       if (ty > 8) {
-        if (!hasCollapsed.value) hasCollapsed.value = true;
-      } else if (ty <= 1 && hasCollapsed.value) {
-        hasCollapsed.value = false;
+        if (!hasCollapsed.get()) hasCollapsed.set(true);
+      } else if (ty <= 1 && hasCollapsed.get()) {
+        hasCollapsed.set(false);
         runOnJS(clearEmbed)();
       }
     }
@@ -195,7 +194,7 @@ export function ThreadEmbedProvider({ children }: { children: React.ReactNode })
       feedLog.info('feed.thread.embed.open');
       embedHaptic();
       setEmbedUrl(target);
-      sheetTranslateY.value = withSpring(snapMiddle, SHEET_SPRING);
+      sheetTranslateY.set(withSpring(snapMiddle, SHEET_SPRING));
     },
     [snapMiddle, sheetTranslateY]
   );
@@ -203,9 +202,9 @@ export function ThreadEmbedProvider({ children }: { children: React.ReactNode })
   const handleEmbedScroll = useCallback(
     (offsetY: number) => {
       // Scrolling the page down tucks the thread strip away to the inline snap.
-      if (offsetY > WEBVIEW_SCROLL_TO_INLINE && sheetTranslateY.value < snapInline - 4) {
+      if (offsetY > WEBVIEW_SCROLL_TO_INLINE && sheetTranslateY.get() < snapInline - 4) {
         embedHaptic();
-        sheetTranslateY.value = withSpring(snapInline, SHEET_SPRING);
+        sheetTranslateY.set(withSpring(snapInline, SHEET_SPRING));
       }
     },
     [snapInline, sheetTranslateY]
