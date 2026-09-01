@@ -119,8 +119,11 @@ describe('wallet surface e2e selectors', () => {
     expect(settings).toContain('testID="settings-version-row"');
     expect(settings).toContain('testID="settings-mock-offline-toggle"');
     expect(settings).toContain('testID="settings-mock-fail-melt-toggle"');
-    expect(settings).toContain("accessibilityRole={testID ? 'switch' : undefined}");
-    expect(settings).toContain('accessibilityState={testID ? { checked: isSelected } : undefined}');
+    // Unconditional, not gated on `testID`: a screen reader needs the role and
+    // the checked state on EVERY toggle, not only the three the e2e harness
+    // happens to target.
+    expect(settings).toContain('accessibilityRole="switch"');
+    expect(settings).toContain('accessibilityState={{ checked: isSelected }}');
     for (const state of ['mockOffline', 'mockFailSend', 'mockFailMelt']) {
       expect(settings).toContain(`isSelected={${state}}`);
     }
@@ -151,8 +154,10 @@ describe('wallet surface e2e selectors', () => {
   it('drives the Design System through actionable outer-row selectors', () => {
     const settings = read('features/settings/screens/SettingsScreen.tsx');
     expect(settings).toContain('testID="settings-design-system-row"');
-    expect(settings).toContain('accessible={testID ? true : undefined}');
-    expect(settings).toContain("accessibilityRole={testID ? 'button' : undefined}");
+    // Unconditional, not gated on `testID` — the outer row is one actionable
+    // node with a button role for every caller, not just instrumented ones.
+    expect(settings).toContain('accessible');
+    expect(settings).toContain('accessibilityRole="button"');
 
     const catalog = read('features/settings/screens/SettingsDesignSystemScreen.tsx');
     expect(catalog).toContain('testID={`design-system-family-${id}`}');

@@ -41,4 +41,11 @@ export interface CapsuleButtonProps {
   textStyle?: StyleProp<TextStyle>;
   /** Stable accessibility identifier for log-doctor / WDA targeting. */
   testID?: string;
+  /**
+   * Spoken name for the control. Defaults to `label`; set it where the visible
+   * text is an abbreviation that does not stand alone (e.g. the wallet unit
+   * pill reads "SATS" but means "Switch wallet account"). Every tier applies
+   * it identically, alongside `accessibilityRole="button"`.
+   */
+  accessibilityLabel?: string;
 }

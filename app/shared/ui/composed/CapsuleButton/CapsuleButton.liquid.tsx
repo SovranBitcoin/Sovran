@@ -28,6 +28,7 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const {
     label,
+    accessibilityLabel,
     onPress,
     color,
     isActive = false,
@@ -84,7 +85,7 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
         testID={testID}
         accessible
         accessibilityRole="button"
-        accessibilityLabel={label}
+        accessibilityLabel={accessibilityLabel ?? label}
         onTouchStart={(e) => {
           rnghFired.current = false;
           moved.current = false;

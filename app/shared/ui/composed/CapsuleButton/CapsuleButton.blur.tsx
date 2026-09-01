@@ -20,6 +20,8 @@ export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement
 
   const {
     onPress,
+    label,
+    accessibilityLabel,
     color = foreground,
     isActive = false,
     height = DEFAULT_HEIGHT,
@@ -58,6 +60,8 @@ export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement
         <PressableFeedback
           animation={false}
           onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={accessibilityLabel ?? label}
           style={[styles.pressable, widthStyle, { minHeight: height }]}>
           <CapsuleButtonContent
             {...props}

@@ -49,6 +49,9 @@ export function UnitSwitcherPillFallback(props: UnitSwitcherPillProps): React.Re
       pointerEvents={canSwitch ? 'auto' : 'none'}>
       <CapsuleButton
         label={PILL_LABELS[shownUnit]}
+        // Matches the liquid tier's spoken name — the visible "SATS"/"USD"
+        // abbreviation does not stand alone.
+        accessibilityLabel="Switch wallet account"
         onPress={openUnitMenu}
         height={PILL_HEIGHT}
         fitContent

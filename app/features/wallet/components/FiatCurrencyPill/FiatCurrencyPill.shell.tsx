@@ -42,6 +42,9 @@ export function FiatPillShell({
     <Pressable
       testID={testID}
       accessibilityLabel={accessibilityLabel}
+      // The liquid tier renders a UIKit UIButton, which is announced as a
+      // button natively; this fallback had the label but never the role.
+      accessibilityRole="button"
       disabled={!primaryHandler && !longPressHandler}
       onPress={primaryHandler}
       onLongPress={longPressHandler}>

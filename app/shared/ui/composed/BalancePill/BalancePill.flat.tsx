@@ -49,6 +49,11 @@ export default function BalancePillFlat({
       <PressableFeedback
         testID={testID}
         animation={false}
+        // The liquid tier is a native SwiftUI Button and gets the button trait
+        // from the platform; this tier is the Android + non-glass iOS path and
+        // has to declare it. No accessibilityLabel on purpose — the flattened
+        // subtree already announces the balance text, which e2e selectors match.
+        accessibilityRole="button"
         onPress={onPress}
         style={[
           styles.pressable,

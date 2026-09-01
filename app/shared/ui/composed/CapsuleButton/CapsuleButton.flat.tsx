@@ -18,6 +18,8 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
   ] as const);
   const {
     onPress,
+    label,
+    accessibilityLabel,
     color,
     isActive = false,
     filled = false,
@@ -59,6 +61,8 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
       <PressableFeedback
         animation={false}
         onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel ?? label}
         style={[styles.pressable, widthStyle, { minHeight: height }]}>
         <CapsuleButtonContent
           {...props}

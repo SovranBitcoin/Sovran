@@ -91,9 +91,16 @@ const SettingsListActionItem: React.FC<{
     <PressableFeedback
       animation={false}
       testID={testID}
-      accessible={testID ? true : undefined}
+      // `accessible` is explicit rather than gated on `testID`: RN's Pressable
+      // already defaults it to true, so the gate never did anything — stating
+      // it keeps the "one actionable outer row" invariant visible.
+      accessible
+      // Role is unconditional: it is what a screen reader needs, and gating it
+      // on `testID` made accessibility a side effect of e2e instrumentation
+      // (18 of 22 rows carry no testID). The explicit label stays gated — where
+      // it is absent RN synthesizes the same "title, description" string.
+      accessibilityRole="button"
       accessibilityLabel={testID ? `${title}${description ? `, ${description}` : ''}` : undefined}
-      accessibilityRole={testID ? 'button' : undefined}
       onPress={onPress}>
       <PressableFeedback.Scale>
         <ListGroup.Item disabled>
@@ -134,11 +141,15 @@ const SettingsToggleItem: React.FC<{
     animation={false}
     onPress={() => onSelectedChange(!isSelected)}
     testID={testID}
-    accessible={testID ? true : undefined}
-    accessibilityRole={testID ? 'switch' : undefined}
-    accessibilityLabel={testID ? title : undefined}
-    accessibilityState={testID ? { checked: isSelected } : undefined}
-    accessibilityValue={testID ? { text: isSelected ? '1' : '0' } : undefined}>
+    accessible
+    // Role and checked-state are unconditional — without them a screen reader
+    // cannot tell a toggle from static text, nor read whether it is on. They
+    // were gated on `testID`, so 5 of the 8 toggles announced neither.
+    // `accessibilityValue` is dropped: RN derives the iOS 1/0 value from the
+    // switch role plus `checked`, and Android exposes the checked state.
+    accessibilityRole="switch"
+    accessibilityState={{ checked: isSelected }}
+    accessibilityLabel={testID ? title : undefined}>
     <PressableFeedback.Scale>
       <ListGroup.Item disabled>
         <ListGroup.ItemContent>

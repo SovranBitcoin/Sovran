@@ -65,6 +65,9 @@ export const StatsCard = memo(function StatsCard({
       <View style={styles.statsContainer}>
         <Pressable
           onPress={onPress}
+          // The glass path above is a UIKit UIButton and is announced as a
+          // button natively; this fallback covers Android + pre-iOS-26.
+          accessibilityRole="button"
           style={[
             styles.fallbackCard,
             {
