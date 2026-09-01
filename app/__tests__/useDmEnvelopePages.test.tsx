@@ -10,7 +10,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 
 import { useDmEnvelopePages } from '@/features/payments/hooks/useDmEnvelopePages';
-import type { DmEnvelopePage } from '@/features/payments/data/dmEnvelopeClient';
+import type { DmEnvelopePage } from '@/features/payments/data/dmEnvelopeTypes';
 
 jest.mock('@/shared/lib/logger', () => ({
   paymentLog: { warn: jest.fn(), debug: jest.fn(), info: jest.fn() },

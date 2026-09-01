@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { paymentLog } from '@/shared/lib/logger';
-import type { DmEnvelopePage } from '../data/dmEnvelopeClient';
+import type { DmEnvelopePage } from '../data/dmEnvelopeTypes';
 import { createDmEnvelopeCursor } from '../data/dmPagination';
 
 interface DmEnvelopePagesOptions {

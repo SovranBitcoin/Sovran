@@ -20,14 +20,7 @@ import {
   normalizeImageAsset,
   type NormalizeImageError,
 } from '@/shared/lib/nostr/media/normalizeImage';
-import type { MediaDescriptor } from '@/shared/lib/nostr/media/types';
-
-export interface PickedAsset {
-  uri: string;
-  mimeType: string;
-  width?: number;
-  height?: number;
-}
+import type { MediaDescriptor, PickedAsset } from '@/shared/lib/nostr/media/types';
 
 interface UploadMediaOptions {
   ndk: NDK;

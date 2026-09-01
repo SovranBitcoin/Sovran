@@ -8,8 +8,9 @@
 import { useCallback, useRef, useState } from 'react';
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
-import { fetchDmConversation, type DmEnvelopePage } from '../data/dmEnvelopeClient';
-import { decryptDmEnvelopes, type DmProtocol } from '../data/dmDecryptPipeline';
+import { fetchDmConversation } from '../data/dmEnvelopeClient';
+import { decryptDmEnvelopes } from '../data/dmDecryptPipeline';
+import type { DmEnvelopePage, DmProtocol } from '../data/dmEnvelopeTypes';
 import { useDmEnvelopePages } from './useDmEnvelopePages';
 
 const PAGE_LIMIT = 50;

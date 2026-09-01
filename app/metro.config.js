@@ -58,6 +58,7 @@ const nostrPath = path.join(workspaceRoot, 'nostr');
 const localPackageEntryPaths = {
   wallet: path.join(walletPath, 'src', 'index.ts'),
   'wallet/react': path.join(walletPath, 'src', 'react', 'index.ts'),
+  'wallet/safeFetch': path.join(walletPath, 'src', 'safeFetch.ts'),
   'wallet/operations': path.join(walletPath, 'src', 'operations', 'index.ts'),
   nostr: path.join(nostrPath, 'src', 'index.ts'),
   'nostr/map': path.join(nostrPath, 'src', 'map', 'index.ts'),

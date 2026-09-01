@@ -3,7 +3,7 @@ import React from 'react';
 import { HistoryEntryTimeline } from '@/features/transactions/components/detail/timeline';
 import { buildTimelineScenarios } from '@/features/settings/screens/designSystemTimelineScenarios';
 
-import type { DesignSystemScenario } from './catalog';
+import type { DesignSystemScenario } from './types';
 
 const TIMELINE_CARD_SOURCE = 'features/transactions/components/detail/timeline/TimelineCard.tsx';
 const TIMELINE_ROW_SOURCE = 'features/transactions/components/detail/timeline/TimelineRow.tsx';

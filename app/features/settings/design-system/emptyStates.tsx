@@ -1,6 +1,6 @@
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
 
-import type { DesignSystemScenario } from './catalog';
+import type { DesignSystemScenario } from './types';
 
 const EMPTY_STATE_SOURCE = 'shared/ui/composed/EmptyState.tsx';
 

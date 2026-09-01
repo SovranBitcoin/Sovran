@@ -5,7 +5,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 
-import type { DesignSystemScenario } from './catalog';
+import type { DesignSystemScenario } from './types';
 
 const CROSSFADE_SOURCE = 'shared/ui/composed/SkeletonContentCrossfade.tsx';
 const SHIMMER_SOURCE = 'shared/ui/composed/SkeletonExitShimmer.tsx';

@@ -5,7 +5,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 
 import type { Capabilities } from '@/shared/ui/capability';
-import type { DesignSystemScenario } from './catalog';
+import type { DesignSystemScenario } from './types';
 
 const SOURCES = {
   actionSegments: 'shared/ui/composed/ActionSegmentsCard.tsx',

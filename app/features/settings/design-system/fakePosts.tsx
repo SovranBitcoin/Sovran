@@ -20,7 +20,7 @@ import type {
 import type { RelayInformation } from '@/shared/lib/nostr/nip11';
 import { relayMetadataKey, useRelayMetadataStore } from '@/shared/stores/global/relayMetadataStore';
 
-import type { DesignSystemScenario } from './catalog';
+import type { DesignSystemScenario } from './types';
 
 const RELAY_CARD_SOURCE = 'features/feed/components/nostr/RelayCard.tsx';
 const POST_CARD_SOURCE = 'features/feed/components/nostr/PostCard.tsx';

@@ -4,10 +4,8 @@ import { ScrollView } from 'react-native';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { ListGroup, PressableFeedback, Separator } from 'heroui-native';
 
-import {
-  DESIGN_SYSTEM_CATALOG,
-  type DesignSystemFamily,
-} from '@/features/settings/design-system/catalog';
+import { DESIGN_SYSTEM_CATALOG } from '@/features/settings/design-system/catalog';
+import type { DesignSystemFamily } from '@/features/settings/design-system/types';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Section } from '@/shared/ui/composed/Section';
 import { Text } from '@/shared/ui/primitives/Text';

@@ -7,8 +7,9 @@
 import { useCallback, useRef, useState } from 'react';
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
-import { fetchDmEnvelopes, type DmEnvelopePage } from '../data/dmEnvelopeClient';
-import { decryptDmEnvelopes, type DmProtocol } from '../data/dmDecryptPipeline';
+import { fetchDmEnvelopes } from '../data/dmEnvelopeClient';
+import { decryptDmEnvelopes } from '../data/dmDecryptPipeline';
+import type { DmEnvelopePage, DmProtocol } from '../data/dmEnvelopeTypes';
 import { useDmEnvelopePages } from './useDmEnvelopePages';
 
 /** Fetched DM kinds: NIP-04 (kind 4) + NIP-17 gift wraps (kind 1059). */

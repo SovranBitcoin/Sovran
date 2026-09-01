@@ -5,7 +5,7 @@
  * nagg orders/filters by the wrap timestamp. We over-fetch by `CURSOR_SLACK_SECONDS`
  * and rely on wrap-id dedup to converge.
  */
-import type { DmEnvelope, DmEnvelopePage } from './dmEnvelopeClient';
+import type { DmEnvelope, DmEnvelopePage } from './dmEnvelopeTypes';
 
 export const CURSOR_SLACK_SECONDS = 2 * 24 * 60 * 60;
 

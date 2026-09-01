@@ -26,7 +26,7 @@ import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { getMarkerColor } from '@/shared/lib/map/categories';
 import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
-import { isAbortError } from '@/shared/lib/apiClient';
+import { isAbortError } from 'wallet/safeFetch';
 import { openExternalUrl } from '@/shared/lib/url';
 import { staticPopup } from '@/shared/lib/popup';
 import { formatDate } from '@/shared/lib/date';

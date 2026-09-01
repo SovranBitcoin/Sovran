@@ -11,7 +11,7 @@ import {
   ROUTSTR_MAX_COMPLETION_TOKENS,
   type RoutstrChatMessage,
 } from '@/shared/lib/routstr/api';
-import { isAbortError } from '@/shared/lib/apiClient';
+import { isAbortError } from 'wallet/safeFetch';
 import { pickFinalizeMessage } from '../lib/finalize';
 import { actionMenuPopup, staticPopup, paramPopup } from '@/shared/lib/popup';
 import { aiLog } from '@/shared/lib/logger';

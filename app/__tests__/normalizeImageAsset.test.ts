@@ -30,7 +30,7 @@ jest.mock('@/shared/lib/logger', () => ({
 }));
 
 import { normalizeImageAsset } from '@/shared/lib/nostr/media/normalizeImage';
-import type { PickedAsset } from '@/shared/lib/nostr/media/mediaUpload';
+import type { PickedAsset } from '@/shared/lib/nostr/media/types';
 
 const {
   manipulate: mockManipulate,

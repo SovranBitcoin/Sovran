@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { apiLog } from '../logger';
-import { buildAbortSignal, isAbortError } from '../apiClient';
-import { type RequestControls } from 'wallet';
+import { buildAbortSignal } from '@/shared/lib/http/requestSignal';
+import { isAbortError, type RequestControls } from 'wallet/safeFetch';
 
 const ROUTSTR_DEFAULT_BASE_URL = 'https://api.routstr.com/v1';
 
@@ -42,7 +42,7 @@ export const ROUTSTR_MAX_COMPLETION_TOKENS = 4096;
 
 /**
  * Per-request budget for routstr endpoints. The chat APIs can take longer
- * than the wallet's `DEFAULT_TIMEOUT_MS` (10s) — match the streaming-side
+ * than the app's shared `DEFAULT_TIMEOUT_MS` (10s) — match the streaming-side
  * 60s budget for the bare-fetch endpoints so a slow upstream doesn't
  * surface as a fake timeout.
  */

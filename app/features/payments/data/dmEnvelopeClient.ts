@@ -17,6 +17,7 @@ import {
 } from 'nostr';
 import { dmConversationAppView } from 'nostr/recipes';
 import { backendConfig } from '@/shared/config/backend';
+import type { DmEnvelope, DmEnvelopePage } from './dmEnvelopeTypes';
 import { paymentLog } from '@/shared/lib/logger';
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
@@ -30,21 +31,6 @@ const client = createNaggClient({
 });
 
 /** Raw DM envelope event as returned by nagg (still encrypted). */
-export interface DmEnvelope {
-  id: string;
-  pubkey: string;
-  kind: number;
-  createdAt: string | number | Date;
-  content: string;
-  tags: string[][];
-  sig?: string;
-}
-
-export interface DmEnvelopePage {
-  envelopes: DmEnvelope[];
-  hasNextPage: boolean;
-}
-
 const EMPTY_PAGE: DmEnvelopePage = { envelopes: [], hasNextPage: false };
 
 /**

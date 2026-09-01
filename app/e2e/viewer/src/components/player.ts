@@ -4,15 +4,10 @@ import { state, update } from '../state';
 import type { AppState } from '../state';
 import { attachDeviceCorners } from './deviceCorners';
 import { bindStatePane, patchStatePane, renderStateBody } from './statePanel';
-import type { Frame, ScenarioTimeline } from '../../lib/types';
+import type { ReelFrame, ScenarioTimeline } from '../../lib/types';
 
 /** A reel entry: an automatic evidence frame, or a named (canonical-page)
  * capture interleaved at its artifact position. */
-export interface ReelFrame extends Frame {
-  /** Canonical page name when this entry is a named capture. */
-  named?: string;
-}
-
 /* Video transport state lives at module level, outside AppState: the <video>
  * element is the source of truth for time, and routing 4-60Hz timeupdate
  * ticks through update() would re-render every component per tick. Reset on

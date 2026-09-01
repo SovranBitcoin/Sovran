@@ -25,6 +25,7 @@ import {
   type ParseError,
 } from '@sovranbitcoin/schemas';
 import { backendConfig } from '@/shared/config/backend';
+import { DEFAULT_TIMEOUT_MS } from '@/shared/lib/http/requestSignal';
 import { NaggAiLineupSchema } from '@/shared/lib/routstr/lineup';
 
 // Local relaxation: the auditor returns `info` in several shapes depending
@@ -148,7 +149,6 @@ const SCORE_API_BASE_URL = backendConfig.scoreApiBaseUrl;
  * behind sovran.money so use a tighter budget than colada's
  * `DEFAULT_TIMEOUT_MS` (15s, tuned for arbitrary LNURL endpoints).
  */
-const DEFAULT_TIMEOUT_MS = 10_000;
 const mintReviewsEnrichment = createNostrMintEnrichment({
   appViewBaseUrl: backendConfig.nostrAppViewBaseUrl,
   appViewVersion: 'v1',
@@ -162,11 +162,6 @@ export type {
   NostrProfileFullType as NostrProfileFull,
 };
 export type { NostrSearchResult } from '@sovranbitcoin/schemas';
-
-// Re-export colada's cancellable-fetch primitives so existing
-// `@/shared/lib/apiClient` consumers don't have to learn the new import
-// path. `colada/safeFetch` is the canonical implementation.
-export { isAbortError };
 
 type FetchOrParseError = Error | ParseError;
 
@@ -204,17 +199,6 @@ function normalizeMintReviewsSummary(
     lastUpdated: summary?.lastUpdated ?? null,
     fromCache: summary?.fromCache ?? true,
   };
-}
-
-/**
- * Compose a caller's abort signal with the per-request timeout into the
- * `signal` to hand to `fetch`. Throw-style callers (e.g. shared/lib/routstr,
- * which surfaces errors via thrown `RoutstrError`) reach for this so they
- * stop bypassing the timeout while keeping their existing exception flow.
- */
-export function buildAbortSignal(controls: RequestControls = {}): AbortSignal {
-  const { signal: callerSignal, timeoutMs = DEFAULT_TIMEOUT_MS } = controls;
-  return combineSignals(callerSignal, timeoutSignal(timeoutMs));
 }
 
 /**

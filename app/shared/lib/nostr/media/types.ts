@@ -30,3 +30,11 @@ export interface MediaDescriptor {
   sensitive?: boolean;
   blurhash?: string;
 }
+
+/** An image/video chosen by the user, before normalization and upload. */
+export interface PickedAsset {
+  uri: string;
+  mimeType: string;
+  width?: number;
+  height?: number;
+}

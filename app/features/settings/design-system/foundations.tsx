@@ -22,7 +22,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
-import type { DesignSystemScenario } from './catalog';
+import type { DesignSystemScenario } from './types';
 
 const SOURCES = {
   badge: 'shared/ui/primitives/Badge.tsx',

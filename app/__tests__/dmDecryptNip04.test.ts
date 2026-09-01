@@ -6,7 +6,7 @@
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import * as nip04 from 'nostr-tools/nip04';
 import { decryptDmEnvelopes } from '@/features/payments/data/dmDecryptPipeline';
-import type { DmEnvelope } from '@/features/payments/data/dmEnvelopeClient';
+import type { DmEnvelope } from '@/features/payments/data/dmEnvelopeTypes';
 import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 
 jest.mock('@react-native-async-storage/async-storage', () =>

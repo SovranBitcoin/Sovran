@@ -1,5 +1,5 @@
 import type { AuditMintResponse } from '@/shared/lib/apiClient';
-import type { MintMetadataEntry } from '@/shared/stores/global/mintMetadataStore';
+import type { MintMetadataEntry } from '@/shared/stores/global/mintMetadataTypes';
 
 interface AuditInfo {
   url: string;

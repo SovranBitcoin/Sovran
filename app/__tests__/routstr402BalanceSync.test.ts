@@ -44,9 +44,9 @@ jest.mock('@/shared/lib/logger', () => {
   };
 });
 
-jest.mock('@/shared/lib/apiClient', () => ({
+jest.mock('@/shared/lib/http/requestSignal', () => ({
+  DEFAULT_TIMEOUT_MS: 10_000,
   buildAbortSignal: () => undefined,
-  isAbortError: () => false,
 }));
 
 const INSUFFICIENT_BODY = {

@@ -10,7 +10,7 @@
  */
 import type { facade } from 'nostr';
 
-import type { DmEnvelope, DmEnvelopePage } from './dmEnvelopeClient';
+import type { DmEnvelope, DmEnvelopePage } from './dmEnvelopeTypes';
 
 /** Translate the app's `until` (wrap arrival seconds) into the facade's cursor.
  *  Only the nagg tier honours it; the relay floor fetches the whole inbox. */

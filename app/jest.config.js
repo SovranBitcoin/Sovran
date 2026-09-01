@@ -23,6 +23,9 @@ module.exports = {
       '<rootDir>/node_modules/@cashu/coco-core/dist/index.js',
       '<rootDir>/../node_modules/@cashu/coco-core/dist/index.js',
     ],
+    // Workspace-package subpath: same resolver gap as the coco v2 subpaths
+    // below — `wallet`'s "exports" map is invisible here, so point at source.
+    '^wallet/safeFetch$': '<rootDir>/../wallet/src/safeFetch.ts',
     // v2 subpath exports (jest's resolver here predates package "exports" maps)
     '^@cashu/coco-core/adapter$': [
       '<rootDir>/node_modules/@cashu/coco-core/dist/adapter.js',

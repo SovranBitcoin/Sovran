@@ -22,10 +22,8 @@ import { useMemo } from 'react';
 import type { MintListItem } from 'wallet';
 
 import { normalizeMintUrlKey } from '@/shared/lib/url';
-import {
-  useMintMetadataStore,
-  type MintMetadataEntry,
-} from '@/shared/stores/global/mintMetadataStore';
+import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
+import type { MintMetadataEntry } from '@/shared/stores/global/mintMetadataTypes';
 
 type MintRowMetaState = 'cold' | 'cached' | 'live';
 

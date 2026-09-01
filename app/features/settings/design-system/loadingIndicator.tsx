@@ -1,6 +1,6 @@
 import { LoadingIndicator, type Phase, type Result } from '@/shared/blocks/status';
 
-import type { DesignSystemScenario } from './catalog';
+import type { DesignSystemScenario } from './types';
 
 const LOADING_INDICATOR_SOURCE = 'shared/blocks/status/LoadingIndicator.tsx';
 

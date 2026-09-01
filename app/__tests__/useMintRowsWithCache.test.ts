@@ -14,7 +14,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import { resolveMintRows } from '@/features/mint/hooks/useMintRowsWithCache';
-import type { MintMetadataEntry } from '@/shared/stores/global/mintMetadataStore';
+import type { MintMetadataEntry } from '@/shared/stores/global/mintMetadataTypes';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 import type { MintListItem } from 'wallet';
 

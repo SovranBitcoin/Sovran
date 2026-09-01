@@ -239,3 +239,9 @@ export interface ClearResult {
   skipped: { runId: string; reason: string }[];
   freedBytes: number;
 }
+
+/** A visible reel entry: a timeline frame, plus the canonical page name when
+ *  the entry is a named capture rather than a step frame. */
+export interface ReelFrame extends Frame {
+  named?: string;
+}

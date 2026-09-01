@@ -1,5 +1,4 @@
-import type { Href } from 'expo-router';
-import type { ReactElement } from 'react';
+import type { DesignSystemFamily } from './types';
 
 import { EMPTY_STATE_SCENARIOS } from './emptyStates';
 import { FADE_REVEAL_STRESS_SCENARIOS } from './fadeRevealStress';
@@ -10,21 +9,6 @@ import { SEGMENTED_PROGRESS_SCENARIOS } from './segmentedProgress';
 import { SKELETON_CROSSFADE_SCENARIOS } from './skeletonCrossfade';
 import { TIMELINE_SCENARIOS } from './timeline';
 import { WALLET_CONTROL_SCENARIOS } from './walletControls';
-
-export interface DesignSystemScenario {
-  readonly id: string;
-  readonly title: string;
-  readonly covers: readonly string[];
-  render(): ReactElement;
-}
-
-export interface DesignSystemFamily {
-  readonly id: string;
-  readonly href: Href;
-  readonly title: string;
-  readonly description: string;
-  readonly scenarios: readonly DesignSystemScenario[];
-}
 
 export const DESIGN_SYSTEM_CATALOG: readonly DesignSystemFamily[] = [
   {

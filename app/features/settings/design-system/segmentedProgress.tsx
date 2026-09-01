@@ -11,7 +11,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 
-import type { DesignSystemScenario } from './catalog';
+import type { DesignSystemScenario } from './types';
 
 const LOADING_INDICATOR_SOURCE = 'shared/blocks/status/LoadingIndicator.tsx';
 const TRANSFER_STEP_CHAIN_SOURCE = 'shared/blocks/transfer/TransferStepChain.tsx';

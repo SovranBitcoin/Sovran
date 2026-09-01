@@ -18,7 +18,7 @@ import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import * as nip19 from 'nostr-tools/nip19';
 import { buildGiftWrappedDMPair } from '@/shared/lib/nostr/nip17';
 import { buildNip04DM } from '@/shared/lib/nostr/nip04';
-import type { DmProtocol } from '@/features/payments/data/dmDecryptPipeline';
+import type { DmProtocol } from '@/features/payments/data/dmEnvelopeTypes';
 
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';

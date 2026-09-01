@@ -17,7 +17,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 
-import type { DesignSystemScenario } from './catalog';
+import type { DesignSystemScenario } from './types';
 
 const TEXT_SOURCE = 'shared/ui/primitives/Text.tsx';
 const HSTACK_SOURCE = 'shared/ui/primitives/View/HStack.tsx';

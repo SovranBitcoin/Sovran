@@ -16,6 +16,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./react": "./src/react/index.ts",
+    "./safeFetch": "./src/safeFetch.ts",
     "./operations": "./src/operations/index.ts"
   },
   "files": [

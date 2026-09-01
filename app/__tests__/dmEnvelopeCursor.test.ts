@@ -8,7 +8,7 @@ import {
   CURSOR_SLACK_SECONDS,
   createDmEnvelopeCursor,
 } from '@/features/payments/data/dmPagination';
-import type { DmEnvelope, DmEnvelopePage } from '@/features/payments/data/dmEnvelopeClient';
+import type { DmEnvelope, DmEnvelopePage } from '@/features/payments/data/dmEnvelopeTypes';
 
 function page(...envelopes: { id: string; createdAt: DmEnvelope['createdAt'] }[]): DmEnvelopePage {
   return {

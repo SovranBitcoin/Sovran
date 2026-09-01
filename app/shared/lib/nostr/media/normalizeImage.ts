@@ -20,7 +20,7 @@ import { ImageManipulator, SaveFormat, type ImageResult } from 'expo-image-manip
 import { ResultAsync, okAsync } from 'neverthrow';
 
 import { nostrLog } from '@/shared/lib/logger';
-import type { PickedAsset } from '@/shared/lib/nostr/media/mediaUpload';
+import type { PickedAsset } from '@/shared/lib/nostr/media/types';
 
 export type NormalizeImageError = { type: 'convert-failed' };
 

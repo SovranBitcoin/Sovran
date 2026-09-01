@@ -12,7 +12,7 @@
  * dump never materializes as DOM up front. */
 import { api } from '../api';
 import { state, update } from '../state';
-import type { ReelFrame } from './player';
+import type { ReelFrame } from '../../lib/types';
 
 type PanelTab = 'store' | 'db';
 
