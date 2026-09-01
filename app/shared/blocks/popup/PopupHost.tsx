@@ -463,18 +463,18 @@ function SheetPopup() {
   // rather than intermittently losing the race on a fast/cached quote.
   const scopedClose = useCallback(() => close(openSeq), [close, openSeq]);
 
-  const lastPayloadRef = useRef<typeof current>(null);
   const wasOpenRef = useRef(false);
   const [openCycle, setOpenCycle] = useState(0);
-  // Bumped (through STATE, not just the ref) when the exit-animation cache is
-  // dropped: clearing only the ref left the previous popup's content MOUNTED
-  // inside the closed sheet until some unrelated re-render — including any
-  // infinite reanimated loops it runs (e.g. nfc-tap's pulse), which then
-  // animate forever. The state bump forces the render below to re-read the
-  // now-null ref and actually unmount the content.
-  const [, setExitCacheEpoch] = useState(0);
-  if (current) {
-    lastPayloadRef.current = current;
+  // The exit-animation payload cache. Held in STATE, not a ref: clearing a ref
+  // left the previous popup's content MOUNTED inside the closed sheet until
+  // some unrelated re-render — including any infinite reanimated loops it runs
+  // (e.g. nfc-tap's pulse), which then animate forever. That previously needed
+  // a ref plus a separate `exitCacheEpoch` counter to force the unmount; one
+  // piece of state does both, and it stops this component reading a ref during
+  // render, which made the React Compiler skip all 34 of its functions.
+  const [lastPayload, setLastPayload] = useState<typeof current>(null);
+  if (current && !Object.is(lastPayload, current)) {
+    setLastPayload(current);
   }
 
   useEffect(() => {
@@ -483,14 +483,11 @@ function SheetPopup() {
     }
     wasOpenRef.current = isOpen;
     // While `isOpen` is false, the render still falls back to
-    // `lastPayloadRef` so the exit animation has content to draw.
+    // `lastPayload` so the exit animation has content to draw.
     // After heroui's exit animation lands (~300ms), drop the cached
     // payload so a later re-open never flashes the previous popup.
     if (!isOpen) {
-      const timer = setTimeout(() => {
-        lastPayloadRef.current = null;
-        setExitCacheEpoch((value) => value + 1);
-      }, 400);
+      const timer = setTimeout(() => setLastPayload(null), 400);
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
@@ -545,12 +542,12 @@ function SheetPopup() {
     representingRef.current = false;
     setRenderedOpen(false);
     // Unmount after heroui's exit animation lands (~300ms) — matches the
-    // lastPayloadRef cache window above.
+    // lastPayload cache window above.
     const unmountTimer = setTimeout(() => setMounted(false), 400);
     return () => clearTimeout(unmountTimer);
   }, [isOpen, openSeq]);
 
-  const payload = current ?? lastPayloadRef.current;
+  const payload = current ?? lastPayload;
   const isCustom = isCustomSheetPayload(payload);
   const [customStack, setCustomStack] = useState<CustomSheetPage[]>([]);
   const [customNavDirection, setCustomNavDirection] = useState<CustomSheetNavDirection>('forward');

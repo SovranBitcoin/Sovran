@@ -171,9 +171,6 @@
     "shared/blocks/InitializationGate.tsx": [
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ],
-    "shared/blocks/popup/PopupHost.tsx": [
-      "Cannot access refs during render"
-    ],
     "shared/blocks/SovranTabBar.tsx": [
       "This value cannot be modified"
     ],

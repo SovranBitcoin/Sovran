@@ -142,17 +142,23 @@ export function PaymentStatusToast({
   const config = cases[variant];
   const active = usePaymentStatusStore((s) => s.active);
   const activeForPayment = active?.id === paymentId ? active : null;
-  const terminalSnapshotRef = React.useRef<typeof active>(null);
+  // Once the payment reaches a terminal state, hold that snapshot so the toast
+  // keeps rendering it after `active` clears. Kept in state and adjusted during
+  // render rather than written to a ref mid-render: a render-phase ref write is
+  // the rule violation that made the React Compiler skip this entire component
+  // (30 functions). `Object.is` keeps the conditional update convergent.
+  const [terminalSnapshotState, setTerminalSnapshotState] = React.useState<typeof active>(null);
   if (
     activeForPayment &&
     (activeForPayment.state === 'waiting' ||
       activeForPayment.state === 'confirmed' ||
-      activeForPayment.state === 'failed')
+      activeForPayment.state === 'failed') &&
+    !Object.is(terminalSnapshotState, activeForPayment)
   ) {
-    terminalSnapshotRef.current = activeForPayment;
+    setTerminalSnapshotState(activeForPayment);
   }
   const terminalSnapshot =
-    terminalSnapshotRef.current?.id === paymentId ? terminalSnapshotRef.current : null;
+    terminalSnapshotState?.id === paymentId ? terminalSnapshotState : null;
   const effectiveActive = activeForPayment ?? terminalSnapshot;
   const isDelivered = activeForPayment?.state === 'delivered';
   const isWaiting = effectiveActive?.state === 'waiting';
