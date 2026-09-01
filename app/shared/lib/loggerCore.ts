@@ -1025,6 +1025,7 @@ export function useInitMount(tag: string): void {
   useEffect(() => {
     initLog(tag, 'mount');
     return () => initLog(tag, 'unmount');
+    // Mount-only by contract: a `tag` change must not re-log a mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }

@@ -116,9 +116,6 @@
     "features/onboarding/components/OnboardingInnerCarousel.tsx": [
       "Cannot access refs during render"
     ],
-    "features/onboarding/components/OnboardingPaginationItem.tsx": [
-      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
-    ],
     "features/onboarding/components/OnboardingScreen.tsx": [
       "Cannot access refs during render"
     ],
@@ -160,7 +157,7 @@
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ],
     "features/transactions/screens/SwapTransactionScreen.tsx": [
-      "Existing memoization could not be preserved"
+      "Support value blocks (conditional, logical, optional chaining, etc) within a try/catch statement"
     ],
     "features/wallet/components/Account.tsx": [
       "Cannot access refs during render"
@@ -205,7 +202,7 @@
       "(BuildHIR::lowerExpression) Support UpdateExpression where argument is a global"
     ],
     "shared/lib/popup/PaymentStatusToast.tsx": [
-      "Cannot access refs during render"
+      "Support value blocks (conditional, logical, optional chaining, etc) within a try/catch statement"
     ],
     "shared/lib/popup/popups/modelPicker.tsx": [
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
@@ -221,17 +218,12 @@
       "Existing memoization could not be preserved"
     ],
     "shared/providers/CocoProvider.tsx": [
-      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
-    ],
-    "shared/providers/InitializationProvider.tsx": [
-      "Cannot access refs during render",
-      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+      "Support value blocks (conditional, logical, optional chaining, etc) within a try/catch statement"
     ],
     "shared/providers/NostrKeysProvider.tsx": [
-      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
-    ],
-    "shared/providers/NostrNDKProvider.tsx": [
-      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+      "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause",
+      "(BuildHIR::lowerStatement) Support ThrowStatement inside of try/catch",
+      "(BuildHIR::lowerExpression) Handle Import expressions"
     ],
     "shared/providers/PricelistProvider.tsx": [
       "(BuildHIR::lowerExpression) Handle UpdateExpression to variables captured within lambdas."

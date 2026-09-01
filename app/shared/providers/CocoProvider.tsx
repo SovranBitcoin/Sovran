@@ -147,7 +147,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
         stage.log('Initializing Coco...');
         initLog('Coco', 'Phase 1 starting');
         log.info('coco.phase1.start', {
-          hasKeys: !!keys,
+          hasKeys: !!keys?.pubkey,
           hasPrivateKey: !!keys?.privateKey,
         });
 
@@ -193,8 +193,13 @@ export function CocoProvider({ children }: CocoProviderProps) {
         log.error('coco.cleanup_failed', { error });
       });
     };
+    // `keys.privateKey` is read but is deliberately NOT a trigger: it is a fresh
+    // `Uint8Array` on every derivation, so depending on it would tear down and
+    // re-initialize CocoManager whenever the keys context re-derived the SAME
+    // identity. `pubkey` is the stable identity of the keypair and the correct
+    // trigger. (`stage` is memoised — it moves only when `canStart` flips.)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage.canStart, keys?.pubkey]);
+  }, [stage, keys?.pubkey]);
 
   // Phase 2: Non-blocking — Default mints + recovery (runs after app is visible)
   useEffect(() => {
@@ -332,8 +337,9 @@ export function CocoProvider({ children }: CocoProviderProps) {
       // gets NPC sync + recovery.
       bgStarted.current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bgStage.canStart, manager, keys?.pubkey]);
+    // `bgStage` is memoised (moves only when `canStart` flips), so depending on
+    // the object costs nothing the primitive did not already cost.
+  }, [bgStage, manager, keys?.pubkey]);
 
   // Keep the mint-info SWR cache in sync with coco's DB. mint:updated /
   // mint:added fire from recovery, addMintByUrl, and the per-mint refresh

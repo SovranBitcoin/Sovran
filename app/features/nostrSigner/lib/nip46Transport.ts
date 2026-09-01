@@ -56,7 +56,7 @@ import { CREATED_AT_SKEW_SEC, NIP46_RPC_KIND } from '@/features/nostrSigner/lib/
 import { nostrLog, redactError, type RedactedError } from '@/shared/lib/logger';
 
 /** Per-relay publish timeout; sendResponse resolves on the FIRST relay OK. */
-export const PUBLISH_TIMEOUT_MS = 5_000;
+export const NIP46_PUBLISH_TIMEOUT_MS = 5_000;
 
 /**
  * Envelope encryption scheme. Structurally identical to the connections
@@ -343,7 +343,7 @@ export class Nip46Transport {
    * Encrypts `payloadJson` to `toPubkey` with the requested scheme, builds a
    * signed kind-24133 event tagged ['p', toPubkey], and publishes it to the
    * dedicated pool. Resolves on the FIRST relay OK; errs only when every
-   * relay fails or times out (PUBLISH_TIMEOUT_MS each, racing concurrently).
+   * relay fails or times out (NIP46_PUBLISH_TIMEOUT_MS each, racing concurrently).
    */
   sendResponse(params: Nip46SendResponseParams): ResultAsync<void, Nip46TransportError> {
     const ndk = this.ndk;
@@ -377,7 +377,7 @@ export class Nip46Transport {
       })
       .andThen((event) =>
         ResultAsync.fromPromise(
-          firstRelayAccept(relays.map((relay) => relay.publish(event, PUBLISH_TIMEOUT_MS))),
+          firstRelayAccept(relays.map((relay) => relay.publish(event, NIP46_PUBLISH_TIMEOUT_MS))),
           (error): Nip46TransportError => {
             const cause = redactError(error);
             nostrLog.error('nostr.signer.transport_publish_failed', {

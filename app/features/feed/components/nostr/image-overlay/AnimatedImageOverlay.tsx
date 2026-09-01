@@ -447,7 +447,7 @@ function AnimatedImageOverlayContent({
       const fn = closeRef.current;
       if (fn) fn(idx);
     },
-    [hasMultipleMedia, pagerOffsetSv, imageScale]
+    [hasMultipleMedia, pagerOffsetSv, imageScale, closeRef]
   );
 
   /**

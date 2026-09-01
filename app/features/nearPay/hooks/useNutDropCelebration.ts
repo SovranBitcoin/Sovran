@@ -51,6 +51,11 @@ export function useNutDropCelebration({
 }): { celebration: CelebrationState; skip: () => void } {
   const reducedMotion = useReducedMotion();
   const [celebration, dispatch] = useReducer(celebrationReducer, INITIAL_CELEBRATION_STATE);
+  // Hoisted so the hooks below depend on plain identifiers instead of member
+  // expressions off `celebration` — the rule cannot see that these two paths
+  // are the only state the bodies read, so it asks for the whole object.
+  const celebrationPhase = celebration.phase;
+  const celebrationPeerID = celebration.current?.peerID ?? null;
   const prevStrikeRef = useRef<ReadonlyMap<string, StrikeState>>(new Map());
   const pendingImpactHapticRef = useRef(false);
   const celebrationDebugRef = useRef<{
@@ -85,9 +90,9 @@ export function useNutDropCelebration({
         // haptic to that 'held' flip. Everything else haptics now.
         const impactsCurrent =
           !reducedMotion &&
-          ((celebration.current?.peerID === peerID &&
-            (celebration.phase === 'centering' || celebration.phase === 'awaiting')) ||
-            (!gated && celebration.phase === 'idle'));
+          ((celebrationPeerID === peerID &&
+            (celebrationPhase === 'centering' || celebrationPhase === 'awaiting')) ||
+            (!gated && celebrationPhase === 'idle'));
         if (impactsCurrent) {
           pendingImpactHapticRef.current = true;
         } else {
@@ -128,7 +133,7 @@ export function useNutDropCelebration({
       if (state.status !== 'active' || strikeMap.has(peerID) || reducedMotion) continue;
       dispatch({ type: 'strike-failed', peerID, now: Date.now() });
     }
-  }, [celebration.current?.peerID, celebration.phase, gated, reducedMotion, strikeMap]);
+  }, [celebrationPeerID, celebrationPhase, gated, reducedMotion, strikeMap]);
 
   useEffect(() => {
     if (reducedMotion) return;
@@ -141,11 +146,11 @@ export function useNutDropCelebration({
   // fire on whatever phase ends the wait. 'centering'/'awaiting' are the
   // only phases still waiting for the payoff.
   useEffect(() => {
-    if (celebration.phase === 'centering' || celebration.phase === 'awaiting') return;
+    if (celebrationPhase === 'centering' || celebrationPhase === 'awaiting') return;
     if (!pendingImpactHapticRef.current) return;
     pendingImpactHapticRef.current = false;
     void EnhancedHaptics.successHaptic();
-  }, [celebration.phase]);
+  }, [celebrationPhase]);
 
   // Beat clock — one timeout per phase; the overlay animates to match.
   // 'awaiting' is event-driven (success/failure ends it) with a safety
@@ -158,19 +163,19 @@ export function useNutDropCelebration({
     hasAmount: celebration.current?.amount !== null,
   };
   useEffect(() => {
-    if (celebration.phase === 'idle') return;
+    if (celebrationPhase === 'idle') return;
     const holdMs = abbreviated ? CELEBRATION_HOLD_ABBREVIATED_MS : CELEBRATION_HOLD_MS;
     const delay =
-      celebration.phase === 'centering'
+      celebrationPhase === 'centering'
         ? CELEBRATION_CENTERING_MS
-        : celebration.phase === 'awaiting'
+        : celebrationPhase === 'awaiting'
           ? CELEBRATION_AWAITING_TIMEOUT_MS
-          : celebration.phase === 'held'
+          : celebrationPhase === 'held'
             ? holdMs
             : CELEBRATION_EXIT_MS;
     // Token the dispatch with the phase this timer was scheduled for: the
     // reducer drops it if a skip/gate/success flip won the race.
-    const scheduledPhase = celebration.phase;
+    const scheduledPhase = celebrationPhase;
     const scheduledDebug = celebrationDebugRef.current;
     paymentLog.debug('near_pay.celebration.phase_scheduled', {
       phase: scheduledPhase,
@@ -188,15 +193,15 @@ export function useNutDropCelebration({
       dispatch({ type: 'phase-complete', phase: scheduledPhase, now: Date.now() });
     }, delay);
     return () => clearTimeout(timer);
-  }, [abbreviated, celebration.phase]);
+  }, [abbreviated, celebrationPhase]);
 
   const skip = useCallback(() => {
     paymentLog.info('near_pay.celebration.skipped', {
-      phase: celebration.phase,
-      peerID: celebration.current?.peerID ?? null,
+      phase: celebrationPhase,
+      peerID: celebrationPeerID,
     });
     dispatch({ type: 'skip', now: Date.now() });
-  }, [celebration.current?.peerID, celebration.phase]);
+  }, [celebrationPeerID, celebrationPhase]);
 
   return { celebration, skip };
 }

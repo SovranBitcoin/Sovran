@@ -210,19 +210,37 @@ export function useBackgroundContext() {
 export function useBackgroundConfig(config: BackgroundConfig) {
   const context = useContext(BackgroundContext);
 
+  // Destructured so the dependencies are plain identifiers rather than member
+  // expressions off an object callers rebuild on every render. Keep this list
+  // exhaustive over `BackgroundConfig`: a field added there but not destructured
+  // here would stop propagating on change, silently.
+  const {
+    blurMode,
+    blurIntensity,
+    blurGradientStart,
+    blurGradientEnd,
+    backgroundOpacity,
+    backgroundColor,
+  } = config;
+
   useFocusEffect(
     useCallback(() => {
-      if (context) {
-        context.setConfig(config);
-      }
+      context?.setConfig({
+        blurMode,
+        blurIntensity,
+        blurGradientStart,
+        blurGradientEnd,
+        backgroundOpacity,
+        backgroundColor,
+      });
     }, [
       context,
-      config.blurMode,
-      config.blurIntensity,
-      config.blurGradientStart,
-      config.blurGradientEnd,
-      config.backgroundOpacity,
-      config.backgroundColor,
+      blurMode,
+      blurIntensity,
+      blurGradientStart,
+      blurGradientEnd,
+      backgroundOpacity,
+      backgroundColor,
     ])
   );
 }

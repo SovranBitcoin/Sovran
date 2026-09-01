@@ -32,6 +32,27 @@
  * Discipline rule: only use `defineVariants` when the component has ≥2 real
  * visual paths. Single-axis components should call `useCapabilities()` and
  * branch inline (see `shared/ui/primitives/View/View.tsx`).
+ *
+ * Barrel convention for a component whose variants have platform-only deps:
+ *
+ *  - `index.ios.ts` / `index.android.ts` are BUNDLE entries. Their job is to
+ *    keep a variant's native dependency (`@expo/ui/swift-ui`, `expo-blur`,
+ *    `@react-native-menu/menu`, …) off the other platform's Metro graph.
+ *  - Do NOT add a plain `index.ts` alongside them just to make the component
+ *    resolvable from node. Jest runs `jest-expo/node` (`defaultPlatform: node`),
+ *    so it would resolve that file in preference to both platform entries —
+ *    and so does knip, which then reports every iOS-only variant the default
+ *    table omits as an unused export. Tried on `BalancePill` and
+ *    `UnitSwitcherPill`; knip immediately flagged `UNIT_SF_SYMBOLS`. The cost
+ *    is a real hole in dead-code analysis for a component nothing imports
+ *    from node anyway.
+ *  - `CapsuleButton`, `CircleActionButton` and `SquircleView` do carry an
+ *    `index.ts`; theirs predates this note and stays because their default
+ *    table omits no exports. New split components should not copy it.
+ *  - Consequence to know when writing tests: of the platform-split
+ *    components, only `SquircleView` currently loads under Jest. Test the
+ *    variant file (`X.flat.tsx`, `X.androidMenu.tsx`) directly instead of the
+ *    barrel — that is what `androidUiRegressions.test.tsx` already does.
  */
 
 import React from 'react';

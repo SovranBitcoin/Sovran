@@ -186,6 +186,8 @@ export function useNostrProfileMetadataMany(
     return () => {
       cancelled = true;
     };
+    // `toFetchKey` is the serialized form of `toFetch`; depending on the array
+    // itself would refire the fetch on every render that rebuilds it unchanged.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toFetchKey]);
 

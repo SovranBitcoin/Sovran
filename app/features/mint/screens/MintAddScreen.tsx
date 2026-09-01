@@ -554,6 +554,9 @@ export function MintAddScreen() {
       duration_ms: duration,
     });
     return adapted;
+    // `mintProfileCache` is a deliberate trigger, not an input: the adapt step
+    // reads it through a closure, so the list must rebuild as operator profiles
+    // resolve even though the body never names the cache.
   }, [searchResults, knownMints, searchQuery, validationState, customMintInfo, mintProfileCache]);
 
   // Hold the skeleton until the discovered list stops changing, so rows do not

@@ -46,6 +46,7 @@ function ShareRoute() {
         type={type}
         data={parsed.data}
         npub={parsed.npub}
+        lud16={parsed.lud16}
         onTitleChange={handleTitleChange}
       />
     </FormSheetChrome>

@@ -75,7 +75,6 @@ export function NostrNDKProvider({
       return;
     }
 
-    hasInitialized.current = true;
     initLog('NDK', 'queued — waiting for interactions to settle');
     nostrLog.info('provider.ndk.init_start', {
       relayCount: relays.length,
@@ -98,6 +97,11 @@ export function NostrNDKProvider({
     const NDK_INIT_DEFER_MS = 800;
     const timeoutId = setTimeout(() => {
       try {
+        // Claim the once-only guard here, not before the timer. Set earlier, a
+        // re-run inside the 800 ms window cancelled the pending init via the
+        // cleanup below and then bailed on an already-true guard, leaving NDK
+        // permanently uninitialized and every subscription empty.
+        hasInitialized.current = true;
         initPhaseSync('NDK.initializeNDK', () => {
           // ndk-mobile's InitNDKParams requires a `settingsStore` we deliberately
           // don't provide (Sovran owns its own settings persistence); the lib
@@ -127,15 +131,10 @@ export function NostrNDKProvider({
     return () => {
       clearTimeout(timeoutId);
     };
-    // NOTE: `stage` is intentionally excluded from deps. `useInitializationStage`
-    // returns a fresh object each render, so including it would re-run this
-    // effect on every render and the cleanup would clearTimeout the deferred
-    // NDK init before it ever fires — leaving the app with NDK never
-    // initialized and every subscription empty. The `hasInitialized` ref
-    // guards against double-firing, and `stage.canStart` (primitive) covers
-    // the readiness transition.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage.canStart, initializeNDK, nostrKeys?.privateKey]);
+    // `stage` is safe to depend on: `useInitializationStage` memoises it, so it
+    // changes only when `canStart` flips — never per render, which is what
+    // would otherwise clearTimeout the deferred init before it ever fired.
+  }, [stage, initializeNDK, nostrKeys?.privateKey, activeAccountIndex, cacheAdapter]);
 
   // Ingest the active profile's NIP-65 relay list (or first-run-publish the
   // defaults) and seed the pool, once NDK is ready. Self-deferred internally.

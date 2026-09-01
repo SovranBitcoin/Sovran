@@ -49,6 +49,8 @@ export function useFeedRows({
       }),
     [
       items,
+      // Deliberate trigger, not an input: `getDisplayMetrics` closes over the map,
+      // so rows must rebuild when it changes even though the body never names it.
       metricsMap,
       profilesMap,
       quotedEventsMap,

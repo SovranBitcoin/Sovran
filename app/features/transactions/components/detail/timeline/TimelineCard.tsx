@@ -293,7 +293,7 @@ export function HistoryEntryTimeline({
           lineDelayMs,
         };
       }),
-    [timeline, onchainConfirmationProgress, isOnchainMint]
+    [timeline, onchainConfirmationProgress]
   );
   const rowsSignature = useMemo(() => JSON.stringify(rowsDiag), [rowsDiag]);
   const headerSignature = `${cardLabel}|${statusHeader}|${statusColorType}`;

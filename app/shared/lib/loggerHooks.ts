@@ -45,6 +45,7 @@ export function useRenderLogger(
         aliveMs: Math.round((monotonicNow() - mountTime.current) * 100) / 100,
       });
     };
+    // Mount-only by contract: a `componentName` change must not re-log a mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }
@@ -70,6 +71,9 @@ export function useMountLog(
   useEffect(() => {
     logger.info(mountEvent, payload);
     return () => logger.info(unmountEvent, {});
+    // Mount-only by contract — see the note above: re-firing on a payload
+    // change would spam mount events, and holding the suppression here keeps
+    // every caller compilable by the React Compiler.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }
@@ -79,6 +83,7 @@ export function useLifecycleLogger(componentName: string, logger: Logger = log):
   useEffect(() => {
     logger.info('lifecycle.mount', { component: componentName });
     return () => logger.info('lifecycle.unmount', { component: componentName });
+    // Mount-only by contract: a `componentName` change must not re-log a mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }

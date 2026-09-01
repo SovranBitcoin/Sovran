@@ -121,8 +121,7 @@ const OnboardingPaginationItem: React.FC<OnboardingPaginationItemProps> = ({
     } else {
       slideProgress.set(0);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentSlideIndex]);
+  }, [currentSlideIndex, index, slideDuration, slideProgress]);
 
   useAnimatedReaction(
     () => ({ isDraggingVal: isDragging.get() }),

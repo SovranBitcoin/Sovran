@@ -102,6 +102,9 @@ export function NotificationFollowersScreen() {
       notificationFollowersCache.setEntry(key, seedRef.current, { viewerKey: viewerPubkey });
       notificationFollowersCache.markTouched(key);
     }
+    // Mount-only: this persists the seed handed over at mount. Re-running on a
+    // later `viewerPubkey`/seed change would write a value just read back from
+    // the cache, which the comment above rules out.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const tabBarPadding = useTabBarBottomPadding();

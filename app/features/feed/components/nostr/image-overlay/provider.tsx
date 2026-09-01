@@ -1036,9 +1036,13 @@ export function ImageOverlayProvider({
     ]
   );
 
-  const stableOnSwipeUp = useCallback((openNext: (layout: ImageOverlayReplaceLayout) => void) => {
-    onSwipeUpToNextPostRef.current?.(openNext);
-  }, []);
+  const stableOnSwipeUp = useCallback(
+    (openNext: (layout: ImageOverlayReplaceLayout) => void) => {
+      onSwipeUpToNextPostRef.current?.(openNext);
+    },
+    // `useLatestRef` returns a `useRef`, so this stays identity-stable.
+    [onSwipeUpToNextPostRef]
+  );
 
   const actionsValue = useMemo<ImageOverlayActionsValue>(() => {
     return {

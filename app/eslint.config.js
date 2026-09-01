@@ -3,6 +3,20 @@ const { defineConfig } = require('eslint/config');
 const expoConfig = require('eslint-config-expo/flat');
 const eslintPluginPrettierRecommended = require('eslint-plugin-prettier/recommended');
 
+// The `.tsx` files the React Compiler cannot compile, straight from the ratchet
+// `check:react-compiler` maintains. Used to scope the `react-perf` rules — see
+// the block that consumes it for why. Falls back to every `.tsx` if the ratchet
+// file is ever absent, so a missing artifact loosens nothing.
+const REACT_COMPILER_BAILING_TSX = (() => {
+  try {
+    const { bailouts } = require('./react-compiler-bailouts.json');
+    const tsx = Object.keys(bailouts).filter((f) => f.endsWith('.tsx'));
+    return tsx.length > 0 ? tsx : ['**/*.tsx'];
+  } catch {
+    return ['**/*.tsx'];
+  }
+})();
+
 module.exports = defineConfig([
   // Global ignores — apply to every config below. Listed first because a
   // flat-config block with only `ignores` (no `files`) is treated as a
@@ -97,8 +111,21 @@ module.exports = defineConfig([
   // `jsx-no-jsx-as-prop` (passing a `<Component />` as a prop) is also
   // available but commonly used in real patterns (slot props, list
   // renderers); skipped to keep noise low.
+  //
+  // SCOPED to the files the React Compiler cannot compile. Hoisting an inline
+  // prop by hand is only real advice where the compiler is not already doing
+  // it: across the whole tree these rules produced 1965 warnings, 1519 of them
+  // (77%) in files that compile with zero bailouts — advice that, if followed,
+  // re-adds the manual memoisation the Stage-6 deslop passes removed. Worse,
+  // that volume buried the handful of genuine `exhaustive-deps` warnings at a
+  // signal-to-noise ratio of roughly 1:393.
+  //
+  // The scope tracks `react-compiler-bailouts.json`, which `check:react-compiler`
+  // already generates and ratchets — so a file that starts compiling drops out
+  // of this list in the same commit that banks the ratchet, and a file that
+  // regresses picks the rules back up. No second list to hand-maintain.
   {
-    files: ['**/*.tsx'],
+    files: REACT_COMPILER_BAILING_TSX,
     plugins: { 'react-perf': require('eslint-plugin-react-perf') },
     rules: {
       'react-perf/jsx-no-new-object-as-prop': 'warn',
@@ -179,6 +206,13 @@ module.exports = defineConfig([
       ],
       // Remove unused imports
       'unused-imports/no-unused-imports': 'error',
+      // `eslint-config-expo` also turns on `@typescript-eslint/no-unused-vars`,
+      // but WITHOUT the `^_` ignore patterns below. Left on, the two rules
+      // report the same code to different standards: a deliberately-discarded
+      // `for (const _char of …)` binding passes one and fails the other. The
+      // plugin's documented setup is to disable the base rule and let this one
+      // own the check.
+      '@typescript-eslint/no-unused-vars': 'off',
       // Remove unused variables but allow prefix `_` to ignore
       'unused-imports/no-unused-vars': [
         'warn',
@@ -189,6 +223,15 @@ module.exports = defineConfig([
           argsIgnorePattern: '^_',
         },
       ],
+      // Pairing a value with a type of the same name is a first-class TS idiom:
+      // `const X = z.object(…)` + `type X = z.infer<typeof X>` in
+      // `shared/lib/apiClient.ts`, and `const X = {…} as const` +
+      // `type X = (typeof X)[keyof typeof X]` in
+      // `features/whitenoise/storage/namespaces.ts`. The value and the type live
+      // in different declaration spaces, so neither is a redeclaration — but
+      // `ignoreDeclarationMerge` only covers interface/namespace/class merging,
+      // so the rule flags them anyway. Those three sites are its only hits.
+      '@typescript-eslint/no-redeclare': 'off',
       // Disable import/no-unresolved since TypeScript handles this
       'import/no-unresolved': 'off',
       // Force every tap surface through the shared `Pressable` at

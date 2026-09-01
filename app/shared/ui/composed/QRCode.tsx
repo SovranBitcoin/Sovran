@@ -378,7 +378,7 @@ function SpeedGaugeIcon({
 
   useEffect(() => {
     rotation.set(withSpring(POINTER_ROTATION[speedIndex] ?? 0, { damping: 12, stiffness: 120 }));
-  }, [speedIndex]);
+  }, [speedIndex, rotation]);
 
   const pointerStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation.get()}deg` }],

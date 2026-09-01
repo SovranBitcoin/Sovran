@@ -148,7 +148,10 @@ jest.mock(
 
 import type { NDKEvent, NDKPrivateKeySigner } from '@nostr-dev-kit/ndk-mobile';
 
-import { Nip46Transport, PUBLISH_TIMEOUT_MS } from '@/features/nostrSigner/lib/nip46Transport';
+import {
+  Nip46Transport,
+  NIP46_PUBLISH_TIMEOUT_MS,
+} from '@/features/nostrSigner/lib/nip46Transport';
 import { CREATED_AT_SKEW_SEC, NIP46_RPC_KIND } from '@/features/nostrSigner/lib/nip46Types';
 
 interface MockRelayShape {
@@ -380,7 +383,7 @@ describe('sendResponse', () => {
     expect(relays).toHaveLength(2);
     for (const relay of relays) {
       expect(relay.publish).toHaveBeenCalledTimes(1);
-      expect(relay.publish.mock.calls[0][1]).toBe(PUBLISH_TIMEOUT_MS);
+      expect(relay.publish.mock.calls[0][1]).toBe(NIP46_PUBLISH_TIMEOUT_MS);
     }
 
     const published = relays[0].publish.mock.calls[0][0] as NDKEvent & { sign: jest.Mock };

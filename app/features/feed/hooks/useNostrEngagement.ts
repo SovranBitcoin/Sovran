@@ -263,6 +263,10 @@ export function useNostrEngagement(
   const engagementRevision = useMemo(() => {
     engagementRevisionRef.current += 1;
     return engagementRevisionRef.current;
+    // The deps are TRIGGERS, not inputs — the body reads none of them, which is
+    // why the rule calls them unnecessary. Consumers fold this token into a
+    // FlashList `extraData` string, so it must stay a scalar that changes
+    // whenever any engagement input does.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     eventIds,

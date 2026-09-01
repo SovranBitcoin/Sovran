@@ -97,12 +97,6 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
     [onchain.quote, bolt12.quote, creq.request]
   );
 
-  const included = [
-    ...(onchain.quote ? ['Onchain'] : []),
-    ...(bolt12.quote ? ['BOLT 12'] : []),
-    ...(creq.request ? ['Cashu'] : []),
-  ];
-
   const anyLoading = onchain.isLoading || bolt12.isLoading || creq.isLoading;
 
   // As the DEFAULT tab this must not stutter: hold the placeholder until
@@ -162,9 +156,13 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
     copyPopup('bip321');
     paymentLog.info('receive.bip321.copied', {
       uriLength: uri.length,
-      included: included.join(','),
+      included: [
+        ...(onchain.quote ? ['Onchain'] : []),
+        ...(bolt12.quote ? ['BOLT 12'] : []),
+        ...(creq.request ? ['Cashu'] : []),
+      ].join(','),
     });
-  }, [uri, included]);
+  }, [uri, onchain.quote, bolt12.quote, creq.request]);
 
   if (!settled) {
     return <ReceiveRailPlaceholder sectionTitle="BIP-321 URI" />;

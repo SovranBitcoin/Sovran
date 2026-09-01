@@ -94,6 +94,8 @@ export function SearchPostsList({ pubkeys }: { pubkeys: string[] }) {
         client.dispose?.();
       });
     return () => controller.abort();
+    // `pubkeysKey` is the serialized form of `pubkeys`; depending on the array
+    // itself would refetch on every render that rebuilds it with equal contents.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pubkeysKey]);
 

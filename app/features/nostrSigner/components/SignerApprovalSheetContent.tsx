@@ -259,7 +259,12 @@ export function SignerApprovalSheetContent({
     return () => clearTimeout(timer);
   }, [headGroup]);
 
-  const finish = () => {
+  // Batch done (handled or expired out) and no notice on screen → wrap up.
+  // `finish` lives inside the effect: as a plain function it was rebuilt on
+  // every render, so listing it as a dependency re-ran this effect on every
+  // render of the approval sheet.
+  useEffect(() => {
+    if (head !== null || expiredNotice !== null) return;
     if (closingRef.current) return;
     closingRef.current = true;
     const { allowed, denied } = tallyRef.current;
@@ -268,12 +273,7 @@ export function SignerApprovalSheetContent({
       popup({ message: summary.label, text: summary.description, type: 'success' });
     }
     close();
-  };
-
-  // Batch done (handled or expired out) and no notice on screen → wrap up.
-  useEffect(() => {
-    if (head === null && expiredNotice === null) finish();
-  }, [head, expiredNotice, finish]);
+  }, [head, expiredNotice, close]);
 
   const submitVerdict = useSingleFlight(async (action: Nip46DecisionAction) => {
     if (headGroup === null) return;

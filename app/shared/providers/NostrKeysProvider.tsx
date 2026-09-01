@@ -443,8 +443,10 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     };
 
     void initializeKeys();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mnemonic, mnemonicLoading, stage.canStart, refreshMnemonic]);
+    // `stage` is memoised (moves only when `canStart` flips). `hasStarted`
+    // keeps this once-only regardless, so listing every value the body reads
+    // costs nothing and keeps the dependency set honest.
+  }, [mnemonic, mnemonicLoading, stage, refreshMnemonic, defaultAccountIndex]);
 
   // Non-blocking: once keys are ready, refresh the user's own-account profiles
   // (kind-0 + follower/following counts) so the drawer/account switcher stay

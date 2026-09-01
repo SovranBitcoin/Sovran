@@ -209,9 +209,12 @@ export function InitializationProvider({ children }: InitializationProviderProps
       (stage) => stage.blocking && (stage.status === 'loading' || stage.status === 'pending')
     );
 
-  // Log isInitializing transitions
+  // Log isInitializing transitions. Written in an effect, not during render:
+  // a render-phase ref write logs renders React went on to discard, and it is
+  // the rule violation that stopped the compiler optimising this provider.
   const prevInitializing = useRef<boolean | null>(null);
-  if (prevInitializing.current !== isInitializing) {
+  useEffect(() => {
+    if (prevInitializing.current === isInitializing) return;
     const blockingStages = Array.from(stages.values())
       .filter((s) => s.blocking)
       .map((s) => `${s.id}=${s.status}`)
@@ -221,7 +224,7 @@ export function InitializationProvider({ children }: InitializationProviderProps
       `${String(prevInitializing.current)} → ${String(isInitializing)} | blocking=[${blockingStages}]`
     );
     prevInitializing.current = isInitializing;
-  }
+  }, [isInitializing, stages]);
 
   // Clear forceReinitialize / holdSplashVisible once real stages have registered
   // (they'll keep isInitializing true via their own blocking status).
@@ -290,13 +293,26 @@ export function useInitializationStage(stageId: string, config: StageConfig = {}
   const { registerStage, updateStage, canStageStart } = useInitializationContext();
   const hasRegistered = useRef(false);
 
+  // Registration is once-per-stage, but `config` is an object literal rebuilt
+  // on every render, so depending on it directly would be dishonest. Depend on
+  // its primitive contents instead: every call site passes literals, so these
+  // never change, and the `hasRegistered` guard covers the case where one does.
+  //
+  // The join/split round-trip is lossless because stage IDs are the closed,
+  // comma-free set in the table at the top of this file. A stage ID containing
+  // a comma would split into two phantom dependencies that never complete.
+  const { message, dependsOn, blocking } = config;
+  const dependsOnKey = dependsOn?.join(',') ?? '';
+
   useEffect(() => {
-    if (!hasRegistered.current) {
-      registerStage(stageId, config);
-      hasRegistered.current = true;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stageId]);
+    if (hasRegistered.current) return;
+    hasRegistered.current = true;
+    registerStage(stageId, {
+      message,
+      blocking,
+      dependsOn: dependsOnKey ? dependsOnKey.split(',') : undefined,
+    });
+  }, [stageId, registerStage, message, blocking, dependsOnKey]);
 
   const log = useCallback(
     (message: string) => {
@@ -319,17 +335,28 @@ export function useInitializationStage(stageId: string, config: StageConfig = {}
   const canStart = canStageStart(stageId);
 
   // Track canStart transitions so we can see the gap between a dependency
-  // completing and this stage actually receiving canStart=true.
+  // completing and this stage actually receiving canStart=true. In an effect,
+  // not during render — see the isInitializing log above for why.
   const prevCanStart = useRef(false);
-  if (canStart && !prevCanStart.current) {
-    initLog('useStage', `${stageId} canStart flipped to true`);
-  }
-  prevCanStart.current = canStart;
+  useEffect(() => {
+    if (canStart && !prevCanStart.current) {
+      initLog('useStage', `${stageId} canStart flipped to true`);
+    }
+    prevCanStart.current = canStart;
+  }, [canStart, stageId]);
 
-  return {
-    log,
-    complete,
-    error,
-    canStart,
-  };
+  // Stable identity: `log`/`complete`/`error` are lifetime-stable (updateStage
+  // and registerStage are `useCallback(…, [])`), so this object changes only
+  // when `canStart` flips. Consumers can therefore depend on the whole `stage`
+  // without their effects re-running on every render — which is what forced
+  // them to suppress exhaustive-deps while this was a fresh object literal.
+  return useMemo(
+    () => ({
+      log,
+      complete,
+      error,
+      canStart,
+    }),
+    [log, complete, error, canStart]
+  );
 }
