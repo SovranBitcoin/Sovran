@@ -65,9 +65,6 @@
     "features/nearPay/screens/NearPayScreen.tsx": [
       "Cannot access refs during render"
     ],
-    "features/nostrSigner/components/SignerApprovalSheetContent.tsx": [
-      "Cannot access refs during render"
-    ],
     "features/onboarding/components/OnboardingInnerCarousel.tsx": [
       "Cannot access refs during render"
     ],
@@ -79,9 +76,6 @@
     ],
     "features/receive/screens/OnchainReceiveScreen.tsx": [
       "Existing memoization could not be preserved"
-    ],
-    "features/receive/screens/ReceivePaymentRequestQuoteScreen.tsx": [
-      "Cannot access refs during render"
     ],
     "features/send/providers/Colada.tsx": [
       "Cannot access refs during render"
@@ -101,9 +95,6 @@
     ],
     "features/transactions/screens/SwapTransactionScreen.tsx": [
       "Support value blocks (conditional, logical, optional chaining, etc) within a try/catch statement"
-    ],
-    "features/whitenoise/WhitenoiseProvider.tsx": [
-      "Existing memoization could not be preserved"
     ],
     "shared/hooks/useNostrProfileMetadata.ts": [
       "Cannot access refs during render",
@@ -142,9 +133,6 @@
     "shared/ui/composed/chat/useChatSurfacePerfLogger.ts": [
       "Cannot access refs during render",
       "This value cannot be modified"
-    ],
-    "shared/ui/composed/CustomKeyboard.tsx": [
-      "Existing memoization could not be preserved"
     ],
     "shared/ui/composed/Screen.tsx": [
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"

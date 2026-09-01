@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, memo } from 'react';
+import React, { useCallback, useEffect, useRef, memo } from 'react';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
@@ -6,6 +6,7 @@ import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { nextKeypadValue, type KeyboardValue } from './keypadInput';
 
 interface CustomKeyboardProps {
   onKeyPress: (value: string) => void;
@@ -16,8 +17,6 @@ interface CustomKeyboardProps {
   value?: string;
 }
 
-type KeyboardValue = string | number;
-
 const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
   onKeyPress,
   unit,
@@ -25,48 +24,27 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
   compact = false,
   value,
 }) => {
-  const [, setInputValue] = useState(value ?? '');
+  // A ref, not state: nothing in this component renders the value — the parent
+  // owns the display and hears every change through `onKeyPress`. Holding it
+  // here keeps `handlePress` stable (so the twelve keys never re-render), and
+  // updating it synchronously at tap time means two presses in one React batch
+  // still compose, which reading it from state would not guarantee.
+  const inputRef = useRef(value ?? '');
   const foreground = useThemeColor('foreground');
 
   useEffect(() => {
     if (value !== undefined) {
-      setInputValue(value);
+      inputRef.current = value;
     }
   }, [value]);
 
   const handlePress = useCallback(
-    (value: KeyboardValue) => {
-      setInputValue((prev) => {
-        const str = String(value);
-        let next: string;
-
-        if (str === '<') {
-          void EnhancedHaptics.actionHaptic();
-          next = prev.slice(0, -1);
-        } else if (unit !== 'sat' && prev === '0' && str !== '.') {
-          void EnhancedHaptics.buttonHaptic();
-          next = str;
-        } else {
-          void EnhancedHaptics.buttonHaptic();
-          next = prev + str;
-        }
-
-        if (next.startsWith('.')) return prev;
-        if ((next.match(/\./g) || []).length > 1) return prev;
-
-        if (next.startsWith('0')) {
-          if (unit === 'sat') return prev;
-          if (next.startsWith('00')) return prev;
-        }
-
-        const parts = next.split('.');
-        if (parts[1] && parts[1].length > 2) {
-          next = `${parts[0]}.${parts[1].slice(0, 2)}`;
-        }
-
-        onKeyPress(next);
-        return next;
-      });
+    (key: KeyboardValue) => {
+      void (String(key) === '<' ? EnhancedHaptics.actionHaptic() : EnhancedHaptics.buttonHaptic());
+      const next = nextKeypadValue(inputRef.current, key, unit);
+      if (next === null) return;
+      inputRef.current = next;
+      onKeyPress(next);
     },
     [onKeyPress, unit]
   );

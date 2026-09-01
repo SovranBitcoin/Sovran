@@ -15,7 +15,7 @@
  * standing rail).
  */
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
 
 import { router } from 'expo-router';
@@ -55,6 +55,22 @@ const ParamsSchema = z.object({
   paymentRequestEntry: z.string().min(2),
 });
 
+/**
+ * Re-encode a single-use payment request, falling back to the original on
+ * failure. At module scope: the catch builds its message with a ternary, and
+ * React Compiler cannot lower a value block inside a try/catch.
+ */
+function reencodeOrFallback(encodedRequest: string, options: SingleUseReencodeOptions): string {
+  try {
+    return reencodeSingleUsePaymentRequest(encodedRequest, options).encodedRequest;
+  } catch (error) {
+    paymentLog.warn('receive.creq.fixed_amount.reencode_failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return encodedRequest;
+  }
+}
+
 export const ReceivePaymentRequestQuoteScreen = memo(function ReceivePaymentRequestQuoteScreen() {
   useLifecycleLogger('ReceivePaymentRequestQuoteScreen');
   const muted = useThemeColor('muted');
@@ -76,7 +92,10 @@ export const ReceivePaymentRequestQuoteScreen = memo(function ReceivePaymentRequ
   const [prState, setPrState] = useState<'requested' | 'paid' | 'finalized'>('requested');
   // Stable timestamp for the synthetic entry's "Requested" step so the
   // position-keyed timeline rows animate in place rather than remounting.
-  const createdAtRef = useRef(Date.now());
+  // Frozen at first render via a lazy state initializer, the repo's idiom for
+  // this (see AmountFormatter): `useRef(Date.now()).current` re-reads the clock
+  // on every render and is a ref access React Compiler skips the screen for.
+  const [createdAt] = useState(() => Date.now());
 
   useEffect(() => {
     if (!entry) return;
@@ -120,8 +139,8 @@ export const ReceivePaymentRequestQuoteScreen = memo(function ReceivePaymentRequ
       type: 'receive',
       source: 'operation',
       operationId: entry.operationId,
-      createdAt: createdAtRef.current,
-      updatedAt: createdAtRef.current,
+      createdAt: createdAt,
+      updatedAt: createdAt,
       mintUrl: entry.mints[0] ?? '',
       unit: entry.unit,
       amount: entry.amount,
@@ -132,7 +151,7 @@ export const ReceivePaymentRequestQuoteScreen = memo(function ReceivePaymentRequ
         ...(prState === 'requested' ? { paymentRequestPending: '1' } : {}),
       },
     });
-  }, [entry, prState]);
+  }, [entry, prState, createdAt]);
 
   // Resolve the keyring P2PK pubkey (the only key coco's claim path can sign
   // for). Absent → the lock toggle is disabled, exactly like the hub tab.
@@ -140,12 +159,18 @@ export const ReceivePaymentRequestQuoteScreen = memo(function ReceivePaymentRequ
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      let key: string | null | undefined;
+      let resolved = false;
       try {
-        const key = await resolvePrimaryReceiveP2PKPublicKey(manager);
-        if (!cancelled) setP2pkKey(key ?? undefined);
+        key = await resolvePrimaryReceiveP2PKPublicKey(manager);
+        resolved = true;
       } catch {
-        /* no key → lock stays disabled */
+        /* no key → keep whatever we already had; the lock stays as it is */
       }
+      // Coalesce outside the try: a `??` inside one is a value block React
+      // Compiler cannot lower. `resolved` keeps the failure path from clearing
+      // a key an earlier run had already found.
+      if (!cancelled && resolved) setP2pkKey(key ?? undefined);
     })();
     return () => {
       cancelled = true;
@@ -162,12 +187,13 @@ export const ReceivePaymentRequestQuoteScreen = memo(function ReceivePaymentRequ
 
   const perOpCustomization = useColadaTransactionAnnotation(syntheticEntry).creqCustomization;
   const effectiveP2pkLock = perOpCustomization?.p2pkLock ?? globalCreqP2pkLock;
+  const perOpExcludedMints = perOpCustomization?.excludedMints;
   const effectiveExcluded = useMemo<Record<string, boolean>>(() => {
-    if (perOpCustomization?.excludedMints) {
-      return Object.fromEntries(perOpCustomization.excludedMints.map((m) => [m, true]));
+    if (perOpExcludedMints) {
+      return Object.fromEntries(perOpExcludedMints.map((m) => [m, true]));
     }
     return globalCreqExcludedMints;
-  }, [perOpCustomization?.excludedMints, globalCreqExcludedMints]);
+  }, [perOpExcludedMints, globalCreqExcludedMints]);
   const currentExcludedArray = useMemo(
     () => Object.keys(effectiveExcluded).filter((m) => effectiveExcluded[m]),
     [effectiveExcluded]
@@ -207,14 +233,7 @@ export const ReceivePaymentRequestQuoteScreen = memo(function ReceivePaymentRequ
       displayMints: mintSelection.displayMints,
       lockP2pkPubkey: mintSelection.p2pkLockEffective ? p2pkKey : undefined,
     };
-    try {
-      return reencodeSingleUsePaymentRequest(entry.encodedRequest, options).encodedRequest;
-    } catch (error) {
-      paymentLog.warn('receive.creq.fixed_amount.reencode_failed', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return entry.encodedRequest;
-    }
+    return reencodeOrFallback(entry.encodedRequest, options);
   }, [entry, mintSelection.displayMints, mintSelection.p2pkLockEffective, p2pkKey]);
 
   const handleP2pkLockChange = useCallback(

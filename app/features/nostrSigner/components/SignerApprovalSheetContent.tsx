@@ -221,7 +221,6 @@ export function SignerApprovalSheetContent({
 
   const resolvedIdsRef = useRef<Set<string>>(new Set());
   const tallyRef = useRef({ allowed: 0, denied: 0 });
-  const hasAdvancedRef = useRef(false);
   const closingRef = useRef(false);
   const prevGroupRef = useRef<{ key: string; ids: string[]; clientPubkey: string } | null>(
     headGroup === null
@@ -248,7 +247,6 @@ export function SignerApprovalSheetContent({
             clientPubkey: headGroup.requests[0].clientPubkey,
           };
     if (prev === null || (headGroup !== null && headGroup.key === prev.key)) return undefined;
-    hasAdvancedRef.current = true;
     setAdvanceCount((count) => count + 1);
     if (groupDeparted(prev.ids, resolvedIdsRef.current) === 'resolved') return undefined;
     const expiredAppName = appDisplayName(
@@ -479,7 +477,9 @@ export function SignerApprovalSheetContent({
   return (
     <Animated.View
       key={headGroupKey ?? head.id}
-      entering={hasAdvancedRef.current ? SlideInRight.duration(ADVANCE_ANIMATION_MS) : undefined}>
+      // `advanceCount` already counts exactly the advances the ref tracked, and
+      // it is state — so the slide-in is render input rather than a ref read.
+      entering={advanceCount > 0 ? SlideInRight.duration(ADVANCE_ANIMATION_MS) : undefined}>
       <VStack gap={14} className="px-1 pb-2 pt-1">
         {totalInBatch > 1 ? (
           <HStack style={QUEUE_STRIP_ROW_STYLE}>
