@@ -29,7 +29,7 @@ import {
   type ViewToken,
 } from 'react-native';
 
-import { feedLog, monotonicNow } from '@/shared/lib/logger';
+import { feedLog, monotonicNow, SHOW_LOGS } from '@/shared/lib/logger';
 
 /** Sub-pixel layout deltas are noise from rounding, not a visible shift. */
 const SHIFT_EPSILON = 0.5;
@@ -49,7 +49,7 @@ interface ShiftReporter {
  * component (the per-key last-value memory lives in a ref, so a recycled list
  * row keeps comparing against the value it last rendered for that key).
  */
-export function useShiftLogger(component: string): ShiftReporter {
+function useShiftLoggerLive(component: string): ShiftReporter {
   const lastRef = useRef<Map<string, number>>(new Map());
 
   const report = useCallback<ShiftReporter['report']>(
@@ -129,8 +129,10 @@ export type VisualLayoutConfig = {
 type ResolvedVisualLayoutConfig = VisualLayoutConfig & { itemKey: string };
 
 type VisualLayoutReporter = {
-  ref: (node: MeasureableNode | null) => void;
-  onLayout: (event: LayoutChangeEvent) => void;
+  /** Attach to the measured view. `undefined` in production — see {@link useVisualLayoutLogger}. */
+  ref?: (node: MeasureableNode | null) => void;
+  /** Attach to the measured view's `onLayout`. `undefined` in production. */
+  onLayout?: (event: LayoutChangeEvent) => void;
   measureNow: (reason: string, extra?: Record<string, unknown>) => void;
 };
 
@@ -259,9 +261,12 @@ type VisualScrollMetricsConfig = {
 };
 
 type VisualScrollMetricsReporter = {
-  onContentSizeChange: (width: number, height: number) => void;
-  onLayout: (event: LayoutChangeEvent) => void;
-  onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  /** Attach to the scroller. All three are `undefined` in production, so a
+   * release build never dispatches a scroll or layout event for measurement
+   * that cannot run. */
+  onContentSizeChange?: (width: number, height: number) => void;
+  onLayout?: (event: LayoutChangeEvent) => void;
+  onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   reportNow: (reason: string) => void;
 };
 
@@ -1071,7 +1076,7 @@ function visualStateRemeasureOptions(
   return remeasure;
 }
 
-export function useVisualStateLogger(config: VisualStateConfig): void {
+function useVisualStateLoggerLive(config: VisualStateConfig): void {
   const configRef = useRef(config);
   const lastSignatureRef = useRef<string | null>(null);
   configRef.current = config;
@@ -1121,7 +1126,7 @@ export function useVisualStateLogger(config: VisualStateConfig): void {
   }, [signature]);
 }
 
-export function useVisualListLogger<ItemT>(
+function useVisualListLoggerLive<ItemT>(
   config: VisualListConfig<ItemT>
 ): VisualListReporter<ItemT> {
   const configRef = useRef(config);
@@ -1341,10 +1346,10 @@ type VisualFlatListReporter<ItemT> = VisualListReporter<ItemT> & {
  * describes what it is rendering — never how the measurements are stitched
  * together.
  */
-export function useVisualFlatListLogger<ItemT>(
+function useVisualFlatListLoggerLive<ItemT>(
   config: VisualFlatListConfig<ItemT>
 ): VisualFlatListReporter<ItemT> {
-  const reporter = useVisualListLogger<ItemT>(config);
+  const reporter = useVisualListLoggerLive<ItemT>(config);
   const { onMetricsChange, onViewableItemsChanged } = reporter;
   const configRef = useRef(config);
   configRef.current = config;
@@ -1424,7 +1429,7 @@ export function useVisualFlatListLogger<ItemT>(
   };
 }
 
-export function useVisualScrollMetricsLogger(
+function useVisualScrollMetricsLoggerLive(
   config: VisualScrollMetricsConfig
 ): VisualScrollMetricsReporter {
   const configRef = useRef(config);
@@ -1439,7 +1444,7 @@ export function useVisualScrollMetricsLogger(
   });
   configRef.current = config;
 
-  const { onMetricsChange } = useVisualListLogger<never>({
+  const { onMetricsChange } = useVisualListLoggerLive<never>({
     enabled: config.enabled,
     scope: config.scope,
     surface: config.surface,
@@ -1515,7 +1520,7 @@ export function useVisualScrollMetricsLogger(
   return { onContentSizeChange, onLayout, onScroll, reportNow };
 }
 
-export function useVisualLayoutLogger(config: VisualLayoutConfig): VisualLayoutReporter {
+function useVisualLayoutLoggerLive(config: VisualLayoutConfig): VisualLayoutReporter {
   const viewport = useWindowDimensions();
   const viewportRef = useRef(viewport);
   const nodeRef = useRef<MeasureableNode | null>(null);
@@ -1750,3 +1755,85 @@ export function remeasureVisualLayoutScope(
     emitVisualLayoutScopeSnapshot(scope, reason, measured, options.extra);
   });
 }
+
+// ─── Production selection ───────────────────────────────────────────────────
+//
+// `SHOW_LOGS` is `__DEV__`, and `Logger.isLevelEnabled` is gated on it, so in a
+// release build every hook above can only ever reach its own early return —
+// after subscribing to `useWindowDimensions`, allocating a dozen refs and
+// registering in the scope registry, once PER INSTANCE. A feed screen mounts
+// hundreds of them (every Skeleton, Spinner, Avatar and loading Text).
+//
+// So production gets no-op implementations instead, chosen ONCE at module
+// init: `SHOW_LOGS` is a build-time constant, so the same function serves for
+// the process's lifetime, which is what the Rules of Hooks actually require.
+//
+// The LAYOUT and SCROLL reporters go further and hand back `undefined`
+// handlers, so the views stop dispatching those events at all. The LIST
+// reporters cannot: their callers invoke them from inside their own
+// viewability and scroll handlers, which exist for real reasons. Any handler
+// that exists PURELY for instrumentation should be gated on
+// {@link VISUAL_LOGGING_ENABLED} at its call site instead.
+
+/**
+ * True only in a build where the loggers can actually emit. Gate any handler
+ * that exists PURELY to feed instrumentation on this — an attached `onLayout`
+ * or `onScroll` still costs a native dispatch even when its body is inert.
+ */
+export const VISUAL_LOGGING_ENABLED = SHOW_LOGS;
+
+const NOOP = () => {};
+
+const NOOP_SHIFT_REPORTER: ShiftReporter = { report: NOOP };
+const NOOP_LAYOUT_REPORTER: VisualLayoutReporter = { measureNow: NOOP };
+const NOOP_SCROLL_METRICS_REPORTER: VisualScrollMetricsReporter = { reportNow: NOOP };
+const NOOP_LIST_REPORTER = {
+  onItemSizeChanged: NOOP,
+  onLoad: NOOP,
+  onMetricsChange: NOOP,
+  onStickyHeaderChange: NOOP,
+  onViewableItemsChanged: NOOP,
+};
+const NOOP_FLAT_LIST_REPORTER = {
+  ...NOOP_LIST_REPORTER,
+  onListLayout: NOOP,
+  onListContentSizeChange: NOOP,
+  onListScroll: NOOP,
+  onListViewableItemsChanged: NOOP,
+};
+
+/** Change-gated numeric reporter for content-shift events. */
+export const useShiftLogger: (component: string) => ShiftReporter = SHOW_LOGS
+  ? useShiftLoggerLive
+  : () => NOOP_SHIFT_REPORTER;
+
+/** Logs a surface's state transitions, optionally remeasuring the scope. */
+export const useVisualStateLogger: (config: VisualStateConfig) => void = SHOW_LOGS
+  ? useVisualStateLoggerLive
+  : NOOP;
+
+/** Virtualisation/viewability instrumentation for a list. */
+export const useVisualListLogger: <ItemT>(
+  config: VisualListConfig<ItemT>
+) => VisualListReporter<ItemT> = SHOW_LOGS
+  ? useVisualListLoggerLive
+  : <ItemT>(): VisualListReporter<ItemT> => NOOP_LIST_REPORTER;
+
+/** {@link useVisualListLogger} wired straight onto a `FlatList`. */
+export const useVisualFlatListLogger: <ItemT>(
+  config: VisualFlatListConfig<ItemT>
+) => VisualFlatListReporter<ItemT> = SHOW_LOGS
+  ? useVisualFlatListLoggerLive
+  : <ItemT>(): VisualFlatListReporter<ItemT> => NOOP_FLAT_LIST_REPORTER;
+
+/** Scroll geometry instrumentation for a plain scroller. */
+export const useVisualScrollMetricsLogger: (
+  config: VisualScrollMetricsConfig
+) => VisualScrollMetricsReporter = SHOW_LOGS
+  ? useVisualScrollMetricsLoggerLive
+  : () => NOOP_SCROLL_METRICS_REPORTER;
+
+/** Measures one node and reports its rect, overlaps and container violations. */
+export const useVisualLayoutLogger: (config: VisualLayoutConfig) => VisualLayoutReporter = SHOW_LOGS
+  ? useVisualLayoutLoggerLive
+  : () => NOOP_LAYOUT_REPORTER;

@@ -24,6 +24,7 @@ export type { Logger, RedactedError } from './loggerCore';
 export {
   createLogger,
   monotonicNow,
+  SHOW_LOGS,
   log,
   initLog,
   initPhase,

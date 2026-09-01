@@ -65,14 +65,17 @@ export function VisualLayoutProbe({
   const layout = useVisualLayoutLogger({ ...config, extra: visualExtra });
   // Destructured to a `*Ref` binding: the compiler can't tell that a `.ref`
   // property read in JSX is a ref OBJECT and skips the component otherwise.
-  const { ref: hostRef } = layout;
+  const { ref: hostRef, onLayout: reportLayout } = layout;
   const handleLayout = useCallback(
     (event: LayoutChangeEvent) => {
       onLayout?.(event);
-      layout.onLayout(event);
+      reportLayout?.(event);
     },
-    [layout, onLayout]
+    [reportLayout, onLayout]
   );
+  // Nothing to report and nothing to forward — in a release build that is the
+  // usual case, and an attached handler would still cost a native dispatch.
+  const layoutHandler = onLayout || reportLayout ? handleLayout : undefined;
 
   return (
     <View
@@ -81,7 +84,7 @@ export function VisualLayoutProbe({
       className={className}
       pointerEvents={pointerEvents}
       style={style}
-      onLayout={handleLayout}>
+      onLayout={layoutHandler}>
       {children}
     </View>
   );

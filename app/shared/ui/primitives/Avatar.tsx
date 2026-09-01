@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react';
-import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { withAlpha } from '@/shared/lib/color';
 
@@ -188,10 +188,9 @@ export const Avatar = ({
   // Destructured to a `*Ref` binding: the compiler can't tell that a `.ref`
   // property read in JSX is a ref OBJECT (not a ref VALUE) and skips the
   // whole component ("Cannot access refs during render") when passed inline.
-  const { ref: visualHostRef } = visualLayout;
-  const handleVisualLayout = (event: LayoutChangeEvent) => {
-    visualLayout.onLayout(event);
-  };
+  // Both are `undefined` in a release build, so the view attaches no ref and
+  // dispatches no layout event for measurement that cannot run.
+  const { ref: visualHostRef, onLayout: reportVisualLayout } = visualLayout;
 
   // 1. Loading state — 50% foreground fill, no image, no gradient.
   if (state === 'loading') {
@@ -201,7 +200,7 @@ export const Avatar = ({
         collapsable={false}
         style={containerStyle}
         accessibilityRole="image"
-        onLayout={handleVisualLayout}>
+        onLayout={reportVisualLayout}>
         <LoadingContent borderRadius={borderRadius} color={loadingColor} />
         {StatusBadgeWrapper}
       </View>
@@ -240,7 +239,7 @@ export const Avatar = ({
       ref={visualHostRef}
       collapsable={false}
       style={avatarFrameStyle}
-      onLayout={handleVisualLayout}>
+      onLayout={reportVisualLayout}>
       {previousPicture ? (
         <ExpoImage
           source={previousPictureSource}

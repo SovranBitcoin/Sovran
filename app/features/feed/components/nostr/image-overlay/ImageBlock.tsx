@@ -117,7 +117,7 @@ export const ImageBlock = React.memo(function ImageBlock({
   const setContainerRef = useCallback(
     (node: React.ComponentRef<typeof View> | null) => {
       containerRef.current = node;
-      visualLayout.ref(node);
+      visualLayout.ref?.(node);
     },
     [visualLayout]
   );
@@ -383,7 +383,7 @@ export const ImageBlock = React.memo(function ImageBlock({
           style={{ aspectRatio }}
           onLayout={(event) => {
             registerLayout();
-            visualLayout.onLayout(event);
+            visualLayout.onLayout?.(event);
           }}>
           {imageOverlay?.open ? (
             <Pressable

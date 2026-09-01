@@ -13,7 +13,11 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import Icon from 'assets/icons';
 import { withAlpha } from '@/shared/lib/color';
 import { log, feedLog } from '@/shared/lib/logger';
-import { useShiftLogger, useVisualLayoutLogger } from '@/shared/lib/contentShiftLog';
+import {
+  useShiftLogger,
+  useVisualLayoutLogger,
+  VISUAL_LOGGING_ENABLED,
+} from '@/shared/lib/contentShiftLog';
 import { openExternalUrl } from '@/shared/lib/url';
 import { staticPopup } from '@/shared/lib/popup';
 import { ImageBlock, useImageOverlay } from './image-overlay';
@@ -698,7 +702,7 @@ export const NoteContent = React.memo(function NoteContent({
   // reflows the note — the raw signal for "the post grew/shrank under me".
   const handleNoteLayout = useCallback(
     (e: LayoutChangeEvent) => {
-      reportVisualLayout(e);
+      reportVisualLayout?.(e);
       shift.report('feed.shift.note.height', noteKey, e.nativeEvent.layout.height, {
         contentLength: content.length,
         blockCount: blockSegments.length,
@@ -707,6 +711,9 @@ export const NoteContent = React.memo(function NoteContent({
     },
     [reportVisualLayout, shift, noteKey, content.length, blockSegments.length, expanded]
   );
+  // Purely instrumentation: in a release build both reporters are inert, and an
+  // attached handler would still cost a native layout dispatch per note.
+  const noteLayoutHandler = VISUAL_LOGGING_ENABLED ? handleNoteLayout : undefined;
   const taggedQuoteIds = useMemo(() => {
     if (!overlayEvent) return [];
     const inlineQuoteIds = new Set(
@@ -783,7 +790,7 @@ export const NoteContent = React.memo(function NoteContent({
   // while quote cards remain below it when the poll cites another post.
   if (overlayEvent?.kind === POLL_KIND) {
     return (
-      <VStack ref={attachVisualLayoutNode} gap={0} onLayout={handleNoteLayout}>
+      <VStack ref={attachVisualLayoutNode} gap={0} onLayout={noteLayoutHandler}>
         <PollCard event={overlayEvent} />
         {blockSegments.map((seg, i) => renderQuoteBlockSegment(seg, i))}
         {taggedQuoteIds.map((id) => renderQuoteCard(id, `q${id}`))}
@@ -792,7 +799,7 @@ export const NoteContent = React.memo(function NoteContent({
   }
 
   return (
-    <VStack ref={attachVisualLayoutNode} gap={0} onLayout={handleNoteLayout}>
+    <VStack ref={attachVisualLayoutNode} gap={0} onLayout={noteLayoutHandler}>
       {hasInline && (
         <Text
           size={NOTE_CONTENT_FONT_SIZE}

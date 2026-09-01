@@ -31,7 +31,7 @@ const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
  * re-rendering the sweep. The caller's visual-layout logger still sees every
  * layout event.
  */
-function useShimmerSweep(visualLayout: { onLayout: (event: LayoutChangeEvent) => void }): {
+function useShimmerSweep(visualLayout: { onLayout?: (event: LayoutChangeEvent) => void }): {
   sweepWidth: number;
   handleLayout: (event: LayoutChangeEvent) => void;
 } {
@@ -40,7 +40,7 @@ function useShimmerSweep(visualLayout: { onLayout: (event: LayoutChangeEvent) =>
   const handleLayout = (event: LayoutChangeEvent) => {
     const w = Math.round(event.nativeEvent.layout.width);
     setContainerWidth((prev) => (prev === w ? prev : w));
-    visualLayout.onLayout(event);
+    visualLayout.onLayout?.(event);
   };
   return { sweepWidth: containerWidth > 0 ? containerWidth : screenWidth, handleLayout };
 }

@@ -4,7 +4,7 @@
 
 import { useEffect, useRef } from 'react';
 
-import { log, monotonicNow, type Logger } from './loggerCore';
+import { log, monotonicNow, SHOW_LOGS, type Logger } from './loggerCore';
 
 /**
  * Track render count for a component. Escalates to 'warn' after threshold.
@@ -15,7 +15,7 @@ import { log, monotonicNow, type Logger } from './loggerCore';
  *     // ...
  *   }
  */
-export function useRenderLogger(
+function useRenderLoggerLive(
   componentName: string,
   warnAfter: number = 20,
   logger: Logger = log
@@ -49,6 +49,17 @@ export function useRenderLogger(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }
+
+/**
+ * Track render count for a component. Escalates to 'warn' after threshold.
+ *
+ * Unlike the mount-only hooks below, this one does work on EVERY render — a
+ * clock read plus an un-deped effect. A release build can never emit, so it
+ * gets a no-op instead, chosen once at module init from the build-time
+ * `SHOW_LOGS` constant.
+ */
+export const useRenderLogger: (componentName: string, warnAfter?: number, logger?: Logger) => void =
+  SHOW_LOGS ? useRenderLoggerLive : () => {};
 
 /**
  * One-shot mount/unmount log pair with a caller-shaped payload, captured at

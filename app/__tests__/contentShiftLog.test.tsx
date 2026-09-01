@@ -39,6 +39,10 @@ const mockInfo = jest.fn();
 const mockWarn = jest.fn();
 const mockIsLevelEnabled = jest.fn((_level: string) => true);
 jest.mock('@/shared/lib/logger', () => ({
+  // The visual hooks pick their no-op implementations when `SHOW_LOGS` is
+  // false, which is exactly what a release build does — these tests cover the
+  // live path, so the mock has to say logging is on.
+  SHOW_LOGS: true,
   monotonicNow: jest.fn(() => Date.now()),
   feedLog: {
     info: (event: string, params?: Record<string, unknown>) => mockInfo(event, params),
@@ -68,7 +72,7 @@ type VisualListHarness = ReturnType<typeof useVisualListLogger<{ id: string; typ
 type VisualScrollHarness = ReturnType<typeof useVisualScrollMetricsLogger>;
 // Test-only host target for NativeSyntheticEvent; the hook only reads nativeEvent.layout.
 // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-const EVENT_TARGET = {} as Parameters<VisualHarness['onLayout']>[0]['target'];
+const EVENT_TARGET = {} as Parameters<NonNullable<VisualHarness['onLayout']>>[0]['target'];
 
 function visualHarness(input: {
   itemKey: string;
@@ -107,7 +111,7 @@ function visualHarness(input: {
     TestRenderer.create(<Probe />);
   });
   act(() => {
-    ref.visual?.ref(node);
+    ref.visual?.ref?.(node);
   });
   return {
     visual: ref.visual as VisualHarness,
@@ -117,8 +121,11 @@ function visualHarness(input: {
   };
 }
 
-function layoutEvent(width: number, height: number): Parameters<VisualHarness['onLayout']>[0] {
-  const event: Parameters<VisualHarness['onLayout']>[0] = {
+function layoutEvent(
+  width: number,
+  height: number
+): Parameters<NonNullable<VisualHarness['onLayout']>>[0] {
+  const event: Parameters<NonNullable<VisualHarness['onLayout']>>[0] = {
     nativeEvent: {
       layout: { x: 0, y: 0, width, height },
     },
@@ -209,7 +216,7 @@ function scrollEvent(input: {
   width: number;
   x: number;
   y: number;
-}): Parameters<VisualScrollHarness['onScroll']>[0] {
+}): Parameters<NonNullable<VisualScrollHarness['onScroll']>>[0] {
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   return {
     nativeEvent: {
@@ -235,7 +242,7 @@ function scrollEvent(input: {
     persist: jest.fn(),
     timeStamp: 0,
     type: 'scroll',
-  } as Parameters<VisualScrollHarness['onScroll']>[0];
+  } as Parameters<NonNullable<VisualScrollHarness['onScroll']>>[0];
 }
 
 beforeEach(() => {
@@ -314,7 +321,7 @@ describe('useVisualLayoutLogger', () => {
     const { visual, setRect } = visualHarness({ itemKey: 'row-1' });
     setRect({ x: 8, y: 120, w: 320, h: 72 });
 
-    act(() => visual.onLayout(layoutEvent(320, 72)));
+    act(() => visual.onLayout?.(layoutEvent(320, 72)));
     act(() => flushRaf());
 
     expect([...mockInfo.mock.calls, ...mockWarn.mock.calls]).toEqual(
@@ -348,7 +355,7 @@ describe('useVisualLayoutLogger', () => {
     const { visual, setRect } = visualHarness({ itemKey: hexId, component: 'HomeFeedRow' });
     setRect({ x: 0, y: 0, w: 320, h: 200 });
 
-    act(() => visual.onLayout(layoutEvent(320, 200)));
+    act(() => visual.onLayout?.(layoutEvent(320, 200)));
     act(() => flushRaf());
 
     const measure = [...mockInfo.mock.calls, ...mockWarn.mock.calls].find(
@@ -362,9 +369,9 @@ describe('useVisualLayoutLogger', () => {
     const { visual, setRect } = visualHarness({ itemKey: 'row-disabled', enabled: false });
     setRect({ x: 8, y: 120, w: 320, h: 72 });
 
-    act(() => visual.onLayout(layoutEvent(320, 72)));
+    act(() => visual.onLayout?.(layoutEvent(320, 72)));
     act(() => flushRaf());
-    act(() => visual.measureNow('manual'));
+    act(() => visual.measureNow?.('manual'));
     act(() => flushRaf());
 
     expect(mockInfo).not.toHaveBeenCalledWith('visual.layout.measure', expect.anything());
@@ -377,9 +384,9 @@ describe('useVisualLayoutLogger', () => {
     const { visual, setRect } = visualHarness({ itemKey: 'row-logger-disabled' });
     setRect({ x: 8, y: 120, w: 320, h: 72 });
 
-    act(() => visual.onLayout(layoutEvent(320, 72)));
+    act(() => visual.onLayout?.(layoutEvent(320, 72)));
     act(() => flushRaf());
-    act(() => visual.measureNow('manual'));
+    act(() => visual.measureNow?.('manual'));
     act(() => flushRaf());
 
     expect(mockInfo).not.toHaveBeenCalled();
@@ -402,9 +409,9 @@ describe('useVisualLayoutLogger', () => {
     first.setRect({ x: 0, y: 100, w: 320, h: 80 });
     second.setRect({ x: 0, y: 140, w: 320, h: 80 });
 
-    act(() => first.visual.onLayout(layoutEvent(320, 80)));
+    act(() => first.visual.onLayout?.(layoutEvent(320, 80)));
     act(() => flushRaf());
-    act(() => second.visual.onLayout(layoutEvent(320, 80)));
+    act(() => second.visual.onLayout?.(layoutEvent(320, 80)));
     act(() => flushRaf());
 
     expect(mockWarn).toHaveBeenCalledWith(
@@ -446,10 +453,10 @@ describe('useVisualLayoutLogger', () => {
     skeleton.setRect({ x: 0, y: 420, w: 320, h: 110 });
     reply.setRect({ x: 0, y: 420, w: 320, h: 110 });
 
-    act(() => skeleton.visual.onLayout(layoutEvent(320, 110)));
+    act(() => skeleton.visual.onLayout?.(layoutEvent(320, 110)));
     act(() => flushRaf());
     mockWarn.mockClear();
-    act(() => reply.visual.onLayout(layoutEvent(320, 110)));
+    act(() => reply.visual.onLayout?.(layoutEvent(320, 110)));
     act(() => flushRaf());
 
     const overlapWarn = mockWarn.mock.calls.find(
@@ -476,9 +483,9 @@ describe('useVisualLayoutLogger', () => {
     container.setRect({ x: 0, y: 100, w: 320, h: 100 });
     child.setRect({ x: 0, y: 80, w: 320, h: 50 });
 
-    act(() => container.visual.onLayout(layoutEvent(320, 100)));
+    act(() => container.visual.onLayout?.(layoutEvent(320, 100)));
     act(() => flushRaf());
-    act(() => child.visual.onLayout(layoutEvent(320, 50)));
+    act(() => child.visual.onLayout?.(layoutEvent(320, 50)));
     act(() => flushRaf());
 
     expect(mockWarn).toHaveBeenCalledWith(
@@ -1034,10 +1041,10 @@ describe('useVisualScrollMetricsLogger', () => {
   it('logs vertical ScrollView layout, content size, and scroll offsets as visual metrics', () => {
     const visual = visualScrollHarness('y');
 
-    act(() => visual.onLayout(layoutEvent(320, 500)));
-    act(() => visual.onContentSizeChange(640, 1200));
+    act(() => visual.onLayout?.(layoutEvent(320, 500)));
+    act(() => visual.onContentSizeChange?.(640, 1200));
     act(() =>
-      visual.onScroll(
+      visual.onScroll?.(
         scrollEvent({
           contentHeight: 1200,
           contentWidth: 640,
@@ -1072,7 +1079,7 @@ describe('useVisualScrollMetricsLogger', () => {
     const visual = visualScrollHarness('x');
 
     act(() =>
-      visual.onScroll(
+      visual.onScroll?.(
         scrollEvent({
           contentHeight: 96,
           contentWidth: 900,

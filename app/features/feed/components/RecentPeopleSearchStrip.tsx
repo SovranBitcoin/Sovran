@@ -12,6 +12,7 @@ import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import {
   remeasureVisualLayoutScope,
   useVisualScrollMetricsLogger,
+  VISUAL_LOGGING_ENABLED,
 } from '@/shared/lib/contentShiftLog';
 import { navigateToProfile } from '@/features/contacts/lib/navigateToProfile';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -56,7 +57,7 @@ export function RecentPeopleSearchStrip({
   } = stripScrollMetrics;
   const handleStripScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      reportStripScroll(event);
+      reportStripScroll?.(event);
       remeasureVisualLayoutScope(RECENT_PEOPLE_VISUAL_SCOPE, 'horizontal_scroll', {
         extra: {
           rows: rows.length,
@@ -66,6 +67,9 @@ export function RecentPeopleSearchStrip({
     },
     [reportStripScroll, rows.length, title]
   );
+  // Purely instrumentation — see NoteContent: an attached `onScroll` costs a
+  // JS dispatch per frame even when everything it calls is a no-op.
+  const stripScrollHandler = VISUAL_LOGGING_ENABLED ? handleStripScroll : undefined;
 
   if (rows.length === 0) return null;
 
@@ -100,7 +104,7 @@ export function RecentPeopleSearchStrip({
         keyboardShouldPersistTaps="always"
         onLayout={handleStripLayout}
         onContentSizeChange={handleStripContentSizeChange}
-        onScroll={handleStripScroll}
+        onScroll={stripScrollHandler}
         scrollEventThrottle={250}
         contentContainerStyle={styles.listContent}>
         {rows.map((row, index) => (

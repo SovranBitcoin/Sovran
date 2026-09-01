@@ -58,7 +58,7 @@ const Skeleton = React.forwardRef<View, SkeletonProps>(function Skeleton(
 
   const setRef = useCallback(
     (node: View | null) => {
-      layout.ref(node);
+      layout.ref?.(node);
       if (typeof forwardedRef === 'function') {
         forwardedRef(node);
       } else if (forwardedRef) {
@@ -70,7 +70,7 @@ const Skeleton = React.forwardRef<View, SkeletonProps>(function Skeleton(
   const handleLayout = useCallback(
     (event: LayoutChangeEvent) => {
       onLayout?.(event);
-      layout.onLayout(event);
+      layout.onLayout?.(event);
     },
     [layout, onLayout]
   );
