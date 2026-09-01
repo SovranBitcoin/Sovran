@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useRef } from 'react';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { View } from 'react-native';
 import { BottomSheet, Menu } from 'heroui-native';
 import { decodeEcashTokenMetadata, defaultDetectors, type AnnotatedOption } from 'wallet';
@@ -142,18 +143,12 @@ export function PaymentOptionsContent({ payload, close, isFallback }: PaymentOpt
   // Distinguish user-pick close (machine.chooseOption already fired) from
   // overlay-tap / swipe-down close (machine still needs `onDismiss`).
   const pickedRef = useRef(false);
-  const dismissLogRef = useRef({
+  const dismissLogRef = useLatestRef({
     isFallback,
     optionCount: options.length,
     failedCount: failedSet.size,
     hasLastFailedMessage: !!lastFailedMessage,
   });
-  dismissLogRef.current = {
-    isFallback,
-    optionCount: options.length,
-    failedCount: failedSet.size,
-    hasLastFailedMessage: !!lastFailedMessage,
-  };
   useEffect(
     () => () => {
       if (!pickedRef.current) {

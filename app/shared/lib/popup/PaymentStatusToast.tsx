@@ -122,6 +122,90 @@ type PaymentStatusToastProps = {
   [key: string]: unknown;
 };
 
+type PaymentStatusToastCase = ReturnType<
+  typeof createPaymentStatusToastCases
+>[PaymentStatusToastVariant];
+
+/**
+ * Navigate to the transaction a status toast is reporting on.
+ *
+ * At module scope rather than inline in the toast: the body's ternary and
+ * optional chains live inside a try/catch, which React Compiler cannot lower —
+ * and this component is a global overlay that renders on every payment.
+ */
+async function openToastTransaction({
+  config,
+  variant,
+  paymentId,
+  mintUrl,
+  amount,
+  unit,
+  effectiveReceiveEntryId,
+  effectiveOperationId,
+}: {
+  config: PaymentStatusToastCase;
+  variant: PaymentStatusToastVariant;
+  paymentId: string;
+  mintUrl: string;
+  amount: number;
+  unit: string;
+  effectiveReceiveEntryId: string | undefined;
+  effectiveOperationId: string | undefined;
+}): Promise<void> {
+  try {
+    const manager = CocoManager.getInstance();
+    const history = await manager.history.getPaginatedHistory(0, 100);
+    const { type, idField } = config.history;
+    // For receive-ecash, use effectiveReceiveEntryId when available (real entry id from receive:created)
+    const lookupId =
+      variant === 'receive-ecash' && effectiveReceiveEntryId ? effectiveReceiveEntryId : paymentId;
+    let entry = history.find(
+      (h) =>
+        h.type === type &&
+        idField in h &&
+        (h as Record<string, unknown>)[idField] === lookupId &&
+        h.mintUrl === mintUrl
+    );
+    // v3 melts are not in history; construct MeltHistoryEntry from operationId
+    if (!entry && variant === 'melt' && effectiveOperationId) {
+      const now = Date.now();
+      entry = asHistoryEntry({
+        type: 'melt',
+        id: effectiveOperationId,
+        source: 'legacy',
+        legacyHistoryId: effectiveOperationId,
+        quoteId: paymentId,
+        mintUrl,
+        amount,
+        unit,
+        state: MeltQuoteState.PAID,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+    if (entry) {
+      if (entry.type === 'mint') {
+        guardedRouter.navigate({
+          pathname: getMintDetailPathname(entry),
+          params: { mintHistoryEntry: JSON.stringify(entry) },
+        });
+      } else if (entry.type === 'melt') {
+        guardedRouter.navigate({
+          pathname: getMeltDetailPathname(entry),
+          params: { meltHistoryEntry: JSON.stringify(entry) },
+        });
+      } else {
+        guardedRouter.navigate({
+          pathname: config.route.pathname,
+          params: { [config.route.paramKey]: JSON.stringify(entry) },
+        });
+      }
+    }
+  } catch (e) {
+    popupLog.warn('popup.open_transaction_failed', { error: e });
+  }
+}
+
 export function PaymentStatusToast({
   variant,
   paymentId,
@@ -236,61 +320,19 @@ export function PaymentStatusToast({
   // copies of the destination screen on the back stack — `guardedRouter`'s
   // 600ms debounce only catches the navigation, not the history fetch.
   const onPressViewTransaction = useSingleFlight(async () => {
-    try {
-      if (!CocoManager.isInitialized()) return;
-      const manager = CocoManager.getInstance();
-      const history = await manager.history.getPaginatedHistory(0, 100);
-      const { type, idField } = config.history;
-      // For receive-ecash, use effectiveReceiveEntryId when available (real entry id from receive:created)
-      const lookupId =
-        variant === 'receive-ecash' && effectiveReceiveEntryId
-          ? effectiveReceiveEntryId
-          : paymentId;
-      let entry = history.find(
-        (h) =>
-          h.type === type &&
-          idField in h &&
-          (h as Record<string, unknown>)[idField] === lookupId &&
-          h.mintUrl === mintUrl
-      );
-      // v3 melts are not in history; construct MeltHistoryEntry from operationId
-      if (!entry && variant === 'melt' && effectiveOperationId) {
-        const now = Date.now();
-        entry = asHistoryEntry({
-          type: 'melt',
-          id: effectiveOperationId,
-          source: 'legacy',
-          legacyHistoryId: effectiveOperationId,
-          quoteId: paymentId,
-          mintUrl,
-          amount,
-          unit,
-          state: MeltQuoteState.PAID,
-          createdAt: now,
-          updatedAt: now,
-        });
-      }
-      if (entry) {
-        if (entry.type === 'mint') {
-          guardedRouter.navigate({
-            pathname: getMintDetailPathname(entry),
-            params: { mintHistoryEntry: JSON.stringify(entry) },
-          });
-        } else if (entry.type === 'melt') {
-          guardedRouter.navigate({
-            pathname: getMeltDetailPathname(entry),
-            params: { meltHistoryEntry: JSON.stringify(entry) },
-          });
-        } else {
-          guardedRouter.navigate({
-            pathname: config.route.pathname,
-            params: { [config.route.paramKey]: JSON.stringify(entry) },
-          });
-        }
-      }
-    } catch (e) {
-      popupLog.warn('popup.open_transaction_failed', { error: e });
-    }
+    // Guard stays HERE, not in the helper: an uninitialised manager leaves the
+    // toast up rather than dismissing it with nothing to show for the tap.
+    if (!CocoManager.isInitialized()) return;
+    await openToastTransaction({
+      config,
+      variant,
+      paymentId,
+      mintUrl,
+      amount,
+      unit,
+      effectiveReceiveEntryId,
+      effectiveOperationId,
+    });
     hide();
   });
 

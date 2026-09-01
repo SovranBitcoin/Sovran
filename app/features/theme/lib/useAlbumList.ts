@@ -64,7 +64,9 @@ export function useAlbumList(): {
 
     for (const w of catalog) {
       newestInAlbum[w.albumSlug] = Math.max(newestInAlbum[w.albumSlug] || 0, w.createdAt);
-      (wallpapersByAlbum[w.albumSlug] ||= []).push(w);
+      const albumWallpapers = wallpapersByAlbum[w.albumSlug] ?? [];
+      albumWallpapers.push(w);
+      wallpapersByAlbum[w.albumSlug] = albumWallpapers;
     }
     for (const [slug, list] of Object.entries(wallpapersByAlbum)) {
       list.sort((a, b) => b.createdAt - a.createdAt);

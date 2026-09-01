@@ -1,10 +1,6 @@
 {
   "$comment": "Files containing at least one function the React Compiler cannot compile. Ratcheted by scripts/check-react-compiler.mjs — this list may only shrink. Regenerate with `bun run check:react-compiler:update`.",
   "bailouts": {
-    "app/(drawer)/_layout.tsx": [
-      "Hooks may not be referenced as normal values, they must be called. See https://react.dev/reference/rules/react-calls-components-and-hooks#never-pass-around-hook",
-      "Cannot access refs during render"
-    ],
     "features/ai/hooks/useAiSend.ts": [
       "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause",
       "(BuildHIR::lowerStatement) Support ThrowStatement inside of try/catch",
@@ -20,13 +16,10 @@
     "features/feed/components/nostr/image-overlay/AnimatedImageOverlay.tsx": [
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ],
-    "features/feed/components/nostr/image-overlay/ImageBlock.tsx": [
-      "Existing memoization could not be preserved"
-    ],
     "features/feed/components/nostr/image-overlay/provider.tsx": [
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ],
-    "features/feed/components/nostr/NoteContent.tsx": [
+    "features/feed/components/nostr/useVideoTapGesture.ts": [
       "Cannot access refs during render"
     ],
     "features/feed/components/ThreadView.tsx": [
@@ -50,11 +43,7 @@
     ],
     "features/feed/screens/NotificationsScreen.tsx": [
       "(BuildHIR::lowerStatement) Handle TryStatement without a catch clause",
-      "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause",
-      "Unexpected terminal kind `optional` for ternary test block"
-    ],
-    "features/feed/screens/StoriesScreen.tsx": [
-      "Cannot access refs during render"
+      "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause"
     ],
     "features/mint/hooks/useMintRebalanceOrchestrator.ts": [
       "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause",
@@ -107,9 +96,6 @@
       "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause",
       "(BuildHIR::lowerStatement) Handle TryStatement without a catch clause"
     ],
-    "features/theme/lib/useAlbumList.ts": [
-      "(BuildHIR::lowerExpression) Handle ||= operators in AssignmentExpression"
-    ],
     "features/transactions/components/detail/timeline/TimelineCard.tsx": [
       "Cannot access refs during render"
     ],
@@ -144,12 +130,6 @@
     ],
     "shared/lib/popup/E2EActionMenuProbe.tsx": [
       "(BuildHIR::lowerExpression) Support UpdateExpression where argument is a global"
-    ],
-    "shared/lib/popup/PaymentStatusToast.tsx": [
-      "Support value blocks (conditional, logical, optional chaining, etc) within a try/catch statement"
-    ],
-    "shared/lib/popup/popups/paymentOptionsSheet.tsx": [
-      "Cannot access refs during render"
     ],
     "shared/providers/NostrKeysProvider.tsx": [
       "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause",

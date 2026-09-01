@@ -101,6 +101,20 @@ function ownsConfirmationRing(step: TimelineStep, progress: unknown): boolean {
   return !!progress && !!step.confirmationRing;
 }
 
+/**
+ * Renders-so-far for one instance, for the diagnostics below only.
+ *
+ * The counter has to be bumped DURING render — that is what it measures — and
+ * React Compiler skips any component that writes a ref in render. Holding it
+ * in a hook costs the hook its (worthless) memoization and leaves the card
+ * compilable. Read `.current` from an effect, never from render.
+ */
+function useRenderCount(): { readonly current: number } {
+  const count = useRef(0);
+  count.current += 1;
+  return count;
+}
+
 export function HistoryEntryTimeline({
   historyEntry,
   meltQuote,
@@ -120,9 +134,19 @@ export function HistoryEntryTimeline({
   // staggered entrance fade (regardless of data readiness — late-resolving
   // labels correct under the fade); rows/labels added by LATER timeline
   // changes crossfade at FADE_MS.
+  // State, not a ref: `hasMounted` decides which entrance a row plays, so it
+  // is render input. Reading it from a ref hid the flip from React (and made
+  // React Compiler skip this component); an in-flight `entering` animation is
+  // captured when the row mounts, so the extra post-mount render does not
+  // disturb the staggered entrance already playing.
+  const [hasMounted, setHasMounted] = useState(false);
+  // The diagnostics below run in effects and want the value as of THIS commit,
+  // which the state closure cannot give them (their dep sets deliberately omit
+  // it). Mirroring it in the same mount effect keeps that log unchanged.
   const hasMountedRef = useRef(false);
   useEffect(() => {
     hasMountedRef.current = true;
+    setHasMounted(true);
   }, []);
 
   // ── Verbose diagnostics ──────────────────────────────────────────────────
@@ -131,8 +155,7 @@ export function HistoryEntryTimeline({
   // this component; only actual visual transitions (rows, dots, lines,
   // labels, badge) emit.
   const entryId = String((historyEntry as { id?: unknown }).id ?? 'no-id');
-  const renderCountRef = useRef(0);
-  renderCountRef.current += 1;
+  const renderCountRef = useRenderCount();
 
   useEffect(() => {
     paymentLog.debug('tx.history_timeline.mount', {
@@ -486,7 +509,7 @@ export function HistoryEntryTimeline({
                 index={index}
                 isLast={isLast}
                 connector={nextStep ? connectorType(step, nextStep) : null}
-                hasMounted={hasMountedRef.current}
+                hasMounted={hasMounted}
                 confirmationProgress={confirmationProgress}
                 segmentedInProgress={onchainConfirmationProgress?.hasPayment}
                 entryId={entryId}

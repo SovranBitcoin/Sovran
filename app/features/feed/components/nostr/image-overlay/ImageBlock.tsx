@@ -141,11 +141,14 @@ export const ImageBlock = React.memo(function ImageBlock({
    * "dismiss lands too high" bug. EVERY rect that leaves this component goes
    * through here so tap-time, onLayout, and JIT-close rects share one space.
    */
-  const correctionRef = imageOverlay?.measureSpaceCorrection;
   const measureCorrected = useCallback(
     (node: Measureable, cb: (x: number, y: number, w: number, h: number) => void) => {
       node.measureInWindow((pageX, pageY, width, height) => {
-        const corr = correctionRef?.current;
+        // Read at measure time, not in render: hoisting the correction ref out
+        // of the context during render is a ref access React Compiler cannot
+        // reason about, and it refuses to preserve this memo because of it.
+        // `imageOverlay` is already this component's effect dependency.
+        const corr = imageOverlay?.measureSpaceCorrection.current;
         if (Platform.OS === 'android' && corr) {
           cb(pageX + corr.dx, pageY + corr.dy, width, height);
         } else {
@@ -153,7 +156,7 @@ export const ImageBlock = React.memo(function ImageBlock({
         }
       });
     },
-    [correctionRef]
+    [imageOverlay]
   );
 
   /**
@@ -218,6 +221,8 @@ export const ImageBlock = React.memo(function ImageBlock({
       const touch = event?.nativeEvent;
       const trueX = touch != null ? touch.pageX - touch.locationX : null;
       const trueY = touch != null ? touch.pageY - touch.locationY : null;
+      // Read here, not in render — see `measureCorrected`.
+      const correctionRef = imageOverlay.measureSpaceCorrection;
       node.measureInWindow((rawPageX: number, rawPageY: number, width: number, height: number) => {
         if (
           Platform.OS === 'android' &&
@@ -277,7 +282,6 @@ export const ImageBlock = React.memo(function ImageBlock({
       imageOverlay,
       measureSourceRef,
       measureNow,
-      correctionRef,
       url,
       aspectRatio,
       allImageUrls,

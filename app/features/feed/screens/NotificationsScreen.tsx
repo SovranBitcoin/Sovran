@@ -1180,8 +1180,11 @@ function NotificationBody({
   muted: string;
 }) {
   const previewEvent = notificationPreviewEvent(notification);
-  const targetEvent =
-    previewEvent?.id === notification.targetEvent?.id ? undefined : notification.targetEvent;
+  // The optional chains are resolved before the ternary: React Compiler cannot
+  // lower an optional member access used as a ternary's test.
+  const previewEventId = previewEvent?.id;
+  const targetEventId = notification.targetEvent?.id;
+  const targetEvent = previewEventId === targetEventId ? undefined : notification.targetEvent;
 
   if (!previewEvent) return null;
 

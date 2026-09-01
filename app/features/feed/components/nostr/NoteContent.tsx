@@ -1,8 +1,7 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, Platform, type LayoutChangeEvent } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
+import { GestureDetector } from 'react-native-gesture-handler';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -18,6 +17,7 @@ import {
   useVisualLayoutLogger,
   VISUAL_LOGGING_ENABLED,
 } from '@/shared/lib/contentShiftLog';
+import { useVideoTapGesture } from './useVideoTapGesture';
 import { openExternalUrl } from '@/shared/lib/url';
 import { staticPopup } from '@/shared/lib/popup';
 import { ImageBlock, useImageOverlay } from './image-overlay';
@@ -130,57 +130,6 @@ const InlineLink = React.memo(function InlineLink({
 
 /** Relay cards past this ordinal render without fetching NIP-11. */
 const RELAY_NIP11_FETCH_CAP = 3;
-
-/**
- * Tap handling for an inline video block: measure the thumbnail and hand its
- * rect to the overlay, or fall back to the caller's tap / the OS browser.
- *
- * The container ref lives in here because the gesture's `onEnd` closes over it
- * and is handed to `Gesture.Tap()` during render — which React Compiler reads
- * as a render-time ref access, and a note body is on the feed's hot path.
- */
-function useVideoTapGesture({
-  isAndroid,
-  onBeforeOpen,
-  onTap,
-  openInBrowser,
-  openOverlay,
-  overlayLayout,
-}: {
-  isAndroid: boolean;
-  onBeforeOpen?: () => void;
-  onTap?: () => void;
-  openInBrowser: () => void | Promise<void>;
-  openOverlay?: (layout: ImageOverlayLayout) => void;
-  overlayLayout?: Omit<ImageOverlayLayout, 'pageX' | 'pageY' | 'width' | 'height'>;
-}) {
-  const containerRef = useRef<React.ComponentRef<typeof View>>(null);
-
-  const handleTap = useCallback(() => {
-    if (openOverlay && overlayLayout && containerRef.current) {
-      onBeforeOpen?.();
-      containerRef.current.measureInWindow(
-        (pageX: number, pageY: number, width: number, height: number) => {
-          openOverlay({ ...overlayLayout, pageX, pageY, width, height });
-        }
-      );
-    } else if (isAndroid) {
-      void (onTap ?? openInBrowser)();
-    } else if (onTap) {
-      onTap();
-    }
-  }, [openOverlay, overlayLayout, onBeforeOpen, onTap, isAndroid, openInBrowser]);
-
-  const tapGesture = useMemo(() => {
-    if (!isAndroid && !handleTap) return undefined;
-    return Gesture.Tap().onEnd(() => {
-      'worklet';
-      runOnJS(handleTap)();
-    });
-  }, [isAndroid, handleTap]);
-
-  return { containerRef, tapGesture };
-}
 
 const VideoBlockInner = React.memo(function VideoBlockInner({
   url,

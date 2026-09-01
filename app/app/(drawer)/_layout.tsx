@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef } from 'react';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { Drawer, DrawerContentComponentProps, useDrawerStatus } from 'expo-router/drawer';
 import {
   GestureHandlerRootView,
@@ -46,15 +47,21 @@ type MenuItem = {
   /** Segment-prefix that, when matched against `useSegments()`, marks this menu item active. */
   activeSegments: readonly string[];
   /**
-   * Optional live badge-count selector hook. Must be a stable module-level
-   * hook (rules-of-hooks: every MenuButton calls exactly one count hook).
-   * The badge renders only while the count is > 0.
+   * Optional live badge. A COMPONENT, not a count hook: a hook passed as a
+   * prop is a rules-of-react violation (its identity could change between
+   * renders and reorder the row's hooks), and React Compiler refuses to
+   * compile any component that calls one. Subscribing inside the badge also
+   * narrows a count change to the badge itself rather than the row.
    */
-  useBadgeCount?: () => number;
+  Badge?: React.ComponentType;
 };
 
-const useNoBadgeCount = () => 0;
-const useSignerPendingCount = () => useNip46RequestsStore((s) => s.pending.length);
+/** Pending NIP-46 requests, rendered on the Remote Login row. */
+const SignerPendingBadge = React.memo(function SignerPendingBadge() {
+  const count = useNip46RequestsStore((s) => s.pending.length);
+  if (count <= 0) return null;
+  return <Badge variant="primary">{count}</Badge>;
+});
 
 const MENU_ITEMS: MenuItem[] = [
   {
@@ -92,7 +99,7 @@ const MENU_ITEMS: MenuItem[] = [
     label: 'Remote Login',
     route: '/(signer-flow)',
     activeSegments: ['(signer-flow)'],
-    useBadgeCount: useSignerPendingCount,
+    Badge: SignerPendingBadge,
   },
   {
     icon: {
@@ -133,17 +140,16 @@ const MenuButton = React.memo(function MenuButton({
   route,
   onNavigate,
   isActive,
-  useBadgeCount = useNoBadgeCount,
+  Badge: RowBadge,
 }: {
   icon: MenuIconPair;
   label: string;
   route: MenuRoute;
   onNavigate: (route: MenuRoute) => void;
   isActive: boolean;
-  useBadgeCount?: () => number;
+  Badge?: React.ComponentType;
 }) {
   const foreground = useThemeColor('foreground');
-  const badgeCount = useBadgeCount();
 
   return (
     <GesturePressable
@@ -162,20 +168,54 @@ const MenuButton = React.memo(function MenuButton({
         <Text size={18} bold style={{ color: foreground }}>
           {label}
         </Text>
-        {badgeCount > 0 ? <Badge variant="primary">{badgeCount}</Badge> : null}
+        {RowBadge ? <RowBadge /> : null}
       </HStack>
     </GesturePressable>
   );
 });
 
+/**
+ * Navigate to a drawer route, closing the drawer instead when the route is
+ * already active, and swallowing a second tap while a push is in flight.
+ *
+ * The segment mirror and the in-flight guard live in here, not in the drawer:
+ * the returned callback must keep ONE identity across segment changes or the
+ * memoized rows re-render during the commit that native-stack gates the push
+ * animation on — and a component that touches a ref during render is one
+ * React Compiler skips entirely.
+ */
+function useDrawerNavigation(
+  navigation: DrawerContentComponentProps['navigation'],
+  segments: ReturnType<typeof useSegments>
+) {
+  const segmentsRef = useLatestRef(segments);
+  const navInProgressRef = useRef(false);
+
+  return useCallback(
+    (route: MenuRoute) => {
+      if (navInProgressRef.current) return;
+      const item = MENU_ITEMS.find((m) => m.route === route);
+      const active = item
+        ? segmentsMatch(segmentsRef.current as string[], item.activeSegments)
+        : false;
+      if (active) {
+        navigation.closeDrawer();
+        return;
+      }
+      navInProgressRef.current = true;
+      router.navigate(route);
+      navigation.closeDrawer();
+      setTimeout(() => {
+        navInProgressRef.current = false;
+      }, 400);
+    },
+    [navigation, segmentsRef]
+  );
+}
+
 function CustomDrawerContent(props: DrawerContentComponentProps) {
   const segments = useSegments();
-  // Read segments through a ref inside the navigation callback so its
-  // identity survives segment changes — keeps the memoized MenuButtons from
-  // re-rendering during the push-gated commit.
-  const segmentsRef = useRef(segments);
-  segmentsRef.current = segments;
-  const navInProgressRef = useRef(false);
+  const handleNavigation = useDrawerNavigation(props.navigation, segments);
 
   // Fire a single Light-impact haptic the moment the drawer commits to a
   // state change — covers gesture release that crosses the open/close
@@ -199,27 +239,6 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
     [segments]
   );
 
-  const handleNavigation = useCallback(
-    (route: MenuRoute) => {
-      if (navInProgressRef.current) return;
-      const item = MENU_ITEMS.find((m) => m.route === route);
-      const active = item
-        ? segmentsMatch(segmentsRef.current as string[], item.activeSegments)
-        : false;
-      if (active) {
-        props.navigation.closeDrawer();
-        return;
-      }
-      navInProgressRef.current = true;
-      router.navigate(route);
-      props.navigation.closeDrawer();
-      setTimeout(() => {
-        navInProgressRef.current = false;
-      }, 400);
-    },
-    [props.navigation]
-  );
-
   const surface = useThemeColor('surface');
   const closeDrawer = useCallback(() => props.navigation.closeDrawer(), [props.navigation]);
 
@@ -239,7 +258,7 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
               route={item.route}
               onNavigate={handleNavigation}
               isActive={isRouteActive(item.route)}
-              useBadgeCount={item.useBadgeCount}
+              Badge={item.Badge}
             />
           ))}
         </VStack>

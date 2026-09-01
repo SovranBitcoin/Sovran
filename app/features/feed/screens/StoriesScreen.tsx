@@ -61,14 +61,19 @@ export function StoriesScreen() {
     return () => clearTimeout(t);
   }, [isClosing]);
 
-  if (storyUsers.length === 0) {
-    if (!closeRequestedRef.current) {
-      closeRequestedRef.current = true;
-      feedLog.warn('feed.stories.empty', { reason: 'no_story_users' });
-      setTimeout(() => router.back(), 0);
-    }
-    return null;
-  }
+  // Nothing to show: leave. In an effect, not in render — logging and
+  // scheduling a navigation from render is a side effect, and the ref guard it
+  // needed is what made React Compiler skip this screen. The effect's own
+  // guard is the empty-deps run-once, so no ref is required at all.
+  const isEmpty = storyUsers.length === 0;
+  useEffect(() => {
+    if (!isEmpty || closeRequestedRef.current) return;
+    closeRequestedRef.current = true;
+    feedLog.warn('feed.stories.empty', { reason: 'no_story_users' });
+    router.back();
+  }, [isEmpty, closeRequestedRef]);
+
+  if (isEmpty) return null;
 
   return (
     <Log
