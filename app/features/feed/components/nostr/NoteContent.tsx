@@ -44,11 +44,6 @@ import { fontSize } from '@/shared/styles/tokens';
 import { NOTE_CONTENT_LINE_HEIGHT } from '@/features/feed/lib/threadListLayout';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 
-// Re-exported so `NoteContent` stays the import site for note-rendering
-// consumers (PostCard); the value's source of truth lives in `threadListLayout`
-// so the rendered line height and the skeleton fixed-size math can't drift.
-export { NOTE_CONTENT_LINE_HEIGHT };
-
 const EMPTY_QUOTED_EVENTS: Map<string, FeedEvent> = new Map();
 export const NOTE_CONTENT_FONT_SIZE = fontSize.lg;
 

@@ -26,7 +26,7 @@ import { buildMintInfoHref } from '@/shared/lib/nav/mintInfoRoutes';
 import { extractDomain, getMintDisplayName } from '@/shared/lib/url';
 import { paymentLog, cashuLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { NoResultsFound } from '@/features/payments/components/NoResultsFound';
-import { CONTACT_SEARCH_MIN_LENGTH } from '@/features/payments/hooks/useContactSearch';
+import { CONTACT_SEARCH_MIN_LENGTH } from '@/shared/lib/contactSearch';
 import type { TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
 
 type SearchResultRowsProps = {

@@ -19,17 +19,9 @@
 
 import { useMemo } from 'react';
 
-import {
-  useContactSearch,
-  type DisplayResult,
-  CONTACT_SEARCH_MIN_LENGTH,
-} from '@/features/payments/hooks/useContactSearch';
+import { useContactSearch, type DisplayResult } from '@/features/payments/hooks/useContactSearch';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 import type { NostrSearchResult } from '@/shared/lib/apiClient';
-
-// Re-exported so consumers gate the People section on the same threshold the
-// provider enforces, without importing from two modules.
-export { CONTACT_SEARCH_MIN_LENGTH };
 
 /**
  * One overlaid contact-search row. Structurally the `'contact'` arm of

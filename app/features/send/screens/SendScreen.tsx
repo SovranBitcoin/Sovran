@@ -53,10 +53,8 @@ import {
   peerNostrPubkey,
 } from '@/features/nearPay/lib/peerProfile';
 import { useRememberPeers } from '@/features/nearPay/hooks/useRememberPeers';
-import {
-  useOverlaidContactSearch,
-  CONTACT_SEARCH_MIN_LENGTH,
-} from '@/features/contacts/hooks/useOverlaidContactSearch';
+import { CONTACT_SEARCH_MIN_LENGTH } from '@/shared/lib/contactSearch';
+import { useOverlaidContactSearch } from '@/features/contacts/hooks/useOverlaidContactSearch';
 import { useQuickPayPeople, type QuickPayPerson } from '@/features/send/hooks/useQuickPayPeople';
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';

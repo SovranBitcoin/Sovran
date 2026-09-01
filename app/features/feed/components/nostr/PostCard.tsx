@@ -33,7 +33,8 @@ import { formatDate, formatRelativeUnixSeconds } from '@/shared/lib/date';
 import { tryNpubEncode } from './feedParse';
 import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { useCardTapGesture } from '@/features/feed/hooks/useCardTapGesture';
-import { NoteContent, NOTE_CONTENT_FONT_SIZE, NOTE_CONTENT_LINE_HEIGHT } from './NoteContent';
+import { NoteContent, NOTE_CONTENT_FONT_SIZE } from './NoteContent';
+import { NOTE_CONTENT_LINE_HEIGHT } from '@/features/feed/lib/threadListLayout';
 import { useProfile } from '@/shared/lib/nostr/useEntityCache';
 import { MetricsFooter, POST_ACTION_ICON_SIZES } from './MetricsFooter';
 import {

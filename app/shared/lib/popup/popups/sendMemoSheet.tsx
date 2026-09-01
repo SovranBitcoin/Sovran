@@ -32,11 +32,8 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { relays as defaultRelays } from '@/shared/ndk';
-import {
-  CONTACT_SEARCH_MIN_LENGTH,
-  useContactSearch,
-  type DisplayResult,
-} from '@/features/payments/hooks/useContactSearch';
+import { useContactSearch, type DisplayResult } from '@/features/payments/hooks/useContactSearch';
+import { CONTACT_SEARCH_MIN_LENGTH } from '@/shared/lib/contactSearch';
 
 import { showActionSheet } from './bridge';
 import {

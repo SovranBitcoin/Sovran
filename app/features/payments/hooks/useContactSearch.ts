@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { CONTACT_SEARCH_MIN_LENGTH } from '@/shared/lib/contactSearch';
 import { type NostrSearchResult } from '@/shared/lib/apiClient';
 import { searchProfilesViaFacade } from '@/shared/lib/nostr/searchProfiles';
 import { paymentLog, redactError } from '@/shared/lib/logger';
@@ -27,7 +28,6 @@ const SEARCH_DEBOUNCE_MS = 250;
 
 // Mirror the server-side `SearchQuery.min(3)` in `sovran-schemas/src/nostr-api.ts`.
 // Anything shorter is rejected upstream, so suppress the request entirely.
-export const CONTACT_SEARCH_MIN_LENGTH = 3;
 
 /** The search-effect fetch body, verbatim: query the facade and seed caches. */
 async function runContactSearch(ctx: {
