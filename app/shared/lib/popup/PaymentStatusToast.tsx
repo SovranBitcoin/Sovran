@@ -157,8 +157,7 @@ export function PaymentStatusToast({
   ) {
     setTerminalSnapshotState(activeForPayment);
   }
-  const terminalSnapshot =
-    terminalSnapshotState?.id === paymentId ? terminalSnapshotState : null;
+  const terminalSnapshot = terminalSnapshotState?.id === paymentId ? terminalSnapshotState : null;
   const effectiveActive = activeForPayment ?? terminalSnapshot;
   const isDelivered = activeForPayment?.state === 'delivered';
   const isWaiting = effectiveActive?.state === 'waiting';
