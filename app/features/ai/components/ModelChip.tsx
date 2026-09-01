@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { Keyboard } from 'react-native';
 import Icon from 'assets/icons';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
@@ -73,10 +74,14 @@ export function ModelChip() {
   // popups). One fetch per chip mount keeps the pill and picker honest.
   const apiKey = useRoutstrStore((s) => s.apiKey);
   const setBalance = useRoutstrStore((s) => s.setBalance);
+  // Read at mount, never a trigger: a key rotation mid-session must not refire
+  // the self-heal fetch.
+  const apiKeyRef = useLatestRef(apiKey);
   useEffect(() => {
-    if (!apiKey) return;
+    const key = apiKeyRef.current;
+    if (!key) return;
     let cancelled = false;
-    checkBalance(apiKey)
+    checkBalance(key)
       .then((data) => {
         if (!cancelled) setBalance(data.balance);
       })
@@ -87,10 +92,7 @@ export function ModelChip() {
     return () => {
       cancelled = true;
     };
-    // Mount-only: one refresh per AI-tab session, not per keystroke of
-    // dependent state.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [apiKeyRef, setBalance]);
 
   // Server-curated lineup first: nagg's /app/ai-lineup outranks the
   // client-side derivation (it carries the pinned/curated tier picks and

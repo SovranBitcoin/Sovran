@@ -4,6 +4,7 @@ import { Manager } from '@cashu/coco-core';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { reportCocoApiFailure } from '@/shared/lib/cashu/cocoFeedback';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { attachMintMetadataToManager } from '@/shared/stores/global/mintMetadataStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
@@ -116,6 +117,145 @@ async function initializeDefaultMints(manager: Manager): Promise<void> {
  *  - **Non-blocking** (`coco-background` stage): Default mints + recovery.
  *    These run after the app is visible and don't hold up rendering.
  */
+type CocoPhase1Args = {
+  stage: { log: (message: string) => void; complete: () => void; error: (message: string) => void };
+  hasPubkey: boolean;
+  privateKey: Uint8Array | undefined;
+  onManager: (manager: Manager) => void;
+  onReady: () => void;
+  onFailure: (error: Error) => void;
+};
+
+/**
+ * Phase 1 of Coco startup: hand the manager the already-derived signer key,
+ * initialise it, and report the outcome to the initialisation stage.
+ *
+ * At module scope rather than inside the effect: React Compiler cannot lower a
+ * try/catch containing optional chaining or ternaries, so an inline body costs
+ * the whole provider its memoization.
+ */
+async function runCocoPhase1({
+  stage,
+  hasPubkey,
+  privateKey,
+  onManager,
+  onReady,
+  onFailure,
+}: CocoPhase1Args): Promise<void> {
+  try {
+    stage.log('Initializing Coco...');
+    initLog('Coco', 'Phase 1 starting');
+    log.info('coco.phase1.start', { hasKeys: hasPubkey, hasPrivateKey: !!privateKey });
+
+    // Pass the already-derived private key so CocoManager doesn't re-derive
+    if (privateKey) {
+      CocoManager.setSignerKey(privateKey);
+    } else {
+      log.warn('coco.phase1.no_private_key_for_manager');
+    }
+
+    const mgr = await initPhase('Coco.managerInit', () => CocoManager.initialize());
+    onManager(mgr);
+    log.info('coco.phase1.manager_ready');
+
+    initLog('Coco', 'setting isReady=true, calling stage.complete()');
+    onReady();
+    stage.complete();
+    initLog('Coco', 'Phase 1 complete');
+    log.info('coco.phase1.done');
+  } catch (caught) {
+    const failure = caught instanceof Error ? caught : new Error('Initialization failed');
+    initLog('Coco', `Phase 1 ERROR: ${caught}`);
+    // Log what was actually thrown, not the substituted message — a non-Error
+    // throw's own text is the only clue about where it came from.
+    log.error('coco.phase1.failed', {
+      error: caught instanceof Error ? caught.message : String(caught),
+    });
+    onFailure(failure);
+    stage.error(failure.message);
+  }
+}
+
+type CocoPhase2Args = {
+  bgStage: { log: (message: string) => void; complete: () => void };
+  chainManager: Manager;
+  isLive: () => boolean;
+};
+
+/**
+ * Phase 2 of Coco startup: default mints, NPC sync, and pending-operation
+ * recovery, each gated on the captured manager still being the live instance.
+ *
+ * At module scope for the same reason as {@link runCocoPhase1} — a try/catch
+ * with ternaries inside it cannot be lowered by React Compiler, and inline it
+ * would cost the provider its memoization.
+ */
+async function runCocoPhase2({ bgStage, chainManager, isLive }: CocoPhase2Args): Promise<void> {
+  try {
+    initLog('Coco-bg', 'Phase 2 starting');
+    log.info('coco.phase2.start');
+
+    // Safe to enable observe-only watchers and pre-warm the seed cache
+    // immediately — neither uses the deterministic counter.
+    if (!isLive()) return;
+    await initPhase('Coco-bg.safeWatchers', () => CocoManager.enableSafeWatchers());
+
+    if (!isLive()) return;
+    bgStage.log('Initializing default mints...');
+    await initPhase('Coco-bg.defaultMints', () => initializeDefaultMints(chainManager));
+
+    // Block NPC sync + the mint-operation processor until the wallet
+    // has restored its NUT-13 counter (or proven restore isn't needed).
+    // RestoreGate routes the user to /restore when this is pending.
+    if (!isLive()) return;
+    bgStage.log('Waiting for wallet restore...');
+    await initPhase('Coco-bg.restoreReady', () => awaitRestoreReady(useWalletLifecycleStore));
+    if (!isLive()) return;
+    bgStage.log('Starting NPC sync...');
+    await initPhase('Coco-bg.npcSync', () => CocoManager.enableNpcSyncAndProcessor());
+
+    try {
+      if (!isLive()) return;
+      bgStage.log('Recovering pending operations...');
+      log.info('coco.recovery.send.start');
+      await initPhase('Coco-bg.sendRecovery', () => chainManager.ops.send.recovery.run());
+      if (!isLive()) return;
+      log.info('coco.recovery.send.done');
+      log.info('coco.recovery.melt.start');
+      await initPhase('Coco-bg.meltRecovery', () => chainManager.ops.melt.recovery.run());
+      if (!isLive()) return;
+      log.info('coco.recovery.melt.done');
+      log.info('coco.recovery.receive.start');
+      await initPhase('Coco-bg.receiveRecovery', () => chainManager.ops.receive.recovery.run());
+      if (!isLive()) return;
+      log.info('coco.recovery.receive.done');
+      // Safe no-op sweep while the NUT-18 incoming saga is unused.
+      log.info('coco.recovery.payment_request_receive.start');
+      await initPhase('Coco-bg.paymentRequestReceiveRecovery', () =>
+        chainManager.recoverPendingPaymentRequestReceiveAttempts()
+      );
+      log.info('coco.recovery.payment_request_receive.done');
+    } catch (recoveryErr) {
+      initLog('Coco-bg', `recovery failed (non-fatal): ${recoveryErr}`);
+      log.warn('coco.recovery.failed', {
+        error: recoveryErr instanceof Error ? recoveryErr.message : String(recoveryErr),
+      });
+      reportCocoApiFailure('ops.*.recovery.run', recoveryErr);
+    }
+
+    if (!isLive()) return;
+    bgStage.complete();
+    initLog('Coco-bg', 'Phase 2 complete');
+    log.info('coco.phase2.done');
+  } catch (error) {
+    initLog('Coco-bg', `Phase 2 failed (non-fatal): ${error}`);
+    log.warn('coco.phase2.failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    bgStage.complete();
+  }
+}
+
 export function CocoProvider({ children }: CocoProviderProps) {
   useInitMount('CocoProvider');
   const stage = useInitializationStage('coco', {
@@ -129,6 +269,11 @@ export function CocoProvider({ children }: CocoProviderProps) {
     blocking: false,
   });
   const { keys } = useNostrKeysContext();
+  // Mirrored, not depended on: `privateKey` is a fresh `Uint8Array` on every
+  // derivation, so making it a trigger would tear down and re-initialise
+  // CocoManager whenever the keys context re-derived the SAME identity.
+  // `pubkey` is the stable identity of the keypair and the real trigger.
+  const privateKeyRef = useLatestRef(keys?.privateKey);
   const [manager, setManager] = useState<Manager | null>(null);
   const [isReady, setIsReady] = useState(false);
   const isMigrating = false;
@@ -142,43 +287,14 @@ export function CocoProvider({ children }: CocoProviderProps) {
     if (hasStarted.current) return;
     hasStarted.current = true;
 
-    const initializeCoco = async () => {
-      try {
-        stage.log('Initializing Coco...');
-        initLog('Coco', 'Phase 1 starting');
-        log.info('coco.phase1.start', {
-          hasKeys: !!keys?.pubkey,
-          hasPrivateKey: !!keys?.privateKey,
-        });
-
-        // Pass the already-derived private key so CocoManager doesn't re-derive
-        if (keys?.privateKey) {
-          CocoManager.setSignerKey(keys.privateKey);
-        } else {
-          log.warn('coco.phase1.no_private_key_for_manager');
-        }
-
-        const mgr = await initPhase('Coco.managerInit', () => CocoManager.initialize());
-        setManager(mgr);
-        log.info('coco.phase1.manager_ready');
-
-        initLog('Coco', 'setting isReady=true, calling stage.complete()');
-        setIsReady(true);
-        stage.complete();
-        initLog('Coco', 'Phase 1 complete');
-        log.info('coco.phase1.done');
-      } catch (error) {
-        initLog('Coco', `Phase 1 ERROR: ${error}`);
-        const errorMessage = error instanceof Error ? error.message : 'Initialization failed';
-        log.error('coco.phase1.failed', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-        setMigrationError(error instanceof Error ? error : new Error('Initialization failed'));
-        stage.error(errorMessage);
-      }
-    };
-
-    void initializeCoco();
+    void runCocoPhase1({
+      stage,
+      hasPubkey: !!keys?.pubkey,
+      privateKey: privateKeyRef.current,
+      onManager: setManager,
+      onReady: () => setIsReady(true),
+      onFailure: setMigrationError,
+    });
 
     return () => {
       // Reset the start-guard so a deps change (e.g. profile switch flipping
@@ -193,13 +309,8 @@ export function CocoProvider({ children }: CocoProviderProps) {
         log.error('coco.cleanup_failed', { error });
       });
     };
-    // `keys.privateKey` is read but is deliberately NOT a trigger: it is a fresh
-    // `Uint8Array` on every derivation, so depending on it would tear down and
-    // re-initialize CocoManager whenever the keys context re-derived the SAME
-    // identity. `pubkey` is the stable identity of the keypair and the correct
-    // trigger. (`stage` is memoised — it moves only when `canStart` flips.)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage, keys?.pubkey]);
+    // (`stage` is memoised — it moves only when `canStart` flips.)
+  }, [stage, keys?.pubkey, privateKeyRef]);
 
   // Phase 2: Non-blocking — Default mints + recovery (runs after app is visible)
   useEffect(() => {
@@ -218,71 +329,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
     const chainManager = manager;
     const isLive = () => !controller.signal.aborted && CocoManager.peekInstance() === chainManager;
 
-    const runBackground = async () => {
-      try {
-        initLog('Coco-bg', 'Phase 2 starting');
-        log.info('coco.phase2.start');
-
-        // Safe to enable observe-only watchers and pre-warm the seed cache
-        // immediately — neither uses the deterministic counter.
-        if (!isLive()) return;
-        await initPhase('Coco-bg.safeWatchers', () => CocoManager.enableSafeWatchers());
-
-        if (!isLive()) return;
-        bgStage.log('Initializing default mints...');
-        await initPhase('Coco-bg.defaultMints', () => initializeDefaultMints(chainManager));
-
-        // Block NPC sync + the mint-operation processor until the wallet
-        // has restored its NUT-13 counter (or proven restore isn't needed).
-        // RestoreGate routes the user to /restore when this is pending.
-        if (!isLive()) return;
-        bgStage.log('Waiting for wallet restore...');
-        await initPhase('Coco-bg.restoreReady', () => awaitRestoreReady(useWalletLifecycleStore));
-        if (!isLive()) return;
-        bgStage.log('Starting NPC sync...');
-        await initPhase('Coco-bg.npcSync', () => CocoManager.enableNpcSyncAndProcessor());
-
-        try {
-          if (!isLive()) return;
-          bgStage.log('Recovering pending operations...');
-          log.info('coco.recovery.send.start');
-          await initPhase('Coco-bg.sendRecovery', () => chainManager.ops.send.recovery.run());
-          if (!isLive()) return;
-          log.info('coco.recovery.send.done');
-          log.info('coco.recovery.melt.start');
-          await initPhase('Coco-bg.meltRecovery', () => chainManager.ops.melt.recovery.run());
-          if (!isLive()) return;
-          log.info('coco.recovery.melt.done');
-          log.info('coco.recovery.receive.start');
-          await initPhase('Coco-bg.receiveRecovery', () => chainManager.ops.receive.recovery.run());
-          if (!isLive()) return;
-          log.info('coco.recovery.receive.done');
-          // Safe no-op sweep while the NUT-18 incoming saga is unused.
-          log.info('coco.recovery.payment_request_receive.start');
-          await initPhase('Coco-bg.paymentRequestReceiveRecovery', () =>
-            chainManager.recoverPendingPaymentRequestReceiveAttempts()
-          );
-          log.info('coco.recovery.payment_request_receive.done');
-        } catch (recoveryErr) {
-          initLog('Coco-bg', `recovery failed (non-fatal): ${recoveryErr}`);
-          log.warn('coco.recovery.failed', {
-            error: recoveryErr instanceof Error ? recoveryErr.message : String(recoveryErr),
-          });
-          reportCocoApiFailure('ops.*.recovery.run', recoveryErr);
-        }
-
-        if (!isLive()) return;
-        bgStage.complete();
-        initLog('Coco-bg', 'Phase 2 complete');
-        log.info('coco.phase2.done');
-      } catch (error) {
-        initLog('Coco-bg', `Phase 2 failed (non-fatal): ${error}`);
-        log.warn('coco.phase2.failed', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-        bgStage.complete();
-      }
-    };
+    const runBackground = () => runCocoPhase2({ bgStage, chainManager, isLive });
 
     // Wait for the splash → QR button morph to settle before starting
     // heavy background work (default mints, NPC sync, recovery). The fixed

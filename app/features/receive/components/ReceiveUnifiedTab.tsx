@@ -12,6 +12,7 @@
  */
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 
 import { setStringAsync } from 'expo-clipboard';
 
@@ -139,15 +140,16 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
       }
     }
   }, [onchain.isLoading, bolt12.isLoading, creq.isLoading]);
+  // `uri` is the payload of the settle log, not its trigger — mirrored so the
+  // dep list stays honest and this component keeps its auto-memoization.
+  const uriRef = useLatestRef(uri);
   useEffect(() => {
     if (!settled) return;
     paymentLog.info('receive.unified.settled', {
       duration_ms: Date.now() - mountTsRef.current,
-      hasUri: !!uri,
+      hasUri: !!uriRef.current,
     });
-    // Settles exactly once — uri presence at that moment is the payload.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settled]);
+  }, [settled, uriRef]);
 
   const handleCopy = useCallback(async () => {
     if (!uri) return;

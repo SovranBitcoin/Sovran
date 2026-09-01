@@ -8,6 +8,8 @@ import React, {
 } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
 
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
+
 import { FlashList, type FlashListRef, type ViewToken } from '@shopify/flash-list';
 import { Link } from 'expo-router';
 import { withAlpha } from '@/shared/lib/color';
@@ -489,13 +491,13 @@ export const Transactions = React.memo(
       return () => clearTimeout(timer);
       // No sectionsToDisplay here: this is the churn-proof upper bound.
     }, [settled, hasSettleData]);
+    // The section count is the payload of the settle log, not its trigger.
+    const sectionsToDisplayRef = useLatestRef(sectionsToDisplay);
     useEffect(() => {
       if (settled) {
-        log.info('transactions.render.settled', { items: sectionsToDisplay.length });
+        log.info('transactions.render.settled', { items: sectionsToDisplayRef.current.length });
       }
-      // Log once on the transition; sectionsToDisplay is read, not a trigger.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [settled]);
+    }, [settled, sectionsToDisplayRef]);
 
     // Render-order diagnostics: the exact order the list renders, one line
     // per change. Types + dates only — no amounts, mints, or tokens.

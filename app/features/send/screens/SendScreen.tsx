@@ -138,15 +138,16 @@ export function SendScreen({ unit }: { unit: string }) {
   // quick-pay tier after they leave range.
   useRememberPeers(peers);
   // Re-tick so stale peers drop out of the fresh window without a peer event.
-  const [, setTick] = useState(0);
+  // The tick IS the dependency — `filterFreshBLEPeers` reads the wall clock, so
+  // nothing else marks the result stale.
+  const [freshnessTick, setFreshnessTick] = useState(0);
   useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), BLE_PEER_FRESHNESS_TICK_MS);
+    const id = setInterval(() => setFreshnessTick((tick) => tick + 1), BLE_PEER_FRESHNESS_TICK_MS);
     return () => clearInterval(id);
   }, []);
   const freshPeers = useMemo(
     () => filterFreshBLEPeers(peers, Date.now()).filter((p) => peerNostrPubkey(p) != null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run on tick
-    [peers, query]
+    [peers, freshnessTick]
   );
 
   // Live peers already show in the "Nearby" tier, so exclude them from the

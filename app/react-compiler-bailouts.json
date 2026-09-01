@@ -8,9 +8,6 @@
       "Hooks may not be referenced as normal values, they must be called. See https://react.dev/reference/rules/react-calls-components-and-hooks#never-pass-around-hook",
       "Cannot access refs during render"
     ],
-    "features/ai/components/ModelChip.tsx": [
-      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
-    ],
     "features/ai/hooks/useAiSend.ts": [
       "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause",
       "(BuildHIR::lowerStatement) Support ThrowStatement inside of try/catch",
@@ -22,9 +19,6 @@
     ],
     "features/bitchat/hooks/useBitchatNickname.ts": [
       "Existing memoization could not be preserved"
-    ],
-    "features/contacts/components/SearchPostsList.tsx": [
-      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ],
     "features/feed/components/nostr/image-overlay/AnimatedImageOverlay.tsx": [
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
@@ -55,7 +49,8 @@
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ],
     "features/feed/screens/NotificationFollowersScreen.tsx": [
-      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+      "(BuildHIR::lowerStatement) Handle TryStatement without a catch clause",
+      "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause"
     ],
     "features/feed/screens/NotificationsScreen.tsx": [
       "(BuildHIR::lowerStatement) Handle TryStatement without a catch clause",
@@ -97,9 +92,6 @@
     "features/payments/hooks/useMintContacts.ts": [
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ],
-    "features/receive/components/ReceiveUnifiedTab.tsx": [
-      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
-    ],
     "features/receive/screens/OnchainReceiveScreen.tsx": [
       "Existing memoization could not be preserved"
     ],
@@ -111,9 +103,6 @@
     ],
     "features/send/screens/OnchainSendScreen.tsx": [
       "Existing memoization could not be preserved"
-    ],
-    "features/send/screens/SendScreen.tsx": [
-      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ],
     "features/settings/design-system/fadeRevealStress.tsx": [
       "Hooks must be the same function on every render, but this value may change over time to a different function. See https://react.dev/reference/rules/react-calls-"
@@ -128,9 +117,6 @@
     "features/transactions/components/detail/timeline/TimelineCard.tsx": [
       "Cannot access refs during render"
     ],
-    "features/transactions/components/Transactions.tsx": [
-      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
-    ],
     "features/transactions/screens/SwapTransactionScreen.tsx": [
       "Support value blocks (conditional, logical, optional chaining, etc) within a try/catch statement"
     ],
@@ -139,9 +125,6 @@
     ],
     "features/whitenoise/WhitenoiseProvider.tsx": [
       "Existing memoization could not be preserved"
-    ],
-    "shared/blocks/InitializationGate.tsx": [
-      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ],
     "shared/hooks/useNostrProfileMetadata.ts": [
       "Cannot access refs during render",
@@ -172,14 +155,8 @@
     "shared/lib/popup/PaymentStatusToast.tsx": [
       "Support value blocks (conditional, logical, optional chaining, etc) within a try/catch statement"
     ],
-    "shared/lib/popup/popups/modelPicker.tsx": [
-      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
-    ],
     "shared/lib/popup/popups/paymentOptionsSheet.tsx": [
       "Cannot access refs during render"
-    ],
-    "shared/providers/CocoProvider.tsx": [
-      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ],
     "shared/providers/NostrKeysProvider.tsx": [
       "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause",
@@ -188,9 +165,6 @@
     ],
     "shared/ui/composed/CapsuleButton/CapsuleButton.liquid.tsx": [
       "Cannot access refs during render"
-    ],
-    "shared/ui/composed/chat/LiquidChatComposer.tsx": [
-      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ],
     "shared/ui/composed/chat/useChatSurfacePerfLogger.ts": [
       "Cannot access refs during render",

@@ -25,7 +25,7 @@
  *   modelPickerPopup({});
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BottomSheet, Menu } from 'heroui-native';
@@ -38,7 +38,7 @@ import type { AiProviderId, LineupEntry } from '@/shared/lib/routstr/lineup';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Text } from '@/shared/ui/primitives/Text';
 import { SheetMenuRowContent } from './sheetMenuRow';
-import { log } from '@/shared/lib/logger';
+import { log, useMountLog } from '@/shared/lib/logger';
 
 import {
   AI_PROVIDERS,
@@ -198,16 +198,14 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
   // matching their current selection is the right default.
   const [activeProviderTab, setActiveProviderTab] = useState<AiProviderId>(() => selectedProvider);
 
-  useEffect(() => {
-    pickerLog.info('modelPicker.mount', {
-      selectedProvider,
-      selectedTier,
-      lineupSource,
-    });
-    return () => pickerLog.info('modelPicker.unmount', {});
-    // Mount-only — we want a single record per open cycle.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // `useMountLog` owns the mount-only log pair (and the exhaustive-deps
+  // suppression it needs), so this component stays compilable.
+  useMountLog(
+    'modelPicker.mount',
+    { selectedProvider, selectedTier, lineupSource },
+    'modelPicker.unmount',
+    pickerLog
+  );
 
   const balanceSats = balanceMsats != null ? Math.floor(balanceMsats / 1000) : 0;
   const activeProvider = useMemo(

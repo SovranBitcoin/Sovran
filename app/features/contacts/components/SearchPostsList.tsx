@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { useShallowMemo } from '@/shared/hooks/useShallowMemo';
 import { List } from '@/shared/ui/composed/List';
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
 import type { FeedParseResult } from '@/features/feed/data/feedClient';
@@ -24,12 +25,15 @@ import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 
 export function SearchPostsList({ pubkeys }: { pubkeys: string[] }) {
-  const pubkeysKey = pubkeys.join(',');
+  // Stabilised by content, not identity: callers rebuild the array on every
+  // render, and the fetch below must not refire for an equal list.
+  const stablePubkeys = useShallowMemo(pubkeys);
+  const pubkeysKey = stablePubkeys.join(',');
 
   // Warm-navigation seed: if these matched pubkeys were fetched earlier this
   // session, initialise from the cached posts so returning to the Posts tab
   // paints instantly instead of flashing a spinner.
-  const initialCacheKey = pubkeys.length ? searchPostsKey(pubkeysKey) : null;
+  const initialCacheKey = stablePubkeys.length ? searchPostsKey(pubkeysKey) : null;
   const seed =
     initialCacheKey && !searchPostsCache.isColdStart(initialCacheKey)
       ? searchPostsCache.getEntry(initialCacheKey)?.data
@@ -79,7 +83,7 @@ export function SearchPostsList({ pubkeys }: { pubkeys: string[] }) {
     const controller = new AbortController();
     const client = getFeedClient();
     void client
-      .getPostsByPubkeys({ pubkeys, limit: 30, signal: controller.signal })
+      .getPostsByPubkeys({ pubkeys: stablePubkeys, limit: 30, signal: controller.signal })
       .then((res) => {
         if (controller.signal.aborted) return;
         apply(res);
@@ -94,10 +98,7 @@ export function SearchPostsList({ pubkeys }: { pubkeys: string[] }) {
         client.dispose?.();
       });
     return () => controller.abort();
-    // `pubkeysKey` is the serialized form of `pubkeys`; depending on the array
-    // itself would refetch on every render that rebuilds it with equal contents.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pubkeysKey]);
+  }, [stablePubkeys, pubkeysKey]);
 
   const getMetrics = useMemo(
     () => (id: string) => metricsMap.get(id) ?? DEFAULT_METRICS,

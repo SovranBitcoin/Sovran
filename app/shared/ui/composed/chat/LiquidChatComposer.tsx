@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import {
   Platform,
   TextInput,
@@ -125,6 +126,25 @@ const MAX_ROW_HEIGHT = 140;
  * Used by every chat surface (BitChat, Nostr DM, WhiteNoise, AI) via
  * `ChatScreen`, which mounts this composer inside its `renderInputToolbar`.
  */
+/**
+ * Imperative handle for the SwiftUI `TextField`.
+ *
+ * The ref lives here, not in the composer: handing a ref-closing callback to a
+ * function during render — which `onTapGesture(focus)` is — reads to React
+ * Compiler as a render-time ref access, and skips the whole composer. Holding
+ * it in a hook costs this (unmemoizable anyway) hook and nothing else.
+ */
+function useTextFieldHandle() {
+  const ref = useRef<TextFieldRef>(null);
+  const focus = useCallback(() => {
+    void ref.current?.focus();
+  }, []);
+  const setText = useCallback((text: string) => {
+    void ref.current?.setText(text);
+  }, []);
+  return { ref, focus, setText };
+}
+
 export function LiquidChatComposer({
   value,
   onChangeText,
@@ -180,20 +200,24 @@ export function LiquidChatComposer({
     [onChangeText]
   );
 
-  // Imperative ref so taps on the capsule's padding edges (outside the
+  // Imperative handle so taps on the capsule's padding edges (outside the
   // TextField's intrinsic content rect) can focus the field — see the
   // `onTapGesture(focusTextField)` on the bubble below.
-  const textFieldRef = useRef<TextFieldRef>(null);
-  const focusTextField = useCallback(() => {
-    void textFieldRef.current?.focus();
-  }, []);
+  const {
+    ref: textFieldRef,
+    focus: focusTextField,
+    setText: setTextFieldText,
+  } = useTextFieldHandle();
   // SDK 56 @expo/ui dropped TextField `defaultValue`. The field is still
   // uncontrolled (manages its own internal state), so seed it imperatively on
   // (re)mount — `resetKey` bumps remount the field with the latest `value`.
+  // `value` is the seed, `resetKey` the trigger: re-seeding on every keystroke
+  // would fight the field's own uncontrolled state.
+  const valueRef = useLatestRef(value);
   useEffect(() => {
-    if (value) void textFieldRef.current?.setText(value);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resetKey]);
+    const seed = valueRef.current;
+    if (seed) setTextFieldText(seed);
+  }, [resetKey, valueRef, setTextFieldText]);
 
   // Fallback-only state: the RN multiline `TextInput` reports its intrinsic
   // height via `onContentSizeChange`. We clamp to `MIN_ROW_HEIGHT` so the

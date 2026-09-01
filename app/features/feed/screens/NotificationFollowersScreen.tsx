@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { RefreshControl, StyleSheet } from 'react-native';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -96,17 +97,19 @@ export function NotificationFollowersScreen() {
   // Persist a freshly-handed-over seed into the session cache once, so the next
   // focus / re-mount reads it as a warm page instead of refetching. Only write
   // a real seed (not a value we just read back from the cache).
+  // Mount-only: this persists the seed handed over at mount. Re-running on a
+  // later `viewerPubkey` change would write a value just read back from the
+  // cache, which the comment above rules out — so the viewer is mirrored
+  // rather than depended on.
+  const viewerPubkeyRef = useLatestRef(viewerPubkey);
   useEffect(() => {
-    if (viewerPubkey && seedRef.current && seedRef.current.notifications.length > 0) {
-      const key = notificationFollowersKey(viewerPubkey);
-      notificationFollowersCache.setEntry(key, seedRef.current, { viewerKey: viewerPubkey });
+    const viewer = viewerPubkeyRef.current;
+    if (viewer && seedRef.current && seedRef.current.notifications.length > 0) {
+      const key = notificationFollowersKey(viewer);
+      notificationFollowersCache.setEntry(key, seedRef.current, { viewerKey: viewer });
       notificationFollowersCache.markTouched(key);
     }
-    // Mount-only: this persists the seed handed over at mount. Re-running on a
-    // later `viewerPubkey`/seed change would write a value just read back from
-    // the cache, which the comment above rules out.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [viewerPubkeyRef, seedRef]);
   const tabBarPadding = useTabBarBottomPadding();
   const [foreground, surface, separator, muted, surfaceTertiary] = useThemeColor([
     'foreground',
