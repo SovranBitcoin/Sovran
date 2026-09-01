@@ -36,7 +36,7 @@ describe('DEV static-toast AX probe', () => {
     jest.useRealTimers();
   });
 
-  it('exposes only the closed popup key after the toast component mounts, then expires it', () => {
+  it('exposes only the closed popup key after the toast component mounts, then expires it', async () => {
     let renderer: TestRenderer.ReactTestRenderer;
     act(() => {
       renderer = TestRenderer.create(
@@ -53,10 +53,19 @@ describe('DEV static-toast AX probe', () => {
     expect(marker.props.accessibilityLabel).toBe('Static toast visible');
     expect(JSON.stringify(marker.props)).not.toContain('Token is still pending');
 
-    act(() => jest.advanceTimersByTime(5_000));
+    // The probe outlives its toast by STATIC_TOAST_RETAIN_MS (20s), not the
+    // 5s toast duration — per-step evidence capture can spend several seconds
+    // between the action and the waitFor that observes the probe. Async act so
+    // the zustand-driven unmount flushes before the assertion.
+    await act(async () => {
+      jest.advanceTimersByTime(20_000);
+    });
+    // toHaveLength, not toEqual([]) — deep-comparing react-test-renderer
+    // instances walks their internals and throws a cross-realm
+    // `Map.prototype.entries` TypeError that masks the real assertion.
     expect(
       renderer!.root.findAllByProps({ testID: 'e2e-toast-token-pending-not-redeemed' })
-    ).toEqual([]);
+    ).toHaveLength(0);
   });
 
   it('retains the confirmed View action past overlay dismissal and clears it after use', () => {

@@ -64,6 +64,20 @@ jest.mock('@/shared/lib/color', () => ({
   withAlpha: jest.fn(() => 'rgba(0,0,0,0.07)'),
 }));
 
+// This suite failed intermittently (roughly 1 run in 3) with the REAL icon
+// barrel loading despite the virtual 'assets/icons' mock below, at which point
+// @monicon/native evaluates `Platform.select` outside the RN runtime and
+// throws. The mechanism that lets the virtual mock miss is not established —
+// the specifier matches what Avatar imports. Stubbing the leaf that actually
+// throws makes the suite pass regardless of whether the barrel mock applies.
+jest.mock('@monicon/native', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  return {
+    Monicon: ({ name }: { name: string }) =>
+      ReactActual.createElement('monicon', { testID: `monicon-${name}` }),
+  };
+});
+
 jest.mock(
   'assets/icons',
   () => ({

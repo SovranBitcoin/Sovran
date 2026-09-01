@@ -12,6 +12,26 @@ import { LightningSendScreen } from '@/features/send/screens/LightningSendScreen
 const mockCancel = jest.fn(async () => undefined);
 const mockUseScreenActions = jest.fn();
 
+// `LightningSendScreen` reaches ndk-mobile transitively (ZappedPostSection ->
+// useEntityCache -> buildNostrDataLayer -> nostrTierConfig -> outbox/defaults),
+// and the package ships ESM only, which this jest resolver cannot load. Mocked
+// here rather than via moduleNameMapper: mapping it globally drags
+// @monicon/native into the node project and breaks avatarFallback instead.
+jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ normalizeRelayUrl: (url: string) => url }), {
+  virtual: true,
+});
+
+// The same transitive reach pulls Avatar -> assets/icons -> @monicon/native,
+// which throws on import outside the RN runtime. Same stub the design-system
+// snapshot suite uses.
+jest.mock('@monicon/native', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  return {
+    Monicon: ({ name }: { name: string }) =>
+      ReactActual.createElement('monicon', { testID: `monicon-${name}` }),
+  };
+});
+
 jest.mock('expo-router', () => ({ Stack: { Screen: () => null } }));
 jest.mock('wallet', () => ({
   isMeltQuotePaid: (entry: { state: string }) => entry.state === 'PAID',
@@ -61,6 +81,11 @@ jest.mock('@/features/transactions', () => ({
 }));
 jest.mock('@/shared/lib/logger', () => ({
   log: { debug: jest.fn(), warn: jest.fn() },
+  // persistConfig's onRehydrateStorage error branch calls storeLog.warn; a
+  // hand-listed logger factory that omits it turns a rehydrate warning into a
+  // TypeError inside the store under test.
+  storeLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+  redactError: (error: unknown) => error,
   useLifecycleLogger: jest.fn(),
 }));
 jest.mock('@/shared/hooks/useMintInfo', () => ({ useMintInfo: jest.fn(() => null) }));
