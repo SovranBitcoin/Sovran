@@ -27,7 +27,13 @@
     "noFallthroughCasesInSwitch": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
-    "moduleSuffixes": [".ios", ".android", ""],
+    // Metro's iOS resolution order, exactly: `.ios` then the extension-less
+    // file. The old list also probed `.android` in between, so a module with
+    // only an Android variant (SquircleView) type-checked its ANDROID
+    // implementation on the iOS pass. `tsconfig.android.json` is the mirror
+    // pass — without it, Android-only variants are never checked against
+    // their callers at all.
+    "moduleSuffixes": [".ios", ""],
     "paths": {
       "@/*": ["./*"],
       "@/shared/*": ["./shared/*"],

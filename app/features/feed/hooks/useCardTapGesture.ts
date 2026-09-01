@@ -20,7 +20,7 @@ import { useCallback, useMemo, useRef } from 'react';
 import { Gesture } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 
-export type CardTapGesture = {
+type CardTapGesture = {
   /** Attach to the card's `<GestureDetector>`. */
   gesture: ReturnType<typeof Gesture.Tap>;
   /** Wire to a nested pressable's `onPressIn` — swallows the next card tap. */

@@ -1,0 +1,10 @@
+{
+  // Android's half of the type-check. `tsconfig.json` resolves the `.ios`
+  // variant of every platform-split module, so without this pass an
+  // Android-only file — a prop it never added, an import it no longer has —
+  // is only ever checked in isolation, never against the screens that use it.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "moduleSuffixes": [".android", ""]
+  }
+}
