@@ -13,7 +13,7 @@
  */
 
 import React, { useEffect } from 'react';
-import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   type EasingFunction,
@@ -30,6 +30,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, Defs, Mask, Path, Rect } from 'react-native-svg';
 
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { IS_ANDROID_E2E } from '@/shared/lib/e2e/isAndroidE2E';
 import {
@@ -192,8 +193,6 @@ const D_ICON_OUT = 250;
 const T_FILL = 350;
 const T_ICON = 550;
 
-let loadingIndicatorVisualInstance = 0;
-
 interface NormalizedSegmentedProgress {
   segmentCount: number;
   completedSegments: number;
@@ -338,12 +337,10 @@ function ConfirmationSegment({
   // Latest-callback ref: the parent recreates the closure every render; the
   // ref keeps it out of the animation effects' dependency arrays so logging
   // can never re-trigger a fill or breathe.
-  const debugEventRef = React.useRef(onDebugEvent);
-  debugEventRef.current = onDebugEvent;
+  const debugEventRef = useLatestRef(onDebugEvent);
   // Render-time snapshot of geometry for the logs — kept in a ref so logging
   // extra fields never widens the animation effects' dependency arrays.
-  const debugMetaRef = React.useRef({ index, segmentCount, stroke, pxTargeted });
-  debugMetaRef.current = { index, segmentCount, stroke, pxTargeted };
+  const debugMetaRef = useLatestRef({ index, segmentCount, stroke, pxTargeted });
   const wasBreathingRef = React.useRef(false);
   const progress = useSharedValue(completed ? 1 : 0);
   const pulse = useSharedValue(0);
@@ -358,8 +355,7 @@ function ConfirmationSegment({
   // otherwise a delay change alone would re-pulse an already-filled segment.
   // Together with wasCompletedRef/mountedRef this keeps the fill effect keyed
   // to real `completed` flips, not to dependency identity.
-  const delayRef = React.useRef(delayMs);
-  delayRef.current = delayMs;
+  const delayRef = useLatestRef(delayMs);
   // Dash/seam geometry comes from the shared module — see `segmentDash` for
   // the seam policy and the dash-centering rationale.
   const { strokeDasharray, strokeDashoffset } = segmentDash(
@@ -423,7 +419,7 @@ function ConfirmationSegment({
         })
       );
     }
-  }, [completed, progress, pulse]);
+  }, [completed, progress, pulse, debugEventRef, debugMetaRef, delayRef]);
 
   useEffect(() => {
     // Under Android e2e the perpetual breathe keeps the window from idling, so
@@ -458,7 +454,7 @@ function ConfirmationSegment({
         withTiming(0, { duration: SEGMENT_PULSE_MS, easing: Easing.inOut(Easing.ease) })
       );
     }
-  }, [active, completed, activePulse]);
+  }, [active, completed, activePulse, debugEventRef, debugMetaRef]);
 
   const animatedProps = useAnimatedProps(() => {
     const p = progress.get();
@@ -566,9 +562,7 @@ export function LoadingIndicator({
   // Latest-callback + render-snapshot refs: logging must never widen an
   // animation effect's dependency array (that would re-fire choreography on
   // unrelated re-renders), so effects read these refs instead of props.
-  const debugEventRef = React.useRef(onDebugEvent);
-  debugEventRef.current = onDebugEvent;
-  const debugSnapshotRef = React.useRef<Record<string, unknown>>({});
+  const debugEventRef = useLatestRef(onDebugEvent);
 
   // ── Unfilled-stroke chrome ─────────────────────────────────────────────
   // Single owner for how non-result strokes render — the idle dash ring, the
@@ -619,7 +613,7 @@ export function LoadingIndicator({
           ? warnColor
           : okColor;
 
-  debugSnapshotRef.current = {
+  const debugSnapshotRef = useLatestRef<Record<string, unknown>>({
     size,
     strokeWidthPx: strokeWidthPx ?? null,
     pxTargeted,
@@ -631,19 +625,14 @@ export function LoadingIndicator({
     playOnMount,
     rawPhaseProp: phase,
     rawResultProp: result,
-  };
+  });
 
-  const visualInstanceKeyRef = React.useRef<string | null>(null);
-  if (visualInstanceKeyRef.current === null) {
-    loadingIndicatorVisualInstance += 1;
-    visualInstanceKeyRef.current = `loading-indicator:${loadingIndicatorVisualInstance}`;
-  }
-  const visualLayout = useVisualLayoutLogger({
+  const { ref: attachVisualLayoutNode, onLayout: reportVisualLayout } = useVisualLayoutLogger({
     enabled: visualDisabled !== true,
     scope: visualScope,
     surface: visualSurface,
     component: visualComponent,
-    itemKey: visualKey ? visualLayoutScopePart(visualKey) : visualInstanceKeyRef.current,
+    itemKey: visualKey ? visualLayoutScopePart(visualKey) : undefined,
     itemType: 'status-indicator',
     phase: visualPhase ?? effectivePhase,
     extra: () => ({
@@ -658,12 +647,6 @@ export function LoadingIndicator({
       ...(typeof visualExtra === 'function' ? visualExtra() : (visualExtra ?? {})),
     }),
   });
-  const handleVisualLayout = React.useCallback(
-    (event: LayoutChangeEvent) => {
-      visualLayout.onLayout(event);
-    },
-    [visualLayout]
-  );
 
   // Mount in terminal state when phase='done': skip the ring/fill/icon
   // choreography and render the resolved frame immediately. Matches
@@ -671,17 +654,21 @@ export function LoadingIndicator({
   // when re-rendering rows with an already-resolved status. Static
   // success/error decorations that want the draw-in on mount opt out
   // via `playOnMount`.
-  const startedDone = React.useRef(
-    effectivePhase === 'done' && !playOnMount && !segmentedComplete
-  ).current;
-  const startedResult = React.useRef(effectiveResult).current;
+  const [startedDone] = React.useState(
+    () => effectivePhase === 'done' && !playOnMount && !segmentedComplete
+  );
+  const [startedResult] = React.useState(() => effectiveResult);
   const startedSuccess = startedDone && startedResult === 'success';
   const startedError = startedDone && startedResult === 'error';
   const startedReverted = startedDone && startedResult === 'reverted';
   const startedWarning = startedDone && startedResult === 'warning';
 
   React.useEffect(() => {
-    debugEventRef.current?.('dot.mount', {
+    // `startedDone`/`startedResult` are frozen at first render, so this pair
+    // fires exactly once: capture the emitter at mount and use the same one to
+    // close the pair at unmount.
+    const emitDebugEvent = debugEventRef.current;
+    emitDebugEvent?.('dot.mount', {
       // startedDone = mounted already-terminal: the draw-in choreography is
       // skipped and the resolved frame paints immediately.
       mountedTerminal: startedDone,
@@ -689,9 +676,9 @@ export function LoadingIndicator({
       ...debugSnapshotRef.current,
     });
     return () => {
-      debugEventRef.current?.('dot.unmount', {});
+      emitDebugEvent?.('dot.unmount', {});
     };
-  }, [startedDone, startedResult]);
+  }, [startedDone, startedResult, debugEventRef, debugSnapshotRef]);
 
   // Settle-to-static: once a live transition's done choreography has fully
   // played, swap the animated SVG for a static terminal frame. A Fabric
@@ -739,6 +726,7 @@ export function LoadingIndicator({
     segmentedComplete,
     resultDelayMs,
     transitionDelayMs,
+    debugEventRef,
   ]);
 
   const dashA = useSharedValue(startedDone ? DASH.done[0] : idleDash);
@@ -791,7 +779,15 @@ export function LoadingIndicator({
       setSettledStatic(true);
     }, settleAtMs);
     return () => clearTimeout(timer);
-  }, [shouldShowResult, startedDone, transitionDelayMs, resultDelayMs, targetSpeed, speed]);
+  }, [
+    shouldShowResult,
+    startedDone,
+    transitionDelayMs,
+    resultDelayMs,
+    targetSpeed,
+    speed,
+    debugEventRef,
+  ]);
 
   useEffect(() => {
     const d = transitionDelayMs;
@@ -936,6 +932,8 @@ export function LoadingIndicator({
     xOff,
     revertOff,
     wifiOff,
+    debugEventRef,
+    debugSnapshotRef,
   ]);
 
   const ringStrokeAP = useAnimatedProps(() => ({
@@ -982,10 +980,10 @@ export function LoadingIndicator({
   if (settledStatic && shouldShowResult) {
     return (
       <View
-        ref={visualLayout.ref}
+        ref={attachVisualLayoutNode}
         collapsable={false}
         style={{ width: size, height: size }}
-        onLayout={handleVisualLayout}>
+        onLayout={reportVisualLayout}>
         <Svg width={size} height={size} viewBox="0 0 100 100">
           <Defs>
             <Mask id="iconMaskStatic">
@@ -1074,10 +1072,10 @@ export function LoadingIndicator({
 
   return (
     <View
-      ref={visualLayout.ref}
+      ref={attachVisualLayoutNode}
       collapsable={false}
       style={{ width: size, height: size }}
-      onLayout={handleVisualLayout}>
+      onLayout={reportVisualLayout}>
       {/* Disc + glyphs (mask cut-out). Scales/fades via outer Animated.View. */}
       <Animated.View style={[StyleSheet.absoluteFill, fillWrapStyle]}>
         <Svg width={size} height={size} viewBox="0 0 100 100">

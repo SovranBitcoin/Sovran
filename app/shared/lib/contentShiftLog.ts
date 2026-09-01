@@ -20,7 +20,7 @@
  *
  * Dev-only: `feedLog` (like every Sovran logger) short-circuits in production.
  */
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useId, useRef } from 'react';
 import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -112,12 +112,21 @@ export type VisualLayoutConfig = {
   scope: string;
   surface: string;
   component: string;
-  itemKey: string;
+  /**
+   * Stable identity for this node within `scope`. Omit it when the caller has
+   * no natural key — the hook then mints a per-instance one from `useId`, which
+   * keeps render pure (a module-level counter bumped in render is a React rule
+   * violation AND makes the calling component uncompilable by React Compiler).
+   */
+  itemKey?: string;
   itemType?: string;
   index?: number;
   phase?: string;
   extra?: VisualExtra;
 };
+
+/** {@link VisualLayoutConfig} after {@link useVisualLayoutLogger} fills in `itemKey`. */
+type ResolvedVisualLayoutConfig = VisualLayoutConfig & { itemKey: string };
 
 type VisualLayoutReporter = {
   ref: (node: MeasureableNode | null) => void;
@@ -1517,8 +1526,13 @@ export function useVisualLayoutLogger(config: VisualLayoutConfig): VisualLayoutR
     visualLayoutMountSequence += 1;
     mountOrderRef.current = visualLayoutMountSequence;
   }
-  const configRef = useRef(config);
-  configRef.current = config;
+  const autoItemKey = useId();
+  const resolvedConfig: ResolvedVisualLayoutConfig =
+    config.itemKey === undefined
+      ? { ...config, itemKey: `${config.itemType ?? config.component}:${autoItemKey}` }
+      : (config as ResolvedVisualLayoutConfig);
+  const configRef = useRef(resolvedConfig);
+  configRef.current = resolvedConfig;
   viewportRef.current = viewport;
 
   const setRef = useCallback((node: MeasureableNode | null) => {
@@ -1698,7 +1712,7 @@ export function useVisualLayoutLogger(config: VisualLayoutConfig): VisualLayoutR
       VISUAL_SCOPE_REGISTRY.get(current.scope)?.delete(registryKey);
       pruneScope(current.scope);
     };
-  }, [config.enabled, config.itemKey, config.scope, measureNow]);
+  }, [config.enabled, resolvedConfig.itemKey, config.scope, measureNow]);
 
   return { ref: setRef, onLayout, measureNow };
 }

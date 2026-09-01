@@ -156,7 +156,7 @@ export function ThreadReplyBar({
   const replyBarVisualScope = targetEvent
     ? `thread.${targetEvent.id}.${scopeSegment}replybar`
     : `thread.loading.${scopeSegment}replybar`;
-  const visualLayout = useVisualLayoutLogger({
+  const { ref: attachVisualLayoutNode, onLayout: reportVisualLayout } = useVisualLayoutLogger({
     scope: replyBarVisualScope,
     surface: 'thread',
     component: 'ThreadReplyBar',
@@ -316,8 +316,8 @@ export function ThreadReplyBar({
 
   const barContent = (
     <Animated.View
-      ref={visualLayout.ref}
-      onLayout={visualLayout.onLayout}
+      ref={attachVisualLayoutNode}
+      onLayout={reportVisualLayout}
       layout={EXPAND_TRANSITION}
       style={[
         styles.container,

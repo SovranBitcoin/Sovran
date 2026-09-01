@@ -1,11 +1,4 @@
-import { useCallback, useRef } from 'react';
-import {
-  StyleSheet,
-  View,
-  type LayoutChangeEvent,
-  type StyleProp,
-  type ViewStyle,
-} from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { LoadingIndicator } from '@/shared/blocks/status';
 import {
@@ -30,8 +23,6 @@ type SpinnerProps = {
   color?: string;
 } & SpinnerVisualProps;
 
-let spinnerVisualInstance = 0;
-
 export function Spinner({
   size = 8,
   style,
@@ -44,17 +35,12 @@ export function Spinner({
   visualExtra,
   visualDisabled,
 }: SpinnerProps) {
-  const instanceKeyRef = useRef<string | null>(null);
-  if (instanceKeyRef.current === null) {
-    spinnerVisualInstance += 1;
-    instanceKeyRef.current = `spinner:${spinnerVisualInstance}`;
-  }
-  const layout = useVisualLayoutLogger({
+  const { ref: attachLayoutNode, onLayout: reportLayout } = useVisualLayoutLogger({
     enabled: visualDisabled !== true,
     scope: visualScope,
     surface: visualSurface,
     component: visualComponent,
-    itemKey: visualKey ? visualLayoutScopePart(visualKey) : instanceKeyRef.current,
+    itemKey: visualKey ? visualLayoutScopePart(visualKey) : undefined,
     itemType: 'spinner',
     phase: visualPhase,
     extra: () => ({
@@ -63,20 +49,14 @@ export function Spinner({
       ...(typeof visualExtra === 'function' ? visualExtra() : (visualExtra ?? {})),
     }),
   });
-  const handleLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      layout.onLayout(event);
-    },
-    [layout]
-  );
 
   return (
     <View
-      ref={layout.ref}
+      ref={attachLayoutNode}
       collapsable={false}
       testID="spinner-loading-indicator"
       style={[styles.container, style]}
-      onLayout={handleLayout}>
+      onLayout={reportLayout}>
       <LoadingIndicator size={size} phase="loading" color={color} visualDisabled />
     </View>
   );

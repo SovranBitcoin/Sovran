@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
 
 import {
@@ -30,8 +30,6 @@ type SkeletonVisualProps = {
 
 type SkeletonProps = React.ComponentPropsWithoutRef<typeof View> & SkeletonVisualProps;
 
-let skeletonVisualInstance = 0;
-
 const Skeleton = React.forwardRef<View, SkeletonProps>(function Skeleton(
   {
     className,
@@ -47,17 +45,12 @@ const Skeleton = React.forwardRef<View, SkeletonProps>(function Skeleton(
   },
   forwardedRef
 ) {
-  const instanceKeyRef = useRef<string | null>(null);
-  if (instanceKeyRef.current === null) {
-    skeletonVisualInstance += 1;
-    instanceKeyRef.current = `skeleton:${skeletonVisualInstance}`;
-  }
   const layout = useVisualLayoutLogger({
     enabled: visualDisabled !== true,
     scope: visualScope,
     surface: visualSurface,
     component: visualComponent,
-    itemKey: visualKey ? visualLayoutScopePart(visualKey) : instanceKeyRef.current,
+    itemKey: visualKey ? visualLayoutScopePart(visualKey) : undefined,
     itemType: 'skeleton',
     phase: visualPhase,
     extra: visualExtra,

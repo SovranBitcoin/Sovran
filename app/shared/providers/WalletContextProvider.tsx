@@ -112,15 +112,7 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
       ),
     [rawTrustedMints, activeUnit, keysetUnitsByMint]
   );
-  const prevMintUrlsRef = useRef<string[]>(trustedMintUrls);
-  const stableMintUrls = useMemo(() => {
-    const prev = prevMintUrlsRef.current;
-    if (prev.length === trustedMintUrls.length && prev.every((u, i) => u === trustedMintUrls[i])) {
-      return prev;
-    }
-    prevMintUrlsRef.current = trustedMintUrls;
-    return trustedMintUrls;
-  }, [trustedMintUrls]);
+  const stableMintUrls = useShallowMemo(trustedMintUrls);
 
   // RC4+ removed the legacy `total` injection into the per-mint map; mintBalances
   // already contains only mint-keyed entries.

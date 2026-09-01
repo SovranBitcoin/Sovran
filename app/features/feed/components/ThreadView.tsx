@@ -656,8 +656,8 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               }}
               onScroll={(e) => {
                 const y = e.nativeEvent.contentOffset.y;
-                if (imageOverlay?.scrollOffsetY != null) imageOverlay.scrollOffsetY.value = y;
-                if (embed) embed.scrollY.value = y;
+                if (imageOverlay?.scrollOffsetY != null) imageOverlay.scrollOffsetY.set(y);
+                if (embed) embed.scrollY.set(y);
               }}
               scrollEventThrottle={16}
               scrollEnabled={embed ? embed.listScrollEnabled : undefined}

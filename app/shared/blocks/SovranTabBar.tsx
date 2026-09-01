@@ -45,18 +45,22 @@ function TabButton({
   }));
 
   const onPressIn = useCallback(() => {
-    scale.value = withTiming(0.88, {
-      duration: 70,
-      easing: Easing.out(Easing.cubic),
-    });
+    scale.set(
+      withTiming(0.88, {
+        duration: 70,
+        easing: Easing.out(Easing.cubic),
+      })
+    );
   }, [scale]);
 
   const onPressOut = useCallback(() => {
-    scale.value = withSpring(1, {
-      damping: 12,
-      stiffness: 380,
-      mass: 0.6,
-    });
+    scale.set(
+      withSpring(1, {
+        damping: 12,
+        stiffness: 380,
+        mass: 0.6,
+      })
+    );
   }, [scale]);
 
   return (

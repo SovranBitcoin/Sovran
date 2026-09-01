@@ -39,10 +39,6 @@
       "Cannot access refs during render",
       "(BuildHIR::lowerExpression) Handle UpdateExpression to variables captured within lambdas."
     ],
-    "features/feed/components/nostr/PostCard.tsx": [
-      "Cannot access refs during render",
-      "This value cannot be modified"
-    ],
     "features/feed/components/thread-embed/EmbedActionBar.tsx": [
       "This value cannot be modified"
     ],
@@ -52,13 +48,10 @@
     "features/feed/components/thread-embed/ThreadEmbedSheet.tsx": [
       "This value cannot be modified"
     ],
-    "features/feed/components/ThreadReplyBar.tsx": [
+    "features/feed/components/ThreadView.tsx": [
       "Cannot access refs during render"
     ],
-    "features/feed/components/ThreadView.tsx": [
-      "This value cannot be modified"
-    ],
-    "features/feed/components/UserFeed.tsx": [
+    "features/feed/hooks/useCardTapGesture.ts": [
       "Cannot access refs during render"
     ],
     "features/feed/hooks/useFeedCardProps.ts": [
@@ -168,13 +161,6 @@
     "shared/blocks/InitializationGate.tsx": [
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ],
-    "shared/blocks/SovranTabBar.tsx": [
-      "This value cannot be modified"
-    ],
-    "shared/blocks/status/LoadingIndicator.tsx": [
-      "Cannot access refs during render",
-      "Cannot reassign variables declared outside of the component/hook"
-    ],
     "shared/hooks/useNostrProfileMetadata.ts": [
       "Cannot access refs during render",
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
@@ -213,12 +199,8 @@
     "shared/lib/utils.tsx": [
       "This value cannot be modified"
     ],
-    "shared/providers/BackgroundProvider.tsx": [
-      "This value cannot be modified",
-      "Existing memoization could not be preserved"
-    ],
     "shared/providers/CocoProvider.tsx": [
-      "Support value blocks (conditional, logical, optional chaining, etc) within a try/catch statement"
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ],
     "shared/providers/NostrKeysProvider.tsx": [
       "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause",
@@ -227,12 +209,6 @@
     ],
     "shared/providers/PricelistProvider.tsx": [
       "(BuildHIR::lowerExpression) Handle UpdateExpression to variables captured within lambdas."
-    ],
-    "shared/providers/WalletContextProvider.tsx": [
-      "Cannot access refs during render"
-    ],
-    "shared/ui/composed/BootEntrance.tsx": [
-      "Cannot access refs during render"
     ],
     "shared/ui/composed/BottomButtons.tsx": [
       "(BuildHIR::node.lowerReorderableExpression) Expression type `ConditionalExpression` cannot be safely reordered"
@@ -261,15 +237,6 @@
     ],
     "shared/ui/composed/search/SearchOverlay.tsx": [
       "(BuildHIR::node.lowerReorderableExpression) Expression type `TemplateLiteral` cannot be safely reordered"
-    ],
-    "shared/ui/primitives/Skeleton.tsx": [
-      "Cannot reassign variables declared outside of the component/hook"
-    ],
-    "shared/ui/primitives/Spinner.tsx": [
-      "Cannot reassign variables declared outside of the component/hook"
-    ],
-    "shared/ui/primitives/Text.tsx": [
-      "Cannot reassign variables declared outside of the component/hook"
     ]
   }
 }

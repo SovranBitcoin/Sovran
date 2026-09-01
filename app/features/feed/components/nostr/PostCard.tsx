@@ -18,10 +18,9 @@ import Reanimated, {
   useAnimatedStyle,
   withDelay,
   withTiming,
-  runOnJS,
   Easing,
 } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { GestureDetector } from 'react-native-gesture-handler';
 
 import type { FeedEvent, NoteMetrics, ProfileInfo } from './feedTypes';
 import { DeletedTombstone } from './DeletedTombstone';
@@ -33,6 +32,7 @@ import { TierBadge } from '@/shared/ui/composed/TierBadge';
 import { formatDate, formatRelativeUnixSeconds } from '@/shared/lib/date';
 import { tryNpubEncode } from './feedParse';
 import { useQuotePost } from '@/features/feed/lib/useQuotePost';
+import { useCardTapGesture } from '@/features/feed/hooks/useCardTapGesture';
 import { NoteContent, NOTE_CONTENT_FONT_SIZE, NOTE_CONTENT_LINE_HEIGHT } from './NoteContent';
 import { useProfile } from '@/shared/lib/nostr/useEntityCache';
 import { MetricsFooter, POST_ACTION_ICON_SIZES } from './MetricsFooter';
@@ -331,37 +331,26 @@ export const PostCard = React.memo(function PostCard({
     [quotePost, event, profile]
   );
 
-  const suppressThreadTapRef = useRef(false);
+  const {
+    gesture: tapGesture,
+    suppress: suppressThreadTap,
+    release: releaseThreadTap,
+    handleTap: handleThreadPress,
+  } = useCardTapGesture(navigateToThread);
 
   const handleNestedPressIn = useCallback(() => {
-    suppressThreadTapRef.current = true;
+    suppressThreadTap();
     onNestedProfilePressIn?.();
-  }, [onNestedProfilePressIn]);
+  }, [suppressThreadTap, onNestedProfilePressIn]);
 
   const handleNestedPressOut = useCallback(() => {
-    setTimeout(() => {
-      suppressThreadTapRef.current = false;
-    }, 0);
+    releaseThreadTap();
     onNestedProfilePressOut?.();
-  }, [onNestedProfilePressOut]);
-
-  const handleThreadPress = useCallback(() => {
-    if (suppressThreadTapRef.current) return;
-    navigateToThread();
-  }, [navigateToThread]);
+  }, [releaseThreadTap, onNestedProfilePressOut]);
 
   const handleMorePress = useCallback(() => {
     onMorePress?.();
   }, [onMorePress]);
-
-  const tapGesture = useMemo(
-    () =>
-      Gesture.Tap().onEnd(() => {
-        'worklet';
-        runOnJS(handleThreadPress)();
-      }),
-    [handleThreadPress]
-  );
 
   // Delete-requested: replace the whole card with the tombstone. Placed after
   // all hooks so rules-of-hooks hold across the flip.
@@ -617,7 +606,7 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
   const revealOnSettle = useCallback(() => {
     if (revealedRef.current) return;
     revealedRef.current = true;
-    revealOpacity.value = withTiming(1, { duration: 160, easing: Easing.out(Easing.cubic) });
+    revealOpacity.set(withTiming(1, { duration: 160, easing: Easing.out(Easing.cubic) }));
   }, [revealOpacity]);
 
   if (variant === 'thread-target') {

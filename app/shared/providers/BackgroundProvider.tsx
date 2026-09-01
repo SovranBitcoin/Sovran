@@ -122,7 +122,7 @@ export function BackgroundProvider({ children }: BackgroundProviderProps) {
       const bgOpacity = config.backgroundOpacity ?? 1;
 
       // Skip if mode and opacity haven't changed — avoids redundant animations on tab refocus
-      if (blurMode.value === targetMode && backgroundOpacity.value === bgOpacity) {
+      if (blurMode.get() === targetMode && backgroundOpacity.get() === bgOpacity) {
         return;
       }
 
@@ -138,30 +138,30 @@ export function BackgroundProvider({ children }: BackgroundProviderProps) {
       const bgColor = config.backgroundColor ?? ''; // Empty string = use theme default
 
       // Animate to new values
-      blurMode.value = targetMode;
-      blurIntensity.value = withTiming(intensity, ANIMATION_CONFIG);
-      blurGradientStart.value = withTiming(gradientStart, ANIMATION_CONFIG);
-      blurGradientEnd.value = withTiming(gradientEnd, ANIMATION_CONFIG);
-      backgroundOpacity.value = withTiming(bgOpacity, ANIMATION_CONFIG);
-      backgroundColor.value = bgColor; // Color changes instantly (no animation)
+      blurMode.set(targetMode);
+      blurIntensity.set(withTiming(intensity, ANIMATION_CONFIG));
+      blurGradientStart.set(withTiming(gradientStart, ANIMATION_CONFIG));
+      blurGradientEnd.set(withTiming(gradientEnd, ANIMATION_CONFIG));
+      backgroundOpacity.set(withTiming(bgOpacity, ANIMATION_CONFIG));
+      backgroundColor.set(bgColor); // Color changes instantly (no animation)
 
       // Animate opacity based on mode
       switch (config.blurMode) {
         case 'none':
-          partialBlurOpacity.value = withTiming(0, ANIMATION_CONFIG);
-          fullBlurOpacity.value = withTiming(0, ANIMATION_CONFIG);
+          partialBlurOpacity.set(withTiming(0, ANIMATION_CONFIG));
+          fullBlurOpacity.set(withTiming(0, ANIMATION_CONFIG));
           break;
         case 'partial':
-          partialBlurOpacity.value = withTiming(1, ANIMATION_CONFIG);
-          fullBlurOpacity.value = withTiming(0, ANIMATION_CONFIG);
+          partialBlurOpacity.set(withTiming(1, ANIMATION_CONFIG));
+          fullBlurOpacity.set(withTiming(0, ANIMATION_CONFIG));
           break;
         case 'full':
-          partialBlurOpacity.value = withTiming(0, ANIMATION_CONFIG);
-          fullBlurOpacity.value = withTiming(1, ANIMATION_CONFIG);
+          partialBlurOpacity.set(withTiming(0, ANIMATION_CONFIG));
+          fullBlurOpacity.set(withTiming(1, ANIMATION_CONFIG));
           break;
         case 'gradient':
-          partialBlurOpacity.value = withTiming(0, ANIMATION_CONFIG);
-          fullBlurOpacity.value = withTiming(0, ANIMATION_CONFIG);
+          partialBlurOpacity.set(withTiming(0, ANIMATION_CONFIG));
+          fullBlurOpacity.set(withTiming(0, ANIMATION_CONFIG));
           break;
       }
     },

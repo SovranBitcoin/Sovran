@@ -41,13 +41,13 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
 import { withAlpha } from '@/shared/lib/color';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useCardTapGesture } from '@/features/feed/hooks/useCardTapGesture';
+import { GestureDetector } from 'react-native-gesture-handler';
 import Reanimated, {
   useSharedValue,
   useAnimatedStyle,
   withDelay,
   withTiming,
-  runOnJS,
   Easing,
 } from 'react-native-reanimated';
 
@@ -221,31 +221,11 @@ export const RepostCard = React.memo(function RepostCard({
     });
   }, [threadEventId, getThreadContext, originalEvent, _repostEvent]);
 
-  const suppressThreadTapRef = useRef(false);
-
-  const suppressThreadTapStart = useCallback(() => {
-    suppressThreadTapRef.current = true;
-  }, []);
-
-  const suppressThreadTapEnd = useCallback(() => {
-    setTimeout(() => {
-      suppressThreadTapRef.current = false;
-    }, 0);
-  }, []);
-
-  const handleThreadPress = useCallback(() => {
-    if (suppressThreadTapRef.current) return;
-    navigateToThread();
-  }, [navigateToThread]);
-
-  const tapGesture = useMemo(
-    () =>
-      Gesture.Tap().onEnd(() => {
-        'worklet';
-        runOnJS(handleThreadPress)();
-      }),
-    [handleThreadPress]
-  );
+  const {
+    gesture: tapGesture,
+    suppress: suppressThreadTapStart,
+    release: suppressThreadTapEnd,
+  } = useCardTapGesture(navigateToThread);
 
   return (
     <GestureDetector gesture={tapGesture}>

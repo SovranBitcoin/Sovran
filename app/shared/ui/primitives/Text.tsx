@@ -5,7 +5,6 @@ import {
   ColorValue,
   View,
   type StyleProp,
-  type LayoutChangeEvent,
   type ViewStyle,
 } from 'react-native';
 import { withAlpha } from '@/shared/lib/color';
@@ -305,8 +304,6 @@ type TextLoadingPlaceholderProps = {
   visualDisabled?: boolean;
 };
 
-let textLoadingVisualInstance = 0;
-
 function TextLoadingPlaceholder({
   children,
   fallback,
@@ -323,19 +320,14 @@ function TextLoadingPlaceholder({
   visualExtra,
   visualDisabled,
 }: TextLoadingPlaceholderProps): React.ReactElement {
-  const instanceKeyRef = React.useRef<string | null>(null);
-  if (instanceKeyRef.current === null) {
-    textLoadingVisualInstance += 1;
-    instanceKeyRef.current = `text-loading:${textLoadingVisualInstance}`;
-  }
   const placeholderText =
     placeholder ?? children ?? (typeof fallback === 'string' ? fallback : '\u00A0');
-  const layout = useVisualLayoutLogger({
+  const { ref: attachLayoutNode, onLayout: reportLayout } = useVisualLayoutLogger({
     enabled: visualDisabled !== true,
     scope: visualScope,
     surface: visualSurface,
     component: visualComponent,
-    itemKey: visualKey ? visualLayoutScopePart(visualKey) : instanceKeyRef.current,
+    itemKey: visualKey ? visualLayoutScopePart(visualKey) : undefined,
     itemType: 'text-loading',
     phase: visualPhase,
     extra: () => ({
@@ -345,12 +337,6 @@ function TextLoadingPlaceholder({
       ...(typeof visualExtra === 'function' ? visualExtra() : (visualExtra ?? {})),
     }),
   });
-  const handleLayout = React.useCallback(
-    (event: LayoutChangeEvent) => {
-      layout.onLayout(event);
-    },
-    [layout]
-  );
   const loadingBarStyle = React.useMemo<StyleProp<ViewStyle>>(
     () => [loadingInsetStyle, { borderRadius: 4, backgroundColor: loadingColor }],
     [loadingColor]
@@ -362,11 +348,11 @@ function TextLoadingPlaceholder({
 
   return (
     <View
-      ref={layout.ref}
+      ref={attachLayoutNode}
       collapsable={false}
       pointerEvents="none"
       style={loadingWrapperStyle}
-      onLayout={handleLayout}>
+      onLayout={reportLayout}>
       <View style={loadingBarStyle} />
       <UntranslatedText size={size} italic={italic} {...textProps} style={hiddenTextCompositeStyle}>
         {placeholderText}

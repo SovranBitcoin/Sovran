@@ -640,7 +640,7 @@ export const NoteContent = React.memo(function NoteContent({
 
   const hasInline = inlineSegments.length > 0;
   const hasBlocks = blockSegments.length > 0;
-  const visualLayout = useVisualLayoutLogger({
+  const { ref: attachVisualLayoutNode, onLayout: reportVisualLayout } = useVisualLayoutLogger({
     scope: `feed.note.${noteKey.slice(0, 12)}`,
     surface: 'feed',
     component: 'NoteContent',
@@ -659,14 +659,14 @@ export const NoteContent = React.memo(function NoteContent({
   // reflows the note — the raw signal for "the post grew/shrank under me".
   const handleNoteLayout = useCallback(
     (e: LayoutChangeEvent) => {
-      visualLayout.onLayout(e);
+      reportVisualLayout(e);
       shift.report('feed.shift.note.height', noteKey, e.nativeEvent.layout.height, {
         contentLength: content.length,
         blockCount: blockSegments.length,
         expanded,
       });
     },
-    [visualLayout, shift, noteKey, content.length, blockSegments.length, expanded]
+    [reportVisualLayout, shift, noteKey, content.length, blockSegments.length, expanded]
   );
   const taggedQuoteIds = useMemo(() => {
     if (!overlayEvent) return [];
@@ -744,7 +744,7 @@ export const NoteContent = React.memo(function NoteContent({
   // while quote cards remain below it when the poll cites another post.
   if (overlayEvent?.kind === POLL_KIND) {
     return (
-      <VStack ref={visualLayout.ref} gap={0} onLayout={handleNoteLayout}>
+      <VStack ref={attachVisualLayoutNode} gap={0} onLayout={handleNoteLayout}>
         <PollCard event={overlayEvent} />
         {blockSegments.map((seg, i) => renderQuoteBlockSegment(seg, i))}
         {taggedQuoteIds.map((id) => renderQuoteCard(id, `q${id}`))}
@@ -753,7 +753,7 @@ export const NoteContent = React.memo(function NoteContent({
   }
 
   return (
-    <VStack ref={visualLayout.ref} gap={0} onLayout={handleNoteLayout}>
+    <VStack ref={attachVisualLayoutNode} gap={0} onLayout={handleNoteLayout}>
       {hasInline && (
         <Text
           size={NOTE_CONTENT_FONT_SIZE}

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, type ViewStyle } from 'react-native';
 import Animated, {
   Easing,
@@ -45,7 +45,7 @@ interface BootEntranceProps {
  */
 export function BootEntrance({ children, style }: BootEntranceProps): React.ReactElement {
   const handoff = useBootSplashHandoff();
-  const initialHandoff = useRef(getBootSplashHandoff()).current;
+  const [initialHandoff] = useState(getBootSplashHandoff);
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
   const hasArmedRef = useRef(initialHandoff);

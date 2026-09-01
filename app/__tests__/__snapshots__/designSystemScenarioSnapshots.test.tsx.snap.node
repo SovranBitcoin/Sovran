@@ -21230,7 +21230,7 @@ exports[`Design System exact structural snapshots renders timeline/cashu-receive
                                   ],
                                   "props": {
                                     "gradientUnits": "userSpaceOnUse",
-                                    "id": "_r_5_",
+                                    "id": "_r_0_",
                                     "x1": "0",
                                     "x2": "0",
                                     "y1": "0",
@@ -21261,7 +21261,7 @@ exports[`Design System exact structural snapshots renders timeline/cashu-receive
                                 "animatedProps": {
                                   "height": 50,
                                 },
-                                "fill": "url(#_r_5_)",
+                                "fill": "url(#_r_0_)",
                                 "rx": 1.5,
                                 "ry": 1.5,
                                 "width": 3,
@@ -23302,7 +23302,7 @@ exports[`Design System exact structural snapshots renders timeline/cashu-send-ro
                                   ],
                                   "props": {
                                     "gradientUnits": "userSpaceOnUse",
-                                    "id": "_r_4_",
+                                    "id": "_r_0_",
                                     "x1": "0",
                                     "x2": "0",
                                     "y1": "0",
@@ -23333,7 +23333,7 @@ exports[`Design System exact structural snapshots renders timeline/cashu-send-ro
                                 "animatedProps": {
                                   "height": 50,
                                 },
-                                "fill": "url(#_r_4_)",
+                                "fill": "url(#_r_0_)",
                                 "rx": 1.5,
                                 "ry": 1.5,
                                 "width": 3,
@@ -25389,7 +25389,7 @@ exports[`Design System exact structural snapshots renders timeline/lightning-min
                                   ],
                                   "props": {
                                     "gradientUnits": "userSpaceOnUse",
-                                    "id": "_r_8_",
+                                    "id": "_r_0_",
                                     "x1": "0",
                                     "x2": "0",
                                     "y1": "0",
@@ -25420,7 +25420,7 @@ exports[`Design System exact structural snapshots renders timeline/lightning-min
                                 "animatedProps": {
                                   "height": 50,
                                 },
-                                "fill": "url(#_r_8_)",
+                                "fill": "url(#_r_0_)",
                                 "rx": 1.5,
                                 "ry": 1.5,
                                 "width": 3,
