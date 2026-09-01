@@ -8,6 +8,7 @@ import {
   type WalletBalanceBreakdown,
 } from "../balance/breakdown";
 import { useColadaManager } from "./ColadaProvider";
+import { useLatestRef } from "./useLatestRef";
 
 // Pending sends are recent; the first history page is enough to total them
 // (matches how the app previously filtered usePaginatedHistory()).
@@ -22,6 +23,51 @@ interface NumericSnapshot {
 }
 
 const EMPTY_SNAPSHOT: NumericSnapshot = { spendable: 0, reserved: 0, total: 0 };
+
+/**
+ * One coco read of every figure the breakdown shows, or `null` when the read
+ * failed. Module scope on purpose: the React Compiler cannot lower a `try`
+ * whose body contains `??`/ternaries, so leaving this inline is what made the
+ * hook uncompilable. Nothing here touches React.
+ */
+async function readBreakdown(
+  mgr: Manager,
+  unit: string,
+): Promise<{
+  snapshot: NumericSnapshot;
+  byMint: BalancesByMint;
+  pending: number;
+  redeeming: number;
+} | null> {
+  try {
+    const [total, perMint, historyPage, inFlight] = await Promise.all([
+      mgr.wallet.balances.total({ units: [unit] }),
+      mgr.wallet.balances.byMint({ units: [unit] }),
+      mgr.history.getPaginatedHistory(0, PENDING_PAGE_SIZE).catch(() => []),
+      mgr.ops.receive.listInFlight().catch(() => []),
+    ]);
+    return {
+      snapshot: {
+        spendable: amountToNumber(total.spendable),
+        reserved: amountToNumber(total.reserved),
+        total: amountToNumber(total.total),
+      },
+      byMint: perMint,
+      pending: sumReservedSends(
+        (historyPage ?? []).filter((entry) => (entry.unit ?? "sat") === unit),
+      ),
+      redeeming: inFlight
+        .filter((op) => (op.unit ?? "sat") === unit)
+        .reduce((sum, op) => sum + amountToNumber(op.amount), 0),
+    };
+  } catch (err) {
+    logger.warn("balance.breakdown.reload_failed", {
+      unit,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
 
 /**
  * The wallet balance breakdown: spendable / reserved / total from coco's
@@ -41,8 +87,11 @@ export function useColadaBalance(unit = "sat"): WalletBalanceBreakdown {
   const [redeeming, setRedeeming] = useState(0);
 
   const mountedRef = useRef(true);
-  const managerRef = useRef<Manager>(manager);
-  managerRef.current = manager;
+  // Written in useInsertionEffect rather than in render: a ref write in the
+  // render body switches the React Compiler off for this whole hook. Every
+  // read is from `reload`, which only ever runs from an effect or a coco
+  // event, so it still observes the same manager the render committed.
+  const managerRef = useLatestRef(manager);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -51,43 +100,31 @@ export function useColadaBalance(unit = "sat"): WalletBalanceBreakdown {
     };
   }, []);
 
+  // The dep list names the ref too. It used to read `[unit]` while the body
+  // also reached `managerRef`, and a memo the compiler cannot preserve
+  // switches the compiler off for the whole hook. Keeping an explicit
+  // useCallback (rather than letting the compiler infer one) matters here:
+  // the effect below depends on `reload`, so an identity that churned every
+  // render would re-enter it every render — a balance-reload loop against the
+  // mint in any environment where the compiler is not running, Jest included.
   const reload = useCallback(async () => {
+    // Pin the manager this read belongs to. A profile switch swaps the manager
+    // while a read is in flight — the outgoing manager's event subscription is
+    // still attached until its cleanup runs — and without this the slower of
+    // the two reads wins, which can paint the PREVIOUS profile's balance over
+    // the current one.
     const mgr = managerRef.current;
-    try {
-      const [total, perMint, historyPage, inFlight] = await Promise.all([
-        mgr.wallet.balances.total({ units: [unit] }),
-        mgr.wallet.balances.byMint({ units: [unit] }),
-        mgr.history.getPaginatedHistory(0, PENDING_PAGE_SIZE).catch(() => []),
-        mgr.ops.receive.listInFlight().catch(() => []),
-      ]);
-      if (!mountedRef.current) return;
-      setSnapshot({
-        spendable: amountToNumber(total.spendable),
-        reserved: amountToNumber(total.reserved),
-        total: amountToNumber(total.total),
-      });
-      setByMint(perMint);
-      setPending(
-        sumReservedSends(
-          (historyPage ?? []).filter((entry) => (entry.unit ?? "sat") === unit),
-        ),
-      );
-      setRedeeming(
-        inFlight
-          .filter((op) => (op.unit ?? "sat") === unit)
-          .reduce((sum, op) => sum + amountToNumber(op.amount), 0),
-      );
-      logger.debug("balance.breakdown.reload", {
-        unit,
-        mintCount: Object.keys(perMint).length,
-      });
-    } catch (err) {
-      logger.warn("balance.breakdown.reload_failed", {
-        unit,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }, [unit]);
+    const next = await readBreakdown(mgr, unit);
+    if (!next || !mountedRef.current || managerRef.current !== mgr) return;
+    setSnapshot(next.snapshot);
+    setByMint(next.byMint);
+    setPending(next.pending);
+    setRedeeming(next.redeeming);
+    logger.debug("balance.breakdown.reload", {
+      unit,
+      mintCount: Object.keys(next.byMint).length,
+    });
+  }, [unit, managerRef]);
 
   const reloadRef = useRef(reload);
   useEffect(() => {
