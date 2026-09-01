@@ -84,6 +84,9 @@ const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' }
 // 10s `updateMint` timeout so one dead mint can't visibly gate the list.
 const FIRST_OPEN_DEADLINE_MS = 3000;
 
+/** Authoritative active unit for flow resets, read straight off the store. */
+const getActiveUnit = () => useMintStore.getState().activeUnit;
+
 export function SovranColadaProvider({ children }: { children: React.ReactNode }) {
   const manager = useManager();
   const { keys } = useNostrKeysContext();
@@ -144,6 +147,10 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   // a modal pushed before the prior screen unmounts — each see the refresh
   // instead of clobbering the prior subscriber's slot.
   const p2pkKeyRefreshedSubscribers = useRef(new Set<(newKey: string | null) => void>());
+  // One stable accessor for the live manager. Five call sites used to mint
+  // `() => manager` inline, so every render handed the engine, the operations
+  // override and the notifications factory a fresh function identity.
+  const getManager = useCallback(() => manager, [manager]);
   const getNpub = useCallback(() => npubRef.current, [npubRef]);
   const getBitchatIdentityMaterial = useCallback(() => {
     const privateKey = privateKeyRef.current;
@@ -383,8 +390,8 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     () =>
       ({
         ...instance.operations,
-        executeReceive: createSovranExecuteReceive(() => manager, getOffline),
-        executeMintQuote: createSovranExecuteMintQuote(() => manager),
+        executeReceive: createSovranExecuteReceive(getManager, getOffline),
+        executeMintQuote: createSovranExecuteMintQuote(getManager),
         // Stage 2 of recipient resolution: hex pubkey → Nostr kind-0 profile.
         // Stage 1 (NIP-05 → pubkey) is shipped by colada's default
         // operation set; this one has no default because NDK / cache wiring
@@ -455,7 +462,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
           }
         },
       }) as MachineOperations,
-    [getOffline, instance, manager, ndkRef]
+    [getOffline, getManager, instance, ndkRef]
   );
 
   const actions = useMemo(() => createSovranScreenActionHandlers(), []);
@@ -554,31 +561,39 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
       createSovranHandlers({
         machine,
         onOptionDismiss: () => refs.getOptionDismiss()?.(),
-        getManager: () => manager,
+        getManager,
         getNpub,
         getBitchatIdentityMaterial,
         deliverContactEcashDm,
       }),
-    [manager, getNpub, getBitchatIdentityMaterial, deliverContactEcashDm]
+    [getManager, getNpub, getBitchatIdentityMaterial, deliverContactEcashDm]
+  );
+
+  // Built once per manager, not per render: it lands in Colada's context, so a
+  // fresh object here re-rendered every payment surface below the provider.
+  const notifications = useMemo(
+    () =>
+      createSovranNotifications({
+        getPubkey: () => pubkeyRef.current,
+        getPrivateKey: () => privateKeyRef.current,
+        getManager,
+        onP2pkKeyRefreshed: (newKey) => {
+          for (const subscriber of p2pkKeyRefreshedSubscribers.current) {
+            subscriber(newKey);
+          }
+        },
+      }),
+    [getManager, pubkeyRef, privateKeyRef]
   );
 
   return (
     <ColadaProviderBase
       handlers={handlers}
       instance={instance}
-      getManager={() => manager}
+      getManager={getManager}
       annotationStore={transactionAnnotationAdapter}
       operations={operationsOverride}
-      notifications={createSovranNotifications({
-        getPubkey: () => pubkeyRef.current,
-        getPrivateKey: () => privateKeyRef.current,
-        getManager: () => manager,
-        onP2pkKeyRefreshed: (newKey) => {
-          for (const subscriber of p2pkKeyRefreshedSubscribers.current) {
-            subscriber(newKey);
-          }
-        },
-      })}
+      notifications={notifications}
       actions={actions}
       screenActionsBridge={screenActionsBridge}
       clipboardAdapter={clipboardAdapter}
@@ -591,7 +606,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
       // Authoritative active unit for flow resets. Screens no longer need to
       // bind `unit: activeUnit` — explicit `usePaymentFlowMachine({ unit })`
       // remains only for deliberate pins (NearPay sat, rail routes).
-      getUnit={() => useMintStore.getState().activeUnit}
+      getUnit={getActiveUnit}
       navigation={navigation}>
       {children}
     </ColadaProviderBase>

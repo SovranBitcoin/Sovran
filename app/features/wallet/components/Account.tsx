@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { StyleSheet, type LayoutChangeEvent } from 'react-native';
 import PagerView, {
   type PageScrollStateChangedNativeEvent,
@@ -80,8 +81,7 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
   // Tracks the page the PAGER currently sits on, so external unit changes
   // move the pager but pager-driven changes don't re-set the same page.
   const pagerPositionRef = useRef(pageIndex);
-  const pageIndexRef = useRef(pageIndex);
-  pageIndexRef.current = pageIndex;
+  const pageIndexRef = useLatestRef(pageIndex);
 
   useEffect(() => {
     if (pagerPositionRef.current === pageIndex) return;

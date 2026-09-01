@@ -861,12 +861,14 @@ export default function RootLayout() {
   const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
 
   // Log the moment fonts finish loading — first-launch font-loading is a
-  // common contributor to time-to-first-paint.
-  const fontsReadyLogged = useRef(false);
-  if ((fontsLoaded || fontError) && !fontsReadyLogged.current) {
-    fontsReadyLogged.current = true;
+  // common contributor to time-to-first-paint. In an effect, not in render:
+  // a render-time ref write is impure, and the commit that makes the fonts
+  // available is the moment that actually matters for paint.
+  const fontsSettled = fontsLoaded || !!fontError;
+  useEffect(() => {
+    if (!fontsSettled) return;
     initLog('Fonts', `loaded=${fontsLoaded} error=${!!fontError}`);
-  }
+  }, [fontsSettled, fontsLoaded, fontError]);
 
   initLog(
     'RootLayout',

@@ -1,9 +1,6 @@
 {
   "$comment": "Files containing at least one function the React Compiler cannot compile. Ratcheted by scripts/check-react-compiler.mjs — this list may only shrink. Regenerate with `bun run check:react-compiler:update`.",
   "bailouts": {
-    "app/_layout.tsx": [
-      "Cannot access refs during render"
-    ],
     "app/(drawer)/_layout.tsx": [
       "Hooks may not be referenced as normal values, they must be called. See https://react.dev/reference/rules/react-calls-components-and-hooks#never-pass-around-hook",
       "Cannot access refs during render"
@@ -30,8 +27,7 @@
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ],
     "features/feed/components/nostr/NoteContent.tsx": [
-      "Cannot access refs during render",
-      "(BuildHIR::lowerExpression) Handle UpdateExpression to variables captured within lambdas."
+      "Cannot access refs during render"
     ],
     "features/feed/components/ThreadView.tsx": [
       "Cannot access refs during render"
@@ -119,9 +115,6 @@
     ],
     "features/transactions/screens/SwapTransactionScreen.tsx": [
       "Support value blocks (conditional, logical, optional chaining, etc) within a try/catch statement"
-    ],
-    "features/wallet/components/Account.tsx": [
-      "Cannot access refs during render"
     ],
     "features/whitenoise/WhitenoiseProvider.tsx": [
       "Existing memoization could not be preserved"

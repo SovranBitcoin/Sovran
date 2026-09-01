@@ -1,6 +1,6 @@
 import { getCornerStyle } from './CapsuleButton.corners';
-import React, { useMemo, useRef } from 'react';
-import { StyleSheet } from 'react-native';
+import React, { useCallback, useMemo, useRef } from 'react';
+import { StyleSheet, type GestureResponderEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { withAlpha } from '@/shared/lib/color';
 
@@ -24,6 +24,70 @@ import type { CapsuleButtonProps } from './CapsuleButton.types';
 // (the iOS-26 tap-swallow that forced `isInteractive` off in 17b70500). A
 // gesture-handler recognizer arbitrates natively alongside the glass, so the tap
 // fires reliably — critical here since these are the Send/Receive entry points.
+/** Drag distance that cancels the fallback, matching RNGH Tap's own maxDistance. */
+const TAP_FALLBACK_MAX_DRIFT_PX = 10;
+/** How long to wait for RNGH to claim the tap before the responder fires it. */
+const TAP_FALLBACK_DELAY_MS = 180;
+
+/**
+ * RNGH tap with a plain-responder fallback for synthesized taps.
+ *
+ * Synthesized taps (VoiceOver activation, HID automation like serve-sim) reach
+ * the JS touch responder but the RNGH Tap recognizer never fires for them next
+ * to interactive glass. So the responder fires the press itself when RNGH has
+ * stayed silent for a beat after touch-up; real finger taps recognize instantly
+ * and suppress the fallback.
+ *
+ * The three tracking refs live in here rather than in the button: the gesture's
+ * `onEnd` closes over one of them and is handed to `Gesture.Tap()` during
+ * render, which React Compiler reads as a render-time ref access — enough to
+ * skip the whole button.
+ */
+function useGlassTapFallback(onPress: () => void) {
+  const rnghFired = useRef(false);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const moved = useRef(false);
+
+  const gesture = useMemo(
+    () =>
+      Gesture.Tap()
+        .runOnJS(true)
+        .onEnd((_event, success) => {
+          if (success) {
+            rnghFired.current = true;
+            onPress();
+          }
+        }),
+    [onPress]
+  );
+
+  const onTouchStart = useCallback((e: GestureResponderEvent) => {
+    rnghFired.current = false;
+    moved.current = false;
+    touchStart.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
+  }, []);
+
+  const onTouchMove = useCallback((e: GestureResponderEvent) => {
+    const start = touchStart.current;
+    if (!start) return;
+    if (
+      Math.abs(e.nativeEvent.pageX - start.x) > TAP_FALLBACK_MAX_DRIFT_PX ||
+      Math.abs(e.nativeEvent.pageY - start.y) > TAP_FALLBACK_MAX_DRIFT_PX
+    ) {
+      moved.current = true;
+    }
+  }, []);
+
+  const onTouchEnd = useCallback(() => {
+    if (moved.current) return;
+    setTimeout(() => {
+      if (!rnghFired.current) onPress();
+    }, TAP_FALLBACK_DELAY_MS);
+  }, [onPress]);
+
+  return { gesture, onTouchStart, onTouchMove, onTouchEnd };
+}
+
 export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactElement {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const {
@@ -56,57 +120,18 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
     if (result instanceof Promise) await result;
   });
 
-  // Synthesized taps (VoiceOver activation, HID automation like serve-sim)
-  // reach the JS touch responder but the RNGH Tap recognizer never fires for
-  // them next to the interactive glass. Fall back to firing the press from
-  // the plain responder when RNGH stays silent for a beat after touch-up;
-  // real finger taps recognize instantly and suppress the fallback. A >10pt
-  // drag cancels it, matching Tap's own maxDistance.
-  const rnghFired = useRef(false);
-  const touchStart = useRef<{ x: number; y: number } | null>(null);
-  const moved = useRef(false);
-
-  const tap = useMemo(
-    () =>
-      Gesture.Tap()
-        .runOnJS(true)
-        .onEnd((_event, success) => {
-          if (success) {
-            rnghFired.current = true;
-            void guardedPress();
-          }
-        }),
-    [guardedPress]
-  );
+  const { gesture, onTouchStart, onTouchMove, onTouchEnd } = useGlassTapFallback(guardedPress);
 
   return (
-    <GestureDetector gesture={tap}>
+    <GestureDetector gesture={gesture}>
       <GlassView
         testID={testID}
         accessible
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label}
-        onTouchStart={(e) => {
-          rnghFired.current = false;
-          moved.current = false;
-          touchStart.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
-        }}
-        onTouchMove={(e) => {
-          const start = touchStart.current;
-          if (!start) return;
-          if (
-            Math.abs(e.nativeEvent.pageX - start.x) > 10 ||
-            Math.abs(e.nativeEvent.pageY - start.y) > 10
-          ) {
-            moved.current = true;
-          }
-        }}
-        onTouchEnd={() => {
-          if (moved.current) return;
-          setTimeout(() => {
-            if (!rnghFired.current) void guardedPress();
-          }, 180);
-        }}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
         glassEffectStyle="regular"
         isInteractive
         tintColor={tintColor}

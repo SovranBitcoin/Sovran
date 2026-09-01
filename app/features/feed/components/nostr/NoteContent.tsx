@@ -129,6 +129,60 @@ const InlineLink = React.memo(function InlineLink({
 
 // ─── Block renderers ─────────────────────────────────────────────────────────
 
+/** Relay cards past this ordinal render without fetching NIP-11. */
+const RELAY_NIP11_FETCH_CAP = 3;
+
+/**
+ * Tap handling for an inline video block: measure the thumbnail and hand its
+ * rect to the overlay, or fall back to the caller's tap / the OS browser.
+ *
+ * The container ref lives in here because the gesture's `onEnd` closes over it
+ * and is handed to `Gesture.Tap()` during render — which React Compiler reads
+ * as a render-time ref access, and a note body is on the feed's hot path.
+ */
+function useVideoTapGesture({
+  isAndroid,
+  onBeforeOpen,
+  onTap,
+  openInBrowser,
+  openOverlay,
+  overlayLayout,
+}: {
+  isAndroid: boolean;
+  onBeforeOpen?: () => void;
+  onTap?: () => void;
+  openInBrowser: () => void | Promise<void>;
+  openOverlay?: (layout: ImageOverlayLayout) => void;
+  overlayLayout?: Omit<ImageOverlayLayout, 'pageX' | 'pageY' | 'width' | 'height'>;
+}) {
+  const containerRef = useRef<React.ComponentRef<typeof View>>(null);
+
+  const handleTap = useCallback(() => {
+    if (openOverlay && overlayLayout && containerRef.current) {
+      onBeforeOpen?.();
+      containerRef.current.measureInWindow(
+        (pageX: number, pageY: number, width: number, height: number) => {
+          openOverlay({ ...overlayLayout, pageX, pageY, width, height });
+        }
+      );
+    } else if (isAndroid) {
+      void (onTap ?? openInBrowser)();
+    } else if (onTap) {
+      onTap();
+    }
+  }, [openOverlay, overlayLayout, onBeforeOpen, onTap, isAndroid, openInBrowser]);
+
+  const tapGesture = useMemo(() => {
+    if (!isAndroid && !handleTap) return undefined;
+    return Gesture.Tap().onEnd(() => {
+      'worklet';
+      runOnJS(handleTap)();
+    });
+  }, [isAndroid, handleTap]);
+
+  return { containerRef, tapGesture };
+}
+
 const VideoBlockInner = React.memo(function VideoBlockInner({
   url,
   onTap,
@@ -146,7 +200,6 @@ const VideoBlockInner = React.memo(function VideoBlockInner({
   aspectRatio?: number;
 }) {
   const surface = useThemeColor('surface');
-  const containerRef = useRef<React.ComponentRef<typeof View>>(null);
   const isAndroid = Platform.OS === 'android';
   const openInBrowser = useCallback(async () => {
     const result = await openExternalUrl(url);
@@ -160,28 +213,14 @@ const VideoBlockInner = React.memo(function VideoBlockInner({
     p.muted = true;
   });
 
-  const handleTap = useCallback(() => {
-    if (openOverlay && overlayLayout && containerRef.current) {
-      onBeforeOpen?.();
-      containerRef.current.measureInWindow(
-        (pageX: number, pageY: number, width: number, height: number) => {
-          openOverlay({ ...overlayLayout, pageX, pageY, width, height });
-        }
-      );
-    } else if (isAndroid) {
-      (onTap ?? openInBrowser)();
-    } else if (onTap) {
-      onTap();
-    }
-  }, [openOverlay, overlayLayout, onBeforeOpen, onTap, isAndroid, openInBrowser]);
-
-  const tapGesture = useMemo(() => {
-    if (!isAndroid && !handleTap) return undefined;
-    return Gesture.Tap().onEnd(() => {
-      'worklet';
-      runOnJS(handleTap)();
-    });
-  }, [isAndroid, handleTap]);
+  const { containerRef, tapGesture } = useVideoTapGesture({
+    isAndroid,
+    onBeforeOpen,
+    onTap,
+    openInBrowser,
+    openOverlay,
+    overlayLayout,
+  });
 
   const hasTap = !!(openOverlay && overlayLayout) || !!onTap;
   const aspectRatio = overlayLayout?.aspectRatio ?? aspectRatioProp ?? 16 / 9;
@@ -790,10 +829,18 @@ export const NoteContent = React.memo(function NoteContent({
           const imageUrls = blockSegments
             .filter((s): s is typeof s & { kind: 'image' } => s.kind === 'image')
             .map((s) => s.url);
-          // Fan-out cap: only the first 3 relay cards per note fetch NIP-11
+          // Fan-out cap: only the first few relay cards per note fetch NIP-11
           // (a pasted NIP-65-style relay dump must not fan out N HTTP GETs);
-          // the rest render the static non-fetching row.
-          let relayCount = 0;
+          // the rest render the static non-fetching row. Resolved up front —
+          // counting inside the map's callback mutates a captured variable,
+          // which React Compiler cannot lower.
+          const relayOrdinalBySegment = new Map<number, number>();
+          for (let index = 0, seen = 0; index < blockSegments.length; index += 1) {
+            if (blockSegments[index].kind === 'relay') {
+              relayOrdinalBySegment.set(index, seen);
+              seen += 1;
+            }
+          }
           return blockSegments.map((seg, i) => {
             switch (seg.kind) {
               case 'image': {
@@ -867,7 +914,13 @@ export const NoteContent = React.memo(function NoteContent({
               case 'lightning':
                 return <LightningBlock key={`b${i}`} meltTarget={seg.meltTarget} />;
               case 'relay':
-                return <RelayCard key={`b${i}`} url={seg.url} noFetch={relayCount++ >= 3} />;
+                return (
+                  <RelayCard
+                    key={`b${i}`}
+                    url={seg.url}
+                    noFetch={(relayOrdinalBySegment.get(i) ?? 0) >= RELAY_NIP11_FETCH_CAP}
+                  />
+                );
               case 'nevent':
               case 'note':
                 return renderQuoteCard(seg.eventId, `b${i}`);
