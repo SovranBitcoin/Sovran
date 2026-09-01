@@ -1,5 +1,5 @@
 {
-  "$comment": "Files containing at least one function the React Compiler cannot compile. Ratcheted by scripts/check-react-compiler.mjs \u2014 this list may only shrink. Regenerate with `bun run check:react-compiler:update`.",
+  "$comment": "Files containing at least one function the React Compiler cannot compile. Ratcheted by scripts/check-react-compiler.mjs — this list may only shrink. Regenerate with `bun run check:react-compiler:update`.",
   "bailouts": {
     "app/_layout.tsx": [
       "Cannot access refs during render"
@@ -280,9 +280,6 @@
       "(BuildHIR::node.lowerReorderableExpression) Expression type `TemplateLiteral` cannot be safely reordered"
     ],
     "shared/ui/composed/SpriteView.tsx": [
-      "Cannot access refs during render"
-    ],
-    "shared/ui/primitives/Button.tsx": [
       "Cannot access refs during render"
     ],
     "shared/ui/primitives/Skeleton.tsx": [

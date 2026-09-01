@@ -45,7 +45,7 @@
  * @see {@link ./Text}
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { StyleProp, ViewStyle, GestureResponderEvent, Platform, StyleSheet } from 'react-native';
 import { withAlpha } from '@/shared/lib/color';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -216,17 +216,28 @@ export const Button = ({
   accessibilityHint,
 }: ButtonProps) => {
   const sz = SIZES[size];
-  const stableContentRef = useRef<{ text?: string | React.ReactNode; icon?: React.ReactNode }>({
-    text,
-    icon,
-  });
-  useEffect(() => {
-    if (!loading) {
-      stableContentRef.current = { text, icon };
-    }
-  }, [icon, loading, text]);
-  const layoutText = loading ? stableContentRef.current.text : text;
-  const layoutIcon = loading ? stableContentRef.current.icon : icon;
+  // Hold the last non-loading content so the button keeps its width while the
+  // spinner shows. Adjusted during render rather than cached in a ref: reading
+  // a ref during render is the rule violation that made the React Compiler skip
+  // this whole component (10 functions), and this component is the app's button
+  // primitive.
+  //
+  // `Object.is`, not `!==`: `ReactNode` admits numbers, and `text={NaN}` would
+  // make a `!==` guard permanently true — an unbounded render loop rather than
+  // the single convergent retry this pattern relies on.
+  //
+  // Cost, measured: when a caller passes an identity-unstable node (an inline
+  // `<Icon/>` from a parent the compiler did not memoize) a non-loading update
+  // costs one extra, discarded render attempt. Only `ModelChip` does that today.
+  const [stableContent, setStableContent] = useState<{
+    text?: React.ReactNode;
+    icon?: React.ReactNode;
+  }>({ text, icon });
+  if (!loading && !(Object.is(stableContent.text, text) && Object.is(stableContent.icon, icon))) {
+    setStableContent({ text, icon });
+  }
+  const layoutText = loading ? stableContent.text : text;
+  const layoutIcon = loading ? stableContent.icon : icon;
   // Derive a sensible default label from `text` when it's a string so the
   // common case ("primary CTA with visible copy") needs no extra prop.
   // Icon-only and ReactNode-text callers must supply `accessibilityLabel`
