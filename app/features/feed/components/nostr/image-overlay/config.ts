@@ -183,7 +183,7 @@ export const CLEAR_URL_DELAY_MS = 50;
 export const CLOSE_REMEASURE_TIMEOUT_MS = 50;
 
 // -----------------------------------------------------------------------------
-// Android backdrop (no real blur without experimentalBlurMethod; solid scrims)
+// Android backdrop (no real blur without a `blurMethod`; solid scrims)
 // -----------------------------------------------------------------------------
 
 /** Android backdrop scrim opacity at full blur intensity (intensity 0..100 → opacity 0..this). */

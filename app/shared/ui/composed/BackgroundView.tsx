@@ -23,7 +23,7 @@ import { retainWallpaperMotion } from '@/shared/lib/theme/wallpaperMotion';
 import { useTheme } from '@/shared/providers/ThemeProvider';
 import { isBackgroundImageTheme, getGradientColorScale } from '@/config/backgroundImageThemes';
 import { View } from '@/shared/ui/primitives/View/View';
-import { BlurView } from '@/shared/ui/primitives/BlurView';
+import { BlurView } from 'expo-blur';
 import { supportsBlur } from '@/shared/lib/version';
 import { Log, log, useRenderLogger } from '@/shared/lib/logger';
 import AnimatedSpriteBackground from './SpriteView';

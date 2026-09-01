@@ -2,7 +2,7 @@ import { type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Toast } from 'heroui-native';
 
-import { BlurView } from '@/shared/ui/primitives/BlurView';
+import { BlurView } from 'expo-blur';
 import { useCapabilities } from '@/shared/ui/capability';
 import {
   TOAST_DANGER_DARK_BG,
@@ -22,7 +22,7 @@ const BLUR_INTENSITY = 60;
 // Semi-transparent tint over the BlurView gives the toast its theme-tinted
 // hue without flattening the frosted-glass look. The frosted branch is
 // gated on Capabilities.frostedSurface (iOS-only): expo-blur on Android
-// renders a weak translucent tint, NOT real blur (no experimentalBlurMethod
+// renders a weak translucent tint, NOT real blur (no `blurMethod`
 // set), so a 0.3-alpha tint over it read as a ghosted ~30%-opaque toast.
 // Non-frosted platforms take the opaque surface branch instead.
 export const TINT_ALPHA = 0.3;

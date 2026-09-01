@@ -13,7 +13,7 @@ import Reanimated, {
   useSharedValue,
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
-import { BlurView } from '@/shared/ui/primitives/BlurView';
+import { BlurView } from 'expo-blur';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import Icon from 'assets/icons';
@@ -298,11 +298,16 @@ export const ImageBlock = React.memo(function ImageBlock({
     intensity: thumbnailBlur.value,
   }));
   /**
-   * Android: expo-blur without experimentalBlurMethod renders as a weak tint
+   * Android: expo-blur without a `blurMethod` renders as a weak tint
    * while paying animatedProps cost every frame. Dim the thumbnail with a
    * plain animated-opacity scrim driven by the same displacement value
    * instead, preserving the intent (hide the duplicate thumbnail while the
    * overlay image is displaced; fade out as the dismiss morph lands on it).
+   *
+   * The split is Android-vs-rest, not Android-vs-iOS: web's `BlurView` is a
+   * CSS `backdrop-filter`, which blurs for real, so it takes the blur path
+   * too. (It rendered nothing at all until the `supportsBlur` wrapper — which
+   * excluded web — was removed.)
    */
   const thumbnailDimStyle = useAnimatedStyle(() => ({
     opacity: (thumbnailBlur.value / THUMB_BLUR_MAX_INTENSITY) * ANDROID_THUMB_DIM_MAX_OPACITY,

@@ -46,8 +46,16 @@ class DeviceChecker {
 const device = new DeviceChecker();
 
 /**
- * Blur effects need iOS 13+ / Android 12+ (API 31) / macOS 14+
- * for consistent vibrancy and native blur support.
+ * Whether the OS can render a native blur: iOS 13+ / Android 12+ (API 31) /
+ * macOS 14+.
+ *
+ * OS support, not what this app actually draws. `expo-blur`'s Android
+ * `blurMethod` defaults to `'none'` and nothing here sets it — and since SDK
+ * 56 a blur method also needs a `blurTarget` ref or it silently falls back to
+ * `'none'`. So on Android a `BlurView` is a translucent tint at ANY version,
+ * and the API-31 threshold buys nothing today. That is why
+ * `Capabilities.frostedSurface`, the design-intent axis, is iOS-only; gate
+ * frosted chrome on that, not on this.
  */
 export const supportsBlur = (): boolean => {
   return (

@@ -25,6 +25,7 @@
  */
 
 import { Platform, type ViewStyle } from 'react-native';
+import type { BlurTint } from 'expo-blur';
 
 // ─── Spacing ──────────────────────────────────────────────────────────────
 // 4-pt grid. Used for `padding`, `margin`, and HStack/VStack `spacing` props.
@@ -237,3 +238,11 @@ export const controlHeight = {
  * custom views at ~44pt, so iOS keeps the 44 diameter (border still applies).
  */
 export const headerButtonSize = Platform.select({ android: 54, default: minTouchTarget });
+
+/**
+ * The tint every chrome surface (bottom button bars, scroll edge fades) blurs
+ * with. iOS's system material renders true frosted glass that composes
+ * correctly through a gradient mask; plain `'dark'` is a tinted overlay, not a
+ * blur, and is all Android has without a `blurMethod` (see `supportsBlur`).
+ */
+export const chromeBlurTint: BlurTint = Platform.OS === 'ios' ? 'systemChromeMaterialDark' : 'dark';

@@ -363,7 +363,7 @@ function AnimatedImageOverlayContent({
   }));
 
   /**
-   * Android backdrop: expo-blur without experimentalBlurMethod renders as a
+   * Android backdrop: expo-blur without a `blurMethod` renders as a
    * weak translucent tint while paying animatedProps cost every frame, so the
    * backdrop is a solid black scrim instead. Its opacity is driven by the
    * same shared value as the blur intensity (0..DISMISS_BLUR_AT_REST →
