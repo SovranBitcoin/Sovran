@@ -60,9 +60,6 @@
     "features/receive/screens/OnchainReceiveScreen.tsx": [
       "Existing memoization could not be preserved"
     ],
-    "features/send/providers/Colada.tsx": [
-      "Cannot access refs during render"
-    ],
     "features/send/screens/OnchainSendScreen.tsx": [
       "Existing memoization could not be preserved"
     ],

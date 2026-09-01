@@ -1,5 +1,3 @@
-import type { MutableRefObject } from 'react';
-
 import { getMintQuoteRemoteState } from '@cashu/coco-core';
 import type { HistoryEntry } from '@cashu/coco-core';
 
@@ -284,13 +282,20 @@ function getSourceLabel(entry: EntryRecord | null): string | null {
 interface CreateSovranScreenActionsBridgeConfig {
   manager: Manager;
   requestCameraPermission: () => Promise<boolean>;
-  p2pkKeyRefreshedSubscribers: MutableRefObject<Set<(newKey: string | null) => void>>;
+  /**
+   * Register for p2pk-keypair regeneration; returns an unsubscribe.
+   *
+   * A function, not the provider's `Set` ref: handing a mutable collection
+   * across this boundary let the callee reach into the caller's storage, and
+   * passing the ref itself is also what kept the provider off React Compiler.
+   */
+  subscribeP2pkKeyRefreshed: (listener: (newKey: string | null) => void) => () => void;
 }
 
 export function createSovranScreenActionsBridge({
   manager,
   requestCameraPermission,
-  p2pkKeyRefreshedSubscribers,
+  subscribeP2pkKeyRefreshed,
 }: CreateSovranScreenActionsBridgeConfig): ScreenActionsBridge {
   let mintInfoCallback: ((entry: EntryRecord) => void) | null = null;
   let mintInfoFetchingUrl: string | null = null;
@@ -383,8 +388,7 @@ export function createSovranScreenActionsBridge({
       const p2pkSubscriber = (newKey: string | null) => {
         bus.publish({ type: 'receive.p2pkKeyChanged', p2pkKey: newKey });
       };
-      p2pkKeyRefreshedSubscribers.current.add(p2pkSubscriber);
-      unsubscribes.push(() => p2pkKeyRefreshedSubscribers.current.delete(p2pkSubscriber));
+      unsubscribes.push(subscribeP2pkKeyRefreshed(p2pkSubscriber));
 
       const publishMintEnrichment = () =>
         bus.publish({

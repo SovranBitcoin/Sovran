@@ -1,4 +1,4 @@
-import { useInsertionEffect, useRef, type MutableRefObject } from 'react';
+import { useCallback, useInsertionEffect, useRef, type MutableRefObject } from 'react';
 
 /**
  * Mirror the latest value of a prop, store slice, or callback into a ref so
@@ -16,4 +16,16 @@ export function useLatestRef<T>(value: T): MutableRefObject<T> {
     ref.current = value;
   });
   return ref;
+}
+
+/**
+ * A stable getter for the latest `value`.
+ *
+ * The ref lives in here so a caller can hand the getter to a factory it builds
+ * during render — an adapter, a bridge, a gesture — without React Compiler
+ * reading that as a render-time ref access and skipping the whole component.
+ */
+export function useLatestGetter<T>(value: T): () => T {
+  const ref = useLatestRef(value);
+  return useCallback(() => ref.current, [ref]);
 }

@@ -36,7 +36,7 @@ import {
   type DeepLinkConfig,
 } from 'wallet/react';
 
-import { useLatestRef } from '@/shared/hooks/useLatestRef';
+import { useLatestGetter, useLatestRef } from '@/shared/hooks/useLatestRef';
 import { parseRawMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
@@ -87,19 +87,155 @@ const FIRST_OPEN_DEADLINE_MS = 3000;
 /** Authoritative active unit for flow resets, read straight off the store. */
 const getActiveUnit = () => useMintStore.getState().activeUnit;
 
+/**
+ * Stage 2 of recipient resolution: hex pubkey → Nostr kind-0 profile.
+ *
+ * Stage 1 (NIP-05 → pubkey) is shipped by colada's default operation set; this
+ * one has no default because NDK / cache wiring is app-specific. Returning null
+ * on any failure is the contract: the machine's resolver treats it as
+ * best-effort cosmetic data and does not block the flow.
+ *
+ * At module scope: its try/catch is full of `??` and `!!` value blocks, which
+ * React Compiler cannot lower, and inline it kept the whole payment provider
+ * from compiling.
+ */
+async function resolveRecipientProfileFromNdk(
+  currentNdk: ReturnType<typeof useNDK>['ndk'],
+  pubkey: string,
+  signal?: AbortSignal
+): Promise<RecipientProfile | null> {
+  paymentLog.debug('colada.adapter.resolve_recipient_profile.start', {
+    pubkeyLength: pubkey.length,
+  });
+  if (!currentNdk) {
+    paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
+      reason: 'no_ndk',
+    });
+    return null;
+  }
+  if (signal?.aborted) {
+    paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
+      reason: 'aborted_before_fetch',
+    });
+    return null;
+  }
+  try {
+    const event = await currentNdk.fetchEvent({
+      kinds: [Metadata as number],
+      authors: [pubkey],
+      limit: 1,
+    });
+    if (!event) {
+      paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
+        reason: 'not_found',
+      });
+      return null;
+    }
+    const parsed = parseRawMetadata(event.content);
+    if (!parsed) {
+      paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
+        reason: 'invalid_metadata',
+      });
+      return null;
+    }
+    // Warm the single owner (entity cache) so other surfaces (ContactRow,
+    // DmChatHeader, profile screens, HistoryEntryHeader) hit warm cache
+    // for this pubkey on next render without re-fetching.
+    ingestResolvedProfiles({ [pubkey]: parsed });
+    const displayName = resolveIdentityName({ pubkey, nostrProfile: parsed });
+    if (!displayName) {
+      paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
+        reason: 'no_display_name',
+      });
+      return null;
+    }
+    paymentLog.debug('colada.adapter.resolve_recipient_profile.done', {
+      hasAvatar: !!parsed.picture,
+      hasNip05: !!parsed.nip05,
+    });
+    return {
+      displayName,
+      avatarUrl: parsed.picture ?? null,
+      nip05: parsed.nip05 ?? null,
+    };
+  } catch (err) {
+    paymentLog.warn('recipient.resolveProfile.threw', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
+type ColadaIdentity = {
+  getNdk: () => ReturnType<typeof useNDK>['ndk'];
+  getNpub: () => string | undefined;
+  getPubkey: () => string | undefined;
+  getPrivateKey: () => Uint8Array | undefined;
+  getBitchatIdentityMaterial: () => ReturnType<typeof deriveBitchatBLEIdentityMaterial> | null;
+  /** Register a receive surface for p2pk-keypair regeneration. Returns an unsubscribe. */
+  subscribeP2pkKeyRefreshed: (listener: (newKey: string | null) => void) => () => void;
+  notifyP2pkKeyRefreshed: (newKey: string | null) => void;
+};
+
+/**
+ * Stable accessors for the active identity, plus the p2pk-refresh fan-out.
+ *
+ * Every value in here is read LATE — inside an adapter the provider builds
+ * during render and hands to colada — so each needs a ref. Keeping those refs
+ * in this hook rather than in the provider is what lets the provider compile:
+ * React Compiler treats handing a ref-closing closure to a function during
+ * render as a render-time ref access, and the provider builds five such
+ * factories. NDK in particular changes identity across login/logout, so the
+ * operations closure must always see the latest instance.
+ *
+ * The subscriber fan-out is a Set, not a single slot: co-mounted receive
+ * screens — a modal pushed before the prior screen unmounts — must each see
+ * the refresh instead of clobbering the prior subscriber.
+ */
+function useColadaIdentity(
+  ndk: ReturnType<typeof useNDK>['ndk'],
+  keys: ReturnType<typeof useNostrKeysContext>['keys']
+): ColadaIdentity {
+  const ndkRef = useLatestRef(ndk);
+  const npubRef = useLatestRef(keys?.npub);
+  const pubkeyRef = useLatestRef(keys?.pubkey);
+  const privateKeyRef = useLatestRef(keys?.privateKey);
+  const subscribersRef = useRef(new Set<(newKey: string | null) => void>());
+
+  return useMemo(
+    () => ({
+      getNdk: () => ndkRef.current,
+      getNpub: () => npubRef.current,
+      getPubkey: () => pubkeyRef.current,
+      getPrivateKey: () => privateKeyRef.current,
+      getBitchatIdentityMaterial: () => {
+        const privateKey = privateKeyRef.current;
+        const pubkey = pubkeyRef.current;
+        if (!privateKey || !pubkey) return null;
+        return deriveBitchatBLEIdentityMaterial({ privateKey, pubkey });
+      },
+      subscribeP2pkKeyRefreshed: (listener: (newKey: string | null) => void) => {
+        subscribersRef.current.add(listener);
+        return () => {
+          subscribersRef.current.delete(listener);
+        };
+      },
+      notifyP2pkKeyRefreshed: (newKey: string | null) => {
+        for (const subscriber of subscribersRef.current) subscriber(newKey);
+      },
+    }),
+    [ndkRef, npubRef, pubkeyRef, privateKeyRef]
+  );
+}
+
 export function SovranColadaProvider({ children }: { children: React.ReactNode }) {
   const manager = useManager();
   const { keys } = useNostrKeysContext();
   const { ndk } = useNDK();
-  // NDK can change identity across renders (login/logout); the operations
-  // closure below must always see the latest instance, so use a ref instead
-  // of capturing `ndk` directly.
-  const ndkRef = useLatestRef(ndk);
   const { isOffline: contextOffline } = useOfflineStatus();
   const mockOffline = useSettingsStore((state) => state.mockOffline);
   const isOffline = mockOffline || contextOffline;
-  const offlineRef = useLatestRef(isOffline);
-  const getOffline = useCallback(() => offlineRef.current, [offlineRef]);
+  const getOffline = useLatestGetter(isOffline);
 
   // Camera permission lives here rather than behind a (receive-flow)-scoped
   // context provider so it's reachable from this provider's navigation /
@@ -110,9 +246,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   const { handlePermission } = useHandleCameraPermission();
   const requestCameraPermission = useCallback(() => handlePermission(), [handlePermission]);
 
-  const npubRef = useLatestRef(keys?.npub);
-  const pubkeyRef = useLatestRef(keys?.pubkey);
-  const privateKeyRef = useLatestRef(keys?.privateKey);
+  const identity = useColadaIdentity(ndk, keys);
 
   const [nfcAdapter] = useState(() => createNfcAdapter());
   const chainAdapter = useMemo(() => createMempoolSpaceChainAdapter(), []);
@@ -141,23 +275,11 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     }),
     []
   );
-  // Receive-screen subscribers register a callback here so the notifications
-  // factory can fan a p2pk-keypair regeneration out to every mounted receive
-  // surface. A Set (not a single slot) lets co-mounted receive screens — e.g.
-  // a modal pushed before the prior screen unmounts — each see the refresh
-  // instead of clobbering the prior subscriber's slot.
-  const p2pkKeyRefreshedSubscribers = useRef(new Set<(newKey: string | null) => void>());
   // One stable accessor for the live manager. Five call sites used to mint
   // `() => manager` inline, so every render handed the engine, the operations
   // override and the notifications factory a fresh function identity.
   const getManager = useCallback(() => manager, [manager]);
-  const getNpub = useCallback(() => npubRef.current, [npubRef]);
-  const getBitchatIdentityMaterial = useCallback(() => {
-    const privateKey = privateKeyRef.current;
-    const pubkey = pubkeyRef.current;
-    if (!privateKey || !pubkey) return null;
-    return deriveBitchatBLEIdentityMaterial({ privateKey, pubkey });
-  }, [privateKeyRef, pubkeyRef]);
+  const { getNpub, getBitchatIdentityMaterial } = identity;
 
   const getBtcPrice = useCallback(() => {
     const currency = useSettingsStore.getState().displayCurrency;
@@ -184,11 +306,11 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         manager,
         sendNostrDM: async (nprofile, message) => {
           paymentLog.info('colada.adapter.send_nostr_dm.start', {
-            hasPrivateKey: !!privateKeyRef.current,
+            hasPrivateKey: !!identity.getPrivateKey(),
             nprofileLength: nprofile.length,
             messageLength: message.length,
           });
-          const pk = privateKeyRef.current;
+          const pk = identity.getPrivateKey();
           if (!pk) throw new Error('Nostr keys not available');
           try {
             await sendDirectMessageToRelays({ senderPrivateKey: pk, nprofile, message });
@@ -223,7 +345,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         getLnurlPayExtras: async ({ meltTarget, amountMsats, allowsNostr, nostrPubkey }) => {
           const pending = peekPendingZap(meltTarget);
           if (!pending) return null;
-          const pk = privateKeyRef.current;
+          const pk = identity.getPrivateKey();
           if (!allowsNostr || !nostrPubkey || !pk) {
             markPendingZapReceipt(meltTarget, 'plain');
             paymentLog.info('zap.extras.plain_fallback', {
@@ -364,7 +486,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         shouldMockFailSend: () => useSettingsStore.getState().mockFailSend,
         logger: paymentLog,
       }),
-    [manager, getOffline, getBtcPrice, getSatsPerUnitMinor, getDisplayCurrency, privateKeyRef]
+    [manager, getOffline, getBtcPrice, getSatsPerUnitMinor, getDisplayCurrency, identity]
   );
 
   useEffect(() => {
@@ -398,71 +520,10 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         // is app-specific. Returning null on any failure is the contract:
         // the machine's resolver treats it as best-effort cosmetic data and
         // does not block the flow.
-        resolveRecipientProfile: async (pubkey, signal): Promise<RecipientProfile | null> => {
-          paymentLog.debug('colada.adapter.resolve_recipient_profile.start', {
-            pubkeyLength: pubkey.length,
-          });
-          const currentNdk = ndkRef.current;
-          if (!currentNdk) {
-            paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
-              reason: 'no_ndk',
-            });
-            return null;
-          }
-          if (signal?.aborted) {
-            paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
-              reason: 'aborted_before_fetch',
-            });
-            return null;
-          }
-          try {
-            const event = await currentNdk.fetchEvent({
-              kinds: [Metadata as number],
-              authors: [pubkey],
-              limit: 1,
-            });
-            if (!event) {
-              paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
-                reason: 'not_found',
-              });
-              return null;
-            }
-            const parsed = parseRawMetadata(event.content);
-            if (!parsed) {
-              paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
-                reason: 'invalid_metadata',
-              });
-              return null;
-            }
-            // Warm the single owner (entity cache) so other surfaces (ContactRow,
-            // DmChatHeader, profile screens, HistoryEntryHeader) hit warm cache
-            // for this pubkey on next render without re-fetching.
-            ingestResolvedProfiles({ [pubkey]: parsed });
-            const displayName = resolveIdentityName({ pubkey, nostrProfile: parsed });
-            if (!displayName) {
-              paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
-                reason: 'no_display_name',
-              });
-              return null;
-            }
-            paymentLog.debug('colada.adapter.resolve_recipient_profile.done', {
-              hasAvatar: !!parsed.picture,
-              hasNip05: !!parsed.nip05,
-            });
-            return {
-              displayName,
-              avatarUrl: parsed.picture ?? null,
-              nip05: parsed.nip05 ?? null,
-            };
-          } catch (err) {
-            paymentLog.warn('recipient.resolveProfile.threw', {
-              error: err instanceof Error ? err.message : String(err),
-            });
-            return null;
-          }
-        },
+        resolveRecipientProfile: (pubkey, signal) =>
+          resolveRecipientProfileFromNdk(identity.getNdk(), pubkey, signal),
       }) as MachineOperations,
-    [getOffline, getManager, instance, ndkRef]
+    [getOffline, getManager, instance, identity]
   );
 
   const actions = useMemo(() => createSovranScreenActionHandlers(), []);
@@ -517,9 +578,9 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
       createSovranScreenActionsBridge({
         manager,
         requestCameraPermission,
-        p2pkKeyRefreshedSubscribers,
+        subscribeP2pkKeyRefreshed: identity.subscribeP2pkKeyRefreshed,
       }),
-    [manager, requestCameraPermission]
+    [manager, requestCameraPermission, identity]
   );
 
   // Deliver a bearer ecash token to a remote Nostr contact over an encrypted
@@ -527,8 +588,8 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   // thread too). Used by the destination-first Send flow's contact path.
   const deliverContactEcashDm = useCallback(
     async ({ recipientPubkey, token }: { recipientPubkey: string; token: string }) => {
-      const pk = privateKeyRef.current;
-      const ndkInstance = ndkRef.current;
+      const pk = identity.getPrivateKey();
+      const ndkInstance = identity.getNdk();
       if (!pk) throw new Error('Nostr keys not available');
       if (!ndkInstance) throw new Error('NDK not available');
       const { selfWrapId } = await publishGiftWrappedDM({
@@ -553,7 +614,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         pubkey: ownPubkey,
       });
     },
-    [privateKeyRef, ndkRef]
+    [identity]
   );
 
   const handlers = useCallback<ColadaProviderProps['handlers']>(
@@ -574,16 +635,12 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   const notifications = useMemo(
     () =>
       createSovranNotifications({
-        getPubkey: () => pubkeyRef.current,
-        getPrivateKey: () => privateKeyRef.current,
+        getPubkey: () => identity.getPubkey(),
+        getPrivateKey: () => identity.getPrivateKey(),
         getManager,
-        onP2pkKeyRefreshed: (newKey) => {
-          for (const subscriber of p2pkKeyRefreshedSubscribers.current) {
-            subscriber(newKey);
-          }
-        },
+        onP2pkKeyRefreshed: identity.notifyP2pkKeyRefreshed,
       }),
-    [getManager, pubkeyRef, privateKeyRef]
+    [getManager, identity]
   );
 
   return (
