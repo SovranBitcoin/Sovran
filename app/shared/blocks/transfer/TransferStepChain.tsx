@@ -11,7 +11,7 @@
  * reset) snap instantly with no stagger.
  */
 
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { withAlpha } from '@/shared/lib/color';
@@ -248,13 +248,29 @@ export const TransferStepChain = React.memo(
     const currentIdx = statusToCurrentIdx(status);
 
     // ── Stagger delay computation ──
-    // Track previous currentIdx to detect forward progression.
     // On forward steps (e.g. 0→1), stagger: dot(0ms) → line(DOT) → next dot(DOT+LINE).
     // On non-forward changes (failed, reset, initial), all delays = 0.
-    const prevIdxRef = useRef(currentIdx);
-
-    const isForward = currentIdx > prevIdxRef.current && prevIdxRef.current >= 0;
-    const wavefrontOrigin = isForward ? prevIdxRef.current : -1;
+    //
+    // Settled snapshot in two pieces of state, the shape `useSegmentCascade`
+    // in LoadingIndicator already uses: the wavefront origin is captured as
+    // its OWN state the moment the index moves, so the restarted render still
+    // commits the staggered delays even though `settledIdx` has caught up. A
+    // single `prevIdx` state would read equal on the retry and flatten the
+    // stagger; an effect-driven update would recompute the delays to zero a
+    // commit later and cancel the animation mid-flight.
+    //
+    // Deliberately NOT identical to the ref it replaces: once the ref's effect
+    // had run, an unrelated re-render at the same index recomputed the origin
+    // as -1 and dropped the stagger. The captured origin now survives that.
+    const [settledIdx, setSettledIdx] = useState(currentIdx);
+    const [settledWavefront, setSettledWavefront] = useState(-1);
+    const moved = !Object.is(settledIdx, currentIdx);
+    const movedWavefront = currentIdx > settledIdx && settledIdx >= 0 ? settledIdx : -1;
+    if (moved) {
+      setSettledIdx(currentIdx);
+      setSettledWavefront(movedWavefront);
+    }
+    const wavefrontOrigin = moved ? movedWavefront : settledWavefront;
 
     // Compute per-node and per-line delays
     const nodeDelays = useMemo(() => {
@@ -286,11 +302,6 @@ export const TransferStepChain = React.memo(
       }
       return delays;
     }, [chain.length, wavefrontOrigin]);
-
-    // Update ref after delay computation (useEffect runs after render)
-    useEffect(() => {
-      prevIdxRef.current = currentIdx;
-    }, [currentIdx]);
 
     const isRouting = status === 'routing';
 

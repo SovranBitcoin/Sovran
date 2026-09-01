@@ -178,9 +178,6 @@
       "Cannot access refs during render",
       "Cannot reassign variables declared outside of the component/hook"
     ],
-    "shared/blocks/transfer/TransferStepChain.tsx": [
-      "Cannot access refs during render"
-    ],
     "shared/hooks/useNostrProfileMetadata.ts": [
       "Cannot access refs during render",
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
