@@ -81,8 +81,14 @@ const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
   // Perf counters: how often this (notoriously re-render-prone) background
   // re-renders, and how long the wallpaper takes to decode. Surfaced so a
   // custom-wallpaper perf regression is visible in `bg.sprite.*` logs.
+  // Counted and logged from an effect, not the render body. Incrementing a ref
+  // and calling `log.debug` during render are both side effects in render — the
+  // second is a React rule violation on its own, and together they made the
+  // React Compiler skip this component, so the counter was suppressing the
+  // memoization whose absence it exists to report. Post-commit counting also
+  // measures committed renders rather than discarded attempts, which is the
+  // number a wallpaper perf regression actually shows up in.
   const renderCountRef = useRef(0);
-  renderCountRef.current += 1;
   const loadStartRef = useRef(0);
   useEffect(() => {
     loadStartRef.current = Date.now();
@@ -119,24 +125,22 @@ const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
     });
   }, [activeTheme, backgroundColor, backgroundImageSource, ctxTheme.currentTheme, themeName]);
 
-  if (!backgroundImageSource) {
+  useEffect(() => {
+    renderCountRef.current += 1;
     log.debug('bg.sprite.render', {
       theme: activeTheme,
-      hasImage: false,
+      hasImage: !!backgroundImageSource,
       renderCount: renderCountRef.current,
     });
+  });
+
+  if (!backgroundImageSource) {
     return (
       <Log name="SpriteView">
         <View style={[StyleSheet.absoluteFill, { backgroundColor }]}></View>
       </Log>
     );
   }
-
-  log.debug('bg.sprite.render', {
-    theme: activeTheme,
-    hasImage: true,
-    renderCount: renderCountRef.current,
-  });
 
   return (
     <Log name="SpriteView">

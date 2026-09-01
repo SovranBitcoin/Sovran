@@ -242,9 +242,6 @@
     "shared/providers/WalletContextProvider.tsx": [
       "Cannot access refs during render"
     ],
-    "shared/ui/composed/AmountFormatter.tsx": [
-      "Cannot access refs during render"
-    ],
     "shared/ui/composed/BootEntrance.tsx": [
       "Cannot access refs during render"
     ],
@@ -275,9 +272,6 @@
     ],
     "shared/ui/composed/search/SearchOverlay.tsx": [
       "(BuildHIR::node.lowerReorderableExpression) Expression type `TemplateLiteral` cannot be safely reordered"
-    ],
-    "shared/ui/composed/SpriteView.tsx": [
-      "Cannot access refs during render"
     ],
     "shared/ui/primitives/Skeleton.tsx": [
       "Cannot reassign variables declared outside of the component/hook"

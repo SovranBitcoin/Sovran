@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Animated,
   StyleProp,
@@ -231,7 +231,11 @@ function ScaleWrapper({
   text: string;
   children: React.ReactNode;
 }) {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  // `useState` with a lazy initializer, not `useRef(new Animated.Value(1)).current`:
+  // the ref form both reads a ref during render (which made the React Compiler
+  // skip this component) and constructs a throwaway `Animated.Value` on every
+  // render, since `useRef` ignores its argument after the first.
+  const [scaleAnim] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
     if (!animated) return;
