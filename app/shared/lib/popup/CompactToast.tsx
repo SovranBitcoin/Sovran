@@ -30,7 +30,7 @@ export function CompactToast({
   label,
   description,
   icon,
-  hide,
+  hide: _hide,
   ...toastProps
 }: CompactToastProps) {
   const { bg, fg } = useToastSurface();

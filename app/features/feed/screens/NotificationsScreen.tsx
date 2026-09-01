@@ -21,7 +21,7 @@ import {
   notificationReasonLabel,
   notificationReplyScopeLabel,
 } from '@/features/feed/lib/notificationCopy';
-import { formatRelativeUnixSeconds } from '@/shared/lib/date';
+import { formatDate, formatRelativeUnixSeconds } from '@/shared/lib/date';
 import {
   notificationListStyles,
   NotificationRowPressable,
@@ -46,7 +46,6 @@ import {
   useVisualFlatListLogger,
   VISUAL_LIST_VIEWABILITY_CONFIG,
 } from '@/shared/lib/contentShiftLog';
-import { formatDate } from '@/shared/lib/date';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

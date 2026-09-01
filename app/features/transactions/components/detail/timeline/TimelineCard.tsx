@@ -87,6 +87,20 @@ function useExpiry(expiresAt: number | undefined): number {
   return currentTime;
 }
 
+/**
+ * The segmented block-confirmation ring renders on the row that owns it: the
+ * engine's flow declarations flag it (onchain melt "In mempool" row, onchain
+ * mint deposit row) — the view only gates on progress presence.
+ *
+ * Module scope, taking progress as an argument: as an in-render closure this
+ * was an undeclared dependency of the diagnostics memo below, which
+ * `react-hooks/exhaustive-deps` flagged and which could not have been
+ * satisfied without defeating that memo (the closure is new every render).
+ */
+function ownsConfirmationRing(step: TimelineStep, progress: unknown): boolean {
+  return !!progress && !!step.confirmationRing;
+}
+
 export function HistoryEntryTimeline({
   historyEntry,
   meltQuote,
@@ -178,12 +192,6 @@ export function HistoryEntryTimeline({
   );
   const timeline = model.steps;
 
-  // The segmented block-confirmation ring renders on the row that owns it:
-  // the engine's flow declarations flag it (onchain melt "In mempool" row,
-  // onchain mint deposit row) — the view only gates on progress presence.
-  const ownsConfirmationRing = (step: TimelineStep): boolean =>
-    !!onchainConfirmationProgress && !!step.confirmationRing;
-
   const cardLabel = getCardLabel(historyEntry, timeline, tokenCreated, nostrSent, paymentCopy);
   const statusHeader = getStatusHeader(timeline);
   const statusColorType = getStatusColorType(timeline);
@@ -249,7 +257,7 @@ export function HistoryEntryTimeline({
         const indicator = mapCheckpointStatusToIndicator(
           timelineStepTypeToCheckpointStatus(step.stepType)
         );
-        const showConfirmationRing = ownsConfirmationRing(step);
+        const showConfirmationRing = ownsConfirmationRing(step, onchainConfirmationProgress);
         const { dotDelayMs, lineDelayMs } = rowDelays(index);
         return {
           row: index,
@@ -462,7 +470,7 @@ export function HistoryEntryTimeline({
           {timeline.map((step, index) => {
             const isLast = index === timeline.length - 1;
             const nextStep = !isLast ? timeline[index + 1] : null;
-            const showConfirmationRing = ownsConfirmationRing(step);
+            const showConfirmationRing = ownsConfirmationRing(step, onchainConfirmationProgress);
             const confirmationProgress =
               showConfirmationRing && onchainConfirmationProgress
                 ? {

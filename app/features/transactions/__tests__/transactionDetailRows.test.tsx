@@ -1,6 +1,3 @@
-jest.mock('assets/icons', () => ({ __esModule: true, default: () => null }));
-jest.mock('@/shared/lib/popup', () => ({ copyPopup: jest.fn() }));
-
 import {
   amountDetailItem,
   stateDetailItem,
@@ -9,6 +6,9 @@ import {
 } from '../components/detail/transactionDetailRows';
 import { formatAmount } from '@/shared/lib/currency';
 import { CopyableValue } from '@/shared/ui/composed/CopyableValue';
+
+jest.mock('assets/icons', () => ({ __esModule: true, default: () => null }));
+jest.mock('@/shared/lib/popup', () => ({ copyPopup: jest.fn() }));
 
 describe('transactionDetailRows', () => {
   it('amountDetailItem formats through the shared currency formatter', () => {

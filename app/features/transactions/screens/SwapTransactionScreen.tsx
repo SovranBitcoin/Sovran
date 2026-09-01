@@ -227,7 +227,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
       });
       return !prev;
     });
-  }, [chevronRotation]);
+  }, [chevronRotation, groupId]);
 
   const chevronAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${chevronRotation.value}deg` }],

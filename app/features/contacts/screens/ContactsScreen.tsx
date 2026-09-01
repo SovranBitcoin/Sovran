@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { List } from '@/shared/ui/composed/List';
 import Icon from 'assets/icons';
@@ -367,9 +367,12 @@ export const ContactsScreen = () => {
 
   // Idle Contacts-tab pills. Groups lives in the outer tab bar (not a pill),
   // and live search now has its own scope tabs in UnifiedSearch.
-  const visibleFilters: readonly ContactsFilter[] = whitenoiseEnabled
-    ? ['All', 'Recent', 'Requests', 'Mints']
-    : ['All', 'Recent', 'Mints'];
+  // Memoized because the effect below depends on it: rebuilt inline it was a
+  // fresh array every render, so the fallback effect re-ran on every render.
+  const visibleFilters: readonly ContactsFilter[] = useMemo(
+    () => (whitenoiseEnabled ? ['All', 'Recent', 'Requests', 'Mints'] : ['All', 'Recent', 'Mints']),
+    [whitenoiseEnabled]
+  );
 
   // If the active pill drops out of the visible set (e.g. White Noise gets
   // disabled while 'Requests' is active), fall back to 'All'.

@@ -284,7 +284,14 @@ function v1ToV2(state: unknown): unknown {
   fold(s.repostsByEventId, 'reposted', 'repostEventId');
   fold(s.repliedByEventId, 'replied', 'replyEventId');
 
-  const { likesByEventId, repostsByEventId, repliedByEventId, ...rest } = s;
+  // Dropped on purpose: the three per-action maps are folded into
+  // `engagementByEventId` above and must not survive into v2.
+  const {
+    likesByEventId: _likes,
+    repostsByEventId: _reposts,
+    repliedByEventId: _replied,
+    ...rest
+  } = s;
   return { ...rest, engagementByEventId: capByRecency(merged, MAX_ENGAGEMENT_ENTRIES) };
 }
 
