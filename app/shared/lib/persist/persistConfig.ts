@@ -61,6 +61,14 @@ interface PersistRegistryEntry {
   name: string;
   version: number;
   schema: ZodType<unknown>;
+  /**
+   * The store's own projection into the persisted subset. Registered so a test
+   * can round-trip `schema.safeParse(partialize(state))`: a schema that rejects
+   * what its own store writes discards the blob on EVERY rehydrate, which is
+   * silent, permanent data loss that no other guard here can see (the drift
+   * snapshot compares schemas to themselves, not to the data).
+   */
+  partialize: (state: never) => unknown;
 }
 export const persistRegistry: PersistRegistryEntry[] = [];
 
@@ -84,7 +92,12 @@ export function persistConfig<TFull, TPartial>(
   const version = opts.version ?? DEFAULT_VERSION;
 
   if (!persistRegistry.some((e) => e.name === opts.name)) {
-    persistRegistry.push({ name: opts.name, version, schema: opts.schema });
+    persistRegistry.push({
+      name: opts.name,
+      version,
+      schema: opts.schema,
+      partialize: opts.partialize as (state: never) => unknown,
+    });
   }
 
   return {
