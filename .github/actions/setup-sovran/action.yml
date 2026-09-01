@@ -2,8 +2,8 @@ name: Setup Sovran
 description: >-
   Bun setup + workspace install shared by the Sovran CI gate workflows.
   Installs the bun workspace at the repo root (app + wallet + nostr + docs),
-  re-resolving the external @sovranbitcoin/* packages to their latest published
-  versions (deps:sovran-latest) and caching the Bun store.
+  optionally refreshes external @sovranbitcoin/* packages, and caches the Bun
+  store. Bundle measurement opts into the frozen-lockfile path.
 
 # The repo is checked out at the runner root (no path nesting), so the workspace
 # root package.json / bun.lock live at the working directory. Install runs here;
@@ -12,6 +12,10 @@ inputs:
   github-token:
     description: Token used to auth the @sovranbitcoin/* GitHub Packages fetch.
     required: true
+  refresh-sovran-externals:
+    description: Resolve @sovranbitcoin/* dependencies to their latest published versions before install.
+    required: false
+    default: "true"
 
 runs:
   using: composite
@@ -39,18 +43,29 @@ runs:
     # externals — @cashu/coco-* from npm, @sovranbitcoin/schemas +
     # coco-cashu-plugin-p2pk-import from GitHub Packages — resolve here.
     # SOVRAN_CI_TOKEN carries cross-repo GitHub Packages read; GITHUB_TOKEN is
-    # the fallback. `deps:sovran-latest` re-resolves the external @sovranbitcoin/*
-    # packages to newest published before install, so CI keeps the always-on
-    # compatibility signal (a breaking schemas/p2pk publish reds CI by design).
+    # the fallback. By default, `deps:sovran-latest` re-resolves the external
+    # @sovranbitcoin/* packages to newest published before install, so CI keeps
+    # the always-on compatibility signal (a breaking schemas/p2pk publish reds
+    # CI by design). Callers that measure the checked-out artifact opt out.
     # --backend=copyfile (also inside deps:sovran-latest) keeps node_modules
     # files as real copies: bun's Linux default hardlinks them to the global
     # store, so postinstall patch-package writes mutate the cached copies and
     # actions/cache persists the patched state — the next run's pristine patch
     # then fails to apply whenever a patch file has since been regenerated.
     - name: Install workspace (latest Sovran externals)
+      if: inputs.refresh-sovran-externals == 'true'
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
       run: |
         bun run deps:sovran-latest
         bun install --backend=copyfile
+
+    # Bundle measurements must describe the checked-out commit, not a moving
+    # dependency publish that happened after its lockfile was written.
+    - name: Install workspace (locked dependencies)
+      if: inputs.refresh-sovran-externals != 'true'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: bun install --frozen-lockfile --backend=copyfile

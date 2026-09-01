@@ -1,0 +1,25 @@
+{
+  "$comment": "Production Expo export ceilings. References are the 2026-09-01 iOS/Android measurements; raise ceilings only with measured product justification.",
+  "platforms": {
+    "ios": {
+      "referenceBytes": {
+        "bundle": 20374496,
+        "assets": 1791416
+      },
+      "maximumBytes": {
+        "bundle": 21400000,
+        "assets": 1900000
+      }
+    },
+    "android": {
+      "referenceBytes": {
+        "bundle": 20550160,
+        "assets": 2753722
+      },
+      "maximumBytes": {
+        "bundle": 21600000,
+        "assets": 2900000
+      }
+    }
+  }
+}

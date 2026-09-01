@@ -55,7 +55,7 @@
     "check:styling": "node scripts/check-styling.mjs",
     "check:react-compiler": "bun scripts/check-react-compiler.mjs",
     "check:react-compiler:update": "bun scripts/check-react-compiler.mjs --update",
-    "react-doctor": "bunx react-doctor@latest --verbose",
+    "react-doctor": "bunx react-doctor@0.9.12 --verbose --no-telemetry",
     "vendor:marmot-ts": "bash scripts/vendor-marmot-ts.sh",
     "prebuild": "expo prebuild --clean",
     "sim:serve": "serve-sim --host 127.0.0.1",

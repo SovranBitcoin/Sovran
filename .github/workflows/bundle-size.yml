@@ -1,0 +1,62 @@
+name: Bundle Size
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: bundle-size-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_DIR: app
+  APP_VARIANT: production
+  EXPO_NO_DOTENV: "1"
+  EXPO_PUBLIC_CASHU_NATIVE_CRYPTO: "1"
+  EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL: https://nagg.up.railway.app
+  EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT: https://nagg.up.railway.app/graphql
+
+jobs:
+  bundle-size:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout app
+        uses: actions/checkout@v6
+
+      - name: Setup Sovran
+        uses: ./.github/actions/setup-sovran
+        with:
+          github-token: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
+          refresh-sovran-externals: "false"
+
+      # Export release-mode Hermes bundles for both platforms. Only the small
+      # JSON scorecard is retained; compiled bundles can contain public build
+      # configuration and do not need to become downloadable artifacts.
+      - name: Export iOS bundle
+        working-directory: ${{ env.APP_DIR }}
+        run: bunx expo export --platform ios --output-dir "$RUNNER_TEMP/export-ios" --clear
+
+      - name: Export Android bundle
+        working-directory: ${{ env.APP_DIR }}
+        run: bunx expo export --platform android --output-dir "$RUNNER_TEMP/export-android"
+
+      - name: Check budgets and build scorecard
+        working-directory: ${{ env.APP_DIR }}
+        run: >-
+          node scripts/maintenance-health.mjs
+          --ios "$RUNNER_TEMP/export-ios"
+          --android "$RUNNER_TEMP/export-android"
+          --output "$RUNNER_TEMP/maintenance-health.json"
+
+      - name: Upload maintenance scorecard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maintenance-health
+          path: ${{ runner.temp }}/maintenance-health.json
+          if-no-files-found: warn

@@ -1,5 +1,11 @@
 # Sovran
 
+## Maintenance health
+
+[![Tests](https://github.com/SovranBitcoin/Sovran/actions/workflows/ci.yml/badge.svg)](https://github.com/SovranBitcoin/Sovran/actions/workflows/ci.yml) [![Lint](https://github.com/SovranBitcoin/Sovran/actions/workflows/lint.yml/badge.svg)](https://github.com/SovranBitcoin/Sovran/actions/workflows/lint.yml) [![Type Check](https://github.com/SovranBitcoin/Sovran/actions/workflows/type-check.yml/badge.svg)](https://github.com/SovranBitcoin/Sovran/actions/workflows/type-check.yml) [![Knip](https://github.com/SovranBitcoin/Sovran/actions/workflows/knip.yml/badge.svg)](https://github.com/SovranBitcoin/Sovran/actions/workflows/knip.yml) [![React Compiler](https://github.com/SovranBitcoin/Sovran/actions/workflows/react-compiler.yml/badge.svg)](https://github.com/SovranBitcoin/Sovran/actions/workflows/react-compiler.yml) [![React Doctor — advisory](https://github.com/SovranBitcoin/Sovran/actions/workflows/react-doctor.yml/badge.svg)](https://github.com/SovranBitcoin/Sovran/actions/workflows/react-doctor.yml) [![Styling](https://github.com/SovranBitcoin/Sovran/actions/workflows/styling.yml/badge.svg)](https://github.com/SovranBitcoin/Sovran/actions/workflows/styling.yml) [![Bundle Size](https://github.com/SovranBitcoin/Sovran/actions/workflows/bundle-size.yml/badge.svg)](https://github.com/SovranBitcoin/Sovran/actions/workflows/bundle-size.yml)
+
+Green means the check passes its zero-debt or no-regression gate. React Doctor is advisory—the badge only means its report was generated. Bundle Size publishes the scored iOS/Android `maintenance-health.json` artifact.
+
 Monorepo for the Sovran Bitcoin wallet and its self-contained packages. Managed
 with [Bun](https://bun.sh) workspaces — no inter-package publishing; everything
 links directly.

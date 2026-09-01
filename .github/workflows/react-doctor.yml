@@ -1,10 +1,10 @@
-name: React Doctor
+name: React Doctor (Advisory)
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
-    branches: [main]
+    branches: [main, master]
 
 env:
   APP_DIR: app
@@ -24,20 +24,20 @@ jobs:
         with:
           github-token: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
 
-      # Informational, non-blocking: react-doctor surfaces patterns we *might* be
-      # getting wrong, but it is false-positive-heavy on this codebase, so its
-      # findings are review signal — never a merge gate. continue-on-error keeps
-      # the workflow (and its badge) green; the full report ships as an artifact.
-      - name: React Doctor
-        id: react-doctor
-        continue-on-error: true
+      # Advisory telemetry only: findings are heuristics and must never become
+      # a merge gate or an autonomous-fix queue. This workflow is red only when
+      # the scan itself cannot complete; the presence/count of findings cannot
+      # fail it.
+      - name: React Doctor scan
         working-directory: ${{ env.APP_DIR }}
-        run: bun run react-doctor 2>&1 | tee react-doctor-report.txt
+        run: >-
+          bun run react-doctor --json --json-out react-doctor-report.json
+          --yes --no-color --blocking none
 
       - name: Upload React Doctor report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: react-doctor-report
-          path: ${{ env.APP_DIR }}/react-doctor-report.txt
+          path: ${{ env.APP_DIR }}/react-doctor-report.json
           if-no-files-found: warn
