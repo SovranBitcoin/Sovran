@@ -322,24 +322,26 @@ export function ImageOverlayProvider({
 
   const setPanelHeight = useCallback(
     (height: number) => {
-      panelHeightSv.value = withTiming(height, {
-        duration: BOTTOM_PANEL_STIFF_DURATION_MS,
-        easing: Easing.out(Easing.cubic),
-      });
+      panelHeightSv.set(
+        withTiming(height, {
+          duration: BOTTOM_PANEL_STIFF_DURATION_MS,
+          easing: Easing.out(Easing.cubic),
+        })
+      );
     },
     [panelHeightSv]
   );
 
   const setPanelContentMinHeight = useCallback(
     (height: number) => {
-      panelContentMinHeightSv.value = height;
+      panelContentMinHeightSv.set(height);
     },
     [panelContentMinHeightSv]
   );
 
   useEffect(() => {
-    safeTopSv.value = safeTop;
-    safeBottomSv.value = safeBottom;
+    safeTopSv.set(safeTop);
+    safeBottomSv.set(safeBottom);
   }, [safeTop, safeBottom, safeTopSv, safeBottomSv]);
 
   useEffect(() => {
@@ -352,18 +354,18 @@ export function ImageOverlayProvider({
   /** 0 when overlay is aligned with thumbnail, max when displaced (open/drag). Drives thumbnail blur. */
   const thumbnailBlurIntensity = useDerivedValue(() => {
     'worklet';
-    if (imageState.value === 'close') return 0;
-    const cx = imageXCoord.value + imageWidth.value / 2;
-    const cy = imageYCoord.value + imageHeight.value / 2;
-    const tx = closeTargetPageX.value + closeTargetWidth.value / 2;
-    const ty = closeTargetPageY.value + closeTargetHeight.value / 2;
+    if (imageState.get() === 'close') return 0;
+    const cx = imageXCoord.get() + imageWidth.get() / 2;
+    const cy = imageYCoord.get() + imageHeight.get() / 2;
+    const tx = closeTargetPageX.get() + closeTargetWidth.get() / 2;
+    const ty = closeTargetPageY.get() + closeTargetHeight.get() / 2;
     const positionDist = Math.sqrt((cx - tx) ** 2 + (cy - ty) ** 2);
-    const thumbDiag = Math.sqrt(closeTargetWidth.value ** 2 + closeTargetHeight.value ** 2) || 1;
+    const thumbDiag = Math.sqrt(closeTargetWidth.get() ** 2 + closeTargetHeight.get() ** 2) || 1;
     const positionD = Math.min(1, positionDist / (thumbDiag * THUMB_BLUR_DISTANCE_FACTOR));
-    const tw = closeTargetWidth.value;
-    const expandedW = expandedWidthSv.value;
+    const tw = closeTargetWidth.get();
+    const expandedW = expandedWidthSv.get();
     const sizeD =
-      expandedW > tw ? Math.min(1, Math.max(0, (imageWidth.value - tw) / (expandedW - tw))) : 0;
+      expandedW > tw ? Math.min(1, Math.max(0, (imageWidth.get() - tw) / (expandedW - tw))) : 0;
     const displacement = Math.max(positionD, sizeD);
     return Math.round(displacement * THUMB_BLUR_MAX_INTENSITY);
   });
@@ -372,10 +374,10 @@ export function ImageOverlayProvider({
     setActiveOverlayPost(null);
     setVideoFeedLayoutsState(null);
     setVideoFeedLayoutIndexState(0);
-    hasPanelSv.value = 0;
-    openAnimationInProgressSv.value = 0;
-    panelHeightSv.value = 0;
-    panelContentMinHeightSv.value = 0;
+    hasPanelSv.set(0);
+    openAnimationInProgressSv.set(0);
+    panelHeightSv.set(0);
+    panelContentMinHeightSv.set(0);
     openSessionInitialLayoutRef.current = null;
     openSessionLayoutsByIndexRef.current = [];
     // No overlay is open at clear-time, so cached thumbnail positions are
@@ -392,8 +394,8 @@ export function ImageOverlayProvider({
   }, [hasPanelSv, openAnimationInProgressSv, panelHeightSv, panelContentMinHeightSv]);
 
   const finishClose = useCallback(() => {
-    imageState.value = 'close';
-    isClosing.value = false;
+    imageState.set('close');
+    isClosing.set(false);
     clearUrlDelayed();
   }, [clearUrlDelayed, imageState, isClosing]);
 
@@ -407,22 +409,34 @@ export function ImageOverlayProvider({
       duration: CLOSE_BLUR_AND_BTN_DURATION_MS,
       easing: Easing.out(Easing.cubic),
     };
-    const cx = centerXSv.value;
-    const cy = centerYSv.value;
-    const ew = expandedWidthSv.value;
-    const eh = expandedHeightSv.value;
-    blurIntensity.value = withTiming(100, blurTiming);
+    const cx = centerXSv.get();
+    const cy = centerYSv.get();
+    const ew = expandedWidthSv.get();
+    const eh = expandedHeightSv.get();
+    blurIntensity.set(withTiming(100, blurTiming));
     // Delay expand so overlay can mount and paint thumbnail before animating; use same spring as dismiss
-    imageXCoord.value = withDelay(OPEN_START_DELAY_MS, withSpring(cx - ew / 2, CLOSE_SPRING));
-    imageYCoord.value = withDelay(OPEN_START_DELAY_MS, withSpring(cy - eh / 2, CLOSE_SPRING));
-    imageWidth.value = withDelay(OPEN_START_DELAY_MS, withSpring(ew, CLOSE_SPRING));
-    imageHeight.value = withDelay(OPEN_START_DELAY_MS, withSpring(eh, CLOSE_SPRING));
-    closeBtnOpacity.value = withDelay(
-      OPEN_START_DELAY_MS + CLOSE_BLUR_AND_BTN_DURATION_MS,
-      withTiming(1)
+    imageXCoord.set(withDelay(OPEN_START_DELAY_MS, withSpring(cx - ew / 2, CLOSE_SPRING)));
+    imageYCoord.set(withDelay(OPEN_START_DELAY_MS, withSpring(cy - eh / 2, CLOSE_SPRING)));
+    imageWidth.set(withDelay(OPEN_START_DELAY_MS, withSpring(ew, CLOSE_SPRING)));
+    imageHeight.set(withDelay(OPEN_START_DELAY_MS, withSpring(eh, CLOSE_SPRING)));
+    closeBtnOpacity.set(
+      withDelay(OPEN_START_DELAY_MS + CLOSE_BLUR_AND_BTN_DURATION_MS, withTiming(1))
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- worklet captures shared-value refs
-  }, []);
+    // Shared values are stable for the provider's lifetime, so listing the ones
+    // this worklet writes is honest and costs nothing — and it replaces the
+    // exhaustive-deps suppression that used to switch React Compiler off here.
+  }, [
+    blurIntensity,
+    centerXSv,
+    centerYSv,
+    closeBtnOpacity,
+    expandedHeightSv,
+    expandedWidthSv,
+    imageHeight,
+    imageWidth,
+    imageXCoord,
+    imageYCoord,
+  ]);
 
   /** Only blur + close button (and thus dots/panel). Used when opening with panel so image stays at thumbnail until startOpenPanelImageAnimation. */
   const openRevealUi = useCallback(() => {
@@ -431,39 +445,48 @@ export function ImageOverlayProvider({
       duration: CLOSE_BLUR_AND_BTN_DURATION_MS,
       easing: Easing.out(Easing.cubic),
     };
-    blurIntensity.value = withTiming(100, blurTiming);
-    closeBtnOpacity.value = withDelay(
-      OPEN_START_DELAY_MS + CLOSE_BLUR_AND_BTN_DURATION_MS,
-      withTiming(1)
+    blurIntensity.set(withTiming(100, blurTiming));
+    closeBtnOpacity.set(
+      withDelay(OPEN_START_DELAY_MS + CLOSE_BLUR_AND_BTN_DURATION_MS, withTiming(1))
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- worklet captures shared-value refs
-  }, []);
+  }, [blurIntensity, closeBtnOpacity]);
 
   /** Worklet: animate image from thumbnail to current centerYSv/expandedWidthSv/expandedHeightSv (final position). Uses same spring as dismiss. */
   const openPanelImageToFinal = useCallback(() => {
     'worklet';
-    openAnimationInProgressSv.value = 1;
-    const cx = centerXSv.value;
-    const cy = centerYSv.value;
-    const ew = expandedWidthSv.value;
-    const eh = expandedHeightSv.value;
+    openAnimationInProgressSv.set(1);
+    const cx = centerXSv.get();
+    const cy = centerYSv.get();
+    const ew = expandedWidthSv.get();
+    const eh = expandedHeightSv.get();
     const targetX = cx - ew / 2;
     const targetY = cy - eh / 2;
-    imageXCoord.value = withSpring(targetX, CLOSE_SPRING);
-    imageYCoord.value = withSpring(targetY, CLOSE_SPRING);
-    imageWidth.value = withSpring(ew, CLOSE_SPRING);
-    imageHeight.value = withSpring(eh, CLOSE_SPRING, () => {
-      'worklet';
-      openAnimationInProgressSv.value = 0;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- worklet captures shared-value refs
-  }, []);
+    imageXCoord.set(withSpring(targetX, CLOSE_SPRING));
+    imageYCoord.set(withSpring(targetY, CLOSE_SPRING));
+    imageWidth.set(withSpring(ew, CLOSE_SPRING));
+    imageHeight.set(
+      withSpring(eh, CLOSE_SPRING, () => {
+        'worklet';
+        openAnimationInProgressSv.set(0);
+      })
+    );
+  }, [
+    centerXSv,
+    centerYSv,
+    expandedHeightSv,
+    expandedWidthSv,
+    imageHeight,
+    imageWidth,
+    imageXCoord,
+    imageYCoord,
+    openAnimationInProgressSv,
+  ]);
 
   const startOpenPanelImageAnimation = useCallback(
     (minPanelHeight: number, aspectRatioOverride?: number) => {
       // openAnimationInProgressSv already set to 1 in open() when hasPanel so reaction skips from first frame
       const availableHeight = imageViewportHeight - minPanelHeight;
-      const targetAspectRatio = aspectRatioOverride ?? aspectRatioSv.value;
+      const targetAspectRatio = aspectRatioOverride ?? aspectRatioSv.get();
       // Use thumbnail aspect ratio so overlay image rect matches the feed image; shared-element close animates correctly.
       const { width: expW, height: expH } = computeExpandedSize(
         screenWidth,
@@ -471,10 +494,10 @@ export function ImageOverlayProvider({
         targetAspectRatio
       );
       const centerY = safeTop + availableHeight / 2;
-      centerYSv.value = centerY;
-      expandedWidthSv.value = expW;
-      expandedHeightSv.value = expH;
-      aspectRatioSv.value = targetAspectRatio;
+      centerYSv.set(centerY);
+      expandedWidthSv.set(expW);
+      expandedHeightSv.set(expH);
+      aspectRatioSv.set(targetAspectRatio);
       scheduleOnUI(openPanelImageToFinal);
     },
     [
@@ -499,8 +522,8 @@ export function ImageOverlayProvider({
   const beginOverlaySession = useCallback(
     (layout: ImageOverlayReplaceLayout, fallbackAspectRatio: number) => {
       openSessionIdRef.current += 1;
-      safeTopSv.value = safeTop;
-      safeBottomSv.value = safeBottom;
+      safeTopSv.set(safeTop);
+      safeBottomSv.set(safeBottom);
       const hasPanel = !!layout.post;
       const availableHeight = imageViewportHeight;
       const media = resolveOverlayMedia(layout, screenWidth, availableHeight, fallbackAspectRatio);
@@ -510,16 +533,16 @@ export function ImageOverlayProvider({
       setActiveAspectRatio(media.aspectRatio);
       setActiveOverlayPost(layout.post ?? null);
 
-      screenWidthSv.value = screenWidth;
-      screenHeightSv.value = screenHeight;
-      aspectRatioSv.value = media.aspectRatio;
-      panelHeightSv.value = 0; // Sheet closed initially (or no panel at all)
+      screenWidthSv.set(screenWidth);
+      screenHeightSv.set(screenHeight);
+      aspectRatioSv.set(media.aspectRatio);
+      panelHeightSv.set(0); // Sheet closed initially (or no panel at all)
       if (hasPanel) {
-        hasPanelSv.value = 1;
+        hasPanelSv.set(1);
         // Block panel reaction until the caller's open/replace animation runs.
-        openAnimationInProgressSv.value = 1;
+        openAnimationInProgressSv.set(1);
       } else {
-        hasPanelSv.value = 0;
+        hasPanelSv.set(0);
       }
       return { ...media, hasPanel, imageAreaCenterY: safeTop + availableHeight / 2 };
     },
@@ -553,11 +576,11 @@ export function ImageOverlayProvider({
         // matches the feed image and the shared-element close lands on it.
       } = beginOverlaySession(layout, layout.width / layout.height);
 
-      scrollOffsetAtOpen.value = scrollOffsetY.value;
-      closeTargetPageX.value = layout.pageX;
-      closeTargetPageY.value = layout.pageY;
-      closeTargetWidth.value = layout.width;
-      closeTargetHeight.value = layout.height;
+      scrollOffsetAtOpen.set(scrollOffsetY.get());
+      closeTargetPageX.set(layout.pageX);
+      closeTargetPageY.set(layout.pageY);
+      closeTargetWidth.set(layout.width);
+      closeTargetHeight.set(layout.height);
       const eventId = layout.post?.event?.id;
       const keyForIndex = (i: number, u: string) => (eventId != null ? `${eventId}-${i}` : u);
       thumbnailLayoutsRef.current[keyForIndex(initialIndex, layout.url)] = {
@@ -602,18 +625,18 @@ export function ImageOverlayProvider({
         cancelAnimation(panelHeightSv);
 
         // 2. Set starting position (thumbnail rect) — must happen after cancel.
-        closeSpringsDoneCount.value = 0;
-        isClosing.value = false;
-        imageState.value = 'open';
-        imageXCoord.value = fromX;
-        imageYCoord.value = fromY;
-        imageWidth.value = fromW;
-        imageHeight.value = fromH;
+        closeSpringsDoneCount.set(0);
+        isClosing.set(false);
+        imageState.set('open');
+        imageXCoord.set(fromX);
+        imageYCoord.set(fromY);
+        imageWidth.set(fromW);
+        imageHeight.set(fromH);
 
-        centerXSv.value = screenCenterX;
-        centerYSv.value = toCenterY;
-        expandedWidthSv.value = expW;
-        expandedHeightSv.value = expH;
+        centerXSv.set(screenCenterX);
+        centerYSv.set(toCenterY);
+        expandedWidthSv.set(expW);
+        expandedHeightSv.set(expH);
 
         // 3. Start the expand animation in the same UI scheduling block.
         if (hasPanel) {
@@ -621,21 +644,22 @@ export function ImageOverlayProvider({
           // Keep panel-open initial expand fully on UI thread.
           // Relying on a JS setTimeout here could intermittently miss and leave
           // the image at thumbnail size.
-          openAnimationInProgressSv.value = 1;
-          const targetX = centerXSv.value - expandedWidthSv.value / 2;
-          const targetY = centerYSv.value - expandedHeightSv.value / 2;
-          imageXCoord.value = withDelay(OPEN_START_DELAY_MS, withSpring(targetX, CLOSE_SPRING));
-          imageYCoord.value = withDelay(OPEN_START_DELAY_MS, withSpring(targetY, CLOSE_SPRING));
-          imageWidth.value = withDelay(
-            OPEN_START_DELAY_MS,
-            withSpring(expandedWidthSv.value, CLOSE_SPRING)
+          openAnimationInProgressSv.set(1);
+          const targetX = centerXSv.get() - expandedWidthSv.get() / 2;
+          const targetY = centerYSv.get() - expandedHeightSv.get() / 2;
+          imageXCoord.set(withDelay(OPEN_START_DELAY_MS, withSpring(targetX, CLOSE_SPRING)));
+          imageYCoord.set(withDelay(OPEN_START_DELAY_MS, withSpring(targetY, CLOSE_SPRING)));
+          imageWidth.set(
+            withDelay(OPEN_START_DELAY_MS, withSpring(expandedWidthSv.get(), CLOSE_SPRING))
           );
-          imageHeight.value = withDelay(
-            OPEN_START_DELAY_MS,
-            withSpring(expandedHeightSv.value, CLOSE_SPRING, () => {
-              'worklet';
-              openAnimationInProgressSv.value = 0;
-            })
+          imageHeight.set(
+            withDelay(
+              OPEN_START_DELAY_MS,
+              withSpring(expandedHeightSv.get(), CLOSE_SPRING, () => {
+                'worklet';
+                openAnimationInProgressSv.set(0);
+              })
+            )
           );
         } else {
           openToCenter();
@@ -693,15 +717,15 @@ export function ImageOverlayProvider({
       const targetX = centerX - expW / 2;
       const targetY = toCenterY - expH / 2;
       if (!preserveCloseTarget) {
-        closeTargetPageX.value = targetX;
-        closeTargetPageY.value = targetY;
-        closeTargetWidth.value = expW;
-        closeTargetHeight.value = expH;
+        closeTargetPageX.set(targetX);
+        closeTargetPageY.set(targetY);
+        closeTargetWidth.set(expW);
+        closeTargetHeight.set(expH);
       }
-      centerXSv.value = centerX;
-      centerYSv.value = toCenterY;
-      expandedWidthSv.value = expW;
-      expandedHeightSv.value = expH;
+      centerXSv.set(centerX);
+      centerYSv.set(toCenterY);
+      expandedWidthSv.set(expW);
+      expandedHeightSv.set(expH);
 
       if (!preserveCloseTarget) {
         const eventId = layout.post?.event?.id;
@@ -726,17 +750,17 @@ export function ImageOverlayProvider({
         cancelAnimation(imageYCoord);
         cancelAnimation(imageWidth);
         cancelAnimation(imageHeight);
-        closeSpringsDoneCount.value = 0;
-        isClosing.value = false;
-        imageState.value = 'open';
-        imageXCoord.value = targetX;
-        imageYCoord.value = targetY;
-        imageWidth.value = expW;
-        imageHeight.value = expH;
-        blurIntensity.value = 100;
-        closeBtnOpacity.value = 1;
+        closeSpringsDoneCount.set(0);
+        isClosing.set(false);
+        imageState.set('open');
+        imageXCoord.set(targetX);
+        imageYCoord.set(targetY);
+        imageWidth.set(expW);
+        imageHeight.set(expH);
+        blurIntensity.set(100);
+        closeBtnOpacity.set(1);
         if (hasPanel) {
-          openAnimationInProgressSv.value = 0;
+          openAnimationInProgressSv.set(0);
         }
       });
 
@@ -799,66 +823,70 @@ export function ImageOverlayProvider({
   /** Worklet: run close animation to current closeTarget* (call after syncing targets from dismiss index). */
   const closeAnimationWorklet = useCallback(() => {
     'worklet';
-    if (imageState.value !== 'open') return;
-    if (isClosing.value) return;
-    isClosing.value = true;
+    if (imageState.get() !== 'open') return;
+    if (isClosing.get()) return;
+    isClosing.set(true);
 
     cancelAnimation(imageXCoord);
     cancelAnimation(imageYCoord);
     cancelAnimation(imageWidth);
     cancelAnimation(imageHeight);
 
-    const x = closeTargetPageX.value;
-    const scrollY = scrollOffsetY.value;
-    const scrollAtOpen = scrollOffsetAtOpen.value;
-    const y = closeTargetPageY.value - scrollY + scrollAtOpen;
-    const w = closeTargetWidth.value;
-    const h = closeTargetHeight.value;
+    const x = closeTargetPageX.get();
+    const scrollY = scrollOffsetY.get();
+    const scrollAtOpen = scrollOffsetAtOpen.get();
+    const y = closeTargetPageY.get() - scrollY + scrollAtOpen;
+    const w = closeTargetWidth.get();
+    const h = closeTargetHeight.get();
     // Animate from current overlay rect to target; do not snap to target aspect first
     // (that caused a visible jump when dismissing after a pan).
-    closeSpringsDoneCount.value = 0;
+    closeSpringsDoneCount.set(0);
 
     const maybeFinishClose = () => {
       'worklet';
-      closeSpringsDoneCount.value += 1;
-      if (closeSpringsDoneCount.value === 4) {
-        imageState.value = 'close';
+      closeSpringsDoneCount.set(closeSpringsDoneCount.get() + 1);
+      if (closeSpringsDoneCount.get() === 4) {
+        imageState.set('close');
         scheduleOnRN(finishClose);
       }
     };
 
-    blurIntensity.value = withTiming(0, {
-      duration: CLOSE_BLUR_AND_BTN_DURATION_MS,
-      easing: Easing.out(Easing.cubic),
-    });
+    blurIntensity.set(
+      withTiming(0, {
+        duration: CLOSE_BLUR_AND_BTN_DURATION_MS,
+        easing: Easing.out(Easing.cubic),
+      })
+    );
     const onXFinish = () => {
       'worklet';
-      imageXCoord.value = x;
+      imageXCoord.set(x);
       maybeFinishClose();
     };
     const onYFinish = () => {
       'worklet';
-      imageYCoord.value = y;
+      imageYCoord.set(y);
       maybeFinishClose();
     };
     const onWFinish = () => {
       'worklet';
-      imageWidth.value = w;
+      imageWidth.set(w);
       maybeFinishClose();
     };
     const onHFinish = () => {
       'worklet';
-      imageHeight.value = h;
+      imageHeight.set(h);
       maybeFinishClose();
     };
-    imageXCoord.value = withSpring(x, CLOSE_SPRING, onXFinish);
-    imageYCoord.value = withSpring(y, CLOSE_SPRING, onYFinish);
-    imageWidth.value = withSpring(w, CLOSE_SPRING, onWFinish);
-    imageHeight.value = withSpring(h, CLOSE_SPRING, onHFinish);
-    closeBtnOpacity.value = withTiming(0, {
-      duration: CLOSE_BLUR_AND_BTN_DURATION_MS,
-      easing: Easing.out(Easing.cubic),
-    });
+    imageXCoord.set(withSpring(x, CLOSE_SPRING, onXFinish));
+    imageYCoord.set(withSpring(y, CLOSE_SPRING, onYFinish));
+    imageWidth.set(withSpring(w, CLOSE_SPRING, onWFinish));
+    imageHeight.set(withSpring(h, CLOSE_SPRING, onHFinish));
+    closeBtnOpacity.set(
+      withTiming(0, {
+        duration: CLOSE_BLUR_AND_BTN_DURATION_MS,
+        easing: Easing.out(Easing.cubic),
+      })
+    );
   }, [
     imageState,
     isClosing,
@@ -916,15 +944,15 @@ export function ImageOverlayProvider({
         isFreshWindowRect: boolean
       ) => {
         if (layout) {
-          closeTargetPageX.value = layout.pageX;
-          closeTargetPageY.value = layout.pageY;
-          closeTargetWidth.value = layout.width;
-          closeTargetHeight.value = layout.height;
+          closeTargetPageX.set(layout.pageX);
+          closeTargetPageY.set(layout.pageY);
+          closeTargetWidth.set(layout.width);
+          closeTargetHeight.set(layout.height);
           if (isFreshWindowRect) {
             // A just-measured rect is already in current window coordinates;
             // zero the worklet's scroll-at-open correction so it isn't applied
             // on top (targetY = pageY - scrollY + scrollAtOpen).
-            scrollOffsetAtOpen.value = scrollOffsetY.value;
+            scrollOffsetAtOpen.set(scrollOffsetY.get());
           }
         }
         scheduleOnUI(closeAnimationWorklet);
@@ -933,7 +961,7 @@ export function ImageOverlayProvider({
       const measureNow = refKey != null ? thumbnailMeasureNowRef.current[refKey] : undefined;
       // Already closing (e.g. double-tap on close): keep the synchronous path;
       // the worklet's isClosing guard makes the second invocation a no-op.
-      if (!measureNow || isClosing.value) {
+      if (!measureNow || isClosing.get()) {
         applyTargetAndAnimate(fallbackLayout, false);
         return;
       }
@@ -942,7 +970,7 @@ export function ImageOverlayProvider({
         // Overlay was reopened/replaced (or a parallel close won) while we
         // awaited — don't retarget or restart the animation.
         if (openSessionIdRef.current !== sessionId) return;
-        if (isClosing.value) return;
+        if (isClosing.get()) return;
         if (fresh && fresh.width > 0 && fresh.height > 0) {
           applyTargetAndAnimate(fresh, true);
         } else {
@@ -979,10 +1007,10 @@ export function ImageOverlayProvider({
     }
     const layout = sessionLayoutByIndex ?? refLayout;
     if (layout) {
-      closeTargetPageX.value = layout.pageX;
-      closeTargetPageY.value = layout.pageY;
-      closeTargetWidth.value = layout.width;
-      closeTargetHeight.value = layout.height;
+      closeTargetPageX.set(layout.pageX);
+      closeTargetPageY.set(layout.pageY);
+      closeTargetWidth.set(layout.width);
+      closeTargetHeight.set(layout.height);
     }
   }, [
     activeIndex,
@@ -1119,15 +1147,15 @@ export function ImageOverlayProvider({
   ]);
 
   useAnimatedReaction(
-    () => panelHeightSv.value,
+    () => panelHeightSv.get(),
     (panelH) => {
-      if (hasPanelSv.value !== 1) return;
-      if (openAnimationInProgressSv.value === 1) return;
-      if (isClosing.value) return;
-      const sh = screenHeightSv.value;
-      const sw = screenWidthSv.value;
-      const topInset = safeTopSv.value;
-      const bottomInset = safeBottomSv.value;
+      if (hasPanelSv.get() !== 1) return;
+      if (openAnimationInProgressSv.get() === 1) return;
+      if (isClosing.get()) return;
+      const sh = screenHeightSv.get();
+      const sw = screenWidthSv.get();
+      const topInset = safeTopSv.get();
+      const bottomInset = safeBottomSv.get();
       // Only shrink image when the sheet would collide with it (sheet top above content).
       const effectiveBottom = panelH > bottomInset ? panelH : 0;
       const availableHeight = sh - topInset - effectiveBottom;
@@ -1135,17 +1163,17 @@ export function ImageOverlayProvider({
       // Max viewport: full width and height so each image can fit independently (contentFit="contain")
       const expW = sw;
       const expH = availableHeight;
-      expandedWidthSv.value = expW;
-      expandedHeightSv.value = expH;
-      centerYSv.value = centerY;
-      const cx = centerXSv.value;
+      expandedWidthSv.set(expW);
+      expandedHeightSv.set(expH);
+      centerYSv.set(centerY);
+      const cx = centerXSv.get();
       const imageX = cx - expW / 2;
       const imageY = centerY - expH / 2;
       // Direct assignment so image follows panel without restarting springs every frame (avoids jitter)
-      imageXCoord.value = imageX;
-      imageYCoord.value = imageY;
-      imageWidth.value = expW;
-      imageHeight.value = expH;
+      imageXCoord.set(imageX);
+      imageYCoord.set(imageY);
+      imageWidth.set(expW);
+      imageHeight.set(expH);
     }
   );
 
@@ -1183,6 +1211,6 @@ export function trackFeedScrollOffset(
 ): void {
   scrollOffsetRef.current = offsetY;
   if (imageOverlay?.scrollOffsetY != null) {
-    imageOverlay.scrollOffsetY.value = offsetY;
+    imageOverlay.scrollOffsetY.set(offsetY);
   }
 }

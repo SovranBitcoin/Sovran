@@ -164,19 +164,19 @@ function AnimatedImageOverlayContent({
   useEffect(() => {
     const idx = activeIndex;
     const isVideo = activeMediaTypes.length > idx && activeMediaTypes[idx] === 'video';
-    isCurrentPageVideoSv.value = isVideo ? 1 : 0;
+    isCurrentPageVideoSv.set(isVideo ? 1 : 0);
   }, [activeIndex, activeMediaTypes, isCurrentPageVideoSv]);
 
   useEffect(() => {
-    pagerOffsetSv.value = activeIndex;
+    pagerOffsetSv.set(activeIndex);
   }, [activeIndex, pagerOffsetSv]);
 
   useEffect(() => {
-    verticalPagerOffsetSv.value = videoFeedLayoutIndex;
+    verticalPagerOffsetSv.set(videoFeedLayoutIndex);
   }, [videoFeedLayoutIndex, verticalPagerOffsetSv]);
 
   useEffect(() => {
-    if (activeUrl) overlayUIVisible.value = 1;
+    if (activeUrl) overlayUIVisible.set(1);
   }, [activeUrl, overlayUIVisible]);
 
   /** When overlay opens from a video, enable vertical feed; never switch to video feed when user opened an image. */
@@ -203,7 +203,7 @@ function AnimatedImageOverlayContent({
   const handleReplyBarHeight = useCallback(
     (height: number) => {
       setReplyBarHeight(height);
-      replyBarHeightSv.value = height;
+      replyBarHeightSv.set(height);
     },
     [replyBarHeightSv]
   );
@@ -216,7 +216,7 @@ function AnimatedImageOverlayContent({
     setSheetOpen(open);
   }, []);
   useAnimatedReaction(
-    () => panelHeightSv.value > 10,
+    () => panelHeightSv.get() > 10,
     (isOpen, wasOpen) => {
       if (wasOpen !== undefined && isOpen !== wasOpen) {
         scheduleOnRN(setSheetOpenFromReaction, isOpen);
@@ -228,13 +228,13 @@ function AnimatedImageOverlayContent({
   /** Fade absolute overlay bar in when sheet is closed, out when sheet opens or overlay closes. */
   useEffect(() => {
     if (!activeOverlayPost) {
-      absoluteOverlayOpacitySv.value = withTiming(0, { duration: duration.instant });
+      absoluteOverlayOpacitySv.set(withTiming(0, { duration: duration.instant }));
       return;
     }
     if (sheetOpen) {
-      absoluteOverlayOpacitySv.value = withTiming(0, { duration: duration.quick });
+      absoluteOverlayOpacitySv.set(withTiming(0, { duration: duration.quick }));
     } else {
-      absoluteOverlayOpacitySv.value = withTiming(1, { duration: duration.quick });
+      absoluteOverlayOpacitySv.set(withTiming(1, { duration: duration.quick }));
     }
   }, [activeOverlayPost, sheetOpen, absoluteOverlayOpacitySv]);
 
@@ -247,10 +247,12 @@ function AnimatedImageOverlayContent({
       if (options?.expandContent) setOpenWithContentExpanded(true);
       const snap60 = screenHeight * BOTTOM_PANEL_SHEET_SNAP_60_FRACTION;
       setPanelContentMinHeight(snap60);
-      panelHeightSv.value = withSpring(snap60, {
-        dampingRatio: 0.82,
-        duration: 520,
-      });
+      panelHeightSv.set(
+        withSpring(snap60, {
+          dampingRatio: 0.82,
+          duration: 520,
+        })
+      );
     },
     [screenHeight, setPanelContentMinHeight, panelHeightSv]
   );
@@ -266,23 +268,23 @@ function AnimatedImageOverlayContent({
   );
 
   const rContainerStyle = useAnimatedStyle(() => ({
-    pointerEvents: imageState.value === 'open' ? 'auto' : 'none',
-    opacity: imageState.value === 'open' ? 1 : 0,
+    pointerEvents: imageState.get() === 'open' ? 'auto' : 'none',
+    opacity: imageState.get() === 'open' ? 1 : 0,
   }));
 
   const rImageStyle = useAnimatedStyle(() => {
     'worklet';
-    const open = imageState.value === 'open';
-    const closing = isClosing.value;
-    const tw = closeTargetWidth.value;
-    const th = closeTargetHeight.value;
-    const w = imageWidth.value;
-    const h = imageHeight.value;
-    const panelOpen = panelHeightSv.value > 10;
+    const open = imageState.get() === 'open';
+    const closing = isClosing.get();
+    const tw = closeTargetWidth.get();
+    const th = closeTargetHeight.get();
+    const w = imageWidth.get();
+    const h = imageHeight.get();
+    const panelOpen = panelHeightSv.get() > 10;
     // Vertical feed + open + not closing: full-screen wrap centered on image so pager isn't clipped when swiping, and wrap still moves with drag (imageXCoord/imageYCoord drive center).
     if (isVerticalFeed && open && !closing) {
-      const centerX = imageXCoord.value + w / 2;
-      const centerY = imageYCoord.value + h / 2;
+      const centerX = imageXCoord.get() + w / 2;
+      const centerY = imageYCoord.get() + h / 2;
       return {
         left: centerX - screenWidth / 2,
         top: centerY - screenHeight / 2,
@@ -290,20 +292,20 @@ function AnimatedImageOverlayContent({
         height: screenHeight,
         opacity: 1,
         overflow: 'hidden' as const,
-        transform: [{ scale: imageScale.value }],
+        transform: [{ scale: imageScale.get() }],
       };
     }
     // When panel is open, image viewport shrinks with sheet — allow size to go below thumbnail. When closed, keep at least thumbnail size for dismiss animation.
     const viewW = panelOpen ? w : tw > 0 && th > 0 ? Math.max(w, tw) : w;
     const viewH = panelOpen ? h : tw > 0 && th > 0 ? Math.max(h, th) : h;
     return {
-      left: imageXCoord.value,
-      top: imageYCoord.value,
+      left: imageXCoord.get(),
+      top: imageYCoord.get(),
       width: viewW,
       height: viewH,
       opacity: open ? 1 : 0,
       overflow: 'hidden' as const,
-      transform: [{ scale: imageScale.value }],
+      transform: [{ scale: imageScale.get() }],
     };
   }, [
     isVerticalFeed,
@@ -317,13 +319,13 @@ function AnimatedImageOverlayContent({
 
   const rPagerScaleStyle = useAnimatedStyle(() => {
     'worklet';
-    const ew = expandedWidthSv.value;
-    const eh = expandedHeightSv.value;
-    const tw = closeTargetWidth.value;
-    const th = closeTargetHeight.value;
-    const w = imageWidth.value;
-    const h = imageHeight.value;
-    const panelOpen = panelHeightSv.value > 10;
+    const ew = expandedWidthSv.get();
+    const eh = expandedHeightSv.get();
+    const tw = closeTargetWidth.get();
+    const th = closeTargetHeight.get();
+    const w = imageWidth.get();
+    const h = imageHeight.get();
+    const panelOpen = panelHeightSv.get() > 10;
     const viewW = panelOpen ? w : tw > 0 && th > 0 ? Math.max(w, tw) : w;
     const viewH = panelOpen ? h : tw > 0 && th > 0 ? Math.max(h, th) : h;
     const scale = ew > 0 && eh > 0 ? Math.max(viewW / ew, viewH / eh) : 1;
@@ -348,9 +350,9 @@ function AnimatedImageOverlayContent({
   const urlCount = activeUrls.length;
   const rPagerRowStyle = useAnimatedStyle(() => {
     'worklet';
-    const ew = expandedWidthSv.value;
-    const eh = expandedHeightSv.value;
-    const x = -pagerOffsetSv.value * ew;
+    const ew = expandedWidthSv.get();
+    const eh = expandedHeightSv.get();
+    const x = -pagerOffsetSv.get() * ew;
     return {
       width: ew * Math.max(1, urlCount),
       height: eh,
@@ -359,7 +361,7 @@ function AnimatedImageOverlayContent({
   }, [expandedWidth, expandedHeight, expandedWidthSv, expandedHeightSv, urlCount]);
 
   const backdropAnimatedProps = useAnimatedProps(() => ({
-    intensity: blurIntensity.value,
+    intensity: blurIntensity.get(),
   }));
 
   /**
@@ -371,31 +373,31 @@ function AnimatedImageOverlayContent({
    * like the iOS blur.
    */
   const rAndroidScrimStyle = useAnimatedStyle(() => ({
-    opacity: (blurIntensity.value / DISMISS_BLUR_AT_REST) * ANDROID_SCRIM_MAX_OPACITY,
+    opacity: (blurIntensity.get() / DISMISS_BLUR_AT_REST) * ANDROID_SCRIM_MAX_OPACITY,
   }));
 
   const rCloseBtnStyle = useAnimatedStyle(() => ({
-    opacity: closeBtnOpacity.value * overlayUIVisible.value * (panelHeightSv.value <= 10 ? 1 : 0),
+    opacity: closeBtnOpacity.get() * overlayUIVisible.get() * (panelHeightSv.get() <= 10 ? 1 : 0),
   }));
 
   /** Fade dots only during drag-to-dismiss (not affected by tap-on-image toggle). */
   const rDotPagerStyle = useAnimatedStyle(() => ({
-    opacity: closeBtnOpacity.value,
+    opacity: closeBtnOpacity.get(),
   }));
 
   /** Fade bottom panel with close button during dismiss. Tap image toggles overlayUIVisible. */
   const rBottomPanelStyle = useAnimatedStyle(() => ({
-    opacity: closeBtnOpacity.value * overlayUIVisible.value,
+    opacity: closeBtnOpacity.get() * overlayUIVisible.get(),
   }));
 
   /** Absolute overlay bar opacity: fades in when sheet closed, fades out when sheet opens; still tied to closeBtn/overlayUI for dismiss. */
   const rAbsoluteOverlayBarOpacityStyle = useAnimatedStyle(() => ({
-    opacity: absoluteOverlayOpacitySv.value * closeBtnOpacity.value * overlayUIVisible.value,
+    opacity: absoluteOverlayOpacitySv.get() * closeBtnOpacity.get() * overlayUIVisible.get(),
   }));
 
   /** Panel position/size driven by panelHeightSv. */
   const rBottomPanelLayoutStyle = useAnimatedStyle(() => {
-    const h = panelHeightSv.value;
+    const h = panelHeightSv.get();
     return {
       top: screenHeight - h,
       height: h,
@@ -410,8 +412,8 @@ function AnimatedImageOverlayContent({
   // and the fade completes by the time the drawer shrinks to the bar's height so
   // the bar never pokes above the closing sheet.
   const rReplyBarFadeStyle = useAnimatedStyle(() => {
-    const bar = replyBarHeightSv.value || 120;
-    const t = (panelHeightSv.value - bar) / 100;
+    const bar = replyBarHeightSv.get() || 120;
+    const t = (panelHeightSv.get() - bar) / 100;
     return { opacity: Math.min(1, Math.max(0, t)) };
   });
 
@@ -437,12 +439,12 @@ function AnimatedImageOverlayContent({
   /** Pass current pager index when multiple images so dismiss animates to the visible thumbnail. */
   const triggerClose = useCallback(
     (dismissedPageIndex?: number) => {
-      imageScale.value = 1;
+      imageScale.set(1);
       const idx =
         typeof dismissedPageIndex === 'number'
           ? dismissedPageIndex
           : hasMultipleMedia
-            ? Math.round(pagerOffsetSv.value)
+            ? Math.round(pagerOffsetSv.get())
             : 0;
       const fn = closeRef.current;
       if (fn) fn(idx);
@@ -466,20 +468,22 @@ function AnimatedImageOverlayContent({
     (gesture: PanGesture): PanGesture =>
       gesture
         .onStart(() => {
-          dismissPanActive.value = 1;
+          dismissPanActive.set(1);
           scheduleOnRN(setDismissPanActive, true);
-          panStartX.value = imageXCoord.value;
-          panStartY.value = imageYCoord.value;
-          closeBtnOpacity.value = withTiming(0, {
-            duration: DISMISS_CLOSE_BTN_FADE_DURATION_MS,
-          });
+          panStartX.set(imageXCoord.get());
+          panStartY.set(imageYCoord.get());
+          closeBtnOpacity.set(
+            withTiming(0, {
+              duration: DISMISS_CLOSE_BTN_FADE_DURATION_MS,
+            })
+          );
         })
         .onChange((event) => {
-          if (imageState.value === 'close') return;
-          imageXCoord.value += event.changeX * DISMISS_DRAG_FOLLOW;
-          imageYCoord.value += event.changeY * DISMISS_DRAG_FOLLOW;
-          const deltaX = imageXCoord.value - panStartX.value;
-          const deltaY = imageYCoord.value - panStartY.value;
+          if (imageState.get() === 'close') return;
+          imageXCoord.set(imageXCoord.get() + event.changeX * DISMISS_DRAG_FOLLOW);
+          imageYCoord.set(imageYCoord.get() + event.changeY * DISMISS_DRAG_FOLLOW);
+          const deltaX = imageXCoord.get() - panStartX.get();
+          const deltaY = imageYCoord.get() - panStartY.get();
           const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
           const dragRange = screenWidth * DISMISS_DRAG_RANGE_FRACTION;
           const scale = interpolate(distance, [0, dragRange], [1, DISMISS_SCALE_AT_DRAG], {
@@ -488,29 +492,29 @@ function AnimatedImageOverlayContent({
           const blur = interpolate(distance, [0, dragRange], [DISMISS_BLUR_AT_REST, 0], {
             extrapolateRight: 'clamp',
           });
-          imageScale.value = scale;
-          blurIntensity.value = blur;
+          imageScale.set(scale);
+          blurIntensity.set(blur);
         })
         .onFinalize(() => {
-          const wasActive = dismissPanActive.value === 1;
-          dismissPanActive.value = 0;
-          const deltaX = imageXCoord.value - panStartX.value;
-          const deltaY = imageYCoord.value - panStartY.value;
+          const wasActive = dismissPanActive.get() === 1;
+          dismissPanActive.set(0);
+          const deltaX = imageXCoord.get() - panStartX.get();
+          const deltaY = imageYCoord.get() - panStartY.get();
           const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-          const ew = expandedWidthSv.value || expandedWidth;
-          const eh = expandedHeightSv.value || expandedHeight;
+          const ew = expandedWidthSv.get() || expandedWidth;
+          const eh = expandedHeightSv.get() || expandedHeight;
           const threshold = Math.max(ew, eh) * DISMISS_THRESHOLD_FRACTION;
           const dismissed = distance > threshold;
           scheduleOnRN(setDismissPanActive, false);
           if (!wasActive) return;
           if (dismissed) {
             // Avoid transform-origin drift while closing; return animation should be driven by x/y/size only.
-            imageScale.value = 1;
+            imageScale.set(1);
             cancelAnimation(pagerOffsetSv);
-            pagerOffsetSv.value = Math.round(pagerOffsetSv.value);
-            scheduleOnRN(triggerClose, Math.round(pagerOffsetSv.value));
+            pagerOffsetSv.set(Math.round(pagerOffsetSv.get()));
+            scheduleOnRN(triggerClose, Math.round(pagerOffsetSv.get()));
           } else {
-            imageScale.value = withTiming(1, IMAGE_OVERLAY_TIMING_CONFIG);
+            imageScale.set(withTiming(1, IMAGE_OVERLAY_TIMING_CONFIG));
             openToCenter();
           }
         }),
@@ -559,8 +563,8 @@ function AnimatedImageOverlayContent({
   const toggleOverlayUI = useCallback(() => {
     scheduleOnUI(() => {
       'worklet';
-      const next = overlayUIVisible.value === 1 ? 0 : 1;
-      overlayUIVisible.value = withTiming(next, { duration: 200 });
+      const next = overlayUIVisible.get() === 1 ? 0 : 1;
+      overlayUIVisible.set(withTiming(next, { duration: 200 }));
     });
   }, [overlayUIVisible]);
 
@@ -605,32 +609,46 @@ function AnimatedImageOverlayContent({
       Gesture.Tap()
         .maxDistance(TAP_MAX_DISTANCE)
         .onEnd((e) => {
-          if (imageState.value === 'close') return;
+          if (imageState.get() === 'close') return;
           const x = e.x;
           const y = e.y;
-          const ix = imageXCoord.value;
-          const iy = imageYCoord.value;
-          const iw = imageWidth.value;
-          const ih = imageHeight.value;
+          const ix = imageXCoord.get();
+          const iy = imageYCoord.get();
+          const iw = imageWidth.get();
+          const ih = imageHeight.get();
           const insideImage = x >= ix && x <= ix + iw && y >= iy && y <= iy + ih;
           if (insideImage) {
             scheduleOnRN(handleImagePress);
             return;
           }
           const effectiveBottom = activeOverlayPost
-            ? panelHeightSv.value > 0
-              ? panelHeightSv.value
+            ? panelHeightSv.get() > 0
+              ? panelHeightSv.get()
               : BOTTOM_PANEL_ABSOLUTE_OVERLAY_HEIGHT
             : BOTTOM_PANEL_SAFE_HEIGHT;
           const panelTopY = screenHeight - effectiveBottom;
           const insideBottomPanel = y >= panelTopY;
           if (insideBottomPanel) return;
           cancelAnimation(pagerOffsetSv);
-          pagerOffsetSv.value = Math.round(pagerOffsetSv.value);
-          scheduleOnRN(triggerClose, Math.round(pagerOffsetSv.value));
+          pagerOffsetSv.set(Math.round(pagerOffsetSv.get()));
+          scheduleOnRN(triggerClose, Math.round(pagerOffsetSv.get()));
         }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- worklet reads shared values
-    [triggerClose, handleImagePress, screenHeight, activeOverlayPost, panelHeightSv, pagerOffsetSv]
+    // Shared values are stable for the component's lifetime, so listing the ones
+    // these worklets touch is honest and costs nothing — and it replaces the
+    // exhaustive-deps suppressions that used to switch React Compiler off.
+    [
+      triggerClose,
+      handleImagePress,
+      screenHeight,
+      activeOverlayPost,
+      panelHeightSv,
+      pagerOffsetSv,
+      imageHeight,
+      imageState,
+      imageWidth,
+      imageXCoord,
+      imageYCoord,
+    ]
   );
 
   const panelDragStartSv = useSharedValue(0);
@@ -645,7 +663,7 @@ function AnimatedImageOverlayContent({
 
   const panelScrollHandler = useCallback(
     (e: { nativeEvent: { contentOffset: { y: number } } }) => {
-      scrollOffsetYInPanel.value = e.nativeEvent.contentOffset.y;
+      scrollOffsetYInPanel.set(e.nativeEvent.contentOffset.y);
     },
     [scrollOffsetYInPanel]
   );
@@ -675,16 +693,18 @@ function AnimatedImageOverlayContent({
       else if (current < t80) snapTo = SNAP_60;
       else snapTo = SNAP_100;
       const closeSheet = snapTo <= 0;
-      panelHeightSv.value = withTiming(
-        snapTo,
-        {
-          duration: BOTTOM_PANEL_STIFF_DURATION_MS,
-          easing: Easing.out(Easing.cubic),
-        },
-        (finished) => {
-          'worklet';
-          if (finished && closeSheet) scheduleOnRN(setSheetOpenFromReaction, false);
-        }
+      panelHeightSv.set(
+        withTiming(
+          snapTo,
+          {
+            duration: BOTTOM_PANEL_STIFF_DURATION_MS,
+            easing: Easing.out(Easing.cubic),
+          },
+          (finished) => {
+            'worklet';
+            if (finished && closeSheet) scheduleOnRN(setSheetOpenFromReaction, false);
+          }
+        )
       );
     },
     [panelHeightSv, snap60Height, panelMaxHeight, screenHeight, setSheetOpenFromReaction]
@@ -695,16 +715,16 @@ function AnimatedImageOverlayContent({
     () =>
       Gesture.Pan()
         .onStart(() => {
-          panelDragStartSv.value = panelHeightSv.value;
+          panelDragStartSv.set(panelHeightSv.get());
         })
         .onChange((e) => {
           const maxH = panelMaxHeight;
-          const next = panelDragStartSv.value - e.translationY;
-          panelHeightSv.value = Math.max(0, Math.min(maxH, next));
+          const next = panelDragStartSv.get() - e.translationY;
+          panelHeightSv.set(Math.max(0, Math.min(maxH, next)));
         })
         .onEnd((e) => {
           'worklet';
-          settlePanelHeight(panelHeightSv.value, -e.velocityY);
+          settlePanelHeight(panelHeightSv.get(), -e.velocityY);
         }),
     [panelHeightSv, panelDragStartSv, panelMaxHeight, settlePanelHeight]
   );
@@ -724,27 +744,27 @@ function AnimatedImageOverlayContent({
             stateManager.fail();
             return;
           }
-          panelTouchStartYSv.value = e.allTouches[0]?.y ?? 0;
+          panelTouchStartYSv.set(e.allTouches[0]?.y ?? 0);
         })
         .onTouchesMove((e, stateManager) => {
           'worklet';
-          if (panelTouchStartYSv.value < 0) return;
+          if (panelTouchStartYSv.get() < 0) return;
           if (e.numberOfTouches !== 1) {
-            panelTouchStartYSv.value = -1;
+            panelTouchStartYSv.set(-1);
             stateManager.fail();
             return;
           }
           const touchY = e.allTouches[0]?.y ?? 0;
-          const deltaY = touchY - panelTouchStartYSv.value;
-          const sheetAtSmallSnap = panelHeightSv.value < scrollVsDragMidHeight;
+          const deltaY = touchY - panelTouchStartYSv.get();
+          const sheetAtSmallSnap = panelHeightSv.get() < scrollVsDragMidHeight;
           const draggedDown = deltaY >= PANEL_DRAG_THRESHOLD;
           const draggedUp = deltaY <= -PANEL_DRAG_THRESHOLD;
           if (draggedDown || draggedUp) {
-            panelTouchStartYSv.value = -1;
+            panelTouchStartYSv.set(-1);
             if (sheetAtSmallSnap) {
               stateManager.activate();
             } else {
-              const scrollAtTop = scrollOffsetYInPanel.value <= SCROLL_AT_TOP_THRESHOLD;
+              const scrollAtTop = scrollOffsetYInPanel.get() <= SCROLL_AT_TOP_THRESHOLD;
               if (scrollAtTop && draggedDown) {
                 stateManager.activate();
               } else {
@@ -755,29 +775,29 @@ function AnimatedImageOverlayContent({
         })
         .onTouchesUp((_e, stateManager) => {
           'worklet';
-          if (panelTouchStartYSv.value >= 0) {
-            panelTouchStartYSv.value = -1;
+          if (panelTouchStartYSv.get() >= 0) {
+            panelTouchStartYSv.set(-1);
             stateManager.fail();
           }
         })
         .onTouchesCancelled((_e, stateManager) => {
           'worklet';
-          if (panelTouchStartYSv.value >= 0) {
-            panelTouchStartYSv.value = -1;
+          if (panelTouchStartYSv.get() >= 0) {
+            panelTouchStartYSv.set(-1);
             stateManager.fail();
           }
         })
         .onStart(() => {
-          panelDragStartSv.value = panelHeightSv.value;
+          panelDragStartSv.set(panelHeightSv.get());
         })
         .onChange((e) => {
           const maxH = panelMaxHeight;
-          const next = panelDragStartSv.value - e.translationY;
-          panelHeightSv.value = Math.max(0, Math.min(maxH, next));
+          const next = panelDragStartSv.get() - e.translationY;
+          panelHeightSv.set(Math.max(0, Math.min(maxH, next)));
         })
         .onEnd((e) => {
           'worklet';
-          settlePanelHeight(panelHeightSv.value, -e.velocityY);
+          settlePanelHeight(panelHeightSv.get(), -e.velocityY);
         })
         .withRef(scrollAreaPanRef),
     [
@@ -802,12 +822,10 @@ function AnimatedImageOverlayContent({
     if (!onSwipeUpToNextPost || !openReplace) return;
     animatingToNextRef.current = true;
     const duration = SWIPE_UP_TRANSITION_DURATION_MS;
-    swipeUpTranslateY.value = withTiming(
-      -screenHeight,
-      { duration, easing: Easing.out(Easing.cubic) },
-      (finished) => {
+    swipeUpTranslateY.set(
+      withTiming(-screenHeight, { duration, easing: Easing.out(Easing.cubic) }, (finished) => {
         if (finished) scheduleOnRN(triggerSwipeUpToNext);
-      }
+      })
     );
   }, [onSwipeUpToNextPost, openReplace, screenHeight, swipeUpTranslateY, triggerSwipeUpToNext]);
 
@@ -820,24 +838,24 @@ function AnimatedImageOverlayContent({
         .failOffsetX([-PAGER_FAIL_OFFSET_Y, PAGER_FAIL_OFFSET_Y])
         .minDistance(PAGER_MIN_DISTANCE)
         .onStart(() => {
-          if (imageState.value !== 'open') return;
+          if (imageState.get() !== 'open') return;
           scheduleOnRN(setPagerDragActive, true);
-          startVerticalPagerOffsetSv.value = verticalPagerOffsetSv.value;
+          startVerticalPagerOffsetSv.set(verticalPagerOffsetSv.get());
         })
         .onChange((e) => {
-          if (imageState.value !== 'open') return;
+          if (imageState.get() !== 'open') return;
           const delta = -e.translationY / screenHeight;
-          const next = startVerticalPagerOffsetSv.value + delta;
-          verticalPagerOffsetSv.value = Math.max(0, Math.min(verticalFeedPageCount - 1, next));
+          const next = startVerticalPagerOffsetSv.get() + delta;
+          verticalPagerOffsetSv.set(Math.max(0, Math.min(verticalFeedPageCount - 1, next)));
         })
         .onEnd((e) => {
-          if (imageState.value !== 'open') return;
+          if (imageState.get() !== 'open') return;
           const delta = -e.translationY / screenHeight;
-          const current = startVerticalPagerOffsetSv.value + delta;
+          const current = startVerticalPagerOffsetSv.get() + delta;
           const velocity = -e.velocityY / screenHeight;
           const effective = current + velocity * PAGER_VELOCITY_WEIGHT;
           let snapTo = Math.max(0, Math.min(verticalFeedPageCount - 1, Math.round(effective)));
-          const startIndex = Math.round(startVerticalPagerOffsetSv.value);
+          const startIndex = Math.round(startVerticalPagerOffsetSv.get());
           if (
             velocity >= PAGER_FLICK_VELOCITY_THRESHOLD &&
             startIndex < verticalFeedPageCount - 1
@@ -851,17 +869,19 @@ function AnimatedImageOverlayContent({
             ? 0
             : Math.max(-PAGER_VELOCITY_CLAMP, Math.min(PAGER_VELOCITY_CLAMP, velocity));
           const springConfig = didChangePage ? SNAP_SPRING_PAGE_CHANGE : SNAP_SPRING_SAME_PAGE;
-          verticalPagerOffsetSv.value = withSpring(
-            snapTo,
-            {
-              ...springConfig,
-              velocity: initialVelocity,
-            },
-            (finished) => {
-              if (finished && didChangePage) {
-                scheduleOnRN(onVerticalPagerSnap, snapTo);
+          verticalPagerOffsetSv.set(
+            withSpring(
+              snapTo,
+              {
+                ...springConfig,
+                velocity: initialVelocity,
+              },
+              (finished) => {
+                if (finished && didChangePage) {
+                  scheduleOnRN(onVerticalPagerSnap, snapTo);
+                }
               }
-            }
+            )
           );
           scheduleOnRN(setPagerDragActive, false);
         }),
@@ -879,12 +899,12 @@ function AnimatedImageOverlayContent({
   );
 
   const rVerticalFeedPagerStyle = useAnimatedStyle(() => {
-    const open = imageState.value === 'open';
-    const closing = isClosing.value;
-    const baseTranslateY = -verticalPagerOffsetSv.value * screenHeight;
+    const open = imageState.get() === 'open';
+    const closing = isClosing.get();
+    const baseTranslateY = -verticalPagerOffsetSv.get() * screenHeight;
     // When wrap is full-screen (vertical feed + open + !closing), center the fitted video in the viewport.
     const centerOffset =
-      isVerticalFeed && open && !closing ? (screenHeight - expandedHeightSv.value) / 2 : 0;
+      isVerticalFeed && open && !closing ? (screenHeight - expandedHeightSv.get()) / 2 : 0;
     return {
       width: screenWidth,
       height: screenHeight * Math.max(1, verticalFeedPageCount),
@@ -904,10 +924,10 @@ function AnimatedImageOverlayContent({
   /** Vertical bar pager fades with closeBtnOpacity so it doesn't sit on top of the shrinking image during close. */
   const rVerticalOverlayBarPagerStyle = useAnimatedStyle(
     () => ({
-      opacity: closeBtnOpacity.value,
+      opacity: closeBtnOpacity.get(),
       width: screenWidth,
       height: screenHeight * Math.max(1, verticalFeedPageCount),
-      transform: [{ translateY: -verticalPagerOffsetSv.value * screenHeight }],
+      transform: [{ translateY: -verticalPagerOffsetSv.get() * screenHeight }],
     }),
     [closeBtnOpacity, screenWidth, screenHeight, verticalFeedPageCount, verticalPagerOffsetSv]
   );
@@ -915,16 +935,18 @@ function AnimatedImageOverlayContent({
   useEffect(() => {
     if (!animatingToNextRef.current) return;
     animatingToNextRef.current = false;
-    swipeUpTranslateY.value = screenHeight;
+    swipeUpTranslateY.set(screenHeight);
     const duration = SWIPE_UP_TRANSITION_DURATION_MS;
-    swipeUpTranslateY.value = withTiming(0, {
-      duration,
-      easing: Easing.out(Easing.cubic),
-    });
+    swipeUpTranslateY.set(
+      withTiming(0, {
+        duration,
+        easing: Easing.out(Easing.cubic),
+      })
+    );
   }, [activeUrl, activeOverlayPost?.event?.id, screenHeight, swipeUpTranslateY]);
 
   const rSwipeUpWrapperStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: swipeUpTranslateY.value }],
+    transform: [{ translateY: swipeUpTranslateY.get() }],
   }));
 
   /** Swipe up on the overlay bar: only when current media is video. */
@@ -937,17 +959,17 @@ function AnimatedImageOverlayContent({
         .minDistance(6)
         .onChange((e) => {
           'worklet';
-          if (imageState.value !== 'open') return;
+          if (imageState.get() !== 'open') return;
           const ty = e.translationY;
           const clamped = Math.max(-screenHeight, Math.min(0, ty));
-          swipeUpTranslateY.value = clamped;
+          swipeUpTranslateY.set(clamped);
         })
         .onEnd((e) => {
           'worklet';
-          if (imageState.value !== 'open') return;
+          if (imageState.get() !== 'open') return;
           const ty = e.translationY;
           if (ty > -SWIPE_UP_CONFIRM_DISTANCE) {
-            swipeUpTranslateY.value = withSpring(0, SNAP_SPRING_SAME_PAGE);
+            swipeUpTranslateY.set(withSpring(0, SNAP_SPRING_SAME_PAGE));
             return;
           }
           scheduleOnRN(commitToNextPost);
@@ -970,26 +992,26 @@ function AnimatedImageOverlayContent({
         .failOffsetY([-PAGER_FAIL_OFFSET_Y, PAGER_FAIL_OFFSET_Y])
         .minDistance(PAGER_MIN_DISTANCE)
         .onStart(() => {
-          if (imageState.value !== 'open') return;
+          if (imageState.get() !== 'open') return;
           scheduleOnRN(setPagerDragActive, true);
-          startPagerOffsetSv.value = pagerOffsetSv.value;
+          startPagerOffsetSv.set(pagerOffsetSv.get());
         })
         .onChange((e) => {
-          if (imageState.value !== 'open') return;
-          const ew = expandedWidthSv.value || expandedWidth;
+          if (imageState.get() !== 'open') return;
+          const ew = expandedWidthSv.get() || expandedWidth;
           const delta = -e.translationX / ew;
-          const next = startPagerOffsetSv.value + delta;
-          pagerOffsetSv.value = Math.max(0, Math.min(maxPagerIndex, next));
+          const next = startPagerOffsetSv.get() + delta;
+          pagerOffsetSv.set(Math.max(0, Math.min(maxPagerIndex, next)));
         })
         .onEnd((e) => {
-          if (imageState.value !== 'open') return;
-          const ew = expandedWidthSv.value || expandedWidth;
+          if (imageState.get() !== 'open') return;
+          const ew = expandedWidthSv.get() || expandedWidth;
           const delta = -e.translationX / ew;
-          const current = startPagerOffsetSv.value + delta;
+          const current = startPagerOffsetSv.get() + delta;
           const velocity = -e.velocityX / ew;
           const effective = current + velocity * PAGER_VELOCITY_WEIGHT;
           let snapTo = Math.max(0, Math.min(maxPagerIndex, Math.round(effective)));
-          const startIndex = Math.round(startPagerOffsetSv.value);
+          const startIndex = Math.round(startPagerOffsetSv.get());
           if (velocity >= PAGER_FLICK_VELOCITY_THRESHOLD && startIndex < maxPagerIndex) {
             snapTo = startIndex + 1;
           } else if (velocity <= -PAGER_FLICK_VELOCITY_THRESHOLD && startIndex > 0) {
@@ -1000,25 +1022,29 @@ function AnimatedImageOverlayContent({
             ? 0
             : Math.max(-PAGER_VELOCITY_CLAMP, Math.min(PAGER_VELOCITY_CLAMP, velocity));
           const springConfig = didChangePage ? SNAP_SPRING_PAGE_CHANGE : SNAP_SPRING_SAME_PAGE;
-          pagerOffsetSv.value = withSpring(
-            snapTo,
-            {
-              ...springConfig,
-              velocity: initialVelocity,
-            },
-            (finished) => {
-              if (finished && didChangePage) {
-                scheduleOnRN(setActiveIndex, snapTo);
+          pagerOffsetSv.set(
+            withSpring(
+              snapTo,
+              {
+                ...springConfig,
+                velocity: initialVelocity,
+              },
+              (finished) => {
+                if (finished && didChangePage) {
+                  scheduleOnRN(setActiveIndex, snapTo);
+                }
               }
-            }
+            )
           );
           scheduleOnRN(setPagerDragActive, false);
         }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- shared values stable refs
     [
       hasMultipleMedia,
       expandedWidth,
       expandedWidthSv,
+      imageState,
+      pagerOffsetSv,
+      startPagerOffsetSv,
       maxPagerIndex,
       setActiveIndex,
       setPagerDragActive,

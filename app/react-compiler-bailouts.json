@@ -14,10 +14,7 @@
       "Existing memoization could not be preserved"
     ],
     "features/feed/components/nostr/image-overlay/AnimatedImageOverlay.tsx": [
-      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
-    ],
-    "features/feed/components/nostr/image-overlay/provider.tsx": [
-      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+      "Cannot access refs during render"
     ],
     "features/feed/components/nostr/useVideoTapGesture.ts": [
       "Cannot access refs during render"
@@ -52,7 +49,7 @@
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ],
     "features/nearPay/screens/NearPayScreen.tsx": [
-      "Cannot access refs during render"
+      "Support value blocks (conditional, logical, optional chaining, etc) within a try/catch statement"
     ],
     "features/payments/hooks/useMintContacts.ts": [
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
