@@ -7,6 +7,7 @@ import type {
   NostrTier,
 } from '@sovranbitcoin/schemas';
 import type { NaggFeedItem, NaggFeedEvent, NaggNoteMetrics, NaggProfileInfo, NaggFeedPage } from '../map/feed';
+import { toNoteStats } from './noteStatsContract';
 import type { RequestControls } from '../timeout';
 import type { TierOutcome } from '../tiers';
 import type { SortKey } from './session/page-buffer';
@@ -126,13 +127,13 @@ export function feedItemKey(item: FeedItem): SortKey {
 export function statsFromMetrics(metrics: Record<string, NaggNoteMetrics>): NoteStatsMap {
   const out: Record<string, NoteStats> = {};
   for (const [id, m] of Object.entries(metrics)) {
-    out[id] = {
+    out[id] = toNoteStats({
       likes: m.likeCount,
       reposts: m.repostCount,
       replies: m.replyCount,
       zaps: m.zapCount ?? 0,
       satsZapped: m.satsZapped,
-    };
+    });
   }
   return out;
 }
