@@ -1,14 +1,12 @@
-import React, { useEffect, createContext, useMemo } from 'react';
+import React, { useEffect, createContext, useMemo, useRef } from 'react';
+import { AppState } from 'react-native';
 import { useShallow } from 'zustand/react/shallow';
-import { usePricelistStore, BitcoinPrices } from '@/shared/stores/global/pricelistStore';
-import { log, initLog, useInitMount } from '@/shared/lib/logger';
-import { PricelistWsMessage, loggableIssues, parseWith } from '@sovranbitcoin/schemas';
+import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
+import { initLog, useInitMount } from '@/shared/lib/logger';
+import { createPricelistFeed, type PricelistFeed } from '@/shared/lib/pricelistFeed';
+import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 
 initLog('Module', 'PricelistProvider loaded');
-
-const PRICELIST_URL = 'wss://ws.sovran.money';
-
-const parsePricelistWs = parseWith(PricelistWsMessage, 'pricelist.ws');
 
 interface PricelistContextType {
   btcPrice?: number;
@@ -34,99 +32,48 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
   const setLoading = usePricelistStore((s) => s.setLoading);
   const setError = usePricelistStore((s) => s.setError);
   const isDataStale = usePricelistStore((s) => s.isStale);
+  const { isOffline } = useOfflineStatus();
+
+  const feedRef = useRef<PricelistFeed | null>(null);
 
   useEffect(() => {
-    let ws: WebSocket | null = null;
-    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 5;
-    const reconnectDelay = 1000; // Start with 1 second
-
-    const connect = () => {
-      if (ws?.readyState === WebSocket.OPEN) return;
-
-      log.info('pricelist.ws.connecting');
-      setLoading(true);
-      setError(null);
-
-      try {
-        ws = new WebSocket(PRICELIST_URL);
-
-        ws.onopen = () => {
-          log.info('pricelist.ws.connected');
-          setLoading(false);
-          setError(null);
-          reconnectAttempts = 0; // Reset on successful connection
-        };
-
-        ws.onmessage = (event) => {
-          let raw: unknown;
-          try {
-            raw = JSON.parse(event.data);
-          } catch (err) {
-            log.error('pricelist.ws.json_error', { error: err });
-            return; // Keep socket open; ignore malformed frame.
-          }
-          const parsed = parsePricelistWs(raw);
-          if (parsed.isErr()) {
-            log.warn('pricelist.ws.parse_rejected', {
-              issues: loggableIssues(parsed.error),
-            });
-            // Drop unknown-shape frames silently — price UI keeps its
-            // last-valid value rather than surfacing an error.
-            return;
-          }
-          setBtcPrices(parsed.value.btcPrices as BitcoinPrices);
-        };
-
-        ws.onerror = (err) => {
-          log.error('pricelist.ws.error', { error: err });
-          setError('Connection error');
-          setLoading(false);
-        };
-
-        ws.onclose = () => {
-          log.info('pricelist.ws.closed');
-          setLoading(false);
-
-          // Attempt to reconnect if we haven't exceeded max attempts
-          if (reconnectAttempts < maxReconnectAttempts) {
-            reconnectAttempts += 1;
-            log.info('pricelist.ws.reconnecting', {
-              attempt: reconnectAttempts,
-              max: maxReconnectAttempts,
-            });
-
-            reconnectTimeout = setTimeout(
-              () => {
-                connect();
-              },
-              reconnectDelay * Math.pow(2, reconnectAttempts - 1)
-            ); // Exponential backoff
-          } else {
-            log.error('pricelist.ws.max_reconnects');
-            setError('Connection lost. Please check your internet connection.');
-          }
-        };
-      } catch (err) {
-        log.error('pricelist.ws.create_failed', { error: err });
-        setError('Failed to connect to price feed');
-        setLoading(false);
-      }
-    };
-
-    // Start connection
-    connect();
-
+    const feed = createPricelistFeed({
+      onPrices: setBtcPrices,
+      onLoading: setLoading,
+      onError: setError,
+    });
+    feedRef.current = feed;
+    feed.start();
     return () => {
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
-      }
-      if (ws) {
-        ws.close();
-      }
+      feedRef.current = null;
+      feed.stop();
     };
   }, [setBtcPrices, setLoading, setError]);
+
+  // Re-arm on the two events that mean "the reason we failed may be gone".
+  // The backoff ladder is a burst limit, so without these a launch that spent
+  // its five attempts offline would never reconnect for the rest of the
+  // session. Foreground mirrors what the NIP-46 signer service already does
+  // for its relay sockets; the offline flag is the app's single connectivity
+  // owner, already debounced against Android's transport flapping, so this
+  // adds no second poller.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') return;
+      feedRef.current?.resume('foreground');
+    });
+    return () => subscription.remove();
+  }, []);
+
+  const wasOfflineRef = useRef(false);
+  useEffect(() => {
+    const wasOffline = wasOfflineRef.current;
+    wasOfflineRef.current = isOffline;
+    // Only the offline→online EDGE. Firing on the initial `false` would just
+    // re-enter a dial already in flight from the effect above.
+    if (isOffline || !wasOffline) return;
+    feedRef.current?.resume('online');
+  }, [isOffline]);
 
   const contextValue = useMemo<PricelistContextType>(
     () => ({
