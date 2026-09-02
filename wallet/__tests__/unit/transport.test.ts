@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getEncodedToken } from "@cashu/cashu-ts";
+import { getEncodedToken, Amount, type Proof } from "@cashu/cashu-ts";
 import {
   classifyMeshToken,
   meshTokenDedupeKey,
@@ -26,8 +26,16 @@ function p2pkSecret(
   ]);
 }
 
-function proof(secret: string, amount = 2) {
-  return { amount, id: KEYSET_ID, secret, C: `02${"ef".repeat(32)}` };
+function proof(secret: string, amount = 2): Proof {
+  // `Proof.amount` is a cashu-ts `Amount`, not a number. The encoder normalises
+  // either form to the same bytes, so this is about the fixture describing the
+  // shape production actually carries.
+  return {
+    amount: Amount.from(amount),
+    id: KEYSET_ID,
+    secret,
+    C: `02${"ef".repeat(32)}`,
+  };
 }
 
 function encode(proofs: ReturnType<typeof proof>[]): string {

@@ -19,6 +19,15 @@ import {
   type TransactionAnnotation,
 } from "../../src/annotations";
 
+/**
+ * An entry as the read model actually holds one: `metadata` is part of the
+ * shape but need not be present. Declaring the property is what lets these
+ * literals satisfy `EntryWithMetadata` (a bare `{ id }` shares no property
+ * with it); writing `metadata: undefined` instead would have put the key on
+ * the object, which is exactly what "has no metadata" must not do.
+ */
+type ReadModelEntry = { id: string; metadata?: Record<string, string> };
+
 describe("encodeAnnotation / decodeAnnotation", () => {
   it("round-trips a full annotation", () => {
     const annotation: TransactionAnnotation = {
@@ -335,10 +344,9 @@ describe("mergeAnnotationsIntoEntry", () => {
   });
 
   it("works when the entry has no metadata", () => {
-    const merged = mergeAnnotationsIntoEntry(
-      { id: "a" },
-      { scanMethod: "nfc" },
-    );
+    const entry: ReadModelEntry = { id: "a" };
+    const merged = mergeAnnotationsIntoEntry(entry, { scanMethod: "nfc" });
+    expect("metadata" in entry).toBe(false);
     expect(merged.metadata).toEqual({ scanMethod: "nfc" });
   });
 });
@@ -351,7 +359,8 @@ describe("selectors over a merged entry", () => {
       swap: { groupId: "g", role: "melt" },
       lock: { type: "p2pk", direction: "outgoing" },
     });
-    const entry = mergeAnnotationsIntoEntry({ id: "a" }, record);
+    const bare: ReadModelEntry = { id: "a" };
+    const entry = mergeAnnotationsIntoEntry(bare, record);
     expect(getCounterparty(entry)).toEqual({
       pubkey: "pk",
       direction: "sender",
@@ -362,7 +371,7 @@ describe("selectors over a merged entry", () => {
   });
 
   it("reports not-locked for an un-annotated entry", () => {
-    expect(isP2PKLocked({ id: "a", metadata: {} })).toBe(false);
+    expect(isP2PKLocked({ metadata: {} })).toBe(false);
   });
 
   it("falls back to proof secrets when there is no lock annotation", () => {
@@ -465,8 +474,9 @@ describe("in-memory annotation store", () => {
     if (bridged) store.set(annotationKey(entry), bridged);
 
     const record = firstAnnotationRecord(store.getMany(candidateKeys(entry)));
+    const bridgedEntry: ReadModelEntry = { id: "r" };
     expect(
-      getScanSource(mergeAnnotationsIntoEntry({ id: "r" }, record)),
+      getScanSource(mergeAnnotationsIntoEntry(bridgedEntry, record)),
     ).toMatchObject({
       method: "qr",
     });

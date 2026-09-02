@@ -1,3 +1,4 @@
+export { assertStep } from './assertStep';
 export { createTestMachine, runScenario } from './createTestMachine';
 export { createMockOperations, resetTxCounter } from './mockOperations';
 export { WALLETS, MINT1, MINT2, MINT3, UNTRUSTED_MINT, MINT_METADATA, INPUTS } from './fixtures';

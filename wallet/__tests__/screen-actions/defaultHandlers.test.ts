@@ -29,6 +29,7 @@ import type {
   MachineOperations,
   PaymentMachine,
   ProcessResult,
+  ReceiveExecuteResult,
 } from "../../src/machine/types";
 import type {
   ScreenActionContext,
@@ -695,7 +696,7 @@ describe("receiveToken default handlers", () => {
       };
       const { handlers, notifications } = createMockConfig({
         operations: {
-          executeReceive: vi.fn(async () => ({
+          executeReceive: vi.fn(async (): Promise<ReceiveExecuteResult> => ({
             status: "pending",
             operationId: "op-1",
             pendingReason: "network",

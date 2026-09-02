@@ -85,6 +85,7 @@ async function createHarness(): Promise<MeltHarness> {
   const bolt11 = {
     method: "bolt11",
     unit: "sat",
+    method_name: null,
     min_amount: null,
     max_amount: null,
   };

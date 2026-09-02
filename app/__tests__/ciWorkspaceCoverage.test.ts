@@ -1,6 +1,7 @@
 /**
  * @jest-environment node
  */
+import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 
@@ -96,6 +97,26 @@ function step(workflow: string, name: string): Step {
   return { run, pinnedTo: stepPin ?? jobPin ?? null };
 }
 
+/**
+ * The files TypeScript actually puts in a package's program.
+ *
+ * Asks `tsc` rather than reading `include` out of the tsconfig: the config text
+ * cannot be reasoned about safely — `include: ["src", "__tests__"]` alongside
+ * `exclude: ["__tests__"]` looks right and compiles nothing, and a legitimate
+ * broad recursive glob looks wrong. `--listFilesOnly` enumerates the resolved
+ * program without type-checking it, so this stays fast and does not duplicate
+ * the type-check gate.
+ */
+function programFiles(workspace: string): string[] {
+  const tsc = require.resolve('typescript/bin/tsc');
+  const output = execFileSync(
+    process.execPath,
+    [tsc, '-p', path.join(REPO_ROOT, workspace), '--noEmit', '--listFilesOnly'],
+    { encoding: 'utf8', cwd: REPO_ROOT }
+  );
+  return output.split('\n').filter(Boolean);
+}
+
 describe('CI covers every workspace package', () => {
   it.each(['test', 'type-check'])(
     'root `%s` fans out over the workspace rather than delegating to one package',
@@ -125,6 +146,18 @@ describe('CI covers every workspace package', () => {
     expect(gate.run).toBe(command);
     // Any pinning at all re-scopes the aggregate to one package.
     expect(gate.pinnedTo).toBeNull();
+  });
+
+  it.each(['wallet', 'nostr'])('%s type-checks its own tests, not just src', (workspace) => {
+    // `wallet` shipped with `include: ["src"]` and `rootDir: "src"`, so its
+    // 77 test files were never in the program — 20 real errors had
+    // accumulated, including a `fundWallet` helper still calling coco v1's
+    // `ops.mint.prepare({ mintUrl, method, quoteId })`. Only the live-mint
+    // tests reach that helper, so nothing ever executed it either.
+    const testFiles = programFiles(workspace).filter((file) =>
+      file.includes(`/${workspace}/__tests__/`)
+    );
+    expect(testFiles.length).toBeGreaterThan(0);
   });
 
   it('every workspace package is a real directory with a manifest', () => {
