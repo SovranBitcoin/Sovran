@@ -319,7 +319,90 @@ const PersistedRoutstrMessage = z.looseObject({
 // transcript beats mis-attributed model context); the rest of the session
 // survives. Dropping a branch parent degrades branch nav for its children,
 // which is the acceptable cost.
-const PersistedRoutstrMessages = tolerantArray(PersistedRoutstrMessage, 10_000);
+/**
+ * Capacity ceilings, shared by the schema below and by `partialize`.
+ *
+ * They have to be one constant each, used at both ends. The schema said 1024
+ * sessions and `createSession` prepended without a cap, so session 1025 made
+ * the blob fail parse — and `createMergeWithSchema` is all-or-nothing, so the
+ * next launch discarded the WHOLE store: the API key, every session and its
+ * transcript, the last-known lineup and the node override. Tolerance cannot
+ * help here (a `.max()` breach rejects the array itself, not an entry), so the
+ * projection is what has to respect the ceiling.
+ *
+ * Sessions are newest-first, so the newest survive; messages are chronological,
+ * so the tail does. Dropping the head of a transcript degrades branch nav for
+ * whatever pointed at it, which is the cost `PersistedRoutstrMessages` already
+ * accepts for a dropped parent.
+ */
+const MAX_PERSISTED_SESSIONS = 1024;
+const MAX_PERSISTED_SESSION_MESSAGES = 10_000;
+
+const PersistedRoutstrMessages = tolerantArray(
+  PersistedRoutstrMessage,
+  MAX_PERSISTED_SESSION_MESSAGES
+);
+
+/**
+ * The session list, bounded to what the schema accepts.
+ *
+ * Returns the SAME array when nothing exceeds a ceiling — which is every write
+ * until a user has 1024 sessions or a 10,000-turn transcript. `persist` calls
+ * `partialize` on every state change, so the common path stays a pair of length
+ * checks and no allocation. (The serialisation that follows is already linear
+ * in the whole persisted state, so even the scan costs nothing against it.)
+ *
+ * The active session is kept whichever end of the list it is at: trimming the
+ * one the user is looking at would drop the turns they are adding right now.
+ * Truncating a transcript also prunes `activeChildren` entries whose parent
+ * went with the head, so branch navigation is left with no key pointing at a
+ * message that is not there.
+ */
+function boundedSessions(
+  sessions: RoutstrSession[],
+  currentSessionId: string | null
+): RoutstrSession[] {
+  const tooMany = sessions.length > MAX_PERSISTED_SESSIONS;
+  if (!tooMany && !sessions.some((s) => s.messages.length > MAX_PERSISTED_SESSION_MESSAGES)) {
+    return sessions;
+  }
+  let kept = sessions;
+  if (tooMany) {
+    kept = sessions.slice(0, MAX_PERSISTED_SESSIONS);
+    const active = sessions.find((session) => session.id === currentSessionId);
+    if (active && !kept.includes(active)) kept = [...kept.slice(0, -1), active];
+  }
+  return kept.map((session) =>
+    session.messages.length > MAX_PERSISTED_SESSION_MESSAGES ? truncateTranscript(session) : session
+  );
+}
+
+/**
+ * Keep the newest turns, and leave no branch reference aimed at a dropped one.
+ *
+ * Both halves matter. A retained message whose `parentId` went with the head
+ * is an orphan `buildBranchIndex` cannot root, so its siblings collapse into
+ * one arbitrary choice and the others become unreachable; re-parenting it to
+ * null makes it a root, which is what it now is. An `activeChildren` entry
+ * naming either a dropped parent or a dropped child is a saved branch choice
+ * pointing at nothing.
+ */
+function truncateTranscript(session: RoutstrSession): RoutstrSession {
+  const kept = session.messages.slice(-MAX_PERSISTED_SESSION_MESSAGES);
+  const present = new Set(kept.map((message) => message.id));
+  const messages = kept.map((message) =>
+    message.parentId != null && !present.has(message.parentId)
+      ? { ...message, parentId: null }
+      : message
+  );
+  if (!session.activeChildren) return { ...session, messages };
+  const activeChildren = Object.fromEntries(
+    Object.entries(session.activeChildren).filter(
+      ([parentId, childId]) => present.has(parentId) && present.has(childId)
+    )
+  );
+  return { ...session, messages, activeChildren };
+}
 
 const PersistedRoutstrSession = z.looseObject({
   id: z.string().max(128),
@@ -333,7 +416,7 @@ const PersistedRoutstrStore = z.object({
   apiKey: z.string().max(8192).nullable().default(null),
   balance: z.number().nullable().default(null),
   selectedModel: z.string().max(256).nullable().default(null),
-  sessions: z.array(PersistedRoutstrSession).max(1024).default([]),
+  sessions: z.array(PersistedRoutstrSession).max(MAX_PERSISTED_SESSIONS).default([]),
   currentSessionId: z.string().max(128).nullable().default(null),
   // Additive + tolerant (no version bump needed): a malformed snapshot
   // parses to null and the menu just re-derives on next fetch.
@@ -588,7 +671,14 @@ export const useRoutstrStore = create<RoutstrStore>()(
         apiKey: state.apiKey,
         balance: state.balance,
         selectedModel: state.selectedModel,
-        sessions: state.sessions,
+        // The ceilings are applied HERE, not at each writer. Sessions grow in
+        // one place but a session's messages are mirrored from
+        // `conversationHistory` through several, and a cap repeated at every
+        // writer is a cap that drifts. `partialize` is the one point where
+        // store state becomes the persisted blob, so it is where the blob has
+        // to be made to fit. Live state is untouched: the running session
+        // keeps its full transcript for as long as the app is open.
+        sessions: boundedSessions(state.sessions, state.currentSessionId),
         currentSessionId: state.currentSessionId,
         lastKnownLineup: state.lastKnownLineup,
         nodeBaseUrl: state.nodeBaseUrl,
