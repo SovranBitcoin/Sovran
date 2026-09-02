@@ -44,6 +44,7 @@ import { Glob } from 'bun';
 import * as babel from '@babel/core';
 
 const APP_DIR = resolve(import.meta.dirname, '..');
+const REPO_DIR = resolve(APP_DIR, '..');
 const BASELINE_PATH = resolve(APP_DIR, 'react-compiler-bailouts.json');
 
 /**
@@ -51,6 +52,14 @@ const BASELINE_PATH = resolve(APP_DIR, 'react-compiler-bailouts.json');
  * React Compiler on in a production build. The gate is only as honest as this
  * set — a component outside it renders unmemoized while the ratchet reports
  * zero, which is the exact failure the ratchet exists to prevent.
+ *
+ * The set is a deliberate SUPERSET of what a given bundle reaches: it is every
+ * file the compiler would run on if Metro resolved it, not the resolved
+ * dependency graph. A module that only ever appears behind `export type` is
+ * therefore swept even though production erases it. Erring wide is the safe
+ * direction — an over-swept file fails the gate loudly, while an under-swept
+ * one ships unmemoized in silence, which is the whole failure this exists to
+ * catch.
  *
  * The rule is production parity, not "all our source". babel-preset-expo
  * refuses to run the compiler on any file resolved from `node_modules`
@@ -76,6 +85,58 @@ const SRC_GLOB = `{${SOURCE_ROOTS.join(',')}}/**/*.{ts,tsx,js,jsx}`;
 /** Bundled source that sits beside the roots rather than inside one. */
 const SOURCE_FILES = ['index.js', 'polyfills.js', 'shim.js', 'themes.ts'];
 
+/**
+ * The in-repo workspace packages, which the same production-parity rule pulls
+ * in. `app/` is not the whole compiled surface: `metro.config.js` pins the
+ * `wallet*` and `nostr*` specifiers through `localPackageEntryPaths` to
+ * absolute files under `<repo>/wallet/src` and `<repo>/nostr/src`, bypassing
+ * the `node_modules/{wallet,nostr}` workspace symlinks entirely. Every import
+ * inside those trees is relative, so it stays there too. `@expo/metro-config`
+ * decides the compiler's node-module opt-out with a bare
+ * `filename.includes('node_modules')`, which is false for all of them — so
+ * babel-preset-expo DOES run `babel-plugin-react-compiler` over both packages.
+ * Neither the resolver pin nor that filename test looks at `platform`, so this
+ * is identical in the iOS and the Android bundle.
+ *
+ * That makes `wallet/src/react` — the Colada provider, the payment machine and
+ * every wallet read hook — compiled production code the ratchet could not see.
+ * Commit 05bff9f0 is the proof it matters: eight hooks were bailing there, and
+ * nothing reported it. `nostr/src` is UI-agnostic and holds no components
+ * today; sweeping it costs nothing and means a hook added there is caught the
+ * day it lands.
+ *
+ * `__tests__` and the vitest config sit OUTSIDE `src/` in both packages, so
+ * the roots below already exclude them.
+ */
+const PACKAGE_ROOTS = ['wallet/src', 'nostr/src'];
+
+/**
+ * One root at a time, deliberately: Bun's `Glob` does not brace-alternate a
+ * pattern whose alternatives contain a `/`, so the obvious
+ * `{wallet/src,nostr/src}/**` silently matches NOTHING. A sweep set that
+ * quietly empties is the same failure as no sweep at all, so a root that
+ * resolves to zero files is a hard error rather than a shrug.
+ */
+function scanRoot(cwd, root) {
+  const found = [...new Glob(`${root}/**/*.{ts,tsx,js,jsx}`).scanSync({ cwd, absolute: true })];
+  if (found.length === 0) {
+    console.error(`✗ Swept 0 files under ${root} — moved root, or a glob that matches nothing?`);
+    process.exit(2);
+  }
+  return found;
+}
+
+/**
+ * App files stay keyed app-relative: `eslint.config.js` reads these keys back
+ * as `files` globs to scope its `react-perf` rules, and those are resolved
+ * from `app/`. Package files are keyed repo-relative (`wallet/src/...`), which
+ * names them unambiguously and cannot collide with an app path — `app/` has no
+ * `wallet` or `nostr` directory of its own.
+ */
+function baselineKey(file) {
+  return file.startsWith(`${APP_DIR}/`) ? relative(APP_DIR, file) : relative(REPO_DIR, file);
+}
+
 const shouldUpdate = process.argv.includes('--update');
 
 /** Production compiler options — must mirror babel-preset-expo's wiring. */
@@ -89,6 +150,7 @@ function sweep() {
   const files = [
     ...new Glob(SRC_GLOB).scanSync({ cwd: APP_DIR, absolute: true }),
     ...SOURCE_FILES.map((file) => resolve(APP_DIR, file)),
+    ...PACKAGE_ROOTS.flatMap((root) => scanRoot(REPO_DIR, root)),
   ]
     .filter((file) => !file.includes('/__tests__/') && !file.includes('/__mocks__/'))
     .sort();
@@ -131,7 +193,7 @@ function sweep() {
       reasons.push(`transform threw: ${String(error.message).split('\n')[0].slice(0, 160)}`);
     }
 
-    if (reasons.length > 0) bailouts.set(relative(APP_DIR, file), [...new Set(reasons)]);
+    if (reasons.length > 0) bailouts.set(baselineKey(file), [...new Set(reasons)]);
   }
 
   return { files, bailouts, compiledFns, bailedFns };
@@ -150,7 +212,7 @@ if (shouldUpdate) {
     `${JSON.stringify(
       {
         $comment:
-          'Files containing at least one function the React Compiler cannot compile. Ratcheted by scripts/check-react-compiler.mjs — this list may only shrink. Regenerate with `bun run check:react-compiler:update`.',
+          'Files containing at least one function the React Compiler cannot compile. App paths are relative to app/; workspace-package paths (wallet/src, nostr/src) are relative to the repo root. Ratcheted by scripts/check-react-compiler.mjs — this list may only shrink. Regenerate with `bun run check:react-compiler:update`.',
         bailouts: Object.fromEntries([...bailouts].sort(([a], [b]) => a.localeCompare(b))),
       },
       null,

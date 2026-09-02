@@ -22,10 +22,21 @@ import path from 'node:path';
  * The invariant these tests hold: every top-level directory and every
  * top-level source file is either swept by the gate or listed in NOT_SWEPT
  * with a reason. A new one cannot default into invisibility.
+ *
+ * `app/` was not the whole set either. `metro.config.js` pins the `wallet*`
+ * and `nostr*` specifiers to absolute files under `<repo>/wallet/src` and
+ * `<repo>/nostr/src`, which are outside any `node_modules`, so Expo runs the
+ * compiler over them too — in both the iOS and the Android bundle. The gate
+ * swept none of it, which is how eight bailing hooks in the payment read model
+ * went unreported until commit 05bff9f0 found them by hand. The second block
+ * of tests below holds that half: the package roots, and the Metro pin that is
+ * the whole reason they belong in the sweep.
  */
 
 const APP_DIR = path.resolve(__dirname, '..');
+const REPO_DIR = path.resolve(APP_DIR, '..');
 const GATE_PATH = path.join(APP_DIR, 'scripts/check-react-compiler.mjs');
+const METRO_CONFIG_PATH = path.join(APP_DIR, 'metro.config.js');
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx'];
 
 /**
@@ -104,6 +115,21 @@ function isDir(target: string): boolean {
   }
 }
 
+/**
+ * The top-level entries of `wallet/` and `nostr/` the gate deliberately does
+ * not sweep. Both packages ship only `src/`; everything else here is either
+ * test or build-time material Metro never bundles.
+ */
+const PACKAGE_NOT_SWEPT: Record<string, string> = {
+  __tests__: 'vitest suites, not bundled',
+  docs: 'markdown',
+  node_modules: 'dependencies',
+  'package.json': 'manifest',
+  'README.md': 'markdown',
+  'tsconfig.json': 'build config',
+  'vitest.config.ts': 'test config',
+};
+
 describe('React Compiler gate coverage', () => {
   const roots = gateArray('SOURCE_ROOTS');
   const files = gateArray('SOURCE_FILES');
@@ -163,5 +189,111 @@ describe('React Compiler gate coverage', () => {
     expect(files).toEqual(
       expect.arrayContaining(['index.js', 'shim.js', 'polyfills.js', 'themes.ts'])
     );
+  });
+});
+
+describe('React Compiler gate coverage — workspace packages', () => {
+  const packageRoots = gateArray('PACKAGE_ROOTS');
+
+  it('sweeps each package root separately, and treats an empty one as fatal', () => {
+    const source = uncommented(readFileSync(GATE_PATH, 'utf8'));
+    // Bun's Glob does not brace-alternate alternatives containing a `/`, so
+    // `{wallet/src,nostr/src}/**` matches NOTHING and reports a clean sweep.
+    // Per-root scanning plus a hard error on zero is what makes that
+    // impossible; both halves are asserted so neither can quietly come back.
+    expect(source).toContain('...PACKAGE_ROOTS.flatMap((root) => scanRoot(REPO_DIR, root)),');
+    expect(source).toContain('if (found.length === 0) {');
+    expect(source).toContain('process.exit(2);');
+    expect(source).not.toContain('${PACKAGE_ROOTS.join');
+    // And that the per-root glob is the whole tree, not an entry file: a
+    // narrowed pattern would still satisfy every assertion above while
+    // sweeping almost nothing, and the ratchet would stay green because the
+    // packages contribute no baseline entries.
+    expect(source).toContain(
+      'new Glob(`${root}/**/*.{ts,tsx,js,jsx}`).scanSync({ cwd, absolute: true })'
+    );
+  });
+
+  it('sweeps the workspace packages Metro compiles from source', () => {
+    expect(packageRoots).toEqual(['wallet/src', 'nostr/src']);
+    for (const root of packageRoots) {
+      expect(statSync(path.join(REPO_DIR, root)).isDirectory()).toBe(true);
+    }
+  });
+
+  it('finds real source under every package root', () => {
+    // A root that silently resolves to nothing is the same failure as no
+    // sweep at all — the gate would report zero bailouts because nothing
+    // looked. This is the assertion that catches it from the outside.
+    for (const root of packageRoots) {
+      expect(containsSource(path.join(REPO_DIR, root))).toBe(true);
+    }
+  });
+
+  it.each([
+    // The payment context every screen in the app renders inside, and the
+    // three hooks that read coco through it. All four bailed unreported.
+    'wallet/src/react/ColadaProvider.tsx',
+    'wallet/src/react/useColadaTransactions.ts',
+    'wallet/src/react/usePaymentMachine.ts',
+    'wallet/src/react/useScreenActions.ts',
+  ])('sweeps the compiled package file %s', (relativePath) => {
+    expect(statSync(path.join(REPO_DIR, relativePath)).isFile()).toBe(true);
+    expect(packageRoots.some((root) => relativePath.startsWith(`${root}/`))).toBe(true);
+  });
+
+  it.each(['wallet', 'nostr'])(
+    'classifies every top-level entry of %s as swept or explicitly not swept',
+    (pkg) => {
+      const packageDir = path.join(REPO_DIR, pkg);
+      const swept = packageRoots
+        .filter((root) => root.startsWith(`${pkg}/`))
+        .map((root) => root.slice(pkg.length + 1));
+      const classified = new Set([...swept, ...Object.keys(PACKAGE_NOT_SWEPT)]);
+      const unclassified = readdirSync(packageDir, { withFileTypes: true })
+        .map((entry) => entry.name)
+        .filter((name) => !classified.has(name))
+        .filter((name) => {
+          const full = path.join(packageDir, name);
+          return isDir(full)
+            ? containsSource(full)
+            : SOURCE_EXTENSIONS.includes(path.extname(name));
+        });
+      expect(unclassified).toEqual([]);
+    }
+  );
+
+  it('sweeps the packages BECAUSE Metro resolves them outside node_modules', () => {
+    // This is the premise the whole package half rests on.
+    // `@expo/metro-config` decides the compiler's node-module opt-out with a
+    // bare `filename.includes('node_modules')`, and `babel-preset-expo` skips
+    // the compiler entirely when that is true. Metro's resolver pins every
+    // `wallet*`/`nostr*` specifier to a path under the swept roots — outside
+    // any `node_modules`, and with no `platform` branch, so it is the same on
+    // iOS and Android. Re-point one at the `node_modules` symlink and the
+    // sweep would start reporting compile successes production never performs;
+    // drop the pin and the sweep would cover files the bundle no longer uses.
+    const metro = uncommented(readFileSync(METRO_CONFIG_PATH, 'utf8'));
+    const entries = /const localPackageEntryPaths = \{([\s\S]*?)\n\};/.exec(metro)?.[1];
+    expect(entries).toBeDefined();
+
+    const specifiers = [...(entries as string).matchAll(/^\s*'?([\w/]+)'?:/gm)].map(
+      (match) => match[1] as string
+    );
+    expect(specifiers).toEqual(expect.arrayContaining(['wallet', 'wallet/react', 'nostr']));
+
+    for (const specifier of specifiers) {
+      const pkg = specifier.split('/')[0] as string;
+      expect(packageRoots.some((root) => root.startsWith(`${pkg}/`))).toBe(true);
+    }
+    // The pinned paths are built from `walletPath`/`nostrPath`, which are
+    // `path.join(workspaceRoot, …)` — never `node_modules`.
+    expect(metro).toContain("const walletPath = path.join(workspaceRoot, 'wallet');");
+    expect(metro).toContain("const nostrPath = path.join(workspaceRoot, 'nostr');");
+    expect(entries).not.toContain('node_modules');
+    for (const root of packageRoots) {
+      const [pkg, sub] = root.split('/');
+      expect(entries).toContain(`${pkg}Path, '${sub}'`);
+    }
   });
 });

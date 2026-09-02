@@ -16,7 +16,7 @@ import React, {
   useEffect,
   useLayoutEffect,
   useMemo,
-  useRef,
+  useState,
   useSyncExternalStore,
 } from "react";
 
@@ -194,6 +194,23 @@ export interface ColadaProviderProps {
 // Context
 // ---------------------------------------------------------------------------
 
+/**
+ * The provider's writers for the three pieces of flow state a screen binder
+ * owns. Handing out the raw refs is what made `usePaymentFlowMachine`
+ * uncompilable — a function that mutates a value it reached through
+ * `useContext` is rejected outright — and it also let any consumer clobber
+ * flow state the provider is responsible for.
+ */
+interface ColadaBindings {
+  setWalletContext: (walletContext: WalletContext) => void;
+  setUnitOverride: (unit: string) => void;
+  /** Clears the override only if it is still the one `unit` set. */
+  clearUnitOverride: (unit: string) => void;
+  setOptionDismiss: (onOptionDismiss: (() => void) | undefined) => void;
+  /** Clears only if still the same callback; returns whether it cleared. */
+  clearOptionDismiss: (onOptionDismiss: (() => void) | undefined) => boolean;
+}
+
 interface ColadaContextValue {
   machine: PaymentMachine;
   walletContextSource: Pick<
@@ -203,6 +220,7 @@ interface ColadaContextValue {
   walletContextRef: React.MutableRefObject<WalletContext | null>;
   unitRef: React.MutableRefObject<string | undefined>;
   optionDismissRef: React.MutableRefObject<(() => void) | undefined>;
+  bindings: ColadaBindings;
   screenActionHandlers: ScreenActionHandlerMap;
   screenActionsBridge: ScreenActionsBridge | undefined;
   getLocaleRef: React.MutableRefObject<(() => string) | undefined>;
@@ -304,6 +322,153 @@ function summarizeWalletContext(
 // Provider
 // ---------------------------------------------------------------------------
 
+/**
+ * Builds the provider's one PaymentMachine and seeds its handler map.
+ *
+ * Module scope on purpose. Every getter below reads `someRef.current` — which
+ * is the whole point: the machine is created once and must always see the
+ * latest wallet context, unit, offline flag and locale. But a closure CREATED
+ * during render that reads a ref is what the React Compiler rejects, and one
+ * rejection switched the compiler off for this entire provider — the payment
+ * context every screen in the app renders inside. Out here the reads are
+ * unchanged and the render-scope analysis no longer applies.
+ */
+function buildProviderMachine(
+  config: {
+    detectors: Detectors | undefined;
+    instance: ColadaInstance | undefined;
+    enableEcashSendMemo: boolean | undefined;
+    operations: Partial<MachineOperations> | undefined;
+    notifications: NotificationHandlerMap | undefined;
+    createURDecoder: Parameters<
+      typeof createPaymentMachine
+    >[0]["createURDecoder"];
+    scanSources: ScanSources | undefined;
+    nfcAdapter: NfcAdapter | undefined;
+    handlersFactory: ColadaProviderProps["handlers"];
+  },
+  refs: {
+    handlersRef: React.MutableRefObject<StepHandlerMap>;
+    walletContextRef: React.MutableRefObject<WalletContext | null>;
+    unitRef: React.MutableRefObject<string | undefined>;
+    getUnitRef: React.MutableRefObject<(() => string) | undefined>;
+    getOfflineRef: React.MutableRefObject<(() => boolean) | undefined>;
+    getSatsPerUnitMinorRef: React.MutableRefObject<
+      ((unit: string) => number | null) | undefined
+    >;
+    getLocaleRef: React.MutableRefObject<(() => string) | undefined>;
+    optionDismissRef: React.MutableRefObject<(() => void) | undefined>;
+  },
+): PaymentMachine {
+  const {
+    detectors,
+    instance,
+    enableEcashSendMemo,
+    operations,
+    notifications,
+    createURDecoder,
+    scanSources,
+    nfcAdapter,
+    handlersFactory,
+  } = config;
+  const {
+    handlersRef,
+    walletContextRef,
+    unitRef,
+    getUnitRef,
+    getOfflineRef,
+    getSatsPerUnitMinorRef,
+    getLocaleRef,
+    optionDismissRef,
+  } = refs;
+
+  logger.info("react.provider.machine.create", {
+    hasInstance: !!instance,
+    detectorOverride: !!detectors,
+    operationCount: Object.keys(operations ?? {}).length,
+    notificationCount: Object.keys(notifications ?? {}).length,
+    hasNfcAdapter: !!nfcAdapter,
+    scanSourceCount: Object.keys(scanSources ?? {}).length,
+    enableEcashSendMemo,
+  });
+
+  const machine = createPaymentMachine({
+    handlers: new Proxy(
+      {},
+      {
+        get: (_target, key: string) =>
+          (handlersRef.current as Record<string, unknown>)[key],
+      },
+    ) as StepHandlerMap,
+    detectors,
+    getContext: instance
+      ? () => instance.tracker.getContext()
+      : () => {
+          if (!walletContextRef.current) {
+            throw new Error("ColadaProvider has no wallet context bound yet.");
+          }
+          return walletContextRef.current;
+        },
+    getUnit: () => unitRef.current ?? getUnitRef.current?.() ?? "sat",
+    getOffline: () => getOfflineRef.current?.() ?? false,
+    getSatsPerUnitMinor: (unit) =>
+      getSatsPerUnitMinorRef.current?.(unit) ?? null,
+    enableEcashSendMemo,
+    getLocale: () => getLocaleRef.current?.() ?? "en",
+    operations: operations as MachineOperations | undefined,
+    notifications,
+    createURDecoder,
+    scanSources,
+    nfcAdapter,
+  });
+
+  handlersRef.current = handlersFactory(machine, {
+    getOptionDismiss: () => optionDismissRef.current,
+  });
+  logger.info("react.provider.machine.ready", {
+    handlerCount: Object.keys(handlersRef.current).length,
+  });
+  return machine;
+}
+
+/**
+ * The provider's own writers for the three refs a screen binder owns. They
+ * exist because `usePaymentFlowMachine` used to reach through the context and
+ * assign `ctx.walletContextRef.current = …` directly: the compiler refuses to
+ * compile a function that mutates a value it reached from `useContext`, and
+ * handing a mutable ref across a context boundary is the reason it can. The
+ * provider owns the mutation now; consumers ask for it.
+ *
+ * Every clear is compare-and-clear, exactly as the assignments were: a binder
+ * unmounting must never wipe a newer screen's override.
+ */
+function buildProviderBindings(refs: {
+  walletContextRef: React.MutableRefObject<WalletContext | null>;
+  unitRef: React.MutableRefObject<string | undefined>;
+  optionDismissRef: React.MutableRefObject<(() => void) | undefined>;
+}): ColadaBindings {
+  const { walletContextRef, unitRef, optionDismissRef } = refs;
+  return {
+    setWalletContext: (walletContext) => {
+      walletContextRef.current = walletContext;
+    },
+    setUnitOverride: (unit) => {
+      unitRef.current = unit;
+    },
+    clearUnitOverride: (unit) => {
+      if (unitRef.current === unit) unitRef.current = undefined;
+    },
+    setOptionDismiss: (onOptionDismiss) => {
+      optionDismissRef.current = onOptionDismiss;
+    },
+    clearOptionDismiss: (onOptionDismiss) => {
+      if (optionDismissRef.current !== onOptionDismiss) return false;
+      optionDismissRef.current = undefined;
+      return true;
+    },
+  };
+}
+
 export function ColadaProvider({
   children,
   handlers: handlersFactory,
@@ -396,7 +561,8 @@ export function ColadaProvider({
     enableEcashSendMemoProp ?? ic?.enableEcashSendMemo ?? false;
   const getBtcPrice = getBtcPriceProp ?? ic?.getBtcPrice;
   const getDisplayCurrency = getDisplayCurrencyProp ?? ic?.getDisplayCurrency;
-  const getSatsPerUnitMinor = getSatsPerUnitMinorProp ?? ic?.getSatsPerUnitMinor;
+  const getSatsPerUnitMinor =
+    getSatsPerUnitMinorProp ?? ic?.getSatsPerUnitMinor;
   const writeClipboard = clipboardAdapter?.writeText;
   const shareContent = shareAdapter
     ? (content: { message: string; url?: string }) =>
@@ -449,16 +615,11 @@ export function ColadaProvider({
   );
   // Annotation persistence: explicit prop wins, else the createColada instance's
   // adapter, else a lazily-created in-memory default (stable for this mount).
-  const defaultAnnotationStoreRef = useRef<AnnotationStoreAdapter | undefined>(
-    undefined,
-  );
-  if (!defaultAnnotationStoreRef.current) {
-    defaultAnnotationStoreRef.current = createInMemoryAnnotationStore();
-  }
+  const [defaultAnnotationStore] = useState(createInMemoryAnnotationStore);
   const annotationStoreRef = useLatestRef<AnnotationStoreAdapter>(
     annotationStoreProp ??
       instance?.config.annotationStore ??
-      defaultAnnotationStoreRef.current,
+      defaultAnnotationStore,
   );
   const subscriptionBusRef = useLatestRef(subscriptionBus);
   const notificationsRef = useLatestRef(notifications);
@@ -476,17 +637,7 @@ export function ColadaProvider({
   const getDisplayCurrencyRef = useLatestRef(getDisplayCurrency);
   const getSatsPerUnitMinorRef = useLatestRef(getSatsPerUnitMinor);
 
-  const walletContextRef = useRef<WalletContext | null>(null);
   const getUnitRef = useLatestRef(getUnitProp);
-  // Explicit per-screen unit override (usePaymentFlowMachine({ unit })).
-  // undefined = no override — the flow reset falls back to the app's
-  // authoritative getUnit prop. Screens must NOT be defaulted into 'sat'
-  // here: a unit-less binding used to clobber this ref and freeze the wrong
-  // unit into the next flow reset (first-open-wrong-unit bug).
-  const unitRef = useRef<string | undefined>(undefined);
-  const optionDismissRef = useRef<(() => void) | undefined>(undefined);
-  const handlersRef = useRef<StepHandlerMap>({});
-  const machineRef = useRef<PaymentMachine | null>(null);
 
   useEffect(() => {
     logger.info("react.provider.config", {
@@ -563,73 +714,119 @@ export function ColadaProvider({
     return screenActionsBridge?.bindSubscriptionBus?.(subscriptionBus);
   }, [screenActionsBridge, subscriptionBus]);
 
-  if (!machineRef.current) {
-    logger.info("react.provider.machine.create", {
-      hasInstance: !!instance,
-      detectorOverride: !!detectors,
-      operationCount: Object.keys(operations ?? {}).length,
-      notificationCount: Object.keys(notifications ?? {}).length,
-      hasNfcAdapter: !!nfcAdapter,
-      scanSourceCount: Object.keys(scanSources ?? {}).length,
-      enableEcashSendMemo,
-    });
-    machineRef.current = createPaymentMachine({
-      handlers: new Proxy(
-        {},
-        {
-          get: (_target, key: string) =>
-            (handlersRef.current as Record<string, unknown>)[key],
-        },
-      ) as StepHandlerMap,
-      detectors,
-      getContext: instance
-        ? () => instance.tracker.getContext()
-        : () => {
-            if (!walletContextRef.current) {
-              throw new Error(
-                "ColadaProvider has no wallet context bound yet.",
-              );
-            }
-            return walletContextRef.current;
-          },
-      getUnit: () => unitRef.current ?? getUnitRef.current?.() ?? "sat",
-      getOffline: () => getOfflineRef.current?.() ?? false,
-      getSatsPerUnitMinor: (unit) =>
-        getSatsPerUnitMinorRef.current?.(unit) ?? null,
-      enableEcashSendMemo,
-      getLocale: () => getLocaleRef.current?.() ?? "en",
-      operations: operations as MachineOperations | undefined,
-      notifications,
-      createURDecoder,
-      scanSources,
-      nfcAdapter,
-    });
-
-    handlersRef.current = handlersFactory(machineRef.current, {
-      getOptionDismiss: () => optionDismissRef.current,
-    });
-    logger.info("react.provider.machine.ready", {
-      handlerCount: Object.keys(handlersRef.current).length,
-    });
-  }
+  // Everything the provider owns and creates exactly once: the four mutable
+  // boxes, the machine that reads them, and the writers a screen binder uses.
+  //
+  // The boxes are plain `{ current }` objects, not `useRef`s. Nothing reads
+  // them during render — the machine reads them at send() time, the binder
+  // writes them from an effect — so they never needed React's ref identity,
+  // and being refs is precisely what made this provider uncompilable: the
+  // compiler will not compile a function that hands a ref to another function
+  // during render. `useState` gives the same create-once guarantee the old
+  // `if (!machineRef.current)` lazy init did, without a ref read in render.
+  //
+  // ⚠️ A `useState` initializer is double-invoked under React StrictMode, so a
+  // second machine would be built and thrown away — costing a second
+  // `handlersFactory` call and a second UR decoder, though nothing is
+  // subscribed at construction, and the layout effect below re-binds the
+  // handler map to the machine React kept before any handler can run. The ref
+  // idiom this replaced did survive that, but it survived it by reading a ref
+  // in render, which is what left this provider uncompiled. StrictMode is off
+  // in the consuming app (`index.js` hands straight to Expo Router) and the
+  // same caveat already stands on the lazy initializer in
+  // `NotificationFollowersScreen`: turning StrictMode on means making
+  // construction idempotent, not reverting this.
+  const [core] = useState(() => {
+    const walletContextRef: React.MutableRefObject<WalletContext | null> = {
+      current: null,
+    };
+    // Explicit per-screen unit override (usePaymentFlowMachine({ unit })).
+    // undefined = no override — the flow reset falls back to the app's
+    // authoritative getUnit prop. Screens must NOT be defaulted into 'sat'
+    // here: a unit-less binding used to clobber this box and freeze the wrong
+    // unit into the next flow reset (first-open-wrong-unit bug).
+    const unitRef: React.MutableRefObject<string | undefined> = {
+      current: undefined,
+    };
+    const optionDismissRef: React.MutableRefObject<(() => void) | undefined> = {
+      current: undefined,
+    };
+    const handlersRef: React.MutableRefObject<StepHandlerMap> = { current: {} };
+    const machine = buildProviderMachine(
+      {
+        detectors,
+        instance,
+        enableEcashSendMemo,
+        operations,
+        notifications,
+        createURDecoder,
+        scanSources,
+        nfcAdapter,
+        handlersFactory,
+      },
+      {
+        handlersRef,
+        walletContextRef,
+        unitRef,
+        getUnitRef,
+        getOfflineRef,
+        getSatsPerUnitMinorRef,
+        getLocaleRef,
+        optionDismissRef,
+      },
+    );
+    return {
+      walletContextRef,
+      unitRef,
+      optionDismissRef,
+      machine,
+      // The handler map is written only from the layout effect below. It is a
+      // setter rather than the box itself for the same reason `bindings`
+      // exists: the compiler refuses to compile a function that assigns
+      // through a value it destructured out of `useState`.
+      setHandlers: (next: StepHandlerMap) => {
+        handlersRef.current = next;
+      },
+      bindings: buildProviderBindings({
+        walletContextRef,
+        unitRef,
+        optionDismissRef,
+      }),
+    };
+  });
+  const {
+    walletContextRef,
+    unitRef,
+    optionDismissRef,
+    machine,
+    bindings,
+    setHandlers,
+  } = core;
 
   // Re-bind handlers when the factory identity changes. Runs in
   // useLayoutEffect so the next event handled by the machine sees the
   // updated handler map without a render gap.
   useLayoutEffect(() => {
-    if (!machineRef.current) return;
-    handlersRef.current = handlersFactory(machineRef.current, {
+    const bound = handlersFactory(machine, {
       getOptionDismiss: () => optionDismissRef.current,
     });
+    setHandlers(bound);
     logger.debug("react.provider.handlers.bound", {
-      handlerCount: Object.keys(handlersRef.current).length,
+      handlerCount: Object.keys(bound).length,
     });
-  }, [handlersFactory]);
+  }, [handlersFactory, machine, optionDismissRef, setHandlers]);
+
+  // The effect below intentionally re-runs on the URL alone: `deepLinks` is a
+  // fresh object on most renders, and depending on it would re-scan the same
+  // link every time. Everything else it reads comes through this ref, so the
+  // dep list is honest instead of silenced.
+  const deepLinksRef = useLatestRef(deepLinks);
 
   // Deep link processing
   useEffect(() => {
+    const deepLinks = deepLinksRef.current;
     const url = deepLinks?.url;
-    if (!url || !machineRef.current?.scan) return;
+    if (!url || !machine.scan) return;
 
     // Extract scheme and host from scheme://host or scheme:host
     const match = url.match(/^([a-zA-Z][a-zA-Z0-9+\-.]*):(?:\/\/)?([^/?#]+)/);
@@ -680,7 +877,7 @@ export function ColadaProvider({
       customSchemeCount: deepLinks.customSchemes?.length ?? 0,
     });
     deepLinks.onBeforeScan?.();
-    machineRef.current.scan(host, { source: "deeplink" }).catch((err) => {
+    machine.scan(host, { source: "deeplink" }).catch((err: unknown) => {
       logger.warn("deepLink.scan.failed", {
         scheme,
         hostLength: host.length,
@@ -688,17 +885,18 @@ export function ColadaProvider({
       });
       deepLinks.onError?.(err instanceof Error ? err : new Error(String(err)));
     });
-  }, [deepLinks?.url]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [deepLinks?.url, deepLinksRef, machine]);
 
   const screenActionHandlers = actions ?? EMPTY_SCREEN_ACTIONS;
 
   const value = useMemo<ColadaContextValue>(
     () => ({
-      machine: machineRef.current!,
+      machine,
       walletContextSource: instance ?? null,
       walletContextRef,
       unitRef,
       optionDismissRef,
+      bindings,
       screenActionHandlers,
       screenActionsBridge,
       getLocaleRef,
@@ -716,14 +914,34 @@ export function ColadaProvider({
       writeClipboardRef,
       shareContentRef,
     }),
+    // Every value the object reads is named. The refs are stable identities
+    // for the life of the provider, so this list is longer than the old one
+    // without being looser — but a memo whose body reads something the list
+    // does not name is one the compiler cannot preserve, and that alone kept
+    // the whole provider uncompiled.
     [
-      walletContextRef,
+      adaptersRef,
+      annotationStoreRef,
+      bindings,
+      getBtcPriceRef,
+      getDisplayCurrencyRef,
+      getLocaleRef,
+      getManagerRef,
+      getOfflineRef,
       instance,
+      machine,
+      navigationRef,
+      notificationsRef,
+      operationsRef,
+      optionDismissRef,
+      paymentCopyOverridesRef,
       screenActionHandlers,
       screenActionsBridge,
-      paymentCopyOverridesRef,
-      adaptersRef,
+      shareContentRef,
       subscriptionBusRef,
+      unitRef,
+      walletContextRef,
+      writeClipboardRef,
     ],
   );
 
@@ -901,31 +1119,28 @@ export function usePaymentFlowMachine({
   // that get discarded — transition aborted, suspense fallback — don't mutate
   // shared provider state with values that were never committed.
   useEffect(() => {
-    ctx.walletContextRef.current = walletContext;
+    ctx.bindings.setWalletContext(walletContext);
     logger.debug("react.paymentFlowMachine.bindContext", {
       unit: unit ?? null,
       ...summarizeWalletContext(walletContext),
     });
     if (unit === undefined) return;
-    ctx.unitRef.current = unit;
+    ctx.bindings.setUnitOverride(unit);
     return () => {
       // Release the override when this binder unmounts (or changes unit) so
       // a stale explicit unit can't leak into a later flow's reset. Guarded
       // so we never clear a different screen's newer override.
-      if (ctx.unitRef.current === unit) {
-        ctx.unitRef.current = undefined;
-      }
+      ctx.bindings.clearUnitOverride(unit);
     };
   }, [ctx, walletContext, unit]);
 
   useEffect(() => {
-    ctx.optionDismissRef.current = onOptionDismiss;
+    ctx.bindings.setOptionDismiss(onOptionDismiss);
     logger.debug("react.paymentFlowMachine.bindOptionDismiss", {
       hasOptionDismiss: !!onOptionDismiss,
     });
     return () => {
-      if (ctx.optionDismissRef.current === onOptionDismiss) {
-        ctx.optionDismissRef.current = undefined;
+      if (ctx.bindings.clearOptionDismiss(onOptionDismiss)) {
         logger.debug("react.paymentFlowMachine.clearOptionDismiss");
       }
     };
