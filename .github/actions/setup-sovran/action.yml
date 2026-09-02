@@ -6,8 +6,10 @@ description: >-
   store. Bundle measurement opts into the frozen-lockfile path.
 
 # The repo is checked out at the runner root (no path nesting), so the workspace
-# root package.json / bun.lock live at the working directory. Install runs here;
-# per-gate workflows then run their checks with working-directory: app.
+# root package.json / bun.lock live at the working directory. Install runs here.
+# The Tests and Type Check gates then run their root script, which fans out over
+# every workspace package; the app-only gates (lint, styling, glass headers,
+# React Compiler, React Doctor) run with working-directory: app.
 inputs:
   github-token:
     description: Token used to auth the @sovranbitcoin/* GitHub Packages fetch.

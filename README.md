@@ -33,9 +33,21 @@ bun run dev            # start the app (delegates to app/)
 bun run docs:dev       # start the docs site
 ```
 
-App-specific commands (`type-check`, `lint`, `test`, `knip`, `build:*`, …) are
-available at the root as `cd app` delegators, or run them inside `app/` directly.
-EAS builds run from `app/` (where `eas.json` lives).
+`bun run test` and `bun run type-check` at the root cover the WHOLE workspace —
+they fan out with `bun run --filter '*'`, so app (both platform passes), wallet
+and nostr all run. That is what CI runs. To scope to one package, filter it
+(`bun --filter wallet run test`) or run it inside the package; focused Jest with
+arguments has its own root alias, since arguments would otherwise be forwarded to
+every package's runner:
+
+```bash
+bun run test:app -- <files> --runInBand
+```
+
+The remaining app commands (`lint`, `knip`, `build:*`, …) are still `cd app`
+delegators at the root, or run them inside `app/` directly. `lint` covers `app/`
+only — wallet and nostr are not in its ESLint project. EAS builds run from
+`app/` (where `eas.json` lives).
 
 ## Docs
 
