@@ -38,10 +38,12 @@
  * can only shrink.
  */
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
 import { Glob } from 'bun';
 import * as babel from '@babel/core';
+
+import { writeRatchetArtifact } from './lib/ratchet-artifact.mjs';
 
 const APP_DIR = resolve(import.meta.dirname, '..');
 const REPO_DIR = resolve(APP_DIR, '..');
@@ -207,18 +209,11 @@ if (files.length === 0) {
 }
 
 if (shouldUpdate) {
-  writeFileSync(
-    BASELINE_PATH,
-    `${JSON.stringify(
-      {
-        $comment:
-          'Files containing at least one function the React Compiler cannot compile. App paths are relative to app/; workspace-package paths (wallet/src, nostr/src) are relative to the repo root. Ratcheted by scripts/check-react-compiler.mjs — this list may only shrink. Regenerate with `bun run check:react-compiler:update`.',
-        bailouts: Object.fromEntries([...bailouts].sort(([a], [b]) => a.localeCompare(b))),
-      },
-      null,
-      2
-    )}\n`
-  );
+  await writeRatchetArtifact(BASELINE_PATH, {
+    $comment:
+      'Files containing at least one function the React Compiler cannot compile. App paths are relative to app/; workspace-package paths (wallet/src, nostr/src) are relative to the repo root. Ratcheted by scripts/check-react-compiler.mjs — this list may only shrink. Regenerate with `bun run check:react-compiler:update`.',
+    bailouts: Object.fromEntries([...bailouts].sort(([a], [b]) => a.localeCompare(b))),
+  });
   console.error(
     `✓ Banked ${bailouts.size} bailing files (${compiledFns} functions compiled, ${bailedFns} bailed).`
   );
