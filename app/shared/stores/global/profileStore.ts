@@ -53,12 +53,19 @@ interface ProfileState {
 
 interface ProfileActions {
   /** Add a new profile entry (idempotent — skips if accountIndex already exists) */
+  /**
+   * Record a profile. Returns whether it is in the list afterwards — `true`
+   * for a fresh add AND for one already present, `false` only when the list is
+   * at `MAX_PROFILES` and this one is new. Callers must not assume success:
+   * proceeding to switch into a profile that was refused leaves the app
+   * running as an account the store does not know about.
+   */
   addProfile: (
     accountIndex: number,
     pubkey: string,
     source?: 'derived' | 'imported',
     externalChain?: number
-  ) => void;
+  ) => boolean;
   /** Set the active account index (caller is responsible for cleanup/resetStages before this) */
   switchProfile: (accountIndex: number) => boolean;
   /** Get the next available account index (only considers derived profiles) */
@@ -94,9 +101,21 @@ const PersistedProfileEntry = z.looseObject({
   cachedPicture: z.string().max(2048).optional(),
 });
 
+/**
+ * Profile ceiling, shared by the schema and by `addProfile`.
+ *
+ * One constant used at both ends. The schema declared 64 and `addProfile`
+ * appended without a cap, so a 65th profile made the blob unparseable — and
+ * `createMergeWithSchema` is all-or-nothing, so the next launch discarded the
+ * GLOBAL profile store: every profile the user has, and the active index with
+ * them. Refusing the 65th costs one profile; the old behaviour cost all
+ * sixty-four.
+ */
+export const MAX_PROFILES = 64;
+
 const PersistedProfileStore = z.object({
   activeAccountIndex: z.number().int().default(0),
-  profiles: z.array(PersistedProfileEntry).max(64).default([]),
+  profiles: z.array(PersistedProfileEntry).max(MAX_PROFILES).default([]),
 });
 
 /**
@@ -140,11 +159,29 @@ export const useProfileStore = create<ProfileStore>()(
         externalChain?: number
       ) => {
         storeLog.info('store.profile.add', { accountIndex, source, externalChain });
+        const existing = get().profiles;
+        const atIndex = existing.find((p) => p.accountIndex === accountIndex);
+        if (atIndex) {
+          // Same index AND same key: already recorded, so the caller's request
+          // is satisfied. A different key at that index is NOT this profile —
+          // saying `true` would let a create restart into somebody else's
+          // identity — and it is not ours to overwrite either.
+          const same = atIndex.pubkey === pubkey;
+          storeLog.debug(
+            same ? 'store.profile.add.skip_duplicate' : 'store.profile.add.index_taken',
+            { accountIndex }
+          );
+          return same;
+        }
+        if (existing.length >= MAX_PROFILES) {
+          storeLog.warn('store.profile.add.at_capacity', {
+            accountIndex,
+            max: MAX_PROFILES,
+          });
+          return false;
+        }
         set((state) => {
-          if (state.profiles.some((p) => p.accountIndex === accountIndex)) {
-            storeLog.debug('store.profile.add.skip_duplicate', { accountIndex });
-            return state;
-          }
+          if (state.profiles.some((p) => p.accountIndex === accountIndex)) return state;
           const effectiveChain = externalChain ?? (source === 'imported' ? 1 : undefined);
           return {
             profiles: [
@@ -161,6 +198,7 @@ export const useProfileStore = create<ProfileStore>()(
             ],
           };
         });
+        return true;
       },
 
       switchProfile: (accountIndex: number) => {
@@ -222,6 +260,23 @@ export const useProfileStore = create<ProfileStore>()(
         activeAccountIndex: state.activeAccountIndex,
         profiles: state.profiles,
       }),
+      afterHydrate: (state) => {
+        if (!state || state.profiles.length === 0) return;
+        if (state.profiles.some((p) => p.accountIndex === state.activeAccountIndex)) return;
+        // The schema cannot express "the active index is one of these", and a
+        // refine that could would discard the whole blob — the failure this
+        // store is most exposed to. Repair instead: an active index with no
+        // profile behind it makes `getActiveProfilePubkey()` undefined, and
+        // `createProfileScopedStorage` then falls back to the BARE key, so
+        // every profile-scoped store silently reads and writes unscoped state
+        // shared across profiles.
+        const fallback = state.profiles[0].accountIndex;
+        storeLog.warn('store.profile.active_index_repaired', {
+          from: state.activeAccountIndex,
+          to: fallback,
+        });
+        useProfileStore.setState({ activeAccountIndex: fallback });
+      },
     })
   )
 );

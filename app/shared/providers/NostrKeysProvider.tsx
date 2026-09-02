@@ -426,7 +426,13 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
 
         if (defaultKeys?.pubkey && !isImported) {
           initLog('NostrKeys', 'adding profile to profileStore...');
-          useProfileStore.getState().addProfile(defaultAccountIndex, defaultKeys.pubkey);
+          if (!useProfileStore.getState().addProfile(defaultAccountIndex, defaultKeys.pubkey)) {
+            // Boot keeps going: the keys are derived and the wallet works, it
+            // is only the profile row that is missing. Refusing here would
+            // mean a full list AND this account absent from it, which the
+            // switch paths cannot produce.
+            log.warn('nostr.keys.profile_add_refused', { defaultAccountIndex });
+          }
         }
 
         setIsReady(true);

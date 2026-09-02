@@ -227,6 +227,23 @@ export async function switchToExistingProfile(opts: {
   }
 }
 
+/**
+ * Unwind a transition that got past `beginTransition()` and cannot continue.
+ *
+ * All three pieces, always. `transitionInFlight` is module-level and the first
+ * thing every switch checks, so a bail that only cancels the held stages
+ * leaves it set and refuses EVERY later profile switch for the rest of the
+ * session — the guard only clears on the next app start. This is what the
+ * `catch` below already does; the early returns have to match it.
+ */
+async function abandonTransition(
+  cancelResetStages: TransitionControls['cancelResetStages'] | undefined
+): Promise<void> {
+  cancelResetStages?.();
+  transitionInFlight = false;
+  await endTransition();
+}
+
 export async function createAndSwitchProfile(opts?: {
   getKeysForAccount?: KeyDerivationFn;
   resetStages?: TransitionControls['resetStages'];
@@ -258,11 +275,18 @@ export async function createAndSwitchProfile(opts?: {
     const newKeys = await getKeysForAccount(nextIndex);
     if (!newKeys?.pubkey) {
       log.warn('profile.orchestrator.key_derivation_failed');
-      cancelResetStages?.();
+      await abandonTransition(cancelResetStages);
       return false;
     }
 
-    profileStore.addProfile(nextIndex, newKeys.pubkey);
+    // Not fire-and-forget: at `MAX_PROFILES` the store refuses, and switching
+    // into an index it does not hold would leave the app running as an account
+    // nothing knows about — profile-scoped storage included.
+    if (!profileStore.addProfile(nextIndex, newKeys.pubkey)) {
+      log.warn('profile.orchestrator.at_capacity', { nextIndex });
+      await abandonTransition(cancelResetStages);
+      return false;
+    }
 
     await cleanupCocoWithTimeout();
     // Persist-then-restart without the in-memory flip (BTC-13 — see

@@ -8,6 +8,10 @@
  */
 import AsyncStorageMock from '@react-native-async-storage/async-storage';
 
+// A literal, identical in every module graph, so it does not need re-requiring
+// after `jest.resetModules()` the way the stateful modules below do.
+import { MAX_PROFILES } from '@/shared/stores/global/profileStore';
+
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );
@@ -63,6 +67,7 @@ function setup() {
   (AsyncStorage.setItem as jest.Mock).mockClear();
   return {
     switchToExistingProfile: orchestrator.switchToExistingProfile,
+    createAndSwitchProfile: orchestrator.createAndSwitchProfile,
     useProfileStore,
     mockRestart: jest.mocked(restartApp),
     AsyncStorage,
@@ -153,5 +158,100 @@ describe('switchToExistingProfile — bounded teardown (BTC-14)', () => {
 
     await expect(pending).resolves.toBe(true);
     expect(jest.mocked(restartApp)).toHaveBeenCalled();
+  });
+});
+
+describe('createAndSwitchProfile — capacity', () => {
+  // `PersistedProfileStore` caps `profiles`, and `addProfile` used to append
+  // past it: the blob then failed parse and the next launch discarded the
+  // GLOBAL profile store. Refusing is only half the fix — the orchestrator
+  // switches into the index it just asked for, so a refusal it ignored would
+  // leave the app running as an account the store does not hold.
+  it('aborts instead of switching into a profile the store refused', async () => {
+    const { createAndSwitchProfile, useProfileStore, mockRestart, AsyncStorage } = setup();
+    mockRestart.mockReturnValue(true);
+    useProfileStore.setState({
+      activeAccountIndex: 0,
+      profiles: Array.from({ length: MAX_PROFILES }, (_, i) => ({
+        accountIndex: i,
+        pubkey: `${i}`.padStart(64, '0'),
+        addedAt: i + 1,
+      })),
+    });
+    (AsyncStorage.setItem as jest.Mock).mockClear();
+
+    const resetStages = jest.fn();
+    const cancelResetStages = jest.fn();
+    const created = await createAndSwitchProfile({
+      getKeysForAccount: async () => ({ pubkey: 'f'.repeat(64), privateKey: new Uint8Array() }),
+      resetStages,
+      cancelResetStages,
+    });
+
+    expect(created).toBe(false);
+    // The bail happens after the stages were held, so releasing them is part
+    // of the unwind — otherwise the boot gate stays up over a switch that is
+    // not happening.
+    expect(resetStages).toHaveBeenCalledWith({ holdUntilCancel: true });
+    expect(cancelResetStages).toHaveBeenCalled();
+    // Nothing was switched to, nothing was persisted, nothing restarted.
+    expect(useProfileStore.getState().profiles).toHaveLength(MAX_PROFILES);
+    expect(useProfileStore.getState().activeAccountIndex).toBe(0);
+    expect(persistedActiveIndex(AsyncStorage)).toBeUndefined();
+    expect(mockRestart).not.toHaveBeenCalled();
+  });
+
+  it('leaves the transition guard clear so a later switch still works', async () => {
+    // Every other bail in `createAndSwitchProfile` unwinds fully
+    // (`cancelResetStages` + `transitionInFlight = false` + `endTransition`).
+    // A bail that only cancels the stages leaves the module-level guard set,
+    // and the guard is the first thing every switch checks — so one failed
+    // create would refuse every profile switch for the rest of the session.
+    const { createAndSwitchProfile, switchToExistingProfile, useProfileStore, mockRestart } =
+      setup();
+    mockRestart.mockReturnValue(true);
+    useProfileStore.setState({
+      activeAccountIndex: 0,
+      profiles: Array.from({ length: MAX_PROFILES }, (_, i) => ({
+        accountIndex: i,
+        pubkey: `${i}`.padStart(64, '0'),
+        addedAt: i + 1,
+      })),
+    });
+
+    expect(
+      await createAndSwitchProfile({
+        getKeysForAccount: async () => ({ pubkey: 'f'.repeat(64), privateKey: new Uint8Array() }),
+      })
+    ).toBe(false);
+
+    expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+  });
+
+  it('leaves the guard clear when key derivation fails too', async () => {
+    const { createAndSwitchProfile, switchToExistingProfile, mockRestart } = setup();
+    mockRestart.mockReturnValue(true);
+
+    expect(
+      await createAndSwitchProfile({
+        getKeysForAccount: async () => null,
+      })
+    ).toBe(false);
+
+    expect(await switchToExistingProfile({ accountIndex: 1 })).toBe(true);
+  });
+
+  it('creates and switches normally when there is room', async () => {
+    const { createAndSwitchProfile, useProfileStore, mockRestart, AsyncStorage } = setup();
+    mockRestart.mockReturnValue(true);
+    (AsyncStorage.setItem as jest.Mock).mockClear();
+
+    const created = await createAndSwitchProfile({
+      getKeysForAccount: async () => ({ pubkey: 'f'.repeat(64), privateKey: new Uint8Array() }),
+    });
+
+    expect(created).toBe(true);
+    expect(useProfileStore.getState().profiles).toHaveLength(3);
+    expect(persistedActiveIndex(AsyncStorage)).toBe(2);
   });
 });
