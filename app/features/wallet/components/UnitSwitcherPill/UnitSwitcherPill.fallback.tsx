@@ -1,18 +1,17 @@
 /**
  * Fallback tiers (iOS blur/flat + Android): the shared `CapsuleButton` face —
  * the same component behind the ecash status pills, which tiers itself
- * (blur/flat) — opening the app-wide `actionMenuPopup()` bottom sheet
- * (rendered once by <ActionMenuHost /> at the app root). Inline menus
- * mis-position on Android; the global host opens fully and stays hidden
- * when closed.
+ * (blur/flat). The shared action-menu sheet also presents above native route
+ * modals. Header callers use the canonical circular header action instead.
  */
 
 import React, { useCallback } from 'react';
 import { StyleSheet } from 'react-native';
 
 import Icon from 'assets/icons';
-import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
+import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
 import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import {
@@ -23,24 +22,40 @@ import {
   type UnitSwitcherPillProps,
 } from './useUnitSwitcherPill';
 
-export function UnitSwitcherPillFallback(props: UnitSwitcherPillProps): React.ReactElement {
-  const { unit, shownUnit, availableOptions, canSwitch, handleSelectUnit, textSize } =
+export function UnitSwitcherPillFallback(
+  props: UnitSwitcherPillProps & { header?: boolean }
+): React.ReactElement {
+  const { unit, shownUnit, shownOption, availableOptions, canSwitch, handleSelectUnit, textSize } =
     useUnitSwitcherPill(props);
+  const selectedUnit = props.header ? shownUnit : unit;
   const success = useThemeColor('success');
 
   const openUnitMenu = useCallback(() => {
-    actionMenuPopup({
+    actionMenuSheet({
       title: 'Wallet accounts',
       buttons: availableOptions.map((option) => ({
         text: option.label,
         iconNode: unitIconNode(option, 22),
         testID: `wallet-unit-menu-${option.unit}`,
         suffix:
-          option.unit === unit ? <Icon name="mdi:check" size={20} color={success} /> : undefined,
+          option.unit === selectedUnit ? (
+            <Icon name="mdi:check" size={20} color={success} />
+          ) : undefined,
         onPress: () => handleSelectUnit(option.unit),
       })),
     });
-  }, [unit, availableOptions, handleSelectUnit, success]);
+  }, [selectedUnit, availableOptions, handleSelectUnit, success]);
+
+  if (props.header) {
+    return (
+      <ScreenHeaderAction
+        onPress={openUnitMenu}
+        testID="wallet-unit-switcher"
+        accessibilityLabel={`Switch wallet account, ${PILL_LABELS[shownUnit]}`}>
+        {unitIconNode(shownOption, 24)}
+      </ScreenHeaderAction>
+    );
+  }
 
   return (
     // Greyed out when only one unit exists — nothing to switch to.

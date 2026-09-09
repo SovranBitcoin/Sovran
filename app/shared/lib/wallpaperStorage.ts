@@ -20,6 +20,47 @@ const MIN_WALLPAPER_BYTES = 1024;
 // theme-commit chain. A 1080x1920 wallpaper is ~1MB and fetches in a couple of
 // seconds; 60s is generous headroom.
 const DOWNLOAD_TIMEOUT_MS = 60_000;
+let downloadSequence = 0;
+const activeDownloadFiles = new Set<string>();
+const publishing = new Map<string, Promise<void>>();
+
+async function removeDownloadFile(uri: string): Promise<void> {
+  await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+  activeDownloadFiles.delete(uri);
+}
+
+/** Serialise only promotion, keeping concurrent downloads independent. iOS's
+ * legacy move removes the destination first, so retain a recoverable copy until
+ * the replacement is published. Never delete that copy if restoration fails. */
+async function publishWallpaper(stagingUri: string, localUri: string): Promise<void> {
+  const previous = publishing.get(localUri) ?? Promise.resolve();
+  const pending = previous
+    .catch(() => {})
+    .then(async () => {
+      const backupUri = `${stagingUri}.backup`;
+      const existing = await FileSystem.getInfoAsync(localUri);
+      if (existing.exists) {
+        await FileSystem.copyAsync({ from: localUri, to: backupUri });
+      }
+      try {
+        await FileSystem.moveAsync({ from: stagingUri, to: localUri });
+      } catch (error) {
+        if (existing.exists) {
+          // If this also fails, the .backup remains for recovery rather than
+          // being included in orphan cleanup or deleted by the outer catch.
+          await FileSystem.moveAsync({ from: backupUri, to: localUri });
+        }
+        throw error;
+      }
+      if (existing.exists) await removeDownloadFile(backupUri);
+    });
+  publishing.set(localUri, pending);
+  try {
+    await pending;
+  } finally {
+    if (publishing.get(localUri) === pending) publishing.delete(localUri);
+  }
+}
 
 /**
  * Ensure the wallpapers directory exists.
@@ -47,15 +88,21 @@ export async function downloadWallpaper(
   await ensureWallpaperDir();
 
   const localUri = getWallpaperUri(themeName);
+  const stagingUri = `${WALLPAPER_DIR}.download-${Date.now()}-${++downloadSequence}.png`;
+  activeDownloadFiles.add(stagingUri);
+  let acceptingProgress = true;
+  let downloadResumable: FileSystem.DownloadResumable | undefined;
+  let download: ReturnType<FileSystem.DownloadResumable['downloadAsync']> | undefined;
 
   log.info('wallpaper.download.start', { themeName, url, localUri });
 
   try {
-    const downloadResumable = FileSystem.createDownloadResumable(
+    downloadResumable = FileSystem.createDownloadResumable(
       url,
-      localUri,
+      stagingUri,
       {},
       (downloadProgress) => {
+        if (!acceptingProgress) return;
         const total = downloadProgress.totalBytesExpectedToWrite;
         // total is 0/-1 before the (possibly redirected) response's
         // Content-Length is known — guard the divide so we never report a
@@ -71,7 +118,8 @@ export async function downloadWallpaper(
     // file:// URI while the bytes were still being written. The background
     // then registered that theme and `<Image>` decoded a truncated/empty file
     // ("Downloaded image decode failed") and rendered black.
-    const result = await withTimeout(downloadResumable.downloadAsync(), DOWNLOAD_TIMEOUT_MS);
+    download = downloadResumable.downloadAsync();
+    const result = await withTimeout(download, DOWNLOAD_TIMEOUT_MS);
 
     const status = result?.status ?? 0;
     if (status < 200 || status >= 300) {
@@ -81,22 +129,39 @@ export async function downloadWallpaper(
     // Only report success once the file is actually a plausible image on disk.
     // An empty/truncated download registered as a wallpaper is worse than no
     // wallpaper: it decode-fails silently and paints the screen black.
-    const info = await FileSystem.getInfoAsync(localUri);
+    const info = await FileSystem.getInfoAsync(stagingUri);
     const bytes = info.exists ? (info.size ?? 0) : 0;
     if (bytes < MIN_WALLPAPER_BYTES) {
       throw new Error(`empty download (${info.exists ? `${bytes} bytes` : 'missing'})`);
     }
 
+    await publishWallpaper(stagingUri, localUri);
+    activeDownloadFiles.delete(stagingUri);
     log.info('wallpaper.download.complete', { themeName, uri: localUri, status, bytes });
     return localUri;
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : String(error ?? 'Unknown download error');
     log.error('wallpaper.download.error', { themeName, url, localUri, error: message });
-    // Remove any partial/empty file so a broken download can't shadow a later
-    // retry (isWallpaperDownloaded checks existence, not validity).
-    await FileSystem.deleteAsync(localUri, { idempotent: true }).catch(() => {});
+    // A cancellation request does not wait for the native writer to stop.
+    // Clean up this attempt only once its download settles; a late completion
+    // can never overwrite the canonical image or a retry's unique staging file.
+    if (download) {
+      void download.then(
+        () => removeDownloadFile(stagingUri),
+        () => removeDownloadFile(stagingUri)
+      );
+    } else {
+      await removeDownloadFile(stagingUri);
+    }
     throw new Error(`Download failed for "${themeName}": ${message}`);
+  } finally {
+    acceptingProgress = false;
+    // Also removes DownloadResumable's JS progress subscription on success.
+    // Do not await a potentially stalled native cancellation on the timeout path.
+    void downloadResumable?.cancelAsync().catch(() => {
+      log.warn('wallpaper.download.cancel_failed', { themeName });
+    });
   }
 }
 
@@ -140,6 +205,9 @@ export async function cleanupOrphanedFiles(trackedThemeNames: Set<string>): Prom
   const cleaned: string[] = [];
 
   for (const file of files) {
+    // Live staging files belong to native writers; failed restoration backups
+    // must remain available even after a restart.
+    if (activeDownloadFiles.has(`${WALLPAPER_DIR}${file}`) || file.endsWith('.backup')) continue;
     const themeName = file.replace(/\.[^.]+$/, '');
     if (!trackedThemeNames.has(themeName)) {
       await FileSystem.deleteAsync(`${WALLPAPER_DIR}${file}`, { idempotent: true });

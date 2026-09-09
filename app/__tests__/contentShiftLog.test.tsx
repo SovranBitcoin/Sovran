@@ -14,6 +14,7 @@ import {
   useShiftLogger,
   useVisualLayoutLogger,
   useVisualListLogger,
+  useVisualFlatListLogger,
   useVisualScrollMetricsLogger,
   useVisualStateLogger,
   visualLayoutScopePart,
@@ -747,6 +748,41 @@ describe('useVisualListLogger', () => {
         viewable: [expect.objectContaining({ key: 'row-a', itemType: 'note' })],
       })
     );
+  });
+
+  it('handles removed FlashList rows when switching from notifications to the App tab', () => {
+    let report!: ReturnType<typeof useVisualFlatListLogger<{ id: string }>>;
+    function Probe() {
+      report = useVisualFlatListLogger<{ id: string }>({
+        scope: 'test.notifications.app',
+        surface: 'notifications',
+        component: 'NotificationsFlatList',
+        getItemKey: (item) => item.id,
+        getItemContext: (item) => ({ rowKey: item.id }),
+      });
+      return null;
+    }
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(<Probe />);
+    });
+    // FlashList2 maps old nonvisible indices through the NEW data array.
+    // After50 notifications become1 welcome row, an old index has no item.
+    expect(() =>
+      act(() =>
+        report.onListViewableItemsChanged({
+          viewableItems: [{ index: 0, key: 'welcome', item: { id: 'welcome' }, isViewable: true }],
+          changed: [{ index: 5, key: '5', item: undefined, isViewable: false }],
+        })
+      )
+    ).not.toThrow();
+    expect(mockInfo).toHaveBeenCalledWith(
+      'visual.layout.viewability',
+      expect.objectContaining({
+        changed: [expect.objectContaining({ key: '5', index: 5, isViewable: false })],
+      })
+    );
+    act(() => renderer.unmount());
   });
 
   it('logs sticky header changes with virtual position context', () => {

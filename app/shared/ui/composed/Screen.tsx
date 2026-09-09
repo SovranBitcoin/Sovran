@@ -23,7 +23,7 @@ import React, {
   useState,
   useLayoutEffect,
 } from 'react';
-import { Platform, View } from 'react-native';
+import { Platform, View, type ScrollView } from 'react-native';
 import type { SharedValue } from 'react-native-reanimated';
 import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -41,6 +41,8 @@ import { ScreenBackgroundContext, ScreenFooterContext } from './ScreenFooterCont
 type ScreenScrollMode = 'auto' | 'animated' | 'none' | 'custom';
 
 interface ScreenProps {
+  scrollViewRef?: React.Ref<ScrollView>;
+  scrollContentRef?: React.RefObject<View | null>;
   /** Required. Names the screen boundary for log-doctor + phone-tree testID paths. */
   name: string;
   children: ReactNode;
@@ -118,6 +120,8 @@ export function Screen({
   scrollIndicatorInsets,
   safeArea = false,
   deferContent = true,
+  scrollViewRef,
+  scrollContentRef,
 }: ScreenProps) {
   const [measuredFooterHeight, setMeasuredFooterHeight] = useState(0);
   // Track what we last committed to state so we can ignore onLayout callbacks
@@ -200,6 +204,8 @@ export function Screen({
       <ScreenBackgroundContext.Provider value={resolvedBgColor}>
         <ScreenFooterContext.Provider value={footerContextValue}>
           <ModalLayoutWrapper
+            scrollViewRef={scrollViewRef}
+            scrollContentRef={scrollContentRef}
             contentPadding={contentPadding}
             headerGradient={headerGradient}
             headerGradientHeight={headerGradientHeight}

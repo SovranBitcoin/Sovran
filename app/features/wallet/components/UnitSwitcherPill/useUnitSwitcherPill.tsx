@@ -10,6 +10,8 @@ export interface UnitSwitcherPillProps {
   /** Show THIS account on the pill (carousel pages preview their own unit);
    *  the menu still switches the ACTIVE unit. Defaults to the active unit. */
   displayUnit?: ActiveUnit;
+  /** Override selection when a screen must coordinate its current flow. */
+  onSelectUnit?: (unit: ActiveUnit) => void;
 }
 
 interface UnitOption {
@@ -60,9 +62,9 @@ interface UnitSwitcherPillShared {
   /** The unit shown on the pill face (a carousel page's own account). */
   shownUnit: ActiveUnit;
   shownOption: UnitOption;
-  /** Unit options some trusted mint actually supports, in menu order. */
+  /** Offered unit options, in menu order. */
   availableOptions: UnitOption[];
-  /** False when only one unit exists — the pill greys out, nothing to pick. */
+  /** False when no other available unit can replace the displayed account. */
   canSwitch: boolean;
   handleSelectUnit: (unit: ActiveUnit) => void;
   textSize: number;
@@ -71,20 +73,22 @@ interface UnitSwitcherPillShared {
 export function useUnitSwitcherPill({
   textSize = 12,
   displayUnit,
+  onSelectUnit,
 }: UnitSwitcherPillProps): UnitSwitcherPillShared {
   const { unit, availableUnits, selectUnit } = useActiveUnit();
   const shownUnit = displayUnit ?? unit;
-  const canSwitch = availableUnits.length > 1;
+  const availableOptions = UNIT_OPTIONS.filter((option) => availableUnits.includes(option.unit));
+  const canSwitch = availableOptions.some((option) => option.unit !== shownUnit);
 
   const handleSelectUnit = useCallback(
     (next: ActiveUnit) => {
       walletLog.info('wallet.unit.menu_selected', { from: unit, to: next });
-      selectUnit(next);
+      if (onSelectUnit) onSelectUnit(next);
+      else selectUnit(next);
     },
-    [unit, selectUnit]
+    [unit, selectUnit, onSelectUnit]
   );
 
-  const availableOptions = UNIT_OPTIONS.filter((option) => availableUnits.includes(option.unit));
   const shownOption = UNIT_OPTIONS.find((o) => o.unit === shownUnit) ?? UNIT_OPTIONS[0];
 
   return {

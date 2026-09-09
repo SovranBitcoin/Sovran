@@ -2,11 +2,22 @@
  * @jest-environment node
  */
 
+import { useLayoutEffect } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import { act, renderHook } from '@testing-library/react-native';
 
 import { defaultChainAdapter, type ChainTransactionStatus } from 'wallet';
 
 import { useMempoolTxConfirmations } from '@/shared/hooks/useMempoolTxConfirmations';
+
+let mockFocused = true;
+let appStateChanged: (state: AppStateStatus) => void;
+jest.mock('expo-router', () => ({
+  useFocusEffect: (effect: () => void | (() => void)) => {
+    const ReactActual = jest.requireActual<typeof import('react')>('react');
+    ReactActual.useEffect(() => (mockFocused ? effect() : undefined), [effect, mockFocused]);
+  },
+}));
 
 const POLL_MS = 30_000;
 
@@ -32,8 +43,151 @@ async function flushEffects(): Promise<void> {
 }
 
 describe('useMempoolTxConfirmations', () => {
+  it('does not overlap a slow request with subsequent polling ticks', async () => {
+    const pending = deferred<ChainTransactionStatus | null>();
+    const getStatus = jest
+      .spyOn(defaultChainAdapter, 'getTransactionStatus')
+      .mockReturnValue(pending.promise);
+    const { unmount } = renderHook(() => useMempoolTxConfirmations('abc'));
+    await act(async () => jest.advanceTimersByTimeAsync(POLL_MS * 3));
+    expect(getStatus).toHaveBeenCalledTimes(1);
+    unmount();
+    pending.resolve(null);
+    await flushEffects();
+  });
+
+  it('stops polling while backgrounded or blurred and refreshes on return', async () => {
+    const getStatus = jest
+      .spyOn(defaultChainAdapter, 'getTransactionStatus')
+      .mockResolvedValue(txStatus('abc', false, 0));
+    const { result, rerender, unmount } = renderHook(() => useMempoolTxConfirmations('abc'));
+    await flushEffects();
+    act(() => appStateChanged('background'));
+    await act(async () => jest.advanceTimersByTimeAsync(POLL_MS * 3));
+    expect(getStatus).toHaveBeenCalledTimes(1);
+    expect(result.current.status?.txid).toBe('abc');
+    act(() => appStateChanged('active'));
+    await flushEffects();
+    expect(getStatus).toHaveBeenCalledTimes(2);
+    mockFocused = false;
+    rerender({});
+    await act(async () => jest.advanceTimersByTimeAsync(POLL_MS * 2));
+    expect(getStatus).toHaveBeenCalledTimes(2);
+    mockFocused = true;
+    rerender({});
+    await flushEffects();
+    expect(getStatus).toHaveBeenCalledTimes(3);
+    unmount();
+  });
+
+  it('does not commit the previous transaction status on a txid change', async () => {
+    jest
+      .spyOn(defaultChainAdapter, 'getTransactionStatus')
+      .mockResolvedValue(txStatus('abc', true, 1));
+    const commits: (string | undefined)[] = [];
+    const { rerender, unmount } = renderHook(
+      ({ txid }: { txid: string }) => {
+        const result = useMempoolTxConfirmations(txid);
+        useLayoutEffect(() => {
+          commits.push(result.status?.txid);
+        });
+        return result;
+      },
+      { initialProps: { txid: 'abc' } }
+    );
+    await flushEffects();
+    commits.length = 0;
+    rerender({ txid: 'def' });
+    expect(commits).not.toContain('abc');
+    unmount();
+  });
+
+  it.each(['background', 'blur'] as const)(
+    'waits for a pending request across a fast %s/resume and ignores its stale result',
+    async (pause) => {
+      const pending = deferred<ChainTransactionStatus | null>();
+      const refreshed = deferred<ChainTransactionStatus | null>();
+      const getStatus = jest
+        .spyOn(defaultChainAdapter, 'getTransactionStatus')
+        .mockReturnValueOnce(pending.promise)
+        .mockReturnValueOnce(refreshed.promise);
+      const { result, rerender, unmount } = renderHook(() => useMempoolTxConfirmations('abc'));
+      if (pause === 'background') {
+        act(() => appStateChanged('background'));
+        act(() => appStateChanged('active'));
+      } else {
+        mockFocused = false;
+        rerender({});
+        mockFocused = true;
+        rerender({});
+      }
+      await act(async () => jest.advanceTimersByTimeAsync(POLL_MS * 3));
+      expect(getStatus).toHaveBeenCalledTimes(1);
+      pending.resolve(txStatus('abc', true, 10));
+      await flushEffects();
+      expect(getStatus).toHaveBeenCalledTimes(2);
+      expect(result.current.status).toBeNull();
+      refreshed.resolve(txStatus('abc', false, 0));
+      await flushEffects();
+      expect(result.current.status?.confirmations).toBe(0);
+      expect(result.current.isLoading).toBe(false);
+      unmount();
+    }
+  );
+
+  it('stops at required depth across resume, and restarts when greater depth is requested', async () => {
+    const next = deferred<ChainTransactionStatus | null>();
+    const getStatus = jest
+      .spyOn(defaultChainAdapter, 'getTransactionStatus')
+      .mockResolvedValueOnce(txStatus('abc', true, 3))
+      .mockReturnValueOnce(next.promise);
+    const { result, rerender, unmount } = renderHook(
+      ({ depth }: { depth: number }) =>
+        useMempoolTxConfirmations('abc', { requiredConfirmations: depth }),
+      { initialProps: { depth: 3 } }
+    );
+    await flushEffects();
+    act(() => appStateChanged('background'));
+    act(() => appStateChanged('active'));
+    mockFocused = false;
+    rerender({ depth: 3 });
+    mockFocused = true;
+    rerender({ depth: 3 });
+    await act(async () => jest.advanceTimersByTimeAsync(POLL_MS * 3));
+    expect(getStatus).toHaveBeenCalledTimes(1);
+    rerender({ depth: 6 });
+    expect(getStatus).toHaveBeenCalledTimes(2);
+    expect(result.current.status?.confirmations).toBe(3);
+    expect(result.current.isLoading).toBe(true);
+    next.resolve(txStatus('abc', true, 6));
+    await flushEffects();
+    await act(async () => jest.advanceTimersByTimeAsync(POLL_MS * 3));
+    expect(getStatus).toHaveBeenCalledTimes(2);
+    unmount();
+  });
+
+  it('does not start requests until a backgrounded detail becomes active', async () => {
+    jest.spyOn(AppState, 'currentState', 'get').mockReturnValue('background');
+    const getStatus = jest
+      .spyOn(defaultChainAdapter, 'getTransactionStatus')
+      .mockResolvedValue(txStatus('abc', false, 0));
+    const { unmount } = renderHook(() => useMempoolTxConfirmations('abc'));
+    await act(async () => jest.advanceTimersByTimeAsync(POLL_MS * 3));
+    expect(getStatus).not.toHaveBeenCalled();
+    act(() => appStateChanged('active'));
+    await flushEffects();
+    expect(getStatus).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
   beforeEach(() => {
     jest.useFakeTimers();
+    mockFocused = true;
+    jest.spyOn(AppState, 'currentState', 'get').mockReturnValue('active');
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((event, listener) => {
+      if (event === 'change') appStateChanged = listener;
+      return { remove: jest.fn() };
+    });
     jest.spyOn(console, 'debug').mockImplementation(() => undefined);
     jest.spyOn(console, 'info').mockImplementation(() => undefined);
     jest.spyOn(console, 'warn').mockImplementation(() => undefined);

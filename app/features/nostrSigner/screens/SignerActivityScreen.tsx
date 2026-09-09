@@ -19,7 +19,8 @@ import React, { useState } from 'react';
 import { ScrollView } from 'react-native';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Button as HerouiButton } from 'heroui-native';
 
 import Icon from 'assets/icons';

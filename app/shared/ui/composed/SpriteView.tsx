@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, useWindowDimensions } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import { retainWallpaperMotion, wallpaperMotion } from '@/shared/lib/theme/wallpaperMotion';
 import { noteWallpaperRendered } from '@/shared/lib/theme/themeTransition';
 import { markWallpaperLoaded, markWallpaperFailed } from '@/shared/lib/theme/wallpaperRenderState';
@@ -73,6 +74,7 @@ const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
   imageTransitionMs,
 }: AnimatedSpriteBackgroundProps) {
   const window = useWindowDimensions();
+  const reducedMotion = useReducedMotion();
   const ctxTheme = useTheme();
   const activeTheme = themeName ?? ctxTheme.currentTheme;
   const backgroundImageSource = backgroundImageThemes[activeTheme];
@@ -99,9 +101,9 @@ const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
   // motionEnabled only controls whether THIS instance keeps the shared
   // DeviceMotion subscription alive (hidden layers don't).
   useEffect(() => {
-    if (!hasImage || !motionEnabled) return;
+    if (!hasImage || !motionEnabled || reducedMotion) return;
     return retainWallpaperMotion();
-  }, [hasImage, motionEnabled]);
+  }, [hasImage, motionEnabled, reducedMotion]);
 
   useEffect(() => {
     if (!backgroundImageSource) {

@@ -21,7 +21,10 @@ jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ normalizeRelayUrl: (url: string)
   virtual: true,
 });
 
-jest.mock('expo-router', () => ({ Stack: { Screen: () => null } }));
+jest.mock('expo-router', () => ({
+  Stack: { Screen: () => null },
+  router: { push: jest.fn(), navigate: jest.fn(), back: jest.fn() },
+}));
 jest.mock('wallet', () => ({
   isMeltQuotePaid: (entry: { state: string }) => entry.state === 'PAID',
   isMeltQuoteReadyToPay: (entry: { state: string }) => entry.state === 'UNPAID',

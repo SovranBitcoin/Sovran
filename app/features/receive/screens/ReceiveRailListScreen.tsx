@@ -37,11 +37,10 @@ import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
-import { Skeleton } from '@/shared/ui/primitives/Skeleton';
+import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
-import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
@@ -200,39 +199,6 @@ const ReceiveRailRow = memo(function ReceiveRailRow({
   );
 });
 
-// Skeleton row mirroring ReceiveRailRow's layout (icon · two lines · badge) so
-// the loading state matches the real chrome — same `surface-secondary` fill and
-// pulse as every other skeleton in the app.
-const ReceiveRailRowSkeleton = memo(function ReceiveRailRowSkeleton({
-  skeletonColor,
-}: {
-  skeletonColor: string;
-}) {
-  const bar = (width: number, height: number) => (
-    <Skeleton style={{ width, height, borderRadius: 4, backgroundColor: skeletonColor }} />
-  );
-  return (
-    <ListGroup.Item disabled>
-      <ListGroup.ItemPrefix>
-        <Skeleton
-          style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: skeletonColor }}
-        />
-      </ListGroup.ItemPrefix>
-      <ListGroup.ItemContent>
-        <VStack gap={6}>
-          {bar(150, 15)}
-          {bar(96, 12)}
-        </VStack>
-      </ListGroup.ItemContent>
-      <ListGroup.ItemSuffix>
-        <Skeleton
-          style={{ width: 72, height: 22, borderRadius: 999, backgroundColor: skeletonColor }}
-        />
-      </ListGroup.ItemSuffix>
-    </ListGroup.Item>
-  );
-});
-
 const ParamsSchema = z.object({
   rail: z.enum(['paymentRequest', 'onchain', 'bolt12']),
   unit: z.string().max(16).default('sat'),
@@ -242,11 +208,10 @@ export function ReceiveRailListScreen() {
   const params = useRouteParams(ParamsSchema, { where: 'receive-flow.railList' });
   const manager = useColadaManager();
   const insets = useSafeAreaInsets();
-  const [background, foreground, accent, skeletonColor, green] = useThemeColor([
+  const [background, foreground, accent, green] = useThemeColor([
     'background',
     'foreground',
     'accent',
-    'surface-secondary',
     'success',
   ] as const);
   const muted = withAlpha(foreground, 0.4);
@@ -318,16 +283,13 @@ export function ReceiveRailListScreen() {
         }}
         showsVerticalScrollIndicator={false}>
         {state.loading ? (
-          <GradientCard>
-            <ListGroup variant="transparent">
-              {[0, 1, 2, 3].map((i) => (
-                <React.Fragment key={i}>
-                  {i > 0 ? <Separator className="mx-4" /> : null}
-                  <ReceiveRailRowSkeleton skeletonColor={skeletonColor} />
-                </React.Fragment>
-              ))}
-            </ListGroup>
-          </GradientCard>
+          <View
+            className="items-center py-12"
+            testID="receive-rail-list-loading"
+            accessibilityLabel={`Loading ${RAIL_TITLE[rail].toLowerCase()}`}
+            accessibilityRole="progressbar">
+            <Spinner size={32} />
+          </View>
         ) : state.items.length === 0 ? (
           <Text size={14} className="text-muted mt-6 text-center">
             Nothing here yet.

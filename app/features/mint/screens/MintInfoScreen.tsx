@@ -8,7 +8,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { Stack, Link } from 'expo-router';
+import { Stack } from 'expo-router';
 import { z } from 'zod';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -553,19 +553,13 @@ export function MintInfoScreen() {
             entry?.fromAccepter || !(typeof kymScore === 'number' && kymScore >= 0)
               ? undefined
               : () => (
-                  <Link
-                    href={{
-                      pathname: '/reviews',
-                      params: { mintUrl },
-                    }}
-                    asChild>
-                    <ScreenHeaderAction
-                      icon="ic:round-star"
-                      color={starColor}
-                      testID="mint-info-reviews"
-                      accessibilityLabel="View mint reviews"
-                    />
-                  </Link>
+                  <ScreenHeaderAction
+                    onPress={() => router.navigate({ pathname: '/reviews', params: { mintUrl } })}
+                    icon="ic:round-star"
+                    color={starColor}
+                    testID="mint-info-reviews"
+                    accessibilityLabel="View mint reviews"
+                  />
                 ),
         })}
       />

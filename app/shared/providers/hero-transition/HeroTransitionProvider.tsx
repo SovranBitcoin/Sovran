@@ -11,7 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { ClaimUsernameCardFrame } from '@/shared/blocks/claim/ClaimUsernameCardFrame';
 import { measureInWindowAsync, rafAsync } from './measure';
 import type { HeroId, Rect, HeroRole } from './types';

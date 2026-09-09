@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Platform, TextInput, useWindowDimensions } from 'react-native';
+import { usePreventRemove } from 'expo-router/react-navigation';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -20,8 +21,8 @@ import {
   normalizeMintUrlKey,
   normalizeUrlForApi,
 } from '@/shared/lib/url';
-import { CocoManager } from '@/shared/lib/cashu/manager';
-import { staticPopup, paramPopup } from '@/shared/lib/popup';
+import { useMintImport } from '@/features/mint/hooks/useMintImport';
+import { staticPopup } from '@/shared/lib/popup';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
@@ -35,7 +36,7 @@ import { useStickyCurrencyTabs } from '@/features/mint/hooks/useStickyCurrencyTa
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import { withAlpha } from '@/shared/lib/color';
-import { log, cashuLog, useLifecycleLogger, mintUrlLogFields } from '@/shared/lib/logger';
+import { cashuLog, useLifecycleLogger, mintUrlLogFields } from '@/shared/lib/logger';
 import { getHeaderTitleWidthFromWidth } from '@/features/wallet/lib/walletHeader';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 
@@ -326,98 +327,6 @@ function MintItem({
   );
 }
 
-async function addSelectedMints(
-  selectedMints: Set<string>,
-  setIsAdding: (adding: boolean) => void
-): Promise<void> {
-  log.info('mint.add.batch.start', { count: selectedMints.size });
-  setIsAdding(true);
-  try {
-    if (!CocoManager.isInitialized()) {
-      log.error('mint.add.batch.manager_not_initialized');
-      staticPopup('manager-not-initialized');
-      setIsAdding(false);
-      return;
-    }
-
-    const manager = CocoManager.getInstance();
-    const results: string[] = [];
-    const errors: { mintUrl: string; error: string }[] = [];
-
-    // Normalize all URLs to ensure https:// prefix before adding.
-    // normalizeUrlForApi strips any http(s)?:// prefix and re-prepends https://,
-    // so plaintext-http URLs from the search backend can't bypass the upgrade.
-    const mintUrlsToAdd = Array.from(selectedMints).map(normalizeUrlForApi);
-
-    for (let i = 0; i < mintUrlsToAdd.length; i++) {
-      const mintUrl = mintUrlsToAdd[i];
-      const itemT0 = performance.now();
-      log.debug('mint.add.item.adding', {
-        index: i + 1,
-        total: mintUrlsToAdd.length,
-        ...mintUrlLogFields(mintUrl),
-      });
-      try {
-        await manager.mint.addMint(mintUrl, { trusted: true });
-        const addDuration = Math.round(performance.now() - itemT0);
-        log.info('mint.add.item.added', {
-          ...mintUrlLogFields(mintUrl),
-          duration_ms: addDuration,
-        });
-        results.push(mintUrl);
-
-        // Restore proofs for the newly added mint
-        try {
-          const restoreT0 = performance.now();
-          await manager.wallet.restore(mintUrl);
-          log.info('mint.add.restore.success', {
-            ...mintUrlLogFields(mintUrl),
-            duration_ms: Math.round(performance.now() - restoreT0),
-          });
-        } catch (restoreErr) {
-          log.warn('mint.add.restore.failed', {
-            ...mintUrlLogFields(mintUrl),
-            error: restoreErr instanceof Error ? restoreErr.message : String(restoreErr),
-          });
-        }
-
-        if (i < mintUrlsToAdd.length - 1) {
-          await new Promise((r) => setTimeout(r, 100));
-        }
-      } catch (err) {
-        log.error('mint.add.item.failed', {
-          ...mintUrlLogFields(mintUrl),
-          duration_ms: Math.round(performance.now() - itemT0),
-          error: err instanceof Error ? err.message : String(err),
-        });
-        errors.push({ mintUrl, error: err instanceof Error ? err.message : String(err) });
-      }
-    }
-
-    log.info('mint.add.batch.complete', { added: results.length, failed: errors.length });
-    // Give the MintProvider's `mint:added` listener a tick to refetch
-    // `trustedMints` before we pop back. Without this delay the parent
-    // Mint List screen sometimes refocuses before the new mint is in
-    // its `useMints()` snapshot, leaving the row missing until the next
-    // background tick.
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    if (errors.length === 0) {
-      paramPopup('mints-added', { added: results.length });
-      router.back();
-    } else if (results.length > 0) {
-      paramPopup('mints-added', { added: results.length, failed: errors.length });
-      router.back();
-    } else {
-      staticPopup('mints-add-failed');
-    }
-  } catch {
-    log.error('mint.add.batch.unexpected_error');
-    staticPopup('mints-add-failed');
-  } finally {
-    setIsAdding(false);
-  }
-}
-
 export function MintAddScreen() {
   useLifecycleLogger('MintAddScreen');
   const surface = useThemeColor('surface');
@@ -425,7 +334,9 @@ export function MintAddScreen() {
   const searchBarWidth = getHeaderTitleWidthFromWidth(windowWidth);
 
   const [selectedMints, setSelectedMints] = useState<Set<string>>(new Set());
-  const [isAdding, setIsAdding] = useState(false);
+  const mintImport = useMintImport();
+  const isAdding = mintImport.state?.running ?? false;
+  usePreventRemove(isAdding, noop);
 
   // Receive-rail discovery CTAs deep-link here pre-filtered by the payment
   // method AND unit the rail needs (?method=bolt12|onchain&unit=sat). Matching
@@ -615,7 +526,7 @@ export function MintAddScreen() {
       return;
     }
     if (isAdding) return;
-    await addSelectedMints(selectedMints, setIsAdding);
+    await mintImport.start(selectedMints);
   };
 
   // Feed the result List skeleton placeholders during the first search so the
@@ -797,6 +708,94 @@ export function MintAddScreen() {
       scrollEventThrottle={16}
     />
   );
+
+  if (mintImport.state) {
+    const { running, items } = mintImport.state;
+    const complete = items.filter((item) => item.stage === 'complete').length;
+    const added = items.filter(
+      (item) => item.stage === 'complete' || item.stage === 'restore-failed'
+    ).length;
+    const allComplete = complete === items.length;
+    const currentItem = items.find((item) => item.stage === 'adding' || item.stage === 'restoring');
+    const recoveryIncomplete = items.some((item) => item.stage === 'restore-failed');
+    const subtitle = running
+      ? items.length === 1
+        ? extractDomain(items[0].url)
+        : `${Math.max(1, items.findIndex((item) => item === currentItem) + 1)} of ${items.length}`
+      : allComplete
+        ? items.length === 1
+          ? extractDomain(items[0].url)
+          : `${items.length} mints added`
+        : recoveryIncomplete
+          ? 'Recovery incomplete. Retry in Settings.'
+          : added > 0
+            ? `${added} of ${items.length} mints added`
+            : 'Please try again.';
+    return (
+      <Screen
+        name="MintAddScreen"
+        bgColor={surface}
+        deferContent={false}
+        footer={
+          <BottomButtons>
+            <ButtonHandler
+              buttons={[
+                {
+                  testID: 'mint-import-done',
+                  text: added > 0 ? 'Done' : 'Back to mints',
+                  variant: 'primary',
+                  disabled: running,
+                  onPress: async () => {
+                    if (added > 0) router.back();
+                    else mintImport.dismiss();
+                  },
+                },
+              ]}
+            />
+          </BottomButtons>
+        }>
+        <Stack.Screen
+          options={withGlassHeaderItems({
+            title: 'Add Mints',
+            headerTitle: () => (
+              <Text size={17} bold className="text-foreground">
+                Add Mints
+              </Text>
+            ),
+            headerRight: () => null,
+            gestureEnabled: !running,
+            headerBackButtonMenuEnabled: false,
+          })}
+        />
+        <View
+          className="items-center px-6 py-16"
+          accessibilityLiveRegion="polite"
+          testID="mint-import-progress">
+          <LoadingIndicator
+            size={64}
+            phase={running ? 'loading' : 'done'}
+            result={allComplete ? 'success' : added > 0 ? 'warning' : 'error'}
+          />
+          <Spacer size={24} />
+          <Text size={24} bold className="text-foreground text-center">
+            {running
+              ? items.length === 1
+                ? 'Adding mint'
+                : 'Adding mints'
+              : added === items.length
+                ? items.length === 1
+                  ? 'Mint added'
+                  : 'Mints added'
+                : added > 0
+                  ? 'Some mints added'
+                  : 'Couldn’t add mint'}
+          </Text>
+          <Spacer size={8} />
+          <Text className="text-muted min-h-10 text-center">{subtitle}</Text>
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen

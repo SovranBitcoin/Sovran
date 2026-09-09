@@ -43,6 +43,8 @@ import {
   normalizeRebalanceTransferError,
   resetFailedStepStates,
 } from '@/features/mint/lib/rebalanceRunState';
+import { fetchRebalanceRouteAudits } from '@/features/mint/lib/rebalanceRouteAudits';
+import { waitForRebalanceMint } from '@/features/mint/lib/waitForRebalanceMint';
 
 type RebalanceRunStatus = 'idle' | 'running' | 'finished' | 'cancelled';
 
@@ -82,6 +84,10 @@ export function useMintRebalanceOrchestrator({
   minTransferThreshold,
 }: UseMintRebalanceOrchestratorArgs): UseMintRebalanceOrchestratorResult {
   const manager = useManager();
+  const managerRef = useRef(manager);
+  useEffect(() => {
+    managerRef.current = manager;
+  }, [manager]);
   const requestLightningInvoice = useCallback(
     async (mintUrl: string, amount: number) => {
       return prepareBolt11MintQuote(manager, mintUrl, amount, unit);
@@ -102,6 +108,11 @@ export function useMintRebalanceOrchestrator({
   const isRunningRef = useRef(false);
   const swapGroupIdRef = useRef<string | null>(null);
   const swapLegIdByStepIdRef = useRef<Record<string, string>>({});
+  const isRunActive = useCallback(
+    (runId: number) =>
+      !abortRef.current && runIdRef.current === runId && managerRef.current === manager,
+    [manager]
+  );
 
   const appendDebug = useCallback((entry: Record<string, unknown>) => {
     cashuLog.debug('mint.rebalance.step', entry);
@@ -163,11 +174,7 @@ export function useMintRebalanceOrchestrator({
         new Set([...planMints, ...trustedUrls, ...localCandidateMints, fromMintUrl, toMintUrl])
       ).slice(0, 12);
 
-      const audits: AuditMintResponse[] = [];
-      for (const url of candidates) {
-        const a = await fetchAudit(url);
-        if (a) audits.push(a);
-      }
+      const audits = await fetchRebalanceRouteAudits(candidates, fetchAudit);
 
       const graph = buildSwapGraph(audits);
 
@@ -189,46 +196,6 @@ export function useMintRebalanceOrchestrator({
       return { path: result.path, pathNames };
     },
     [runPlan, fetchAudit, mintInfoMap, trustedMints, middlemanRouting]
-  );
-
-  const waitForBalanceIncrease = useCallback(
-    async (mintUrl: string, _expectedIncrease: number, maxWaitMs: number = 15000) => {
-      // Get fresh balances directly from manager to avoid stale closure
-      const getBalances = async () => {
-        try {
-          return await manager.wallet.balances.byMint();
-        } catch (error) {
-          // Don't swallow silently — a transient balance-fetch failure looks
-          // identical to a real "balance didn't increase" timeout downstream,
-          // and that ambiguity hides operator-actionable network issues.
-          cashuLog.warn('mint.rebalance.balance_fetch_failed', {
-            ...mintUrlLogFields(mintUrl),
-            error,
-          });
-          return {};
-        }
-      };
-
-      const initialBalances = await getBalances();
-      const startBalance = amountToNumber(initialBalances[mintUrl]?.total);
-      const startTime = Date.now();
-      const pollInterval = 1000; // Check every 1 second
-
-      while (Date.now() - startTime < maxWaitMs) {
-        await new Promise((resolve) => setTimeout(resolve, pollInterval));
-
-        const currentBalances = await getBalances();
-        const currentBalance = amountToNumber(currentBalances[mintUrl]?.total);
-
-        // Allow for some fee variance - consider success if balance increased
-        if (currentBalance > startBalance) {
-          return true;
-        }
-      }
-
-      return false;
-    },
-    [manager]
   );
 
   const waitForLock = useCallback(async (maxWaitMs: number = 30000): Promise<boolean> => {
@@ -270,7 +237,7 @@ export function useMintRebalanceOrchestrator({
 
   const executeStep = useCallback(
     async (step: TransferStep, runId: number): Promise<boolean> => {
-      if (abortRef.current || runIdRef.current !== runId) return false;
+      if (!isRunActive(runId)) return false;
 
       // Prevent concurrent melt operations
       // Coco operations are stateful (proof selection, inflight tracking, etc). Running melts in parallel
@@ -281,7 +248,7 @@ export function useMintRebalanceOrchestrator({
         cashuLog.warn('mint.rebalance.lock_failed', { stepId: step.id });
         return false;
       }
-      if (abortRef.current || runIdRef.current !== runId) return false;
+      if (!isRunActive(runId)) return false;
       executionLockRef.current = true;
 
       const { id, fromMintUrl, toMintUrl, amount: originalAmount } = step;
@@ -433,6 +400,7 @@ export function useMintRebalanceOrchestrator({
         };
 
         let mintQuote = await createInvoiceForAmount(transferAmount);
+        let finalAutoRouteMint: typeof mintQuote | null = null;
         invoice = mintQuote.request;
 
         // ── Probe melt quote for actual fee_reserve ──
@@ -578,6 +546,7 @@ export function useMintRebalanceOrchestrator({
 
               const result = (await manager.ops.melt.execute(operationToExecute.id)) as unknown as
                 { state?: string; id?: string } | undefined;
+              if (!isRunActive(runId)) return;
 
               if (result?.state === 'pending') {
                 const opId = result.id ?? operationToExecute.id;
@@ -586,9 +555,10 @@ export function useMintRebalanceOrchestrator({
                 const start = Date.now();
 
                 while (Date.now() - start < maxWaitMs) {
-                  const decision = (await manager.ops.melt.refresh(opId)) as unknown as string;
-                  if (decision === 'finalize') return;
-                  if (decision === 'rollback') {
+                  if (!isRunActive(runId)) return;
+                  const refreshed = await manager.ops.melt.refresh(opId);
+                  if (refreshed.state === 'finalized') return;
+                  if (refreshed.state === 'rolled_back') {
                     throw new Error('Melt payment rolled back by mint');
                   }
                   await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
@@ -601,6 +571,7 @@ export function useMintRebalanceOrchestrator({
 
               return; // success
             } catch (err) {
+              if (!isRunActive(runId)) return;
               const msg = err instanceof Error ? err.message : String(err);
 
               if (msg.includes('Melt operation already in progress')) {
@@ -646,6 +617,7 @@ export function useMintRebalanceOrchestrator({
         let meltSucceeded = false;
         try {
           await executeMeltWithRetry();
+          if (!isRunActive(runId)) return false;
           meltSucceeded = true;
         } catch (meltErr) {
           const meltMsg = meltErr instanceof Error ? meltErr.message : String(meltErr);
@@ -787,7 +759,7 @@ export function useMintRebalanceOrchestrator({
 
             try {
               for (let hopIdx = 0; hopIdx < chainPath.length - 1; hopIdx++) {
-                if (abortRef.current || runIdRef.current !== runId) {
+                if (!isRunActive(runId)) {
                   chainSuccess = false;
                   break;
                 }
@@ -942,8 +914,16 @@ export function useMintRebalanceOrchestrator({
                     if (pm.includes('Not enough proofs') && att < MAX_PREPARE_RETRIES) {
                       hopTransferAmt -= RETRY_REDUCE_SATS;
                       if (hopTransferAmt < minTransferThreshold) throw pErr;
-                      const retryMq = await requestLightningInvoice(hopTo, hopTransferAmt);
-                      hopInvoice = retryMq.request;
+                      hopMq = await requestLightningInvoice(hopTo, hopTransferAmt);
+                      hopInvoice = hopMq.request;
+                      if (groupId && hopLegId && hopMq.quoteId) {
+                        useSwapTransactionsStore
+                          .getState()
+                          .tagMintQuote(groupId, hopLegId, hopMq.quoteId);
+                        setTransactionAnnotation(`quote:${hopMq.quoteId}`, {
+                          swap: { groupId, role: 'mint', chainId, hopIndex: hopIdx },
+                        });
+                      }
                       updateStepState(hopStepId, { status: 'invoiceReady', invoice: hopInvoice });
                       continue;
                     }
@@ -966,11 +946,17 @@ export function useMintRebalanceOrchestrator({
                   const maxWait = 15000;
                   const start = Date.now();
                   while (Date.now() - start < maxWait) {
-                    const dec = (await manager.ops.melt.refresh(opId)) as unknown as string;
-                    if (dec === 'finalize') break;
-                    if (dec === 'rollback') throw new Error('Hop melt rolled back');
+                    if (!isRunActive(runId)) break;
+                    const refreshed = await manager.ops.melt.refresh(opId);
+                    if (refreshed.state === 'finalized') break;
+                    if (refreshed.state === 'rolled_back') throw new Error('Hop melt rolled back');
                     await new Promise((r) => setTimeout(r, 2000));
                   }
+                }
+
+                if (!isRunActive(runId)) {
+                  chainSuccess = false;
+                  break;
                 }
 
                 // Tag melt in swap store
@@ -1000,9 +986,14 @@ export function useMintRebalanceOrchestrator({
                   amount: hopTransferAmt,
                 });
 
-                // Wait for balance on the receiving mint before next hop
+                finalAutoRouteMint = hopMq;
+                // Wait for this hop's recipient operation before the next hop.
                 if (hopIdx < chainPath.length - 2) {
-                  await waitForBalanceIncrease(hopTo, hopTransferAmt, 12000);
+                  await waitForRebalanceMint(manager, hopMq, 12000, () => !isRunActive(runId));
+                  if (!isRunActive(runId)) {
+                    chainSuccess = false;
+                    break;
+                  }
                   updateStepState(hopStepId, { status: 'done', routingDetail: undefined });
                   if (groupId && hopLegId) {
                     useSwapTransactionsStore
@@ -1048,6 +1039,7 @@ export function useMintRebalanceOrchestrator({
             // balance is surfaced (not used to retain trust); user can
             // manually re-trust to recover any stranded funds.
             await releaseTemporaryTrust(temporarilyTrusted, finalAutoRouteStepId ?? id);
+            if (!isRunActive(runId)) return false;
 
             if (chainSuccess) {
               meltSucceeded = true;
@@ -1081,8 +1073,8 @@ export function useMintRebalanceOrchestrator({
           }
         }
 
-        // Step 4: Verify - wait for balance to increase on receiving mint
-        // The MintQuoteProcessor runs every 5 seconds to claim paid quotes
+        // Step 4: Verify this transfer's recipient operation.
+        // Coco's background processing claims paid quotes.
         if (finalAutoRouteStepId) {
           updateStepState(finalAutoRouteStepId, { status: 'verifying', routingDetail: undefined });
         } else {
@@ -1090,10 +1082,16 @@ export function useMintRebalanceOrchestrator({
           setLegLocalStatus('verifying');
         }
 
-        // Poll for up to 15 seconds for the balance to update
-        const balanceUpdated = await waitForBalanceIncrease(toMintUrl, transferAmount, 15000);
+        // Retain the existing verification budget, scoped to the owned receipt.
+        const recipientFinalized = await waitForRebalanceMint(
+          manager,
+          finalAutoRouteMint ?? mintQuote,
+          15000,
+          () => !isRunActive(runId)
+        );
+        if (!isRunActive(runId)) return false;
 
-        if (!balanceUpdated && meltSucceeded) {
+        if (!recipientFinalized && meltSucceeded) {
           /**
            * Verification is best-effort:
            * - receiving mint may not have redeemed the quote yet (processor runs periodically)
@@ -1134,6 +1132,7 @@ export function useMintRebalanceOrchestrator({
         await new Promise((resolve) => setTimeout(resolve, 500));
         return true;
       } catch (error) {
+        if (!isRunActive(runId)) return false;
         // Sanity check: restore any proofs stuck in "inflight" on the source mint
         await CocoManager.restoreInflightProofsForMint(fromMintUrl);
 
@@ -1169,7 +1168,7 @@ export function useMintRebalanceOrchestrator({
     [
       requestLightningInvoice,
       updateStepState,
-      waitForBalanceIncrease,
+      isRunActive,
       waitForLock,
       manager,
       computeRouteSuggestion,
@@ -1196,7 +1195,7 @@ export function useMintRebalanceOrchestrator({
       let anyFailed = false;
       try {
         for (const step of steps) {
-          if (abortRef.current || runIdRef.current !== runId) return;
+          if (!isRunActive(runId)) return;
 
           const current = stepStatesRef.current[step.id]?.status;
           if (current === 'done' || current === 'skipped') {
@@ -1222,7 +1221,7 @@ export function useMintRebalanceOrchestrator({
           });
         }
 
-        if (abortRef.current || runIdRef.current !== runId) return;
+        if (!isRunActive(runId)) return;
         setCurrentStepId(null);
         setRunStatus('finished');
         if (swapGroupIdRef.current) {
@@ -1253,7 +1252,7 @@ export function useMintRebalanceOrchestrator({
         isRunningRef.current = false;
       }
     },
-    [executeStep]
+    [executeStep, isRunActive]
   );
 
   const handleStart = useCallback(() => {

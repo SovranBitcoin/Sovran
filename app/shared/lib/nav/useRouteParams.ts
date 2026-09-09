@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import type { ZodType, infer as zInfer } from 'zod';
 import { loggableIssues } from '@sovranbitcoin/schemas';
 import { log } from '@/shared/lib/logger';

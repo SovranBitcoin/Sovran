@@ -9,7 +9,7 @@
 
 import React, { memo, useCallback, useRef, useState } from 'react';
 
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 import { getMintMethodCapability, buildBip321OnchainUri, type WalletContext } from 'wallet';
 import { useReusableMintQuote, type UseScreenActionsResult } from 'wallet/react';
@@ -42,6 +42,7 @@ const ROTATE_COOLDOWN_MS = 5000;
 interface ReceiveReusableQuoteTabProps {
   method: 'bolt12' | 'onchain';
   unit: string;
+  active?: boolean;
   walletContext: Pick<WalletContext, 'trustedMintUrls' | 'mintMethodCapabilities' | 'mintBalances'>;
   actions: UseScreenActionsResult<'receive'>['actions'];
   muted: string;
@@ -71,6 +72,7 @@ const METHOD_COPY = {
 export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   method,
   unit,
+  active = true,
   walletContext,
   actions,
   muted,
@@ -235,6 +237,8 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
     </View>
   );
 
+  if (!active) return null;
+
   // No trusted mint can serve this rail at all — point at discovery,
   // pre-filtered to mints advertising the method.
   if (!anyMintSupports) {
@@ -306,7 +310,7 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
 
   return (
     <>
-      <PaymentInfo data={qrData} copyTarget={copy.copyTarget} unit={unit} />
+      <PaymentInfo active={active} data={qrData} copyTarget={copy.copyTarget} unit={unit} />
       {/* Same 12px offset the QR speed controls use under the QR; the Section
           below brings its own py-3, keeping the gaps symmetric. Onchain gets
           New address + View all; bolt12 reuses one standing offer per mint, so

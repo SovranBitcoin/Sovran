@@ -3,6 +3,25 @@ import { log } from '@/shared/lib/logger';
 import { getBootMorphCompleted, subscribeBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
 
 const prefetchedUrls = new Set<string>();
+const MAX_PREFETCHED_URLS = 512;
+const MAX_CONCURRENT_PREFETCHES = 4;
+const inflight = new Map<string, Promise<void>>();
+const waiting: (() => void)[] = [];
+let activePrefetches = 0;
+
+async function acquirePrefetchSlot(): Promise<void> {
+  if (activePrefetches < MAX_CONCURRENT_PREFETCHES) {
+    activePrefetches += 1;
+    return;
+  }
+  await new Promise<void>((resolve) => waiting.push(resolve));
+}
+
+function releasePrefetchSlot(): void {
+  const next = waiting.shift();
+  if (next) next();
+  else activePrefetches -= 1;
+}
 
 function normalizeUrl(url: string): string {
   return url.trim();
@@ -43,24 +62,41 @@ function awaitBootGate(): Promise<void> {
   return bootGate;
 }
 
-export async function prefetchImage(url?: string | null): Promise<void> {
-  if (!url) return;
+export function prefetchImage(url?: string | null): Promise<void> {
+  if (!url) return Promise.resolve();
   const normalized = normalizeUrl(url);
-  if (!normalized || prefetchedUrls.has(normalized)) return;
+  if (!normalized || prefetchedUrls.has(normalized)) return Promise.resolve();
+  const pending = inflight.get(normalized);
+  if (pending) return pending;
   if (!isSafeImageUrl(normalized)) {
     log.warn('image.prefetch.rejected_scheme', { url: normalized.slice(0, 40) });
-    return;
+    return Promise.resolve();
   }
 
-  prefetchedUrls.add(normalized);
+  const request = runPrefetch(normalized).finally(() => inflight.delete(normalized));
+  inflight.set(normalized, request);
+  return request;
+}
+
+async function runPrefetch(normalized: string): Promise<void> {
+  await awaitBootGate();
+  await acquirePrefetchSlot();
   try {
-    await awaitBootGate();
     const t0 = performance.now();
-    await Image.prefetch(normalized, 'memory-disk');
+    const succeeded = await Image.prefetch(normalized, 'memory-disk');
+    if (succeeded) {
+      prefetchedUrls.add(normalized);
+      if (prefetchedUrls.size > MAX_PREFETCHED_URLS) {
+        const oldest = prefetchedUrls.values().next().value;
+        if (oldest !== undefined) prefetchedUrls.delete(oldest);
+      }
+    }
     const duration_ms = Math.round((performance.now() - t0) * 100) / 100;
-    log.debug('image.prefetch', { url: normalized.slice(0, 40), duration_ms });
+    log.debug('image.prefetch', { url: normalized.slice(0, 40), duration_ms, succeeded });
   } catch {
     log.debug('image.prefetch.fail', { url: normalized.slice(0, 40) });
+  } finally {
+    releasePrefetchSlot();
   }
 }
 
@@ -72,7 +108,7 @@ export async function prefetchImages(
   if (newUrls.length === 0) return;
   await awaitBootGate();
   const t0 = performance.now();
-  await Promise.all(urls.map((url) => prefetchImage(url)));
+  await Promise.all(newUrls.map((url) => prefetchImage(url)));
   const duration_ms = Math.round((performance.now() - t0) * 100) / 100;
   const level = duration_ms > 200 ? 'warn' : 'debug';
   log[level]('image.prefetch.batch', { count: newUrls.length, duration_ms });

@@ -171,26 +171,33 @@ export function useNostrProfileMetadataMany(
     return out;
   }, [pubkeys, records]);
 
-  const [isFetching, setIsFetching] = useState(false);
+  const [pendingPubkeys, setPendingPubkeys] = useState<ReadonlySet<string>>(() => new Set());
   const toFetchKey = toFetch.join(',');
   useEffect(() => {
-    if (toFetch.length === 0) return;
-    for (const pk of toFetch) attempted.current.add(pk);
-    let cancelled = false;
-    setIsFetching(true);
+    // Strict Mode may replay this effect before a render recomputes toFetch.
+    const batch = toFetch.filter((pk) => !attempted.current.has(pk));
+    if (batch.length === 0) return;
+    for (const pk of batch) attempted.current.add(pk);
+    setPendingPubkeys((pending) => new Set([...pending, ...batch]));
     // getProfiles write-throughs into the entity cache; the reactive read above
-    // picks up resolved profiles, so no explicit cache write here.
-    void fetchProfilesViaFacade(toFetch, { refresh: true }).finally(() => {
-      if (!cancelled) setIsFetching(false);
-    });
-    return () => {
-      cancelled = true;
+    // picks up resolved profiles. That update can change toFetch before this
+    // request settles, so effect cleanup cannot own the loading flag. Track the
+    // pending keys themselves: an old batch never clears a newer batch's work.
+    const finish = () => {
+      setPendingPubkeys((pending) => {
+        const remaining = new Set(pending);
+        for (const pk of batch) remaining.delete(pk);
+        return remaining;
+      });
     };
+    void fetchProfilesViaFacade(batch, { refresh: true }).then(finish, finish);
     // `toFetchKey` is the serialized form of `toFetch`; depending on the array
     // itself would refire the fetch on every render that rebuilds it unchanged.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toFetchKey]);
 
-  const isLoading = isFetching;
+  const isLoading =
+    pubkeys.some((pk) => pendingPubkeys.has(pk)) ||
+    toFetch.some((pk) => !attempted.current.has(pk));
   return { metadata, isLoading };
 }

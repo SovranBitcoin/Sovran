@@ -3,15 +3,35 @@
  */
 
 import React from 'react';
+import { Dimensions } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 
+import { QRCodeFrame, qrCodeGeometry, PAYMENT_QR_PADDING } from '@/shared/ui/composed/QRCodeFrame';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+const mockQrRendered = jest.fn();
+let mockScheme = 'dark';
+const mockDimensions = { width: 393, height: 852, scale: 3, fontScale: 1 };
+jest.mock('@/shared/hooks/useColorScheme', () => ({ useColorScheme: () => mockScheme }));
+jest.mock('@/shared/ui/composed/GradientCard', () => ({
+  GradientCard: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => (
+    <view {...props}>{children}</view>
+  ),
+}));
+jest.mock('expo-linear-gradient', () => ({
+  LinearGradient: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => (
+    <view {...props}>{children}</view>
+  ),
+}));
+
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
 jest.mock('@/shared/ui/composed/QRCode', () => ({
-  AnimatedQRCode: () => null,
+  AnimatedQRCode: (props: unknown) => {
+    mockQrRendered(props);
+    return null;
+  },
   QRSpeedControls: () => null,
   SPEED_PRESETS: [{ label: 'Normal', intervalMs: 1000 }],
   DENSITY_PRESETS: [{ label: 'Normal', fragmentSize: 100 }],
@@ -45,6 +65,62 @@ jest.mock('@/shared/lib/logger', () => ({
 }));
 
 describe('PaymentInfo device data probe', () => {
+  beforeEach(() => Dimensions.set({ window: mockDimensions, screen: mockDimensions }));
+  it.each(['dark', 'light'])(
+    'reserves the shared QR frame while empty in %s mode without encoding or exposing a payload',
+    (scheme) => {
+      mockScheme = scheme;
+      mockQrRendered.mockClear();
+      let renderer!: TestRenderer.ReactTestRenderer;
+      act(() => {
+        renderer = TestRenderer.create(<PaymentInfo unit="sat" data="" copyTarget="token" />);
+      });
+      const frame = renderer.root.findByType(QRCodeFrame);
+      expect(frame.props.children.props.style).toEqual({ width: 329, height: 329 });
+      expect(mockQrRendered).not.toHaveBeenCalled();
+      expect(renderer.root.findAllByProps({ testID: 'payment-info-token-data' })).toHaveLength(0);
+      act(() =>
+        renderer.update(<PaymentInfo unit="sat" data="fixture-token" copyTarget="token" />)
+      );
+      expect(mockQrRendered).toHaveBeenCalledWith(
+        expect.objectContaining({ address: 'fixture-token', padding: PAYMENT_QR_PADDING })
+      );
+      expect(renderer.root.findAllByProps({ testID: 'payment-info-qr-placeholder' })).toHaveLength(
+        0
+      );
+      act(() => renderer.unmount());
+    }
+  );
+
+  it('does not encode a hidden receive rail and mounts only when active', () => {
+    mockQrRendered.mockClear();
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <PaymentInfo unit="sat" data="fixture-token" copyTarget="token" active={false} />
+      );
+    });
+    expect(mockQrRendered).not.toHaveBeenCalled();
+    act(() =>
+      renderer.update(<PaymentInfo unit="sat" data="fixture-token" copyTarget="token" active />)
+    );
+    expect(mockQrRendered).toHaveBeenCalledTimes(1);
+    act(() =>
+      renderer.update(
+        <PaymentInfo unit="sat" data="fixture-token" copyTarget="token" active={false} />
+      )
+    );
+    expect(mockQrRendered).toHaveBeenCalledTimes(1);
+    expect(renderer.root.findAllByProps({ testID: 'payment-info-token-data' })).toHaveLength(0);
+    act(() => renderer.unmount());
+  });
+
+  it.each([320, 393, 430, 768])('shares responsive QR card geometry at width %i', (width) => {
+    const geometry = qrCodeGeometry(width, PAYMENT_QR_PADDING);
+    expect(geometry.frameSize).toBe(Math.min(width, 600) - 32);
+    expect(geometry.qrSize + 32).toBe(geometry.frameSize);
+  });
+
   it('binds the full payment value to a stable accessible view id', async () => {
     let renderer: TestRenderer.ReactTestRenderer;
     await act(async () => {

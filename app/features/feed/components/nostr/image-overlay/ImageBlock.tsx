@@ -4,7 +4,8 @@
  * Applies blur to thumbnail when overlay is displaced.
  */
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef } from 'react';
+import { useRecyclingState } from '@shopify/flash-list';
 import { Platform, StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Reanimated, {
@@ -88,11 +89,12 @@ export const ImageBlock = React.memo(function ImageBlock({
   const [foreground] = useThemeColor(['foreground'] as const);
   // Seed the reserved size from what we already know (a ratio learned from a
   // prior onLoad, else the post's imeta dim) so the image doesn't flash 16:9 and
-  // resize. Lazy initializer so the lookup runs once at mount.
-  const [aspectRatio, setAspectRatio] = useState(
-    () => getCachedAspect(url) ?? initialAspectRatio ?? DEFAULT_IMAGE_ASPECT
+  // resize. Recycling to another URL resets geometry before that frame paints.
+  const [aspectRatio, setAspectRatio] = useRecyclingState(
+    () => getCachedAspect(url) ?? initialAspectRatio ?? DEFAULT_IMAGE_ASPECT,
+    [url]
   );
-  const [error, setError] = useState(false);
+  const [error, setError] = useRecyclingState(false, [url]);
   const shift = useShiftLogger('ImageBlock');
   const containerRef = useRef<React.ComponentRef<typeof View>>(null);
   /** Ref to the actual image so we measure the image bounds for shared-element, not the container. */

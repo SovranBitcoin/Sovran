@@ -1,4 +1,5 @@
-import { Stack, router, DarkTheme, ThemeProvider as NavigationThemeProvider } from 'expo-router';
+import { Stack, DarkTheme, ThemeProvider as NavigationThemeProvider } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { setBackgroundColorAsync } from 'expo-system-ui';

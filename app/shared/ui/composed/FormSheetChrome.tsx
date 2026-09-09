@@ -22,7 +22,7 @@
  */
 import React from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { headerButtonSize, spacing, fontSize } from '@/shared/styles/tokens';
 import { Text } from '@/shared/ui/primitives/Text';

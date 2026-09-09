@@ -6,7 +6,7 @@
  * only renders UI and wires buttons.
  */
 
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { Alert } from 'heroui-native';
@@ -70,6 +70,7 @@ export function SendTokenScreen({
   onNavigateBack,
 }: SendTokenScreenProps) {
   useLifecycleLogger('SendTokenScreen');
+  const [cancellationStarted, setCancellationStarted] = useState(false);
   const { entry, error, actions, source, mintUrl } = useScreenActions(
     'sendToken',
     sendHistoryEntry
@@ -220,6 +221,7 @@ export function SendTokenScreen({
               icon: 'lets-icons:copy',
               variant: 'primary',
               onPress: openCopyMenu,
+              disabled: actions.cancel.loading,
               condition: actions.copy.available,
             },
             {
@@ -228,6 +230,7 @@ export function SendTokenScreen({
               icon: 'mdi:share-variant',
               variant: 'secondary',
               onPress: () => actions.share.execute(),
+              disabled: actions.cancel.loading,
               condition: actions.share.available,
             },
             {
@@ -241,6 +244,7 @@ export function SendTokenScreen({
                 await actions.nfc.execute();
               },
               condition: actions.nfc.available,
+              disabled: actions.cancel.loading,
             },
             {
               testID: 'send-token-check-status',
@@ -250,15 +254,22 @@ export function SendTokenScreen({
               variant: 'secondary',
               onPress: () => actions.checkStatus.execute(),
               condition: actions.checkStatus.available,
+              loading: actions.checkStatus.loading,
+              disabled: actions.cancel.loading || actions.checkStatus.loading,
             },
             {
               testID: 'send-token-cancel-transaction',
-              text: 'Cancel transaction',
+              text: actions.cancel.loading ? 'Cancelling…' : 'Cancel transaction',
               description: 'Return the funds to your balance',
               icon: 'mdi:cancel',
               variant: 'dangerous',
-              onPress: () => actions.cancel.execute(),
+              onPress: () => {
+                setCancellationStarted(true);
+                return actions.cancel.execute();
+              },
               condition: actions.cancel.available,
+              loading: actions.cancel.loading,
+              disabled: actions.cancel.loading,
             },
           ]}
         />
@@ -268,6 +279,12 @@ export function SendTokenScreen({
 
   return (
     <TransactionDetailShell
+      cancelling={actions.cancel.loading}
+      timelineFocusKey={
+        cancellationStarted || actions.cancel.loading
+          ? `${entry.id}:${entry.state}:${actions.cancel.loading}`
+          : undefined
+      }
       screenName="SendTokenScreen"
       testID={`send-token-id-${entry.id}`}
       entry={entry}
@@ -288,12 +305,13 @@ export function SendTokenScreen({
             </View>
           )}
 
-          {!isComplete && !isCancelled && entry.tokenString && (
+          {!isComplete && !isCancelled && (
             <PaymentInfo
               copyTarget="token"
+              copyDisabled={actions.cancel.loading}
               unit={entry.unit}
-              data={entry.tokenString.toString()}
-              animated={(entry.tokenString.length ?? 0) >= 500}
+              data={entry.tokenString?.toString() ?? ''}
+              animated={(entry.tokenString?.length ?? 0) >= 500}
             />
           )}
 

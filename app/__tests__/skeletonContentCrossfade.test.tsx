@@ -23,6 +23,7 @@ import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCr
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 let mockReducedMotion = false;
+let mockFinishAnimation: ((finished: boolean) => void) | undefined;
 
 jest.mock('react-native-reanimated', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
@@ -43,13 +44,19 @@ jest.mock('react-native-reanimated', () => {
         this.value = next;
       },
     }),
-    // Return the target but never invoke the completion callback, so the
-    // component stays in its 'exiting' frame for assertions.
-    withTiming: (toValue: number) => toValue,
+    // Hold the animation at its start and expose completion to the test,
+    // so the exiting frame and content mount lifecycle stay observable.
+    withTiming: (_toValue: number, _config: unknown, callback: (finished: boolean) => void) => {
+      mockFinishAnimation = callback;
+      return 0;
+    },
     cancelAnimation: () => {},
-    useAnimatedStyle: () => ({}),
+    useAnimatedStyle: (factory: () => object) => factory(),
     runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
-    interpolate: () => 0,
+    interpolate: (value: number, input: number[], output: number[]) => {
+      const fraction = Math.max(0, Math.min(1, (value - input[0]) / (input[1] - input[0])));
+      return output[0] + fraction * (output[1] - output[0]);
+    },
     Extrapolation: { CLAMP: 'clamp' },
     Easing: {
       out: () => (t: number) => t,
@@ -98,8 +105,86 @@ function render(element: React.ReactElement) {
 }
 
 describe('SkeletonContentCrossfade', () => {
+  it('does not render unloaded content before the loading effect runs', () => {
+    const renderUnloadedContent = jest.fn(contentNode);
+    const r = render(
+      <SkeletonContentCrossfade
+        loading={false}
+        renderSkeleton={skeletonNode}
+        renderContent={contentNode}
+      />
+    );
+    act(() =>
+      r.update(
+        <SkeletonContentCrossfade
+          loading
+          renderSkeleton={skeletonNode}
+          renderContent={renderUnloadedContent}
+        />
+      )
+    );
+    expect(renderUnloadedContent).not.toHaveBeenCalled();
+    expect(present(r, 'sk')).toBe(true);
+    act(() => r.unmount());
+  });
+
+  it('shows loaded content at full opacity throughout the skeleton exit', () => {
+    const r = render(
+      <SkeletonContentCrossfade loading renderSkeleton={skeletonNode} renderContent={contentNode} />
+    );
+    act(() =>
+      r.update(
+        <SkeletonContentCrossfade
+          loading={false}
+          renderSkeleton={skeletonNode}
+          renderContent={contentNode}
+        />
+      )
+    );
+    const content = r.root.findByProps({ testID: 'ct' });
+    const opacity = content.parent?.props.style?.opacity;
+    expect(opacity ?? 1).toBe(1);
+    act(() => r.unmount());
+  });
+
+  it('keeps stateful content mounted when the exit animation completes', () => {
+    const mounted = jest.fn();
+    const unmounted = jest.fn();
+    function Content() {
+      React.useEffect(() => {
+        mounted();
+        return unmounted;
+      }, []);
+      return <View testID="stateful" />;
+    }
+    const renderContent = () => <Content />;
+    const r = render(
+      <SkeletonContentCrossfade
+        loading
+        renderSkeleton={skeletonNode}
+        renderContent={renderContent}
+      />
+    );
+    act(() =>
+      r.update(
+        <SkeletonContentCrossfade
+          loading={false}
+          renderSkeleton={skeletonNode}
+          renderContent={renderContent}
+        />
+      )
+    );
+    expect(mounted).toHaveBeenCalledTimes(1);
+    act(() => mockFinishAnimation?.(true));
+    expect(present(r, 'sk')).toBe(false);
+    expect(mounted).toHaveBeenCalledTimes(1);
+    expect(unmounted).not.toHaveBeenCalled();
+    act(() => r.unmount());
+  });
+
   beforeEach(() => {
     mockReducedMotion = false;
+    mockFinishAnimation = undefined;
   });
 
   it('shows skeleton + region wave while loading, not content', () => {

@@ -484,8 +484,7 @@ export const getLatestVersion = ({
   signal?: AbortSignal;
 }) =>
   fetchJson(
-    // Served by nagg (SCORE_API_BASE_URL), not api.sovran.money.
-    `${SCORE_API_BASE_URL}/app/latest-version`,
+    `${API_BASE_URL}/app/latest-version`,
     parseLatestVersion,
     'app/latest-version',
     {

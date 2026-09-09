@@ -44,7 +44,7 @@ type ResolveOfflineOptions = {
 const DEFAULT_REACHABILITY_PROBES: readonly ReachabilityProbe[] = [
   {
     name: 'sovran-api',
-    url: `${backendConfig.scoreApiBaseUrl}/app/latest-version`,
+    url: `${backendConfig.apiBaseUrl}/app/latest-version`,
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -62,11 +62,9 @@ export async function resolveOfflineReachability(
     return { isOffline: true, reason: 'network-disconnected', probes: [] };
   }
 
-  // `isInternetReachable === false` is deliberately NOT a short-circuit: on
-  // Android, expo-network derives it from `activeNetwork != null` with no
-  // validation, and it flaps to false transiently on every transport change
-  // (Wi-Fi<->cell handoff, VPN, Doze). The probe below is the authoritative
-  // signal; the raw field is still logged by the provider for diagnosis.
+  // A transport handoff can transiently report unreachable. SDK 56 Android
+  // checks VALIDATED/INTERNET capabilities, while iOS reports connection
+  // presence; keep the bounded probe and provider hysteresis on both platforms.
 
   const probes = options.probes ?? DEFAULT_REACHABILITY_PROBES;
   const attempts: ReachabilityProbeAttempt[] = [];

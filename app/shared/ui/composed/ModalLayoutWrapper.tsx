@@ -3,7 +3,7 @@
  * Handles safe areas, scroll behavior, header gradient, sticky content.
  */
 
-import { ReactNode, useContext, useEffect, useState } from 'react';
+import { type Ref, type RefObject, ReactNode, useContext, useEffect, useState } from 'react';
 import {
   Platform,
   ScrollView,
@@ -43,6 +43,8 @@ const IOS_MODAL_HEADER_HEIGHT = 70;
  * worklet (never read/written during render), so it's React Compiler safe.
  */
 function AnimatedScrollContainer({
+  scrollViewRef,
+  scrollContentRef,
   externalScrollY,
   contentContainerStyle,
   scrollIndicatorInsets,
@@ -50,6 +52,8 @@ function AnimatedScrollContainer({
   totalHeaderHeight,
   children,
 }: {
+  scrollViewRef?: Ref<ScrollView>;
+  scrollContentRef?: RefObject<View | null>;
   externalScrollY?: SharedValue<number>;
   contentContainerStyle: StyleProp<ViewStyle>;
   scrollIndicatorInsets?: { top?: number; right?: number; bottom?: number; left?: number };
@@ -68,6 +72,8 @@ function AnimatedScrollContainer({
 
   return (
     <Animated.ScrollView
+      ref={scrollViewRef}
+      innerViewRef={scrollContentRef as RefObject<View> | undefined}
       style={{ flex: 1 }}
       contentContainerStyle={contentContainerStyle}
       onScroll={animatedScrollHandler}
@@ -86,6 +92,8 @@ function AnimatedScrollContainer({
 }
 
 interface ModalLayoutWrapperProps {
+  scrollViewRef?: Ref<ScrollView>;
+  scrollContentRef?: RefObject<View | null>;
   children: ReactNode;
   /** Additional horizontal padding for content container (default: 16) */
   contentPadding?: number;
@@ -128,6 +136,8 @@ interface ModalLayoutWrapperProps {
 }
 
 export function ModalLayoutWrapper({
+  scrollViewRef,
+  scrollContentRef,
   children,
   contentPadding = 16,
   headerGradient = false,
@@ -251,6 +261,8 @@ export function ModalLayoutWrapper({
           <View style={{ flex: 1 }}>{children}</View>
         ) : useAnimatedScroll ? (
           <AnimatedScrollContainer
+            scrollViewRef={scrollViewRef}
+            scrollContentRef={scrollContentRef}
             externalScrollY={externalScrollY}
             contentContainerStyle={scrollContentStyle}
             scrollIndicatorInsets={scrollIndicatorInsets}
@@ -260,6 +272,8 @@ export function ModalLayoutWrapper({
           </AnimatedScrollContainer>
         ) : (
           <ScrollView
+            ref={scrollViewRef}
+            innerViewRef={scrollContentRef as RefObject<View> | undefined}
             className="flex-1"
             contentInsetAdjustmentBehavior="automatic"
             // Android: see the nested-scroll note on AnimatedScrollContainer

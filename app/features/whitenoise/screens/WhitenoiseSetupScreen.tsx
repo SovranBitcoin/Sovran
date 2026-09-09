@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter as useRouter } from '@/shared/hooks/useGuardedRouter';
 import Icon from 'assets/icons';
 import { Button } from '@/shared/ui/primitives/Button';
 import { Screen } from '@/shared/ui/composed/Screen';

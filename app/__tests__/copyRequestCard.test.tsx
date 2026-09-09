@@ -91,6 +91,11 @@ describe('CopyRequestRow', () => {
       'muted-color'
     );
     expect(findByType(renderer, 'ListGroup.ItemTitle').props.children).toBe('creqA…xyz');
+    expect(findByType(renderer, 'ListGroup.ItemTitle').props.numberOfLines).toBe(1);
+    expect(findByType(renderer, 'ListGroup.ItemTitle').props.ellipsizeMode).toBe('middle');
+    expect(findByType(renderer, 'ListGroup.ItemContent').props.className).toContain('min-w-0');
+    expect(findByType(renderer, 'ListGroup.ItemPrefix').props.className).toContain('shrink-0');
+    expect(findByType(renderer, 'ListGroup.ItemSuffix').props.className).toContain('shrink-0');
 
     const pressable = findByType(renderer, 'PressableFeedback');
     expect(pressable.props.animation).toBe(false);

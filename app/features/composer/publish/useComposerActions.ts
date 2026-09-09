@@ -10,7 +10,7 @@ import { useCallback } from 'react';
 
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import type NDK from '@nostr-dev-kit/ndk-mobile';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 import { nostrLog } from '@/shared/lib/logger';
 import { getOwnWriteRelays } from '@/shared/lib/nostr/outbox/relayListStore';

@@ -42,11 +42,10 @@ export function NostrNDKProvider({
   const activeAccountIndex = accountIndexProp ?? 0;
   const hasInitialized = useRef(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  const cacheAdapter = useMemo(
-    () =>
-      new NDKCacheAdapterSqlite(activeAccountIndex === 0 ? 'nostr' : `nostr-${activeAccountIndex}`),
-    [activeAccountIndex]
-  );
+  const cacheAdapterRef = useRef<{
+    accountIndex: number;
+    adapter: NDKCacheAdapterSqlite;
+  } | null>(null);
 
   // Non-blocking: starts after all blocking stages complete so it doesn't
   // compete for the JS thread during splash. App is already visible.
@@ -74,6 +73,20 @@ export function NostrNDKProvider({
       nostrLog.debug('provider.ndk.waiting', { reason: 'no_private_key' });
       return;
     }
+
+    // The constructor immediately opens SQLite and starts cache migrations.
+    // Keep that work out of render and behind the same readiness gates as NDK.
+    // Reuse it during effect replay so the deferred initializer still gets one
+    // account-scoped cache with the existing 800ms warmup window.
+    if (cacheAdapterRef.current?.accountIndex !== activeAccountIndex) {
+      cacheAdapterRef.current = {
+        accountIndex: activeAccountIndex,
+        adapter: new NDKCacheAdapterSqlite(
+          activeAccountIndex === 0 ? 'nostr' : `nostr-${activeAccountIndex}`
+        ),
+      };
+    }
+    const cacheAdapter = cacheAdapterRef.current.adapter;
 
     initLog('NDK', 'queued — waiting for interactions to settle');
     nostrLog.info('provider.ndk.init_start', {
@@ -134,7 +147,7 @@ export function NostrNDKProvider({
     // `stage` is safe to depend on: `useInitializationStage` memoises it, so it
     // changes only when `canStart` flips — never per render, which is what
     // would otherwise clearTimeout the deferred init before it ever fired.
-  }, [stage, initializeNDK, nostrKeys?.privateKey, activeAccountIndex, cacheAdapter]);
+  }, [stage, initializeNDK, nostrKeys?.privateKey, activeAccountIndex]);
 
   // Ingest the active profile's NIP-65 relay list (or first-run-publish the
   // defaults) and seed the pool, once NDK is ready. Self-deferred internally.

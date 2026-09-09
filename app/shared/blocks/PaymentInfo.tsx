@@ -9,10 +9,8 @@ import {
   DEFAULT_SPEED_INDEX,
   DEFAULT_DENSITY_INDEX,
 } from '@/shared/ui/composed/QRCode';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { Skeleton } from '@/shared/ui/primitives/Skeleton';
-import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
+import { PAYMENT_QR_PADDING, PaymentQRCodePlaceholder } from '@/shared/ui/composed/QRCodeFrame';
 import { copyPopup, type CopyTarget } from '@/shared/lib/popup';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Log, paymentLog } from '@/shared/lib/logger';
@@ -36,6 +34,10 @@ function kebabCase(s: string): string {
 
 interface PaymentInfoProps {
   unit: string;
+  /** Hidden receive rails preload data without encoding or animating a QR. */
+  active?: boolean;
+  /** Keep the QR visible while temporarily disabling its copy gesture. */
+  copyDisabled?: boolean;
   data: string | { name: string; value: string }[];
   copyTarget: CopyTarget;
   animated?: boolean;
@@ -44,6 +46,8 @@ interface PaymentInfoProps {
 
 export function PaymentInfo({
   unit,
+  active = true,
+  copyDisabled = false,
   data,
   copyTarget,
   animated = false,
@@ -110,74 +114,64 @@ export function PaymentInfo({
     });
   }
 
+  if (loading || !active) return <PaymentQRCodePlaceholder testID="payment-info-qr-placeholder" />;
+
   return (
-    <SkeletonContentCrossfade
-      loading={loading}
-      visualKey="payment-info"
-      visualSurface="payment"
-      renderSkeleton={() => (
-        <HStack align="center" justify="center">
-          <Skeleton className="bg-surface-secondary h-64 w-64" />
-        </HStack>
-      )}
-      renderContent={() => (
-        <Log name="PaymentInfo">
-          <View>
-            {/* Explicit 1×1 accessibility probe carrying the payment value.
+    <Log name="PaymentInfo">
+      <View>
+        {/* Explicit 1×1 accessibility probe carrying the payment value.
             A hidden Text child keeps its label on iOS but can lose its
             accessibilityIdentifier, making exact simulator capture unsafe.
             This mirrors TransactionProbe's proven stable View contract. */}
-            <View
-              testID={`payment-info-${kebabCase(copyTarget)}-data`}
-              accessible
-              accessibilityRole="text"
-              accessibilityLabel={selectedValue}
-              importantForAccessibility="yes"
-              collapsable={false}
-              pointerEvents="none"
-              style={{
-                position: 'absolute',
-                left: 0,
-                top: 0,
-                width: 1,
-                height: 1,
-              }}
+        <View
+          testID={`payment-info-${kebabCase(copyTarget)}-data`}
+          accessible
+          accessibilityRole="text"
+          accessibilityLabel={selectedValue}
+          importantForAccessibility="yes"
+          collapsable={false}
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: 1,
+            height: 1,
+          }}
+        />
+        {/* QR code — tap to copy */}
+        <View
+          testID="payment-info-sensitive-visual"
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel="Sensitive payment visual"
+          importantForAccessibility="yes"
+          collapsable={false}>
+          <Pressable disabled={copyDisabled} onPress={handleCopyPress}>
+            <AnimatedQRCode
+              padding={PAYMENT_QR_PADDING}
+              unit={unit}
+              address={selectedValue}
+              animate={animated}
+              variant={variant}
+              intervalMs={SPEED_PRESETS[speedIndex].intervalMs}
+              fragmentSize={DENSITY_PRESETS[densityIndex].fragmentSize}
             />
-            {/* QR code — tap to copy */}
-            <View
-              testID="payment-info-sensitive-visual"
-              accessible
-              accessibilityRole="image"
-              accessibilityLabel="Sensitive payment visual"
-              importantForAccessibility="yes"
-              collapsable={false}>
-              <Pressable onPress={handleCopyPress}>
-                <AnimatedQRCode
-                  padding={32}
-                  unit={unit}
-                  address={selectedValue}
-                  animate={animated}
-                  variant={variant}
-                  intervalMs={SPEED_PRESETS[speedIndex].intervalMs}
-                  fragmentSize={DENSITY_PRESETS[densityIndex].fragmentSize}
-                />
-              </Pressable>
-            </View>
+          </Pressable>
+        </View>
 
-            {/* Speed + Density controls — outside the copy pressable */}
-            {willAnimate && (
-              <View style={{ marginTop: 12 }}>
-                <QRSpeedControls
-                  speedIndex={speedIndex}
-                  densityIndex={densityIndex}
-                  onCycleSpeed={cycleSpeed}
-                  onCycleDensity={cycleDensity}
-                />
-              </View>
-            )}
+        {/* Speed + Density controls — outside the copy pressable */}
+        {willAnimate && (
+          <View style={{ marginTop: 12 }}>
+            <QRSpeedControls
+              speedIndex={speedIndex}
+              densityIndex={densityIndex}
+              onCycleSpeed={cycleSpeed}
+              onCycleDensity={cycleDensity}
+            />
           </View>
-        </Log>
-      )}
-    />
+        )}
+      </View>
+    </Log>
   );
 }

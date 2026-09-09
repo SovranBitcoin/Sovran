@@ -19,7 +19,7 @@
  */
 
 import { StyleSheet } from 'react-native';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { withAlpha } from '@/shared/lib/color';
 
 import { getZap } from 'wallet';

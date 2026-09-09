@@ -28,7 +28,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { BottomSheet, Button as HerouiButton } from 'heroui-native';
 import Animated, { SlideInRight } from 'react-native-reanimated';
 

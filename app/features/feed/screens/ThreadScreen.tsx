@@ -21,7 +21,7 @@ export function ThreadScreen() {
   feedLog.info('feed.thread.view', { eventId: params.eventId });
 
   return (
-    <Screen name="ThreadScreen" scroll="custom" bgColor={surface}>
+    <Screen name="ThreadScreen" scroll="custom" bgColor={surface} deferContent={false}>
       <ThreadView eventId={params.eventId} />
     </Screen>
   );

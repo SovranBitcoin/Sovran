@@ -693,7 +693,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
 function ThreadViewWithEmbed(props: ThreadViewProps) {
   return (
     <ThreadEmbedProvider>
-      <ThreadViewInner {...props} />
+      <ThreadViewInner key={props.eventId} {...props} />
     </ThreadEmbedProvider>
   );
 }

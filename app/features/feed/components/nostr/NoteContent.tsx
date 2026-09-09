@@ -1,5 +1,6 @@
 import { parseImetaTags } from '@/shared/lib/nostr/media/imeta';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo } from 'react';
+import { useRecyclingState } from '@shopify/flash-list';
 import { StyleSheet, Platform, type LayoutChangeEvent } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { GestureDetector } from 'react-native-gesture-handler';
@@ -465,7 +466,7 @@ export const NoteContent = React.memo(function NoteContent({
   onActionPressOut?: () => void;
 }) {
   const foreground = useThemeColor('foreground');
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useRecyclingState(false, [overlayEvent?.id ?? content]);
   const imageOverlay = useImageOverlay();
   const shift = useShiftLogger('NoteContent');
   const noteKey = overlayEvent?.id ?? 'inline-note';
@@ -480,7 +481,7 @@ export const NoteContent = React.memo(function NoteContent({
       });
       setExpanded(next);
     },
-    [noteKey, content.length]
+    [noteKey, content.length, setExpanded]
   );
 
   const onBeforeOpen = useCallback(() => {

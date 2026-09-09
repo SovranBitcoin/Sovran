@@ -16,7 +16,7 @@ import { log, Log, feedLog } from '@/shared/lib/logger';
 import { List } from '@/shared/ui/composed/List';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Button } from 'heroui-native';
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
 import type { FeedParseResult } from '@/features/feed/data/feedClient';

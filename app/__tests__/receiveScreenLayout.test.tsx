@@ -3,16 +3,38 @@
  */
 
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { Platform } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 
+import { useScreenOptions } from '@/shared/ui/composed/Screen';
+import { UnitSwitcherPillFallback } from '@/features/wallet/components/UnitSwitcherPill/UnitSwitcherPill.fallback';
+import { createPaymentMachine, type PaymentMachine } from 'wallet';
 import { ReceiveScreen } from '@/features/receive/screens/ReceiveScreen';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mockUseScreenActions = jest.fn();
+jest.mock('@/shared/lib/version', () => ({ supportsLiquidGlass: () => true }));
+
+const mockMachine = { reset: jest.fn(), inspect: jest.fn(() => ({ isExecuting: false })) };
+let mockMachineOverride: PaymentMachine | null = null;
+const mockSelectUnit = jest.fn();
+const mockSetParams = jest.fn();
+jest.mock('@/features/wallet/hooks/useActiveUnit', () => ({
+  useActiveUnit: () => ({ selectUnit: mockSelectUnit }),
+}));
+jest.mock('@/features/wallet/components/UnitSwitcherPill/UnitSwitcherPill.fallback', () => ({
+  UnitSwitcherPillFallback: () => null,
+}));
+jest.mock('@/features/wallet/components/UnitSwitcherPill/useUnitSwitcherPill', () => ({
+  PILL_LABELS: { sat: 'Bitcoin', usd: 'USD', eur: 'EUR', gbp: 'GBP' },
+}));
+jest.mock('@/shared/hooks/useGuardedRouter', () => ({
+  guardedRouter: { setParams: (...args: unknown[]) => mockSetParams(...args) },
+}));
 
 jest.mock('wallet/react', () => ({
+  useColadaContext: () => ({ machine: mockMachineOverride ?? mockMachine }),
   useScreenActions: (...args: unknown[]) => mockUseScreenActions(...args),
   // The screen-owned standing creq (fresh-per-visit): loading until the
   // fresh request lands — mirrors the no-stale-seed hook behavior.
@@ -303,7 +325,13 @@ describe('ReceiveScreen layout stability', () => {
   let consoleErrorSpy: jest.SpyInstance;
 
   beforeEach(() => {
+    jest.replaceProperty(Platform, 'OS', 'ios');
     mockUseScreenActions.mockReset();
+    mockMachine.inspect.mockReturnValue({ isExecuting: false });
+    mockMachine.reset.mockClear();
+    mockSelectUnit.mockReset();
+    mockMachineOverride = null;
+    mockSetParams.mockClear();
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
       if (String(args[0]).includes('react-test-renderer is deprecated')) return;
       throw new Error(`Unexpected console.error: ${args.map(String).join(' ')}`);
@@ -344,7 +372,15 @@ describe('ReceiveScreen layout stability', () => {
     expect(screen.props.deferContent).toBe(false);
 
     expect(findAllByType(renderer!, 'ScreenErrorState')).toHaveLength(0);
+    expect(findAllByType(renderer!, 'PaymentInfo')).toHaveLength(0);
+    act(() => {
+      findAllByType(renderer!, 'UnderlineTabs')[0].props.handleTabPress('Lightning');
+    });
     expect(findAllByType(renderer!, 'PaymentInfo')).toHaveLength(1);
+    act(() => {
+      findAllByType(renderer!, 'UnderlineTabs')[0].props.handleTabPress('Unified');
+    });
+    expect(findAllByType(renderer!, 'PaymentInfo')).toHaveLength(0);
     // Paste / Fixed Amount / Scan QR moved to the receive hub — the QR
     // display's footer is a single Copy of the visible tab's payload.
     const copyButton = findByTestID(renderer!, 'receive-copy');
@@ -356,6 +392,127 @@ describe('ReceiveScreen layout stability', () => {
     act(() => {
       renderer!.unmount();
     });
+  });
+
+  it('explains non-Bitcoin addresses and switches route and machine through the header picker', () => {
+    const raw = {
+      type: 'receive',
+      id: 'receive-hub',
+      unit: 'usd',
+      npcAddress: 'fixture@npub.cash',
+    };
+    const entry = {
+      ...raw,
+      npcAddress: { toString: () => raw.npcAddress, truncate: () => 'fixture' },
+    };
+    mockUseScreenActions.mockReturnValue({ entry, error: null, actions: receiveActions() });
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <ReceiveScreen receiveEntry={JSON.stringify(raw)} unit="usd" />
+      );
+    });
+    act(() => {
+      findAllByType(renderer, 'UnderlineTabs')[0].props.handleTabPress('Lightning');
+    });
+    expect(findByTestID(renderer, 'receive-address-unit-unavailable')).toBeTruthy();
+    expect(findAllByType(renderer, 'PaymentInfo')).toHaveLength(0);
+    const options = jest.mocked(useScreenOptions).mock.calls.at(-1)![0]();
+    const picker = options.headerRight!({ canGoBack: true }) as React.ReactElement<
+      React.ComponentProps<typeof UnitSwitcherPillFallback>
+    >;
+    expect(picker.type).toBe(UnitSwitcherPillFallback);
+    expect(picker.props.header).toBe(true);
+    expect(options.unstable_headerRightItems).toBeDefined();
+    act(() => picker.props.onSelectUnit!('sat'));
+    expect(mockSelectUnit).toHaveBeenCalledWith('sat');
+    expect(mockMachine.reset).toHaveBeenCalledTimes(1);
+    expect(mockSelectUnit.mock.invocationCallOrder[0]).toBeLessThan(
+      mockMachine.reset.mock.invocationCallOrder[0]
+    );
+    expect(mockSetParams).toHaveBeenCalledWith({
+      unit: 'sat',
+      receiveEntry: JSON.stringify({ ...raw, unit: 'sat' }),
+    });
+    act(() =>
+      renderer.update(
+        <ReceiveScreen receiveEntry={JSON.stringify({ ...raw, unit: 'sat' })} unit="sat" />
+      )
+    );
+    expect(findAllByType(renderer, 'UnderlineTabs')[0].props.selectedTab).toBe('Lightning');
+    expect(findAllByType(renderer, 'PaymentInfo')).toHaveLength(1);
+    const bitcoinOptions = jest.mocked(useScreenOptions).mock.calls.at(-1)![0]();
+    const bitcoinPicker = bitcoinOptions.headerRight!({ canGoBack: true }) as React.ReactElement<
+      React.ComponentProps<typeof UnitSwitcherPillFallback>
+    >;
+    act(() => bitcoinPicker.props.onSelectUnit!('usd'));
+    expect(mockSetParams).toHaveBeenLastCalledWith({
+      unit: 'usd',
+      receiveEntry: JSON.stringify(raw),
+    });
+    act(() => renderer.update(<ReceiveScreen receiveEntry={JSON.stringify(raw)} unit="usd" />));
+    expect(findByTestID(renderer, 'receive-address-unit-unavailable')).toBeTruthy();
+    expect(findAllByType(renderer, 'PaymentInfo')).toHaveLength(0);
+    expect(findByTestID(renderer, 'receive-copy').props.disabled).toBe(true);
+    act(() => renderer.unmount());
+  });
+
+  it('resets the real payment machine using the newly selected unit and clears old flow context', async () => {
+    let activeUnit = 'usd';
+    const machine = createPaymentMachine({
+      handlers: {},
+      getContext: () => ({ trustedMintUrls: [], mintBalances: {}, proofAmounts: {} }),
+      getUnit: () => activeUnit,
+    });
+    await machine.startReceiveLightning({ reset: true });
+    expect(machine.getContext().destination).toBe('mintQuote');
+    mockMachineOverride = machine;
+    mockSelectUnit.mockImplementation((unit: string) => {
+      activeUnit = unit;
+    });
+    mockUseScreenActions.mockReturnValue({
+      entry: { type: 'receive' },
+      error: null,
+      actions: receiveActions(),
+    });
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <ReceiveScreen receiveEntry='{"type":"receive","unit":"usd"}' unit="usd" />
+      );
+    });
+    const options = jest.mocked(useScreenOptions).mock.calls.at(-1)![0]();
+    const picker = options.headerRight!({ canGoBack: true }) as React.ReactElement<
+      React.ComponentProps<typeof UnitSwitcherPillFallback>
+    >;
+    act(() => picker.props.onSelectUnit!('sat'));
+    expect(machine.getContext()).toEqual({ unit: 'sat' });
+    expect(machine.getStep()).toBe('idle');
+    act(() => renderer.unmount());
+  });
+
+  it('does not switch a receive unit while a payment is executing', () => {
+    mockUseScreenActions.mockReturnValue({
+      entry: { type: 'receive' },
+      error: null,
+      actions: receiveActions(),
+    });
+    mockMachine.inspect.mockReturnValue({ isExecuting: true });
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <ReceiveScreen receiveEntry='{"type":"receive","unit":"usd"}' unit="usd" />
+      );
+    });
+    const options = jest.mocked(useScreenOptions).mock.calls.at(-1)![0]();
+    const picker = options.headerRight!({ canGoBack: true }) as React.ReactElement<
+      React.ComponentProps<typeof UnitSwitcherPillFallback>
+    >;
+    act(() => picker.props.onSelectUnit!('sat'));
+    expect(mockSelectUnit).not.toHaveBeenCalled();
+    expect(mockMachine.reset).not.toHaveBeenCalled();
+    expect(mockSetParams).not.toHaveBeenCalled();
+    act(() => renderer.unmount());
   });
 
   it('keeps an in-place QR-sized placeholder instead of swapping to a loading screen', () => {
@@ -376,13 +533,7 @@ describe('ReceiveScreen layout stability', () => {
     expect(findAllByType(renderer!, 'Screen')).toHaveLength(1);
     expect(findAllByType(renderer!, 'ScreenErrorState')).toHaveLength(0);
     expect(findByTestID(renderer!, 'receive-hub-placeholder')).toBeTruthy();
-    expect(
-      StyleSheet.flatten(findByTestID(renderer!, 'receive-hub-qr-placeholder').props.style)
-    ).toEqual(
-      expect.objectContaining({
-        borderRadius: 16,
-      })
-    );
+    expect(findByTestID(renderer!, 'receive-hub-qr-placeholder')).toBeTruthy();
     expect(findByTestID(renderer!, 'receive-copy').props.disabled).toBe(true);
 
     act(() => {

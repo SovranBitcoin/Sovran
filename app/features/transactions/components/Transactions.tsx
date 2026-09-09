@@ -8,10 +8,10 @@ import React, {
 } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
 
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 
 import { FlashList, type FlashListRef, type ViewToken } from '@shopify/flash-list';
-import { Link } from 'expo-router';
 import { withAlpha } from '@/shared/lib/color';
 import { groupBy } from '@/shared/lib/groupBy';
 
@@ -733,29 +733,26 @@ export const Transactions = React.memo(
                       </BlurCardFrame>
                     </View>
                     {label === 'Confirmed' && !embedded && (
-                      <Link
-                        href={{
-                          pathname: '/transactions',
-                          params: {
-                            filterCurrency: account.unit,
-                            filterStatus: 'Confirmed',
-                          },
-                        }}
-                        asChild>
-                        <Pressable
-                          testID="transactions-view-all"
-                          accessibilityLabel="View all transactions">
-                          <View style={[styles.viewAllButton, { borderColor }]}>
-                            <BlurCardFrame accentColor={muted}>
-                              <View style={styles.viewAllContent}>
-                                <Text size={14} bold>
-                                  View all ({filteredHistory.length})
-                                </Text>
-                              </View>
-                            </BlurCardFrame>
-                          </View>
-                        </Pressable>
-                      </Link>
+                      <Pressable
+                        onPress={() =>
+                          router.navigate({
+                            pathname: '/transactions',
+                            params: { filterCurrency: account.unit, filterStatus: 'Confirmed' },
+                          })
+                        }
+                        testID="transactions-view-all"
+                        accessibilityRole="link"
+                        accessibilityLabel="View all transactions">
+                        <View style={[styles.viewAllButton, { borderColor }]}>
+                          <BlurCardFrame accentColor={muted}>
+                            <View style={styles.viewAllContent}>
+                              <Text size={14} bold>
+                                View all ({filteredHistory.length})
+                              </Text>
+                            </View>
+                          </BlurCardFrame>
+                        </View>
+                      </Pressable>
                     )}
                   </VStack>
                 </View>

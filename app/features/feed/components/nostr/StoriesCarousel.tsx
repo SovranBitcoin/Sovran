@@ -349,6 +349,7 @@ const UserStoriesItem: FC<UserItemProps> = ({
   const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
   const { width: screenWidth } = useWindowDimensions();
   const mountedRef = useRef(true);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isActive = userIndex === listCurrentIndex;
   const currentVideo = user.videoPosts[currentStoryIndex];
@@ -359,12 +360,22 @@ const UserStoriesItem: FC<UserItemProps> = ({
     p.muted = false;
   });
 
+  // A source change replaces the native player, not this mounted story card.
+  // Keep its liveness independent so later playToEnd events still advance.
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      safePlayerCall(player, (p) => p.pause());
     };
-  }, [player]);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      safePlayerCall(player, (p) => p.pause());
+      if (closeTimerRef.current !== null) clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    };
+  }, [player, isActive, isClosing]);
 
   useEffect(() => {
     if (isClosing) safePlayerCall(player, (p) => p.pause());
@@ -372,26 +383,25 @@ const UserStoriesItem: FC<UserItemProps> = ({
 
   useEffect(() => {
     safePlayerCall(player, (p) => {
-      p.timeUpdateEventInterval = isActive ? 0.05 : 0;
+      p.timeUpdateEventInterval = isActive && !isClosing ? 0.05 : 0;
     });
     return () => {
       safePlayerCall(player, (p) => {
         p.timeUpdateEventInterval = 0;
       });
     };
-  }, [isActive, player]);
+  }, [isActive, isClosing, player]);
 
-  useEventListener(player, 'timeUpdate', () => {
-    if (!isActive) return;
+  useEventListener(player, 'timeUpdate', ({ currentTime }) => {
+    if (!isActive || isClosing) return;
     safePlayerCall(player, (p) => {
-      const ct = p.currentTime ?? 0;
       const dur = p.duration ?? 0;
-      if (dur > 0) storyProgress.set(ct / dur);
+      if (dur > 0) storyProgress.set(currentTime / dur);
     });
   });
 
   useEffect(() => {
-    if (isActive) {
+    if (isActive && !isClosing) {
       storyProgress.set(0);
       safePlayerCall(player, (p) => {
         p.currentTime = 0;
@@ -400,17 +410,19 @@ const UserStoriesItem: FC<UserItemProps> = ({
     } else {
       safePlayerCall(player, (p) => p.pause());
     }
-  }, [currentStoryIndex, isActive, player, storyProgress]);
+  }, [currentStoryIndex, isActive, isClosing, player, storyProgress]);
 
   useEventListener(player, 'playToEnd', () => {
-    if (!isActive || !mountedRef.current) return;
+    if (!isActive || isClosing || !mountedRef.current) return;
     if (currentStoryIndex < user.videoPosts.length - 1) {
       setCurrentStoryIndex(currentStoryIndex + 1);
     } else if (userIndex < totalUsers - 1) {
       scrollRef.current?.scrollToIndex({ index: userIndex + 1, animated: true });
     } else {
       safePlayerCall(player, (p) => p.pause());
-      setTimeout(() => {
+      if (closeTimerRef.current !== null) clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = setTimeout(() => {
+        closeTimerRef.current = null;
         if (mountedRef.current) onClose?.();
       }, 150);
     }
@@ -421,8 +433,9 @@ const UserStoriesItem: FC<UserItemProps> = ({
   }, [player]);
 
   const resumePlayer = useCallback(() => {
+    if (!isActive || isClosing) return;
     safePlayerCall(player, (p) => p.play());
-  }, [player]);
+  }, [isActive, isClosing, player]);
 
   useAnimatedReaction(
     () => isDragging.get(),
@@ -477,8 +490,8 @@ const UserStoriesItem: FC<UserItemProps> = ({
 
   const onStoryPressOut = useCallback(() => {
     if (isDragging.get()) return;
-    safePlayerCall(player, (p) => p.play());
-  }, [isDragging, player]);
+    resumePlayer();
+  }, [isDragging, resumePlayer]);
 
   const handleClose = useCallback(() => {
     safePlayerCall(player, (p) => p.pause());

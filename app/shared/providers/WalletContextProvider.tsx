@@ -38,6 +38,14 @@ import { walletLog, initLog, useInitMount, mintUrlLogFields } from '@/shared/lib
 initLog('Module', 'WalletContextProvider loaded');
 
 const WalletContextCtx = createContext<WalletContext | null>(null);
+const EMPTY_PROOF_AMOUNTS: Record<string, number[]> = {};
+
+type ProofAmountsScope = {
+  manager: ReturnType<typeof useManager>;
+  unit: string;
+  mintUrls: readonly string[];
+  balanceSignature: string;
+};
 
 function preferredMintLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
   return {
@@ -89,7 +97,10 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
   const manager = useManager();
   const preferredMintUrl = useMintStore((state) => state.selectedMint);
 
-  const [proofAmounts, setProofAmounts] = useState<Record<string, number[]>>({});
+  const [proofSnapshot, setProofSnapshot] = useState<{
+    scope: ProofAmountsScope;
+    amounts: Record<string, number[]>;
+  } | null>(null);
 
   // Stabilise coco-react references — they return new objects every render
   const mintBalances = useShallowMemo(rawMintBalances);
@@ -131,6 +142,14 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
         .join('|'),
     [mintBalancesOnly]
   );
+  const proofScope = useMemo<ProofAmountsScope>(
+    () => ({ manager, unit: activeUnit, mintUrls: stableMintUrls, balanceSignature }),
+    [manager, activeUnit, stableMintUrls, balanceSignature]
+  );
+  // Do not expose proof denominations from another unit, manager, mint set, or
+  // pre-spend balance even for the first render before the next effect starts.
+  const proofAmounts =
+    proofSnapshot?.scope === proofScope ? proofSnapshot.amounts : EMPTY_PROOF_AMOUNTS;
 
   // Follow the preferred mint with the active unit: when the user switches
   // mints and the new mint doesn't support the current unit, snap to the
@@ -178,7 +197,7 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
         try {
           const proofs = await getReadyProofs(manager, url);
           const amounts = proofs
-            .filter((p) => (p.unit ?? 'sat') === activeUnit)
+            .filter((p) => (p.unit ?? 'sat') === activeUnit && p.usedByOperationId == null)
             .map((p) => amountToNumber(p.amount))
             .sort((a, b) => a - b);
           const proofTotal = amounts.reduce((sum, n) => sum + n, 0);
@@ -202,14 +221,47 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
       mintCount: stableMintUrls.length,
       totalReady,
     });
-    setProofAmounts(next);
+    return next;
   }, [manager, stableMintUrls, activeUnit]);
 
   useEffect(() => {
-    void fetchProofAmounts();
-    // balanceSignature isn't used inside fetchProofAmounts but its change is the
-    // signal that proofs have moved — depend on it explicitly.
-  }, [fetchProofAmounts, balanceSignature]);
+    let current = true;
+    let running = false;
+    let requested = false;
+    const reload = async () => {
+      requested = true;
+      if (running) return;
+      running = true;
+      while (current && requested) {
+        requested = false;
+        const amounts = await fetchProofAmounts();
+        if (current && !requested) setProofSnapshot({ scope: proofScope, amounts });
+      }
+      running = false;
+    };
+    // Reservations and denomination changes can leave the total unchanged.
+    // Invalidate immediately, then collapse events during a read into one
+    // trailing refresh; never publish denominations from an invalidated read.
+    const onProofChange = ({ mintUrl }: { mintUrl: string }) => {
+      if (!current || !stableMintUrls.includes(mintUrl)) return;
+      setProofSnapshot(null);
+      void reload();
+    };
+    const events = [
+      'proofs:saved',
+      'proofs:state-changed',
+      'proofs:reserved',
+      'proofs:released',
+      'proofs:deleted',
+      'proofs:wiped',
+    ] as const;
+    for (const event of events) manager.on(event, onProofChange);
+    void reload();
+    return () => {
+      current = false;
+      for (const event of events) manager.off(event, onProofChange);
+    };
+  }, [fetchProofAmounts, manager, proofScope, stableMintUrls]);
 
   const value = useMemo<WalletContext>(() => {
     const proofMintCount = Object.keys(proofAmounts).length;

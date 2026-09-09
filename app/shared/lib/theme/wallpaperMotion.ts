@@ -43,6 +43,7 @@ export function retainWallpaperMotion(): () => void {
     if (subscribers <= 0 && subscription) {
       subscription.remove();
       subscription = null;
+      wallpaperMotion.stopAnimation();
       log.debug('bg.motion.shared_stop');
     }
   };

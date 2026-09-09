@@ -5,7 +5,11 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useBackgroundContext } from '@/shared/providers/BackgroundProvider';
 import { ReactNode, useEffect, useSyncExternalStore } from 'react';
 import { Platform, StyleSheet, useWindowDimensions, ViewStyle } from 'react-native';
-import Animated, { interpolateColor, useAnimatedStyle } from 'react-native-reanimated';
+import Animated, {
+  interpolateColor,
+  useAnimatedStyle,
+  useReducedMotion,
+} from 'react-native-reanimated';
 import {
   carouselLayerOpacity,
   carouselX,
@@ -279,6 +283,7 @@ export function AnimatedBackgroundView({
   useMeshGradient = false,
 }: AnimatedBackgroundViewProps) {
   useRenderLogger('AnimatedBackgroundView');
+  const reducedMotion = useReducedMotion();
   const surface = useThemeColor('surface');
   const { currentTheme } = useTheme();
 
@@ -311,9 +316,9 @@ export function AnimatedBackgroundView({
     isBackgroundImageTheme(currentTheme) ||
     carouselPages.some((page) => isBackgroundImageTheme(page.theme));
   useEffect(() => {
-    if (!hasImageWallpaper) return;
+    if (!hasImageWallpaper || reducedMotion) return;
     return retainWallpaperMotion();
-  }, [hasImageWallpaper]);
+  }, [hasImageWallpaper, reducedMotion]);
 
   const backgroundAnimatedStyle = useAnimatedStyle(() => ({
     // themeLayerOpacity dips to 0 during color-only theme switches so the
