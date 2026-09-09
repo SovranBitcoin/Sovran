@@ -1,4 +1,3 @@
-import { useScreenInsets } from '@/shared/hooks/useScreenInsets';
 /**
  * @fileoverview Bitcoin Map Screen
  *
@@ -23,6 +22,8 @@ import { AppleMaps, GoogleMaps } from 'expo-maps';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useScreenInsets } from '@/shared/hooks/useScreenInsets';
+import { spacing } from '@/shared/styles/tokens';
 import { useCallback, useEffect, useInsertionEffect, useRef, useState } from 'react';
 import { InteractionManager, Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
@@ -46,6 +47,7 @@ const HAS_ANDROID_GOOGLE_MAPS_KEY = !!process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KE
 
 export function MapScreen() {
   const { bottom } = useScreenInsets();
+  const bottomOverlayStyle = { bottom: bottom + spacing.lg };
   useLifecycleLogger('MapScreen');
   const [foreground, accent, background, skeleton] = useThemeColor([
     'foreground',
@@ -283,35 +285,41 @@ export function MapScreen() {
         />
       )}
 
-      <StatsCard
-        visibleCount={visibleCount}
-        totalCount={totalCount}
-        loading={loading}
-        category={category}
-        onCategoryChange={setCategory}
-        cardWidth={statsCardWidth}
-      />
-
-      <VStack style={[styles.floatingButtons, { bottom: bottom + 16 }]} gap={8}>
-        <CircleActionButton
-          icon="mdi:crosshairs-gps"
-          systemIcon="location.fill"
-          onPress={handleMyLocation}
-          testID="map-locate"
+      {/* Keep controls and the category card in normal flow within one safe-area
+          anchor so different card heights cannot overlap the zoom buttons. */}
+      <View
+        pointerEvents="box-none"
+        className="absolute left-4 right-4 gap-4"
+        style={bottomOverlayStyle}>
+        <VStack pointerEvents="box-none" className="gap-2 self-end">
+          <CircleActionButton
+            icon="mdi:crosshairs-gps"
+            systemIcon="location.fill"
+            onPress={handleMyLocation}
+            testID="map-locate"
+          />
+          <CircleActionButton
+            icon="mdi:plus"
+            systemIcon="plus"
+            onPress={handleZoomIn}
+            testID="map-zoom-in"
+          />
+          <CircleActionButton
+            icon="mdi:minus"
+            systemIcon="minus"
+            onPress={handleZoomOut}
+            testID="map-zoom-out"
+          />
+        </VStack>
+        <StatsCard
+          visibleCount={visibleCount}
+          totalCount={totalCount}
+          loading={loading}
+          category={category}
+          onCategoryChange={setCategory}
+          cardWidth={statsCardWidth}
         />
-        <CircleActionButton
-          icon="mdi:plus"
-          systemIcon="plus"
-          onPress={handleZoomIn}
-          testID="map-zoom-in"
-        />
-        <CircleActionButton
-          icon="mdi:minus"
-          systemIcon="minus"
-          onPress={handleZoomOut}
-          testID="map-zoom-out"
-        />
-      </VStack>
+      </View>
     </Log>
   );
 }
@@ -335,9 +343,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
-  },
-  floatingButtons: {
-    position: 'absolute',
-    right: 16,
   },
 });

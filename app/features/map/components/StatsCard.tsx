@@ -62,7 +62,7 @@ export const StatsCard = memo(function StatsCard({
   // through to the flat card (which also covers Android and pre-iOS-26).
   if (!liquidGlass || !LiquidGlassMenu.isSupported) {
     const renderCard = (onPress: () => void) => (
-      <View style={styles.statsContainer}>
+      <View>
         <Pressable
           onPress={onPress}
           // The glass path above is a UIKit UIButton and is announced as a
@@ -133,7 +133,7 @@ export const StatsCard = memo(function StatsCard({
   // by comparison). A single TAP opens the category menu and morphs the capsule;
   // the leading bitcoin icon + two-line label live inside the button itself.
   return (
-    <View style={styles.statsContainer}>
+    <View>
       <LiquidGlassMenu
         style={{ width: cardWidth, height: 64 }}
         image="bitcoinsign.circle.fill"
@@ -157,12 +157,6 @@ export const StatsCard = memo(function StatsCard({
 });
 
 const styles = StyleSheet.create({
-  statsContainer: {
-    position: 'absolute',
-    bottom: 32,
-    left: 16,
-    right: 16,
-  },
   fallbackCard: {
     minHeight: 60,
     borderRadius: radius.pill,
