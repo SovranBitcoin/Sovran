@@ -170,20 +170,32 @@ export function deriveMintMethodSupportFromInfo(
 }
 
 /**
- * Display order for mint pickers: available mints first, then by balance
- * (descending), ties keep their incoming (trusted) order. This is THE sort
- * for every "Select Mint" list — the machine's synchronous fallback rows,
- * the async enriched rows, and the candidates in step data all use it, so
- * the FIRST render is already in the final order and enrichment never
- * re-shuffles rows.
+ * Display order for mint pickers: available mints first, then below-minimum
+ * mints (lowest minimum first), then other disabled mints. Remaining ties use
+ * descending balance, then incoming (trusted) order. This is THE sort
+ * for every "Select Mint" list — the machine's synchronous fallback rows
+ * and the async enriched rows both use it, so unchanged capabilities keep
+ * the same order when enrichment finishes.
  */
 export function compareMintDisplayOrder(
-  a: { status?: "available" | "disabled"; balance: number },
-  b: { status?: "available" | "disabled"; balance: number },
+  a: Pick<MintCandidate, "status" | "balance" | "reason">,
+  b: Pick<MintCandidate, "status" | "balance" | "reason">,
 ): number {
   const aDisabled = a.status === "disabled";
   const bDisabled = b.status === "disabled";
   if (aDisabled !== bDisabled) return aDisabled ? 1 : -1;
+  if (aDisabled && bDisabled) {
+    const aBelowMin = a.reason?.code === "AMOUNT_BELOW_MINT_MIN";
+    const bBelowMin = b.reason?.code === "AMOUNT_BELOW_MINT_MIN";
+    if (aBelowMin !== bBelowMin) return aBelowMin ? -1 : 1;
+    if (aBelowMin && bBelowMin) {
+      const aMin = a.reason?.params?.min;
+      const bMin = b.reason?.params?.min;
+      if (typeof aMin === "number" && typeof bMin === "number" && aMin !== bMin) {
+        return aMin - bMin;
+      }
+    }
+  }
   return b.balance - a.balance;
 }
 
