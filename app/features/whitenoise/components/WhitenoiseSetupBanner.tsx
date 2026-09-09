@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { usePathname } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useScreenInsets } from '@/shared/hooks/useScreenInsets';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -27,12 +27,11 @@ import Icon from 'assets/icons';
  *   3. `success`  → green check scales in with overshoot, hold ~900ms,
  *                   then the whole card fades out and unmounts
  *
- * Mounted at the tabs layout level (`app/(drawer)/(tabs)/_layout.tsx`)
+ * Mounted inside ContactsScreen so it shares the page viewport and inset
  * with `position: absolute`, anchored above the native tab bar via the
- * safe-area bottom inset + estimated tab-bar height. Only renders on
+ * navigator-aware bottom inset. Only renders on
  * the Contacts tab.
  */
-const TAB_BAR_HEIGHT_ESTIMATE = Platform.select({ ios: 49, android: 56, default: 56 });
 const FLOAT_GAP = 12;
 // LoadingIndicator's `done` choreography runs ~T_FILL+T_ICON+D_ICON_IN
 // (~1.4s end-to-end). Start the dismiss right as the glyph finishes —
@@ -49,14 +48,21 @@ type Phase = 'idle' | 'running' | 'success' | 'gone';
 const cardEnter = FadeIn.duration(250);
 const cardExit = FadeOut.duration(400);
 
-export function WhitenoiseSetupBanner({ testID }: { testID?: string }) {
+export function WhitenoiseSetupBanner({
+  testID,
+  onClearanceChange,
+}: {
+  testID?: string;
+  onClearanceChange?: (height: number) => void;
+}) {
   const pathname = usePathname();
-  const insets = useSafeAreaInsets();
+  const insets = useScreenInsets();
   const { isReady, isLoading, isBootstrapping, bootstrap } = useWhitenoiseSetup();
   const { client } = useWhitenoise();
   const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled);
 
   const [phase, setPhase] = useState<Phase>('idle');
+  const [cardHeight, setCardHeight] = useState(0);
 
   // Reset phase if upstream `isReady` flips back to false (e.g. user
   // wiped key packages on another surface). Keeps the banner reusable.
@@ -88,12 +94,20 @@ export function WhitenoiseSetupBanner({ testID }: { testID?: string }) {
     phase !== 'gone' &&
     (phase !== 'idle' || (pathname.includes('/contacts') && !!client && !isLoading && !isReady));
 
-  const bottomOffset = insets.bottom + (TAB_BAR_HEIGHT_ESTIMATE ?? 49) + FLOAT_GAP;
+  useEffect(() => {
+    onClearanceChange?.(shouldRenderCard ? cardHeight + FLOAT_GAP + 16 : 0);
+  }, [shouldRenderCard, cardHeight, onClearanceChange]);
+
+  const bottomOffset = insets.bottom + FLOAT_GAP;
 
   return (
     <View pointerEvents="box-none" style={[styles.host, { bottom: bottomOffset }]}>
       {shouldRenderCard ? (
-        <Animated.View entering={cardEnter} exiting={cardExit} style={styles.cardWrap}>
+        <Animated.View
+          entering={cardEnter}
+          exiting={cardExit}
+          style={styles.cardWrap}
+          onLayout={(event) => setCardHeight(Math.ceil(event.nativeEvent.layout.height))}>
           <BannerCard
             phase={phase}
             onPress={onPress}

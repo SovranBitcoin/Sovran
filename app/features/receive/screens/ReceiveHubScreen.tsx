@@ -19,7 +19,8 @@
  */
 
 import { useMemo } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { withAlpha } from '@/shared/lib/color';
 
@@ -140,14 +141,15 @@ export function ReceiveHubScreen({ receiveHubEntry, unit }: ReceiveHubScreenProp
   }
 
   return (
-    <ScrollView
+    <ScreenScrollView
+      bottomSpacing={24}
       style={[styles.screen, { backgroundColor: overlay }]}
       contentContainerStyle={[styles.content, { paddingTop: headerHeight + 8 }]}>
       {/* This screen is a sheet: iOS modal AX hides the root-layout probe, so
           toast evidence (e.g. no-clipboard-address) must be mirrored in-sheet. */}
       <E2EToastProbe />
       {rows}
-    </ScrollView>
+    </ScreenScrollView>
   );
 }
 
@@ -155,7 +157,5 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  content: {
-    paddingBottom: 24,
-  },
+  content: {},
 });

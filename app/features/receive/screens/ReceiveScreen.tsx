@@ -481,6 +481,7 @@ function ReceiveScreenForUnit({
       <View style={styles.content}>
         <SkeletonContentCrossfade
           loading={!receiveEntryData}
+          wave="none"
           visualKey="receive-hub"
           visualSurface="receive"
           renderSkeleton={() => (

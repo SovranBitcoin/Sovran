@@ -108,7 +108,7 @@ export function NearPayPeerListScreen() {
   // wallet's active mint unit.
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
   const { isOffline } = useOfflineStatus();
-  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
 
   const peers = useFreshNearbyPeers();
 
@@ -224,12 +224,14 @@ export function NearPayPeerListScreen() {
           </Text>
         </HStack>
         <List
+          screen
+          bottomSpacing={24}
           data={sortedPeers}
           keyExtractor={peerKeyExtractor}
           renderItem={renderItem}
           keyboardDismissMode="on-drag"
           style={styles.list}
-          contentContainerStyle={peers.length === 0 ? styles.emptyListContent : styles.listContent}
+          contentContainerStyle={peers.length === 0 ? styles.emptyListContent : undefined}
           ListEmptyComponent={emptyContent}
         />
       </View>
@@ -251,9 +253,6 @@ const styles = StyleSheet.create({
   },
   list: {
     flex: 1,
-  },
-  listContent: {
-    paddingBottom: 24,
   },
   emptyListContent: {
     alignItems: 'center',

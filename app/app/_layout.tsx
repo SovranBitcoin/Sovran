@@ -242,7 +242,7 @@ const CloseButton = React.memo(function CloseButton() {
 // Inner component that can access theme context
 function RootLayoutContent() {
   const { currentTheme } = useTheme();
-  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
 
   // SDK 56: Android is edge-to-edge and expo-status-bar dropped the
   // backgroundColor prop. Set the window background (shown THROUGH the

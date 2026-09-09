@@ -1,3 +1,4 @@
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 /**
  * @fileoverview Network configuration — the three tiers of the resilient Nostr
  * data layer (nagg → Primal cache → raw relays) with live health, plus the
@@ -9,7 +10,7 @@
  * only sets the persisted preference the data layer reads.
  */
 import React, { useState } from 'react';
-import { RefreshControl, ScrollView, View } from 'react-native';
+import { RefreshControl, View } from 'react-native';
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import type NDK from '@nostr-dev-kit/ndk-mobile';
 import { Button, Card, Input, ListGroup, Separator, Switch, TextField } from 'heroui-native';
@@ -144,10 +145,9 @@ export function SettingsNetworkScreen() {
 
   return (
     <ScreenWrapper name="SettingsNetworkScreen" scroll="custom" safeArea>
-      <ScrollView
+      <ScreenScrollView
         className="px-4"
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerClassName="pb-8"
+        bottomSpacing={32}
         refreshControl={
           <RefreshControl refreshing={tierHealth.isRefreshing} onRefresh={tierHealth.refresh} />
         }>
@@ -272,7 +272,7 @@ export function SettingsNetworkScreen() {
             ) : null}
           </View>
         </Section>
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenWrapper>
   );
 }

@@ -41,7 +41,7 @@ const SWAP_OPTIONS = { title: 'Swap' };
 const THREAD_OPTIONS = { title: 'Thread' };
 
 function TransactionsFlowContent() {
-  const background = useThemeColor('background');
+  const background = useThemeColor('surface');
   // KEPT as an explicit useMemo: react-navigation re-applies options on
   // identity change, so the entry screen's options object must stay stable.
   // ast-grep-ignore: no-manual-memo-tsx

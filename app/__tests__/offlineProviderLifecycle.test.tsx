@@ -54,6 +54,18 @@ async function flush() {
   });
 }
 
+it('checks a healthy idle connection once per minute and still reacts to network changes', async () => {
+  renderHook(useOfflineStatus, { wrapper: OfflineStatusProvider });
+  await flush();
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(59_000);
+  });
+  expect(Network.getNetworkStateAsync).toHaveBeenCalledTimes(1);
+  act(() => jest.mocked(Network.addNetworkStateListener).mock.calls[0][0]({ isConnected: false }));
+  await flush();
+  expect(Network.getNetworkStateAsync).toHaveBeenCalledTimes(2);
+});
+
 it('stops connectivity polling in background and refreshes immediately on return', async () => {
   const { unmount } = renderHook(useOfflineStatus, { wrapper: OfflineStatusProvider });
   await flush();

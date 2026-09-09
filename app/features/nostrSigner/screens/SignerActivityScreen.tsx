@@ -18,7 +18,6 @@
 import React, { useState } from 'react';
 import { ScrollView } from 'react-native';
 import { useHeaderHeight } from 'expo-router/react-navigation';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Button as HerouiButton } from 'heroui-native';
@@ -164,8 +163,7 @@ export function SignerActivityScreen(): React.ReactElement {
 
   // Content scrolls UNDER the transparent blur header (thread-page style).
   const headerHeight = useHeaderHeight();
-  const insets = useSafeAreaInsets();
-  const listContentStyle = { paddingTop: headerHeight, paddingBottom: insets.bottom };
+  const listContentStyle = { paddingTop: headerHeight };
   const indicatorInsets = { top: headerHeight };
 
   const renderItem = ({ item }: { item: Nip46ActivityEntry }) => {
@@ -239,6 +237,7 @@ export function SignerActivityScreen(): React.ReactElement {
       {/* The activity log holds up to ACTIVITY_CAP entries; rows are stateless
           (ListRow + derived props), so recycling is safe. */}
       <List
+        screen
         data={filtered}
         keyExtractor={keyExtractor}
         renderItem={renderItem}

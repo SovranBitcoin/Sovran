@@ -35,7 +35,6 @@ import {
 import { formatRelativeUnixSeconds } from '@/shared/lib/date';
 import { List } from '@/shared/ui/composed/List';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
 import { feedLog, Log, useLifecycleLogger } from '@/shared/lib/logger';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
@@ -223,7 +222,6 @@ export function NotificationFollowersScreen() {
       notificationFollowersCache.markTouched(key);
     }
   }, [viewerPubkeyRef, seed]);
-  const tabBarPadding = useTabBarBottomPadding();
   const [foreground, surface, separator, muted, surfaceTertiary] = useThemeColor([
     'foreground',
     'surface',
@@ -430,11 +428,11 @@ export function NotificationFollowersScreen() {
     <Screen name="NotificationFollowersScreen" scroll="custom" bgColor={surface}>
       <Log name="NotificationFollowersContent" style={notificationListStyles.root}>
         <List
+          screen
           data={followers}
           keyExtractor={(notification) => notification.event.id}
           contentContainerStyle={[
             notificationListStyles.listContent,
-            { paddingBottom: tabBarPadding },
             followers.length === 0 && notificationListStyles.emptyListContent,
           ]}
           contentInsetAdjustmentBehavior="never"

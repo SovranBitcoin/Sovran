@@ -1,3 +1,4 @@
+import { Screen } from '@/shared/ui/composed/Screen';
 import { useState, useEffect } from 'react';
 import Animated from 'react-native-reanimated';
 import { Stack } from 'expo-router';
@@ -28,13 +29,7 @@ import { List } from '@/shared/ui/composed/List';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { withAlpha } from '@/shared/lib/color';
-import {
-  cashuLog,
-  Log,
-  redactError,
-  useLifecycleLogger,
-  mintUrlLogFields,
-} from '@/shared/lib/logger';
+import { cashuLog, redactError, useLifecycleLogger, mintUrlLogFields } from '@/shared/lib/logger';
 import { formatDate } from '@/shared/lib/date';
 
 /** Commented reviews first, each group newest-first. */
@@ -328,7 +323,7 @@ function HeaderStats({
 
 export function MintReviewsScreen() {
   useLifecycleLogger('MintReviewsScreen');
-  const [background, foreground] = useThemeColor(['background', 'foreground'] as const);
+  const [background, foreground] = useThemeColor(['surface', 'foreground'] as const);
   const insets = useSafeAreaInsets();
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.reviews' });
   const mintUrl = params?.mintUrl;
@@ -458,41 +453,38 @@ export function MintReviewsScreen() {
   ) : null;
 
   return (
-    <Log name="MintReviewsScreen" style={{ flex: 1, backgroundColor: background }}>
+    <Screen
+      name="MintReviewsScreen"
+      scroll="custom"
+      bgColor={background}
+      footer={
+        <BottomButtons>
+          <ButtonHandler
+            buttons={[
+              {
+                text: 'Close',
+                variant: 'secondary',
+                onPress: async () => router.back(),
+              },
+            ]}
+          />
+        </BottomButtons>
+      }>
       <Stack.Screen options={{ title: 'Reviews' }} />
 
-      {showEmptyState ? (
-        <View className="flex-1 px-4" style={{ paddingTop: insets.top + 48 }}>
-          {ListHeader}
-          <EmptyState />
-        </View>
-      ) : (
-        <List
-          data={reviews}
-          renderItem={renderItem}
-          keyExtractor={keyExtractor}
-          ListHeaderComponent={ListHeader}
-          ListFooterComponent={ListFooter}
-          ListEmptyComponent={listEmpty}
-          contentContainerStyle={{
-            paddingHorizontal: 16,
-            paddingTop: insets.top + 48,
-            paddingBottom: 120,
-          }}
-        />
-      )}
-
-      <BottomButtons>
-        <ButtonHandler
-          buttons={[
-            {
-              text: 'Close',
-              variant: 'secondary',
-              onPress: async () => router.back(),
-            },
-          ]}
-        />
-      </BottomButtons>
-    </Log>
+      <List
+        screen
+        data={reviews}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        ListHeaderComponent={ListHeader}
+        ListFooterComponent={showEmptyState ? null : ListFooter}
+        ListEmptyComponent={showEmptyState ? <EmptyState /> : listEmpty}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: insets.top + 48,
+        }}
+      />
+    </Screen>
   );
 }

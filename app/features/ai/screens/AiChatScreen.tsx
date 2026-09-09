@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Keyboard, ScrollView, View as RNView } from 'react-native';
 import { useHeaderHeight } from 'expo-router/react-navigation';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useScreenInsets } from '@/shared/hooks/useScreenInsets';
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
 import { FlashList } from '@shopify/flash-list';
@@ -25,11 +25,6 @@ import {
   useLoggedChatSend,
 } from '@/shared/ui/composed/chat/useChatSurfacePerfLogger';
 import { aiLog, useLifecycleLogger, useMountLog } from '@/shared/lib/logger';
-import { isExpo55NativeTabsSupported } from '@/navigation/nativeTabs';
-import {
-  SOVRAN_TAB_BAR_ROW_HEIGHT,
-  SOVRAN_TAB_BAR_MIN_BOTTOM_PADDING,
-} from '@/shared/blocks/SovranTabBar';
 import { ModelChip } from '../components/ModelChip';
 import { AiEmptyState } from '../components/AiEmptyState';
 import { AiMessageBubble, type BranchNav } from '../components/AiMessageBubble';
@@ -124,28 +119,9 @@ export function AiChatScreen() {
     store.createSession();
   }, []);
 
-  const insets = useSafeAreaInsets();
-  // Two tab-bar paths, two different bottom-inset shapes:
-  //   • NativeTabs (iOS 26+ liquid glass): real `UITabBarController` grows
-  //     the screen's bottom safe-area inset to cover tab bar + home-indicator
-  //     together. The composer sits at `bottom: insets.bottom` over a
-  //     full-screen frame and lands flush above the bar.
-  //   • SovranTabBar (older iOS / Android): JS tab bar that already absorbs
-  //     the home-indicator inset itself. Pass 0 so the composer sits flush
-  //     against the bar instead of floating above it.
-  const isNativeTabsPath = isExpo55NativeTabsSupported();
-  const bottomInset = isNativeTabsPath ? insets.bottom : 0;
-  // On the SovranTabBar path the screen-content area stops at the tab bar's
-  // top edge, which sits `sovranTabBarHeight` above the window bottom. The
-  // composer is anchored at `bottom: 0` of that content area — i.e., already
-  // `sovranTabBarHeight` above the window bottom at rest — so the keyboard
-  // lift below must subtract this gap or the composer overshoots the keyboard
-  // top by the tab bar's height when focused. On the NativeTabs path the
-  // screen extends to the window bottom under a translucent system bar, so
-  // this gap is 0 and `bottomInset` already captures the right offset.
-  const sovranTabBarHeight = isNativeTabsPath
-    ? 0
-    : SOVRAN_TAB_BAR_ROW_HEIGHT + Math.max(insets.bottom, SOVRAN_TAB_BAR_MIN_BOTTOM_PADDING);
+  // The navigator owns viewport geometry; keyboard lift subtracts only the
+  // measured bar below a docked viewport.
+  const { bottom: bottomInset, dockedTabBarHeight: sovranTabBarHeight } = useScreenInsets();
   const headerHeight = useHeaderHeight();
 
   const surfaceColor = useThemeColor('surface');
@@ -377,6 +353,7 @@ export function AiChatScreen() {
             <RNView style={{ flex: 1 }}>{emptyContent}</RNView>
           ) : (
             <FlashList
+              contentInsetAdjustmentBehavior="never"
               data={activeMessages}
               keyExtractor={messageKeyExtractor}
               renderItem={renderItem}

@@ -18,6 +18,7 @@
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
+import { ScreenBackgroundContext } from '@/shared/ui/composed/ScreenFooterContext';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -79,8 +80,16 @@ jest.mock('@/shared/ui/composed/SkeletonExitShimmer', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   const { View } = jest.requireActual<typeof import('react-native')>('react-native');
   return {
-    SkeletonLoadingShimmer: ({ active }: { active?: boolean }) =>
-      active ? ReactActual.createElement(View, { testID: 'shimmer' }) : null,
+    SkeletonLoadingShimmer: ({
+      active,
+      highlightColor,
+    }: {
+      active?: boolean;
+      highlightColor?: string;
+    }) =>
+      active
+        ? ReactActual.createElement(View, { testID: 'shimmer', accessibilityLabel: highlightColor })
+        : null,
   };
 });
 
@@ -321,4 +330,23 @@ describe('SkeletonContentCrossfade', () => {
     expect(present(r, 'sk')).toBe(false);
     act(() => r.unmount());
   });
+});
+
+it.each([
+  [null, undefined, 'theme-surface'],
+  ['custom-page', undefined, 'custom-page'],
+  ['custom-page', 'card-surface', 'card-surface'],
+])('shimmers against the actual containing surface', (pageColor, surfaceColor, expected) => {
+  const r = render(
+    <ScreenBackgroundContext.Provider value={pageColor}>
+      <SkeletonContentCrossfade
+        loading
+        surfaceColor={surfaceColor ?? undefined}
+        renderSkeleton={skeletonNode}
+        renderContent={contentNode}
+      />
+    </ScreenBackgroundContext.Provider>
+  );
+  expect(r.root.findByProps({ testID: 'shimmer' }).props.accessibilityLabel).toBe(expected);
+  act(() => r.unmount());
 });

@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { useReportTabBarHeight } from '@/shared/hooks/useScreenInsets';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -13,9 +14,9 @@ import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 
-export const SOVRAN_TAB_BAR_ROW_HEIGHT = 52;
+const SOVRAN_TAB_BAR_ROW_HEIGHT = 52;
 /** Minimum bottom padding under the tab row when there's no home indicator. */
-export const SOVRAN_TAB_BAR_MIN_BOTTOM_PADDING = 8;
+const SOVRAN_TAB_BAR_MIN_BOTTOM_PADDING = 8;
 
 type TabBarIcon = NonNullable<BottomTabBarProps['descriptors'][string]['options']['tabBarIcon']>;
 
@@ -85,6 +86,7 @@ function TabButton({
 
 export function SovranTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const reportHeight = useReportTabBarHeight();
   const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
 
   const activeColor = foreground;
@@ -93,6 +95,7 @@ export function SovranTabBar({ state, descriptors, navigation }: BottomTabBarPro
 
   return (
     <View
+      onLayout={(event) => reportHeight?.(event.nativeEvent.layout.height)}
       style={{
         backgroundColor: surface,
         paddingBottom: Math.max(insets.bottom, SOVRAN_TAB_BAR_MIN_BOTTOM_PADDING),

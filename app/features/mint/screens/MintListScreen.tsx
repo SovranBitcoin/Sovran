@@ -272,6 +272,7 @@ export function MintListScreen({
 
   const renderList = (data: MintRow[], skeleton: boolean) => (
     <List
+      screen
       data={data}
       renderItem={skeleton ? renderSkeletonItem : renderRow}
       keyExtractor={keyExtractor}
@@ -287,7 +288,7 @@ export function MintListScreen({
       maintainVisibleContentPosition={{ disabled: true }}
       contentInsetAdjustmentBehavior="never"
       style={{ flex: 1, height: 0 }}
-      contentContainerClassName="pt-3 pb-30"
+      contentContainerClassName="pt-3"
       ListHeaderComponent={listHeader}
       // Skeleton data is non-empty, so the empty text can't flash mid-load.
       ListEmptyComponent={skeleton ? undefined : emptyComponent}

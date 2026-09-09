@@ -1,3 +1,4 @@
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 /**
  * @fileoverview Empty-query body for the unified search surface.
  *
@@ -7,7 +8,7 @@
  *   2. Recent people strip — shared across surfaces (`recentPeopleStore`).
  * Followed by a prompt explaining what can be searched.
  */
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import Icon from '@/assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -44,7 +45,7 @@ export function RecentSearches({
   const [foreground, muted, accent] = useThemeColor(['foreground', 'muted', 'accent'] as const);
 
   return (
-    <ScrollView
+    <ScreenScrollView
       style={styles.flex1}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="always"
@@ -97,7 +98,7 @@ export function RecentSearches({
           </Text>
         </VStack>
       </VStack>
-    </ScrollView>
+    </ScreenScrollView>
   );
 }
 

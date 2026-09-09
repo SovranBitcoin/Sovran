@@ -1,10 +1,11 @@
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 /**
  * Merchant detail screen: displays info about a Bitcoin-accepting merchant.
  * Used from map flow when a marker is tapped.
  */
 
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShallow } from 'zustand/react/shallow';
@@ -119,7 +120,7 @@ export function MerchantDetailScreen() {
   const [foreground, defaultColor, background] = useThemeColor([
     'foreground',
     'default',
-    'background',
+    'surface',
   ] as const);
   const insets = useSafeAreaInsets();
   const params = useRouteParams(ParamsSchema, { where: 'map-flow.detail' });
@@ -243,14 +244,14 @@ export function MerchantDetailScreen() {
 
   return (
     <Log name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
-      <ScrollView
+      <ScreenScrollView
+        bottomSpacing={32}
         style={styles.scrollView}
         // Android form-sheet: top-edge drag dismisses, mid-scroll scrolls.
         nestedScrollEnabled
         contentContainerStyle={{
           paddingTop: insets.top + 56,
           paddingHorizontal: 16,
-          paddingBottom: 120,
         }}
         showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
@@ -335,7 +336,7 @@ export function MerchantDetailScreen() {
             Data from BTCMap.org • Last updated {formatDate(place.updated_at, 'short-date')}
           </Text>
         </View>
-      </ScrollView>
+      </ScreenScrollView>
     </Log>
   );
 }

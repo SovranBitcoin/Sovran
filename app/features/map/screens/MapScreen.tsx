@@ -1,3 +1,4 @@
+import { useScreenInsets } from '@/shared/hooks/useScreenInsets';
 /**
  * @fileoverview Bitcoin Map Screen
  *
@@ -44,11 +45,12 @@ const DEFER_MAP_RENDER_MS = 50; // Small delay to let modal animation start
 const HAS_ANDROID_GOOGLE_MAPS_KEY = !!process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 export function MapScreen() {
+  const { bottom } = useScreenInsets();
   useLifecycleLogger('MapScreen');
   const [foreground, accent, background, skeleton] = useThemeColor([
     'foreground',
     'accent',
-    'background',
+    'surface',
     'skeleton',
   ] as const);
 
@@ -290,7 +292,7 @@ export function MapScreen() {
         cardWidth={statsCardWidth}
       />
 
-      <VStack style={styles.floatingButtons} gap={8}>
+      <VStack style={[styles.floatingButtons, { bottom: bottom + 16 }]} gap={8}>
         <CircleActionButton
           icon="mdi:crosshairs-gps"
           systemIcon="location.fill"
@@ -337,6 +339,5 @@ const styles = StyleSheet.create({
   floatingButtons: {
     position: 'absolute',
     right: 16,
-    bottom: 110,
   },
 });

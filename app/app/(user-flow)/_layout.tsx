@@ -28,14 +28,10 @@ const SHARE_OPTIONS = { title: 'Share profile' };
 const HIDDEN_HEADER_OPTIONS = { headerShown: false };
 
 export default function UserFlowLayout() {
-  const [foreground, background, surface] = useThemeColor([
-    'foreground',
-    'background',
-    'surface',
-  ] as const);
+  const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
   const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }),
-    [foreground, background]
+    () => createFlowLayoutScreenOptions({ foreground, background: surface }),
+    [foreground, surface]
   );
   const threadOptions = useMemo(
     () => ({

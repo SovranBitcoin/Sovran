@@ -13,6 +13,7 @@
  * transaction timeline — render FlashList directly rather than through `<List>`.
  */
 import type { Ref } from 'react';
+import { useScreenBottomPadding } from '@/shared/hooks/useScreenInsets';
 import {
   FlashList as BaseFlashList,
   type FlashListProps,
@@ -54,14 +55,34 @@ export function List<T>({
   // otherwise dragging the list down (to scroll up) dismisses the sheet. It's a
   // no-op when the list isn't nested in another scrollable, and ignored on iOS.
   nestedScrollEnabled = true,
+  screen = false,
+  bottomSpacing,
+  contentContainerStyle,
+  contentInsetAdjustmentBehavior,
+  scrollIndicatorInsets,
   ...props
-}: FlashListProps<T> & ListClassNameProps & { ref?: Ref<FlashListRef<T>> }) {
+}: FlashListProps<T> &
+  ListClassNameProps & {
+    ref?: Ref<FlashListRef<T>>;
+    /** Page-level list: owns bottom safe area and measured Screen footer clearance. */
+    screen?: boolean;
+    /** Content gap above the screen bottom or footer. */
+    bottomSpacing?: number;
+  }) {
+  const bottomPadding = useScreenBottomPadding(bottomSpacing);
   return (
     <FlashList
       showsVerticalScrollIndicator={showsVerticalScrollIndicator}
       drawDistance={drawDistance}
       nestedScrollEnabled={nestedScrollEnabled}
       {...props}
+      contentContainerStyle={
+        screen ? [contentContainerStyle, { paddingBottom: bottomPadding }] : contentContainerStyle
+      }
+      contentInsetAdjustmentBehavior={screen ? 'never' : contentInsetAdjustmentBehavior}
+      scrollIndicatorInsets={
+        screen ? { ...scrollIndicatorInsets, bottom: bottomPadding } : scrollIndicatorInsets
+      }
     />
   );
 }

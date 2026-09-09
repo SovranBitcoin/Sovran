@@ -17,6 +17,8 @@ interface GradientCardProps {
   /** Style applied to the content layer above the gradient. */
   contentStyle?: StyleProp<ViewStyle>;
   variant?: GlowVariant;
+  /** Keep the frame and content geometry while hiding unresolved contents. */
+  loading?: boolean;
   testID?: string;
 }
 
@@ -31,6 +33,7 @@ export function GradientCard({
   style,
   contentStyle,
   variant,
+  loading = false,
   testID,
 }: GradientCardProps) {
   const muted = useThemeColor('muted');
@@ -40,7 +43,14 @@ export function GradientCard({
     <Log name="GradientCard">
       <SquircleView testID={testID} style={[styles.card, { borderColor }, style]}>
         <BlurCardFrame accentColor={muted} variant={variant}>
-          <RNView style={[styles.content, contentStyle]}>{children}</RNView>
+          <RNView
+            style={[styles.content, contentStyle]}
+            className={loading ? 'opacity-0' : undefined}
+            pointerEvents={loading ? 'none' : undefined}
+            accessibilityElementsHidden={loading}
+            importantForAccessibility={loading ? 'no-hide-descendants' : 'auto'}>
+            {children}
+          </RNView>
         </BlurCardFrame>
       </SquircleView>
     </Log>

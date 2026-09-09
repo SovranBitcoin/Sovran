@@ -33,7 +33,7 @@ const RECOVERY_OPTIONS = { title: 'Recover wallet' };
 const DELETE_OPTIONS = { title: 'Delete account' };
 
 export default function SettingsFlowLayout() {
-  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
   const screenOptions = useMemo(
     () => createFlowLayoutScreenOptions({ foreground, background }),
     [foreground, background]

@@ -25,7 +25,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { Platform, StyleSheet, TextInput } from 'react-native';
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { usePaymentFlowMachine } from 'wallet/react';
 import { describeDestination, defaultDetectors, parsePaymentInput } from 'wallet';
@@ -473,7 +474,8 @@ export function SendScreen({ unit }: { unit: string }) {
   ));
 
   return (
-    <ScrollView
+    <ScreenScrollView
+      bottomSpacing={32}
       style={[styles.screen, { backgroundColor: overlay }]}
       contentContainerStyle={[styles.content, { paddingTop: headerHeight + 8 }]}
       keyboardShouldPersistTaps="handled"
@@ -631,7 +633,7 @@ export function SendScreen({ unit }: { unit: string }) {
           ))}
         </VStack>
       ) : null}
-    </ScrollView>
+    </ScreenScrollView>
   );
 }
 
@@ -649,9 +651,7 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  content: {
-    paddingBottom: 32,
-  },
+  content: {},
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',

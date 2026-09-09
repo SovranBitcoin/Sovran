@@ -50,7 +50,7 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
 export function AmountFlowContent({ amountEntry, headerMode = 'native' }: AmountFlowContentProps) {
   useLifecycleLogger(headerMode === 'native' ? 'AmountFlowScreen' : 'NearPayInlineAmountFlow');
   const foreground = useThemeColor('foreground');
-  const background = useThemeColor('background');
+  const background = useThemeColor('surface');
 
   const { entry, error, actions, suggestions, mintUrl } = useScreenActions(
     'amountEntry',

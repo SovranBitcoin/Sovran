@@ -91,6 +91,14 @@ jest.mock('heroui-native', () => {
   return { PressableFeedback };
 });
 
+jest.mock('@/shared/hooks/useVisualActivityEffect', () => ({
+  useVisualActivityEffect: (effect: () => void | (() => void), enabled = true) => {
+    jest.requireActual<typeof import('react')>('react').useEffect(() => {
+      if (enabled) return effect();
+    }, [effect, enabled]);
+  },
+}));
+
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (tokens: string | readonly string[]) => {
     const colors: Record<string, string> = {
@@ -162,7 +170,8 @@ jest.mock('react-native-reanimated', () => {
     runOnJS: <T extends (...args: never[]) => unknown>(fn: T) => fn,
     useAnimatedProps: <T extends object>(factory: () => T) => factory(),
     useAnimatedStyle: <T extends object>(factory: () => T) => factory(),
-    useFrameCallback: jest.fn(),
+    useFrameCallback: () =>
+      ReactActual.useMemo(() => ({ setActive: jest.fn(), isActive: false, callbackId: 1 }), []),
     useReducedMotion: jest.fn(() => false),
     useSharedValue: <T,>(value: T) => {
       const ref = ReactActual.useRef<{

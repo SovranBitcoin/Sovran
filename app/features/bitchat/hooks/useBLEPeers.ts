@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
   getBLEPeers,
   getBLEState,
@@ -9,6 +9,7 @@ import {
   startBLE,
   type BLEPeer,
 } from 'bitchat-module';
+import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
 import { useMints } from '@cashu/coco-react';
 import { areBLEPeerSnapshotsEquivalent } from '@/features/bitchat/lib/blePeerSnapshots';
 import { useBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
@@ -99,75 +100,79 @@ export function useBLEPeers(): UseBLEPeersResult {
     setPeersIfChanged(getBLEPeers());
   }, [setPeersIfChanged]);
 
-  useEffect(() => {
-    refresh();
-    const sub = addBLEPeerListener(() => {
+  useVisualActivityEffect(
+    useCallback(() => {
       refresh();
-    });
-    // A peer handing us its Nostr identity (favoriting us back with a creq
-    // suffix) flips it bearer → lockable; refresh immediately so the radar
-    // doesn't wait up to 5 s for the next poll. iOS emits this; Android relies
-    // on the poll. peerKey includes nostrPubkeyHex, so the snapshot updates.
-    const identitySub = addBLEPeerIdentityListener(() => {
-      refresh();
-    });
-    const interval = setInterval(refresh, 5_000);
-    return () => {
-      sub.remove();
-      identitySub.remove();
-      clearInterval(interval);
-    };
-  }, [refresh]);
-
-  useEffect(() => {
-    if (!nickname || !profileScope || !identityMaterial) {
-      // Without this line a missing input is indistinguishable from "started
-      // but alone" — the #1 cause of a forever-"Scanning nearby" radar.
-      bitchatLog.warn('bitchat.peers.ble_start_blocked', {
-        hasNickname: !!nickname,
-        hasProfileScope: !!profileScope,
-        hasIdentityMaterial: !!identityMaterial,
+      const sub = addBLEPeerListener(() => {
+        refresh();
       });
-      return;
-    }
+      // A peer handing us its Nostr identity (favoriting us back with a creq
+      // suffix) flips it bearer → lockable; refresh immediately so the radar
+      // doesn't wait up to 5 s for the next poll. iOS emits this; Android relies
+      // on the poll. peerKey includes nostrPubkeyHex, so the snapshot updates.
+      const identitySub = addBLEPeerIdentityListener(() => {
+        refresh();
+      });
+      const interval = setInterval(refresh, 5_000);
+      return () => {
+        sub.remove();
+        identitySub.remove();
+        clearInterval(interval);
+      };
+    }, [refresh])
+  );
 
-    let cancelled = false;
-    const attempt = () => {
-      startBLE(nickname, profileScope, identityMaterial, creq)
-        .then(() => {
-          if (cancelled) return;
-          bitchatLog.info('bitchat.peers.ble_start_ok', {
-            bleState: getBLEState(),
-            initialPeerCount: getBLEPeers().length,
-            // The vendored bitchat commit this native build compiled from. Verify
-            // it matches the intended pin — a stale build (e.g. one predating the
-            // fragment fix) shows the wrong SHA here.
-            vendorVersion: bitchatVendorVersion(),
-          });
-          refresh();
-        })
-        .catch((err) => {
-          bitchatLog.error('bitchat.peers.ble_start_failed', {
-            bleState: getBLEState(),
-            error: err instanceof Error ? err.message : String(err),
-          });
+  useVisualActivityEffect(
+    useCallback(() => {
+      if (!nickname || !profileScope || !identityMaterial) {
+        // Without this line a missing input is indistinguishable from "started
+        // but alone" — the #1 cause of a forever-"Scanning nearby" radar.
+        bitchatLog.warn('bitchat.peers.ble_start_blocked', {
+          hasNickname: !!nickname,
+          hasProfileScope: !!profileScope,
+          hasIdentityMaterial: !!identityMaterial,
         });
-    };
-    attempt();
-    // startBLE rejects while Bluetooth is unauthorized or powered off
-    // (Android). Retry when the adapter reports ready — startBLE is
-    // idempotent natively (same scope + identity → no-op), so re-attempts
-    // after a permission grant or radio toggle are safe on both platforms.
-    const stateSub = addBLEStateListener((event) => {
-      bitchatLog.info('bitchat.peers.ble_state_changed', { state: event.state });
-      if (event.state === 'poweredOn') attempt();
-    });
+        return;
+      }
 
-    return () => {
-      cancelled = true;
-      stateSub.remove();
-    };
-  }, [identityMaterial, nickname, profileScope, creq, refresh]);
+      let cancelled = false;
+      const attempt = () => {
+        startBLE(nickname, profileScope, identityMaterial, creq)
+          .then(() => {
+            if (cancelled) return;
+            bitchatLog.info('bitchat.peers.ble_start_ok', {
+              bleState: getBLEState(),
+              initialPeerCount: getBLEPeers().length,
+              // The vendored bitchat commit this native build compiled from. Verify
+              // it matches the intended pin — a stale build (e.g. one predating the
+              // fragment fix) shows the wrong SHA here.
+              vendorVersion: bitchatVendorVersion(),
+            });
+            refresh();
+          })
+          .catch((err) => {
+            bitchatLog.error('bitchat.peers.ble_start_failed', {
+              bleState: getBLEState(),
+              error: err instanceof Error ? err.message : String(err),
+            });
+          });
+      };
+      attempt();
+      // startBLE rejects while Bluetooth is unauthorized or powered off
+      // (Android). Retry when the adapter reports ready — startBLE is
+      // idempotent natively (same scope + identity → no-op), so re-attempts
+      // after a permission grant or radio toggle are safe on both platforms.
+      const stateSub = addBLEStateListener((event) => {
+        bitchatLog.info('bitchat.peers.ble_state_changed', { state: event.state });
+        if (event.state === 'poweredOn') attempt();
+      });
+
+      return () => {
+        cancelled = true;
+        stateSub.remove();
+      };
+    }, [identityMaterial, nickname, profileScope, creq, refresh])
+  );
 
   const connectedCount = useMemo(() => peers.filter((p) => p.isConnected).length, [peers]);
 

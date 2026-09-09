@@ -52,7 +52,6 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { feedLog, Log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 import { useOwnContentStore } from '@/shared/stores/profile/ownContentStore';
 import { actionMenuPopup } from '@/shared/lib/popup';
@@ -285,7 +284,6 @@ export function NotificationsScreen() {
   // nothing new — more reliable than the server's (conservative) hasNextPage,
   // which under-reports once grouping collapses a page below the page size.
   const seenKeysRef = useRef<Set<string>>(new Set());
-  const tabBarPadding = useTabBarBottomPadding();
   const [foreground, surface, separator, muted, surfaceTertiary] = useThemeColor([
     'foreground',
     'surface',
@@ -850,6 +848,7 @@ export function NotificationsScreen() {
           <MintChangesList />
         ) : (
           <List
+            screen
             data={notificationItems}
             keyExtractor={(item) => item.id}
             // Heterogeneous rows (welcome/group/single) — without this
@@ -859,7 +858,6 @@ export function NotificationsScreen() {
             getItemType={notificationItemType}
             contentContainerStyle={[
               notificationListStyles.listContent,
-              { paddingBottom: tabBarPadding },
               notificationItems.length === 0 && notificationListStyles.emptyListContent,
             ]}
             contentInsetAdjustmentBehavior="never"

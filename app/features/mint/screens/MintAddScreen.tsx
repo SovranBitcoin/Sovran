@@ -687,6 +687,7 @@ export function MintAddScreen() {
   // nothing. Two List instances coexist only for the ~220ms fade.
   const renderResultList = (data: SearchableMint[]) => (
     <List
+      screen
       data={data}
       renderItem={renderItem}
       keyExtractor={keyExtractor}
@@ -700,7 +701,6 @@ export function MintAddScreen() {
       maintainVisibleContentPosition={{ disabled: true }}
       contentInsetAdjustmentBehavior="never"
       style={{ flex: 1, height: 0 }}
-      contentContainerClassName="pb-30"
       ListHeaderComponent={listHeader}
       // Skeleton data is non-empty, so the empty state can't flash mid-load.
       ListEmptyComponent={isInitialLoading ? undefined : emptyComponent}

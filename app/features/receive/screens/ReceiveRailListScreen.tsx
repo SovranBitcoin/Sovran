@@ -1,3 +1,4 @@
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 /**
  * "View all" screen for a receive rail — payment requests, onchain addresses,
  * or bolt12 offers. A real `(receive-flow)` route (not a bottom sheet) so that
@@ -13,7 +14,6 @@
 
 import React, { memo, useCallback, useEffect, useState } from 'react';
 
-import { ScrollView } from 'react-native';
 import { Stack } from 'expo-router';
 import { ListGroup, PressableFeedback, Separator } from 'heroui-native';
 import { setStringAsync } from 'expo-clipboard';
@@ -209,7 +209,7 @@ export function ReceiveRailListScreen() {
   const manager = useColadaManager();
   const insets = useSafeAreaInsets();
   const [background, foreground, accent, green] = useThemeColor([
-    'background',
+    'surface',
     'foreground',
     'accent',
     'success',
@@ -273,13 +273,13 @@ export function ReceiveRailListScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen options={{ title: RAIL_TITLE[rail] }} />
-      <ScrollView
+      <ScreenScrollView
+        bottomSpacing={32}
         // Android form-sheet: top-edge drag dismisses, mid-scroll scrolls.
         nestedScrollEnabled
         contentContainerStyle={{
           paddingHorizontal: 8,
           paddingTop: topPad,
-          paddingBottom: insets.bottom + 32,
         }}
         showsVerticalScrollIndicator={false}>
         {state.loading ? (
@@ -312,7 +312,7 @@ export function ReceiveRailListScreen() {
             </ListGroup>
           </GradientCard>
         )}
-      </ScrollView>
+      </ScreenScrollView>
     </View>
   );
 }

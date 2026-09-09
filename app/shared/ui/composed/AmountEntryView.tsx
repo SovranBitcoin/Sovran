@@ -435,7 +435,7 @@ export function AmountEntryView({
   ]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: background }}>
+    <View className="bg-surface flex-1">
       <View style={{ flex: 1, paddingTop: topPadding, paddingHorizontal: 16 }}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <VStack align="center" gap={centerSpacing}>

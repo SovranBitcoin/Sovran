@@ -22,7 +22,8 @@ const OfflineContext = createContext<OfflineContextValue>({ isOffline: false });
 
 const BORDER_WIDTH = 2;
 const BANNER_HEIGHT = 14;
-const CONNECTIVITY_POLL_MS = 3000;
+const CONNECTIVITY_POLL_MS = 60_000;
+const OFFLINE_RETRY_MS = 3000;
 // Offline hysteresis: going offline must be CONFIRMED (consecutive failed
 // evaluations spanning a minimum window) while coming back online is instant.
 // Android's network listener fires per transport change (Wi-Fi<->cell, VPN,
@@ -90,7 +91,8 @@ function startConnectivityEngine(ctx: {
   let active = AppState.currentState !== 'background' && AppState.currentState !== 'inactive';
   let checking = false;
   let refreshOnResume = false;
-  let interval: ReturnType<typeof setInterval> | null = null;
+  let interval: ReturnType<typeof setTimeout> | null = null;
+  let offlineRounds = 0;
   let networkSubscription: { remove: () => void } | null = null;
   let lastOffline: boolean | null = null;
   let lastCheckId = 0;
@@ -134,6 +136,7 @@ function startConnectivityEngine(ctx: {
         lastOffline = nowOffline;
       }
       if (!nowOffline) {
+        offlineRounds = 0;
         if (offlineSince !== null) {
           log.debug('provider.offline.pending_cancelled', { evals: offlineEvals });
         }
@@ -151,6 +154,9 @@ function startConnectivityEngine(ctx: {
       const confirmed =
         offlineEvals >= OFFLINE_CONFIRM_CHECKS && Date.now() - offlineSince >= OFFLINE_CONFIRM_MS;
       if (confirmed) {
+        offlineRounds += 1;
+        if (recheckTimer) clearTimeout(recheckTimer);
+        recheckTimer = null;
         commit(true, reachabilityLog);
         return;
       }
@@ -173,7 +179,7 @@ function startConnectivityEngine(ctx: {
   const runConnectivityCheck = async () => {
     if (!mounted || !active || checking) return;
     // Coalesce listener bursts and overlapping poll/listener triggers — the
-    // pending re-check (1200ms) and the poll (3000ms) clear this naturally.
+    // pending re-check (1200ms) and adaptive poll clear this naturally.
     if (Date.now() - lastEvalAt < MIN_EVAL_INTERVAL_MS) return;
     lastEvalAt = Date.now();
     checking = true;
@@ -192,6 +198,13 @@ function startConnectivityEngine(ctx: {
       if (mounted && active && refreshOnResume) {
         lastEvalAt = 0;
         void runConnectivityCheck();
+      } else if (mounted && active) {
+        if (interval) clearTimeout(interval);
+        const delay =
+          lastOffline === true
+            ? Math.min(CONNECTIVITY_POLL_MS, OFFLINE_RETRY_MS * 2 ** Math.min(offlineRounds - 1, 5))
+            : CONNECTIVITY_POLL_MS;
+        interval = setTimeout(runConnectivityCheck, Math.max(OFFLINE_RETRY_MS, delay));
       }
     }
   };
@@ -204,7 +217,6 @@ function startConnectivityEngine(ctx: {
   networkSubscription = Network.addNetworkStateListener(() => {
     void runConnectivityCheck();
   });
-  if (active) interval = setInterval(runConnectivityCheck, CONNECTIVITY_POLL_MS);
 
   const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
     const nextActive = nextAppState === 'active';
@@ -217,15 +229,15 @@ function startConnectivityEngine(ctx: {
       clearTimeout(recheckTimer);
       recheckTimer = null;
     }
-    if (interval) clearInterval(interval);
+    if (interval) clearTimeout(interval);
     interval = null;
+    offlineRounds = 0;
     if (!active) return;
     log.debug('provider.offline.app_foregrounded', { reason: 'app_state_active' });
     // Revalidate after foreground even if an earlier probe is still settling.
     refreshOnResume = true;
     lastEvalAt = 0;
     void runConnectivityCheck();
-    interval = setInterval(runConnectivityCheck, CONNECTIVITY_POLL_MS);
   });
 
   const onWebOnline = () => {
@@ -246,7 +258,7 @@ function startConnectivityEngine(ctx: {
   return () => {
     mounted = false;
     if (interval) {
-      clearInterval(interval);
+      clearTimeout(interval);
     }
     networkSubscription?.remove();
     appStateSubscription.remove();

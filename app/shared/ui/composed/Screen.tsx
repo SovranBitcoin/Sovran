@@ -26,7 +26,11 @@ import React, {
 import { Platform, View, type ScrollView } from 'react-native';
 import type { SharedValue } from 'react-native-reanimated';
 import { useNavigation } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  useScreenInsets,
+  ConsumedBottomInsetContext,
+  ScreenBottomPaddingContext,
+} from '@/shared/hooks/useScreenInsets';
 import { HeaderHeightContext } from 'expo-router/react-navigation';
 import { SheetHeaderHeightContext } from '@/shared/ui/composed/AndroidSheetRoot';
 import type { NativeStackNavigationOptions } from 'expo-router';
@@ -63,7 +67,7 @@ interface ScreenProps {
   contentPadding?: number;
   headerGradient?: boolean;
   headerGradientHeight?: number;
-  /** Override the theme background. Defaults to `useThemeColor('background')`. */
+  /** Override the theme background. Defaults to `useThemeColor('surface')`. */
   bgColor?: string;
   /**
    * Force a specific bottom padding. Leave undefined to auto-compute from the
@@ -85,9 +89,9 @@ interface ScreenProps {
   /**
    * Apply safe-area top/bottom padding to the content frame. Only meaningful
    * with `scroll="custom"` or `scroll="none"` — when a ScrollView is used it
-   * handles the insets itself via `contentInsetAdjustmentBehavior="automatic"`.
+   * owns its insets (native automatic on iOS auto scroll; manual otherwise).
    *
-   * Top padding is `insets.top + headerHeight` so transparent stack headers
+   * Top padding uses `headerHeight` (or `insets.top` without a header) so transparent stack headers
    * never clip content. Outside a navigator, `headerHeight` is 0 and this
    * collapses to the status-bar inset (e.g. pre-navigation onboarding).
    */
@@ -95,12 +99,9 @@ interface ScreenProps {
 }
 
 const FOOTER_CLEARANCE = 16;
-// The pre-refactor `ModalLayoutWrapper` default was 120 — every screen that
-// relied on the default was built with this much bottom clearance above the
-// BottomButtons bar. Keep it as a floor so auto-measured padding never sits
-// closer to the buttons than legacy screens expected. Callers can still
-// override with an explicit `bottomPadding` prop.
-const FOOTER_MIN_PADDING = 120;
+// Reserve space until the first footer measurement arrives. Subsequent layout
+// follows the actual footer, including text wrapping and accessibility sizes.
+const INITIAL_FOOTER_PADDING = 120;
 
 export function Screen({
   name,
@@ -149,7 +150,7 @@ export function Screen({
   // screen testID appears right away; only `children`/`footer` wait one tick.
   const contentReady = useDeferredMount(deferContent);
 
-  const insets = useSafeAreaInsets();
+  const insets = useScreenInsets();
   // Match ModalLayoutWrapper: read header height directly so this is safe to
   // render outside a Stack navigator (returns 0 in that case). Inside an
   // Android formSheet, prefer the sheet's KNOWN fixed header height — the
@@ -158,13 +159,13 @@ export function Screen({
   const sheetHeaderHeight = useContext(SheetHeaderHeightContext);
   const navigatorHeaderHeight = useContext(HeaderHeightContext) ?? 0;
   const headerHeight = sheetHeaderHeight ?? navigatorHeaderHeight;
-  const themeBackground = useThemeColor('background');
+  const themeBackground = useThemeColor('surface');
   const resolvedBgColor = bgColor ?? themeBackground;
 
   // Inside an Android formSheet, declare the page's actual background to the
   // sheet header: FlowSheetHeader reads headerStyle.backgroundColor for its
-  // scrim color. Without this, screens that override bgColor (mint list/add,
-  // notifications) get a scrim fading from the darker theme background — a
+  // scrim color. Without this, screens that override bgColor get a scrim
+  // fading from the default page surface — a
   // visibly wrong-colored slab across the top of the page.
   const navigation = useNavigation();
   useLayoutEffect(() => {
@@ -172,11 +173,12 @@ export function Screen({
     navigation.setOptions({ headerStyle: { backgroundColor: bgColor } });
   }, [navigation, sheetHeaderHeight, bgColor]);
 
-  const resolvedBottomPadding =
-    bottomPadding ??
-    (footer
-      ? Math.max(measuredFooterHeight + FOOTER_CLEARANCE, FOOTER_MIN_PADDING)
-      : FOOTER_CLEARANCE);
+  const footerClearance = footer
+    ? measuredFooterHeight > 0
+      ? measuredFooterHeight + FOOTER_CLEARANCE
+      : INITIAL_FOOTER_PADDING
+    : 0;
+  const resolvedBottomPadding = bottomPadding ?? (footer ? footerClearance : FOOTER_CLEARANCE);
 
   const useCustomScrollView = scroll === 'custom' || scroll === 'none';
 
@@ -192,9 +194,16 @@ export function Screen({
 
   const framedChildren =
     safeArea && useCustomScrollView ? (
-      <View style={{ flex: 1, paddingTop: safeAreaTopPadding, paddingBottom: insets.bottom }}>
-        {children}
-      </View>
+      <ConsumedBottomInsetContext.Provider value={!footer}>
+        <View
+          style={{
+            flex: 1,
+            paddingTop: safeAreaTopPadding,
+            paddingBottom: footer ? 0 : insets.bottom,
+          }}>
+          {children}
+        </View>
+      </ConsumedBottomInsetContext.Provider>
     ) : (
       children
     );
@@ -203,25 +212,28 @@ export function Screen({
     <Log name={name} style={{ flex: 1 }}>
       <ScreenBackgroundContext.Provider value={resolvedBgColor}>
         <ScreenFooterContext.Provider value={footerContextValue}>
-          <ModalLayoutWrapper
-            scrollViewRef={scrollViewRef}
-            scrollContentRef={scrollContentRef}
-            contentPadding={contentPadding}
-            headerGradient={headerGradient}
-            headerGradientHeight={headerGradientHeight}
-            stickyContent={stickyContent}
-            stickyContentHeight={stickyContentHeight}
-            useAnimatedScroll={scroll === 'animated'}
-            scrollY={scrollY}
-            useCustomScrollView={useCustomScrollView}
-            bottomPadding={resolvedBottomPadding}
-            disableHeaderSpacer={disableHeaderSpacer}
-            onHeaderHeightChange={onHeaderHeightChange}
-            scrollIndicatorInsets={scrollIndicatorInsets}
-            bgColor={bgColor}
-            bottomContent={contentReady ? footer : undefined}>
-            {contentReady ? framedChildren : null}
-          </ModalLayoutWrapper>
+          <ScreenBottomPaddingContext.Provider value={footer ? resolvedBottomPadding : 0}>
+            <ModalLayoutWrapper
+              scrollViewRef={scrollViewRef}
+              scrollContentRef={scrollContentRef}
+              contentPadding={contentPadding}
+              headerGradient={headerGradient}
+              headerGradientHeight={headerGradientHeight}
+              stickyContent={stickyContent}
+              stickyContentHeight={stickyContentHeight}
+              useAnimatedScroll={scroll === 'animated'}
+              scrollY={scrollY}
+              useCustomScrollView={useCustomScrollView}
+              bottomPadding={resolvedBottomPadding}
+              bottomPaddingIncludesInset={!!footer}
+              disableHeaderSpacer={disableHeaderSpacer}
+              onHeaderHeightChange={onHeaderHeightChange}
+              scrollIndicatorInsets={scrollIndicatorInsets}
+              bgColor={bgColor}
+              bottomContent={contentReady ? footer : undefined}>
+              {contentReady ? framedChildren : null}
+            </ModalLayoutWrapper>
+          </ScreenBottomPaddingContext.Provider>
         </ScreenFooterContext.Provider>
       </ScreenBackgroundContext.Provider>
     </Log>

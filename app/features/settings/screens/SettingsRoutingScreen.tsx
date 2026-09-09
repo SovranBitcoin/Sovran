@@ -1,5 +1,6 @@
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { useCallback } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import {
   useSettingsStore,
   type MiddlemanRoutingSettings,
@@ -46,10 +47,7 @@ export function SettingsRoutingScreen() {
 
   return (
     <ScreenWrapper name="SettingsRoutingScreen" scroll="custom" safeArea>
-      <ScrollView
-        className="px-4"
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerClassName="pb-8">
+      <ScreenScrollView className="px-4" bottomSpacing={32}>
         <Section title="Rebalancing">
           <VStack gap={12}>
             <Card variant="secondary">
@@ -211,7 +209,7 @@ export function SettingsRoutingScreen() {
             </Card>
           </VStack>
         </Section>
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenWrapper>
   );
 }

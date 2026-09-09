@@ -6,10 +6,11 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { StyleSheet, useWindowDimensions } from 'react-native';
+import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
+import { useScreenBottomPadding, useScreenInsets } from '@/shared/hooks/useScreenInsets';
 
 import { FlashList, type FlashListRef, type ViewToken } from '@shopify/flash-list';
 import { withAlpha } from '@/shared/lib/color';
@@ -212,6 +213,12 @@ export const Transactions = React.memo(
     onEndReached,
     ref,
   }: Props) => {
+    const manualBottomPadding = useScreenBottomPadding();
+    const { bottom } = useScreenInsets();
+    const bottomPadding = Math.max(
+      0,
+      manualBottomPadding - (!disableContentInsetAdjustment && Platform.OS === 'ios' ? bottom : 0)
+    );
     const [muted, foreground] = useThemeColor(['muted', 'foreground'] as const);
     const { height: screenHeight } = useWindowDimensions();
 
@@ -820,7 +827,7 @@ export const Transactions = React.memo(
               onViewableItemsChanged={handleViewableItemsChanged}
               viewabilityConfig={MONTH_VIEWABILITY_CONFIG}
               renderItem={renderSection}
-              contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 250 }}
+              contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPadding }}
             />
           </View>
           {!settled && (

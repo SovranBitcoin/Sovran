@@ -1,9 +1,9 @@
+import { WhitenoiseSetupBanner } from '@/features/whitenoise/components/WhitenoiseSetupBanner';
 import { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { List } from '@/shared/ui/composed/List';
 import Icon from 'assets/icons';
 
-import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintManagement } from '@/features/mint';
 import { useNip17RecentContacts } from '@/features/payments/hooks/useNip17RecentContacts';
@@ -102,6 +102,7 @@ function buildContactsListData(
 export const ContactsScreen = () => {
   useLifecycleLogger('ContactsScreen');
   const [activeTab, setActiveTab] = useState<TopTab>('contacts');
+  const [bannerClearance, setBannerClearance] = useState(0);
   const [activeFilter, setActiveFilter] = useState<ContactsFilter>('All');
   const [surface, separator, muted] = useThemeColor([
     'surface',
@@ -109,7 +110,6 @@ export const ContactsScreen = () => {
     'muted',
   ] as const);
   const { tiers: locationTiers } = useLocationTiers();
-  const tabBarPadding = useTabBarBottomPadding();
   const pullToAi = usePullToAiRefreshControl();
   const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled);
   const mockMode = useSettingsStore((state) => state.mockMode);
@@ -416,6 +416,8 @@ export const ContactsScreen = () => {
     }
     return (
       <List
+        screen
+        bottomSpacing={Math.max(16, bannerClearance)}
         data={currentListData}
         extraData={profilesMap}
         refreshControl={pullToAi.refreshControl}
@@ -426,11 +428,7 @@ export const ContactsScreen = () => {
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="always"
         ListEmptyComponent={renderEmpty}
-        contentContainerStyle={
-          currentListData.length === 0
-            ? [styles.emptyList, { paddingBottom: tabBarPadding }]
-            : { paddingBottom: tabBarPadding }
-        }
+        contentContainerStyle={currentListData.length === 0 ? styles.emptyList : undefined}
       />
     );
   };
@@ -438,6 +436,8 @@ export const ContactsScreen = () => {
   // Groups tab — the user's location tiers (provinces, countries, transports).
   const renderGroupsList = () => (
     <List
+      screen
+      bottomSpacing={Math.max(16, bannerClearance)}
       data={locationTiers}
       keyExtractor={(item) => item.key}
       refreshControl={pullToAi.refreshControl}
@@ -450,11 +450,7 @@ export const ContactsScreen = () => {
           <Text style={[styles.emptyText, { color: muted }]}>Getting your location...</Text>
         </View>
       }
-      contentContainerStyle={
-        locationTiers.length === 0
-          ? [styles.emptyList, { paddingBottom: tabBarPadding }]
-          : { paddingBottom: tabBarPadding }
-      }
+      contentContainerStyle={locationTiers.length === 0 ? styles.emptyList : undefined}
     />
   );
 
@@ -496,6 +492,7 @@ export const ContactsScreen = () => {
 
       <ScreenContainer>
         {activeTab === 'groups' ? renderGroupsList() : renderContactsList()}
+        <WhitenoiseSetupBanner onClearanceChange={setBannerClearance} />
       </ScreenContainer>
       <SearchOverlay recentContext="contacts" />
     </Log>

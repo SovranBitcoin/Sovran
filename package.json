@@ -51,6 +51,7 @@
     "expo-modules-jsi@56.0.12": "app/patches/expo-modules-jsi+56.0.12.patch",
     "react-native-screens@4.25.2": "app/patches/react-native-screens+4.25.2.patch",
     "expo-router@56.2.11": "app/patches/expo-router+56.2.11.patch",
-    "@gorhom/bottom-sheet@5.2.14": "app/patches/@gorhom+bottom-sheet+5.2.14.patch"
+    "@gorhom/bottom-sheet@5.2.14": "app/patches/@gorhom+bottom-sheet+5.2.14.patch",
+    "@cashu/coco-core@2.0.0": "app/patches/@cashu+coco-core+2.0.0.patch"
   }
 }

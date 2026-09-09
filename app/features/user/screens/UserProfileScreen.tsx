@@ -587,7 +587,7 @@ function BannerWithAvatar({
   const [foreground, surfaceSecondary, background] = useThemeColor([
     'foreground',
     'surface-secondary',
-    'background',
+    'surface',
   ] as const);
   const fadeAnim = useSharedValue(0);
   const avatarStyle = useAnimatedStyle(() => ({
@@ -998,7 +998,7 @@ async function toggleFollowContacts(ctx: {
 export function UserProfileScreen() {
   useLifecycleLogger('UserProfileScreen', nostrLog);
 
-  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
   const profileFlowGroup = useActiveProfileFlowGroup();
   const { ndk } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();

@@ -156,6 +156,7 @@ export default function NetworkSheet() {
       </HStack>
 
       <List
+        screen
         data={sortedPeers}
         keyExtractor={keyExtractor}
         renderItem={renderPeerItem}

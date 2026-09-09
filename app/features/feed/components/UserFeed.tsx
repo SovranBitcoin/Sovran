@@ -696,17 +696,18 @@ export function UserFeed({
     isLoading || feedItems.length === 0 ? (
       // Loading or empty: header-only mode (no rows to render).
       <List
+        screen
         data={[] as FeedRow[]}
         renderItem={() => null}
         ListHeaderComponent={feedHeader}
         style={styles.flexOne}
-        contentContainerStyle={USER_FEED_CONTENT_STYLE}
         showsVerticalScrollIndicator={false}
         onScroll={handleListScroll}
         scrollEventThrottle={16}
       />
     ) : (
       <List
+        screen
         data={feedRows}
         keyExtractor={getFeedRowKey}
         getItemType={getFeedRowItemType}
@@ -719,7 +720,6 @@ export function UserFeed({
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.4}
         style={styles.flexOne}
-        contentContainerStyle={USER_FEED_CONTENT_STYLE}
         showsVerticalScrollIndicator={false}
         onScroll={handleListScroll}
         scrollEventThrottle={16}
@@ -975,8 +975,6 @@ async function loadMoreUserItemsImpl(ctx: UserFeedLoadCtx): Promise<FeedItem[]> 
 // ============================================================================
 // Styles (UserFeed-specific only — shared styles live in nostr/shared.tsx)
 // ============================================================================
-
-const USER_FEED_CONTENT_STYLE = { paddingBottom: 120 };
 
 const styles = StyleSheet.create({
   flexOne: {

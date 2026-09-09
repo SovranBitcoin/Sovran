@@ -139,7 +139,7 @@ export const createFlowLayoutScreenOptions = (
  * sheet geometry, and stack policy stay local to this module.
  */
 export function AndroidSheetFlowStack({ children }: { children: ReactNode }) {
-  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
   const screenOptions = useMemo(
     () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
     [foreground, background]

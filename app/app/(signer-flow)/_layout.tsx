@@ -34,7 +34,7 @@ const SHARE_OPTIONS = { title: 'Share Remote Login' };
 const CONNECT_OPTIONS = { title: 'Connect App' };
 
 export default function SignerFlowLayout() {
-  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
   const screenOptions = useMemo(
     () => createFlowLayoutScreenOptions({ foreground, background }),
     [foreground, background]

@@ -20,7 +20,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useHeaderHeight } from 'expo-router/react-navigation';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useScreenBottomPadding } from '@/shared/hooks/useScreenInsets';
 import { useLocalSearchParams } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
@@ -349,8 +349,8 @@ export function SignerAppDetailScreen(): React.ReactElement {
   // the scroll view spans the full screen and the CONTENT is padded by the
   // header height instead of framing the whole screen below it.
   const headerHeight = useHeaderHeight();
-  const insets = useSafeAreaInsets();
-  const scrollContentStyle = { paddingTop: headerHeight, paddingBottom: 32 + insets.bottom };
+  const bottomPadding = useScreenBottomPadding(32);
+  const scrollContentStyle = { paddingTop: headerHeight, paddingBottom: bottomPadding };
   const indicatorInsets = { top: headerHeight };
 
   // ── Scroll-linked identity handoff (content ↔ header) ────────
@@ -682,6 +682,8 @@ export function SignerAppDetailScreen(): React.ReactElement {
   return (
     <Screen name="SignerAppDetailScreen" scroll="custom">
       <Animated.ScrollView
+        contentInsetAdjustmentBehavior="never"
+        nestedScrollEnabled
         style={SCROLL_H_PADDING}
         contentContainerStyle={scrollContentStyle}
         scrollIndicatorInsets={indicatorInsets}

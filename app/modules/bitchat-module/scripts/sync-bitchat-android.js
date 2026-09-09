@@ -29,7 +29,9 @@ const DEST_SRC = path.join(MODULE_ROOT, 'vendor-src', 'com', 'bitchat', 'android
 const DEST_ASSETS = path.join(MODULE_ROOT, 'vendor-assets');
 
 if (!fs.existsSync(VENDOR_SRC)) {
-  console.log(`[sync-bitchat-android] ${VENDOR_SRC} not present (submodule not checked out?), skipping.`);
+  console.log(
+    `[sync-bitchat-android] ${VENDOR_SRC} not present (submodule not checked out?), skipping.`
+  );
   process.exit(0);
 }
 
@@ -49,15 +51,7 @@ function readExistingVendorCommit(file, pattern) {
 // the subset still references (ui.NotificationManager, services.NicknameProvider,
 // services.MessageRouter, net.OkHttpProvider) are stubbed in
 // android/src/main/java/com/bitchat/android/ (same trick as iOS TorStub.swift).
-const INCLUDE_DIRS = [
-  'mesh',
-  'noise',
-  'protocol',
-  'model',
-  'sync',
-  'util',
-  'services/meshgraph',
-];
+const INCLUDE_DIRS = ['mesh', 'noise', 'protocol', 'model', 'sync', 'util', 'services/meshgraph'];
 const INCLUDE_FILES = [
   'crypto/EncryptionService.kt',
   'identity/SecureIdentityStateManager.kt',
@@ -101,6 +95,14 @@ const INCLUDE_ASSETS = ['nostr_relays.csv'];
 // cheap and uniform). A missed anchor means upstream changed shape: fail loudly.
 const PATCHES = [
   {
+    file: 'mesh/PowerManager.kt',
+    name: 'CHARGING_BALANCED_DISCOVERY',
+    anchor: /isCharging && !isAppInBackground -> PowerMode\.PERFORMANCE/,
+    replacement:
+      '// [sovran] Charging is not a request for continuous scanning.\n' +
+      '            isCharging && !isAppInBackground -> PowerMode.BALANCED',
+  },
+  {
     file: 'mesh/BluetoothMeshService.kt',
     name: 'ENCRYPTION_SERVICE_INTERNAL',
     anchor: /    private val encryptionService = EncryptionService\(context\)/,
@@ -112,8 +114,7 @@ const PATCHES = [
   {
     file: 'mesh/BluetoothPermissionManager.kt',
     name: 'ANDROID_12_BLE_PERMISSIONS_NO_LOCATION',
-    anchor:
-      /    fun hasBluetoothPermissions\(\): Boolean \{\n[\s\S]*?\n    \}\n\}/,
+    anchor: /    fun hasBluetoothPermissions\(\): Boolean \{\n[\s\S]*?\n    \}\n\}/,
     replacement:
       '    fun hasBluetoothPermissions(): Boolean {\n' +
       '        // [sovran] Android 12+ BLE is gated by the runtime Bluetooth\n' +
@@ -273,8 +274,7 @@ const PATCHES = [
   {
     file: 'protocol/BinaryProtocol.kt',
     name: 'BINARY_PROTOCOL_HEADER_SIZES',
-    anchor:
-      /    private const val HEADER_SIZE_V1 = 13\n    private const val HEADER_SIZE_V2 = 15/,
+    anchor: /    private const val HEADER_SIZE_V1 = 13\n    private const val HEADER_SIZE_V2 = 15/,
     replacement:
       '    // [sovran] The fixed header is version/type/ttl (3) + timestamp (8)\n' +
       '    // + flags (1) + payload length (2 for v1, 4 for v2). Upstream Android\n' +
@@ -331,7 +331,8 @@ const PATCHES = [
   {
     file: 'model/NoiseEncrypted.kt',
     name: 'EXTENDED_PM_ENCODE_GUARD',
-    anchor: /        if \(messageIDData\.size > 255 \|\| contentData\.size > 255\) \{\n            return null\n        \}/,
+    anchor:
+      /        if \(messageIDData\.size > 255 \|\| contentData\.size > 255\) \{\n            return null\n        \}/,
     replacement:
       '        // [sovran] extended content length: messageID 1-byte, content ≤64 KB.\n' +
       '        if (messageIDData.size > 255 || contentData.size > 0xFFFF) {\n' +
@@ -341,7 +342,8 @@ const PATCHES = [
   {
     file: 'model/NoiseEncrypted.kt',
     name: 'EXTENDED_PM_ENCODE_LEN',
-    anchor: /        result\.add\(TLVType\.CONTENT\.value\.toByte\(\)\)\n        result\.add\(contentData\.size\.toByte\(\)\)/,
+    anchor:
+      /        result\.add\(TLVType\.CONTENT\.value\.toByte\(\)\)\n        result\.add\(contentData\.size\.toByte\(\)\)/,
     replacement:
       '        result.add(TLVType.CONTENT.value.toByte())\n' +
       '        // [sovran] 0x00–0xFE literal; 0xFF sentinel + 2-byte big-endian length.\n' +
@@ -356,7 +358,8 @@ const PATCHES = [
   {
     file: 'model/NoiseEncrypted.kt',
     name: 'EXTENDED_PM_DECODE_LEN',
-    anchor: /                val length = data\[offset\]\.toUByte\(\)\.toInt\(\)\n                offset \+= 1/,
+    anchor:
+      /                val length = data\[offset\]\.toUByte\(\)\.toInt\(\)\n                offset \+= 1/,
     replacement:
       '                // [sovran] extended length read: 0xFF sentinel → 2-byte BE.\n' +
       '                var length = data[offset].toUByte().toInt()\n' +
@@ -407,7 +410,8 @@ function copyDir(relDir, patches) {
   for (const ent of fs.readdirSync(srcDir, { withFileTypes: true })) {
     const rel = path.join(relDir, ent.name);
     if (ent.isDirectory()) count += copyDir(rel, patches);
-    else if (ent.name.endsWith('.kt') || ent.name.endsWith('.java')) count += copyFile(rel, patches);
+    else if (ent.name.endsWith('.kt') || ent.name.endsWith('.java'))
+      count += copyFile(rel, patches);
   }
   return count;
 }
@@ -446,7 +450,9 @@ const NODE_MODULES_COPY = (() => {
   }
   return path.join(
     path.resolve(__dirname, '..', '..', '..'),
-    'node_modules', 'bitchat-module', 'android'
+    'node_modules',
+    'bitchat-module',
+    'android'
   );
 })();
 if (fs.existsSync(NODE_MODULES_COPY) && fs.realpathSync(NODE_MODULES_COPY) !== MODULE_ROOT) {
@@ -462,15 +468,21 @@ if (fs.existsSync(NODE_MODULES_COPY) && fs.realpathSync(NODE_MODULES_COPY) !== M
 // preserves the existing baked SHA when EAS_NO_VCS archives strip .git metadata.
 (function writeVendorVersion() {
   const out = path.join(
-    MODULE_ROOT, 'src', 'main', 'java', 'expo', 'modules', 'bitchat', 'BitchatVendorVersion.kt'
+    MODULE_ROOT,
+    'src',
+    'main',
+    'java',
+    'expo',
+    'modules',
+    'bitchat',
+    'BitchatVendorVersion.kt'
   );
   let commit = readExistingVendorCommit(out, /const val commit = "([^"]+)"/);
   try {
-    const gitCommit =
-      require('child_process')
-        .execSync('git rev-parse --short HEAD', { cwd: VENDOR, stdio: ['ignore', 'pipe', 'ignore'] })
-        .toString()
-        .trim();
+    const gitCommit = require('child_process')
+      .execSync('git rev-parse --short HEAD', { cwd: VENDOR, stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
     if (gitCommit) commit = gitCommit;
   } catch {
     /* git unavailable — keep the existing baked SHA */
@@ -488,4 +500,6 @@ if (fs.existsSync(NODE_MODULES_COPY) && fs.realpathSync(NODE_MODULES_COPY) !== M
   console.log(`[sync-bitchat-android] vendor version: ${commit}`);
 })();
 
-console.log(`[sync-bitchat-android] copied ${copied} source file(s) + ${INCLUDE_ASSETS.length} asset(s)`);
+console.log(
+  `[sync-bitchat-android] copied ${copied} source file(s) + ${INCLUDE_ASSETS.length} asset(s)`
+);

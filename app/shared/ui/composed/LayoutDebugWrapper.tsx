@@ -13,6 +13,8 @@ import { useHeaderHeight } from 'expo-router/react-navigation';
 
 import { AnimatedBackgroundView } from '@/shared/ui/composed/BackgroundView';
 import { Log } from '@/shared/lib/logger';
+import { useScreenInsets } from '@/shared/hooks/useScreenInsets';
+import { spacing } from '@/shared/styles/tokens';
 
 interface LayoutDebugWrapperProps {
   children: ReactNode;
@@ -50,6 +52,7 @@ export function LayoutDebugWrapper({
   onScrollEndDrag,
 }: LayoutDebugWrapperProps) {
   const headerHeight = useHeaderHeight();
+  const { bottom } = useScreenInsets();
 
   const flattenedContentStyle = StyleSheet.flatten(contentContainerStyle) ?? {};
   const baseTopPadding =
@@ -84,7 +87,10 @@ export function LayoutDebugWrapper({
           onScrollBeginDrag={onScrollBeginDrag}
           onScrollEndDrag={onScrollEndDrag}
           onContentSizeChange={onContentSizeChange}
-          contentContainerStyle={scrollContentStyle}
+          contentContainerStyle={[
+            scrollContentStyle,
+            { paddingBottom: spacing.lg + (Platform.OS === 'ios' ? 0 : bottom) },
+          ]}
           refreshControl={refreshControl}>
           {children}
         </ScrollView>

@@ -33,6 +33,9 @@ it('shares one sensor subscription and stops the native spring on the final idem
   };
   onMotion(measurement);
   expect(spring).toHaveBeenCalledTimes(1);
+  onMotion(measurement);
+  onMotion({ ...measurement, rotation: { ...measurement.rotation!, beta: 0.101 } });
+  expect(spring).toHaveBeenCalledTimes(1);
   releaseA();
   releaseA();
   expect(remove).not.toHaveBeenCalled();

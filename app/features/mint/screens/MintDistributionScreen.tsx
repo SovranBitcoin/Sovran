@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { LayoutAnimation, ScrollView } from 'react-native';
+import { LayoutAnimation } from 'react-native';
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
@@ -281,7 +282,7 @@ export function MintDistributionScreen() {
       onHeaderHeightChange={setTotalHeaderHeight}
       footer={bottomButtons}>
       <Stack.Screen options={withGlassHeaderItems({ title: 'Balance split' })} />
-      <ScrollView
+      <ScreenScrollView
         // The JS spacer below is the sole inset authority (same as the mint
         // list); `never` keeps iOS from re-adjusting it natively.
         contentInsetAdjustmentBehavior="never"
@@ -290,8 +291,7 @@ export function MintDistributionScreen() {
         nestedScrollEnabled
         onScroll={handleScroll}
         scrollEventThrottle={16}
-        style={{ flex: 1 }}
-        contentContainerClassName="pb-30">
+        style={{ flex: 1 }}>
         {headerSpacer}
 
         {mintsForCurrency.length === 0 ? (
@@ -333,7 +333,7 @@ export function MintDistributionScreen() {
             />
           </>
         )}
-      </ScrollView>
+      </ScreenScrollView>
     </Screen>
   );
 }

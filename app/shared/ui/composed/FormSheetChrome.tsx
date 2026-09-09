@@ -42,7 +42,7 @@ interface FormSheetChromeProps {
 }
 
 function AndroidFormSheetChrome({ title, children, scrimColor }: FormSheetChromeProps) {
-  const background = useThemeColor('background');
+  const background = useThemeColor('surface');
   return (
     // AndroidSheetRoot pins the sheet to exact full height — RNS single-detent
     // sheets otherwise size to content (variable top gap) — and publishes the

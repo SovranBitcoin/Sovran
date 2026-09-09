@@ -42,6 +42,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useScreenBackground } from '@/shared/ui/composed/ScreenFooterContext';
 import { useFadeRevealProbe } from '@/shared/lib/debug/fadeRevealProbe';
 import { SkeletonLoadingShimmer } from '@/shared/ui/composed/SkeletonExitShimmer';
 
@@ -71,7 +72,7 @@ interface SkeletonContentCrossfadeProps {
   exit?: ExitMode;
   /** The color of the surface the skeleton sits ON — the wave is painted in this
    *  color so it "erases" the skeleton as it sweeps (disappear/reappear), rather
-   *  than reading as a stripe on top. Defaults to the screen `background`; pass
+   *  than reading as a stripe on top. Defaults to the resolved screen background; pass
    *  the container's color when the skeleton is on a card/surface (e.g. a
    *  `surface-secondary` Card). This is the only thing that should set the wave
    *  color — never a brand/accent tint. */
@@ -103,10 +104,11 @@ export function SkeletonContentCrossfade({
   const reducedMotion = useReducedMotion();
   // The wave is painted in the color of the surface the skeleton sits on, so the
   // band "erases" the skeleton as it sweeps (disappear/reappear) rather than
-  // reading as a brighter stripe on top. Defaults to the screen background;
+  // reading as a brighter stripe on top. Defaults to the resolved screen background;
   // callers on a card/surface pass that surface's color.
-  const screenBackground = useThemeColor('background');
-  const waveColor = surfaceColor ?? screenBackground;
+  const screenBackground = useThemeColor('surface');
+  const pageBackground = useScreenBackground();
+  const waveColor = surfaceColor ?? pageBackground ?? screenBackground;
   const animatedExit = exit === 'fade' && !reducedMotion;
   const showWave = wave === 'region' && !reducedMotion;
 
