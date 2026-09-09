@@ -41,7 +41,7 @@ type TransactionSource = ScanMethod | DistributionSource;
  * Icon name for each source value. Every value here MUST be present in the
  * registry at `assets/icons/index.tsx` — adding a brand-new icon also
  * requires running `node scripts/regenerate-icons.js` to refresh
- * `.monicon/icons.js`. The values below are all icons that were already in
+ * `assets/icons/generated.json`. The values below are all icons that were already in
  * the registry, so no regeneration is needed.
  *
  * Adding a new source means: extend the union types in `scanHistoryStore.ts`

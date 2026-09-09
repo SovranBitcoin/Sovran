@@ -1,6 +1,6 @@
-diff --git a/node_modules/heroui-native/lib/module/helpers/internal/components/bottom-sheet-content-container.js b/node_modules/heroui-native/lib/module/helpers/internal/components/bottom-sheet-content-container.js
---- a/node_modules/heroui-native/lib/module/helpers/internal/components/bottom-sheet-content-container.js
-+++ b/node_modules/heroui-native/lib/module/helpers/internal/components/bottom-sheet-content-container.js
+diff --git a/lib/module/helpers/internal/components/bottom-sheet-content-container.js b/lib/module/helpers/internal/components/bottom-sheet-content-container.js
+--- a/lib/module/helpers/internal/components/bottom-sheet-content-container.js
++++ b/lib/module/helpers/internal/components/bottom-sheet-content-container.js
 @@ -1,7 +1,7 @@
  "use strict";
  
@@ -68,9 +68,9 @@ diff --git a/node_modules/heroui-native/lib/module/helpers/internal/components/b
      children: children
    });
  }
-diff --git a/node_modules/heroui-native/src/helpers/internal/components/bottom-sheet-content-container.tsx b/node_modules/heroui-native/src/helpers/internal/components/bottom-sheet-content-container.tsx
---- a/node_modules/heroui-native/src/helpers/internal/components/bottom-sheet-content-container.tsx
-+++ b/node_modules/heroui-native/src/helpers/internal/components/bottom-sheet-content-container.tsx
+diff --git a/src/helpers/internal/components/bottom-sheet-content-container.tsx b/src/helpers/internal/components/bottom-sheet-content-container.tsx
+--- a/src/helpers/internal/components/bottom-sheet-content-container.tsx
++++ b/src/helpers/internal/components/bottom-sheet-content-container.tsx
 @@ -1,5 +1,5 @@
  import { useEffect, useRef } from 'react';
 -import { BackHandler } from 'react-native';
@@ -142,9 +142,9 @@ diff --git a/node_modules/heroui-native/src/helpers/internal/components/bottom-s
 +    </Container>
    );
  }
-diff --git a/node_modules/heroui-native/lib/module/components/toast/toast.js b/node_modules/heroui-native/lib/module/components/toast/toast.js
---- a/node_modules/heroui-native/lib/module/components/toast/toast.js
-+++ b/node_modules/heroui-native/lib/module/components/toast/toast.js
+diff --git a/lib/module/components/toast/toast.js b/lib/module/components/toast/toast.js
+--- a/lib/module/components/toast/toast.js
++++ b/lib/module/components/toast/toast.js
 @@ -119,7 +119,14 @@ const ToastRoot = /*#__PURE__*/forwardRef((props, ref) => {
            }), /*#__PURE__*/_jsx(AnimatedToastRoot, {
              pointerEvents: "none",
@@ -161,9 +161,9 @@ diff --git a/node_modules/heroui-native/lib/module/components/toast/toast.js b/n
              onLayout: event => {
                const measuredHeight = event.nativeEvent.layout.height;
                heights.modify(value => {
-diff --git a/node_modules/heroui-native/src/components/toast/toast.tsx b/node_modules/heroui-native/src/components/toast/toast.tsx
---- a/node_modules/heroui-native/src/components/toast/toast.tsx
-+++ b/node_modules/heroui-native/src/components/toast/toast.tsx
+diff --git a/src/components/toast/toast.tsx b/src/components/toast/toast.tsx
+--- a/src/components/toast/toast.tsx
++++ b/src/components/toast/toast.tsx
 @@ -153,7 +153,11 @@ const ToastRoot = forwardRef<ViewRef, ToastRootProps>((props, ref) => {
              <AnimatedToastRoot
                pointerEvents="none"

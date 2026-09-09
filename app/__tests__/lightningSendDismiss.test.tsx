@@ -16,20 +16,9 @@ const mockUseScreenActions = jest.fn();
 // useEntityCache -> buildNostrDataLayer -> nostrTierConfig -> outbox/defaults),
 // and the package ships ESM only, which this jest resolver cannot load. Mocked
 // here rather than via moduleNameMapper: mapping it globally drags
-// @monicon/native into the node project and breaks avatarFallback instead.
+// unrelated native rendering dependencies into the node project.
 jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ normalizeRelayUrl: (url: string) => url }), {
   virtual: true,
-});
-
-// The same transitive reach pulls Avatar -> assets/icons -> @monicon/native,
-// which throws on import outside the RN runtime. Same stub the design-system
-// snapshot suite uses.
-jest.mock('@monicon/native', () => {
-  const ReactActual = jest.requireActual<typeof import('react')>('react');
-  return {
-    Monicon: ({ name }: { name: string }) =>
-      ReactActual.createElement('monicon', { testID: `monicon-${name}` }),
-  };
 });
 
 jest.mock('expo-router', () => ({ Stack: { Screen: () => null } }));

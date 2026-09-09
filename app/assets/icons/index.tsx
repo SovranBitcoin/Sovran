@@ -1,8 +1,9 @@
-import Svg, { Circle, Defs, Path, Stop, LinearGradient } from 'react-native-svg';
+import Svg, { Circle, Defs, Path, Stop, LinearGradient, SvgXml } from 'react-native-svg';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
-import { Monicon } from '@monicon/native';
+import type { StyleProp, ViewStyle } from 'react-native';
+import generatedIcons from './generated.json';
 
 import { View } from '@/shared/ui/primitives/View/View';
 
@@ -10,16 +11,30 @@ type IconProps = {
   name: string;
   color?: string;
   size?: number;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
   className?: string;
+};
+
+const iconData: Record<string, { svg: string; width: number; height: number }> = generatedIcons;
+const missingIcon = {
+  svg: '<svg width="32" height="32" viewBox="0 0 24 24" > <path fill="currentColor" d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10s-4.477 10-10 10m0-2a8 8 0 1 0 0-16a8 8 0 0 0 0 16m-1-5h2v2h-2zm2-1.645V14h-2v-1.5a1 1 0 0 1 1-1a1.5 1.5 0 1 0-1.471-1.794l-1.962-.393A3.501 3.501 0 1 1 13 13.355" /> </svg>',
+  width: 32,
+  height: 32,
 };
 
 function Icon({ name, color, size = 24, style = {}, className }: IconProps) {
   const foreground = useThemeColor('foreground');
+  const icon = Object.hasOwn(iconData, name) ? iconData[name] : missingIcon;
+  const height = size || icon.height;
 
   return (
     <View style={style} className={className}>
-      <Monicon name={name} size={size} color={color || foreground} />
+      <SvgXml
+        xml={icon.svg}
+        width={(height * icon.width) / icon.height}
+        height={height}
+        color={color || foreground}
+      />
     </View>
   );
 }
@@ -27,13 +42,12 @@ function Icon({ name, color, size = 24, style = {}, className }: IconProps) {
 export default Icon;
 
 // Icon registry. Read at build time by `scripts/regenerate-icons.js`, which
-// parses this file's AST for the `icons` array and bakes .monicon/icons.js —
+// parses this file's AST for the `icons` array and bakes generated.json —
 // so this export has no import site and knip cannot see the consumer.
 export const icons: string[] = [
-  // Your existing icons array...
   // Currency flag icons used by MintCurrencyTabs via a template literal —
-  // the monicon scanner can't follow the dynamic name, so list them here
-  // so regeneration of .monicon/icons.js keeps them.
+  // the icon scanner can't follow the dynamic name, so list them here
+  // so regeneration of generated.json keeps them.
   'circle-flags:us',
   'circle-flags:eu',
   'circle-flags:gb',

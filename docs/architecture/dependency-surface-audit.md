@@ -1,5 +1,16 @@
 # Dependency surface audit
 
+**September 9, 2026 follow-up:** `@monicon/native` and `patch-package` have
+also been removed. `app/assets/icons/generated.json` now feeds the existing
+`react-native-svg` renderer directly; Bun applies the five exact-version patches
+from root `patchedDependencies`. Across all workspaces this follow-up removes
+79 distinct resolved package versions (1,825 → 1,746), with no new versions.
+All 212 glyph records and all 27 patched files were verified against the
+previous implementation. Bun can accept mismatched removed-line text in a
+patch, so successful installation alone does not establish patch correctness;
+review exact target versions and resulting files whenever changing patches.
+The dated audit below records the earlier dependency graph and decisions.
+
 This is a source and lockfile audit of the app's non-Cashu, non-Nostr,
 non-React, and non-Expo dependency candidates. The baseline was captured on
 **2026-08-20, before the reductions described here began**. The declared ranges

@@ -29,7 +29,6 @@
       "ignoreDependencies": [
         "buffer",
         "expo-screen-corner-radius",
-        "patch-package",
         "react-native-fast-squircle"
       ],
       "ignoreBinaries": ["claude", "eas", "gh", "tsx"]

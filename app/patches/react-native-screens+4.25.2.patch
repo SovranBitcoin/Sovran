@@ -1,7 +1,7 @@
-diff --git a/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingViewManager.kt b/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingViewManager.kt
+diff --git a/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingViewManager.kt b/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingViewManager.kt
 index 885c2b0..140180c 100644
---- a/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingViewManager.kt
-+++ b/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingViewManager.kt
+--- a/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingViewManager.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingViewManager.kt
 @@ -17,7 +17,9 @@ class DimmingViewManager(
      screen: Screen,
  ) {

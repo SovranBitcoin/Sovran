@@ -27,10 +27,6 @@ jest.mock('@/shared/lib/logger', () => {
   };
 });
 
-jest.mock('@monicon/native', () => ({
-  Monicon: () => null,
-}));
-
 function walkTsxFiles(root: string): string[] {
   if (!fs.existsSync(root)) return [];
 

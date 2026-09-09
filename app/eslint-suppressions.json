@@ -9,11 +9,6 @@
       "count": 1
     }
   },
-  "assets/icons/index.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "config/modalScreens.ts": {
     "no-restricted-syntax": {
       "count": 1

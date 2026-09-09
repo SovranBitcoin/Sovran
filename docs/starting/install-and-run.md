@@ -15,9 +15,9 @@ From the repository root (the Bun workspace root):
 bun install
 ```
 
-This installs all four workspace packages (`app`, `wallet`, `nostr`, `docs`) and
-runs the root `postinstall`, which applies the `patch-package` patches and the
-BitChat native sync against the app. The `wallet` and `nostr` packages link
+This installs all four workspace packages (`app`, `wallet`, `nostr`, `docs`),
+applies the root `patchedDependencies` with Bun, and runs the root `postinstall`
+for Coco deduplication and BitChat native sync. The `wallet` and `nostr` packages link
 directly via the workspace — there is nothing to publish or version-sync.
 
 ## Run the app

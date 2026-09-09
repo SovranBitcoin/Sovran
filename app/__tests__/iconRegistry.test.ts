@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import path from 'path';
 import ts from 'typescript';
+import registry from '../assets/icons/generated.json';
 
 type IconReference = {
   name: string;
@@ -18,7 +19,7 @@ const RUNTIME_ICON_SOURCE_FILES = [
   path.join(ROOT, '..', 'wallet', 'src', 'screen-actions', 'availability.ts'),
 ];
 const EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx']);
-const IGNORED_PATH_PARTS = new Set(['node_modules', '.monicon', 'ios', 'android']);
+const IGNORED_PATH_PARTS = new Set(['node_modules', 'ios', 'android']);
 const ICON_NAME_PATTERN = /^([a-z0-9][a-z0-9-]*):([a-z0-9][a-z0-9_.-]*)$/i;
 const POPUP_ICON_PATTERN = /^icon:([a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9_.-]*)$/i;
 const ICON_PROPERTY_NAMES = new Set([
@@ -34,11 +35,6 @@ const ICON_PROPERTY_NAMES = new Set([
   'suffixIcon',
 ]);
 
-const registrySource = readFileSync(path.join(ROOT, '.monicon', 'icons.js'), 'utf8');
-const registryJson = registrySource.match(/module\.exports = ([\s\S]*);\s*$/)?.[1];
-if (!registryJson) throw new Error('Could not parse .monicon/icons.js');
-
-const registry = JSON.parse(registryJson) as Record<string, unknown>;
 const registryNames = new Set(Object.keys(registry));
 const iconPrefixes = new Set<string>(['internal']);
 
@@ -201,7 +197,7 @@ function collectIconReferences(): IconReference[] {
   return references;
 }
 
-describe('Monicon registry', () => {
+describe('Icon registry', () => {
   it('contains every icon literal used by app and runtime UI sources', () => {
     const missing = collectIconReferences()
       .filter((reference) => !registryNames.has(reference.name))

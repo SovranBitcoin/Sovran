@@ -17,7 +17,7 @@
     "nostr-tools": "2.24.2"
   },
   "scripts": {
-    "postinstall": "cd app && node scripts/dedupe-coco.js && node scripts/apply-patches.js && node modules/bitchat-module/scripts/patch-bitchat-imports.js && node modules/bitchat-module/scripts/sync-bitchat-android.js",
+    "postinstall": "cd app && node scripts/dedupe-coco.js && node modules/bitchat-module/scripts/patch-bitchat-imports.js && node modules/bitchat-module/scripts/sync-bitchat-android.js",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
@@ -45,5 +45,12 @@
   },
   "devDependencies": {
     "vitepress": "^1.6.3"
+  },
+  "patchedDependencies": {
+    "heroui-native@1.0.4": "app/patches/heroui-native+1.0.4.patch",
+    "expo-modules-jsi@56.0.12": "app/patches/expo-modules-jsi+56.0.12.patch",
+    "react-native-screens@4.25.2": "app/patches/react-native-screens+4.25.2.patch",
+    "expo-router@56.2.11": "app/patches/expo-router+56.2.11.patch",
+    "@gorhom/bottom-sheet@5.2.14": "app/patches/@gorhom+bottom-sheet+5.2.14.patch"
   }
 }

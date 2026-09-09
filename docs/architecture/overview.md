@@ -26,7 +26,7 @@ properties) and resolves from GitHub Packages.
   Cashu/Nostr/NFC/Routstr helpers, theme and persistence infrastructure.
 - `app/modules/` — local native modules (BitChat, Liquid Glass text).
 - `app/targets/widget/` — iOS widget target via `@bacons/apple-targets`.
-- `app/patches/` — patch-package patches applied by the root `postinstall`.
+- `app/patches/` — native dependency patches applied by Bun via root `patchedDependencies`.
 
 ## Package boundaries
 
