@@ -103,6 +103,7 @@ export function createNotificationsSession(
 
   const merger = createNotificationsMerger();
   const controller = new AbortController();
+  const signal = combineSignals(options.request.signal, controller.signal);
   const listeners = new Set<() => void>();
   const per = new Map<NostrTier, { cursor: NostrCursor; exhausted: boolean }>();
   let painted = false;
@@ -123,7 +124,7 @@ export function createNotificationsSession(
       limit: pageSize,
       ...(cursor ? { cursor } : {}),
       timeoutMs: options.request.timeoutMs ?? timeoutMs,
-      signal: combineSignals(options.request.signal, controller.signal),
+      signal,
     };
   }
 
