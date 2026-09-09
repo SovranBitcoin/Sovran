@@ -163,6 +163,9 @@ export function createScreenActionManager<S extends ScreenType>(
     action: ScreenActionName[S],
     params?: Record<string, unknown>,
   ): Promise<void> => {
+    // A reopened overflow menu can retain an older action snapshot. Guard at
+    // the execution seam, before any await, rather than relying on disabled UI.
+    if (loadingActions.has(action as string)) return;
     if (amountMgr) {
       if (action === "setInput") {
         logger.debug("screenActionManager.execute.amountInput", {

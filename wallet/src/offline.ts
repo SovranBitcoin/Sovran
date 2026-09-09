@@ -5,8 +5,8 @@
 // proof denominations without a swap. The wallet uses these to power its
 // own proof-selection UX (round up/down suggestions, proof picker, etc.).
 //
-// Algorithms: exhaustive (≤20 proofs), bitset-DP (sum ≤2M),
-// meet-in-the-middle (≤40 proofs, larger sums).
+// Algorithms: greedy for divisible denominations, exhaustive (≤20 proofs),
+// bitset-DP (sum ≤2M), meet-in-the-middle (≤40 proofs, larger sums).
 // ---------------------------------------------------------------------------
 
 import { errField, logger } from './logger';
@@ -297,6 +297,43 @@ function prefilterCoins(
   return selected;
 }
 
+function composeDivisibleDenominations(
+  coins: number[],
+  target: number,
+  total: number,
+  startedAt: number,
+): CompositionResult | null {
+  if (!Number.isSafeInteger(total) || !Number.isSafeInteger(target))
+    return null;
+  const sorted = [...coins].sort((a, b) => b - a);
+  for (let index = 0; index < sorted.length; index += 1) {
+    const coin = sorted[index]!;
+    if (!Number.isSafeInteger(coin)) return null;
+    if (index > 0 && sorted[index - 1]! % coin !== 0) return null;
+  }
+  // When every larger denomination is a multiple of the next smaller one,
+  // taking the largest fitting proof cannot make a better lower sum impossible.
+  // Repeated denominations and missing powers are allowed; each proof is used
+  // at most once. Nondivisible denominations retain the subset-sum algorithms.
+  const lowerSum = (limit: number) => {
+    let sum = 0;
+    for (const coin of sorted) if (coin <= limit - sum) sum += coin;
+    return sum;
+  };
+  const lower = lowerSum(target);
+  // Complementing the best subset <= total-target gives the least subset
+  // >= target, using the same finite proof multiset without approximation.
+  const upper = total - lowerSum(total - target);
+  return compositionResult(
+    lower === target,
+    target,
+    lower || null,
+    upper,
+    'denomination-greedy',
+    startedAt,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Public: Satoshi composition
 // ---------------------------------------------------------------------------
@@ -409,7 +446,13 @@ export function composeSatoshis(
   let result: CompositionResult;
   let reason: string;
   try {
-    if (valid.length <= EXHAUSTIVE_LIMIT) {
+    const divisible = composeDivisibleDenominations(
+      valid, target, totalSum, t0,
+    );
+    if (divisible) {
+      reason = 'divisible-denominations';
+      result = divisible;
+    } else if (valid.length <= EXHAUSTIVE_LIMIT) {
       reason = 'exhaustive-limit';
       result = exhaustiveSearch(valid, target, t0);
     } else if (bitsetSafe) {

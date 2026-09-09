@@ -144,6 +144,21 @@ async function readHistoryPage(
   }
 }
 
+async function readSupplements(manager: Manager) {
+  try {
+    const [receives, pendingRequests] = await Promise.all([
+      listInFlightReceiveEntries(manager),
+      listPendingPaymentRequestEntries(manager),
+    ]);
+    return { receives, pendingRequests };
+  } catch (err) {
+    logger.warn("history.transactions.supplements_failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
 /**
  * The canonical wallet transaction list. Wraps coco's paginated history and
  * supplements it with melt operations and received-but-unredeemed (executing)
@@ -208,6 +223,13 @@ export function useColadaTransactions(
   const mountedRef = useRef(true);
   const sessionRef = useRef(0);
   const fetchingRef = useRef(false);
+  const refreshPendingRef = useRef(false);
+  const refreshRef = useRef<() => Promise<void>>(async () => {});
+  const supplementReadRef = useRef<{
+    session: number;
+    requested: boolean;
+    promise: Promise<void>;
+  } | null>(null);
   // Written in useInsertionEffect rather than in the render body: a ref write
   // during render switches the React Compiler off for the whole hook, and a
   // discarded concurrent render must not mutate it. Every read is from a
@@ -217,6 +239,12 @@ export function useColadaTransactions(
   const setFetching = useCallback((value: boolean) => {
     fetchingRef.current = value;
     setIsFetching(value);
+    if (!value && refreshPendingRef.current) {
+      refreshPendingRef.current = false;
+      // History can change during a page read. Keep one trailing refresh so
+      // those events cannot disappear behind the pagination re-entry guard.
+      void refreshRef.current();
+    }
   }, []);
 
   const applyHasMore = useCallback((value: boolean) => {
@@ -251,26 +279,50 @@ export function useColadaTransactions(
     [pageSize, managerRef],
   );
 
-  const fetchSupplements = useCallback(async () => {
+  const fetchSupplements = useCallback(() => {
     const session = sessionRef.current;
-    try {
-      const [receives, pendingRequests] = await Promise.all([
-        listInFlightReceiveEntries(managerRef.current),
-        listPendingPaymentRequestEntries(managerRef.current),
-      ]);
-      if (!mountedRef.current) return;
-      if (sessionRef.current !== session) return;
-      setReceiveEntries((prev) => keepIfSame(prev, receives));
-      setPendingRequestEntries((prev) => keepIfSame(prev, pendingRequests));
-    } catch (err) {
-      logger.warn("history.transactions.supplements_failed", {
-        error: err instanceof Error ? err.message : String(err),
-      });
+    const active = supplementReadRef.current;
+    if (active?.session === session) {
+      active.requested = true;
+      return active.promise;
     }
+    const manager = managerRef.current;
+    const work = { session, requested: true, promise: Promise.resolve() };
+    supplementReadRef.current = work;
+    const run = async () => {
+      while (
+        work.requested &&
+        mountedRef.current &&
+        sessionRef.current === session
+      ) {
+        work.requested = false;
+        const next = await readSupplements(manager);
+        if (
+          !next ||
+          work.requested ||
+          !mountedRef.current ||
+          sessionRef.current !== session
+        )
+          continue;
+        setReceiveEntries((prev) => keepIfSame(prev, next.receives));
+        setPendingRequestEntries((prev) =>
+          keepIfSame(prev, next.pendingRequests),
+        );
+      }
+    };
+    // Each scope has one read plus one trailing invalidation. A retired
+    // manager's completion must never release the new manager's queue.
+    work.promise = run().finally(() => {
+      if (supplementReadRef.current === work) supplementReadRef.current = null;
+    });
+    return work.promise;
   }, [managerRef, mountedRef, sessionRef]);
 
   const refresh = useCallback(async () => {
-    if (fetchingRef.current) return;
+    if (fetchingRef.current) {
+      refreshPendingRef.current = true;
+      return;
+    }
     const session = sessionRef.current;
     setFetching(true);
     // `Promise.prototype.finally` rather than a `try`/`finally` statement,
@@ -279,6 +331,7 @@ export function useColadaTransactions(
     // but the React Compiler cannot lower a `try` with a `finally`, and these
     // three statements were the whole reason this hook rendered unmemoized.
     const run = async () => {
+      const supplements = fetchSupplements();
       if (modeRef.current === "infinite") {
         // Merge a fresh page 0 onto the head at ANY scroll depth. This
         // deliberately diverges from coco-react's usePaginatedHistory, which
@@ -306,7 +359,7 @@ export function useColadaTransactions(
           setCocoHistory((prev) => keepIfSame(prev, page));
         }
       }
-      if (sessionRef.current === session) await fetchSupplements();
+      await supplements;
     };
     await run().finally(() => {
       if (mountedRef.current && sessionRef.current === session)
@@ -322,7 +375,6 @@ export function useColadaTransactions(
   ]);
 
   // Keep a stable ref to refresh for event handlers.
-  const refreshRef = useRef(refresh);
   useEffect(() => {
     refreshRef.current = refresh;
   }, [refresh]);
@@ -331,6 +383,7 @@ export function useColadaTransactions(
   useEffect(() => {
     let cancelled = false;
     sessionRef.current += 1;
+    refreshPendingRef.current = false;
     setCocoHistory([]);
     setReceiveEntries([]);
     setPendingRequestEntries([]);
@@ -339,6 +392,7 @@ export function useColadaTransactions(
     modeRef.current = "infinite";
     offsetRef.current = -pageSize;
     (async () => {
+      const supplements = fetchSupplements();
       const page = await fetchPage(0);
       // Inside the guard, not before it. `hasMore` is state now, so a run this
       // effect already cancelled (a pageSize change, or the manager swapping)
@@ -350,7 +404,7 @@ export function useColadaTransactions(
         historyReasonRef.current = "initial";
         setCocoHistory((prev) => keepIfSame(prev, page));
       }
-      if (!cancelled) await fetchSupplements();
+      await supplements;
       if (!cancelled) setFetching(false);
     })();
     return () => {

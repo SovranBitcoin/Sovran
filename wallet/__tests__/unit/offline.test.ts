@@ -126,12 +126,11 @@ describe('composeSatoshis — edge cases', () => {
  *   3. Each algorithm produces correct results for its input range
  */
 describe('composeSatoshis — algorithm selection', () => {
-  it('uses exhaustive search for ≤20 proofs', () => {
-    // 10 proofs = well under the 20-proof threshold for exhaustive search.
-    // Power-of-2 denominations can compose any amount 1..1023.
+  it('uses exact denomination composition for power-of-two proofs', () => {
+    // Canonical denominations no longer require enumerating their subsets.
     const coins = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512];
     const result = composeSatoshis(coins, 100);
-    expect(result.strategy).toBe('exhaustive');
+    expect(result.strategy).toBe('denomination-greedy');
     // 4 + 32 + 64 = 100
     expect(result.exactMatch).toBe(true);
   });

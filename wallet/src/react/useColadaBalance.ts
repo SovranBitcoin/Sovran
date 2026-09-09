@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { Manager } from "@cashu/coco-core";
+import { useEffect, useMemo, useState } from "react";
+import { Amount, type Manager } from "@cashu/coco-core";
 
 import { logger } from "../logger";
 import {
@@ -9,7 +9,6 @@ import {
   type WalletBalanceBreakdown,
 } from "../balance/breakdown";
 import { useColadaManager } from "./ColadaProvider";
-import { useLatestRef } from "./useLatestRef";
 
 // Pending sends are recent; the first history page is enough to total them
 // (matches how the app previously filtered usePaginatedHistory()).
@@ -26,16 +25,25 @@ async function readBreakdown(
   unit: string,
 ): Promise<WalletBalanceBreakdown | null> {
   try {
-    const [total, perMint, historyPage, inFlight] = await Promise.all([
-      mgr.wallet.balances.total({ units: [unit] }),
+    const [perMint, historyPage, inFlight] = await Promise.all([
       mgr.wallet.balances.byMint({ units: [unit] }),
       mgr.history.getPaginatedHistory(0, PENDING_PAGE_SIZE).catch(() => []),
       mgr.ops.receive.listInFlight().catch(() => []),
     ]);
+    // Coco's total() reads byMint() again. Aggregate this one snapshot with
+    // Amount arithmetic, matching Coco without a second scan of ready proofs.
+    let spendable = Amount.zero();
+    let reserved = Amount.zero();
+    let total = Amount.zero();
+    for (const balance of Object.values(perMint)) {
+      spendable = spendable.add(balance.spendable);
+      reserved = reserved.add(balance.reserved);
+      total = total.add(balance.total);
+    }
     return {
-      spendable: amountToNumber(total.spendable),
-      reserved: amountToNumber(total.reserved),
-      total: amountToNumber(total.total),
+      spendable: amountToNumber(spendable),
+      reserved: amountToNumber(reserved),
+      total: amountToNumber(total),
       byMint: perMint,
       pending: sumReservedSends(
         (historyPage ?? []).filter((entry) => (entry.unit ?? "sat") === unit),
@@ -65,68 +73,44 @@ async function readBreakdown(
 export function useColadaBalance(unit = "sat"): WalletBalanceBreakdown {
   const manager = useColadaManager();
 
-  const [balance, setBalance] = useState(emptyBalanceBreakdown);
-
-  const mountedRef = useRef(true);
-  const readVersionRef = useRef(0);
-  // Written in useInsertionEffect rather than in render: a ref write in the
-  // render body switches the React Compiler off for this whole hook. Every
-  // read is from `reload`, which only ever runs from an effect or a coco
-  // event, so it still observes the same manager the render committed.
-  const managerRef = useLatestRef(manager);
+  const [snapshot, setSnapshot] = useState(() => ({
+    manager,
+    unit,
+    balance: emptyBalanceBreakdown(),
+  }));
+  const balance = useMemo(
+    () => snapshot.manager === manager && snapshot.unit === unit
+      ? snapshot.balance
+      : emptyBalanceBreakdown(),
+    [snapshot, manager, unit],
+  );
 
   useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
+    // Scope the queue to this manager and unit. Cleanup invalidates both the
+    // current read and any trailing refresh before a new scope starts reading.
+    let cancelled = false;
+    let running = false;
+    let requested = false;
+    const reload = async () => {
+      requested = true;
+      if (running) return;
+      running = true;
+      while (requested && !cancelled) {
+        requested = false;
+        const next = await readBreakdown(manager, unit);
+        // Events received during a read invalidate it. Collapse their work
+        // into one trailing read, and never paint the outdated snapshot.
+        if (next && !requested && !cancelled) {
+          setSnapshot({ manager, unit, balance: next });
+          logger.debug("balance.breakdown.reload", {
+            unit,
+            mintCount: Object.keys(next.byMint).length,
+          });
+        }
+      }
+      running = false;
     };
-  }, []);
-
-  // The dep list names the ref too. It used to read `[unit]` while the body
-  // also reached `managerRef`, and a memo the compiler cannot preserve
-  // switches the compiler off for the whole hook. Keeping an explicit
-  // useCallback (rather than letting the compiler infer one) matters here:
-  // the effect below depends on `reload`, so an identity that churned every
-  // render would re-enter it every render — a balance-reload loop against the
-  // mint in any environment where the compiler is not running, Jest included.
-  const reload = useCallback(async () => {
-    // Pin the manager this read belongs to. A profile switch swaps the manager
-    // while a read is in flight — the outgoing manager's event subscription is
-    // still attached until its cleanup runs — and without this the slower of
-    // the two reads wins, which can paint the PREVIOUS profile's balance over
-    // the current one.
-    // Only the newest requested snapshot may publish, even on the same manager.
-    const version = ++readVersionRef.current;
-    const mgr = managerRef.current;
-    const next = await readBreakdown(mgr, unit);
-    if (
-      !next ||
-      !mountedRef.current ||
-      managerRef.current !== mgr ||
-      readVersionRef.current !== version
-    )
-      return;
-    setBalance(next);
-    logger.debug("balance.breakdown.reload", {
-      unit,
-      mintCount: Object.keys(next.byMint).length,
-    });
-  }, [unit, managerRef]);
-
-  const reloadRef = useRef(reload);
-  useEffect(() => {
-    reloadRef.current = reload;
-  }, [reload]);
-
-  // Initial load + reload when the manager identity changes (profile switch).
-  useEffect(() => {
-    void reload();
-  }, [manager, reload]);
-
-  // Recompute on the events that move any figure: proof movement (balance +
-  // reserved + pending + redeeming), mint changes, and history projection.
-  useEffect(() => {
-    const onChange = () => void reloadRef.current();
+    const onChange = () => void reload();
     const events = [
       "proofs:saved",
       "proofs:state-changed",
@@ -139,10 +123,12 @@ export function useColadaBalance(unit = "sat"): WalletBalanceBreakdown {
       "receive-op:rolled-back",
     ] as const;
     for (const event of events) manager.on(event, onChange);
+    void reload();
     return () => {
+      cancelled = true;
       for (const event of events) manager.off(event, onChange);
     };
-  }, [manager]);
+  }, [manager, unit]);
 
   return balance;
 }
