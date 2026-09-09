@@ -44,6 +44,21 @@ describe('notificationMergeKey', () => {
 });
 
 describe('notifications merger', () => {
+  it("reveals newest first and breaks timestamp ties by descending event id", () => {
+    const merger = createNotificationsMerger();
+    merger.ingest("relay", [
+      item("a", "alice", "reply", 10),
+      item("old", "bob", "reply", 1),
+      item("z", "zoe", "reply", 10),
+    ]);
+    merger.reveal(50);
+    expect(merger.snapshot().notifications.map((row) => row.event.id)).toEqual([
+      "z",
+      "a",
+      "old",
+    ]);
+  });
+
   it('merges cross-source evidence for one target into one group row', () => {
     const merger = createNotificationsMerger();
     merger.ingest('relay', [item('like1', 'alice', 'reaction', 10)]);

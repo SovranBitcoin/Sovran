@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { BalancesByMint, Manager } from "@cashu/coco-core";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Manager } from "@cashu/coco-core";
 
 import { logger } from "../logger";
 import {
   amountToNumber,
+  emptyBalanceBreakdown,
   sumReservedSends,
   type WalletBalanceBreakdown,
 } from "../balance/breakdown";
@@ -14,16 +15,6 @@ import { useLatestRef } from "./useLatestRef";
 // (matches how the app previously filtered usePaginatedHistory()).
 const PENDING_PAGE_SIZE = 100;
 
-// Colada's balance read model carries plain numbers; coco v2 BalanceSnapshot
-// fields are Amount value objects and convert once at reload.
-interface NumericSnapshot {
-  spendable: number;
-  reserved: number;
-  total: number;
-}
-
-const EMPTY_SNAPSHOT: NumericSnapshot = { spendable: 0, reserved: 0, total: 0 };
-
 /**
  * One coco read of every figure the breakdown shows, or `null` when the read
  * failed. Module scope on purpose: the React Compiler cannot lower a `try`
@@ -33,12 +24,7 @@ const EMPTY_SNAPSHOT: NumericSnapshot = { spendable: 0, reserved: 0, total: 0 };
 async function readBreakdown(
   mgr: Manager,
   unit: string,
-): Promise<{
-  snapshot: NumericSnapshot;
-  byMint: BalancesByMint;
-  pending: number;
-  redeeming: number;
-} | null> {
+): Promise<WalletBalanceBreakdown | null> {
   try {
     const [total, perMint, historyPage, inFlight] = await Promise.all([
       mgr.wallet.balances.total({ units: [unit] }),
@@ -47,11 +33,9 @@ async function readBreakdown(
       mgr.ops.receive.listInFlight().catch(() => []),
     ]);
     return {
-      snapshot: {
-        spendable: amountToNumber(total.spendable),
-        reserved: amountToNumber(total.reserved),
-        total: amountToNumber(total.total),
-      },
+      spendable: amountToNumber(total.spendable),
+      reserved: amountToNumber(total.reserved),
+      total: amountToNumber(total.total),
       byMint: perMint,
       pending: sumReservedSends(
         (historyPage ?? []).filter((entry) => (entry.unit ?? "sat") === unit),
@@ -81,12 +65,10 @@ async function readBreakdown(
 export function useColadaBalance(unit = "sat"): WalletBalanceBreakdown {
   const manager = useColadaManager();
 
-  const [snapshot, setSnapshot] = useState<NumericSnapshot>(EMPTY_SNAPSHOT);
-  const [byMint, setByMint] = useState<BalancesByMint>({});
-  const [pending, setPending] = useState(0);
-  const [redeeming, setRedeeming] = useState(0);
+  const [balance, setBalance] = useState(emptyBalanceBreakdown);
 
   const mountedRef = useRef(true);
+  const readVersionRef = useRef(0);
   // Written in useInsertionEffect rather than in render: a ref write in the
   // render body switches the React Compiler off for this whole hook. Every
   // read is from `reload`, which only ever runs from an effect or a coco
@@ -113,13 +95,18 @@ export function useColadaBalance(unit = "sat"): WalletBalanceBreakdown {
     // still attached until its cleanup runs — and without this the slower of
     // the two reads wins, which can paint the PREVIOUS profile's balance over
     // the current one.
+    // Only the newest requested snapshot may publish, even on the same manager.
+    const version = ++readVersionRef.current;
     const mgr = managerRef.current;
     const next = await readBreakdown(mgr, unit);
-    if (!next || !mountedRef.current || managerRef.current !== mgr) return;
-    setSnapshot(next.snapshot);
-    setByMint(next.byMint);
-    setPending(next.pending);
-    setRedeeming(next.redeeming);
+    if (
+      !next ||
+      !mountedRef.current ||
+      managerRef.current !== mgr ||
+      readVersionRef.current !== version
+    )
+      return;
+    setBalance(next);
     logger.debug("balance.breakdown.reload", {
       unit,
       mintCount: Object.keys(next.byMint).length,
@@ -157,15 +144,5 @@ export function useColadaBalance(unit = "sat"): WalletBalanceBreakdown {
     };
   }, [manager]);
 
-  return useMemo(
-    () => ({
-      spendable: snapshot.spendable,
-      reserved: snapshot.reserved,
-      total: snapshot.total,
-      pending,
-      redeeming,
-      byMint,
-    }),
-    [snapshot, pending, redeeming, byMint],
-  );
+  return balance;
 }

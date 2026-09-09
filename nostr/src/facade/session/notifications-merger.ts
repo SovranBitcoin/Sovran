@@ -1,7 +1,7 @@
+import type { NotificationSortKey } from "../notifications";
 import type { NostrTier, NoteStatsMap } from '@sovranbitcoin/schemas';
 import type { NaggFeedEvent, NaggProfileInfo } from '../../map/feed';
 import { sourceRank } from '../cache/entity-cache';
-import { compareNewestFirst, type SortKey } from './page-buffer';
 import type { NotificationActor, NotificationItem, NotificationsBundle } from '../notifications';
 
 // ---------------------------------------------------------------------------
@@ -33,6 +33,16 @@ import type { NotificationActor, NotificationItem, NotificationsBundle } from '.
 //              which is what keeps the visible list shift-free.
 // ---------------------------------------------------------------------------
 
+/** Order newest first, with an id-descending tiebreaker. */
+function compareNewestFirst(
+  a: NotificationSortKey,
+  b: NotificationSortKey,
+): number {
+  if (a.createdAt !== b.createdAt) return b.createdAt - a.createdAt;
+  if (a.id === b.id) return 0;
+  return a.id < b.id ? 1 : -1;
+}
+
 const GROUPABLE = new Set(['follow', 'repost', 'reaction', 'zap']);
 
 /** Session-level row identity — the app's notificationDedupeKey semantics. */
@@ -49,7 +59,7 @@ type MergedRow = {
   /** Rank of the source that owns the row's shape. */
   srcRank: number;
   /** Frozen at reveal; null while pooled. Upgrades never move a revealed row. */
-  sortAt: SortKey | null;
+  sortAt: NotificationSortKey | null;
   /** evidenceId → actor pubkey ('' when unknowable, e.g. relay zap receipts). */
   evidence: Map<string, string>;
   /** nagg's authoritative total for this key, when nagg has answered. */

@@ -19,6 +19,9 @@ import { statsFromMetrics } from './feed';
 // key + a manifest the facade renders by, so the list never reshuffles.
 // ---------------------------------------------------------------------------
 
+/** Stable notification order: timestamp, then event id descending. */
+export type NotificationSortKey = { createdAt: number; id: string };
+
 export type NotificationTab = 'ALL' | 'MENTIONS';
 export type NotificationPolicy = 'RELAXED' | 'MODERATE' | 'STRICT' | 'FOLLOWS';
 export type NotificationReplyScope = 'DIRECT' | 'THREAD';

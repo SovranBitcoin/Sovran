@@ -2,7 +2,7 @@ import { describe, test, expect } from 'vitest';
 import { ok, type Result } from 'neverthrow';
 import { createNaggClient } from '../src/transport';
 import { createNaggTier, createNostrDataLayer, pendingFeedTier } from '../src/facade';
-import { createRelayTier, type RelayConnection, type RawRelayEvent } from '../src/facade/relay';
+import { createRelayTier, type RelayConnection, type RawRelayEvent, type NostrFilter } from '../src/facade/relay';
 import type { NaggError } from '../src/errors';
 
 const TARGET = 'a'.repeat(64);
@@ -49,23 +49,14 @@ const PAGE = {
   hasNext: false,
 };
 
-function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}): Response {
-  return {
-    ok: init.ok ?? true,
-    status: init.status ?? 200,
-    statusText: 'OK',
-    json: async () => body,
-  } as unknown as Response;
-}
-
 function naggClientReturning(body: unknown) {
   let lastUrl = '';
   const client = createNaggClient({
     appView: { baseUrl: 'https://nagg.test' },
-    fetchImpl: (async (url: string) => {
+    fetchImpl: (async (url: Parameters<typeof fetch>[0]) => {
       lastUrl = String(url);
-      return jsonResponse(body);
-    }) as unknown as typeof fetch,
+      return Response.json(body);
+    }) as typeof fetch,
   });
   return { client, urlOf: () => lastUrl };
 }
@@ -210,18 +201,35 @@ describe('relay notifications — flat floor + ownership gate', () => {
 
   // Bug 3 (Stage-F): the #e backstop filter must page with the same until as the
   // primary filter, or every page re-fetches the full backstop set from newest.
-  test('the #e backstop filter carries the cursor until', async () => {
-    let captured: Array<Record<string, unknown>> | undefined;
+  test.each([0, 500])('all notification filters preserve timestamp bounds %s', async (timestamp) => {
+    let captured: NostrFilter[] = [];
     const connection: RelayConnection = {
       request: (filters): Promise<Result<RawRelayEvent[], NaggError>> => {
-        captured = filters as unknown as Array<Record<string, unknown>>;
+        captured = filters;
         return Promise.resolve(ok([]));
       },
     };
     const tier = createRelayTier({ connection });
-    await tier.notifications!({ viewerPubkey: ME, ownEventIds: [MYEVENT], cursor: { createdAt: 500, id: 'a'.repeat(64) } });
-    expect(captured?.[0]?.until).toBe(500); // primary
-    expect(captured?.[1]?.['#e']).toEqual([MYEVENT]); // backstop
-    expect(captured?.[1]?.until).toBe(500); // backstop now paged (was missing)
+    await tier.notifications!({ viewerPubkey: ME, ownEventIds: [MYEVENT], since: timestamp, cursor: { createdAt: timestamp, id: 'a'.repeat(64) } });
+    expect(captured).toHaveLength(3);
+    expect(captured[1]['#e']).toEqual([MYEVENT]);
+    expect(captured[2]['#q']).toEqual([MYEVENT]);
+    for (const filter of captured) expect(filter).toMatchObject({ since: timestamp, until: timestamp });
   });
+});
+
+
+test.each([0, 500])('feed and own-history requests preserve cursor timestamp %s', async (createdAt) => {
+  const requests: NostrFilter[][] = [];
+  const tier = createRelayTier({ connection: {
+    request: async (filters) => {
+      requests.push(filters);
+      return ok([]);
+    },
+  } });
+  const cursor = { createdAt, id: TARGET };
+  await tier.feedPage!({ spec: { kind: 'user', pubkey: PUB }, cursor });
+  await tier.ownHistory!({ actionType: 'likes', viewerPubkey: PUB, cursor });
+  expect(requests).toHaveLength(2);
+  for (const filters of requests) expect(filters[0]).toMatchObject({ until: createdAt });
 });

@@ -1,3 +1,4 @@
+import type { NotificationSortKey } from "../notifications";
 import type { NostrTier } from '@sovranbitcoin/schemas';
 import type { TierOutcome } from '../../tiers';
 import { combineSignals } from '../../timeout';
@@ -12,8 +13,7 @@ import type {
   ResolvedNotifications,
 } from '../notifications';
 import { createNotificationsMerger } from './notifications-merger';
-import type { Scheduler } from './surface-session';
-import type { SortKey } from './page-buffer';
+type Scheduler = (flush: () => void) => () => void;
 
 // ---------------------------------------------------------------------------
 // Notifications session — the one facade surface that fans out CONCURRENTLY.
@@ -42,7 +42,7 @@ export type NotificationsSessionOptions = {
   sources: ReadonlyArray<NotificationsSessionSource>;
   liveSubscribe?: (
     request: NotificationsRequest,
-    since: SortKey | undefined,
+    since: NotificationSortKey | undefined,
     onItems: (items: readonly NotificationItem[]) => void,
   ) => () => void;
   cache?: NostrEntityCache;

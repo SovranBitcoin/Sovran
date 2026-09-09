@@ -1,7 +1,7 @@
+import type { NotificationSortKey } from "./notifications";
 import type { NostrTier } from '@sovranbitcoin/schemas';
 import type { TierOutcome } from '../tiers';
-import type { FeedBundle, FeedItem, FeedPageRequest } from './feed';
-import type { SortKey } from './session/page-buffer';
+import type { FeedBundle, FeedPageRequest } from './feed';
 import type { ThreadBundle, ThreadRequest } from './thread';
 import type { NotificationItem, NotificationsBundle, NotificationsRequest } from './notifications';
 import type { OwnHistoryBundle, OwnHistoryRequest } from './own-state';
@@ -32,15 +32,6 @@ import type { ProfileSearchBundle, SearchRequest } from './search';
 export interface NostrTierStrategy {
   readonly tier: NostrTier;
   feedPage?(request: FeedPageRequest): Promise<TierOutcome<FeedBundle>>;
-  /**
-   * Open a live listener for feed items NEWER than `since` (the "Load new" seam).
-   * Only the relay tier streams; other tiers omit it. Returns an unsubscribe.
-   */
-  feedLiveSubscribe?(
-    request: FeedPageRequest,
-    since: SortKey | undefined,
-    onItems: (items: readonly FeedItem[]) => void,
-  ): () => void;
   thread?(request: ThreadRequest): Promise<TierOutcome<ThreadBundle>>;
   notifications?(request: NotificationsRequest): Promise<TierOutcome<NotificationsBundle>>;
   /**
@@ -53,7 +44,7 @@ export interface NostrTierStrategy {
    */
   notificationsLiveSubscribe?(
     request: NotificationsRequest,
-    since: SortKey | undefined,
+    since: NotificationSortKey | undefined,
     onItems: (items: readonly NotificationItem[]) => void,
   ): () => void;
   ownHistory?(request: OwnHistoryRequest): Promise<TierOutcome<OwnHistoryBundle>>;

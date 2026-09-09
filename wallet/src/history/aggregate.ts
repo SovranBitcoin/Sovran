@@ -136,26 +136,32 @@ export function mergeTransactionSources(input: {
   });
 }
 
-/**
- * True when two merged histories are display-equivalent — same length and same
- * (id, state) per row. `state` is the only field that mutates after creation
- * and the only one bucketing depends on, so this is a safe reference-stability
- * gate for React snapshots.
+/** Compare Coco history values, including nested metadata and Amount values.
+ * History is an acyclic read model; reference equality handles unchanged branches.
+ */
+function sameHistoryValue(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (!a || !b || typeof a !== "object" || typeof b !== "object") return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const entries = Object.entries(a);
+  if (entries.length !== Object.keys(b).length) return false;
+  return entries.every(
+    ([key, value]) =>
+      Object.prototype.hasOwnProperty.call(b, key) &&
+      sameHistoryValue(value, (b as Record<string, unknown>)[key]),
+  );
+}
+
+/** Keep snapshots stable only when every history field is unchanged.
+ * Quote remoteState, amounts and metadata can change independently of state.
  */
 export function sameTransactionList(
   a: readonly HistoryEntry[],
   b: readonly HistoryEntry[],
 ): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    const x = a[i];
-    const y = b[i];
-    if (
-      x.id !== y.id ||
-      (x as { state?: unknown }).state !== (y as { state?: unknown }).state
-    ) {
-      return false;
-    }
-  }
-  return true;
+  return (
+    a === b ||
+    (a.length === b.length &&
+      a.every((entry, i) => sameHistoryValue(entry, b[i])))
+  );
 }

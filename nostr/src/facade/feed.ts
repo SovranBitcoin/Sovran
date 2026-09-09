@@ -10,7 +10,6 @@ import type { NaggFeedItem, NaggFeedEvent, NaggNoteMetrics, NaggProfileInfo, Nag
 import { toNoteStats } from './noteStatsContract';
 import type { RequestControls } from '../timeout';
 import type { TierOutcome } from '../tiers';
-import type { SortKey } from './session/page-buffer';
 
 // ---------------------------------------------------------------------------
 // Feed surface — domain request + result + the per-tier contract
@@ -106,17 +105,7 @@ export interface FeedTier {
 
 /** Stable id for a feed item: the note's id, or a repost's original (anchor) id. */
 export function feedItemId(item: FeedItem): string {
-  return item.type === 'note' ? item.event.id : item.originalEventId ?? item.repostEvent.id;
-}
-
-/** The item's position in the feed: a repost ranks by the repost time, a note by its own. */
-export function feedItemTimestamp(item: FeedItem): number {
-  return item.type === 'note' ? item.event.created_at : item.repostEvent.created_at;
-}
-
-/** The (created_at, id) sort key a surface session orders/de-dupes a feed item by. */
-export function feedItemKey(item: FeedItem): SortKey {
-  return { createdAt: feedItemTimestamp(item), id: feedItemId(item) };
+  return item.type === 'note' ? item.event.id : (item.originalEventId ?? item.repostEvent.id);
 }
 
 /**

@@ -34,47 +34,6 @@ export interface UseColadaTransactionsResult {
   isFetching: boolean;
 }
 
-function sameMetadata(
-  a: Record<string, string> | undefined,
-  b: Record<string, string> | undefined,
-): boolean {
-  if (a === b) return true;
-  if (!a || !b) return !a && !b;
-  const aKeys = Object.keys(a);
-  if (aKeys.length !== Object.keys(b).length) return false;
-  for (const key of aKeys) {
-    if (a[key] !== b[key]) return false;
-  }
-  return true;
-}
-
-/**
- * Like `sameTransactionList` but also compares merged metadata, so an
- * annotation change (which mutates content without changing id/state)
- * re-renders the row while un-annotated rows keep their reference.
- */
-function sameAnnotatedList(
-  a: readonly HistoryEntry[],
-  b: readonly HistoryEntry[],
-): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    const x = a[i];
-    const y = b[i];
-    if (
-      x.id !== y.id ||
-      (x as { state?: unknown }).state !== (y as { state?: unknown }).state ||
-      !sameMetadata(
-        (x as { metadata?: Record<string, string> }).metadata,
-        (y as { metadata?: Record<string, string> }).metadata,
-      )
-    ) {
-      return false;
-    }
-  }
-  return true;
-}
-
 /**
  * Annotates a list and keeps the PREVIOUS array whenever nothing a row
  * displays actually moved.
@@ -99,15 +58,14 @@ function createAnnotatedListStabiliser(): (
         mergeAnnotationRecords(store.getMany(candidateKeys(entry))),
       ),
     );
-    if (sameAnnotatedList(previous, annotated)) return previous;
+    if (sameTransactionList(previous, annotated)) return previous;
     previous = annotated;
     return annotated;
   };
 }
 
 /**
- * Keep the previous array whenever the display-relevant content (id + state
- * per row) is unchanged, so a refresh that returns the same rows cannot hand
+ * Keep the previous array whenever the complete row content is unchanged, so a refresh that returns the same rows cannot hand
  * consumers a brand-new list. Written to be passed straight to `setState`,
  * where React additionally short-circuits the re-render once the updater
  * returns the value it already holds.
@@ -125,7 +83,7 @@ function keepIfSame(
 }
 
 /**
- * One page of coco history, normalized, or `[]` when the read failed.
+ * One page of coco history, normalized, or `null` when the read failed (not an empty page).
  *
  * Module scope on purpose: the React Compiler cannot lower a `try` whose body
  * holds value blocks — `??`, ternaries, optional chaining — and this body is
@@ -136,7 +94,7 @@ async function readHistoryPage(
   manager: Manager,
   offset: number,
   pageSize: number,
-): Promise<HistoryEntry[]> {
+): Promise<HistoryEntry[] | null> {
   try {
     const raw =
       (await manager.history.getPaginatedHistory(offset, pageSize)) ?? [];
@@ -182,7 +140,7 @@ async function readHistoryPage(
       offset,
       error: err instanceof Error ? err.message : String(err),
     });
-    return [];
+    return null;
   }
 }
 
@@ -240,13 +198,15 @@ export function useColadaTransactions(
   const [annotationVersion, setAnnotationVersion] = useState(0);
 
   // coco pagination state — mirrors @cashu/coco-react usePaginatedHistory.
-  const offsetRef = useRef(0);
+  // Last successfully loaded page; a failed first read must retry offset zero.
+  const offsetRef = useRef(-pageSize);
   const hasMoreRef = useRef(true);
   const modeRef = useRef<"infinite" | "page">("infinite");
   // Which code path produced the current cocoHistory — stamped right before
   // each setCocoHistory, logged once per committed change below.
   const historyReasonRef = useRef("init");
   const mountedRef = useRef(true);
+  const sessionRef = useRef(0);
   const fetchingRef = useRef(false);
   // Written in useInsertionEffect rather than in the render body: a ref write
   // during render switches the React Compiler off for the whole hook, and a
@@ -292,12 +252,14 @@ export function useColadaTransactions(
   );
 
   const fetchSupplements = useCallback(async () => {
+    const session = sessionRef.current;
     try {
       const [receives, pendingRequests] = await Promise.all([
         listInFlightReceiveEntries(managerRef.current),
         listPendingPaymentRequestEntries(managerRef.current),
       ]);
       if (!mountedRef.current) return;
+      if (sessionRef.current !== session) return;
       setReceiveEntries((prev) => keepIfSame(prev, receives));
       setPendingRequestEntries((prev) => keepIfSame(prev, pendingRequests));
     } catch (err) {
@@ -305,10 +267,11 @@ export function useColadaTransactions(
         error: err instanceof Error ? err.message : String(err),
       });
     }
-  }, [managerRef, mountedRef]);
+  }, [managerRef, mountedRef, sessionRef]);
 
   const refresh = useCallback(async () => {
     if (fetchingRef.current) return;
+    const session = sessionRef.current;
     setFetching(true);
     // `Promise.prototype.finally` rather than a `try`/`finally` statement,
     // here and in loadMore/goToPage below. The guarantee is identical — the
@@ -325,7 +288,9 @@ export function useColadaTransactions(
         // would drop every newer page and jump the list to old history.
         // Upstream-feedback case; report against coco-react.
         const page = await fetchPage(0);
-        if (mountedRef.current) {
+        if (page && mountedRef.current && sessionRef.current === session) {
+          if (offsetRef.current <= 0) applyHasMore(page.length === pageSize);
+          offsetRef.current = Math.max(0, offsetRef.current);
           historyReasonRef.current = "refresh-head";
           setCocoHistory((prev) => {
             const pageIds = new Set(page.map((n) => n.id));
@@ -335,15 +300,26 @@ export function useColadaTransactions(
         }
       } else {
         const page = await fetchPage(offsetRef.current);
-        if (mountedRef.current) {
+        if (page && mountedRef.current && sessionRef.current === session) {
+          applyHasMore(page.length === pageSize);
           historyReasonRef.current = "refresh-window";
           setCocoHistory((prev) => keepIfSame(prev, page));
         }
       }
-      await fetchSupplements();
+      if (sessionRef.current === session) await fetchSupplements();
     };
-    await run().finally(() => setFetching(false));
-  }, [fetchPage, fetchSupplements, setFetching]);
+    await run().finally(() => {
+      if (mountedRef.current && sessionRef.current === session)
+        setFetching(false);
+    });
+  }, [
+    fetchPage,
+    fetchSupplements,
+    setFetching,
+    applyHasMore,
+    pageSize,
+    sessionRef,
+  ]);
 
   // Keep a stable ref to refresh for event handlers.
   const refreshRef = useRef(refresh);
@@ -354,25 +330,32 @@ export function useColadaTransactions(
   // Initial load + reload when the manager identity changes (profile switch).
   useEffect(() => {
     let cancelled = false;
+    sessionRef.current += 1;
+    setCocoHistory([]);
+    setReceiveEntries([]);
+    setPendingRequestEntries([]);
+    applyHasMore(true);
     setFetching(true);
     modeRef.current = "infinite";
-    offsetRef.current = 0;
+    offsetRef.current = -pageSize;
     (async () => {
       const page = await fetchPage(0);
       // Inside the guard, not before it. `hasMore` is state now, so a run this
       // effect already cancelled (a pageSize change, or the manager swapping)
       // would otherwise publish its page length as the live flag and either
       // stop pagination early or keep asking past the end.
-      if (!cancelled && mountedRef.current) {
+      if (page && !cancelled && mountedRef.current) {
         applyHasMore(page.length === pageSize);
+        offsetRef.current = 0;
         historyReasonRef.current = "initial";
         setCocoHistory((prev) => keepIfSame(prev, page));
       }
-      await fetchSupplements();
+      if (!cancelled) await fetchSupplements();
       if (!cancelled) setFetching(false);
     })();
     return () => {
       cancelled = true;
+      sessionRef.current += 1;
     };
   }, [
     manager,
@@ -423,13 +406,14 @@ export function useColadaTransactions(
 
   const loadMore = useCallback(async () => {
     if (!hasMoreRef.current || fetchingRef.current) return;
+    const session = sessionRef.current;
     setFetching(true);
-    modeRef.current = "infinite";
     const run = async () => {
       const nextOffset = offsetRef.current + pageSize;
       const page = await fetchPage(nextOffset);
-      if (mountedRef.current) {
+      if (page && mountedRef.current && sessionRef.current === session) {
         applyHasMore(page.length === pageSize);
+        modeRef.current = "infinite";
         historyReasonRef.current = "loadMore";
         setCocoHistory((prev) => {
           const seen = new Set<string>();
@@ -444,27 +428,34 @@ export function useColadaTransactions(
         offsetRef.current = nextOffset;
       }
     };
-    await run().finally(() => setFetching(false));
-  }, [fetchPage, pageSize, setFetching, applyHasMore]);
+    await run().finally(() => {
+      if (mountedRef.current && sessionRef.current === session)
+        setFetching(false);
+    });
+  }, [fetchPage, pageSize, setFetching, applyHasMore, sessionRef]);
 
   const goToPage = useCallback(
     async (page: number) => {
       if (fetchingRef.current) return;
+      const session = sessionRef.current;
       setFetching(true);
-      modeRef.current = "page";
       const run = async () => {
         const offset = page * pageSize;
         const result = await fetchPage(offset);
-        if (mountedRef.current) {
+        if (result && mountedRef.current && sessionRef.current === session) {
           applyHasMore(result.length === pageSize);
+          modeRef.current = "page";
           historyReasonRef.current = "goToPage";
           setCocoHistory((prev) => keepIfSame(prev, result));
           offsetRef.current = offset;
         }
       };
-      await run().finally(() => setFetching(false));
+      await run().finally(() => {
+        if (mountedRef.current && sessionRef.current === session)
+          setFetching(false);
+      });
     },
-    [fetchPage, pageSize, setFetching, applyHasMore],
+    [fetchPage, pageSize, setFetching, applyHasMore, sessionRef],
   );
 
   // Merge sources. Identity is already stable: each source keeps its previous

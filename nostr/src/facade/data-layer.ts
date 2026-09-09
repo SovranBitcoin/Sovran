@@ -1,3 +1,4 @@
+import type { NotificationSortKey } from "./notifications";
 import { ok, type Result } from 'neverthrow';
 import type { NostrTier } from '@sovranbitcoin/schemas';
 import {
@@ -9,13 +10,8 @@ import {
 } from '../tiers';
 import { nostrLog, type NostrLogData } from '../log';
 import type { NaggFeedEvent } from '../map/feed';
-import { feedItemKey, type FeedBundle, type FeedItem, type FeedPageRequest, type ResolvedFeedPage } from './feed';
 import {
-  createSurfaceSession,
-  type FetchPage,
-  type LiveSubscribe,
-  type SurfaceSession,
-} from './session/surface-session';
+  type FeedBundle, type FeedItem, type FeedPageRequest, type ResolvedFeedPage } from './feed';
 import {
   partitionOpFirst,
   isDirectReplyTo,
@@ -36,7 +32,6 @@ import {
   createNotificationsSession,
   type NotificationsSession,
 } from './session/notifications-session';
-import type { SortKey } from './session/page-buffer';
 import type { OwnHistoryBundle, OwnHistoryRequest, ResolvedOwnHistory } from './own-state';
 import type {
   DiscoverMintsRequest,
@@ -106,13 +101,6 @@ export interface NostrDataLayer {
    */
   readThread(noteId: string): CachedThreadView;
   getFeedPage(request: FeedPageRequest): Promise<Result<ResolvedFeedPage, TierResolutionError>>;
-  /**
-   * A live-aware feed SESSION: a normal paginated API (firstPage/loadOlder/
-   * loadNew) over the tiered fetch, with a relay-only background listener feeding
-   * the "Load new" pill. Pages still fall back across tiers; only the live delta
-   * is relay-only. The app drives this instead of getFeedPage for scrollable feeds.
-   */
-  openFeedSession(request: FeedPageRequest): SurfaceSession<FeedItem>;
   getThread(request: ThreadRequest): Promise<Result<ResolvedThread, TierResolutionError>>;
   /**
    * Background "Might be spam" second opinion for a thread: consult only the
@@ -174,10 +162,6 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
   nostrLog.info('nostr.facade.created', { tiers: tierNames });
   const cache = config.cache ?? createNostrEntityCache(config.cacheLimits);
 
-  // The relay tier (if configured) owns the live "Load new" listener — the one
-  // explicit relay seam. Pages come from whichever tier answers; the delta is
-  // relay-only.
-  const liveTier = config.tiers.find((t) => typeof t.feedLiveSubscribe === 'function');
   const dmLiveTier = config.tiers.find((t) => typeof t.dmLiveSubscribe === 'function');
 
   // Per-note audit memo. Layer-scoped (the app supplies a profile-scoped
@@ -189,35 +173,6 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
 
     readThread(noteId) {
       return readThreadFromCache(cache, noteId);
-    },
-
-    openFeedSession(request) {
-      const fetchPage: FetchPage<FeedItem> = async (bound) => {
-        const pageRequest: FeedPageRequest = {
-          ...request,
-          cursor: bound.until ? { createdAt: bound.until.createdAt, id: bound.until.id } : request.cursor,
-          limit: bound.limit,
-        };
-        const candidates = candidatesFor(config.tiers, 'feedPage', (t) => () => t.feedPage!(pageRequest));
-        const resolved = await resolveAcrossTiers<FeedBundle>(candidates);
-        return resolved.match(
-          ({ tier, value }) => {
-            const page = assembleFeedPage(tier, value);
-            ingestFeedPage(cache, page);
-            return page.items;
-          },
-          () => [],
-        );
-      };
-      const liveSubscribe: LiveSubscribe<FeedItem> | undefined = liveTier
-        ? (since, onItems) => liveTier.feedLiveSubscribe!(request, since, onItems)
-        : undefined;
-      return createSurfaceSession<FeedItem>({
-        keyOf: feedItemKey,
-        fetchPage,
-        liveSubscribe,
-        ...(request.limit ? { pageSize: request.limit } : {}),
-      });
     },
 
     async getFeedPage(request) {
@@ -280,7 +235,7 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
           ? {
               liveSubscribe: (
                 req: NotificationsRequest,
-                since: SortKey | undefined,
+                since: NotificationSortKey | undefined,
                 onItems: (items: readonly NotificationItem[]) => void,
               ) => notifLiveTier.notificationsLiveSubscribe!(req, since, onItems),
             }
@@ -613,7 +568,8 @@ async function runThreadAudit(
   }
   // OP promotions read as the author's continuation → chronological; the spam
   // bucket reads as an appendix → recency-descending, id tiebreak.
-  const createdAtOf = (item: FeedItem) => (item.type === 'note' ? item.event.created_at : 0);
+  const createdAtOf = (item: FeedItem) =>
+    item.type === 'note' ? item.event.created_at : 0;
   const idOf = (item: FeedItem) => (item.type === 'note' ? item.event.id : '');
   opExtras.sort((a, b) => createdAtOf(a) - createdAtOf(b) || (idOf(a) < idOf(b) ? -1 : 1));
   extras.sort((a, b) => createdAtOf(b) - createdAtOf(a) || (idOf(a) > idOf(b) ? -1 : 1));

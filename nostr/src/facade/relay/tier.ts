@@ -1,7 +1,7 @@
+import type { NotificationSortKey } from "../notifications";
 import type { NostrCursor } from '@sovranbitcoin/schemas';
 import { answered, failed, unsupported, type TierOutcome } from '../../tiers';
-import type { FeedBundle, FeedItem, FeedPageRequest, FeedSpec } from '../feed';
-import type { SortKey } from '../session/page-buffer';
+import type { FeedBundle, FeedPageRequest, FeedSpec } from '../feed';
 import type { ThreadBundle, ThreadRequest } from '../thread';
 import type { NotificationItem, NotificationsBundle, NotificationsRequest } from '../notifications';
 import { ownActionKinds, type OwnHistoryBundle, type OwnHistoryRequest } from '../own-state';
@@ -92,25 +92,6 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
       );
     },
 
-    feedLiveSubscribe(
-      request: FeedPageRequest,
-      since: SortKey | undefined,
-      onItems: (items: readonly FeedItem[]) => void,
-    ): () => void {
-      // The one explicit relay seam: stream NEWER notes for the "Load new" pill.
-      // Pages still come from the best tier; only the live delta is relay-only.
-      if (!config.connection.subscribe) return () => {};
-      const filters = filtersForSpec(request.spec, { since: since?.createdAt });
-      if (!filters) return () => {};
-      // Drop the page-size limit for a live sub; it's an open stream, not a page.
-      const liveFilters = filters.map(({ limit: _limit, ...rest }) => rest);
-      return config.connection.subscribe(liveFilters, (raw) => {
-        const event = toFeedEvent(raw);
-        if (!event) return;
-        onItems([{ type: 'note', event }]);
-      });
-    },
-
     async thread(request: ThreadRequest): Promise<TierOutcome<ThreadBundle>> {
       // The root by id, plus its direct replies (#e references to it). The floor
       // can't rank — replies render newest-first via the synthesized manifest.
@@ -150,8 +131,8 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
       const limit = request.limit ?? 50;
       const isMentions = request.tab === 'MENTIONS';
       const bounds = {
-        ...(request.since ? { since: request.since } : {}),
-        ...(request.cursor?.createdAt ? { until: request.cursor.createdAt } : {}),
+        ...(request.since !== undefined ? { since: request.since } : {}),
+        ...(request.cursor ? { until: request.cursor.createdAt } : {}),
       };
       // MENTIONS is replies + quotes + @-mentions (all kind-1); ALL also carries
       // reaction/repost/zap. The demux is the source of truth on tab semantics —
@@ -188,7 +169,7 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
 
     notificationsLiveSubscribe(
       request: NotificationsRequest,
-      since: SortKey | undefined,
+      since: NotificationSortKey | undefined,
       onItems: (items: readonly NotificationItem[]) => void,
     ): () => void {
       if (!config.connection.subscribe) return () => {};
@@ -227,7 +208,7 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
         kinds: ownActionKinds(request.actionType),
         authors: [request.viewerPubkey],
         limit: request.limit ?? 100,
-        ...(request.cursor?.createdAt ? { until: request.cursor.createdAt } : {}),
+        ...(request.cursor ? { until: request.cursor.createdAt } : {}),
       };
       const result = await config.connection.request([filter], {
         signal: request.signal,
@@ -455,8 +436,8 @@ export function filtersForSpec(
   paging: { until?: number; since?: number; limit?: number },
 ): NostrFilter[] | null {
   const bounds = {
-    ...(paging.until ? { until: paging.until } : {}),
-    ...(paging.since ? { since: paging.since } : {}),
+    ...(paging.until !== undefined ? { until: paging.until } : {}),
+    ...(paging.since !== undefined ? { since: paging.since } : {}),
   };
   switch (spec.kind) {
     case 'for-you':
