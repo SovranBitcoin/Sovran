@@ -1,6 +1,6 @@
 import type { NetworkState } from 'expo-network';
 
-const REACHABILITY_PRIMARY_URL = 'https://api.sovran.money/api/app/latest-version';
+import { backendConfig } from '@/shared/config/backend';
 const REACHABILITY_TIMEOUT_MS = 1500;
 
 type NetworkStateForReachability = Pick<
@@ -44,7 +44,7 @@ type ResolveOfflineOptions = {
 const DEFAULT_REACHABILITY_PROBES: readonly ReachabilityProbe[] = [
   {
     name: 'sovran-api',
-    url: REACHABILITY_PRIMARY_URL,
+    url: `${backendConfig.scoreApiBaseUrl}/app/latest-version`,
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

@@ -58,7 +58,10 @@ async function migrateIndexKeysToPubkeyKeys(): Promise<void> {
       const oldData = await AsyncStorage.getItem(oldKey);
       if (!oldData) continue;
 
-      await AsyncStorage.setItem(newKey, oldData);
+      // A partially completed upgrade may already have newer profile data.
+      if ((await AsyncStorage.getItem(newKey)) === null) {
+        await AsyncStorage.setItem(newKey, oldData);
+      }
       await AsyncStorage.removeItem(oldKey);
       migratedCount++;
     }
@@ -106,56 +109,51 @@ async function migrateLegacyGlobalThemeToProfile(): Promise<void> {
 
   const profileRaw = await AsyncStorage.getItem('profile-store');
   if (profileRaw) {
-    try {
-      const profileParsed = JSON.parse(profileRaw);
-      const profiles: { accountIndex: number; pubkey: string }[] =
-        profileParsed?.state?.profiles ?? [];
-      const activeIndex: number | undefined = profileParsed?.state?.activeAccountIndex;
-      const activeProfile = profiles.find((p) => p.accountIndex === activeIndex) ?? profiles[0];
+    const profileParsed = JSON.parse(profileRaw);
+    const profiles: { accountIndex: number; pubkey: string }[] =
+      profileParsed?.state?.profiles ?? [];
+    const activeIndex: number | undefined = profileParsed?.state?.activeAccountIndex;
+    const activeProfile = profiles.find((p) => p.accountIndex === activeIndex) ?? profiles[0];
 
-      if (activeProfile?.pubkey && !isBuiltinColorTheme(legacyTheme)) {
-        const themeStoreKey = `theme-store:profile:${activeProfile.pubkey}`;
-        const existingRaw = await AsyncStorage.getItem(themeStoreKey);
-        let existing: {
-          state?: { activeAlbumSlug?: unknown; unitWallpapers?: Record<string, unknown> };
-        } | null = null;
-        try {
-          existing = existingRaw ? JSON.parse(existingRaw) : null;
-        } catch {
-          existing = null;
-        }
-        const hasUserData =
-          !!existing?.state?.activeAlbumSlug ||
-          (existing?.state?.unitWallpapers &&
-            Object.keys(existing.state.unitWallpapers).length > 0);
-
-        if (!hasUserData) {
-          // Write just the override — activeAlbumSlug stays null so the
-          // resolver picks the single override we're seeding. Once the
-          // wallpaper catalog loads, the user can reopen Theme to pick an
-          // album properly.
-          const nextBlob = {
-            state: {
-              activeAlbumSlug: null,
-              unitWallpapers: { [PROFILE_PRIMARY_UNIT_ID]: legacyTheme },
-              mode: 'dark',
-            },
-            version: 0,
-          };
-          await AsyncStorage.setItem(themeStoreKey, JSON.stringify(nextBlob));
-          log.info('migrations.global.theme_to_profile', {
-            from: legacyTheme,
-            pubkeyPrefix: activeProfile.pubkey.slice(0, 8),
-          });
-        }
+    if (activeProfile?.pubkey && !isBuiltinColorTheme(legacyTheme)) {
+      const themeStoreKey = `theme-store:profile:${activeProfile.pubkey}`;
+      const existingRaw = await AsyncStorage.getItem(themeStoreKey);
+      let existing: {
+        state?: { activeAlbumSlug?: unknown; unitWallpapers?: Record<string, unknown> };
+      } | null = null;
+      try {
+        existing = existingRaw ? JSON.parse(existingRaw) : null;
+      } catch {
+        existing = null;
       }
-    } catch (err) {
-      log.warn('migrations.global.theme_profile_parse_failed', { error: String(err) });
+      const hasUserData =
+        !!existing?.state?.activeAlbumSlug ||
+        (existing?.state?.unitWallpapers && Object.keys(existing.state.unitWallpapers).length > 0);
+
+      if (!hasUserData) {
+        // Write just the override — activeAlbumSlug stays null so the
+        // resolver picks the single override we're seeding. Once the
+        // wallpaper catalog loads, the user can reopen Theme to pick an
+        // album properly.
+        const nextBlob = {
+          state: {
+            activeAlbumSlug: null,
+            unitWallpapers: { [PROFILE_PRIMARY_UNIT_ID]: legacyTheme },
+            mode: 'dark',
+          },
+          version: 0,
+        };
+        await AsyncStorage.setItem(themeStoreKey, JSON.stringify(nextBlob));
+        log.info('migrations.global.theme_to_profile', {
+          from: legacyTheme,
+          pubkeyPrefix: activeProfile.pubkey.slice(0, 8),
+        });
+      }
     }
   }
 
-  // Always strip the legacy `theme` field from settings-store so subsequent
-  // rehydrates don't resurrect it.
+  // Strip only after the destination write succeeds. A failed write must
+  // preserve the source and leave this migration pending for the next launch.
   if (settingsParsed?.state) {
     delete settingsParsed.state.theme;
     await AsyncStorage.setItem('settings-store', JSON.stringify(settingsParsed));

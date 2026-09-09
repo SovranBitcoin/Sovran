@@ -88,14 +88,16 @@ interface ScanHistoryActions {
 
 type ScanHistoryStore = ScanHistoryState & ScanHistoryActions;
 
-/**
- * Lookup key for dedupe — never persisted. Strips a leading payment-URI scheme
- * (`nostr:`, `cashu:`, `bitcoin:`, `lightning:`), trims, and lower-cases so
- * trivially-different surface forms collapse onto the same prior entry.
- */
-export function normaliseForDedupe(raw: string): string {
-  const trimmed = raw.trim().toLowerCase();
-  return trimmed.replace(/^(nostr|cashu|bitcoin|lightning):/, '');
+/** Compare URI wrappers without folding case-sensitive Cashu/base64 or URL payloads. */
+function normaliseForDedupe(raw: string): string {
+  const value = raw.trim().replace(/^(nostr|cashu|bitcoin|lightning):/i, '');
+  // BOLT-11 / Bech32 and hexadecimal identities are case-insensitive. URI
+  // queries and other payloads are not; never lowercase an arbitrary scan.
+  return /^(?:ln(?:bc|tb|bcrt)[0-9]*[munp]?1|(?:lnurl|npub|nprofile|note|nevent|naddr|nsec|bc|tb|bcrt)1)[a-z0-9]+$/i.test(
+    value
+  ) || /^[0-9a-f]{64}$/i.test(value)
+    ? value.toLowerCase()
+    : value;
 }
 
 // `processed` was an in-memory mirror of `raw` (the sole call site passed raw
@@ -171,9 +173,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
               // Tail-evict oldest by scannedAt once the cap is breached. Stable when under cap.
               nextEntries =
                 appended.length > MAX_SCAN_HISTORY
-                  ? [...appended]
-                      .sort((a, b) => b.scannedAt - a.scannedAt)
-                      .slice(0, MAX_SCAN_HISTORY)
+                  ? appended.sort((a, b) => b.scannedAt - a.scannedAt).slice(0, MAX_SCAN_HISTORY)
                   : appended;
             }
             return {
@@ -188,7 +188,8 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
           storeLog.debug('store.scan_history.link_transaction', { transactionId });
 
           set((state) => {
-            const index = state.entries.findIndex((entry) => entry.raw === raw);
+            const key = normaliseForDedupe(raw);
+            const index = state.entries.findIndex((entry) => normaliseForDedupe(entry.raw) === key);
             if (index === -1) return state;
             const nextEntries = [...state.entries];
             nextEntries[index] = { ...nextEntries[index], transactionId };

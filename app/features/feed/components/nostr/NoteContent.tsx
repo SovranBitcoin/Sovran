@@ -1,3 +1,4 @@
+import { parseImetaTags } from '@/shared/lib/nostr/media/imeta';
 import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, Platform, type LayoutChangeEvent } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -31,7 +32,6 @@ import {
   collectQuoteTagIds,
   mediaKindForMime,
   parseContent,
-  parseImetaTags,
   prettifyUrl,
   tryNpubEncode,
 } from './feedParse';

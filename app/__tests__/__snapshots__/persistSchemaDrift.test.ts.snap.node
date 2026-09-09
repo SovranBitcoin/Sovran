@@ -8018,8 +8018,17 @@ exports[`persisted schema drift transaction-annotation-store schema matches the 
           },
           "default": {},
           "propertyNames": {
-            "maxLength": 256,
             "type": "string",
+          },
+          "tolerantKey": {
+            "input": {
+              "maxLength": 256,
+              "type": "string",
+            },
+            "output": {
+              "maxLength": 256,
+              "type": "string",
+            },
           },
           "type": "object",
         },
@@ -8030,25 +8039,7 @@ exports[`persisted schema drift transaction-annotation-store schema matches the 
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
-        "annotations": {
-          "additionalProperties": {
-            "additionalProperties": {
-              "maxLength": 16384,
-              "type": "string",
-            },
-            "propertyNames": {
-              "maxLength": 64,
-              "type": "string",
-            },
-            "type": "object",
-          },
-          "default": {},
-          "propertyNames": {
-            "maxLength": 256,
-            "type": "string",
-          },
-          "type": "object",
-        },
+        "annotations": {},
       },
       "required": [
         "annotations",

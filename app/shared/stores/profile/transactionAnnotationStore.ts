@@ -12,7 +12,7 @@
  *
  * Legacy data (scan-history transaction links, distribution, location) is
  * imported per profile by the `dataMigrations` registry, which calls
- * `importLegacyTransactionSideData` and tracks completion via a numeric level.
+ * its import and tracks completion via a numeric level.
  */
 
 import { create } from 'zustand';
@@ -23,8 +23,8 @@ import type { AnnotationRecord, AnnotationStoreAdapter, TransactionAnnotation } 
 import { encodeAnnotation } from 'wallet';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { tolerantRecord } from '@/shared/lib/persist/tolerant';
 
 interface TransactionAnnotationState {
   /** colada annotation key -> flat annotation record. */
@@ -34,27 +34,9 @@ interface TransactionAnnotationState {
 const AnnotationRecordSchema = z.record(z.string().max(64), z.string().max(16_384));
 
 const PersistedTransactionAnnotationStore = z.object({
-  // Entry-tolerant: an invalid key or record drops THAT entry, never the blob.
-  // Historical `raw:<full-token>` keys (>1kB, pre-hashing) used to fail the
-  // 256-char key cap and — via createMergeWithSchema's whole-blob discard —
-  // silently wiped every annotation on the next launch. The preprocess
-  // salvages all valid entries from such blobs and ages the poison out.
-  annotations: z.preprocess(
-    (value) => {
-      if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
-      const sanitized: Record<string, unknown> = {};
-      for (const [key, record] of Object.entries(value as Record<string, unknown>)) {
-        if (key.length > 256) continue;
-        if (!AnnotationRecordSchema.safeParse(record).success) continue;
-        sanitized[key] = record;
-      }
-      return sanitized;
-    },
-    z.record(z.string().max(256), AnnotationRecordSchema).default({})
-  ),
-  // (legacy `_migratedLegacy` flag removed — the cross-store import is now
-  // tracked by dataMigrationStore's level. Old blobs carrying the field still
-  // validate via the loose record and it simply ages out.)
+  // Contain malformed entries (including historical raw-token keys >256 chars)
+  // without discarding valid annotations from the same profile.
+  annotations: tolerantRecord(z.string().max(256), AnnotationRecordSchema),
 });
 
 // Exported only for the dev-gated e2e state mirror; app code goes through the
@@ -134,125 +116,4 @@ export function setDistributionAnnotation(
 ): void {
   if (transactionAnnotationAdapter.get(key)?.distributionSource) return;
   applyPatch(key, encodeAnnotation({ distribution: { source } }));
-}
-
-// ---------------------------------------------------------------------------
-// One-time legacy migration
-// ---------------------------------------------------------------------------
-
-export async function whenHydrated(store: {
-  persist: { hasHydrated: () => boolean; onFinishHydration: (cb: () => void) => () => void };
-}): Promise<void> {
-  if (store.persist.hasHydrated()) return;
-  await new Promise<void>((resolve) => {
-    const unsub = store.persist.onFinishHydration(() => {
-      unsub();
-      resolve();
-    });
-  });
-}
-
-/**
- * Import legacy per-transaction side-data into annotation keys. Distribution
- * rows are written under both `quote:` and `id:` (the old store keyed mint
- * quotes by quoteId, others by entry id); scan + location rows key by
- * `id:<transactionId>`. colada's `mergeAnnotationRecords` recombines them across
- * an entry's candidate keys at read time.
- *
- * Idempotent + additive (first-write-wins for distribution): safe to re-run, so
- * the dataMigrations registry can drive it via a level rather than a one-shot
- * flag, and a future "retire legacy stores" step can re-sweep before deleting.
- */
-export async function importLegacyTransactionSideData(): Promise<void> {
-  try {
-    const [
-      { useScanHistoryStore },
-      { useTransactionDistributionStore },
-      { useTransactionLocationStore },
-      { useSwapTransactionsStore },
-    ] = await Promise.all([
-      import('@/shared/stores/profile/scanHistoryStore'),
-      import('@/shared/stores/profile/transactionDistributionStore'),
-      import('@/shared/stores/profile/transactionLocationStore'),
-      import('@/shared/stores/profile/swapTransactionsStore'),
-    ]);
-
-    await Promise.all([
-      whenHydrated(useTransactionAnnotationStore),
-      whenHydrated(useScanHistoryStore),
-      whenHydrated(useTransactionDistributionStore),
-      whenHydrated(useTransactionLocationStore),
-      whenHydrated(useSwapTransactionsStore),
-    ]);
-
-    const next: Record<string, AnnotationRecord> = {
-      ...useTransactionAnnotationStore.getState().annotations,
-    };
-    const mergeInto = (key: string, record: AnnotationRecord) => {
-      if (Object.keys(record).length === 0) return;
-      next[key] = { ...(next[key] ?? {}), ...record };
-    };
-
-    let scans = 0;
-    for (const entry of useScanHistoryStore.getState().entries) {
-      if (!entry.transactionId) continue;
-      mergeInto(
-        `id:${entry.transactionId}`,
-        encodeAnnotation({
-          scan: {
-            method: entry.source,
-            raw: entry.raw,
-            container: entry.container,
-            optionKinds: entry.optionKinds,
-            inputType: entry.inputType,
-          },
-        })
-      );
-      scans += 1;
-    }
-
-    let distributions = 0;
-    for (const [key, value] of Object.entries(
-      useTransactionDistributionStore.getState().distributions
-    )) {
-      const record = encodeAnnotation({ distribution: { source: value.source } });
-      mergeInto(`quote:${key}`, record);
-      mergeInto(`id:${key}`, record);
-      distributions += 1;
-    }
-
-    let locations = 0;
-    for (const [entryId, value] of Object.entries(
-      useTransactionLocationStore.getState().locations
-    )) {
-      mergeInto(
-        `id:${entryId}`,
-        encodeAnnotation({ location: { lat: value.latitude, lng: value.longitude } })
-      );
-      locations += 1;
-    }
-
-    let swaps = 0;
-    for (const [quoteId, ref] of Object.entries(
-      useSwapTransactionsStore.getState().quoteIdToGroup
-    )) {
-      mergeInto(
-        `quote:${quoteId}`,
-        encodeAnnotation({ swap: { groupId: ref.groupId, role: ref.kind } })
-      );
-      swaps += 1;
-    }
-
-    useTransactionAnnotationStore.setState({ annotations: next });
-    storeLog.info('store.tx_annotation.migrated_legacy', {
-      scans,
-      distributions,
-      locations,
-      swaps,
-    });
-  } catch (error) {
-    storeLog.warn('store.tx_annotation.migrate_failed', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
 }

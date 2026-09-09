@@ -9,8 +9,7 @@
  * Pure: callers (the create hook, the ingest seams) feed events/descriptors in
  * and persist the result into `ownedMediaStore`.
  */
-import { parseImetaTags } from '@/features/feed/components/nostr/feedParse';
-import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
+import { parseImetaTags } from '@/shared/lib/nostr/media/imeta';
 import type { MediaDescriptor } from '@/shared/lib/nostr/media/types';
 
 export interface OwnedBlob {
@@ -56,7 +55,10 @@ const blobKey = (host: string, sha256: string): string => `${host}|${sha256}`;
  * Blobs a note declares: imeta entries (with mime) plus blossom-shaped content
  * URLs. Deduped by host+sha256 — the imeta entry wins (it carries the mime).
  */
-export function extractOwnedBlobs(event: FeedEvent): OwnedBlob[] {
+export function extractOwnedBlobs(event: {
+  content: string;
+  tags: readonly string[][];
+}): OwnedBlob[] {
   const byBlob = new Map<string, OwnedBlob>();
 
   for (const info of parseImetaTags(event.tags).values()) {

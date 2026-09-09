@@ -14,7 +14,7 @@ import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useOwnedMediaStore } from '@/shared/stores/profile/ownedMediaStore';
 import { useDeleteStatusStore } from '@/shared/stores/runtime/deleteStatusStore';
 
-import { parseImetaTags } from '../components/nostr/feedParse';
+import { parseImetaTags } from '@/shared/lib/nostr/media/imeta';
 import type { FeedEvent } from '../components/nostr/feedTypes';
 
 function relayDomain(url: string): string {

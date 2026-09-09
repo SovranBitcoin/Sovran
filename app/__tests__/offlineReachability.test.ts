@@ -5,6 +5,10 @@ import {
   type ReachabilityProbe,
 } from '@/shared/lib/offlineReachability';
 
+jest.mock('@/shared/config/backend', () => ({
+  backendConfig: { scoreApiBaseUrl: 'https://configured-nagg.example' },
+}));
+
 const connectedWifi: NetworkState = {
   isConnected: true,
   isInternetReachable: true,
@@ -31,6 +35,16 @@ function response(status: number): Response {
 }
 
 describe('offline reachability', () => {
+  it('probes the configured latest-version backend by default', async () => {
+    const fetcher = jest.fn().mockResolvedValue(response(200));
+    const result = await resolveOfflineReachability(connectedWifi, { fetcher });
+    expect(result.isOffline).toBe(false);
+    expect(fetcher).toHaveBeenCalledWith(
+      'https://configured-nagg.example/app/latest-version',
+      expect.objectContaining({ method: 'POST', body: '{"storage":{"version":"0.0.0"}}' })
+    );
+  });
+
   it('treats airplane/no active network as offline without probing', async () => {
     const fetcher = jest.fn();
 

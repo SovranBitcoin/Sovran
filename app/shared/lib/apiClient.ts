@@ -510,9 +510,6 @@ export const getAiLineup = (controls: RequestControls = {}) =>
     controls
   );
 
-/** Test seam: the v2 envelope -> NostrProfileFull mapper. */
-export const __parseNostrProfileForTest = parseNostrProfileFor;
-
 export const fetchNostrProfile = (pubkey: string, controls: RequestControls = {}) =>
   fetchJson(
     `${SCORE_API_BASE_URL}/nostr/profile?pubkey=${encodeURIComponent(pubkey)}`,
