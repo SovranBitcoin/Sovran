@@ -151,6 +151,7 @@ interface RoutstrError {
   error: {
     message: string;
     type: string;
+    code?: string;
     details?: {
       required?: number;
       available?: number;
@@ -160,6 +161,7 @@ interface RoutstrError {
 }
 
 interface ParsedErrorData {
+  code?: string;
   message: string;
   type: string;
   details?: Record<string, unknown>;
@@ -194,6 +196,7 @@ async function parseErrorResponse(response: Response): Promise<ParsedErrorData> 
       return {
         message: raw.error.message || raw.detail || '',
         type: raw.error.type || raw.error.code || 'unknown_error',
+        code: typeof raw.error.code === 'string' ? raw.error.code : undefined,
         details,
         error: raw.error,
       };
@@ -227,25 +230,6 @@ async function extractErrorMessageFromHTML(response: Response): Promise<string> 
   } catch {
     return `HTTP ${response.status}`;
   }
-}
-
-const FRIENDLY_MESSAGES: Record<number, string> = {
-  401: 'Authentication failed. Please check your API key.',
-  402: 'Insufficient balance. Please top up your account.',
-  429: 'Rate limit exceeded. Please wait a moment before trying again.',
-  502: 'Service temporarily unavailable. Please try again in a few minutes.',
-  503: 'Service temporarily unavailable. Please try again in a few minutes.',
-  504: 'Request timeout. The service is taking too long to respond.',
-};
-
-function getUserFriendlyErrorMessage(status: number, errorData: ParsedErrorData): string {
-  if (status === 402 && errorData.error?.message) return errorData.error.message;
-  return (
-    FRIENDLY_MESSAGES[status] ||
-    errorData.error?.message ||
-    errorData.message ||
-    `HTTP ${status} error`
-  );
 }
 
 /**
@@ -302,7 +286,8 @@ async function throwResponseError(response: Response): Promise<never> {
   throw {
     status,
     error: {
-      message: getUserFriendlyErrorMessage(status, errorData),
+      message: errorData.message,
+      code: errorData.code,
       type: errorData.type || 'unknown_error',
       details: errorData.details,
     },

@@ -105,3 +105,26 @@ describe('paymentStatusStore', () => {
     expect(usePaymentStatusStore.getState().active).toBeNull();
   });
 });
+
+it('presents wrapped mint errors through the shared catalog in the payment toast state', () => {
+  const store = usePaymentStatusStore.getState();
+  store.setActive({
+    id: 'failed-receive',
+    variant: 'receive-ecash',
+    state: 'processing',
+    mintUrl: 'https://mint.invalid',
+    amount: 21,
+    unit: 'sat',
+  });
+  store.setFailed(
+    'failed-receive',
+    new Error('Coco receive failed', {
+      cause: { code: 20002, detail: 'quote already issued' },
+    })
+  );
+  expect(usePaymentStatusStore.getState().active).toMatchObject({
+    state: 'failed',
+    errorMessage:
+      'The mint has already issued ecash for this quote. Check transaction history or use wallet recovery.',
+  });
+});

@@ -1,3 +1,4 @@
+import { describeError } from '@/shared/lib/errors';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, StyleSheet } from 'react-native';
 import { useFocusEffect } from 'expo-router';
@@ -481,7 +482,7 @@ export function NotificationsScreen() {
             paintedFromCache,
             message,
           });
-          setErrorMessage(message);
+          setErrorMessage(describeError(error, 'nagg').text);
           // Keep the warm-painted page on a transient failure.
           if (mode === 'initial' && !paintedFromCache) applyFirstPage(null, 'error-reset');
         })

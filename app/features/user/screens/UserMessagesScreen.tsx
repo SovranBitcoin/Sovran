@@ -314,7 +314,7 @@ export function UserMessagesScreen({
             total_ms: Math.round(performance.now() - dmStart),
           });
           setLocalMessages((prev) => prev.filter((msg) => msg.id !== nip04EchoId));
-          staticPopup('send-message-failed');
+          staticPopup('send-message-failed', { failure: { service: 'nostr', error } });
         }
         return;
       }
@@ -385,7 +385,7 @@ export function UserMessagesScreen({
       } catch (error) {
         log.error('dm.send.failed', { error, total_ms: Math.round(performance.now() - dmStart) });
         setLocalMessages((prev) => prev.filter((msg) => msg.id !== echoId));
-        staticPopup('send-message-failed');
+        staticPopup('send-message-failed', { failure: { service: 'nostr', error } });
       }
     },
     [ndk, nostrKeys?.privateKey, nostrKeys?.pubkey, pubkey, isMockThread, protocol]

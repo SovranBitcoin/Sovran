@@ -209,7 +209,7 @@ async function fetchNaggFeedPage(
 }
 
 function errorFromNaggError(error: NaggError): Error {
-  const out = new Error(error.message);
+  const out = new Error(error.message, { cause: error });
   out.name =
     error.type === 'network' && /abort|timed out|timeout/i.test(error.message)
       ? 'AbortError'

@@ -1,3 +1,4 @@
+import { describeError } from '@/shared/lib/errors';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { GetInfoResponse, Proof } from '@cashu/cashu-ts';
 import { useManager } from '@cashu/coco-react';
@@ -40,7 +41,6 @@ import {
   formatCandidateRoutingDetail,
   insertStepsAfter,
   mergeStepState,
-  normalizeRebalanceTransferError,
   resetFailedStepStates,
 } from '@/features/mint/lib/rebalanceRunState';
 import { fetchRebalanceRouteAudits } from '@/features/mint/lib/rebalanceRouteAudits';
@@ -1015,7 +1015,7 @@ export function useMintRebalanceOrchestrator({
               for (const url of chainPath) {
                 await CocoManager.restoreInflightProofsForMint(url);
               }
-              const failedHopMessage = hopErr instanceof Error ? hopErr.message : String(hopErr);
+              const failedHopMessage = describeError(hopErr, 'cashu').text;
               if (finalAutoRouteStepId) {
                 updateStepState(finalAutoRouteStepId, {
                   status: 'failed',
@@ -1150,7 +1150,7 @@ export function useMintRebalanceOrchestrator({
           errorObject: String(error),
         });
 
-        const errorMessage = normalizeRebalanceTransferError(error);
+        const errorMessage = describeError(error, 'cashu').text;
 
         updateStepState(id, {
           status: 'failed',

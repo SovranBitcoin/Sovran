@@ -1,3 +1,4 @@
+import { describeError } from '@/shared/lib/errors';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { RefreshControl, StyleSheet } from 'react-native';
@@ -315,7 +316,7 @@ export function NotificationFollowersScreen() {
           if (signal.aborted || sequence !== loadSequenceRef.current) return;
           const message = error instanceof Error ? error.message : String(error);
           feedLog.warn('feed.notification_followers.load_failed', { message });
-          setErrorMessage(message);
+          setErrorMessage(describeError(error, 'nagg').text);
           // Keep the warm-painted page on a transient revalidate failure.
           if (mode === 'initial' && !paintedFromCache) applyFirstPage(null);
         })

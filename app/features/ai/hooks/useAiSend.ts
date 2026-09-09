@@ -683,7 +683,7 @@ export function useAiSend() {
             ],
           });
         } else {
-          staticPopup('send-message-failed', { text: err?.error?.message ?? err?.message });
+          staticPopup('send-message-failed', { failure: { service: 'routstr', error: err } });
         }
       } finally {
         clearStreaming();

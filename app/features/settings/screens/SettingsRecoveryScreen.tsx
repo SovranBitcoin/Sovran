@@ -1,3 +1,4 @@
+import { describeError } from '@/shared/lib/errors';
 import React, { useState, useEffect } from 'react';
 import { ScrollView } from 'react-native';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -738,7 +739,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         setPhase('error');
       }
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      const errorMsg = describeError(error, 'cashu').text;
       setErrorMessage(errorMsg);
       if (!gateMode) {
         staticPopup('recovery-failed', { text: errorMsg });

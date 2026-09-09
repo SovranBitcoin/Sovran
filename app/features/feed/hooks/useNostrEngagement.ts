@@ -113,7 +113,7 @@ async function toggleEngagement(opts: ToggleEngagementOpts): Promise<void> {
       ndkEvent.created_at = Math.floor(Date.now() / 1000);
       // Reactions are latency-sensitive: settle as soon as one relay accepts.
       const published = await publishEvent({ ndk, event: ndkEvent, resolveOn: 'first-ok' });
-      if (published.isErr()) throw new Error(`${label} publish failed`);
+      if (published.isErr()) throw new Error(`${label} publish failed`, { cause: published.error });
       onActivated?.(eventId);
       setOptimistic(eventId, {
         value: nextActive,
@@ -136,10 +136,11 @@ async function toggleEngagement(opts: ToggleEngagementOpts): Promise<void> {
     ];
     deleteEvent.created_at = Math.floor(Date.now() / 1000);
     const deleted = await publishEvent({ ndk, event: deleteEvent, resolveOn: 'first-ok' });
-    if (deleted.isErr()) throw new Error(`${label} delete publish failed`);
+    if (deleted.isErr())
+      throw new Error(`${label} delete publish failed`, { cause: deleted.error });
     onDeactivated?.(eventId);
     setOptimistic(eventId, { value: nextActive, pending: false, delta, expectedCount });
-  } catch {
+  } catch (error) {
     if (previousOptimistic) {
       setOptimistic(eventId, {
         value: previousOptimistic.value,
@@ -151,7 +152,9 @@ async function toggleEngagement(opts: ToggleEngagementOpts): Promise<void> {
     } else {
       clearOptimistic(eventId);
     }
-    paramPopup('engagement-update-failed', label as 'follow' | 'like' | 'repost');
+    paramPopup('engagement-update-failed', label as 'follow' | 'like' | 'repost', {
+      failure: { service: 'nostr', error },
+    });
   }
 }
 

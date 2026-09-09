@@ -400,6 +400,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 - `app/` — Expo Router routes and route-group stacks.
 - `features/` — domain modules for wallet, send, receive, mint, transactions, feed, contacts, AI, map, split bill, settings, BitChat, Whitenoise, theme, and onboarding.
 - `shared/` — cross-cutting UI primitives, providers, stores, Cashu/Nostr/NFC/Routstr helpers, theme and persistence infrastructure.
+- [Service error translations](shared/lib/errors/README.md) — the shared catalog and extension workflow for Routstr, Cashu/Coco/mints, Nostr, and Nagg failures.
 - `../wallet/` — in-repo workspace package (formerly `colada`) for the payment parser, state machine, guards, screen actions, LNURL/NIP-05 resolution, and tests.
 - `../nostr/` — in-repo workspace package (formerly `nagg-ts`) for the Nostr app-view client and tiered data layer.
 - `modules/` — local native modules: BitChat and Liquid Glass text.

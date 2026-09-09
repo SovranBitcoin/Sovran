@@ -1,3 +1,4 @@
+import { describeError } from '@/shared/lib/errors';
 /**
  * The Notifications → Mints data source: what the mints in THIS wallet changed
  * about their own NUT-06 info, newest first.
@@ -107,7 +108,7 @@ export function useMintChanges(): UseMintChangesResult {
         if (signal.aborted) return;
         const message = error instanceof Error ? error.message : String(error);
         cashuLog.warn('mint.changes.load_failed', { mode, message });
-        setErrorMessage(message);
+        setErrorMessage(describeError(error, 'nagg').text);
       })
       .finally(() => {
         if (signal.aborted) return;
