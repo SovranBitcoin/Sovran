@@ -12,8 +12,6 @@ import {
   rasterizeBrand,
 } from "./brand-assets.mjs";
 
-// Keep resize math consistent between ARM developer machines and x64 CI.
-sharp.simd(false);
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const folder = join(root, "marketing/feature-graphic");

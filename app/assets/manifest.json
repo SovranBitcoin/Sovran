@@ -85,6 +85,12 @@
         "sourceUrl": "https://blossom.primal.net/c2d8ea95568005e1e1d9e303f48431dcee3caf1c0fcb295e172b83cf48ba5a6a.png",
         "license": "Publicly available third-party demo media; no separate license assertion",
         "snapshot": "shared/stores/runtime/fixtures/publicDemoSnapshot.json"
+      },
+      "equivalentExportHashes": {
+        "image@3x.png": [
+          "e67ba4038a1ea81d6050f323d559fb4d09af615005786773c9575819d2446a1b",
+          "8ae53e2430e2fecb7bb2c0ec6a4d03eb3c696fd011e70ab63ecbaa2f40dc9698"
+        ]
       }
     },
     {

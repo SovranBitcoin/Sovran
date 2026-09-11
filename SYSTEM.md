@@ -728,10 +728,29 @@ central 66/108 circular safe zone. Native icon/splash changes need a new binary.
 from the root or `app/`. The [brand generator](scripts/brand-assets.mjs) records
 source hashes, version, geometry and output hashes in its generated manifest.
 The install hook regenerates before Expo prebuild; EAS and release checks reject
-stale artwork. Asset generators disable Sharp SIMD so CPU-specific resize paths
-do not change committed output between ARM development and x64 CI; retain exact
-byte comparisons. Commit source and generated output together so regeneration does
+stale artwork. Commit source and generated output together so regeneration does
 not dirty the release checkout. See [the brand guide](app/assets/brand/README.md).
+
+**Measured asset-budget update (2026-09-11):** the requested offline demo PNGs
+add 14,893,736 bundled bytes; standardized branding/other assets add 22,997 bytes.
+Linux release exports total 16,708,149 bytes on iOS and 17,670,455 on Android.
+`bundle-size-budget.json` adds exactly that 14,916,733-byte product increase to
+each prior asset ceiling, retaining original headroom and reference measurements.
+JavaScript ceilings are unchanged. Source originals are not bundled. Future
+fixture additions or alternative formats need a new measured review; splitting
+demo media from production builds remains a possible size optimization.
+
+**Verified raster platform exception (2026-09-11):** libvips 8.17.3 / Sharp 0.34.5
+on macOS ARM and Linux x64 differ in 217 of 589,824 decoded channel values
+(maximum difference 2/255) for only
+`demo/43baaf0c28e6cfb195b17ee083e19eb3a4afdfac54d9b6baf170270ed193e34c/image@3x.png`.
+Disabling SIMD does not remove the difference. Its `equivalentExportHashes` in
+`app/assets/manifest.json` pins both inspected PNG hashes; the saved and freshly
+rendered file must each match one of those hashes. Source identity/dimensions
+remain checked, all other outputs require exact bytes, and release publication
+always preserves the committed bytes and hashes. No general image tolerance is
+allowed. Recheck/remove this exception when the source, sizing recipe or renderer
+changes. Both platform checks passed with this bounded exception.
 
 **Store feature graphics:** [the composition](marketing/feature-graphic/source/composition.json)
 selects four native screenshots per platform; [the generator](scripts/feature-graphic.mjs)

@@ -13,8 +13,6 @@ const app = join(root, "app");
 const assets = join(app, "assets");
 const require = createRequire(join(app, "package.json"));
 const sharp = require("sharp");
-// Keep resize math consistent between ARM developer machines and x64 CI.
-sharp.simd(false);
 const check = process.argv[2] === "--check";
 assert(
   process.argv.length === 2 || (process.argv.length === 3 && check),
@@ -102,8 +100,13 @@ for (const asset of manifest.assets) {
       .png({ compressionLevel: 9, adaptiveFiltering: true })
       .toBuffer();
     if (check) {
+      const saved = await readFile(file);
+      // A reviewed platform variant must match exact hashes on BOTH sides.
+      // Never accept arbitrary pixel tolerances or a changed committed image.
+      const equivalents = asset.equivalentExportHashes?.[output.file] ?? [];
       assert(
-        (await readFile(file)).equals(png),
+        saved.equals(png) ||
+          (equivalents.includes(sha256(saved)) && equivalents.includes(sha256(png))),
         `Stale export: ${relative(root, file)}; run bun run assets:generate`,
       );
     } else {
