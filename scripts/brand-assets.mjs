@@ -12,6 +12,8 @@ import opentype from "opentype.js";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(join(root, "app/package.json"));
 const sharp = require("sharp");
+// Keep resize math consistent between ARM developer machines and x64 CI.
+sharp.simd(false);
 const images = join(root, "app/assets/brand");
 const hash = (data) => createHash("sha256").update(data).digest("hex");
 const number = (n) => Number(n.toFixed(6));

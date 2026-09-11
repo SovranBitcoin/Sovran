@@ -728,7 +728,9 @@ central 66/108 circular safe zone. Native icon/splash changes need a new binary.
 from the root or `app/`. The [brand generator](scripts/brand-assets.mjs) records
 source hashes, version, geometry and output hashes in its generated manifest.
 The install hook regenerates before Expo prebuild; EAS and release checks reject
-stale artwork. Commit source and generated output together so regeneration does
+stale artwork. Asset generators disable Sharp SIMD so CPU-specific resize paths
+do not change committed output between ARM development and x64 CI; retain exact
+byte comparisons. Commit source and generated output together so regeneration does
 not dirty the release checkout. See [the brand guide](app/assets/brand/README.md).
 
 **Store feature graphics:** [the composition](marketing/feature-graphic/source/composition.json)

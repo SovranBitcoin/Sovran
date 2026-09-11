@@ -13,6 +13,8 @@ const app = join(root, "app");
 const assets = join(app, "assets");
 const require = createRequire(join(app, "package.json"));
 const sharp = require("sharp");
+// Keep resize math consistent between ARM developer machines and x64 CI.
+sharp.simd(false);
 const check = process.argv[2] === "--check";
 assert(
   process.argv.length === 2 || (process.argv.length === 3 && check),
