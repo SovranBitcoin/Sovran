@@ -49,7 +49,7 @@ The sample contains:
 
 Two anonymized mint/endpoint groups account for 111 and 109 rate-limit responses, respectively, with mean error spacings of **5.35 and 5.41 seconds**. That establishes repeated failed activity in this sample. It does not establish why the mint returned each error or how much energy these calls consumed. Transaction logs count database transactions, not necessarily writes, fsyncs, or independent network requests.
 
-[Manager construction](../../app/shared/lib/cashu/manager.ts#L538) leaves subscription intervals at Coco defaults. [Watcher startup](../../app/shared/lib/cashu/manager.ts#L714) restores existing pending operations and reusable quotes. The installed `@cashu/coco-core/dist/index.js` has:
+[Manager construction](https://github.com/SovranBitcoin/Sovran/blob/7fec36acb46bd0d3994ac77c2f1cd55791c18c65/app/shared/lib/cashu/manager.ts#L538) leaves subscription intervals at Coco defaults. [Watcher startup](https://github.com/SovranBitcoin/Sovran/blob/7fec36acb46bd0d3994ac77c2f1cd55791c18c65/app/shared/lib/cashu/manager.ts#L714) restores existing pending operations and reusable quotes. The installed `@cashu/coco-core/dist/index.js` has:
 
 - `PollingTransport.maybeRun`, around line 8550: a per-mint queue with a fixed next-allowed interval after processing; mint quote tasks are requeued.
 - `performOpportunity`, around line 8607: consumes updated quote outcomes without adapting the schedule to failed outcomes.
@@ -62,11 +62,11 @@ Deduplicate subscriptions for the same quote and unsubscribe only when its lifec
 
 This likely requires a Coco dependency fix or a supported transport extension. Do not hand-edit `node_modules` or change the sibling reference repository as part of an app-only fix.
 
-The NUT-18 [transport](../../app/shared/lib/cashu/paymentRequestNostrTransport.ts#L139) also checks DM envelopes every fifteen seconds while it has active receive operations, with live relay delivery in parallel. Verify which outstanding operations justify that work. Its fallback protects reception after silent relay failure; removing it without replacing that recovery guarantee is incorrect.
+The NUT-18 [transport](https://github.com/SovranBitcoin/Sovran/blob/7fec36acb46bd0d3994ac77c2f1cd55791c18c65/app/shared/lib/cashu/paymentRequestNostrTransport.ts#L139) also checks DM envelopes every fifteen seconds while it has active receive operations, with live relay delivery in parallel. Verify which outstanding operations justify that work. Its fallback protects reception after silent relay failure; removing it without replacing that recovery guarantee is incorrect.
 
 ## 2. Actually deactivate completed animation callbacks
 
-[LoadingIndicator](../../app/shared/blocks/status/LoadingIndicator.tsx#L749) calls `useFrameCallback` with default autostart. When both speeds are zero it returns early, but never deactivates the registered callback. Even its static completed rendering path leaves the hook mounted. The component appears in transaction timelines and transfer steps, as well as spinners.
+[LoadingIndicator](https://github.com/SovranBitcoin/Sovran/blob/7fec36acb46bd0d3994ac77c2f1cd55791c18c65/app/shared/blocks/status/LoadingIndicator.tsx#L749) calls `useFrameCallback` with default autostart. When both speeds are zero it returns early, but never deactivates the registered callback. Even its static completed rendering path leaves the hook mounted. The component appears in transaction timelines and transfer steps, as well as spinners.
 
 The installed Reanimated registry reschedules `requestAnimationFrame` while any registered callback is active. A small Node harness executed that actual registry with a simulated frame scheduler: an early-return callback ran **600 times over 600 simulated frames**, with another frame still queued. Deactivation drained the loop to zero queued frames. This verifies scheduler behavior, not device power consumption or whether such an indicator was mounted during the supplied log window.
 
@@ -76,9 +76,9 @@ Reanimated documents both default autostart and `setActive(false)`. Returning ea
 
 ## 3. Make wallpaper motion optional and visibility-aware
 
-[wallpaperMotion.ts](../../app/shared/lib/theme/wallpaperMotion.ts#L22) subscribes to DeviceMotion every **50 ms** and starts a native-driver spring for every rotation sample, with no motion deadband. The sensor callback still reaches JavaScript; using a native animation driver does not remove that work.
+[wallpaperMotion.ts](https://github.com/SovranBitcoin/Sovran/blob/7fec36acb46bd0d3994ac77c2f1cd55791c18c65/app/shared/lib/theme/wallpaperMotion.ts#L22) subscribes to DeviceMotion every **50 ms** and starts a native-driver spring for every rotation sample, with no motion deadband. The sensor callback still reaches JavaScript; using a native animation driver does not remove that work.
 
-[AnimatedBackgroundView](../../app/shared/ui/composed/BackgroundView.tsx#L312) retains the shared subscription if the current theme **or any registered carousel page** has an image wallpaper. Its retention condition checks reduced motion, but not screen focus or actual visibility. Thus a solid current page alone does not guarantee motion is stopped when another carousel page has an image. Hidden layers share the animated transform. Existing reference counting correctly prevents one sensor subscription per wallpaper layer.
+[AnimatedBackgroundView](https://github.com/SovranBitcoin/Sovran/blob/7fec36acb46bd0d3994ac77c2f1cd55791c18c65/app/shared/ui/composed/BackgroundView.tsx#L312) retains the shared subscription if the current theme **or any registered carousel page** has an image wallpaper. Its retention condition checks reduced motion, but not screen focus or actual visibility. Thus a solid current page alone does not guarantee motion is stopped when another carousel page has an image. Hidden layers share the animated transform. Existing reference counting correctly prevents one sensor subscription per wallpaper layer.
 
 **Recommended fix:** offer static wallpaper motion, retain the sensor only for visible foreground wallpaper, and stop springs when that visibility ends. If parallax is retained, ignore insignificant rotation changes and evaluate a lower update rate. Test the full carousel, not just the current theme. Measure before pursuing a native sensor rewrite; stopping unnecessary work is the first experiment.
 
@@ -88,7 +88,7 @@ Apple recommends avoiding unnecessary redraws and ending animation when its purp
 
 ## 4. Replace constant reachability traffic with adaptive checks
 
-[OfflineProvider](../../app/shared/providers/OfflineProvider.tsx#L26) checks every **3,000 ms** while active. [offlineReachability.ts](../../app/shared/lib/offlineReachability.ts#L47) sends an uncached POST to the application's latest-version endpoint on each connected-state evaluation. That is approximately **20 requests/minute, or 1,200/hour**, under healthy steady conditions, before extra listener-triggered checks. This is a source-derived rate; the request bypasses the regular API logger and is not included in the mint-request count above.
+[OfflineProvider](https://github.com/SovranBitcoin/Sovran/blob/7fec36acb46bd0d3994ac77c2f1cd55791c18c65/app/shared/providers/OfflineProvider.tsx#L26) checks every **3,000 ms** while active. [offlineReachability.ts](https://github.com/SovranBitcoin/Sovran/blob/7fec36acb46bd0d3994ac77c2f1cd55791c18c65/app/shared/lib/offlineReachability.ts#L47) sends an uncached POST to the application's latest-version endpoint on each connected-state evaluation. That is approximately **20 requests/minute, or 1,200/hour**, under healthy steady conditions, before extra listener-triggered checks. This is a source-derived rate; the request bypasses the regular API logger and is not included in the mint-request count above.
 
 The provider already has an overlap mutex, network events, offline hysteresis, and background timer cleanup. Preserve those safeguards.
 
@@ -98,7 +98,7 @@ Apple recommends reducing timer wakeups and batching networking. [Timer guidance
 
 ## 5. Bound BLE discovery after leaving nearby features
 
-BLE is not started by the root provider at fresh launch. [useBLEPeers](../../app/features/bitchat/hooks/useBLEPeers.ts#L119) starts it on feature mount; ordinary Send and user message-menu surfaces also consume this hook. Cleanup removes listeners but does not stop the native service. The root provider deliberately preserves DM and payment delivery after screen exit.
+BLE is not started by the root provider at fresh launch. [useBLEPeers](https://github.com/SovranBitcoin/Sovran/blob/7fec36acb46bd0d3994ac77c2f1cd55791c18c65/app/features/bitchat/hooks/useBLEPeers.ts#L119) starts it on feature mount; ordinary Send and user message-menu surfaces also consume this hook. Cleanup removes listeners but does not stop the native service. The root provider deliberately preserves DM and payment delivery after screen exit.
 
 The vendored iOS `BLEService.swift` uses duplicate discovery in foreground and explicitly forces continuous scanning with at most two connected neighbors (`updateScanningDutyCycle`, around line 4514). It adapts for background and dense networks, so describing it as having no lifecycle or power controls would be inaccurate.
 
@@ -106,9 +106,9 @@ The vendored iOS `BLEService.swift` uses duplicate discovery in foreground and e
 
 ## 6. Reduce development instrumentation overhead
 
-[loggerCore](../../app/shared/lib/loggerCore.ts#L697) is gated off in release, but in development emitted entries capture stack locations, compact parameters, and serialize structured output. [loggerJsThread](../../app/shared/lib/loggerJsThread.ts#L25) adds a 200 ms development heartbeat. Optional file logging batches synchronous appends; it defaults off.
+[loggerCore](https://github.com/SovranBitcoin/Sovran/blob/7fec36acb46bd0d3994ac77c2f1cd55791c18c65/app/shared/lib/loggerCore.ts#L697) is gated off in release, but in development emitted entries capture stack locations, compact parameters, and serialize structured output. [loggerJsThread](https://github.com/SovranBitcoin/Sovran/blob/7fec36acb46bd0d3994ac77c2f1cd55791c18c65/app/shared/lib/loggerJsThread.ts#L25) adds a 200 ms development heartbeat. Optional file logging batches synchronous appends; it defaults off.
 
-The sample's 4,685 debug entries amplify its repeated network/database activity. [CocoCoreLogger._emit](../../app/shared/lib/cashu/cocoLogger.ts#L212) also builds and sanitizes metadata before reaching the release-disabled sink: add an early `cashuLog.isLevelEnabled(level)` check there so disabled logs skip this preparatory work too. Preserve redaction on emitted logs.
+The sample's 4,685 debug entries amplify its repeated network/database activity. [CocoCoreLogger._emit](https://github.com/SovranBitcoin/Sovran/blob/7fec36acb46bd0d3994ac77c2f1cd55791c18c65/app/shared/lib/cashu/cocoLogger.ts#L212) also builds and sanitizes metadata before reaching the release-disabled sink: add an early `cashuLog.isLevelEnabled(level)` check there so disabled logs skip this preparatory work too. Preserve redaction on emitted logs.
 
 **Recommended fix:** opt into expensive debug categories and stack capture during focused diagnosis, disable file logging for a clean baseline, and make the heartbeat opt-in. `LogBox.ignoreAllLogs()` hides warnings; it does not disable these emitters. Avoid adding more continuous logs to diagnose heat.
 
