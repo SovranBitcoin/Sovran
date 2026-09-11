@@ -1,6 +1,6 @@
 import { ReactNode, useCallback, useMemo } from 'react';
 import { LayoutChangeEvent, Platform, StyleSheet, ViewStyle, StyleProp } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useScreenInsets } from '@/shared/hooks/useScreenInsets';
 import { BlurView, BlurTint } from 'expo-blur';
 
 import { chromeBlurTint } from '@/shared/styles/tokens';
@@ -21,7 +21,7 @@ interface BottomButtonsProps {
   style?: StyleProp<ViewStyle>;
   /**
    * Override the gradient's opaque-end color. Default: the screen's
-   * background (via `ScreenBackgroundContext`) or the theme `background`
+   * background (via `ScreenBackgroundContext`) or the theme `surface`
    * token if no Screen provides one. Set to `null` to disable the gradient.
    */
   gradientColor?: string | null;
@@ -85,8 +85,8 @@ export function BottomButtons({
   blurTint = chromeBlurTint,
   onLayout,
 }: BottomButtonsProps) {
-  const insets = useSafeAreaInsets();
-  const themeBackground = useThemeColor('background');
+  const insets = useScreenInsets();
+  const themeBackground = useThemeColor('surface');
   // The screen this footer sits inside publishes its actual background via
   // context — falls back to the theme token when no provider is mounted
   // (e.g. screens that bypass the composed `Screen` wrapper). Ensures the

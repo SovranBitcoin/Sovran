@@ -250,7 +250,7 @@ describe('composeThreadItems — ignore filters + the "Might be spam" section', 
     expect(stillPaging.some((i) => i.type === 'spam-separator')).toBe(false);
   });
 
-  it('ignore filters drop replies AND spam, never the target', () => {
+  it('ignore filters drop replies, spam, and blocked targets', () => {
     const filtered = composeThreadItems(
       built,
       [spamA, spamIgnored],
@@ -263,7 +263,7 @@ describe('composeThreadItems — ignore filters + the "Might be spam" section', 
     expect(
       filtered.map((i) => (i.type === 'spam-separator' ? i.type : `${i.type}:${i.event.id}`))
     ).toEqual(['target:root', 'reply:reply-1', 'spam-separator', 'spam-reply:spam-1']);
-    // Ignoring the target's author never removes the target itself.
+    // An already-open thread must stop displaying a blocked author's target.
     const opIgnored = composeThreadItems(
       built,
       [],
@@ -273,7 +273,7 @@ describe('composeThreadItems — ignore filters + the "Might be spam" section', 
       },
       { includeSpam: true }
     );
-    expect(opIgnored.some((i) => i.type === 'target')).toBe(true);
+    expect(opIgnored.some((i) => i.type === 'target')).toBe(false);
   });
 
   it('spam already acknowledged by the primary list is deduped, and an empty bucket adds no separator', () => {

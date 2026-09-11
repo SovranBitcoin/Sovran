@@ -9,7 +9,7 @@
   "requires": ["fresh-install","cocod.send.bolt11","unit.sat"],
   "funds": {"assets":[{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"maxPrincipal":50},{"mintUrl":"https://mint.minibits.cash/Bitcoin","unit":"sat","accountIndex":0,"maxPrincipal":50}],"transfers":[{"fromMintUrl":"https://mint.minibits.cash/Bitcoin","toMintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"maxFeeSats":10}]},
   "setup": [
-    {"use":"flow.onboard"},
+    {"use":"flow.onboard-sovran-mint"},
     {"use":"flow.fund-lightning-50","with":{"mintUrl":"https://mint.sovran.money","mintHost":"mint.sovran.money"}},
     {"action":"waitFor","selector":{"label":"₿ 50"},"timeoutMs":45000},
     {"use":"flow.fund-lightning-50","with":{"mintUrl":"https://mint.minibits.cash/Bitcoin","mintHost":"mint.minibits.cash"}},

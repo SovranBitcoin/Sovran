@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "name": "store-screenshots",
+  "scenarios": [
+    {"id":"store.screenshots","file":"scenarios/store-screenshots.json","order":9990,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"}
+  ]
+}

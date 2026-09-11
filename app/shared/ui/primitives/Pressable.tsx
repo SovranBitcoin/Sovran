@@ -92,7 +92,7 @@ export const Pressable = forwardRef<View, SharedPressableProps>(function Pressab
 
   const guardedOnPress = useSingleFlight(async (e: GestureResponderEvent) => {
     if (!onPress) return;
-    await triggerHaptic('end');
+    void triggerHaptic('end');
     // RN types onPress as `() => void` but callers routinely pass async
     // handlers; cast through `unknown` so the runtime check can see the
     // Promise the type system refuses to admit.
@@ -100,9 +100,9 @@ export const Pressable = forwardRef<View, SharedPressableProps>(function Pressab
     if (result instanceof Promise) await result;
   });
 
-  const handlePressIn = async (e: GestureResponderEvent) => {
-    await triggerHaptic('start');
+  const handlePressIn = (e: GestureResponderEvent) => {
     onPressIn?.(e);
+    void triggerHaptic('start');
   };
 
   // Compose the user's style with default opacity-on-press feedback so

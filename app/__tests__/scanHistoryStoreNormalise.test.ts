@@ -1,12 +1,4 @@
-/**
- * Pins the dedupe-key shape for `useScanHistoryStore.addScan`. Surface forms
- * a real user produces — leading scheme prefixes from QR / clipboard / NFC,
- * stray whitespace, mixed casing on hex blobs — must collapse to a single
- * entry instead of accumulating once per surface form. The helper is pure
- * so the test exercises it directly without booting zustand+persist.
- */
-
-import { normaliseForDedupe, useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
+import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
 
 jest.mock('@sovranbitcoin/schemas', () => ({
   loggableIssues: () => [],
@@ -26,38 +18,6 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   }),
 }));
 
-describe('normaliseForDedupe', () => {
-  it('strips a leading nostr: scheme', () => {
-    const npub = 'npub1abc';
-    expect(normaliseForDedupe(`nostr:${npub}`)).toBe(npub);
-    expect(normaliseForDedupe(npub)).toBe(npub);
-  });
-
-  it('strips bitcoin: / lightning: / cashu: schemes', () => {
-    expect(normaliseForDedupe('bitcoin:bc1q...')).toBe('bc1q...');
-    expect(normaliseForDedupe('lightning:lnbc1...')).toBe('lnbc1...');
-    expect(normaliseForDedupe('cashu:cashuB...')).toBe('cashub...');
-  });
-
-  it('lowercases and trims surrounding whitespace', () => {
-    expect(normaliseForDedupe('  LNBC1Foo  ')).toBe('lnbc1foo');
-  });
-
-  it('collapses scheme + casing + whitespace variants onto the same key', () => {
-    const variants = ['LNBC1Foo', 'lnbc1foo', 'lightning:LNBC1Foo', '  Lightning:lnbc1foo  '];
-    const keys = new Set(variants.map(normaliseForDedupe));
-    expect(keys.size).toBe(1);
-    expect([...keys][0]).toBe('lnbc1foo');
-  });
-
-  it('only strips a scheme prefix, not embedded matches', () => {
-    expect(normaliseForDedupe('nostr:npub:embedded')).toBe('npub:embedded');
-    expect(normaliseForDedupe('http://example.com/lightning:foo')).toBe(
-      'http://example.com/lightning:foo'
-    );
-  });
-});
-
 describe('useScanHistoryStore.addScan', () => {
   beforeEach(() => {
     useScanHistoryStore.setState({ entries: [], entriesByTransactionId: {} });
@@ -76,11 +36,39 @@ describe('useScanHistoryStore.addScan', () => {
     expect(entries[0].source).toBe('nfc');
   });
 
-  it('linkTransaction matches on raw (the same value addScan recorded)', () => {
+  it('linkTransaction matches an equivalent normalized scan', () => {
     const { addScan, linkTransaction } = useScanHistoryStore.getState();
     addScan('lnbc1foo', 'lightning', 'qr');
-    linkTransaction('lnbc1foo', 'tx-123');
+    linkTransaction('  LIGHTNING:LNBC1FOO  ', 'tx-123');
     expect(useScanHistoryStore.getState().entries[0].transactionId).toBe('tx-123');
+  });
+
+  it.each([
+    ['cashuBAbC', 'cashuBaBc', 'ecash'],
+    ['https://mint.example/Bitcoin', 'https://mint.example/bitcoin', 'mint'],
+    ['bitcoin:bc1qfixture?label=Alice', 'bitcoin:bc1qfixture?label=alice', 'paymentRequest'],
+    ['creqAAbC', 'creqAaBc', 'paymentRequest'],
+  ] as const)('keeps case-sensitive inputs distinct: %s', (first, second, type) => {
+    const { addScan, linkTransaction } = useScanHistoryStore.getState();
+    addScan(first, type, 'qr');
+    addScan(second, type, 'paste');
+    linkTransaction(second, 'tx-second');
+    expect(
+      useScanHistoryStore
+        .getState()
+        .entries.map(({ raw, transactionId }) => ({ raw, transactionId }))
+    ).toEqual([
+      { raw: first, transactionId: undefined },
+      { raw: second, transactionId: 'tx-second' },
+    ]);
+  });
+
+  it('dedupes a cashu URI without changing its case-sensitive payload', () => {
+    const { addScan } = useScanHistoryStore.getState();
+    addScan('cashuBAbC', 'ecash', 'qr');
+    addScan(' CASHU:cashuBAbC ', 'ecash', 'paste');
+    expect(useScanHistoryStore.getState().entries).toHaveLength(1);
+    expect(useScanHistoryStore.getState().entries[0].raw).toBe('cashuBAbC');
   });
 
   it('caps entries at MAX_SCAN_HISTORY (500), tail-evicting oldest by scannedAt', () => {

@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { useIsFocused } from 'expo-router';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 import { ClusterManager, cameraToBbox, MapMarker, GeoPoint } from '@/shared/lib/map/mapClustering';
-import { getOrBuildBTCMapClusterManager } from '@/shared/lib/map/btcMapClusterCache';
+import {
+  getCachedBTCMapClusterManager,
+  getOrBuildBTCMapClusterManager,
+} from '@/shared/lib/map/btcMapClusterCache';
 import { getIconsForCategory } from '@/shared/lib/map/categories';
 import { deferWork, mapLog } from '@/shared/lib/logger';
 import type { CategoryFilter } from '../components/StatsCard';
@@ -41,6 +45,7 @@ export function useMapMarkers({
   isMapReady,
   getCamera,
 }: UseMapMarkersOptions): UseMapMarkers {
+  const isFocused = useIsFocused();
   const { placesCache, storeLoading, error, fetchPlaces, setError } = useBTCMapStore(
     useShallow((s) => ({
       placesCache: s.placesCache,
@@ -61,6 +66,14 @@ export function useMapMarkers({
   const clusterManagerRef = useRef<ClusterManager | null>(null);
   const markersRef = useRef<MapMarker[]>([]);
 
+  const clearMarkers = useCallback(() => {
+    markersRef.current = [];
+    lastRenderedMarkersRef.current = [];
+    lastRenderedVisibleCountRef.current = 0;
+    setMarkers((current) => (current.length === 0 ? current : []));
+    setVisibleCount(0);
+  }, []);
+
   const clusterCacheKey = useMemo(() => {
     // Persisted cache timestamp keeps the cluster index stable across modal opens.
     const ts = placesCache?.timestamp ?? 'no-cache';
@@ -79,10 +92,7 @@ export function useMapMarkers({
     (lat: number, lon: number, z: number) => {
       const manager = clusterManagerRef.current;
       if (!manager || !manager.isLoaded()) {
-        setMarkers([]);
-        setVisibleCount(0);
-        lastRenderedMarkersRef.current = [];
-        lastRenderedVisibleCountRef.current = 0;
+        clearMarkers();
         return;
       }
 
@@ -141,7 +151,7 @@ export function useMapMarkers({
       setMarkers(mapMarkers);
       setVisibleCount(count);
     },
-    [aspectRatio]
+    [aspectRatio, clearMarkers]
   );
 
   // Initialize/update cluster manager when points change — DEFERRED.
@@ -152,8 +162,20 @@ export function useMapMarkers({
 
     if (filteredPoints.length === 0) {
       clusterManagerRef.current = null;
-      setMarkers([]);
-      setVisibleCount(0);
+      clearMarkers();
+      setIsClusteringReady(true);
+      return;
+    }
+
+    // A covered or preloaded map must not begin a synchronous cold build.
+    // Cleanup below also cancels queued work if navigation wins the race.
+    if (!isFocused) return;
+
+    const cached = getCachedBTCMapClusterManager(clusterCacheKey, filteredPoints.length);
+    if (cached) {
+      clusterManagerRef.current = cached;
+      const { lat, lon, zoom } = getCamera();
+      updateMarkersForCamera(lat, lon, zoom);
       setIsClusteringReady(true);
       return;
     }
@@ -185,7 +207,15 @@ export function useMapMarkers({
     );
 
     return () => handle.cancel();
-  }, [isMapReady, filteredPoints, clusterCacheKey, getCamera, updateMarkersForCamera]);
+  }, [
+    isMapReady,
+    isFocused,
+    filteredPoints,
+    clusterCacheKey,
+    getCamera,
+    updateMarkersForCamera,
+    clearMarkers,
+  ]);
 
   const resolveMarker = useCallback(
     (id: string) => markersRef.current.find((m) => m.id === id),

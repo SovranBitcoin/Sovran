@@ -7,19 +7,11 @@ import { useInitializationStage } from '@/shared/providers/InitializationProvide
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { attachMintMetadataToManager } from '@/shared/stores/global/mintMetadataStore';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
-import {
-  log,
-  initLog,
-  initPhase,
-  useInitMount,
-  deferWork,
-  mintUrlLogFields,
-} from '@/shared/lib/logger';
+import { log, initLog, initPhase, useInitMount, deferWork } from '@/shared/lib/logger';
 import { getBootMorphCompleted, subscribeBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
 import { awaitRestoreReady } from '@/shared/providers/awaitRestoreReady';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
-import { ensureTrustedDefaultMint } from '@/shared/lib/cashu/defaultMintInitialization';
+import { initializeDefaultMints } from '@/shared/lib/cashu/initializeDefaultMints';
 
 initLog('Module', 'CocoProvider loaded');
 
@@ -39,73 +31,6 @@ const CocoContext = createContext<CocoContextValue>({
 
 interface CocoProviderProps {
   children: ReactNode;
-}
-
-function defaultSelectedMintLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasDefaultSelectedMint: !!mintUrl,
-    defaultSelectedMintLength: mintUrl?.length ?? 0,
-  };
-}
-
-async function initializeDefaultMints(manager: Manager): Promise<void> {
-  try {
-    // Default mint set installed on first run. Mirrors numo's curated list
-    // (minibits + chorus + cubabitcoin) plus our own mint.sovran.money, but
-    // deliberately excludes coinos. Sovran's own mint is the default selection.
-    const defaultMints = [
-      'https://mint.sovran.money',
-      'https://mint.minibits.cash/Bitcoin',
-      'https://mint.chorus.community',
-      'https://mint.cubabitcoin.org',
-    ];
-    const defaultSelectedMint = 'https://mint.sovran.money';
-    log.info('coco.init_default_mints', {
-      defaultMintCount: defaultMints.length,
-      ...defaultSelectedMintLogFields(defaultSelectedMint),
-    });
-
-    for (const mintUrl of defaultMints) {
-      try {
-        log.debug('coco.mint_trust_check.start', { ...mintUrlLogFields(mintUrl) });
-        const result = await ensureTrustedDefaultMint(manager.mint, mintUrl);
-        if (result.status === 'already-trusted') {
-          log.debug('coco.mint_exists', { ...mintUrlLogFields(mintUrl) });
-          continue;
-        }
-
-        log.info('coco.mint_added', {
-          ...mintUrlLogFields(mintUrl),
-          attempts: result.attempts,
-        });
-      } catch (error) {
-        log.warn('coco.mint_add_failed', { ...mintUrlLogFields(mintUrl), error });
-      }
-    }
-
-    try {
-      const { selectedMint, setSelectedMint } = useMintStore.getState();
-      log.debug('coco.default_mint_selection.check', {
-        hasSelectedMint: !!selectedMint,
-        ...defaultSelectedMintLogFields(defaultSelectedMint),
-      });
-      if (!selectedMint) {
-        const isDefaultTrusted = await manager.mint.isTrustedMint(defaultSelectedMint);
-        if (isDefaultTrusted) {
-          setSelectedMint(defaultSelectedMint);
-          log.info('coco.mint_selected', { ...mintUrlLogFields(defaultSelectedMint) });
-        } else {
-          log.warn('coco.default_mint_not_trusted', { ...mintUrlLogFields(defaultSelectedMint) });
-        }
-      }
-    } catch (error) {
-      log.warn('coco.mint_select_failed', { error });
-    }
-
-    log.info('coco.init_default_mints_done');
-  } catch (error) {
-    log.error('coco.init_default_mints_failed', { error });
-  }
 }
 
 /**
@@ -202,7 +127,7 @@ async function runCocoPhase2({ bgStage, chainManager, isLive }: CocoPhase2Args):
 
     if (!isLive()) return;
     bgStage.log('Initializing default mints...');
-    await initPhase('Coco-bg.defaultMints', () => initializeDefaultMints(chainManager));
+    await initPhase('Coco-bg.defaultMints', () => initializeDefaultMints(chainManager, isLive));
 
     // Block NPC sync + the mint-operation processor until the wallet
     // has restored its NUT-13 counter (or proven restore isn't needed).

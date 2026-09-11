@@ -38,6 +38,7 @@ import type { EventTemplate, VerifiedEvent } from 'nostr-tools/core';
 import * as Sharing from 'expo-sharing';
 import { cashuLog, initLog, initPhase, redactError, mintUrlLogFields } from '../logger';
 import { resolveOutputDataCreator } from './nativeOutputDataCreator';
+import { drainSqlite } from './drainSqlite';
 import { logCocoVersions, reportCocoApiFailure, reportCocoIssue } from './cocoFeedback';
 import {
   createP2PKImportPlugin,
@@ -408,12 +409,13 @@ export class CocoManager {
         );
         cashuLog.debug('cashu.manager.sqlite_opened', { dbName });
         const {
-          db,
+          db: openedDb,
           migrationCount: preInitMigrationCount,
           migrationExpected,
         } = await initPhase('CocoManager.preInitSafetyRails', () =>
           this.runPreInitSafetyRails(opened, dbName)
         );
+        const db = drainSqlite(openedDb);
         this.db = db;
         const database = db as unknown as ExpoSqliteRepositoriesOptions['database'];
         // The profile's signer key is imported into coco's keyring (p2pk-import

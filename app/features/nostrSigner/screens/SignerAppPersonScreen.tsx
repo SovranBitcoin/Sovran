@@ -11,7 +11,8 @@
  */
 
 import React from 'react';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { ListGroup, PressableFeedback, Switch as HeroSwitch } from 'heroui-native';
 import { z } from 'zod';
 

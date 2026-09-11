@@ -141,7 +141,8 @@ function enqueue(state: CelebrationState, request: CelebrationRequest): Celebrat
     return { ...state, queue };
   }
   if (queue.length >= CELEBRATION_QUEUE_CAP) return { ...state, queue };
-  return { ...state, queue: [...queue, request] };
+  queue.push(request);
+  return { ...state, queue };
 }
 
 /** Admit a fresh request: queue it while busy/gated, else start the ceremony. */
@@ -175,25 +176,20 @@ export function celebrationReducer(
       // Same sender mid-ceremony: confirm/extend the displayed amount. From
       // 'awaiting' the impact fires immediately; from 'centering' it fires
       // on arrival (the beat clock sees the amount and goes to 'held').
-      if (state.current && state.current.peerID === event.peerID) {
-        if (state.phase === 'centering' || state.phase === 'awaiting' || state.phase === 'held') {
-          return {
-            ...state,
-            phase: state.phase === 'awaiting' ? 'held' : state.phase,
-            current: {
-              ...state.current,
-              waiting: false,
-              amount: (state.current.amount ?? 0) + event.amount,
-              unit: event.unit,
-            },
-          };
-        }
-        // 'returning' — this redeem already had its ceremony interrupted or
-        // is a fresh drop landing late; queue a fresh (abbreviated) one.
+      if (state.current?.peerID === event.peerID && isPlaying(state)) {
+        return {
+          ...state,
+          phase: state.phase === 'awaiting' ? 'held' : state.phase,
+          current: {
+            ...state.current,
+            waiting: false,
+            amount: (state.current.amount ?? 0) + event.amount,
+            unit: event.unit,
+          },
+        };
       }
+      // A late success during return queues a fresh abbreviated ceremony.
 
-      // Success with no prior staging (ambient entries, races): play the
-      // whole ceremony with the amount known — impact on arrival.
       return admit(state, event.now, {
         peerID: event.peerID,
         amount: event.amount,
@@ -203,14 +199,12 @@ export function celebrationReducer(
     }
 
     case 'strike-waiting': {
-      if (state.current && state.current.peerID === event.peerID) {
-        if (state.phase === 'centering' || state.phase === 'awaiting' || state.phase === 'held') {
-          return {
-            ...state,
-            phase: state.phase === 'awaiting' ? 'held' : state.phase,
-            current: { ...state.current, waiting: true },
-          };
-        }
+      if (state.current?.peerID === event.peerID && isPlaying(state)) {
+        return {
+          ...state,
+          phase: state.phase === 'awaiting' ? 'held' : state.phase,
+          current: { ...state.current, waiting: true },
+        };
       }
 
       return admit(state, event.now, {

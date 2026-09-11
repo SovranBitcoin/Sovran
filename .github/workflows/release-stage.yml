@@ -1,0 +1,97 @@
+name: Release stage
+
+on:
+  workflow_call:
+    inputs:
+      stage: { required: true, type: string }
+      source-sha: { required: true, type: string }
+
+permissions: {}
+jobs:
+  stage:
+    if: github.repository == 'SovranBitcoin/Sovran' && github.ref == 'refs/heads/main' && vars.RELEASE_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: production-release
+    permissions:
+      contents: write
+      packages: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: controller
+          persist-credentials: false
+      - if: inputs.stage == 'build'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.source-sha }}
+          path: source
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - if: contains(fromJSON('["build","zapstore"]'), inputs.stage)
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: '1.3.5'
+      - if: inputs.stage == 'build'
+        name: Install locked build dependencies
+        run: bun install --frozen-lockfile --backend=copyfile
+        working-directory: source
+        env:
+          GITHUB_TOKEN: ${{ secrets.SOVRAN_CI_TOKEN || github.token }}
+      - if: inputs.stage == 'build'
+        name: Install pinned EAS CLI outside source
+        run: npm install --global eas-cli@24.0.0 --ignore-scripts
+      - if: inputs.stage == 'zapstore'
+        name: Install existing Nostr verifier from locked workspace
+        working-directory: controller
+        run: bun install --frozen-lockfile --ignore-scripts --backend=copyfile
+        env:
+          GITHUB_TOKEN: ${{ secrets.SOVRAN_CI_TOKEN || github.token }}
+      - if: contains(fromJSON('["android","github","zapstore"]'), inputs.stage)
+        name: Install pinned Android verification tools
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;35.0.0"'
+      - if: contains(fromJSON('["android","github"]'), inputs.stage)
+        id: google
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GOOGLE_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+          create_credentials_file: false
+          export_environment_variables: false
+      - if: contains(fromJSON('["assets","website"]'), inputs.stage)
+        id: website
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: SovranBitcoin
+          repositories: sovran.money
+          permission-contents: write
+      - name: Reconcile one release stage
+        run: node controller/release/run.mjs "$RELEASE_STAGE"
+        env:
+          RELEASE_STAGE: ${{ inputs.stage }}
+          RELEASE_SHA: ${{ inputs.source-sha }}
+          SOURCE_DIR: ${{ github.workspace }}/source
+          RELEASE_ENABLED: ${{ vars.RELEASE_ENABLED }}
+          GH_TOKEN: ${{ github.token }}
+          EXPO_TOKEN: ${{ contains(fromJSON('["build","android"]'), inputs.stage) && secrets.EXPO_TOKEN || '' }}
+          ASC_PRIVATE_KEY: ${{ contains(fromJSON('["apple","assets"]'), inputs.stage) && secrets.ASC_PRIVATE_KEY || '' }}
+          ASC_KEY_ID: ${{ vars.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ vars.ASC_ISSUER_ID }}
+          GOOGLE_ACCESS_TOKEN: ${{ steps.google.outputs.access_token }}
+          ANDROID_CERT_SHA256: ${{ vars.ANDROID_CERT_SHA256 }}
+          ARTIFACT_DOWNLOAD_HOSTS: ${{ vars.ARTIFACT_DOWNLOAD_HOSTS }}
+          WEBSITE_TOKEN: ${{ steps.website.outputs.token }}
+          FREEDOM_TOKEN: ${{ inputs.stage == 'freedom' && secrets.FREEDOM_TOKEN || '' }}
+          FREEDOM_FORK: ${{ vars.FREEDOM_FORK }}
+          SIGN_WITH: ${{ inputs.stage == 'zapstore' && secrets.ZAPSTORE_SIGN_WITH || '' }}
+          ZAPSTORE_BUNKER_CLIENT_KEY: ${{ inputs.stage == 'zapstore' && secrets.ZAPSTORE_BUNKER_CLIENT_KEY || '' }}
+          ZAPSTORE_NPUB: ${{ vars.ZAPSTORE_NPUB }}

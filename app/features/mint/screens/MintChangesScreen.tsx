@@ -154,6 +154,7 @@ export function MintChangesScreen() {
     <Screen name="MintChangesScreen" scroll="custom" bgColor={surface}>
       <Log name="MintChangesContent" style={styles.root}>
         <List
+          screen
           testID="mint-changes-detail"
           data={revisions}
           keyExtractor={(revision) => revision.entry.hash}

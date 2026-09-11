@@ -1,0 +1,192 @@
+name: Production release
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Plan reads state only; release starts or resumes publication
+        type: choice
+        options: [plan, release]
+        default: plan
+  push:
+    branches: [main]
+    paths: [app/app.json]
+  schedule:
+    - cron: '23 * * * *'
+
+permissions: {}
+concurrency:
+  group: sovran-production-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.repository == 'SovranBitcoin/Sovran' && github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.RELEASE_ENABLED == 'true')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    outputs:
+      active: ${{ steps.prepare.outputs.active }}
+      sha: ${{ steps.prepare.outputs.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - id: prepare
+        run: node release/run.mjs prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'release' }}
+          RELEASE_ENABLED: ${{ vars.RELEASE_ENABLED }}
+          ARTIFACT_DOWNLOAD_HOSTS: ${{ vars.ARTIFACT_DOWNLOAD_HOSTS }}
+          ANDROID_CERT_SHA256: ${{ vars.ANDROID_CERT_SHA256 }}
+          FREEDOM_FORK: ${{ vars.FREEDOM_FORK }}
+          ZAPSTORE_NPUB: ${{ vars.ZAPSTORE_NPUB }}
+
+  validate:
+    needs: prepare
+    if: needs.prepare.outputs.active == 'true'
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: source
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          path: source
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: controller
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.3.5'
+      - name: Install exact reviewed dependency graph
+        run: bun install --frozen-lockfile --backend=copyfile
+        env:
+          GITHUB_TOKEN: ${{ secrets.SOVRAN_CI_TOKEN || github.token }}
+      - name: Validate release failure paths and source archive policy
+        run: |
+          node --test ../controller/release/tests/*.test.mjs
+          python3 -m unittest discover -s ../controller/release/tests -p 'test_*.py'
+          node ../controller/release/check-inputs.mjs
+      - name: Verify generated artwork matches the release version
+        run: bun run assets:check
+      - name: Reject install-time changes to committed artwork
+        run: test -z "$(git status --porcelain --untracked-files=all -- app/assets/brand)"
+      - name: Test brand geometry and SVG rendering
+        run: bun run assets:test
+      - name: Validate native harness contracts
+        working-directory: source/app
+        run: |
+          bun run e2e:validate
+          bun run e2e:test
+      - run: bun run type-check
+      - run: bun run test
+      - run: bun run lint
+        working-directory: source/app
+      - run: bun run pretty:check
+        working-directory: source/app
+      - run: bunx --no-install knip
+      - name: Check compiler coverage and UI invariants
+        working-directory: source/app
+        run: |
+          bun run check:react-compiler
+          bun run check:styling
+          bun run check:glass-headers
+
+  build:
+    needs: [prepare, validate]
+    if: needs.prepare.outputs.active == 'true'
+    permissions:
+      contents: write
+      packages: read
+      id-token: write
+    uses: ./.github/workflows/release-stage.yml
+    with:
+      stage: build
+      source-sha: ${{ needs.prepare.outputs.sha }}
+    secrets: inherit
+
+  apple:
+    needs: [prepare, validate, build]
+    if: ${{ !cancelled() && needs.prepare.outputs.active == 'true' && needs.validate.result == 'success' }}
+    permissions: { contents: write, packages: read, id-token: write }
+    uses: ./.github/workflows/release-stage.yml
+    with:
+      stage: apple
+      source-sha: ${{ needs.prepare.outputs.sha }}
+    secrets: inherit
+
+  android:
+    needs: [prepare, validate, apple]
+    if: ${{ !cancelled() && needs.prepare.outputs.active == 'true' && needs.validate.result == 'success' }}
+    permissions: { contents: write, packages: read, id-token: write }
+    uses: ./.github/workflows/release-stage.yml
+    with:
+      stage: android
+      source-sha: ${{ needs.prepare.outputs.sha }}
+    secrets: inherit
+
+  github:
+    needs: [prepare, validate, android]
+    if: ${{ !cancelled() && needs.prepare.outputs.active == 'true' && needs.validate.result == 'success' }}
+    permissions: { contents: write, packages: read, id-token: write }
+    uses: ./.github/workflows/release-stage.yml
+    with:
+      stage: github
+      source-sha: ${{ needs.prepare.outputs.sha }}
+    secrets: inherit
+
+  assets:
+    needs: [prepare, validate, github]
+    if: ${{ !cancelled() && needs.prepare.outputs.active == 'true' && needs.validate.result == 'success' }}
+    permissions: { contents: write, packages: read, id-token: write }
+    uses: ./.github/workflows/release-stage.yml
+    with:
+      stage: assets
+      source-sha: ${{ needs.prepare.outputs.sha }}
+    secrets: inherit
+
+  freedom:
+    needs: [prepare, validate, assets]
+    if: ${{ !cancelled() && needs.prepare.outputs.active == 'true' && needs.validate.result == 'success' }}
+    permissions: { contents: write, packages: read, id-token: write }
+    uses: ./.github/workflows/release-stage.yml
+    with:
+      stage: freedom
+      source-sha: ${{ needs.prepare.outputs.sha }}
+    secrets: inherit
+
+  zapstore:
+    needs: [prepare, validate, freedom]
+    if: ${{ !cancelled() && needs.prepare.outputs.active == 'true' && needs.validate.result == 'success' }}
+    permissions: { contents: write, packages: read, id-token: write }
+    uses: ./.github/workflows/release-stage.yml
+    with:
+      stage: zapstore
+      source-sha: ${{ needs.prepare.outputs.sha }}
+    secrets: inherit
+
+  website:
+    needs: [prepare, validate, zapstore]
+    if: ${{ !cancelled() && needs.prepare.outputs.active == 'true' && needs.validate.result == 'success' }}
+    permissions: { contents: write, packages: read, id-token: write }
+    uses: ./.github/workflows/release-stage.yml
+    with:
+      stage: website
+      source-sha: ${{ needs.prepare.outputs.sha }}
+    secrets: inherit

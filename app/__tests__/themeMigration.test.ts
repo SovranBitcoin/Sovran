@@ -1,67 +1,32 @@
-/**
- * Migration: legacy `settingsStore.theme` (string, global) →
- *   active-profile `theme-store:profile:{pubkey}` (per-profile, per-unit).
- *
- * The real migration lives in shared/lib/migrations/globalMigrations.ts and
- * runs once at app startup against AsyncStorage. Here we reproduce the
- * algorithm as a pure function so we can drive it with plain objects and
- * assert its three branches (album wallpaper, built-in colour theme, unknown
- * string) without a storage mock.
- */
-
-import { isBuiltinColorTheme, PROFILE_PRIMARY_UNIT_ID } from '@/shared/lib/theme/builtinAlbums';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { runGlobalMigrations } from '@/shared/lib/migrations/globalMigrations';
 
 type StorageMap = Record<string, string>;
+let mockStorage: StorageMap = {};
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(async (key: string) => mockStorage[key] ?? null),
+  setItem: jest.fn(async (key: string, value: string) => {
+    mockStorage[key] = value;
+  }),
+  removeItem: jest.fn(async (key: string) => {
+    delete mockStorage[key];
+  }),
+}));
+jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
+  PROFILE_SCOPED_STORE_KEYS: ['theme-store'],
+}));
+jest.mock('@/shared/lib/logger', () => ({
+  log: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+}));
 
+const COMPLETED_KEY = 'global-migrations-completed';
 async function runMigration(store: StorageMap): Promise<void> {
-  const settingsRaw = store['settings-store'];
-  if (!settingsRaw) return;
-
-  const settingsParsed = JSON.parse(settingsRaw);
-  const legacyTheme = settingsParsed?.state?.theme;
-
-  if (typeof legacyTheme !== 'string' || !legacyTheme) {
-    if (settingsParsed?.state && 'theme' in settingsParsed.state) {
-      delete settingsParsed.state.theme;
-      store['settings-store'] = JSON.stringify(settingsParsed);
-    }
-    return;
-  }
-
-  const profileRaw = store['profile-store'];
-  if (profileRaw) {
-    const profileParsed = JSON.parse(profileRaw);
-    const profiles: { accountIndex: number; pubkey: string }[] =
-      profileParsed?.state?.profiles ?? [];
-    const activeIndex: number | undefined = profileParsed?.state?.activeAccountIndex;
-    const activeProfile = profiles.find((p) => p.accountIndex === activeIndex) ?? profiles[0];
-
-    if (activeProfile?.pubkey && !isBuiltinColorTheme(legacyTheme)) {
-      const themeStoreKey = `theme-store:profile:${activeProfile.pubkey}`;
-      const existingRaw = store[themeStoreKey];
-      const existing = existingRaw ? JSON.parse(existingRaw) : null;
-      const hasUserData =
-        !!existing?.state?.activeAlbumSlug ||
-        (existing?.state?.unitWallpapers && Object.keys(existing.state.unitWallpapers).length > 0);
-
-      if (!hasUserData) {
-        const nextBlob = {
-          state: {
-            activeAlbumSlug: null,
-            unitWallpapers: { [PROFILE_PRIMARY_UNIT_ID]: legacyTheme },
-            mode: 'dark',
-          },
-          version: 0,
-        };
-        store[themeStoreKey] = JSON.stringify(nextBlob);
-      }
-    }
-  }
-
-  if (settingsParsed?.state) {
-    delete settingsParsed.state.theme;
-    store['settings-store'] = JSON.stringify(settingsParsed);
-  }
+  mockStorage = store;
+  store[COMPLETED_KEY] ??= JSON.stringify([
+    'index-to-pubkey-keys-v2',
+    'wallet-lifecycle-stamp-existing-users-v1',
+  ]);
+  await runGlobalMigrations();
 }
 
 const activePubkey = 'f'.repeat(64);
@@ -145,6 +110,32 @@ describe('legacy theme migration', () => {
   it('exits cleanly when no legacy settings blob exists (fresh install)', async () => {
     const store: StorageMap = {};
     await runMigration(store);
-    expect(Object.keys(store)).toEqual([]);
+    expect(store['settings-store']).toBeUndefined();
+    expect(store[`theme-store:profile:${activePubkey}`]).toBeUndefined();
+  });
+  it('keeps the source and retries when persisting the migrated theme fails', async () => {
+    const store: StorageMap = {
+      'settings-store': JSON.stringify({ state: { theme: 'flowers-1' }, version: 0 }),
+      'profile-store': profileStoreBlob,
+    };
+    jest.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error('disk full'));
+    await runMigration(store);
+    expect(JSON.parse(store['settings-store']).state.theme).toBe('flowers-1');
+    expect(JSON.parse(store[COMPLETED_KEY])).not.toContain('legacy-global-theme-to-profile-v1');
+    await runMigration(store);
+    expect(JSON.parse(store[`theme-store:profile:${activePubkey}`]).state.unitWallpapers).toEqual({
+      sat: 'flowers-1',
+    });
+  });
+
+  it('does not overwrite an existing pubkey-scoped store with an older index-scoped copy', async () => {
+    const current = JSON.stringify({ state: { activeAlbumSlug: 'current' }, version: 1 });
+    mockStorage = {
+      'profile-store': profileStoreBlob,
+      'theme-store': JSON.stringify({ state: { activeAlbumSlug: 'old' }, version: 1 }),
+      [`theme-store:profile:${activePubkey}`]: current,
+    };
+    await runGlobalMigrations();
+    expect(mockStorage[`theme-store:profile:${activePubkey}`]).toBe(current);
   });
 });

@@ -214,9 +214,9 @@ export interface PagesIndex {
 
 export type TriggerRequest = (
   | { kind: 'scenario'; scenarioId: string }
-  | { kind: 'suite'; suite: 'default' | 'full' }
+  | { kind: 'suite'; suite: 'default' | 'full' | 'store-screenshots' }
   | { kind: 'commit-run'; suite?: 'default' | 'full' }
-) & { acceptFundLoss?: boolean };
+) & { acceptFundLoss?: boolean; platform?: Platform | 'both' };
 
 export interface JobStatus {
   id: string;
@@ -244,4 +244,9 @@ export interface ClearResult {
  *  the entry is a named capture rather than a step frame. */
 export interface ReelFrame extends Frame {
   named?: string;
+}
+
+export interface StoreScreenshotExport {
+  screenshots: { file: string; page: string; width: number; height: number }[];
+  targets?: { id: string; label: string; archive: string; files?: string[] }[];
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 import type { facade } from 'nostr';
 
@@ -53,73 +53,87 @@ interface UseNostrProfileResult {
 }
 
 export function useNostrProfile(pubkey: string | null): UseNostrProfileResult {
-  const [data, setData] = useState<NostrProfileFull | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const [state, setState] = useState<{
+    pubkey: string | null;
+    data: NostrProfileFull | null;
+    isLoading: boolean;
+    error: Error | null;
+  }>(() => ({ pubkey, data: null, isLoading: !!pubkey, error: null }));
+  const requestRef = useRef<AbortController | null>(null);
 
-  // Refetch builds a fresh AbortController each call; the effect's cleanup
-  // signal aborts whichever fetch is in flight when pubkey changes or the
-  // component unmounts.
-  const fetchProfile = useCallback(
-    async (signal?: AbortSignal) => {
-      if (!pubkey) {
-        setData(null);
-        setIsLoading(false);
+  // Initial loads and manual refreshes share cancellation. Starting a newer
+  // request, changing profile, or unmounting retires every prior completion.
+  const fetchProfile = useCallback(async () => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    const { signal } = controller;
+    if (!pubkey) {
+      setState({ pubkey, data: null, isLoading: false, error: null });
+      return;
+    }
+
+    log.debug('feed.profile.fetch.start', { pubkey });
+    setState((previous) => ({
+      pubkey,
+      data: previous.pubkey === pubkey ? previous.data : null,
+      isLoading: true,
+      error: null,
+    }));
+
+    // Only nagg supplies reputation + top followers; honor tier settings and
+    // preserve the existing Primal/relay fallback when nagg is unavailable.
+    if (getNostrTierConfig().nagg.enabled) {
+      const result = await fetchNostrProfile(pubkey, { signal });
+      if (signal.aborted) return;
+      if (result.isOk()) {
+        log.debug('feed.profile.fetch.success', { pubkey, source: 'nagg' });
+        recordDebugTiers([pubkey], 'nagg');
+        setState({ pubkey, data: result.value, isLoading: false, error: null });
         return;
       }
+      log.warn('feed.profile.fetch.nagg_failed_fallback', { pubkey, error: result.error });
+    }
 
-      log.debug('feed.profile.fetch.start', { pubkey });
-      setIsLoading(true);
-      setError(null);
-
-      // nagg's `/nostr/profile` (the score API) is the only source of reputation
-      // + top followers, so prefer it WHEN nagg is the active tier. When nagg is
-      // disabled in settings — or enabled but unreachable — fall through to the
-      // facade's profile-stats surface (Primal `user_profile` → relay floor) so
-      // counts/joined/metadata still load and the disable flag is actually honored.
-      const naggEnabled = getNostrTierConfig().nagg.enabled;
-
-      if (naggEnabled) {
-        const result = await fetchNostrProfile(pubkey, { signal });
-        if (signal?.aborted) return;
-        if (result.isOk()) {
-          log.debug('feed.profile.fetch.success', { pubkey, source: 'nagg' });
-          recordDebugTiers([pubkey], 'nagg');
-          setData(result.value);
-          setIsLoading(false);
-          return;
-        }
-        log.warn('feed.profile.fetch.nagg_failed_fallback', { pubkey, error: result.error });
-      }
-
-      const stats = await fetchProfileStatsViaFacade(pubkey, { signal });
-      if (signal?.aborted) return;
-      if (stats) {
-        log.debug('feed.profile.fetch.success', { pubkey, source: stats.tier });
-        recordDebugTiers([pubkey], stats.tier);
-        setData(profileFullFromStats(pubkey, stats));
-      } else {
-        const err = new Error('profile unavailable from all tiers');
-        log.warn('feed.profile.fetch.error', { pubkey });
-        setError(err);
-        setData(null);
-      }
-      setIsLoading(false);
-    },
-    [pubkey]
-  );
+    const stats = await fetchProfileStatsViaFacade(pubkey, { signal });
+    if (signal.aborted) return;
+    if (stats) {
+      log.debug('feed.profile.fetch.success', { pubkey, source: stats.tier });
+      recordDebugTiers([pubkey], stats.tier);
+      setState({
+        pubkey,
+        data: profileFullFromStats(pubkey, stats),
+        isLoading: false,
+        error: null,
+      });
+    } else {
+      log.warn('feed.profile.fetch.error', { pubkey });
+      setState({
+        pubkey,
+        data: null,
+        isLoading: false,
+        error: new Error('profile unavailable from all tiers'),
+      });
+    }
+  }, [pubkey]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    void fetchProfile(controller.signal);
-    return () => controller.abort();
+    void fetchProfile();
+    return () => requestRef.current?.abort();
   }, [fetchProfile]);
 
   const refetch = useCallback(() => {
     void fetchProfile();
   }, [fetchProfile]);
-
-  return { data, isLoading, error, refetch };
+  // Hide the previous person's stats on the first render of a new route,
+  // before the effect can reset request state.
+  const current = state.pubkey === pubkey;
+  return {
+    data: current ? state.data : null,
+    isLoading: current ? state.isLoading : !!pubkey,
+    error: current ? state.error : null,
+    refetch,
+  };
 }
 
 /**

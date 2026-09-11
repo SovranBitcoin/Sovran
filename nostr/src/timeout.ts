@@ -7,13 +7,22 @@ export interface RequestControls {
 
 export function combineSignals(...signals: Array<AbortSignal | undefined>): AbortSignal {
   const controller = new AbortController();
-  for (const signal of signals) {
-    if (!signal) continue;
-    if (signal.aborted) {
+  const sources = [...new Set(signals.filter((signal): signal is AbortSignal => !!signal))];
+  const aborted = sources.find((signal) => signal.aborted);
+  if (aborted) {
+    controller.abort(aborted.reason);
+    return controller.signal;
+  }
+  const listeners = new Map<AbortSignal, () => void>();
+  for (const signal of sources) {
+    const onAbort = () => {
+      // A deadline must release its listener on the longer-lived caller too.
+      for (const [source, listener] of listeners) source.removeEventListener('abort', listener);
+      listeners.clear();
       controller.abort(signal.reason);
-      return controller.signal;
-    }
-    signal.addEventListener('abort', () => controller.abort(signal.reason), { once: true });
+    };
+    listeners.set(signal, onAbort);
+    signal.addEventListener('abort', onAbort, { once: true });
   }
   return controller.signal;
 }

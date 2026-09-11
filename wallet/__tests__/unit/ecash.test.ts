@@ -6,7 +6,7 @@
  * ecash.ts — canonical cashu token metadata decoder.
  */
 
-import { getDecodedToken, getEncodedToken } from "@cashu/cashu-ts";
+import { getDecodedToken, getEncodedToken, Amount } from "@cashu/cashu-ts";
 import { describe, expect, it } from "vitest";
 
 import { decodeEcashTokenMetadata, isValidEcashToken } from "../../src/ecash";
@@ -28,13 +28,13 @@ function duplicateSecretToken(): string {
     unit: "sat",
     proofs: [
       {
-        amount: 2,
+        amount: Amount.from(2),
         id: "009a1f293253e41e",
         secret,
         C: `02${"ef".repeat(32)}`,
       },
       {
-        amount: 8,
+        amount: Amount.from(8),
         id: "009a1f293253e41e",
         secret,
         C: `03${"ab".repeat(32)}`,

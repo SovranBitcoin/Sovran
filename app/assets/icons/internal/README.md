@@ -1,6 +1,6 @@
 # `internal:` custom icon namespace
 
-Brand and product-specific glyphs that are bundled into the Monicon registry alongside Iconify icons. Reference them at runtime as `<Icon name="internal:<filename>" />`.
+Brand and product-specific glyphs bundled into `../generated.json` alongside Iconify icons. Reference them at runtime as `<Icon name="internal:<filename>" />`.
 
 ## Adding a new icon
 

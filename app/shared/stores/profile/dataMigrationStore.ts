@@ -24,7 +24,6 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
 interface DataMigrationState {
   /** Highest cross-store data-migration step this profile has completed. */
   level: number;
-  setLevel: (level: number) => void;
 }
 
 const PersistedDataMigrationStore = z.object({
@@ -33,10 +32,7 @@ const PersistedDataMigrationStore = z.object({
 
 export const useDataMigrationStore = create<DataMigrationState>()(
   persist(
-    (set) => ({
-      level: 0,
-      setLevel: (level: number) => set({ level }),
-    }),
+    () => ({ level: 0 }),
     persistConfig({
       name: 'data-migration-store',
       storage: createProfileScopedStorage(),

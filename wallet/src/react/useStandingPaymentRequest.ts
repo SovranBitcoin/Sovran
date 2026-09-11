@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { Manager } from "@cashu/coco-core";
+
 import { logger } from "../logger";
 import {
   ensureStandingPaymentRequest,
@@ -11,6 +13,7 @@ import {
 } from "../payment-request-receive";
 import type { ReusableQuoteIdentityStore } from "../quotes/reusable";
 import { useColadaManager } from "./ColadaProvider";
+import { useLatestRef } from "./useLatestRef";
 
 export interface UseStandingPaymentRequestResult {
   request: StandingPaymentRequest | null;
@@ -18,6 +21,64 @@ export interface UseStandingPaymentRequestResult {
   error: string | null;
   /** Cancel the current request and mint a fresh one (new request id). */
   rotate: () => Promise<void>;
+}
+
+type StandingOutcome =
+  | { ok: true; request: StandingPaymentRequest }
+  | { ok: false; message: string };
+
+/**
+ * Resolve (or, with `wantFresh`, rotate then resolve) the standing request.
+ * Module scope on purpose: the React Compiler cannot lower a `try` that has a
+ * `finally`, or one whose body holds a ternary — both of which this had — so
+ * leaving it inline in the effect is what made the hook uncompilable.
+ */
+async function resolveStandingRequest(
+  manager: Manager,
+  requestInput: StandingPaymentRequestInput,
+  identityStore: ReusableQuoteIdentityStore,
+  wantFresh: boolean,
+): Promise<StandingOutcome> {
+  try {
+    const request = wantFresh
+      ? await rotateStandingPaymentRequest(manager, requestInput, identityStore)
+      : await ensureStandingPaymentRequest(
+          manager,
+          requestInput,
+          identityStore,
+        );
+    return { ok: true, request };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn("creq.standing.ensure_failed", {
+      unit: requestInput.unit,
+      error: message,
+    });
+    return { ok: false, message };
+  }
+}
+
+/** The explicit user-driven rotation, with its own log line. */
+async function rotateStandingRequest(
+  manager: Manager,
+  requestInput: StandingPaymentRequestInput,
+  identityStore: ReusableQuoteIdentityStore,
+): Promise<StandingOutcome> {
+  try {
+    const request = await rotateStandingPaymentRequest(
+      manager,
+      requestInput,
+      identityStore,
+    );
+    return { ok: true, request };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn("creq.standing.rotate_failed", {
+      unit: requestInput.unit,
+      error: message,
+    });
+    return { ok: false, message };
+  }
 }
 
 /**
@@ -60,24 +121,28 @@ export function useStandingPaymentRequest(
     };
   }, []);
 
-  const identityStoreRef = useRef(identityStore);
-  identityStoreRef.current = identityStore;
-  const operationIdRef = useRef<string | null>(null);
-  operationIdRef.current = request?.operationId ?? null;
+  // Written in useInsertionEffect rather than in render: a ref write in the
+  // render body switches the React Compiler off for the whole hook. Every read
+  // is from an effect, an async continuation, or an identity-store
+  // subscription — all of which run after insertion effects.
+  const identityStoreRef = useLatestRef(identityStore);
+  const operationIdRef = useLatestRef<string | null>(
+    request?.operationId ?? null,
+  );
 
   const unit = input?.unit ?? null;
   // Mint list identity: order-stable join so a re-render with the same mints
   // doesn't re-resolve, while trust changes do.
   const mintsKey = input ? input.mints.join("|") : null;
-  const mintsRef = useRef<string[]>(input?.mints ?? []);
-  mintsRef.current = input?.mints ?? [];
+  const mintsRef = useLatestRef<string[]>(input?.mints ?? []);
   const lockP2pkPubkey = input?.lockP2pkPubkey;
   // Display-mint identity: like the lock, a change only re-ENCODEs the same
   // operation (never rotates), so it triggers the effect but stays out of
   // the fresh key.
   const displayMintsKey = input?.displayMints?.join("|");
-  const displayMintsRef = useRef<string[] | undefined>(input?.displayMints);
-  displayMintsRef.current = input?.displayMints;
+  const displayMintsRef = useLatestRef<string[] | undefined>(
+    input?.displayMints,
+  );
 
   useEffect(() => {
     if (!unit || mintsKey === null) {
@@ -109,39 +174,42 @@ export function useStandingPaymentRequest(
       setIsLoading(true);
     }
     setError(null);
-    (async () => {
-      try {
-        if (wantFresh) freshDoneForRef.current = inputKey;
-        const requestInput = {
+    void (async () => {
+      if (wantFresh) freshDoneForRef.current = inputKey;
+      const outcome = await resolveStandingRequest(
+        manager,
+        {
           unit,
           mints: mintsRef.current,
           lockP2pkPubkey,
           displayMints: displayMintsRef.current,
-        };
-        const resolved = wantFresh
-          ? await rotateStandingPaymentRequest(
-              manager,
-              requestInput,
-              identityStoreRef.current,
-            )
-          : await ensureStandingPaymentRequest(
-              manager,
-              requestInput,
-              identityStoreRef.current,
-            );
-        if (!cancelled && mountedRef.current) setRequest(resolved);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        logger.warn("creq.standing.ensure_failed", { unit, error: message });
-        if (!cancelled && mountedRef.current) setError(message);
-      } finally {
-        if (!cancelled && mountedRef.current) setIsLoading(false);
-      }
-    })();
+        },
+        identityStoreRef.current,
+        wantFresh,
+      );
+      if (cancelled || !mountedRef.current) return;
+      if (outcome.ok) setRequest(outcome.request);
+      else setError(outcome.message);
+      setIsLoading(false);
+    })().catch(() => {
+      // Restores the guarantee the old `try/finally` gave: whatever went wrong
+      // after the wallet call — including a logger that threw — the field must
+      // stop showing a spinner. `finally` itself cannot come back; the React
+      // Compiler refuses to lower it and the hook would stop compiling.
+      if (!cancelled && mountedRef.current) setIsLoading(false);
+    });
     return () => {
       cancelled = true;
     };
-  }, [manager, unit, mintsKey, lockP2pkPubkey, displayMintsKey, generation, freshOnMount]);
+  }, [
+    manager,
+    unit,
+    mintsKey,
+    lockP2pkPubkey,
+    displayMintsKey,
+    generation,
+    freshOnMount,
+  ]);
 
   // External rotations land in the identity store — re-resolve.
   useEffect(() => {
@@ -156,26 +224,36 @@ export function useStandingPaymentRequest(
     });
   }, [unit]);
 
+  // The dep list names the refs too. It used to read
+  // `[manager, unit, lockP2pkPubkey]` while the body also reached
+  // `mintsRef`/`displayMintsRef`/`identityStoreRef`/`mountedRef`, and a memo
+  // the compiler cannot preserve switches it off for the whole hook. It stays
+  // an explicit useCallback so `rotate`'s identity is stable for consumers
+  // even where the compiler is not running (Jest), not only once compiled.
   const rotate = useCallback(async () => {
     if (!unit) return;
-    try {
-      const created = await rotateStandingPaymentRequest(
-        manager,
-        {
-          unit,
-          mints: mintsRef.current,
-          lockP2pkPubkey,
-          displayMints: displayMintsRef.current,
-        },
-        identityStoreRef.current,
-      );
-      if (mountedRef.current) setRequest(created);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      logger.warn("creq.standing.rotate_failed", { unit, error: message });
-      if (mountedRef.current) setError(message);
-    }
-  }, [manager, unit, lockP2pkPubkey]);
+    const outcome = await rotateStandingRequest(
+      manager,
+      {
+        unit,
+        mints: mintsRef.current,
+        lockP2pkPubkey,
+        displayMints: displayMintsRef.current,
+      },
+      identityStoreRef.current,
+    );
+    if (!mountedRef.current) return;
+    if (outcome.ok) setRequest(outcome.request);
+    else setError(outcome.message);
+  }, [
+    manager,
+    unit,
+    lockP2pkPubkey,
+    mintsRef,
+    displayMintsRef,
+    identityStoreRef,
+    mountedRef,
+  ]);
 
   // Auto-rotation when a payment lands on the CURRENT standing request is driven
   // centrally by `usePaymentStatusListener` (the same chokepoint that rotates the

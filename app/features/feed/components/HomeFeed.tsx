@@ -6,6 +6,7 @@
  * stats), with Primal cache / raw relays as fallback tiers.
  */
 
+import { COMPOSE_FAB_CLEARANCE } from '@/features/composer/ui/ComposeFab';
 import { useMemo, useRef, useEffect, useCallback, useState, type ReactNode } from 'react';
 import { StyleSheet, type LayoutChangeEvent } from 'react-native';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
@@ -16,7 +17,7 @@ import { log, Log, feedLog } from '@/shared/lib/logger';
 import { List } from '@/shared/ui/composed/List';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Button } from 'heroui-native';
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
 import type { FeedParseResult } from '@/features/feed/data/feedClient';
@@ -651,6 +652,8 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
         getVideoFeedLayoutsAndIndex={getVideoFeedLayoutsAndIndex}>
         <View style={styles.flex1}>
           <List
+            screen
+            bottomSpacing={COMPOSE_FAB_CLEARANCE}
             data={feedRows}
             keyExtractor={getFeedRowKey}
             getItemType={getFeedRowItemType}
@@ -683,7 +686,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             onEndReached={handleEndReached}
             onEndReachedThreshold={0.4}
             style={styles.flex1}
-            contentContainerStyle={LIST_CONTENT_STYLE}
             showsVerticalScrollIndicator={false}
             onScroll={onScroll}
             scrollEventThrottle={16}
@@ -699,8 +701,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
 // ============================================================================
 // Stable references — defined outside the component to avoid re-creation
 // ============================================================================
-
-const LIST_CONTENT_STYLE = { paddingBottom: 120 };
 
 const DEFAULT_FEED_SPECS: FeedSpec[] = [
   {

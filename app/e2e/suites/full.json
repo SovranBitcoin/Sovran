@@ -128,6 +128,9 @@
     {"id":"wallet.deeplink.camera-permission","file":"scenarios/wallet-deeplink-camera-permission.json","order":530,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"transactions.filter.empty-result","file":"scenarios/transactions-filter-empty-result.json","order":540,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.bolt11","unit.sat","cocod.receive.cashu"],"endState":"wallet"},
     {"id":"send.cashu.back-reentry","file":"scenarios/send-cashu-back-reentry.json","order":550,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.bolt11","cocod.receive.cashu","unit.sat"],"endState":"wallet"},
-    {"id":"wallet.location.permission","file":"scenarios/wallet-location-permission.json","order":560,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"}
+    {"id":"wallet.location.permission","file":"scenarios/wallet-location-permission.json","order":560,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"store.screenshots","file":"scenarios/store-screenshots.json","order":9990,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"settings.moderation.filter","file":"scenarios/settings-moderation-filter.json","order":570,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"settings.legal.navigate","file":"scenarios/settings-legal-navigate.json","order":580,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"}
   ]
 }

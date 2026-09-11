@@ -181,16 +181,12 @@ export interface BLEDmContact {
 
 /**
  * Payload dispatched on the `onBLEPeerUpdate` event. The native bridge sends
- * a fresh peer snapshot whenever announce-state changes (new peer, peer
- * dropped, nickname change). Consumers may receive a single peer or a list —
- * the bridge normalises to one event per change.
+ * peer-ID lists on both platforms and individual connection changes on iOS.
+ * A list event does not carry a `peerID`; read getBLEPeers() for full records.
  */
-export interface BLEPeerEvent {
-  peerID: string;
-  nickname?: string;
-  isConnected?: boolean;
-  lastSeen?: number;
-}
+export type BLEPeerEvent =
+  | { type: 'list'; peers: string[] }
+  | { type: 'connected' | 'disconnected'; peerID: string };
 
 // --- Nostr bridge payloads ---
 

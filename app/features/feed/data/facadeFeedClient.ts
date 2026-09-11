@@ -206,10 +206,37 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
       const layer = buildNostrDataLayer();
       if (!layer) return emptyFeedParseResult();
 
-      const result = await layer.getFeedPage({
+      const transport = feedPageTransport(request);
+      let result = await layer.getFeedPage({
         spec: { kind: 'user', pubkey: request.pubkey },
-        ...feedPageTransport(request),
+        ...transport,
       });
+
+      // Relay pages include replies. A page filtered down to zero posts is not
+      // the end of this profile's history; follow its cursor until a visible
+      // post arrives or the source stops advancing.
+      while (result.isOk() && !request.signal?.aborted) {
+        const page = result.value;
+        const hasPosts = page.items.some((item) =>
+          item.type === 'note'
+            ? item.event.pubkey === request.pubkey && isRootNote(item.event)
+            : item.repostEvent.pubkey === request.pubkey
+        );
+        const next = page.cursor;
+        const previous = transport.cursor;
+        if (hasPosts || page.items.length === 0 || !next) break;
+        if (
+          previous &&
+          (next.createdAt > previous.createdAt ||
+            (next.createdAt === previous.createdAt && next.id >= previous.id))
+        )
+          break;
+        transport.cursor = next;
+        result = await layer.getFeedPage({
+          spec: { kind: 'user', pubkey: request.pubkey },
+          ...transport,
+        });
+      }
 
       return result.match(
         (page) => {

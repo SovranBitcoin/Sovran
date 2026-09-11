@@ -649,14 +649,14 @@ export function createSovranNotifications(
       if (data?.mintUnreachable) {
         staticPopup('mint-unreachable');
       } else {
-        staticPopup('general-error', { text: message });
+        staticPopup('general-error', { failure: { service: 'cashu', error: { message, data } } });
       }
     },
     MINT_QUOTE_FAILED: ({ code: _code, message, data }) => {
       if (data?.mintUnreachable) {
         staticPopup('mint-unreachable');
       } else {
-        staticPopup('general-error', { text: message });
+        staticPopup('general-error', { failure: { service: 'cashu', error: { message, data } } });
       }
     },
     MELT_FAILED: ({ code: _code, message, data }) => {
@@ -664,11 +664,13 @@ export function createSovranNotifications(
       if (data?.mintUnreachable) {
         staticPopup('mint-unreachable');
       } else {
-        staticPopup('general-error', { text: message });
+        staticPopup('general-error', { failure: { service: 'cashu', error: { message, data } } });
       }
     },
     PAYMENT_REQUEST_FAILED: ({ code: _code, message, data: _data }) => {
-      staticPopup('send-payment-failed', { text: message });
+      staticPopup('send-payment-failed', {
+        failure: { service: 'cashu', error: { message, data: _data } },
+      });
     },
     NFC_WRITE_FAILED: ({ code: _code, message, data: _data }) => {
       paramPopup('nfc-error', { title: 'NFC Write Failed', message });
@@ -987,7 +989,7 @@ export function createSovranNotifications(
       } else if (mintUnreachable) {
         staticPopup('mint-unreachable');
       } else {
-        staticPopup('cancel-transaction-failed', { text: message });
+        staticPopup('cancel-transaction-failed', { failure: { service: 'cashu', error: message } });
       }
     },
 
@@ -1099,7 +1101,7 @@ export function createSovranNotifications(
       if (store.active?.id === id && store.active?.state === 'processing') {
         store.setFailed(id, new Error(message));
       } else {
-        staticPopup('receive-failed', { text: message });
+        staticPopup('receive-failed', { failure: { service: 'cashu', error: message } });
       }
     },
 
@@ -1111,7 +1113,7 @@ export function createSovranNotifications(
       if (mintUnreachable) {
         staticPopup('mint-unreachable');
       } else {
-        staticPopup('could-not-cancel', { text: message });
+        staticPopup('could-not-cancel', { failure: { service: 'cashu', error: message } });
       }
     },
 
@@ -1508,14 +1510,16 @@ export function createSovranHandlers({
             }
             useRoutstrTopUpStore.getState().complete('success');
           } else {
-            staticPopup('routstr-transaction-failed', { text: result.error });
+            staticPopup('routstr-transaction-failed', {
+              failure: { service: 'routstr', error: result.error },
+            });
             useRoutstrTopUpStore.getState().complete('failed');
           }
         } catch (e) {
           paymentLog.error('payment.routstr_topup.error', {
             error: e instanceof Error ? e.message : String(e),
           });
-          staticPopup('routstr-transaction-failed', { text: 'Failed to process top-up' });
+          staticPopup('routstr-transaction-failed', { failure: { service: 'routstr', error: e } });
           useRoutstrTopUpStore.getState().complete('failed');
         }
         router.dismiss();

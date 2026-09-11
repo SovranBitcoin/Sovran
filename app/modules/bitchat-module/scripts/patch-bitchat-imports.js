@@ -21,6 +21,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { patchIdleDiscovery } = require('./patch-idle-discovery');
 
 const ROOT = path.resolve(__dirname, '..', 'ios', 'BitChatVendor');
 // BitLogger / BitFoundation: bundled into BitChatModule (no separate Swift module).
@@ -210,13 +211,15 @@ for (const file of walk(ROOT)) {
   let after = before
     .replace(PATTERN, REPLACEMENT)
     .replace(SCOPED_PRIVATE_IMPORT, SCOPED_PRIVATE_REPLACEMENT)
-    .split(TESTNET_UUID).join(MAINNET_UUID);
+    .split(TESTNET_UUID)
+    .join(MAINNET_UUID);
   if (file.endsWith('BLEAnnounceHandlingPolicy.swift')) {
     const next = after.replace(MISMATCH_GUARD_ANCHOR, MISMATCH_GUARD_REPLACEMENT);
     if (next !== after) applied.mismatchGuard = true;
     after = next;
   }
-  if (file.endsWith('BLEService.swift')) {
+  if (path.basename(file) === 'BLEService.swift') {
+    after = patchIdleDiscovery(after);
     let next = after.replace(LINKSTATE_ANCHOR, LINKSTATE_REPLACEMENT);
     if (next !== after) applied.linkState = true;
     after = next;
@@ -248,10 +251,14 @@ function assertApplied(name, appliedNow, file, alreadyPattern, optional = false)
   // version-specific files like BLEAnnounceHandlingPolicy.swift (post-v1.5.1).
   if (!fs.existsSync(file)) {
     if (optional) {
-      console.warn(`[patch-bitchat-imports] SKIP: ${name} — target file absent at this vendor version`);
+      console.warn(
+        `[patch-bitchat-imports] SKIP: ${name} — target file absent at this vendor version`
+      );
       return;
     }
-    console.error(`[patch-bitchat-imports] FATAL: ${name} target file missing: ${path.relative(ROOT, file)}`);
+    console.error(
+      `[patch-bitchat-imports] FATAL: ${name} target file missing: ${path.relative(ROOT, file)}`
+    );
     process.exit(1);
   }
   const content = fs.readFileSync(file, 'utf8');
@@ -305,11 +312,10 @@ console.log(`[patch-bitchat-imports] patched ${patched} file(s)`);
   const out = path.join(path.resolve(__dirname, '..', 'ios'), 'BitchatVendorVersion.swift');
   let commit = readExistingVendorCommit(out, /static let commit = "([^"]+)"/);
   try {
-    const gitCommit =
-      require('child_process')
-        .execSync('git rev-parse --short HEAD', { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] })
-        .toString()
-        .trim();
+    const gitCommit = require('child_process')
+      .execSync('git rev-parse --short HEAD', { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
     if (gitCommit) commit = gitCommit;
   } catch {
     /* git unavailable — keep the existing baked SHA */

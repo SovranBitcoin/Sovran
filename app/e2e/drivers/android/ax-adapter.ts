@@ -15,7 +15,8 @@
  * - Native Switch semantics ride `checkable`/`checked` → value '1'/'0',
  *   matching the iOS accessibilityValue convention the scenarios assert.
  */
-import type { AxSnapshot, AxElement } from '../ax';
+import { findElement, elementTapCenter, type AxSnapshot, type AxElement } from '../ax';
+import type { Selector } from '../../schema/selectors';
 import { redactProfileSecretAxFields } from '../ax-redaction';
 
 const decodeXmlEntities = (value: string): string =>
@@ -109,4 +110,24 @@ export function parseUiautomatorXml(
     screen ??
     (rootFrame ? { width: rootFrame.width, height: rootFrame.height } : { width: 0, height: 0 });
   return { screen: dims, elements };
+}
+
+/** RN Android sheets retain background-screen nodes in document order. For
+ * duplicate testIDs, the last on-screen copy belongs to the foreground screen.
+ * Fold only the selection view: screenshot redaction must retain every frame. */
+export function findAndroidElement(snapshot: AxSnapshot, selector: Selector): AxElement | null {
+  const lastVisibleId = new Map<string, AxElement>();
+  for (const element of snapshot.elements) {
+    if (element.id && elementTapCenter(element, snapshot.screen))
+      lastVisibleId.set(element.id, element);
+  }
+  return findElement(
+    {
+      ...snapshot,
+      elements: snapshot.elements.filter(
+        (element) => !element.id || lastVisibleId.get(element.id) === element
+      ),
+    },
+    selector
+  );
 }

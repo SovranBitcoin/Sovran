@@ -10,7 +10,7 @@ import type { DmProtocol } from './dmEnvelopeTypes';
  *  `ContactsScreen`, the split-bill picker, and `mockDataStore` are unaffected). */
 export interface RecentContact {
   type: 'contact';
-  dmEvent: { content: string } | null | undefined;
+  dmEvent: { content: string; isOwn?: boolean } | null | undefined;
   nip17Content: string | undefined;
   pubkey: string;
   timestamp: number;

@@ -554,7 +554,7 @@ export interface CompositionResult {
   target: number;
   nearestLower: number | null;
   nearestUpper: number | null;
-  strategy: 'exhaustive' | 'meet-in-the-middle' | 'bitset-dp';
+  strategy: 'exhaustive' | 'meet-in-the-middle' | 'bitset-dp' | 'denomination-greedy';
   elapsedMs: number;
 }
 

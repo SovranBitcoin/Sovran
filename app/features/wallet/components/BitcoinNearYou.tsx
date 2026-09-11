@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Platform, StyleSheet, View as RNView } from 'react-native';
 import { AppleMaps, GoogleMaps } from 'expo-maps';
 import * as Location from 'expo-location';
-import { Link } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
@@ -295,52 +295,54 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
 
   return (
     <Log name="BitcoinNearYou">
-      <Link href="/(map-flow)" asChild>
-        {/* The permission outcome rides the card's aggregated AX element (iOS
+      {/* The permission outcome rides the card's aggregated AX element (iOS
             flattens every descendant into this Pressable), so denial — which
             is otherwise silent — stays e2e-observable. */}
-        <Pressable activeOpacity={0.85} testID={`wallet-location:${permStatus}`}>
-          <SquircleView
-            style={{
-              overflow: 'hidden',
-              borderRadius: 20,
-              borderWidth: 1,
-              borderCurve: 'continuous',
-              borderColor: withAlpha(muted, 0.3),
-            }}>
-            <BlurCardFrame accentColor={muted}>
-              <RNView className="z-[1]">
-                <MapPreview
-                  latitude={coords.latitude}
-                  longitude={coords.longitude}
-                  markers={nearbyMarkers}
-                />
+      <Pressable
+        onPress={() => router.navigate('/(map-flow)')}
+        accessibilityRole="link"
+        activeOpacity={0.85}
+        testID={`wallet-location:${permStatus}`}>
+        <SquircleView
+          style={{
+            overflow: 'hidden',
+            borderRadius: 20,
+            borderWidth: 1,
+            borderCurve: 'continuous',
+            borderColor: withAlpha(muted, 0.3),
+          }}>
+          <BlurCardFrame accentColor={muted}>
+            <RNView className="z-[1]">
+              <MapPreview
+                latitude={coords.latitude}
+                longitude={coords.longitude}
+                markers={nearbyMarkers}
+              />
 
-                <RNView className="absolute left-0 right-0 top-0 z-[2] flex-row items-center justify-between px-4 pt-3.5">
-                  <Text size={14} semibold color={titleColor}>
-                    Bitcoin near you
+              <RNView className="absolute left-0 right-0 top-0 z-[2] flex-row items-center justify-between px-4 pt-3.5">
+                <Text size={14} semibold color={titleColor}>
+                  Bitcoin near you
+                </Text>
+                <Icon name="mdi:chevron-right" size={18} color={titleColor} />
+              </RNView>
+
+              <RNView className="absolute bottom-2.5 left-3 z-[2]">
+                <RNView
+                  className="flex-row items-center gap-1 rounded-full px-2 py-1"
+                  style={{
+                    borderCurve: 'continuous',
+                    backgroundColor: withAlpha(foreground, 0.1),
+                  }}>
+                  <Icon name="mdi:map-marker" size={12} color={titleColor} />
+                  <Text size={11} semibold color={titleColor}>
+                    {countLabel}
                   </Text>
-                  <Icon name="mdi:chevron-right" size={18} color={titleColor} />
-                </RNView>
-
-                <RNView className="absolute bottom-2.5 left-3 z-[2]">
-                  <RNView
-                    className="flex-row items-center gap-1 rounded-full px-2 py-1"
-                    style={{
-                      borderCurve: 'continuous',
-                      backgroundColor: withAlpha(foreground, 0.1),
-                    }}>
-                    <Icon name="mdi:map-marker" size={12} color={titleColor} />
-                    <Text size={11} semibold color={titleColor}>
-                      {countLabel}
-                    </Text>
-                  </RNView>
                 </RNView>
               </RNView>
-            </BlurCardFrame>
-          </SquircleView>
-        </Pressable>
-      </Link>
+            </RNView>
+          </BlurCardFrame>
+        </SquircleView>
+      </Pressable>
     </Log>
   );
 });

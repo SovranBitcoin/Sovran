@@ -24,6 +24,8 @@ jobs:
         with:
           github-token: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
 
+      # Runs at the repo ROOT: `type-check` fans out over every workspace package
+      # (`bun run --filter '*'`), so this covers app (both platform passes),
+      # wallet and nostr rather than app alone.
       - name: Type Check
-        working-directory: ${{ env.APP_DIR }}
         run: bun run type-check

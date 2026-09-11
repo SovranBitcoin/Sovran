@@ -83,7 +83,7 @@ describe('fresh payment-root context clearing', () => {
     expectBefore(
       deepLinkEffect,
       'deepLinks.onBeforeScan?.();',
-      'machineRef.current.scan(host, { source: "deeplink" })'
+      'machine.scan(host, { source: "deeplink" })'
     );
     expect(walletProvider).not.toContain('@/shared/stores/runtime/clearPaymentContext');
   });

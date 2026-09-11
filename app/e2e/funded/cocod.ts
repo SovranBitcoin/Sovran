@@ -127,8 +127,32 @@ export function createCocodCounterparty(options: {
   return {
     async status() {
       const raw = await run('status', ['status']);
-      if (!STATUSES.has(raw as CocodStatus)) throw new Error('unknown cocod status response');
-      return raw as CocodStatus;
+      if (STATUSES.has(raw as CocodStatus)) return raw as CocodStatus;
+      // 0.0.17 separates process liveness, seed access and the running wallet session.
+      // Available seed access alone must never authorize a payment operation.
+      let value;
+      try {
+        value = JSON.parse(raw);
+      } catch {
+        throw new Error('unknown cocod status response');
+      }
+      if (value?.daemon?.version !== '0.0.17' || value.daemon.interfaceVersion !== '1')
+        throw new Error('unknown cocod status response');
+      if (
+        value.wallet === null &&
+        value.seedAccess === null &&
+        value.cocoSession?.state === 'stopped'
+      )
+        return 'UNINITIALIZED';
+      if (!value.wallet || typeof value.wallet.configuredAt !== 'string')
+        throw new Error('unknown cocod status response');
+      if (value.cocoSession?.state === 'running' && value.seedAccess?.state === 'available')
+        return 'UNLOCKED';
+      if (value.seedAccess?.state === 'locked' && value.cocoSession?.state === 'stopped')
+        return 'LOCKED';
+      if (['starting', 'stopping', 'stopped', 'failed'].includes(value.cocoSession?.state))
+        return 'ERROR';
+      throw new Error('unknown cocod status response');
     },
 
     async balanceSnapshot() {

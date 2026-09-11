@@ -1,3 +1,5 @@
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { MOCK_SWAP_GROUPS } from '@/shared/stores/runtime/mockDataStore';
 import React, {
   useCallback,
   useEffect,
@@ -6,12 +8,13 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { StyleSheet, useWindowDimensions } from 'react-native';
+import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
 
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
+import { useScreenBottomPadding, useScreenInsets } from '@/shared/hooks/useScreenInsets';
 
 import { FlashList, type FlashListRef, type ViewToken } from '@shopify/flash-list';
-import { Link } from 'expo-router';
 import { withAlpha } from '@/shared/lib/color';
 import { groupBy } from '@/shared/lib/groupBy';
 
@@ -212,6 +215,12 @@ export const Transactions = React.memo(
     onEndReached,
     ref,
   }: Props) => {
+    const manualBottomPadding = useScreenBottomPadding();
+    const { bottom } = useScreenInsets();
+    const bottomPadding = Math.max(
+      0,
+      manualBottomPadding - (!disableContentInsetAdjustment && Platform.OS === 'ios' ? bottom : 0)
+    );
     const [muted, foreground] = useThemeColor(['muted', 'foreground'] as const);
     const { height: screenHeight } = useWindowDimensions();
 
@@ -223,7 +232,9 @@ export const Transactions = React.memo(
     const collapsing = useRollbackStore((s) => s.collapsing);
 
     const borderColor = useMemo(() => withAlpha(muted, 0.3), [muted]);
-    const swapGroupsById = useSwapTransactionsStore((state) => state.groups);
+    const mockMode = useSettingsStore((state) => state.mockMode);
+    const liveSwapGroups = useSwapTransactionsStore((state) => state.groups);
+    const swapGroupsById = mockMode ? MOCK_SWAP_GROUPS : liveSwapGroups;
 
     const swapGroups = useMemo(() => {
       if (account.unit === 'all') return Object.values(swapGroupsById);
@@ -733,29 +744,26 @@ export const Transactions = React.memo(
                       </BlurCardFrame>
                     </View>
                     {label === 'Confirmed' && !embedded && (
-                      <Link
-                        href={{
-                          pathname: '/transactions',
-                          params: {
-                            filterCurrency: account.unit,
-                            filterStatus: 'Confirmed',
-                          },
-                        }}
-                        asChild>
-                        <Pressable
-                          testID="transactions-view-all"
-                          accessibilityLabel="View all transactions">
-                          <View style={[styles.viewAllButton, { borderColor }]}>
-                            <BlurCardFrame accentColor={muted}>
-                              <View style={styles.viewAllContent}>
-                                <Text size={14} bold>
-                                  View all ({filteredHistory.length})
-                                </Text>
-                              </View>
-                            </BlurCardFrame>
-                          </View>
-                        </Pressable>
-                      </Link>
+                      <Pressable
+                        onPress={() =>
+                          router.navigate({
+                            pathname: '/transactions',
+                            params: { filterCurrency: account.unit, filterStatus: 'Confirmed' },
+                          })
+                        }
+                        testID="transactions-view-all"
+                        accessibilityRole="link"
+                        accessibilityLabel="View all transactions">
+                        <View style={[styles.viewAllButton, { borderColor }]}>
+                          <BlurCardFrame accentColor={muted}>
+                            <View style={styles.viewAllContent}>
+                              <Text size={14} bold>
+                                View all ({filteredHistory.length})
+                              </Text>
+                            </View>
+                          </BlurCardFrame>
+                        </View>
+                      </Pressable>
                     )}
                   </VStack>
                 </View>
@@ -823,7 +831,7 @@ export const Transactions = React.memo(
               onViewableItemsChanged={handleViewableItemsChanged}
               viewabilityConfig={MONTH_VIEWABILITY_CONFIG}
               renderItem={renderSection}
-              contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 250 }}
+              contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPadding }}
             />
           </View>
           {!settled && (

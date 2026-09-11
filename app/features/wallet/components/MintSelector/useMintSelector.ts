@@ -1,3 +1,5 @@
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { getMockMintBalance } from '@/shared/stores/runtime/mockDataStore';
 import { useEffect, useMemo } from 'react';
 import { useWindowDimensions } from 'react-native';
 
@@ -63,7 +65,12 @@ export function useMintSelector({
 
   const storedSelectedMint = useMintStore((state) => state.selectedMint);
   const mintUrl = selectedMintUrl ?? storedSelectedMint;
-  const balance = mintUrl ? amountToNumber(liveBalances.byMint[mintUrl]?.total) : 0;
+  const mockMode = useSettingsStore((state) => state.mockMode);
+  const balance = mintUrl
+    ? mockMode
+      ? getMockMintBalance(mintUrl, unit)
+      : amountToNumber(liveBalances.byMint[mintUrl]?.total)
+    : 0;
   const mintData = useMemo(
     () => (mintUrl ? mints.find((m) => m.mintUrl === mintUrl) : undefined),
     [mints, mintUrl]

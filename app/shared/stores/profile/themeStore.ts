@@ -17,7 +17,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { storeLog } from '@/shared/lib/logger';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { PersistedThemeStore, type ThemeMode } from '@sovranbitcoin/schemas';
+import { PersistedThemeStore, ThemeMode } from '@sovranbitcoin/schemas';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 const profileStorage = createProfileScopedStorage();
@@ -26,6 +26,23 @@ export type UnitId = string;
 export type { ThemeMode };
 
 const DEFAULT_MODE: ThemeMode = 'dark';
+
+/**
+ * The package schema with `mode` made tolerant. `ThemeMode.default('dark')`
+ * upstream rescues a MISSING mode; it does nothing for an INVALID one, and
+ * invalid is the wipe class — `createMergeWithSchema` discards the whole blob,
+ * taking the active album and every per-unit wallpaper assignment with it. A
+ * third mode landing later and the user rolling back to this build is all it
+ * takes. `mode` is presentational and has a real neutral member, so it catches
+ * to the same default the store already starts from.
+ *
+ * Applied here rather than in `@sovranbitcoin/schemas`: that package is shared
+ * with the web properties, where the value is validated at a boundary that
+ * SHOULD reject. Tolerance belongs to the persisted read, which is this store.
+ */
+const PersistedThemeStoreTolerant = PersistedThemeStore.extend({
+  mode: ThemeMode.default(DEFAULT_MODE).catch(DEFAULT_MODE),
+});
 
 type PersistedTheme = {
   activeAlbumSlug: string | null;
@@ -80,7 +97,7 @@ export const useThemeStore = create<ThemeStore>()(
     persistConfig({
       name: 'theme-store',
       storage: profileStorage,
-      schema: PersistedThemeStore,
+      schema: PersistedThemeStoreTolerant,
       version: 2,
       migrate: migrateThemeStore,
       partialize: (state) => ({

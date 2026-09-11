@@ -27,7 +27,7 @@ import type {
   ReceiveHistoryEntry,
   SendHistoryEntry,
 } from "@cashu/coco-core";
-import { getEncodedToken } from "@cashu/coco-core";
+import { getEncodedToken, operationHistoryId } from "@cashu/coco-core";
 import { emitPaymentRequestCreated } from "../paymentRequestEvents";
 import { proofsHaveP2PK } from "../p2pk";
 import type { MachineOperations, StepDataMap } from "../machine/types";
@@ -99,19 +99,17 @@ async function findSendHistoryEntryByOperationId(
 ): Promise<string | null> {
   logger.debug("operations.history.send.lookup.start", {
     operationId,
-    limit: 50,
   });
-  const history = await mgr.history.getPaginatedHistory(0, 50);
-  const entry = history.find(
-    (h): h is SendHistoryEntry =>
-      h.type === "send" &&
-      (h.operationId === operationId ||
-        h.metadata?.operationId === operationId),
+  // Coco derives modern history directly from its operation projection.
+  // Read this operation by its canonical history ID instead of scanning a page.
+  const found = await mgr.history.getHistoryEntryById(
+    operationHistoryId("send", operationId),
   );
+  const entry =
+    found?.type === "send" && found.operationId === operationId ? found : null;
   logger.debug("operations.history.send.lookup.done", {
     operationId,
     found: !!entry,
-    historyCount: history.length,
     entryState: entry?.state ?? null,
   });
   return entry ? JSON.stringify(entry) : null;

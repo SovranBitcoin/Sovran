@@ -13,6 +13,14 @@ import {
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+jest.mock('@/shared/hooks/useVisualActivityEffect', () => ({
+  useVisualActivityEffect: (effect: () => void | (() => void), enabled = true) => {
+    jest.requireActual<typeof import('react')>('react').useEffect(() => {
+      if (enabled) return effect();
+    }, [effect, enabled]);
+  },
+}));
+
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (tokens: string | string[]) =>
     Array.isArray(tokens) ? tokens.map((token) => token) : tokens,
@@ -39,7 +47,12 @@ jest.mock('react-native-reanimated', () => {
       value >= 1 ? colors[1] : colors[0],
     useAnimatedProps: <T extends object>(factory: () => T) => factory(),
     useAnimatedStyle: <T extends object>(factory: () => T) => factory(),
-    useFrameCallback: jest.fn(),
+    cancelAnimation: jest.fn(),
+    useFrameCallback: jest.fn(() =>
+      jest
+        .requireActual<typeof import('react')>('react')
+        .useMemo(() => ({ setActive: jest.fn(), isActive: false, callbackId: 1 }), [])
+    ),
     useSharedValue: <T,>(value: T) => {
       let current = value;
 

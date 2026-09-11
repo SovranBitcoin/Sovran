@@ -1,3 +1,4 @@
+import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -79,7 +80,6 @@ function PostCardGutterHeader({
   onProfilePress,
   onMorePress,
   onNestedPressIn,
-  onNestedPressOut,
 }: {
   loading?: boolean;
   foreground: string;
@@ -95,7 +95,6 @@ function PostCardGutterHeader({
   onProfilePress?: () => void;
   onMorePress?: () => void;
   onNestedPressIn?: () => void;
-  onNestedPressOut?: () => void;
 }) {
   const textPrimary = { color: withAlpha(foreground, 0.9) };
   const textMuted = { color: withAlpha(foreground, 0.4) };
@@ -106,10 +105,7 @@ function PostCardGutterHeader({
         {loading ? (
           <Text loading numberOfLines={1} placeholder={placeholderAuthor} bold size={14} />
         ) : (
-          <Pressable
-            onPressIn={onNestedPressIn}
-            onPressOut={onNestedPressOut}
-            onPress={onProfilePress}>
+          <Pressable onPressIn={onNestedPressIn} onPress={onProfilePress}>
             <Text
               bold
               size={14}
@@ -149,8 +145,8 @@ function PostCardGutterHeader({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="More post actions"
+            hitSlop={8}
             onPressIn={onNestedPressIn}
-            onPressOut={onNestedPressOut}
             onPress={onMorePress}
             haptics
             style={pcStyles.moreButton}>
@@ -204,7 +200,6 @@ interface PostCardProps {
   repostPendingDirection?: 'activating' | 'deactivating';
   likePendingDirection?: 'activating' | 'deactivating';
   onNestedProfilePressIn?: () => void;
-  onNestedProfilePressOut?: () => void;
   /**
    * Called immediately before navigating to this post's thread. Returns the
    * data the caller already has (visible parent chain via `allEvents`, plus
@@ -214,7 +209,15 @@ interface PostCardProps {
   getThreadContext?: () => ThreadSeed | null;
 }
 
-export const PostCard = React.memo(function PostCard({
+export const PostCard = React.memo(function PostCard(props: PostCardProps) {
+  const hidden = useFeedIgnoreStore(
+    (s) =>
+      s.ignoredPubkeys.includes(props.event.pubkey) || s.ignoredEventIds.includes(props.event.id)
+  );
+  return hidden ? null : <PostCardBody {...props} />;
+});
+
+const PostCardBody = React.memo(function PostCardBody({
   event,
   metrics,
   quotedEvents,
@@ -247,7 +250,6 @@ export const PostCard = React.memo(function PostCard({
   repostPendingDirection,
   likePendingDirection,
   onNestedProfilePressIn,
-  onNestedProfilePressOut,
   getThreadContext,
 }: PostCardProps) {
   const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
@@ -335,19 +337,14 @@ export const PostCard = React.memo(function PostCard({
   const {
     gesture: tapGesture,
     suppress: suppressThreadTap,
-    release: releaseThreadTap,
     handleTap: handleThreadPress,
+    begin: beginThreadTap,
   } = useCardTapGesture(navigateToThread);
 
   const handleNestedPressIn = useCallback(() => {
     suppressThreadTap();
     onNestedProfilePressIn?.();
   }, [suppressThreadTap, onNestedProfilePressIn]);
-
-  const handleNestedPressOut = useCallback(() => {
-    releaseThreadTap();
-    onNestedProfilePressOut?.();
-  }, [releaseThreadTap, onNestedProfilePressOut]);
 
   const handleMorePress = useCallback(() => {
     onMorePress?.();
@@ -378,7 +375,6 @@ export const PostCard = React.memo(function PostCard({
     repostPendingDirection,
     likePendingDirection,
     onActionPressIn: handleNestedPressIn,
-    onActionPressOut: handleNestedPressOut,
   };
 
   // ── Thread target: stacked layout (no gutter) ──
@@ -390,10 +386,7 @@ export const PostCard = React.memo(function PostCard({
       <Log name="PostCard">
         <View>
           <View style={pcStyles.targetRow}>
-            <Pressable
-              onPressIn={handleNestedPressIn}
-              onPressOut={handleNestedPressOut}
-              onPress={navigateToProfile}>
+            <Pressable onPressIn={handleNestedPressIn} onPress={navigateToProfile}>
               <HStack align="center" gap={10} style={sharedStyles.mb6}>
                 <Avatar
                   state={
@@ -429,9 +422,7 @@ export const PostCard = React.memo(function PostCard({
               onVideoTap={onVideoTap}
               onLinkPress={onLinkPress}
               onQuotedPressIn={handleNestedPressIn}
-              onQuotedPressOut={handleNestedPressOut}
               onInlineActionPressIn={handleNestedPressIn}
-              onInlineActionPressOut={handleNestedPressOut}
             />
 
             {fullDate ? (
@@ -469,10 +460,7 @@ export const PostCard = React.memo(function PostCard({
             ]}
           />
         ) : null}
-        <Pressable
-          onPressIn={handleNestedPressIn}
-          onPressOut={handleNestedPressOut}
-          onPress={navigateToProfile}>
+        <Pressable onPressIn={handleNestedPressIn} onPress={navigateToProfile}>
           <Avatar
             state={profile?.picture ? 'image' : 'fallback'}
             picture={profile?.picture}
@@ -504,7 +492,6 @@ export const PostCard = React.memo(function PostCard({
           onProfilePress={navigateToProfile}
           onMorePress={handleMorePress}
           onNestedPressIn={handleNestedPressIn}
-          onNestedPressOut={handleNestedPressOut}
         />
 
         <NoteContent
@@ -514,11 +501,8 @@ export const PostCard = React.memo(function PostCard({
           getMetrics={getMetrics}
           onVideoTap={onVideoTap}
           onQuotedPressIn={handleNestedPressIn}
-          onQuotedPressOut={handleNestedPressOut}
           onInlineActionPressIn={handleNestedPressIn}
-          onInlineActionPressOut={handleNestedPressOut}
           onImagePressIn={handleNestedPressIn}
-          onImagePressOut={handleNestedPressOut}
           event={event}
           metrics={metrics}
           profile={profile}
@@ -538,7 +522,6 @@ export const PostCard = React.memo(function PostCard({
           onLikePress={onLikePress}
           onZapPress={onZapPress}
           onActionPressIn={handleNestedPressIn}
-          onActionPressOut={handleNestedPressOut}
         />
 
         <Spacer size={8} />
@@ -567,7 +550,9 @@ export const PostCard = React.memo(function PostCard({
     return (
       <Log name="PostCard">
         <GestureDetector gesture={tapGesture}>
-          <Reanimated.View style={animStyle}>{gutterContent}</Reanimated.View>
+          <Reanimated.View style={animStyle} onStartShouldSetResponderCapture={beginThreadTap}>
+            {gutterContent}
+          </Reanimated.View>
         </GestureDetector>
       </Log>
     );
@@ -576,7 +561,9 @@ export const PostCard = React.memo(function PostCard({
   if (isThread) {
     return (
       <Log name="PostCard">
-        <Pressable onPress={handleThreadPress}>{gutterContent}</Pressable>
+        <View onStartShouldSetResponderCapture={beginThreadTap}>
+          <Pressable onPress={handleThreadPress}>{gutterContent}</Pressable>
+        </View>
       </Log>
     );
   }

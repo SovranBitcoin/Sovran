@@ -1,0 +1,21 @@
+{
+  "repository": "SovranBitcoin/Sovran",
+  "websiteRepository": "SovranBitcoin/sovran.money",
+  "website": "https://sovran.money",
+  "bundleId": "com.sovranbitcoin",
+  "appleAppId": "6499554529",
+  "appleTeamId": "2ZTL7KLN2V",
+  "expoProjectId": "09112d75-3a3a-49ba-bec6-ab881c5a2fa6",
+  "stateBranch": "release-state",
+  "baselineVersion": "0.1.1",
+  "buildProfile": "production",
+  "easVersion": "24.0.0",
+  "androidBuildTools": "35.0.0",
+  "freedomRepository": "freedomstore/freedomstore",
+  "freedomSource": "https://source.freedomstore.io/",
+  "locale": "en-US",
+  "zsp": {
+    "version": "0.4.17",
+    "sha256": "3f241da6a5dc7a85fe851d3b42b77790b651bd36c7029382a701262bda832d20"
+  }
+}

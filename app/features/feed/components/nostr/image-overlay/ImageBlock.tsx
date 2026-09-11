@@ -4,7 +4,8 @@
  * Applies blur to thumbnail when overlay is displaced.
  */
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef } from 'react';
+import { useRecyclingState } from '@shopify/flash-list';
 import { Platform, StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Reanimated, {
@@ -25,6 +26,7 @@ import { ANDROID_THUMB_DIM_MAX_OPACITY, THUMB_BLUR_MAX_INTENSITY } from './confi
 import { Log, feedLog } from '@/shared/lib/logger';
 import { useShiftLogger, useVisualLayoutLogger, urlHost } from '@/shared/lib/contentShiftLog';
 import { getCachedAspect, rememberAspect } from './imageAspectCache';
+import { useMediaSource } from './MediaSourceContext';
 import { openExternalUrl } from '@/shared/lib/url';
 
 /** Aspect ratio reserved before the image's intrinsic size is known. */
@@ -85,14 +87,17 @@ export const ImageBlock = React.memo(function ImageBlock({
   /** Post payload for the overlay bottom panel (built once by NoteContent). */
   overlayPost?: ImageOverlayPost | null;
 }) {
+  const mediaSource = useMediaSource();
+  const localSource = mediaSource?.sources[url];
   const [foreground] = useThemeColor(['foreground'] as const);
   // Seed the reserved size from what we already know (a ratio learned from a
   // prior onLoad, else the post's imeta dim) so the image doesn't flash 16:9 and
-  // resize. Lazy initializer so the lookup runs once at mount.
-  const [aspectRatio, setAspectRatio] = useState(
-    () => getCachedAspect(url) ?? initialAspectRatio ?? DEFAULT_IMAGE_ASPECT
+  // resize. Recycling to another URL resets geometry before that frame paints.
+  const [aspectRatio, setAspectRatio] = useRecyclingState(
+    () => getCachedAspect(url) ?? initialAspectRatio ?? DEFAULT_IMAGE_ASPECT,
+    [url]
   );
-  const [error, setError] = useState(false);
+  const [error, setError] = useRecyclingState(false, [url]);
   const shift = useShiftLogger('ImageBlock');
   const containerRef = useRef<React.ComponentRef<typeof View>>(null);
   /** Ref to the actual image so we measure the image bounds for shared-element, not the container. */
@@ -338,7 +343,7 @@ export const ImageBlock = React.memo(function ImageBlock({
   const image = (
     <Image
       ref={imageRef}
-      source={{ uri: url, isAnimated: ANIMATED_IMAGE_EXT.test(url) }}
+      source={localSource ?? { uri: url, isAnimated: ANIMATED_IMAGE_EXT.test(url) }}
       placeholder={blurhash}
       placeholderContentFit="cover"
       style={{ width: '100%', aspectRatio, borderRadius: 12 }}
@@ -350,6 +355,7 @@ export const ImageBlock = React.memo(function ImageBlock({
       accessibilityLabel={alt}
       accessibilityRole="image"
       onLoad={(e) => {
+        mediaSource?.onLoad?.(url);
         const { width, height } = e.source;
         if (width && height) {
           const next = width / height;

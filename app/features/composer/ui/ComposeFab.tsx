@@ -5,17 +5,18 @@
  */
 import { useCallback } from 'react';
 import { StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useScreenInsets } from '@/shared/hooks/useScreenInsets';
 
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { INVARIANT_BLACK } from '@/shared/lib/brandColors';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { isExpo55NativeTabsSupported } from '@/navigation/nativeTabs';
 import { useOpenComposer } from '@/features/composer/publish/useComposerActions';
 
 /** Gap between the FAB and the tab bar's top edge. */
 const FAB_TAB_BAR_GAP = 16;
+const FAB_SIZE = 56;
+export const COMPOSE_FAB_CLEARANCE = FAB_SIZE + FAB_TAB_BAR_GAP * 2;
 
 export function ComposeFab() {
   const openComposer = useOpenComposer();
@@ -23,14 +24,8 @@ export function ComposeFab() {
   // dark themes), which made a white icon invisible. Fill with foreground and
   // draw the icon in the background colour — high contrast in both themes.
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
-  const insets = useSafeAreaInsets();
-  // Match the AI tab composer's bottom anchor: on the NativeTabs (liquid-glass)
-  // path the system already grows `insets.bottom` to cover the tab bar + home
-  // indicator, so the FAB sits flush above the bar at `insets.bottom`. On the
-  // SovranTabBar path the screen content already stops at the bar's top edge,
-  // so `0` is flush. Adding the tab-bar height (as a list padding would) here
-  // double-counts it and floats the FAB too high.
-  const bottom = (isExpo55NativeTabsSupported() ? insets.bottom : 0) + FAB_TAB_BAR_GAP;
+  const insets = useScreenInsets();
+  const bottom = insets.bottom + FAB_TAB_BAR_GAP;
   const onPress = useCallback(() => openComposer({ mode: 'new' }), [openComposer]);
 
   return (
@@ -48,8 +43,8 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 20,
-    width: 56,
-    height: 56,
+    width: FAB_SIZE,
+    height: FAB_SIZE,
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',

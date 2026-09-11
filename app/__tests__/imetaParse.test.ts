@@ -2,7 +2,7 @@
  * NIP-92 imeta tag parsing (feed media display). Round-trips with the
  * write-side `buildImetaTag` so dimensions/alt reach the renderer.
  */
-import { parseImetaTags } from '@/features/feed/components/nostr/feedParse';
+import { parseImetaTags } from '@/shared/lib/nostr/media/imeta';
 import { buildImetaTag } from '@/shared/lib/nostr/media/imeta';
 
 describe('parseImetaTags', () => {

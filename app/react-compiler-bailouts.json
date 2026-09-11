@@ -1,5 +1,5 @@
 {
-  "$comment": "Files containing at least one function the React Compiler cannot compile. Ratcheted by scripts/check-react-compiler.mjs — this list may only shrink. Regenerate with `bun run check:react-compiler:update`.",
+  "$comment": "Files containing at least one function the React Compiler cannot compile. App paths are relative to app/; workspace-package paths (wallet/src, nostr/src) are relative to the repo root. Ratcheted by scripts/check-react-compiler.mjs — this list may only shrink. Regenerate with `bun run check:react-compiler:update`.",
   "bailouts": {
     "features/ai/hooks/useAiSend.ts": [
       "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause",
@@ -10,27 +10,15 @@
     "features/bitchat/hooks/useBitchatBLEIdentityMaterial.ts": [
       "Existing memoization could not be preserved"
     ],
-    "features/bitchat/hooks/useBitchatNickname.ts": [
-      "Existing memoization could not be preserved"
-    ],
+    "features/bitchat/hooks/useBitchatNickname.ts": ["Existing memoization could not be preserved"],
     "features/feed/components/nostr/image-overlay/AnimatedImageOverlay.tsx": [
       "Cannot access refs during render"
     ],
-    "features/feed/components/nostr/useVideoTapGesture.ts": [
-      "Cannot access refs during render"
-    ],
-    "features/feed/components/ThreadView.tsx": [
-      "Cannot access refs during render"
-    ],
-    "features/feed/hooks/useCardTapGesture.ts": [
-      "Cannot access refs during render"
-    ],
-    "features/feed/hooks/useFeedCardProps.ts": [
-      "Cannot access refs during render"
-    ],
-    "features/feed/hooks/useFeedRows.ts": [
-      "Cannot access refs during render"
-    ],
+    "features/feed/components/nostr/useVideoTapGesture.ts": ["Cannot access refs during render"],
+    "features/feed/components/ThreadView.tsx": ["Cannot access refs during render"],
+    "features/feed/hooks/useCardTapGesture.ts": ["Cannot access refs during render"],
+    "features/feed/hooks/useFeedCardProps.ts": ["Cannot access refs during render"],
+    "features/feed/hooks/useFeedRows.ts": ["Cannot access refs during render"],
     "features/feed/hooks/useNostrEngagement.ts": [
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ],
@@ -39,12 +27,8 @@
       "(BuildHIR::lowerStatement) Support ThrowStatement inside of try/catch",
       "(BuildHIR::lowerStatement) Handle TryStatement without a catch clause"
     ],
-    "features/mint/hooks/useStickyMintSelectorItems.ts": [
-      "Cannot access refs during render"
-    ],
-    "features/nearPay/hooks/useNutDropCelebration.ts": [
-      "Cannot access refs during render"
-    ],
+    "features/mint/hooks/useStickyMintSelectorItems.ts": ["Cannot access refs during render"],
+    "features/nearPay/hooks/useNutDropCelebration.ts": ["Cannot access refs during render"],
     "features/nearPay/hooks/useRememberPeers.ts": [
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ],
@@ -57,9 +41,7 @@
     "features/receive/screens/OnchainReceiveScreen.tsx": [
       "Existing memoization could not be preserved"
     ],
-    "features/send/screens/OnchainSendScreen.tsx": [
-      "Existing memoization could not be preserved"
-    ],
+    "features/send/screens/OnchainSendScreen.tsx": ["Existing memoization could not be preserved"],
     "features/settings/design-system/fadeRevealStress.tsx": [
       "Hooks must be the same function on every render, but this value may change over time to a different function. See https://react.dev/reference/rules/react-calls-"
     ],
@@ -74,9 +56,7 @@
       "Cannot access refs during render",
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ],
-    "shared/hooks/useShallowMemo.ts": [
-      "Cannot access refs during render"
-    ],
+    "shared/hooks/useShallowMemo.ts": ["Cannot access refs during render"],
     "shared/lib/contentShiftLog.ts": [
       "Cannot access refs during render",
       "Cannot reassign variables declared outside of the component/hook"

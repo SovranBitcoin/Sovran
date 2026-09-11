@@ -1,7 +1,7 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import Svg, { Path } from 'react-native-svg';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import { UR, UREncoder } from '@gandlaf21/bc-ur';
+import { useAnimatedQrFrames } from '@/shared/hooks/useAnimatedQrFrames';
 import { PressableFeedback } from 'heroui-native';
 import { log, Log } from '@/shared/lib/logger';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
@@ -15,7 +15,7 @@ import EQRCode from 'react-native-qrcode-svg';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { withAlpha } from '@/shared/lib/color';
-import { LinearGradient } from 'expo-linear-gradient';
+import { QRCodeFrame, qrCodeGeometry } from '@/shared/ui/composed/QRCodeFrame';
 import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { IS_ANDROID_E2E } from '@/shared/lib/e2e/isAndroidE2E';
 
@@ -56,51 +56,6 @@ const DENSITY_PRESETS = [
 const DEFAULT_DENSITY_INDEX = 2; // L (150 bytes, ecosystem default)
 
 const LOGO_SIZE = 54;
-
-// Module scope: the try/catch (with throw + timing) cannot be lowered by the
-// React Compiler — inside the component's effect it made the whole component
-// skip compilation. Encoding is synchronous, so the effect just applies the
-// returned result.
-function encodeUrParts(
-  address: string,
-  fragmentSize: number,
-  needsAnimation: boolean
-): { ok: true; parts: string[] } | { ok: false; message: string } {
-  const encodeStart = performance.now();
-  try {
-    // `UR.from` does the string -> Buffer conversion with bc-ur's own bundled
-    // `buffer`, so the payload never depends on whichever library happened to
-    // install a `Buffer` global first.
-    const ur = UR.from(address);
-    const encoder = new UREncoder(ur, fragmentSize, 0);
-    const encodedParts = encoder.encodeWhole();
-
-    if (encodedParts.length === 0) {
-      throw new Error('UR encoding produced no parts');
-    }
-
-    const duration = Math.round(performance.now() - encodeStart);
-    log.info('ui.qrcode.ur_encoded', {
-      inputLength: address.length,
-      partCount: encodedParts.length,
-      fragmentSize,
-      firstPartLength: encodedParts[0].length,
-      duration_ms: duration,
-    });
-
-    return { ok: true, parts: encodedParts };
-  } catch (error) {
-    log.error('ui.qrcode.encode_failed', {
-      error,
-      addressLength: address.length,
-      needsAnimation,
-    });
-    return {
-      ok: false,
-      message: error instanceof Error ? error.message : 'Failed to encode QR data',
-    };
-  }
-}
 
 interface AnimatedQRCodeProps {
   padding?: number;
@@ -145,11 +100,6 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
 }: AnimatedQRCodeProps) {
   const { width: screenWidth } = useWindowDimensions();
 
-  const [index, setIndex] = useState(0);
-  const [parts, setParts] = useState<string[]>([]);
-  const [isEncoding, setIsEncoding] = useState(false);
-  const [encodingError, setEncodingError] = useState<string | null>(null);
-
   const activeIntervalMs = intervalMs ?? SPEED_PRESETS[DEFAULT_SPEED_INDEX].intervalMs;
   const activeFragmentSize = fragmentSize ?? DENSITY_PRESETS[DEFAULT_DENSITY_INDEX].fragmentSize;
 
@@ -161,64 +111,22 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
     (address != null && address.length > MAX_QR_DATA_LENGTH) ||
     (!E2E_STATIC_QR && animateProp && address != null && address.length >= ANIMATE_THRESHOLD);
 
-  // Encode address for animated QR code
-  useEffect(() => {
-    if (!address) {
-      log.debug('ui.qrcode.no_address');
-      return;
-    }
-
-    // Reset state when address changes
-    setParts([]);
-    setIndex(0);
-    setEncodingError(null);
-
-    log.info('ui.qrcode.address_set', {
-      length: address.length,
-      needsAnimation,
-      isUR: address.toLowerCase().startsWith('ur:'),
-    });
-
-    // If we don't need animation and data fits in a single QR, skip encoding
-    if (!needsAnimation) {
-      log.debug('ui.qrcode.static_mode', { dataLength: address.length });
-      return;
-    }
-
-    setIsEncoding(true);
-    const result = encodeUrParts(address, activeFragmentSize, needsAnimation);
-    if (result.ok) {
-      setParts(result.parts);
-      setEncodingError(null);
-    } else {
-      setEncodingError(result.message);
-      setParts([]);
-    }
-    setIsEncoding(false);
-  }, [address, needsAnimation, activeFragmentSize]);
-
-  // Cycle through QR code parts at the selected speed
-  const cycling = needsAnimation && parts.length > 1;
-  useEffect(() => {
-    if (!cycling) return;
-    const id = setInterval(() => setIndex((prev) => (prev + 1) % parts.length), activeIntervalMs);
-    return () => clearInterval(id);
-  }, [cycling, parts.length, activeIntervalMs]);
-
-  // Determine what data to show
-  const qrData = needsAnimation && parts.length > 0 ? parts[index] : address;
-  const showLoading = needsAnimation && (isEncoding || (parts.length === 0 && !encodingError));
+  const { parts, index, encodingError, encodingPending, qrData } = useAnimatedQrFrames({
+    address,
+    animated: needsAnimation,
+    fragmentSize: activeFragmentSize,
+    intervalMs: activeIntervalMs,
+  });
+  const showLoading = encodingPending;
   const showError = needsAnimation && encodingError && parts.length === 0;
   const canRenderQR = !showLoading && !showError && qrData && qrData.length <= MAX_QR_DATA_LENGTH;
 
-  const width = size ?? Math.min(screenWidth, 600);
   const isLocationUnit = unit.startsWith('circle-flags');
   // QR codes are pinned to dark-on-white regardless of theme — scanners are
   // strict, and an inverted (light-on-dark) QR is unreliable on most readers.
   const QR_DARK = INVARIANT_BLACK;
   const QR_LIGHT = INVARIANT_WHITE;
-  const gradientColors = [QR_LIGHT, QR_LIGHT] as const;
-  const qrSize = width - 2 * padding;
+  const { qrSize } = qrCodeGeometry(screenWidth, padding, size);
   // On light themes a pure-white card disappears into the page surface, so
   // swap the flat gradient for `GradientCard` — the same blur + corner-glow
   // frame the Receive Address row uses on this screen, so the QR sits in
@@ -309,13 +217,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
       <View style={{ alignItems: 'center' }}>
         {/* QR + centered logo overlay */}
         <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-          {useBlurCard ? (
-            <GradientCard contentStyle={{ padding: 16 }}>{qrContent}</GradientCard>
-          ) : (
-            <LinearGradient colors={gradientColors} style={{ borderRadius: 16, padding: 16 }}>
-              {qrContent}
-            </LinearGradient>
-          )}
+          <QRCodeFrame>{qrContent}</QRCodeFrame>
 
           {/* Centered logo — absolutely positioned from the container's center.
               The circle background is always white so the logo punches a

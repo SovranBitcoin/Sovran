@@ -6,6 +6,7 @@ import type { PopupIcon } from '../icons';
 import type { PopupTextSegment } from '../format';
 import { flattenSegments } from '../format';
 import type { SheetCloseEvent } from '@/shared/stores/runtime/popupStore';
+import { describeError, type ServiceFailure } from '@/shared/lib/errors';
 
 type PopupVariant = 'toast' | 'sheet';
 type PopupSeverity = 'success' | 'error' | 'warning' | 'info';
@@ -28,6 +29,7 @@ type PopupButton = {
 interface PopupConfig {
   message: string;
   text?: PopupText;
+  failure?: ServiceFailure;
   icon?: PopupIcon;
   variant?: PopupVariant;
   dismissable?: boolean;
@@ -45,7 +47,8 @@ interface PopupConfig {
 export const popup = (config: PopupConfig) => {
   const {
     message,
-    text,
+    text: suppliedText,
+    failure,
     icon,
     buttons,
     type,
@@ -54,8 +57,11 @@ export const popup = (config: PopupConfig) => {
     ...options
   } = config;
 
+  const errorPresentation = failure ? describeError(failure.error, failure.service) : undefined;
+  const text = errorPresentation?.text ?? suppliedText;
+
   const resolvedButtons = buttons ?? [];
-  const severity: PopupSeverity = type ?? 'info';
+  const severity: PopupSeverity = type ?? (failure ? 'error' : 'info');
   const variant: PopupVariant = explicitVariant ?? (resolvedButtons.length > 0 ? 'sheet' : 'toast');
 
   popupLog.info('popup.engine.invoke', {
@@ -66,6 +72,8 @@ export const popup = (config: PopupConfig) => {
     duration: options.duration,
     hasIcon: !!icon,
     hasLive: !!options.live,
+    errorId: errorPresentation?.id,
+    errorService: failure?.service,
   });
 
   if (variant === 'sheet') {

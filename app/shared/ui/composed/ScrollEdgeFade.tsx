@@ -34,6 +34,7 @@ import { withAlpha } from '@/shared/lib/color';
 
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useScreenBackground } from '@/shared/ui/composed/ScreenFooterContext';
 
 interface ScrollEdgeFadeProps {
   /** Which edge the fade pins to. */
@@ -104,8 +105,9 @@ export function ScrollEdgeFade({
   zIndex = 50,
   offset = 0,
 }: ScrollEdgeFadeProps) {
-  const themeBackground = useThemeColor('background');
-  const fillColor = color === null ? null : (color ?? themeBackground);
+  const themeBackground = useThemeColor('surface');
+  const pageBackground = useScreenBackground();
+  const fillColor = color === null ? null : (color ?? pageBackground ?? themeBackground);
 
   // Resolve fade band. Clamp so we always have a well-formed mask even
   // when callers pass extreme values.

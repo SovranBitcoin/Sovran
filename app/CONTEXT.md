@@ -160,3 +160,11 @@ refocused. The reserve = `viewport − (rows below the note × approx height)`,
 shrinking to 0 as replies fill the screen. Owned in `ThreadView` (not the
 library's opaque `anchoredEndSpace`) so it's deterministic and logged
 (`thread.reserve`). See [[Thread anchor]] and ADR 0004.
+
+## Service error presentation
+
+**Service error presentation** — curated user-facing copy derived from an original
+error and explicit service context (`routstr`, `cashu`, `nostr`, `nagg`, or `app`).
+Owned by `shared/lib/errors`; used by popups and inline error text. Presentation
+IDs and text never determine retries, payment outcomes, or recovery. Cashu errors
+may originate in Coco or a mint implementation such as CDK or Nutshell.

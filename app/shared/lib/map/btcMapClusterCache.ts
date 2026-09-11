@@ -10,11 +10,9 @@ type CacheEntry = {
 };
 
 const CACHE = new Map<string, CacheEntry>();
-// 8 covers the categorical filter set (food, lodging, retail, services,
-// entertainment, transport, atm, other) + the unfiltered "all" view —
-// users actively cycling tabs no longer pay a 100 ms+ rebuild on every
-// switch. Each entry holds a Supercluster index over ~5–40k points;
-// 8 × ~3 MB worst-case stays comfortably under the heap budget.
+// Retain the current category indexes plus recently used data versions.
+// The cap bounds index count; actual heap cost depends on the point set and
+// needs measurement on devices, especially alongside cached media.
 const MAX_ENTRIES = 8;
 
 function evictIfNeeded() {
@@ -37,13 +35,8 @@ export function getOrBuildBTCMapClusterManager(
   points: GeoPoint[],
   options?: Supercluster.Options<any, any>
 ): ClusterManager {
-  const existing = CACHE.get(cacheKey);
-  if (existing && existing.pointsCount === points.length && existing.manager.isLoaded()) {
-    // Touch on hit so the LRU eviction in `evictIfNeeded` actually drops
-    // the least-recently-used entry, not the oldest-built one.
-    existing.createdAt = Date.now();
-    return existing.manager;
-  }
+  const existing = getCachedBTCMapClusterManager(cacheKey, points.length);
+  if (existing) return existing;
 
   const t0 = performance.now();
   const manager = new ClusterManager(options);
@@ -59,4 +52,15 @@ export function getOrBuildBTCMapClusterManager(
     });
   }
   return manager;
+}
+
+/** Read an already-built index without risking a synchronous cold build. */
+export function getCachedBTCMapClusterManager(
+  cacheKey: string,
+  pointsCount: number
+): ClusterManager | undefined {
+  const existing = CACHE.get(cacheKey);
+  if (!existing || existing.pointsCount !== pointsCount || !existing.manager.isLoaded()) return;
+  existing.createdAt = Date.now();
+  return existing.manager;
 }

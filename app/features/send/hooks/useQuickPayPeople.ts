@@ -13,6 +13,11 @@
  */
 
 import { useMemo } from 'react';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import {
+  DEMO_RECENT_PUBKEYS,
+  PUBLIC_DEMO_METADATA,
+} from '@/shared/stores/runtime/mockPublicProfile';
 import { getCounterparty } from 'wallet';
 
 import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWithMelts';
@@ -47,6 +52,7 @@ export interface QuickPayPerson {
  *   surfaced live in the "Nearby" tier so they don't appear twice).
  */
 export function useQuickPayPeople(excludePubkeys: readonly string[] = []): QuickPayPerson[] {
+  const mockMode = useSettingsStore((s) => s.mockMode);
   const { history } = useHistoryWithMelts();
   const recentPeople = useRecentPeopleStore((state) => state.entries);
 
@@ -93,9 +99,10 @@ export function useQuickPayPeople(excludePubkeys: readonly string[] = []): Quick
 
   const excludeKey = excludePubkeys.join(',');
   const merged = useMemo(() => {
+    if (mockMode) return [];
     const exclude = new Set(excludeKey ? excludeKey.split(',') : []);
     return mergeQuickPayContributions([...txContributions, ...storeContributions], exclude);
-  }, [txContributions, storeContributions, excludeKey]);
+  }, [txContributions, storeContributions, excludeKey, mockMode]);
 
   const pubkeys = useMemo(() => merged.map((contribution) => contribution.pubkey), [merged]);
   const profiles = useRecentPeopleProfiles(pubkeys);
@@ -106,26 +113,41 @@ export function useQuickPayPeople(excludePubkeys: readonly string[] = []): Quick
 
   return useMemo(
     () =>
-      merged.map((contribution) => {
-        const row = profileByPubkey.get(contribution.pubkey);
-        const metadata = row?.metadata;
-        // Prefer a fresh kind-0 name, then the source's own name, then a
-        // deterministic word-pair — so the row is never blank / "Unknown".
-        const displayName = resolveIdentityName({
-          pubkey: contribution.pubkey,
-          nostrProfile: metadata,
-          bleNickname: contribution.displayName ?? undefined,
-        });
-        return {
-          pubkey: contribution.pubkey,
-          source: contribution.source,
-          displayName,
-          picture: metadata?.picture ?? contribution.picture ?? null,
-          lud16: metadata?.lud16 ?? null,
-          nip05: metadata?.nip05 ?? contribution.nip05 ?? null,
-          isLoading: row?.isLoading ?? false,
-        };
-      }),
-    [merged, profileByPubkey]
+      mockMode
+        ? DEMO_RECENT_PUBKEYS.filter((pubkey) => !excludeKey.split(',').includes(pubkey)).map(
+            (pubkey): QuickPayPerson => {
+              const metadata = PUBLIC_DEMO_METADATA.get(pubkey);
+              return {
+                pubkey,
+                source: 'search',
+                displayName: resolveIdentityName({ pubkey, nostrProfile: metadata }),
+                picture: metadata?.picture ?? null,
+                lud16: metadata?.lud16 ?? null,
+                nip05: metadata?.nip05 ?? null,
+                isLoading: false,
+              };
+            }
+          )
+        : merged.map((contribution) => {
+            const row = profileByPubkey.get(contribution.pubkey);
+            const metadata = row?.metadata;
+            // Prefer a fresh kind-0 name, then the source's own name, then a
+            // deterministic word-pair — so the row is never blank / "Unknown".
+            const displayName = resolveIdentityName({
+              pubkey: contribution.pubkey,
+              nostrProfile: metadata,
+              bleNickname: contribution.displayName ?? undefined,
+            });
+            return {
+              pubkey: contribution.pubkey,
+              source: contribution.source,
+              displayName,
+              picture: metadata?.picture ?? contribution.picture ?? null,
+              lud16: metadata?.lud16 ?? null,
+              nip05: metadata?.nip05 ?? contribution.nip05 ?? null,
+              isLoading: row?.isLoading ?? false,
+            };
+          }),
+    [merged, profileByPubkey, mockMode, excludeKey]
   );
 }

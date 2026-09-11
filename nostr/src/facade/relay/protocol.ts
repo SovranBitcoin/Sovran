@@ -1,3 +1,9 @@
+import {
+  openWebSocket,
+  sendWebSocket,
+  closeWebSocket,
+  type WebSocketLike,
+} from '../websocket';
 import { parseWireFrame } from '../wire-frame';
 import { ok, err, type Result } from 'neverthrow';
 import { DEFAULT_TIMEOUT_MS, type RequestControls } from '../../timeout';
@@ -57,15 +63,6 @@ export interface RelayConnection {
   subscribe?(filters: NostrFilter[], onEvent: (event: RawRelayEvent) => void): () => void;
 }
 
-type WebSocketLike = {
-  send(data: string): void;
-  close(): void;
-  onopen: ((ev: unknown) => void) | null;
-  onmessage: ((ev: { data: unknown }) => void) | null;
-  onerror: ((ev: unknown) => void) | null;
-  onclose: ((ev: unknown) => void) | null;
-};
-
 export type RelayPoolConfig = {
   relays: string[];
   WebSocketImpl?: new (url: string) => WebSocketLike;
@@ -86,6 +83,15 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
 
   return {
     request(filters, controls) {
+      if (controls?.signal?.aborted) {
+        return Promise.resolve(
+          err<RawRelayEvent[], NaggError>({
+            type: 'network',
+            message: 'Relay request aborted',
+            cause: controls.signal.reason,
+          }),
+        );
+      }
       const relays = config.relays.filter((r) => r.length > 0);
       if (!Ctor || relays.length === 0) {
         return Promise.resolve(
@@ -118,14 +124,9 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
           if (settled) return;
           settled = true;
           clearTimeout(hardTimer);
+          controls?.signal?.removeEventListener('abort', finish);
           if (settleTimer) clearTimeout(settleTimer);
-          for (const socket of sockets) {
-            try {
-              socket.close();
-            } catch {
-              // ignore
-            }
-          }
+          for (const socket of sockets) closeWebSocket(socket);
           const events = [...byId.values()];
           if (events.length === 0 && !anyResponded) {
             nostrLog.warn('nostr.relay.failed', { relays: relays.length, durationMs: Date.now() - startedAt });
@@ -148,15 +149,22 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
           }
         }
 
-        controls?.signal?.addEventListener('abort', () => finish());
+        controls?.signal?.addEventListener('abort', finish, { once: true });
 
         for (const url of relays) {
-          const socket = new Ctor(url);
+          const opened = openWebSocket(Ctor, url);
+          if (opened.isErr()) {
+            closedCount += 1;
+            if (closedCount >= relays.length) finish();
+            continue;
+          }
+          const socket = opened.value;
           sockets.push(socket);
           // A real socket fires onerror THEN onclose for the same failure; count
           // each socket's terminal state ONCE, or one dead relay would count twice
           // and prematurely drive closedCount past the threshold.
           let terminal = false;
+          let receivedEose = false;
           const markClosed = () => {
             if (terminal) return;
             terminal = true;
@@ -164,16 +172,22 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
             if (closedCount >= relays.length) finish();
           };
           socket.onopen = () => {
-            socket.send(JSON.stringify(['REQ', subId, ...filters]));
+            if (settled) return;
+            if (sendWebSocket(socket, ['REQ', subId, ...filters]).isErr()) {
+              closeWebSocket(socket);
+              markClosed();
+            }
           };
           socket.onmessage = (event) => {
+            if (settled) return;
             const message = parseWireFrame(event.data);
             if (!message || message[1] !== subId) return;
             anyResponded = true;
             if (message[0] === 'EVENT' && message[2] && typeof message[2] === 'object') {
               const raw = message[2] as RawRelayEvent;
               if (typeof raw.id === 'string' && !byId.has(raw.id)) byId.set(raw.id, raw);
-            } else if (message[0] === 'EOSE') {
+            } else if (message[0] === 'EOSE' && !receivedEose) {
+              receivedEose = true;
               eoseCount += 1;
               maybeSettle();
             }
@@ -195,12 +209,17 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
       nostrLog.debug('nostr.relay.listen', { relays: relays.length, filters: filters.length });
 
       for (const url of relays) {
-        const socket = new Ctor(url);
+        const opened = openWebSocket(Ctor, url);
+        if (opened.isErr()) continue;
+        const socket = opened.value;
         sockets.push(socket);
         socket.onopen = () => {
-          if (!closed) socket.send(JSON.stringify(['REQ', subId, ...filters]));
+          if (!closed && sendWebSocket(socket, ['REQ', subId, ...filters]).isErr()) {
+            closeWebSocket(socket);
+          }
         };
         socket.onmessage = (event) => {
+          if (closed) return;
           const message = parseWireFrame(event.data);
           // Stay open past EOSE — a live listener only cares about EVENTs.
           if (!message || message[1] !== subId || message[0] !== 'EVENT') return;
@@ -218,12 +237,8 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
         if (closed) return;
         closed = true;
         for (const socket of sockets) {
-          try {
-            socket.send(JSON.stringify(['CLOSE', subId]));
-            socket.close();
-          } catch {
-            // ignore
-          }
+          sendWebSocket(socket, ['CLOSE', subId]);
+          closeWebSocket(socket);
         }
       };
     },

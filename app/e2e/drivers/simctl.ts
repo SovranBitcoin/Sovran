@@ -316,6 +316,23 @@ async function hasBakedEntitlements(app: string): Promise<boolean> {
     '__entitlements'
   );
 }
+/** Temporary devices can disappear during another run's cleanup. Never use
+ * their installed app as a build artifact for a new session. */
+export function installSourceDeviceIds(
+  devices: Record<string, readonly { udid: string; name: string; isAvailable: boolean }[]>,
+  targetUdid?: string
+): ReadonlySet<string> {
+  return new Set(
+    Object.values(devices)
+      .flat()
+      .filter(
+        (device) =>
+          device.isAvailable && device.udid !== targetUdid && !device.name.startsWith('Sovran E2E ')
+      )
+      .map((device) => device.udid)
+  );
+}
+
 export async function findInstallableApp(
   targetUdid?: string,
   bundleId = BUNDLE_ID,
@@ -334,9 +351,10 @@ export async function findInstallableApp(
       if (config.endsWith('-iphonesimulator')) push(join(products, config, 'Sovran.app'));
     }
   }
+  const inventory = JSON.parse(await run(['xcrun', 'simctl', 'list', 'devices', '--json']));
+  const sourceDevices = installSourceDeviceIds(inventory.devices, targetUdid);
   const devices = join(homedir(), 'Library', 'Developer', 'CoreSimulator', 'Devices');
-  for (const dev of existsSync(devices) ? readdirSync(devices) : []) {
-    if (dev === targetUdid) continue;
+  for (const dev of sourceDevices) {
     const apps = join(devices, dev, 'data', 'Containers', 'Bundle', 'Application');
     for (const container of existsSync(apps) ? readdirSync(apps) : [])
       push(join(apps, container, 'Sovran.app'));

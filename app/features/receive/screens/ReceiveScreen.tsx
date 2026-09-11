@@ -18,6 +18,7 @@ import { useMints } from '@cashu/coco-react';
 
 import {
   useScreenActions,
+  useColadaContext,
   useStandingPaymentRequest,
   type UseScreenActionsResult,
 } from 'wallet/react';
@@ -36,7 +37,13 @@ import {
   MAX_ADVERTISED_MINTS,
   standingQuoteIdentityStore,
 } from '@/features/receive/lib/standingQuoteIdentityStore';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { useMintStore, type ActiveUnit } from '@/shared/stores/profile/mintStore';
+import { UnitSwitcherPillFallback } from '@/features/wallet/components/UnitSwitcherPill/UnitSwitcherPill.fallback';
+import { PILL_LABELS } from '@/features/wallet/components/UnitSwitcherPill/useUnitSwitcherPill';
+import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { Text } from '@/shared/ui/primitives/Text';
 import { copyPopup } from '@/shared/lib/popup';
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 import { CopyRequestCard } from '@/shared/ui/composed/CopyRequestCard';
@@ -55,6 +62,19 @@ import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 
+function receiveEntryInUnit(
+  entry: ReceiveScreenProps['receiveEntry'],
+  unit: string
+): string | null {
+  try {
+    const raw = typeof entry === 'string' ? JSON.parse(entry) : entry;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    return JSON.stringify({ ...raw, unit });
+  } catch {
+    return null;
+  }
+}
+
 interface ReceiveHubEntry {
   npcAddress?: FormattedString;
   p2pkKey?: string;
@@ -70,6 +90,7 @@ interface ReceiveLightningTabProps {
   isNpcMintUpdating: boolean;
   actions: UseScreenActionsResult<'receive'>['actions'];
   muted: string;
+  active: boolean;
 }
 
 const ReceiveLightningTab = memo(function ReceiveLightningTab({
@@ -80,12 +101,36 @@ const ReceiveLightningTab = memo(function ReceiveLightningTab({
   isNpcMintUpdating,
   actions,
   muted,
+  active,
 }: ReceiveLightningTabProps) {
-  // The Address/BOLT 12 switcher lives in the pill sub-tab row above the
-  // content (contacts-style), so a unit without an npc address renders
-  // nothing here and the user can still switch to the offer rail.
+  // The human-readable Lightning address receives Bitcoin; fiat accounts
+  // keep an explanation and the header account selector instead of a blank pane.
   const npcAddress = unit === 'sat' ? data.npcAddress : undefined;
-  if (!npcAddress) return null;
+  if (!active) return null;
+  if (unit !== 'sat') {
+    return (
+      <View
+        className="bg-surface-secondary mx-4 rounded-xl p-6"
+        testID="receive-address-unit-unavailable">
+        <Text size={16} bold>
+          Lightning addresses receive Bitcoin
+        </Text>
+        <Text size={14} className="text-muted mt-2">
+          Your {unit.toUpperCase()} account cannot receive at this address. Switch to Bitcoin using
+          the account selector above, or choose BOLT 12 to see supported offers.
+        </Text>
+      </View>
+    );
+  }
+  if (!npcAddress) {
+    return (
+      <View className="mx-4 p-6">
+        <Text size={14} className="text-muted">
+          Your Lightning address is not available yet.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <>
@@ -169,19 +214,42 @@ interface ReceiveScreenProps {
   unit: string;
 }
 
-export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
+export function ReceiveScreen(props: ReceiveScreenProps) {
+  const [selectedTab, setSelectedTab] = useState<string>('Unified');
+  const [lightningMode, setLightningMode] = useState<'address' | 'offer'>('address');
+  // Keep the selected tab, but reset every quote/copy cache across accounts so
+  // an old-unit payment request cannot paint or copy during the new load.
+  return (
+    <ReceiveScreenForUnit
+      key={props.unit}
+      {...props}
+      selectedTab={selectedTab}
+      setSelectedTab={setSelectedTab}
+      lightningMode={lightningMode}
+      setLightningMode={setLightningMode}
+    />
+  );
+}
+
+function ReceiveScreenForUnit({
+  receiveEntry,
+  unit,
+  selectedTab,
+  setSelectedTab,
+  lightningMode,
+  setLightningMode,
+}: ReceiveScreenProps & {
+  selectedTab: string;
+  setSelectedTab: (tab: string) => void;
+  lightningMode: 'address' | 'offer';
+  setLightningMode: (mode: 'address' | 'offer') => void;
+}) {
   useLifecycleLogger('ReceiveScreen');
   const [muted, overlay, separator] = useThemeColor([
     'muted',
     'overlay',
     'separator-secondary',
   ] as const);
-  const [selectedTab, setSelectedTab] = useState<string>('Unified');
-  const [lightningMode, setLightningMode] = useState<'address' | 'offer'>('address');
-
-  // Same canvas as the send modal (which paints `overlay`); the sheet header
-  // scrim must fade from the same color or the header band reads as a seam.
-  useScreenOptions(() => ({ headerStyle: { backgroundColor: overlay } }), [overlay]);
 
   const { entry, error, actions, mintUrl } = useScreenActions(
     'receive',
@@ -227,18 +295,21 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   );
 
   const npcAddress = unit === 'sat' ? receiveEntryData?.npcAddress : undefined;
-  const activePayload: ReceiveQrPayload | null =
-    selectedTab === 'Lightning'
-      ? lightningMode === 'address'
-        ? npcAddress
-          ? { value: npcAddress.toString(), copyTarget: 'address' }
-          : null
-        : (qrPayloads['lightning-offer'] ?? null)
-      : selectedTab === 'Unified'
-        ? (qrPayloads['unified'] ?? null)
-        : selectedTab === 'Onchain'
-          ? (qrPayloads['onchain'] ?? null)
-          : (qrPayloads['cashu'] ?? null);
+  const activePayload: ReceiveQrPayload | null = useMemo(
+    () =>
+      selectedTab === 'Lightning'
+        ? lightningMode === 'address'
+          ? npcAddress
+            ? { value: npcAddress.toString(), copyTarget: 'address' }
+            : null
+          : (qrPayloads['lightning-offer'] ?? null)
+        : selectedTab === 'Unified'
+          ? (qrPayloads['unified'] ?? null)
+          : selectedTab === 'Onchain'
+            ? (qrPayloads['onchain'] ?? null)
+            : (qrPayloads['cashu'] ?? null),
+    [selectedTab, lightningMode, npcAddress, qrPayloads]
+  );
 
   const handleFooterCopy = useCallback(async () => {
     if (!activePayload) return;
@@ -255,6 +326,41 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   const isNpcMintUpdating = useNpcMintStore((s) => s.isUpdating);
   const mintInfo = useMintInfo(mintUrl);
   const walletContext = useWalletContext();
+  const { machine } = useColadaContext();
+  const { selectUnit } = useActiveUnit();
+  const selectReceiveUnit = useCallback(
+    (next: ActiveUnit) => {
+      if (
+        next === unit ||
+        machine.inspect().isExecuting ||
+        [actions.changeNpcMint, actions.changeBolt12Mint, actions.changeOnchainMint].some(
+          (action) => action.loading
+        )
+      )
+        return;
+      const nextEntry = receiveEntryInUnit(receiveEntry, next);
+      if (!nextEntry) return;
+      selectUnit(next);
+      machine.reset();
+      router.setParams({ unit: next, receiveEntry: nextEntry });
+    },
+    [actions, machine, receiveEntry, selectUnit, unit]
+  );
+  useScreenOptions(
+    () =>
+      withGlassHeaderItems({
+        headerStyle: { backgroundColor: overlay },
+        headerRight: () =>
+          hasReceiveEntryData ? (
+            <UnitSwitcherPillFallback
+              header
+              displayUnit={Object.hasOwn(PILL_LABELS, unit) ? (unit as ActiveUnit) : undefined}
+              onSelectUnit={selectReceiveUnit}
+            />
+          ) : null,
+      }),
+    [overlay, hasReceiveEntryData, unit, selectReceiveUnit]
+  );
 
   // THE standing creq, owned here and shared by the Cashu + Unified tabs so
   // both always show the SAME request. freshOnMount rotates once per visit;
@@ -306,7 +412,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   // snap back to Lightning so hidden content stops rendering.
   useEffect(() => {
     if (!(tabs as readonly string[]).includes(selectedTab)) setSelectedTab('Unified');
-  }, [tabs, selectedTab]);
+  }, [tabs, selectedTab, setSelectedTab]);
 
   useEffect(() => {
     if (error) paymentLog.warn('receive.screen.error', { error });
@@ -375,6 +481,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
       <View style={styles.content}>
         <SkeletonContentCrossfade
           loading={!receiveEntryData}
+          wave="none"
           visualKey="receive-hub"
           visualSurface="receive"
           renderSkeleton={() => (
@@ -395,6 +502,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
                     switching never stutters. */}
                   <View style={lightningMode === 'address' ? undefined : styles.hiddenPane}>
                     <ReceiveLightningTab
+                      active={selectedTab === 'Lightning' && lightningMode === 'address'}
                       data={receiveEntryData}
                       unit={unit}
                       mintInfo={mintInfo}
@@ -407,6 +515,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
                   <View style={lightningMode === 'offer' ? undefined : styles.hiddenPane}>
                     <ReceiveReusableQuoteTab
                       method="bolt12"
+                      active={selectedTab === 'Lightning' && lightningMode === 'offer'}
                       unit={unit}
                       walletContext={walletContext}
                       actions={actions}
@@ -417,6 +526,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
                 </TabPane>
                 <TabPane visible={selectedTab === 'Unified'}>
                   <ReceiveUnifiedTab
+                    active={selectedTab === 'Unified'}
                     unit={unit}
                     walletContext={walletContext}
                     muted={muted}
@@ -427,6 +537,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
                 <TabPane visible={selectedTab === 'Onchain'}>
                   <ReceiveReusableQuoteTab
                     method="onchain"
+                    active={selectedTab === 'Onchain'}
                     unit={unit}
                     walletContext={walletContext}
                     actions={actions}
@@ -436,6 +547,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
                 </TabPane>
                 <TabPane visible={selectedTab === 'Cashu'}>
                   <ReceivePaymentRequestTab
+                    active={selectedTab === 'Cashu'}
                     unit={unit}
                     walletContext={walletContext}
                     p2pkKey={receiveEntryData.p2pkKey}

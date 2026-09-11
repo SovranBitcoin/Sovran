@@ -6,7 +6,8 @@ import {
   Pressable as GesturePressable,
 } from 'react-native-gesture-handler';
 import { StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
-import { router, useSegments } from 'expo-router';
+import { useSegments } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { getScreenCornerRadius } from '@/shared/lib/screenCornerRadius';
 
 import Icon from 'assets/icons';

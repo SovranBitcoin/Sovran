@@ -1,9 +1,10 @@
 import * as nip19 from 'nostr-tools/nip19';
 import { mapNaggFeedPage } from '@/features/feed/data/mapNaggFeedPage';
-import { NaggFeedResponse } from '@/features/feed/data/naggSchemas';
 import { DEFAULT_METRICS, type FeedEvent } from '@/features/feed/components/nostr/feedTypes';
 import { THREAD_CONNECTOR_LINE_STYLE } from '@/features/feed/components/nostr/threadConnectorStyle';
 import { getFeedItemRootContext } from '@/features/feed/lib/rootContext';
+
+type FeedPage = Parameters<typeof mapNaggFeedPage>[0];
 
 const metrics = {
   likeCount: 1,
@@ -37,7 +38,7 @@ describe('mapNaggFeedPage', () => {
       created_at: 90,
     });
 
-    const page = NaggFeedResponse.parse({
+    const page: FeedPage = {
       items: [
         { type: 'note', event: note },
         { type: 'repost', repostEvent: repost, originalEvent: original },
@@ -47,7 +48,7 @@ describe('mapNaggFeedPage', () => {
       quoted: {},
       paginationUntil: 80,
       paginationOffset: 2,
-    });
+    };
 
     const result = mapNaggFeedPage(page);
 
@@ -90,7 +91,7 @@ describe('mapNaggFeedPage', () => {
       created_at: 90,
     });
 
-    const page = NaggFeedResponse.parse({
+    const page: FeedPage = {
       items: [{ type: 'note', event: reply, rootEvent: root, rootEventId: root.id }],
       metrics: { [root.id]: metrics, [reply.id]: { ...metrics, likeCount: 9 } },
       profiles: {
@@ -101,7 +102,7 @@ describe('mapNaggFeedPage', () => {
       quoted: { [quote.id]: quote },
       paginationUntil: 90,
       paginationOffset: 1,
-    });
+    };
 
     const result = mapNaggFeedPage(page);
     const item = result.orderedFeedItems[0];
@@ -127,14 +128,14 @@ describe('mapNaggFeedPage', () => {
       created_at: 100,
     });
 
-    const page = NaggFeedResponse.parse({
+    const page: FeedPage = {
       items: [{ type: 'note', event: root, rootEvent: root, rootEventId: root.id }],
       metrics: {},
       profiles: {},
       quoted: {},
       paginationUntil: 100,
       paginationOffset: 1,
-    });
+    };
 
     const result = mapNaggFeedPage(page);
 
@@ -158,14 +159,14 @@ describe('mapNaggFeedPage', () => {
       content: 'hello',
       created_at: 100,
     });
-    const naggPage = NaggFeedResponse.parse({
+    const naggPage: FeedPage = {
       items: [{ type: 'note', event: note }],
       metrics: { [note.id]: metrics },
       profiles: { alice: { name: 'Alice', picture: 'https://example.test/a.png' } },
       quoted: {},
       paginationUntil: 100,
       paginationOffset: 1,
-    });
+    };
 
     const result = mapNaggFeedPage(naggPage);
     expect(result.orderedFeedItems).toHaveLength(1);
@@ -185,14 +186,14 @@ describe('mapNaggFeedPage', () => {
       content: `see nostr:${nip19.noteEncode(quotedId)}`,
     });
 
-    const page = NaggFeedResponse.parse({
+    const page: FeedPage = {
       items: [{ type: 'note', event: note }],
       metrics: {},
       profiles: { alice: { name: 'Alice' } },
       quoted: {},
       paginationUntil: 100,
       paginationOffset: 1,
-    });
+    };
 
     const result = mapNaggFeedPage(page);
 
@@ -208,14 +209,14 @@ describe('mapNaggFeedPage', () => {
       tags: [['q', quotedId]],
     });
 
-    const page = NaggFeedResponse.parse({
+    const page: FeedPage = {
       items: [{ type: 'note', event: note }],
       metrics: {},
       profiles: { alice: { name: 'Alice' } },
       quoted: {},
       paginationUntil: 100,
       paginationOffset: 1,
-    });
+    };
 
     const result = mapNaggFeedPage(page);
 
@@ -237,7 +238,7 @@ describe('mapNaggFeedPage', () => {
       created_at: 80,
     });
 
-    const page = NaggFeedResponse.parse({
+    const page: FeedPage = {
       items: [
         { type: 'note', event: root },
         { type: 'note', event: reply },
@@ -248,7 +249,7 @@ describe('mapNaggFeedPage', () => {
       quoted: {},
       paginationUntil: 80,
       paginationOffset: 3,
-    });
+    };
 
     const result = mapNaggFeedPage(page, {
       includeNote: (ev) => {

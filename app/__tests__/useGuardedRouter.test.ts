@@ -89,3 +89,52 @@ describe('guardedRouter', () => {
     expect(mockPush).toHaveBeenCalledTimes(2);
   });
 });
+
+it('suppresses the same route even if param object construction orders differ', () => {
+  __resetGuardForTests();
+  mockPush.mockReset();
+  guardedRouter.push({ pathname: '/profile', params: { pubkey: 'abc', tab: 'posts' } });
+  guardedRouter.push({ params: { tab: 'posts', pubkey: 'abc' }, pathname: '/profile' });
+  expect(mockPush).toHaveBeenCalledTimes(1);
+});
+
+it('requires the explicit raw escape hatch for intentional immediate duplicate pushes', () => {
+  __resetGuardForTests();
+  mockPush.mockReset();
+  guardedRouter.raw.push('/profile');
+  guardedRouter.raw.push('/profile');
+  expect(mockPush).toHaveBeenCalledTimes(2);
+});
+
+it('keeps one destination entry in the installed Expo stack for a rapid repeated push', () => {
+  // Exercise SDK 56's actual reducer: raw PUSH actions really do append twice.
+  const { StackRouter } = jest.requireActual(
+    'expo-router/build/react-navigation/routers/StackRouter'
+  );
+  const stack = StackRouter({ initialRouteName: 'receive' });
+  const options = { routeNames: ['receive', 'mint-add'], routeParamList: {}, routeGetIdList: {} };
+  const initial = stack.getInitialState(options);
+  const action = { type: 'PUSH', payload: { name: 'mint-add', params: { method: 'bolt12' } } };
+  const rawTwice = stack.getStateForAction(
+    stack.getStateForAction(initial, action, options),
+    action,
+    options
+  );
+  expect(rawTwice.routes.map((route: { name: string }) => route.name)).toEqual([
+    'receive',
+    'mint-add',
+    'mint-add',
+  ]);
+
+  let state = initial;
+  __resetGuardForTests();
+  mockPush.mockReset().mockImplementation(() => {
+    state = stack.getStateForAction(state, action, options);
+  });
+  guardedRouter.push('/(mint-flow)/add');
+  guardedRouter.push('/(mint-flow)/add');
+  expect(state.routes.map((route: { name: string }) => route.name)).toEqual([
+    'receive',
+    'mint-add',
+  ]);
+});

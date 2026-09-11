@@ -7,7 +7,6 @@ import {
   createMiddlemanCandidateRoutes,
   formatCandidateRoutingDetail,
   insertStepsAfter,
-  normalizeRebalanceTransferError,
   resetFailedStepStates,
 } from '@/features/mint/lib/rebalanceRunState';
 import type { TransferStep } from '@/features/mint/components/rebalance';
@@ -201,18 +200,5 @@ describe('rebalanceRunState', () => {
         feeHeadroom: 5,
       })
     ).toEqual({ status: 'capped', amount: 97, capped: true });
-  });
-
-  it('normalizes common mint and Lightning errors for the row UI', () => {
-    expect(normalizeRebalanceTransferError(new Error('lnd is not ready for payments'))).toMatch(
-      /Mint Lightning node is not ready/
-    );
-    expect(normalizeRebalanceTransferError(new Error('FAILURE_REASON_NO_ROUTE'))).toBe(
-      'No Lightning route found. No middleman route available either.'
-    );
-    expect(normalizeRebalanceTransferError(new Error('invoice expired'))).toBe(
-      'Invoice expired before payment could complete. Please retry.'
-    );
-    expect(normalizeRebalanceTransferError(new Error('custom failure'))).toBe('custom failure');
   });
 });

@@ -1479,3 +1479,37 @@ describe('network step (device.network real airplane mode)', () => {
     expect(result).toBe('failed');
   });
 });
+
+describe('screenshot evidence mode', () => {
+  it('keeps named captures and final proof but skips successful action evidence', async () => {
+    const { deps, events } = harness({ permissive: true, currentState: 'wallet' });
+    deps.evidence = 'screenshots';
+    expect(
+      await runScenario(
+        sc([
+          { action: 'waitFor', selector: { id: 'wallet-send' } },
+          { action: 'screenshot', name: 'wallet' },
+          { action: 'assert', that: 'visible', selector: { id: 'wallet-send' } },
+        ]),
+        new Map(),
+        deps
+      )
+    ).toBe('passed');
+    const shots = events.filter((e) => e.type === 'artifact' && e.kind === 'screenshot');
+    expect(shots).toHaveLength(2);
+    expect(shots[0]).toMatchObject({ path: expect.stringContaining('/named/wallet-') });
+  });
+
+  it('captures failed controls even when automatic evidence is disabled', async () => {
+    const { deps, events } = harness({ currentState: 'wallet' });
+    deps.evidence = 'screenshots';
+    expect(
+      await runScenario(
+        sc([{ action: 'assert', that: 'visible', selector: { id: 'absent' } }]),
+        new Map(),
+        deps
+      )
+    ).toBe('failed');
+    expect(events.filter((e) => e.type === 'artifact' && e.kind === 'screenshot')).toHaveLength(2);
+  });
+});

@@ -10,8 +10,17 @@ module.exports = {
   setupFiles: [
     ...(expoNodePreset.setupFiles || []),
     require.resolve('@react-native/jest-preset/jest/setup.js'),
+    '<rootDir>/jest.staticAssets.js',
   ],
   moduleNameMapper: {
+    // A hoisted install and an isolated install must use the renderer's React.
+    '^react$': require.resolve('react'),
+    // bc-ur uses CommonJS while cborg exposes only an import condition.
+    // Resolve its real source so UR round-trip tests exercise the shipped codec.
+    '^cborg$': [
+      '<rootDir>/node_modules/cborg/cborg.js',
+      '<rootDir>/../node_modules/cborg/cborg.js',
+    ],
     // Probe app-local then the hoisted workspace-root node_modules (jest tries
     // each target in order and uses the first that exists). Under the bun
     // workspace these shared deps hoist to <root>/node_modules.
@@ -43,9 +52,6 @@ module.exports = {
       '<rootDir>/node_modules/@cashu/coco-react/dist/index.js',
       '<rootDir>/../node_modules/@cashu/coco-react/dist/index.js',
     ],
-    // Match Metro's committed-runtime alias so component tests never depend on
-    // @monicon/icon-loader's undeclared @monicon/runtime import being hoisted.
-    '^@monicon/runtime$': '<rootDir>/.monicon/icons.js',
     '^@/shared/(.*)$': '<rootDir>/shared/$1',
     '^@/features/(.*)$': '<rootDir>/features/$1',
     '^@/sheets/(.*)$': '<rootDir>/shared/lib/popup/sheets/$1',
@@ -68,6 +74,6 @@ module.exports = {
   ],
   modulePathIgnorePatterns: ['/coco-cashu-plugin-p2pk-import/'],
   transformIgnorePatterns: [
-    'node_modules/(?!(?:\\.bun/[^/]+/node_modules/)?(?:(jest-)?react-native|@react-native(-community)?|@bacons/.*|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|@shopify/react-native-skia|nostr-tools|@scure|@noble|coco-cashu-core|@cashu/cashu-ts|@cashu/coco-core|@cashu/coco-expo-sqlite|@cashu/coco-react|@sovranbitcoin/.*|wallet|nostr|bitchat-module|standard-navigation))',
+    'node_modules/(?!(?:\\.bun/[^/]+/node_modules/)?(?:(jest-)?react-native|@react-native(-community)?|@bacons/.*|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|@shopify/react-native-skia|nostr-tools|@scure|@noble|coco-cashu-core|@cashu/cashu-ts|@cashu/coco-core|@cashu/coco-expo-sqlite|@cashu/coco-react|@sovranbitcoin/.*|wallet|nostr|bitchat-module|standard-navigation|cborg|@shopify/flash-list))',
   ],
 };

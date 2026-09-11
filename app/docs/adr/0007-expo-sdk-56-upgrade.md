@@ -31,7 +31,8 @@ dry-run). The native build + on-device pass is owned by the release engineer.
     `DrawerContentComponentProps`) are re-exported from `expo-router/drawer`.
 - Removed the 5 `@react-navigation/*` direct dependencies (now transitive under
   expo-router). The two that are patched still hoist to top-level `node_modules`,
-  so patch-package continues to reach them.
+  so the dependency patches continue to reach them. These patches now use Bun's
+  root `patchedDependencies` mapping.
 
 ### Patches re-targeted to expo-router's react-navigation fork
 

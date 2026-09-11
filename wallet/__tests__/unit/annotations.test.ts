@@ -19,6 +19,15 @@ import {
   type TransactionAnnotation,
 } from "../../src/annotations";
 
+/**
+ * An entry as the read model actually holds one: `metadata` is part of the
+ * shape but need not be present. Declaring the property is what lets these
+ * literals satisfy `EntryWithMetadata` (a bare `{ id }` shares no property
+ * with it); writing `metadata: undefined` instead would have put the key on
+ * the object, which is exactly what "has no metadata" must not do.
+ */
+type ReadModelEntry = { id: string; metadata?: Record<string, string> };
+
 describe("encodeAnnotation / decodeAnnotation", () => {
   it("round-trips a full annotation", () => {
     const annotation: TransactionAnnotation = {
@@ -40,7 +49,10 @@ describe("encodeAnnotation / decodeAnnotation", () => {
       distribution: { source: "airdrop" },
       location: { lat: 51.5, lng: -0.12 },
       swap: { groupId: "g1", role: "mint", chainId: "c1", hopIndex: 2 },
-      creqCustomization: { p2pkLock: true, excludedMints: ["https://m1", "https://m2"] },
+      creqCustomization: {
+        p2pkLock: true,
+        excludedMints: ["https://m1", "https://m2"],
+      },
       zap: {
         eventId: "e".repeat(64),
         eventKind: 1,
@@ -61,11 +73,16 @@ describe("encodeAnnotation / decodeAnnotation", () => {
       zap: { eventId: "abc", eventKind: 1, receiptKind: "plain" },
     });
     record.zapReceiptKind = "bogus";
-    expect(decodeAnnotation(record).zap).toEqual({ eventId: "abc", eventKind: 1 });
+    expect(decodeAnnotation(record).zap).toEqual({
+      eventId: "abc",
+      eventKind: 1,
+    });
   });
 
   it("round-trips the numeric zap eventKind through the string record", () => {
-    const record = encodeAnnotation({ zap: { eventId: "abc", eventKind: 30023 } });
+    const record = encodeAnnotation({
+      zap: { eventId: "abc", eventKind: 30023 },
+    });
     expect(record.zapEventKind).toBe("30023");
     expect(decodeAnnotation(record).zap?.eventKind).toBe(30023);
   });
@@ -84,7 +101,9 @@ describe("encodeAnnotation / decodeAnnotation", () => {
   });
 
   it("treats a malformed creqExcludedMints JSON as absent on decode", () => {
-    expect(decodeAnnotation({ creqExcludedMints: "not-json" }).creqCustomization).toBeUndefined();
+    expect(
+      decodeAnnotation({ creqExcludedMints: "not-json" }).creqCustomization,
+    ).toBeUndefined();
   });
 
   it("omits undefined and empty fields", () => {
@@ -153,7 +172,11 @@ describe("encodeAnnotation / decodeAnnotation", () => {
 
   it("round-trips a payment-request linkage (payer and payee)", () => {
     const payer: TransactionAnnotation = {
-      paymentRequest: { role: "payer", requestId: "sovabc123", transport: "nostr" },
+      paymentRequest: {
+        role: "payer",
+        requestId: "sovabc123",
+        transport: "nostr",
+      },
     };
     expect(decodeAnnotation(encodeAnnotation(payer))).toEqual(payer);
 
@@ -269,7 +292,10 @@ describe("annotationKey / candidateKeys", () => {
     };
     expect(annotationKey(inflight)).toBe(`op:${opId}`);
     expect(annotationKey(finalised)).toBe(`op:${opId}`);
-    expect(candidateKeys(finalised)).toEqual([`op:${opId}`, `id:receive:${opId}`]);
+    expect(candidateKeys(finalised)).toEqual([
+      `op:${opId}`,
+      `id:receive:${opId}`,
+    ]);
   });
 });
 
@@ -285,7 +311,9 @@ describe("normaliseAnnotationRaw / rawAnnotationKey", () => {
     expect(key.startsWith("raw:")).toBe(true);
     expect(key.length).toBeLessThanOrEqual(256);
     // Deterministic across normalisation variants (scheme/case/whitespace)…
-    expect(rawAnnotationKey(`  CASHU:${"cashuBo2F0".repeat(200).toUpperCase()} `)).toBe(key);
+    expect(
+      rawAnnotationKey(`  CASHU:${"cashuBo2F0".repeat(200).toUpperCase()} `),
+    ).toBe(key);
     // …and distinct for distinct raw material.
     expect(rawAnnotationKey("cashu:other-token")).not.toBe(key);
   });
@@ -316,10 +344,9 @@ describe("mergeAnnotationsIntoEntry", () => {
   });
 
   it("works when the entry has no metadata", () => {
-    const merged = mergeAnnotationsIntoEntry(
-      { id: "a" },
-      { scanMethod: "nfc" },
-    );
+    const entry: ReadModelEntry = { id: "a" };
+    const merged = mergeAnnotationsIntoEntry(entry, { scanMethod: "nfc" });
+    expect("metadata" in entry).toBe(false);
     expect(merged.metadata).toEqual({ scanMethod: "nfc" });
   });
 });
@@ -332,7 +359,8 @@ describe("selectors over a merged entry", () => {
       swap: { groupId: "g", role: "melt" },
       lock: { type: "p2pk", direction: "outgoing" },
     });
-    const entry = mergeAnnotationsIntoEntry({ id: "a" }, record);
+    const bare: ReadModelEntry = { id: "a" };
+    const entry = mergeAnnotationsIntoEntry(bare, record);
     expect(getCounterparty(entry)).toEqual({
       pubkey: "pk",
       direction: "sender",
@@ -343,7 +371,7 @@ describe("selectors over a merged entry", () => {
   });
 
   it("reports not-locked for an un-annotated entry", () => {
-    expect(isP2PKLocked({ id: "a", metadata: {} })).toBe(false);
+    expect(isP2PKLocked({ metadata: {} })).toBe(false);
   });
 
   it("falls back to proof secrets when there is no lock annotation", () => {
@@ -446,10 +474,38 @@ describe("in-memory annotation store", () => {
     if (bridged) store.set(annotationKey(entry), bridged);
 
     const record = firstAnnotationRecord(store.getMany(candidateKeys(entry)));
+    const bridgedEntry: ReadModelEntry = { id: "r" };
     expect(
-      getScanSource(mergeAnnotationsIntoEntry({ id: "r" }, record)),
+      getScanSource(mergeAnnotationsIntoEntry(bridgedEntry, record)),
     ).toMatchObject({
       method: "qr",
     });
+  });
+});
+
+describe("candidateKeys fields the annotation hook must key on", () => {
+  // `useColadaTransactionAnnotation` used to memoise on a hand-picked
+  // `[entry.id, entry.quoteId, entry.operationId]` behind an exhaustive-deps
+  // suppression. These are the two inputs that list did NOT name, so an entry
+  // that gained either one kept serving the annotation resolved before it.
+  it("adds the quote key only once `type` says mint or melt", () => {
+    const withoutType: AnnotationEntryLike = { id: "E", quoteId: "Q" };
+    const asMint: AnnotationEntryLike = { id: "E", quoteId: "Q", type: "mint" };
+
+    expect(candidateKeys(withoutType)).not.toContain("quote:Q");
+    expect(candidateKeys(asMint)).toContain("quote:Q");
+    expect(candidateKeys(withoutType)).not.toEqual(candidateKeys(asMint));
+  });
+
+  it("reads the operation id out of metadata when the column is empty", () => {
+    const bare: AnnotationEntryLike = { id: "E" };
+    const withMetaOp: AnnotationEntryLike = {
+      id: "E",
+      metadata: { operationId: "OP" },
+    };
+
+    expect(candidateKeys(bare)).not.toContain("op:OP");
+    expect(candidateKeys(withMetaOp)).toContain("op:OP");
+    expect(candidateKeys(bare)).not.toEqual(candidateKeys(withMetaOp));
   });
 });

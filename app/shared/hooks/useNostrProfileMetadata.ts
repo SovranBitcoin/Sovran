@@ -1,3 +1,5 @@
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { getMockProfileMetadata } from '@/shared/stores/runtime/mockDataStore';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Kind0MetadataSchema,
@@ -30,7 +32,12 @@ const RETRY_BACKOFF_MS = 4_000;
 export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrProfileMetadataResult {
   // Reads the single owner (entity cache) via useCachedNostrProfile; a fetch
   // write-throughs there (getProfiles), so no explicit cache write here.
-  const { metadata, isStale, isMissing } = useCachedNostrProfile(pubkey ?? '');
+  const mockMode = useSettingsStore((state) => state.mockMode);
+  const fixture = mockMode && pubkey ? getMockProfileMetadata(pubkey) : undefined;
+  const cached = useCachedNostrProfile(pubkey ?? '');
+  const metadata = fixture ?? cached.metadata;
+  const isStale = !fixture && cached.isStale;
+  const isMissing = !fixture && cached.isMissing;
   const [isFetching, setIsFetching] = useState(false);
 
   // Per-pubkey attempt counter, capped at MAX_FETCH_ATTEMPTS. A facade fetch can
@@ -147,6 +154,7 @@ export function useNostrProfileMetadataMany(
   // Read the single owner (entity cache) for this set; the returned Map is
   // referentially stable across renders that don't change these keys' records.
   const records = useProfileRecordsMany(pubkeys);
+  const mockMode = useSettingsStore((state) => state.mockMode);
 
   const metadata = useMemo(() => {
     const map = new Map<string, NostrProfileMetadata>();
@@ -154,8 +162,13 @@ export function useNostrProfileMetadataMany(
       const mapped = cachedProfileToMetadata(record);
       if (mapped) map.set(pk, mapped);
     }
+    if (mockMode)
+      for (const pubkey of pubkeys) {
+        const fixture = getMockProfileMetadata(pubkey);
+        if (fixture) map.set(pubkey, fixture);
+      }
     return map;
-  }, [records]);
+  }, [records, mockMode, pubkeys]);
 
   // Pubkeys missing or stale in the cache and not yet attempted this lifetime.
   const attempted = useRef<Set<string>>(new Set());
@@ -164,33 +177,40 @@ export function useNostrProfileMetadataMany(
     const now = Date.now();
     const out: string[] = [];
     for (const pk of pubkeys) {
-      if (attempted.current.has(pk)) continue;
+      if (attempted.current.has(pk) || (mockMode && getMockProfileMetadata(pk))) continue;
       const record = records.get(pk);
       if (!record || now - (record.seenAt ?? 0) > STALE_TTL_MS) out.push(pk);
     }
     return out;
-  }, [pubkeys, records]);
+  }, [pubkeys, records, mockMode]);
 
-  const [isFetching, setIsFetching] = useState(false);
+  const [pendingPubkeys, setPendingPubkeys] = useState<ReadonlySet<string>>(() => new Set());
   const toFetchKey = toFetch.join(',');
   useEffect(() => {
-    if (toFetch.length === 0) return;
-    for (const pk of toFetch) attempted.current.add(pk);
-    let cancelled = false;
-    setIsFetching(true);
+    // Strict Mode may replay this effect before a render recomputes toFetch.
+    const batch = toFetch.filter((pk) => !attempted.current.has(pk));
+    if (batch.length === 0) return;
+    for (const pk of batch) attempted.current.add(pk);
+    setPendingPubkeys((pending) => new Set([...pending, ...batch]));
     // getProfiles write-throughs into the entity cache; the reactive read above
-    // picks up resolved profiles, so no explicit cache write here.
-    void fetchProfilesViaFacade(toFetch, { refresh: true }).finally(() => {
-      if (!cancelled) setIsFetching(false);
-    });
-    return () => {
-      cancelled = true;
+    // picks up resolved profiles. That update can change toFetch before this
+    // request settles, so effect cleanup cannot own the loading flag. Track the
+    // pending keys themselves: an old batch never clears a newer batch's work.
+    const finish = () => {
+      setPendingPubkeys((pending) => {
+        const remaining = new Set(pending);
+        for (const pk of batch) remaining.delete(pk);
+        return remaining;
+      });
     };
+    void fetchProfilesViaFacade(batch, { refresh: true }).then(finish, finish);
     // `toFetchKey` is the serialized form of `toFetch`; depending on the array
     // itself would refire the fetch on every render that rebuilds it unchanged.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toFetchKey]);
 
-  const isLoading = isFetching;
+  const isLoading =
+    pubkeys.some((pk) => pendingPubkeys.has(pk)) ||
+    toFetch.some((pk) => !attempted.current.has(pk));
   return { metadata, isLoading };
 }

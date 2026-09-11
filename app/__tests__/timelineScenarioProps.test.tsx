@@ -271,4 +271,37 @@ describe('timeline scenario pins (redesign acceptance surface)', () => {
       });
     });
   }
+  it('morphs the existing send checkpoint through cancellation, failure, retry and authoritative rollback', () => {
+    const historyEntry = scenarios
+      .flatMap((scenario) => scenario.frames)
+      .find(
+        (frame) => frame.historyEntry.type === 'send' && frame.historyEntry.state === 'pending'
+      )?.historyEntry;
+    if (historyEntry?.type !== 'send') throw new Error('Missing pending send fixture');
+    const rolledBack: typeof historyEntry = { ...historyEntry, state: 'rolled_back' };
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(<HistoryEntryTimeline historyEntry={historyEntry} />);
+    });
+    const before = pinFrame(renderer.toJSON() as unknown as JsonNode);
+    act(() => renderer.update(<HistoryEntryTimeline historyEntry={historyEntry} cancelling />));
+    const pending = pinFrame(renderer.toJSON() as unknown as JsonNode);
+    expect(pending.texts).toContain('Cancelling');
+    expect(pending.indicators.map((dot) => dot.id)).toEqual([
+      'indicator-done-success',
+      'indicator-loading-success',
+    ]);
+    // A failed action releases the local overlay; it never claims funds returned.
+    act(() => renderer.update(<HistoryEntryTimeline historyEntry={historyEntry} />));
+    expect(pinFrame(renderer.toJSON() as unknown as JsonNode).texts).toEqual(before.texts);
+    act(() => renderer.update(<HistoryEntryTimeline historyEntry={historyEntry} cancelling />));
+    act(() => renderer.update(<HistoryEntryTimeline historyEntry={rolledBack} cancelling />));
+    const completed = pinFrame(renderer.toJSON() as unknown as JsonNode);
+    expect(completed.texts).not.toContain('Cancelling');
+    expect(completed.indicators.map((dot) => dot.id)).toEqual([
+      'indicator-done-success',
+      'indicator-done-reverted',
+    ]);
+    act(() => renderer.unmount());
+  });
 });

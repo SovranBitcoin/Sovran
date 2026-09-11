@@ -1,3 +1,6 @@
+import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
+import { ModeratedDmBubble } from '@/features/user/components/ModeratedDmBubble';
+import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMemo } from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { wnLog, useLifecycleLogger } from '@/shared/lib/logger';
@@ -25,6 +28,10 @@ const SURFACE = 'whitenoise' as const;
  */
 export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
   useLifecycleLogger('WhitenoiseDMScreen');
+  const blocked = useFeedIgnoreStore((s) => s.ignoredPubkeys.includes(pubkey));
+  const filterEnabled = useFeedIgnoreStore((s) => s.dmFilterEnabled);
+  const filterWords = useFeedIgnoreStore((s) => s.dmFilterWords);
+  const ownPubkey = useNostrKeysContext().keys?.pubkey;
 
   const { metadata } = useNostrProfileMetadata(pubkey);
   const { isLoading, isCreatingGroup, error, hasGroup, messages, send, isClientReady } =
@@ -70,13 +77,25 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
       <ChatScreen
         surface={SURFACE}
         log={wnLog}
-        messages={bubbleMessages}
-        onSend={send}
-        composerDisabled={!isClientReady || isCreatingGroup}
+        messages={blocked ? [] : bubbleMessages}
+        renderBubble={(args) => (
+          <ModeratedDmBubble
+            {...args}
+            scope={`${ownPubkey}:${pubkey}:whitenoise`}
+            enabled={filterEnabled}
+            words={filterWords}
+          />
+        )}
+        onSend={(text) => {
+          if (!useFeedIgnoreStore.getState().ignoredPubkeys.includes(pubkey)) return send(text);
+        }}
+        composerDisabled={blocked || !isClientReady || isCreatingGroup}
         composerPlaceholder={isCreatingGroup ? 'Creating encrypted group…' : 'Write here'}
         composerTestID="whitenoise-dm-input"
         banner={
-          error ? (
+          blocked ? (
+            <Text>This person is blocked. Open “Block or report” to unblock them.</Text>
+          ) : error ? (
             <Text size={13} style={{ color: danger, padding: 12 }}>
               {error}
             </Text>

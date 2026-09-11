@@ -23,5 +23,13 @@ export function useHistoryWithMelts(pageSize = 100, unit?: string) {
     return base.filter((entry) => (entry.unit ?? 'sat') === unit);
   }, [mockMode, mockHistory, result.history, unit]);
 
-  return useMemo(() => ({ ...result, history }), [result, history]);
+  return useMemo(
+    () => ({
+      ...result,
+      history,
+      hasMore: !mockMode && result.hasMore,
+      isFetching: !mockMode && result.isFetching,
+    }),
+    [result, history, mockMode]
+  );
 }

@@ -173,7 +173,7 @@ type VisualViewToken<ItemT> = {
   index: number | null;
   key: string;
   isViewable: boolean;
-  item: ItemT;
+  item: ItemT | undefined;
   percentVisible?: number;
   size?: number;
   sizeVisible?: number;
@@ -190,7 +190,7 @@ export function visualToken<ItemT>(token: ViewToken): VisualViewToken<ItemT> {
     index: typeof token.index === 'number' ? token.index : null,
     key: token.key,
     isViewable: token.isViewable,
-    item: token.item as ItemT,
+    item: token.item as ItemT | undefined,
   };
 }
 
@@ -657,8 +657,10 @@ function viewTokenSummary<ItemT>(
   state?: VisualListState<ItemT> | null
 ): Record<string, unknown>[] {
   return tokens.slice(0, 12).map((token) => {
+    // FlashList resolves outgoing indices against the NEW data. Shrinking a
+    // list (e.g. Notifications -> App) legitimately leaves removed tokens empty.
     const key =
-      token.index == null
+      token.index == null || token.item == null
         ? token.key
         : (config.getItemKey?.(token.item, token.index, token.key) ?? token.key);
     return {
@@ -670,7 +672,7 @@ function viewTokenSummary<ItemT>(
       size: typeof token.size === 'number' ? round(token.size) : undefined,
       sizeVisible: typeof token.sizeVisible === 'number' ? round(token.sizeVisible) : undefined,
       ...visualVirtualMetrics(state, key, token.index),
-      ...(token.index == null
+      ...(token.index == null || token.item == null
         ? {}
         : safeContextKeys(config.getItemContext?.(token.item, token.index) ?? {})),
     };

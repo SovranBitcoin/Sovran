@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "sizes": [16, 32, 64, 128, 256, 512, 1024, 2048],
+  "themes": {
+    "black-on-light": {
+      "foreground": "dark",
+      "background": "light"
+    },
+    "white-on-dark": {
+      "foreground": "light",
+      "background": "dark"
+    },
+    "black-on-transparent": {
+      "foreground": "dark",
+      "background": null
+    },
+    "white-on-transparent": {
+      "foreground": "light",
+      "background": null
+    }
+  },
+  "layouts": {
+    "symbol": {
+      "canvas": [1024, 1024],
+      "markHeight": 832
+    },
+    "wordmark-lockup": {
+      "canvas": [2048, 768],
+      "markHeight": 448,
+      "textHeight": 304,
+      "gap": 128
+    },
+    "version-lockup": {
+      "canvas": [1024, 1024],
+      "markHeight": 576,
+      "textHeight": 104,
+      "textMaxWidth": 768,
+      "gap": 64
+    }
+  },
+  "androidAdaptive": {
+    "markHeight": 528
+  },
+  "versionSource": "app/app.json#expo.version",
+  "versionFont": "app/assets/fonts/MonaSans/MonaSans-ExtraBold.ttf",
+  "provenance": "User-supplied Sovran artwork, 2026-09-11. Group 2748 owns the shared S; Group 2749 owns the outlined wordmark; Group 2750 is the version-layout reference."
+}

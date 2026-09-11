@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { sendFlow, startSendFlow, startSendEcashFlow } from '../../src/machine/flows/send';
 import { MINT1, WALLETS } from '../_harness/fixtures';
+import { assertStep } from '../_harness/assertStep';
 
 describe('send flow', () => {
   it('opens the destination chooser without selecting a mint or amount', () => {
@@ -18,7 +19,7 @@ describe('send flow', () => {
   it('starts ecash send at amount entry when a mint is selected', () => {
     const result = startSendEcashFlow(WALLETS.default, 'sat');
 
-    expect(result.step).toBe('enterAmount');
+    assertStep(result, 'enterAmount');
     expect(result.context).toMatchObject({
       destination: 'sendEcash',
       mintUrl: MINT1,
@@ -39,6 +40,9 @@ describe('send flow', () => {
       },
     });
 
+    // Also pins the step this flow lands on, which the assertion below was
+    // silently assuming.
+    assertStep(result, 'enterAmount');
     expect(result.context).toMatchObject({
       meltTarget: 'alice@example.com',
       recipientPubkey: 'abc123',

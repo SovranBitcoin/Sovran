@@ -5,6 +5,13 @@ import {
   type ReachabilityProbe,
 } from '@/shared/lib/offlineReachability';
 
+jest.mock('@/shared/config/backend', () => ({
+  backendConfig: {
+    apiBaseUrl: 'https://configured-api.example/api',
+    scoreApiBaseUrl: 'https://configured-nagg.example',
+  },
+}));
+
 const connectedWifi: NetworkState = {
   isConnected: true,
   isInternetReachable: true,
@@ -31,6 +38,16 @@ function response(status: number): Response {
 }
 
 describe('offline reachability', () => {
+  it('probes the configured latest-version backend by default', async () => {
+    const fetcher = jest.fn().mockResolvedValue(response(200));
+    const result = await resolveOfflineReachability(connectedWifi, { fetcher });
+    expect(result.isOffline).toBe(false);
+    expect(fetcher).toHaveBeenCalledWith(
+      'https://configured-api.example/api/app/latest-version',
+      expect.objectContaining({ method: 'POST', body: '{"storage":{"version":"0.0.0"}}' })
+    );
+  });
+
   it('treats airplane/no active network as offline without probing', async () => {
     const fetcher = jest.fn();
 
@@ -42,9 +59,8 @@ describe('offline reachability', () => {
   });
 
   it('probes instead of trusting a transient isInternetReachable=false (Android transport flap)', async () => {
-    // Android's expo-network derives isInternetReachable from activeNetwork
-    // presence with no validation — it flips false on every Wi-Fi<->cell/VPN
-    // handoff while the device is genuinely online. The probe must decide.
+    // A native connectivity event during a transport handoff can temporarily
+    // report unreachable. The probe must decide before hysteresis commits it.
     const fetcher = jest.fn().mockResolvedValue(response(200));
 
     const result = await resolveOfflineReachability(

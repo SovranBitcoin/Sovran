@@ -51,6 +51,7 @@ import { defaultDetectors } from '../../src/detectors';
 import { parsePaymentInput } from '../../src/parse';
 import { deriveMintMethodCapabilityMapFromTrustedMints } from '../../src/mint-capabilities';
 import { WALLETS, MINT1, MINT2, MINT3, INPUTS } from '../_harness/fixtures';
+import { assertStep } from '../_harness/assertStep';
 import type { FlowContext, FlowEvent, FlowStep } from '../../src/machine/types';
 import type { WalletContext } from '../../src/types';
 
@@ -825,7 +826,7 @@ describe('transition — REQUEST_MINT_SELECTOR', () => {
     };
     const result = tx('enterAmount', ctx, { type: 'REQUEST_MINT_SELECTOR', scope: 'npc' });
 
-    expect(result.step).toBe('selectMint');
+    assertStep(result, 'selectMint');
     expect(result.context.destination).toBeUndefined();
     expect(result.data.scope).toBe('npc');
     expect(result.data.destination).toBeUndefined();
@@ -864,8 +865,10 @@ describe('transition — REQUEST_MINT_SELECTOR', () => {
     };
     const result = tx('idle', idle, { type: 'REQUEST_MINT_SELECTOR', scope: 'npc' }, wallet);
 
-    expect(result.step).toBe('selectMint');
-    const byMint = Object.fromEntries(result.data.candidates.map((c) => [c.mintUrl, c]));
+    assertStep(result, 'selectMint');
+    const byMint = Object.fromEntries(
+      result.data.candidates.map((c) => [c.mintUrl, c]),
+    );
     expect(byMint[MINT1]).toMatchObject({
       status: 'disabled',
       reason: expect.objectContaining({ code: 'NO_WEBSOCKET' }),

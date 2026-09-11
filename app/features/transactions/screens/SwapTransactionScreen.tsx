@@ -1,3 +1,5 @@
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { MOCK_SWAP_GROUPS } from '@/shared/stores/runtime/mockDataStore';
 /**
  * @fileoverview Swap Transaction Detail Screen
  *
@@ -12,7 +14,7 @@
  * Consecutive entries on the same mint omit the redundant arrow separator.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { MeltQuoteState } from '@cashu/cashu-ts';
 import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
@@ -52,7 +54,7 @@ import {
 import { formatDate } from '@/shared/lib/date';
 import { formatAmount } from '@/shared/lib/currency';
 import { getMintDisplayName } from '@/shared/lib/url';
-import { useMintManagement } from '@/features/mint';
+import { useSwapMintInfo } from '../hooks/useSwapMintInfo';
 import { getTransactionActionDirection } from '@/features/transactions/lib/transactionPresentation';
 import Icon from 'assets/icons';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -202,21 +204,6 @@ CollapsedLegGroup.displayName = 'CollapsedLegGroup';
 // Main screen
 // -----------------------------------------------------------------------
 
-/**
- * Name + icon for a mint-info response, or null when there is none.
- *
- * At module scope purely so the ternary is not lexically inside the loader's
- * `try` — React Compiler cannot lower a value block in one, and that skipped
- * the whole screen. Keeping the property reads in the callee (rather than
- * hoisting the result out of the try) leaves the original error behaviour
- * untouched.
- */
-function toMintInfoSummary(
-  info: { name?: string; icon_url?: string } | null | undefined
-): { name?: string; icon_url?: string } | null {
-  return info ? { name: info.name, icon_url: info.icon_url } : null;
-}
-
 export function SwapTransactionScreen({ groupId }: Props) {
   useLifecycleLogger('SwapTransactionScreen');
   const [foreground, muted, danger, success] = useThemeColor([
@@ -226,9 +213,12 @@ export function SwapTransactionScreen({ groupId }: Props) {
     'success',
   ] as const);
   const accentColor = muted;
-  const group = useSwapTransactionsStore((state) => (groupId ? state.groups[groupId] : undefined));
+  const mockMode = useSettingsStore((state) => state.mockMode);
+  const liveGroup = useSwapTransactionsStore((state) =>
+    groupId ? state.groups[groupId] : undefined
+  );
+  const group = mockMode && groupId ? MOCK_SWAP_GROUPS[groupId] : liveGroup;
   const { history } = useHistoryWithMelts();
-  const { getMintInfo } = useMintManagement();
   const [expanded, setExpanded] = useState(false);
   const chevronRotation = useSharedValue(0);
 
@@ -248,11 +238,6 @@ export function SwapTransactionScreen({ groupId }: Props) {
     transform: [{ rotate: `${chevronRotation.value}deg` }],
   }));
 
-  // Load mint info for all mint URLs used in the group (including chain URLs)
-  const [mintInfoMap, setMintInfoMap] = useState<
-    Record<string, { name?: string; icon_url?: string } | null>
-  >({});
-
   const mintUrls = useMemo(() => {
     if (!group) return [];
     const urls = new Set<string>();
@@ -266,24 +251,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
     return Array.from(urls);
   }, [group]);
 
-  useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      const map: Record<string, { name?: string; icon_url?: string } | null> = {};
-      for (const url of mintUrls) {
-        try {
-          map[url] = toMintInfoSummary(await getMintInfo(url));
-        } catch {
-          map[url] = null;
-        }
-      }
-      if (mounted) setMintInfoMap(map);
-    };
-    if (mintUrls.length > 0) void load();
-    return () => {
-      mounted = false;
-    };
-  }, [mintUrls, getMintInfo]);
+  const mintInfoMap = useSwapMintInfo(mintUrls);
 
   const historyByQuoteId = useMemo(() => {
     const map = new Map<string, HistoryEntry>();

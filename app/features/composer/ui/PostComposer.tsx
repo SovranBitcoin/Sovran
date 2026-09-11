@@ -22,7 +22,7 @@ import {
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Button } from 'heroui-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

@@ -34,6 +34,7 @@ import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStor
 import { mintLocalId } from '@/shared/lib/id';
 import { NostrEventIdSchema, NostrPubkeyHexSchema } from '@/shared/lib/protocolIds';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { tolerantArray } from '@/shared/lib/persist/tolerant';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -88,7 +89,13 @@ const PersistedActivityEntry = z.looseObject({
 });
 
 const PersistedActivityStore = z.object({
-  entries: z.array(PersistedActivityEntry).max(ACTIVITY_CAP).default([]),
+  // Tolerant: this is an audit log, and `method`/`verdict` are enums that grow
+  // with the protocol. Bare, a single row carrying a value this build does not
+  // know — a method added in a later version, a verdict retired in an earlier
+  // one — rejects the array and `createMergeWithSchema` throws the ENTIRE log
+  // away. Neither field has a neutral member that could be guessed without
+  // misreporting what the signer actually did, so the row is what gets dropped.
+  entries: tolerantArray(PersistedActivityEntry, ACTIVITY_CAP).default([]),
 });
 
 type LogActivityInput = Omit<Nip46ActivityEntry, 'id' | 'at'> & { at?: number };

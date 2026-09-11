@@ -1,60 +1,11 @@
-/**
- * DM envelope client. nagg is zero-knowledge: these calls return the raw
- * encrypted events (NIP-17 gift wraps kind 1059, optional NIP-04 kind 4)
- * involving the viewer; decryption happens client-side in `dmDecryptPipeline`.
- *
- * The conversation-list inbox (`fetchDmEnvelopes`) routes through the
- * tier-selecting facade (nagg DM index → raw-relay floor, gated by the Network
- * toggles). `fetchDmConversation` hits nagg's REST app-view
- * (`GET /nostr/dm/conversation`) directly. Both are best-effort: an exhausted/
- * disabled chain returns empty rather than throwing, so the UI keeps working.
- */
-import {
-  createNaggClient,
-  NaggEnvelopeSchema,
-  orderedEnvelopeEvents,
-  type NaggEnvelope,
-} from 'nostr';
-import { dmConversationAppView } from 'nostr/recipes';
-import { backendConfig } from '@/shared/config/backend';
-import type { DmEnvelope, DmEnvelopePage } from './dmEnvelopeTypes';
+/** Shared opaque DM inbox for Contacts and conversation history. Decryption and peer filtering stay on-device. */
+import type { DmEnvelopePage } from './dmEnvelopeTypes';
 import { paymentLog } from '@/shared/lib/logger';
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 import { resolvedDmEnvelopesToPage, toFacadeDmEnvelopesRequest } from './facadeDmAdapter';
 
-const DM_TIMEOUT_MS = 12_000;
-
-const client = createNaggClient({
-  appView: { baseUrl: backendConfig.nostrAppViewBaseUrl, version: 'v1' },
-  defaultTimeoutMs: DM_TIMEOUT_MS,
-});
-
-/** Raw DM envelope event as returned by nagg (still encrypted). */
 const EMPTY_PAGE: DmEnvelopePage = { envelopes: [], hasNextPage: false };
-
-/**
- * Bridge a v2 envelope into the app's DM page. By design the DM routes carry
- * NO aggregates and NO profile hydration (privacy) — only the raw encrypted
- * wraps, arrival-ordered. Paging is length-based here (the callers re-derive
- * their `until` cursor from envelope `createdAt`), matching the facade path.
- */
-function toPage(envelope: NaggEnvelope): DmEnvelopePage {
-  const events = envelope.order.length > 0 ? orderedEnvelopeEvents(envelope) : envelope.events;
-  const envelopes: DmEnvelope[] = events.map((event) => {
-    const sig = (event as { sig?: unknown }).sig;
-    return {
-      id: event.id,
-      pubkey: event.pubkey,
-      kind: event.kind,
-      createdAt: event.created_at,
-      content: event.content,
-      tags: event.tags,
-      ...(typeof sig === 'string' && sig ? { sig } : {}),
-    };
-  });
-  return { envelopes, hasNextPage: envelopes.length > 0 };
-}
 
 /**
  * All DM envelopes involving the viewer (for the conversation list).
@@ -109,42 +60,7 @@ export async function fetchDmEnvelopes(args: {
       paymentLog.debug('payment.dm.envelopes.exhausted', {
         attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
       });
-      return EMPTY_PAGE;
+      throw new Error('Message history is unavailable', { cause: error });
     }
   );
-}
-
-/** DM envelopes for one conversation. For gift wraps the counterparty is opaque
- *  server-side, so the viewer's full wrap inbox is returned and bucketed after
- *  decryption. */
-export async function fetchDmConversation(args: {
-  viewer: string;
-  counterparty?: string;
-  kinds?: number[];
-  until?: number;
-  limit?: number;
-  refresh?: boolean;
-  signal?: AbortSignal;
-}): Promise<DmEnvelopePage> {
-  const binding = dmConversationAppView({
-    viewer: args.viewer,
-    counterparty: args.counterparty,
-    kinds: args.kinds,
-    until: args.until,
-    limit: args.limit,
-  });
-  const result = await client.rest({
-    path: binding.path,
-    method: binding.method,
-    searchParams: binding.searchParams,
-    responseSchema: NaggEnvelopeSchema,
-    operationName: binding.operationName,
-    refresh: args.refresh,
-    signal: args.signal,
-  });
-  if (result.isErr()) {
-    paymentLog.debug('payment.dm.conversation.failed', { error: result.error.message });
-    return EMPTY_PAGE;
-  }
-  return toPage(result.value);
 }

@@ -81,10 +81,10 @@ export async function fundWallet(manager: Manager, mintUrl: string, amount: numb
     amount,
     method: 'bolt11',
   });
-  const mintOp = await manager.ops.mint.prepare({
-    mintUrl,
-    method: 'bolt11',
-    quoteId: quote.quoteId,
-  });
+  // coco v2 takes the canonical quote itself, not a (mintUrl, method, quoteId)
+  // triple — see app/shared/lib/cashu/cocoOperations.ts, which is what
+  // production calls. This helper still described the pre-v2 shape, and only
+  // the live-mint tests reach it, so nothing ever executed it.
+  const mintOp = await manager.ops.mint.prepare({ quote, amount });
   await manager.ops.mint.execute(mintOp.id);
 }

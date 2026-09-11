@@ -12,7 +12,6 @@ import { View, StyleSheet } from 'react-native';
 
 import { List } from '@/shared/ui/composed/List';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
 import type { AllSearchResult } from '@/features/contacts/hooks/useAllSearchResults';
 import {
   ContactRow,
@@ -154,8 +153,6 @@ export function SearchResultRows({
   searchQuery,
   ListEmptyComponent = NoResultsFound,
 }: SearchResultRowsProps) {
-  const tabBarPadding = useTabBarBottomPadding();
-
   // Mirror useContactSearch's internal rule: short queries don't trigger a
   // real search, so don't flash "no results" at the user.
   const showNoResults =
@@ -172,6 +169,7 @@ export function SearchResultRows({
   return (
     <View style={styles.container}>
       <List
+        screen
         data={listData}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
@@ -179,11 +177,7 @@ export function SearchResultRows({
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="always"
         ListEmptyComponent={renderEmpty}
-        contentContainerStyle={
-          showNoResults
-            ? [styles.emptyList, { paddingBottom: tabBarPadding }]
-            : { paddingBottom: tabBarPadding }
-        }
+        contentContainerStyle={showNoResults ? styles.emptyList : undefined}
       />
     </View>
   );

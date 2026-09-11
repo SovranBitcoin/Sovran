@@ -18,6 +18,7 @@ const ROUTING_OPTIONS = { title: 'Swap routing' };
 const NETWORK_OPTIONS = { title: 'Network' };
 const KEYRING_OPTIONS = { title: 'P2PK Keys' };
 const STORAGE_OPTIONS = { title: 'Storage inventory' };
+const MODERATION_OPTIONS = { title: 'Moderation' };
 const MEDIA_OPTIONS = { title: 'My media' };
 const DESIGN_SYSTEM_OPTIONS = { title: 'Design system' };
 const DESIGN_SYSTEM_FOUNDATIONS_OPTIONS = { title: 'Foundations' };
@@ -33,7 +34,7 @@ const RECOVERY_OPTIONS = { title: 'Recover wallet' };
 const DELETE_OPTIONS = { title: 'Delete account' };
 
 export default function SettingsFlowLayout() {
-  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
   const screenOptions = useMemo(
     () => createFlowLayoutScreenOptions({ foreground, background }),
     [foreground, background]
@@ -47,6 +48,9 @@ export default function SettingsFlowLayout() {
       <Stack.Screen name="network" options={NETWORK_OPTIONS} />
       <Stack.Screen name="keyring" options={KEYRING_OPTIONS} />
       <Stack.Screen name="storage" options={STORAGE_OPTIONS} />
+      <Stack.Screen name="terms" options={{ title: 'Terms and Conditions' }} />
+      <Stack.Screen name="privacy" options={{ title: 'Privacy Policy' }} />
+      <Stack.Screen name="moderation" options={MODERATION_OPTIONS} />
       <Stack.Screen name="media" options={MEDIA_OPTIONS} />
       <Stack.Screen name="design-system" options={DESIGN_SYSTEM_OPTIONS} />
       <Stack.Screen name="design-system-foundations" options={DESIGN_SYSTEM_FOUNDATIONS_OPTIONS} />

@@ -23,7 +23,7 @@ interface CopyRequestRowProps {
   display: string;
   /** Muted theme color threaded from the screen's batched lookup. */
   muted: string;
-  onPress: () => void | Promise<void>;
+  onPress?: () => void | Promise<void>;
   testID?: string;
   accessibilityLabel?: string;
 }
@@ -39,18 +39,21 @@ export function CopyRequestRow({
   return (
     <PressableFeedback
       animation={false}
+      isDisabled={!onPress}
       onPress={onPress}
       testID={testID}
       accessibilityLabel={accessibilityLabel}>
       <PressableFeedback.Scale>
         <ListGroup.Item disabled>
-          <ListGroup.ItemPrefix>
+          <ListGroup.ItemPrefix className="shrink-0">
             {typeof icon === 'string' ? <Icon name={icon} size={20} color={muted} /> : icon}
           </ListGroup.ItemPrefix>
-          <ListGroup.ItemContent>
-            <ListGroup.ItemTitle>{display}</ListGroup.ItemTitle>
+          <ListGroup.ItemContent className="min-w-0 flex-1">
+            <ListGroup.ItemTitle numberOfLines={1} ellipsizeMode="middle">
+              {display}
+            </ListGroup.ItemTitle>
           </ListGroup.ItemContent>
-          <ListGroup.ItemSuffix>
+          <ListGroup.ItemSuffix className="shrink-0">
             <Icon name="lets-icons:copy" size={20} color={muted} />
           </ListGroup.ItemSuffix>
         </ListGroup.Item>
@@ -60,11 +63,15 @@ export function CopyRequestRow({
   );
 }
 
-export function CopyRequestCard({ title, ...row }: CopyRequestRowProps & { title: string }) {
+export function CopyRequestCard({
+  title,
+  loading = false,
+  ...row
+}: CopyRequestRowProps & { title: string; loading?: boolean }) {
   return (
     <View className="mx-4">
       <Section title={title}>
-        <GradientCard>
+        <GradientCard loading={loading}>
           <ListGroup variant="transparent">
             <CopyRequestRow {...row} />
           </ListGroup>

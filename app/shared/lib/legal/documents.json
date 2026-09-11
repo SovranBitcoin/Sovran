@@ -1,0 +1,182 @@
+{
+  "publicationReady": true,
+  "operator": {
+    "name": "SOVRAN LTD",
+    "country": "United Kingdom",
+    "address": "3rd Floor, 86–90 Paul Street, London, EC2A 4NE, United Kingdom",
+    "email": "kelbie@sovran.money"
+  },
+  "terms": {
+    "title": "Terms and Conditions",
+    "updated": "2026-09-10",
+    "summary": "Explains wallet and mint risks, your responsibilities, acceptable use, third-party services, and your legal rights.",
+    "sections": [
+      {
+        "title": "1. About these terms",
+        "paragraphs": [
+          "SOVRAN LTD is registered in England and Wales, company number 15895560. Our registered office and contact details are shown above.",
+          "These terms cover the Sovran app and sovran.money website provided by the operator identified above (Sovran, we, us). The app combines a Cashu ecash wallet with Nostr social features, messaging, and optional services. Features vary by platform and version. Separate purchase terms and third-party terms may apply to particular services; these terms do not replace them.",
+          "In the app, you agree by selecting the terms checkbox and confirming. Reading our website or Privacy Policy does not by itself constitute consent to optional data processing. You must be at least 18, have the legal capacity to agree, and use the services only where your activities are lawful."
+        ]
+      },
+      {
+        "title": "2. Understand the risks before adding money",
+        "paragraphs": [
+          "Cashu ecash is experimental. Bugs, compromised devices, lost keys, double spending, dishonest counterparties, service failures, and unavailable or insolvent mints can cause permanent loss. Use only small amounts you can afford to lose. The app does not guarantee profit, stable value, deposit insurance, or uninterrupted access. A mint’s redemption obligations are governed by its own terms and applicable law; these terms do not cancel those obligations.",
+          "The wallet lets you control local keys and ecash proofs. You rely on the issuing mint to maintain any promised backing and redeem its ecash. The app does not verify its reserves. Holding ecash is not the same as holding bitcoin directly on-chain. A listed or recommended mint, rating, balance, or successful test is not proof of reserves or a guarantee. Check the issuer and its terms, including for any Sovran-branded mint; these app terms do not promise that every mint is independent of Sovran.",
+          "An issuer may impose redemption deadlines or require ecash issued under retired keys to be refreshed. Check its terms and notices; recovery may depend on redeeming or refreshing before a deadline.",
+          "The app sends requests to mints and payment services to carry out actions you authorize. Some enabled features automate steps, including receiving ecash and routing swaps through intermediary mints. Review destinations, units, amounts, permissions, fees, and trust settings. A timeout does not necessarily mean a payment failed: check its status before retrying. Offline receipt is not final validation that ecash is spendable."
+        ]
+      },
+      {
+        "title": "3. Protect your wallet and identity",
+        "paragraphs": [
+          "Protect your device, recovery phrases, private keys, ecash tokens, backups, and any remote signer. Anyone obtaining bearer ecash or a private key may spend funds or act as you. Do not send these secrets to support or post them publicly. A public Nostr key is an identifier, not a password.",
+          "Keep suitable backups before deleting data, uninstalling, importing accounts, or changing devices. A Nostr key alone does not restore your Cashu wallet. Imported identities may require their own key backups. Seed recovery depends on the relevant mint, protocol support, and transaction history; it is not a guarantee of recovering every token, message, or balance. Sovran does not offer a master password reset or a guaranteed reversal or recovery service.",
+          "You are responsible for the transactions, signer permissions, and third-party connections you authorize and for applicable taxes and lawful use. This responsibility does not remove our own legal obligations or your rights where we are at fault."
+        ]
+      },
+      {
+        "title": "4. Other services and paid features",
+        "paragraphs": [
+          "Mints, relays, indexers, media hosts, remote signers, AI providers, network operators, and merchants have their own availability, charges, privacy practices, and terms. The app may use default services before you customize them. The Privacy Policy explains the resulting data flows.",
+          "AI prompts and selected conversation context or attachments are sent to the provider you use. Generated responses can be inaccurate or harmful; verify important information. Neither app content nor AI output is personalized financial, legal, tax, or medical advice.",
+          "Payment fees, AI credit purchases, and eSIM purchases can create obligations separate from using the free app. Review the amount, supplier, delivery, validity, compatibility, cancellation, and refund terms shown for that purchase before paying. A network payment may be irreversible even where you retain a legal claim for a refund. These terms do not waive statutory cancellation or refund rights."
+        ]
+      },
+      {
+        "title": "5. Public content and acceptable use",
+        "paragraphs": [
+          "Public Nostr posts, profiles, reactions, reports, and location-channel messages may be copied, indexed, and retained outside Sovran. Do not publish secrets, bearer tokens, or another person’s personal information without a lawful basis. You retain rights to your own content and must have the rights needed to share it. You authorize the processing and distribution necessary to carry out your requested publication; you are not transferring ownership to Sovran.",
+          "Do not use Sovran to share child sexual abuse material, sexual exploitation, non-consensual intimate imagery, pornography or sexually explicit nudity, gratuitous graphic violence, credible threats, harassment, hateful abuse, scams, malware, stolen material, or other unlawful content. Do not evade protective measures or interfere with other users or services.",
+          "Use a post or profile’s report and block controls for objectionable content. A Nostr report is a public signed event that can identify you and the reported account or post. It is not a private complaint or a guarantee that a relay or moderator will act. You can also contact the operator above for concerns about Sovran-operated services. Blocking hides supported content in your app; it does not erase it from the network or stop someone using another identity.",
+          "For services under our control, we may restrict content or access where reasonably necessary to address unlawful activity, these rules, or security threats. We will explain the reason where appropriate and legally permitted. Contact us to challenge a restriction. We cannot remove every copy held by independent services or recipients."
+        ]
+      },
+      {
+        "title": "6. Availability, changes, and stopping use",
+        "paragraphs": [
+          "We maintain evolving software and cannot promise that every feature will always be available or free of defects. Keep backups and install appropriate security updates. We will give reasonable notice of significant changes or discontinuation where practicable; urgent security or legal issues may require faster action. Changes do not retrospectively remove accrued rights or change an already completed purchase.",
+          "Each app version includes copies of these terms and the Privacy Policy. When an installed update changes either document, the app asks you to review and confirm again. Website changes alone do not silently record agreement in an older app. You may read both documents in Settings or at https://sovran.money/terms and https://sovran.money/privacy.",
+          "If you do not agree to new terms, stop using the affected services. The review screen offers access to existing recovery information without recording agreement. Secure your keys and funds before deleting local data. Removing the app or a local profile does not reverse payments or erase public network records."
+        ]
+      },
+      {
+        "title": "7. Responsibility and your legal rights",
+        "paragraphs": [
+          "The risk notices explain the limitations of experimental software and independent networks. They do not make you waive all claims against us. We are not responsible for loss caused solely by an independent third party or by your own actions where we have not breached a duty owed to you. This does not excuse our own failure to exercise legally required care or perform obligations we have undertaken.",
+          "Nothing here excludes liability for fraud, fraudulent misrepresentation, death or personal injury caused by negligence, or any liability that the law does not allow us to exclude. Mandatory consumer rights concerning digital content, services, accuracy of descriptions, reasonable care, and remedies remain available. We do not impose a blanket indemnity, mandatory paid arbitration, or a waiver of class or collective rights.",
+          "If a problem arises, contact the operator above with non-secret details. Trying to resolve it with us is optional and does not restrict your right to approach a regulator or competent court. Applicable law determines jurisdiction and your rights; these terms do not require consumers to give up mandatory protections in their country. If a provision is invalid, the remaining provisions apply where they can lawfully do so."
+        ]
+      },
+      {
+        "title": "8. Software licenses",
+        "paragraphs": [
+          "The source code and included third-party components remain subject to their respective open-source licenses. These terms govern the services and user conduct; they do not revoke permissions granted by those licenses. Independently operated forks and third-party deployments are not automatically operated or endorsed by Sovran."
+        ]
+      }
+    ]
+  },
+  "privacy": {
+    "title": "Privacy Policy",
+    "updated": "2026-09-10",
+    "summary": "Explains what stays on your device, what goes to services and public networks, and how to manage or request deletion of your data.",
+    "sections": [
+      {
+        "title": "1. Who is responsible and what this covers",
+        "paragraphs": [
+          "This policy covers the Sovran app and sovran.money website. The operator identified above is responsible for personal information it processes for its own services. Independent mints, relays, indexers, media hosts, AI providers, carriers, remote signers, and app stores may act as separate controllers under their own policies. Contact the operator above for privacy questions or requests.",
+          "A public key, wallet identifier, IP address, or payment record can be personal information even if it does not contain your real name. Sovran is not anonymous by default. Information leaves your device when the app communicates with services, including default services used to load content. Acknowledging this notice is not consent to every use of personal information."
+        ]
+      },
+      {
+        "title": "2. Information stored on your device",
+        "paragraphs": [
+          "The app stores wallet settings, local profiles, keys or signer connection information, ecash proofs, transaction records, cached social content and messages, AI conversations, moderation preferences, and document acceptance records. Private key material held by the app uses operating-system secure storage; other app data uses local databases, files, or settings storage. Not all local app data is encrypted by Sovran.",
+          "Locally held recovery phrases and private keys are not intended to be uploaded as part of ordinary app operation. A remote signer, if used, holds its own key material. Copying, exporting, sharing, device backups, malware, or another person with access to your device can expose data. Do not paste secrets into posts, AI prompts, support requests, or untrusted apps. We cannot promise to recover locally lost keys."
+        ]
+      },
+      {
+        "title": "3. Wallet and payments",
+        "paragraphs": [
+          "Mints and payment providers receive the requests needed to issue, validate, swap, redeem, or pay with ecash. Depending on the operation these include proofs being spent, blinded outputs, invoices, payment destinations, amounts, timestamps, public locking keys, and network information such as your IP address. Ecash blinding limits certain links; it does not make every payment or network request untraceable.",
+          "Recipients receive what you send them, including payment requests, tokens, invoices, and any included message. Public zaps can associate your Nostr identity with a recipient and amount. On-chain services and the blockchain can reveal transaction information publicly and permanently. Exchange-rate, mint-discovery, auditing, swap-routing, and merchant-map services receive requests needed for those features. Do not publish bearer tokens unless you intend others to redeem them."
+        ]
+      },
+      {
+        "title": "4. Social profiles, feeds, and media",
+        "paragraphs": [
+          "Publishing to Nostr sends signed events to relays. Public events may contain your public key, profile name, biography, picture, website, payment address, posts, images or media links, follows, reactions, and timestamps. Other users, indexers, search services, and anyone accessing those relays may read and copy them. Public content can be associated with your activity across apps.",
+          "Loading feeds, profiles, searches, notifications, and threads sends queries and identifiers to configured aggregators, caches, and relays. Defaults include Sovran’s Nagg service, Primal, and public Nostr relays. Operators can observe requested public keys or events, search terms, connection times, and IP addresses. Network settings and relay selection affect which services receive requests.",
+          "Nagg also records a viewer public key and last-seen time on certain requests to recognize active users and retain content relevant to them. This can associate use of Sovran with that public key.",
+          "Selected uploads go to a media server, by default Primal’s Blossom server, or the configured alternative. Uploaded files may be publicly retrievable by URL and may contain identifying details or embedded metadata; do not assume these are stripped. Viewing remote images, video, avatars, previews, or web pages contacts their host and may disclose your IP address and requested resource. Removing a post does not necessarily delete its uploaded file."
+        ]
+      },
+      {
+        "title": "5. Messages, reports, and blocks",
+        "paragraphs": [
+          "Supported private Nostr messages are encrypted on the device for their recipients. Relays store or forward encrypted events and may see routing information and connection metadata. Encryption does not prevent recipients from copying messages, compromised devices from exposing them, or linked and uploaded media from being fetched separately. Public chats are not private messages. Experimental messaging transports may have different metadata protections.",
+          "Reporting publishes a signed Nostr report that identifies the reporter and reported user or event and includes a reason. Do not include private messages or sensitive details in public reports. Contacting the operator directly sends the information you include and your contact details to the operator and its communications provider.",
+          "Blocking takes effect locally first. The app attempts to sync your Nostr mute list; newly added private entries are encrypted for your identity, while existing public entries from other clients may remain public. Relays still see event metadata. The optional private-message word filter works locally; it does not send a dictionary or the matched plaintext to a moderation service."
+        ]
+      },
+      {
+        "title": "6. Optional location, nearby communication, and device access",
+        "paragraphs": [
+          "Device permissions are requested for features such as camera scanning, choosing or recording media, location, and nearby Bluetooth communication. Granting an operating-system permission does not make everything captured by the sensor public; what is transmitted depends on the feature you use. You can change permissions in device settings.",
+          "Location-based BitChat channels use a geographic cell derived from your location. Joining or posting to a cell can disclose your area to relays and participants, including precise, block-level location. Resolving place names also uses the operating system’s reverse-geocoding service, which may send coordinates to its geocoding provider. A public post with a geographic tag remains public after you leave. Nearby Bluetooth communication exposes presence and relevant identifiers or messages to nearby devices and relaying peers. It does not guarantee anonymity.",
+          "The payment-location setting is separate from public location chat. Locally stored payment location is used to show your own payment history; it is not permission to publish that history. Merchant maps may fetch map tiles or nearby merchant information from external providers. Disable features you do not want and review the specific disclosure before sharing location."
+        ]
+      },
+      {
+        "title": "7. AI and eSIM services",
+        "paragraphs": [
+          "Using AI sends your prompt, selected conversation history, model choice, and selected attachments to the configured Routstr endpoint and the model services it uses. The default endpoint is api.routstr.com. These providers process the plaintext needed to answer and can receive request metadata and credit or payment credentials. Provider retention and training policies are their own; do not assume that paying with ecash makes the prompt private or prevents retention.",
+          "eSIM browsing, quoting, ordering, and installation involve Sovran’s eSIM service and its provisioning or payment partners. Requests and records can include package choices, invoice or order identifiers, payment status, activation information, and network metadata. A carrier processes additional connectivity and device information when you use its network. Do not share an order link or activation code; possession may allow access to the order or service."
+        ]
+      },
+      {
+        "title": "8. Website, diagnostics, and support",
+        "paragraphs": [
+          "Our production hosting provider, Railway, and other website and API hosts receive network requests, including IP addresses, URLs, timestamps, and technical browser or device information. Website local storage remembers preferences such as language. Opening checkout pages sends the order or invoice identifiers in their URLs to the services handling them.",
+          "Builds that expose diagnostic tools include local logging and export; persistent developer logging is not a standard production feature. An export you choose to share can contain sensitive wallet or activity information; review it and use a private channel. App stores and operating systems may separately collect crash, installation, or diagnostic information according to their settings and policies. This policy does not promise that independent infrastructure keeps no access logs.",
+          "Support and privacy requests include the contact information and details you supply. We use those details to respond, investigate a problem, and handle the request. Never send a recovery phrase, private key, bearer token, or complete unredacted wallet database to support."
+        ]
+      },
+      {
+        "title": "9. Purposes, legal bases, and recipients",
+        "paragraphs": [
+          "For processing under our control, we use information to provide requested features and purchases, respond to support, maintain service security and reliability, address abuse, and comply with legal obligations. Where UK or EU data-protection law applies, the relevant bases are performance of a contract for requested services, legitimate interests in service reliability, recognizing active users and retaining content relevant to them, security, and support where those interests do not override your rights, legal obligations where applicable, and consent where a specific optional activity requires it. A terms checkbox is not a substitute for such consent.",
+          "Information reaches the recipients described in the feature sections, infrastructure providers supporting our services, and authorities where disclosure is legally required. Public publication deliberately makes information available to others. An independent service you choose is governed by its own terms; this does not remove our obligations for processing that we control.",
+          "Public networks and independent service providers can operate in other countries with different privacy laws. You cannot limit a public Nostr event to one country. Our website and api.sovran.money services are configured in Railway’s Amsterdam region, but this does not mean all hosting-provider processing stays in the Netherlands. Railway’s published Data Processing Addendum describes processing in the United States and safeguards for applicable transfers, including standard contractual clauses and the UK Addendum. You can read those terms at https://railway.com/legal/dpa or contact us for information about safeguards for a particular service. Independent services you use have their own transfer arrangements."
+        ]
+      },
+      {
+        "title": "10. Retention and deletion",
+        "paragraphs": [
+          "Local records remain until removed by the app’s cache management, by you, or by deleting app data. Operating-system backups and secure storage may survive some reinstalls. Settings → Delete account attempts to remove local profiles, settings, secure keys, and wallet databases; filesystem caches, diagnostic exports, backups, or data whose cleanup failed may remain. Move funds and back up necessary keys first. It does not close every account with an external service.",
+          "Public events and third-party copies may be retained indefinitely. Nostr deletion requests cannot compel every relay, indexer, or recipient to delete a copy. Settings → My media can request deletion of supported uploads from their original server; other copies may remain. Blocking is not deletion. Blockchain records cannot be erased by Sovran.",
+          "We do not automatically export production server logs to another logging service or storage destination outside Railway. Railway currently makes seven days of log history available under our hosting plan. Its documentation says upgrading can make older logs accessible, so this window is not a guarantee that all copies are permanently erased after seven days. Other records, including database entries, support correspondence, and copies held by independent services, have separate retention arrangements.",
+          "For records under our control, retention depends on the purpose: service records for the period needed to deliver and reconcile the service, support correspondence while resolving the request and related disputes, security records while investigating or preventing abuse, and records required by law for the applicable legal period. These are purpose-based retention criteria, not a single deletion deadline for all data. Contact us for the retention period applicable to your request or order. Independent providers set their own retention periods.",
+          "To request access or deletion of information held by Sovran, email the address above with your public identifier or order reference where relevant. Do not send secret credentials. We may request proportionate proof that you control the relevant account. We will explain if a legal obligation or another valid exception prevents deletion. You can use this contact route without reinstalling or signing into the app."
+        ]
+      },
+      {
+        "title": "11. Your choices and rights",
+        "paragraphs": [
+          "You can limit optional features, adjust network settings, revoke device permissions, remove local data, and stop using a service. These choices do not recall information already published or delivered. Where processing relies on consent, you may withdraw it without affecting earlier lawful processing.",
+          "Your right to object: where we rely on legitimate interests, you may object to processing based on your particular situation. We must stop unless we demonstrate compelling legitimate grounds that override your interests, rights and freedoms, or need the processing for legal claims. You can always object to processing for direct marketing. Contact the operator above to make an objection.",
+          "Depending on the law that applies, you may have rights to access, correct, erase, or receive a portable copy of your information, restrict processing, and complain to your data-protection authority. Contact the operator above to exercise rights. You do not need to waive these rights to use Sovran.",
+          "You may complain to the UK Information Commissioner’s Office (ICO) at https://ico.org.uk/make-a-complaint/ or to another competent data-protection authority. You do not have to contact us first.",
+          "Sovran is intended for adults aged 18 or over. If you believe a child has provided personal information to a Sovran-operated service, contact us. Public content, payment risks, and external services make this app unsuitable for children."
+        ]
+      },
+      {
+        "title": "12. Updates to this policy",
+        "paragraphs": [
+          "The date and content revision identify this policy. The app asks you to acknowledge a changed policy when you install an update containing it, separately from agreeing to the terms. A website update does not silently record acknowledgment on your device. Acknowledgment records the version and time locally; it does not authorize new optional processing. Where a change requires fresh consent or a prominent feature-specific disclosure, that must be obtained separately before the affected processing."
+        ]
+      }
+    ]
+  }
+}

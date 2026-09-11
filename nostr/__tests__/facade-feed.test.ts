@@ -247,6 +247,27 @@ describe('NostrDataLayer.getFeedPage — nagg tier end to end', () => {
 describe('nagg tier cooldown circuit-breaker', () => {
   const FEED_SPEC = { kind: 'for-you', viewerPubkey: PUB } as const;
 
+  test('an in-flight success closes a cooldown armed by concurrent failures', async () => {
+    let finishHealthy!: (response: Response) => void;
+    let calls = 0;
+    const tier = createNaggTier({ client: createNaggClient({
+      appView: { baseUrl: 'https://nagg.test' },
+      fetchImpl: (async () => {
+        calls += 1;
+        if (calls === 1) return new Promise<Response>((resolve) => { finishHealthy = resolve; });
+        if (calls <= 3) throw new Error('temporary network failure');
+        return jsonResponse(FEED_ENVELOPE);
+      }) as unknown as typeof fetch,
+    }) });
+    const healthy = tier.feedPage!({ spec: FEED_SPEC });
+    await tier.feedPage!({ spec: FEED_SPEC });
+    await tier.feedPage!({ spec: FEED_SPEC });
+    finishHealthy(jsonResponse(FEED_ENVELOPE));
+    expect((await healthy).kind).toBe('answered');
+    expect((await tier.feedPage!({ spec: FEED_SPEC })).kind).toBe('answered');
+    expect(calls).toBe(4);
+  });
+
   test('consecutive network failures arm the cooldown; subsequent reads short-circuit without fetching', async () => {
     let fetchCalls = 0;
     const client = createNaggClient({

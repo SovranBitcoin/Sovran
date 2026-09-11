@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "id": "settings.legal.navigate",
+  "name": "Read Terms and Privacy from Settings",
+  "description": "Open both bundled legal documents, scroll to their final paragraphs, and return to Settings.",
+  "details": "Candidate for both native drivers. Uses only gestures and existing source selectors; fake-driver execution does not prove native AX reachability.",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"ACCOUNT"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"settings-terms-row"},"attempts":8,"settleMs":1000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-terms-row"}}],"until":{"id":"legal-document-terms"},"attempts":4,"settleMs":1500},
+    {"action":"screenshot","name":"settings-terms"},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}},{"swipe":{"dir":"up"}},{"swipe":{"dir":"up"}},{"swipe":{"dir":"up"}}],"until":{"id":"legal-document-end-terms"},"attempts":8,"settleMs":500},
+    {"action":"screenshot","name":"settings-terms"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"flow-header-back"}}],"until":{"id":"settings-terms-row"},"attempts":4,"settleMs":1500},
+    {"action":"screenshot","name":"settings"},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"settings-privacy-row"},"attempts":8,"settleMs":1000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-privacy-row"}}],"until":{"id":"legal-document-privacy"},"attempts":4,"settleMs":1500},
+    {"action":"screenshot","name":"settings-privacy"},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}},{"swipe":{"dir":"up"}},{"swipe":{"dir":"up"}},{"swipe":{"dir":"up"}}],"until":{"id":"legal-document-end-privacy"},"attempts":8,"settleMs":500},
+    {"action":"screenshot","name":"settings-privacy"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"flow-header-back"}}],"until":{"id":"settings-privacy-row"},"attempts":4,"settleMs":1500},
+    {"action":"screenshot","name":"settings"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

@@ -1,3 +1,9 @@
+import {
+  openWebSocket,
+  sendWebSocket,
+  closeWebSocket,
+  type WebSocketLike,
+} from '../websocket';
 import { parseWireFrame } from '../wire-frame';
 import { ok, err, type Result } from 'neverthrow';
 import { DEFAULT_TIMEOUT_MS, type RequestControls } from '../../timeout';
@@ -71,15 +77,6 @@ export interface PrimalConnection {
 // Bun, and modern Node — so no transport dependency is added.
 // ---------------------------------------------------------------------------
 
-type WebSocketLike = {
-  send(data: string): void;
-  close(): void;
-  onopen: ((ev: unknown) => void) | null;
-  onmessage: ((ev: { data: unknown }) => void) | null;
-  onerror: ((ev: unknown) => void) | null;
-  onclose: ((ev: unknown) => void) | null;
-};
-
 export type PrimalWebSocketConfig = {
   /** Primal cache WebSocket URL, e.g. `wss://cache2.primal.net/v1`. */
   url: string;
@@ -93,6 +90,15 @@ export function createPrimalWebSocketConnection(config: PrimalWebSocketConfig): 
 
   return {
     request(request, controls) {
+      if (controls?.signal?.aborted) {
+        return Promise.resolve(
+          err<RawPrimalEvent[], NaggError>({
+            type: 'network',
+            message: 'Primal request aborted',
+            cause: controls.signal.reason,
+          }),
+        );
+      }
       if (!Ctor) {
         return Promise.resolve(
           err<RawPrimalEvent[], NaggError>({
@@ -109,7 +115,12 @@ export function createPrimalWebSocketConnection(config: PrimalWebSocketConfig): 
         let settled = false;
         const startedAt = Date.now();
         nostrLog.debug('nostr.primal.connect', { url: config.url, verb: request.verb, subId });
-        const socket = new Ctor(config.url);
+        const opened = openWebSocket(Ctor, config.url);
+        if (opened.isErr()) {
+          resolve(err(opened.error));
+          return;
+        }
+        const socket = opened.value;
 
         const timeoutMs = controls?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
         const timer = setTimeout(
@@ -121,30 +132,30 @@ export function createPrimalWebSocketConnection(config: PrimalWebSocketConfig): 
           if (settled) return;
           settled = true;
           clearTimeout(timer);
+          controls?.signal?.removeEventListener('abort', onAbort);
           nostrLog.debug('nostr.primal.finish', {
             subId,
             ok: result.isOk(),
             events: events.length,
             durationMs: Date.now() - startedAt,
           });
-          try {
-            socket.close();
-          } catch {
-            // ignore close errors
-          }
+          closeWebSocket(socket);
           resolve(result);
         }
 
-        controls?.signal?.addEventListener('abort', () =>
-          finish(err({ type: 'network', message: 'Primal request aborted', cause: undefined })),
-        );
+        const onAbort = () =>
+          finish(err({ type: 'network', message: 'Primal request aborted', cause: controls?.signal?.reason }));
+        controls?.signal?.addEventListener('abort', onAbort, { once: true });
 
         socket.onopen = () => {
+          if (settled) return;
           nostrLog.debug('nostr.primal.req', { subId, verb: request.verb });
-          socket.send(JSON.stringify(['REQ', subId, { cache: [request.verb, request.params] }]));
+          const sent = sendWebSocket(socket, ['REQ', subId, { cache: [request.verb, request.params] }]);
+          if (sent.isErr()) finish(err(sent.error));
         };
 
         socket.onmessage = (event) => {
+          if (settled) return;
           const message = parseWireFrame(event.data);
           if (!message || message[1] !== subId) return;
           if (message[0] === 'EVENT' && message[2] && typeof message[2] === 'object') {

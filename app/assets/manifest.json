@@ -1,0 +1,343 @@
+{
+  "version": 1,
+  "generator": "scripts/assets.mjs",
+  "policy": "PNG density variants preserve aspect ratio and transparency; sources are immutable; static require of image.png selects density. Native exports are explicit exceptions.",
+  "assets": [
+    {
+      "id": "demo/06b7819d7f1c7f5472118266ed7bca8785dceae09e36ea3a4af665c6d1d8327c",
+      "role": "avatar",
+      "source": "demo/06b7819d7f1c7f5472118266ed7bca8785dceae09e36ea3a4af665c6d1d8327c/source.png",
+      "sourceSha256": "f4b758a52c40b729a9001cb88ff331308fe2b0472b0375922a6b7cf418531952",
+      "sourceSize": [982, 948],
+      "baseSize": [133, 128],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "sourceUrl": "https://raw.githubusercontent.com/trbouma/assets/main/profile_pic_crop.png",
+        "license": "Publicly available third-party demo media; no separate license assertion",
+        "snapshot": "shared/stores/runtime/fixtures/publicDemoSnapshot.json"
+      }
+    },
+    {
+      "id": "demo/1b7fce2b8c700773f89fa0c3f5a5921b5e3610e1c80c059dc3bd086420dd5114",
+      "role": "avatar",
+      "source": "demo/1b7fce2b8c700773f89fa0c3f5a5921b5e3610e1c80c059dc3bd086420dd5114/source.png",
+      "sourceSha256": "0c4c62b1beffc88c78ce6298b098f5364c4ef63dee51014db281d107790dcb1e",
+      "sourceSize": [1586, 992],
+      "baseSize": [205, 128],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "sourceUrl": "https://blossom.primal.net/0c4c62b1beffc88c78ce6298b098f5364c4ef63dee51014db281d107790dcb1e.png",
+        "license": "Publicly available third-party demo media; no separate license assertion",
+        "snapshot": "shared/stores/runtime/fixtures/publicDemoSnapshot.json"
+      }
+    },
+    {
+      "id": "demo/1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2",
+      "role": "avatar",
+      "source": "demo/1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2/source.png",
+      "sourceSha256": "6bf922b8fa44d126270a1f5db09c1182bc8bafe62ed98790bd5ba4b08b728533",
+      "sourceSize": [631, 709],
+      "baseSize": [128, 144],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "sourceUrl": "https://blossom.primal.net/6bf922b8fa44d126270a1f5db09c1182bc8bafe62ed98790bd5ba4b08b728533.png",
+        "license": "Publicly available third-party demo media; no separate license assertion",
+        "snapshot": "shared/stores/runtime/fixtures/publicDemoSnapshot.json"
+      }
+    },
+    {
+      "id": "demo/2efaa715bbb46dd5be6b7da8d7700266d11674b913b8178addb5c2e63d987331",
+      "role": "avatar",
+      "source": "demo/2efaa715bbb46dd5be6b7da8d7700266d11674b913b8178addb5c2e63d987331/source.jpg",
+      "sourceSha256": "a0003bbee6f9fb940d1db4074ff72b84fe0476469e17d978129d0c7d456d2aa3",
+      "sourceSize": [2047, 2048],
+      "baseSize": [128, 128],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "sourceUrl": "https://vcavallo.nyc3.cdn.digitaloceanspaces.com/images/denim-shirt-sideways.jpeg",
+        "license": "Publicly available third-party demo media; no separate license assertion",
+        "snapshot": "shared/stores/runtime/fixtures/publicDemoSnapshot.json"
+      }
+    },
+    {
+      "id": "demo/3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
+      "role": "avatar",
+      "source": "demo/3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d/source.jpg",
+      "sourceSha256": "b6a241c973e73fd40d79168a750ab9e28a0945f790bb6c022c88cfe9c39693c4",
+      "sourceSize": [800, 600],
+      "baseSize": [171, 128],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "sourceUrl": "https://fiatjaf.com/static/favicon.jpg",
+        "license": "Publicly available third-party demo media; no separate license assertion",
+        "snapshot": "shared/stores/runtime/fixtures/publicDemoSnapshot.json"
+      }
+    },
+    {
+      "id": "demo/43baaf0c28e6cfb195b17ee083e19eb3a4afdfac54d9b6baf170270ed193e34c",
+      "role": "avatar",
+      "source": "demo/43baaf0c28e6cfb195b17ee083e19eb3a4afdfac54d9b6baf170270ed193e34c/source.png",
+      "sourceSha256": "c2d8ea95568005e1e1d9e303f48431dcee3caf1c0fcb295e172b83cf48ba5a6a",
+      "sourceSize": [1772, 1772],
+      "baseSize": [128, 128],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "sourceUrl": "https://blossom.primal.net/c2d8ea95568005e1e1d9e303f48431dcee3caf1c0fcb295e172b83cf48ba5a6a.png",
+        "license": "Publicly available third-party demo media; no separate license assertion",
+        "snapshot": "shared/stores/runtime/fixtures/publicDemoSnapshot.json"
+      },
+      "equivalentExportHashes": {
+        "image@3x.png": [
+          "e67ba4038a1ea81d6050f323d559fb4d09af615005786773c9575819d2446a1b",
+          "8ae53e2430e2fecb7bb2c0ec6a4d03eb3c696fd011e70ab63ecbaa2f40dc9698"
+        ]
+      }
+    },
+    {
+      "id": "demo/50d94fc2d8580c682b071a542f8b1e31a200b0508bab95a33bef0855df281d63",
+      "role": "avatar",
+      "source": "demo/50d94fc2d8580c682b071a542f8b1e31a200b0508bab95a33bef0855df281d63/source.jpg",
+      "sourceSha256": "d2928abff4298e1102c1f90e202edc651c806d87f2f07ff967f90ae764458a90",
+      "sourceSize": [460, 460],
+      "baseSize": [128, 128],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "sourceUrl": "https://avatars.githubusercontent.com/u/93376500",
+        "license": "Publicly available third-party demo media; no separate license assertion",
+        "snapshot": "shared/stores/runtime/fixtures/publicDemoSnapshot.json"
+      }
+    },
+    {
+      "id": "demo/82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2",
+      "role": "avatar",
+      "source": "demo/82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2/source.jpg",
+      "sourceSha256": "d54985d4c913a6233f038e660cf87557cc9965dae03d9fd8fafd97e549948895",
+      "sourceSize": [1440, 960],
+      "baseSize": [192, 128],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "sourceUrl": "https://image.nostr.build/26867ce34e4b11f0a1d083114919a9f4eca699f3b007454c396ef48c43628315.jpg",
+        "license": "Publicly available third-party demo media; no separate license assertion",
+        "snapshot": "shared/stores/runtime/fixtures/publicDemoSnapshot.json"
+      }
+    },
+    {
+      "id": "demo/9cdb46b00b3bcda4220e256c55f7b630a9a3392e7b6b331a33a36b3dbe6bacff",
+      "role": "avatar",
+      "source": "demo/9cdb46b00b3bcda4220e256c55f7b630a9a3392e7b6b331a33a36b3dbe6bacff/source.png",
+      "sourceSha256": "49277922da98e4752b1f1bd621315e7ce4fa69d0ab6755a168f67bc9cf9478b8",
+      "sourceSize": [1024, 1536],
+      "baseSize": [128, 192],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "sourceUrl": "https://blossom.primal.net/49277922da98e4752b1f1bd621315e7ce4fa69d0ab6755a168f67bc9cf9478b8.png",
+        "license": "Publicly available third-party demo media; no separate license assertion",
+        "snapshot": "shared/stores/runtime/fixtures/publicDemoSnapshot.json"
+      }
+    },
+    {
+      "id": "demo/c673ff0b5f228feb0abb1001882178d4c588bc4e50f857173544b5543b454f81",
+      "role": "avatar",
+      "source": "demo/c673ff0b5f228feb0abb1001882178d4c588bc4e50f857173544b5543b454f81/source.jpg",
+      "sourceSha256": "5ed0319c7cd57d0e238cb2013a08da42eb7a8f4eef66ccbfdd43d671cab55cd1",
+      "sourceSize": [400, 400],
+      "baseSize": [128, 128],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "sourceUrl": "https://pbs.twimg.com/profile_images/1763562765942194176/NVeassdt.jpg",
+        "license": "Publicly available third-party demo media; no separate license assertion",
+        "snapshot": "shared/stores/runtime/fixtures/publicDemoSnapshot.json"
+      }
+    },
+    {
+      "id": "demo/c7fe92f80c516c0c54b15e8d256ac07281036d934ea1ff39fb0cd8a0fd677736",
+      "role": "avatar",
+      "source": "demo/c7fe92f80c516c0c54b15e8d256ac07281036d934ea1ff39fb0cd8a0fd677736/source.jpg",
+      "sourceSha256": "2d8cc31108e623513a9e36522bd115433cff7f4dc3170f608b631b0bd12a3795",
+      "sourceSize": [400, 400],
+      "baseSize": [128, 128],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "sourceUrl": "https://pbs.twimg.com/profile_images/1362807900352245760/Orl7_huJ.jpg",
+        "license": "Publicly available third-party demo media; no separate license assertion",
+        "snapshot": "shared/stores/runtime/fixtures/publicDemoSnapshot.json"
+      }
+    },
+    {
+      "id": "demo/c8383d81dd24406745b68409be40d6721c301029464067fcc50a25ddf9139549",
+      "role": "avatar",
+      "source": "demo/c8383d81dd24406745b68409be40d6721c301029464067fcc50a25ddf9139549/source.gif",
+      "sourceSha256": "562c13fc85cd0047c3f112760bf6955c434631a6acb32b6ae6a8c132385db22d",
+      "sourceSize": [150, 150],
+      "baseSize": [50, 50],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "sourceUrl": "https://blossom.primal.net/562c13fc85cd0047c3f112760bf6955c434631a6acb32b6ae6a8c132385db22d.gif",
+        "license": "Publicly available third-party demo media; no separate license assertion",
+        "snapshot": "shared/stores/runtime/fixtures/publicDemoSnapshot.json",
+        "rendering": "First animation frame; original animation retained"
+      },
+      "frame": 0
+    },
+    {
+      "id": "demo/d679b0f4c94843077301c920480c9d2f2d12c9fa6d10352e134eb1c08229ac9a",
+      "role": "avatar",
+      "source": "demo/d679b0f4c94843077301c920480c9d2f2d12c9fa6d10352e134eb1c08229ac9a/source.gif",
+      "sourceSha256": "fefc3c021c67aaac62df865828ef8adcbbc64e7947e377a7287fbc435df061c4",
+      "sourceSize": [400, 400],
+      "baseSize": [128, 128],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "sourceUrl": "https://nostr.build/i/p/fefc3c021c67aaac62df865828ef8adcbbc64e7947e377a7287fbc435df061c4.gif",
+        "license": "Publicly available third-party demo media; no separate license assertion",
+        "snapshot": "shared/stores/runtime/fixtures/publicDemoSnapshot.json",
+        "rendering": "First animation frame; original animation retained"
+      },
+      "frame": 0
+    },
+    {
+      "id": "demo/e3fc673fc5f99cc554d0ff47756795647d25cb6e6658f912d114ae6429d35d35",
+      "role": "avatar",
+      "source": "demo/e3fc673fc5f99cc554d0ff47756795647d25cb6e6658f912d114ae6429d35d35/source.jpg",
+      "sourceSha256": "8c32b2227be7172ea86d05045c798f2819215a32e2efa2c0c7003f062eeb2b36",
+      "sourceSize": [460, 460],
+      "baseSize": [128, 128],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "sourceUrl": "https://m.primal.net/JfYR.jpg",
+        "license": "Publicly available third-party demo media; no separate license assertion",
+        "snapshot": "shared/stores/runtime/fixtures/publicDemoSnapshot.json"
+      }
+    },
+    {
+      "id": "demo/efcaeffafd9c673bd44cf1c1b50cffbf2291ec900c0b53e166688564897c7eaf",
+      "role": "avatar",
+      "source": "demo/efcaeffafd9c673bd44cf1c1b50cffbf2291ec900c0b53e166688564897c7eaf/source.webp",
+      "sourceSha256": "d9a6c3ec5ae8f35e77e295692b2018b18aa4de805aad8ab743b55078adcf1ed0",
+      "sourceSize": [512, 512],
+      "baseSize": [128, 128],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "sourceUrl": "https://storage.googleapis.com/geyser-images-distribution-prod-us/d67b3578-98de-482a-bffa-7f47aa166d48_1001321475/image_medium.webp",
+        "license": "Publicly available third-party demo media; no separate license assertion",
+        "snapshot": "shared/stores/runtime/fixtures/publicDemoSnapshot.json"
+      }
+    },
+    {
+      "id": "demo/feed-159",
+      "role": "feed",
+      "source": "demo/feed-159/source.jpg",
+      "sourceSha256": "08c708727000761d581cb7615806f66b3b14faa2415499bf568d3e8b25bb04f0",
+      "sourceSize": [3840, 2880],
+      "baseSize": [390, 292],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "sourceUrl": "https://image.nostr.build/73a0a70de41c73241f10ab42edddeab0f2f6566a3b760a9c4abf46df797f41c2.jpg",
+        "license": "Publicly available third-party demo media; no separate license assertion",
+        "snapshot": "shared/stores/runtime/fixtures/publicDemoSnapshot.json"
+      }
+    },
+    {
+      "id": "demo/feed-188",
+      "role": "feed",
+      "source": "demo/feed-188/source.jpg",
+      "sourceSha256": "ab4028a4b2d17241fe65fb15e2f53e32430772b8d8574fc3b601ed42fb32adbf",
+      "sourceSize": [3024, 4032],
+      "baseSize": [390, 520],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "sourceUrl": "https://blossom.primal.net/ab4028a4b2d17241fe65fb15e2f53e32430772b8d8574fc3b601ed42fb32adbf.jpg",
+        "license": "Publicly available third-party demo media; no separate license assertion",
+        "snapshot": "shared/stores/runtime/fixtures/publicDemoSnapshot.json"
+      }
+    },
+    {
+      "id": "demo/feed-24",
+      "role": "feed",
+      "source": "demo/feed-24/source.jpg",
+      "sourceSha256": "2571b9bab2f690baa59b9caf6eddff3c9c4da2ff9e464111485c5cbbb1b9bbaf",
+      "sourceSize": [1080, 1064],
+      "baseSize": [359, 354],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "sourceUrl": "https://i.nostr.build/UQ4RgnqRPRLd76eQJAeajy.jpg",
+        "license": "Publicly available third-party demo media; no separate license assertion",
+        "snapshot": "shared/stores/runtime/fixtures/publicDemoSnapshot.json"
+      }
+    },
+    {
+      "id": "demo/fictional-jamie",
+      "role": "avatar",
+      "source": "demo/fictional-jamie/source.png",
+      "sourceSha256": "74150e7bea465a402af59a6067afd3ee916a01b59e7e9d9e4a39a5d47996b1da",
+      "sourceSize": [1254, 1254],
+      "baseSize": [128, 128],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "origin": "Generated fictional portrait for screenshot demos, 2026-09-11",
+        "generator": "OpenAI image generation",
+        "identity": "Fictional; no real public-key attribution"
+      }
+    },
+    {
+      "id": "demo/fictional-leo",
+      "role": "avatar",
+      "source": "demo/fictional-leo/source.png",
+      "sourceSha256": "ae34026764a274a5de835689056a56325b2a43be995920bb25a35fa0467d1cf2",
+      "sourceSize": [1254, 1254],
+      "baseSize": [128, 128],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "origin": "Generated fictional portrait for screenshot demos, 2026-09-11",
+        "generator": "OpenAI image generation",
+        "identity": "Fictional; no real public-key attribution"
+      }
+    },
+    {
+      "id": "demo/fictional-maya",
+      "role": "avatar",
+      "source": "demo/fictional-maya/source.png",
+      "sourceSha256": "d5d2218cfd03291b5318665e63478b2b80623b98ad3545d973369cf1a460c84a",
+      "sourceSize": [1254, 1254],
+      "baseSize": [128, 128],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "origin": "Generated fictional portrait for screenshot demos, 2026-09-11",
+        "generator": "OpenAI image generation",
+        "identity": "Fictional; no real public-key attribution"
+      }
+    },
+    {
+      "id": "demo/fictional-sofia",
+      "role": "avatar",
+      "source": "demo/fictional-sofia/source.png",
+      "sourceSha256": "e4c5f74fe4ac3fbc1d261dca1742cc5c6ac0c40fdc9bfd66e123c747e18eddfe",
+      "sourceSize": [1254, 1254],
+      "baseSize": [128, 128],
+      "scales": [1, 2, 3],
+      "provenance": {
+        "origin": "Generated fictional portrait for screenshot demos, 2026-09-11",
+        "generator": "OpenAI image generation",
+        "identity": "Fictional; no real public-key attribution"
+      }
+    }
+  ],
+  "preserved": [
+    {
+      "path": "fonts/",
+      "policy": "Keep native font files and central static face registration; original font license records require follow-up."
+    },
+    {
+      "path": "icons/",
+      "policy": "Keep source SVGs and existing generated icon registry; see icons/internal/README.md."
+    },
+    {
+      "path": "patterns/",
+      "policy": "Keep the scalable SVG pattern; do not rasterize the wallpaper."
+    },
+    {
+      "path": "brand/",
+      "policy": "Canonical brand sources and explicit-dimension exports; owned by scripts/brand-assets.mjs and brand/generated/manifest.json."
+    }
+  ]
+}

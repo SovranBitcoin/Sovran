@@ -12,6 +12,7 @@ import { useDmEchoStore } from '@/shared/stores/runtime/dmEchoStore';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const PEER_PUBKEY = '22'.repeat(32);
+let mockDemoEnabled = false;
 const mockOwnPubkey = '11'.repeat(32);
 let mockActiveOwnPubkey = mockOwnPubkey;
 const SELF_WRAP_ID = 'self-wrap-1';
@@ -95,7 +96,7 @@ jest.mock('@/shared/providers/NostrKeysProvider', () => ({
 
 jest.mock('@/shared/stores/global/settingsStore', () => ({
   useSettingsStore: (selector: (state: { mockMode: boolean }) => unknown) =>
-    selector({ mockMode: false }),
+    selector({ mockMode: mockDemoEnabled }),
 }));
 
 jest.mock('@/shared/hooks/useNostrProfileMetadata', () => ({
@@ -116,8 +117,16 @@ jest.mock('@/shared/hooks/useGuardedRouter', () => ({
 
 jest.mock('@/shared/lib/cashu/npc', () => ({ getNpcAddress: () => undefined }));
 jest.mock('@/shared/stores/runtime/mockDataStore', () => ({
-  isMockContactPubkey: () => false,
-  getMockDmThread: () => undefined,
+  isMockContactPubkey: () => true,
+  getMockDmThread: () => [
+    {
+      id: 'demo-dm-fixture',
+      content: 'A demo message',
+      isOwn: false,
+      created_at: 1700000000,
+      pubkey: '22'.repeat(32),
+    },
+  ],
 }));
 jest.mock('@/shared/lib/popup', () => ({ staticPopup: jest.fn() }));
 jest.mock('@/shared/lib/logger', () => {
@@ -229,6 +238,7 @@ jest.mock('@/shared/ui/composed/chat', () => {
 
 describe('UserMessagesScreen optimistic DM echoes', () => {
   beforeEach(() => {
+    mockDemoEnabled = false;
     mockRefresh.mockReset();
     mockLoadMore.mockReset();
     useDmEchoStore.setState({ byThread: {} });
@@ -332,4 +342,21 @@ describe('UserMessagesScreen optimistic DM echoes', () => {
     expect(ownCashuBubbles(renderer!)).toHaveLength(0);
     expect(renderer!.root.findByProps({ testID: 'chat-screen' }).props.messageCount).toBe(0);
   });
+});
+
+it('removes demo messages when Mock Mode is disabled on the mounted conversation', async () => {
+  mockDemoEnabled = true;
+  mockThreadState = threadState();
+  mockUseDmThread.mockImplementation(() => mockThreadState);
+  let renderer: TestRenderer.ReactTestRenderer;
+  await act(async () => {
+    renderer = TestRenderer.create(<UserMessagesScreen pubkey={PEER_PUBKEY} protocol="nip17" />);
+  });
+  expect(renderer!.root.findByProps({ testID: 'chat-screen' }).props.messageCount).toBe(1);
+  mockDemoEnabled = false;
+  await act(async () => {
+    renderer!.update(<UserMessagesScreen pubkey={PEER_PUBKEY} protocol="nip17" />);
+  });
+  expect(renderer!.root.findByProps({ testID: 'chat-screen' }).props.messageCount).toBe(0);
+  await act(async () => renderer!.unmount());
 });

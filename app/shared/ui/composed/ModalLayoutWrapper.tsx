@@ -3,7 +3,7 @@
  * Handles safe areas, scroll behavior, header gradient, sticky content.
  */
 
-import { ReactNode, useContext, useEffect, useState } from 'react';
+import { type Ref, type RefObject, ReactNode, useContext, useEffect, useState } from 'react';
 import {
   Platform,
   ScrollView,
@@ -25,6 +25,7 @@ import { FLOW_SHEET_SCRIM_OVERHANG } from './FlowSheetHeader';
 import { Log, log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { zIndex } from '@/shared/styles/tokens';
+import { useScreenInsets } from '@/shared/hooks/useScreenInsets';
 
 /** Measured iOS flow-modal (pageSheet) header height — a STABLE, frame-0 value
  *  used instead of the navigator header height, which react-native-screens seeds
@@ -43,6 +44,8 @@ const IOS_MODAL_HEADER_HEIGHT = 70;
  * worklet (never read/written during render), so it's React Compiler safe.
  */
 function AnimatedScrollContainer({
+  scrollViewRef,
+  scrollContentRef,
   externalScrollY,
   contentContainerStyle,
   scrollIndicatorInsets,
@@ -50,6 +53,8 @@ function AnimatedScrollContainer({
   totalHeaderHeight,
   children,
 }: {
+  scrollViewRef?: Ref<ScrollView>;
+  scrollContentRef?: RefObject<View | null>;
   externalScrollY?: SharedValue<number>;
   contentContainerStyle: StyleProp<ViewStyle>;
   scrollIndicatorInsets?: { top?: number; right?: number; bottom?: number; left?: number };
@@ -68,6 +73,8 @@ function AnimatedScrollContainer({
 
   return (
     <Animated.ScrollView
+      ref={scrollViewRef}
+      innerViewRef={scrollContentRef as RefObject<View> | undefined}
       style={{ flex: 1 }}
       contentContainerStyle={contentContainerStyle}
       onScroll={animatedScrollHandler}
@@ -78,6 +85,7 @@ function AnimatedScrollContainer({
       // scroll back to the top) is read as a drag-to-dismiss and the sheet
       // closes. Ignored on iOS. See ModalLayoutWrapper's plain ScrollView too.
       nestedScrollEnabled
+      contentInsetAdjustmentBehavior="never"
       scrollIndicatorInsets={scrollIndicatorInsets}>
       {showHeaderSpacer && <View style={{ height: totalHeaderHeight }} />}
       {children}
@@ -86,6 +94,8 @@ function AnimatedScrollContainer({
 }
 
 interface ModalLayoutWrapperProps {
+  scrollViewRef?: Ref<ScrollView>;
+  scrollContentRef?: RefObject<View | null>;
   children: ReactNode;
   /** Additional horizontal padding for content container (default: 16) */
   contentPadding?: number;
@@ -105,6 +115,8 @@ interface ModalLayoutWrapperProps {
   bottomContent?: ReactNode;
   /** Bottom padding for scroll content (default: 120) */
   bottomPadding?: number;
+  /** Measured footer heights already include the safe inset. */
+  bottomPaddingIncludesInset?: boolean;
   /**
    * When true, do not insert the automatic header spacer in the scroll content.
    * Useful when the screen hides the native header (headerShown: false) but still uses Animated.ScrollView.
@@ -123,11 +135,13 @@ interface ModalLayoutWrapperProps {
   onHeaderHeightChange?: (height: number) => void;
   /** Insets for the scroll indicator (e.g., to offset below a sticky header overlay) */
   scrollIndicatorInsets?: { top?: number; right?: number; bottom?: number; left?: number };
-  /** Override the default background color (defaults to theme 'background') */
+  /** Override the default background color (defaults to theme 'surface') */
   bgColor?: string;
 }
 
 export function ModalLayoutWrapper({
+  scrollViewRef,
+  scrollContentRef,
   children,
   contentPadding = 16,
   headerGradient = false,
@@ -138,12 +152,14 @@ export function ModalLayoutWrapper({
   scrollY: externalScrollY,
   bottomContent,
   bottomPadding = 120,
+  bottomPaddingIncludesInset = false,
   disableHeaderSpacer = false,
   useCustomScrollView = false,
   onHeaderHeightChange,
   scrollIndicatorInsets,
   bgColor,
 }: ModalLayoutWrapperProps) {
+  const { bottom: bottomInset } = useScreenInsets();
   // Read the header height context directly with a fallback so this wrapper
   // is safe to render outside a Stack navigator (e.g., AppGate renders the
   // TermsAndConditionsScreen directly during onboarding before the user has
@@ -172,7 +188,7 @@ export function ModalLayoutWrapper({
   // deterministic SheetHeaderHeightContext value (already shift-free).
   const stableHeaderBottom =
     (Platform.OS === 'ios' ? IOS_MODAL_HEADER_HEIGHT : headerHeight) + androidSheetScrimOverhang;
-  const themeBackground = useThemeColor('background');
+  const themeBackground = useThemeColor('surface');
   const background = bgColor ?? themeBackground;
 
   // The animated-scroll shared value + handler live in AnimatedScrollContainer
@@ -216,7 +232,9 @@ export function ModalLayoutWrapper({
 
   const scrollContentStyle = {
     paddingHorizontal: contentPadding,
-    paddingBottom: bottomPadding,
+    paddingBottom: bottomPaddingIncludesInset
+      ? Math.max(0, bottomPadding - (!useAnimatedScroll && Platform.OS === 'ios' ? bottomInset : 0))
+      : bottomPadding + (useAnimatedScroll || Platform.OS !== 'ios' ? bottomInset : 0),
   };
 
   return (
@@ -251,6 +269,8 @@ export function ModalLayoutWrapper({
           <View style={{ flex: 1 }}>{children}</View>
         ) : useAnimatedScroll ? (
           <AnimatedScrollContainer
+            scrollViewRef={scrollViewRef}
+            scrollContentRef={scrollContentRef}
             externalScrollY={externalScrollY}
             contentContainerStyle={scrollContentStyle}
             scrollIndicatorInsets={scrollIndicatorInsets}
@@ -260,13 +280,16 @@ export function ModalLayoutWrapper({
           </AnimatedScrollContainer>
         ) : (
           <ScrollView
+            ref={scrollViewRef}
+            innerViewRef={scrollContentRef as RefObject<View> | undefined}
             className="flex-1"
             contentInsetAdjustmentBehavior="automatic"
             // Android: see the nested-scroll note on AnimatedScrollContainer
             // above — required so the native form-sheet scrolls the content
             // instead of dismissing when the user drags back toward the top.
             nestedScrollEnabled
-            contentContainerStyle={scrollContentStyle}>
+            contentContainerStyle={scrollContentStyle}
+            scrollIndicatorInsets={scrollIndicatorInsets}>
             {shouldRenderAndroidHeaderSpacer && <View style={{ height: totalHeaderHeight }} />}
             {children}
           </ScrollView>

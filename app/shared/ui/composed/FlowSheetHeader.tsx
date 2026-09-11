@@ -60,7 +60,7 @@ export const SCRIM_TOTAL_HEIGHT = FLOW_SHEET_HEADER_HEIGHT + 32;
 export const FLOW_SHEET_SCRIM_OVERHANG = SCRIM_TOTAL_HEIGHT - FLOW_SHEET_HEADER_HEIGHT;
 
 export function FlowSheetHeader({ back, options, route }: NativeStackHeaderProps) {
-  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
 
   const tintColor = options.headerTintColor ?? foreground;
   const titleColor =

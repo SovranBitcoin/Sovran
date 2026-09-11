@@ -1,3 +1,4 @@
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 /**
  * Drawer profile chrome: the top-of-drawer header. A single row with the
  * active-profile avatar on the left and the profile-switcher buttons on
@@ -23,6 +24,8 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { usePresentationPubkey } from '@/shared/hooks/usePresentationPubkey';
+import { DEMO_VIEWER_STATS } from '@/shared/stores/runtime/mockPublicProfile';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
@@ -81,21 +84,34 @@ function useProfileSwitcher(closeDrawer: () => void) {
         break;
       }
       case 'import': {
+        // Every bail here releases `switchingRef`. It is the re-entry guard
+        // for this whole handler, so one that returns while holding it makes
+        // every later profile action a silent no-op for as long as the drawer
+        // stays mounted.
         if (useProfileStore.getState().hasPubkey(action.pubkeyHex)) {
           staticPopup('key-import-failed', {
             text: 'This identity already exists as a profile.',
           });
+          switchingRef.current = false;
           return;
         }
 
         const stored = await storeImportedNsec(action.pubkeyHex, action.nsec);
         if (!stored) {
           staticPopup('key-import-failed', { text: 'Failed to store nsec securely.' });
+          switchingRef.current = false;
           return;
         }
 
-        if (!useProfileStore.getState().hasPubkey(action.pubkeyHex)) {
-          useProfileStore.getState().addProfile(action.accountIndex, action.pubkeyHex, 'imported');
+        if (
+          !useProfileStore.getState().hasPubkey(action.pubkeyHex) &&
+          !useProfileStore.getState().addProfile(action.accountIndex, action.pubkeyHex, 'imported')
+        ) {
+          // The nsec is already in SecureStore; without a profile row there is
+          // nothing to switch to, so say so rather than switch into nothing.
+          staticPopup('key-import-failed', { text: 'Profile limit reached.' });
+          switchingRef.current = false;
+          return;
         }
 
         const imported = await switchToImportedProfile({ accountIndex: action.accountIndex });
@@ -192,10 +208,13 @@ export function DrawerProfileChrome({ closeDrawer }: { closeDrawer: () => void }
   const { keys: nostrKeys } = useNostrKeysContext();
   const foreground = useThemeColor('foreground');
   const insets = useSafeAreaInsets();
-  const pubkey = nostrKeys?.pubkey ?? '';
+  const mockMode = useSettingsStore((state) => state.mockMode);
+  const pubkey = usePresentationPubkey(nostrKeys?.pubkey ?? '');
   const { displayName, picture } = useProfileDisplay(pubkey);
   const { metadata, isLoading: metaLoading } = useNostrProfileMetadata(pubkey || undefined);
-  const { data: socialData, isLoading: socialLoading } = useNostrProfile(pubkey || null);
+  const { data: socialData, isLoading: socialLoading } = useNostrProfile(
+    mockMode ? null : pubkey || null
+  );
   // Mirror UserProfileScreen: own following count comes from the local kind-3
   // contacts store (with optimistic adjustments), not from the backend's
   // `follows` field — the backend's view of the wallet's own follows can lag.
@@ -224,7 +243,7 @@ export function DrawerProfileChrome({ closeDrawer }: { closeDrawer: () => void }
     closeDrawer();
     router.navigate({
       pathname: '/(user-flow)/profile',
-      params: { pubkey: nostrKeys.pubkey },
+      params: { pubkey },
     });
   };
 
@@ -243,7 +262,7 @@ export function DrawerProfileChrome({ closeDrawer }: { closeDrawer: () => void }
         <Pressable onPress={handleAvatarPress} hitSlop={hitSlop.default}>
           <Avatar
             state={picture ? 'image' : 'fallback'}
-            seed={nostrKeys.pubkey}
+            seed={pubkey}
             picture={picture}
             name={displayName}
             size={56}
@@ -274,7 +293,7 @@ export function DrawerProfileChrome({ closeDrawer }: { closeDrawer: () => void }
       <HStack align="center" gap={spacing.lg}>
         <HStack align="baseline" gap={spacing.xs}>
           <Text bold size={14} style={{ color: foreground }}>
-            {ownFollowingCount.toLocaleString()}
+            {(mockMode ? DEMO_VIEWER_STATS.follows_count : ownFollowingCount).toLocaleString()}
           </Text>
           <Text size={14} style={{ color: mutedColor }}>
             Following
@@ -284,10 +303,14 @@ export function DrawerProfileChrome({ closeDrawer }: { closeDrawer: () => void }
           <Text
             bold
             size={14}
-            loading={socialLoading && !socialData}
+            loading={!mockMode && socialLoading && !socialData}
             placeholder="0000"
             style={{ color: foreground }}>
-            {socialData ? socialData.followers.toLocaleString() : ''}
+            {mockMode
+              ? DEMO_VIEWER_STATS.followers_count.toLocaleString()
+              : socialData
+                ? socialData.followers.toLocaleString()
+                : ''}
           </Text>
           <Text size={14} style={{ color: mutedColor }}>
             Followers

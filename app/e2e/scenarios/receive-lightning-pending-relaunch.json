@@ -9,7 +9,7 @@
   "requires": ["fresh-install","cocod.send.bolt11","unit.sat"],
   "funds": {"assets":[{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"maxPrincipal":25}]},
   "setup": [
-    {"use":"flow.onboard"}
+    {"use":"flow.onboard-sovran-mint"}
   ],
   "steps": [
     {"action":"screenshot","name":"wallet"},

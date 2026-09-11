@@ -8,10 +8,6 @@ export type AmountValue = AmountLike | null | undefined;
 // through them — thousands of calls per session), so they only log anomalies,
 // never successful conversions.
 
-export function toCocoAmount(value: AmountValue): number {
-  return amountToNumber(value);
-}
-
 export function amountToNumber(value: AmountValue): number {
   if (value == null) return 0;
   if (typeof value === 'number') {

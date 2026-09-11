@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { withAlpha } from '@/shared/lib/color';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useScreenBackground } from '@/shared/ui/composed/ScreenFooterContext';
 import {
   useVisualLayoutLogger,
   visualLayoutScopePart,
@@ -209,7 +210,8 @@ export function SkeletonLoadingShimmer({
   active: boolean;
   highlightColor?: string;
 } & SkeletonShimmerVisualProps) {
-  const background = useThemeColor('background');
+  const themeBackground = useThemeColor('surface');
+  const background = useScreenBackground() ?? themeBackground;
   const progress = useSharedValue(0);
   const { hostRef, onLayout } = useSkeletonShimmerVisualLayout({
     active,

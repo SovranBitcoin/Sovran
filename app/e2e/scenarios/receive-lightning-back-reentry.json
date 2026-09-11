@@ -8,7 +8,7 @@
   "tags": ["flow:receive","instrument:bolt11","amount:fixed","io:display","outcome:dismissed","check:navigation"],
   "requires": ["fresh-install","unit.sat"],
   "setup": [
-    {"use":"flow.onboard"}
+    {"use":"flow.onboard-sovran-mint"}
   ],
   "steps": [
     {"action":"screenshot","name":"wallet"},

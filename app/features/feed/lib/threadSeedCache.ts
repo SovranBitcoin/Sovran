@@ -46,3 +46,8 @@ export function consumeThreadSeed(eventId: string): ThreadSeed | undefined {
   if (seed) cache.delete(eventId);
   return seed;
 }
+
+/** Pure render-time read; consume only after the destination commits. */
+export function peekThreadSeed(eventId: string): ThreadSeed | undefined {
+  return cache.get(eventId);
+}

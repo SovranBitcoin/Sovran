@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import { parsePaymentError } from '@/shared/lib/popup/parsePaymentError';
+import { describeError } from '@/shared/lib/errors';
 import { paymentLog } from '@/shared/lib/logger';
 
 type PaymentStatusState = 'processing' | 'delivered' | 'waiting' | 'confirmed' | 'failed';
@@ -188,7 +188,7 @@ export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
         logSkip('payment.status.failed.skipped', s, id, 'terminal_or_waiting_state');
         return s;
       }
-      const errorMessage = error !== undefined ? parsePaymentError(error) : undefined;
+      const errorMessage = error !== undefined ? describeError(error, 'cashu').text : undefined;
       paymentLog.error('payment.status.failed', {
         id,
         variant: s.active.variant,

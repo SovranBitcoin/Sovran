@@ -14,7 +14,6 @@ import type { Selector } from '../../schema/selectors';
 import {
   classifyObservedState,
   elementTapCenter,
-  findElement,
   parseBalanceSat,
   toAxNode,
   type AxSnapshot,
@@ -32,7 +31,7 @@ import { E2E_READY_PROOF_STATUS_ID } from '../../../shared/lib/cashu/e2eReadyPro
 import type { E2EReadyProofAsset } from '../../../shared/lib/cashu/e2eProofReconciliationConfig';
 import type { Adb } from './adb';
 import type { AndroidClipboardChannel } from './clipboard';
-import { parseUiautomatorXml } from './ax-adapter';
+import { findAndroidElement, parseUiautomatorXml } from './ax-adapter';
 
 const SHOT_SETTLE_MS = 450;
 const REFRESH_CLEAR_MS = 1800;
@@ -253,7 +252,7 @@ export class AndroidDriver implements Driver {
       const snap = await this.#ax.snapshot(0).catch(() => null);
       if (snap) {
         if (await this.#dismissSystemInterrupt(snap)) continue;
-        const el = findElement(snap, sel);
+        const el = findAndroidElement(snap, sel);
         if (el && (state !== 'enabled' || el.enabled !== false)) {
           const node = toAxNode(el);
           if (value === undefined || node.value === value) return node;
@@ -279,7 +278,7 @@ export class AndroidDriver implements Driver {
       snap = await this.#ax.snapshot(0).catch(() => null);
     }
     if (!snap) return null;
-    const el = findElement(snap, sel);
+    const el = findAndroidElement(snap, sel);
     return el ? toAxNode(el) : null;
   }
 
@@ -290,7 +289,7 @@ export class AndroidDriver implements Driver {
       const snap = await this.#ax.snapshot(0).catch(() => null);
       if (snap) {
         if (await this.#dismissSystemInterrupt(snap)) continue;
-        const el = findElement(snap, sel);
+        const el = findAndroidElement(snap, sel);
         if (el) {
           return elementTapCenter(el, snap.screen);
         }
@@ -349,13 +348,13 @@ export class AndroidDriver implements Driver {
     durationMs = 800
   ): Promise<void> {
     const deadline = Date.now() + 4000;
-    let el = null as ReturnType<typeof findElement>;
+    let el = null as ReturnType<typeof findAndroidElement>;
     let snap: AxSnapshot | null = null;
     while (Date.now() < deadline) {
       this.#throwIfAborted();
       snap = await this.#ax.snapshot(0).catch(() => null);
       if (snap && (await this.#dismissSystemInterrupt(snap))) continue;
-      el = snap ? findElement(snap, sel) : null;
+      el = snap ? findAndroidElement(snap, sel) : null;
       if (snap && el) break;
       await sleep(this.#cfg.pollMs ?? 100);
     }

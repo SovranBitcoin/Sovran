@@ -14,7 +14,7 @@
 
 import React, { memo, useCallback, useEffect } from 'react';
 
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 import { type WalletContext } from 'wallet';
 import { type UseStandingPaymentRequestResult } from 'wallet/react';
@@ -34,6 +34,7 @@ import Icon from 'assets/icons';
 
 interface ReceivePaymentRequestTabProps {
   unit: string;
+  active?: boolean;
   walletContext: Pick<WalletContext, 'trustedMintUrls'>;
   /** Latest keyring P2PK pubkey (02-prefixed) — the only key coco's claim
    *  path can sign for (exact persisted-'p2pk' lookup). Absent → the lock
@@ -55,6 +56,7 @@ interface ReceivePaymentRequestTabProps {
 
 export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
   unit,
+  active = true,
   walletContext,
   p2pkKey,
   muted,
@@ -120,6 +122,8 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
     </View>
   );
 
+  if (!active) return null;
+
   if (mints.length === 0) {
     return renderEmptyState(
       'Add a mint to receive Cashu payment requests.',
@@ -151,7 +155,12 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
 
   return (
     <>
-      <PaymentInfo data={request.encodedRequest} copyTarget="paymentRequest" unit={unit} />
+      <PaymentInfo
+        active={active}
+        data={request.encodedRequest}
+        copyTarget="paymentRequest"
+        unit={unit}
+      />
       {/* Same 12px offset the QR speed controls use; the Section below
           brings its own py-3, keeping the gaps symmetric. */}
       <View style={{ marginTop: 12 }}>

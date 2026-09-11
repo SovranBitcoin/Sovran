@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { AppState, Platform, StyleSheet, View } from 'react-native';
 import * as Network from 'expo-network';
 import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,7 +22,8 @@ const OfflineContext = createContext<OfflineContextValue>({ isOffline: false });
 
 const BORDER_WIDTH = 2;
 const BANNER_HEIGHT = 14;
-const CONNECTIVITY_POLL_MS = 3000;
+const CONNECTIVITY_POLL_MS = 60_000;
+const OFFLINE_RETRY_MS = 3000;
 // Offline hysteresis: going offline must be CONFIRMED (consecutive failed
 // evaluations spanning a minimum window) while coming back online is instant.
 // Android's network listener fires per transport change (Wi-Fi<->cell, VPN,
@@ -83,12 +84,15 @@ function summarizeReachability(result: OfflineReachabilityResult) {
 // Compiler can't lower, and inside the component it bailed the whole provider.
 // Verbatim former effect body; returns the effect's cleanup function.
 function startConnectivityEngine(ctx: {
-  isCheckingRef: React.MutableRefObject<boolean>;
   setNetworkOffline: React.Dispatch<React.SetStateAction<boolean>>;
 }): () => void {
-  const { isCheckingRef, setNetworkOffline } = ctx;
+  const { setNetworkOffline } = ctx;
   let mounted = true;
-  let interval: ReturnType<typeof setInterval> | null = null;
+  let active = AppState.currentState !== 'background' && AppState.currentState !== 'inactive';
+  let checking = false;
+  let refreshOnResume = false;
+  let interval: ReturnType<typeof setTimeout> | null = null;
+  let offlineRounds = 0;
   let networkSubscription: { remove: () => void } | null = null;
   let lastOffline: boolean | null = null;
   let lastCheckId = 0;
@@ -114,11 +118,10 @@ function startConnectivityEngine(ctx: {
     });
   };
 
-  const applyState = async (state: Network.NetworkState) => {
-    const checkId = ++lastCheckId;
+  const applyState = async (state: Network.NetworkState, checkId: number) => {
     try {
       const reachability = await resolveOfflineReachability(state);
-      if (!mounted || checkId !== lastCheckId) return;
+      if (!mounted || !active || checkId !== lastCheckId) return;
       const nowOffline = reachability.isOffline;
       const reachabilityLog = summarizeReachability(reachability);
       // Only log when state actually changes to reduce noise.
@@ -133,6 +136,7 @@ function startConnectivityEngine(ctx: {
         lastOffline = nowOffline;
       }
       if (!nowOffline) {
+        offlineRounds = 0;
         if (offlineSince !== null) {
           log.debug('provider.offline.pending_cancelled', { evals: offlineEvals });
         }
@@ -150,6 +154,9 @@ function startConnectivityEngine(ctx: {
       const confirmed =
         offlineEvals >= OFFLINE_CONFIRM_CHECKS && Date.now() - offlineSince >= OFFLINE_CONFIRM_MS;
       if (confirmed) {
+        offlineRounds += 1;
+        if (recheckTimer) clearTimeout(recheckTimer);
+        recheckTimer = null;
         commit(true, reachabilityLog);
         return;
       }
@@ -170,21 +177,35 @@ function startConnectivityEngine(ctx: {
   };
 
   const runConnectivityCheck = async () => {
-    if (!mounted || isCheckingRef.current) return;
+    if (!mounted || !active || checking) return;
     // Coalesce listener bursts and overlapping poll/listener triggers — the
-    // pending re-check (1200ms) and the poll (3000ms) clear this naturally.
+    // pending re-check (1200ms) and adaptive poll clear this naturally.
     if (Date.now() - lastEvalAt < MIN_EVAL_INTERVAL_MS) return;
     lastEvalAt = Date.now();
-    isCheckingRef.current = true;
+    checking = true;
+    refreshOnResume = false;
+    const checkId = ++lastCheckId;
     try {
       const state = await Network.getNetworkStateAsync();
-      await applyState(state);
+      if (!mounted || !active || checkId !== lastCheckId) return;
+      await applyState(state, checkId);
     } catch (err) {
       log.warn('provider.offline.check_failed', {
         error: err instanceof Error ? err : new Error(String(err)),
       });
     } finally {
-      isCheckingRef.current = false;
+      checking = false;
+      if (mounted && active && refreshOnResume) {
+        lastEvalAt = 0;
+        void runConnectivityCheck();
+      } else if (mounted && active) {
+        if (interval) clearTimeout(interval);
+        const delay =
+          lastOffline === true
+            ? Math.min(CONNECTIVITY_POLL_MS, OFFLINE_RETRY_MS * 2 ** Math.min(offlineRounds - 1, 5))
+            : CONNECTIVITY_POLL_MS;
+        interval = setTimeout(runConnectivityCheck, Math.max(OFFLINE_RETRY_MS, delay));
+      }
     }
   };
 
@@ -196,13 +217,27 @@ function startConnectivityEngine(ctx: {
   networkSubscription = Network.addNetworkStateListener(() => {
     void runConnectivityCheck();
   });
-  interval = setInterval(runConnectivityCheck, CONNECTIVITY_POLL_MS);
 
   const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
-    if (nextAppState === 'active') {
-      log.debug('provider.offline.app_foregrounded', { reason: 'app_state_active' });
-      void runConnectivityCheck();
+    const nextActive = nextAppState === 'active';
+    if (active === nextActive) return;
+    active = nextActive;
+    ++lastCheckId;
+    offlineSince = null;
+    offlineEvals = 0;
+    if (recheckTimer) {
+      clearTimeout(recheckTimer);
+      recheckTimer = null;
     }
+    if (interval) clearTimeout(interval);
+    interval = null;
+    offlineRounds = 0;
+    if (!active) return;
+    log.debug('provider.offline.app_foregrounded', { reason: 'app_state_active' });
+    // Revalidate after foreground even if an earlier probe is still settling.
+    refreshOnResume = true;
+    lastEvalAt = 0;
+    void runConnectivityCheck();
   });
 
   const onWebOnline = () => {
@@ -223,7 +258,7 @@ function startConnectivityEngine(ctx: {
   return () => {
     mounted = false;
     if (interval) {
-      clearInterval(interval);
+      clearTimeout(interval);
     }
     networkSubscription?.remove();
     appStateSubscription.remove();
@@ -245,11 +280,10 @@ function startConnectivityEngine(ctx: {
 export function OfflineStatusProvider({ children }: { children: React.ReactNode }) {
   useInitMount('OfflineStatusProvider');
   const [networkOffline, setNetworkOffline] = useState(false);
-  const isCheckingRef = useRef(false);
   const mockOffline = useSettingsStore((state) => state.mockOffline);
   const isOffline = mockOffline || networkOffline;
 
-  useEffect(() => startConnectivityEngine({ isCheckingRef, setNetworkOffline }), []);
+  useEffect(() => startConnectivityEngine({ setNetworkOffline }), []);
 
   // Context provider `value` — consumers can't opt out of identity churn, so
   // this stays manually memoized even under the React Compiler (hazard class).

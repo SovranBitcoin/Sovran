@@ -1,0 +1,129 @@
+{
+  "size": [1024, 500],
+  "headline": ["Pay in bitcoin.", "Chat on Nostr."],
+  "subtitle": ["Payments, conversations", "and AI in one app."],
+  "platforms": {
+    "android": {
+      "run": "run-2026-09-11T18-14-26-766Z-b2d378ae",
+      "screenshots": [
+        {
+          "file": "source/screenshots/android/ai-chat.png",
+          "label": "AI CHAT",
+          "sha256": "afa0101acb091dffbc6496010c11e44c1841c8d09e9ac1332603ee1ce216b6ab"
+        },
+        {
+          "file": "source/screenshots/android/contacts.png",
+          "label": "CONTACTS",
+          "sha256": "62bb7b9a48624a9d7c0bc96b0f85d05f341a3f1f7a50c0c2ea7c828946700626"
+        },
+        {
+          "file": "source/screenshots/android/lightning-receive.png",
+          "label": "LIGHTNING",
+          "sha256": "f97e01d71e6b660902089014024e9eac104749268d445ac8fb4fcfe6bc003b7a"
+        },
+        {
+          "file": "source/screenshots/android/wallet.png",
+          "label": "WALLET",
+          "sha256": "a5bc1fe44ebfee0da5bdf7bc64fd2414ec2b36a06363cebd8ea11f83e9a6d865"
+        }
+      ]
+    },
+    "ios": {
+      "run": "run-2026-09-11T18-03-58-075Z-813d671c",
+      "screenshots": [
+        {
+          "file": "source/screenshots/ios/ai-chat.png",
+          "label": "AI CHAT",
+          "sha256": "536fcd6a98257e3b421a9b76cb54a0f511139e9730c7c2d70fb7e1e0bf4b3d3e"
+        },
+        {
+          "file": "source/screenshots/ios/contacts.png",
+          "label": "CONTACTS",
+          "sha256": "80a7a86d27e333fbc868c6ba038e49e0ca3ded4f807cbb8ca788c9351db98150"
+        },
+        {
+          "file": "source/screenshots/ios/lightning-receive.png",
+          "label": "LIGHTNING",
+          "sha256": "29fa0e4c002974d6c7448acadfd291acbc30a992139e78d246d6358f1b6052a9"
+        },
+        {
+          "file": "source/screenshots/ios/wallet.png",
+          "label": "WALLET",
+          "sha256": "e1aacd3cb641264168ebf72297393b44ab6690bd9246223302632a37ab30ceb0"
+        }
+      ]
+    }
+  },
+  "presentation": {
+    "background": "#0e0e0e",
+    "spotlight": "#282828",
+    "foreground": "#ffffff",
+    "secondary": "#9a9a9a",
+    "frame": "#181818",
+    "frameEdge": "#2e2e2e",
+    "frameHighlight": "#ffffff",
+    "copy": {
+      "left": 56,
+      "width": 344,
+      "logoHeight": 40
+    },
+    "platforms": {
+      "android": {
+        "phones": [
+          {
+            "x": 424,
+            "top": 230,
+            "width": 168,
+            "dim": 0.42
+          },
+          {
+            "x": 516,
+            "top": 190,
+            "width": 192,
+            "dim": 0.28
+          },
+          {
+            "x": 620,
+            "top": 150,
+            "width": 218,
+            "dim": 0.14
+          },
+          {
+            "x": 744,
+            "top": 96,
+            "width": 240,
+            "dim": 0
+          }
+        ]
+      },
+      "ios": {
+        "phones": [
+          {
+            "x": 430,
+            "top": 213,
+            "width": 150,
+            "dim": 0.42
+          },
+          {
+            "x": 520,
+            "top": 168,
+            "width": 172,
+            "dim": 0.28
+          },
+          {
+            "x": 624,
+            "top": 120,
+            "width": 196,
+            "dim": 0.14
+          },
+          {
+            "x": 748,
+            "top": 60,
+            "width": 228,
+            "dim": 0
+          }
+        ]
+      }
+    }
+  }
+}

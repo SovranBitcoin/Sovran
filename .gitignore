@@ -18,6 +18,17 @@ log.txt
 
 # Env
 .env
+.env.*
+!.env.example
+credentials/
+credentials.json
+*.jks
+*.keystore
+*.p8
+*.p12
+*.pem
+*.key
+*service-account*.json
 .env*.local
 
 # Stale root Expo cache (regenerated under app/.expo)

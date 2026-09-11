@@ -24,14 +24,19 @@ export function buildRunPlan(
     selectionArgs = ['--suite', 'full', '--scenario', request.scenarioId];
   } else {
     const suite = request.kind === 'suite' ? request.suite : (request.suite ?? 'default');
-    if (suite !== 'default' && suite !== 'full') return { error: 'unknown suite' };
+    if (suite !== 'default' && suite !== 'full' && suite !== 'store-screenshots')
+      return { error: 'unknown suite' };
     selected = catalog.filter((entry) => entry.suites.includes(suite));
     if (selected.length === 0) return { error: `suite "${suite}" selected zero scenarios` };
     selectionArgs = ['--suite', suite];
   }
 
-  const platforms = PLATFORMS.filter((platform) =>
-    selected.some((entry) => entry.platforms.includes(platform))
+  if (request.platform !== undefined && !['both', ...PLATFORMS].includes(request.platform))
+    return { error: 'unknown platform' };
+  const platforms = PLATFORMS.filter(
+    (platform) =>
+      (!request.platform || request.platform === 'both' || request.platform === platform) &&
+      selected.some((entry) => entry.platforms.includes(platform))
   );
   if (platforms.length === 0) return { error: 'selection has no supported platforms' };
 
@@ -53,6 +58,8 @@ export function buildRunPlan(
         ...selectionArgs,
         ...(lane ? ['--lane', lane] : []),
       ];
+      if (request.kind === 'suite' && request.suite === 'store-screenshots')
+        argv.push('--evidence', 'screenshots', '--no-record');
       if (request.kind === 'commit-run') argv.push('--require-clean-git');
       const fundedCommand =
         lane === 'funded' ||

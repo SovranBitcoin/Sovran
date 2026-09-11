@@ -23,14 +23,17 @@ interface NostrKeys {
 export function useNip17RecentContacts(nostrKeys: NostrKeys | null) {
   const mockMode = useSettingsStore((s) => s.mockMode);
   const { conversations, loading, hasLoadedOnce, hasMore, loadMore, refresh, error } =
-    useDmConversations(nostrKeys?.pubkey, nostrKeys?.privateKey);
+    useDmConversations(
+      mockMode ? undefined : nostrKeys?.pubkey,
+      mockMode ? undefined : nostrKeys?.privateKey
+    );
 
   const displayContacts = useMemo<RecentContact[]>(() => {
     const recent: RecentContact[] = conversations.map((c) => ({
       type: 'contact',
       pubkey: c.counterparty,
       // Already-decrypted preview from nagg — no client decrypt needed here.
-      dmEvent: { content: c.lastMessagePreview },
+      dmEvent: { content: c.lastMessagePreview, isOwn: c.lastMessageIsOwn },
       nip17Content: c.lastMessagePreview,
       timestamp: c.lastMessageAt,
       protocol: c.protocol,
@@ -51,21 +54,16 @@ export function useNip17RecentContacts(nostrKeys: NostrKeys | null) {
     const base = [...recent, ...defaults];
 
     if (!mockMode) return base;
-    // Mock demo rows + allowlisted pubkeys (rendered with real kind-0 metadata),
-    // deduped against real conversations by pubkey. Mirrors the legacy hook.
-    const realKeys = new Set(base.map((c) => c.pubkey));
-    const mocks = getMockContacts();
-    const allowlistRows: RecentContact[] = [...MOCK_ALLOWED_PUBKEYS_HEX]
-      .filter((pk) => !realKeys.has(pk))
-      .map((pk) => ({
-        type: 'contact',
-        pubkey: pk,
-        dmEvent: null,
-        nip17Content: undefined,
-        timestamp: 0,
-        isDefault: true,
-      }));
-    return [...mocks.filter((m) => !realKeys.has(m.pubkey)), ...allowlistRows, ...base];
+    // Never merge a real private conversation into the presentation fixture.
+    const publicRows: RecentContact[] = [...MOCK_ALLOWED_PUBKEYS_HEX].map((pubkey) => ({
+      type: 'contact',
+      pubkey,
+      dmEvent: null,
+      nip17Content: undefined,
+      timestamp: 0,
+      isDefault: true,
+    }));
+    return [...getMockContacts(), ...publicRows];
   }, [conversations, mockMode]);
 
   const contactPubkeys = useMemo(
@@ -76,10 +74,10 @@ export function useNip17RecentContacts(nostrKeys: NostrKeys | null) {
   return {
     displayContacts,
     contactPubkeys,
-    conversations,
-    loading,
-    hasLoadedOnce,
-    hasMore,
+    conversations: mockMode ? [] : conversations,
+    loading: mockMode ? false : loading,
+    hasLoadedOnce: mockMode || hasLoadedOnce,
+    hasMore: !mockMode && hasMore,
     loadMore,
     refresh,
     error,

@@ -7,9 +7,9 @@ import type {
   NostrTier,
 } from '@sovranbitcoin/schemas';
 import type { NaggFeedItem, NaggFeedEvent, NaggNoteMetrics, NaggProfileInfo, NaggFeedPage } from '../map/feed';
+import { toNoteStats } from './noteStatsContract';
 import type { RequestControls } from '../timeout';
 import type { TierOutcome } from '../tiers';
-import type { SortKey } from './session/page-buffer';
 
 // ---------------------------------------------------------------------------
 // Feed surface — domain request + result + the per-tier contract
@@ -105,17 +105,7 @@ export interface FeedTier {
 
 /** Stable id for a feed item: the note's id, or a repost's original (anchor) id. */
 export function feedItemId(item: FeedItem): string {
-  return item.type === 'note' ? item.event.id : item.originalEventId ?? item.repostEvent.id;
-}
-
-/** The item's position in the feed: a repost ranks by the repost time, a note by its own. */
-export function feedItemTimestamp(item: FeedItem): number {
-  return item.type === 'note' ? item.event.created_at : item.repostEvent.created_at;
-}
-
-/** The (created_at, id) sort key a surface session orders/de-dupes a feed item by. */
-export function feedItemKey(item: FeedItem): SortKey {
-  return { createdAt: feedItemTimestamp(item), id: feedItemId(item) };
+  return item.type === 'note' ? item.event.id : (item.originalEventId ?? item.repostEvent.id);
 }
 
 /**
@@ -126,13 +116,13 @@ export function feedItemKey(item: FeedItem): SortKey {
 export function statsFromMetrics(metrics: Record<string, NaggNoteMetrics>): NoteStatsMap {
   const out: Record<string, NoteStats> = {};
   for (const [id, m] of Object.entries(metrics)) {
-    out[id] = {
+    out[id] = toNoteStats({
       likes: m.likeCount,
       reposts: m.repostCount,
       replies: m.replyCount,
       zaps: m.zapCount ?? 0,
       satsZapped: m.satsZapped,
-    };
+    });
   }
   return out;
 }

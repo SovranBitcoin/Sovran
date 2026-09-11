@@ -12,10 +12,11 @@
  * `SelectableCheck`.
  */
 
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
+  cancelAnimation,
   type EasingFunction,
   type EasingFunctionFactory,
   interpolateColor,
@@ -30,6 +31,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, Defs, Mask, Path, Rect } from 'react-native-svg';
 
+import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { IS_ANDROID_E2E } from '@/shared/lib/e2e/isAndroidE2E';
@@ -421,40 +423,46 @@ function ConfirmationSegment({
     }
   }, [completed, progress, pulse, debugEventRef, debugMetaRef, delayRef]);
 
-  useEffect(() => {
-    // Under Android e2e the perpetual breathe keeps the window from idling, so
-    // uiautomator can't dump a screen with an in-progress segment. Leave it flat.
-    if (active && !completed && !IS_ANDROID_E2E) {
-      wasBreathingRef.current = true;
-      debugEventRef.current?.('dot.segment_breathe', {
-        segmentIndex: debugMetaRef.current.index,
-        segmentCount: debugMetaRef.current.segmentCount,
-        breathing: true,
-        halfCycleMs: SEGMENT_ACTIVE_PULSE_MS,
-      });
-      activePulse.set(
-        withRepeat(
-          withTiming(1, { duration: SEGMENT_ACTIVE_PULSE_MS, easing: Easing.inOut(Easing.ease) }),
-          -1,
-          true
-        )
-      );
-    } else {
-      if (wasBreathingRef.current) {
-        wasBreathingRef.current = false;
+  useVisualActivityEffect(
+    useCallback(() => {
+      // Under Android e2e the perpetual breathe keeps the window from idling, so
+      // uiautomator can't dump a screen with an in-progress segment. Leave it flat.
+      if (active && !completed && !IS_ANDROID_E2E) {
+        wasBreathingRef.current = true;
         debugEventRef.current?.('dot.segment_breathe', {
           segmentIndex: debugMetaRef.current.index,
           segmentCount: debugMetaRef.current.segmentCount,
-          breathing: false,
-          reason: completed ? 'completed' : 'no-longer-active',
-          settleMs: SEGMENT_PULSE_MS,
+          breathing: true,
+          halfCycleMs: SEGMENT_ACTIVE_PULSE_MS,
         });
+        activePulse.set(
+          withRepeat(
+            withTiming(1, { duration: SEGMENT_ACTIVE_PULSE_MS, easing: Easing.inOut(Easing.ease) }),
+            -1,
+            true
+          )
+        );
+      } else {
+        if (wasBreathingRef.current) {
+          wasBreathingRef.current = false;
+          debugEventRef.current?.('dot.segment_breathe', {
+            segmentIndex: debugMetaRef.current.index,
+            segmentCount: debugMetaRef.current.segmentCount,
+            breathing: false,
+            reason: completed ? 'completed' : 'no-longer-active',
+            settleMs: SEGMENT_PULSE_MS,
+          });
+        }
+        activePulse.set(
+          withTiming(0, { duration: SEGMENT_PULSE_MS, easing: Easing.inOut(Easing.ease) })
+        );
       }
-      activePulse.set(
-        withTiming(0, { duration: SEGMENT_PULSE_MS, easing: Easing.inOut(Easing.ease) })
-      );
-    }
-  }, [active, completed, activePulse, debugEventRef, debugMetaRef]);
+      return () => {
+        cancelAnimation(activePulse);
+        activePulse.set(0);
+      };
+    }, [active, completed, activePulse, debugEventRef, debugMetaRef])
+  );
 
   const animatedProps = useAnimatedProps(() => {
     const p = progress.get();
@@ -746,10 +754,8 @@ export function LoadingIndicator({
   const revertOff = useSharedValue(startedReverted ? 0 : ICON.revert.len);
   const wifiOff = useSharedValue(startedWarning ? 0 : ICON.wifiA.len);
 
-  // Lerp speed toward target each frame; bail out cheaply when idle so
-  // a screen with many indicators (e.g. a long history list) doesn't
-  // burn CPU on a no-op every frame.
-  useFrameCallback(() => {
+  // Register cold: even an early-return callback keeps the display loop alive.
+  const spinFrame = useFrameCallback(() => {
     'worklet';
     const currentSpeed = speed.get();
     const nextTargetSpeed = targetSpeed.get();
@@ -759,7 +765,19 @@ export function LoadingIndicator({
     const settledSpeed = Math.abs(nextSpeed) < 0.001 ? 0 : nextSpeed;
     speed.set(settledSpeed);
     rotation.set((rotation.get() + settledSpeed) % 360);
-  });
+  }, false);
+
+  useVisualActivityEffect(
+    useCallback(() => {
+      spinFrame.setActive(true);
+      return () => spinFrame.setActive(false);
+    }, [spinFrame]),
+    !isSegmentedMode &&
+      !IS_ANDROID_E2E &&
+      effectivePhase !== 'idle' &&
+      !settledStatic &&
+      !(startedDone && shouldShowResult)
+  );
 
   useEffect(() => {
     if (!shouldShowResult || startedDone) {

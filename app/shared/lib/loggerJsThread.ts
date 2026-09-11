@@ -9,14 +9,14 @@
 //
 // Active only when SHOW_LOGS is on (gated to IS_DEV at module load) — no
 // production overhead. Importing this module from the public logger barrel
-// arms the auto-start side effect; tests can pause it via stopJSThreadMonitor.
+// arms the monitor only with EXPO_PUBLIC_JS_THREAD_MONITOR=1.
 
 import { log, monotonicNow, SHOW_LOGS } from './loggerCore';
 
 let _heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
- * Start the JS thread heartbeat monitor. Auto-started below in dev builds.
+ * Start the JS thread heartbeat monitor. Opted into below for profiling builds.
  *
  * @param intervalMs How often to check (default 200ms — low overhead)
  * @param thresholdMs Block duration that triggers a warning (default 100ms)
@@ -54,14 +54,14 @@ function startJSThreadMonitor(intervalMs = 200, thresholdMs = 100): () => void {
   };
 }
 
-// Auto-start in dev builds. Capture the stop function so tests and consumers
+// Opt in with EXPO_PUBLIC_JS_THREAD_MONITOR=1. Capture the stop function so consumers
 // can disable the monitor — the previous implementation discarded it, leaving
 // no way to pause the heartbeat (audit 56 F-016).
 let _heartbeatStop: (() => void) | null = null;
 let _heartbeatBootstrap: ReturnType<typeof setTimeout> | null = null;
 const IS_JEST_RUNTIME = typeof process !== 'undefined' && process.env.JEST_WORKER_ID !== undefined;
 
-if (SHOW_LOGS && !IS_JEST_RUNTIME) {
+if (SHOW_LOGS && !IS_JEST_RUNTIME && process.env.EXPO_PUBLIC_JS_THREAD_MONITOR === '1') {
   _heartbeatBootstrap = setTimeout(() => {
     _heartbeatStop = startJSThreadMonitor();
   }, 1000);

@@ -24,7 +24,7 @@ jobs:
       # is named for its blocking gate: the test suite.
       # It also emits non-blocking formatting and structural-review signals.
       #
-      # The behavioral Jest suite gates the workflow. Prettier and the
+      # The behavioral suites gate the workflow. Prettier and the
       # structural-health PR report remain non-blocking signals.
       - name: Setup Sovran
         uses: ./.github/actions/setup-sovran
@@ -36,9 +36,28 @@ jobs:
         continue-on-error: true
         run: bun run pretty:check
 
+      # Runs at the repo ROOT, not in app/: `test` fans out over every workspace
+      # package (`bun run --filter '*'`). Pinning this to app/ is what left
+      # wallet's 1183 vitest tests and nostr's 259 — the payment engine and the
+      # Nostr data layer — running nowhere on a push, so a change to either
+      # could break every one of its own tests and still merge green.
       - name: Test
-        working-directory: ${{ env.APP_DIR }}
         run: bun run test
+
+      - name: Release controller and archive tests
+        run: bun run test:release
+
+      - name: Native harness contracts
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          bun run e2e:validate
+          bun run e2e:test
+
+      - name: Validate asset sources, geometry and generated exports
+        run: |
+          bun run assets:check
+          bun run assets:test
+          test -z "$(git status --porcelain --untracked-files=all -- app/assets/brand)"
 
   # Non-blocking signal job: runs `codereview/analyze-structure` and posts
   # the LLM-friendly summary as a sticky PR comment. The signal mirrors

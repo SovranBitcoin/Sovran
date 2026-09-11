@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { parseUiautomatorXml } from './ax-adapter';
+import { findAndroidElement, parseUiautomatorXml } from './ax-adapter';
 import { classifyObservedState, findElement } from '../ax';
 import { escapeInputText } from './adb';
 
@@ -121,5 +121,36 @@ describe('escapeInputText', () => {
     expect(() => escapeInputText('₿ 100')).toThrow(/cannot type/);
     expect(() => escapeInputText("it's")).toThrow(/cannot type/);
     expect(() => escapeInputText('multi\nline')).toThrow(/cannot type/);
+  });
+});
+
+describe('Android modal duplicate selection', () => {
+  const background = {
+    id: 'transaction-mint-demo-mint-1',
+    frame: { x: 40, y: 0, width: 1000, height: 100 },
+  };
+  const foreground = { ...background, frame: { x: 40, y: 680, width: 1000, height: 140 } };
+  const snapshot = { screen: { width: 1080, height: 1920 }, elements: [background, foreground] };
+  it('taps the foreground copy of a row also exposed behind the sheet', () => {
+    expect(findAndroidElement(snapshot, { id: background.id })).toBe(foreground);
+    expect(snapshot.elements).toEqual([background, foreground]); // redaction retains both frames
+  });
+  it('folds duplicate ids before ordering indexed rows and capturing suffixes', () => {
+    const above = {
+      id: 'transaction-mint-other',
+      frame: { x: 40, y: 400, width: 1000, height: 100 },
+    };
+    expect(
+      findAndroidElement(
+        { ...snapshot, elements: [background, above, foreground] },
+        { idPrefix: 'transaction-mint-', matchIndex: 0 }
+      )
+    ).toBe(above);
+  });
+  it('does not let an offscreen duplicate hide an actionable row', () => {
+    const offscreen = { ...foreground, frame: { ...foreground.frame, y: 2500 } };
+    expect(
+      findAndroidElement({ ...snapshot, elements: [foreground, offscreen] }, { id: foreground.id })
+    ).toBe(foreground);
   });
 });

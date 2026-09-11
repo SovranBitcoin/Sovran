@@ -77,7 +77,7 @@ export function MintRebalancePlanScreen() {
     'foreground',
     'surface-tertiary',
     'surface-secondary',
-    'background',
+    'surface',
   ] as const);
   const [danger, green400] = useThemeColor(['danger', 'green-400'] as const);
   const fgMuted = withAlpha(foreground, 0.5);

@@ -229,6 +229,62 @@ describe('NUT-17 capability flag', () => {
 });
 
 describe('compareMintDisplayOrder', () => {
+  it.each([100, 1_000])('orders onchain minimums before unsupported mints at %i sats', (amount) => {
+    const mints = [
+      { mintUrl: 'https://unsupported.test', balance: 9_000, min: null },
+      { mintUrl: 'https://high-min.test', balance: 500, min: 10_000 },
+      { mintUrl: 'https://mid-min.test', balance: 100, min: 2_000 },
+      { mintUrl: 'https://low-min.test', balance: 0, min: 1_000 },
+    ];
+    const ctx = {
+      trustedMintUrls: mints.map((mint) => mint.mintUrl),
+      mintBalances: Object.fromEntries(mints.map((mint) => [mint.mintUrl, mint.balance])),
+      mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints(
+        mints.map((mint) => ({
+          mintUrl: mint.mintUrl,
+          mintInfo: {
+            nuts: {
+              '4': {
+                methods: mint.min == null
+                  ? [{ method: 'bolt11', unit: 'sat' }]
+                  : [{ method: 'onchain', unit: 'sat', min_amount: mint.min }],
+              },
+            },
+          },
+        }))
+      ),
+    };
+    const availability = evaluateMintMethodAmountAvailability(
+      ctx,
+      { operation: 'mint', method: 'onchain', unit: 'sat' },
+      { amount }
+    );
+    const rows = buildMethodAwareMintCandidates(
+      ctx,
+      { operation: 'mint', method: 'onchain', unit: 'sat' },
+      { amount }
+    ).sort(compareMintDisplayOrder);
+
+    expect(rows.map((row) => row.mintUrl)).toEqual([
+      'https://low-min.test',
+      'https://mid-min.test',
+      'https://high-min.test',
+      'https://unsupported.test',
+    ]);
+    expect(rows[1].reason?.code).toBe('AMOUNT_BELOW_MINT_MIN');
+    expect(rows[3].reason?.code).toBe('MINT_METHOD_UNSUPPORTED');
+    if (amount < 1_000) {
+      expect(availability.availableCandidates).toHaveLength(0);
+      expect(availability.amountBoundsReason?.params?.min).toBe(1_000);
+    } else {
+      expect(availability.availableCandidates.map((candidate) => candidate.mintUrl)).toEqual([
+        'https://low-min.test',
+      ]);
+      expect(availability.amountBoundsReason).toBeNull();
+      expect(rows[0].status).toBe('available');
+    }
+  });
+
   it('sorts available first, then balance descending, keeping stable ties', () => {
     const rows = [
       { mintUrl: 'a', balance: 10, status: 'disabled' as const },

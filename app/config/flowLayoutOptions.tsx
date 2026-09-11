@@ -9,7 +9,8 @@ import { memo, useMemo, type ReactNode } from 'react';
 import { Platform } from 'react-native';
 import type { NativeStackHeaderProps, NativeStackNavigationOptions } from 'expo-router';
 import type { ParamListBase, NavigationProp } from 'expo-router/react-navigation';
-import { router, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
@@ -138,7 +139,7 @@ export const createFlowLayoutScreenOptions = (
  * sheet geometry, and stack policy stay local to this module.
  */
 export function AndroidSheetFlowStack({ children }: { children: ReactNode }) {
-  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
   const screenOptions = useMemo(
     () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
     [foreground, background]

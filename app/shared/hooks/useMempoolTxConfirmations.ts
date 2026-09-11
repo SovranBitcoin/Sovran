@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { AppState } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 
 import {
   DEFAULT_ONCHAIN_REQUIRED_CONFIRMATIONS,
@@ -12,49 +14,112 @@ import { log } from '@/shared/lib/logger';
 // block-by-block and this only runs while an onchain-send detail is open.
 const MEMPOOL_TX_POLL_MS = 30_000;
 
-async function pollTxConfirmations(ctx: {
-  normalized: string;
-  requiredConfirmations: number;
-  isMounted: () => boolean;
-  stopPolling: () => void;
-  setStatus: (status: ChainTransactionStatus | null) => void;
-  setError: (error: Error | null) => void;
-  setIsLoading: (loading: boolean) => void;
-}): Promise<void> {
-  const {
-    normalized,
-    requiredConfirmations,
-    isMounted,
-    stopPolling,
-    setStatus,
-    setError,
-    setIsLoading,
-  } = ctx;
-  setIsLoading(true);
-  try {
-    const result = await defaultChainAdapter.getTransactionStatus(normalized);
-    if (!isMounted()) return;
-    setStatus(result);
-    setError(null);
-    log.debug('mempool.tx.confirmations.result', {
-      txidLength: normalized.length,
-      confirmed: result?.confirmed ?? null,
-      confirmations: result?.confirmations ?? null,
-    });
-    // Mined + at required depth: the rendered ring is capped there, so
-    // nothing another poll returns can change the UI.
-    if (shouldStopTxConfirmationPolling(result, requiredConfirmations)) {
-      stopPolling();
+interface ConfirmationState {
+  txid: string | null;
+  status: ChainTransactionStatus | null;
+  isLoading: boolean;
+  error: Error | null;
+}
+
+interface PollingRuntime {
+  state: ConfirmationState;
+  pending: Map<string, Promise<ChainTransactionStatus | null>>;
+}
+
+const emptyState: ConfirmationState = {
+  txid: null,
+  status: null,
+  isLoading: false,
+  error: null,
+};
+
+function startPolling(
+  txid: string,
+  requiredConfirmations: number,
+  runtime: PollingRuntime,
+  setState: (state: ConfirmationState) => void
+): () => void {
+  let state = runtime.state.txid === txid ? runtime.state : { ...emptyState, txid };
+  let active = AppState.currentState === 'active';
+  let disposed = false;
+  let running = false;
+  let generation = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const publish = (next: ConfirmationState) => {
+    state = next;
+    runtime.state = next;
+    setState(next);
+  };
+  const complete = () => shouldStopTxConfirmationPolling(state.status, requiredConfirmations);
+  const clearTimer = () => {
+    clearTimeout(timer);
+    timer = undefined;
+  };
+
+  async function poll() {
+    if (disposed || !active || running || complete()) return;
+    running = true;
+    const startedGeneration = generation;
+    const current = () => !disposed && active && generation === startedGeneration;
+    publish({ ...state, isLoading: true });
+    try {
+      // The adapter cannot abort. A refocus waits for its previous request to
+      // settle before starting a fresh read; different txids remain independent.
+      const previous = runtime.pending.get(txid);
+      if (previous) await previous.catch(() => undefined);
+      if (!current()) return;
+      const request = defaultChainAdapter.getTransactionStatus(txid);
+      runtime.pending.set(txid, request);
+      let result: ChainTransactionStatus | null;
+      try {
+        result = await request;
+      } finally {
+        if (runtime.pending.get(txid) === request) runtime.pending.delete(txid);
+      }
+      if (!current()) return;
+      publish({ txid, status: result, error: null, isLoading: false });
+      log.debug('mempool.tx.confirmations.result', {
+        txidLength: txid.length,
+        confirmed: result?.confirmed ?? null,
+        confirmations: result?.confirmations ?? null,
+      });
+    } catch (err) {
+      if (!current()) return;
+      publish({
+        ...state,
+        error: err instanceof Error ? err : new Error(String(err)),
+        isLoading: false,
+      });
+      log.warn('mempool.tx.confirmations.failed', {
+        txidLength: txid.length,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      running = false;
+      if (!disposed && active && !complete()) {
+        if (generation !== startedGeneration) void poll();
+        else timer = setTimeout(() => void poll(), MEMPOOL_TX_POLL_MS);
+      }
     }
-  } catch (err) {
-    if (isMounted()) setError(err instanceof Error ? err : new Error(String(err)));
-    log.warn('mempool.tx.confirmations.failed', {
-      txidLength: normalized.length,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  } finally {
-    if (isMounted()) setIsLoading(false);
   }
+
+  publish({ ...state, isLoading: false });
+  const subscription = AppState.addEventListener('change', (next) => {
+    const nextActive = next === 'active';
+    if (nextActive === active) return;
+    active = nextActive;
+    generation += 1;
+    clearTimer();
+    if (active) void poll();
+    else publish({ ...state, isLoading: false });
+  });
+  void poll();
+  return () => {
+    disposed = true;
+    generation += 1;
+    clearTimer();
+    subscription.remove();
+  };
 }
 
 /**
@@ -83,49 +148,23 @@ export function useMempoolTxConfirmations(
 } {
   const normalized = txid?.trim().toLowerCase() || null;
   const unsupportedNetwork = defaultChainAdapter.network !== 'mainnet';
-  const [status, setStatus] = useState<ChainTransactionStatus | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const [state, setState] = useState<ConfirmationState>(emptyState);
+  const runtime = useRef<PollingRuntime>({ state: emptyState, pending: new Map() });
 
-  useEffect(() => {
-    setStatus(null);
-    if (!normalized || unsupportedNetwork) {
-      setIsLoading(false);
-      setError(null);
-      if (normalized && unsupportedNetwork) {
-        log.info('mempool.tx.confirmations.unsupported_network', {
-          network: defaultChainAdapter.network,
-        });
-      }
-      return;
-    }
+  useFocusEffect(
+    useCallback(() => {
+      if (!normalized || unsupportedNetwork) return;
+      return startPolling(normalized, requiredConfirmations, runtime.current, setState);
+    }, [normalized, requiredConfirmations, unsupportedNetwork])
+  );
 
-    let mounted = true;
-    let interval: ReturnType<typeof setInterval> | null = null;
-    const stopPolling = () => {
-      if (interval) {
-        clearInterval(interval);
-        interval = null;
-      }
-    };
-    const poll = () =>
-      pollTxConfirmations({
-        normalized,
-        requiredConfirmations,
-        isMounted: () => mounted,
-        stopPolling,
-        setStatus,
-        setError,
-        setIsLoading,
-      });
-
-    void poll();
-    interval = setInterval(() => void poll(), MEMPOOL_TX_POLL_MS);
-    return () => {
-      mounted = false;
-      stopPolling();
-    };
-  }, [normalized, requiredConfirmations, unsupportedNetwork]);
-
-  return { status, isLoading, error, unsupportedNetwork };
+  // A new txid must never paint another transaction's status, even before its
+  // focus effect runs. Cached status remains visible during same-tx refreshes.
+  const visible = state.txid === normalized && !unsupportedNetwork ? state : emptyState;
+  return {
+    status: visible.status,
+    isLoading: visible.isLoading,
+    error: visible.error,
+    unsupportedNetwork,
+  };
 }

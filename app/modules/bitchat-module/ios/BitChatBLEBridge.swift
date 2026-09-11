@@ -300,6 +300,7 @@ final class BitChatBLEBridge: NSObject {
         )
         let scope = BitchatProfileScope.storageSuffix(for: profileScope)
         if isRunning, activeProfileScope == scope, activeIdentityID == identityMaterial.identityID {
+            bleService?.requestDiscoveryWindow()
             if activeNickname != nickname {
                 bleService?.setNickname(nickname)
                 activeNickname = nickname

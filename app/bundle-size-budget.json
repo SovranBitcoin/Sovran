@@ -1,5 +1,5 @@
 {
-  "$comment": "Production Expo export ceilings. References are the 2026-09-01 iOS/Android measurements; raise ceilings only with measured product justification.",
+  "$comment": "Production Expo export ceilings. References remain the 2026-09-01 measurements. The 2026-09-11 asset review adds exactly the measured 14,916,733-byte product increase to each prior asset ceiling; JS ceilings and original headroom remain unchanged.",
   "platforms": {
     "ios": {
       "referenceBytes": {
@@ -8,7 +8,7 @@
       },
       "maximumBytes": {
         "bundle": 21400000,
-        "assets": 1900000
+        "assets": 16816733
       }
     },
     "android": {
@@ -18,8 +18,17 @@
       },
       "maximumBytes": {
         "bundle": 21600000,
-        "assets": 2900000
+        "assets": 17816733
       }
     }
+  },
+  "assetBudgetReview": {
+    "date": "2026-09-11",
+    "sourceCommit": "b73e9faa",
+    "evidence": "https://github.com/SovranBitcoin/Sovran/actions/runs/34644695957",
+    "addedBytesPerPlatform": 14916733,
+    "bundledDemoPngBytes": 14893736,
+    "otherAssetDeltaBytes": 22997,
+    "reason": "Requested offline Mock Mode avatars/feed images at Metro densities plus standardized branding. No source originals are bundled. Keep the original headroom and remeasure future additions."
   }
 }

@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-restricted-imports -- The one adapter to Expo's imperative router; callers use guardedRouter or its explicit raw escape hatch.
 import { router } from 'expo-router';
 
 import { paymentLog } from '@/shared/lib/logger';
@@ -11,7 +12,15 @@ function signatureFor(href: unknown): string {
   if (typeof href === 'string') return href;
   if (href && typeof href === 'object') {
     try {
-      return JSON.stringify(href);
+      return JSON.stringify(href, (_key, value) =>
+        value && typeof value === 'object' && !Array.isArray(value)
+          ? Object.fromEntries(
+              Object.keys(value)
+                .sort()
+                .map((key) => [key, value[key]])
+            )
+          : value
+      );
     } catch {
       return String(href);
     }

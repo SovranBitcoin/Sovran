@@ -41,6 +41,14 @@ function createMockManager(overrides: MockManagerOverrides = {}) {
 
   return {
     history: {
+      getHistoryEntryById: vi.fn().mockResolvedValue({
+        id: 'send:op-1',
+        type: 'send',
+        operationId: 'op-1',
+        mintUrl: MINT1,
+        amount: 100,
+        state: 'pending',
+      }),
       getPaginatedHistory: vi.fn().mockResolvedValue([
         {
           id: 'op-1',
@@ -965,6 +973,46 @@ describe('quoteMelt / executeMelt quote-first (BTC-05)', () => {
 // ---------------------------------------------------------------------------
 
 describe('executeSend — reservation rescue (BTC-07)', () => {
+  it.each([null, { id: 'send:other', type: 'send', operationId: 'other' }])(
+    'uses the existing operation-derived fallback when the exact history row is missing or unrelated: %j',
+    async (history) => {
+      const manager = createMockManager();
+      manager.history.getHistoryEntryById.mockResolvedValue(history);
+      manager.ops.send.execute = vi.fn().mockResolvedValue({
+        operation: { id: 'op-1', mintUrl: MINT1, createdAt: 1000, amount: 100, unit: 'usd', state: 'pending' },
+        token: manager._mockToken,
+      });
+      const ops = createDefaultOperations({ getManager: () => manager as unknown as Manager });
+      const result = await ops.executeSend!(MINT1, 100, 'memo retained');
+      expect(JSON.parse(result.historyEntry)).toMatchObject({
+        operationId: 'op-1', mintUrl: MINT1, state: 'pending', amount: 100, unit: 'usd',
+        token: { memo: 'memo retained' },
+      });
+      expect(manager.history.getPaginatedHistory).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['executeSend', 'executeOfflineSend'] as const)(
+    '%s reads only its operation history entry and preserves authoritative state, unit and token memo',
+    async (method) => {
+      const manager = createMockManager();
+      manager.history.getPaginatedHistory.mockRejectedValue(new Error('broad history scan forbidden'));
+      manager.history.getHistoryEntryById.mockResolvedValue({
+        id: 'send:op-1', type: 'send', operationId: 'op-1',
+        mintUrl: MINT1, amount: 100, state: 'finalized', unit: 'usd',
+        metadata: { annotation: 'keep' },
+      });
+      const ops = createDefaultOperations({ getManager: () => manager as unknown as Manager });
+      const result = await ops[method]!(MINT1, 100, 'memo retained');
+      expect(manager.history.getHistoryEntryById).toHaveBeenCalledWith('send:op-1');
+      expect(manager.history.getPaginatedHistory).not.toHaveBeenCalled();
+      expect(JSON.parse(result.historyEntry)).toMatchObject({
+        id: 'send:op-1', state: 'finalized', unit: 'usd', amount: 100,
+        metadata: { annotation: 'keep' }, token: { memo: 'memo retained' },
+      });
+    }
+  );
+
   it('cancels the prepared operation when execute throws', async () => {
     const mockManager = createMockManager();
     mockManager.ops.send.execute = vi.fn().mockRejectedValue(new Error('network drop mid-flight'));

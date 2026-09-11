@@ -11,6 +11,7 @@ export interface RunManifest {
   proof: RunProof;
   sourceFingerprint: string;
   recording: boolean;
+  evidence?: 'full' | 'screenshots';
   startedAt: string;
   scenarios: string[];
   git?: GitInfo;

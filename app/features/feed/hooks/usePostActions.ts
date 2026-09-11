@@ -8,26 +8,20 @@ import { getOwnWriteRelays } from '@/shared/lib/nostr/outbox/relayListStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
 
+import { useModerationActions } from './useModerationActions';
 import { useDeletePost } from './useDeletePost';
 import { tryNpubEncode } from '../components/nostr/feedParse';
 import type { FeedEvent } from '../components/nostr/feedTypes';
 
 type MenuButton = NonNullable<Parameters<typeof actionMenuPopup>[0]['buttons']>[number];
 
-/**
- * Post "more" menu — Ignore post / Ignore person.
- *
- * Deliberately wired ONLY in the thread/detail view, not the feed list:
- * ignoring is a considered action, so it belongs where the user has tapped into
- * a post, not on every feed row. The feed reactively hides ignored posts/people
- * via the ignore store (no imperative list removal needed).
- */
+/** Post menu: sharing, local hiding, account blocking, reports, and own-post deletion. */
 export function usePostActions(options?: {
-  /** Resolve a display name for the "Ignore person" row description. */
+  /** Resolve a display name for the "Block person" row description. */
   getProfileName?: (pubkey: string) => string | undefined;
 }) {
   const ignoreEvent = useFeedIgnoreStore((s) => s.ignoreEvent);
-  const ignorePubkey = useFeedIgnoreStore((s) => s.ignorePubkey);
+  const { block, report } = useModerationActions();
   const getProfileName = options?.getProfileName;
   const deletePost = useDeletePost();
   const myPubkey = useNostrKeysContext().keys?.pubkey;
@@ -94,7 +88,7 @@ export function usePostActions(options?: {
       const buttons: MenuButton[] = [
         ...shareButtons,
         {
-          text: 'Ignore post',
+          text: 'Hide post',
           icon: 'mdi:eye-off-outline',
           testID: 'thread-ignore-post',
           onPress: (close) => {
@@ -102,20 +96,30 @@ export function usePostActions(options?: {
             ignoreEvent(event.id);
           },
         },
-        {
-          text: 'Ignore person',
-          description: getProfileName?.(event.pubkey) ?? fallback,
-          icon: 'mdi:account-cancel-outline',
-          testID: 'thread-ignore-person',
-          onPress: (close) => {
-            close();
-            ignorePubkey(event.pubkey);
-          },
-        },
+        ...(!isAuthor
+          ? [
+              {
+                text: 'Block person',
+                description: getProfileName?.(event.pubkey) ?? fallback,
+                icon: 'mdi:account-cancel-outline' as const,
+                testID: 'thread-ignore-person',
+                onPress: (close: () => void) => {
+                  close();
+                  void block(event.pubkey, true);
+                },
+              },
+              {
+                text: 'Report post',
+                icon: 'material-symbols:report-rounded' as const,
+                keepOpen: true,
+                onPress: () => report(event.pubkey, event.id),
+              },
+            ]
+          : []),
         ...deleteButtons,
       ];
       actionMenuPopup({ title: 'Post', buttons });
     },
-    [ignoreEvent, ignorePubkey, getProfileName, deletePost, myPubkey]
+    [ignoreEvent, block, report, getProfileName, deletePost, myPubkey]
   );
 }

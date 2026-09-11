@@ -34,7 +34,8 @@ jobs:
       # The docs site only needs VitePress, but a bun-workspace install resolves
       # every member's deps — including the app's @sovranbitcoin/schemas from
       # GitHub Packages (needs auth). --ignore-scripts skips the app's native
-      # patch/bitchat postinstall, which the docs build doesn't require.
+      # BitChat postinstall, which the docs build doesn't require. Bun applies
+      # dependency patches as part of installation even with --ignore-scripts.
       - name: Install workspace (no scripts)
         env:
           GITHUB_TOKEN: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}

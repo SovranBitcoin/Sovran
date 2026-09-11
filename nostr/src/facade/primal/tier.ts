@@ -274,9 +274,18 @@ function defaultResolveFeedSpec(
         params: pagedParams({ id: 'latest', kind: 'notes' }, spec.viewerPubkey),
       };
     case 'following-recent':
-    case 'user':
-      // No Primal directive wired — fall through to the relay floor (which
-      // serves following-recent/user from the author list).
+      // Explicit author sets are served by the relay floor.
       return null;
+    case 'user':
+      return {
+        verb: 'feed',
+        params: {
+          pubkey: spec.pubkey,
+          notes: 'authored',
+          include_replies: false,
+          limit,
+          ...(paging.until ? { until: paging.until } : {}),
+        },
+      };
   }
 }

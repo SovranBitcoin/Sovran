@@ -118,6 +118,7 @@ describe('wallet surface e2e selectors', () => {
     const settings = read('features/settings/screens/SettingsScreen.tsx');
     expect(settings).toContain('testID="settings-version-row"');
     expect(settings).toContain('testID="settings-mock-offline-toggle"');
+    expect(settings).toContain('testID="settings-mock-mode-toggle"');
     expect(settings).toContain('testID="settings-mock-fail-melt-toggle"');
     // Unconditional, not gated on `testID`: a screen reader needs the role and
     // the checked state on EVERY toggle, not only the three the e2e harness
@@ -187,7 +188,7 @@ describe('wallet surface e2e selectors', () => {
   });
 
   it('pins the seed reveal toggles on SettingsProfileScreen', () => {
-    const source = read('features/settings/screens/SettingsProfileScreen.tsx');
+    const source = read('features/settings/components/ProfileDetailsScreen.tsx');
     expect(source).toContain('testID={`profile-reveal-${fieldKey}`}');
     expect(source).toContain('testID={fieldKey ? `profile-secret-value-${fieldKey}` : undefined}');
     expect(source).toContain('accessibilityRole="switch"');

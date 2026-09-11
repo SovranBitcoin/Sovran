@@ -10,7 +10,7 @@ interface TopUpResult {
 
 interface TopUpFailure {
   success: false;
-  error: string;
+  error: unknown;
 }
 
 /**
@@ -91,7 +91,7 @@ export async function executeRoutstrTopUp(
       store.setApiKey(apiKey);
     }
 
-    return { success: false, error: message };
+    return { success: false, error };
   }
 }
 

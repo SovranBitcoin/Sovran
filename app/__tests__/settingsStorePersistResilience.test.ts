@@ -38,8 +38,7 @@ jest.mock('@/shared/lib/logger', () => ({
 }));
 
 jest.mock('@/shared/stores/runtime/mockDataStore', () => ({
-  useMockDataStore: { getState: () => ({ activate: jest.fn(), deactivate: jest.fn() }) },
-  purgeFixtureMetadata: jest.fn(),
+  purgeLegacyMockData: jest.fn(),
 }));
 
 const STORAGE_KEY = 'settings-store';
@@ -160,4 +159,71 @@ describe('settingsStore persist resilience', () => {
     expect(state.hasSeenOnboarding).toBe(true);
     expect(state.displayCurrency).toBe('eur');
   });
+});
+
+describe('versioned legal acceptance', () => {
+  beforeEach(() => {
+    jest.resetModules();
+    for (const k of Object.keys(mockMemory)) delete mockMemory[k];
+  });
+
+  it('reprompts legacy installations without losing settings or the original notification cutoff', async () => {
+    const legacy = { termsAccepted: true, date: '2026-06-08' };
+    preload({ termsAccepted: legacy, hasSeenOnboarding: true, displayCurrency: 'gbp' });
+    const store = await loadStore();
+    const { hasCurrentLegalAcceptance } = require('@/shared/lib/legal/legalDocuments');
+    expect(hasCurrentLegalAcceptance(store.getState().legalAcceptance)).toBe(false);
+    store.getState().acceptLegalDocuments();
+    expect(hasCurrentLegalAcceptance(store.getState().legalAcceptance)).toBe(true);
+    expect(store.getState().termsAccepted).toEqual(legacy);
+    expect(store.getState().displayCurrency).toBe('gbp');
+    expect(store.getState().hasSeenOnboarding).toBe(true);
+    await store.persist.rehydrate();
+    expect(hasCurrentLegalAcceptance(store.getState().legalAcceptance)).toBe(true);
+  });
+
+  it.each(['termsRevision', 'privacyRevision'])('reprompts when %s differs', async (field) => {
+    const store = await loadStore();
+    const { hasCurrentLegalAcceptance } = require('@/shared/lib/legal/legalDocuments');
+    store.getState().acceptLegalDocuments();
+    const record = store.getState().legalAcceptance!;
+    preload({ legalAcceptance: { ...record, [field]: 'a'.repeat(64) }, displayCurrency: 'eur' });
+    await store.persist.rehydrate();
+    expect(hasCurrentLegalAcceptance(store.getState().legalAcceptance)).toBe(false);
+    expect(store.getState().displayCurrency).toBe('eur');
+  });
+
+  it.each([
+    null,
+    true,
+    {},
+    { termsRevision: 'bad' },
+    {
+      termsRevision: 'a'.repeat(64),
+      privacyRevision: 'b'.repeat(64),
+      acceptedAt: 'yesterday',
+    },
+  ])(
+    'rejects invalid legal acceptance locally without resetting other settings: %j',
+    async (legalAcceptance) => {
+      preload({ legalAcceptance, hasSeenOnboarding: true, displayCurrency: 'eur' });
+      const store = await loadStore();
+      expect(store.getState().legalAcceptance).toBeNull();
+      expect(store.getState().displayCurrency).toBe('eur');
+      expect(store.getState().hasSeenOnboarding).toBe(true);
+    }
+  );
+});
+
+test('failed settings hydration preserves the unreadable blob and exposes retryable error state', async () => {
+  jest.resetModules();
+  mockMemory[STORAGE_KEY] = '{broken json';
+  const store = await loadStore();
+  const { useSettingsHydration } = require('@/shared/stores/global/settingsStore');
+  expect(useSettingsHydration.getState().status).toBe('error');
+  expect(mockMemory[STORAGE_KEY]).toBe('{broken json');
+  preload({ displayCurrency: 'eur', hasSeenOnboarding: true });
+  await store.persist.rehydrate();
+  expect(useSettingsHydration.getState().status).toBe('ready');
+  expect(store.getState().displayCurrency).toBe('eur');
 });

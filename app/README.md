@@ -400,11 +400,12 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 - `app/` — Expo Router routes and route-group stacks.
 - `features/` — domain modules for wallet, send, receive, mint, transactions, feed, contacts, AI, map, split bill, settings, BitChat, Whitenoise, theme, and onboarding.
 - `shared/` — cross-cutting UI primitives, providers, stores, Cashu/Nostr/NFC/Routstr helpers, theme and persistence infrastructure.
+- [Service error translations](shared/lib/errors/README.md) — the shared catalog and extension workflow for Routstr, Cashu/Coco/mints, Nostr, and Nagg failures.
 - `../wallet/` — in-repo workspace package (formerly `colada`) for the payment parser, state machine, guards, screen actions, LNURL/NIP-05 resolution, and tests.
 - `../nostr/` — in-repo workspace package (formerly `nagg-ts`) for the Nostr app-view client and tiered data layer.
 - `modules/` — local native modules: BitChat and Liquid Glass text.
 - `targets/widget/` — iOS widget target managed by `@bacons/apple-targets`.
-- `patches/` — patch-package patches for upstream dependencies consumed by the app.
+- `patches/` — Bun patches registered in the workspace root `patchedDependencies`. Bun applies these during install; refresh a patch with `bun patch <package>@<version>` and `bun patch --commit <package>@<version> --patches-dir app/patches` from the repo root.
 - `../../skills/` and `AGENTS.md` — contributor/agent skills that govern architecture, UI, storage, security, and commit workflow.
 
 ## Platforms
@@ -447,7 +448,7 @@ _How-to — fastest path to a running build._
 **Install & run locally**
 
 ```bash
-bun install                  # installs deps + runs patch-package + bitchat patch
+bun install                  # installs deps + applies Bun patches + runs BitChat setup
 bun run start                # Expo dev server (Metro)
 bun run ios                  # build and launch on iOS simulator
 bun run android              # build and launch on Android when configured
@@ -467,7 +468,7 @@ bun run android              # build and launch on Android when configured
 
 Sovran lives inside a workspace checkout of related repos (see [`CLAUDE.md`](../../CLAUDE.md) for the layout). Before opening a PR:
 
-- Read [`CLAUDE.md`](../../CLAUDE.md) for workspace conventions (where to edit, which sibling repos are read-only, patch-package rules).
+- Read [`CLAUDE.md`](../../CLAUDE.md) for workspace conventions (where to edit, which sibling repos are read-only, dependency patch rules).
 - Read [`AGENTS.md`](../../AGENTS.md) for the repo-local skill router.
 - Load the relevant skills under [`../../skills`](../../skills) before writing code; Sovran-owned skills cover workspace ops, architecture, UI, data/runtime, security, payment-flow guards, compatibility, docs, and PR quality.
 - Run `bun run lint && bun run type-check && bun run test` before committing.

@@ -36,6 +36,7 @@ import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStor
 import { storeLog } from '@/shared/lib/logger';
 import { isNostrPubkeyHex, NostrPubkeyHexSchema } from '@/shared/lib/protocolIds';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { tolerantRecord } from '@/shared/lib/persist/tolerant';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -159,9 +160,25 @@ const PersistedConnection = z.looseObject({
   previousClientPubkeys: z.array(NostrPubkeyHexSchema).max(MAX_PREVIOUS_CLIENT_PUBKEYS).default([]),
 });
 
+// Tolerant at the app level, deliberately bare inside it. The enums below are
+// security semantics and must never be guessed, so an unrecognized connection
+// still hard-rejects and that app has to be re-paired — but bare, `z.record`
+// rejected the whole map for it, and `createMergeWithSchema` then wiped EVERY
+// pairing. The comment on `peerDecryptGrants` already names that outcome as the
+// thing to avoid. Containing the rejection to the one app the blob could not be
+// trusted about is the same fail-closed answer at the right granularity.
+//
+// The refines below stay whole-blob on purpose: they are not "this value is
+// unrecognized", they are "this data violates an invariant the store is
+// supposed to enforce". That is a different failure and rejecting outright
+// remains the correct answer to it. Note they now run on the FILTERED map, so
+// a blob that was over the app cap only because of malformed entries, or whose
+// critical-grant violation sat in an app that was dropped, can pass where it
+// used to reject. Nothing unsafe is admitted by that: the offending app is
+// absent entirely, and every app that survives still satisfies all four.
 const PersistedConnectionsStore = z
   .object({
-    apps: z.record(NostrPubkeyHexSchema, PersistedConnection).default({}),
+    apps: tolerantRecord(NostrPubkeyHexSchema, PersistedConnection),
   })
   .refine((data) => Object.keys(data.apps).length <= MAX_CONNECTED_APPS, 'too many apps')
   .refine(

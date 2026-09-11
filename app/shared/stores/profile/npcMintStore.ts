@@ -9,7 +9,7 @@ import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStor
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { createNpcClient } from '@/shared/lib/cashu/npc';
 
-const NPC_DEFAULT_MINT_URL = 'https://mint.minibits.cash/Bitcoin';
+import { DEFAULT_MINT_URL } from '@/shared/lib/cashu/defaultMints';
 
 interface NpcMintState {
   /** Persisted NPC receive mint URL for the active profile. */
@@ -72,7 +72,7 @@ export const useNpcMintStore = create<NpcMintStore>()(
         isSyncing: false,
         isUpdating: false,
 
-        getActiveMintUrl: () => get().mintUrl ?? NPC_DEFAULT_MINT_URL,
+        getActiveMintUrl: () => get().mintUrl ?? DEFAULT_MINT_URL,
 
         updateServerMint: async (newMintUrl, privateKey) => {
           if (get().isUpdating) return false;

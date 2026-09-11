@@ -11,6 +11,7 @@
  * "X mSats required … Y available".
  */
 
+import { describeError } from '@/shared/lib/errors';
 import { checkBalance, sendMessage } from '@/shared/lib/routstr/api';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
@@ -127,5 +128,45 @@ describe('envelope reads gate on HTTP status before shape', () => {
     ) as unknown as typeof fetch;
 
     await expect(checkBalance('sk-expired')).rejects.toMatchObject({ status: 401 });
+  });
+});
+
+describe('Routstr errors retain machine-readable evidence for shared presentation', () => {
+  // eslint-disable-next-line no-restricted-properties -- fetch fixture boundary
+  const realFetch = global.fetch;
+  afterEach(() => {
+    // eslint-disable-next-line no-restricted-properties -- restore fixture boundary
+    global.fetch = realFetch;
+  });
+
+  it.each([
+    [404, { detail: 'Not found' }, 'routstr.not_found'],
+    [
+      400,
+      {
+        error: { message: 'Unknown model', type: 'invalid_request_error', code: 'model_not_found' },
+      },
+      'routstr.model_unavailable',
+    ],
+  ])('preserves status %s and translates it only at presentation', async (status, body, id) => {
+    // eslint-disable-next-line no-restricted-properties -- fetch fixture boundary
+    global.fetch = jest.fn(
+      async () =>
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'content-type': 'application/json' },
+        })
+    ) as unknown as typeof fetch;
+    await sendMessage('sk-test', [{ role: 'user', content: 'hi' }], { model: 'test-model' }).then(
+      () => {
+        throw new Error('Expected request to fail');
+      },
+      (error) => {
+        expect(error.status).toBe(status);
+        expect(error.error.message).toBe(status === 404 ? 'Not found' : 'Unknown model');
+        expect(describeError(error, 'routstr').id).toBe(id);
+        if (status === 400) expect(error.error.code).toBe('model_not_found');
+      }
+    );
   });
 });

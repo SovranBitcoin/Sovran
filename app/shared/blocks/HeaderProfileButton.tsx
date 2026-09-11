@@ -15,6 +15,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HeaderGlassCircle } from '@/shared/ui/composed/HeaderGlassCircle';
 import { supportsLiquidGlass } from '@/shared/lib/version';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { usePresentationPubkey } from '@/shared/hooks/usePresentationPubkey';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -31,7 +32,7 @@ type HeaderProfileButtonProps = {
 
 export function HeaderProfileButton({ onPress, style }: HeaderProfileButtonProps) {
   const { keys } = useNostrKeysContext();
-  const pubkey = keys?.pubkey ?? '';
+  const pubkey = usePresentationPubkey(keys?.pubkey ?? '');
   const { displayName, picture } = useProfileDisplay(pubkey);
   const [flatSurface, muted] = useThemeColor(['surface-secondary', 'muted'] as const);
   // Drives in lockstep with the drawer overlay + scene border-shadow:

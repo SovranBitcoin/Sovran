@@ -16,3 +16,7 @@ eslint-suppressions.json
 e2e/suites/*.json
 e2e/scenarios/*.json
 e2e/fixtures/*.json
+
+# Deterministic generator output; validated by assets:check / publicDemoSnapshot tests.
+assets/brand/generated/**
+shared/stores/runtime/fixtures/publicDemoSnapshot.json

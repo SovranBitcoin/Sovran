@@ -369,8 +369,16 @@ function createSwitchingCreator(): OutputDataCreator {
  */
 function loadNative(): OutputDataCreator | null {
   try {
-    // Deliberately lazy + guarded: importing this module instantiates the Nitro
-    // HybridObject, which throws outside a React Native runtime.
+    // Metro reports a module-initialization error to LogBox even when this caller
+    // catches it. Check registration before evaluating CDK's eager native export.
+    const { NitroModules } =
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- optional native capability is resolved only at manager initialization
+      require('react-native-nitro-modules') as typeof import('react-native-nitro-modules');
+    if (!NitroModules.hasHybridObject('OutputDataCreator')) {
+      cashuLog.info('cashu.native_crypto.unavailable', { reason: 'hybrid_object_not_registered' });
+      return null;
+    }
+    // Deliberately lazy: importing this module instantiates the HybridObject.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const native = require('@cashudevkit/react-native/native') as {
       cashuOutputDataCreator?: OutputDataCreator;

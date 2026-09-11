@@ -6,7 +6,8 @@
  * viewer has voted or the poll has closed. Voting publishes a kind:1018 through
  * the central seam and works with the local signer (no key gating).
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useRecyclingState } from '@shopify/flash-list';
 import { StyleSheet, View } from 'react-native';
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 
@@ -41,8 +42,12 @@ export function PollCard({ event }: { event: FeedEvent }) {
   const poll = useMemo(() => parsePoll(event), [event]);
   const votes = usePollVotes(poll.id);
   const tally = useMemo(() => tallyPoll(poll, votes, viewerPubkey), [poll, votes, viewerPubkey]);
-  const [selected, setSelected] = useState<string[]>([]);
-  const [voting, setVoting] = useState(false);
+  const [selected, setSelected] = useRecyclingState<string[]>([], [poll.id, viewerPubkey]);
+  const [pendingVote, setPendingVote] = useRecyclingState<object | null>(null, [
+    poll.id,
+    viewerPubkey,
+  ]);
+  const voting = pendingVote !== null;
 
   const closed = isPollClosed(poll, Math.floor(Date.now() / 1000));
   const voted = tally.myVote.length > 0;
@@ -56,12 +61,13 @@ export function PollCard({ event }: { event: FeedEvent }) {
         isMulti ? (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]) : [id]
       );
     },
-    [isMulti, showResults]
+    [isMulti, showResults, setSelected]
   );
 
   const submitVote = useCallback(async () => {
-    if (!ndk || selected.length === 0) return;
-    setVoting(true);
+    if (!ndk || selected.length === 0 || voting) return;
+    const submission = {};
+    setPendingVote(submission);
     const unsigned = buildVoteEvent({
       pollId: poll.id,
       optionIds: selected,
@@ -78,8 +84,10 @@ export function PollCard({ event }: { event: FeedEvent }) {
       relays: [...poll.relays, ...DEFAULT_RELAYS],
       resolveOn: 'first-ok',
     });
-    setVoting(false);
-  }, [ndk, selected, poll.id, poll.relays]);
+    // A recycled cell or profile switch may have started another submission.
+    // Only the operation that set the pending marker can clear it.
+    setPendingVote((current) => (current === submission ? null : current));
+  }, [ndk, selected, poll.id, poll.relays, voting, setPendingVote]);
 
   return (
     <View style={[styles.card, { borderColor: withAlpha(foreground, 0.12) }]}>

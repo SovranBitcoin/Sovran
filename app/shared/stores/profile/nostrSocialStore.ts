@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { tolerantRecord } from '@/shared/lib/persist/tolerant';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -384,7 +385,11 @@ const PersistedNostrSocialStore = z.object({
     .default([]),
   contactsContent: z.string().max(65_536).default(''),
   contactsUpdatedAt: z.number().int().nonnegative().default(0),
-  followingPubkeys: z.record(z.string().max(128), z.literal(true)).default({}),
+  // Tolerant: the follow set is a set — the `true` carries no information, so
+  // a corrupt value has nothing to fall back to. Bare, one bad entry would
+  // reject the blob and take contactsTags, the engagement map and the deleted
+  // -note ids with it; contained, it costs exactly the one follow.
+  followingPubkeys: tolerantRecord(z.string().max(128), z.literal(true)),
   engagementByEventId: z.record(z.string().max(128), PersistedEngagementRecord).default({}),
   deletedRepostOriginalIds: z
     .record(z.string().max(128), z.number().int().nonnegative())

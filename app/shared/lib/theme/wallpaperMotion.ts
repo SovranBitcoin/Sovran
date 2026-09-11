@@ -22,13 +22,18 @@ let subscription: { remove(): void } | null = null;
 export function retainWallpaperMotion(): () => void {
   subscribers += 1;
   if (subscribers === 1 && !subscription) {
-    DeviceMotion.setUpdateInterval(50);
-    log.debug('bg.motion.shared_start', { intervalMs: 50 });
+    DeviceMotion.setUpdateInterval(100);
+    log.debug('bg.motion.shared_start', { intervalMs: 100 });
+    let lastTarget: { x: number; y: number } | null = null;
     subscription = DeviceMotion.addListener(({ rotation }) => {
       if (!rotation) return;
       const { beta = 0, gamma = 0 } = rotation;
+      const target = { x: gamma * 10, y: beta * 10 };
+      // Stationary sensor noise must not continuously restart native springs.
+      if (lastTarget && Math.hypot(target.x - lastTarget.x, target.y - lastTarget.y) < 0.25) return;
+      lastTarget = target;
       Animated.spring(wallpaperMotion, {
-        toValue: { x: gamma * 10, y: beta * 10 },
+        toValue: target,
         useNativeDriver: true,
         bounciness: 100,
         speed: 200,
@@ -43,6 +48,7 @@ export function retainWallpaperMotion(): () => void {
     if (subscribers <= 0 && subscription) {
       subscription.remove();
       subscription = null;
+      wallpaperMotion.stopAnimation();
       log.debug('bg.motion.shared_stop');
     }
   };

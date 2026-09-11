@@ -1,3 +1,4 @@
+import { isLegacyMockProfile } from '@/shared/stores/runtime/legacyMockProfiles';
 import { createNaggClient, setNostrLogger, facade, type NostrLogger } from 'nostr';
 
 import { log } from '@/shared/lib/logger';
@@ -96,6 +97,7 @@ function seedPersistedProfiles(layer: facade.NostrDataLayer): void {
   const metadata: Record<string, facade.ProfileMetadata> = {};
   let count = 0;
   for (const [pubkey, entry] of Object.entries(byPubkey)) {
+    if (isLegacyMockProfile(pubkey, entry)) continue;
     const { fetchedAt: _fetchedAt, ...rest } = entry;
     metadata[pubkey] = rest;
     count += 1;
@@ -118,7 +120,8 @@ function startProfilePersistence(layer: facade.NostrDataLayer): () => void {
     const records: Record<string, NostrProfileMetadata> = {};
     for (const record of layer.cache.profiles.values()) {
       const mapped = cachedProfileToMetadata(record);
-      if (mapped && record.pubkey) records[record.pubkey] = mapped;
+      if (mapped && record.pubkey && !isLegacyMockProfile(record.pubkey, mapped))
+        records[record.pubkey] = mapped;
     }
     useNostrMetadataCache.getState().persistOwnerSnapshot(records);
   };

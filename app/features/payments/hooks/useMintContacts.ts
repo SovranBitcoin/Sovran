@@ -21,7 +21,7 @@ export interface MintContact {
   pubkey: string | null;
   mint: Mint;
   mintInfo: GetInfoResponse;
-  dmEvent: { content: string } | undefined;
+  dmEvent: { content: string; isOwn?: boolean } | undefined;
   timestamp: number;
 }
 
@@ -137,7 +137,9 @@ export function useMintContacts(
         pubkey: mintPubkey,
         mint,
         mintInfo,
-        dmEvent: convo ? { content: convo.lastMessagePreview } : undefined,
+        dmEvent: convo
+          ? { content: convo.lastMessagePreview, isOwn: convo.lastMessageIsOwn }
+          : undefined,
         timestamp: convo?.lastMessageAt ?? 0,
       };
     });

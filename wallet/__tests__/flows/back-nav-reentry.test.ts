@@ -315,8 +315,22 @@ describe("flow generations — stale send results", () => {
       state: "PENDING",
       metadata: {},
     });
+    // Only `executeSend` is exercised here. The other two are required by
+    // `MachineOperations` and this flow never reaches them; the literal used to
+    // omit them entirely, which is what `wallet`'s untyped `__tests__` hid.
+    // They throw rather than stub so a flow that DID reach them says so.
+    //
+    // Deliberately NOT the harness mock and NOT `executeOfflineSend`: the mock
+    // supplies a default offline send, and this test turns on local recovery
+    // only AFTER the online attempt has begun. Having it from the start is a
+    // different scenario.
+    const unreachable = (name: string) => (): never => {
+      throw new Error(`${name} is not part of this flow`);
+    };
     const operations: MachineOperations = {
       executeSend: () => onlineGate.promise,
+      executeMintQuote: unreachable("executeMintQuote"),
+      buildMintListItems: unreachable("buildMintListItems"),
     };
     const machine = createPaymentMachine({
       handlers: {},

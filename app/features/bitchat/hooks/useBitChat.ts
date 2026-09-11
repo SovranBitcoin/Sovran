@@ -194,10 +194,16 @@ export function useBitChat(
       // Redacted projection: peerID is a stable cross-session identifier and
       // nickname is user-controlled (potential PII). Keep just the prefix +
       // connection state for diagnostics.
-      bitchatLog.debug('bitchat.hook.ble_peer', {
-        peerIdPrefix: event.peerID.slice(0, 4),
-        isConnected: event.isConnected,
-      });
+      bitchatLog.debug(
+        'bitchat.hook.ble_peer',
+        event.type === 'list'
+          ? { type: event.type, peerCount: event.peers.length }
+          : {
+              type: event.type,
+              peerIdPrefix: event.peerID.slice(0, 4),
+              isConnected: event.type === 'connected',
+            }
+      );
     });
 
     const sub = addBLEMessageListener((event: BLEMessageEvent) => {

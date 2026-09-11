@@ -1,5 +1,7 @@
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
+import { Screen } from '@/shared/ui/composed/Screen';
 import React, { useRef, useEffect } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -8,7 +10,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { Stack, Link } from 'expo-router';
+import { Stack } from 'expo-router';
 import { z } from 'zod';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -39,7 +41,7 @@ import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
-import { log, useLifecycleLogger, Log } from '@/shared/lib/logger';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { openExternalUrl } from '@/shared/lib/url';
 import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
 import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
@@ -473,7 +475,7 @@ function RatingBarChart({ score }: { score: number }) {
 
 export function MintInfoScreen() {
   useLifecycleLogger('MintInfoScreen');
-  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
   // The mint-status ring + OK badge intentionally diverge from the theme
   // `success` token (which is blue app-wide after the retint commit). A
   // verified mint reads as "good" in green here, so pull the static green
@@ -545,7 +547,64 @@ export function MintInfoScreen() {
   };
 
   return (
-    <Log name="MintInfoScreen" style={{ flex: 1, backgroundColor: background }}>
+    <Screen
+      name="MintInfoScreen"
+      scroll="custom"
+      bgColor={background}
+      footer={
+        <BottomButtons>
+          <ButtonHandler
+            buttons={
+              entry?.fromAccepter
+                ? [
+                    {
+                      testID: 'mint-info-close',
+                      text: 'Reject',
+                      variant: 'secondary',
+                      onPress: async () => {
+                        await actions.back.execute();
+                      },
+                    },
+                    {
+                      testID: 'mint-info-trust',
+                      text: actions.trust.loading ? 'Accepting...' : 'Accept',
+                      variant: 'primary',
+                      disabled: !actions.trust.available || actions.trust.loading,
+                      onPress: () => actions.trust.execute(),
+                    },
+                  ]
+                : mintUrl && (entry?.fromScan || !entry?.isTrusted)
+                  ? [
+                      {
+                        testID: 'mint-info-close',
+                        text: 'Close',
+                        variant: 'secondary',
+                        onPress: async () => {
+                          await actions.back.execute();
+                        },
+                      },
+                      {
+                        testID: 'mint-info-trust',
+                        text: actions.trust.loading ? 'Adding...' : 'Add mint',
+                        variant: 'primary',
+                        disabled: !actions.trust.available || actions.trust.loading,
+                        onPress: () => actions.trust.execute(),
+                      },
+                    ]
+                  : [
+                      {
+                        testID: 'mint-info-close',
+                        text: 'Close',
+                        variant: 'secondary',
+                        onPress: async () => {
+                          await actions.back.execute();
+                        },
+                      },
+                    ]
+            }
+          />
+        </BottomButtons>
+      }>
       <Stack.Screen
         options={withGlassHeaderItems({
           title: entry?.fromAccepter ? 'Verify Mint' : displayName || 'Mint Details',
@@ -553,24 +612,18 @@ export function MintInfoScreen() {
             entry?.fromAccepter || !(typeof kymScore === 'number' && kymScore >= 0)
               ? undefined
               : () => (
-                  <Link
-                    href={{
-                      pathname: '/reviews',
-                      params: { mintUrl },
-                    }}
-                    asChild>
-                    <ScreenHeaderAction
-                      icon="ic:round-star"
-                      color={starColor}
-                      testID="mint-info-reviews"
-                      accessibilityLabel="View mint reviews"
-                    />
-                  </Link>
+                  <ScreenHeaderAction
+                    onPress={() => router.navigate({ pathname: '/reviews', params: { mintUrl } })}
+                    icon="ic:round-star"
+                    color={starColor}
+                    testID="mint-info-reviews"
+                    accessibilityLabel="View mint reviews"
+                  />
                 ),
         })}
       />
 
-      <ScrollView
+      <ScreenScrollView
         className="flex-1"
         // Android form-sheet: opt into nested-scroll so a top-edge drag dismisses
         // the sheet while mid-scroll drags scroll (matches Receive / shared List).
@@ -578,7 +631,6 @@ export function MintInfoScreen() {
         contentContainerStyle={{
           paddingTop: insets.top + 16,
           paddingHorizontal: 16,
-          paddingBottom: 120,
         }}
         showsVerticalScrollIndicator={false}>
         <VStack align="center" className="w-full pb-8 pt-6">
@@ -758,61 +810,8 @@ export function MintInfoScreen() {
             </ListGroup>
           </Section>
         )}
-      </ScrollView>
-
-      <BottomButtons>
-        <ButtonHandler
-          buttons={
-            entry?.fromAccepter
-              ? [
-                  {
-                    testID: 'mint-info-close',
-                    text: 'Reject',
-                    variant: 'secondary',
-                    onPress: async () => {
-                      await actions.back.execute();
-                    },
-                  },
-                  {
-                    testID: 'mint-info-trust',
-                    text: actions.trust.loading ? 'Accepting...' : 'Accept',
-                    variant: 'primary',
-                    disabled: !actions.trust.available || actions.trust.loading,
-                    onPress: () => actions.trust.execute(),
-                  },
-                ]
-              : mintUrl && (entry?.fromScan || !entry?.isTrusted)
-                ? [
-                    {
-                      testID: 'mint-info-close',
-                      text: 'Close',
-                      variant: 'secondary',
-                      onPress: async () => {
-                        await actions.back.execute();
-                      },
-                    },
-                    {
-                      testID: 'mint-info-trust',
-                      text: actions.trust.loading ? 'Adding...' : 'Add mint',
-                      variant: 'primary',
-                      disabled: !actions.trust.available || actions.trust.loading,
-                      onPress: () => actions.trust.execute(),
-                    },
-                  ]
-                : [
-                    {
-                      testID: 'mint-info-close',
-                      text: 'Close',
-                      variant: 'secondary',
-                      onPress: async () => {
-                        await actions.back.execute();
-                      },
-                    },
-                  ]
-          }
-        />
-      </BottomButtons>
-    </Log>
+      </ScreenScrollView>
+    </Screen>
   );
 }
 

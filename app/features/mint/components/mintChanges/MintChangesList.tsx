@@ -14,7 +14,6 @@ import { MintChangeRow } from './MintChangeRow';
 import { useMintChanges } from '@/features/mint/hooks/useMintChanges';
 import type { MintChangeUpdate } from '@/features/mint/lib/mintChanges/groupEntries';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
 import {
   useVisualListLogger,
   visualToken,
@@ -47,7 +46,6 @@ export function MintChangesList() {
   const { updates, trustedMintCount, isLoading, isRefreshing, errorMessage, refresh } =
     useMintChanges();
   const [foreground, separator] = useThemeColor(['foreground', 'separator-secondary'] as const);
-  const tabBarPadding = useTabBarBottomPadding();
 
   const phase = isLoading ? 'initial-loading' : isRefreshing ? 'refreshing' : 'ready';
   const { onViewableItemsChanged: onVisualViewableItemsChanged } =
@@ -77,7 +75,6 @@ export function MintChangesList() {
 
   const contentContainerStyle = [
     styles.listContent,
-    { paddingBottom: tabBarPadding },
     updates.length === 0 && styles.emptyListContent,
   ];
 
@@ -121,6 +118,7 @@ export function MintChangesList() {
 
   return (
     <List
+      screen
       testID="mint-changes-list"
       data={updates}
       keyExtractor={(update) => update.id}

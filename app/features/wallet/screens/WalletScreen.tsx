@@ -318,7 +318,6 @@ const styles = StyleSheet.create({
   },
   content: {
     gap: 16,
-    paddingBottom: 96,
     paddingHorizontal: 16,
     paddingTop: 2,
   },

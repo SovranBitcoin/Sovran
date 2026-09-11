@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, useWindowDimensions } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import { retainWallpaperMotion, wallpaperMotion } from '@/shared/lib/theme/wallpaperMotion';
+import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
 import { noteWallpaperRendered } from '@/shared/lib/theme/themeTransition';
 import { markWallpaperLoaded, markWallpaperFailed } from '@/shared/lib/theme/wallpaperRenderState';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -21,8 +23,7 @@ interface AnimatedSpriteBackgroundProps {
   /**
    * Parallax motion. Pre-mounted hidden wallpaper layers (the account
    * carousel keeps every unit's wallpaper decoded at opacity 0) MUST pass
-   * false — each enabled instance streams DeviceMotion at 50ms and runs
-   * springs, a real per-instance CPU cost.
+   * false — hidden instances must not keep the shared sensor subscription alive.
    */
   motionEnabled?: boolean;
   /**
@@ -73,6 +74,7 @@ const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
   imageTransitionMs,
 }: AnimatedSpriteBackgroundProps) {
   const window = useWindowDimensions();
+  const reducedMotion = useReducedMotion();
   const ctxTheme = useTheme();
   const activeTheme = themeName ?? ctxTheme.currentTheme;
   const backgroundImageSource = backgroundImageThemes[activeTheme];
@@ -98,10 +100,7 @@ const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
   // pre-mounted carousel layers stay pixel-aligned with the base layer);
   // motionEnabled only controls whether THIS instance keeps the shared
   // DeviceMotion subscription alive (hidden layers don't).
-  useEffect(() => {
-    if (!hasImage || !motionEnabled) return;
-    return retainWallpaperMotion();
-  }, [hasImage, motionEnabled]);
+  useVisualActivityEffect(retainWallpaperMotion, hasImage && motionEnabled && !reducedMotion);
 
   useEffect(() => {
     if (!backgroundImageSource) {

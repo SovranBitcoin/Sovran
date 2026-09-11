@@ -136,7 +136,48 @@ describe('persisted schema drift', () => {
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((e) => [e.name, e] as const)
   )('%s schema matches the golden snapshot for its version', (_name, entry) => {
-    const shape = z.toJSONSchema(entry.schema, { unrepresentable: 'any' });
+    // BOTH lenses, because neither is the whole contract.
+    //
+    // `input` is what a rehydrated blob has to look like — and it is the only
+    // one that sees inside a `tolerantRecord`/`tolerantArray`, since a schema
+    // ending in a transform renders as `{}` on the output side. That blind
+    // spot was already live: `transaction-distribution-store.distributions`
+    // was recorded as `{}`, so a field renamed inside one of its rows would
+    // have sailed past this test.
+    //
+    // `output` is the post-parse state the store actually receives, and it
+    // carries what `input` drops: which fields end up required, and the
+    // defaults that were applied. `z.string().catch('x')` and
+    // `z.string().catch('x').optional()` have the same input shape but parse
+    // `{}` differently, and only this half moves.
+    const shape = {
+      input: z.toJSONSchema(entry.schema, { unrepresentable: 'any', io: 'input' }),
+      output: z.toJSONSchema(entry.schema, { unrepresentable: 'any' }),
+    };
     expect({ name: entry.name, version: entry.version, shape }).toMatchSnapshot(entry.name);
+  });
+
+  it('records the entry shape inside a tolerant collection', () => {
+    // The assertion that keeps the lens honest: flip it back to the output
+    // side and this is `{}`, taking every tolerant store's row shape with it.
+    const activity = persistRegistry.find((e) => e.name === 'nip46-activity-store');
+    const shape: unknown = z.toJSONSchema(activity!.schema, {
+      unrepresentable: 'any',
+      io: 'input',
+    });
+    // And the output lens is exactly what cannot tell you: it knows `entries`
+    // exists and carries a default, and nothing at all about a row.
+    const outputShape = z.toJSONSchema(activity!.schema, { unrepresentable: 'any' }) as {
+      properties?: { entries?: Record<string, unknown> };
+    };
+    expect(outputShape.properties?.entries).toEqual({ default: [] });
+    const entryProperties = (
+      shape as {
+        properties?: { entries?: { items?: { properties?: Record<string, unknown> } } };
+      }
+    ).properties?.entries?.items?.properties;
+    expect(Object.keys(entryProperties ?? {})).toEqual(
+      expect.arrayContaining(['method', 'verdict', 'clientPubkey'])
+    );
   });
 });

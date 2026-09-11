@@ -4,9 +4,8 @@
  *
  * While `loading`, it renders the skeleton tree and (for sizeable regions) a
  * single `SkeletonLoadingShimmer` "wave" sweep over it. When data arrives it
- * runs ONE consistent transition everywhere: the skeleton **fades out**, then
- * the real content **fades in** — a clear two-step crossfade, fast enough not to
- * feel like waiting (`SKELETON_CONTENT_FADE_MS` total). Images inside the
+ * mounts real content at full opacity and fades the skeleton out over it.
+ * Keeping the content opaque avoids an empty midpoint. Images inside the
  * content fade in **independently** on their own `expo-image` transition, so the
  * swap never blocks on a slow image load.
  *
@@ -34,8 +33,6 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
-  Extrapolation,
-  interpolate,
   ReduceMotion,
   runOnJS,
   useAnimatedStyle,
@@ -45,13 +42,12 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useScreenBackground } from '@/shared/ui/composed/ScreenFooterContext';
 import { useFadeRevealProbe } from '@/shared/lib/debug/fadeRevealProbe';
 import { SkeletonLoadingShimmer } from '@/shared/ui/composed/SkeletonExitShimmer';
 
-/** Total skeleton→content transition: the skeleton fades out over the first
- *  half, the content fades in over the second. Kept short so the swap reads as a
- *  crisp crossfade, not a wait. */
-const SKELETON_CONTENT_FADE_MS = 300;
+/** The skeleton fades away while loaded content is already visible below it. */
+const SKELETON_CONTENT_FADE_MS = 220;
 
 type WaveMode = 'region' | 'none';
 type ExitMode = 'fade' | 'none';
@@ -70,13 +66,13 @@ interface SkeletonContentCrossfadeProps {
   /** `'region'` (default) sweeps one shimmer wave over the skeleton; `'none'`
    *  keeps the cheaper static pulse for compact/inline placeholders. */
   wave?: WaveMode;
-  /** `'fade'` (default) runs the skeleton-out/content-in crossfade; `'none'`
+  /** `'fade'` (default) fades the skeleton out over loaded content; `'none'`
    *  swaps instantly — use inside FlashList-recycled cells and for footer-only
    *  skeletons with no in-place content. */
   exit?: ExitMode;
   /** The color of the surface the skeleton sits ON — the wave is painted in this
    *  color so it "erases" the skeleton as it sweeps (disappear/reappear), rather
-   *  than reading as a stripe on top. Defaults to the screen `background`; pass
+   *  than reading as a stripe on top. Defaults to the resolved screen background; pass
    *  the container's color when the skeleton is on a card/surface (e.g. a
    *  `surface-secondary` Card). This is the only thing that should set the wave
    *  color — never a brand/accent tint. */
@@ -108,10 +104,11 @@ export function SkeletonContentCrossfade({
   const reducedMotion = useReducedMotion();
   // The wave is painted in the color of the surface the skeleton sits on, so the
   // band "erases" the skeleton as it sweeps (disappear/reappear) rather than
-  // reading as a brighter stripe on top. Defaults to the screen background;
+  // reading as a brighter stripe on top. Defaults to the resolved screen background;
   // callers on a card/surface pass that surface's color.
-  const screenBackground = useThemeColor('background');
-  const waveColor = surfaceColor ?? screenBackground;
+  const screenBackground = useThemeColor('surface');
+  const pageBackground = useScreenBackground();
+  const waveColor = surfaceColor ?? pageBackground ?? screenBackground;
   const animatedExit = exit === 'fade' && !reducedMotion;
   const showWave = wave === 'region' && !reducedMotion;
 
@@ -119,15 +116,12 @@ export function SkeletonContentCrossfade({
   // recycled FlashList cell rebinding to loaded data) starts in 'content' and
   // never plays a spurious fade.
   const [phase, setPhase] = useState<Phase>(loading ? 'loading' : 'content');
-  // 0 → 1 across the whole transition: [0, 0.5] fades the skeleton out, then
-  // [0.5, 1] fades the content in.
+  // 0 → 1 fades only the skeleton overlay; content remains fully opaque.
   const progress = useSharedValue(0);
 
   const finishExit = useCallback(() => setPhase('content'), []);
 
-  // [DEBUG-inv] armed only while 'exiting' — a stuck report means the
-  // crossfade timing never flushed and the content is sitting at opacity 0
-  // behind an already-faded skeleton (content present but invisible).
+  // A stuck exit can leave a skeleton overlay covering loaded content.
   useFadeRevealProbe(`skeleton.crossfade:${visualKey ?? visualComponent}`, progress, {
     enabled: phase === 'exiting',
     deadlineMs: durationMs + 900,
@@ -169,21 +163,10 @@ export function SkeletonContentCrossfade({
   }, [phase, durationMs, progress, finishExit]);
 
   const skeletonExitStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.get(), [0, 0.5], [1, 0], Extrapolation.CLAMP),
-  }));
-  const contentEnterStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.get(), [0.5, 1], [0, 1], Extrapolation.CLAMP),
+    opacity: 1 - progress.get(),
   }));
 
-  if (phase === 'content') {
-    return (
-      <View style={style} testID={testID}>
-        {renderContent()}
-      </View>
-    );
-  }
-
-  if (phase === 'loading') {
+  if (loading || phase === 'loading') {
     return (
       <View style={style} testID={testID}>
         {renderSkeleton()}
@@ -201,14 +184,16 @@ export function SkeletonContentCrossfade({
     );
   }
 
-  // 'exiting' — content fades in (second half) in normal flow (it owns the
-  // height, so no shift); the skeleton fades out (first half) on top of it.
+  // Keep this host identical during and after the exit so finishing the fade
+  // cannot remount content, restart its effects, or reset local state.
   return (
     <View style={style} testID={testID}>
-      <Animated.View style={contentEnterStyle}>{renderContent()}</Animated.View>
-      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, skeletonExitStyle]}>
-        {renderSkeleton()}
-      </Animated.View>
+      {renderContent()}
+      {phase === 'exiting' ? (
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, skeletonExitStyle]}>
+          {renderSkeleton()}
+        </Animated.View>
+      ) : null}
     </View>
   );
 }

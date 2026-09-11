@@ -17,7 +17,11 @@
     "nostr-tools": "2.24.2"
   },
   "scripts": {
-    "postinstall": "cd app && node scripts/dedupe-coco.js && node scripts/apply-patches.js && node modules/bitchat-module/scripts/patch-bitchat-imports.js && node modules/bitchat-module/scripts/sync-bitchat-android.js",
+    "assets:generate": "node scripts/assets.mjs && node scripts/feature-graphic.mjs",
+    "assets:check": "node scripts/assets.mjs --check && node scripts/feature-graphic.mjs --check",
+    "assets:brand": "node scripts/brand-assets.mjs",
+    "assets:test": "node --test scripts/brand-assets.test.mjs",
+    "postinstall": "cd app && node scripts/dedupe-coco.js && node modules/bitchat-module/scripts/patch-bitchat-imports.js && node modules/bitchat-module/scripts/sync-bitchat-android.js && node ../scripts/brand-assets.mjs",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
@@ -26,9 +30,10 @@
     "ios": "cd app && bun run ios",
     "android": "cd app && bun run android",
     "prebuild": "cd app && bun run prebuild",
-    "type-check": "cd app && bun run type-check",
+    "type-check": "bun run --filter '*' type-check",
     "lint": "cd app && bun run lint",
-    "test": "cd app && bun run test",
+    "test": "bun run --filter '*' test",
+    "test:app": "cd app && bun run test",
     "knip": "knip",
     "pretty": "cd app && bun run pretty",
     "pretty:check": "cd app && bun run pretty:check",
@@ -37,12 +42,27 @@
     "build:dev:android": "cd app && bun run build:dev:android",
     "build:ios": "cd app && bun run build:ios",
     "build:android": "cd app && bun run build:android",
-    "build:android:apk": "cd app && bun run build:android:apk",
     "submit:ios": "cd app && bun run submit:ios",
     "submit:android": "cd app && bun run submit:android",
-    "release:ios": "cd app && bun run release:ios"
+    "test:release": "node --test release/tests/*.test.mjs && python3 -m unittest discover -s release/tests -p 'test_*.py'",
+    "legal:sync": "node scripts/legal.mjs --sync-site",
+    "legal:check": "node scripts/legal.mjs --check-site",
+    "legal:publication-check": "node scripts/legal.mjs --publication-check",
+    "assets:feature": "node scripts/feature-graphic.mjs",
+    "assets:feature:check": "node scripts/feature-graphic.mjs --check"
   },
   "devDependencies": {
-    "vitepress": "^1.6.3"
+    "opentype.js": "2.0.0",
+    "svg-path-bbox": "2.1.0",
+    "svgo": "4.1.0",
+    "vitepress": "^1.6.3",
+    "sharp": "0.34.5"
+  },
+  "patchedDependencies": {
+    "heroui-native@1.0.4": "app/patches/heroui-native+1.0.4.patch",
+    "expo-modules-jsi@56.0.12": "app/patches/expo-modules-jsi+56.0.12.patch",
+    "react-native-screens@4.25.2": "app/patches/react-native-screens+4.25.2.patch",
+    "expo-router@56.2.11": "app/patches/expo-router+56.2.11.patch",
+    "@gorhom/bottom-sheet@5.2.14": "app/patches/@gorhom+bottom-sheet+5.2.14.patch"
   }
 }

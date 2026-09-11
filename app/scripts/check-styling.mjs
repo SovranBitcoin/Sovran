@@ -21,8 +21,10 @@
  * needs to be *stable*, so that the same file yields the same number until
  * someone actually changes how it is styled.
  */
-import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+
+import { writeRatchetArtifact } from './lib/ratchet-artifact.mjs';
 
 const ROOTS = ['app', 'features', 'shared', 'navigation', 'config'];
 const BUDGET_FILE = 'styling-budget.json';
@@ -86,7 +88,7 @@ function measure() {
 const { counts, scanned } = measure();
 
 if (process.argv.includes('--update')) {
-  writeFileSync(BUDGET_FILE, `${JSON.stringify(counts, null, 2)}\n`);
+  await writeRatchetArtifact(BUDGET_FILE, counts);
   const total = Object.values(counts).reduce(
     (sum, e) => sum + Object.values(e).reduce((a, b) => a + b, 0),
     0

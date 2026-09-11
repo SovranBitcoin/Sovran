@@ -722,7 +722,9 @@ function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger 
     }
 
     const src =
-      IS_DEV || logLevel === 'error' || logLevel === 'fatal'
+      (IS_DEV && process.env.EXPO_PUBLIC_LOG_STACKS === '1') ||
+      logLevel === 'error' ||
+      logLevel === 'fatal'
         ? getCallerLocation(3)
         : { file: 'unknown', func: 'unknown', line: 0 };
 

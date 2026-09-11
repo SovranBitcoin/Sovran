@@ -28,7 +28,7 @@ describe('loadE2E over the real tree', () => {
   });
 
   it('requires every canonical scenario to author a non-empty verify section', () => {
-    expect(loaded.scenarios.size).toBe(126);
+    expect(loaded.scenarios.size).toBe(129);
     for (const scenario of loaded.scenarios.values()) {
       expect(scenario.verify.length).toBeGreaterThan(0);
     }
@@ -52,7 +52,18 @@ describe('loadE2E over the real tree', () => {
     ]) {
       const scenario = loaded.scenarios.get(id)!;
       expect(scenario.steps).toContainEqual(revealWelcome);
-      expect(scenario.steps).not.toContainEqual({ action: 'swipe', dir: 'up' });
+      const confirmed = scenario.steps.findIndex(
+        (step) =>
+          step.action === 'tap' &&
+          'label' in step.selector &&
+          step.selector.label === 'Confirm and continue'
+      );
+      expect(confirmed).toBeGreaterThan(-1);
+      // Legal documents can scroll normally; carousel transitions require observed retry.
+      expect(scenario.steps.slice(confirmed + 1)).not.toContainEqual({
+        action: 'swipe',
+        dir: 'up',
+      });
     }
   });
 
@@ -1383,10 +1394,12 @@ describe('loadE2E over the real tree', () => {
     }
   });
 
-  it('limits Android AX value checks to audited semantic checked controls', () => {
+  it('limits Android AX value checks to audited checked controls and editable fields', () => {
     // Android flattens a labeled non-editable node's accessibilityValue into
     // content-desc. Only native checked state survives that merge as a
-    // separately parseable 0/1 value. Each selector below is pinned to a
+    // separately parseable 0/1 value. Editable Input maps to EditText, whose
+    // text is separately decoded as value by ax-adapter (covered there).
+    // Each checked selector below is pinned to a
     // checkbox, radio, or switch contract in the focused product-source tests.
     const auditedCheckedSelectors = [
       'filter-direction-in',
@@ -1397,16 +1410,21 @@ describe('loadE2E over the real tree', () => {
       'mint-distribution-toggle:https://mint.cubabitcoin.org',
       'mint-distribution-toggle:https://mint.minibits.cash/Bitcoin',
       'mint-distribution-toggle:https://mint.sovran.money',
+      'moderation-filter-toggle',
       'notification-policy-relaxed',
       'notification-policy-strict',
       'profile-reveal-mnemonic',
       'settings-mock-fail-melt-toggle',
       'settings-mock-fail-send-toggle',
       'settings-mock-offline-toggle',
+      'settings-mock-mode-toggle',
       'terms-acceptance',
+      'privacy-acknowledgment',
     ].sort();
     const auditedSet = new Set(auditedCheckedSelectors);
     const observed = new Set<string>();
+    const auditedEditableSelectors = new Set(['moderation-filter-words']);
+    const observedEditable = new Set<string>();
 
     for (const scenario of loaded.scenarios.values()) {
       if (scenario.lane !== 'simulator' && scenario.lane !== 'funded') continue;
@@ -1433,6 +1451,10 @@ describe('loadE2E over the real tree', () => {
             `${scenario.id} ${planned.id} uses Android AX value equality without an exact id`
           );
         }
+        if (auditedEditableSelectors.has(valueCheck.selector.id)) {
+          observedEditable.add(valueCheck.selector.id);
+          continue;
+        }
         if (valueCheck.value !== '0' && valueCheck.value !== '1') {
           throw new Error(
             `${scenario.id} ${planned.id} reads non-semantic Android AX value ${JSON.stringify(valueCheck.value)}`
@@ -1450,6 +1472,7 @@ describe('loadE2E over the real tree', () => {
     // Keep this an exact inventory: stale exemptions and newly introduced
     // labeled-value checks both fail until their product semantics are audited.
     expect([...observed].sort()).toEqual(auditedCheckedSelectors);
+    expect(observedEditable).toEqual(auditedEditableSelectors);
   });
 
   it('observes amount state by semantic id instead of Android-merged AX values', () => {
@@ -1781,10 +1804,11 @@ describe('loadE2E over the real tree', () => {
     expect(p.availability).toBe('ready');
     expect(p.steps[0]).toMatchObject({ phase: 'test', action: 'launch' }); // onboarding owns its launch
     const shots = p.steps.filter((s) => s.phase === 'test' && s.action === 'screenshot');
-    // splash, terms, four carousel slides (occurrences 1-4), and the welcome checkpoint
+    // splash, both legal documents, four carousel slides, and the welcome checkpoint
     expect(shots.map((s) => s.step.action === 'screenshot' && s.step.name)).toEqual([
       'splash',
       'terms',
+      'privacy',
       'onboarding-carousel',
       'onboarding-carousel',
       'onboarding-carousel',

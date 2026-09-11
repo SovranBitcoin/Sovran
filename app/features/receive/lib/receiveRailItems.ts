@@ -174,25 +174,38 @@ interface HistoryLinkIndex {
   truncated: boolean;
 }
 
-async function buildHistoryLinkIndex(manager: Manager): Promise<HistoryLinkIndex> {
+function quoteLinkKey(mintUrl: string, quoteId: string): string {
+  return JSON.stringify([mintUrl, quoteId]);
+}
+
+async function buildHistoryLinkIndex(
+  manager: Manager,
+  targets: { requestOpIds?: string[]; quoteKeys?: string[] }
+): Promise<HistoryLinkIndex> {
   const byRequestOpId = new Map<string, HistoryEntry>();
   const byQuoteId = new Map<string, HistoryEntry>();
+  const missingRequests = new Set(targets.requestOpIds);
+  const missingQuotes = new Set(targets.quoteKeys);
   let truncated = false;
   for (let page = 0; page < HISTORY_MAX_PAGES; page++) {
     const entries = await manager.history.getPaginatedHistory(page * HISTORY_PAGE, HISTORY_PAGE);
     for (const entry of entries) {
       if (entry.type === 'receive') {
         const reqId = (entry.metadata as Record<string, unknown> | undefined)?.requestOperationId;
-        if (typeof reqId === 'string' && reqId && !byRequestOpId.has(reqId)) {
+        if (typeof reqId === 'string' && missingRequests.delete(reqId)) {
           byRequestOpId.set(reqId, entry);
         }
       } else if (entry.type === 'mint') {
-        const quoteId = (entry as { quoteId?: unknown }).quoteId;
-        if (typeof quoteId === 'string' && quoteId && !byQuoteId.has(quoteId)) {
-          byQuoteId.set(quoteId, entry);
+        const key = quoteLinkKey(entry.mintUrl, entry.quoteId);
+        if (missingQuotes.delete(key)) {
+          byQuoteId.set(key, entry);
         }
       }
     }
+    // Pages are newest first, so the first match is authoritative for each
+    // link. Once every visible paid row is linked, older pages add no value.
+    if (missingRequests.size === 0 && missingQuotes.size === 0)
+      return { byRequestOpId, byQuoteId, truncated };
     if (entries.length < HISTORY_PAGE) return { byRequestOpId, byQuoteId, truncated };
     if (page === HISTORY_MAX_PAGES - 1) truncated = true;
   }
@@ -210,7 +223,13 @@ export async function buildPaymentRequestItems(
   const operations = await manager.paymentRequests.incoming.list();
   const sorted = [...operations].sort((a, b) => b.createdAt - a.createdAt);
   const needsLink = sorted.some((op) => op.singleUse && op.state === 'completed');
-  const index = needsLink ? await buildHistoryLinkIndex(manager) : null;
+  const index = needsLink
+    ? await buildHistoryLinkIndex(manager, {
+        requestOpIds: sorted
+          .filter((op) => op.singleUse && op.state === 'completed')
+          .map((op) => op.id),
+      })
+    : null;
   if (index?.truncated) {
     paymentLog.warn('receive.rail_list.history_truncated', {
       rail: 'paymentRequest',
@@ -242,7 +261,13 @@ export async function buildOnchainItems(
   const nowSeconds = Math.floor(Date.now() / 1000);
   const sorted = [...pending].sort((a, b) => b.createdAt - a.createdAt);
   const needsLink = sorted.some((q) => quoteAmountPaid(q) > 0);
-  const index = needsLink ? await buildHistoryLinkIndex(manager) : null;
+  const index = needsLink
+    ? await buildHistoryLinkIndex(manager, {
+        quoteKeys: sorted
+          .filter((q) => quoteAmountPaid(q) > 0)
+          .map((q) => quoteLinkKey(q.mintUrl, q.quoteId)),
+      })
+    : null;
   if (index?.truncated) {
     paymentLog.warn('receive.rail_list.history_truncated', { rail: 'onchain' });
   }
@@ -256,7 +281,8 @@ export async function buildOnchainItems(
       copyTarget: 'address',
       status,
       ...mintQuoteRailFields(q, opts.standingIds),
-      linkEntry: status === 'paid' ? index?.byQuoteId.get(q.quoteId) : undefined,
+      linkEntry:
+        status === 'paid' ? index?.byQuoteId.get(quoteLinkKey(q.mintUrl, q.quoteId)) : undefined,
       // coco watches until expiry (see `listening` docs); a reusable onchain
       // address keeps being watched even after a deposit, so this is `!expired`
       // (not tied to paid state).

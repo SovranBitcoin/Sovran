@@ -1,6 +1,6 @@
-diff --git a/node_modules/expo-router/build/react-navigation/drawer/views/DrawerView.js b/node_modules/expo-router/build/react-navigation/drawer/views/DrawerView.js
---- a/node_modules/expo-router/build/react-navigation/drawer/views/DrawerView.js
-+++ b/node_modules/expo-router/build/react-navigation/drawer/views/DrawerView.js
+diff --git a/build/react-navigation/drawer/views/DrawerView.js b/build/react-navigation/drawer/views/DrawerView.js
+--- a/build/react-navigation/drawer/views/DrawerView.js
++++ b/build/react-navigation/drawer/views/DrawerView.js
 @@ -59,7 +59,7 @@
      react_native_1.Platform.OS === 'ios', }) {
      const { direction } = (0, native_1.useLocale)();
@@ -19,9 +19,9 @@ diff --git a/node_modules/expo-router/build/react-navigation/drawer/views/Drawer
  }
  function DrawerView({ navigation, ...rest }) {
      return ((0, jsx_runtime_1.jsx)(elements_1.SafeAreaProviderCompat, { children: (0, jsx_runtime_1.jsx)(DrawerViewBase, { navigation: navigation, ...rest }) }));
-diff --git a/node_modules/expo-router/build/react-navigation/drawer/types.d.ts b/node_modules/expo-router/build/react-navigation/drawer/types.d.ts
---- a/node_modules/expo-router/build/react-navigation/drawer/types.d.ts
-+++ b/node_modules/expo-router/build/react-navigation/drawer/types.d.ts
+diff --git a/build/react-navigation/drawer/types.d.ts b/build/react-navigation/drawer/types.d.ts
+--- a/build/react-navigation/drawer/types.d.ts
++++ b/build/react-navigation/drawer/types.d.ts
 @@ -128,6 +128,7 @@
       * The opacity is animated from `0` to `1` when the drawer opens.
       */

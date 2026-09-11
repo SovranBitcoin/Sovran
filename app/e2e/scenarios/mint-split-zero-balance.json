@@ -13,9 +13,9 @@
   "steps": [
     {"action":"screenshot","name":"wallet"},
     {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-split"}}],"until":{"id":"mint-distribution-next"},"attempts":4,"settleMs":6000},
-    {"action":"waitFor","selector":{"id":"mint-distribution-toggle:https://mint.sovran.money"},"timeoutMs":30000},
+    {"action":"waitFor","selector":{"id":"mint-distribution-toggle:https://mint.macadamia.cash"},"timeoutMs":30000},
     {"action":"waitFor","selector":{"id":"mint-distribution-toggle:https://mint.minibits.cash/Bitcoin"},"timeoutMs":15000},
-    {"action":"waitFor","selector":{"id":"mint-distribution-toggle:https://mint.chorus.community"},"timeoutMs":15000},
+    {"action":"waitFor","selector":{"id":"mint-distribution-toggle:https://antifiat.cash"},"timeoutMs":15000},
     {"action":"waitFor","selector":{"id":"mint-distribution-toggle:https://mint.cubabitcoin.org"},"timeoutMs":15000},
     {"action":"waitFor","selector":{"id":"mint-distribution-next"},"state":"enabled","timeoutMs":15000},
     {"action":"screenshot","name":"balance-split","stable":true,"tolerance":0.001},

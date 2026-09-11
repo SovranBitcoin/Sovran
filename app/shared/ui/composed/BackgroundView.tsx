@@ -3,9 +3,13 @@ import { MeshGradientView } from 'expo-mesh-gradient';
 import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useBackgroundContext } from '@/shared/providers/BackgroundProvider';
-import { ReactNode, useEffect, useSyncExternalStore } from 'react';
+import { ReactNode, useSyncExternalStore } from 'react';
 import { Platform, StyleSheet, useWindowDimensions, ViewStyle } from 'react-native';
-import Animated, { interpolateColor, useAnimatedStyle } from 'react-native-reanimated';
+import Animated, {
+  interpolateColor,
+  useAnimatedStyle,
+  useReducedMotion,
+} from 'react-native-reanimated';
 import {
   carouselLayerOpacity,
   carouselX,
@@ -20,6 +24,7 @@ import {
   themeSurfaceTo,
 } from '@/shared/lib/theme/themeTransition';
 import { retainWallpaperMotion } from '@/shared/lib/theme/wallpaperMotion';
+import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
 import { useTheme } from '@/shared/providers/ThemeProvider';
 import { isBackgroundImageTheme, getGradientColorScale } from '@/config/backgroundImageThemes';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -279,6 +284,7 @@ export function AnimatedBackgroundView({
   useMeshGradient = false,
 }: AnimatedBackgroundViewProps) {
   useRenderLogger('AnimatedBackgroundView');
+  const reducedMotion = useReducedMotion();
   const surface = useThemeColor('surface');
   const { currentTheme } = useTheme();
 
@@ -306,14 +312,9 @@ export function AnimatedBackgroundView({
 
   // ONE shared DeviceMotion subscription drives every layer's parallax
   // transform (they all read the shared wallpaperMotion value), retained
-  // here while any image wallpaper is in play.
-  const hasImageWallpaper =
-    isBackgroundImageTheme(currentTheme) ||
-    carouselPages.some((page) => isBackgroundImageTheme(page.theme));
-  useEffect(() => {
-    if (!hasImageWallpaper) return;
-    return retainWallpaperMotion();
-  }, [hasImageWallpaper]);
+  // only while the focused foreground screen uses an image wallpaper.
+  const hasImageWallpaper = isBackgroundImageTheme(currentTheme);
+  useVisualActivityEffect(retainWallpaperMotion, hasImageWallpaper && !reducedMotion);
 
   const backgroundAnimatedStyle = useAnimatedStyle(() => ({
     // themeLayerOpacity dips to 0 during color-only theme switches so the

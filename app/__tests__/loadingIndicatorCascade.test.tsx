@@ -23,10 +23,19 @@
 
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
+import { useFrameCallback } from 'react-native-reanimated';
 
 import { LoadingIndicator } from '@/shared/blocks/status/LoadingIndicator';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+jest.mock('@/shared/hooks/useVisualActivityEffect', () => ({
+  useVisualActivityEffect: (effect: () => void | (() => void), enabled = true) => {
+    jest.requireActual<typeof import('react')>('react').useEffect(() => {
+      if (enabled) return effect();
+    }, [effect, enabled]);
+  },
+}));
 
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (tokens: string | string[]) =>
@@ -55,7 +64,12 @@ jest.mock('react-native-reanimated', () => {
       value >= 1 ? colors[1] : colors[0],
     useAnimatedProps: <T extends object>(factory: () => T) => factory(),
     useAnimatedStyle: <T extends object>(factory: () => T) => factory(),
-    useFrameCallback: jest.fn(),
+    cancelAnimation: jest.fn(),
+    useFrameCallback: jest.fn(() =>
+      jest
+        .requireActual<typeof import('react')>('react')
+        .useMemo(() => ({ setActive: jest.fn(), isActive: false, callbackId: 1 }), [])
+    ),
     // Stable across renders, like the real hook: effects keyed on shared
     // values must not re-fire just because the component re-rendered.
     useSharedValue: <T,>(value: T) => {
@@ -102,6 +116,36 @@ type DebugEvent = { event: string; params: Record<string, unknown> };
 
 const SEGMENT_ANIM_MS = 340;
 const SEGMENT_STAGGER_MS = 55;
+
+it('keeps terminal indicators cold and deactivates a spinner after its completion animation', () => {
+  jest.useFakeTimers();
+  let renderer!: TestRenderer.ReactTestRenderer;
+  act(() => {
+    renderer = TestRenderer.create(<LoadingIndicator phase="done" />);
+  });
+  const coldFrame = jest.mocked(useFrameCallback).mock.results.at(-1)!.value;
+  expect(coldFrame.setActive).not.toHaveBeenCalledWith(true);
+  expect(jest.mocked(useFrameCallback).mock.calls.at(-1)![1]).toBe(false);
+  act(() => {
+    renderer.unmount();
+  });
+  act(() => {
+    renderer = TestRenderer.create(<LoadingIndicator phase="loading" />);
+  });
+  const spinningFrame = jest.mocked(useFrameCallback).mock.results.at(-1)!.value;
+  expect(spinningFrame.setActive).toHaveBeenCalledWith(true);
+  act(() => {
+    renderer.update(<LoadingIndicator phase="done" />);
+  });
+  act(() => {
+    jest.advanceTimersByTime(3000);
+  });
+  expect(spinningFrame.setActive).toHaveBeenLastCalledWith(false);
+  act(() => {
+    renderer.unmount();
+  });
+  jest.useRealTimers();
+});
 
 describe('LoadingIndicator segment cascade timing', () => {
   function renderHarness(initialCompleted: number, segmentCount: number) {

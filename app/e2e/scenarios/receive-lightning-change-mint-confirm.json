@@ -9,7 +9,7 @@
   "requires": ["fresh-install","cocod.send.bolt11","unit.sat"],
   "funds": {"assets":[{"mintUrl":"https://mint.minibits.cash/Bitcoin","unit":"sat","accountIndex":0,"maxPrincipal":150}]},
   "setup": [
-    {"use":"flow.onboard"}
+    {"use":"flow.onboard-sovran-mint"}
   ],
   "steps": [
     {"action":"screenshot","name":"wallet"},

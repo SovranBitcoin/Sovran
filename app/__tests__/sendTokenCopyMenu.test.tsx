@@ -12,6 +12,7 @@ import { SendTokenScreen } from '@/features/send/screens/SendTokenScreen';
 const mockCopy = jest.fn(async () => undefined);
 const mockActionMenuPopup = jest.fn();
 const mockActionMenuSheet = jest.fn();
+let mockCancelLoading = false;
 
 jest.mock('wallet', () => ({
   getSendTokenReachabilityWarning: jest.fn(() => null),
@@ -52,17 +53,31 @@ jest.mock('wallet/react', () => ({
       share: { available: true, execute: jest.fn() },
       nfc: { available: true, execute: jest.fn() },
       checkStatus: { available: true, loading: false, execute: jest.fn() },
-      cancel: { available: true, execute: jest.fn() },
+      cancel: { available: true, loading: mockCancelLoading, execute: jest.fn() },
     },
   })),
 }));
 
 jest.mock('@/features/transactions', () => ({
   TransactionDetailShell: ({
+    cancelling,
+    timelineFocusKey,
     children,
     footer,
-  }: React.PropsWithChildren<{ footer: React.ReactNode }>) => (
+    beforeStatus,
+  }: React.PropsWithChildren<{
+    cancelling?: boolean;
+    timelineFocusKey?: string;
+    footer: React.ReactNode;
+    beforeStatus: React.ReactNode;
+  }>) => (
     <>
+      {jest.requireActual<typeof React>('react').createElement('TimelineFeedbackMock', {
+        testID: 'timeline-feedback',
+        cancelling,
+        focusKey: timelineFocusKey,
+      })}
+      {beforeStatus}
       {children}
       {footer}
     </>
@@ -128,7 +143,13 @@ jest.mock('@/features/send/components/P2PKLockIndicator', () => ({
   hasP2PKLock: jest.fn(() => false),
   P2PKLockIndicator: () => null,
 }));
-jest.mock('@/shared/blocks/PaymentInfo', () => ({ PaymentInfo: () => null }));
+jest.mock('@/shared/blocks/PaymentInfo', () => {
+  const ReactActual = jest.requireActual<typeof React>('react');
+  return {
+    PaymentInfo: (props: { active?: boolean }) =>
+      ReactActual.createElement('MockPaymentInfo', { ...props, testID: 'mock-payment-info' }),
+  };
+});
 jest.mock('@/shared/ui/composed/DetailsSection', () => ({ DetailsSection: () => null }));
 jest.mock('@/shared/ui/composed/GradientCard', () => ({ GradientCard: () => null }));
 jest.mock('@/shared/ui/composed/ScreenStates', () => ({
@@ -152,16 +173,16 @@ jest.mock('@/shared/ui/composed/ButtonHandler', () => {
         ...buttons
           .filter((button) => button.condition !== false)
           .map((button) =>
-            ReactActual.createElement(
-              'MockButton',
-              { key: button.testID, testID: button.testID, onPress: button.onPress },
-              button.text
-            )
+            ReactActual.createElement('MockButton', { ...button, key: button.testID }, button.text)
           )
       ),
   };
 });
-jest.mock('@/shared/ui/primitives/View/View', () => ({ View: () => null }));
+jest.mock('@/shared/ui/primitives/View/View', () => {
+  const ReactActual = jest.requireActual<typeof React>('react');
+  return { View: (props: React.PropsWithChildren) => ReactActual.createElement('MockView', props) };
+});
+jest.mock('@/shared/ui/primitives/Spinner', () => ({ Spinner: () => null }));
 jest.mock('@/shared/ui/primitives/View/HStack', () => ({
   HStack: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }));
@@ -170,9 +191,41 @@ jest.mock('heroui-native', () => ({ Alert: () => null }));
 
 describe('SendTokenScreen Copy menu', () => {
   beforeEach(() => {
+    mockCancelLoading = false;
     mockActionMenuPopup.mockReset();
     mockActionMenuSheet.mockReset();
     mockCopy.mockClear();
+  });
+
+  it('keeps cancellation feedback visible after the overflow closes without changing financial state', async () => {
+    let renderer!: TestRenderer.ReactTestRenderer;
+    mockCancelLoading = true;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <SendTokenScreen sendHistoryEntry="send:1" onNavigateBack={jest.fn()} />
+      );
+    });
+    expect(renderer.root.findAllByProps({ testID: 'send-token-cancelling' })).toHaveLength(0);
+    expect(renderer.root.findByProps({ testID: 'mock-payment-info' }).props.copyDisabled).toBe(
+      true
+    );
+    expect(renderer.root.findByProps({ testID: 'mock-payment-info' }).props.active).toBeUndefined();
+    expect(renderer.root.findByProps({ testID: 'timeline-feedback' }).props.cancelling).toBe(true);
+    expect(renderer.root.findByProps({ testID: 'timeline-feedback' }).props.focusKey).toBeDefined();
+    for (const id of ['cancel-transaction', 'copy', 'share', 'nfc', 'check-status']) {
+      expect(renderer.root.findByProps({ testID: `send-token-${id}` }).props.disabled).toBe(true);
+    }
+    mockCancelLoading = false;
+    await act(async () =>
+      renderer.update(<SendTokenScreen sendHistoryEntry="send:1" onNavigateBack={jest.fn()} />)
+    );
+    expect(renderer.root.findAllByProps({ testID: 'send-token-cancelling' })).toHaveLength(0);
+    expect(renderer.root.findByProps({ testID: 'mock-payment-info' }).props.copyDisabled).toBe(
+      false
+    );
+    expect(
+      renderer.root.findByProps({ testID: 'send-token-cancel-transaction' }).props.disabled
+    ).toBe(false);
   });
 
   it('opens its variants above the native transaction-flow modal', async () => {

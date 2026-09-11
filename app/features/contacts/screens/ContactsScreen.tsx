@@ -1,9 +1,11 @@
+import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
+import { shouldCensorDm } from '@/features/feed/lib/moderation';
+import { WhitenoiseSetupBanner } from '@/features/whitenoise/components/WhitenoiseSetupBanner';
 import { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { List } from '@/shared/ui/composed/List';
 import Icon from 'assets/icons';
 
-import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintManagement } from '@/features/mint';
 import { useNip17RecentContacts } from '@/features/payments/hooks/useNip17RecentContacts';
@@ -27,6 +29,7 @@ import { TierBadge } from '@/shared/ui/composed/TierBadge';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 import { ScreenContainer } from '../components/ScreenContainer';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { navigateToProfile } from '../lib/navigateToProfile';
 import {
   SearchFilters,
@@ -41,7 +44,10 @@ import { useWhitenoiseDmContacts } from '@/features/whitenoise/hooks/useWhitenoi
 import { RequestActions } from '@/features/whitenoise/components/RequestActions';
 import { useLocationTiers, type TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import { MOCK_ALLOWED_PUBKEYS_HEX } from '@/shared/stores/runtime/mockDataStore';
+import {
+  MOCK_ALLOWED_PUBKEYS_HEX,
+  isMockContactPubkey,
+} from '@/shared/stores/runtime/mockDataStore';
 
 type TopTab = 'contacts' | 'groups';
 
@@ -102,6 +108,7 @@ function buildContactsListData(
 export const ContactsScreen = () => {
   useLifecycleLogger('ContactsScreen');
   const [activeTab, setActiveTab] = useState<TopTab>('contacts');
+  const [bannerClearance, setBannerClearance] = useState(0);
   const [activeFilter, setActiveFilter] = useState<ContactsFilter>('All');
   const [surface, separator, muted] = useThemeColor([
     'surface',
@@ -109,10 +116,9 @@ export const ContactsScreen = () => {
     'muted',
   ] as const);
   const { tiers: locationTiers } = useLocationTiers();
-  const tabBarPadding = useTabBarBottomPadding();
   const pullToAi = usePullToAiRefreshControl();
-  const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled);
   const mockMode = useSettingsStore((state) => state.mockMode);
+  const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled) && !mockMode;
 
   const { keys: nostrKeys } = useNostrKeysContext();
   const { mints, getMintInfo } = useMintManagement();
@@ -144,7 +150,7 @@ export const ContactsScreen = () => {
   useEffect(() => {
     if (contactsHasLoadedOnce && !mintInfoLoading) setContactsLoadedOnce(true);
   }, [contactsHasLoadedOnce, mintInfoLoading]);
-  const showContactsSpinner = !contactsLoadedOnce;
+  const showContactsSpinner = !mockMode && !contactsLoadedOnce;
 
   // Pending White Noise (Marmot MLS) DM invites — surfaced as the 'Requests'
   // pill on the idle Contacts tab. The InviteReader (mounted by
@@ -171,9 +177,16 @@ export const ContactsScreen = () => {
   // Profile metadata is served from the shared SWR cache. Cache hits paint
   // immediately; misses/stale entries trigger one batched kind-0 subscription
   // with `authors: missingOrStale`.
-  const allPubkeys = [
-    ...new Set([...contactPubkeys, ...mintPubkeys, ...requestPubkeys, ...whitenoiseContactPubkeys]),
-  ];
+  const allPubkeys = mockMode
+    ? contactPubkeys
+    : [
+        ...new Set([
+          ...contactPubkeys,
+          ...mintPubkeys,
+          ...requestPubkeys,
+          ...whitenoiseContactPubkeys,
+        ]),
+      ];
   const { metadata: profilesMap } = useNostrProfileMetadataMany(allPubkeys);
 
   useEffect(() => {
@@ -208,20 +221,23 @@ export const ContactsScreen = () => {
       }))
     : [];
 
+  const blockedPeople = useFeedIgnoreStore((s) => s.ignoredPubkeys);
+  const filterEnabled = useFeedIgnoreStore((s) => s.dmFilterEnabled);
+  const filterWords = useFeedIgnoreStore((s) => s.dmFilterWords);
   const rawListData: ContactsListItem[] = buildContactsListData(
     activeFilter,
     whitenoiseContactRows,
     displayContacts,
     mintsWithProfile,
     requestRows
-  );
+  ).filter((item) => !item.pubkey || !blockedPeople.includes(item.pubkey));
 
-  // Mock-mode allowlist filter: only show rows whose nostr pubkey is in
-  // MOCK_ALLOWED_PUBKEYS_HEX (defined in mockDataStore). Mints / requests are
-  // dropped entirely so the screen reads as a clean, hardcoded demo list.
+  // Keep the curated public profiles and fictional chats; exclude live transports.
   const currentListData: ContactsListItem[] = mockMode
     ? rawListData.filter(
-        (item) => item.type === 'contact' && MOCK_ALLOWED_PUBKEYS_HEX.has(item.pubkey)
+        (item) =>
+          item.type === 'contact' &&
+          (MOCK_ALLOWED_PUBKEYS_HEX.has(item.pubkey) || isMockContactPubkey(item.pubkey))
       )
     : rawListData;
   const handleFilterChange = (filter: ContactsFilter) => {
@@ -263,8 +279,13 @@ export const ContactsScreen = () => {
     }
 
     const profile = item.pubkey ? profilesMap.get(item.pubkey) : undefined;
+    const rawMessage = typeof item.dmEvent?.content === 'string' ? item.dmEvent.content : undefined;
     const lastMessage =
-      typeof item.dmEvent?.content === 'string' ? item.dmEvent.content : undefined;
+      rawMessage &&
+      item.dmEvent?.isOwn !== true &&
+      shouldCensorDm(rawMessage, filterEnabled, filterWords)
+        ? '[censored]'
+        : rawMessage;
     // Relative date of the last message so it's obvious how long ago it was.
     const lastMessageAt =
       item.type === 'contact' &&
@@ -330,7 +351,14 @@ export const ContactsScreen = () => {
             </View>
           ) : undefined
         }
-        onPress={() => navigateToProfile(item.pubkey, mintUrl)}
+        onPress={() =>
+          mockMode && isMockContactPubkey(item.pubkey)
+            ? router.push({
+                pathname: '/(user-flow)/userMessages',
+                params: { pubkey: item.pubkey },
+              })
+            : navigateToProfile(item.pubkey, mintUrl)
+        }
         testID={`contact-row:nostr:${item.pubkey}`}
       />
     );
@@ -416,6 +444,8 @@ export const ContactsScreen = () => {
     }
     return (
       <List
+        screen
+        bottomSpacing={Math.max(16, bannerClearance)}
         data={currentListData}
         extraData={profilesMap}
         refreshControl={pullToAi.refreshControl}
@@ -426,11 +456,7 @@ export const ContactsScreen = () => {
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="always"
         ListEmptyComponent={renderEmpty}
-        contentContainerStyle={
-          currentListData.length === 0
-            ? [styles.emptyList, { paddingBottom: tabBarPadding }]
-            : { paddingBottom: tabBarPadding }
-        }
+        contentContainerStyle={currentListData.length === 0 ? styles.emptyList : undefined}
       />
     );
   };
@@ -438,6 +464,8 @@ export const ContactsScreen = () => {
   // Groups tab — the user's location tiers (provinces, countries, transports).
   const renderGroupsList = () => (
     <List
+      screen
+      bottomSpacing={Math.max(16, bannerClearance)}
       data={locationTiers}
       keyExtractor={(item) => item.key}
       refreshControl={pullToAi.refreshControl}
@@ -450,11 +478,7 @@ export const ContactsScreen = () => {
           <Text style={[styles.emptyText, { color: muted }]}>Getting your location...</Text>
         </View>
       }
-      contentContainerStyle={
-        locationTiers.length === 0
-          ? [styles.emptyList, { paddingBottom: tabBarPadding }]
-          : { paddingBottom: tabBarPadding }
-      }
+      contentContainerStyle={locationTiers.length === 0 ? styles.emptyList : undefined}
     />
   );
 
@@ -496,6 +520,7 @@ export const ContactsScreen = () => {
 
       <ScreenContainer>
         {activeTab === 'groups' ? renderGroupsList() : renderContactsList()}
+        <WhitenoiseSetupBanner onClearanceChange={setBannerClearance} />
       </ScreenContainer>
       <SearchOverlay recentContext="contacts" />
     </Log>

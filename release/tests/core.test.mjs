@@ -1,0 +1,89 @@
+import { test, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { request, download, safeUrl, GitHub, Ledger, sha256, compareVersion, published } from '../core.mjs';
+
+test('API credentials cannot follow redirects or escape the allowed origin', async () => {
+  const calls = [];
+  const handle = mock.method(globalThis, 'fetch', async (url, options) => {
+    calls.push({ url, options }); return new Response(null, { status: 302, headers: { location: 'https://attacker.example/token' } });
+  });
+  try {
+    await assert.rejects(request('https://api.github.com/repos/a/b', { hosts: ['api.github.com'], token: 'fake-canary' }), /HTTP 302/);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].options.redirect, 'error');
+    assert.throws(() => safeUrl('https://api.github.com@attacker.example/', ['api.github.com']));
+    assert.throws(() => safeUrl('http://api.github.com/', ['api.github.com']));
+    assert.throws(() => safeUrl('https://api.github.com:8443/', ['api.github.com']));
+  } finally { handle.mock.restore(); }
+});
+
+test('artifact redirects are checked before the next request and never carry auth', async () => {
+  let calls = 0;
+  const handle = mock.method(globalThis, 'fetch', async (_url, options) => {
+    calls++; assert.equal(options.headers, undefined);
+    return new Response(null, { status: 302, headers: { location: 'https://127.0.0.1/private' } });
+  });
+  try { await assert.rejects(download('https://github.com/artifact', ['github.com'])); assert.equal(calls, 1); }
+  finally { handle.mock.restore(); }
+});
+
+test('network exception text never propagates signed URLs or credentials', async () => {
+  const handle = mock.method(globalThis, 'fetch', async () => { throw new Error('https://host/?secret=fake-canary'); });
+  try {
+    await assert.rejects(request('https://api.github.com/', { hosts: ['api.github.com'] }), (error) => !error.message.includes('fake-canary'));
+    await assert.rejects(download('https://github.com/', ['github.com']), (error) => !error.message.includes('fake-canary'));
+  } finally { handle.mock.restore(); }
+});
+
+test('oversized provider data fails closed', async () => {
+  const handle = mock.method(globalThis, 'fetch', async () => new Response('12345'));
+  try { await assert.rejects(download('https://github.com/file', ['github.com'], 4)); }
+  finally { handle.mock.restore(); }
+});
+
+test('write-ahead intent survives lost acknowledgement and is not issued twice', async () => {
+  let saved; let calls = 0;
+  const gh = {
+    file: async () => saved ? { sha: 'one', bytes: saved } : null,
+    put: async (_file, bytes) => { saved = Buffer.from(bytes); calls++; throw new Error('lost acknowledgement'); },
+  };
+  const ledger = new Ledger(gh);
+  ledger.state = { schema: 1, version: '1.0.0', sourceSha: 'a'.repeat(40), intents: {} };
+  await assert.rejects(ledger.intent('build-ios'));
+  const resumed = new Ledger(gh); await resumed.load();
+  assert.equal(await resumed.intent('build-ios'), false);
+  assert.equal(calls, 1);
+});
+
+test('version comparison is numeric and rejects shell-shaped versions', () => {
+  assert.equal(compareVersion('0.10.0', '0.9.9'), 1);
+  assert.equal(compareVersion('1.0.0', '1.0.0'), 0);
+  assert.throws(() => compareVersion('1.0.0;echo secret', '1.0.0'));
+  assert.equal(sha256(Buffer.from('abc')), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+});
+test('reconfirming publication preserves timestamp and avoids website churn', () => {
+  const state = { version: '1.0.0', sourceSha: 'a'.repeat(40), channels: {} };
+  state.channels.appStore = published(state, 'appStore', '170', 'https://apps.apple.com/app/id6499554529');
+  assert.equal(published(state, 'appStore', '170', state.channels.appStore.url), state.channels.appStore);
+  assert.throws(() => published(state, 'appStore', '171', state.channels.appStore.url));
+});
+
+test('large checkpoint files resume through the immutable Git blob', async () => {
+  const sha = 'a'.repeat(40);
+  const calls = [];
+  const handle = mock.method(globalThis, 'fetch', async (url, options) => {
+    calls.push(String(url));
+    if (calls.length === 1) {
+      assert.equal(options.headers.Accept, 'application/vnd.github.object+json');
+      return Response.json({ type: 'file', sha, encoding: 'none', content: '' });
+    }
+    assert.ok(String(url).endsWith(`/git/blobs/${sha}`));
+    return Response.json({ sha, encoding: 'base64', content: Buffer.from('checkpoint').toString('base64') });
+  });
+  try {
+    const result = await new GitHub('fake-canary').file('active.json', 'release-state');
+    assert.equal(result.bytes.toString(), 'checkpoint');
+    assert.equal(result.sha, sha);
+    assert.equal(calls.length, 2);
+  } finally { handle.mock.restore(); }
+});

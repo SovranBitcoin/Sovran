@@ -133,6 +133,7 @@ function withCooldown(rawClient: NaggClient): NaggClient {
       return rawClient.rest(request)
         .map((value) => {
           consecutiveNetworkFailures = 0;
+          cooldownUntil = 0;
           return value;
         })
         .mapErr((error) => {

@@ -65,6 +65,7 @@ import type {
 import { DEFAULT_METRICS } from './nostr/feedTypes';
 import { buildDedupedVideoPosts } from './nostr/videoLayout';
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
+import { loadUserFeedImpl, type UserFeedLoadCtx } from '@/features/feed/lib/loadUserFeed';
 import {
   DEFAULT_ENGAGEMENT_STATE,
   getFeedRowItemType,
@@ -84,7 +85,6 @@ import { useFeedContentState } from '@/features/feed/hooks/useFeedContentState';
 import { useFeedInteractions } from '@/features/feed/hooks/useFeedInteractions';
 import { useFeedRows } from '@/features/feed/hooks/useFeedRows';
 import { usePostActions } from '@/features/feed/hooks/usePostActions';
-import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { List } from '@/shared/ui/composed/List';
 
@@ -224,17 +224,16 @@ export const RepostCard = React.memo(function RepostCard({
   const {
     gesture: tapGesture,
     suppress: suppressThreadTapStart,
-    release: suppressThreadTapEnd,
+    begin: beginThreadTap,
   } = useCardTapGesture(navigateToThread);
 
   return (
     <GestureDetector gesture={tapGesture}>
-      <Reanimated.View style={animStyle}>
+      <Reanimated.View style={animStyle} onStartShouldSetResponderCapture={beginThreadTap}>
         {/* Repost header */}
         <Pressable
           activeOpacity={0.7}
           onPressIn={suppressThreadTapStart}
-          onPressOut={suppressThreadTapEnd}
           onPress={() =>
             router.push({
               pathname: '/(user-flow)/profile',
@@ -281,7 +280,6 @@ export const RepostCard = React.memo(function RepostCard({
             onZapPress={onZapPress}
             onMorePress={onMorePress}
             onNestedProfilePressIn={suppressThreadTapStart}
-            onNestedProfilePressOut={suppressThreadTapEnd}
             getThreadContext={getThreadContext}
             showLineAbove={showLineAbove}
             fullBleedFooterBorder={fullBleedFooterBorder}
@@ -696,17 +694,18 @@ export function UserFeed({
     isLoading || feedItems.length === 0 ? (
       // Loading or empty: header-only mode (no rows to render).
       <List
+        screen
         data={[] as FeedRow[]}
         renderItem={() => null}
         ListHeaderComponent={feedHeader}
         style={styles.flexOne}
-        contentContainerStyle={USER_FEED_CONTENT_STYLE}
         showsVerticalScrollIndicator={false}
         onScroll={handleListScroll}
         scrollEventThrottle={16}
       />
     ) : (
       <List
+        screen
         data={feedRows}
         keyExtractor={getFeedRowKey}
         getItemType={getFeedRowItemType}
@@ -719,7 +718,6 @@ export function UserFeed({
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.4}
         style={styles.flexOne}
-        contentContainerStyle={USER_FEED_CONTENT_STYLE}
         showsVerticalScrollIndicator={false}
         onScroll={handleListScroll}
         scrollEventThrottle={16}
@@ -747,114 +745,6 @@ export function UserFeed({
 // (BuildHIR TryStatement); keeping them inside UserFeed made it skip the whole
 // component. Hoisted here, the component compiles and the loaders stay plain
 // async functions over an explicit context.
-
-type UserFeedContentState = ReturnType<typeof useFeedContentState>;
-
-interface UserFeedLoadCtx {
-  pubkey: string;
-  authorName: string | undefined;
-  authorPicture: string | undefined;
-  isOwnProfile: boolean | undefined;
-  hasMoreRef: { current: boolean };
-  paginationUntilRef: { current: number };
-  paginationOffsetRef: { current: number };
-  loadingMoreRef: { current: boolean };
-  feedItemIdsRef: { current: Set<string> };
-  activeLoadMoreIdRef: { current: string | null };
-  isFirstRender: { current: boolean };
-  deletedRepostIdsRef: { current: Record<string, number> | null };
-  quotedRef: UserFeedContentState['quotedRef'];
-  profilesRef: UserFeedContentState['profilesRef'];
-  applyPage: UserFeedContentState['applyPage'];
-  appendPage: UserFeedContentState['appendPage'];
-  applyEnrichment: UserFeedContentState['applyEnrichment'];
-  resetContent: UserFeedContentState['resetContent'];
-  setIsLoading: (value: boolean) => void;
-  setIsLoadingMore: (value: boolean) => void;
-}
-
-async function loadUserFeedImpl(ctx: UserFeedLoadCtx, isCancelled: () => boolean): Promise<void> {
-  const {
-    pubkey,
-    authorName,
-    authorPicture,
-    isOwnProfile,
-    hasMoreRef,
-    paginationUntilRef,
-    paginationOffsetRef,
-    feedItemIdsRef,
-    isFirstRender,
-    deletedRepostIdsRef,
-    applyPage,
-    applyEnrichment,
-    resetContent,
-    setIsLoading,
-  } = ctx;
-  const client = getFeedClient();
-
-  try {
-    const phase1 = await client.getUserFeed({
-      pubkey,
-      authorName,
-      authorPicture,
-      limit: 50,
-    });
-    if (isCancelled()) return;
-
-    paginationUntilRef.current = phase1.paginationUntil;
-    hasMoreRef.current = phase1.paginationUntil > 0 && phase1.orderedFeedItems.length > 0;
-    paginationOffsetRef.current = phase1.paginationOffset;
-    feedItemIdsRef.current = new Set(
-      phase1.orderedFeedItems.map((item) =>
-        item.type === 'note' ? item.event.id : item.repostEvent.id
-      )
-    );
-
-    if (isOwnProfile && deletedRepostIdsRef.current === null) {
-      deletedRepostIdsRef.current = useNostrSocialStore.getState().deletedRepostOriginalIds;
-    }
-
-    const displayItems =
-      isOwnProfile && deletedRepostIdsRef.current
-        ? phase1.orderedFeedItems.filter((item) => {
-            if (item.type !== 'repost') return true;
-            return !deletedRepostIdsRef.current![item.originalEventId];
-          })
-        : phase1.orderedFeedItems;
-
-    applyPage(phase1, displayItems);
-    setIsLoading(false);
-    // After initial render, mark first render done so subsequent items skip animation
-    requestAnimationFrame(() => {
-      isFirstRender.current = false;
-    });
-
-    if (!isCancelled()) {
-      const updates = await client.enrich({
-        missingQuotedIds: phase1.missingQuotedIds,
-        missingProfilePubkeys: phase1.missingProfilePubkeys,
-      });
-      if (isCancelled()) return;
-      // Async enrichment lands after first paint and reflows rows (quoted
-      // posts resolving, author names/avatars filling in). See HomeFeed.
-      feedLog.info('feed.shift.enrich', {
-        surface: 'user',
-        quotedEvents: updates.quotedEvents?.size ?? 0,
-        metrics: updates.metrics?.size ?? 0,
-        profiles: updates.profiles?.size ?? 0,
-      });
-      applyEnrichment(updates);
-    }
-  } catch (error) {
-    log.error('feed.user.load_failed', { error });
-    if (!isCancelled()) {
-      resetContent();
-      setIsLoading(false);
-    }
-  } finally {
-    client.dispose?.();
-  }
-}
 
 async function loadMoreUserItemsImpl(ctx: UserFeedLoadCtx): Promise<FeedItem[]> {
   const {
@@ -975,8 +865,6 @@ async function loadMoreUserItemsImpl(ctx: UserFeedLoadCtx): Promise<FeedItem[]> 
 // ============================================================================
 // Styles (UserFeed-specific only — shared styles live in nostr/shared.tsx)
 // ============================================================================
-
-const USER_FEED_CONTENT_STYLE = { paddingBottom: 120 };
 
 const styles = StyleSheet.create({
   flexOne: {

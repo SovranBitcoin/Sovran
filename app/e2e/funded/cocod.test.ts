@@ -22,6 +22,40 @@ const result = (stdout: string, code = 0): CocodCommandResult => ({
 });
 
 describe('typed cocod counterparty', () => {
+  it('requires a running session and available seed access for the 0.0.17 lifecycle', async () => {
+    const status = {
+      daemon: { version: '0.0.17', interfaceVersion: '1' },
+      wallet: { configuredAt: '2026-09-11T00:00:00Z' },
+      seedAccess: { state: 'available', requiresPassphrase: false },
+      cocoSession: { state: 'running' },
+    };
+    const cocod = createCocodCounterparty({ execute: async () => result(JSON.stringify(status)) });
+    expect(await cocod.status()).toBe('UNLOCKED');
+    for (const state of ['starting', 'stopping', 'stopped', 'failed']) {
+      status.cocoSession.state = state;
+      expect(await cocod.status()).toBe('ERROR');
+    }
+    status.cocoSession.state = 'running';
+    status.seedAccess.state = 'locked';
+    await expect(cocod.status()).rejects.toThrow('unknown cocod status');
+    status.cocoSession.state = 'stopped';
+    expect(await cocod.status()).toBe('LOCKED');
+    status.daemon.interfaceVersion = '2';
+    await expect(cocod.status()).rejects.toThrow('unknown cocod status');
+  });
+
+  it('rejects concatenated or string balances instead of coercing them into payment amounts', async () => {
+    const cocod = createCocodCounterparty({
+      execute: async () =>
+        result(
+          JSON.stringify({
+            'https://mint.sovran.money': { sats: '01024512256128128' },
+          })
+        ),
+    });
+    await expect(cocod.balanceSnapshot()).rejects.toThrow('invalid cocod balance');
+  });
+
   it('exposes strict status and exact mint/unit balance snapshots without history', async () => {
     const commands: string[][] = [];
     const execute: CocodCommandExecutor = mock(async (args) => {

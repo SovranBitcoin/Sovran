@@ -1,0 +1,1003 @@
+{
+  "schema": 1,
+  "productVersion": "0.1.1",
+  "sources": {
+    "mark": "83eeeba15af8106c183066523665fe83ce7d37ff0ebbdde089e66087d985c5c4",
+    "wordmark": "8e181d4c2989f79a4b4e1b0a254725dfb01c7127ee41586b40d2dd220021c151",
+    "font": "20c4d7ba5080f0ddd534f97c18b00fd29e6c2bfa3127821f926ce368dea64e0c",
+    "config": "381e2d4679d880f39950429519445f88c76c620af8c55e77aaadfba8e40c333d"
+  },
+  "tools": {
+    "svgo": "4.1.0",
+    "opentype": "2.0.0",
+    "geometry": "svg-path-bbox@2.1.0"
+  },
+  "variants": [
+    {
+      "layout": "symbol",
+      "theme": "black-on-light",
+      "svg": "generated/symbol/black-on-light/artwork.svg",
+      "viewBox": [
+        0,
+        0,
+        1024,
+        1024
+      ],
+      "bounds": [
+        {
+          "role": "mark",
+          "x": 268.268354,
+          "y": 96,
+          "width": 487.463292,
+          "height": 832
+        }
+      ],
+      "svgBytes": 1139,
+      "unoptimizedBytes": 1148,
+      "pngs": [
+        {
+          "file": "generated/symbol/black-on-light/16x16.png",
+          "width": 16,
+          "height": 16,
+          "sha256": "6bd3dbba39bcb46c70d813759904846db16581071eada373f7254c2abbb09145"
+        },
+        {
+          "file": "generated/symbol/black-on-light/32x32.png",
+          "width": 32,
+          "height": 32,
+          "sha256": "33eb84d27925a8c176166c610450dee7e438e2a24663e392c715f2c8fb7987d6"
+        },
+        {
+          "file": "generated/symbol/black-on-light/64x64.png",
+          "width": 64,
+          "height": 64,
+          "sha256": "c05cf83712d8a6ad8b93964e10758cfd0f1dca6ced3adabac53862547b653ee3"
+        },
+        {
+          "file": "generated/symbol/black-on-light/128x128.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "c69f4a0916155b26b518687f22cc11dfddbdfa6e6b95da229a12d158ce77424b"
+        },
+        {
+          "file": "generated/symbol/black-on-light/256x256.png",
+          "width": 256,
+          "height": 256,
+          "sha256": "f83369913a50ad3c04afbbe65329260331305c2edc383d83978dd58532f4581d"
+        },
+        {
+          "file": "generated/symbol/black-on-light/512x512.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "29e5984acc101550bc34a6a18e5681af13254299e03d8966a4c24b867ca77bde"
+        },
+        {
+          "file": "generated/symbol/black-on-light/1024x1024.png",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "cdf96d48160a01bc733bf0f42cc0f46df2900f091f076b5b40b0fd6126bf5afe"
+        },
+        {
+          "file": "generated/symbol/black-on-light/2048x2048.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "d88769d0101a1ef8428640308fc61ee7ddfac509455be5757fe14490fcb3631b"
+        }
+      ]
+    },
+    {
+      "layout": "symbol",
+      "theme": "white-on-dark",
+      "svg": "generated/symbol/white-on-dark/artwork.svg",
+      "viewBox": [
+        0,
+        0,
+        1024,
+        1024
+      ],
+      "bounds": [
+        {
+          "role": "mark",
+          "x": 268.268354,
+          "y": 96,
+          "width": 487.463292,
+          "height": 832
+        }
+      ],
+      "svgBytes": 1139,
+      "unoptimizedBytes": 1148,
+      "pngs": [
+        {
+          "file": "generated/symbol/white-on-dark/16x16.png",
+          "width": 16,
+          "height": 16,
+          "sha256": "1e1aa6c2dab667cef1487e98d06969235eced79829909f191998decde4c01066"
+        },
+        {
+          "file": "generated/symbol/white-on-dark/32x32.png",
+          "width": 32,
+          "height": 32,
+          "sha256": "cfbb256ca9d7eda4aeacc4d9854c8f9bacfa98ccd0cba5561401b25171180617"
+        },
+        {
+          "file": "generated/symbol/white-on-dark/64x64.png",
+          "width": 64,
+          "height": 64,
+          "sha256": "55a61fa60d199c0ba508959d7c91903f03f8a3caffd0948c5a00fa13d00ddebb"
+        },
+        {
+          "file": "generated/symbol/white-on-dark/128x128.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "d3e2fa2f98ccebf188431ccbe2ca90d9eed86f80023d3bb9d00ee61ce72c1e2f"
+        },
+        {
+          "file": "generated/symbol/white-on-dark/256x256.png",
+          "width": 256,
+          "height": 256,
+          "sha256": "31535384a2f05753331385af7da78d28cebaaf85aa8038db1de8b955729f892e"
+        },
+        {
+          "file": "generated/symbol/white-on-dark/512x512.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "5c2bbd9d7dfa1f291710b2e104467576b6f9131a91a36b662f7c8d20948bdbf0"
+        },
+        {
+          "file": "generated/symbol/white-on-dark/1024x1024.png",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "d88d75100a72840b4045095b82b67f5d04dad769747a63be957da361ad6ea23a"
+        },
+        {
+          "file": "generated/symbol/white-on-dark/2048x2048.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "e528b12466df3a8dbd912f7dd76eefbeba7e9833de9f56843643417dae0ce6b1"
+        }
+      ]
+    },
+    {
+      "layout": "symbol",
+      "theme": "black-on-transparent",
+      "svg": "generated/symbol/black-on-transparent/artwork.svg",
+      "viewBox": [
+        0,
+        0,
+        1024,
+        1024
+      ],
+      "bounds": [
+        {
+          "role": "mark",
+          "x": 268.268354,
+          "y": 96,
+          "width": 487.463292,
+          "height": 832
+        }
+      ],
+      "svgBytes": 930,
+      "unoptimizedBytes": 937,
+      "pngs": [
+        {
+          "file": "generated/symbol/black-on-transparent/16x16.png",
+          "width": 16,
+          "height": 16,
+          "sha256": "1ab037d09067f16b8b153dde56e9a36357b02d73b45efca7c9f3671b50cc7343"
+        },
+        {
+          "file": "generated/symbol/black-on-transparent/32x32.png",
+          "width": 32,
+          "height": 32,
+          "sha256": "0112c86cf640cf1ed774cebceda2f7c9dda3c4dfc99f22381a39c06397e3add4"
+        },
+        {
+          "file": "generated/symbol/black-on-transparent/64x64.png",
+          "width": 64,
+          "height": 64,
+          "sha256": "1e5a19823bee46e497c07ba358c844a1373d1b776a3d196e6d1d2dc008ccbade"
+        },
+        {
+          "file": "generated/symbol/black-on-transparent/128x128.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "0e96d4606e9214c0dc5bfa31fc973dcfe60c911365c151100b4ee26c97e26282"
+        },
+        {
+          "file": "generated/symbol/black-on-transparent/256x256.png",
+          "width": 256,
+          "height": 256,
+          "sha256": "04dfa74a9bdde26df226800fb1a53e9b334e1aaae8e9e13c5fdefee0a9358d62"
+        },
+        {
+          "file": "generated/symbol/black-on-transparent/512x512.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "0e8d4a4c1bdd76fda05aa32c6c42d439f3240ce814ad7aff0bbe7f524cca679d"
+        },
+        {
+          "file": "generated/symbol/black-on-transparent/1024x1024.png",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "d257e55a4f2c51d99876a8c8fba30edc22e8943ec6d58cefaf5faa98f908a270"
+        },
+        {
+          "file": "generated/symbol/black-on-transparent/2048x2048.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "b4cd49476a68653bfe0cdf2523e79bc3c018b69a98489151d115e14d5062900f"
+        }
+      ]
+    },
+    {
+      "layout": "symbol",
+      "theme": "white-on-transparent",
+      "svg": "generated/symbol/white-on-transparent/artwork.svg",
+      "viewBox": [
+        0,
+        0,
+        1024,
+        1024
+      ],
+      "bounds": [
+        {
+          "role": "mark",
+          "x": 268.268354,
+          "y": 96,
+          "width": 487.463292,
+          "height": 832
+        }
+      ],
+      "svgBytes": 927,
+      "unoptimizedBytes": 934,
+      "pngs": [
+        {
+          "file": "generated/symbol/white-on-transparent/16x16.png",
+          "width": 16,
+          "height": 16,
+          "sha256": "88002455b3df1b3a06a40bd334153aaa938fda06201513f4cf85d3d6303c534c"
+        },
+        {
+          "file": "generated/symbol/white-on-transparent/32x32.png",
+          "width": 32,
+          "height": 32,
+          "sha256": "2ca0223844a86e43d9dd571f896f667d28a74a84904cd1c6365fdc92fd1fc666"
+        },
+        {
+          "file": "generated/symbol/white-on-transparent/64x64.png",
+          "width": 64,
+          "height": 64,
+          "sha256": "78b1f874f4aecfc00e7a2620991585cd4a182c6264884eac44e569cb2cd3b768"
+        },
+        {
+          "file": "generated/symbol/white-on-transparent/128x128.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "f68b95ef55b8e5095a01b21b6bc97340ff691e834a71eaa710f3b402f950c165"
+        },
+        {
+          "file": "generated/symbol/white-on-transparent/256x256.png",
+          "width": 256,
+          "height": 256,
+          "sha256": "b4cc4d419c0674950109370379cd580066e1601e8d0fac330b2d736b5ee137a1"
+        },
+        {
+          "file": "generated/symbol/white-on-transparent/512x512.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "ab2fd6f0afd22fdab9f5e970f8a7cceadf893352ba322b16f4ede171ecfadddc"
+        },
+        {
+          "file": "generated/symbol/white-on-transparent/1024x1024.png",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "759af35cc7e6436560e7a22d5d24e436d00701a9bb26015688094c365f845205"
+        },
+        {
+          "file": "generated/symbol/white-on-transparent/2048x2048.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "565270dc1d509345f9d7b73be5c96639fd18fd0c1a8662575b6cd64c4dbdc4db"
+        }
+      ]
+    },
+    {
+      "layout": "wordmark-lockup",
+      "theme": "black-on-light",
+      "svg": "generated/wordmark-lockup/black-on-light/artwork.svg",
+      "viewBox": [
+        0,
+        0,
+        2048,
+        768
+      ],
+      "bounds": [
+        {
+          "role": "mark",
+          "x": 160.457752,
+          "y": 160,
+          "width": 262.480234,
+          "height": 448
+        },
+        {
+          "role": "wordmark",
+          "x": 550.937986,
+          "y": 232,
+          "width": 1336.604262,
+          "height": 304
+        }
+      ],
+      "svgBytes": 4694,
+      "unoptimizedBytes": 4698,
+      "pngs": [
+        {
+          "file": "generated/wordmark-lockup/black-on-light/16x6.png",
+          "width": 16,
+          "height": 6,
+          "sha256": "6c790cc910daa9afbec96e2d0151bd762f010adfd6dd311c18dad04b988b8746"
+        },
+        {
+          "file": "generated/wordmark-lockup/black-on-light/32x12.png",
+          "width": 32,
+          "height": 12,
+          "sha256": "aa65b6f6e1da01b3fd512e85359ae507664ec2b1076bfcb030b86d6d1d9f8a32"
+        },
+        {
+          "file": "generated/wordmark-lockup/black-on-light/64x24.png",
+          "width": 64,
+          "height": 24,
+          "sha256": "1b9b1979c37f568e68051d83756f93e2190eb40c2e1ca398e31d0e0e6c745fe1"
+        },
+        {
+          "file": "generated/wordmark-lockup/black-on-light/128x48.png",
+          "width": 128,
+          "height": 48,
+          "sha256": "0072d16aa43477499067b408f99043cfa7f565967159116120ab54120b31ab60"
+        },
+        {
+          "file": "generated/wordmark-lockup/black-on-light/256x96.png",
+          "width": 256,
+          "height": 96,
+          "sha256": "256961b932720dd95a0502458594a7a3ecf64fb2b916becd0d27bc9fc5f41b74"
+        },
+        {
+          "file": "generated/wordmark-lockup/black-on-light/512x192.png",
+          "width": 512,
+          "height": 192,
+          "sha256": "32ce575e1b55075ba41f083a2a1cbecffc818413b7c23125150b0f73e91a675a"
+        },
+        {
+          "file": "generated/wordmark-lockup/black-on-light/1024x384.png",
+          "width": 1024,
+          "height": 384,
+          "sha256": "0ce0e35340d0b3bf5e950f5e8d8cf763d1d0cfeb414d8ff87eecf3e6b1cfff6f"
+        },
+        {
+          "file": "generated/wordmark-lockup/black-on-light/2048x768.png",
+          "width": 2048,
+          "height": 768,
+          "sha256": "ad5a138b520b912ae2c1cce7b0c7ac45ec5053ed567d3a49172ffc8c1e09ffbd"
+        }
+      ]
+    },
+    {
+      "layout": "wordmark-lockup",
+      "theme": "white-on-dark",
+      "svg": "generated/wordmark-lockup/white-on-dark/artwork.svg",
+      "viewBox": [
+        0,
+        0,
+        2048,
+        768
+      ],
+      "bounds": [
+        {
+          "role": "mark",
+          "x": 160.457752,
+          "y": 160,
+          "width": 262.480234,
+          "height": 448
+        },
+        {
+          "role": "wordmark",
+          "x": 550.937986,
+          "y": 232,
+          "width": 1336.604262,
+          "height": 304
+        }
+      ],
+      "svgBytes": 4694,
+      "unoptimizedBytes": 4698,
+      "pngs": [
+        {
+          "file": "generated/wordmark-lockup/white-on-dark/16x6.png",
+          "width": 16,
+          "height": 6,
+          "sha256": "6e75e635821daf646db2f01b4f4694e81a5fa755e0deba5f111050bf2be45232"
+        },
+        {
+          "file": "generated/wordmark-lockup/white-on-dark/32x12.png",
+          "width": 32,
+          "height": 12,
+          "sha256": "cd0f56639eae1c6ca4571e7a257a3523c1fd9d8169d9d453bb10706924b70f16"
+        },
+        {
+          "file": "generated/wordmark-lockup/white-on-dark/64x24.png",
+          "width": 64,
+          "height": 24,
+          "sha256": "43a89040d6dc5600b119689da78bb0b96656b56d878f9fad474af48d447413db"
+        },
+        {
+          "file": "generated/wordmark-lockup/white-on-dark/128x48.png",
+          "width": 128,
+          "height": 48,
+          "sha256": "53c9518f43170c6c2e6a4a65c06d499a70213f324f4be472be685918fd9a3b8a"
+        },
+        {
+          "file": "generated/wordmark-lockup/white-on-dark/256x96.png",
+          "width": 256,
+          "height": 96,
+          "sha256": "60b675e242eefd981c269cf392949a3682302f9534210997d3f54d7397173c7f"
+        },
+        {
+          "file": "generated/wordmark-lockup/white-on-dark/512x192.png",
+          "width": 512,
+          "height": 192,
+          "sha256": "d4ab3d0403b9a20e26195f7499775853576a33e5699533043a6388db5ffd55b5"
+        },
+        {
+          "file": "generated/wordmark-lockup/white-on-dark/1024x384.png",
+          "width": 1024,
+          "height": 384,
+          "sha256": "b557a07e58e1286a86a53e299884bc8529de90e463a27b9a98e7c06367c28495"
+        },
+        {
+          "file": "generated/wordmark-lockup/white-on-dark/2048x768.png",
+          "width": 2048,
+          "height": 768,
+          "sha256": "a949185f2a0a3af5118fbf2a65170f9569c14c61c1bb984c694090ee5fc96f97"
+        }
+      ]
+    },
+    {
+      "layout": "wordmark-lockup",
+      "theme": "black-on-transparent",
+      "svg": "generated/wordmark-lockup/black-on-transparent/artwork.svg",
+      "viewBox": [
+        0,
+        0,
+        2048,
+        768
+      ],
+      "bounds": [
+        {
+          "role": "mark",
+          "x": 160.457752,
+          "y": 160,
+          "width": 262.480234,
+          "height": 448
+        },
+        {
+          "role": "wordmark",
+          "x": 550.937986,
+          "y": 232,
+          "width": 1336.604262,
+          "height": 304
+        }
+      ],
+      "svgBytes": 4486,
+      "unoptimizedBytes": 4488,
+      "pngs": [
+        {
+          "file": "generated/wordmark-lockup/black-on-transparent/16x6.png",
+          "width": 16,
+          "height": 6,
+          "sha256": "22e3c56867f68bd598adde99b52fd4116f457964f5418f9994e705892a3c9290"
+        },
+        {
+          "file": "generated/wordmark-lockup/black-on-transparent/32x12.png",
+          "width": 32,
+          "height": 12,
+          "sha256": "87ce8d239a328b5d694eead757cee3d385a25062a298f29bbba4e2aa3cf2f957"
+        },
+        {
+          "file": "generated/wordmark-lockup/black-on-transparent/64x24.png",
+          "width": 64,
+          "height": 24,
+          "sha256": "45059358f425ba16b99712d8dcf96c7019cd8d43d22b1cbede98b1984125d002"
+        },
+        {
+          "file": "generated/wordmark-lockup/black-on-transparent/128x48.png",
+          "width": 128,
+          "height": 48,
+          "sha256": "70a69d3a6dacd2497288e909684bc0de9c87acd6bafe77a8689a88ea474fda9d"
+        },
+        {
+          "file": "generated/wordmark-lockup/black-on-transparent/256x96.png",
+          "width": 256,
+          "height": 96,
+          "sha256": "71913adcb6e719861786dd42ab5d39607673343f868e27ea9f0bba815494710a"
+        },
+        {
+          "file": "generated/wordmark-lockup/black-on-transparent/512x192.png",
+          "width": 512,
+          "height": 192,
+          "sha256": "5913ae52c91ed81f96c87e351e0a1f3c5ca45e6bda19bb11fb01c97149ca7df4"
+        },
+        {
+          "file": "generated/wordmark-lockup/black-on-transparent/1024x384.png",
+          "width": 1024,
+          "height": 384,
+          "sha256": "3c8f78a4c42372ddd064e220eb829e354a3b6874d51827ee2b3ce5bc9bcd3325"
+        },
+        {
+          "file": "generated/wordmark-lockup/black-on-transparent/2048x768.png",
+          "width": 2048,
+          "height": 768,
+          "sha256": "30f866181cea041b56a88d0bd766bbe09e270e13fb04c72d7901036f6cce3425"
+        }
+      ]
+    },
+    {
+      "layout": "wordmark-lockup",
+      "theme": "white-on-transparent",
+      "svg": "generated/wordmark-lockup/white-on-transparent/artwork.svg",
+      "viewBox": [
+        0,
+        0,
+        2048,
+        768
+      ],
+      "bounds": [
+        {
+          "role": "mark",
+          "x": 160.457752,
+          "y": 160,
+          "width": 262.480234,
+          "height": 448
+        },
+        {
+          "role": "wordmark",
+          "x": 550.937986,
+          "y": 232,
+          "width": 1336.604262,
+          "height": 304
+        }
+      ],
+      "svgBytes": 4483,
+      "unoptimizedBytes": 4485,
+      "pngs": [
+        {
+          "file": "generated/wordmark-lockup/white-on-transparent/16x6.png",
+          "width": 16,
+          "height": 6,
+          "sha256": "41b1616970c84ea484e43a4fb575f0d7586041f530164efc32a6de1c45da1b4c"
+        },
+        {
+          "file": "generated/wordmark-lockup/white-on-transparent/32x12.png",
+          "width": 32,
+          "height": 12,
+          "sha256": "30b87b7c8efc562c7b65b3504f1221778cfeece7baef81d40d7fa24634a9a29e"
+        },
+        {
+          "file": "generated/wordmark-lockup/white-on-transparent/64x24.png",
+          "width": 64,
+          "height": 24,
+          "sha256": "872660df960f6dcbedc1c6de8999fd17143d0b704c045415d5a2f8232cf89da8"
+        },
+        {
+          "file": "generated/wordmark-lockup/white-on-transparent/128x48.png",
+          "width": 128,
+          "height": 48,
+          "sha256": "9fd77d54e683b264d590ee3bdadcf921b07fb591baa6ef8b845a9722b0a57fc1"
+        },
+        {
+          "file": "generated/wordmark-lockup/white-on-transparent/256x96.png",
+          "width": 256,
+          "height": 96,
+          "sha256": "3fc3be780f125197c2bc5dc3a4bf4b4a5375d7e7ba061cfa6aa9c21da412c89d"
+        },
+        {
+          "file": "generated/wordmark-lockup/white-on-transparent/512x192.png",
+          "width": 512,
+          "height": 192,
+          "sha256": "fb2d45784ee40097cd1c8dfe68f3d4547c195a74ced2fb27e1e32a85249a3534"
+        },
+        {
+          "file": "generated/wordmark-lockup/white-on-transparent/1024x384.png",
+          "width": 1024,
+          "height": 384,
+          "sha256": "b386b355faec5234ebedbb8f0b771059b7728c365db002294b54e79455c1676d"
+        },
+        {
+          "file": "generated/wordmark-lockup/white-on-transparent/2048x768.png",
+          "width": 2048,
+          "height": 768,
+          "sha256": "e24a9e2c70f5d2c618c68168cc64fa190d9272203276305f6a40a47702590670"
+        }
+      ]
+    },
+    {
+      "layout": "version-lockup",
+      "theme": "black-on-light",
+      "svg": "generated/version-lockup/black-on-light/artwork.svg",
+      "viewBox": [
+        0,
+        0,
+        1024,
+        1024
+      ],
+      "bounds": [
+        {
+          "role": "mark",
+          "x": 343.262707,
+          "y": 140,
+          "width": 337.474587,
+          "height": 576
+        },
+        {
+          "role": "version",
+          "x": 382.629032,
+          "y": 780,
+          "width": 258.741935,
+          "height": 104
+        }
+      ],
+      "version": "0.1.1",
+      "svgBytes": 1729,
+      "unoptimizedBytes": 2685,
+      "pngs": [
+        {
+          "file": "generated/version-lockup/black-on-light/16x16.png",
+          "width": 16,
+          "height": 16,
+          "sha256": "f8a12d7c817afad6b5bf11ea5fb352c04152c03961d03ba442c9b22de02f7cc0"
+        },
+        {
+          "file": "generated/version-lockup/black-on-light/32x32.png",
+          "width": 32,
+          "height": 32,
+          "sha256": "0300b205ffcc663cda447eb33cc12fa67580901742282a4f9543cdd7d622d0c2"
+        },
+        {
+          "file": "generated/version-lockup/black-on-light/64x64.png",
+          "width": 64,
+          "height": 64,
+          "sha256": "90db6733269bee9061008d948a69b1ceebcca378cd98bad1233da16c405aafc9"
+        },
+        {
+          "file": "generated/version-lockup/black-on-light/128x128.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "7b8a3f77b7477b9a14a89c1fa8e24cf9912ccd48039b338f925a265fc171727f"
+        },
+        {
+          "file": "generated/version-lockup/black-on-light/256x256.png",
+          "width": 256,
+          "height": 256,
+          "sha256": "c053b13346f43b9c8e3f0a146555e3d8f62e00ea34380a19c472990740a6d880"
+        },
+        {
+          "file": "generated/version-lockup/black-on-light/512x512.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "fc5517d0ca4091b4852cb76d43cc86a8c5f27269218ad75cae3e654a2a421186"
+        },
+        {
+          "file": "generated/version-lockup/black-on-light/1024x1024.png",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "7da00d8d19a58f5888c141cf8017c7f687e6c21323ff28bf8f27ebd7e79b43ee"
+        },
+        {
+          "file": "generated/version-lockup/black-on-light/2048x2048.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "a54d6862bfd98a5af1000eff730680e3ef036cd27c39cec8f9e9c0565da7dae2"
+        }
+      ]
+    },
+    {
+      "layout": "version-lockup",
+      "theme": "white-on-dark",
+      "svg": "generated/version-lockup/white-on-dark/artwork.svg",
+      "viewBox": [
+        0,
+        0,
+        1024,
+        1024
+      ],
+      "bounds": [
+        {
+          "role": "mark",
+          "x": 343.262707,
+          "y": 140,
+          "width": 337.474587,
+          "height": 576
+        },
+        {
+          "role": "version",
+          "x": 382.629032,
+          "y": 780,
+          "width": 258.741935,
+          "height": 104
+        }
+      ],
+      "version": "0.1.1",
+      "svgBytes": 1729,
+      "unoptimizedBytes": 2685,
+      "pngs": [
+        {
+          "file": "generated/version-lockup/white-on-dark/16x16.png",
+          "width": 16,
+          "height": 16,
+          "sha256": "d22cf59b30cdd90c72c8258cccc5954e804c18004daec67d97359a26f2a7bfeb"
+        },
+        {
+          "file": "generated/version-lockup/white-on-dark/32x32.png",
+          "width": 32,
+          "height": 32,
+          "sha256": "e251ac88852c8fa904a31891f9767bd8928169ecba678de084d4f3c38cc113b2"
+        },
+        {
+          "file": "generated/version-lockup/white-on-dark/64x64.png",
+          "width": 64,
+          "height": 64,
+          "sha256": "71f7c4a6fdbbc57b437efa5c1e45cabdd315badd6726328a0b1365b8db32af36"
+        },
+        {
+          "file": "generated/version-lockup/white-on-dark/128x128.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "ccba0319ac94cb04bbcef5febfd601e80673e0ca9d11eabe8b2f2e6e5cdab2b3"
+        },
+        {
+          "file": "generated/version-lockup/white-on-dark/256x256.png",
+          "width": 256,
+          "height": 256,
+          "sha256": "45f041bcb3b4c628d9f1320dea7574122df37a01b2bb04adee09b464825048f9"
+        },
+        {
+          "file": "generated/version-lockup/white-on-dark/512x512.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "907c3aa808f71a4cd0ae23bcc357665cc8f76fc6ecd78d9509bb4216d3de3cec"
+        },
+        {
+          "file": "generated/version-lockup/white-on-dark/1024x1024.png",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "51ca8c010b85500dba6a91ed25046cf8a4078cf5dece17dedd6977197a3cebe9"
+        },
+        {
+          "file": "generated/version-lockup/white-on-dark/2048x2048.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "33c11038e4144c93c544646f34ce17153afa206809d19490d31db0ab2422a6d9"
+        }
+      ]
+    },
+    {
+      "layout": "version-lockup",
+      "theme": "black-on-transparent",
+      "svg": "generated/version-lockup/black-on-transparent/artwork.svg",
+      "viewBox": [
+        0,
+        0,
+        1024,
+        1024
+      ],
+      "bounds": [
+        {
+          "role": "mark",
+          "x": 343.262707,
+          "y": 140,
+          "width": 337.474587,
+          "height": 576
+        },
+        {
+          "role": "version",
+          "x": 382.629032,
+          "y": 780,
+          "width": 258.741935,
+          "height": 104
+        }
+      ],
+      "version": "0.1.1",
+      "svgBytes": 1520,
+      "unoptimizedBytes": 2474,
+      "pngs": [
+        {
+          "file": "generated/version-lockup/black-on-transparent/16x16.png",
+          "width": 16,
+          "height": 16,
+          "sha256": "640cfd74ceb554ff49d0e1462a1e9e91b7303504a0313939dd0c860c47ce25f5"
+        },
+        {
+          "file": "generated/version-lockup/black-on-transparent/32x32.png",
+          "width": 32,
+          "height": 32,
+          "sha256": "35c160f3d71f530f4131bb9792a44642e35d87bf7d8ac5b577a9a21131c5a816"
+        },
+        {
+          "file": "generated/version-lockup/black-on-transparent/64x64.png",
+          "width": 64,
+          "height": 64,
+          "sha256": "e80906d696ece19d7e52e38d4c09f57af80bdcd5904707862f6fe64d9b99682f"
+        },
+        {
+          "file": "generated/version-lockup/black-on-transparent/128x128.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "994ee2d1b70021badf93e631f81bb2f44db7243d0105cd58ead7ca6770598efb"
+        },
+        {
+          "file": "generated/version-lockup/black-on-transparent/256x256.png",
+          "width": 256,
+          "height": 256,
+          "sha256": "94c6b9e4eadc1cfc01e78e7817172dc02d0a88edbcfdcecc13d73a01d71f3227"
+        },
+        {
+          "file": "generated/version-lockup/black-on-transparent/512x512.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "f725f64e7abb671e3df23be94b73c83da20ea3dd8ce9a707b0323ed613e5230c"
+        },
+        {
+          "file": "generated/version-lockup/black-on-transparent/1024x1024.png",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "c4505e072ae6e253305a0e10b4553670f8f6c8d803f5207eb009451a457f54e2"
+        },
+        {
+          "file": "generated/version-lockup/black-on-transparent/2048x2048.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "011857899ea50dc4b93e16a866f548b6b1aee723016cb88d27b2475c52bf4af9"
+        }
+      ]
+    },
+    {
+      "layout": "version-lockup",
+      "theme": "white-on-transparent",
+      "svg": "generated/version-lockup/white-on-transparent/artwork.svg",
+      "viewBox": [
+        0,
+        0,
+        1024,
+        1024
+      ],
+      "bounds": [
+        {
+          "role": "mark",
+          "x": 343.262707,
+          "y": 140,
+          "width": 337.474587,
+          "height": 576
+        },
+        {
+          "role": "version",
+          "x": 382.629032,
+          "y": 780,
+          "width": 258.741935,
+          "height": 104
+        }
+      ],
+      "version": "0.1.1",
+      "svgBytes": 1517,
+      "unoptimizedBytes": 2471,
+      "pngs": [
+        {
+          "file": "generated/version-lockup/white-on-transparent/16x16.png",
+          "width": 16,
+          "height": 16,
+          "sha256": "afe3bf4225ec49d2459c6266566003b2ac17cc6c169bca546ba057ba82733544"
+        },
+        {
+          "file": "generated/version-lockup/white-on-transparent/32x32.png",
+          "width": 32,
+          "height": 32,
+          "sha256": "357f3a12049f1a34921f07de0574670b0a61d8e360c24f0292e80b11f2f74ff2"
+        },
+        {
+          "file": "generated/version-lockup/white-on-transparent/64x64.png",
+          "width": 64,
+          "height": 64,
+          "sha256": "aab6f4e5392cee9cb77c54172f40b3ec5c63a9421542af90ab78b3b0a275051e"
+        },
+        {
+          "file": "generated/version-lockup/white-on-transparent/128x128.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "84065b514d83a51911b2c1050bb490216210bb41454cfc90d9056f1ade484af3"
+        },
+        {
+          "file": "generated/version-lockup/white-on-transparent/256x256.png",
+          "width": 256,
+          "height": 256,
+          "sha256": "d5098cc101ee4334ae495f1888ca5b4c2e3c360c807cef4839992000e2ff4ad9"
+        },
+        {
+          "file": "generated/version-lockup/white-on-transparent/512x512.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "11efa1e1f70af88e4c5a4f177f785abc4a60bb09c7d1cf06cdd0c9cb1365864b"
+        },
+        {
+          "file": "generated/version-lockup/white-on-transparent/1024x1024.png",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "4615e3d33f4da53b851aa09ad97b49a3721600bcc1a01e4f70c0b1a2a7f89e65"
+        },
+        {
+          "file": "generated/version-lockup/white-on-transparent/2048x2048.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "0a0b60520fe5070ea9d4e959ecf8349001a3d245e15804ba1ad0d5c98042d8ea"
+        }
+      ]
+    }
+  ],
+  "androidAdaptive": {
+    "svg": "generated/android-adaptive-icon/black-on-transparent/artwork.svg",
+    "bounds": [
+      {
+        "role": "mark",
+        "x": 357.324148,
+        "y": 248,
+        "width": 309.351705,
+        "height": 528
+      }
+    ],
+    "pngs": [
+      {
+        "file": "generated/android-adaptive-icon/black-on-transparent/16x16.png",
+        "width": 16,
+        "height": 16,
+        "sha256": "a1c01a327817660d692b2af3d7778f79dd77d9763bfe0f2edf8bca3e0dedb537"
+      },
+      {
+        "file": "generated/android-adaptive-icon/black-on-transparent/32x32.png",
+        "width": 32,
+        "height": 32,
+        "sha256": "19514352339e0a6e9223c1d50df82324e4c87c942c29fcde2fe3e1660e8fc41a"
+      },
+      {
+        "file": "generated/android-adaptive-icon/black-on-transparent/64x64.png",
+        "width": 64,
+        "height": 64,
+        "sha256": "b167890393922df1157328751f15e4957c1752f7a5a2c5c54de947e778c5198f"
+      },
+      {
+        "file": "generated/android-adaptive-icon/black-on-transparent/128x128.png",
+        "width": 128,
+        "height": 128,
+        "sha256": "5b7ac72870297b6a5c16c3ed190ef98249188ac23c11a074a2cca753ff3a7f69"
+      },
+      {
+        "file": "generated/android-adaptive-icon/black-on-transparent/256x256.png",
+        "width": 256,
+        "height": 256,
+        "sha256": "3b9ece105e19f0db5d4e505a5b1137c6e981f2055c63a8c77b0553adaf13b051"
+      },
+      {
+        "file": "generated/android-adaptive-icon/black-on-transparent/512x512.png",
+        "width": 512,
+        "height": 512,
+        "sha256": "e90657e8adbe274b0714b6ca83e0369106efeb9a8c4ed2170be2dafbfd182600"
+      },
+      {
+        "file": "generated/android-adaptive-icon/black-on-transparent/1024x1024.png",
+        "width": 1024,
+        "height": 1024,
+        "sha256": "a6bb755b98d2333b392dca4c8f6eb66f2312bfa086aea5d4f38d7bf63cac8e54"
+      },
+      {
+        "file": "generated/android-adaptive-icon/black-on-transparent/2048x2048.png",
+        "width": 2048,
+        "height": 2048,
+        "sha256": "f138f20a8b31d5c36335b754468e6ace23fd9ae4ab2145c00c7f9d28372348da"
+      }
+    ]
+  }
+}

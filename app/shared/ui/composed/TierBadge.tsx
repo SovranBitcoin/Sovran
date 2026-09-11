@@ -2,6 +2,7 @@ import type { NostrTier } from '@sovranbitcoin/schemas';
 import * as React from 'react';
 
 import { Badge } from '@/shared/ui/primitives/Badge';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useDebugTier } from '@/shared/stores/runtime/debugTierStore';
 
 // Single-letter debug chip showing which facade tier served this note's data.
@@ -23,7 +24,9 @@ const TIER_DISPLAY: Record<
  */
 export function TierBadge({ eventId }: { eventId: string }): React.ReactElement | null {
   const tier = useDebugTier(eventId);
-  if (!__DEV__ || !tier) return null;
+  const mockMode = useSettingsStore((state) => state.mockMode);
+  // Mock Mode is for presentation captures; internal source chips are not app UI.
+  if (!__DEV__ || mockMode || !tier) return null;
   const display = TIER_DISPLAY[tier] ?? { letter: tier.charAt(0), variant: 'secondary' as const };
   return (
     <Badge variant={display.variant} size={10}>

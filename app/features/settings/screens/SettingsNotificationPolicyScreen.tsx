@@ -1,5 +1,6 @@
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import React, { useCallback } from 'react';
-import { ScrollView } from 'react-native';
+
 import { ListGroup, PressableFeedback, Separator } from 'heroui-native';
 
 import type { FeedNotificationPolicy } from '@/features/feed/data/feedClient';
@@ -39,10 +40,7 @@ export function SettingsNotificationPolicyScreen() {
 
   return (
     <ScreenWrapper name="SettingsNotificationPolicyScreen" scroll="custom" safeArea>
-      <ScrollView
-        className="px-4"
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerClassName="pb-8">
+      <ScreenScrollView className="px-4" bottomSpacing={32}>
         <Section title="Policy">
           <ListGroup variant="secondary">
             {NOTIFICATION_POLICIES.map((option, index) => (
@@ -59,7 +57,7 @@ export function SettingsNotificationPolicyScreen() {
             ))}
           </ListGroup>
         </Section>
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenWrapper>
   );
 }

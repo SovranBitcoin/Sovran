@@ -2,6 +2,7 @@
 /* eslint-disable no-console -- this file is the human-facing CLI boundary */
 /** Strict JSON-native E2E entrypoint. Suite manifests own selection and order;
  * filters may narrow a suite but can never silently broaden it or select zero. */
+import { exportStoreScreenshots } from './store/export';
 import { randomUUID } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -436,6 +437,7 @@ artifacts.write(
     proof,
     sourceFingerprint,
     recording: options.driver === 'sim' && !options.noRecord,
+    evidence: options.evidence,
     startedAt: new Date().toISOString(),
     scenarios: scenarios.map((scenario) => scenario.id),
     ...(git ? { git } : {}),
@@ -520,6 +522,8 @@ try {
         const status = await runScenario(scenario, loaded.fixtures, {
           ...deps,
           scenarioIndex: scenarioIndexes.get(scenario.id)!,
+          evidence: options.evidence,
+          appData: options.evidence === 'screenshots' ? undefined : deps.appData,
           totalScenarios: scenarios.length,
           nextArtifactSeq: () => ++artifactSeq,
         });
@@ -553,6 +557,7 @@ try {
       let pendingMnemonic: string | undefined;
       await withAndroidEmulatorSession(
         {
+          storeScreenshots: suite.name === 'store-screenshots',
           runId: sessionId,
           runDir: sessionDir,
           onLifecycle: (message) => bus.emit({ type: 'lifecycle', message }),
@@ -664,6 +669,7 @@ try {
       let pendingMnemonic: string | undefined;
       await withEphemeralSimulatorSession(
         {
+          ...(suite.name === 'store-screenshots' ? { preferredDevice: 'iPhone 17 Pro Max' } : {}),
           runId: sessionId,
           runDir: sessionDir,
           onLifecycle: (message) => bus.emit({ type: 'lifecycle', message }),
@@ -819,6 +825,15 @@ try {
   if (options.driver === 'fake')
     console.log('\n[e2e] fake driver: orchestration smoke only, never product proof');
   process.exitCode = failed || !fundedFundsSafe ? 1 : 0;
+  if (
+    suite.name === 'store-screenshots' &&
+    options.driver !== 'fake' &&
+    passed === scenarios.length &&
+    !failed &&
+    !deferred
+  ) {
+    console.log(`[e2e] Store screenshots: ${await exportStoreScreenshots(runDir)}`);
+  }
 } catch (error) {
   const code = interruptionCode(error) ?? 1;
   console.error(`✗ ${error instanceof Error ? error.message : String(error)}`);

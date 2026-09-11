@@ -157,7 +157,7 @@ async function recoverPendingOperations(reservedTotal: number): Promise<void> {
       error: error instanceof Error ? error : new Error(String(error)),
     });
     staticPopup('reserved-proofs-failed', {
-      text: error instanceof Error ? error.message : 'Unknown error',
+      failure: { service: 'cashu', error },
     });
   }
 }
@@ -188,7 +188,7 @@ async function runRedeemingRecovery(lockedTotal: number): Promise<void> {
       error: error instanceof Error ? error : new Error(String(error)),
     });
     staticPopup('redeem-receives-failed', {
-      text: error instanceof Error ? error.message : 'Unknown error',
+      failure: { service: 'cashu', error },
     });
   }
 }

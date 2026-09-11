@@ -119,3 +119,27 @@ describe('buildRunPlan', () => {
     });
   });
 });
+
+test('store capture selects one platform and disables per-action evidence and video', () => {
+  const result = buildRunPlan({ kind: 'suite', suite: 'store-screenshots', platform: 'android' }, [
+    scenario('store.screenshots', ['ios', 'android'], { suites: ['store-screenshots', 'full'] }),
+  ]);
+  expect(result).toMatchObject({ funded: false, platforms: ['android'] });
+  if ('error' in result) throw new Error(result.error);
+  expect(result.argvs).toHaveLength(1);
+  expect(result.argvs[0]).toEqual([
+    'bun',
+    'e2e/cli.ts',
+    'run',
+    '--driver',
+    'android',
+    '--i-approve-destructive-reset',
+    '--suite',
+    'store-screenshots',
+    '--lane',
+    'simulator',
+    '--evidence',
+    'screenshots',
+    '--no-record',
+  ]);
+});

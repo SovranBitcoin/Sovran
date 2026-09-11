@@ -11,6 +11,7 @@ import {
   type ReusableQuoteIdentityStore,
 } from "../quotes/reusable";
 import { useColadaManager } from "./ColadaProvider";
+import { useLatestRef } from "./useLatestRef";
 
 type ReusableMintQuote = Awaited<
   ReturnType<Manager["quotes"]["mint"]["create"]>
@@ -30,6 +31,66 @@ export interface UseReusableMintQuoteResult {
    * an automatic deposit-detected rotation (`"deposit_received"`).
    */
   rotate: (reason?: "manual" | "deposit_received") => Promise<void>;
+}
+
+/**
+ * One get-or-create against the identity store, reported as a tagged result.
+ * Module scope on purpose: the React Compiler cannot lower a `try` that has a
+ * `finally`, or one whose body holds a ternary, so leaving this inline in the
+ * effect is what made the hook uncompilable. Nothing here touches React.
+ */
+async function resolveReusableQuote(
+  manager: Manager,
+  input: EnsureReusableMintQuoteInput,
+  identityStore: ReusableQuoteIdentityStore,
+): Promise<
+  { ok: true; quote: ReusableMintQuote } | { ok: false; message: string }
+> {
+  try {
+    const quote = await ensureReusableMintQuote(manager, input, identityStore);
+    return { ok: true, quote };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn("quotes.reusable.ensure_failed", {
+      ...mintUrlFields(input.mintUrl),
+      method: input.method,
+      unit: input.unit,
+      error: message,
+    });
+    return { ok: false, message };
+  }
+}
+
+/**
+ * The rotate half of the same story: retire the standing quote and record its
+ * replacement. Module scope for the same reason as `resolveReusableQuote`.
+ */
+async function rotateReusableQuote(
+  manager: Manager,
+  input: EnsureReusableMintQuoteInput,
+  identityStore: ReusableQuoteIdentityStore,
+  reason: "manual" | "deposit_received",
+): Promise<
+  { ok: true; quote: ReusableMintQuote } | { ok: false; message: string }
+> {
+  try {
+    const quote = await rotateReusableMintQuote(
+      manager,
+      input,
+      identityStore,
+      reason,
+    );
+    return { ok: true, quote };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn("quotes.reusable.rotate_failed", {
+      ...mintUrlFields(input.mintUrl),
+      method: input.method,
+      unit: input.unit,
+      error: message,
+    });
+    return { ok: false, message };
+  }
 }
 
 /**
@@ -61,10 +122,12 @@ export function useReusableMintQuote(
     };
   }, []);
 
-  const identityStoreRef = useRef(identityStore);
-  identityStoreRef.current = identityStore;
-  const quoteIdRef = useRef<string | null>(null);
-  quoteIdRef.current = quote?.quoteId ?? null;
+  // Both written in useInsertionEffect rather than in render: a ref write in
+  // the render body switches the React Compiler off for the whole hook. Every
+  // read happens from an effect or a coco event handler, both of which run
+  // after insertion effects, so they still see the committed render's values.
+  const identityStoreRef = useLatestRef(identityStore);
+  const quoteIdRef = useLatestRef<string | null>(quote?.quoteId ?? null);
 
   const mintUrl = input?.mintUrl ?? null;
   const method = input?.method ?? null;
@@ -84,27 +147,23 @@ export function useReusableMintQuote(
       setIsLoading(true);
     }
     setError(null);
-    (async () => {
-      try {
-        const resolved = await ensureReusableMintQuote(
-          manager,
-          { mintUrl, method, unit },
-          identityStoreRef.current,
-        );
-        if (!cancelled && mountedRef.current) setQuote(resolved);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        logger.warn("quotes.reusable.ensure_failed", {
-          ...mintUrlFields(mintUrl),
-          method,
-          unit,
-          error: message,
-        });
-        if (!cancelled && mountedRef.current) setError(message);
-      } finally {
-        if (!cancelled && mountedRef.current) setIsLoading(false);
-      }
-    })();
+    void (async () => {
+      const outcome = await resolveReusableQuote(
+        manager,
+        { mintUrl, method, unit },
+        identityStoreRef.current,
+      );
+      if (cancelled || !mountedRef.current) return;
+      if (outcome.ok) setQuote(outcome.quote);
+      else setError(outcome.message);
+      setIsLoading(false);
+    })().catch(() => {
+      // Restores the guarantee the old `try/finally` gave: whatever went wrong
+      // after the wallet call — including a logger that threw — the field must
+      // stop showing a spinner. `finally` itself cannot come back; the React
+      // Compiler refuses to lower it and the hook would stop compiling.
+      if (!cancelled && mountedRef.current) setIsLoading(false);
+    });
     return () => {
       cancelled = true;
     };
@@ -141,29 +200,26 @@ export function useReusableMintQuote(
 
   const refresh = useCallback(() => setGeneration((g) => g + 1), []);
 
+  // The dep list names the refs too. It used to read
+  // `[manager, mintUrl, method, unit]` while the body also reached
+  // `identityStoreRef`/`mountedRef`, and a memo the compiler cannot preserve
+  // switches it off for the whole hook. It stays an explicit useCallback so
+  // `rotate`'s identity is stable for consumers even where the compiler is
+  // not running (Jest), not only once compiled.
   const rotate = useCallback(
     async (reason: "manual" | "deposit_received" = "manual") => {
       if (!mintUrl || !method || !unit) return;
-      try {
-        const created = await rotateReusableMintQuote(
-          manager,
-          { mintUrl, method, unit },
-          identityStoreRef.current,
-          reason,
-        );
-        if (mountedRef.current) setQuote(created);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        logger.warn("quotes.reusable.rotate_failed", {
-          ...mintUrlFields(mintUrl),
-          method,
-          unit,
-          error: message,
-        });
-        if (mountedRef.current) setError(message);
-      }
+      const outcome = await rotateReusableQuote(
+        manager,
+        { mintUrl, method, unit },
+        identityStoreRef.current,
+        reason,
+      );
+      if (!mountedRef.current) return;
+      if (outcome.ok) setQuote(outcome.quote);
+      else setError(outcome.message);
     },
-    [manager, mintUrl, method, unit],
+    [manager, mintUrl, method, unit, identityStoreRef, mountedRef],
   );
 
   return { quote, isLoading, error, refresh, rotate };

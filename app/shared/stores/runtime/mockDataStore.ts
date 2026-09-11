@@ -1,20 +1,12 @@
-/**
- * @fileoverview Mock Data Store
- *
- * Non-persisted zustand store that holds fake wallet data for demo/screenshot
- * purposes. Controlled by the `mockMode` flag in settingsStore.
- *
- * Safety:
- * - Mock history and balance are kept here (never persisted to AsyncStorage).
- * - Mock scan entries, swap groups, and locations are injected into the real
- *   in-memory stores with `demo-` prefixed IDs, but the persist middleware is
- *   gated off for these writes via `withSkippedPersistWrites`, so demo data
- *   never reaches AsyncStorage.
- * - `onFinishHydration` callbacks re-inject after AsyncStorage rehydration.
+import { Asset } from 'expo-asset';
+import { PUBLIC_DEMO_METADATA } from './mockPublicProfile';
+import { isLegacyMockProfile } from './legacyMockProfiles';
+/** Presentation fixtures only. Never inject these into live stores or caches.
+ * settingsStore.mockMode is the sole selector; disabling it reveals live data.
+ * Legacy cleanup below removes only identifiable fixtures from older builds.
  */
 
 import { create } from 'zustand';
-import * as nip19 from 'nostr-tools/nip19';
 import { storeLog } from '@/shared/lib/logger';
 import { useScanHistoryStore, type ScanSource } from '@/shared/stores/profile/scanHistoryStore';
 import {
@@ -22,13 +14,11 @@ import {
   type SwapGroup,
 } from '@/shared/stores/profile/swapTransactionsStore';
 import { useTransactionLocationStore } from '@/shared/stores/profile/transactionLocationStore';
-import { ingestResolvedProfiles } from '@/shared/lib/nostr/useEntityCache';
 import {
   useNostrMetadataCache,
   type NostrProfileMetadata,
 } from '@/shared/stores/global/nostrMetadataCache';
-import { withSkippedPersistWrites } from '@/shared/lib/cashu/profileScopedStorage';
-import { amountToNumber, toCocoAmount } from '@/shared/lib/cashu/amount';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import type { HistoryEntry } from '@cashu/coco-core';
 import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
 // Type-only import — `useRecentContacts` does not import this file at runtime
@@ -41,8 +31,8 @@ import type { RecentContact } from '@/features/payments/data/recentContactTypes'
 
 const MINTS = [
   'https://mint.minibits.cash/Bitcoin',
-  'https://mint.coinos.io',
-  'https://nofees.testnut.cashu.space',
+  'https://mint.macadamia.cash',
+  'https://mint.cubabitcoin.org',
 ];
 
 type DemoRow =
@@ -124,7 +114,7 @@ function buildMockData() {
       updatedAt: createdAt,
       mintUrl,
       unit: 'sat' as const,
-      amount: toCocoAmount(row.amount),
+      amount: row.amount,
     };
 
     if (row.type === 'melt') {
@@ -139,7 +129,7 @@ function buildMockData() {
           paymentRequest:
             'lnbc500u1pnxk4ppq0gfq2ue6m8k5tvz6gwldkdhjr07samkjhy5palzqrn64aqxgx0qdqu2askcmr9wssx7e3q2dshgmmndp5scqzzsxqyz5vqsp5usycvxaz',
           quoteId: `${id}-q`,
-          state: 'PAID' as const,
+          state: 'ISSUED' as const,
         })
       );
     } else if (row.type === 'receive') {
@@ -207,119 +197,77 @@ function buildMockData() {
 // ---------------------------------------------------------------------------
 // Mock contacts + DM threads
 //
-// Real npubs (decoded to hex once at module load) so deep-links and copy-pubkey
-// affordances stay coherent — the threads themselves are entirely fabricated
-// and never publish anywhere.
-// ---------------------------------------------------------------------------
-
+// Fictional demo identities have no signer, payment address, or real person's key.
 interface MockContact {
-  /** 64-hex Schnorr key. */
   pubkey: string;
-  /** Bech32 form, retained for display affordances (copy as npub). */
-  npub: string;
   metadata: Omit<NostrProfileMetadata, 'fetchedAt'>;
-  /** Deterministic thread, oldest first. ISO-ish offsets from `now` in minutes. */
   thread: readonly { content: string; isOwn: boolean; minutesAgo: number }[];
 }
-
 const MOCK_CONTACTS: readonly MockContact[] = [
   {
-    pubkey: '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2',
-    npub: 'npub1ref7jqxrh0z74554y900ufajer2lh52lk0wczrdrqcm8fjmjzweqll64x3',
+    pubkey: 'b362ccc4912c046428cf9d80b742f44d7fb5a19fa1c227cccb779b2a1f61ef1c',
     metadata: {
-      name: 'satoshi',
-      displayName: 'Satoshi',
-      about: 'Just a guy who likes peer-to-peer cash.',
-      nip05: 'satoshi@sovran.money',
-      lud16: 'satoshi@sovran.money',
+      name: 'maya',
+      displayName: 'Maya Chen',
+      about: 'Fictional demo contact.',
+      picture: Asset.fromModule(require('../../../assets/demo/fictional-maya/image.png')).uri,
     },
     thread: [
-      { content: 'hey, you free for lunch?', isOwn: false, minutesAgo: 240 },
-      { content: 'yeah, 1pm at the usual spot?', isOwn: true, minutesAgo: 235 },
-      { content: 'perfect. bringing the new hardware to show you', isOwn: false, minutesAgo: 230 },
-      { content: 'oh nice, finally', isOwn: true, minutesAgo: 14 },
+      { content: 'Coffee after the meetup?', isOwn: false, minutesAgo: 38 },
+      { content: 'Sounds good! Same place?', isOwn: true, minutesAgo: 23 },
+      { content: 'Yes! See you there ☕', isOwn: false, minutesAgo: 8 },
     ],
   },
   {
-    pubkey: '50d94fc2d8580c682b071a542f8b1e31a200b0508bab95a33bef0855df281d63',
-    npub: 'npub12rv5lskctqxxs2c8rf2zlzc7xx3qpvzs3w4etgemauy9thegr43sf485vg',
+    pubkey: 'c0068b3c6e1dafed39cf8f0e137857d12715221ad38db5b01fd11a1d5c9baa33',
     metadata: {
-      name: 'alice',
-      displayName: 'Alice',
-      about: 'mint operator. occasionally pays for coffee in sats.',
-      nip05: 'alice@sovran.money',
-      lud16: 'alice@sovran.money',
+      name: 'jamie',
+      displayName: 'Jamie Brooks',
+      about: 'Fictional demo contact.',
+      picture: Asset.fromModule(require('../../../assets/demo/fictional-jamie/image.png')).uri,
     },
     thread: [
-      { content: 'invoice please?', isOwn: false, minutesAgo: 90 },
-      { content: 'one sec', isOwn: true, minutesAgo: 89 },
-      { content: 'lnbc500u1pnxk4ppq0gfq2ue6m8k5tvz6gwldkdhjr07s', isOwn: true, minutesAgo: 88 },
-      { content: 'paid. thanks!', isOwn: false, minutesAgo: 47 },
+      { content: 'Made it home?', isOwn: false, minutesAgo: 46 },
+      { content: 'Just got in. Thanks for dinner!', isOwn: true, minutesAgo: 31 },
+      { content: 'Next one is on me 😊', isOwn: false, minutesAgo: 16 },
     ],
   },
   {
-    pubkey: '82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2',
-    npub: 'npub1sg6plzptd64u62a878hep2kev88swjh3tw00gjsfl8f237lmu63q0uf63m',
+    pubkey: 'f090f8d7311ac41f64dcd05db9c89a07102d3e79126e98f9d7073ce4f3b8e3c8',
     metadata: {
-      name: 'bob',
-      displayName: 'Bob',
-      about: 'split bills with me, not with banks.',
-      nip05: 'bob@sovran.money',
+      name: 'sofia',
+      displayName: 'Sofia Costa',
+      about: 'Fictional demo contact.',
+      picture: Asset.fromModule(require('../../../assets/demo/fictional-sofia/image.png')).uri,
     },
     thread: [
-      { content: 'split the dinner?', isOwn: true, minutesAgo: 60 * 26 },
-      { content: 'sure, send me a request', isOwn: false, minutesAgo: 60 * 25 },
-      { content: 'sent', isOwn: true, minutesAgo: 60 * 24 },
+      { content: 'Found a beautiful trail for Saturday.', isOwn: false, minutesAgo: 54 },
+      { content: 'Send me the details!', isOwn: true, minutesAgo: 39 },
+      { content: 'I’ll bring coffee and a camera.', isOwn: false, minutesAgo: 24 },
     ],
   },
   {
-    pubkey: '3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d',
-    npub: 'npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6',
+    pubkey: '6e99ae9ac3aab13dba8595b1acb0594132cf681533e235ef2d9dbe6d8866bb21',
     metadata: {
-      name: 'carol',
-      displayName: 'Carol',
-      about: 'nostr, NFC, and overpriced espresso.',
-      lud16: 'carol@sovran.money',
+      name: 'leo',
+      displayName: 'Leo Martin',
+      about: 'Fictional demo contact.',
+      picture: Asset.fromModule(require('../../../assets/demo/fictional-leo/image.png')).uri,
     },
     thread: [
-      { content: 'tap to pay worked first try 🎉', isOwn: false, minutesAgo: 60 * 72 },
-      { content: "told you it'd be smooth", isOwn: true, minutesAgo: 60 * 71 },
+      { content: 'Are you coming to the meetup?', isOwn: false, minutesAgo: 62 },
+      { content: 'Absolutely. See you at six!', isOwn: true, minutesAgo: 47 },
+      { content: 'Great, I saved you a seat.', isOwn: false, minutesAgo: 32 },
     ],
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Mock-mode contacts allowlist
-//
-// In mock mode the Contacts screen is restricted to ONLY the npubs in this
-// list (every other contact, mint, request, BLE peer is hidden). Crucially,
-// pubkeys on this list use REAL Nostr data — they are excluded from every
-// mock injection below (metadata, threads, recent-contacts rows, the
-// `isMockContactPubkey` check). That way a collision between an allowlisted
-// npub and an entry in `MOCK_CONTACTS` (e.g. "alice") does not shadow real
-// kind-0 metadata or real DM history.
-//
-// To add a real contact to the demo, append its npub here.
-// ---------------------------------------------------------------------------
-
-const MOCK_ALLOWED_NPUBS: readonly string[] = [
-  'npub1ceel7z6ly287kz4mzqqcsgtc6nzc30zw2ru9w9e4gj64gw69f7qscyf0p8',
-  'npub1ref7jqxrh0z74554y900ufajer2lh52lk0wczrdrqcm8fjmjzweqll64x3',
-] as const;
-
-export const MOCK_ALLOWED_PUBKEYS_HEX: ReadonlySet<string> = new Set(
-  MOCK_ALLOWED_NPUBS.map((npub) => {
-    const decoded = nip19.decode(npub);
-    return decoded.type === 'npub' ? (decoded.data as string) : '';
-  }).filter(Boolean)
-);
-
-// Mocks that are NOT shadowed by the allowlist. Single source of truth for
-// every runtime injection below — keep `MOCK_CONTACTS` itself intact so the
-// raw demo data is auditable and easy to repopulate later.
-const EFFECTIVE_MOCK_CONTACTS = MOCK_CONTACTS.filter(
-  (c) => !MOCK_ALLOWED_PUBKEYS_HEX.has(c.pubkey)
-);
+/** Real public contacts have metadata only; invented DMs belong to fictional people. */
+export const MOCK_ALLOWED_PUBKEYS_HEX: ReadonlySet<string> = new Set([
+  'c673ff0b5f228feb0abb1001882178d4c588bc4e50f857173544b5543b454f81',
+  '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2',
+]);
+const EFFECTIVE_MOCK_CONTACTS = MOCK_CONTACTS;
 
 interface MockDmMessage {
   id: string;
@@ -359,7 +307,7 @@ function buildMockContactsAndThreads(now: number) {
       // ContactsScreen reads `dmEvent.content` as the row's last-message preview.
       // Skipping the rest of the NDKEvent shape is fine: nothing else on the
       // row touches it.
-      dmEvent: last ? { content: last.content } : null,
+      dmEvent: last ? { content: last.content, isOwn: last.isOwn } : null,
       nip17Content: last?.content,
       timestamp: last?.created_at ?? 0,
     });
@@ -387,22 +335,6 @@ interface MockDataState {
   mockPendingAmount: number;
 }
 
-interface MockDataActions {
-  /**
-   * Inject demo- prefixed entries into scanHistoryStore and
-   * swapTransactionsStore. Subscribe to rehydration so entries survive
-   * AsyncStorage reload.
-   */
-  activate: () => void;
-  /**
-   * Remove all demo- prefixed entries from real stores and unsubscribe
-   * rehydration listeners.
-   */
-  deactivate: () => void;
-}
-
-type MockDataStore = MockDataState & MockDataActions;
-
 const MOCK = buildMockData();
 const MOCK_DM = buildMockContactsAndThreads(Date.now());
 
@@ -416,186 +348,101 @@ export function getMockDmThread(pubkey: string): MockDmMessage[] | null {
   return MOCK_DM.threadsByPubkey[pubkey] ?? null;
 }
 
-// Hydration unsubscribe handles — stored outside zustand state so they
-// are never serialised / compared.
-let unsubScans: (() => void) | null = null;
-let unsubSwaps: (() => void) | null = null;
-let unsubLocations: (() => void) | null = null;
-let unsubMetadata: (() => void) | null = null;
-
-// All inject/remove helpers gate the persist middleware off via
-// `withSkippedPersistWrites` so demo entries stay runtime-only and never
-// leak into AsyncStorage. A force-quit while mockMode is on therefore
-// cannot leave `demo-`-prefixed entries behind in the persisted blob.
-
-function injectScans() {
-  withSkippedPersistWrites(() => {
-    useScanHistoryStore.setState((state) => ({
-      entries: [...state.entries.filter((e) => !e.id.startsWith('demo-')), ...MOCK.scanEntries],
-    }));
-  });
+/** Pure profile overlay. Callers must gate this by the reactive mockMode flag. */
+export function getMockProfileMetadata(pubkey: string): NostrProfileMetadata | undefined {
+  return PUBLIC_DEMO_METADATA.get(pubkey) ?? MOCK_PROFILE_METADATA[pubkey];
 }
 
-function injectSwaps() {
-  if (MOCK.swapGroups.length === 0) return;
-  withSkippedPersistWrites(() => {
-    useSwapTransactionsStore.setState((state) => {
-      const merged = { ...state.groups };
-      for (const g of MOCK.swapGroups) merged[g.id] = g;
-      return { groups: merged };
-    });
-  });
+const MOCK_PROFILE_METADATA: Record<string, NostrProfileMetadata> = Object.fromEntries(
+  Object.entries(MOCK_DM.metadataByPubkey).map(([pubkey, metadata]) => [
+    pubkey,
+    { ...metadata, fetchedAt: Date.now() },
+  ])
+);
+
+/** Presentation balances only. Never use these for spendability or mint selection eligibility. */
+export const MOCK_MINT_BALANCES: Readonly<Record<string, number>> = {
+  'https://mint.macadamia.cash': 110_000,
+  'https://antifiat.cash': 90_000,
+  'https://mint.cubabitcoin.org': 47_382,
+};
+
+export function getMockMintBalance(mintUrl: string, unit: string): number {
+  return unit.toLowerCase() === 'sat' ? (MOCK_MINT_BALANCES[mintUrl.replace(/\/$/, '')] ?? 0) : 0;
 }
 
-function removeScans() {
-  withSkippedPersistWrites(() => {
-    useScanHistoryStore.setState((state) => ({
-      entries: state.entries.filter((e) => !e.id.startsWith('demo-')),
-    }));
-  });
-}
+export const MOCK_SWAP_GROUPS: Record<string, SwapGroup> = Object.fromEntries(
+  MOCK.swapGroups.map((group) => [group.id, group])
+);
 
-function removeSwaps() {
-  withSkippedPersistWrites(() => {
-    useSwapTransactionsStore.setState((state) => {
-      const cleaned: Record<string, SwapGroup> = {};
-      for (const [k, v] of Object.entries(state.groups)) {
-        if (!k.startsWith('demo-')) cleaned[k] = v;
-      }
-      return { groups: cleaned };
-    });
-  });
-}
-
-function injectLocations() {
-  withSkippedPersistWrites(() => {
-    useTransactionLocationStore.setState((state) => ({
-      locations: { ...state.locations, ...MOCK.locations },
-    }));
-  });
-}
-
-function removeLocations() {
-  withSkippedPersistWrites(() => {
-    useTransactionLocationStore.setState((state) => {
-      const cleaned: Record<string, { latitude: number; longitude: number; createdAt: number }> =
-        {};
-      for (const [k, v] of Object.entries(state.locations)) {
-        if (!k.startsWith('demo-')) cleaned[k] = v;
-      }
-      return { locations: cleaned };
-    });
-  });
-}
-
-function injectNostrMetadata() {
-  // Seed kind-0 metadata so ContactRow / DmChatHeader / profile screens show
-  // the mock name + nip05 / about / lud16 instead of the deterministic
-  // "word-pair" fallback. fetchedAt: now keeps the SWR hook from triggering
-  // a relay refetch.
-  withSkippedPersistWrites(() => {
-    const now = Date.now();
-    useNostrMetadataCache.setState((state) => {
-      const next = { ...state.byPubkey };
-      for (const [pubkey, metadata] of Object.entries(MOCK_DM.metadataByPubkey)) {
-        next[pubkey] = { ...metadata, fetchedAt: now };
-      }
-      return { byPubkey: next };
-    });
-  });
-  // Render path now reads the entity cache (the single owner), so seed mock
-  // identities there too (relay-fresh so the SWR hook doesn't refetch them).
-  ingestResolvedProfiles(MOCK_DM.metadataByPubkey);
-}
-
-function removeNostrMetadata() {
-  withSkippedPersistWrites(() => {
-    useNostrMetadataCache.setState((state) => {
-      const next = { ...state.byPubkey };
-      for (const pubkey of Object.keys(MOCK_DM.metadataByPubkey)) {
-        delete next[pubkey];
-      }
-      return { byPubkey: next };
-    });
-  });
-}
-
-function purgeFixtureMetadataNow() {
-  useNostrMetadataCache.setState((state) => {
-    let removed = 0;
-    const next = { ...state.byPubkey };
-    for (const pubkey of Object.keys(MOCK_DM.metadataByPubkey)) {
-      if (pubkey in next) {
-        delete next[pubkey];
-        removed += 1;
-      }
-    }
-    if (removed === 0) return state;
-    // Deliberately NOT wrapped in withSkippedPersistWrites: unlike the
-    // in-memory inject/remove, this must PERSIST the deletion so leaked fixture
-    // identities (Bob/Alice/…) that were written to AsyncStorage in a previous
-    // build never rehydrate again.
-    storeLog.info('mock.fixture_metadata_purged', { removed });
-    return { byPubkey: next };
-  });
-}
-
-/**
- * Permanently drop any persisted mock fixture metadata (Bob/Alice/…) from the
- * Nostr metadata cache. Called at launch when mock mode is off so demo
- * identities can never leak through real surfaces. Idempotent and a no-op when
- * nothing leaked. Waits for the cache to hydrate so it sees the persisted blob.
- *
- * @public Consumed via a dynamic `require()` in settingsStore's mock-off
- * migration path (deliberately lazy to avoid eagerly loading this store), which
- * knip can't see statically.
- */
-export function purgeFixtureMetadata() {
-  if (useNostrMetadataCache.persist.hasHydrated()) {
-    purgeFixtureMetadataNow();
+function afterHydrationOnce(
+  store: { persist: { hasHydrated(): boolean; onFinishHydration(fn: () => void): () => void } },
+  cleanup: () => void
+) {
+  if (store.persist.hasHydrated()) {
+    cleanup();
     return;
   }
-  const unsub = useNostrMetadataCache.persist.onFinishHydration(() => {
-    purgeFixtureMetadataNow();
-    unsub?.();
+  const unsubscribe = store.persist.onFinishHydration(() => {
+    unsubscribe();
+    cleanup();
   });
 }
 
-export const useMockDataStore = create<MockDataStore>()((_set) => ({
-  // Pre-built mock data — never changes at runtime.
+/** Upgrade cleanup is independent of Mock Mode. No listeners ever re-inject data. */
+export function purgeLegacyMockData() {
+  afterHydrationOnce(useNostrMetadataCache, () => {
+    useNostrMetadataCache.setState((state) => {
+      const byPubkey = Object.fromEntries(
+        Object.entries(state.byPubkey).filter(
+          ([pubkey, metadata]) => !isLegacyMockProfile(pubkey, metadata)
+        )
+      );
+      if (Object.keys(byPubkey).length === Object.keys(state.byPubkey).length) return state;
+      storeLog.info('mock.fixture_metadata_purged', {
+        removed: Object.keys(state.byPubkey).length - Object.keys(byPubkey).length,
+      });
+      return { byPubkey };
+    });
+  });
+  afterHydrationOnce(useScanHistoryStore, () => {
+    useScanHistoryStore.setState((state) => {
+      const entries = state.entries.filter(
+        (entry) => !MOCK.scanEntries.some((fixture) => fixture.id === entry.id)
+      );
+      if (entries.length === state.entries.length) return state;
+      return {
+        entries,
+        entriesByTransactionId: Object.fromEntries(
+          entries
+            .filter((entry) => entry.transactionId)
+            .map((entry) => [entry.transactionId!, entry])
+        ),
+      };
+    });
+  });
+  afterHydrationOnce(useSwapTransactionsStore, () => {
+    useSwapTransactionsStore.setState((state) => {
+      const groups = Object.fromEntries(
+        Object.entries(state.groups).filter(([id]) => !MOCK_SWAP_GROUPS[id])
+      );
+      return Object.keys(groups).length === Object.keys(state.groups).length ? state : { groups };
+    });
+  });
+  afterHydrationOnce(useTransactionLocationStore, () => {
+    useTransactionLocationStore.setState((state) => {
+      const locations = Object.fromEntries(
+        Object.entries(state.locations).filter(([id]) => !MOCK.locations[id])
+      );
+      return Object.keys(locations).length === Object.keys(state.locations).length
+        ? state
+        : { locations };
+    });
+  });
+}
+
+export const useMockDataStore = create<MockDataState>()(() => ({
   mockHistory: MOCK.history,
   mockBalance: MOCK.balance,
   mockPendingAmount: MOCK.pendingAmount,
-
-  activate: () => {
-    // Inject immediately
-    injectScans();
-    injectSwaps();
-    injectLocations();
-    injectNostrMetadata();
-
-    // Re-inject after rehydration from AsyncStorage
-    unsubScans = useScanHistoryStore.persist.onFinishHydration(injectScans);
-    unsubSwaps = useSwapTransactionsStore.persist.onFinishHydration(injectSwaps);
-    unsubLocations = useTransactionLocationStore.persist.onFinishHydration(injectLocations);
-    unsubMetadata = useNostrMetadataCache.persist.onFinishHydration(injectNostrMetadata);
-  },
-
-  deactivate: () => {
-    // Unsubscribe rehydration listeners
-    unsubScans?.();
-    unsubSwaps?.();
-    unsubLocations?.();
-    unsubMetadata?.();
-    unsubScans = null;
-    unsubSwaps = null;
-    unsubLocations = null;
-    unsubMetadata = null;
-
-    // Remove all demo entries from real stores
-    removeScans();
-    removeSwaps();
-    removeLocations();
-    removeNostrMetadata();
-  },
 }));

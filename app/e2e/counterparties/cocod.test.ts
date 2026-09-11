@@ -98,6 +98,12 @@ describe('detectCapabilities', () => {
 
 describe('preflight', () => {
   const which = () => '/abs/cocod';
+  it('accepts the source 0.0.17 CLI with its detected payment capabilities', () => {
+    const p = preflight({ exec: fakeExec('0.0.17'), env: goodEnv, which });
+    expect(p.version).toBe('0.0.17');
+    expect(p.capabilities.has('cocod.send.cashu')).toBe(true);
+    expect(p.capabilities.has('cocod.history')).toBe(false);
+  });
   it('resolves bin/version/home/capabilities on the happy path', () => {
     const p = preflight({ exec: fakeExec(), env: goodEnv, which });
     expect(p).toMatchObject({

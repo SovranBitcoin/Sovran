@@ -14,7 +14,7 @@ import type {
   ThreadSeedBuckets,
 } from '@/features/feed/data/feedClient';
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
-import { consumeThreadSeed } from '@/features/feed/lib/threadSeedCache';
+import { consumeThreadSeed, peekThreadSeed } from '@/features/feed/lib/threadSeedCache';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 import {
   bucketsFromThreadResult,
@@ -124,10 +124,18 @@ function mergeIntoRef<K, V>(ref: React.MutableRefObject<Map<K, V>>, incoming: Ma
 export function useThread(eventId: string): UseThreadResult {
   const { keys: nostrKeys } = useNostrKeysContext();
   const viewerPubkey = nostrKeys?.pubkey;
-  const [baseItems, setBaseItems] = useState<ThreadItem[]>([]);
+  // Reading a handoff must be pure: Strict Mode can replay this initializer.
+  // The effect consumes it after commit, and reuses this snapshot on replay.
+  const [initialContent] = useState(() => {
+    const seed =
+      cachedThreadSeed(eventId) ?? peekThreadSeed(eventId) ?? ownContentSeed(eventId, viewerPubkey);
+    const built = seed ? buildThreadItemsFromSeed(eventId, seed) : null;
+    return { eventId, viewerPubkey, seed: built ? seed : undefined, built };
+  });
+  const [baseItems, setBaseItems] = useState<ThreadItem[]>(initialContent.built?.items ?? []);
   const [spamReplies, setSpamReplies] = useState<FeedEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isFetching, setIsFetching] = useState(false);
+  const [isLoading, setIsLoading] = useState(!initialContent.built);
+  const [isFetching, setIsFetching] = useState(!!eventId);
   const [isLoadingMoreReplies, setIsLoadingMoreReplies] = useState(false);
   const [hasMoreReplies, setHasMoreReplies] = useState(false);
   const [replySort, setReplySort] = useState<ThreadReplySort>('relevant');
@@ -136,9 +144,15 @@ export function useThread(eventId: string): UseThreadResult {
   const ignoredPubkeys = useFeedIgnoreStore((s) => s.ignoredPubkeys);
   const ignoredEventIds = useFeedIgnoreStore((s) => s.ignoredEventIds);
 
-  const profilesRef = useRef<Map<string, ProfileInfo>>(EMPTY_PROFILES);
-  const metricsRef = useRef<Map<string, NoteMetrics>>(EMPTY_METRICS);
-  const quotedEventsRef = useRef<Map<string, FeedEvent>>(EMPTY_QUOTED);
+  const profilesRef = useRef<Map<string, ProfileInfo>>(
+    initialContent.seed?.profiles ?? EMPTY_PROFILES
+  );
+  const metricsRef = useRef<Map<string, NoteMetrics>>(
+    initialContent.seed?.metrics ?? EMPTY_METRICS
+  );
+  const quotedEventsRef = useRef<Map<string, FeedEvent>>(
+    initialContent.seed?.quotedEvents ?? EMPTY_QUOTED
+  );
   const threadSeedRef = useRef<ThreadSeedBuckets | null>(null);
   const replyOrderRef = useRef<string[]>([]);
   const replyOffsetRef = useRef(0);
@@ -301,10 +315,17 @@ export function useThread(eventId: string): UseThreadResult {
     // Cache first (authoritative, complete via readThread's ancestor walk + reply
     // scan); the transient nav snapshot is a safety net for anything not yet
     // ingested; own-content covers a just-posted note not yet round-tripped.
-    const seed =
+    const navigationSeed = consumeThreadSeed(eventId);
+    const candidateSeed =
       cachedThreadSeed(eventId) ??
-      consumeThreadSeed(eventId) ??
-      ownContentSeed(eventId, viewerPubkey);
+      navigationSeed ??
+      ownContentSeed(eventId, viewerPubkey) ??
+      (initialContent.eventId === eventId && initialContent.viewerPubkey === viewerPubkey
+        ? initialContent.seed
+        : undefined);
+    // A handoff without the target cannot render anything. Treat it as a miss,
+    // including on the error path, so it cannot leave an endless skeleton.
+    const seed = candidateSeed?.allEvents.has(eventId) ? candidateSeed : undefined;
     if (seed) {
       threadSeedRef.current = seed;
       const seeded = buildThreadItemsFromSeed(eventId, seed);
@@ -333,6 +354,9 @@ export function useThread(eventId: string): UseThreadResult {
         });
       }
     } else {
+      profilesRef.current = EMPTY_PROFILES;
+      metricsRef.current = EMPTY_METRICS;
+      quotedEventsRef.current = EMPTY_QUOTED;
       setBaseItems([]);
       setIsLoading(true);
     }
@@ -358,7 +382,7 @@ export function useThread(eventId: string): UseThreadResult {
       isLoadingMoreRepliesRef.current = false;
       task.cancel();
     };
-  }, [eventId, loadCtx, replySort, viewerPubkey]);
+  }, [eventId, initialContent, loadCtx, replySort, viewerPubkey]);
 
   // Final composition: ignore filters over replies AND the spam bucket, and the
   // "Might be spam" section appears only once the primary list is exhausted.

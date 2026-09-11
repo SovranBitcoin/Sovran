@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-globals -- standalone browser dev tool; the RN
  * app's fetchJson wrapper (AbortSignal/zod envelopes) doesn't apply here */
 import type {
+  StoreScreenshotExport,
   ClearResult,
   DiffResult,
   JobStatus,
@@ -29,6 +30,8 @@ async function post<T>(url: string, body: unknown): Promise<T> {
 }
 
 export const api = {
+  storeExport: (runId: string) =>
+    get<StoreScreenshotExport>(`/api/runs/${runId}/file/store/manifest.json`),
   runs: () => get<RunSummary[]>('/api/runs'),
   run: (runId: string) => get<RunDetail>(`/api/runs/${runId}`),
   scenarios: () => get<ScenarioCatalogEntry[]>('/api/scenarios'),

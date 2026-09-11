@@ -1,3 +1,9 @@
+import { notificationPreviewText } from '@/features/feed/lib/notificationPreviewText';
+import { collectReferencedIds } from '@/features/feed/components/nostr/feedParse';
+import { DEMO_NOTIFICATIONS } from '@/shared/stores/runtime/mockPresentationData';
+import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
+import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
+import { describeError } from '@/shared/lib/errors';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, StyleSheet } from 'react-native';
 import { useFocusEffect } from 'expo-router';
@@ -52,7 +58,6 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { feedLog, Log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 import { useOwnContentStore } from '@/shared/stores/profile/ownContentStore';
 import { actionMenuPopup } from '@/shared/lib/popup';
@@ -263,6 +268,11 @@ async function loadMoreFromRelay({
 }
 
 export function NotificationsScreen() {
+  const mockMode = useSettingsStore((state) => state.mockMode);
+  return <NotificationsContent key={mockMode ? 'demo' : 'live'} demo={mockMode} />;
+}
+
+function NotificationsContent({ demo }: { demo: boolean }) {
   useLifecycleLogger('NotificationsScreen', feedLog);
 
   const { keys: nostrKeys } = useNostrKeysContext();
@@ -271,8 +281,10 @@ export function NotificationsScreen() {
   const replyScope = useNotificationPolicyStore((state) => state.replyScope);
   const setReplyScope = useNotificationPolicyStore((state) => state.setReplyScope);
   const [activeTab, setActiveTab] = useState<NotificationTab>('ALL');
-  const [result, setResult] = useState<FeedNotificationsResult | null>(null);
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [result, setResult] = useState<FeedNotificationsResult | null>(
+    demo ? DEMO_NOTIFICATIONS : null
+  );
+  const [isInitialLoading, setIsInitialLoading] = useState(!demo);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -285,7 +297,6 @@ export function NotificationsScreen() {
   // nothing new — more reliable than the server's (conservative) hasNextPage,
   // which under-reports once grouping collapses a page below the page size.
   const seenKeysRef = useRef<Set<string>>(new Set());
-  const tabBarPadding = useTabBarBottomPadding();
   const [foreground, surface, separator, muted, surfaceTertiary] = useThemeColor([
     'foreground',
     'surface',
@@ -371,6 +382,13 @@ export function NotificationsScreen() {
   const loadFirstPage = useCallback(
     (signal: AbortSignal, mode: LoadMode) => {
       const sequence = ++loadSequenceRef.current;
+      if (demo) {
+        closeSession();
+        applyFirstPage(activeTab === 'ALL' ? DEMO_NOTIFICATIONS : null, 'client-tab');
+        setIsInitialLoading(false);
+        setIsRefreshing(false);
+        return;
+      }
       // No viewer, or a client-only tab → nothing to fetch; the synthetic items
       // (welcome card) and the mint changelog render without a server round-trip.
       if (!viewerPubkey || isClientTab(activeTab)) {
@@ -483,7 +501,7 @@ export function NotificationsScreen() {
             paintedFromCache,
             message,
           });
-          setErrorMessage(message);
+          setErrorMessage(describeError(error, 'nagg').text);
           // Keep the warm-painted page on a transient failure.
           if (mode === 'initial' && !paintedFromCache) applyFirstPage(null, 'error-reset');
         })
@@ -494,6 +512,7 @@ export function NotificationsScreen() {
         });
     },
     [
+      demo,
       applyFirstPage,
       closeSession,
       fetchNotificationsPage,
@@ -694,7 +713,15 @@ export function NotificationsScreen() {
   const seedCreatedAt = useWalletLifecycleStore((s) => s.seedCreatedAt);
   const termsDate = useSettingsStore((s) => s.termsAccepted?.date ?? null);
 
-  const rawNotifications = result?.notifications ?? EMPTY_NOTIFICATIONS;
+  const ignoredPeople = useFeedIgnoreStore((s) => s.ignoredPubkeys);
+  const ignoredEvents = useFeedIgnoreStore((s) => s.ignoredEventIds);
+  const rawNotifications = useMemo(
+    () =>
+      (result?.notifications ?? EMPTY_NOTIFICATIONS).filter(
+        (n) => !ignoredPeople.includes(n.event.pubkey) && !ignoredEvents.includes(n.event.id)
+      ),
+    [result, ignoredPeople, ignoredEvents]
+  );
 
   // A like/repost/zap is always engagement on one of OUR posts, so its target's
   // content is in the own-content cache (notes we authored, keyed by id). nagg
@@ -725,6 +752,7 @@ export function NotificationsScreen() {
   // facade getProfiles: Primal user_infos → relay kind-0) for every actor and
   // merge it in as a fallback, so names/avatars resolve regardless of tier.
   const actorPubkeys = useMemo(() => {
+    if (demo) return [];
     const set = new Set<string>();
     // Our own profile authors every like/repost/zap target preview — warm it too
     // so the contained post shows our name + avatar, not a truncated pubkey.
@@ -733,8 +761,12 @@ export function NotificationsScreen() {
       if (n.event?.pubkey) set.add(n.event.pubkey);
       for (const actor of n.sampleActors ?? []) if (actor.pubkey) set.add(actor.pubkey);
     }
+    const previewEvents = notifications.flatMap((n) =>
+      n.targetEvent ? [n.event, n.targetEvent] : [n.event]
+    );
+    for (const pubkey of collectReferencedIds(previewEvents).pubkeys) set.add(pubkey);
     return [...set];
-  }, [notifications, viewerPubkey]);
+  }, [notifications, viewerPubkey, demo]);
   const { metadata: cachedProfiles } = useNostrProfileMetadataMany(actorPubkeys);
 
   const resultForRows = useMemo<FeedNotificationsResult | null>(() => {
@@ -815,6 +847,7 @@ export function NotificationsScreen() {
 
   return (
     <Screen name="NotificationsScreen" scroll="custom" bgColor={surface}>
+      <E2EAccessibilityProbe testID="screen-notifications" accessibilityLabel="Notifications" />
       <Log name="NotificationsContent" style={notificationListStyles.root}>
         <VisualLayoutProbe
           scope={notificationsVisualScope}
@@ -850,6 +883,7 @@ export function NotificationsScreen() {
           <MintChangesList />
         ) : (
           <List
+            screen
             data={notificationItems}
             keyExtractor={(item) => item.id}
             // Heterogeneous rows (welcome/group/single) — without this
@@ -859,7 +893,6 @@ export function NotificationsScreen() {
             getItemType={notificationItemType}
             contentContainerStyle={[
               notificationListStyles.listContent,
-              { paddingBottom: tabBarPadding },
               notificationItems.length === 0 && notificationListStyles.emptyListContent,
             ]}
             contentInsetAdjustmentBehavior="never"
@@ -950,8 +983,8 @@ export function NotificationsScreen() {
                   surface={surface}
                   muted={muted}
                   pressedBackground={withAlpha(surfaceTertiary, 0.45)}
-                  onPressNotification={openNotification}
-                  onPressFollowGroup={openFollowGroup}
+                  onPressNotification={demo ? () => undefined : openNotification}
+                  onPressFollowGroup={demo ? () => undefined : openFollowGroup}
                 />
               </VisualLayoutProbe>
             )}
@@ -1302,7 +1335,12 @@ function NotificationBody({
   ) {
     return (
       <VStack gap={8} style={styles.bodyContent}>
-        <NotificationEventText event={previewEvent} foreground={foreground} muted={muted} />
+        <NotificationEventText
+          event={previewEvent}
+          result={result}
+          foreground={foreground}
+          muted={muted}
+        />
         {targetEvent ? (
           <NotificationReferencedPost
             event={targetEvent}
@@ -1335,14 +1373,16 @@ function NotificationBody({
 
 function NotificationEventText({
   event,
+  result,
   foreground,
   muted,
 }: {
   event: FeedEvent;
+  result: FeedNotificationsResult | null;
   foreground: string;
   muted: string;
 }) {
-  const content = event.content.trim();
+  const content = notificationPreviewText(event.content, result?.profilesMap);
   return (
     <Text numberOfLines={4} size={15} style={{ color: content ? foreground : muted }}>
       {content || 'Post unavailable'}
@@ -1367,7 +1407,7 @@ function NotificationReferencedPost({
 }) {
   const profile = result?.profilesMap.get(event.pubkey);
   const name = profile?.name || `${event.pubkey.slice(0, 8)}...`;
-  const content = event.content.trim();
+  const content = notificationPreviewText(event.content, result?.profilesMap);
   const isContained = showAuthorAvatar || contained;
   const targetPostBackground = isContained ? withAlpha(foreground, 0.055) : 'transparent';
 

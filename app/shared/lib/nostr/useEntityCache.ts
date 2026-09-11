@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
 
 import { facade } from 'nostr';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { DEMO_PROFILES } from '@/shared/stores/runtime/mockPresentationData';
 
 import type { ProfileInfo } from '@/features/feed/components/nostr/feedTypes';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
@@ -62,15 +64,18 @@ export function useProfile(pubkey: string | undefined): {
   status: ProfileStatus;
 } {
   const cache = buildNostrDataLayer()?.cache;
+  const mockMode = useSettingsStore((state) => state.mockMode);
+  const demoProfile = mockMode && pubkey ? DEMO_PROFILES.get(pubkey) : undefined;
   const record = useCachedRecord(cache?.profiles, pubkey);
   const pending = usePendingProfile(cache?.pendingProfiles, pubkey);
   return useMemo(() => {
+    if (demoProfile) return { profile: demoProfile, status: 'cached' as const };
     const profile: ProfileInfo | undefined = record
       ? { name: record.name ?? '', ...(record.picture ? { picture: record.picture } : {}) }
       : undefined;
     const status: ProfileStatus = record ? 'cached' : pending ? 'loading' : 'absent';
     return { profile, status };
-  }, [record, pending]);
+  }, [record, pending, demoProfile]);
 }
 
 /**
@@ -98,6 +103,7 @@ export function useProfileRecordsMany(
   const stableKey = useMemo(() => [...pubkeys].sort().join(','), [pubkeys]);
   const versionRef = useRef(0);
   const snapRef = useRef<{
+    store: facade.NormalizingStore<facade.CachedProfile> | undefined;
     key: string;
     version: number;
     map: ReadonlyMap<string, facade.CachedProfile>;
@@ -116,18 +122,26 @@ export function useProfileRecordsMany(
 
   const getSnapshot = useCallback(() => {
     const cached = snapRef.current;
-    if (cached && cached.key === stableKey && cached.version === versionRef.current) {
+    const sameScope = cached?.store === store && cached?.key === stableKey;
+    if (cached && sameScope && cached.version === versionRef.current) {
       return cached.map;
     }
-    const map = new Map<string, facade.CachedProfile>();
-    if (store) {
-      for (const pk of pubkeys) {
-        const record = store.get(pk);
+    // Keep the global subscription: LRU eviction notifies the store even when
+    // only an unrelated key was written. But preserve our snapshot unless one
+    // of the requested records actually changed, so feed ingestion does not
+    // rerender every contact/profile consumer or re-map all their metadata.
+    let map = sameScope ? undefined : new Map<string, facade.CachedProfile>();
+    for (const pk of pubkeys) {
+      const record = store?.get(pk);
+      if (!map && cached?.map.get(pk) !== record) map = new Map(cached?.map);
+      if (map) {
         if (record) map.set(pk, record);
+        else map.delete(pk);
       }
     }
-    snapRef.current = { key: stableKey, version: versionRef.current, map };
-    return map;
+    const snapshot = map ?? cached!.map;
+    snapRef.current = { store, key: stableKey, version: versionRef.current, map: snapshot };
+    return snapshot;
     // pubkeys is captured via stableKey; rebuild only on key/version change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store, stableKey]);

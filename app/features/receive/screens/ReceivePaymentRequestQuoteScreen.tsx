@@ -18,7 +18,7 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
 
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useMints } from '@cashu/coco-react';
 import type { HistoryEntry } from '@cashu/coco-core';
 

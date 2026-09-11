@@ -34,6 +34,7 @@ import Icon from 'assets/icons';
 
 interface ReceiveUnifiedTabProps {
   unit: string;
+  active?: boolean;
   walletContext: Pick<WalletContext, 'trustedMintUrls' | 'mintMethodCapabilities' | 'mintBalances'>;
   muted: string;
   /** The ONE standing request — resolved fresh-per-visit by ReceiveScreen
@@ -47,6 +48,7 @@ interface ReceiveUnifiedTabProps {
 
 export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
   unit,
+  active = true,
   walletContext,
   muted,
   creq,
@@ -166,6 +168,8 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
     });
   }, [uri, onchain.quote, bolt12.quote, creq.request]);
 
+  if (!active) return null;
+
   if (!settled) {
     return <ReceiveRailPlaceholder sectionTitle="BIP-321 URI" />;
   }
@@ -186,7 +190,7 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
 
   return (
     <>
-      <PaymentInfo data={uri} copyTarget="bip321" unit={unit} />
+      <PaymentInfo active={active} data={uri} copyTarget="bip321" unit={unit} />
       <CopyRequestCard
         title="BIP-321 URI"
         icon="stash:qr-code"

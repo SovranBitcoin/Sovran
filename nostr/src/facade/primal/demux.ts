@@ -17,6 +17,7 @@ import type { OwnActionType } from '@sovranbitcoin/schemas';
 import { profilesFromKind0, type ProfileMetadata } from '../profiles';
 import type { ProfileStatsBundle } from '../profile-stats';
 import { socialGraphFromEvents, type SocialGraph } from '../social-graph';
+import { toNoteStats } from '../noteStatsContract';
 import { PRIMAL_KIND, type RawPrimalEvent } from './protocol';
 import {
   PrimalNoteStatsContent,
@@ -124,13 +125,13 @@ function parsePrimalBatch(events: ReadonlyArray<RawPrimalEvent>): PrimalBatch {
       case PRIMAL_KIND.noteStats: {
         const parsed = parseContent(PrimalNoteStatsContent, raw.content);
         if (!parsed) break;
-        stats[parsed.event_id] = {
+        stats[parsed.event_id] = toNoteStats({
           likes: parsed.likes ?? 0,
           reposts: parsed.reposts ?? 0,
           replies: parsed.replies ?? 0,
           zaps: parsed.zaps ?? 0,
           satsZapped: parsed.satszapped ?? 0,
-        };
+        });
         break;
       }
       case PRIMAL_KIND.noteActions: {

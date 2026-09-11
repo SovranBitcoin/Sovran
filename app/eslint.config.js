@@ -244,6 +244,12 @@ module.exports = defineConfig([
         {
           paths: [
             {
+              name: 'expo-router',
+              importNames: ['router', 'useRouter', 'Link'],
+              message:
+                "Use guardedRouter/useGuardedRouter from '@/shared/hooks/useGuardedRouter' for navigation. Route links through a guarded onPress; intentional immediate duplicates require its explicit raw escape hatch and a call-site reason.",
+            },
+            {
               name: 'react-native',
               importNames: [
                 'Pressable',

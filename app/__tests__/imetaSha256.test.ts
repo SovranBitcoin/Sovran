@@ -2,7 +2,7 @@
  * parseImetaTags exposes the Blossom content address (`x`) so the delete flow
  * can target the right blob without parsing it out of the (lossy) URL.
  */
-import { parseImetaTags } from '@/features/feed/components/nostr/feedParse';
+import { parseImetaTags } from '@/shared/lib/nostr/media/imeta';
 
 describe('parseImetaTags sha256 (x field)', () => {
   it('extracts the x field as sha256', () => {

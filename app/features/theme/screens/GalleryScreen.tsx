@@ -24,6 +24,7 @@ import { Image } from '@/shared/ui/primitives/Image';
 import Icon from 'assets/icons';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useScreenBottomPadding } from '@/shared/hooks/useScreenInsets';
 import { useLifecycleLogger, log } from '@/shared/lib/logger';
 import { refreshCatalog } from '@/shared/lib/wallpaperSync';
 import { STAT_COLOR_SOCIAL, STAT_ICONS } from '@/shared/ui/composed/RowStatsAccent';
@@ -48,6 +49,7 @@ export function GalleryScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const foreground = useThemeColor('foreground');
   const headerHeight = useHeaderHeight();
+  const bottomPadding = useScreenBottomPadding(40);
 
   const activeAlbumSlug = useThemeDraft((s) => s.activeAlbumSlug);
   const setAlbum = useThemeDraft((s) => s.setAlbum);
@@ -80,7 +82,8 @@ export function GalleryScreen() {
       <Stack.Screen options={{ title: 'Gallery' }} />
       <Screen name="GalleryScreen" scroll="custom">
         <ScrollView
-          contentContainerStyle={{ paddingBottom: 40, paddingTop: headerHeight + 8 }}
+          contentInsetAdjustmentBehavior="never"
+          contentContainerStyle={{ paddingBottom: bottomPadding, paddingTop: headerHeight + 8 }}
           showsVerticalScrollIndicator={false}
           // Android: gallery opens as a form-sheet; opt into nested scrolling so
           // dragging the page down scrolls instead of dismissing. No-op on iOS.

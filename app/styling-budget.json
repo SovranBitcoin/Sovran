@@ -690,9 +690,6 @@
     "inline-style": 1,
     "stack-layout-props": 1
   },
-  "shared/hooks/useTabBarBottomPadding.ts": {
-    "content-container-style": 1
-  },
   "shared/lib/popup/CompactToast.tsx": {
     "inline-style": 3
   },
@@ -884,9 +881,12 @@
   "shared/ui/composed/LayoutDebugWrapper.tsx": {
     "content-container-style": 1
   },
+  "shared/ui/composed/List.tsx": {
+    "content-container-style": 1
+  },
   "shared/ui/composed/ListRow.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 3,
+    "inline-style": 4,
     "stack-layout-props": 2
   },
   "shared/ui/composed/MintIcon.tsx": {
@@ -920,6 +920,9 @@
   },
   "shared/ui/composed/ScreenHeaderAction.tsx": {
     "stylesheet-create": 1
+  },
+  "shared/ui/composed/ScreenScrollView.tsx": {
+    "content-container-style": 1
   },
   "shared/ui/composed/ScreenStates.tsx": {
     "inline-style": 5

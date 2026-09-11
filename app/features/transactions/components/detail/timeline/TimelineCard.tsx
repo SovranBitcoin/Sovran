@@ -40,6 +40,8 @@ import { TimelineRow, timelineStepTypeToCheckpointStatus } from './TimelineRow';
 import { connectorType, rowDelays } from './timelineTheme';
 
 interface HistoryEntryTimelineProps {
+  /** Local action feedback only; history remains the authority for the outcome. */
+  cancelling?: boolean;
   historyEntry: HistoryEntry;
   meltQuote?: MeltQuoteBolt11Response;
   /** For NUT-18 payment requests - indicates token was created (prepared step complete) */
@@ -116,6 +118,7 @@ function useRenderCount(): { readonly current: number } {
 }
 
 export function HistoryEntryTimeline({
+  cancelling = false,
   historyEntry,
   meltQuote,
   tokenCreated,
@@ -213,10 +216,28 @@ export function HistoryEntryTimeline({
       paymentCopy,
     ]
   );
-  const timeline = model.steps;
+  const cancellationActive =
+    cancelling && historyEntry.type === 'send' && model.outcome.kind === 'pending';
+  const timeline = useMemo(() => {
+    if (!cancellationActive) return model.steps;
+    const pendingIndex = model.steps.findIndex((step) => step.rowKey === 'pending');
+    if (pendingIndex < 0) return model.steps;
+    return model.steps.slice(0, pendingIndex + 1).map((step, index): TimelineStep =>
+      index === pendingIndex
+        ? {
+            ...step,
+            id: 'cancelling',
+            displayLabel: 'Cancelling',
+            info: 'Returning ecash to your balance',
+            stepType: 'current',
+            timestamp: undefined,
+          }
+        : step
+    );
+  }, [model.steps, cancellationActive]);
 
   const cardLabel = getCardLabel(historyEntry, timeline, tokenCreated, nostrSent, paymentCopy);
-  const statusHeader = getStatusHeader(timeline);
+  const statusHeader = cancellationActive ? 'Cancelling transaction' : getStatusHeader(timeline);
   const statusColorType = getStatusColorType(timeline);
   // Change signature for the render log's effect gate (fires on real timeline
   // shape changes, not object identity). Step types read straight off the

@@ -91,6 +91,14 @@ jest.mock('heroui-native', () => {
   return { PressableFeedback };
 });
 
+jest.mock('@/shared/hooks/useVisualActivityEffect', () => ({
+  useVisualActivityEffect: (effect: () => void | (() => void), enabled = true) => {
+    jest.requireActual<typeof import('react')>('react').useEffect(() => {
+      if (enabled) return effect();
+    }, [effect, enabled]);
+  },
+}));
+
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (tokens: string | readonly string[]) => {
     const colors: Record<string, string> = {
@@ -121,31 +129,6 @@ jest.mock('@/shared/lib/color', () => ({
   ...jest.requireActual('@/shared/lib/color'),
   withAlpha: jest.fn((_color: string, opacity: number) => `rgba(16, 16, 16, ${opacity})`),
 }));
-
-jest.mock('@monicon/native', () => {
-  const ReactActual = jest.requireActual<typeof import('react')>('react');
-  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
-
-  return {
-    Monicon: ({
-      name,
-      pointerEvents: _pointerEvents,
-      ...props
-    }: {
-      name: string;
-      pointerEvents?: unknown;
-      [key: string]: unknown;
-    }) => {
-      const viewProps: React.ComponentProps<typeof View> & { name: string } = {
-        testID: `monicon-${name}`,
-        name,
-        ...props,
-      };
-
-      return ReactActual.createElement(View, viewProps);
-    },
-  };
-});
 
 jest.mock('react-native-reanimated', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
@@ -187,7 +170,8 @@ jest.mock('react-native-reanimated', () => {
     runOnJS: <T extends (...args: never[]) => unknown>(fn: T) => fn,
     useAnimatedProps: <T extends object>(factory: () => T) => factory(),
     useAnimatedStyle: <T extends object>(factory: () => T) => factory(),
-    useFrameCallback: jest.fn(),
+    useFrameCallback: () =>
+      ReactActual.useMemo(() => ({ setActive: jest.fn(), isActive: false, callbackId: 1 }), []),
     useReducedMotion: jest.fn(() => false),
     useSharedValue: <T,>(value: T) => {
       const ref = ReactActual.useRef<{
@@ -242,6 +226,7 @@ jest.mock('react-native-svg', () => {
     Path: createSvgHost('Path'),
     Rect: createSvgHost('Rect'),
     Svg: createSvgHost('Svg'),
+    SvgXml: createSvgHost('SvgXml'),
     Stop: createSvgHost('Stop'),
   };
 });

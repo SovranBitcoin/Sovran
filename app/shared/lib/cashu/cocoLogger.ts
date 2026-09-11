@@ -210,6 +210,7 @@ export class CocoCoreLogger implements Logger {
   }
 
   private _emit(level: LogLevel, message: string, meta: unknown[]): void {
+    if (!cashuLog.isLevelEnabled(level)) return;
     const event = `coco.${this.modulePath}.${eventKey(message)}`;
     const metaObj = flattenMeta(meta);
     const safeBindings = sanitizeRecord(this.bindings);

@@ -5,6 +5,13 @@ import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import {
+  isNewerMuteList,
+  mutedValues,
+  normalizeDmWords,
+  reconcileBlockedPeople,
+  type MuteList,
+} from '../lib/moderation';
 
 const HEX64_RE = /^[0-9a-f]{64}$/;
 const MAX_IGNORED_PUBKEYS = 5_000;
@@ -13,6 +20,10 @@ const MAX_IGNORED_EVENT_IDS = 10_000;
 type FeedIgnoreState = {
   ignoredPubkeys: string[];
   ignoredEventIds: string[];
+  muteList: MuteList | null;
+  blockOverrides: Record<string, boolean>;
+  dmFilterEnabled: boolean;
+  dmFilterWords: string[];
 };
 
 type FeedIgnoreActions = {
@@ -21,6 +32,9 @@ type FeedIgnoreActions = {
   ignoreEvent: (eventId: string) => void;
   unignoreEvent: (eventId: string) => void;
   clearIgnoredFeedItems: () => void;
+  receiveMuteList: (list: MuteList, settled?: Record<string, boolean>) => void;
+  setDmFilterEnabled: (enabled: boolean) => void;
+  setDmFilterWords: (words: string) => void;
 };
 
 type FeedIgnoreStore = FeedIgnoreState & FeedIgnoreActions;
@@ -56,9 +70,21 @@ function normalizeHexList(values: readonly string[], max: number): string[] {
   return Array.from(out);
 }
 
-const PersistedFeedIgnoreStore = z.object({
+export const PersistedFeedIgnoreStore = z.object({
   ignoredPubkeys: z.array(z.string().regex(HEX64_RE)).max(MAX_IGNORED_PUBKEYS).default([]),
   ignoredEventIds: z.array(z.string().regex(HEX64_RE)).max(MAX_IGNORED_EVENT_IDS).default([]),
+  muteList: z
+    .object({
+      id: z.string().regex(HEX64_RE),
+      createdAt: z.number().int().nonnegative(),
+      tags: z.array(z.array(z.string())),
+      privateTags: z.array(z.array(z.string())),
+    })
+    .nullable()
+    .default(null),
+  blockOverrides: z.record(z.string().regex(HEX64_RE), z.boolean()).default({}),
+  dmFilterEnabled: z.boolean().default(false),
+  dmFilterWords: z.array(z.string().max(100)).max(100).default([]),
 });
 
 export const useFeedIgnoreStore = create<FeedIgnoreStore>()(
@@ -66,23 +92,65 @@ export const useFeedIgnoreStore = create<FeedIgnoreStore>()(
     (set, get) => ({
       ignoredPubkeys: [],
       ignoredEventIds: [],
+      muteList: null,
+      blockOverrides: {},
+      dmFilterEnabled: false,
+      dmFilterWords: [],
+      setDmFilterEnabled: (dmFilterEnabled) => set({ dmFilterEnabled }),
+      setDmFilterWords: (words) => set({ dmFilterWords: normalizeDmWords(words) }),
+      receiveMuteList: (list, settled) => {
+        const current = get();
+        if (list.id !== current.muteList?.id && !isNewerMuteList(list, current.muteList)) return;
+        const blockOverrides = { ...current.blockOverrides };
+        for (const [pubkey, blocked] of Object.entries(settled ?? {})) {
+          if (blockOverrides[pubkey] === blocked) delete blockOverrides[pubkey];
+        }
+        const ignoredPubkeys = reconcileBlockedPeople(
+          current.ignoredPubkeys,
+          current.muteList,
+          list,
+          blockOverrides,
+          MAX_IGNORED_PUBKEYS
+        );
+        const previousEvents = new Set(mutedValues(current.muteList, 'e'));
+        set({
+          muteList: list,
+          blockOverrides,
+          ignoredPubkeys,
+          ignoredEventIds: normalizeHexList(
+            current.ignoredEventIds
+              .filter((id) => !previousEvents.has(id))
+              .concat(mutedValues(list, 'e')),
+            MAX_IGNORED_EVENT_IDS
+          ),
+        });
+      },
 
       ignorePubkey: (pubkey) => {
+        const key = normalizeIgnoreHex(pubkey);
+        if (!key) return;
+        if (
+          !get().ignoredPubkeys.includes(key) &&
+          get().ignoredPubkeys.length >= MAX_IGNORED_PUBKEYS
+        )
+          throw new Error('Block list is full');
         const ignoredPubkeys = addHex(get().ignoredPubkeys, pubkey, MAX_IGNORED_PUBKEYS);
         storeLog.info('feed.ignore.pubkey', {
           pubkey: normalizeIgnoreHex(pubkey)?.slice(0, 8),
           count: ignoredPubkeys.length,
         });
-        set({ ignoredPubkeys });
+        set({ ignoredPubkeys, blockOverrides: { ...get().blockOverrides, [key]: true } });
       },
 
       unignorePubkey: (pubkey) => {
+        const key = normalizeIgnoreHex(pubkey);
+        if (!key) return;
         const ignoredPubkeys = removeHex(get().ignoredPubkeys, pubkey, MAX_IGNORED_PUBKEYS);
         storeLog.info('feed.ignore.pubkey.clear', {
           pubkey: normalizeIgnoreHex(pubkey)?.slice(0, 8),
           count: ignoredPubkeys.length,
         });
-        set({ ignoredPubkeys });
+        set({ ignoredPubkeys, blockOverrides: { ...get().blockOverrides, [key]: false } });
       },
 
       ignoreEvent: (eventId) => {
@@ -113,6 +181,10 @@ export const useFeedIgnoreStore = create<FeedIgnoreStore>()(
       partialize: (state) => ({
         ignoredPubkeys: state.ignoredPubkeys,
         ignoredEventIds: state.ignoredEventIds,
+        muteList: state.muteList,
+        blockOverrides: state.blockOverrides,
+        dmFilterEnabled: state.dmFilterEnabled,
+        dmFilterWords: state.dmFilterWords,
       }),
     })
   )

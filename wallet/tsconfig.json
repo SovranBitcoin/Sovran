@@ -11,10 +11,16 @@
     "declarationMap": true,
     "sourceMap": true,
     "outDir": "dist",
-    "rootDir": "src",
+    // "." rather than "src" so `__tests__` can join the program below. Nothing
+    // emits — `main`/`exports` point straight at `src/*.ts` and there is no
+    // build script — so outDir/rootDir/declaration only shape the type-check.
+    "rootDir": ".",
     "jsx": "react-jsx",
     "types": []
   },
-  "include": ["src"],
+  // Tests are type-checked too, as in `nostr`. Leaving them out is how 20 type
+  // errors accumulated unseen, including a helper still calling coco v1's
+  // `ops.mint.prepare` shape.
+  "include": ["src", "__tests__"],
   "exclude": ["node_modules", "dist"]
 }
