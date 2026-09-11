@@ -2,12 +2,10 @@
  * Shared cursor helpers for nagg DM pagination. The pagination cursor MUST use
  * the envelope (gift-wrap) `createdAt`, NOT the decrypted rumor time: NIP-59
  * randomizes the wrap timestamp up to ~2 days away from the real send time, and
- * nagg orders/filters by the wrap timestamp. We over-fetch by `CURSOR_SLACK_SECONDS`
- * and rely on wrap-id dedup to converge.
+ * nagg orders/filters by the wrap timestamp. Overlap only its last second
+ * (the server uses an exclusive bound), deduplicating by envelope ID.
  */
 import type { DmEnvelope, DmEnvelopePage } from './dmEnvelopeTypes';
-
-export const CURSOR_SLACK_SECONDS = 2 * 24 * 60 * 60;
 
 /** Normalize an envelope `createdAt` (ISO string | unix seconds | ms | Date) to unix seconds. */
 function envelopeUnixSeconds(createdAt: DmEnvelope['createdAt']): number {
@@ -34,7 +32,7 @@ function pageOldestWrapTs(page: DmEnvelopePage): number | undefined {
  * Both DM paginators (the conversation list and a single thread) need the same
  * three things per page — count the envelopes they hadn't seen, keep the oldest
  * wrap time across ALL pages, and turn that into the next `until` — plus the
- * slack correction above. Keeping them together means a caller can't apply the
+ * inclusive boundary above. Keeping them together means a caller can't apply the
  * slack to a per-page minimum by mistake.
  */
 interface DmEnvelopeCursor {
@@ -70,7 +68,7 @@ export function createDmEnvelopeCursor(): DmEnvelopeCursor {
       return fresh;
     },
     nextUntil() {
-      return oldestWrapTs === undefined ? undefined : oldestWrapTs + CURSOR_SLACK_SECONDS;
+      return oldestWrapTs === undefined ? undefined : oldestWrapTs + 1;
     },
   };
 }

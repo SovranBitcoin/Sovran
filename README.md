@@ -49,6 +49,10 @@ delegators at the root, or run them inside `app/` directly. `lint` covers `app/`
 only — wallet and nostr are not in its ESLint project. EAS builds run from
 `app/` (where `eas.json` lives).
 
+Production automation, credentials, signing continuity, and operator validation
+are documented in [`release/README.md`](release/README.md). Publication is disabled
+until explicitly configured and enabled.
+
 ## Docs
 
 ```bash

@@ -17,6 +17,8 @@ import { join } from 'node:path';
 import { SimulatorInfrastructureError } from '../simulator-session';
 import {
   assertOwnedAndroidAvdSafe,
+  ANDROID_BOOT_MIN_FREE_BYTES,
+  waitForAndroidDiskSpace,
   buildEmulatorLaunchArgs,
   buildOwnedAndroidEmulatorEnv,
   createOwnedAndroidAvd,
@@ -250,7 +252,7 @@ function fakeLifecycleAdb(calls: string[]) {
     },
     async uiautomatorDumpXml() {
       calls.push('dump');
-      return '<hierarchy><node text="Sovran" /></hierarchy>';
+      return '<hierarchy><node package="com.sovranbitcoin.dev" text="Sovran" /></hierarchy>';
     },
   };
 }
@@ -315,4 +317,71 @@ describe('owned Android app lifecycle', () => {
     abort.abort(new Error('android session complete'));
     expect(() => throwIfAndroidInfrastructureUnavailable(abort.signal)).not.toThrow();
   });
+});
+
+it('reopens the dev client when Android is still showing its home launcher', async () => {
+  const calls: string[] = [];
+  const adb = fakeLifecycleAdb(calls);
+  let dumps = 0;
+  adb.uiautomatorDumpXml = async () =>
+    ++dumps === 1
+      ? '<hierarchy><node package="com.google.android.apps.nexuslauncher" text="Sovran" /></hierarchy>'
+      : '<hierarchy><node package="com.sovranbitcoin.dev" resource-id="tab-wallet" /></hierarchy>';
+  await installOwnedAndroidApp({
+    adb,
+    reset: 'none',
+    apkPath: '/build/app-debug.apk',
+    metroUrl: 'http://localhost:8081',
+    onLifecycle: () => undefined,
+    wait: async () => undefined,
+  });
+  expect(calls.filter((call) => call === 'openUrl')).toHaveLength(2);
+});
+
+it('does not restart a bundle download already visible in the app window', async () => {
+  const calls: string[] = [];
+  const adb = fakeLifecycleAdb(calls);
+  adb.uiautomatorDumpXml = async () =>
+    '<hierarchy><node package="com.sovranbitcoin.dev" text="Downloading JavaScript bundle" /></hierarchy>';
+  await installOwnedAndroidApp({
+    adb,
+    reset: 'none',
+    apkPath: '/build/app-debug.apk',
+    metroUrl: 'http://localhost:8081',
+    onLifecycle: () => undefined,
+    wait: async () => undefined,
+  });
+  expect(calls.filter((call) => call === 'openUrl')).toHaveLength(1);
+});
+
+it('waits for delayed disk reclamation and stops without booting if space never recovers', async () => {
+  let reads = 0;
+  let waits = 0;
+  const signal = new AbortController().signal;
+  await waitForAndroidDiskSpace(
+    signal,
+    () => {},
+    () => (++reads === 1 ? 0 : ANDROID_BOOT_MIN_FREE_BYTES),
+    async () => {
+      waits++;
+    }
+  );
+  expect(waits).toBe(1);
+  await expect(
+    waitForAndroidDiskSpace(
+      signal,
+      () => {},
+      () => 0,
+      async () => {}
+    )
+  ).rejects.toThrow(/7.3 GiB/);
+  const controller = new AbortController();
+  controller.abort(new Error('cancelled'));
+  await expect(
+    waitForAndroidDiskSpace(
+      controller.signal,
+      () => {},
+      () => ANDROID_BOOT_MIN_FREE_BYTES
+    )
+  ).rejects.toThrow('cancelled');
 });

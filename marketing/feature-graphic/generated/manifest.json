@@ -1,0 +1,40 @@
+{
+  "size": [
+    1024,
+    500
+  ],
+  "inputs": {
+    "mark": "83eeeba15af8106c183066523665fe83ce7d37ff0ebbdde089e66087d985c5c4",
+    "wordmark": "8e181d4c2989f79a4b4e1b0a254725dfb01c7127ee41586b40d2dd220021c151"
+  },
+  "outputs": [
+    {
+      "file": "generated/android/1024x500.png",
+      "width": 1024,
+      "height": 500,
+      "channels": 3,
+      "bytes": 90424,
+      "sha256": "55518ca9ae9fe97ffdce16d43e69036a4aa89cb70c1268ceeb2c00581aecfed0",
+      "screenshots": [
+        "afa0101acb091dffbc6496010c11e44c1841c8d09e9ac1332603ee1ce216b6ab",
+        "62bb7b9a48624a9d7c0bc96b0f85d05f341a3f1f7a50c0c2ea7c828946700626",
+        "f97e01d71e6b660902089014024e9eac104749268d445ac8fb4fcfe6bc003b7a",
+        "a5bc1fe44ebfee0da5bdf7bc64fd2414ec2b36a06363cebd8ea11f83e9a6d865"
+      ]
+    },
+    {
+      "file": "generated/ios/1024x500.png",
+      "width": 1024,
+      "height": 500,
+      "channels": 3,
+      "bytes": 99990,
+      "sha256": "ac60589ca09f4553fc2fe2b990bccbcc44b0704ecf12fa180c5ad013d68bb997",
+      "screenshots": [
+        "536fcd6a98257e3b421a9b76cb54a0f511139e9730c7c2d70fb7e1e0bf4b3d3e",
+        "80a7a86d27e333fbc868c6ba038e49e0ca3ded4f807cbb8ca788c9351db98150",
+        "29fa0e4c002974d6c7448acadfd291acbc30a992139e78d246d6358f1b6052a9",
+        "e1aacd3cb641264168ebf72297393b44ab6690bd9246223302632a37ab30ceb0"
+      ]
+    }
+  ]
+}

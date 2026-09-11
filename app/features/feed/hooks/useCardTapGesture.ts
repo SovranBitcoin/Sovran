@@ -1,51 +1,37 @@
 /**
- * @fileoverview Card-level tap-to-open-thread, suppressed while a nested
- * pressable is active.
- *
- * A feed card is one large tap target with smaller ones inside it — the avatar,
- * a quoted post, the action row, an image. Without suppression, pressing any of
- * those ALSO opens the thread, because the card's tap gesture still fires. The
- * nested control announces itself on press-in/press-out and the card ignores
- * taps in between.
- *
- * The suppression flag is a ref, and it lives HERE rather than inline in each
- * card: React Compiler refuses to compile any component that hands a
- * ref-reading closure to a function during render (which `Gesture.Tap().onEnd`
- * is), and a feed row is the last component in the app that can afford to
- * render unmemoized. Keeping the ref inside this hook costs the hook its own
- * (worthless) memoization and buys every card back its own.
+ * A card body opens its thread; nested actions own their entire touch.
+ * The ancestor responder-capture resets the latch before descendants receive
+ * press-in. Press-out never clears it, since native recognition can arrive later.
+ * Keeping ref access inside the hook also preserves PostCard compilation.
  */
 
 import { useCallback, useMemo, useRef } from 'react';
 import { Gesture } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
 
 type CardTapGesture = {
   /** Attach to the card's `<GestureDetector>`. */
   gesture: ReturnType<typeof Gesture.Tap>;
   /** Wire to a nested pressable's `onPressIn` — swallows the next card tap. */
   suppress: () => void;
-  /** Wire to the same pressable's `onPressOut`. */
-  release: () => void;
+  /** Reset before descendants receive a new physical touch; never claims the responder. */
+  begin: () => false;
   /** The suppression-aware tap handler, for plain `<Pressable onPress>` areas. */
   handleTap: () => void;
 };
 
 export function useCardTapGesture(onTap: () => void): CardTapGesture {
   const suppressedRef = useRef(false);
+  const begin = useCallback(() => {
+    suppressedRef.current = false;
+    return false as const;
+  }, []);
 
   const suppress = useCallback(() => {
     suppressedRef.current = true;
   }, []);
 
-  // Released on the next tick, not synchronously: press-out lands before the
-  // card's tap gesture ends, so clearing it immediately would let the tap
-  // through — the bug this whole protocol exists to prevent.
-  const release = useCallback(() => {
-    setTimeout(() => {
-      suppressedRef.current = false;
-    }, 0);
-  }, []);
+  // Press-out can precede the parent's recognition by an arbitrary JS delay.
+  // Keep this touch suppressed until the next responder-capture begins.
 
   const handleTap = useCallback(() => {
     if (suppressedRef.current) return;
@@ -54,12 +40,13 @@ export function useCardTapGesture(onTap: () => void): CardTapGesture {
 
   const gesture = useMemo(
     () =>
-      Gesture.Tap().onEnd(() => {
-        'worklet';
-        runOnJS(handleTap)();
-      }),
+      Gesture.Tap()
+        .runOnJS(true)
+        .onEnd((_event, success) => {
+          if (success) handleTap();
+        }),
     [handleTap]
   );
 
-  return { gesture, suppress, release, handleTap };
+  return { gesture, suppress, begin, handleTap };
 }

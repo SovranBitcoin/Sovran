@@ -51,6 +51,7 @@ import { getNpcAddress } from '@/shared/lib/cashu/npc';
 import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { usePaymentFlowMachine } from 'wallet/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useModerationActions } from '@/features/feed/hooks/useModerationActions';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { SendMessageMenu } from '@/features/user/components/SendMessageMenu';
@@ -996,6 +997,7 @@ async function toggleFollowContacts(ctx: {
 }
 
 export function UserProfileScreen() {
+  const { personMenu } = useModerationActions();
   useLifecycleLogger('UserProfileScreen', nostrLog);
 
   const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
@@ -1290,7 +1292,10 @@ export function UserProfileScreen() {
       />
       <Stack.Screen
         options={withGlassHeaderItems({
-          title: isMetadataLoading ? 'Profile' : displayName,
+          title: '',
+          // The banner already displays the name below the avatar. A second
+          // transparent header title overlaps the avatar on both platforms.
+          headerTitle: '',
           // The profile renders its own full-bleed banner at the top — the
           // default Android header scrim painted a theme-background band
           // over it. A null headerBackground is the sanctioned scrim opt-out
@@ -1300,6 +1305,13 @@ export function UserProfileScreen() {
           ...(Platform.OS === 'android' ? { headerBackground: () => null } : {}),
           headerRight: () => (
             <HStack gap={4}>
+              {!isOwnProfile && (
+                <ScreenHeaderAction
+                  icon="material-symbols:report-rounded"
+                  accessibilityLabel="Block or report person"
+                  onPress={() => personMenu(pubkey)}
+                />
+              )}
               {profileMintUrl && (
                 <ScreenHeaderAction
                   icon="mingcute:bank-fill"

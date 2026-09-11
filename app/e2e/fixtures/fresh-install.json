@@ -6,8 +6,12 @@
   "steps": [
     {"action":"launch","reset":"erase"},
     {"action":"waitFor","selector":{"id":"terms-acceptance"},"timeoutMs":240000},
+    {"action":"waitFor","selector":{"id":"terms-acceptance"},"state":"enabled"},
     {"action":"tapUntil","sequence":[{"tap":{"id":"terms-acceptance"}}],"until":{"id":"terms-acceptance"},"untilValue":"1","attempts":4,"settleMs":6000},
-    {"action":"waitFor","selector":{"label":"Next"},"state":"enabled"},
-    {"action":"tap","selector":{"label":"Next"}}
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Continue to Privacy"}}],"until":{"label":"Privacy"},"attempts":4,"settleMs":1000},
+    {"action":"waitFor","selector":{"id":"privacy-acknowledgment"},"state":"enabled"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"privacy-acknowledgment"}}],"until":{"id":"privacy-acknowledgment"},"untilValue":"1","attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"Confirm and continue"},"state":"enabled"},
+    {"action":"tap","selector":{"label":"Confirm and continue"}}
   ]
 }

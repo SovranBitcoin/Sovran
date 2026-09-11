@@ -4,6 +4,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { storeLog, applyFileLogging } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { legalRevisions, type LegalAcceptance } from '@/shared/lib/legal/legalDocuments';
+
+// Separate, non-persisted status: setting an error must never write default settings over unreadable data.
+export const useSettingsHydration = create<{ status: 'loading' | 'ready' | 'error' }>(() => ({
+  status: 'loading',
+}));
 
 interface TermsAccepted {
   termsAccepted: boolean;
@@ -56,6 +62,7 @@ interface SettingsState {
    */
   mockNoGlass: boolean;
   termsAccepted: TermsAccepted | null;
+  legalAcceptance: LegalAcceptance | null;
   hasSeenOnboarding: boolean;
   quickAccessP2PK: boolean;
   regenerateP2PKOnReceive: boolean;
@@ -151,6 +158,15 @@ const PersistedSettings = z.object({
   // `.catch(null)` so a malformed terms record only resets terms (re-prompt),
   // never takes the rest of the store (real settings) down with it.
   termsAccepted: PersistedTermsAccepted.default(null).catch(null),
+  legalAcceptance: z
+    .object({
+      termsRevision: z.string().regex(/^[a-f0-9]{64}$/),
+      privacyRevision: z.string().regex(/^[a-f0-9]{64}$/),
+      acceptedAt: z.iso.datetime(),
+    })
+    .nullable()
+    .default(null)
+    .catch(null),
   hasSeenOnboarding: z.boolean().default(false).catch(false),
   quickAccessP2PK: z.boolean().default(false).catch(false),
   regenerateP2PKOnReceive: z.boolean().default(true).catch(true),
@@ -179,6 +195,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   whitenoiseEnabled: false,
   mockNoGlass: false,
   termsAccepted: null,
+  legalAcceptance: null,
   hasSeenOnboarding: false,
   quickAccessP2PK: false,
   regenerateP2PKOnReceive: true,
@@ -211,7 +228,7 @@ interface SettingsActions {
   setMockNoGlass: (enabled: boolean) => void;
 
   // Terms acceptance
-  acceptTerms: (date: string) => void;
+  acceptLegalDocuments: () => void;
   isTermsAccepted: () => boolean;
 
   // Onboarding
@@ -264,17 +281,9 @@ export const useSettingsStore = create<SettingsStore>()(
           set({ experimental });
         },
 
-        // Mock mode — lazy-import to avoid circular dependency at module load time
+        // Presentation selector only. Fixtures never enter live stores.
         setMockMode: (enabled: boolean) => {
           storeLog.info('store.settings.set_mock_mode', { enabled });
-          const { useMockDataStore } = require('../runtime/mockDataStore') as {
-            useMockDataStore: { getState: () => { activate: () => void; deactivate: () => void } };
-          };
-          if (enabled) {
-            useMockDataStore.getState().activate();
-          } else {
-            useMockDataStore.getState().deactivate();
-          }
           set({ mockMode: enabled });
         },
         setMockOffline: (enabled: boolean) => {
@@ -303,9 +312,19 @@ export const useSettingsStore = create<SettingsStore>()(
         },
 
         // Terms
-        acceptTerms: (date: string) => {
-          storeLog.info('store.settings.accept_terms', { date });
-          set({ termsAccepted: { termsAccepted: true, date } });
+        acceptLegalDocuments: () => {
+          const acceptedAt = new Date().toISOString();
+          set((state) => ({
+            // Preserve the original terms date: notifications use it as a history boundary.
+            termsAccepted: state.termsAccepted?.termsAccepted
+              ? state.termsAccepted
+              : { termsAccepted: true, date: acceptedAt },
+            legalAcceptance: {
+              termsRevision: legalRevisions.terms,
+              privacyRevision: legalRevisions.privacy,
+              acceptedAt,
+            },
+          }));
         },
         isTermsAccepted: () => get().termsAccepted?.termsAccepted === true,
 
@@ -415,6 +434,7 @@ export const useSettingsStore = create<SettingsStore>()(
           whitenoiseEnabled: state.whitenoiseEnabled,
           mockNoGlass: state.mockNoGlass,
           termsAccepted: state.termsAccepted,
+          legalAcceptance: state.legalAcceptance,
           hasSeenOnboarding: state.hasSeenOnboarding,
           quickAccessP2PK: state.quickAccessP2PK,
           regenerateP2PKOnReceive: state.regenerateP2PKOnReceive,
@@ -427,23 +447,15 @@ export const useSettingsStore = create<SettingsStore>()(
           relayTierEnabled: state.relayTierEnabled,
         }),
         afterHydrate: (state, error) => {
+          useSettingsHydration.setState({ status: error ? 'error' : 'ready' });
           if (error) return;
           // Resume on-device file logging if it was left on (dev-only; no-op in
           // production). Mirrors the persisted toggle into the logger transport.
           applyFileLogging(state?.fileLoggingEnabled ?? false);
-          if (state?.mockMode) {
-            const { useMockDataStore } = require('../runtime/mockDataStore') as {
-              useMockDataStore: { getState: () => { activate: () => void } };
-            };
-            useMockDataStore.getState().activate();
-          } else {
-            // Mock is off — scrub any fixture identities that leaked into the
-            // persisted Nostr metadata cache in a previous build.
-            const { purgeFixtureMetadata } = require('../runtime/mockDataStore') as {
-              purgeFixtureMetadata: () => void;
-            };
-            purgeFixtureMetadata();
-          }
+          const { purgeLegacyMockData } = require('../runtime/mockDataStore') as {
+            purgeLegacyMockData: () => void;
+          };
+          purgeLegacyMockData();
         },
       })
     )

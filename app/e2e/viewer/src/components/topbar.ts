@@ -70,22 +70,31 @@ export function renderTopbar(root: HTMLElement): void {
     (state.mode === 'browse' && versions.length > 0
       ? `<select data-action="version" aria-label="run version" title="run version">${versionOptions}</select>`
       : '') +
-    `<button data-action="rerun" ${busy || !state.selectedScenarioId ? 'disabled' : ''} title="${versions.length > 0 ? 'rerun' : 'run'} the selected scenario">${versions.length > 0 ? 'Rerun' : 'Run scenario'}</button>` +
-    `<div class="btn-group" role="group" aria-label="suite runs">` +
-    `<span class="btn-group-label">run</span>` +
-    `<button data-action="suite-default" ${busy ? 'disabled' : ''} title="run the default suite">Default</button>` +
-    `<button data-action="suite-full" ${busy ? 'disabled' : ''} title="run the full suite">Full</button>` +
-    `<button data-action="commit-run" ${busy ? 'disabled' : ''} title="commit run: full suite, requires a clean git tree">Commit</button>` +
-    `</div>` +
-    `<button data-action="clear" class="danger" ${busy ? 'disabled' : ''}>Clear</button>` +
+    (state.mode !== 'store'
+      ? `<button data-action="rerun" ${busy || !state.selectedScenarioId ? 'disabled' : ''} title="${versions.length > 0 ? 'rerun' : 'run'} the selected scenario">${versions.length > 0 ? 'Rerun' : 'Run scenario'}</button>` +
+        `<div class="btn-group" role="group" aria-label="suite runs">` +
+        `<span class="btn-group-label">run</span>` +
+        `<button data-action="suite-default" ${busy ? 'disabled' : ''} title="run the default suite">Default</button>` +
+        `<button data-action="suite-full" ${busy ? 'disabled' : ''} title="run the full suite">Full</button>` +
+        `<button data-action="commit-run" ${busy ? 'disabled' : ''} title="commit run: full suite, requires a clean git tree">Commit</button>` +
+        `</div>` +
+        `<button data-action="clear" class="danger" ${busy ? 'disabled' : ''}>Clear</button>`
+      : '') +
     `</div>` +
     `</div>` +
     `<nav class="mode-tabs" role="tablist" aria-label="viewer mode">` +
+    tab('store', 'Store screenshots') +
     tab('browse', 'Browse') +
     tab('diff', 'Diff') +
     tab('pages', 'Pages') +
     `</nav>`;
 
+  root.querySelector('[data-action=mode-store]')?.addEventListener('click', () =>
+    update((current) => {
+      current.mode = 'store';
+      current.playing = false;
+    })
+  );
   root.querySelector('[data-action=mode-browse]')?.addEventListener('click', () =>
     update((current) => {
       current.mode = 'browse';

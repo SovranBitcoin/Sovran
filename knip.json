@@ -22,7 +22,8 @@
         "scripts/*.{js,ts}",
         "e2e/viewer/server.ts",
         "e2e/viewer/src/main.ts",
-        "e2e/audit/fresh-matrix-cli.ts"
+        "e2e/audit/fresh-matrix-cli.ts",
+        "shared/stores/runtime/mockDataStore.ts"
       ],
       "project": ["**/*.{ts,tsx,js,jsx}"],
       "ignore": ["modules/**", "targets/**"],
@@ -31,7 +32,7 @@
         "expo-screen-corner-radius",
         "react-native-fast-squircle"
       ],
-      "ignoreBinaries": ["claude", "eas", "gh", "tsx"]
+      "ignoreBinaries": ["claude", "eas", "gh", "tsx", "python3"]
     },
     "wallet": {
       "project": ["src/**/*.{ts,tsx}"]
@@ -41,7 +42,10 @@
     },
     "docs": {
       "project": [".vitepress/**/*.{ts,mts}"]
+    },
+    ".": {
+      "entry": ["release/check-inputs.mjs"]
     }
   },
-  "ignoreBinaries": ["knip"]
+  "ignoreBinaries": ["knip", "python3"]
 }

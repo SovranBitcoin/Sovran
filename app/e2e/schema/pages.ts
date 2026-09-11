@@ -14,6 +14,7 @@ export const CANONICAL_PAGES = [
   // launch + onboarding
   'splash', // boot splash before the Terms gate on a fresh install
   'terms', // Terms & Conditions gate
+  'privacy', // Privacy review step
   'onboarding-carousel', // the four intro slides (occurrences 1-4)
   'welcome', // "Welcome to Sovran" + Get Started reveal
   // shell
@@ -55,6 +56,58 @@ export const CANONICAL_PAGES = [
   'restore-gate', // recovery gate with slide-to-confirm
   'recovery-complete', // recovery success state with Continue
   'map', // bitcoin merchant map (MapScreen, screen-map)
+  // Additional route surfaces: catalogued, not necessarily native-covered.
+  'bitchat-dm',
+  'bitchat-network',
+  'claim-username',
+  'composer',
+  'geohash-chat',
+  'map-detail',
+  'near-pay',
+  'near-pay-peers',
+  'not-found',
+  'notification-followers',
+  'notification-mint-changes',
+  'onchain-receive',
+  'onchain-send',
+  'payment-request',
+  'profile-share',
+  'receive-rails',
+  'settings-delete',
+  'settings-design-system',
+  'settings-design-system-empty-states',
+  'settings-design-system-fade-stress',
+  'settings-design-system-foundations',
+  'settings-design-system-loading',
+  'settings-design-system-posts',
+  'settings-design-system-segmented',
+  'settings-design-system-skeleton-crossfade',
+  'settings-design-system-timeline',
+  'settings-design-system-wallet-controls',
+  'settings-keyring',
+  'settings-media',
+  'settings-moderation',
+  'settings-network',
+  'settings-notification-policy',
+  'settings-privacy',
+  'settings-profile',
+  'settings-recovery',
+  'settings-routing',
+  'settings-storage',
+  'settings-terms',
+  'signer-activity',
+  'signer-activity-detail',
+  'signer-app',
+  'signer-app-permissions',
+  'signer-app-person',
+  'signer-connect',
+  'signer-requests',
+  'signer-share',
+  'stories',
+  'theme-background',
+  'transaction-filters',
+  'whitenoise-dm',
+  'whitenoise-setup',
 ] as const;
 
 const CANONICAL_PAGE_SET: ReadonlySet<string> = new Set(CANONICAL_PAGES);

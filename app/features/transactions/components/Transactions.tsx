@@ -1,3 +1,5 @@
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { MOCK_SWAP_GROUPS } from '@/shared/stores/runtime/mockDataStore';
 import React, {
   useCallback,
   useEffect,
@@ -230,7 +232,9 @@ export const Transactions = React.memo(
     const collapsing = useRollbackStore((s) => s.collapsing);
 
     const borderColor = useMemo(() => withAlpha(muted, 0.3), [muted]);
-    const swapGroupsById = useSwapTransactionsStore((state) => state.groups);
+    const mockMode = useSettingsStore((state) => state.mockMode);
+    const liveSwapGroups = useSwapTransactionsStore((state) => state.groups);
+    const swapGroupsById = mockMode ? MOCK_SWAP_GROUPS : liveSwapGroups;
 
     const swapGroups = useMemo(() => {
       if (account.unit === 'all') return Object.values(swapGroupsById);

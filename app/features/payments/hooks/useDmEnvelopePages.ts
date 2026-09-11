@@ -12,7 +12,7 @@
  * passing an unmemoized closure — the identity of the feed is stated, not
  * inferred from dependency arrays.
  */
-import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { paymentLog } from '@/shared/lib/logger';
 import type { DmEnvelopePage } from '../data/dmEnvelopeTypes';
@@ -35,40 +35,37 @@ interface DmEnvelopePagesOptions {
     signal?: AbortSignal;
   }) => Promise<DmEnvelopePage>;
   /** Consume a page, after the cursor has tracked it. */
-  onPage: (page: DmEnvelopePage) => void;
+  onPage: (page: DmEnvelopePage) => number | void;
+  /** Threads skip unrelated inbox pages without requiring a scrollable message. */
+  continueWhileEmpty?: boolean;
   /** Drop everything accumulated so far, before a fresh first page. */
   onReset: () => void;
   /** Log event for a failed first page. */
   failureEvent: string;
 }
 
-/** The `loadMore` fetch body, verbatim: fetch one older page and track it. */
-async function fetchNextDmPage(ctx: {
-  until: number;
+/** Read until the caller has a result, or the inbox ends/stops advancing. */
+async function readDmPages(ctx: {
+  until?: number;
+  refresh: boolean;
   pageLimit: number;
   cursor: ReturnType<typeof createDmEnvelopeCursor>;
   fetchPage: DmEnvelopePagesOptions['fetchPage'];
   onPage: DmEnvelopePagesOptions['onPage'];
-  loadingMoreRef: MutableRefObject<boolean>;
-  setHasMore: (hasMore: boolean) => void;
-  setError: (error: Error | null) => void;
-}): Promise<void> {
-  const { until, pageLimit, cursor, fetchPage, onPage, loadingMoreRef, setHasMore, setError } = ctx;
-  loadingMoreRef.current = true;
-  try {
-    const page = await fetchPage({ until, refresh: false });
-    const fresh = cursor.track(page);
-    onPage(page);
-    // Stop on a short page (the end) OR a full page with nothing new — the
-    // server ignored `until`, or this window is drained. A page can be full
-    // of envelopes yet hold no messages for the caller's filter, so "nothing
-    // new" has to mean new ENVELOPES, not new results.
-    setHasMore(page.envelopes.length >= pageLimit && fresh > 0);
-  } catch (e) {
-    setError(e instanceof Error ? e : new Error(String(e)));
-  } finally {
-    loadingMoreRef.current = false;
+  signal: AbortSignal;
+  continueWhileEmpty: boolean;
+}): Promise<boolean> {
+  let until = ctx.until;
+  while (!ctx.signal.aborted) {
+    const page = await ctx.fetchPage({ until, refresh: ctx.refresh, signal: ctx.signal });
+    if (ctx.signal.aborted) return false;
+    const fresh = ctx.cursor.track(page);
+    const visible = ctx.onPage(page);
+    const hasMore = page.envelopes.length >= ctx.pageLimit && fresh > 0;
+    until = ctx.cursor.nextUntil();
+    if (!ctx.continueWhileEmpty || visible !== 0 || !hasMore || until === undefined) return hasMore;
   }
+  return false;
 }
 
 export function useDmEnvelopePages({
@@ -78,6 +75,7 @@ export function useDmEnvelopePages({
   fetchPage,
   onPage,
   onReset,
+  continueWhileEmpty = false,
   failureEvent,
 }: DmEnvelopePagesOptions) {
   const [loading, setLoading] = useState(false);
@@ -93,6 +91,7 @@ export function useDmEnvelopePages({
 
   const cursorRef = useRef(createDmEnvelopeCursor());
   const loadingMoreRef = useRef(false);
+  const controllerRef = useRef<AbortController | null>(null);
 
   const hydrateRef = useLatestRef(hydrate);
   const fetchPageRef = useLatestRef(fetchPage);
@@ -104,23 +103,33 @@ export function useDmEnvelopePages({
     if (!feedKey) {
       onResetRef.current();
       setHasMore(false);
+      setLoading(false);
+      setHasLoadedOnce(false);
       return;
     }
     const controller = new AbortController();
-    cursorRef.current.reset();
+    controllerRef.current = controller;
+    const cursor = createDmEnvelopeCursor();
+    cursorRef.current = cursor;
+    loadingMoreRef.current = false;
+    const fetchPage = fetchPageRef.current;
+    const onPage = onPageRef.current;
     onResetRef.current();
     setError(null);
     setLoading(true);
     void (async () => {
       await hydrateRef.current();
-      const page = await fetchPageRef.current({
-        refresh: refreshKey > 0,
-        signal: controller.signal,
-      });
       if (controller.signal.aborted) return;
-      cursorRef.current.track(page);
-      onPageRef.current(page);
-      if (!controller.signal.aborted) setHasMore(page.envelopes.length >= pageLimit);
+      const more = await readDmPages({
+        refresh: refreshKey > 0,
+        pageLimit,
+        cursor,
+        fetchPage,
+        onPage,
+        signal: controller.signal,
+        continueWhileEmpty,
+      });
+      if (!controller.signal.aborted) setHasMore(more);
     })()
       .catch((e) => {
         if (controller.signal.aborted) return;
@@ -138,6 +147,7 @@ export function useDmEnvelopePages({
   }, [
     feedKey,
     pageLimit,
+    continueWhileEmpty,
     refreshKey,
     failureEventRef,
     fetchPageRef,
@@ -148,18 +158,42 @@ export function useDmEnvelopePages({
 
   const loadMore = useCallback(async () => {
     const until = cursorRef.current.nextUntil();
-    if (loadingMoreRef.current || !hasMore || !feedKey || until === undefined) return;
-    await fetchNextDmPage({
+    const controller = controllerRef.current;
+    if (
+      loading ||
+      loadingMoreRef.current ||
+      !hasMore ||
+      !feedKey ||
+      until === undefined ||
+      !controller ||
+      controller.signal.aborted
+    )
+      return;
+    loadingMoreRef.current = true;
+    setError(null);
+    await readDmPages({
       until,
+      refresh: false,
       pageLimit,
       cursor: cursorRef.current,
       fetchPage: fetchPageRef.current,
       onPage: onPageRef.current,
-      loadingMoreRef,
-      setHasMore,
-      setError,
-    });
-  }, [hasMore, feedKey, pageLimit, fetchPageRef, onPageRef]);
+      signal: controller.signal,
+      continueWhileEmpty,
+    })
+      .then(
+        (more) => {
+          if (!controller.signal.aborted) setHasMore(more);
+        },
+        (error: unknown) => {
+          if (!controller.signal.aborted)
+            setError(error instanceof Error ? error : new Error(String(error)));
+        }
+      )
+      .finally(() => {
+        if (controllerRef.current === controller) loadingMoreRef.current = false;
+      });
+  }, [loading, hasMore, feedKey, pageLimit, continueWhileEmpty, fetchPageRef, onPageRef]);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 

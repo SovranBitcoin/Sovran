@@ -1,3 +1,5 @@
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { DemoHomeFeed } from '../components/DemoHomeFeed';
 import { useState, useCallback, useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -116,6 +118,7 @@ const filtersInnerStyles = StyleSheet.create({
 
 export function FeedScreen() {
   useLifecycleLogger('FeedScreen', feedLog);
+  const mockMode = useSettingsStore((state) => state.mockMode);
 
   const [activeTab, setActiveTab] = useState<FeedTabId>(FEED_TAB_FOR_YOU);
   const [followingMode, setFollowingMode] = useState<FollowingMode>('Popular');
@@ -161,7 +164,7 @@ export function FeedScreen() {
       </View>
 
       <ScreenContainer>
-        <HomeFeed activeFilter={activeFilter} />
+        {mockMode ? <DemoHomeFeed /> : <HomeFeed activeFilter={activeFilter} />}
       </ScreenContainer>
       <ComposeFab />
       <SearchOverlay recentContext="feed" />

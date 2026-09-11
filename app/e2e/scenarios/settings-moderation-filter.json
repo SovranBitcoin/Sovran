@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "id": "settings.moderation.filter",
+  "name": "Edit and persist the private-message word filter",
+  "description": "Opens Moderation, enables the local word filter, saves a phrase, reopens the page to check persistence, then disables filtering.",
+  "details": "Candidate for both native drivers. No public report or mute-list write is sent. Source selectors and fake-driver execution do not establish native AX reachability. Uses a fresh test account.",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"ACCOUNT"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"settings-moderation-row"},"attempts":5,"settleMs":1000},
+    {"action":"screenshot","name":"settings"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-moderation-row"}}],"until":{"id":"moderation-filter-toggle"},"attempts":4,"settleMs":1500},
+    {"action":"waitFor","selector":{"id":"moderation-filter-toggle"},"value":"0","timeoutMs":15000},
+    {"action":"screenshot","name":"settings-moderation"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"moderation-filter-toggle"}}],"until":{"id":"moderation-filter-toggle"},"untilValue":"1","attempts":4,"settleMs":1500},
+    {"action":"waitFor","selector":{"id":"moderation-filter-words"},"timeoutMs":15000},
+    {"action":"input","selector":{"id":"moderation-filter-words"},"value":"demo-filter-phrase"},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"moderation-filter-save"},"attempts":3,"settleMs":1000},
+    {"action":"tap","selector":{"id":"moderation-filter-save"}},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"flow-header-back"}}],"until":{"id":"settings-moderation-row"},"attempts":4,"settleMs":1500},
+    {"action":"screenshot","name":"settings"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-moderation-row"}}],"until":{"id":"moderation-filter-toggle"},"attempts":4,"settleMs":1500},
+    {"action":"waitFor","selector":{"id":"moderation-filter-toggle"},"value":"1","timeoutMs":15000},
+    {"action":"waitFor","selector":{"id":"moderation-filter-words"},"value":"demo-filter-phrase","timeoutMs":15000},
+    {"action":"screenshot","name":"settings-moderation"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"moderation-filter-toggle"}}],"until":{"id":"moderation-filter-toggle"},"untilValue":"0","attempts":4,"settleMs":1500},
+    {"action":"screenshot","name":"settings-moderation"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

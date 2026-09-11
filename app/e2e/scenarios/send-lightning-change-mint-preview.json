@@ -9,7 +9,7 @@
   "requires": ["fresh-install","cocod.send.bolt11","cocod.receive.bolt11","unit.sat"],
   "funds": {"assets":[{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"maxPrincipal":100},{"mintUrl":"https://mint.minibits.cash/Bitcoin","unit":"sat","accountIndex":0,"maxPrincipal":80}]},
   "setup": [
-    {"use":"flow.onboard"},
+    {"use":"flow.onboard-sovran-mint"},
     {"use":"flow.fund-lightning-100"},
     {"action":"tapUntil","sequence":[{"tap":{"label":"Receive"}}],"until":{"id":"receive-method-fixedAmount"},"attempts":4,"settleMs":6000},
     {"action":"waitFor","selector":{"id":"receive-method-fixedAmount"},"state":"enabled","timeoutMs":60000},

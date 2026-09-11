@@ -1,6 +1,6 @@
 // This file extends app.json with dynamic configuration.
-// EAS will auto-increment buildNumber/versionCode in app.json,
-// while this file handles dynamic values like bundle identifiers.
+// EAS manages native build numbers remotely; app.json owns the product version.
+// This file handles dynamic values like bundle identifiers.
 
 module.exports = ({ config }) => {
   const buildProfile =
@@ -18,8 +18,9 @@ module.exports = ({ config }) => {
     );
   }
 
-  const appIcon = './assets/images/light.png';
-  const adaptiveIcon = './assets/images/dark-t.png';
+  const appIcon = './assets/brand/generated/symbol/black-on-light/1024x1024.png';
+  const adaptiveIcon =
+    './assets/brand/generated/android-adaptive-icon/black-on-transparent/1024x1024.png';
   const androidGoogleMapsApiKey =
     process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
 

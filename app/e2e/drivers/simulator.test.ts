@@ -29,6 +29,51 @@ const snapshot = (label: string): AxSnapshot => ({
 });
 
 describe('AxWatcher navigation freshness', () => {
+  it('does not reuse the pre-tap page to locate the next control', async () => {
+    const watcher = new AxWatcher('unused');
+    watcher.update(snapshot('terms-continue'));
+    const driver = new SimulatorDriver(
+      { udid: 'offline-test', axEndpoint: 'unused', touchEndpoint: 'unused' },
+      { axWatcher: watcher, press: async () => {} }
+    );
+    await driver.tap({ id: 'terms-continue' });
+    expect(await driver.find({ id: 'terms-continue' })).toBeNull();
+    watcher.update(snapshot('privacy-acknowledgment'));
+    expect(await driver.find({ id: 'privacy-acknowledgment' })).not.toBeNull();
+  });
+
+  it('brackets a tap with stream suspension and a fresh native observation', async () => {
+    const order: string[] = [];
+    class ActiveWatcher extends AxWatcher {
+      override async pause() {
+        order.push('pause');
+        return true;
+      }
+      override start() {
+        order.push('resume');
+      }
+    }
+    const watcher = new ActiveWatcher('unused');
+    watcher.update(snapshot('terms-continue'));
+    const driver = new SimulatorDriver(
+      { udid: 'offline-test', axEndpoint: 'unused', touchEndpoint: 'unused' },
+      {
+        axWatcher: watcher,
+        press: async () => {
+          order.push('tap');
+        },
+        captureAxSnapshot: async () => {
+          order.push('observe');
+          return snapshot('privacy-acknowledgment');
+        },
+      }
+    );
+    await driver.tap({ id: 'terms-continue' });
+    expect(order).toEqual(['pause', 'tap', 'observe', 'resume']);
+    expect(await driver.find({ id: 'terms-continue' })).toBeNull();
+    expect(await driver.find({ id: 'privacy-acknowledgment' })).not.toBeNull();
+  });
+
   it('invalidates both the cached tree and its generation barrier', () => {
     const watcher = new AxWatcher('unused');
     const stale = snapshot('stale-wallet');

@@ -44,6 +44,21 @@ jobs:
       - name: Test
         run: bun run test
 
+      - name: Release controller and archive tests
+        run: bun run test:release
+
+      - name: Native harness contracts
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          bun run e2e:validate
+          bun run e2e:test
+
+      - name: Validate asset sources, geometry and generated exports
+        run: |
+          bun run assets:check
+          bun run assets:test
+          test -z "$(git status --porcelain --untracked-files=all -- app/assets/brand)"
+
   # Non-blocking signal job: runs `codereview/analyze-structure` and posts
   # the LLM-friendly summary as a sticky PR comment. The signal mirrors
   # what `npm run analyze-structure` (or the `audit/fix` scripts) consume

@@ -98,14 +98,9 @@ interface ListRowProps {
   trailing?: ReactNode;
 
   /**
-   * Set when `trailing` is its own tappable control (e.g. the mint row's
-   * 3-dot inspect button) on a row that also has `onPress`. heroui
-   * PressableFeedback's `Ripple` compound is an `absolute inset-0` overlay
-   * stacked ABOVE the row content whose container (not `pointerEvents:
-   * 'none'`) is the row's actual touch target — so a trailing button under
-   * it can never receive a touch and every tap fires the ROW action. This
-   * flag drops the ripple overlay (scale feedback remains) so the trailing
-   * control can win the tap.
+   * Set when `trailing` is independently tappable. It renders as a sibling
+   * of the main pressable so native accessibility does not collapse the
+   * action and the primary ripple cannot intercept its touches.
    */
   trailingInteractive?: boolean;
 
@@ -296,7 +291,7 @@ export function ListRow({
         {subtitleEl}
         {accentBelow ? null : accent}
       </VStack>
-      {trailing}
+      {trailingInteractive && onPress ? null : trailing}
     </HStack>
   );
 
@@ -328,6 +323,31 @@ export function ListRow({
   }
 
   const a11yLabel = accessibilityLabel ?? (typeof title === 'string' ? title : undefined);
+
+  // Two independent native targets. A nested accessible Pressable hides its
+  // trailing control on iOS even when pointer delivery works visually.
+  if (trailingInteractive) {
+    return (
+      <View style={[disabled && styles.disabled, style]}>
+        <HStack className="items-center">
+          <PressableFeedback
+            testID={testID}
+            animation={false}
+            onPress={guardedPress}
+            isDisabled={disabled}
+            accessibilityRole="button"
+            accessibilityLabel={a11yLabel}
+            accessibilityHint={accessibilityHint}
+            accessibilityState={{ disabled }}
+            className="flex-1">
+            <PressableFeedback.Scale>{body}</PressableFeedback.Scale>
+            <PressableFeedback.Ripple />
+          </PressableFeedback>
+          <View style={{ paddingRight: paddingHorizontal }}>{trailing}</View>
+        </HStack>
+      </View>
+    );
+  }
 
   // Settings-row press grammar (see SettingsScreen): subtle scale on the
   // content + a ripple expanding from the touch point, instead of a flat

@@ -1,3 +1,5 @@
+import { useFeedIgnoreStore } from '../stores/ignoreStore';
+import { moderateFeedItems } from '../lib/moderation';
 /**
  * @fileoverview Shared feed content state.
  *
@@ -12,7 +14,7 @@
  * keep their own pagination — the cursor rules differ per surface.
  */
 
-import { useCallback, useState, useTransition } from 'react';
+import { useCallback, useMemo, useState, useTransition } from 'react';
 
 import type { FeedEnrichmentUpdates, FeedParseResult } from '@/features/feed/data/feedClient';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
@@ -96,8 +98,15 @@ export function useFeedContentState(seed?: FeedContentPage) {
     [startTransition]
   );
 
+  const ignoredPeople = useFeedIgnoreStore((s) => s.ignoredPubkeys);
+  const ignoredEvents = useFeedIgnoreStore((s) => s.ignoredEventIds);
+  const visibleItems = useMemo(
+    () => moderateFeedItems(feedItems, ignoredPeople, ignoredEvents),
+    [feedItems, ignoredPeople, ignoredEvents]
+  );
+
   return {
-    feedItems,
+    feedItems: visibleItems,
     metricsMap,
     quotedEventsMap,
     profilesMap,

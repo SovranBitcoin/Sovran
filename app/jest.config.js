@@ -10,8 +10,11 @@ module.exports = {
   setupFiles: [
     ...(expoNodePreset.setupFiles || []),
     require.resolve('@react-native/jest-preset/jest/setup.js'),
+    '<rootDir>/jest.staticAssets.js',
   ],
   moduleNameMapper: {
+    // A hoisted install and an isolated install must use the renderer's React.
+    '^react$': require.resolve('react'),
     // bc-ur uses CommonJS while cborg exposes only an import condition.
     // Resolve its real source so UR round-trip tests exercise the shipped codec.
     '^cborg$': [

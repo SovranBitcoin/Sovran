@@ -61,7 +61,7 @@ type ThreadIgnoreFilters = {
 
 /**
  * Pure final composition of the thread list: apply the viewer's ignore filters
- * to replies (NEVER the target; parents stay for context), then — only once the
+ * to every event, including the target and parent context, then — only once the
  * primary list is fully loaded — append the "Might be spam" section: a
  * separator carrying the surviving count, followed by the audit-found replies.
  */
@@ -77,7 +77,7 @@ export function composeThreadItems(
   const primaryIds = new Set<string>();
   const items: ThreadItem[] = [];
   for (const item of built) {
-    if ((item.type === 'reply' || item.type === 'spam-reply') && isIgnored(item.event)) continue;
+    if (item.type !== 'spam-separator' && isIgnored(item.event)) continue;
     if (item.type === 'reply' || item.type === 'target' || item.type === 'parent') {
       primaryIds.add(item.event.id);
     }

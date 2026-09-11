@@ -886,7 +886,7 @@
   },
   "shared/ui/composed/ListRow.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 3,
+    "inline-style": 4,
     "stack-layout-props": 2
   },
   "shared/ui/composed/MintIcon.tsx": {

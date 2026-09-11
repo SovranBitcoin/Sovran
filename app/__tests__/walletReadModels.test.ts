@@ -4,8 +4,6 @@ import { act, renderHook } from '@testing-library/react-native';
 import { useColadaBalance } from '../../wallet/src/react/useColadaBalance';
 import { useColadaTransactions } from '../../wallet/src/react/useColadaTransactions';
 
-// The app renderer and workspace hooks must share React's dispatcher.
-jest.mock('../../wallet/node_modules/react', () => jest.requireActual('react'));
 jest.mock('../../wallet/src/react/ColadaProvider', () => ({
   useColadaManager: () => mockActiveManager,
   useAnnotationStore: () => mockAnnotations,

@@ -17,6 +17,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  statfsSync,
   writeFileSync,
 } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
@@ -390,6 +391,32 @@ async function allocateConsolePort(adb: string): Promise<number> {
   throw new Error('no free emulator console port in 5554–5680');
 }
 
+// This pinned Play system image requires 7.2 GiB even if the AVD requests a
+// smaller partition. Leave a small reserve and allow macOS to reclaim a just-
+// deleted iPhone simulator before failing. Never delete unrelated files.
+export const ANDROID_BOOT_MIN_FREE_BYTES = Math.ceil(7.3 * 1024 ** 3);
+export async function waitForAndroidDiskSpace(
+  signal: AbortSignal | undefined,
+  onLifecycle: (message: string) => void,
+  readFreeBytes = () => {
+    const stats = statfsSync(tmpdir());
+    return stats.bavail * stats.bsize;
+  },
+  pause: (ms: number) => Promise<void> = sleep
+): Promise<void> {
+  for (let attempt = 0; attempt <= 24; attempt++) {
+    if (signal?.aborted) throw signal.reason;
+    if (readFreeBytes() >= ANDROID_BOOT_MIN_FREE_BYTES) return;
+    if (attempt === 24) break;
+    if (attempt === 0)
+      onLifecycle('waiting up to 60s for host disk space to be reclaimed (7.3 GiB needed)');
+    await pause(2500);
+  }
+  throw new SimulatorInfrastructureError(
+    'Android boot needs at least 7.3 GiB free on the temporary-files volume'
+  );
+}
+
 async function bootEmulator(options: EmulatorBootOptions): Promise<BootedEmulator> {
   const sdkRoot = resolveAndroidSdkRoot();
   const adb = adbBin(sdkRoot);
@@ -404,6 +431,7 @@ async function bootEmulator(options: EmulatorBootOptions): Promise<BootedEmulato
       `Android E2E system image not found at ${systemImage} — install ${E2E_SYSTEM_IMAGE}`
     );
   }
+  await waitForAndroidDiskSpace(options.signal, onLifecycle);
   const owned = createOwnedAndroidAvd({ uniqueId: options.runId });
   onLifecycle(
     `booting emulator ${owned.avdName} on ${serial} (factory-fresh private AVD, no snapshot, headless)`
@@ -631,14 +659,13 @@ export async function installOwnedAndroidApp(options: {
     await adb.openUrl(devClientUrl);
     await wait(4_000 + attempt * 2_000);
     const xml = await adb.uiautomatorDumpXml().catch(() => '');
-    if (xml && !DEV_LAUNCHER_HOME.test(xml)) return;
-    onLifecycle(
-      `dev client still on launcher home — re-firing bundle deep link (${attempt + 1}/6)`
-    );
+    // Any XML is not success: a dropped VIEW intent can leave the OS home
+    // launcher visible (including an icon labeled Sovran). Require our window.
+    const appWindowVisible = xml.includes(`package="${ANDROID_PACKAGE_ID}"`);
+    if (appWindowVisible && !DEV_LAUNCHER_HOME.test(xml)) return;
+    onLifecycle(`dev client window not ready — re-firing bundle deep link (${attempt + 1}/6)`);
   }
-  throw new Error(
-    'dev client never left the dev-launcher home — Metro bundle deep link not taking'
-  );
+  throw new Error('dev client window never became ready — Metro bundle deep link not taking');
 }
 
 function asAndroidInfrastructureError(error: unknown): SimulatorInfrastructureError {
@@ -717,6 +744,8 @@ export async function withAndroidEmulatorSession<T>(
     runId: string;
     runDir: string;
     onLifecycle?: (message: string) => void;
+    /** Presentation lane: 1080x1920 at 320 dpi on the disposable device. */
+    storeScreenshots?: boolean;
     /** Funded sessions: the Metro spawns a private seed-export server (adb-
      * reversed so the emulator app can POST to the same 127.0.0.1 endpoint)
      * and declares the funded assets for in-app reconciliation. */
@@ -794,7 +823,37 @@ export async function withAndroidEmulatorSession<T>(
       },
     });
     cleanups.push({ priority: 30, run: () => cleanupAdb.reverseRemoveAll() });
+    if (options.storeScreenshots) {
+      await adb.shell(['wm', 'size', '1080x1920']);
+      // Pair pixels with density: retaining the 2400px device's 420 dpi leaves
+      // only 731dp of height and pushes the receive address under its footer.
+      await adb.shell(['wm', 'density', '320']);
+    }
     await prepareEmulator(adb);
+    if (options.storeScreenshots) {
+      // Android 16's demo defaults include satellite icons. Normalize only the
+      // presentation status bar; this broadcast does not change connectivity.
+      await adb.shell([
+        'am',
+        'broadcast',
+        '-a',
+        'com.android.systemui.demo',
+        '-e',
+        'command',
+        'network',
+        ...Object.entries({
+          wifi: 'show',
+          mobile: 'show',
+          datatype: 'none',
+          level: '4',
+          fully: 'true',
+          sims: '1',
+          satellite: 'hide',
+          connection: 'off',
+          nosim: 'hide',
+        }).flatMap(([key, value]) => ['-e', key, value]),
+      ]);
+    }
     await adb.reverse(metro.port);
     // Funded sessions: reverse the seed-export server too, so the emulator
     // app's POST to http://127.0.0.1:<seedPort>/seed reaches the host server

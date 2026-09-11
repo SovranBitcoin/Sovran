@@ -453,3 +453,27 @@ are decoupled.
 8. The aggregate verification report runs wallet Vitest, app Jest, JSON validation,
    and offline harness checks separately; it must not imply that one runner
    covered another layer or that fake execution proves product behavior.
+
+
+## Store presentation capture
+
+`store.screenshots` owns the eight-screen store capture journey on iPhone and
+Android. It uses the existing demo wallet/contact/message data on an owned fresh
+device, with no counterparty effects or message sends. This is presentation
+coverage, not settlement proof. Fake-driver execution is orchestration evidence
+only. Native capture is currently unverified: the 2026-09-11 attempt found an
+outdated iOS binary, and rebuilding both platforms failed when the host ran out
+of disk space. See [the capture workflow and audit](testing-store-screenshots.md).
+
+## New settings journeys (2026-09-11)
+
+- `settings.moderation.filter`: candidate iOS/Android journey enabling the private
+  message filter, saving a phrase, reopening to verify persistence, then disabling
+  filtering. Does not publish a report or mute-list event.
+- `settings.legal.navigate`: candidate iOS/Android journey opening Terms and
+  Privacy from Settings, scrolling each document to its final paragraph and
+  returning through the navigation controls.
+
+Both validate and pass fake-driver orchestration smoke. Native AX reachability,
+keyboard dismissal, scrolling and back navigation remain unverified on both
+platforms; these results are not product proof.

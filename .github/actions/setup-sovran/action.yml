@@ -3,7 +3,7 @@ description: >-
   Bun setup + workspace install shared by the Sovran CI gate workflows.
   Installs the bun workspace at the repo root (app + wallet + nostr + docs),
   optionally refreshes external @sovranbitcoin/* packages, and caches the Bun
-  store. Bundle measurement opts into the frozen-lockfile path.
+  store. Merge and release gates use the frozen lockfile by default.
 
 # The repo is checked out at the runner root (no path nesting), so the workspace
 # root package.json / bun.lock live at the working directory. Install runs here.
@@ -17,7 +17,7 @@ inputs:
   refresh-sovran-externals:
     description: Resolve @sovranbitcoin/* dependencies to their latest published versions before install.
     required: false
-    default: "true"
+    default: "false"
 
 runs:
   using: composite
@@ -45,10 +45,7 @@ runs:
     # externals — @cashu/coco-* from npm, @sovranbitcoin/schemas +
     # coco-cashu-plugin-p2pk-import from GitHub Packages — resolve here.
     # SOVRAN_CI_TOKEN carries cross-repo GitHub Packages read; GITHUB_TOKEN is
-    # the fallback. By default, `deps:sovran-latest` re-resolves the external
-    # @sovranbitcoin/* packages to newest published before install, so CI keeps
-    # the always-on compatibility signal (a breaking schemas/p2pk publish reds
-    # CI by design). Callers that measure the checked-out artifact opt out.
+    # the fallback. Only explicit compatibility jobs refresh external versions.
     # --backend=copyfile (also inside deps:sovran-latest) keeps node_modules
     # files as real copies: bun's Linux default hardlinks them to the global
     # store, so postinstall patch-package writes mutate the cached copies and

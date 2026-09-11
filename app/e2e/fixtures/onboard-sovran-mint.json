@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "id": "flow.onboard-sovran-mint",
+  "params": [],
+  "requires": ["fresh-install"],
+  "steps": [
+    {"use":"flow.onboard"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-mint-selector"}}],"until":{"id":"mint-select-add"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"mint-select-add"}}],"until":{"id":"mint-add-search-toggle"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"mint-add-search-toggle"}}],"until":{"id":"mint-add-search-input"},"attempts":4,"settleMs":6000},
+    {"action":"input","selector":{"id":"mint-add-search-input"},"value":"https://mint.sovran.money"},
+    {"action":"waitFor","selector":{"id":"contact-row:mint:https://mint.sovran.money"},"timeoutMs":45000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"contact-row:mint:https://mint.sovran.money"}}],"until":{"label":"Add (1)"},"attempts":4,"settleMs":4000},
+    {"action":"waitFor","selector":{"id":"mint-add-confirm"},"state":"enabled","timeoutMs":15000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"mint-add-confirm"}}],"until":{"id":"e2e-toast-mints-added"},"attempts":4,"settleMs":30000},
+    {"action":"assert","that":"notVisible","selector":{"id":"mint-add-confirm"},"timeoutMs":30000},
+    {"action":"waitFor","selector":{"id":"mint-select-add"},"timeoutMs":30000},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"id":"contact-row:mint:https://mint.sovran.money"},"timeoutMs":30000},
+    {"action":"tap","selector":{"label":"Cancel"}},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-mint-selector"}}],"until":{"id":"mint-select-add"},"attempts":4,"settleMs":6000},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"id":"contact-row:mint:https://mint.sovran.money"},"timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"contact-row:mint:https://mint.sovran.money"}}],"until":{"id":"wallet-selected-mint:mint.sovran.money"},"attempts":4,"settleMs":6000}
+  ]
+}

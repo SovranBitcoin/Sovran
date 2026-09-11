@@ -17,6 +17,7 @@ interface CliOptions {
   requireCleanGit: boolean;
   /** Simulator screen recording is on by default; --no-record opts out. */
   noRecord: boolean;
+  evidence: 'full' | 'screenshots';
   runId?: string;
   leg?: string;
   amount?: number;
@@ -32,6 +33,7 @@ const COMMANDS = new Set<CliCommand>([
   'funds-write-off',
 ]);
 const VALUE_FLAGS = new Set([
+  'evidence',
   'suite',
   'scenario',
   'tag',
@@ -58,6 +60,7 @@ const ALLOWED_BY_COMMAND: Record<CliCommand, Set<string>> = {
   list: new Set(['suite', 'scenario', 'tag', 'lane', 'shuffle', 'seed']),
   'dry-run': new Set(['suite', 'scenario', 'tag', 'lane', 'shuffle', 'seed', 'caps']),
   run: new Set([
+    'evidence',
     'suite',
     'scenario',
     'tag',
@@ -107,6 +110,9 @@ export function parseCliArgs(argv: string[]): CliOptions {
   if (driver !== 'fake' && driver !== 'sim' && driver !== 'android')
     throw new Error(`unknown driver "${driver}" (use fake | sim | android)`);
   const capsRaw = values.get('caps');
+  const evidence = values.get('evidence') ?? 'full';
+  if (evidence !== 'full' && evidence !== 'screenshots')
+    throw new Error('--evidence must be full | screenshots');
   const caps = capsRaw?.split(',').filter(Boolean);
   if (capsRaw !== undefined && (!caps?.length || caps.join(',') !== capsRaw))
     throw new Error('--caps must be a non-empty comma-separated list');
@@ -139,6 +145,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
     acceptTestFundLoss: booleans.has('i-accept-test-fund-loss'),
     requireCleanGit: booleans.has('require-clean-git'),
     noRecord: booleans.has('no-record'),
+    evidence,
     runId: values.get('run-id'),
     leg: values.get('leg'),
     amount,

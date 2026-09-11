@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
 
 import { facade } from 'nostr';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { DEMO_PROFILES } from '@/shared/stores/runtime/mockPresentationData';
 
 import type { ProfileInfo } from '@/features/feed/components/nostr/feedTypes';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
@@ -62,15 +64,18 @@ export function useProfile(pubkey: string | undefined): {
   status: ProfileStatus;
 } {
   const cache = buildNostrDataLayer()?.cache;
+  const mockMode = useSettingsStore((state) => state.mockMode);
+  const demoProfile = mockMode && pubkey ? DEMO_PROFILES.get(pubkey) : undefined;
   const record = useCachedRecord(cache?.profiles, pubkey);
   const pending = usePendingProfile(cache?.pendingProfiles, pubkey);
   return useMemo(() => {
+    if (demoProfile) return { profile: demoProfile, status: 'cached' as const };
     const profile: ProfileInfo | undefined = record
       ? { name: record.name ?? '', ...(record.picture ? { picture: record.picture } : {}) }
       : undefined;
     const status: ProfileStatus = record ? 'cached' : pending ? 'loading' : 'absent';
     return { profile, status };
-  }, [record, pending]);
+  }, [record, pending, demoProfile]);
 }
 
 /**

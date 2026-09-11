@@ -2,7 +2,7 @@
 module.exports = {
   type: 'widget',
   deploymentTarget: '16.4',
-  icon: '../../assets/images/light-t.png',
+  icon: '../../assets/brand/generated/symbol/black-on-light/1024x1024.png',
   colors: {
     $accent: '#F7931A',
     $widgetBackground: '#F7931A',

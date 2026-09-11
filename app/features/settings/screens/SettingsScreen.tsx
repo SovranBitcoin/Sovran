@@ -306,9 +306,32 @@ export const SettingsScreen = () => {
               />
               <Separator className="mx-4" />
               <SettingsListLinkItem
+                href="/(settings-flow)/moderation"
+                testID="settings-moderation-row"
+                title="Moderation"
+                description="Blocked people and private-message word filter"
+              />
+              <Separator className="mx-4" />
+              <SettingsListLinkItem
                 href="/(settings-flow)/media"
                 title="My media"
                 description="Images you've posted and their deletion status"
+              />
+            </ListGroup>
+          </Section>
+
+          <Section title="Legal">
+            <ListGroup variant="secondary">
+              <SettingsListLinkItem
+                href="/(settings-flow)/terms"
+                title="Terms and Conditions"
+                testID="settings-terms-row"
+              />
+              <Separator className="mx-4" />
+              <SettingsListLinkItem
+                href="/(settings-flow)/privacy"
+                title="Privacy Policy"
+                testID="settings-privacy-row"
               />
             </ListGroup>
           </Section>
@@ -334,6 +357,7 @@ export const SettingsScreen = () => {
                 <Separator className="mx-4" />
                 <SettingsToggleItem
                   title="Mock Mode"
+                  testID="settings-mock-mode-toggle"
                   isSelected={mockMode}
                   onSelectedChange={setMockMode}
                 />

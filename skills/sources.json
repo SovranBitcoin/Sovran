@@ -1,0 +1,322 @@
+{
+  "format_version": 1,
+  "reviewed_on": "2026-09-10",
+  "review_policy": "SYSTEM.md#29-project-skills-and-review-policy",
+  "repository_popularity_snapshot": [
+    {
+      "repository": "https://github.com/mattpocock/skills",
+      "revision": "3cca18b368ae95cdbdebbff572ccafa662551015",
+      "repository_stars": 258476,
+      "checked_on": "2026-09-10"
+    },
+    {
+      "repository": "https://github.com/pbakaus/impeccable",
+      "revision": "67d018fe052853c104a96d441ce175dd5ec4c39d",
+      "repository_stars": 67030,
+      "checked_on": "2026-09-10"
+    },
+    {
+      "repository": "https://github.com/vercel-labs/agent-skills",
+      "revision": "063bee94c3f4df8453406c830b0a7df0f2860278",
+      "repository_stars": 31032,
+      "checked_on": "2026-09-10"
+    },
+    {
+      "repository": "https://github.com/expo/skills",
+      "revision": "85c7236254db761c3905f9078ce17393f3544ff8",
+      "repository_stars": 2514,
+      "checked_on": "2026-09-10"
+    },
+    {
+      "repository": "https://github.com/callstackincubator/agent-skills",
+      "revision": "2766baa46ca0fe7c16cc5ab4d0077ccec2e95fb9",
+      "repository_stars": 1642,
+      "checked_on": "2026-09-10"
+    },
+    {
+      "repository": "https://github.com/Gentleman-Programming/Gentleman-Skills",
+      "revision": "c8036a37893679dc5e942484975405d39689c63b",
+      "repository_stars": 650,
+      "checked_on": "2026-09-10"
+    }
+  ],
+  "skills": [
+    {
+      "name": "codebase-design",
+      "kind": "upstream",
+      "repository": "https://github.com/mattpocock/skills",
+      "revision": "3cca18b368ae95cdbdebbff572ccafa662551015",
+      "source_path": "skills/engineering/codebase-design",
+      "reviewed_on": "2026-09-10",
+      "license": "MIT",
+      "license_file": "LICENSE",
+      "local_changes": [
+        "Added repository license; upstream skill files unchanged."
+      ],
+      "files_sha256": {
+        "DEEPENING.md": "f3dd099ce99289bd213914d8ee3e2429b78309c3957ca4583f7659551b1d53c1",
+        "DESIGN-IT-TWICE.md": "8e740bf98446dbd4dfdc132ac4346d9a7eedaf93de6a495889171cf7f99f16bd",
+        "LICENSE": "0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5",
+        "SKILL.md": "2c20617f87ec8af6a434859f381b2f061a69b530444e74eb39e78bb016a6d1e2",
+        "agents/openai.yaml": "edebc9e4fcfe102114012575eaa9600b9b5fd08c311664f389c36e7bc717740f"
+      }
+    },
+    {
+      "name": "improve-codebase-architecture",
+      "kind": "upstream",
+      "repository": "https://github.com/mattpocock/skills",
+      "revision": "3cca18b368ae95cdbdebbff572ccafa662551015",
+      "source_path": "skills/engineering/improve-codebase-architecture",
+      "reviewed_on": "2026-09-10",
+      "license": "MIT",
+      "license_file": "LICENSE",
+      "local_changes": [
+        "Added repository license; upstream skill files unchanged."
+      ],
+      "files_sha256": {
+        "HTML-REPORT.md": "581e8bb5a521e46bbda8ca7e19b15948bed882187108092ebb90c62513b77528",
+        "LICENSE": "0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5",
+        "SKILL.md": "d1ac25511a936ff4250a48dbcefda363837d6bb9321b3cba73df99fa37270a75",
+        "agents/openai.yaml": "c8cb20f68ebf0edb4e497bc11ae5fcaa196004e661cd189015b04f4109ced7f1"
+      }
+    },
+    {
+      "name": "domain-modeling",
+      "kind": "upstream",
+      "repository": "https://github.com/mattpocock/skills",
+      "revision": "3cca18b368ae95cdbdebbff572ccafa662551015",
+      "source_path": "skills/engineering/domain-modeling",
+      "reviewed_on": "2026-09-10",
+      "license": "MIT",
+      "license_file": "LICENSE",
+      "local_changes": [
+        "Added repository license; upstream skill files unchanged."
+      ],
+      "files_sha256": {
+        "ADR-FORMAT.md": "944c92aa790e8fbdc9199640b170979abb8a34ba8d0fe18c2a01a63bce140ca0",
+        "CONTEXT-FORMAT.md": "17ab16ce783e4d2801ee52fd9acdf550cbf44de65ae76797a93943bbedf22a13",
+        "LICENSE": "0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5",
+        "SKILL.md": "327a2b50620e2fd70abc6893cd6965e76b20f8d0adb0dc2c8d5eb3845efb643e",
+        "agents/openai.yaml": "f6bf2aa996c6e6f53fdd0708e18a0d16a56aed8322cca59fedbe3c0d2c75f06b"
+      }
+    },
+    {
+      "name": "diagnosing-bugs",
+      "kind": "upstream",
+      "repository": "https://github.com/mattpocock/skills",
+      "revision": "3cca18b368ae95cdbdebbff572ccafa662551015",
+      "source_path": "skills/engineering/diagnosing-bugs",
+      "reviewed_on": "2026-09-10",
+      "license": "MIT",
+      "license_file": "LICENSE",
+      "local_changes": [
+        "Added repository license; upstream skill files unchanged."
+      ],
+      "files_sha256": {
+        "LICENSE": "0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5",
+        "SKILL.md": "77f3cf31bc99b2f49af943222526531fcc9fc41d047626d3640e875e85af3e84",
+        "agents/openai.yaml": "3e430dbe4334a87597488c060cb3dc3786bb00c9182877d6f5ec41f62490e90b",
+        "scripts/hitl-loop.template.sh": "35103539fc36873eea36074769ad454f9379d6fc8b2dc0e26ce987fd3bfe5503"
+      }
+    },
+    {
+      "name": "tdd",
+      "kind": "upstream",
+      "repository": "https://github.com/mattpocock/skills",
+      "revision": "3cca18b368ae95cdbdebbff572ccafa662551015",
+      "source_path": "skills/engineering/tdd",
+      "reviewed_on": "2026-09-10",
+      "license": "MIT",
+      "license_file": "LICENSE",
+      "local_changes": [
+        "Added repository license; upstream skill files unchanged."
+      ],
+      "files_sha256": {
+        "LICENSE": "0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5",
+        "SKILL.md": "cb01f66bebfaa25fa1f88e6b7e769cd9fd9f35b1120b8563749820738814c927",
+        "agents/openai.yaml": "ea6f01cf1b8c06a4b0f5b649d74b1b8ce8685e72af1b38d70d877693e092af0b",
+        "mocking.md": "3ceb807fdf4a47d6a93d4d9a891e5ba6d362a6247bd08adc451feebfc17361ef",
+        "tests.md": "859f9e592c188fda4fc7277dd180e4ce9c7a2e13f6efe1f6f29eccc9d28c106a"
+      }
+    },
+    {
+      "name": "code-review",
+      "kind": "upstream",
+      "repository": "https://github.com/mattpocock/skills",
+      "revision": "3cca18b368ae95cdbdebbff572ccafa662551015",
+      "source_path": "skills/engineering/code-review",
+      "reviewed_on": "2026-09-10",
+      "license": "MIT",
+      "license_file": "LICENSE",
+      "local_changes": [
+        "Added repository license; upstream skill files unchanged."
+      ],
+      "files_sha256": {
+        "LICENSE": "0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5",
+        "SKILL.md": "47f4e52c21694def9c7c11cbfbf891ca35eac7a93e395797515be3c8a409ae50",
+        "agents/openai.yaml": "8229ca854e11dc8e6aef2131ee03f31fb1561cf905fab9ccc325180cf3331352"
+      }
+    },
+    {
+      "name": "grilling",
+      "kind": "upstream",
+      "repository": "https://github.com/mattpocock/skills",
+      "revision": "3cca18b368ae95cdbdebbff572ccafa662551015",
+      "source_path": "skills/productivity/grilling",
+      "reviewed_on": "2026-09-10",
+      "license": "MIT",
+      "license_file": "LICENSE",
+      "local_changes": [
+        "Added repository license; upstream skill files unchanged."
+      ],
+      "files_sha256": {
+        "LICENSE": "0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5",
+        "SKILL.md": "10ff989e7498b23b5acb49d5048f11dcd906757d2f79c5cdf8a00001381296f2",
+        "agents/openai.yaml": "1411d7df7d99b7e621a1ff8283c8133cc2464be63d064e52d8ce169c6800ee9b"
+      }
+    },
+    {
+      "name": "react-native-best-practices",
+      "kind": "upstream",
+      "repository": "https://github.com/callstackincubator/agent-skills",
+      "revision": "2766baa46ca0fe7c16cc5ab4d0077ccec2e95fb9",
+      "source_path": "skills/react-native-best-practices",
+      "reviewed_on": "2026-09-10",
+      "license": "MIT",
+      "license_file": "LICENSE",
+      "local_changes": [
+        "Added repository license; upstream skill files unchanged."
+      ],
+      "files_sha256": {
+        "LICENSE": "6b4d67d192cedc90cabeac71e2fc1e24f158638192b8bf93d639b28bc42b62f1",
+        "POWER.md": "7e39898ec7b7e3335fbc8d290bd3b806020435fecfbc1c5e98ebfd31b2798999",
+        "SKILL.md": "abdbb7fc34ad739420fe43632e0baa1d646a01d097c6905211aa8b5b41957bf1",
+        "agents/openai.yaml": "13d867840f5d10f87256653bc71da8de508ad13b10fd6931e1eb29cdd8ceb9e6",
+        "references/bundle-analyze-app.md": "2c43a39bdad593091b2ec6f3fb0307096feb854bf11f4187f31f237a50cf76ca",
+        "references/bundle-analyze-js.md": "4e97a27c06ea91b49cacb18230f63bad392fc949e40d348787aab39755e8da41",
+        "references/bundle-barrel-exports.md": "187ac5a80822d22dbccdf3bb07f0fa60905b494285e735b30d97e79961fdfca5",
+        "references/bundle-code-splitting.md": "4cf3cae585f9ae7f64fc55af7af71d70e5ac3acb93fa6264a3186cc79d939cd7",
+        "references/bundle-hermes-mmap.md": "5eca09ae487bce41436461cc7d8d96fa8861b39815a2b930263807591778b757",
+        "references/bundle-library-size.md": "cb87a2d8a3cddd508b524b6b627ca775f5fc5a613f29d8a0f7e037ba054e4a7e",
+        "references/bundle-native-assets.md": "766fb2d22a3cb8b5f26969fd4afc3caf1dd32fd8f2da6bf9233aac48c2bbfd42",
+        "references/bundle-r8-android.md": "9f49269531e906e25f26eeb2a77b9af76bd562065d537c3cc0155301eb7bf9c0",
+        "references/bundle-tree-shaking.md": "3033f006a07a430ca4e2381b456774e59b3ace4fe0aee38740291cd0f305e9ca",
+        "references/images/bundle-treemap-source-map-explorer.png": "280495fc828cde33b0c1a83a02031d3ab484c0af240ab6fc408a313aa445fd3b",
+        "references/images/controlled-textinput-pingpong.png": "883cc345490473110ce93536a39c224f692229f691da1203b084488569f48781",
+        "references/images/devtools-flamegraph.png": "b257c6dbf4304aa6e2ca40ec357a13441cfa2f3cb84d5653af56484861a63c94",
+        "references/images/emerge-xray-ios.png": "41d00a6e90e89bcc941daa41ad2bfc742e3817e421b4cd6e42fb7f43d304c3b2",
+        "references/images/expo-atlas-treemap.png": "3e4ef5894d949f0e6a445329b33e3346dc8bded3855e18afe500584cd4c761a2",
+        "references/images/flashlight-flatlist-vs-flashlist.png": "a9e57f2673669bed947e57c121ad85088e237f462362382008b3bb46570c72ca",
+        "references/images/fps-drop-graph.png": "bb43718e87b140307e37d66dc2a5332e882881c4f8a14629b96072913b2ca580",
+        "references/images/memory-heap-snapshot.png": "0cd36795ce16814717cad712b744ad4e523e1acef95263a3b49a8bb24ede8bad",
+        "references/images/tti-warm-start-diagram.png": "6fc7cbf22a8ce657fe8d31978e7adfec24cd88a9a58c3d2a302f86fb64ff6a8e",
+        "references/images/view-hierarchy-flattening.png": "9edaac44f464730d3f5b6c2c0ccd19d2edf24fa358b4470c6ebc4a37b61753d7",
+        "references/images/xcode-instruments-templates.png": "5d864f068bb1dc5edf9586a557260aa0f27b2b6fc96e473d8d5a8b3c2c1e836b",
+        "references/images/xcode-thread-view.png": "f3e7b75b87ce445e36293fcac070eecdb0609557fffb98a8cd000bcbe3e1b921",
+        "references/js-animations-reanimated.md": "b0912deb98d8af8b8bf97d98789e39d467466be28cab9d96def7101b6e799b16",
+        "references/js-atomic-state.md": "6005f5ba3e46c120d3c3fa38d1ea077bbc026c8c707dea0075025c84a4ff8254",
+        "references/js-bottomsheet.md": "43eca23b45f2c100d506f51c21e56d72ae501147b5acec7b9fd1cbb92e2d08df",
+        "references/js-concurrent-react.md": "0b2bab623b62136745e34ce135148f79311c3c4487068b0b0f2fa0b1fab851f2",
+        "references/js-lists-flatlist-flashlist.md": "4d62b3a9d6325fc77cdc4fc18597d9e5d241e5afd37f9284babf0fc69ce0def7",
+        "references/js-measure-fps.md": "5efca75bfbe57ebf1ec1e38df8704909e0df2e41df856715bb425d438cb48a34",
+        "references/js-memory-leaks.md": "52d0f71f0addbd6b03e8a12e46fa7405a5ae68394f106081768e2625f1ffd838",
+        "references/js-profile-react.md": "c7a283f68320de85d84940871e58c0c40b71182d704202d49a115ba98fdca716",
+        "references/js-react-compiler.md": "70f873d84646260256e01b93f504468d645a4e57ad5f88eef5d090f63358aa1a",
+        "references/js-uncontrolled-components.md": "4c27d770d1818edcb193612f141efe62f1ec907aa3aa8fbc54d15e677ffa54e7",
+        "references/native-android-16kb-alignment.md": "d61c945db16abf89c03099138febb8be2f228187b94a534eab7c385290938806",
+        "references/native-measure-tti.md": "f27bc1de4d443a9e49d372806aea91bf793bb4c7125e693db7cae3442eff57a1",
+        "references/native-memory-leaks.md": "3b69f2545bcc541b81dde55c0e0d2803a87671dd7a64da848e041af43019b4f4",
+        "references/native-memory-patterns.md": "cecf5b6eea44e3de9544976a9077b1b88d11bf5a336bf25cd27e094988ffb17d",
+        "references/native-platform-setup.md": "767b2d7ee9889fb43eccaec15ef2601cc3e25706f85cef14f264ce052789572e",
+        "references/native-profiling.md": "7830d1fd35fc52979b34d09646b8d237e895a3894d464ad16d6fd8bb32fe80c9",
+        "references/native-sdks-over-polyfills.md": "ac9ca06c1f3a3646c4b75d2ca85039ed357cc117522d4d2de112dda5bd75cf2f",
+        "references/native-threading-model.md": "7543ae88d708a382f0ec4d8fba987e7e89d8f2d2c954586a77a26c449e246b66",
+        "references/native-turbo-modules.md": "39ca96ce0b787cbff25aa649508cb64ea8bbb1c07ddd08e10c1d6a6ac932ea41",
+        "references/native-view-flattening.md": "483a25551f4d73199156599874d21d67731dbc4d1bc241ec672f064667265c24"
+      }
+    },
+    {
+      "name": "expo-router",
+      "kind": "upstream",
+      "repository": "https://github.com/expo/skills",
+      "revision": "85c7236254db761c3905f9078ce17393f3544ff8",
+      "source_path": "plugins/expo/skills/expo-router",
+      "reviewed_on": "2026-09-10",
+      "license": "MIT",
+      "license_file": "LICENSE",
+      "local_changes": [
+        "Added repository license; upstream skill files unchanged."
+      ],
+      "files_sha256": {
+        "LICENSE": "49c5f9c7097c9a940ff663a54c27a4c60e379df6cc2b3052df0d37a09a85df93",
+        "SKILL.md": "93ff75501eb74e4982a93119ad3145499d400bb613260d2eb39be8008651f500",
+        "agents/openai.yaml": "7b76d9331a33e06e61504db9af069bccc8ab4a02e2f8be92727e8e0f9ad7941d",
+        "references/form-sheet.md": "947de9cf35a15aacf3f02e96e45942b5e4826e536e529570886e5ddbb7ec8591",
+        "references/route-structure.md": "4c3d70edeb7e36d965c4d96fa150f23ee57e01be5f6c57dd3e34c6309aab7e87",
+        "references/search.md": "bb4785df4757d84f1aff09d34cdb84043e7099684b9731a24a1d79cc3c0df172",
+        "references/tabs.md": "c49081529a200bfc62c95d41229e5dd7368f2e35cd5775ccaaab3289ed1fd7eb",
+        "references/toolbar-and-headers.md": "14d9a71dd949bd2b28a5bd531f6b9c1b4f3fa847a86db8c5218fee67b5295769",
+        "references/zoom-transitions.md": "cacc1665e9f3044762765d2cd55fd1ead9627f06478f12dfa2280c6f9ae88ede"
+      }
+    },
+    {
+      "name": "sovran-zod",
+      "kind": "owned",
+      "reviewed_on": "2026-09-10",
+      "source_path": "skills/sovran-zod",
+      "guidance": "SYSTEM.md"
+    },
+    {
+      "name": "sovran-zustand",
+      "kind": "owned",
+      "reviewed_on": "2026-09-10",
+      "source_path": "skills/sovran-zustand",
+      "guidance": "SYSTEM.md"
+    },
+    {
+      "name": "sovran-app-copy",
+      "kind": "owned",
+      "reviewed_on": "2026-09-10",
+      "source_path": "skills/sovran-app-copy",
+      "guidance": "SYSTEM.md",
+      "license": "Apache-2.0",
+      "license_file": "LICENSE",
+      "adapted_from": {
+        "repository": "https://github.com/pbakaus/impeccable",
+        "revision": "67d018fe052853c104a96d441ce175dd5ec4c39d",
+        "paths": [
+          ".agents/skills/impeccable/reference/clarify.md",
+          ".agents/skills/impeccable/reference/operate.md"
+        ]
+      },
+      "local_changes": [
+        "Project-authored native workflow derived from selected playbooks.",
+        "SYSTEM.md owns conventions; no launcher, binary, hooks, extra context documents, browser CSS, or automatic handoffs."
+      ]
+    },
+    {
+      "name": "sovran-native-ui-review",
+      "kind": "owned",
+      "reviewed_on": "2026-09-10",
+      "source_path": "skills/sovran-native-ui-review",
+      "guidance": "SYSTEM.md",
+      "license": "Apache-2.0",
+      "license_file": "LICENSE",
+      "adapted_from": {
+        "repository": "https://github.com/pbakaus/impeccable",
+        "revision": "67d018fe052853c104a96d441ce175dd5ec4c39d",
+        "paths": [
+          ".agents/skills/impeccable/reference/operate.md",
+          ".agents/skills/impeccable/reference/audit.native.md",
+          ".agents/skills/impeccable/reference/harden.md",
+          ".agents/skills/impeccable/reference/ios.md",
+          ".agents/skills/impeccable/reference/android.md"
+        ]
+      },
+      "local_changes": [
+        "Project-authored native workflow derived from selected playbooks.",
+        "SYSTEM.md owns conventions; no launcher, binary, hooks, extra context documents, browser CSS, or automatic handoffs."
+      ]
+    }
+  ]
+}

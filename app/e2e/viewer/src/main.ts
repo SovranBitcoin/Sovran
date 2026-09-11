@@ -1,3 +1,4 @@
+import { renderStoreView } from './components/storeView';
 import { refreshAll, selectScenario, startLivePoll } from './actions';
 import { diffTransportStep, renderDiffView } from './components/diffView';
 import { renderModal } from './components/modal';
@@ -32,6 +33,7 @@ function render(): void {
     contentEl.dataset.mode = state.mode;
   }
   if (state.mode === 'browse') renderPlayer(contentEl);
+  else if (state.mode === 'store') renderStoreView(contentEl);
   else if (state.mode === 'pages') renderPagesView(contentEl);
   else renderDiffView(contentEl);
   renderConsole(consoleEl);

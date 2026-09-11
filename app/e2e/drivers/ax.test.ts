@@ -106,26 +106,29 @@ describe('toAxNode checked-control values', () => {
     expect(toAxNode(el({ value })).value).toBe(value);
   });
 
-  it('redacts every secret-profile label and value while preserving stable selector state', () => {
-    const node = toAxNode(
-      el({
-        id: 'profile-secret-value-mnemonic',
-        label: 'raw-private-label',
-        value: 'raw-private-value',
-        role: 'text',
-        enabled: false,
-        frame: { x: -500, y: -500, width: 10, height: 10 },
-      })
-    );
+  it.each(['profile-secret-value-mnemonic', 'profile-secret-value-nsec'])(
+    'redacts %s while preserving stable selector state',
+    (id) => {
+      const node = toAxNode(
+        el({
+          id,
+          label: 'raw-private-label',
+          value: 'raw-private-value',
+          role: 'text',
+          enabled: false,
+          frame: { x: -500, y: -500, width: 10, height: 10 },
+        })
+      );
 
-    expect(node).toEqual({
-      id: 'profile-secret-value-mnemonic',
-      label: '‹profile-secret:redacted›',
-      value: '‹profile-secret:redacted›',
-      role: 'text',
-      state: { enabled: false },
-    });
-  });
+      expect(node).toEqual({
+        id,
+        label: '‹profile-secret:redacted›',
+        value: '‹profile-secret:redacted›',
+        role: 'text',
+        state: { enabled: false },
+      });
+    }
+  );
 });
 
 describe('elementTapCenter', () => {

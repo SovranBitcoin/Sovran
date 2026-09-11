@@ -5,6 +5,7 @@ import { join } from 'node:path';
 
 import {
   gesture,
+  installSourceDeviceIds,
   handleDevClientChrome,
   preparePrivateLog,
   pressAt,
@@ -288,4 +289,20 @@ describe('owned simulator bridge touch connection', () => {
     await expect(pressing).rejects.toThrow(/test abort/);
     expect(closed).toBe(true);
   });
+});
+
+it('never installs from a temporary, unavailable, or target simulator', () => {
+  expect([
+    ...installSourceDeviceIds(
+      {
+        runtime: [
+          { udid: 'stable', name: 'iPhone 17 Pro', isAvailable: true },
+          { udid: 'deleting', name: 'Sovran E2E previous-run', isAvailable: true },
+          { udid: 'target', name: 'iPhone 17 Pro', isAvailable: true },
+          { udid: 'unavailable', name: 'Old iPhone', isAvailable: false },
+        ],
+      },
+      'target'
+    ),
+  ]).toEqual(['stable']);
 });

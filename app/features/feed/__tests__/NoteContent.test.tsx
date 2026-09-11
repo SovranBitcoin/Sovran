@@ -6,6 +6,11 @@ jest.mock('react-native/Libraries/Utilities/Platform', () => ({
   OS: 'ios',
   select: (values: Record<string, unknown>) => values.ios ?? values.default,
 }));
+jest.mock('@/features/feed/stores/ignoreStore', () => ({
+  useFeedIgnoreStore: (
+    select: (state: { ignoredPubkeys: string[]; ignoredEventIds: string[] }) => unknown
+  ) => select({ ignoredPubkeys: [], ignoredEventIds: [] }),
+}));
 jest.mock('@/shared/ui/primitives/Pressable', () => ({ Pressable: 'Pressable' }));
 jest.mock('@/shared/ui/primitives/View/View', () => ({ View: require('react-native').View }));
 jest.mock('@/shared/ui/primitives/View/VStack', () => ({ VStack: require('react-native').View }));

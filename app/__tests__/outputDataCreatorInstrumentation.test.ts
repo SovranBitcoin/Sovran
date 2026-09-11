@@ -11,6 +11,16 @@ import {
   setNativeCryptoEnabled,
 } from '@/shared/lib/cashu/nativeOutputDataCreator';
 
+jest.mock('react-native-nitro-modules', () => ({
+  NitroModules: { hasHybridObject: jest.fn(() => false) },
+}));
+
+const mockNativeImport = jest.fn();
+jest.mock('@cashudevkit/react-native/native', () => {
+  mockNativeImport();
+  throw new Error('OutputDataCreator has not been registered');
+});
+
 jest.mock('@/shared/lib/logger', () => ({
   __esModule: true,
   cashuLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
@@ -35,6 +45,17 @@ afterEach(() => {
 });
 
 describe('resolveOutputDataCreator', () => {
+  it('does not import an unregistered HybridObject and preserves reference output', () => {
+    const creator = resolveOutputDataCreator();
+    expect(mockNativeImport).not.toHaveBeenCalled();
+    expect(isNativeCryptoAvailable()).toBe(false);
+    const output = creator.createSingleDeterministicData(0, SEED, 7, KEYSET_ID);
+    const reference = OutputData.createSingleDeterministicData(0, SEED, 7, KEYSET_ID);
+    expect(output.blindedMessage).toEqual(reference.blindedMessage);
+    expect(output.secret).toEqual(reference.secret);
+    expect(output.blindingFactor).toEqual(reference.blindingFactor);
+  });
+
   it('honours the explicit opt-out and falls back to instrumented cashu-ts', () => {
     process.env[CASHU_NATIVE_CRYPTO_ENV] = '0';
 
@@ -100,11 +121,10 @@ describe('resolveOutputDataCreator', () => {
     // shipped builds must not need a flag to use CDK.
     const creator = resolveOutputDataCreator();
 
-    // Node has no Nitro runtime, so the native load fails and is logged.
-    expect(cashuLog.info).toHaveBeenCalledWith(
-      'cashu.native_crypto.unavailable',
-      expect.objectContaining({ error: expect.any(String) })
-    );
+    // The linked runtime reports no creator, so skip its eager import and log why.
+    expect(cashuLog.info).toHaveBeenCalledWith('cashu.native_crypto.unavailable', {
+      reason: 'hybrid_object_not_registered',
+    });
 
     cashuLog.info.mockClear();
     creator.createDeterministicData(0, SEED, 0, KEYSET, [0]);

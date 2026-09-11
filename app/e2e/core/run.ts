@@ -30,6 +30,8 @@ import { MINT_FAULTS_CAPABILITY, DEVICE_NETWORK_CAPABILITY } from '../schema/cap
 import { redactProfileSecretAxNodes } from '../drivers/ax-redaction';
 
 export interface RunDeps {
+  /** Named captures, failures and final-state proof only. Full evidence is the default. */
+  evidence?: 'full' | 'screenshots';
   driver: Driver;
   runner: CommandRunner;
   bus: EventBus;
@@ -74,7 +76,8 @@ const pad = (n: number) => String(n).padStart(3, '0');
 type Capture = (
   subLabel: string,
   options?: Parameters<Driver['screenshot']>[0],
-  named?: string
+  named?: string,
+  failed?: boolean
 ) => Promise<void>;
 
 function capturedSecretKind(value: string, selectorId?: string): SecretKind | undefined {
@@ -176,8 +179,9 @@ export async function runScenario(
 
   const captureFor =
     (ps: PlannedStep, enabled = true): Capture =>
-    async (subLabel, options, named) => {
+    async (subLabel, options, named, failed) => {
       if (!enabled) return;
+      if (deps.evidence === 'screenshots' && !named && !failed) return;
       const seq = nextArtifactSeq();
       const base = named
         ? `${plan.id}/named/${named}-${pad(seq)}`
@@ -494,9 +498,9 @@ async function execStep(
 
   // A screenshot step already captured named screenshot + AX evidence with its
   // declared options. Never follow it with duplicate automatic evidence.
-  if (ps.step.action !== 'screenshot') {
+  if (ps.step.action !== 'screenshot' || !ok) {
     try {
-      await evidence(ps.action);
+      await evidence(ps.action, undefined, undefined, !ok);
     } catch (e) {
       ok = false;
       const evidenceError = `evidence capture failed: ${redactString((e as Error).message)}`;

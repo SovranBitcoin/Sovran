@@ -1,3 +1,4 @@
+import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 /**
  * @fileoverview Shared Transactions screen component
  *
@@ -302,6 +303,10 @@ export function TransactionsScreen({
       scroll="custom"
       footer={sweepFooter}
       onHeaderHeightChange={setTotalHeaderHeight}>
+      <E2EAccessibilityProbe
+        testID="screen-transactions"
+        accessibilityLabel="Transaction history"
+      />
       <Transactions
         ref={transactionsRef}
         listKey={listKey}

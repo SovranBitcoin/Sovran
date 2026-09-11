@@ -1,3 +1,6 @@
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { DEMO_AI_MESSAGES } from '@/shared/stores/runtime/mockPresentationData';
+import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { useEffect, useMemo, useState } from 'react';
 import { Keyboard, ScrollView, View as RNView } from 'react-native';
 import { useHeaderHeight } from 'expo-router/react-navigation';
@@ -91,6 +94,11 @@ function buildBranchNavById(
  */
 export function AiChatScreen() {
   useLifecycleLogger('AiChatScreen');
+  const mockMode = useSettingsStore((state) => state.mockMode);
+  const [demoMessages, setDemoMessages] = useState(DEMO_AI_MESSAGES);
+  useEffect(() => {
+    if (!mockMode) setDemoMessages(DEMO_AI_MESSAGES);
+  }, [mockMode]);
 
   // On AiChatScreen MOUNT (not every focus), archive any in-progress
   // conversation and start fresh. The surface stays mounted across tab
@@ -111,6 +119,7 @@ export function AiChatScreen() {
   // user reported the obvious bug. Prior conversations remain accessible
   // via `openAiSessionsMenu` (the header-right clock icon).
   useEffect(() => {
+    if (useSettingsStore.getState().mockMode) return;
     const store = useRoutstrStore.getState();
     if (store.conversationHistory.length === 0) return;
     aiLog.info('ai.session.auto_new_on_mount', {
@@ -126,7 +135,8 @@ export function AiChatScreen() {
 
   const surfaceColor = useThemeColor('surface');
 
-  const conversationHistory = useRoutstrStore((s) => s.conversationHistory);
+  const liveHistory = useRoutstrStore((s) => s.conversationHistory);
+  const conversationHistory = mockMode ? demoMessages : liveHistory;
   const activeChildren = useRoutstrStore((s) => s.activeChildren);
   const setActiveBranch = useRoutstrStore((s) => s.setActiveBranch);
 
@@ -145,7 +155,7 @@ export function AiChatScreen() {
     balanceMsats != null ? Math.floor(balanceMsats / 1000) : 0,
     sessionLineup ?? lastKnownLineup?.lineup ?? null
   );
-  const canAttachImages = resolvedEntry?.visionInput === true;
+  const canAttachImages = !mockMode && resolvedEntry?.visionInput === true;
 
   const { send, retry, isSending, streamingMessageId } = useAiSend();
 
@@ -186,7 +196,7 @@ export function AiChatScreen() {
 
   const handleRetry = (messageId: string) => {
     aiLog.info('ai.retry.dispatch', { messageId });
-    void retry(messageId);
+    if (!mockMode) void retry(messageId);
   };
 
   // Composer state (draft + pending image attachments + measured height
@@ -261,6 +271,21 @@ export function AiChatScreen() {
   const handleSubmit = () => {
     const text = draft.trim();
     if (!text) return;
+    if (mockMode) {
+      const timestamp = Date.now();
+      setDemoMessages((messages) => [
+        ...messages,
+        { id: `demo-ai-user-${timestamp}`, role: 'user', content: text, timestamp },
+        {
+          id: `demo-ai-assistant-${timestamp}`,
+          role: 'assistant',
+          content: 'This is a local demo conversation. Turn off Mock Mode to ask an AI model.',
+          timestamp: timestamp + 1,
+        },
+      ]);
+      setDraft('');
+      return;
+    }
     const attachments = pendingAttachments;
     setDraft('');
     setPendingAttachments([]);
@@ -325,20 +350,10 @@ export function AiChatScreen() {
     </Pressable>
   );
 
-  // Pad bottom of the list so the newest bubble rests just above the
-  // composer's top edge while the composer itself is absolutely positioned
-  // over the chat — older bubbles slide *under* the composer's translucent
-  // glass on scroll-up (the iMessage / Telegram bleed-under-input look).
-  // No `paddingTop` here: adding one breaks `alignItemsAtEnd`'s
-  // "content < viewport → dock to bottom" math (the contentContainer's
-  // own paddingTop counts toward effective content height, so FlashList
-  // thinks the viewport is already filled and skips the auto-bottom
-  // padding it would otherwise insert). The AI Stack header is its own
-  // opaque/translucent surface above the screen scene; content sliding
-  // under it on scroll is the intended chat UX.
-  const listContentContainerStyle = {
-    paddingBottom: composerHeight + bottomInset + 16,
-  };
+  // FlashList's short-history alignment excludes footer/padding height from
+  // its bottom anchor. Reserve the measured composer outside the viewport so
+  // the last message cannot dock behind the input controls.
+  const listBottom = composerHeight + bottomInset + 16;
 
   return (
     <RNView style={{ flex: 1, backgroundColor: surfaceColor }}>
@@ -347,7 +362,7 @@ export function AiChatScreen() {
           the composer. When the keyboard opens, both shift up together so
           the latest message stays just above the composer instead of
           getting hidden behind the keyboard. */}
-      <Reanimated.View style={[{ flex: 1 }, keyboardLiftStyle]}>
+      <Reanimated.View style={[{ flex: 1, marginBottom: listBottom }, keyboardLiftStyle]}>
         <RNView style={{ flex: 1 }}>
           {activeMessages.length === 0 ? (
             <RNView style={{ flex: 1 }}>{emptyContent}</RNView>
@@ -371,7 +386,6 @@ export function AiChatScreen() {
                 autoscrollToBottomThreshold: 0.1,
               }}
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={listContentContainerStyle}
             />
           )}
         </RNView>
@@ -437,7 +451,7 @@ export function AiChatScreen() {
             value={draft}
             onChangeText={setDraft}
             onSend={handleSubmit}
-            disabled={isSending}
+            disabled={!mockMode && isSending}
             placeholder="Ask anything"
             onPlusPress={handlePlusPress}
             plusDisabled={!canAttachImages}
@@ -449,6 +463,7 @@ export function AiChatScreen() {
       {/* The header-right clock opens the Conversations menu (heroui
           actionMenuPopup, FWO — rows AX-invisible); mirror its open state so
           e2e can wait on it, same as WalletScreen / FeedScreen. */}
+      <E2EAccessibilityProbe testID="screen-ai" accessibilityLabel="AI conversation" />
       <E2EHerouiMenuProbe />
       {/* The model chip opens the model-picker FWO custom-sheet (the OTHER
           probe lane, e2e-action-menu-open) — mount its probe here too. */}

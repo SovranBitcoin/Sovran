@@ -18,6 +18,7 @@ const DM_KINDS = [4, 1059];
 export interface DmConversation {
   counterparty: string;
   lastMessagePreview: string;
+  lastMessageIsOwn?: boolean;
   /** unix seconds */
   lastMessageAt: number;
   /** Protocol of the most recent message with this counterparty. */
@@ -53,6 +54,7 @@ export function useDmConversations(viewerPubkey?: string, viewerPrivateKey?: Uin
           bucketRef.current.set(dm.counterparty, {
             counterparty: dm.counterparty,
             lastMessagePreview: dm.content,
+            lastMessageIsOwn: dm.isOwn,
             lastMessageAt: dm.createdAt,
             protocol: dm.protocol,
             newestMessageId: dm.id,

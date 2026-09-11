@@ -1,3 +1,4 @@
+import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
 import { parseImetaTags } from '@/shared/lib/nostr/media/imeta';
 import React, { useCallback, useMemo } from 'react';
 import { useRecyclingState } from '@shopify/flash-list';
@@ -465,6 +466,8 @@ export const NoteContent = React.memo(function NoteContent({
   onActionPressIn?: () => void;
   onActionPressOut?: () => void;
 }) {
+  const ignoredPeople = useFeedIgnoreStore((s) => s.ignoredPubkeys);
+  const ignoredEvents = useFeedIgnoreStore((s) => s.ignoredEventIds);
   const foreground = useThemeColor('foreground');
   const [expanded, setExpanded] = useRecyclingState(false, [overlayEvent?.id ?? content]);
   const imageOverlay = useImageOverlay();
@@ -715,16 +718,21 @@ export const NoteContent = React.memo(function NoteContent({
     }
   };
 
-  const renderQuoteCard = (eventId: string, key: string) => (
-    <QuotedPostCard
-      key={key}
-      event={quotedEvents.get(eventId)}
-      profiles={profiles}
-      getMetrics={getMetrics}
-      onPressIn={onQuotedPressIn}
-      onPressOut={onQuotedPressOut}
-    />
-  );
+  const renderQuoteCard = (eventId: string, key: string) => {
+    const quoted = quotedEvents.get(eventId);
+    if (ignoredEvents.includes(eventId) || (quoted && ignoredPeople.includes(quoted.pubkey)))
+      return null;
+    return (
+      <QuotedPostCard
+        key={key}
+        event={quotedEvents.get(eventId)}
+        profiles={profiles}
+        getMetrics={getMetrics}
+        onPressIn={onQuotedPressIn}
+        onPressOut={onQuotedPressOut}
+      />
+    );
+  };
 
   const renderQuoteBlockSegment = (seg: ContentSegment, i: number) => {
     if (seg.kind !== 'nevent' && seg.kind !== 'note') return null;

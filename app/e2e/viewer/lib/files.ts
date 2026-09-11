@@ -1,4 +1,4 @@
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 import { ARTIFACTS, isValidRunDirName, safeArtifactPath } from './paths';
 
@@ -8,6 +8,7 @@ const CONTENT_TYPES: Record<string, string> = {
   '.jsonl': 'application/x-ndjson',
   '.mp4': 'video/mp4',
   '.mov': 'video/quicktime',
+  '.zip': 'application/zip',
 };
 
 function contentTypeFor(path: string): string {
@@ -49,6 +50,9 @@ export function serveRunFile(
     'content-type': contentTypeFor(abs),
     'cache-control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
     'accept-ranges': 'bytes',
+    ...(abs.endsWith('.zip')
+      ? { 'content-disposition': `attachment; filename="${basename(abs)}"` }
+      : {}),
   };
   const range = rangeHeader ? parseByteRange(rangeHeader, file.size) : undefined;
   if (range) {

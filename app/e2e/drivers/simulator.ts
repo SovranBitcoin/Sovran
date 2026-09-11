@@ -170,8 +170,11 @@ async function captureSimulatorAxSnapshot(cfg: SimConfig): Promise<AxSnapshot> {
   } catch {
     throw new Error('simulator AX endpoint is invalid');
   }
+  const timeout = AbortSignal.timeout(10_000);
   // eslint-disable-next-line no-restricted-globals -- owned loopback serve-sim snapshot endpoint
-  const response = await fetch(endpoint, { signal: cfg.signal });
+  const response = await fetch(endpoint, {
+    signal: cfg.signal ? AbortSignal.any([cfg.signal, timeout]) : timeout,
+  });
   if (!response.ok) {
     throw new Error(`simulator accessibility snapshot failed with status ${response.status}`);
   }
@@ -831,10 +834,23 @@ export class SimulatorDriver implements Driver {
   async tap(sel: Selector): Promise<void> {
     const c = await this.#waitCenter(sel);
     if (!c) throw new Error(`tap: selector not on screen ${JSON.stringify(sel)}`);
-    await this.#press(c.x, c.y);
+    await this.#interact(() => this.#press(c.x, c.y));
   }
   async tapAt(x: number, y: number): Promise<void> {
-    await this.#press(x, y);
+    await this.#interact(() => this.#press(x, y));
+  }
+  async #interact(action: () => Promise<void>): Promise<void> {
+    // A queued pre-gesture SSE read must not satisfy the destination check or
+    // provide coordinates for the next tap. This barrier cannot depend on PNG
+    // evidence: screenshot-only runs deliberately omit per-action captures.
+    const resume = await this.#ax.pause();
+    this.#ax.invalidate();
+    try {
+      await action();
+      if (resume) this.#ax.update(await this.#captureAxSnapshot());
+    } finally {
+      if (resume) this.#ax.start();
+    }
   }
   async swipe(dir: 'left' | 'right' | 'up' | 'down'): Promise<void> {
     const [a, b] =
@@ -857,18 +873,20 @@ export class SimulatorDriver implements Driver {
                 [0.5, 0.3],
                 [0.5, 0.7],
               ];
-    await gesture(this.#cfg.touchEndpoint, 'begin', a[0], a[1], { signal: this.#cfg.signal });
-    for (let i = 1; i <= 8; i++) {
-      await sleep(25);
-      await gesture(
-        this.#cfg.touchEndpoint,
-        'move',
-        a[0] + ((b[0] - a[0]) * i) / 8,
-        a[1] + ((b[1] - a[1]) * i) / 8,
-        { signal: this.#cfg.signal }
-      );
-    }
-    await gesture(this.#cfg.touchEndpoint, 'end', b[0], b[1], { signal: this.#cfg.signal });
+    await this.#interact(async () => {
+      await gesture(this.#cfg.touchEndpoint, 'begin', a[0], a[1], { signal: this.#cfg.signal });
+      for (let i = 1; i <= 8; i++) {
+        await sleep(25);
+        await gesture(
+          this.#cfg.touchEndpoint,
+          'move',
+          a[0] + ((b[0] - a[0]) * i) / 8,
+          a[1] + ((b[1] - a[1]) * i) / 8,
+          { signal: this.#cfg.signal }
+        );
+      }
+      await gesture(this.#cfg.touchEndpoint, 'end', b[0], b[1], { signal: this.#cfg.signal });
+    });
   }
   async drag(
     sel: Selector,

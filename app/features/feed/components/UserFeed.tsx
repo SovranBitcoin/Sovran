@@ -224,17 +224,16 @@ export const RepostCard = React.memo(function RepostCard({
   const {
     gesture: tapGesture,
     suppress: suppressThreadTapStart,
-    release: suppressThreadTapEnd,
+    begin: beginThreadTap,
   } = useCardTapGesture(navigateToThread);
 
   return (
     <GestureDetector gesture={tapGesture}>
-      <Reanimated.View style={animStyle}>
+      <Reanimated.View style={animStyle} onStartShouldSetResponderCapture={beginThreadTap}>
         {/* Repost header */}
         <Pressable
           activeOpacity={0.7}
           onPressIn={suppressThreadTapStart}
-          onPressOut={suppressThreadTapEnd}
           onPress={() =>
             router.push({
               pathname: '/(user-flow)/profile',
@@ -281,7 +280,6 @@ export const RepostCard = React.memo(function RepostCard({
             onZapPress={onZapPress}
             onMorePress={onMorePress}
             onNestedProfilePressIn={suppressThreadTapStart}
-            onNestedProfilePressOut={suppressThreadTapEnd}
             getThreadContext={getThreadContext}
             showLineAbove={showLineAbove}
             fullBleedFooterBorder={fullBleedFooterBorder}

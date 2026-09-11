@@ -1,3 +1,5 @@
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { MOCK_SWAP_GROUPS } from '@/shared/stores/runtime/mockDataStore';
 /**
  * @fileoverview Swap Transaction Detail Screen
  *
@@ -211,7 +213,11 @@ export function SwapTransactionScreen({ groupId }: Props) {
     'success',
   ] as const);
   const accentColor = muted;
-  const group = useSwapTransactionsStore((state) => (groupId ? state.groups[groupId] : undefined));
+  const mockMode = useSettingsStore((state) => state.mockMode);
+  const liveGroup = useSwapTransactionsStore((state) =>
+    groupId ? state.groups[groupId] : undefined
+  );
+  const group = mockMode && groupId ? MOCK_SWAP_GROUPS[groupId] : liveGroup;
   const { history } = useHistoryWithMelts();
   const [expanded, setExpanded] = useState(false);
   const chevronRotation = useSharedValue(0);

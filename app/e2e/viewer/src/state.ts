@@ -29,7 +29,7 @@ type ModalView =
   | { kind: 'clear'; skipped: string[]; send: () => void };
 
 export interface AppState {
-  mode: 'browse' | 'diff' | 'pages';
+  mode: 'browse' | 'diff' | 'pages' | 'store';
   runs: RunSummary[];
   catalog: ScenarioCatalogEntry[];
   selectedRunId?: string;

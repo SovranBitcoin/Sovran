@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
-import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { useSettingsStore, useSettingsHydration } from '@/shared/stores/global/settingsStore';
+import { hasCurrentLegalAcceptance } from '@/shared/lib/legal/legalDocuments';
 import { TermsAndConditionsScreen } from '@/features/onboarding/screens/TermsAndConditionsScreen';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import OnboardingScreen from '@/features/onboarding/components/OnboardingScreen';
@@ -115,11 +116,27 @@ const AppGate: React.FC<AppGateProps> = ({ children }) => {
   useInitMount('AppGate');
   useLifecycleLogger('AppGate');
   const { isReady, isLoading } = useNostrKeysContext();
-  const isTermsAccepted = useSettingsStore((state) => state.isTermsAccepted());
-  const acceptTerms = useSettingsStore((state) => state.acceptTerms);
+  const isTermsAccepted = useSettingsStore((state) =>
+    hasCurrentLegalAcceptance(state.legalAcceptance)
+  );
+  const acceptLegalDocuments = useSettingsStore((state) => state.acceptLegalDocuments);
   const hasSeenOnboarding = useSettingsStore((state) => state.hasSeenOnboarding);
   const completeOnboarding = useSettingsStore((state) => state.completeOnboarding);
   const reinstallState = useReinstallDetection(hasSeenOnboarding);
+  const hydration = useSettingsHydration((s) => s.status);
+  if (hydration === 'loading') return null;
+  if (hydration === 'error') {
+    return (
+      <TermsAndConditionsScreen
+        onClose={acceptLegalDocuments}
+        settingsError
+        onRetry={() => {
+          useSettingsHydration.setState({ status: 'loading' });
+          void useSettingsStore.persist.rehydrate();
+        }}
+      />
+    );
+  }
 
   if (!isTermsAccepted) {
     log.debug('gate.app.blocked', { reason: 'terms_not_accepted' });
@@ -128,7 +145,7 @@ const AppGate: React.FC<AppGateProps> = ({ children }) => {
         <TermsAndConditionsScreen
           onClose={() => {
             log.info('gate.app.terms_accepted');
-            acceptTerms(new Date().toISOString());
+            acceptLegalDocuments();
           }}
         />
       </Log>

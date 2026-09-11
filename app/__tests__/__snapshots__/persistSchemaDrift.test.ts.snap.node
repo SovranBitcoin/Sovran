@@ -325,6 +325,30 @@ exports[`persisted schema drift feed-ignore-store schema matches the golden snap
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
+        "blockOverrides": {
+          "additionalProperties": {
+            "type": "boolean",
+          },
+          "default": {},
+          "propertyNames": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string",
+          },
+          "type": "object",
+        },
+        "dmFilterEnabled": {
+          "default": false,
+          "type": "boolean",
+        },
+        "dmFilterWords": {
+          "default": [],
+          "items": {
+            "maxLength": 100,
+            "type": "string",
+          },
+          "maxItems": 100,
+          "type": "array",
+        },
         "ignoredEventIds": {
           "default": [],
           "items": {
@@ -342,6 +366,52 @@ exports[`persisted schema drift feed-ignore-store schema matches the golden snap
           },
           "maxItems": 5000,
           "type": "array",
+        },
+        "muteList": {
+          "anyOf": [
+            {
+              "properties": {
+                "createdAt": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "id": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string",
+                },
+                "privateTags": {
+                  "items": {
+                    "items": {
+                      "type": "string",
+                    },
+                    "type": "array",
+                  },
+                  "type": "array",
+                },
+                "tags": {
+                  "items": {
+                    "items": {
+                      "type": "string",
+                    },
+                    "type": "array",
+                  },
+                  "type": "array",
+                },
+              },
+              "required": [
+                "id",
+                "createdAt",
+                "tags",
+                "privateTags",
+              ],
+              "type": "object",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
         },
       },
       "type": "object",
@@ -350,6 +420,30 @@ exports[`persisted schema drift feed-ignore-store schema matches the golden snap
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
+        "blockOverrides": {
+          "additionalProperties": {
+            "type": "boolean",
+          },
+          "default": {},
+          "propertyNames": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string",
+          },
+          "type": "object",
+        },
+        "dmFilterEnabled": {
+          "default": false,
+          "type": "boolean",
+        },
+        "dmFilterWords": {
+          "default": [],
+          "items": {
+            "maxLength": 100,
+            "type": "string",
+          },
+          "maxItems": 100,
+          "type": "array",
+        },
         "ignoredEventIds": {
           "default": [],
           "items": {
@@ -368,10 +462,61 @@ exports[`persisted schema drift feed-ignore-store schema matches the golden snap
           "maxItems": 5000,
           "type": "array",
         },
+        "muteList": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "createdAt": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "id": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string",
+                },
+                "privateTags": {
+                  "items": {
+                    "items": {
+                      "type": "string",
+                    },
+                    "type": "array",
+                  },
+                  "type": "array",
+                },
+                "tags": {
+                  "items": {
+                    "items": {
+                      "type": "string",
+                    },
+                    "type": "array",
+                  },
+                  "type": "array",
+                },
+              },
+              "required": [
+                "id",
+                "createdAt",
+                "tags",
+                "privateTags",
+              ],
+              "type": "object",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
       },
       "required": [
         "ignoredPubkeys",
         "ignoredEventIds",
+        "muteList",
+        "blockOverrides",
+        "dmFilterEnabled",
+        "dmFilterWords",
       ],
       "type": "object",
     },
@@ -7250,6 +7395,37 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           "maxLength": 16,
           "type": "string",
         },
+        "legalAcceptance": {
+          "anyOf": [
+            {
+              "properties": {
+                "acceptedAt": {
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                  "type": "string",
+                },
+                "privacyRevision": {
+                  "pattern": "^[a-f0-9]{64}$",
+                  "type": "string",
+                },
+                "termsRevision": {
+                  "pattern": "^[a-f0-9]{64}$",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "termsRevision",
+                "privacyRevision",
+                "acceptedAt",
+              ],
+              "type": "object",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
         "middlemanRouting": {
           "additionalProperties": {},
           "default": {
@@ -7414,6 +7590,38 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           "maxLength": 16,
           "type": "string",
         },
+        "legalAcceptance": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "acceptedAt": {
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                  "type": "string",
+                },
+                "privacyRevision": {
+                  "pattern": "^[a-f0-9]{64}$",
+                  "type": "string",
+                },
+                "termsRevision": {
+                  "pattern": "^[a-f0-9]{64}$",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "termsRevision",
+                "privacyRevision",
+                "acceptedAt",
+              ],
+              "type": "object",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
         "middlemanRouting": {
           "additionalProperties": {},
           "default": {
@@ -7561,6 +7769,7 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
         "whitenoiseEnabled",
         "mockNoGlass",
         "termsAccepted",
+        "legalAcceptance",
         "hasSeenOnboarding",
         "quickAccessP2PK",
         "regenerateP2PKOnReceive",

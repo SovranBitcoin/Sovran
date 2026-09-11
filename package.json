@@ -17,7 +17,11 @@
     "nostr-tools": "2.24.2"
   },
   "scripts": {
-    "postinstall": "cd app && node scripts/dedupe-coco.js && node modules/bitchat-module/scripts/patch-bitchat-imports.js && node modules/bitchat-module/scripts/sync-bitchat-android.js",
+    "assets:generate": "node scripts/assets.mjs && node scripts/feature-graphic.mjs",
+    "assets:check": "node scripts/assets.mjs --check && node scripts/feature-graphic.mjs --check",
+    "assets:brand": "node scripts/brand-assets.mjs",
+    "assets:test": "node --test scripts/brand-assets.test.mjs",
+    "postinstall": "cd app && node scripts/dedupe-coco.js && node modules/bitchat-module/scripts/patch-bitchat-imports.js && node modules/bitchat-module/scripts/sync-bitchat-android.js && node ../scripts/brand-assets.mjs",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
@@ -38,13 +42,21 @@
     "build:dev:android": "cd app && bun run build:dev:android",
     "build:ios": "cd app && bun run build:ios",
     "build:android": "cd app && bun run build:android",
-    "build:android:apk": "cd app && bun run build:android:apk",
     "submit:ios": "cd app && bun run submit:ios",
     "submit:android": "cd app && bun run submit:android",
-    "release:ios": "cd app && bun run release:ios"
+    "test:release": "node --test release/tests/*.test.mjs && python3 -m unittest discover -s release/tests -p 'test_*.py'",
+    "legal:sync": "node scripts/legal.mjs --sync-site",
+    "legal:check": "node scripts/legal.mjs --check-site",
+    "legal:publication-check": "node scripts/legal.mjs --publication-check",
+    "assets:feature": "node scripts/feature-graphic.mjs",
+    "assets:feature:check": "node scripts/feature-graphic.mjs --check"
   },
   "devDependencies": {
-    "vitepress": "^1.6.3"
+    "opentype.js": "2.0.0",
+    "svg-path-bbox": "2.1.0",
+    "svgo": "4.1.0",
+    "vitepress": "^1.6.3",
+    "sharp": "0.34.5"
   },
   "patchedDependencies": {
     "heroui-native@1.0.4": "app/patches/heroui-native+1.0.4.patch",

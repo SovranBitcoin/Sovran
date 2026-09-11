@@ -26,12 +26,14 @@ type TabDef = {
 const TAB_DEFS: readonly TabDef[] = [
   {
     name: 'feed',
+    testID: 'tab-feed',
     title: 'Feed',
     sf: { default: 'house', selected: 'house.fill' },
     monicon: { default: 'mingcute:home-4-line', selected: 'mingcute:home-4-fill' },
   },
   {
     name: 'contacts',
+    testID: 'tab-contacts',
     title: 'Contacts',
     sf: { default: 'person.2', selected: 'person.2.fill' },
     monicon: { default: 'mdi:account-group-outline', selected: 'mdi:account-group' },
@@ -45,6 +47,7 @@ const TAB_DEFS: readonly TabDef[] = [
   },
   {
     name: 'notifications',
+    testID: 'tab-notifications',
     title: 'Notifications',
     sf: { default: 'bell', selected: 'bell.fill' },
     monicon: { default: 'mdi:bell-outline', selected: 'mdi:bell' },

@@ -23,6 +23,10 @@ dist/
 web-build/
 *.orig.*
 *.jks
+*.keystore
+credentials/
+credentials.json
+*service-account*.json
 *.p8
 *.p12
 *.key
@@ -35,6 +39,8 @@ yarn-error.*
 *.pem
 .env*.local
 .env
+.env.*
+!.env.example
 .env.local
 *.tsbuildinfo
 expo-env.d.ts

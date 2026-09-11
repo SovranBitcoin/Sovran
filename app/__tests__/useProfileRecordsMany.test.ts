@@ -1,13 +1,19 @@
 import { act, renderHook } from '@testing-library/react-native';
 import { facade } from 'nostr';
-import { useProfileRecordsMany } from '@/shared/lib/nostr/useEntityCache';
+import { DEMO_FEED, DEMO_PROFILES } from '@/shared/stores/runtime/mockPresentationData';
+import { useProfile, useProfileRecordsMany } from '@/shared/lib/nostr/useEntityCache';
 
+let mockMode = false;
+jest.mock('@/shared/stores/global/settingsStore', () => ({
+  useSettingsStore: (selector: (state: { mockMode: boolean }) => unknown) => selector({ mockMode }),
+}));
 let mockStore: facade.NormalizingStore<facade.CachedProfile>;
 jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({
   buildNostrDataLayer: () => ({ cache: { profiles: mockStore } }),
 }));
 
 beforeEach(() => {
+  mockMode = false;
   mockStore = facade.createNormalizingStore({ maxEntries: 1000 });
 });
 
@@ -49,4 +55,18 @@ it('updates when an observed contact is evicted by an unrelated write', () => {
   const { result } = renderHook(() => useProfileRecordsMany(keys));
   act(() => mockStore.set('replacement', { name: 'Replacement', seenAt: 1 }));
   expect(result.current.size).toBe(0);
+});
+
+it('overlays demo authors without caching them and restores live names when disabled', () => {
+  const pubkey = DEMO_FEED[0].pubkey;
+  mockStore.set(pubkey, { name: 'Live author', seenAt: 1 });
+  const { result, rerender } = renderHook(() => useProfile(pubkey));
+  expect(result.current.profile?.name).toBe('Live author');
+  mockMode = true;
+  rerender(undefined);
+  expect(result.current.profile?.name).toBe(DEMO_PROFILES.get(pubkey)?.name);
+  expect(mockStore.get(pubkey)?.name).toBe('Live author');
+  mockMode = false;
+  rerender(undefined);
+  expect(result.current.profile?.name).toBe('Live author');
 });

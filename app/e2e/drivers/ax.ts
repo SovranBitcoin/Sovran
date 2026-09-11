@@ -111,7 +111,9 @@ export function classifyObservedState(snap: AxSnapshot | null): ObservedState {
       (candidate) =>
         candidate.label === 'Welcome to Sovran' ||
         candidate.label === 'Get Started' ||
-        candidate.label === 'I have read and agree to the Terms and Conditions'
+        candidate.id === 'terms-acceptance' ||
+        candidate.id === 'legal-review-title' ||
+        candidate.id === 'privacy-acknowledgment'
     )
   ) {
     return 'onboarding';

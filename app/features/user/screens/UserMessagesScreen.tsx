@@ -1,3 +1,5 @@
+import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
+import { ModeratedDmBubble } from '../components/ModeratedDmBubble';
 /**
  * @fileoverview Direct Messages screen
  *
@@ -7,7 +9,7 @@
  * self-copy wrap id, then dedups cleanly when nagg returns it on the next fetch.
  * Used by the standalone, user-flow, and mint-flow `userMessages` route wrappers
  * — `pubkey` is the recipient, validated as a 64-hex Schnorr key at the route
- * boundary. Legacy NIP-04 conversations are no longer surfaced.
+ * boundary. The selected protocol separates NIP-17 and legacy NIP-04 history.
  */
 
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
@@ -83,6 +85,9 @@ export function UserMessagesScreen({
   onBack,
 }: UserMessagesScreenProps) {
   useLifecycleLogger('UserMessagesScreen');
+  const blocked = useFeedIgnoreStore((s) => s.ignoredPubkeys.includes(pubkey));
+  const filterEnabled = useFeedIgnoreStore((s) => s.dmFilterEnabled);
+  const filterWords = useFeedIgnoreStore((s) => s.dmFilterWords);
 
   const [shade400, background] = useThemeColor(['shade-400', 'background'] as const);
   const { keys: nostrKeys } = useNostrKeysContext();
@@ -92,16 +97,19 @@ export function UserMessagesScreen({
 
   // Mock-mode short-circuit: if this DM is with one of the demo contacts,
   // serve the seeded thread and disable the server fetch / publish. These
-  // pubkeys are real npubs the user pasted as demo seeds.
+  // identities are fictional and must never enter real transport.
   const mockMode = useSettingsStore((s) => s.mockMode);
-  const isMockThread = mockMode && isMockContactPubkey(pubkey);
+  const isFictionalContact = isMockContactPubkey(pubkey);
+  const isMockThread = mockMode && isFictionalContact;
 
   // Counterparty kind-0 metadata is served from the shared SWR cache. First
   // open of a conversation per session pays one round-trip; subsequent opens
   // are instant (the cache is shared across surfaces + persisted).
-  const { metadata: counterpartyMetadata } = useNostrProfileMetadata(pubkey);
+  const { metadata: counterpartyMetadata } = useNostrProfileMetadata(
+    isFictionalContact && !mockMode ? undefined : pubkey
+  );
 
-  // Server-backed thread history (paginated, NIP-17 only). Mock threads serve
+  // Shared inbox history, filtered locally to this peer and protocol. Mock threads serve
   // from local state, so the hook is disabled with an empty counterparty.
   const {
     messages: threadMessages,
@@ -110,12 +118,18 @@ export function UserMessagesScreen({
     loadMore,
     refresh,
     error: threadError,
-  } = useDmThread(isMockThread ? '' : pubkey, nostrKeys?.pubkey, nostrKeys?.privateKey, protocol);
+  } = useDmThread(
+    isFictionalContact || blocked ? '' : pubkey,
+    nostrKeys?.pubkey,
+    nostrKeys?.privateKey,
+    protocol
+  );
 
-  // Local messages = optimistic sent echoes (real threads) OR the seeded mock
-  // thread. Echoes are keyed on the self-copy wrap id so they dedup against the
+  // Local messages contain only real optimistic sent echoes. Demo messages
+  // have a separate lifetime and can never merge into the live conversation. Echoes are keyed on the self-copy wrap id so they dedup against the
   // server copy nagg later returns.
   const [localMessages, setLocalMessages] = useState<DmMessage[]>([]);
+  const [demoMessages, setDemoMessages] = useState<DmMessage[]>([]);
 
   // Reset local state when the conversation changes, seeding any echoes sent
   // OUTSIDE this screen (the Send flow's contact ecash delivery publishes
@@ -133,9 +147,8 @@ export function UserMessagesScreen({
 
   // Seed the mock thread (after the reset effect on the same [pubkey] change).
   useEffect(() => {
-    if (!isMockThread) return;
-    const thread = getMockDmThread(pubkey) ?? [];
-    setLocalMessages(thread.map((m) => ({ ...m })));
+    const thread = isMockThread ? (getMockDmThread(pubkey) ?? []) : [];
+    setDemoMessages(thread.map((m) => ({ ...m })));
   }, [isMockThread, pubkey]);
 
   // Pull anything that landed while we were away (incoming arrives on nagg's
@@ -156,7 +169,7 @@ export function UserMessagesScreen({
   // Merge server history with optimistic echoes (deduped by id). Once nagg
   // returns the self-copy of an echoed message (same wrap id), the echo drops.
   const messages = useMemo<DmMessage[]>(() => {
-    if (isMockThread) return localMessages;
+    if (isMockThread) return demoMessages;
     const serverIds = new Set(threadMessages.map((m) => m.id));
     const server: DmMessage[] = threadMessages.map((m) => ({
       id: m.id,
@@ -167,7 +180,7 @@ export function UserMessagesScreen({
     }));
     const pending = localMessages.filter((m) => !serverIds.has(m.id));
     return [...server, ...pending].sort((a, b) => a.created_at - b.created_at);
-  }, [isMockThread, threadMessages, localMessages]);
+  }, [isMockThread, threadMessages, localMessages, demoMessages]);
 
   const isLoading = !isMockThread && threadLoading && messages.length === 0;
 
@@ -228,11 +241,12 @@ export function UserMessagesScreen({
 
   const handleNostrDMSend = useCallback(
     async (text: string) => {
+      if (useFeedIgnoreStore.getState().ignoredPubkeys.includes(pubkey)) return;
       // Mock thread: append locally and stop. Publishing here would broadcast
-      // actual DMs to the real npubs seeded as demo contacts.
+      // demo messages outside the isolated conversation.
       if (isMockThread) {
         const timestamp = Math.floor(Date.now() / 1000);
-        setLocalMessages((prev) => [
+        setDemoMessages((prev) => [
           ...prev,
           {
             id: `demo-dm-local-${timestamp}`,
@@ -244,6 +258,7 @@ export function UserMessagesScreen({
         ]);
         return;
       }
+      if (isFictionalContact) return;
       const dmStart = performance.now();
       log.info('dm.send.start', {
         messageLength: text.length,
@@ -388,7 +403,15 @@ export function UserMessagesScreen({
         staticPopup('send-message-failed', { failure: { service: 'nostr', error } });
       }
     },
-    [ndk, nostrKeys?.privateKey, nostrKeys?.pubkey, pubkey, isMockThread, protocol]
+    [
+      ndk,
+      nostrKeys?.privateKey,
+      nostrKeys?.pubkey,
+      pubkey,
+      isMockThread,
+      isFictionalContact,
+      protocol,
+    ]
   );
 
   const dmProbeValue = useMemo(() => ({ text: pubkey ?? 'unknown' }), [pubkey]);
@@ -399,7 +422,7 @@ export function UserMessagesScreen({
       usedNpcFallback: !lud16,
       userName: counterpartyMetadata?.name,
     });
-    if (!sendMoneyTarget || !counterpartyMetadata) return;
+    if (isFictionalContact || !sendMoneyTarget || !counterpartyMetadata) return;
 
     // Enter through colada's normal Send entrypoint so no-balance and
     // multi-mint selection behavior stays identical to the wallet Send button.
@@ -409,7 +432,7 @@ export function UserMessagesScreen({
       meltTarget: sendMoneyTarget,
       recipientPubkey: pubkey,
     });
-  }, [counterpartyMetadata, lud16, sendMoneyTarget, machine, pubkey]);
+  }, [counterpartyMetadata, lud16, sendMoneyTarget, machine, pubkey, isFictionalContact]);
 
   return (
     <Screen name="UserMessagesScreen" scroll="none">
@@ -431,14 +454,28 @@ export function UserMessagesScreen({
       <ChatScreen
         surface={SURFACE}
         log={chatLog}
-        messages={bubbleMessages}
+        messages={blocked ? [] : bubbleMessages}
+        composerDisabled={blocked}
+        banner={
+          blocked ? (
+            <Text>This person is blocked. Open “Block or report” to unblock them.</Text>
+          ) : undefined
+        }
+        renderBubble={(args) => (
+          <ModeratedDmBubble
+            {...args}
+            scope={`${nostrKeys?.pubkey}:${pubkey}:${protocol}`}
+            enabled={filterEnabled}
+            words={filterWords}
+          />
+        )}
         onSend={handleNostrDMSend}
         onStartReached={hasMore ? loadMore : undefined}
         onStartReachedThreshold={0.3}
         composerPlaceholder="Write here"
         composerTestID="dm-composer"
         composerActions={
-          sendMoneyTarget ? (
+          !blocked && !isFictionalContact && sendMoneyTarget ? (
             <Button
               text="Send money"
               variant="primary"
@@ -456,11 +493,14 @@ export function UserMessagesScreen({
           </Text>
         }
         emptyContent={
-          <Text size={16} style={{ color: shade400, textAlign: 'center' }}>
-            {threadError
-              ? "Couldn't load messages. Pull to refresh or try again."
-              : 'No messages yet. Start the conversation!'}
-          </Text>
+          <View className="items-center gap-3 px-6 py-8">
+            <Text size={16} style={{ color: shade400, textAlign: 'center' }}>
+              {threadError ? "Couldn't load your message history." : 'No messages yet.'}
+            </Text>
+            {threadError && (
+              <Button text="Try again" variant="secondary" size="compact" onPress={refresh} />
+            )}
+          </View>
         }
         historyExtras={(last) => ({
           lastIsOwn: last?.isOwn ?? null,

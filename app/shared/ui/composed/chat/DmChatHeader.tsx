@@ -1,3 +1,5 @@
+import { useModerationActions } from '@/features/feed/hooks/useModerationActions';
+import { HStack } from '@/shared/ui/primitives/View/HStack';
 import React, { useCallback, useMemo } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { Stack } from 'expo-router';
@@ -67,6 +69,7 @@ export function DmChatHeader({
   onBack,
   trailing,
 }: DmChatHeaderProps) {
+  const { personMenu } = useModerationActions();
   const { width: screenWidth } = useWindowDimensions();
   const headerTitleWidth = screenWidth - 124 - 24;
 
@@ -187,7 +190,18 @@ export function DmChatHeader({
             </VStack>
           </View>
         ),
-        headerRight: () => trailingNode,
+        headerRight: () => (
+          <HStack className="gap-1">
+            {trailingNode}
+            {pubkey && (
+              <ScreenHeaderAction
+                icon="material-symbols:report-rounded"
+                accessibilityLabel="Block or report person"
+                onPress={() => personMenu(pubkey)}
+              />
+            )}
+          </HStack>
+        ),
       })}
     />
   );

@@ -38,15 +38,6 @@
         "credentialsSource": "remote"
       },
       "autoIncrement": true
-    },
-    "production-apk": {
-      "extends": "production",
-      "distribution": "internal",
-      "android": {
-        "credentialsSource": "remote",
-        "buildType": "apk"
-      },
-      "autoIncrement": false
     }
   },
   "submit": {

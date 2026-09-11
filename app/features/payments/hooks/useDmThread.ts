@@ -8,7 +8,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
-import { fetchDmConversation } from '../data/dmEnvelopeClient';
+import { fetchDmEnvelopes } from '../data/dmEnvelopeClient';
 import { decryptDmEnvelopes } from '../data/dmDecryptPipeline';
 import type { DmEnvelopePage, DmProtocol } from '../data/dmEnvelopeTypes';
 import { useDmEnvelopePages } from './useDmEnvelopePages';
@@ -44,13 +44,13 @@ export function useDmThread(
 
   const onPage = useCallback(
     (page: DmEnvelopePage) => {
-      if (!viewerPubkey || !viewerPrivateKey) return;
+      if (!viewerPubkey || !viewerPrivateKey) return 0;
       const decrypted = decryptDmEnvelopes(page.envelopes, viewerPubkey, viewerPrivateKey);
       const relevant = decrypted.filter(
         (dm) => dm.counterparty === counterparty && dm.protocol === protocol
       );
       const fresh = relevant.filter((dm) => !seenMsgIdsRef.current.has(dm.id));
-      if (fresh.length === 0) return;
+      if (fresh.length === 0) return 0;
       fresh.forEach((dm) => seenMsgIdsRef.current.add(dm.id));
       setMessages((prev) => {
         const merged = [
@@ -66,6 +66,7 @@ export function useDmThread(
         merged.sort((a, b) => a.createdAt - b.createdAt);
         return merged;
       });
+      return fresh.length;
     },
     [counterparty, protocol, viewerPubkey, viewerPrivateKey]
   );
@@ -79,14 +80,12 @@ export function useDmThread(
 
   const fetchPage = useCallback(
     (args: { until?: number; refresh: boolean; signal?: AbortSignal }) =>
-      fetchDmConversation({
+      fetchDmEnvelopes({
         viewer: viewerPubkey ?? '',
-        counterparty,
-        kinds: protocol === 'nip04' ? [4] : [1059],
         limit: PAGE_LIMIT,
         ...args,
       }),
-    [counterparty, protocol, viewerPubkey]
+    [viewerPubkey]
   );
 
   const { loading, hasMore, loadMore, refresh, error } = useDmEnvelopePages({
@@ -98,6 +97,7 @@ export function useDmThread(
     hydrate,
     fetchPage,
     onPage,
+    continueWhileEmpty: true,
     onReset,
     failureEvent: 'payment.dm.thread.failed',
   });

@@ -1,3 +1,6 @@
+import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
+import { ModeratedDmBubble } from '@/features/user/components/ModeratedDmBubble';
+import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 /**
  * @fileoverview Geohash-based location chat screen
  *
@@ -121,6 +124,12 @@ export function GeohashChatScreen({
   // identity). For ble-dm it's a 16-hex BitChat peer ID — no Nostr identity,
   // so DmChatHeader falls back to nickname-only and hides the npub/QR.
   const isNostrPubkey = !!dmPeerID && Hex64.safeParse(dmPeerID).success;
+  const blocked = useFeedIgnoreStore(
+    (s) => transport === 'nostr-dm' && !!dmPeerID && s.ignoredPubkeys.includes(dmPeerID)
+  );
+  const filterEnabled = useFeedIgnoreStore((s) => s.dmFilterEnabled);
+  const filterWords = useFeedIgnoreStore((s) => s.dmFilterWords);
+  const ownPubkey = useNostrKeysContext().keys?.pubkey;
 
   const handleBack = onBack ?? (() => router.back());
 
@@ -301,8 +310,20 @@ export function GeohashChatScreen({
       <ChatScreen
         surface={surface}
         log={bitchatLog}
-        messages={bubbleMessages}
-        onSend={sendMessage}
+        messages={blocked ? [] : bubbleMessages}
+        composerDisabled={blocked}
+        banner={
+          blocked ? (
+            <Text>This person is blocked. Open “Block or report” to unblock them.</Text>
+          ) : undefined
+        }
+        onSend={(text) => {
+          if (
+            transport !== 'nostr-dm' ||
+            !useFeedIgnoreStore.getState().ignoredPubkeys.includes(dmPeerID ?? '')
+          )
+            return sendMessage(text);
+        }}
         composerPlaceholder="Write here"
         renderBubble={
           transport === 'ble-dm'
@@ -330,7 +351,16 @@ export function GeohashChatScreen({
                   />
                 );
               }
-            : undefined
+            : transport === 'nostr-dm'
+              ? (args) => (
+                  <ModeratedDmBubble
+                    {...args}
+                    scope={`${ownPubkey}:${dmPeerID}:${geohash}`}
+                    enabled={filterEnabled}
+                    words={filterWords}
+                  />
+                )
+              : undefined
         }
         emptyContent={
           <VStack align="center" gap={12}>

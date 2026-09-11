@@ -1,3 +1,5 @@
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { getMockMintBalance } from '@/shared/stores/runtime/mockDataStore';
 /**
  * @fileoverview Shared Mint List screen component
  *
@@ -121,6 +123,7 @@ export function MintListScreen({
   onClose,
 }: MintListScreenProps) {
   useLifecycleLogger('MintListScreen', cashuLog);
+  const mockMode = useSettingsStore((state) => state.mockMode);
 
   const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
   const [selectedCurrency, setSelectedCurrency] = useState<string>('ALL');
@@ -229,7 +232,9 @@ export function MintListScreen({
     ) : null;
     return (
       <ContactRow
-        identity={mintIdentity(item)}
+        identity={mintIdentity(
+          mockMode ? { ...item, balance: getMockMintBalance(item.mintUrl, item.unit) } : item
+        )}
         stats={MINT_ROW_STATS}
         disabled={isExecuting || item.status !== 'available'}
         disabledReason={getMintDisabledReasonLabel(item.reason) ?? undefined}
