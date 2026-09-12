@@ -20,11 +20,20 @@
       "ready": true
     }
   },
-  "channels": {},
+  "channels": {
+    "appStore": {
+      "version": "0.1.3",
+      "build": "176",
+      "url": "https://apps.apple.com/app/id6499554529",
+      "sourceSha": "d9ad12c4bde03b609cd90a4487c466b88007a4cb",
+      "confirmedAt": "2026-09-12T17:26:46.634Z"
+    }
+  },
   "steps": {
     "iosUpload": true
   },
   "appleVersionId": "b8a49c95-832b-4ae8-8bba-a408729092da",
   "aabSha256": "b4396a382b380c9c797ef13b7f6f5b27931a2faba2a838deb3aeb6356745b1e6",
-  "playEdit": "07808612630045523005"
+  "playEdit": "07808612630045523005",
+  "adpId": "097f7b82-7aac-4574-a594-3e7fcaecc652"
 }
