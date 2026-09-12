@@ -50,7 +50,8 @@ export async function androidRelease(ledger) {
   if (state.playEdit) {
     try { await play(`edits/${encodeURIComponent(state.playEdit)}`); }
     catch (error) {
-      if (![404, 409].includes(error.status)) throw error;
+      // Expired edits answer 400 FAILED_PRECONDITION rather than 404/409.
+      if (![404, 409].includes(error.status) && !(error.status === 400 && /expired/i.test(error.message))) throw error;
       check(summary || !state.intents['play-commit'], 'Play commit acknowledgement ambiguous; inspect Play before clearing edit');
       delete state.playEdit; await ledger.save();
     }

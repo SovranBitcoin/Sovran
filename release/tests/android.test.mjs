@@ -61,3 +61,34 @@ for (const ownsTrack of [true, false]) {
     }
   });
 }
+
+test('an expired Play edit (400 FAILED_PRECONDITION) is replaced instead of failing the stage', async () => {
+  const oldToken = process.env.GOOGLE_ACCESS_TOKEN;
+  process.env.GOOGLE_ACCESS_TOKEN = 'fake-canary';
+  const state = preparedRelease(true); state.playEdit = 'stale-edit';
+  const saved = [];
+  const ledger = { state, async save() { saved.push(structuredClone(state)); }, async intent(name) { state.intents[name] = '2026-09-10T01:00:00Z'; await this.save(); } };
+  const calls = [];
+  const handle = mock.method(globalThis, 'fetch', async (url, options) => {
+    const route = new URL(url).pathname.split(`/applications/${config.bundleId}/`)[1];
+    calls.push(`${options.method} ${route}`);
+    if (options.method === 'GET' && route === 'tracks/production/releases') return Response.json({ releases: [] });
+    if (options.method === 'GET' && route === 'edits/stale-edit') return Response.json({ error: { code: 400, status: 'FAILED_PRECONDITION', message: 'This edit has expired please create a new Edit.' } }, { status: 400 });
+    if (options.method === 'POST' && route === 'edits') return Response.json({ id: 'fresh-edit' });
+    if (options.method === 'GET' && route === 'edits/fresh-edit/bundles') return Response.json({ bundles: [{ versionCode: 30, sha256: state.aabSha256 }] });
+    if (options.method === 'GET' && route === 'edits/fresh-edit/tracks/production') return Response.json({ releases: [{ name: '0.1.1', status: 'completed', versionCodes: ['30'] }] });
+    if (options.method === 'POST' && route === 'edits/fresh-edit:validate') return Response.json({});
+    if (options.method === 'POST' && route === 'edits/fresh-edit:commit') return Response.json({ id: 'fresh-edit' });
+    if (options.method === 'GET' && route === 'generatedApks/30') return new Response(null, { status: 404 });
+    throw new Error(`Unexpected provider operation ${options.method} ${route}`);
+  });
+  try {
+    await androidRelease(ledger);
+    assert.ok(calls.includes('POST edits'), 'a replacement edit is created');
+    assert.equal(state.steps.playSubmitted, true);
+    assert.equal(state.playEdit, undefined);
+  } finally {
+    handle.mock.restore();
+    if (oldToken === undefined) delete process.env.GOOGLE_ACCESS_TOKEN; else process.env.GOOGLE_ACCESS_TOKEN = oldToken;
+  }
+});
