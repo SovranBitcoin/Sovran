@@ -26,7 +26,18 @@ export function safeUrl(value, hosts) {
 
 // No provider bodies, URLs, subprocess stderr or raw exceptions in logs: these
 // can contain tokens, signed artifact URLs, private metadata or workflow commands.
-export class HttpError extends Error { constructor(status) { super(`Provider HTTP ${status}`); this.status = status; } }
+export class HttpError extends Error { constructor(status, detail) { super(`Provider HTTP ${status}${detail ? ` ${detail}` : ''}`); this.status = status; } }
+// Reduce a JSON error envelope (Google: error.status/errors[].reason/message;
+// Apple: errors[].code/title/detail) to codes plus a message restricted to the
+// same character set run.mjs allows in logs. Nothing else from the body survives.
+export function errorDetail(body) {
+  let json; try { json = JSON.parse(body); } catch { return ''; }
+  const error = json?.error ?? {};
+  const codes = [error.status, ...(error.errors ?? []).map((e) => e?.reason), ...(json?.errors ?? []).map((e) => e?.code)].filter((c) => /^[A-Za-z0-9_]{1,60}$/.test(String(c ?? '')));
+  const text = [error.message, ...(json?.errors ?? []).map((e) => [e?.title, e?.detail].filter(Boolean).join(' '))].filter(Boolean).join(' ');
+  const message = String(text).replace(/[^A-Za-z0-9 .:;()/_-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+  return [...new Set(codes)].join('/') + (message ? `: ${message}` : '');
+}
 export async function request(url, { hosts, token, method = 'GET', body, bytes, limit = 8 * 1024 * 1024, type = 'application/json', accept = 'application/json' } = {}) {
   safeUrl(url, hosts);
   const headers = { Accept: accept, 'User-Agent': 'sovran-release' };
@@ -35,7 +46,13 @@ export async function request(url, { hosts, token, method = 'GET', body, bytes, 
   let response;
   try {
     response = await fetch(url, { method, headers, redirect: 'error', signal: AbortSignal.timeout(300_000), body: bytes ?? (body === undefined ? undefined : JSON.stringify(body)) });
-    if (!response.ok) throw new HttpError(response.status);
+    if (!response.ok) {
+      let detail = '';
+      if (response.status >= 400 && response.status < 500 && (response.headers.get('content-type') ?? '').includes('json')) {
+        try { detail = errorDetail((await response.text()).slice(0, 64 * 1024)); } catch { detail = ''; }
+      }
+      throw new HttpError(response.status, detail);
+    }
     const parts = []; let size = 0;
     for await (const chunk of response.body ?? []) { size += chunk.length; check(size <= limit, 'Provider response too large'); parts.push(chunk); }
     const data = Buffer.concat(parts);
