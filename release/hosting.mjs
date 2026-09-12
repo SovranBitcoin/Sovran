@@ -1,11 +1,51 @@
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config, check, GitHub, request, required, sha256, command, temporary, download, artifactHosts, uuid } from './core.mjs';
 import { Apple } from './apple.mjs';
 
 const blobId = (bytes) => createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+// GitHub's JSON blob API rejects files above roughly 50 MB even though git
+// itself accepts up to 100 MB. Apple distribution packages carry ~48 MB device
+// variants, so publish those through a partial clone and a non-force push.
+export const GIT_PUBLISH_THRESHOLD = 25_000_000;
+export async function commitFilesGit(gh, files, message) {
+  return temporary(async (dir) => {
+    const repo = path.join(dir, 'repo');
+    // The token travels in git config env, never in argv or the remote URL.
+    const auth = Buffer.from(`x-access-token:${gh.token}`).toString('base64');
+    const env = {
+      PATH: process.env.PATH, HOME: dir, GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_COUNT: '3',
+      GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader', GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${auth}`,
+      GIT_CONFIG_KEY_1: 'user.name', GIT_CONFIG_VALUE_1: 'sovran-release',
+      GIT_CONFIG_KEY_2: 'user.email', GIT_CONFIG_VALUE_2: 'release@sovran.money',
+    };
+    const git = (args) => command('git', args, { cwd: repo, env });
+    // Trees only: no blob download of the multi-gigabyte site history.
+    command('git', ['clone', '--quiet', '--filter=blob:none', '--no-checkout', '--depth', '1', '--single-branch', '--branch', 'main', `https://github.com/${gh.repository}.git`, repo], { env });
+    git(['read-tree', 'HEAD']);
+    const head = git(['rev-parse', 'HEAD']).trim();
+    let changed = 0;
+    for (const file of files) {
+      const entry = git(['ls-tree', 'HEAD', '--', file.path]).trim();
+      const previous = entry ? entry.split(/\s+/)[2] : null;
+      if (file.expectedSha) check(previous === file.expectedSha, 'Website metadata changed concurrently; retry against new state');
+      if (previous === blobId(file.bytes)) continue;
+      if (file.immutable) check(!previous, 'Refusing to overwrite immutable release asset');
+      check(file.bytes.length < 99_000_000, 'Publication file exceeds GitHub limit');
+      const target = path.join(repo, file.path);
+      mkdirSync(path.dirname(target), { recursive: true }); writeFileSync(target, file.bytes, { mode: 0o600 });
+      git(['add', '--', file.path]); changed++;
+    }
+    if (!changed) return head;
+    git(['commit', '--quiet', '-m', message]);
+    // No force: a concurrent site change rejects this push and the next
+    // reconcile recomputes against current main.
+    git(['push', '--quiet', 'origin', 'HEAD:main']);
+    return git(['rev-parse', 'HEAD']).trim();
+  });
+}
 export async function commitFiles(gh, files, message) {
   const unique = new Map();
   for (const file of files) {
@@ -16,6 +56,7 @@ export async function commitFiles(gh, files, message) {
   files = [...unique.values()];
   check(files.length > 0 && files.length <= 10000, 'Invalid publication file count');
   for (const file of files) check(/^(public\/(ios\/(releases|media)\/|releases\/)|src\/releaseMedia\.json$)/.test(file.path) && !file.path.includes('..') && !file.path.includes('\\'), 'Publication path outside allowlist');
+  if (files.some((file) => file.bytes.length > GIT_PUBLISH_THRESHOLD)) return commitFilesGit(gh, files, message);
   const head = (await gh.api('git/ref/heads/main')).object.sha;
   const commit = await gh.api(`git/commits/${head}`);
   const tree = await gh.api(`git/trees/${commit.tree.sha}?recursive=1`);
