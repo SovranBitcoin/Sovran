@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "version": "0.1.2",
+  "sourceSha": "148ebd085a5ad6b6f95f6958914d769067ee6d2f",
+  "createdAt": "2026-09-12T00:35:06.002Z",
+  "intents": {
+    "build-ios": "2026-09-12T01:46:20.928Z",
+    "build-android": "2026-09-12T01:46:48.502Z",
+    "submit-ios": "2026-09-12T02:32:11.777Z",
+    "play-track": "2026-09-12T03:15:23.369Z"
+  },
+  "builds": {
+    "ios": {
+      "id": "45092f46-1c36-43d5-af88-3769044e610a",
+      "number": "175",
+      "ready": true
+    },
+    "android": {
+      "id": "2635d998-a8b3-492e-a0aa-7a5cfe768f41",
+      "number": "23",
+      "ready": true
+    }
+  },
+  "channels": {},
+  "steps": {
+    "iosUpload": true
+  },
+  "appleVersionId": "ec0b8265-e631-4476-b536-42b36cc297cf",
+  "aabSha256": "31f4cccc9772f3944acbed1241c8c55534e4afb869ce2100058c869fbef63c91",
+  "playEdit": "05362725190116803528",
+  "complete": true,
+  "retired": {
+    "at": "2026-09-12T14:30:00Z",
+    "reason": "Superseded by 0.1.3: Play health declaration cannot be completed for a bundle declaring ACTIVITY_RECOGNITION (expo-sensors); permission blocked in 0.1.3. iOS build 175 remains submitted to App Store Connect.",
+    "reviewedBy": "operator"
+  }
+}
