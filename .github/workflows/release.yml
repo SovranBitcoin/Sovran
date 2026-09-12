@@ -79,6 +79,11 @@ jobs:
         run: bun install --frozen-lockfile --backend=copyfile
         env:
           GITHUB_TOKEN: ${{ secrets.SOVRAN_CI_TOKEN || github.token }}
+      - name: Install locked controller workspace tools (Prettier for Freedom tests)
+        working-directory: controller
+        run: bun install --frozen-lockfile --ignore-scripts --backend=copyfile
+        env:
+          GITHUB_TOKEN: ${{ secrets.SOVRAN_CI_TOKEN || github.token }}
       - name: Validate release failure paths and source archive policy
         run: |
           node --test ../controller/release/tests/*.test.mjs
