@@ -122,3 +122,9 @@ test('4xx JSON error envelopes surface only codes and a sanitized message', asyn
   globalThis.fetch = async () => new Response('<html>oops</html>', { status: 502, headers: { 'content-type': 'text/html' } });
   try { await assert.rejects(request('https://api.github.com/', { hosts: ['api.github.com'] }), (error) => error.message === 'Provider HTTP 502'); } finally { globalThis.fetch = originalFetch; }
 });
+
+test('Apple and Play locales are configured separately and valid', async () => {
+  const { config } = await import('../core.mjs');
+  assert.match(config.locale, /^[a-z]{2}-[A-Z]{2}$/);
+  assert.match(config.appleLocale, /^[a-z]{2}-[A-Z]{2}$/);
+});
