@@ -267,5 +267,6 @@
     "at": "2026-09-12T21:15:00Z",
     "reason": "Hosted screenshots came from the stale APP_IPHONE_69 set; re-host from APP_IPHONE_65 (PR #266). Package files are unchanged and remain hosted; the seven stale media PNGs stay as immutable orphans.",
     "reviewedBy": "operator"
-  }
+  },
+  "playEdit": "13953961103830622998"
 }
