@@ -5,7 +5,8 @@
   "createdAt": "2026-09-12T13:46:34.731Z",
   "intents": {
     "build-ios": "2026-09-12T13:52:56.856Z",
-    "build-android": "2026-09-12T13:53:28.519Z"
+    "build-android": "2026-09-12T13:53:28.519Z",
+    "submit-ios": "2026-09-12T14:21:49.358Z"
   },
   "builds": {
     "ios": {
