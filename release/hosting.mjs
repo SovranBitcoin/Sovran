@@ -10,7 +10,7 @@ const blobId = (bytes) => createHash('sha1').update(`blob ${bytes.length}\0`).up
 // itself accepts up to 100 MB. Apple distribution packages carry ~48 MB device
 // variants, so publish those through a partial clone and a non-force push.
 export const GIT_PUBLISH_THRESHOLD = 25_000_000;
-export async function commitFilesGit(gh, files, message) {
+async function commitFilesGit(gh, files, message) {
   return temporary(async (dir) => {
     const repo = path.join(dir, 'repo');
     // The token travels in git config env, never in argv or the remote URL.
