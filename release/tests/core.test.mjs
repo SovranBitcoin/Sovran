@@ -114,6 +114,8 @@ test('4xx JSON error envelopes surface only codes and a sanitized message', asyn
   assert.match(detail, /^INVALID_ARGUMENT\/apkUpgradeVersionConflict: Version code 23 has already been used/);
   assert.ok(!detail.includes('<') && !detail.includes('?') && !detail.includes('='));
   assert.equal(errorDetail('not json'), '');
+  const github = { message: 'Validation Failed', errors: [{ resource: 'Blob', code: 'too_large', field: 'content', message: `content is too large ${canary}` }], documentation_url: 'https://docs.github.com/x' };
+  assert.equal(errorDetail(JSON.stringify(github)), 'too_large: Validation Failed Blob content content is too large fake-canary-secret');
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => Response.json(google, { status: 400 });
   try {
