@@ -56,7 +56,10 @@ export async function verifyHosted(inventory) {
 }
 async function mediaFiles(state, apple) {
   const locales = await apple.list(`appStoreVersions/${state.appleVersionId}/appStoreVersionLocalizations`);
-  const locale = locales.find((l) => l.attributes.locale === config.locale);
+  // App Store Connect localizations (en-GB) differ from the Play release-notes
+  // language (en-US); each is configured explicitly.
+  const wanted = config.appleLocale ?? config.locale;
+  const locale = locales.find((l) => l.attributes.locale === wanted);
   check(locale, 'Configured ASC screenshot locale missing');
   const sets = await apple.list(`appStoreVersionLocalizations/${locale.id}/appScreenshotSets`);
   const preference = ['APP_IPHONE_69', 'APP_IPHONE_67', 'APP_IPHONE_65', 'APP_IPHONE_61', 'APP_IPHONE_58', 'APP_IPHONE_55'];
