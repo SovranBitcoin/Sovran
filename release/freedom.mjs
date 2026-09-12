@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { config, check, GitHub, request, required, published, compareVersion } from './core.mjs';
 import { verifyHosted } from './hosting.mjs';
 
@@ -11,12 +12,20 @@ export function updateSource(source, state) {
   else {
     check(!app.versions.some((v) => v.downloadURL === state.adp.url), 'ADP reused for a different release');
     check(!app.versions.some((v) => compareVersion(v.version, state.version) > 0), 'Freedom already has a newer release');
-    app.versions.unshift({ version: state.version, buildVersion: state.builds.ios.number, date: state.createdAt, downloadURL: state.adp.url, size: state.adp.size, minOSVersion: state.adp.minOSVersion, localizedDescription: `Sovran ${state.version}. Improvements and fixes.` });
+    app.versions.unshift({ version: state.version, buildVersion: state.builds.ios.number, date: state.createdAt.slice(0, 10), downloadURL: state.adp.url, size: state.adp.size, minOSVersion: state.adp.minOSVersion, localizedDescription: `Sovran ${state.version}. Improvements and fixes.` });
   }
   app.screenshots = state.screenshots;
   return result;
 }
 
+// freedomstore/altstore-source.json is Prettier-formatted (default options).
+// Re-serializing with JSON.stringify expands every short array and turns a
+// nine-line release into a whole-file rewrite, so format with the app
+// workspace's pinned Prettier instead of shipping a hand-rolled printer.
+export async function formatSource(source) {
+  const prettier = createRequire(new URL('../app/package.json', import.meta.url))('prettier');
+  return prettier.format(JSON.stringify(source), { parser: 'json' });
+}
 export async function freedomRelease(ledger) {
   const state = ledger.state;
   if (!state.steps.assetsHosted || state.channels.freedomStore?.version === state.version) return;
@@ -64,7 +73,7 @@ export async function freedomRelease(ledger) {
     check(upstreamApp.versions.find((v) => v.version === state.version && String(v.buildVersion) === state.builds.ios.number).downloadURL === state.adp.url, 'Merged Freedom release has a different ADP');
     return;
   }
-  const bytes = Buffer.from(JSON.stringify(updateSource(JSON.parse(base.bytes), state), null, 2) + '\n');
+  const bytes = Buffer.from(await formatSource(updateSource(JSON.parse(base.bytes), state)));
   let ref = await fork.optional(`git/ref/heads/${branch}`);
   if (!ref) {
     await fork.api('git/refs', { method: 'POST', body: { ref: `refs/heads/${branch}`, sha: upstreamHead } });

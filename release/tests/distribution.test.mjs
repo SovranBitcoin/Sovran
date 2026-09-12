@@ -1,7 +1,7 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { config, sha256 } from '../core.mjs';
-import { updateSource } from '../freedom.mjs';
+import { updateSource, formatSource } from '../freedom.mjs';
 import { validateManifest, verifyHosted, commitFiles } from '../hosting.mjs';
 import { selectUniversal } from '../android.mjs';
 import { validateBuild } from '../build.mjs';
@@ -108,4 +108,15 @@ test('large publication files go through a partial clone and a non-force git pus
     assert.deepEqual(calls.filter((c) => c[0] === 'add').map((c) => c.at(-1)), ['public/ios/releases/id/variant/a.ipa', 'public/releases/0.1.3-ios.json']);
     const push = calls.find((c) => c[0] === 'push'); assert.deepEqual(push, ['push', '--quiet', 'origin', 'HEAD:main']);
   } finally { handle.mock.restore(); syncBuiltinESMExports(); }
+});
+
+test('Freedom source keeps upstream Prettier formatting and date shape', async () => {
+  const next = updateSource(source(), state());
+  const entry = next.apps[0].versions[0];
+  assert.match(entry.date, /^\d{4}-\d{2}-\d{2}$/, 'catalog dates are plain calendar days like every other entry');
+  const upstream = '{\n  "apps": [\n    {\n      "entitlements": ["com.apple.developer.associated-domains"],\n      "versions": [{ "version": "0.1.0" }]\n    }\n  ]\n}\n';
+  assert.equal(await formatSource(JSON.parse(upstream)), upstream, 'formatting a Prettier-formatted file is a no-op');
+  const formatted = await formatSource(next);
+  assert.ok(!formatted.includes('[\n        "https://'), 'short arrays stay on one line');
+  assert.ok(formatted.endsWith('\n') && !formatted.endsWith('\n\n'));
 });
