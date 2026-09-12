@@ -1,7 +1,7 @@
 {
   "name": "sovran-monorepo",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.1.3",
   "packageManager": "bun@1.3.5",
   "description": "Sovran monorepo \u2014 the app and its self-contained wallet (colada) and nostr (nagg-ts) packages, plus the docs site.",
   "workspaces": [

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sovran",
     "slug": "sovran",
-    "version": "0.1.2",
+    "version": "0.1.3",
     "orientation": "portrait",
     "scheme": [
       "sovran",
@@ -53,6 +53,7 @@
         "foregroundImage": "./assets/brand/generated/android-adaptive-icon/black-on-transparent/1024x1024.png",
         "backgroundColor": "#FFFFFF"
       },
+      "blockedPermissions": ["android.permission.ACTIVITY_RECOGNITION"],
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
