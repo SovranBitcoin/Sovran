@@ -8,7 +8,9 @@
   },
   "builds": {
     "ios": {
-      "id": "d9bc15f4-204f-46dd-b61d-c3010025a451"
+      "id": "d9bc15f4-204f-46dd-b61d-c3010025a451",
+      "number": "176",
+      "ready": false
     }
   },
   "channels": {},
