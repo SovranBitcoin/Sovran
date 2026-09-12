@@ -71,6 +71,21 @@ test("version artwork follows the product version and fits longer versions witho
   }
 });
 
+test("every version digit has finite outlines before SVG optimization", () => {
+  for (let digit = 0; digit <= 9; digit++) {
+    for (const version of [`0.1.${digit}`, `${digit}.12.345`, `12.${digit}.6789`]) {
+      const drawing = composeBrand(
+        inputs, "version-lockup", "black-on-light", version,
+      );
+      assert(!/NaN|Infinity/.test(drawing.raw), `Malformed glyph in ${version}`);
+      assert(
+        !/NaN|Infinity/.test(drawing.svg),
+        `Malformed optimized glyph in ${version}`,
+      );
+    }
+  }
+});
+
 test("SVGO preserves the composed artwork when rasterized at 1024px and 2048px", async () => {
   for (const layout of Object.keys(inputs.config.layouts)) {
     for (const theme of Object.keys(inputs.config.themes)) {
