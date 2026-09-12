@@ -228,5 +228,6 @@
   "manualPlayRelease": {
     "reason": "First production release on a draft Play app must be created in Play Console; release 0.1.3 (versionCode 24, name 0.1.3, full rollout, all countries) uploaded and submitted for review by the operator on 2026-09-12. Bundle sha256 matches aabSha256.",
     "reviewedBy": "operator"
-  }
+  },
+  "playEdit": "00949440908533392284"
 }
