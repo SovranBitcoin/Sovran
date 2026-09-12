@@ -75,7 +75,8 @@ export async function zapstoreRelease(ledger) {
     if (!applications.length) return false;
     const blobUrl = asset.tags.find((t) => t[0] === 'url')?.[1]; check(blobUrl, 'Zapstore APK URL missing');
     try {
-      const blob = await download(blobUrl, ['cdn.zapstore.dev', 'blossom.zapstore.dev', 'github.com', 'release-assets.githubusercontent.com', 'objects.githubusercontent.com']);
+      // cdn.zapstore.dev answers GET with a 307 to its Bunny CDN origin.
+      const blob = await download(blobUrl, ['cdn.zapstore.dev', 'blossom.zapstore.dev', 'zsapk.b-cdn.net', 'github.com', 'release-assets.githubusercontent.com', 'objects.githubusercontent.com']);
       check(sha256(blob) === state.apk.sha256, 'Zapstore served APK hash mismatch');
     } catch (e) { if (e.status === 404) return false; throw e; }
     state.zapstoreEventId = release.id; return true;
