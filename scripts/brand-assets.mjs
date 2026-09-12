@@ -48,6 +48,7 @@ function geometry(svg) {
   );
   assert.equal(paths.length, 1, "Each canonical source owns one compound path");
   const d = paths[0];
+  assert(!/NaN|Infinity/.test(d), "Outlined paths must have finite coordinates");
   const [x1, y1, x2, y2] = svgPathBbox(d);
   return { d, x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
 }
@@ -154,6 +155,16 @@ export function composeBrand(
     const textPath = inputs.font.getPath(productVersion, 0, 0, 100, {
       kerning: true,
     });
+    // opentype.js 2.0's decimal rounding fails for near-integer floats
+    // (e.g. 185.00000000000003), producing NaN in otherwise valid glyphs.
+    // Quantize to the export precision before its SVG serialization.
+    for (const command of textPath.commands) {
+      for (const key of Object.keys(command)) {
+        if (typeof command[key] === "number") {
+          command[key] = Number(command[key].toFixed(5));
+        }
+      }
+    }
     const text = geometry(
       `<path d="${textPath.toPathData({ decimalPlaces: 5, flipY: false })}"/>`,
     );
