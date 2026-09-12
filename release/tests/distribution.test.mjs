@@ -79,3 +79,33 @@ test('pending stores preserve old availability; conflicting APK hashes are rejec
   assert.throws(() => mergeChannels(next, { githubApk: { version: '0.1.1', build: '30', sha256: 'b'.repeat(64) } }));
   assert.deepEqual(mergeChannels(next, { appStore: { version: '0.0.9', build: '100' } }), next);
 });
+
+test('large publication files go through a partial clone and a non-force git push', async () => {
+  const childProcess = (await import('node:child_process')).default;
+  const { syncBuiltinESMExports } = await import('node:module');
+  const { mock } = await import('node:test');
+  const { GIT_PUBLISH_THRESHOLD } = await import('../hosting.mjs');
+  const { GitHub } = await import('../core.mjs');
+  const gh = new GitHub('fake-canary-token', 'SovranBitcoin/sovran.money');
+  const big = Buffer.alloc(GIT_PUBLISH_THRESHOLD + 1, 1);
+  const calls = [];
+  const handle = mock.method(childProcess, 'execFileSync', (binary, args, options) => {
+    assert.equal(binary, 'git'); calls.push(args);
+    assert.ok(!args.join(' ').includes('fake-canary-token'), 'token must not appear in argv');
+    assert.ok(String(options.env.GIT_CONFIG_VALUE_0).startsWith('AUTHORIZATION: basic '));
+    if (args[0] === 'rev-parse') return calls.some((c) => c[0] === 'push') ? 'new-head\n' : 'old-head\n';
+    if (args[0] === 'ls-tree') return args.at(-1) === 'public/ios/releases/id/existing.ipa' ? '100644 blob deadbeef\tpublic/ios/releases/id/existing.ipa\n' : '';
+    return '';
+  });
+  syncBuiltinESMExports();
+  try {
+    await assert.rejects(commitFiles(gh, [{ path: 'public/ios/releases/id/existing.ipa', bytes: big, immutable: true }], 'x'), /Refusing to overwrite immutable release asset/);
+    calls.length = 0;
+    const sha = await commitFiles(gh, [{ path: 'public/ios/releases/id/variant/a.ipa', bytes: big, immutable: true }, { path: 'public/releases/0.1.3-ios.json', bytes: Buffer.from('[]'), immutable: true }], 'chore: publish');
+    assert.equal(sha, 'new-head');
+    const clone = calls.find((c) => c[0] === 'clone'); assert.ok(clone.includes('--filter=blob:none') && clone.includes('--no-checkout'));
+    assert.ok(calls.some((c) => c[0] === 'read-tree'));
+    assert.deepEqual(calls.filter((c) => c[0] === 'add').map((c) => c.at(-1)), ['public/ios/releases/id/variant/a.ipa', 'public/releases/0.1.3-ios.json']);
+    const push = calls.find((c) => c[0] === 'push'); assert.deepEqual(push, ['push', '--quiet', 'origin', 'HEAD:main']);
+  } finally { handle.mock.restore(); syncBuiltinESMExports(); }
+});
