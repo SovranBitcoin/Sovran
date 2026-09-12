@@ -256,5 +256,226 @@
     "size": 247607844
   },
   "complete": false,
-  "zapstoreEventId": "c0b033cef9072e5a8388ac37e5a15cdd574ac2a3576246f9ad23dd40d10a352d"
+  "zapstoreEventId": "c0b033cef9072e5a8388ac37e5a15cdd574ac2a3576246f9ad23dd40d10a352d",
+  "screenshots": [
+    "https://sovran.money/ios/media/9600afe92cc32fcad960d58f6a95e596ed377795849a3f0e1ddfe321633f66d4.png",
+    "https://sovran.money/ios/media/acd4a9f983ee071814d4d1b53599da04a5d9df5c7c0c8c31c0d32ec25df0a818.png",
+    "https://sovran.money/ios/media/6fd2286cdee3b5385ce6d69f3458b03e35764cf8c4605389334f2e397929ba35.png",
+    "https://sovran.money/ios/media/a307324a80ab492f444e0d3ce33aee4dae806df4e0f8c2dc28c901e0d18edb32.png",
+    "https://sovran.money/ios/media/436a4656bd8a97cd81f3ad08cf38798df21dfc5138387f7725a864356de4b62a.png",
+    "https://sovran.money/ios/media/04fa8cc1386498522b34fdf38d38193d33fea9e6cad8a5bd7810d069f5145590.png",
+    "https://sovran.money/ios/media/c1dc99066099a7a7ab52b2a9153327363a951ce23a3bc116def384286563d24c.png"
+  ],
+  "inventory": [
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/02217809-cb5a-3f94-84d2-fb5784da511c.ipa",
+      "size": 36374877,
+      "sha256": "414614353479caa665c410603d35b7fc1c0fa95480da5539d703b00d2024b2d5"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/0cb68869-03e9-3325-b8a0-53f89bcc6742.ipa",
+      "size": 35954,
+      "sha256": "b4033b3fabb022ccd228302cc963c52c4d8a71973d0bd1824622ce0c66156eef"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/1499eec3-6c88-3025-a3e2-4121829502fd.ipa",
+      "size": 36351720,
+      "sha256": "7dcd4a833e5499ff42b9d1db2567365104a3a89eb9900bb9a106f5d0bb784065"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/1b3666e8-f456-3388-960e-191e126e10de.ipa",
+      "size": 36302,
+      "sha256": "01d5f4ccda488d70aa6ef64f55bd3ffc98485d53c422b9e26810fa58b2fbfe2e"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/1c9be2c1-0c79-3cb6-8b46-40012aa4f825.ipa",
+      "size": 45872142,
+      "sha256": "2a2f338bc635cb7256fc9f264d5fcb7f8d2ecd160f8ac23e6f768840aa7dfb97"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/1cbf902c-90d8-3da6-877f-091f966f7563.ipa",
+      "size": 36336,
+      "sha256": "bae8d95906770b115bb46c53f16923449df95b3643bfe06d69a0723eac4c44ec"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/237ab0af-1fb9-3fd6-9ded-7c116f51e00f.ipa",
+      "size": 45899483,
+      "sha256": "d87509d6e606b39c832f558d0fcb50286b12872ba5c2fb21390b32235c410c1c"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/255d46b2-bf52-31dd-b0d8-74ed328865aa.ipa",
+      "size": 29974,
+      "sha256": "6056beb125f93067412edb2d6fcb1074548369ceebe6db9552d577914f6776f7"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/25ade85e-79fa-3bcb-948b-16f3a381d5e4.ipa",
+      "size": 36100,
+      "sha256": "3e73f2efafb3f1d86a424346acb93489d2d2e23351dd28bac3f00c2632c10c2d"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/48ef4413-b06a-3d28-8ad5-fff9d7731819.ipa",
+      "size": 36351982,
+      "sha256": "f0a0cb0a9432ae3c19f6f6be1294977954f2f1f06047c8cc90f49e10d18a5eb0"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/501af52c-4b54-3286-af5c-f5c34f755792.ipa",
+      "size": 29902,
+      "sha256": "3ec255ed347f2569f0edbbb8add209c76beeca8235c84dc96c1bbb687da99de9"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/6fa4be82-e2f6-3089-865f-0fe22e5ca47b.ipa",
+      "size": 30226,
+      "sha256": "755b2c2937413ca98765db6ea8238b4d0ff4f6f31b6c5fe44fef4fb9d357d587"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/73ae76a7-f05a-3570-9a61-f95b519793dc.ipa",
+      "size": 36376716,
+      "sha256": "24861a7177fa6b57bb2d6102fe3695f674ceb83f3dfe5b00c1a7609bcf2d55f8"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/9a0ce10f-52f5-3f86-b14c-cae6a02e4be3.ipa",
+      "size": 36958,
+      "sha256": "3c98b0591e55faad03beb90a792357a53b5ab53468b94ca1f9e9eff42e0ed92b"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/9a20ecc1-7cc2-3710-8003-9be244ddebe3.ipa",
+      "size": 36013,
+      "sha256": "faf226a2eefcbfec396f05b926a42f876accc173524446123355bc30e7d256b4"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/ca4abd14-f6cd-3fb8-a038-5048f0273712.ipa",
+      "size": 29435,
+      "sha256": "a0f3ff9d2eea6cf33ab5ef93299782975fff915895d167286105f754637c9446"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/ccf8e770-ad20-3c52-b613-ef8869ee3789.ipa",
+      "size": 45878621,
+      "sha256": "d7733f2708d45fd2e8abd4adcd9f0e19c9f5b666676f67f4442d7fe77681aaec"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/ce7773fa-dec0-3849-8dac-99c65a2c9149.ipa",
+      "size": 36355270,
+      "sha256": "f83204e55c8f68b805c9095fe9e7c159f365d548139725b18cc3ad3a2ad679ec"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/d4533158-1998-3bfd-9b9e-044bd75a08d8.ipa",
+      "size": 45873223,
+      "sha256": "cd0a768afa06cd3a7cd1c17809870b636989c1f756139c58e7a75b57aefbf800"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/dbc0e168-a88b-3897-ab60-83d1fd2277fe.ipa",
+      "size": 36803,
+      "sha256": "93b46221195ecad1773b807db2b14c96b4c47e58c7ef2de028193708313495e0"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/dcc240fe-922f-3ce8-91b6-a36935de8d66.ipa",
+      "size": 36024,
+      "sha256": "e35ada6a24c51ec03fe67e55a61d990a7e5e8c2e0af41138efbf419741cbc4f5"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/e0705436-01dd-35ae-8c6b-81f7c7917b74.ipa",
+      "size": 36349123,
+      "sha256": "6d33918e5663eb222d9a0c21809ae596157c14cf9250ccabf16cff0b4f6d8159"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/f0422e46-bacc-3472-809e-30373ba9dd7f.ipa",
+      "size": 36313214,
+      "sha256": "b002ef06b46932294300224054c1c31fadccd6e84ee74eaab5e39d3e6625c615"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/delta/fc24bea1-9994-388d-9ea4-fed269827dc1.ipa",
+      "size": 36352076,
+      "sha256": "ed3333799a7e993281d7f89b2e43823626ad461088e963a74a39e585ccb19bb2"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/manifest.json",
+      "size": 81253,
+      "sha256": "c836cf38611eea3e606cf4ebcc666dc75469fa654d103b9ba814d55532fb96e8"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/signature",
+      "size": 5622,
+      "sha256": "9955e4979126121db437d0ee05d7bed7b45ec7d16dc3f14b3a27b2ec40b48e42"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/variant/1244a2fa-d5cc-30f1-a08a-3b40bb104722.ipa",
+      "size": 48429258,
+      "sha256": "cf6db04a1939d42b797dbe721b5e782346683786a6fddba5899854891ffa7853"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/variant/275a15c3-c4d8-387d-a990-abf385a95456.ipa",
+      "size": 48402081,
+      "sha256": "f86450389f0e90aedfe8d1ee275fd1ad90ff5134a93eccca7e574bc1b60cbfe5"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/variant/438c1e8a-c30c-31f2-8859-2d30188203b2.ipa",
+      "size": 48402463,
+      "sha256": "74a86de98c03443f7d1cce6f2bf17afe743c349eaf738c6a1fcc7078e1e0e856"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/variant/7ea14b0c-5741-38eb-a225-0f3d660018ba.ipa",
+      "size": 48408755,
+      "sha256": "d5de53a3aa83ec8f77fa898a62a8d33bb8356ce71be9c56ab83d7d6eca40016e"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/variant/b9ed3433-a096-3c29-9eed-c449c5042615.ipa",
+      "size": 48408636,
+      "sha256": "93f4aaf123b2f4d8a8d626042c96751a9aacb1fa19f3af7cc60e97b57d587940"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/variant/bb356abd-4930-39ca-b724-66907079df8f.ipa",
+      "size": 48402593,
+      "sha256": "7b44d241ff8ad3b56f69e7a1e7307d0ff4f296020a1457850624cba424eb6f7a"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/variant/c03dbcdd-4dc2-3238-b4c4-db53c0612179.ipa",
+      "size": 48429568,
+      "sha256": "ebc6e23dae6a85f83c04fc2de4e8f76bdae1812b680ad4c12087152e6dfb836a"
+    },
+    {
+      "path": "ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/variant/ff808d8f-dca9-3660-9c5a-2b9c36ff7d86.ipa",
+      "size": 48401957,
+      "sha256": "91b53414e45a5015c28482ce485848c852c182ed8ce29fe9ac6aabae2af0be17"
+    },
+    {
+      "path": "ios/media/9600afe92cc32fcad960d58f6a95e596ed377795849a3f0e1ddfe321633f66d4.png",
+      "size": 682046,
+      "sha256": "9600afe92cc32fcad960d58f6a95e596ed377795849a3f0e1ddfe321633f66d4"
+    },
+    {
+      "path": "ios/media/acd4a9f983ee071814d4d1b53599da04a5d9df5c7c0c8c31c0d32ec25df0a818.png",
+      "size": 568419,
+      "sha256": "acd4a9f983ee071814d4d1b53599da04a5d9df5c7c0c8c31c0d32ec25df0a818"
+    },
+    {
+      "path": "ios/media/6fd2286cdee3b5385ce6d69f3458b03e35764cf8c4605389334f2e397929ba35.png",
+      "size": 379957,
+      "sha256": "6fd2286cdee3b5385ce6d69f3458b03e35764cf8c4605389334f2e397929ba35"
+    },
+    {
+      "path": "ios/media/a307324a80ab492f444e0d3ce33aee4dae806df4e0f8c2dc28c901e0d18edb32.png",
+      "size": 262350,
+      "sha256": "a307324a80ab492f444e0d3ce33aee4dae806df4e0f8c2dc28c901e0d18edb32"
+    },
+    {
+      "path": "ios/media/436a4656bd8a97cd81f3ad08cf38798df21dfc5138387f7725a864356de4b62a.png",
+      "size": 768060,
+      "sha256": "436a4656bd8a97cd81f3ad08cf38798df21dfc5138387f7725a864356de4b62a"
+    },
+    {
+      "path": "ios/media/04fa8cc1386498522b34fdf38d38193d33fea9e6cad8a5bd7810d069f5145590.png",
+      "size": 197416,
+      "sha256": "04fa8cc1386498522b34fdf38d38193d33fea9e6cad8a5bd7810d069f5145590"
+    },
+    {
+      "path": "ios/media/c1dc99066099a7a7ab52b2a9153327363a951ce23a3bc116def384286563d24c.png",
+      "size": 683234,
+      "sha256": "c1dc99066099a7a7ab52b2a9153327363a951ce23a3bc116def384286563d24c"
+    }
+  ],
+  "adp": {
+    "minOSVersion": "16.4",
+    "size": 862130660,
+    "url": "https://sovran.money/ios/releases/097f7b82-7aac-4574-a594-3e7fcaecc652/"
+  }
 }
