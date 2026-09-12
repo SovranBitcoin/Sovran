@@ -11,7 +11,7 @@
     "ios": {
       "id": "d9bc15f4-204f-46dd-b61d-c3010025a451",
       "number": "176",
-      "ready": false
+      "ready": true
     },
     "android": {
       "id": "162aa254-fc02-4210-a98a-8a4725c548e7",
