@@ -33,8 +33,9 @@ export class HttpError extends Error { constructor(status, detail) { super(`Prov
 export function errorDetail(body) {
   let json; try { json = JSON.parse(body); } catch { return ''; }
   const error = json?.error ?? {};
+  // GitHub: top-level message plus errors[].resource/field/code(/message).
   const codes = [error.status, ...(error.errors ?? []).map((e) => e?.reason), ...(json?.errors ?? []).map((e) => e?.code)].filter((c) => /^[A-Za-z0-9_]{1,60}$/.test(String(c ?? '')));
-  const text = [error.message, ...(json?.errors ?? []).map((e) => [e?.title, e?.detail].filter(Boolean).join(' '))].filter(Boolean).join(' ');
+  const text = [error.message, json?.message, ...(json?.errors ?? []).map((e) => [e?.resource, e?.field, e?.title, e?.detail, e?.message].filter(Boolean).join(' '))].filter(Boolean).join(' ');
   const message = String(text).replace(/[^A-Za-z0-9 .:;()/_-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
   return [...new Set(codes)].join('/') + (message ? `: ${message}` : '');
 }
