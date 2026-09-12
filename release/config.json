@@ -15,6 +15,7 @@
   "freedomSource": "https://source.freedomstore.io/",
   "locale": "en-US",
   "appleLocale": "en-GB",
+  "appleScreenshotSet": "APP_IPHONE_65",
   "zsp": {
     "version": "0.4.17",
     "sha256": "3f241da6a5dc7a85fe851d3b42b77790b651bd36c7029382a701262bda832d20"

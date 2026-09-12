@@ -129,4 +129,5 @@ test('Apple and Play locales are configured separately and valid', async () => {
   const { config } = await import('../core.mjs');
   assert.match(config.locale, /^[a-z]{2}-[A-Z]{2}$/);
   assert.match(config.appleLocale, /^[a-z]{2}-[A-Z]{2}$/);
+  assert.match(config.appleScreenshotSet, /^APP_IPHONE_\d{2}$/, 'the hosted screenshot set is pinned to the one the App Store listing serves');
 });

@@ -103,7 +103,11 @@ async function mediaFiles(state, apple) {
   const locale = locales.find((l) => l.attributes.locale === wanted);
   check(locale, 'Configured ASC screenshot locale missing');
   const sets = await apple.list(`appStoreVersionLocalizations/${locale.id}/appScreenshotSets`);
-  const preference = ['APP_IPHONE_69', 'APP_IPHONE_67', 'APP_IPHONE_65', 'APP_IPHONE_61', 'APP_IPHONE_58', 'APP_IPHONE_55'];
+  // App Store Connect keeps every historical size; the set Apple serves on the
+  // public listing is the one the catalog should mirror. Pin it in config
+  // (0.1.3: the 6.9" set held stale 2025 screenshots while 6.5" was current)
+  // and fall back to the largest set only when the configured one is absent.
+  const preference = [config.appleScreenshotSet, 'APP_IPHONE_69', 'APP_IPHONE_67', 'APP_IPHONE_65', 'APP_IPHONE_61', 'APP_IPHONE_58', 'APP_IPHONE_55'].filter(Boolean);
   const set = preference.map((type) => sets.find((s) => s.attributes.screenshotDisplayType === type)).find(Boolean);
   check(set, 'No iPhone screenshot set');
   const shots = await apple.list(`appScreenshotSets/${set.id}/appScreenshots`);
