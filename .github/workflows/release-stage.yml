@@ -30,6 +30,9 @@ jobs:
           path: source
           persist-credentials: false
           fetch-depth: 1
+          # Vendored bitchat native sources are git submodules; EAS archives
+          # the checked-out tree, so an uninitialized submodule ships empty.
+          submodules: true
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
