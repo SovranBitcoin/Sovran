@@ -30,7 +30,8 @@
     }
   },
   "steps": {
-    "iosUpload": true
+    "iosUpload": true,
+    "artworkHosted": false
   },
   "appleVersionId": "b8a49c95-832b-4ae8-8bba-a408729092da",
   "aabSha256": "b4396a382b380c9c797ef13b7f6f5b27931a2faba2a838deb3aeb6356745b1e6",
