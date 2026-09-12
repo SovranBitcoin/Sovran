@@ -1,6 +1,6 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { request, download, safeUrl, GitHub, Ledger, sha256, compareVersion, published } from '../core.mjs';
+import { request, download, safeUrl, GitHub, Ledger, sha256, compareVersion, published, diagnostic } from '../core.mjs';
 
 test('API credentials cannot follow redirects or escape the allowed origin', async () => {
   const calls = [];
@@ -86,4 +86,20 @@ test('large checkpoint files resume through the immutable Git blob', async () =>
     assert.equal(result.sha, sha);
     assert.equal(calls.length, 2);
   } finally { handle.mock.restore(); }
+});
+
+test('diagnostics expose only error classes and codes, never provider text', async () => {
+  const canary = 'fake-canary-secret';
+  const network = Object.assign(new TypeError(`fetch failed ${canary}`), { code: 'ECONNRESET' });
+  assert.equal(diagnostic(new Error(canary, { cause: network })), 'Error/ECONNRESET');
+  assert.equal(diagnostic(new Error(canary, { cause: new TypeError(canary) })), 'Error/TypeError');
+  assert.equal(diagnostic(new TypeError(canary)), 'TypeError');
+  assert.equal(diagnostic(Object.assign(new Error(canary), { cause: { code: `bad ${canary}` } })), 'Error/unknown');
+  assert.equal(diagnostic(undefined), 'unknown');
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => { throw Object.assign(new TypeError(canary), { code: 'UND_ERR_SOCKET' }); };
+  try {
+    await assert.rejects(request('https://api.github.com/', { hosts: ['api.github.com'] }), (error) => diagnostic(error) === 'Error/UND_ERR_SOCKET' && !error.message.includes(canary));
+    await assert.rejects(download('https://github.com/', ['github.com']), (error) => diagnostic(error) === 'Error/UND_ERR_SOCKET' && !error.message.includes(canary));
+  } finally { globalThis.fetch = originalFetch; }
 });

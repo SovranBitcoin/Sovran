@@ -42,8 +42,17 @@ export async function request(url, { hosts, token, method = 'GET', body, bytes, 
     return type === 'application/json' ? (data.length ? JSON.parse(data.toString()) : null) : data;
   } catch (error) {
     if (error instanceof HttpError) throw error;
-    throw new Error('Provider response failed validation or timed out');
+    throw new Error('Provider response failed validation or timed out', { cause: error });
   }
+}
+// Failure class plus a network error code only. Messages, bodies and URLs from
+// providers or subprocesses can carry tokens, so they never reach the log.
+export function diagnostic(error) {
+  const tag = (value) => (/^[A-Za-z0-9_]{1,40}$/.test(String(value ?? '')) ? String(value) : 'unknown');
+  const cause = error?.cause;
+  const parts = [tag(error?.constructor?.name)];
+  if (cause) parts.push(tag(cause?.code ?? cause?.constructor?.name));
+  return parts.join('/');
 }
 export function command(binary, args, options = {}) {
   try { return execFileSync(binary, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 600_000, maxBuffer: 16 * 1024 * 1024, ...options }); }
@@ -61,7 +70,7 @@ export async function download(url, hosts, limit = 1_000_000_000) {
     safeUrl(url, hosts);
     let response;
     try { response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(300_000) }); }
-    catch { throw new Error('Artifact download failed'); }
+    catch (error) { throw new Error('Artifact download failed', { cause: error }); }
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       const location = response.headers.get('location'); await response.body?.cancel();
       check(location, 'Artifact redirect missing destination'); url = new URL(location, url).href; continue;
