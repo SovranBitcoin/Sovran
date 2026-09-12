@@ -52,7 +52,9 @@ export function diagnostic(error) {
   const cause = error?.cause;
   const parts = [tag(error?.constructor?.name)];
   if (cause) parts.push(tag(cause?.code ?? cause?.constructor?.name));
-  return parts.join('/');
+  // First controller frame: our own file name and position, nothing else.
+  const frame = String(error?.stack ?? '').match(/\/release\/([a-z]+\.mjs):(\d+):(\d+)/);
+  return parts.join('/') + (frame ? `@${frame[1]}:${frame[2]}:${frame[3]}` : '');
 }
 export function command(binary, args, options = {}) {
   try { return execFileSync(binary, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 600_000, maxBuffer: 16 * 1024 * 1024, ...options }); }

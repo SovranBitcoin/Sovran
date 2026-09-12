@@ -96,10 +96,13 @@ test('diagnostics expose only error classes and codes, never provider text', asy
   assert.equal(diagnostic(new TypeError(canary)), 'TypeError');
   assert.equal(diagnostic(Object.assign(new Error(canary), { cause: { code: `bad ${canary}` } })), 'Error/unknown');
   assert.equal(diagnostic(undefined), 'unknown');
+  const located = new TypeError(canary);
+  located.stack = `TypeError: ${canary}\n    at androidRelease (file:///home/runner/work/Sovran/Sovran/controller/release/android.mjs:44:63)\n    at run (file:///x/release/run.mjs:20:5)`;
+  assert.equal(diagnostic(located), 'TypeError@android.mjs:44:63');
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => { throw Object.assign(new TypeError(canary), { code: 'UND_ERR_SOCKET' }); };
   try {
-    await assert.rejects(request('https://api.github.com/', { hosts: ['api.github.com'] }), (error) => diagnostic(error) === 'Error/UND_ERR_SOCKET' && !error.message.includes(canary));
-    await assert.rejects(download('https://github.com/', ['github.com']), (error) => diagnostic(error) === 'Error/UND_ERR_SOCKET' && !error.message.includes(canary));
+    await assert.rejects(request('https://api.github.com/', { hosts: ['api.github.com'] }), (error) => /^Error\/UND_ERR_SOCKET@core\.mjs:\d+:\d+$/.test(diagnostic(error)) && !error.message.includes(canary));
+    await assert.rejects(download('https://github.com/', ['github.com']), (error) => /^Error\/UND_ERR_SOCKET@core\.mjs:\d+:\d+$/.test(diagnostic(error)) && !error.message.includes(canary));
   } finally { globalThis.fetch = originalFetch; }
 });

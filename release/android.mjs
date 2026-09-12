@@ -38,7 +38,8 @@ export async function androidRelease(ledger) {
   if (!state.builds.android?.ready) return;
   if (state.apk && state.channels.googlePlay?.version === state.version) return;
   const number = state.builds.android.number;
-  let summaries = (await play('tracks/production/releases')).releases ?? [];
+  // An empty 2xx body decodes to null; treat it as a track with no releases.
+  let summaries = (await play('tracks/production/releases'))?.releases ?? [];
   let summary = summaries.find((r) => r.activeArtifacts?.some((a) => String(a.versionCode) === number));
   let aab;
   if (!state.aabSha256) {
