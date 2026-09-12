@@ -24,5 +24,6 @@
   "steps": {
     "iosUpload": true
   },
-  "appleVersionId": "ec0b8265-e631-4476-b536-42b36cc297cf"
+  "appleVersionId": "ec0b8265-e631-4476-b536-42b36cc297cf",
+  "aabSha256": "31f4cccc9772f3944acbed1241c8c55534e4afb869ce2100058c869fbef63c91"
 }
