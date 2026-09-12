@@ -1,5 +1,5 @@
 import { appendFileSync } from 'node:fs';
-import { config, check, GitHub, Ledger, required, ReleaseError, HttpError } from './core.mjs';
+import { config, check, diagnostic, GitHub, Ledger, required, ReleaseError, HttpError } from './core.mjs';
 import { prepare } from './prepare.mjs';
 import { build } from './build.mjs';
 import { appleRelease } from './apple.mjs';
@@ -31,5 +31,7 @@ try {
   const message = String(error?.message ?? '');
   const safe = (error instanceof ReleaseError || error instanceof HttpError) && /^[A-Za-z0-9 .:;()/_-]{1,180}$/.test(message);
   console.error(safe ? message : 'Release stage failed; inspect provider status without exposing credentials.');
+  // Class names and error codes only: never messages, bodies or URLs.
+  if (!safe) console.error(`Diagnostic: ${diagnostic(error)}`);
   process.exitCode = 1;
 }
