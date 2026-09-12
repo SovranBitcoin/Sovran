@@ -35,5 +35,192 @@
   "appleVersionId": "b8a49c95-832b-4ae8-8bba-a408729092da",
   "aabSha256": "b4396a382b380c9c797ef13b7f6f5b27931a2faba2a838deb3aeb6356745b1e6",
   "playEdit": "07808612630045523005",
-  "adpId": "097f7b82-7aac-4574-a594-3e7fcaecc652"
+  "adpId": "097f7b82-7aac-4574-a594-3e7fcaecc652",
+  "artworkInventory": [
+    {
+      "path": "releases/0.1.3/artwork/black-on-light/artwork.svg",
+      "size": 2010,
+      "sha256": "115aca7cbc531bc04b3ac0075fc056c4f5d3d4182a009107df2dc3392e1ea9a8"
+    },
+    {
+      "path": "releases/0.1.3/artwork/black-on-light/16x16.png",
+      "size": 386,
+      "sha256": "6bb4a73f1aaa006a8ad8e7c74d8060ee4083929228c4767bc76a9862950a2c6e"
+    },
+    {
+      "path": "releases/0.1.3/artwork/black-on-light/32x32.png",
+      "size": 882,
+      "sha256": "5aed6a8d43838c7c74c0daa18fd36605025a11da3f984c286e307006ab1b8682"
+    },
+    {
+      "path": "releases/0.1.3/artwork/black-on-light/64x64.png",
+      "size": 1864,
+      "sha256": "2542bf4b3565e07f21b7010d5208a3cdf483601dbc75814d3f37ef5c7da97081"
+    },
+    {
+      "path": "releases/0.1.3/artwork/black-on-light/128x128.png",
+      "size": 3962,
+      "sha256": "93c1a1827d8c825baff4fc5b4294cca8b0fcf82f3de5e4d2ecf98ced8daecb48"
+    },
+    {
+      "path": "releases/0.1.3/artwork/black-on-light/256x256.png",
+      "size": 8416,
+      "sha256": "e700278a0ffac5f40dd50f808d2e991dff71e1494b8c405e41d51d3c9803f156"
+    },
+    {
+      "path": "releases/0.1.3/artwork/black-on-light/512x512.png",
+      "size": 19079,
+      "sha256": "ba1d3dea17269e5f7eb18f9d737cc8835c340ba0492a6c57243d7d223fbc2856"
+    },
+    {
+      "path": "releases/0.1.3/artwork/black-on-light/1024x1024.png",
+      "size": 44652,
+      "sha256": "04f4f819202c2b6a21dd16bbeafb43b31b9ee3ddca71fdf6cd2b542a10b81df1"
+    },
+    {
+      "path": "releases/0.1.3/artwork/black-on-light/2048x2048.png",
+      "size": 105317,
+      "sha256": "db43dcc0c05e7856c991be2735cf595f68d61935e774439388e21ab9b6be483a"
+    },
+    {
+      "path": "releases/0.1.3/artwork/white-on-dark/artwork.svg",
+      "size": 2010,
+      "sha256": "9a2617c09ea771aa06689ae6a0564c4909a5a465606765aaedf27e8f4b43672e"
+    },
+    {
+      "path": "releases/0.1.3/artwork/white-on-dark/16x16.png",
+      "size": 403,
+      "sha256": "8b77690445462e1617135ff84248f96b5634cb858236394bbb20a4fc626b4967"
+    },
+    {
+      "path": "releases/0.1.3/artwork/white-on-dark/32x32.png",
+      "size": 890,
+      "sha256": "e89d44136ba27df963458c5bc520ab644687f00981338a5b1bf99aa4921d2ad0"
+    },
+    {
+      "path": "releases/0.1.3/artwork/white-on-dark/64x64.png",
+      "size": 1939,
+      "sha256": "a3576fe37813a13ebfbed14b45b7b67e1440a29f4dfe6d7202a54d641c44698b"
+    },
+    {
+      "path": "releases/0.1.3/artwork/white-on-dark/128x128.png",
+      "size": 4061,
+      "sha256": "9f310023f02f91c90fab3ab1ef55bb8730f27e320d63628047b0867c80d88f77"
+    },
+    {
+      "path": "releases/0.1.3/artwork/white-on-dark/256x256.png",
+      "size": 8698,
+      "sha256": "2c290ca89e6c1366259728955294e5ef4e34ec0566e1e9ab766b71e9fb65740d"
+    },
+    {
+      "path": "releases/0.1.3/artwork/white-on-dark/512x512.png",
+      "size": 19390,
+      "sha256": "86ebebf317131b9dd8870ee261f526d489b150e0f0a95c63c96270ec2f283e2d"
+    },
+    {
+      "path": "releases/0.1.3/artwork/white-on-dark/1024x1024.png",
+      "size": 45186,
+      "sha256": "0cf7216bff92710d9ad91bac7f4d04ef0f75091d27411fc5528f4f758c8a52e8"
+    },
+    {
+      "path": "releases/0.1.3/artwork/white-on-dark/2048x2048.png",
+      "size": 101973,
+      "sha256": "e5df0311c96998b1e1f065fa5b6b365511f07fd08adf933f5a194941468bdd65"
+    },
+    {
+      "path": "releases/0.1.3/artwork/black-on-transparent/artwork.svg",
+      "size": 1801,
+      "sha256": "7e0023c1f46798d3caad9b9677b9b57ce3ec71ce4ef6d46671504635f29361c6"
+    },
+    {
+      "path": "releases/0.1.3/artwork/black-on-transparent/16x16.png",
+      "size": 327,
+      "sha256": "c49eefad25d8c38373f0c77cef2bbd2fcdd9904e74f7d2c81211842989f7c535"
+    },
+    {
+      "path": "releases/0.1.3/artwork/black-on-transparent/32x32.png",
+      "size": 641,
+      "sha256": "1c464b06633b62fdf9fbdb294419e4c7f323d79575c07fd2daa64a3d2a882299"
+    },
+    {
+      "path": "releases/0.1.3/artwork/black-on-transparent/64x64.png",
+      "size": 1229,
+      "sha256": "4bb6f4f05014faa21398f077f3ede32413c83e9a7120947bd65b7e1734bb9929"
+    },
+    {
+      "path": "releases/0.1.3/artwork/black-on-transparent/128x128.png",
+      "size": 2938,
+      "sha256": "ca8b1f518bd646dcab09faf3d756a0b9c249afafeaaeba252fc4a8d599045719"
+    },
+    {
+      "path": "releases/0.1.3/artwork/black-on-transparent/256x256.png",
+      "size": 6810,
+      "sha256": "22f05e422809c96d6bf6fee0933e38e6b4aa0ff76ac3454d0e78cc328bde436d"
+    },
+    {
+      "path": "releases/0.1.3/artwork/black-on-transparent/512x512.png",
+      "size": 14422,
+      "sha256": "5c900dc1a93d3185635bd69656ff6fdd48ef803b25fe7e8b537305712b78c048"
+    },
+    {
+      "path": "releases/0.1.3/artwork/black-on-transparent/1024x1024.png",
+      "size": 31912,
+      "sha256": "a7a515707c766a8e5309ed06050c7c77dfb2835e1aab62177cb2a29e73ecc27c"
+    },
+    {
+      "path": "releases/0.1.3/artwork/black-on-transparent/2048x2048.png",
+      "size": 72932,
+      "sha256": "c0b11a4b6f8416938fa0a7a34b9de8d5acfae7073af4488e24ec72ca0fde7ec1"
+    },
+    {
+      "path": "releases/0.1.3/artwork/white-on-transparent/artwork.svg",
+      "size": 1798,
+      "sha256": "aa5bbbc2265b502739a603f3cb48d9e88f6c2ddf5ec0c31cf40a0e88a4f7d894"
+    },
+    {
+      "path": "releases/0.1.3/artwork/white-on-transparent/16x16.png",
+      "size": 293,
+      "sha256": "20b8abeabe79c24bd3d8a127941e469c4b910d352d376abeec9ad09320dc13cc"
+    },
+    {
+      "path": "releases/0.1.3/artwork/white-on-transparent/32x32.png",
+      "size": 524,
+      "sha256": "36fb17e308b2387bf014513ed28b2e403801d396751db9de162d46c2361572af"
+    },
+    {
+      "path": "releases/0.1.3/artwork/white-on-transparent/64x64.png",
+      "size": 1055,
+      "sha256": "9014fc6cd1336b6bb7c905fcf34fee501f9ad46962422fb557185fa00034878f"
+    },
+    {
+      "path": "releases/0.1.3/artwork/white-on-transparent/128x128.png",
+      "size": 2281,
+      "sha256": "4fc957ce5f866cf4758697abd1939896acd8749f1f081ef0ea6310b8610696ec"
+    },
+    {
+      "path": "releases/0.1.3/artwork/white-on-transparent/256x256.png",
+      "size": 4913,
+      "sha256": "f7169640a432c9f241af615a0f767ea194d6f780f3112f966a2666da36741415"
+    },
+    {
+      "path": "releases/0.1.3/artwork/white-on-transparent/512x512.png",
+      "size": 11280,
+      "sha256": "8634d75e7d0a0913d81ddd75bd0c895ad80c6cdba3c0355c1faf13d9aadf5fd1"
+    },
+    {
+      "path": "releases/0.1.3/artwork/white-on-transparent/1024x1024.png",
+      "size": 26588,
+      "sha256": "f5f5a50dd8e38afb2037c997b9f324b3f398d9254b1f38ec277674dbfb038b30"
+    },
+    {
+      "path": "releases/0.1.3/artwork/white-on-transparent/2048x2048.png",
+      "size": 62365,
+      "sha256": "103e42d7face6739e0c2fc5ac9eb08c0984b9c1664628973fb9ca76f758559ca"
+    },
+    {
+      "path": "releases/0.1.3/artwork/manifest.json",
+      "size": 6786,
+      "sha256": "5bd25bec956f7520c11bedd8b7b0bbea2af4a5b9f85d387a91a3a7921fee9055"
+    }
+  ]
 }
