@@ -14,7 +14,9 @@
       "ready": false
     },
     "android": {
-      "id": "2c248212-3233-4437-8867-0738f9050ff7"
+      "id": "2c248212-3233-4437-8867-0738f9050ff7",
+      "number": "22",
+      "ready": false
     }
   },
   "channels": {},
