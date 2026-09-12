@@ -1,6 +1,6 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { request, download, safeUrl, GitHub, Ledger, sha256, compareVersion, published, diagnostic } from '../core.mjs';
+import { request, download, safeUrl, GitHub, Ledger, sha256, compareVersion, published, diagnostic, errorDetail } from '../core.mjs';
 
 test('API credentials cannot follow redirects or escape the allowed origin', async () => {
   const calls = [];
@@ -105,4 +105,20 @@ test('diagnostics expose only error classes and codes, never provider text', asy
     await assert.rejects(request('https://api.github.com/', { hosts: ['api.github.com'] }), (error) => /^Error\/UND_ERR_SOCKET@core\.mjs:\d+:\d+$/.test(diagnostic(error)) && !error.message.includes(canary));
     await assert.rejects(download('https://github.com/', ['github.com']), (error) => /^Error\/UND_ERR_SOCKET@core\.mjs:\d+:\d+$/.test(diagnostic(error)) && !error.message.includes(canary));
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test('4xx JSON error envelopes surface only codes and a sanitized message', async () => {
+  const canary = 'fake-canary-secret';
+  const google = { error: { code: 400, message: `Version code 23 has already been used. <a href="https://x/${canary}?token=${canary}">\nsee</a>`, status: 'INVALID_ARGUMENT', errors: [{ reason: 'apkUpgradeVersionConflict', message: 'x' }] } };
+  const detail = errorDetail(JSON.stringify(google));
+  assert.match(detail, /^INVALID_ARGUMENT\/apkUpgradeVersionConflict: Version code 23 has already been used/);
+  assert.ok(!detail.includes('<') && !detail.includes('?') && !detail.includes('='));
+  assert.equal(errorDetail('not json'), '');
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json(google, { status: 400 });
+  try {
+    await assert.rejects(request('https://api.github.com/', { hosts: ['api.github.com'] }), (error) => error.status === 400 && /^Provider HTTP 400 INVALID_ARGUMENT\/apkUpgradeVersionConflict: Version code 23/.test(error.message) && /^[A-Za-z0-9 .:;()/_-]{1,180}$/.test(error.message));
+  } finally { globalThis.fetch = originalFetch; }
+  globalThis.fetch = async () => new Response('<html>oops</html>', { status: 502, headers: { 'content-type': 'text/html' } });
+  try { await assert.rejects(request('https://api.github.com/', { hosts: ['api.github.com'] }), (error) => error.message === 'Provider HTTP 502'); } finally { globalThis.fetch = originalFetch; }
 });
