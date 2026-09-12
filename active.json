@@ -38,6 +38,16 @@
       "sha256": "2fca91015f0669685d808cae3a6caa274c4f15d1a2acad3893188b1ca758a941",
       "certificateSha256": "b598befca67352eff6a0333e9a963c76db42bd3d1c64920ebd8b5b84751e59af",
       "size": 247607844
+    },
+    "zapstore": {
+      "version": "0.1.3",
+      "build": "24",
+      "url": "https://zapstore.dev/apps/com.sovranbitcoin",
+      "sourceSha": "d9ad12c4bde03b609cd90a4487c466b88007a4cb",
+      "confirmedAt": "2026-09-12T19:31:38.398Z",
+      "sha256": "2fca91015f0669685d808cae3a6caa274c4f15d1a2acad3893188b1ca758a941",
+      "certificateSha256": "b598befca67352eff6a0333e9a963c76db42bd3d1c64920ebd8b5b84751e59af",
+      "size": 247607844
     }
   },
   "steps": {
@@ -245,5 +255,6 @@
     "certificateSha256": "b598befca67352eff6a0333e9a963c76db42bd3d1c64920ebd8b5b84751e59af",
     "size": 247607844
   },
-  "complete": false
+  "complete": false,
+  "zapstoreEventId": "c0b033cef9072e5a8388ac37e5a15cdd574ac2a3576246f9ad23dd40d10a352d"
 }
