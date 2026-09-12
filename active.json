@@ -23,5 +23,6 @@
   "channels": {},
   "steps": {
     "iosUpload": true
-  }
+  },
+  "appleVersionId": "b8a49c95-832b-4ae8-8bba-a408729092da"
 }
