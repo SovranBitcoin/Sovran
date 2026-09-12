@@ -4,7 +4,8 @@
   "sourceSha": "d9ad12c4bde03b609cd90a4487c466b88007a4cb",
   "createdAt": "2026-09-12T13:46:34.731Z",
   "intents": {
-    "build-ios": "2026-09-12T13:52:56.856Z"
+    "build-ios": "2026-09-12T13:52:56.856Z",
+    "build-android": "2026-09-12T13:53:28.519Z"
   },
   "builds": {
     "ios": {
