@@ -17,7 +17,7 @@
     "android": {
       "id": "162aa254-fc02-4210-a98a-8a4725c548e7",
       "number": "24",
-      "ready": false
+      "ready": true
     }
   },
   "channels": {},
