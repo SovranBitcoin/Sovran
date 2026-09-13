@@ -26,14 +26,14 @@
   "ios/ai": {
     "page": "ai",
     "file": "source/screenshots/ios/ai.png",
-    "run": "run-2026-09-11T18-03-58-075Z-813d671c",
-    "sha256": "536fcd6a98257e3b421a9b76cb54a0f511139e9730c7c2d70fb7e1e0bf4b3d3e"
+    "run": "run-2026-09-13T02-12-43-637Z-aca0af50",
+    "sha256": "ce602785362a45ec51ff82f16d610d9b9803cd0a477d06d297c9fa1c965a8678"
   },
   "ios/contacts": {
     "page": "contacts",
     "file": "source/screenshots/ios/contacts.png",
-    "run": "run-2026-09-11T18-03-58-075Z-813d671c",
-    "sha256": "80a7a86d27e333fbc868c6ba038e49e0ca3ded4f807cbb8ca788c9351db98150"
+    "run": "run-2026-09-13T02-12-43-637Z-aca0af50",
+    "sha256": "52670191256ef4790cad3be80ca745cda5db718f58bfab13ba992ce0abbeae65"
   },
   "ios/lightning-receive": {
     "page": "lightning-receive",
@@ -44,14 +44,14 @@
   "ios/wallet": {
     "page": "wallet",
     "file": "source/screenshots/ios/wallet.png",
-    "run": "run-2026-09-11T18-03-58-075Z-813d671c",
-    "sha256": "e1aacd3cb641264168ebf72297393b44ab6690bd9246223302632a37ab30ceb0"
+    "run": "run-2026-09-13T02-12-43-637Z-aca0af50",
+    "sha256": "a41390a1e2ebee1f78dc3e7542cc95291e143636c197a41916f590c4f66d12d0"
   },
   "ios/feed": {
     "page": "feed",
     "file": "source/screenshots/ios/feed.png",
-    "run": null,
-    "sha256": null
+    "run": "run-2026-09-13T02-12-43-637Z-aca0af50",
+    "sha256": "14c590079dd94b5546f9617de5e5d3583ff5a72e8e5de01e2415bf04e4e79cec"
   },
   "ios/thread": {
     "page": "thread",
@@ -62,32 +62,32 @@
   "ios/dm-chat": {
     "page": "dm-chat",
     "file": "source/screenshots/ios/dm-chat.png",
-    "run": null,
-    "sha256": null
+    "run": "run-2026-09-13T02-12-43-637Z-aca0af50",
+    "sha256": "3e777819635b553baf691031825e2f6c58dc60dbf7a29564065ada3a48ed9058"
   },
   "ios/receive-qr": {
     "page": "receive-qr",
     "file": "source/screenshots/ios/receive-qr.png",
-    "run": null,
-    "sha256": null
+    "run": "run-2026-09-13T02-12-43-637Z-aca0af50",
+    "sha256": "8eed5d331360b65718a52abe89fc9672ed74bd2a64ffb5f5982901c5a2bf454e"
   },
   "ios/send": {
     "page": "send",
     "file": "source/screenshots/ios/send.png",
-    "run": null,
-    "sha256": null
+    "run": "run-2026-09-13T02-12-43-637Z-aca0af50",
+    "sha256": "a20b6599478a5cb33ad70b1069e1bd3a72b86e300a5aa0d9b9f60df856afdb1d"
   },
   "ios/mint-select": {
     "page": "mint-select",
     "file": "source/screenshots/ios/mint-select.png",
-    "run": null,
-    "sha256": null
+    "run": "run-2026-09-13T02-12-43-637Z-aca0af50",
+    "sha256": "6943186bac5470b86077c9412fe3779543ee44526491692beb93630f135a3e8e"
   },
   "ios/mint-info": {
     "page": "mint-info",
     "file": "source/screenshots/ios/mint-info.png",
-    "run": null,
-    "sha256": null
+    "run": "run-2026-09-13T02-12-43-637Z-aca0af50",
+    "sha256": "d63004d7b462a4ccb281b83c903cb52ad0c0113af7d651e5f7db849acccf5dbe"
   },
   "ios/notification-mint-changes": {
     "page": "notification-mint-changes",
@@ -104,26 +104,26 @@
   "ios/notifications": {
     "page": "notifications",
     "file": "source/screenshots/ios/notifications.png",
-    "run": null,
-    "sha256": null
+    "run": "run-2026-09-13T02-12-43-637Z-aca0af50",
+    "sha256": "74484a6461111fd9e499e70ee3aaacb66f8c8e7278781682ed32b0c8d333ff4f"
   },
   "ios/settings": {
     "page": "settings",
     "file": "source/screenshots/ios/settings.png",
-    "run": null,
-    "sha256": null
+    "run": "run-2026-09-13T02-12-43-637Z-aca0af50",
+    "sha256": "df7c4b855c788723d1f9b6ccdebd765054ed48f1ad4613778fa1c098d952bfb5"
   },
   "ios/theme-preview": {
     "page": "theme-preview",
     "file": "source/screenshots/ios/theme-preview.png",
-    "run": null,
-    "sha256": null
+    "run": "run-2026-09-13T01-58-39-179Z-dc8d7d7a",
+    "sha256": "209439959acb19453aaa104894f1e4822874bd3425feb98c6e8b914abf3ae5dd"
   },
   "ios/gallery": {
     "page": "gallery",
     "file": "source/screenshots/ios/gallery.png",
-    "run": null,
-    "sha256": null
+    "run": "run-2026-09-13T01-58-39-179Z-dc8d7d7a",
+    "sha256": "83d399920956e30ac9cc4dcb4b89859afaa8b065c2c848159235d6c46fe074ef"
   },
   "ios/stories": {
     "page": "stories",
@@ -140,28 +140,28 @@
   "ios/ai-model-picker": {
     "page": "ai",
     "file": "source/screenshots/ios/ai-model-picker.png",
-    "run": null,
-    "sha256": null
+    "run": "run-2026-09-13T02-12-43-637Z-aca0af50",
+    "sha256": "2c8880bf2cdb2565001ae407983bf6293ffe5ae24ae3136b05507095f709da6c"
   },
   "ios/wallet-navy": {
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-navy.png",
-    "run": null,
-    "sha256": null,
+    "run": "run-2026-09-13T01-58-39-179Z-dc8d7d7a",
+    "sha256": "5846ed6c1820c2adc1e53215574c9d56a435044f7018e18ca68d63b644d0927a",
     "wallpaperId": "navy"
   },
   "ios/wallet-sunset": {
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-sunset.png",
-    "run": null,
-    "sha256": null,
+    "run": "run-2026-09-13T01-58-39-179Z-dc8d7d7a",
+    "sha256": "a664583d573a30214d074662c4783c1a1c407010a135badca3839c65af239206",
     "wallpaperId": "sunset"
   },
   "ios/wallet-beige": {
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-beige.png",
-    "run": null,
-    "sha256": null,
+    "run": "run-2026-09-13T01-58-39-179Z-dc8d7d7a",
+    "sha256": "923eb20ca26815119965816e2f0b3e386c7dbfe6f20ecccfc35cdf20e24d9738",
     "wallpaperId": "beige"
   },
   "android/feed": {
