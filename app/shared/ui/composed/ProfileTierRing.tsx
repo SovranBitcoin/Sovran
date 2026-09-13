@@ -28,11 +28,11 @@ import { PROFILE_TIER_LABEL, type ProfileTier } from '@/shared/lib/profile/profi
 // with `size` so the ring keeps its proportions at any avatar size.
 const REFERENCE_SIZE = 90;
 const GAP = 3; // background gap between the picture and the ring (story-ring look)
-const STROKE = 5;
-const GLOW_STROKE = 11;
+const STROKE = 7.5; // wide enough to carry the inscription
+const GLOW_STROKE = 12;
 const GLOW_BLUR = 8;
-const LABEL_FONT = 7.5;
-const LABEL_BAND = 12; // reserved outside the ring for the coin-rim lettering
+const LABEL_FONT = 5.6;
+const OUTER_MARGIN = 3; // layout reserved outside the band
 /** Where the lettering is centred, in degrees (0 = right, 90 = bottom). */
 const LABEL_ANGLE = 45;
 const LABEL_SPAN = 110;
@@ -47,7 +47,7 @@ const TURN_MS = 16_000;
 /** How far the ring layout extends beyond the avatar on each side. */
 export function profileTierRingInset(size: number): number {
   const scale = size / REFERENCE_SIZE;
-  return (GAP + STROKE + LABEL_BAND) * scale;
+  return (GAP + STROKE + OUTER_MARGIN) * scale;
 }
 
 interface ProfileTierRingProps {
@@ -71,7 +71,8 @@ interface ProfileTierRingProps {
  *
  * Layers, bottom to top: glow → film ring (slowly turning) → bevel (light
  * arc upper-left, shade arc lower-right) → specular kisses → inner rim →
- * the tier name curved along the lower-right rim like the lettering on a coin.
+ * the tier name engraved into the band at the lower right like a coin's rim
+ * inscription (a light lip under dark ink, so it reads on every tier colour).
  * The lighting layers do NOT turn with the film, so the ring reads as a lit
  * object with colour moving through it. Layout is reserved even without a
  * tier, so the avatar never moves when the tier resolves.
@@ -87,9 +88,10 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
   const center = canvas / 2;
   const ringRadius = size / 2 + (GAP + STROKE / 2) * scale;
   const fontSize = LABEL_FONT * scale;
-  // Baseline on the path with glyph tops pointing at the centre: the path sits
-  // one glyph height outside the ring so the letters clear the stroke.
-  const labelRadius = ringRadius + (STROKE / 2 + 1.5) * scale + fontSize * 0.72;
+  // Inscribed ON the band: the baseline sits on the path with glyph tops
+  // pointing at the centre, so the path runs half a cap-height outside the
+  // band's centre line and the letters sit centred in the metal.
+  const labelRadius = ringRadius + fontSize * 0.36;
   const theme = tier ? generateTierRingTheme(tier, seed) : null;
 
   // The film turns; a perpetual tick is skipped under reduced motion and on
@@ -119,7 +121,7 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
   const light = arc(center, center, ringRadius + 1.1 * scale, 195, 300);
   const shade = arc(center, center, ringRadius - 1.1 * scale, 15, 120);
   const kiss = polar(center, center, ringRadius, 225);
-  const kiss2 = polar(center, center, ringRadius, 40);
+  const kiss2 = polar(center, center, ringRadius, 135);
 
   return (
     <View style={{ width: outer, height: outer }} testID="profile-tier-ring">
@@ -216,11 +218,23 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
             <Defs>
               <Path id={`${uid}-label-path`} d={labelPath} />
             </Defs>
+            {/* engraved: a light lip a hair below, dark ink on top */}
             <Text
-              fill={theme.label}
+              fill="rgba(255,255,255,0.55)"
               fontSize={fontSize}
-              fontWeight="700"
-              letterSpacing={1.6 * scale}
+              fontWeight="800"
+              letterSpacing={1.3 * scale}
+              textAnchor="middle"
+              dy={0.6 * scale}>
+              <TextPath href={`#${uid}-label-path`} startOffset="50%">
+                {PROFILE_TIER_LABEL[tier]}
+              </TextPath>
+            </Text>
+            <Text
+              fill="rgba(0,0,0,0.55)"
+              fontSize={fontSize}
+              fontWeight="800"
+              letterSpacing={1.3 * scale}
               textAnchor="middle">
               <TextPath href={`#${uid}-label-path`} startOffset="50%">
                 {PROFILE_TIER_LABEL[tier]}

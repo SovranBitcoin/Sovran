@@ -99,7 +99,9 @@ describe('ProfileTierRing', () => {
     expect(byTestId(root, 'sk-path').every((p) => byTestId(group, 'sk-path').indexOf(p) < 0)).toBe(
       true
     );
-    expect(byTestId(root, 'svg-text-path')[0]!.props.children).toBe('GOLD');
+    // Engraved: the same word twice (light lip under dark ink).
+    const inscriptions = byTestId(root, 'svg-text-path');
+    expect(inscriptions.map((n) => n.props.children)).toEqual(['GOLD', 'GOLD']);
     expect(byTestId(root, 'svg-root')[0]!.props.accessibilityLabel).toBe('GOLD tier');
   });
 

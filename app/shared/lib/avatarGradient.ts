@@ -184,8 +184,6 @@ type TierRingTheme = {
   startAngle: number;
   /** Blurred halo behind the ring. */
   glow: string;
-  /** Coin-rim lettering: the tier's deep tone. */
-  label: string;
 };
 
 type TierBase = {
@@ -249,6 +247,5 @@ export function generateTierRingTheme(tier: ProfileTier, seedInput: string): Tie
     sweep,
     startAngle,
     glow: hsl(base.hue, base.sat, light + 4, 0.7),
-    label: hsl(base.hue, Math.min(base.sat + 10, 80), Math.max(light - 30, 18)),
   };
 }
