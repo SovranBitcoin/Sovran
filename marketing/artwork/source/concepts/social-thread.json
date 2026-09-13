@@ -1,0 +1,22 @@
+{
+  "id": "social-thread",
+  "platform": "ios",
+  "screenshots": [
+    "thread"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "social-thread",
+  "draftReason": "Thread capture missing; isolated media fixture required."
+}

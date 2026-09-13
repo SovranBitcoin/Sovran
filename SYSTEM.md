@@ -815,38 +815,41 @@ always preserves the committed bytes and hashes. No general image tolerance is
 allowed. Recheck/remove this exception when the source, sizing recipe or renderer
 changes. Both platform checks passed with this bounded exception.
 
-**Store feature graphics:** [the composition](marketing/feature-graphic/source/composition.json)
-selects four native screenshots per platform; [the generator](scripts/feature-graphic.mjs)
-uses those retained inputs plus canonical branding and bundled fonts. Keep these
-marketing files outside the runtime asset bundle. Use platform identifiers `ios`
-and `android` consistently: screenshot inputs are
-`source/screenshots/<platform>/<screen-name>.png`, outputs are
-`generated/<platform>/1024x500.png`. Drop capture-order prefixes from retained
-inputs; the composition declares ordering and preserves the original run ID and
-byte hashes. Export 1024×500 opaque RGB PNGs
-under 15 MB; preserve screenshot proportions, trim only system chrome, and verify
-complete text and all four panels visually. Use Android artwork for Google Play;
-the iPhone companion is a marketing banner, not an App Store screenshot format.
-`assets:generate`/`assets:check` include these files; `assets:feature` regenerates
-only the banners. Do not retain redundant intermediate artwork or superseded
-originals once canonical generation inputs are established.
+**Unified marketing artwork:** [the pipeline](scripts/artwork.mjs) and
+[artwork guide](marketing/artwork/README.md) replace both former marketing trees.
+`marketing/artwork/source/layouts.json` describes eight named layouts; concepts,
+copy choices, capture provenance and per-aspect selection are data alongside it.
+Every applicable concept/layout renders wide **2048×1000**, tall **1080×1920** and
+square **1080×1080**. Commit selected PNGs and labelled contact sheets (1500 px
+wide); full variants remain ignored. Phone counts determine n/a, absent captures
+produce labelled drafts. Keep full native capture bytes, status bar and home
+indicator, inside the shared bezel/rim/shadow. Rotation is 2D; assert copy boxes
+never intersect rotated phone bounds. No runtime artwork imports.
 
-**Featured artwork:** [the generator](scripts/featured-artwork.mjs) reads one JSON
-per family from `marketing/featured/source/compositions/` and writes
-`generated/<id>/<aspect>.png` plus `generated/manifest.json`: wide 1920×1080,
-tall 1080×1920, square 1080×1080, opaque RGB under 15 MB. Retain native captures
-with run IDs/hashes in `source/screenshots.json`; fractions and per-aspect
-layouts preserve designed phone angles. Portals use one canvas-aligned wallpaper
-(sharp under a reviewed UI mask; blurred/darkened outside); theme packs use 3–5
-different wallpapers from one album. The first album is synthetic Colors;
-image wallpapers come from the downloaded catalog, not bundled image files.
-See [capture/provenance instructions](marketing/featured/README.md), including
-portal mask requirements and explicitly deferred media fixtures. `--allow-missing`
-produces visibly marked drafts; strict checks fail on missing inputs. Asset
-scripts temporarily use an explicit missing-input skip until captures land.
-Both EAS ignore files exclude marketing, and `marketingNotBundled.test.ts`
-guards the app import graph. Follow-up: complete isolated media-fixture captures,
-review portal masks and remove the transitional skip after the batch is complete.
+`selection.featureGraphic` selects the concept for platform-specific Android/iOS
+1024×500 banners, plain Lanczos downscales of its selected wide layout. The iOS
+companion is promotional artwork, not an App Store screenshot format. Retained
+store screenshot bytes/run IDs remain pinned. Copy alternatives and selections
+live in `copy.json`; the guide records voice rules and supplied-copy exceptions.
+
+Retain the real Nagg wallpaper catalog and authenticated portrait bytes offline.
+Keep generated panoramas with their original provenance; restore portrait pixels
+into the height-matched centre strip with 24 px feathered edges before portal
+wide/square rendering (`centreRestored: true`). Tall uses the portrait. Preserve
+captured UI through a reviewed full-size mask over the sharp canvas-aligned
+wallpaper; outside is blurred/darkened. Never fabricate captures or color-key UI.
+The supplied panorama size exception (two 2048×1024, eleven 3840×1920) is recorded
+in the guide and source provenance, without altering supplied bytes.
+
+`assets:generate`/`assets:check` run this single pipeline with explicit
+`--allow-missing` while captures remain incomplete; checks rerender all committed
+outputs rather than skipping the family. Strict `scripts/artwork.mjs --check`
+fails on missing sources. Both EAS ignores and the marketing import guard keep
+artwork out of builds. Follow-up: orchestrator captures for Artemis, thread,
+stories and X1 backup; reviewed portal masks; human layout/copy review; remove
+the draft allowance once complete. Screenshot scenario names remain canonical
+`wallet`; the guide maps occurrences to wallpaper-specific retained keys because
+this task does not expand the harness screenshot schema.
 
 **Scope and exceptions:** this is a project convention, not a platform-mandated
 folder layout. Native resource tools own their generated names. Keep upstream

@@ -1,0 +1,22 @@
+{
+  "id": "stories",
+  "platform": "ios",
+  "screenshots": [
+    "stories"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "stories",
+  "draftReason": "Stories capture missing; isolated media fixture required."
+}

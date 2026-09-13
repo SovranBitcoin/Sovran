@@ -1,0 +1,21 @@
+{
+  "id": "mint-reviews",
+  "platform": "ios",
+  "screenshots": [
+    "mint-reviews"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "mint-reviews"
+}

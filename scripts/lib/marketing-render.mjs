@@ -7,10 +7,6 @@ import opentype from "opentype.js";
 import { composeBrand, rasterizeBrand } from "../brand-assets.mjs";
 
 export const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
-export function trimSystemChrome(platform) {
-  assert(["ios", "android"].includes(platform), "Unknown platform");
-  return { top: platform === "ios" ? 0.054 : 0.038, bottom: 0.018 };
-}
 export async function loadFonts(root) {
   const fonts = {};
   for (const name of ["ExtraBold", "Medium"]) {
@@ -78,18 +74,9 @@ export async function phone({
   assert(mask === "frame", "Unknown phone mask");
   assert(Number.isFinite(depth));
   const meta = await sharp(screenshot).metadata();
-  // Remove system chrome only. Preserve app pixels and native aspect ratio.
-  const top = Math.round(meta.height * trimSystemChrome(platform).top);
-  const bottom = Math.round(meta.height * trimSystemChrome(platform).bottom);
-  let cropped = await sharp(screenshot)
-    .extract({
-      left: 0,
-      top,
-      width: meta.width,
-      height: meta.height - top - bottom,
-    })
-    .png()
-    .toBuffer();
+  assert(["ios", "android"].includes(platform), "Unknown platform");
+  // Retain the full native capture, including status bar and home indicator.
+  let screenBytes = screenshot;
 
   if (uiMask) {
     const maskMeta = await sharp(uiMask).metadata();
@@ -97,21 +84,12 @@ export async function phone({
       maskMeta.width === meta.width && maskMeta.height === meta.height,
       "UI mask must match the original screenshot size",
     );
-    const alpha = await sharp(uiMask)
-      .extract({
-        left: 0,
-        top,
-        width: meta.width,
-        height: meta.height - top - bottom,
-      })
-      .removeAlpha()
-      .greyscale()
-      .toBuffer();
-    const rgb = await sharp(cropped).removeAlpha().png().toBuffer();
-    cropped = await sharp(rgb).joinChannel(alpha).png().toBuffer();
+    const alpha = await sharp(uiMask).removeAlpha().greyscale().toBuffer();
+    const rgb = await sharp(screenBytes).removeAlpha().png().toBuffer();
+    screenBytes = await sharp(rgb).joinChannel(alpha).png().toBuffer();
   }
   const w = width,
-    h = ((meta.height - top - bottom) / meta.width) * w;
+    h = (meta.height / meta.width) * w;
   const bezel = Math.round(w * 0.03),
     frameW = w + 2 * bezel,
     frameH = h + 2 * bezel,
@@ -127,7 +105,7 @@ export async function phone({
   <rect x="${-bezel}" y="${-bezel}" width="${frameW}" height="${frameH}" rx="${frameR}" fill="#000" filter="url(#shadow)"/>
   <rect x="${-bezel}" y="${-bezel}" width="${frameW}" height="${frameH}" rx="${frameR}" fill="${frame}" stroke="${frameEdge}" stroke-width="1"/>
   <clipPath id="screen${index}"><rect width="${w}" height="${h}" rx="${screenR}"/></clipPath>
-${underlay ? `  ${underlay}\n` : ""}  <image width="${w}" height="${h}" href="data:image/png;base64,${cropped.toString("base64")}" clip-path="url(#screen${index})"/>
+${underlay ? `  ${underlay}\n` : ""}  <image width="${w}" height="${h}" href="data:image/png;base64,${screenBytes.toString("base64")}" clip-path="url(#screen${index})"/>
   <rect width="${w}" height="${h}" rx="${screenR}" fill="#000" opacity="${dim}"/>
   <rect x="${-bezel + 0.5}" y="${-bezel + 0.5}" width="${frameW - 1}" height="${frameH - 1}" rx="${frameR}" fill="none" stroke="url(#rim)" stroke-width="1"/>
   </g>`,

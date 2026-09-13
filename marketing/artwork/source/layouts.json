@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "aspects": {
+    "wide": [
+      2048,
+      1000
+    ],
+    "tall": [
+      1080,
+      1920
+    ],
+    "square": [
+      1080,
+      1080
+    ]
+  },
+  "margin": 0.0625,
+  "layouts": [
+    {
+      "id": "hero-fan",
+      "description": "Reference look of the current feature graphic: copy column left; 3–4 phones stepped to the right, receding in depth (dimmer, smaller behind).",
+      "phones": {
+        "min": 3,
+        "max": 4
+      },
+      "copyBlock": {
+        "wide": "left",
+        "square": "left",
+        "tall": "top"
+      }
+    },
+    {
+      "id": "spotlight",
+      "description": "One large phone, slight rotation, soft radial spotlight; copy beside (wide) or above (tall/square).",
+      "phones": {
+        "min": 1,
+        "max": 1
+      },
+      "copyBlock": {
+        "wide": "left",
+        "tall": "top",
+        "square": "top"
+      }
+    },
+    {
+      "id": "duo",
+      "description": "Two phones overlapping — front lower-left, back upper-right; copy top-left.",
+      "phones": {
+        "min": 2,
+        "max": 2
+      },
+      "copyBlock": {
+        "wide": "top-left",
+        "tall": "top-left",
+        "square": "top-left"
+      }
+    },
+    {
+      "id": "triptych",
+      "description": "Three upright phones in a row, even spacing, no rotation; copy centred above. Tall: stacked vertically with scale falloff.",
+      "phones": {
+        "min": 3,
+        "max": 3
+      },
+      "copyBlock": {
+        "wide": "centred top",
+        "tall": "centred top",
+        "square": "centred top"
+      }
+    },
+    {
+      "id": "stack",
+      "description": "Tilted cascade of 3 phones with increasing rotation/depth bleeding off the bottom edge.",
+      "phones": {
+        "min": 3,
+        "max": 3
+      },
+      "copyBlock": {
+        "wide": "left",
+        "tall": "top",
+        "square": "top"
+      }
+    },
+    {
+      "id": "closeup",
+      "description": "One phone scaled past the canvas, anchored bottom, only the top ~60 % of the screen visible; very large 2-line headline.",
+      "phones": {
+        "min": 1,
+        "max": 1
+      },
+      "copyBlock": {
+        "wide": "top",
+        "tall": "top",
+        "square": "top"
+      }
+    },
+    {
+      "id": "portal",
+      "description": "Wallpaper background (blurred σ≈24, darkened 35 %) with the phone screen showing the same wallpaper sharp and canvas-aligned; wide/square canvases use the wide panorama, tall uses the portrait. Needs the matching wallet-<themeName> capture.",
+      "phones": {
+        "min": 1,
+        "max": 1
+      },
+      "copyBlock": {
+        "wide": "left",
+        "tall": "top",
+        "square": "top"
+      }
+    },
+    {
+      "id": "pack",
+      "description": "Album showcase: 3–5 phones each with a different wallpaper of one album on the album hero's blurred background; copy above.",
+      "phones": {
+        "min": 3,
+        "max": 5
+      },
+      "copyBlock": {
+        "wide": "top",
+        "tall": "top",
+        "square": "top"
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "id": "themes-colors",
+  "platform": "ios",
+  "screenshots": [
+    "wallet-navy",
+    "wallet-sunset",
+    "wallet-beige"
+  ],
+  "background": {
+    "kind": "tint",
+    "wallpaperId": "navy",
+    "album": "colors"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "themes-colors"
+}

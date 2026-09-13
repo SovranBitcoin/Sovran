@@ -1,0 +1,98 @@
+{
+  "featureGraphic": "app-overview",
+  "app-overview": {
+    "wide": "hero-fan",
+    "tall": "hero-fan",
+    "square": "hero-fan"
+  },
+  "wallet": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "receive-unified": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "send": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "mint-trust": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "mint-reviews": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "mint-updates": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "payments-instant": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "social-feed": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "social-thread": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "social-dm": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "contacts": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "ai-chat": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "ai-models": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "themes-colors": {
+    "wide": "pack",
+    "tall": "pack",
+    "square": "pack"
+  },
+  "themes-artemis": {
+    "wide": "pack",
+    "tall": "pack",
+    "square": "pack"
+  },
+  "portal-artemis": {
+    "wide": "portal",
+    "tall": "portal",
+    "square": "portal"
+  },
+  "stories": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "backup": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  }
+}

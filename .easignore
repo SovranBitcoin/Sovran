@@ -53,5 +53,5 @@ app/targets/widget/generated.entitlements
 app/targets/widget/Assets.xcassets/AppIcon.appiconset/
 app/targets/widget/Assets.xcassets/$*.colorset/
 
-# Marketing artwork and retained capture inputs are never build inputs.
+# Unified marketing/artwork sources, wallpapers and generated outputs are never build inputs.
 marketing/

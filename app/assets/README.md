@@ -61,6 +61,6 @@ artwork and the bundled font used to outline version numbers.
 
 ## Store feature graphics
 
-[Android and iPhone banners](../../marketing/feature-graphic/README.md) live outside
+[Android and iPhone banners](../../marketing/artwork/README.md) live outside
 the runtime asset bundle. `assets:generate` and `assets:check` include them;
 `assets:feature` regenerates only those two 1024×500 graphics.

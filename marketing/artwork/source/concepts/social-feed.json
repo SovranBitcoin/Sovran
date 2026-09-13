@@ -1,0 +1,21 @@
+{
+  "id": "social-feed",
+  "platform": "ios",
+  "screenshots": [
+    "feed"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "social-feed"
+}

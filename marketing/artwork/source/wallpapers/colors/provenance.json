@@ -1,0 +1,50 @@
+{
+  "navy": {
+    "album": "colors",
+    "file": "source/wallpapers/colors/navy.svg",
+    "sha256": "93a7ce3133efc2fa61ca8d3af29768688452344e060962375608e458b6e976f7",
+    "paletteSource": "app/themes.ts",
+    "paletteShades": [
+      800,
+      900,
+      950
+    ],
+    "colors": [
+      "#0B2C50",
+      "#0B2746",
+      "#0A1A33"
+    ]
+  },
+  "sunset": {
+    "album": "colors",
+    "file": "source/wallpapers/colors/sunset.svg",
+    "sha256": "7b671a66de8a56ce7de4c56d73ce3a67d559455ddf985d2163fc886ec672876d",
+    "paletteSource": "app/themes.ts",
+    "paletteShades": [
+      800,
+      900,
+      950
+    ],
+    "colors": [
+      "#4B162F",
+      "#46152D",
+      "#330D1F"
+    ]
+  },
+  "beige": {
+    "album": "colors",
+    "file": "source/wallpapers/colors/beige.svg",
+    "sha256": "5abc4713b0e3af4e227d56aff40c1edb01c37be9cec4517679e6f20c19c09c0f",
+    "paletteSource": "app/themes.ts",
+    "paletteShades": [
+      800,
+      900,
+      950
+    ],
+    "colors": [
+      "#4A4536",
+      "#48463C",
+      "#2C2A24"
+    ]
+  }
+}

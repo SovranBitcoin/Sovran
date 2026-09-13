@@ -1,0 +1,22 @@
+{
+  "id": "backup",
+  "platform": "ios",
+  "screenshots": [
+    "backup-words"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "backup",
+  "draftReason": "Capture backup-words after the X1 recovery flow ships; never fabricate recovery words."
+}

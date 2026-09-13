@@ -1,0 +1,21 @@
+{
+  "id": "wallet",
+  "platform": "ios",
+  "screenshots": [
+    "wallet"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "wallet"
+}
