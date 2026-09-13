@@ -173,17 +173,27 @@ export function generateClayAvatarTheme(seedInput: string): ClayAvatarTheme {
   };
 }
 
+/** One soft colour blob drifting around the band. All motion terms are
+ *  integer multiples of one loop so the film is seamless at the wrap. */
+export type TierRingBlob = {
+  color: string;
+  /** Start angle, radians. */
+  angle: number;
+  /** Whole turns per loop; sign is direction. */
+  turns: number;
+  /** Wobble amplitude (radians) and whole cycles per loop. */
+  wobble: number;
+  wobbleCycles: number;
+  /** Radius as a multiple of the band width, and breathing cycles per loop. */
+  radius: number;
+  breathCycles: number;
+  phase: number;
+};
+
 type TierRingTheme = {
-  /**
-   * Seamless sweep (first stop == last stop) around the ring. Metals alternate
-   * light / base / deep like a turned band; gems and "new" drift through
-   * neighbouring hues like a soap film.
-   */
-  sweep: readonly string[];
-  /** Stop positions (0..1) matching `sweep`; even spacing when absent. */
-  positions?: readonly number[];
-  /** Where the seam of the sweep sits, in degrees — per pubkey. */
-  startAngle: number;
+  /** The band's own colour under the blobs. */
+  base: string;
+  blobs: readonly TierRingBlob[];
   /** Blurred halo behind the ring. */
   glow: string;
 };
@@ -192,102 +202,80 @@ type TierBase = {
   hue: number;
   sat: number;
   light: number;
-  /** Hue drift of the film around the ring. */
+  /** Hue drift of the film's blobs. */
   spread: number;
-  /** 'metal' alternates light/deep bands; 'film' drifts through hues;
-   *  'gem' is near-white ice with thin prismatic flashes. */
+  /** 'metal' tints of one hue; 'film' drifts through hues; 'gem' is
+   *  near-white ice with prismatic flashes. */
   finish: 'metal' | 'film' | 'gem';
 };
 
 // Each rung has a fixed identity hue (gold must read as gold) at the same
 // matte, mid-saturation register as the clay avatar palette; everything else
-// about the ring — hue drift and direction, lightness, where the seam sits —
-// is drawn per pubkey so two golds are siblings, not twins.
+// about the ring — where the blobs start, how fast and which way they drift,
+// how they breathe — is drawn per pubkey so two golds are siblings, not twins.
 const TIER_BASE: Record<ProfileTier, TierBase> = {
-  new: { hue: 214, sat: 70, light: 64, spread: 40, finish: 'film' },
-  iron: { hue: 222, sat: 10, light: 58, spread: 8, finish: 'metal' },
-  bronze: { hue: 24, sat: 60, light: 54, spread: 14, finish: 'metal' },
-  silver: { hue: 208, sat: 8, light: 78, spread: 8, finish: 'metal' },
-  gold: { hue: 44, sat: 78, light: 60, spread: 14, finish: 'metal' },
-  platinum: { hue: 170, sat: 32, light: 76, spread: 36, finish: 'film' },
+  new: { hue: 214, sat: 70, light: 62, spread: 50, finish: 'film' },
+  iron: { hue: 222, sat: 10, light: 56, spread: 8, finish: 'metal' },
+  bronze: { hue: 24, sat: 60, light: 52, spread: 16, finish: 'metal' },
+  silver: { hue: 208, sat: 8, light: 76, spread: 8, finish: 'metal' },
+  gold: { hue: 44, sat: 78, light: 58, spread: 16, finish: 'metal' },
+  platinum: { hue: 170, sat: 32, light: 74, spread: 44, finish: 'film' },
   diamond: { hue: 204, sat: 55, light: 86, spread: 0, finish: 'gem' },
 };
 
+const TAU = Math.PI * 2;
+
 /**
- * Ring palette for a profile tier, varied per seed by the same PRNG the
- * banner and clay avatar use. Its own PRNG stream (`tier:seed`), so it adds
- * nothing to the pinned banner draw order.
+ * Ring palette and blob choreography for a profile tier, varied per seed by
+ * the same PRNG the banner and clay avatar use. Its own PRNG stream
+ * (`tier:seed`), so it adds nothing to the pinned banner draw order.
  */
 export function generateTierRingTheme(tier: ProfileTier, seedInput: string): TierRingTheme {
   const random = createSeededRandom(`${tier}:${seedInput}`);
   const base = TIER_BASE[tier];
-
-  const spread = base.spread * (0.7 + random() * 0.6);
-  const direction = random() > 0.5 ? 1 : -1;
   const light = base.light + (random() - 0.5) * 6;
-  const startAngle = random() * 360;
-
+  const direction = random() > 0.5 ? 1 : -1;
   const h = (offset: number) => base.hue + offset * direction;
-  if (base.finish === 'gem') {
-    // Cut stone: near-white ice with two thin prismatic flashes (pink / violet
-    // / cyan, then amber / green) whose place on the ring is per pubkey.
-    const ice = hsl(base.hue, base.sat, light);
-    const pale = hsl(base.hue, base.sat - 20, light + 8);
-    const flashAt = 0.18 + random() * 0.2;
-    const flash2At = flashAt + 0.4 + random() * 0.1;
-    const w = 0.035;
-    return {
-      sweep: [
-        pale,
-        ice,
-        hsl(325, 85, 78),
-        hsl(262, 80, 74),
-        hsl(190, 90, 72),
-        ice,
-        pale,
-        hsl(42, 90, 76),
-        hsl(150, 70, 74),
-        ice,
-        pale,
-      ],
-      positions: [
-        0,
-        flashAt - w * 1.5,
-        flashAt - w * 0.5,
-        flashAt,
-        flashAt + w * 0.5,
-        flashAt + w * 1.5,
-        flash2At - w * 1.5,
-        flash2At - w * 0.4,
-        flash2At + w * 0.4,
-        flash2At + w * 1.5,
-        1,
-      ],
-      startAngle,
-      glow: hsl(base.hue, base.sat, light - 4, 0.75),
-    };
-  }
-  const sweep =
+
+  const colors: string[] =
     base.finish === 'metal'
       ? [
-          hsl(h(0), base.sat, light + 14),
-          hsl(h(spread), base.sat, light),
-          hsl(h(spread * 0.4), Math.max(base.sat - 8, 0), light - 16),
-          hsl(h(-spread * 0.5), base.sat, light + 4),
-          hsl(h(0), base.sat, light + 14),
+          hsl(h(0), base.sat, light + 18),
+          hsl(h(base.spread), Math.max(base.sat - 6, 0), light - 14),
+          hsl(0, 0, 100),
+          hsl(h(-base.spread * 0.6), base.sat, light + 8),
+          hsl(h(base.spread * 0.4), base.sat, light - 6),
         ]
-      : [
-          hsl(h(0), base.sat, light + 8),
-          hsl(h(spread * 0.5), base.sat, light),
-          hsl(h(spread), Math.max(base.sat - 10, 0), light + 10),
-          hsl(h(spread * 0.5), base.sat, light - 6),
-          hsl(h(-spread * 0.35), base.sat, light + 2),
-          hsl(h(0), base.sat, light + 8),
-        ];
+      : base.finish === 'film'
+        ? [
+            hsl(h(base.spread), base.sat, light + 10),
+            hsl(h(-base.spread * 0.7), base.sat, light + 4),
+            hsl(h(base.spread * 1.6), Math.max(base.sat - 10, 0), light + 12),
+            hsl(0, 0, 100),
+            hsl(h(base.spread * 0.3), base.sat, light - 8),
+          ]
+        : [hsl(325, 85, 78), hsl(262, 80, 74), hsl(190, 90, 72), hsl(42, 90, 76), hsl(0, 0, 100)];
+
+  const blobs: TierRingBlob[] = colors.map((color, index) => {
+    const turns = (1 + Math.floor(random() * 2)) * (random() > 0.5 ? 1 : -1);
+    return {
+      color,
+      angle: random() * TAU,
+      turns,
+      wobble: 0.25 + random() * 0.35,
+      wobbleCycles: 2 + Math.floor(random() * 3),
+      radius: (index === colors.length - 1 ? 0.9 : 1.4) + random() * 0.6,
+      breathCycles: 1 + Math.floor(random() * 3),
+      phase: random() * TAU,
+    };
+  });
 
   return {
-    sweep,
-    startAngle,
-    glow: hsl(base.hue, base.sat, light + 4, 0.7),
+    base:
+      base.finish === 'gem'
+        ? hsl(base.hue, base.sat - 20, light)
+        : hsl(base.hue, base.sat, base.finish === 'metal' ? light : light - 2),
+    blobs,
+    glow: hsl(base.hue, base.sat, light + 4, base.finish === 'gem' ? 0.75 : 0.7),
   };
 }

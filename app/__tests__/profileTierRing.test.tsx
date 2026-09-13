@@ -30,9 +30,24 @@ jest.mock('@shopify/react-native-skia', () => ({
   BlurMask: host('sk-blur'),
   Canvas: host('sk-canvas'),
   Circle: host('sk-circle'),
+  FillType: { EvenOdd: 'evenOdd' },
   Group: host('sk-group'),
   Path: host('sk-path'),
-  SweepGradient: host('sk-sweep'),
+  RadialGradient: host('sk-radial'),
+  Skia: {
+    Path: {
+      Make: () => {
+        const circles: number[][] = [];
+        const path = {
+          circles,
+          fillType: '',
+          addCircle: (x: number, y: number, r: number) => circles.push([x, y, r]),
+          setFillType: (fillType: string) => (path.fillType = fillType),
+        };
+        return path;
+      },
+    },
+  },
   vec: (x: number, y: number) => ({ x, y }),
 }));
 
@@ -89,20 +104,30 @@ describe('ProfileTierRing', () => {
     }
   });
 
-  it('layers glow and film under fixed lighting, and letters the rim', () => {
+  it('drifts colour blobs through the band, clipped to it, under fixed lighting', () => {
     const { root } = mount('gold');
-    // Glow + film: two stroked circles carrying the sweep, inside the turning group.
-    const group = byTestId(root, 'sk-group')[0]!;
-    expect(byTestId(group, 'sk-sweep')).toHaveLength(2);
-    const [glow, film] = byTestId(group, 'sk-circle');
-    expect(glow!.props.r).toBe(film!.props.r);
-    expect(glow!.props.strokeWidth).toBeGreaterThan(film!.props.strokeWidth);
-    expect(byTestId(glow!, 'sk-blur')).toHaveLength(1);
-    // Bevel arcs, kisses and rim sit OUTSIDE the turning group.
+    const [glow, film] = byTestId(root, 'sk-group');
+    // Glow: a blurred wide band plus blurred blobs.
+    expect(byTestId(glow!, 'sk-circle')[0]!.props.strokeWidth).toBeGreaterThan(6);
+    const glowBlobs = byTestId(glow!, 'sk-radial');
+    expect(glowBlobs.length).toBeGreaterThanOrEqual(4);
+    // Film: the same blobs, sharp, clipped to the band annulus (two circles, even-odd).
+    const blobs = byTestId(film!, 'sk-radial');
+    expect(blobs).toHaveLength(glowBlobs.length);
+    expect(film!.props.clip.circles).toHaveLength(2);
+    expect(film!.props.clip.fillType).toBe('evenOdd');
+    expect(byTestId(film!, 'sk-blur')).toHaveLength(0);
+    // Each blob rides the ring's centre line, driven by the shared clock.
+    const ringRadius = byTestId(root, 'sk-circle').find((c) => c.props.color)!.props.r;
+    const centre = byTestId(root, 'sk-canvas')[0]!.props.style.width / 2;
+    for (const blob of blobs) {
+      const { x, y } = blob.props.c.value;
+      expect(Math.hypot(x - centre, y - centre)).toBeCloseTo(ringRadius, 6);
+      expect(blob.props.r.value).toBeGreaterThan(0);
+    }
+    // Bevel arcs, kisses and rim sit OUTSIDE the film group.
     expect(byTestId(root, 'sk-path')).toHaveLength(2);
-    expect(byTestId(root, 'sk-path').every((p) => byTestId(group, 'sk-path').indexOf(p) < 0)).toBe(
-      true
-    );
+    expect(byTestId(film!, 'sk-path')).toHaveLength(0);
     // Engraved: the same word twice (light lip under dark ink).
     const inscriptions = byTestId(root, 'svg-text-path');
     expect(inscriptions.map((n) => n.props.children)).toEqual(['GOLD', 'GOLD']);
@@ -126,13 +151,17 @@ describe('ProfileTierRing', () => {
     expect(ey).toBeLessThan(c);
   });
 
-  it('turns the film, and holds still under reduced motion', () => {
-    expect(byTestId(mount('new').root, 'sk-group')[0]!.props.transform.value).toEqual([
-      { rotate: Math.PI * 2 },
-    ]);
-    mockReducedMotion = true;
-    expect(byTestId(mount('new').root, 'sk-group')[0]!.props.transform.value).toEqual([
-      { rotate: 0 },
-    ]);
+  it('the film loops seamlessly: a blob is where it started when the clock wraps', () => {
+    // The mocked clock lands on the loop's end (1); the blob must sit exactly
+    // where a clock of 0 would put it.
+    const { root } = mount('new');
+    const film = byTestId(root, 'sk-group')[1]!;
+    const blob = byTestId(film, 'sk-radial')[0]!;
+    const atWrap = blob.props.c.value;
+    mockReducedMotion = true; // clock held at 0
+    const still = byTestId(byTestId(mount('new').root, 'sk-group')[1]!, 'sk-radial')[0]!;
+    expect(atWrap.x).toBeCloseTo(still.props.c.value.x, 6);
+    expect(atWrap.y).toBeCloseTo(still.props.c.value.y, 6);
+    expect(blob.props.r.value).toBeCloseTo(still.props.r.value, 6);
   });
 });

@@ -55,34 +55,39 @@ describe('resolveProfileTier', () => {
 });
 
 describe('generateTierRingTheme', () => {
+  const hueOf = (c: string) => Number(/hsla\((\d+),/.exec(c)?.[1]);
+  const lightOf = (c: string) => Number(/hsla\(\d+, \d+%, (\d+)%/.exec(c)?.[1]);
+
   it('is deterministic per (tier, seed) and varies across seeds within a tier', () => {
     const a = generateTierRingTheme('gold', 'seed-a');
     expect(generateTierRingTheme('gold', 'seed-a')).toEqual(a);
-    const b = generateTierRingTheme('gold', 'seed-b');
-    expect(b).not.toEqual(a);
-    // A seamless sweep: it ends where it starts.
-    expect(a.sweep.length).toBeGreaterThanOrEqual(5);
-    expect(a.sweep[0]).toBe(a.sweep[a.sweep.length - 1]);
-    expect(a.sweep.every((c) => c.startsWith('hsla('))).toBe(true);
+    expect(generateTierRingTheme('gold', 'seed-b')).not.toEqual(a);
+    expect(a.blobs.length).toBeGreaterThanOrEqual(4);
   });
 
-  it('keeps every tier on its identity hue (the seam stop is the base hue)', () => {
-    const hueOf = (c: string) => Number(/hsla\((\d+),/.exec(c)?.[1]);
-    expect(hueOf(generateTierRingTheme('gold', 'x').sweep[0]!)).toBe(44);
-    expect(hueOf(generateTierRingTheme('new', 'x').sweep[0]!)).toBe(214);
-    expect(hueOf(generateTierRingTheme('bronze', 'x').sweep[0]!)).toBe(24);
-    expect(hueOf(generateTierRingTheme('diamond', 'x').sweep[0]!)).toBe(204);
+  it('keeps every tier on its identity hue (the band is the base hue)', () => {
+    expect(hueOf(generateTierRingTheme('gold', 'x').base)).toBe(44);
+    expect(hueOf(generateTierRingTheme('new', 'x').base)).toBe(214);
+    expect(hueOf(generateTierRingTheme('bronze', 'x').base)).toBe(24);
+    expect(hueOf(generateTierRingTheme('diamond', 'x').base)).toBe(204);
   });
 
-  it('diamond is near-white ice with prismatic flashes at per-seed positions', () => {
+  it('every blob motion term is a whole number of cycles, so the loop is seamless', () => {
+    for (const tier of ['new', 'iron', 'gold', 'platinum', 'diamond'] as const) {
+      for (const blob of generateTierRingTheme(tier, 'seed').blobs) {
+        expect(Number.isInteger(blob.turns)).toBe(true);
+        expect(blob.turns).not.toBe(0);
+        expect(Number.isInteger(blob.wobbleCycles)).toBe(true);
+        expect(Number.isInteger(blob.breathCycles)).toBe(true);
+        expect(blob.radius).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('diamond is near-white ice with prismatic blobs', () => {
     const a = generateTierRingTheme('diamond', 'seed-a');
-    const lightOf = (c: string) => Number(/hsla\(\d+, \d+%, (\d+)%/.exec(c)?.[1]);
-    expect(lightOf(a.sweep[0]!)).toBeGreaterThanOrEqual(85);
-    expect(a.positions).toHaveLength(a.sweep.length);
-    expect(a.positions![0]).toBe(0);
-    expect(a.positions![a.positions!.length - 1]).toBe(1);
-    expect([...a.positions!]).toEqual([...a.positions!].sort((x, y) => x - y));
-    expect(a.positions).not.toEqual(generateTierRingTheme('diamond', 'seed-b').positions);
-    expect(generateTierRingTheme('gold', 'seed-a').positions).toBeUndefined();
+    expect(lightOf(a.base)).toBeGreaterThanOrEqual(82); // 86 ± the per-seed jitter
+    const hues = a.blobs.map((b) => hueOf(b.color));
+    expect(hues).toEqual(expect.arrayContaining([325, 262, 190, 42]));
   });
 });
