@@ -19,7 +19,7 @@
  * 12, row gap 12. `padding="compact"` drops the vertical to 8 for denser lists.
  */
 
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { View, StyleProp, ViewStyle, StyleSheet } from 'react-native';
 import { PressableFeedback } from 'heroui-native';
 import { withAlpha } from '@/shared/lib/color';
@@ -184,6 +184,9 @@ export function ListRow({
   });
 
   const paddingVertical = padding === 'compact' ? 8 : 12;
+  // Width of an interactive trailing control (measured; a 44px control until
+  // the first layout), reserved by the body so the two never overlap.
+  const [trailingWidth, setTrailingWidth] = useState(DEFAULT_AVATAR_SIZE);
 
   // ----- Leading resolution (priority: leading > icon > iconCircle > avatar) -----
 
@@ -324,27 +327,35 @@ export function ListRow({
 
   const a11yLabel = accessibilityLabel ?? (typeof title === 'string' ? title : undefined);
 
-  // Two independent native targets. A nested accessible Pressable hides its
-  // trailing control on iOS even when pointer delivery works visually.
+  // Two independent native targets, NOT nested: a nested accessible Pressable
+  // hides its trailing control on iOS even when pointer delivery works
+  // visually. The row pressable spans the full width (so its ripple runs under
+  // the trailing control too, instead of stopping short of it) and the
+  // trailing control is a later sibling overlaid on the right edge, which is
+  // what receives the taps there. The body reserves the control's measured
+  // width so text never runs underneath it.
   if (trailingInteractive) {
     return (
       <View style={[disabled && styles.disabled, style]}>
-        <HStack className="items-center">
-          <PressableFeedback
-            testID={testID}
-            animation={false}
-            onPress={guardedPress}
-            isDisabled={disabled}
-            accessibilityRole="button"
-            accessibilityLabel={a11yLabel}
-            accessibilityHint={accessibilityHint}
-            accessibilityState={{ disabled }}
-            className="flex-1">
-            <PressableFeedback.Scale>{body}</PressableFeedback.Scale>
-            <PressableFeedback.Ripple />
-          </PressableFeedback>
-          <View style={{ paddingRight: paddingHorizontal }}>{trailing}</View>
-        </HStack>
+        <PressableFeedback
+          testID={testID}
+          animation={false}
+          onPress={guardedPress}
+          isDisabled={disabled}
+          accessibilityRole="button"
+          accessibilityLabel={a11yLabel}
+          accessibilityHint={accessibilityHint}
+          accessibilityState={{ disabled }}>
+          <PressableFeedback.Scale>
+            <View style={{ paddingRight: trailingWidth + ROW_GAP }}>{body}</View>
+          </PressableFeedback.Scale>
+          <PressableFeedback.Ripple />
+        </PressableFeedback>
+        <View
+          style={[styles.trailingOverlay, { right: paddingHorizontal }]}
+          onLayout={(e) => setTrailingWidth(Math.round(e.nativeEvent.layout.width))}>
+          {trailing}
+        </View>
       </View>
     );
   }
@@ -383,5 +394,11 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.5,
+  },
+  trailingOverlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
   },
 });
