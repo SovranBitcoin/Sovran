@@ -195,7 +195,13 @@ function AnimatedCurrencyTab({
   };
 
   return (
-    <Pressable onPress={onPress} activeOpacity={0.7}>
+    <Pressable
+      testID={`mint-currency-tab-${currency}`}
+      accessibilityRole="tab"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: isSelected }}
+      onPress={onPress}
+      activeOpacity={0.7}>
       <Animated.View
         className="rounded-2xl"
         style={[
