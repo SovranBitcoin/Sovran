@@ -165,6 +165,15 @@ export type { NostrSearchResult } from '@sovranbitcoin/schemas';
 
 type FetchOrParseError = Error | ParseError;
 
+export class ApiHttpError extends Error {
+  constructor(
+    readonly status: number,
+    statusText: string
+  ) {
+    super(`Fetch error: ${status} ${statusText}`);
+  }
+}
+
 function toError(e: FetchOrParseError): Error {
   if (e instanceof Error) return e;
   if ((e as ParseError).type === 'schema/zod') {
@@ -226,7 +235,7 @@ export async function fetchJson<T>(
     const res = await fetch(url, { ...init, signal });
     if (!res.ok) {
       apiLog.warn('api.fetch_error', { ...route, status: res.status });
-      return err(new Error(`Fetch error: ${res.status} ${res.statusText}`));
+      return err(new ApiHttpError(res.status, res.statusText));
     }
     const raw = await res.json();
     const parsed = parser(raw);
@@ -390,6 +399,26 @@ const NaggLatestVersionResponse = LatestVersionResponse.extend({
   minVersion: z.string().max(32).optional(),
 });
 const parseLatestVersion = parseWith(NaggLatestVersionResponse, 'app/latest-version');
+// Move this shape into @sovranbitcoin/schemas in its next release and deprecate
+// PricelistWsMessage there. Remove the local schema once the app upgrades.
+const NaggRatesResponse = z.looseObject({
+  rates: z.record(
+    z.string(),
+    z.object({
+      price: z.number().positive(),
+      at: z.number().int(),
+      samples: z.number().int().optional(),
+      sources: z.array(z.string()).optional(),
+      confidence: z.string().optional(),
+    })
+  ),
+  updatedAt: z.number().int(),
+  degraded: z.boolean().optional(),
+});
+const parseRates = parseWith(NaggRatesResponse, 'app/rates');
+export const fetchBtcRates = (controls: RequestControls = {}) =>
+  fetchJson(`${SCORE_API_BASE_URL}/app/rates`, parseRates, 'app/rates', undefined, controls);
+
 const parseAiLineup = parseWith(NaggAiLineupSchema, 'app/ai-lineup');
 const parseDiscoverMints = parseWith(DiscoverMintsResponse, 'nostr/mint/discover');
 const parseMintChanges = parseWith(MintChangesResponse, 'nostr/mint/changes');

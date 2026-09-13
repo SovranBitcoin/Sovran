@@ -2985,6 +2985,19 @@ exports[`persisted schema drift pricelist-store schema matches the golden snapsh
           ],
           "default": null,
         },
+        "serverUpdatedAt": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
       },
       "type": "object",
     },
@@ -3055,10 +3068,24 @@ exports[`persisted schema drift pricelist-store schema matches the golden snapsh
           ],
           "default": null,
         },
+        "serverUpdatedAt": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
       },
       "required": [
         "pricelist",
         "lastUpdated",
+        "serverUpdatedAt",
       ],
       "type": "object",
     },
