@@ -1,0 +1,92 @@
+diff --git a/lib/cashu-ts.es.js b/lib/cashu-ts.es.js
+--- a/lib/cashu-ts.es.js
++++ b/lib/cashu-ts.es.js
+@@ -2020,6 +2020,9 @@
+ 		case Or:
+ 			n.mints || (n.mints = []), n.mints.push(B(e.value));
+ 			break;
++		case 0x09:
++			n.mintsPreferred = Kr(e.value) === 1;
++			break;
+ 		case kr:
+ 			n.description = B(e.value);
+ 			break;
+@@ -2143,6 +2146,7 @@
+ 	if (e.id && t.push(V(wr, $r(e.id))), e.amount !== void 0 && t.push(V(Tr, ei(e.amount))), e.unit && (e.unit === "sat" ? t.push(V(Er, new Uint8Array([0]))) : t.push(V(Er, $r(e.unit)))), e.singleUse !== void 0 && t.push(V(Dr, ti(+!!e.singleUse))), e.mints && e.mints.length > 0) for (let n of e.mints) t.push(V(Or, $r(n)));
+ 	if (e.description && t.push(V(kr, $r(e.description))), e.transports && e.transports.length > 0) for (let n of e.transports) t.push(V(Ar, ii(n)));
+ 	e.nut10 && t.push(V(jr, ai(e.nut10)));
++	e.mintsPreferred !== void 0 && t.push(V(0x09, ti(+!!e.mintsPreferred)));
+ 	let n = t.reduce((e, t) => e + t.length, 0), r = new Uint8Array(n), i = 0;
+ 	for (let e of t) r.set(e, i), i += e.length;
+ 	return r;
+@@ -2247,8 +2251,8 @@
+ //#endregion
+ //#region src/model/PaymentRequest.ts
+ var ui = class e {
+-	constructor(e, t, n, r, i, a, o = !1, s) {
+-		this.transport = e, this.id = t, this.unit = r, this.mints = i, this.description = a, this.singleUse = o, this.nut10 = s, this.amount = n === void 0 ? void 0 : k.from(n);
++	constructor(e, t, n, r, i, a, o = !1, s, mintsPreferred) {
++		this.transport = e, this.id = t, this.unit = r, this.mints = i, this.description = a, this.singleUse = o, this.nut10 = s, this.mintsPreferred = mintsPreferred, this.amount = n === void 0 ? void 0 : k.from(n);
+ 	}
+ 	toRawRequest() {
+ 		let e = {};
+@@ -2256,7 +2260,7 @@
+ 			t: e.type,
+ 			a: e.target,
+ 			g: e.tags
+-		}))), this.id && (e.i = this.id), this.amount && (e.a = this.amount.toBigInt()), this.unit && (e.u = this.unit), this.mints && (e.m = this.mints), this.description && (e.d = this.description), this.singleUse && (e.s = this.singleUse), this.nut10 && (e.nut10 = {
++		}))), this.id && (e.i = this.id), this.amount && (e.a = this.amount.toBigInt()), this.unit && (e.u = this.unit), this.mints && (e.m = this.mints), this.mintsPreferred !== void 0 && (e.mp = this.mintsPreferred), this.description && (e.d = this.description), this.singleUse && (e.s = this.singleUse), this.nut10 && (e.nut10 = {
+ 			k: this.nut10.kind,
+ 			d: this.nut10.data,
+ 			t: this.nut10.tags
+@@ -2276,6 +2280,7 @@
+ 			unit: this.unit,
+ 			singleUse: this.singleUse,
+ 			mints: this.mints,
++			mintsPreferred: this.mintsPreferred,
+ 			description: this.description,
+ 			transports: this.transport,
+ 			nut10: this.nut10 ? {
+@@ -2315,7 +2320,7 @@
+ 			data: t.nut10.d,
+ 			tags: t.nut10.t
+ 		} : void 0;
+-		return new e(n, t.i, t.a, t.u, t.m, t.d, t.s, r);
++		return new e(n, t.i, t.a, t.u, t.m, t.d, t.s, r, t.mp);
+ 	}
+ 	static fromEncodedRequest(t) {
+ 		let n = t.toLowerCase();
+@@ -2325,7 +2330,7 @@
+ 				data: t.nut10.data,
+ 				tags: t.nut10.tags ?? []
+ 			} : void 0;
+-			return new e(t.transports, t.id, t.amount, t.unit, t.mints, t.description, t.singleUse ?? !1, r);
++			return new e(t.transports, t.id, t.amount, t.unit, t.mints, t.description, t.singleUse ?? !1, r, t.mintsPreferred);
+ 		}
+ 		if (!t.startsWith("creq")) throw new y("unsupported pr: invalid prefix");
+ 		if (t[4] !== "A") throw new y("unsupported pr version");
+diff --git a/lib/types/index.d.ts b/lib/types/index.d.ts
+--- a/lib/types/index.d.ts
++++ b/lib/types/index.d.ts
+@@ -3934,11 +3934,12 @@
+                id?: string | undefined;
+                unit?: string | undefined;
+                mints?: string[] | undefined;
++               mintsPreferred?: boolean | undefined;
+                description?: string | undefined;
+                singleUse: boolean;
+                nut10?: NUT10Option | undefined;
+                amount?: Amount;
+-               constructor(transport?: PaymentRequestTransport[] | undefined, id?: string | undefined, amount?: AmountLike, unit?: string | undefined, mints?: string[] | undefined, description?: string | undefined, singleUse?: boolean, nut10?: NUT10Option | undefined);
++               constructor(transport?: PaymentRequestTransport[] | undefined, id?: string | undefined, amount?: AmountLike, unit?: string | undefined, mints?: string[] | undefined, description?: string | undefined, singleUse?: boolean, nut10?: NUT10Option | undefined, mintsPreferred?: boolean | undefined);
+                toRawRequest(): RawPaymentRequest;
+                toEncodedRequest(): string;
+                /**
+@@ -4133,6 +4134,7 @@
+                u?: string;
+                s?: boolean;
+                m?: string[];
++               mp?: boolean;
+                d?: string;
+                t?: RawTransport[];
+                nut10?: RawNUT10Option;

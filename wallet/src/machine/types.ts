@@ -403,6 +403,8 @@ export interface FlowContext {
    */
   mintUnreachableConfirmed?: boolean;
   supportedMintUrls?: string[];
+  /** Advisory receiver preferences; never an allow-list. */
+  preferredMintUrls?: string[];
   /**
    * The pre-created melt quote for the current melt preview (BTC-05). Held
    * on the context (not only step data) so the CONFIRM_MELT restore path —

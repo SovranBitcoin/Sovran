@@ -274,3 +274,35 @@ describe('persisted store round-trip', () => {
     }
   );
 });
+
+describe('mint preference persistence', () => {
+  const { useMintStore } =
+    require('@/shared/stores/profile/mintStore') as typeof import('@/shared/stores/profile/mintStore');
+  const options = useMintStore.persist.getOptions();
+  it.each([false, true])('round-trips creqMintsPreferred=%s as data only', (creqMintsPreferred) => {
+    const state = { ...useMintStore.getInitialState(), creqMintsPreferred };
+    const persisted = JSON.parse(JSON.stringify(options.partialize!(state)));
+    expect(persisted.creqMintsPreferred).toBe(creqMintsPreferred);
+    expect(persisted.setCreqMintsPreferred).toBeUndefined();
+    expect(options.merge!(persisted, useMintStore.getInitialState()).creqMintsPreferred).toBe(
+      creqMintsPreferred
+    );
+  });
+  it.each([undefined, null, 'true', 1, {}])(
+    'defaults invalid/legacy preference %s to Required without losing other fields',
+    (creqMintsPreferred) => {
+      const persisted = {
+        selectedMint: 'https://mint.example',
+        activeUnit: 'usd',
+        creqP2pkLock: true,
+        creqExcludedMints: { 'https://other.example': true },
+        standingQuotes: { 'creq|usd': 'op-1' },
+        creqMintsPreferred,
+      };
+      expect(options.merge!(persisted, useMintStore.getInitialState())).toMatchObject({
+        ...persisted,
+        creqMintsPreferred: false,
+      });
+    }
+  );
+});

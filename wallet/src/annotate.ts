@@ -43,7 +43,13 @@ function hasMatchingMintWithBalance(
       ? ctx.trustedMintUrls
       : mints.filter((m) => ctx.trustedMintUrls.includes(m));
 
-  return candidates.some((m) => (ctx.mintBalances[m] ?? 0) >= amount);
+  return candidates.some(
+    (m) =>
+      (ctx.mintBalances[m] ?? 0) >= amount &&
+      (!info?.mintsPreferred ||
+        mints.length === 0 ||
+        (ctx.mintBalances[m] ?? 0) > 0),
+  );
 }
 
 function noTrustedMintInRequest(
@@ -52,7 +58,7 @@ function noTrustedMintInRequest(
   info?: PaymentRequestInfo | null,
 ): boolean {
   const mints = info?.mints ?? [];
-  if (mints.length === 0) return false;
+  if (mints.length === 0 || info?.mintsPreferred) return false;
   return !mints.some((m) => ctx.trustedMintUrls.includes(m));
 }
 
@@ -147,6 +153,19 @@ const PAYMENT_REQUEST_RULES: RecommendationRule[] = [
     status: "recommended",
     reason: (_o, _c, _i, locale) =>
       localizeReason("PAYABLE_ECASH", locale ?? "en"),
+  },
+  {
+    applies: (_option, ctx, info) =>
+      !!info?.mintsPreferred &&
+      info.mints.length > 0 &&
+      ctx.trustedMintUrls.some(
+        (mint) =>
+          (ctx.mintBalances[mint] ?? 0) > 0 &&
+          (ctx.mintBalances[mint] ?? 0) >= (info.amount ?? 0),
+      ),
+    status: "available",
+    reason: (_o, _c, _i, locale) =>
+      localizeReason("MINT_NOT_PREFERRED", locale ?? "en"),
   },
   {
     applies: (option, ctx, info) => noTrustedMintInRequest(option, ctx, info),
@@ -391,7 +410,10 @@ export function annotateOptions(
   let result: AnnotatedOption[];
   if (!hasRecommended) {
     const available = annotated
-      .filter((a) => a.status === "available")
+      .filter(
+        (a) =>
+          a.status === "available" && a.reason?.code !== "MINT_NOT_PREFERRED",
+      )
       .sort(
         (a, b) =>
           (PROMOTION_SORT[a.option.kind] ?? 10) -

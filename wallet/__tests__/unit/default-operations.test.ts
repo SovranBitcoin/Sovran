@@ -14,6 +14,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
+import { PaymentRequest, PaymentRequestTransportType, decodePaymentRequest } from '@cashu/cashu-ts';
 import type { Manager } from '@cashu/coco-core';
 import { createDefaultOperations } from '../../src/operations/defaultOperations';
 
@@ -1061,4 +1062,44 @@ describe('executeSend — reservation rescue (BTC-07)', () => {
     await expect(ops.executeOfflineSend!(MINT1, 100)).rejects.toThrow('local failure');
     expect(mockManager.ops.send.cancel).toHaveBeenCalledWith('prepared-send-1');
   });
+});
+
+
+describe('executePaymentRequest preferred mint adapter', () => {
+  it.each([false, true])('adapts only advisory mint lists (mp=%s)', async (mintsPreferred) => {
+    const manager = createMockManager();
+    const request = new PaymentRequest(
+      [{ type: PaymentRequestTransportType.POST, target: 'https://receiver.example/pay' }],
+      'preferred-request', 100, 'sat', ['https://preferred.example'], 'memo', true,
+      { kind: 'P2PK', data: `02${'ab'.repeat(32)}`, tags: [] }, mintsPreferred,
+    );
+    const encoded = request.toEncodedRequest();
+    mockGetPRInfo.mockReturnValue({ mints: request.mints!, mintsPreferred, amount: 100, unit: 'sat', transports: request.transport });
+    const ops = createDefaultOperations({ getManager: () => manager as unknown as Manager });
+    await ops.executePaymentRequest!(MINT1, encoded, 100, 'sat');
+    const input = manager.paymentRequests.parse.mock.calls[0][0];
+    const adapted = decodePaymentRequest(input);
+    expect(adapted.mints).toEqual(mintsPreferred ? undefined : request.mints);
+    expect(adapted.toRawRequest()).toEqual({ ...request.toRawRequest(), m: mintsPreferred ? undefined : request.mints });
+    if (!mintsPreferred) expect(input).toBe(encoded);
+    expect(manager.paymentRequests.prepare).toHaveBeenCalledWith({ id: 'parsed-creq' }, { mintUrl: MINT1, amount: 100 });
+  });
+});
+
+it('retains receiver preference order and reason after mint-list enrichment', async () => {
+  const preferred = 'https://preferred.example';
+  const manager = createMockManager({
+    mint: { getAllTrustedMints: vi.fn().mockResolvedValue([{ mintUrl: MINT1 }, { mintUrl: preferred }]) },
+    wallet: { balances: { byMintAndUnit: vi.fn().mockResolvedValue({
+      [MINT1]: { sat: { total: 1000 } }, [preferred]: { sat: { total: 100 } },
+    }) } },
+  });
+  mockGetPRInfo.mockReturnValue({ mints: [preferred], mintsPreferred: true, amount: 50, unit: 'sat' });
+  const ops = createDefaultOperations({ getManager: () => manager as unknown as Manager });
+  const items = await ops.buildMintListItems!({
+    unit: 'sat', destination: 'paymentRequest', paymentRequest: 'preferred', amount: 50,
+    candidates: [{ mintUrl: preferred, balance: 100 }, { mintUrl: MINT1, balance: 1000 }],
+  });
+  expect(items.map((item) => item.mintUrl)).toEqual([preferred, MINT1]);
+  expect(items[1]).toMatchObject({ status: 'available', reason: { code: 'MINT_NOT_PREFERRED' } });
 });

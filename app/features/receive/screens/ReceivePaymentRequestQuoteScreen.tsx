@@ -230,6 +230,7 @@ export const ReceivePaymentRequestQuoteScreen = memo(function ReceivePaymentRequ
   const displayedRequest = useMemo(() => {
     if (!entry) return '';
     const options: SingleUseReencodeOptions = {
+      mintsPreferred: false, // Coco incoming claims still enforce the durable mint list.
       displayMints: mintSelection.displayMints,
       lockP2pkPubkey: mintSelection.p2pkLockEffective ? p2pkKey : undefined,
     };
@@ -287,7 +288,12 @@ export const ReceivePaymentRequestQuoteScreen = memo(function ReceivePaymentRequ
         {syntheticEntry ? (
           <HistoryEntryHeader historyEntry={syntheticEntry} showRecipientAvatar={false} />
         ) : null}
-        <PaymentInfo data={displayedRequest} copyTarget="paymentRequest" unit={entry.unit} />
+        <PaymentInfo
+          animated
+          data={displayedRequest}
+          copyTarget="paymentRequest"
+          unit={entry.unit}
+        />
         {syntheticEntry ? (
           // No key={prState} remount: the P3 cascade fix + rowKey-keyed
           // in-place dot transitions let the idle→done settle play live.

@@ -74,6 +74,10 @@ export function decodePaymentRequestInfo(
       ? { requestId: decoded.id }
       : {}),
     mints: (decoded.mints ?? []).filter(Boolean),
+    mintsPreferred:
+      typeof decoded.mintsPreferred === "boolean"
+        ? decoded.mintsPreferred
+        : undefined,
     amount: amountToNumberOrUndefined(decoded.amount),
     unit: decoded.unit ?? "sat",
     transports,

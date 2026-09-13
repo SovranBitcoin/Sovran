@@ -17,6 +17,7 @@ import type {
 export interface MintSelectionConfig {
   /** Mints allowed by the payment request. Empty/undefined = any trusted mint. */
   allowedMints?: string[];
+  preferredMints?: string[];
   /** Minimum balance required (e.g. from payment request amount). */
   minAmount?: number;
   /** Strategy when multiple mints qualify. Defaults to 'highestBalance'. */
@@ -57,6 +58,22 @@ export function getValidMintCandidates(
 
   if (strategy === "highestBalance") {
     candidates.sort((a, b) => b.balance - a.balance);
+  }
+
+  if (config.preferredMints?.length) {
+    const preferred = new Set(config.preferredMints);
+    candidates = candidates.map((candidate) =>
+      preferred.has(candidate.mintUrl)
+        ? candidate
+        : {
+            ...candidate,
+            reason: localizeReason("MINT_NOT_PREFERRED"),
+          },
+    );
+    candidates.sort(
+      (a, b) =>
+        Number(preferred.has(b.mintUrl)) - Number(preferred.has(a.mintUrl)),
+    );
   }
 
   logger.info("mintSelection.candidates.result", {
@@ -125,13 +142,13 @@ export function selectMint(
     return result;
   }
 
-  // Sort by strategy
-  if (strategy === "highestBalance") {
-    candidates.sort((a, b) => b.balance - a.balance);
-  }
-
   // Preferred mint gets priority when it's in the valid set
-  if (ctx.preferredMintUrl) {
+  if (
+    ctx.preferredMintUrl &&
+    (!config.preferredMints?.length ||
+      config.preferredMints.includes(ctx.preferredMintUrl) ||
+      !candidates.some((c) => config.preferredMints?.includes(c.mintUrl)))
+  ) {
     const preferred = candidates.find(
       (c) => c.mintUrl === ctx.preferredMintUrl,
     );

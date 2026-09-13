@@ -552,6 +552,19 @@ Cancellation of UI work invalidates stale screen updates; it does not erase an a
 
 Treat QR, NFC, payment requests, and public mesh as separate delivery contexts. NFC's intentional automatic resolution does not authorize skipping confirmation elsewhere. A public mesh recipient-locked transfer must never silently degrade to an unlocked bearer token. Encryption/delivery status does not prove redemption.
 
+**Payment-request mint preference (W12):** `wallet` preserves NUT-18 `mp` and
+ranks preferred mints without excluding other funded trusted mints. Coco 2.0.0's
+outgoing parser treats every mint list as strict, so `defaultOperations` removes
+only the advisory list from its private SDK input copy; the original request
+remains the flow identity. Amount, unit, transport and NUT-10 lock are preserved.
+Incoming `validatePayload` still rejects untrusted mints and mints outside the
+durable operation's list. Both receive screens therefore force Required even
+if the profile preference is true, and show Preferred disabled with a reason.
+Enable it only after a request claim can add/trust an unlisted mint and resume,
+or surfaces an actionable add-mint-to-claim prompt. Token receive recovery is
+not evidence for payment-request recovery. See the W12 patch handoff in
+[app/patches/README.cashu-mints-preferred.md](app/patches/README.cashu-mints-preferred.md).
+
 **Follow-up:** the app provider still overrides some default operations to obtain real persisted history IDs and app enrichment. Move reusable behavior to `wallet` only after comparing contracts, not merely to reduce file length. Preserve installed SDK types and test the actual version; direct Cashu SDK usage can be legitimate inside protocol adapters, but is not the UI default.
 
 **Acceptance:** double tap, concurrent resolve, back/re-entry, profile switch, mint change, pending outcomes, interruption after commit, retry/recovery, P2PK constraints, fees/units, and offline flows. Use wallet flow/property/integration tests; device tests are required for native crypto/NFC/BLE behavior. Passing fixture tests does not establish live mint settlement.
@@ -810,7 +823,7 @@ surface separately. Keep one original rather than duplicating source bytes.
 
 **Reviewed skills:** [code-review](skills/code-review/SKILL.md) for patch requirements versus implementation. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
-**Observed:** root [patchedDependencies](package.json) registers five [Bun patches](app/patches). The repo also has [Marmot vendored output](app/vendor/marmot-ts), [BitChat submodules](.gitmodules), and native patch/copy scripts. These are different supply paths and need different rules.
+**Observed:** root [patchedDependencies](package.json) registers six [Bun patches](app/patches). The repo also has [Marmot vendored output](app/vendor/marmot-ts), [BitChat submodules](.gitmodules), and native patch/copy scripts. These are different supply paths and need different rules.
 
 **Decision:** package-manager patches use **Bun's native patch workflow**, not patch-package. Prepare the exact package with `bun patch`, modify the prepared files, then use `bun patch --commit` and inspect the generated manifest/lock changes. Preserve the root workspace's patch registration and `app/patches` convention. Bun documents install-time application and version-associated patch registration in its [patch guide](https://bun.com/docs/pm/cli/patch). Do not edit installed files without a reproducible committed patch.
 
@@ -818,6 +831,7 @@ For every patch record package/version, affected platform, problem/reproduction,
 
 | Current patch | Source-inspected purpose |
 | --- | --- |
+| `@cashu/cashu-ts@5.0.0-rc.4` | Backport NUT-18 `mp` and NUT-26 tag `0x09`, preserving the positional constructor; remove when Coco accepts a cashu-ts release containing `mintsPreferred` |
 | `@gorhom/bottom-sheet@5.2.14` | Set sheet/backdrop `accessible` defaults to false; verify descendants and dismissal remain accessible |
 | `expo-router@56.2.11` | Expose drawer overlay styling in Router's navigation fork |
 | `react-native-screens@4.25.2` | Android form-sheet dimming adjustment |

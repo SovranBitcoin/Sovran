@@ -18,6 +18,7 @@ import { withAlpha } from '@/shared/lib/color';
 import { QRCodeFrame, qrCodeGeometry } from '@/shared/ui/composed/QRCodeFrame';
 import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { IS_ANDROID_E2E } from '@/shared/lib/e2e/isAndroidE2E';
+import { ANIMATE_THRESHOLD } from '@/shared/lib/qr';
 
 export { SPEED_PRESETS, DENSITY_PRESETS, DEFAULT_SPEED_INDEX, DEFAULT_DENSITY_INDEX };
 
@@ -28,7 +29,6 @@ const MAX_QR_DATA_LENGTH = 2000;
 // eNuts: fragment=200, interval=250ms, animate≥150chars
 // minibits: fragment=150, interval=250ms
 // cashu.me: fragment=150 (default), interval=150/250/500ms (adjustable)
-const ANIMATE_THRESHOLD = 500; // chars — animate tokens above this length (multi-proof tokens)
 
 // A fountain-QR that cycles fragments every frame never lets the Android window
 // reach idle, so `uiautomator dump` can never snapshot the Send-ecash screen
