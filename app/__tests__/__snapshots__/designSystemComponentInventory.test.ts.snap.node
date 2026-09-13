@@ -80,6 +80,8 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/feed/components/thread-embed/ThreadEmbedSheet.tsx",
     "features/map/components/StatsCard.tsx",
     "features/mint/components/MintCurrencyTabs.tsx",
+    "features/mint/components/RatingBarChart.tsx",
+    "features/mint/components/RatingStars.tsx",
     "features/mint/components/distribution/MintDistributionCards.tsx",
     "features/mint/components/mintChanges/MintChangeRow.tsx",
     "features/mint/components/mintChanges/MintChangesList.tsx",
@@ -156,6 +158,8 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/whitenoise/components/RequestActions.tsx",
     "features/whitenoise/components/WhitenoiseSetupBanner.tsx",
     "shared/blocks/AppGate.tsx",
+    "shared/blocks/CtaHost.tsx",
+    "shared/blocks/CtaScreen.tsx",
     "shared/blocks/DrawerProfileChrome.tsx",
     "shared/blocks/GlobalMigrationGate.tsx",
     "shared/blocks/HeaderProfileButton.tsx",
@@ -246,6 +250,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 240,
+  "total": 244,
 }
 `;
