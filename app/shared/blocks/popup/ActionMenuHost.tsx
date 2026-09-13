@@ -304,7 +304,7 @@ function ActionMenuInstance({
   const close = useCallback(
     (afterClose?: () => void) => {
       if (!isCurrent()) return;
-      afterCloseRef.current ??= afterClose ?? null;
+      if (afterCloseRef.current == null) afterCloseRef.current = afterClose ?? null;
       dismissActionMenuPopup();
     },
     [isCurrent]

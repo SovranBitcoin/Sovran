@@ -17,6 +17,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrNDKContext } from '@/shared/providers/NostrNDKProvider';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useOwnedMediaStore } from '@/shared/stores/profile/ownedMediaStore';
 import {
@@ -76,6 +77,7 @@ function ProfileEditor({
   const isOwner = () =>
     mounted.current && useProfileStore.getState().getActiveProfile()?.pubkey === pubkey;
 
+  const cached = useLatestRef({ name: cachedName, picture: cachedPicture });
   useEffect(() => {
     mounted.current = true;
     nostrLog.info('nostr.profile.edit.open');
@@ -95,7 +97,7 @@ function ProfileEditor({
             name: textValue(snapshot.content.display_name) || textValue(snapshot.content.name),
             picture: textValue(snapshot.content.picture) || null,
           }
-        : { name: cachedName ?? '', picture: cachedPicture ?? null };
+        : { name: cached.current.name ?? '', picture: cached.current.picture ?? null };
       setBase(next);
       setName(next.name);
       setPicture(next.picture);
@@ -105,8 +107,8 @@ function ProfileEditor({
     return () => {
       canceled = true;
     };
-    // Cached display updates must not overwrite an in-progress draft.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Cached display updates must not overwrite an in-progress draft, so the
+    // effect reads them through a ref instead of depending on them.
   }, [ndk, pubkey, isInitialized]);
 
   function cancelUpload() {

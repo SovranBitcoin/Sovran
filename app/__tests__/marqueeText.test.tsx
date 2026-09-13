@@ -19,8 +19,22 @@ jest.mock('@/shared/hooks/useVisualActivityEffect', () => ({
 jest.mock('react-native-reanimated', () => ({
   __esModule: true,
   default: { View: 'AnimatedView' },
-  useSharedValue: (value: number) =>
-    jest.requireActual<typeof import('react')>('react').useRef({ value }).current,
+  useSharedValue: (initial: number) => {
+    const ref = jest
+      .requireActual<typeof import('react')>('react')
+      .useRef<{ value: number; get: () => number; set: (next: number) => void } | null>(null);
+    if (!ref.current) {
+      const shared = {
+        value: initial,
+        get: () => shared.value,
+        set: (next: number) => {
+          shared.value = next;
+        },
+      };
+      ref.current = shared;
+    }
+    return ref.current;
+  },
   useAnimatedStyle: (factory: () => object) => factory(),
   useReducedMotion: jest.fn(() => false),
   cancelAnimation: jest.fn(),
