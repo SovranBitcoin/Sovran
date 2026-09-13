@@ -14,6 +14,9 @@ import { ReceiveScreen } from '@/features/receive/screens/ReceiveScreen';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mockUseScreenActions = jest.fn();
+const mockStandingRequest = jest.fn();
+let mockCreqExcluded = false;
+let mockTrustedMintUrls: string[] = [];
 jest.mock('@/shared/lib/version', () => ({ supportsLiquidGlass: () => true }));
 
 const mockMachine = { reset: jest.fn(), inspect: jest.fn(() => ({ isExecuting: false })) };
@@ -38,12 +41,15 @@ jest.mock('wallet/react', () => ({
   useScreenActions: (...args: unknown[]) => mockUseScreenActions(...args),
   // The screen-owned standing creq (fresh-per-visit): loading until the
   // fresh request lands — mirrors the no-stale-seed hook behavior.
-  useStandingPaymentRequest: () => ({
-    request: null,
-    isLoading: true,
-    error: null,
-    rotate: jest.fn(),
-  }),
+  useStandingPaymentRequest: (...args: unknown[]) => {
+    mockStandingRequest(...args);
+    return {
+      request: null,
+      isLoading: true,
+      error: null,
+      rotate: jest.fn(),
+    };
+  },
 }));
 
 jest.mock('@/shared/stores/profile/mintStore', () => ({
@@ -72,7 +78,7 @@ jest.mock('@/features/receive/lib/standingQuoteIdentityStore', () => ({
 
 jest.mock('@/shared/providers/WalletContextProvider', () => ({
   useWalletContext: () => ({
-    trustedMintUrls: [],
+    trustedMintUrls: mockTrustedMintUrls,
     mintBalances: {},
     mintMethodCapabilities: {},
     proofAmounts: {},
@@ -94,6 +100,11 @@ jest.mock('@/features/receive/components/ReceiveReusableQuoteTab', () => ({
 }));
 jest.mock('@/features/receive/components/ReceivePaymentRequestTab', () => ({
   ReceivePaymentRequestTab: () => null,
+}));
+jest.mock('@/features/receive/hooks/useBip321RailSelection', () => ({
+  useBip321RailSelection: () => ({
+    selection: { rails: [{ id: 'creq', state: mockCreqExcluded ? 'off' : 'included' }] },
+  }),
 }));
 jest.mock('@/features/receive/components/ReceiveUnifiedTab', () => ({
   ReceiveUnifiedTab: () => null,
@@ -327,6 +338,9 @@ describe('ReceiveScreen layout stability', () => {
   beforeEach(() => {
     jest.replaceProperty(Platform, 'OS', 'ios');
     mockUseScreenActions.mockReset();
+    mockStandingRequest.mockClear();
+    mockCreqExcluded = false;
+    mockTrustedMintUrls = [];
     mockMachine.inspect.mockReturnValue({ isExecuting: false });
     mockMachine.reset.mockClear();
     mockSelectUnit.mockReset();
@@ -392,6 +406,40 @@ describe('ReceiveScreen layout stability', () => {
     act(() => {
       renderer!.unmount();
     });
+  });
+
+  it('does not create an excluded Cashu request until the Cashu tab is selected', () => {
+    mockCreqExcluded = true;
+    mockTrustedMintUrls = ['https://mint.example'];
+    mockUseScreenActions.mockReturnValue({
+      entry: {
+        type: 'receive',
+        id: 'receive-hub',
+        npcAddress: { toString: () => 'fixture@npub.cash', truncate: () => 'fixture' },
+      },
+      error: null,
+      actions: receiveActions(),
+      mintUrl: 'https://mint.example',
+    });
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <ReceiveScreen receiveEntry={JSON.stringify({ type: 'receive' })} unit="sat" />
+      );
+    });
+    expect(mockStandingRequest.mock.calls.at(-1)?.[0]).toBeNull();
+    act(() => {
+      findAllByType(renderer, 'UnderlineTabs')[0].props.handleTabPress('Cashu');
+    });
+    expect(mockStandingRequest.mock.calls.at(-1)?.[0]).toMatchObject({
+      unit: 'sat',
+      mints: mockTrustedMintUrls,
+    });
+    act(() => {
+      findAllByType(renderer, 'UnderlineTabs')[0].props.handleTabPress('Unified');
+    });
+    expect(mockStandingRequest.mock.calls.at(-1)?.[0]).toBeNull();
+    act(() => renderer.unmount());
   });
 
   it('explains non-Bitcoin addresses and switches route and machine through the header picker', () => {

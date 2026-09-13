@@ -294,6 +294,12 @@ const STATIC_POPUPS = {
 } as const satisfies Record<string, PopupSpec>;
 
 const PARAM_POPUPS = {
+  'unified-rail-info': (p: { title: string; message: string }): PopupSpec => ({
+    message: p.title,
+    text: p.message,
+    icon: 'icon:mdi:information-outline',
+    type: 'info',
+  }),
   'mints-added': (p: { added: number; failed?: number }): PopupSpec =>
     p.failed && p.failed > 0
       ? {

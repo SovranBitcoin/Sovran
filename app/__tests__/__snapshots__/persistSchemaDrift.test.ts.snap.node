@@ -1068,6 +1068,21 @@ exports[`persisted schema drift mint-store schema matches the golden snapshot fo
           ],
           "type": "string",
         },
+        "bip321ExcludedRails": {
+          "additionalProperties": {
+            "type": "boolean",
+          },
+          "default": {},
+          "propertyNames": {
+            "enum": [
+              "onchain",
+              "bolt12",
+              "creq",
+            ],
+            "type": "string",
+          },
+          "type": "object",
+        },
         "creqExcludedMints": {
           "additionalProperties": {
             "type": "boolean",
@@ -1126,6 +1141,21 @@ exports[`persisted schema drift mint-store schema matches the golden snapshot fo
           ],
           "type": "string",
         },
+        "bip321ExcludedRails": {
+          "additionalProperties": {
+            "type": "boolean",
+          },
+          "default": {},
+          "propertyNames": {
+            "enum": [
+              "onchain",
+              "bolt12",
+              "creq",
+            ],
+            "type": "string",
+          },
+          "type": "object",
+        },
         "creqExcludedMints": {
           "additionalProperties": {
             "type": "boolean",
@@ -1174,6 +1204,7 @@ exports[`persisted schema drift mint-store schema matches the golden snapshot fo
         "receiveMintByMethod",
         "creqP2pkLock",
         "creqExcludedMints",
+        "bip321ExcludedRails",
       ],
       "type": "object",
     },

@@ -7,8 +7,7 @@
  * BIP-353 (DNS) and resolve TO a BIP-321 URI — so the Lightning rail is
  * deliberately absent here.
  *
- * The parts resolve asynchronously, so the QR re-renders as each rail lands
- * — which is exactly why this tab is NOT the receive hub's default.
+ * The default tab waits for enabled rails to settle before showing its QR.
  */
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -16,13 +15,15 @@ import { useLatestRef } from '@/shared/hooks/useLatestRef';
 
 import { setStringAsync } from 'expo-clipboard';
 
-import { buildUnifiedBip321Uri, getMintMethodCapability, type WalletContext } from 'wallet';
+import { buildUnifiedBip321Uri } from 'wallet';
 import { useReusableMintQuote, type UseStandingPaymentRequestResult } from 'wallet/react';
 import { paymentLog } from '@/shared/lib/logger';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
-import { CopyRequestCard } from '@/shared/ui/composed/CopyRequestCard';
+import { Bip321CustomizationCard } from '@/features/receive/components/Bip321CustomizationCard';
+import { RailsIncludedRow } from '@/features/receive/components/RailsIncludedRow';
+import type { useBip321RailSelection } from '@/features/receive/hooks/useBip321RailSelection';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { ReceiveRailPlaceholder } from '@/features/receive/components/ReceiveRailPlaceholder';
-import { useReceiveMethodMint } from '@/features/receive/hooks/useReceiveMethodMint';
 import type { OnReceiveQrPayload } from '@/features/receive/lib/qrPayload';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -35,7 +36,7 @@ import Icon from 'assets/icons';
 interface ReceiveUnifiedTabProps {
   unit: string;
   active?: boolean;
-  walletContext: Pick<WalletContext, 'trustedMintUrls' | 'mintMethodCapabilities' | 'mintBalances'>;
+  bip321: ReturnType<typeof useBip321RailSelection>;
   muted: string;
   /** The ONE standing request — resolved fresh-per-visit by ReceiveScreen
    *  and shared with the Cashu tab, so the composed URI can never carry a
@@ -49,58 +50,57 @@ interface ReceiveUnifiedTabProps {
 export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
   unit,
   active = true,
-  walletContext,
+  bip321,
   muted,
   creq,
   onQrPayload,
 }: ReceiveUnifiedTabProps) {
   const identityStore = standingQuoteIdentityStore;
 
-  // Same standing singletons as the dedicated tabs (in-flight dedup + shared
-  // identity store means no extra quotes/requests are ever created here).
-  const { mintUrl: onchainMint } = useReceiveMethodMint('onchain', unit);
-  const onchainSupported =
-    !!onchainMint &&
-    (() => {
-      const cap = getMintMethodCapability(walletContext, onchainMint, {
-        operation: 'mint',
-        method: 'onchain',
-        unit,
-      });
-      return cap.supported && !cap.disabled;
-    })();
+  const { selection, onchainMint, bolt12Mint, excluded } = bip321;
+  const setRailExcluded = useMintStore((s) => s.setBip321RailExcluded);
+  const onchainEnabled = selection.rails.some(
+    (rail) => rail.id === 'onchain' && rail.state === 'included'
+  );
+  const bolt12Enabled = selection.rails.some(
+    (rail) => rail.id === 'bolt12' && rail.state === 'included'
+  );
+  const creqEnabled = selection.rails.some(
+    (rail) => rail.id === 'creq' && rail.state === 'included'
+  );
   const onchain = useReusableMintQuote(
-    onchainSupported && onchainMint ? { mintUrl: onchainMint, method: 'onchain', unit } : null,
+    onchainEnabled && onchainMint ? { mintUrl: onchainMint, method: 'onchain', unit } : null,
     identityStore
   );
-
-  const { mintUrl: bolt12Mint } = useReceiveMethodMint('bolt12', unit);
-  const bolt12Supported =
-    !!bolt12Mint &&
-    (() => {
-      const cap = getMintMethodCapability(walletContext, bolt12Mint, {
-        operation: 'mint',
-        method: 'bolt12',
-        unit,
-      });
-      return cap.supported && !cap.disabled;
-    })();
   const bolt12 = useReusableMintQuote(
-    bolt12Supported && bolt12Mint ? { mintUrl: bolt12Mint, method: 'bolt12', unit } : null,
+    bolt12Enabled && bolt12Mint ? { mintUrl: bolt12Mint, method: 'bolt12', unit } : null,
     identityStore
   );
 
+  // Mask cached results immediately: hooks clear disabled input in an effect.
+  const address = onchainEnabled ? (onchain.quote?.request ?? null) : null;
+  const offer = bolt12Enabled ? (bolt12.quote?.request ?? null) : null;
+  const request = creqEnabled ? (creq.request?.encodedRequestB ?? null) : null;
   const uri = useMemo(
-    () =>
-      buildUnifiedBip321Uri({
-        address: onchain.quote?.request ?? null,
-        lno: bolt12.quote?.request ?? null,
-        creq: creq.request?.encodedRequestB ?? null,
-      }),
-    [onchain.quote, bolt12.quote, creq.request]
+    () => buildUnifiedBip321Uri({ address, lno: offer, creq: request }),
+    [address, offer, request]
   );
-
-  const anyLoading = onchain.isLoading || bolt12.isLoading || creq.isLoading;
+  const anyLoading =
+    (onchainEnabled && onchain.isLoading) ||
+    (bolt12Enabled && bolt12.isLoading) ||
+    (creqEnabled && creq.isLoading);
+  // Pills describe the actual URI, including a failed or still-loading quote.
+  // Advanced switches continue to express the capability-gated preference.
+  const payloads = { onchain: address, bolt12: offer, creq: request };
+  const includedRails = selection.rails.map((rail) =>
+    rail.state === 'included' && !payloads[rail.id]
+      ? {
+          ...rail,
+          state: 'unavailable' as const,
+          reason: `${rail.label} request is not available yet`,
+        }
+      : rail
+  );
 
   // As the DEFAULT tab this must not stutter: hold the placeholder until
   // every rail settles ONCE, then render the fully composed QR in a single
@@ -161,42 +161,45 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
     paymentLog.info('receive.bip321.copied', {
       uriLength: uri.length,
       included: [
-        ...(onchain.quote ? ['Onchain'] : []),
-        ...(bolt12.quote ? ['BOLT 12'] : []),
-        ...(creq.request ? ['Cashu'] : []),
+        ...(address ? ['Onchain'] : []),
+        ...(offer ? ['BOLT 12'] : []),
+        ...(request ? ['Cashu'] : []),
       ].join(','),
+      excluded: selection.rails
+        .filter((rail) => excluded[rail.id])
+        .map((rail) => rail.id)
+        .join(','),
     });
-  }, [uri, onchain.quote, bolt12.quote, creq.request]);
+  }, [uri, address, offer, request, excluded, selection.rails]);
 
   if (!active) return null;
 
   if (!settled) {
-    return <ReceiveRailPlaceholder sectionTitle="BIP-321 URI" />;
-  }
-
-  if (!uri) {
-    return (
-      <View className="mx-4 mt-8">
-        <View className="bg-surface-secondary items-center rounded-xl p-6">
-          <Icon name="stash:qr-code" size={48} color={muted} />
-          <Text size={14} className="text-muted mt-3 text-center">
-            No rails available for a unified URI — add a mint that supports onchain, BOLT 12, or
-            Cashu payment requests.
-          </Text>
-        </View>
-      </View>
-    );
+    return <ReceiveRailPlaceholder sectionTitle="Unified" />;
   }
 
   return (
     <>
-      <PaymentInfo active={active} data={uri} copyTarget="bip321" unit={unit} />
-      <CopyRequestCard
-        title="BIP-321 URI"
-        icon="stash:qr-code"
-        display={truncateMiddle(uri, 10)}
+      {uri ? (
+        <PaymentInfo active={active} data={uri} copyTarget="bip321" unit={unit} />
+      ) : (
+        <View className="mx-4 mt-8">
+          <View className="bg-surface-secondary items-center rounded-xl p-6">
+            <Icon name="stash:qr-code" size={48} color={muted} />
+            <Text size={14} className="text-muted mt-3 text-center">
+              No methods available for a Unified request. Add a mint that supports onchain, BOLT 12,
+              or Cashu payment requests.
+            </Text>
+          </View>
+        </View>
+      )}
+      <RailsIncludedRow rails={includedRails} />
+      <Bip321CustomizationCard
+        selection={selection}
+        display={uri ? truncateMiddle(uri, 10) : undefined}
         muted={muted}
-        onPress={handleCopy}
+        onCopy={handleCopy}
+        onRailToggle={(id, enabled) => setRailExcluded(id, !enabled)}
       />
     </>
   );

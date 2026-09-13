@@ -1414,6 +1414,7 @@ describe('loadE2E over the real tree', () => {
       'notification-policy-relaxed',
       'notification-policy-strict',
       'profile-reveal-mnemonic',
+      'receive-unified-rail-switch-bolt12',
       'settings-mock-fail-melt-toggle',
       'settings-mock-fail-send-toggle',
       'settings-mock-offline-toggle',
