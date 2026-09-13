@@ -46,6 +46,8 @@ export function createNfcAdapter(): NfcIOAdapter {
           );
         }
 
+        if (r.payload.length !== 2)
+          throw new NfcError('Invalid NFC length response.', 'INVALID_RESPONSE');
         const nlen = (r.payload[0] << 8) | r.payload[1];
         nfcLog.debug('nfc.adapter.nlen', { nlen });
 
@@ -66,6 +68,8 @@ export function createNfcAdapter(): NfcIOAdapter {
               r.sw
             );
           }
+          if (r.payload.length !== nlen)
+            throw new NfcError('Incomplete NFC content response.', 'INVALID_RESPONSE');
           ndefBytes = r.payload;
         } else {
           nfcLog.debug('nfc.adapter.read_chunked', { nlen });
@@ -81,6 +85,8 @@ export function createNfcAdapter(): NfcIOAdapter {
                 r.sw
               );
             }
+            if (r.payload.length !== chunkSize)
+              throw new NfcError('Incomplete NFC content response.', 'INVALID_RESPONSE');
             ndefBytes.push(...r.payload);
             offset += chunkSize;
             remaining -= chunkSize;

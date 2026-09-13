@@ -19,6 +19,7 @@ import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { CTA_DEFINITIONS } from '@/shared/lib/cta/definitions';
 import type { CtaId } from '@/shared/lib/cta/types';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { openExternalUrl } from '@/shared/lib/url';
 import { DOWNLOAD_URL } from '@/shared/config/download';
 
@@ -30,10 +31,13 @@ export function CtaScreen({ id }: { id: CtaId }) {
   const previewOverride = useCtaStore((s) => s.previewOverride);
   const preview = previewOverride === id;
   const closing = useCtaStore((s) => s.closingId === id);
+  const latestVersion = useSettingsStore((s) => s.lastKnownAppVersion?.version);
+  const triggerVersion = id === 'update-required' ? latestVersion : undefined;
   const permanentlyDismissed = useCtaStore((s) => !!s.dismissed[id]);
   const [exitingPreview, setExitingPreview] = useState(false);
   const [dontAsk, setDontAsk] = useState(false);
   const dismissalHandled = useRef(false);
+  const removalRequested = useRef(false);
   const [updateError, setUpdateError] = useState(false);
   const blocking = cta.presentation === 'blocking-modal' && !exitingPreview && !closing;
   usePreventRemove(blocking, () => {});
@@ -44,7 +48,8 @@ export function CtaScreen({ id }: { id: CtaId }) {
     return () => subscription.remove();
   }, [blocking, navigation]);
   useEffect(() => {
-    if (!exitingPreview && !closing) return;
+    if ((!exitingPreview && !closing) || removalRequested.current) return;
+    removalRequested.current = true;
     // Release usePreventRemove before dispatching the automatic navigation.
     if (router.canGoBack()) router.back();
     else router.replace('/');
@@ -52,13 +57,19 @@ export function CtaScreen({ id }: { id: CtaId }) {
   useEffect(() => {
     if (cta.presentation === 'blocking-modal') return;
     return navigation.addListener('beforeRemove', () => {
+      removalRequested.current = true;
       // Swipe and Android back honor the same checkbox as Not now.
-      if (!dismissalHandled.current) useCtaStore.getState().dismiss(id, dontAsk);
+      if (!dismissalHandled.current) {
+        dismissalHandled.current = true;
+        if (!closing && !preview) useCtaStore.getState().dismiss(id, dontAsk, triggerVersion);
+      }
     });
-  }, [cta.presentation, navigation, id, dontAsk]);
+  }, [cta.presentation, navigation, id, dontAsk, triggerVersion, closing, preview]);
   const dismiss = () => {
+    if (dismissalHandled.current) return;
     dismissalHandled.current = true;
-    useCtaStore.getState().dismiss(id, dontAsk);
+    removalRequested.current = true;
+    if (!preview) useCtaStore.getState().dismiss(id, dontAsk, triggerVersion);
     router.back();
   };
   const primary = async () => {
@@ -79,7 +90,7 @@ export function CtaScreen({ id }: { id: CtaId }) {
       footer={
         <BottomButtons>
           <Button testID="cta-primary" text={cta.content.primary.label} onPress={primary} />
-          {cta.content.secondary && (
+          {!blocking && cta.content.secondary && (
             <Button
               testID="cta-secondary"
               variant="secondary"
@@ -110,6 +121,18 @@ export function CtaScreen({ id }: { id: CtaId }) {
       }>
       <ScreenScrollView>
         {!blocking && <SheetGrabber />}
+        {!blocking && (
+          <View className="items-end px-4 pt-2">
+            <Pressable
+              testID="cta-close"
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              onPress={dismiss}
+              className="bg-surface-secondary h-11 w-11 items-center justify-center rounded-full">
+              <Icon name="mdi:close" size={24} color={foreground} />
+            </Pressable>
+          </View>
+        )}
         <View testID="cta-screen" className="gap-6 px-6 py-12">
           <View className="bg-surface-secondary h-24 w-24 items-center justify-center self-center rounded-full">
             <Icon name={cta.content.icon} size={48} color={foreground} />
@@ -143,7 +166,7 @@ export function CtaScreen({ id }: { id: CtaId }) {
       </ScreenScrollView>
       {preview && (
         <E2EAccessibilityProbe
-          testID="cta-dismissed"
+          testID={permanentlyDismissed ? 'cta-dismissed-yes' : 'cta-dismissed-no'}
           accessibilityLabel="Reminder dismissed permanently"
           value={permanentlyDismissed ? '1' : '0'}
         />

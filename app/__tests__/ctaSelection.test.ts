@@ -12,7 +12,7 @@ const ctx: CtaContext = {
   mockMode: false,
   automation: false,
 };
-it('queues update before backup regardless of registry order and ignores blocking dismissals', () => {
+it('queues update before backup regardless of registry order and ignores legacy dismissals', () => {
   expect(
     selectNextCta(
       { ...ctx, dismissed: { 'update-required': { at: ctx.nowMs } } },
@@ -20,6 +20,31 @@ it('queues update before backup regardless of registry order and ignores blockin
     )?.id
   ).toBe('update-required');
   expect(selectNextCta({ ...ctx, nativeVersion: '2.0.0' })?.id).toBe('backup-recovery-phrase');
+});
+it('snoozes only the dismissed update version for one day and then queues backup', () => {
+  const input = {
+    ...ctx,
+    dismissed: { 'update-required:snooze': { revision: 1, at: ctx.nowMs, version: '2.0.0' } },
+  };
+  expect(selectNextCta(input)?.id).toBe('backup-recovery-phrase');
+  expect(selectNextCta({ ...input, nowMs: ctx.nowMs + DAY_MS - 1 })?.id).toBe(
+    'backup-recovery-phrase'
+  );
+  expect(selectNextCta({ ...input, nowMs: ctx.nowMs + DAY_MS })?.id).toBe('update-required');
+  expect(selectNextCta({ ...input, latest: { version: '2.0.1', fetchedAt: ctx.nowMs } })?.id).toBe(
+    'update-required'
+  );
+});
+it('ignores dismissals only for an explicitly forced definition', () => {
+  expect(
+    selectNextCta(
+      {
+        ...ctx,
+        dismissed: { 'update-required:snooze': { revision: 1, at: ctx.nowMs, version: '2.0.0' } },
+      },
+      [{ ...CTA_DEFINITIONS[0], presentation: 'blocking-modal', dismissPolicy: 'never' }]
+    )?.id
+  ).toBe('update-required');
 });
 it('honors permanent dismissal and ignores one for a different trigger version', () => {
   const backup = {

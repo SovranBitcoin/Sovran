@@ -11,8 +11,8 @@ export const CTA_DEFINITIONS: readonly CtaDefinition[] = [
   {
     id: 'update-required',
     priority: 0,
-    presentation: 'blocking-modal',
-    dismissPolicy: 'never',
+    presentation: 'dismissable-modal',
+    dismissPolicy: { snoozeMs: DAY_MS },
     shouldShow: (ctx) =>
       !!ctx.nativeVersion &&
       ctx.latest !== null &&
@@ -20,9 +20,10 @@ export const CTA_DEFINITIONS: readonly CtaDefinition[] = [
       isNewerVersion(ctx.latest.version, ctx.nativeVersion),
     content: {
       icon: 'mdi:cloud-download-outline',
-      title: 'Update required',
-      body: 'Update Sovran to continue using the app.',
+      title: 'Please update',
+      body: 'A new version of Sovran is available. Update when you’re ready.',
       primary: { label: 'Update', action: 'update' },
+      secondary: { label: 'Not now' },
     },
   },
   {

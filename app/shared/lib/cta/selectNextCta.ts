@@ -22,7 +22,9 @@ export function selectNextCta(
           if (ctx.nowMs - dismissal.at < cta.dismissPolicy.snoozeMs) return false;
         }
         const snooze = ctx.dismissed[`${cta.id}:snooze`];
-        return !(applies(snooze) && ctx.nowMs - snooze.at < BACKUP_SNOOZE_MS);
+        const snoozeMs =
+          typeof cta.dismissPolicy === 'object' ? cta.dismissPolicy.snoozeMs : BACKUP_SNOOZE_MS;
+        return !(applies(snooze) && ctx.nowMs - snooze.at < snoozeMs);
       })
       .sort((a, b) => a.priority - b.priority)[0] ?? null
   );

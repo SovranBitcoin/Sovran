@@ -68,7 +68,7 @@ export async function searchProfilesViaFacade(args: {
   const layer = buildNostrDataLayer();
   if (!layer) return ok({ ...EMPTY, query: args.query });
 
-  const result = await layer.searchProfiles({
+  let result = await layer.searchProfiles({
     query: args.query,
     ...(typeof args.limit === 'number' ? { limit: args.limit } : {}),
     ...(args.signal ? { signal: args.signal } : {}),
@@ -105,7 +105,10 @@ export async function searchProfilesViaFacade(args: {
       () => ok<SearchUsersResponse, Error>({ ...EMPTY, query: args.query })
     );
 
-  if (result.isOk() && result.value.tier === 'nagg' && result.value.vertexFresh === false) {
+  if (
+    !args.signal?.aborted &&
+    (result.isErr() || result.value.tier !== 'nagg' || result.value.vertexFresh !== true)
+  ) {
     const cached = toResponse();
     if (cached.isOk()) args.onCached?.(cached.value);
     const refreshed = await refreshVertex({
@@ -116,8 +119,25 @@ export async function searchProfilesViaFacade(args: {
       ndk: args.ndk,
       signal: args.signal,
     });
-    if (refreshed) {
-      result.value.hits = facade.searchHitsFromEnvelope(refreshed);
+    if (refreshed && !args.signal?.aborted) {
+      const hits = facade.searchHitsFromEnvelope(refreshed);
+      if (hits.length) {
+        // A DVM can know the score without having kind-0 metadata. Preserve
+        // usable fallback names/pictures and results absent from its answer.
+        const previous = new Map(
+          result.isOk() ? result.value.hits.map((hit) => [hit.pubkey, hit]) : []
+        );
+        const merged = hits.map((hit) => {
+          const cached = previous.get(hit.pubkey);
+          previous.delete(hit.pubkey);
+          return { ...cached, ...hit, metadata: { ...cached?.metadata, ...hit.metadata } };
+        });
+        result = ok({
+          tier: 'nagg',
+          vertexFresh: refreshed.vertexFresh,
+          hits: [...merged, ...previous.values()].slice(0, args.limit ?? 10),
+        });
+      }
     }
   }
 

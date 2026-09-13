@@ -121,4 +121,24 @@ describe('normalizeImageAsset', () => {
     expect(result.isErr()).toBe(true);
     expect(result._unsafeUnwrapErr()).toEqual({ type: 'convert-failed' });
   });
+  it.each(['image/gif', 'image/avif', 'application/octet-stream'])(
+    're-encodes %s avatars instead of uploading original metadata',
+    async (mimeType) => {
+      const asset: PickedAsset = { uri: 'file:///avatar', mimeType };
+      const result = await normalizeImageAsset(asset, true);
+      expect(result._unsafeUnwrap()).toMatchObject({
+        uri: 'file:///out.jpg',
+        mimeType: 'image/png',
+      });
+      expect(mockSaveAsync).toHaveBeenCalledWith({ format: 'png', compress: 0.9 });
+    }
+  );
+  it('fails closed for an avatar format the native decoder cannot read', async () => {
+    mockRenderAsync.mockRejectedValueOnce(new Error('unsupported format'));
+    const result = await normalizeImageAsset(
+      { uri: 'file:///avatar', mimeType: 'image/unknown' },
+      true
+    );
+    expect(result._unsafeUnwrapErr()).toEqual({ type: 'convert-failed' });
+  });
 });

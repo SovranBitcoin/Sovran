@@ -2,7 +2,7 @@ import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { refreshVertex, isVertexProfileStale } from '@/shared/lib/nostr/vertex/refreshVertex';
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-import type { facade } from 'nostr';
+import { aggregateValue, type facade } from 'nostr';
 
 import {
   fetchNostrProfile,
@@ -135,6 +135,37 @@ export function useNostrProfile(
         error: new Error('profile unavailable from all tiers'),
       });
     }
+    // A missing nagg profile does not imply that Vertex has no reputation for
+    // this identity. Keep fallback content visible while the consent/budget
+    // owner attempts the same signed refresh used for stale nagg profiles.
+    const refreshed = await refreshVertex({
+      kind: 'profile',
+      target: pubkey,
+      stale: refreshReputation,
+      ndk,
+      signal,
+    });
+    if (signal.aborted || !refreshed) return;
+    const parsed = parseNostrProfileFor(pubkey)(refreshed);
+    if (parsed.isOk())
+      setState((previous) => ({
+        pubkey,
+        data: {
+          ...previous.data,
+          ...parsed.value,
+          followers:
+            aggregateValue(refreshed.aggregates, pubkey, 'followers') ??
+            previous.data?.followers ??
+            parsed.value.followers,
+          follows:
+            aggregateValue(refreshed.aggregates, pubkey, 'following') ??
+            previous.data?.follows ??
+            parsed.value.follows,
+          created_at: parsed.value.created_at ?? previous.data?.created_at ?? null,
+        },
+        isLoading: false,
+        error: null,
+      }));
   }, [pubkey, ndk, refreshReputation]);
 
   useEffect(() => {

@@ -187,6 +187,17 @@ it('suppresses automation but allows preview, close and reopening a dismissed CT
   expect(mockPush).toHaveBeenCalledTimes(2);
 });
 
+it('re-previewing the same CTA re-opens it even when the previous close was never observed', async () => {
+  process.env.EXPO_PUBLIC_E2E_STATE_MIRROR = '1';
+  render(<HostWithScreen />);
+  await act(async () => useCtaStore.getState().preview('update-required'));
+  expect(mockPush).toHaveBeenCalledTimes(1);
+  // The route closed without CtaHost observing a navigation change (stranded activeId).
+  await act(async () => useCtaStore.getState().preview('update-required'));
+  expect(mockPush).toHaveBeenCalledTimes(2);
+  expect(useCtaStore.getState().activeId).toBe('update-required');
+});
+
 it('does not push twice when mount effects replay in Strict Mode', () => {
   render(
     <StrictMode>
@@ -196,7 +207,7 @@ it('does not push twice when mount effects replay in Strict Mode', () => {
   expect(mockPush).toHaveBeenCalledTimes(1);
 });
 
-it('forces a fresh check and releases the blocking route when the corrected version arrives', async () => {
+it('forces a fresh check and closes the optional route when the corrected version arrives', async () => {
   mockBalance = 0;
   useSettingsStore.setState({ lastKnownAppVersion: { version: '2.0.0', fetchedAt: Date.now() } });
   let finish!: (value: Awaited<ReturnType<typeof getLatestVersion>>) => void;
@@ -209,7 +220,7 @@ it('forces a fresh check and releases the blocking route when the corrected vers
   expect(getLatestVersion).toHaveBeenCalledTimes(1);
   mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: 'cta' }] };
   view.rerender(<HostWithScreen id="update-required" />);
-  expect(mockPreventRemove).toHaveBeenLastCalledWith(true);
+  expect(mockPreventRemove).toHaveBeenLastCalledWith(false);
   await act(async () => finish(ok({ version: '1.0.0' })));
   expect(mockPreventRemove).toHaveBeenLastCalledWith(false);
   expect(mockBack).toHaveBeenCalledTimes(1);
@@ -220,7 +231,7 @@ it('forces a fresh check and releases the blocking route when the corrected vers
 });
 
 it.each(['confirmed', 'unavailable'])(
-  'keeps a fresh update gate blocked when the network is %s',
+  'keeps a fresh optional update prompt visible when the network is %s',
   async (result) => {
     useSettingsStore.setState({ lastKnownAppVersion: { version: '2.0.0', fetchedAt: Date.now() } });
     jest
@@ -233,7 +244,7 @@ it.each(['confirmed', 'unavailable'])(
     view.rerender(<HostWithScreen id="update-required" />);
     await act(async () => {});
     expect(getLatestVersion).toHaveBeenCalledTimes(1);
-    expect(mockPreventRemove).toHaveBeenLastCalledWith(true);
+    expect(mockPreventRemove).toHaveBeenLastCalledWith(false);
     expect(mockBack).not.toHaveBeenCalled();
   }
 );
@@ -271,7 +282,7 @@ it.each(['primary', 'secondary'])(
   }
 );
 
-it('releases an offline blocking gate when its cache becomes stale on foreground', async () => {
+it('closes an offline update prompt when its cache becomes stale on foreground', async () => {
   const now = Date.now();
   const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
   useSettingsStore.setState({ lastKnownAppVersion: { version: '2.0.0', fetchedAt: now } });
@@ -296,7 +307,7 @@ it('hands off a directly opened CTA route even without a reserved active ID', as
   expect(mockPush).toHaveBeenCalledWith('/(backup-flow)/intro');
   expect(useCtaStore.getState().backupRequested).toBe(false);
 });
-it('allows a required update to interrupt backup, but never stacks another backup nag', async () => {
+it('allows an optional update prompt during backup, but never stacks another backup nag', async () => {
   mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: '(backup-flow)' }] };
   render(<HostWithScreen />);
   expect(mockPush).not.toHaveBeenCalled();

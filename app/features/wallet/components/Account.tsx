@@ -10,7 +10,7 @@ import Animated, { useEvent, useHandler } from 'react-native-reanimated';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { PrimaryBalance, type PillVisibility } from '@/features/wallet/components/PrimaryBalance';
-import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
+import { useWalletPresentationUnit } from '@/features/wallet/hooks/useWalletPresentationUnit';
 import { useThemeStore } from '@/shared/stores/profile/themeStore';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { resolveUnitWallpaper } from '@/shared/lib/theme/resolveUnitWallpaper';
@@ -75,7 +75,7 @@ interface AccountProps {
  * ThemeProvider applies the CSS vars under an already-correct wallpaper.
  */
 export function Account({ minHeight }: AccountProps): React.ReactElement {
-  const { unit, availableUnits, selectUnit } = useActiveUnit();
+  const { unit, availableUnits, selectUnit } = useWalletPresentationUnit();
   const pagerRef = useRef<PagerView>(null);
   const pageIndex = Math.max(0, availableUnits.indexOf(unit));
   // Tracks the page the PAGER currently sits on, so external unit changes

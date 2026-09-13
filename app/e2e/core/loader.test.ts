@@ -28,7 +28,7 @@ describe('loadE2E over the real tree', () => {
   });
 
   it('requires every canonical scenario to author a non-empty verify section', () => {
-    expect(loaded.scenarios.size).toBe(129);
+    expect(loaded.scenarios.size).toBe(141);
     for (const scenario of loaded.scenarios.values()) {
       expect(scenario.verify.length).toBeGreaterThan(0);
     }
@@ -1402,8 +1402,9 @@ describe('loadE2E over the real tree', () => {
     // Each checked selector below is pinned to a
     // checkbox, radio, or switch contract in the focused product-source tests.
     const auditedCheckedSelectors = [
-      'filter-direction-in',
-      'filter-direction-out',
+      'filter-direction-all',
+      'filter-direction-incoming',
+      'filter-direction-outgoing',
       'filter-mint-https://mint.minibits.cash/Bitcoin',
       'filter-mint-https://mint.sovran.money',
       'mint-distribution-toggle:https://mint.chorus.community',

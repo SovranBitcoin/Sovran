@@ -59,6 +59,24 @@ function setup(...pages: facade.ResolvedFeedPage[]) {
 }
 
 describe('profile post loading', () => {
+  it.each(['nagg', 'primal'] as const)(
+    'preserves bundled engagement counts from %s on profile pages',
+    async (tier) => {
+      const { client } = setup({
+        ...page(ROOT, 100),
+        tier,
+        stats: { [ROOT]: { likes: 17, reposts: 3, replies: 8, zaps: 2, satsZapped: 2100 } },
+      });
+      const result = await client.getUserFeed({ pubkey: PUB });
+      expect(result.metricsMap.get(ROOT)).toEqual({
+        likeCount: 17,
+        repostCount: 3,
+        replyCount: 8,
+        satsZapped: 2100,
+      });
+    }
+  );
+
   it('continues past a reply-only relay page to find authored posts', async () => {
     const { client, getFeedPage } = setup(page(REPLY, 200, true), page(ROOT, 100));
     const result = await client.getUserFeed({ pubkey: PUB, limit: 50 });

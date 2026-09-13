@@ -18,6 +18,8 @@ interface CtaState {
   startBackup: () => void;
   dismiss: (id: CtaId, forever: boolean, version?: string) => void;
   setActive: (id: CtaId | null) => void;
+  /** Bumps on every preview request so re-previewing the same id re-opens it. */
+  previewSeq: number;
   preview: (id: CtaId | null) => void;
 }
 export const useCtaStore = create<CtaState>()(
@@ -26,6 +28,7 @@ export const useCtaStore = create<CtaState>()(
       dismissed: {},
       activeId: null,
       previewOverride: null,
+      previewSeq: 0,
       closingId: null,
       backupStartedAt: null,
       backupRequested: false,
@@ -49,7 +52,14 @@ export const useCtaStore = create<CtaState>()(
           },
         })),
       setActive: (activeId) => set({ activeId, closingId: null, backupRequested: false }),
-      preview: (previewOverride) => set({ previewOverride }),
+      // A preview request must always open: clear any stranded active/closing
+      // state from the previous CTA so CtaHost goes straight to the push branch.
+      preview: (previewOverride) =>
+        set((state) => ({
+          previewOverride,
+          previewSeq: state.previewSeq + 1,
+          ...(previewOverride ? { activeId: null, closingId: null, backupRequested: false } : {}),
+        })),
     }),
     persistConfig({
       name: 'cta-store',

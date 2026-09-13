@@ -1,11 +1,13 @@
 import React, { useCallback } from 'react';
 
 import Icon, { CurrencyIcon } from 'assets/icons';
-import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
+import { useWalletPresentationUnit } from '@/features/wallet/hooks/useWalletPresentationUnit';
 import type { ActiveUnit } from '@/shared/stores/profile/mintStore';
 import { walletLog } from '@/shared/lib/logger';
 
 export interface UnitSwitcherPillProps {
+  /** Only wallet display pages opt into the isolated Mock Mode currency list. */
+  presentation?: boolean;
   textSize?: number;
   /** Show THIS account on the pill (carousel pages preview their own unit);
    *  the menu still switches the ACTIVE unit. Defaults to the active unit. */
@@ -74,8 +76,9 @@ export function useUnitSwitcherPill({
   textSize = 12,
   displayUnit,
   onSelectUnit,
+  presentation = false,
 }: UnitSwitcherPillProps): UnitSwitcherPillShared {
-  const { unit, availableUnits, selectUnit } = useActiveUnit();
+  const { unit, availableUnits, selectUnit } = useWalletPresentationUnit(presentation);
   const shownUnit = displayUnit ?? unit;
   const availableOptions = UNIT_OPTIONS.filter((option) => availableUnits.includes(option.unit));
   const canSwitch = availableOptions.some((option) => option.unit !== shownUnit);

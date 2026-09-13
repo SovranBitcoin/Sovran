@@ -7,14 +7,17 @@ jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ useNDK: () => ({ ndk: undefined 
   virtual: true,
 });
 jest.mock('@/shared/lib/nostr/vertex/refreshVertex', () => ({
-  refreshVertex: async () => null,
+  refreshVertex: (...args: unknown[]) => mockRefreshVertex(...args),
   isVertexProfileStale: () => false,
 }));
 
 const mockFetchProfile = jest.fn();
 const mockFetchStats = jest.fn();
+const mockRefreshVertex = jest.fn();
+const mockParseProfile = jest.fn();
 jest.mock('@/shared/lib/apiClient', () => ({
   fetchNostrProfile: (...args: unknown[]) => mockFetchProfile(...args),
+  parseNostrProfileFor: () => mockParseProfile,
 }));
 jest.mock('@/shared/lib/identity', () => ({ resolveIdentityName: jest.fn() }));
 jest.mock('@/shared/lib/nostr/client', () => ({ npubToPubkey: jest.fn() }));
@@ -31,6 +34,8 @@ jest.mock('@/shared/lib/logger', () => ({ log: { debug: jest.fn(), warn: jest.fn
 beforeEach(() => {
   mockFetchProfile.mockReset();
   mockFetchStats.mockReset();
+  mockRefreshVertex.mockReset().mockResolvedValue(null);
+  mockParseProfile.mockReset();
 });
 
 it('cancels a manual refresh when navigating to another profile and ignores its late result', async () => {
@@ -107,4 +112,45 @@ it('settles after all profile sources report unavailable', async () => {
   expect(result.current.isLoading).toBe(false);
   expect(result.current.data).toBeNull();
   expect(result.current.error?.message).toBe('profile unavailable from all tiers');
+});
+
+it('enriches a fallback profile with Vertex without hiding its available metadata', async () => {
+  mockFetchProfile.mockResolvedValue(err(new Error('not indexed')));
+  mockFetchStats.mockResolvedValue({
+    tier: 'primal',
+    metadata: { displayName: 'Alice' },
+    followersCount: 42,
+  });
+  let complete!: (value: object) => void;
+  mockRefreshVertex.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        complete = resolve;
+      })
+  );
+  mockParseProfile.mockReturnValue(
+    ok({ pubkey: 'alice', score: 0.9, rank: 12, followers: 0, follows: 0, created_at: null })
+  );
+  const { result } = renderHook(() => useNostrProfile('alice', true));
+  await act(async () => {});
+  expect(result.current.data).toMatchObject({ displayName: 'Alice', followers: 42 });
+  expect(result.current.isLoading).toBe(false);
+  expect(mockRefreshVertex).toHaveBeenCalledWith(
+    expect.objectContaining({ kind: 'profile', target: 'alice', stale: true })
+  );
+  await act(async () => complete({ pubkeys: ['alice'], aggregates: {} }));
+  expect(result.current.data).toMatchObject({
+    displayName: 'Alice',
+    score: 0.9,
+    rank: 12,
+    followers: 42,
+  });
+});
+it('preserves fallback content when Vertex cannot refresh', async () => {
+  mockFetchProfile.mockResolvedValue(err(new Error('not indexed')));
+  mockFetchStats.mockResolvedValue({ tier: 'primal', metadata: { displayName: 'Alice' } });
+  const { result } = renderHook(() => useNostrProfile('alice', true));
+  await act(async () => {});
+  expect(result.current.data?.displayName).toBe('Alice');
+  expect(result.current.error).toBeNull();
 });

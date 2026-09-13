@@ -33,6 +33,18 @@ bun run dev            # start the app (delegates to app/)
 bun run docs:dev       # start the docs site
 ```
 
+Run `bun run dev` from the checkout containing the changes you want to try. It
+starts Metro for the installed development client and uses the shared Nagg host,
+`https://nagg.up.railway.app`, unless your environment overrides it. Scan the QR
+code on a phone on the same network. Extra Expo options are forwarded, for example
+`bun run dev -- --port 8082`. Device automation remains an optional, separately
+configured `bun run dev:wda` command.
+
+Each Git worktree has its own source files. Updating a branch in another worktree
+does not update an already running Metro server or a detached checkout. Use the
+normal checkout for device development, with its own installed dependencies;
+sharing `node_modules` across worktrees can load two copies of native modules.
+
 `bun run test` and `bun run type-check` at the root cover the WHOLE workspace —
 they fan out with `bun run --filter '*'`, so app (both platform passes), wallet
 and nostr all run. That is what CI runs. To scope to one package, filter it

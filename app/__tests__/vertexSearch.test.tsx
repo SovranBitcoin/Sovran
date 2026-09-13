@@ -39,7 +39,7 @@ it('sorts scored nagg hits descending, preserving unknown slots and relay API or
   expect(nagg.results.map((r) => r.pubkey)).toEqual([C, B, A]);
   const relay = (await searchProfilesViaFacade({ query: 'alice' }))._unsafeUnwrap();
   expect(relay.results.map((r) => r.pubkey)).toEqual([A, B, C]);
-  expect(mockRefresh).not.toHaveBeenCalled();
+  expect(mockRefresh).toHaveBeenCalledTimes(1);
 });
 it('refreshes an explicitly stale nagg page and retains it on failure', async () => {
   mockSearch.mockResolvedValue(ok({ tier: 'nagg', hits, vertexFresh: false }));
@@ -63,7 +63,7 @@ it('refreshes an explicitly stale nagg page and retains it on failure', async ()
     aggregates: {},
   });
   const fresh = (await searchProfilesViaFacade({ query: 'alice' }))._unsafeUnwrap();
-  expect(fresh.results).toHaveLength(1);
+  expect(fresh.results).toHaveLength(3);
   expect(fresh.results[0].score).toBe(1);
 });
 it('keeps contact keys tied to pubkeys when refreshed scores reorder results', () => {
@@ -73,4 +73,76 @@ it('keeps contact keys tied to pubkeys when refreshed scores reorder results', (
   mockRows = [...mockRows].reverse();
   rerender({});
   expect(result.current.contactRows.map((r) => r.id)).toEqual([`contact:${C}`, `contact:${A}`]);
+});
+
+it.each(['primal', 'relay'])(
+  'refreshes a %s fallback while retaining usable metadata and unmatched results',
+  async (tier) => {
+    mockSearch.mockResolvedValue(
+      ok({
+        tier,
+        hits: [
+          {
+            pubkey: A,
+            metadata: { displayName: 'Alice', picture: 'https://example.com/alice.jpg' },
+          },
+          { pubkey: B, metadata: { name: 'Bob' } },
+        ],
+      })
+    );
+    const onCached = jest.fn();
+    mockRefresh.mockImplementationOnce(async () => {
+      expect(onCached).toHaveBeenCalledWith(
+        expect.objectContaining({
+          results: expect.arrayContaining([expect.objectContaining({ displayName: 'Alice' })]),
+        })
+      );
+      return {
+        pubkeys: [A],
+        providers: { [A]: { vertex: { score: 0.9 } } },
+        events: [],
+        order: [],
+        aggregates: {},
+      };
+    });
+    const response = (await searchProfilesViaFacade({ query: 'alice', onCached }))._unsafeUnwrap();
+    expect(response.results[0]).toMatchObject({
+      pubkey: A,
+      displayName: 'Alice',
+      picture: 'https://example.com/alice.jpg',
+      score: 0.9,
+    });
+    expect(response.results[1]).toMatchObject({ pubkey: B, name: 'Bob' });
+  }
+);
+it('does not erase fallback hits when the signed refresh is empty', async () => {
+  mockSearch.mockResolvedValue(ok({ tier: 'primal', hits }));
+  mockRefresh.mockResolvedValue({
+    pubkeys: [],
+    providers: {},
+    events: [],
+    order: [],
+    aggregates: {},
+  });
+  expect((await searchProfilesViaFacade({ query: 'alice' }))._unsafeUnwrap().results).toHaveLength(
+    3
+  );
+});
+it('never applies a refresh completed after cancellation', async () => {
+  const controller = new AbortController();
+  mockSearch.mockResolvedValue(ok({ tier: 'primal', hits }));
+  mockRefresh.mockImplementationOnce(async () => {
+    controller.abort();
+    return {
+      pubkeys: [A],
+      providers: { [A]: { vertex: { score: 1 } } },
+      events: [],
+      order: [],
+      aggregates: {},
+    };
+  });
+  const response = (
+    await searchProfilesViaFacade({ query: 'alice', signal: controller.signal })
+  )._unsafeUnwrap();
+  expect(response.results[0].score).toBe(0);
 });

@@ -5,6 +5,7 @@ import { useThemeStore } from '@/shared/stores/profile/themeStore';
 import { useUnitWallpaper } from '@/shared/lib/theme/useUnitWallpaper';
 import { useWallpaperRenderStore } from '@/shared/lib/theme/wallpaperRenderState';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { usePresentationUnit } from '@/shared/hooks/usePresentationUnit';
 
 /**
  * Accessibility-only evidence of the applied wallpaper.
@@ -24,7 +25,8 @@ export function WalletWallpaperProbe(): ReactElement {
   const activeAlbumSlug = useThemeStore((state) => state.activeAlbumSlug);
   const slug = activeAlbumSlug ?? 'none';
 
-  const activeUnitId = useMintStore((state) => state.activeUnit);
+  const liveUnit = useMintStore((state) => state.activeUnit);
+  const activeUnitId = usePresentationUnit(liveUnit);
   const resolvedTheme = useUnitWallpaper(activeUnitId);
   const renderStatus = useWallpaperRenderStore((state) => state.statusByTheme[resolvedTheme]);
   const imageStatus = renderStatus ?? 'none';

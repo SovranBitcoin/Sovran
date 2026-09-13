@@ -166,6 +166,7 @@ function ProfileEditor({
       ndk,
       asset: { ...asset, mimeType: asset.mimeType ?? 'image/jpeg' },
       server: getMediaServer(),
+      forceImageReencode: true,
       signal: current.signal,
       onProgress: (progress) => {
         if (isOwner() && !current.signal.aborted) setUpload({ uri: asset.uri, progress });

@@ -11,7 +11,7 @@ import { useBtcPrice } from '@/shared/stores/global/pricelistStore';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { FiatCurrencyPill } from '@/features/wallet/components/FiatCurrencyPill';
 import { withAlpha } from '@/shared/lib/color';
-import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
+import { MOCK_FIAT_BALANCES, useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
@@ -224,10 +224,14 @@ export function PrimaryBalance({
     setDisplayBtc(((displayBtc + 1) % 4) as DisplayBtcMode);
   };
 
-  const balance = mockMode ? mockBalance : breakdown.total;
-  const reservedTotal = breakdown.reserved;
-  const pendingTotal = mockMode ? mockPendingAmount : breakdown.pending;
-  const lockedTotal = breakdown.redeeming;
+  const demoBalance =
+    account.unit === 'usd' || account.unit === 'eur' || account.unit === 'gbp'
+      ? MOCK_FIAT_BALANCES[account.unit]
+      : mockBalance;
+  const balance = mockMode ? demoBalance : breakdown.total;
+  const reservedTotal = mockMode ? 0 : breakdown.reserved;
+  const pendingTotal = mockMode ? (isSatUnit ? mockPendingAmount : 0) : breakdown.pending;
+  const lockedTotal = mockMode ? 0 : breakdown.redeeming;
   // Pills sum amounts in the active unit (matches the balance above).
   const pendingUnit = account.unit;
   const lockedUnit = account.unit;
@@ -313,6 +317,7 @@ export function PrimaryBalance({
             (what the balance IS); the display-currency pill below only
             re-prices it. */}
         <UnitSwitcherPill
+          presentation
           textSize={12}
           displayUnit={
             account.unit === 'sat' ||

@@ -25,6 +25,7 @@ export function CtaHost() {
   const activeId = useCtaStore((s) => s.activeId);
   const backupStartedAt = useCtaStore((s) => s.backupStartedAt);
   const previewOverride = useCtaStore((s) => s.previewOverride);
+  const previewSeq = useCtaStore((s) => s.previewSeq);
   useLatestVersionFetch(activeId === 'update-required' && previewOverride === null);
   const [hydrated, setHydrated] = useState(useCtaStore.persist.hasHydrated);
   const [nowMs, setNowMs] = useState(Date.now);
@@ -100,6 +101,7 @@ export function CtaHost() {
     navigation,
     activeId,
     previewOverride,
+    previewSeq,
     nowMs,
     latest,
     seedCreatedAt,

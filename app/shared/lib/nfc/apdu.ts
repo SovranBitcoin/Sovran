@@ -24,8 +24,9 @@ export function getStatusMessage(sw: string): string {
 }
 
 export async function sendApdu(command: number[], label?: string): Promise<ApduResponse> {
-  const cmdHex = hex(command);
-  nfcLog.debug('nfc.apdu.send', { label, command: cmdHex });
+  // APDU bodies can contain bearer tokens; encoding them as hex does not make
+  // them safe to log and bypasses the text token redactor.
+  nfcLog.debug('nfc.apdu.send', { label, bytes: command.length });
 
   try {
     if (!NfcManager.isoDepHandler) {
@@ -38,11 +39,10 @@ export async function sendApdu(command: number[], label?: string): Promise<ApduR
       throw new NfcError('Invalid or empty response from NFC device', 'INVALID_RESPONSE');
     }
 
-    const hexResp = hex(response);
-    const sw = hexResp.slice(-4);
+    const sw = hex(response.slice(-2));
     const ok = sw.toLowerCase() === STATUS_OK.toLowerCase();
 
-    nfcLog.debug('nfc.apdu.response', { response: hexResp, sw, status: getStatusMessage(sw) });
+    nfcLog.debug('nfc.apdu.response', { bytes: response.length, sw, status: getStatusMessage(sw) });
 
     return {
       ok,
@@ -53,8 +53,9 @@ export async function sendApdu(command: number[], label?: string): Promise<ApduR
   } catch (error) {
     if (error instanceof NfcError) throw error;
     const errorStr = (error instanceof Error ? error.message : String(error)) || 'Unknown error';
-    nfcLog.error('nfc.apdu.transceive_failed', { error: errorStr });
-    throw mapTransceiveError(errorStr);
+    const mapped = mapTransceiveError(errorStr);
+    nfcLog.error('nfc.apdu.transceive_failed', { code: mapped.code });
+    throw mapped;
   }
 }
 
@@ -106,5 +107,5 @@ function mapTransceiveError(message: string): NfcError {
       'TRANSCEIVE_FAILED'
     );
   }
-  return new NfcError(`APDU communication failed: ${message}`, 'TRANSCEIVE_FAILED');
+  return new NfcError('NFC communication failed. Please try again.', 'TRANSCEIVE_FAILED');
 }

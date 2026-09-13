@@ -590,6 +590,13 @@ Cancellation of UI work invalidates stale screen updates; it does not erase an a
 
 Treat QR, NFC, payment requests, and public mesh as separate delivery contexts. NFC's intentional automatic resolution does not authorize skipping confirmation elsewhere. A public mesh recipient-locked transfer must never silently degrade to an unlocked bearer token. Encryption/delivery status does not prove redemption.
 
+NFC APDU diagnostics must record only byte counts, operation labels, and status
+words. Raw request/response hex can contain spendable bearer tokens and bypass
+text token redactors. Native error messages may echo the same bytes; map them to
+curated error codes before logging or displaying them. Successful status words
+do not establish a complete read: validate the two-byte NLEN and every requested
+body/chunk length before decoding. See `nfcApduPrivacy` and `nfcReadLengths` tests.
+
 **Payment-request mint preference (W12):** `wallet` preserves NUT-18 `mp` and
 ranks preferred mints without excluding other funded trusted mints. Coco 2.0.0's
 outgoing parser treats every mint list as strict, so `defaultOperations` removes
@@ -1027,23 +1034,26 @@ in `app/shared/lib/cta/`. Version metadata is persisted by settingsStore.
 
 **Decision:** show one eligible CTA at a time, then re-evaluate on dismissal,
 foreground, version, lifecycle and balance changes. All CTAs use `CtaScreen` in the transactions-style modal presentation
-(iOS page sheet, Android form sheet). Dismissable CTAs allow gestures; the update
-gate retains `gestureEnabled: false` and `usePreventRemove` on the same route.
-Native swipe rejection has not been verified for this change (no simulators).
+(iOS page sheet, Android form sheet). Dismissable CTAs allow gestures, Android back, and an explicit top close button.
+Updates use the optional “Please update” prompt. The registry retains
+`blocking-modal` plus `dismissPolicy: never` for a future explicitly forced CTA;
+those definitions retain `gestureEnabled: false` and `usePreventRemove`.
+Native gesture behavior requires device verification.
 
 **Rules:**
 
 - `shouldShow` is pure and synchronous over an injected context and clock.
-- Blocking CTAs use persisted last-known data; showing one never waits for a
-  network call. Records older than `LATEST_VERSION_MAX_AGE_MS` (24 hours) are
-  unknown, and a missing native version never blocks. Version refresh is normally
-  throttled to six hours; showing the update gate forces one immediate fresh
-  check. Re-evaluate while mounted on each version change and foreground; release
-  the removal guard and close automatically when the update is no longer required.
-  A confirmed newer version, or a fresh cached record while offline, still blocks.
+- Version prompts use persisted last-known data without waiting for a network
+  call. Records older than `LATEST_VERSION_MAX_AGE_MS` (24 hours) are unknown;
+  a missing native version never triggers an update. Version refresh is normally
+  throttled to six hours; showing the update prompt forces one immediate fresh
+  check. Re-evaluate while mounted on each version change and foreground; close
+  automatically when the update is no longer available. A fresh newer version
+  remains optional, including offline. “Not now”, close, swipe and Android back
+  defer that version for one day; a different newer version is eligible immediately.
 - Blocking CTAs have no dismissal, swipe or Android-back escape in production.
 - Dismissals are data-only. Version-triggered dismissals carry the trigger
-  version. A permanent record uses the CTA ID; a three-day deferral uses its
+  version. A permanent record uses the CTA ID; a timed deferral uses its
   `:snooze` key, with the same `{ at, version?, revision? }` shape. Definitions
   default to revision 1. Missing/older dismissal revisions never suppress a
   newer definition, including forever dismissals. Backup uses revision 2.
@@ -1069,7 +1079,8 @@ Native swipe rejection has not been verified for this change (no simulators).
 - Mock Mode suppresses balance-derived backup nags.
 - Automation suppresses all automatic presentation. The Developer preview
   explicitly bypasses eligibility and dismissal and offers End preview, even
-  for blocking CTAs; normal back remains blocked. Preview state is runtime-only.
+  for blocking CTAs; their normal back remains blocked. Preview state is runtime-only
+  and leaving a preview does not persist a dismissal.
 - Every CTA has semantic controls, an in-screen active probe, a registered page
   and a JSON journey. Mnemonics never enter IDs, route params or persistence.
 
@@ -1079,6 +1090,12 @@ Native swipe rejection has not been verified for this change (no simulators).
 back/gesture, large-text and safe-area evidence is still required on both OSes.
 
 ### Mock Mode and screenshot fixtures
+
+Wallet presentation may opt into `useWalletPresentationUnit` and `usePresentationUnit`
+for a runtime-only demo currency selection. The wallet carousel, its currency pill,
+and wallpaper preview offer representative sat/USD/EUR/GBP balances in Mock Mode.
+`useActiveUnit`, mint selection, and payment contexts retain live capability semantics.
+Disabling Mock Mode restores the live selected currency and theme.
 
 **Owner:** [settingsStore.mockMode](app/shared/stores/global/settingsStore.ts) is
 the sole reactive mode selector. [mockDataStore](app/shared/stores/runtime/mockDataStore.ts)
