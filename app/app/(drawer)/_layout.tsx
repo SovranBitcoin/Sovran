@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { Drawer, DrawerContentComponentProps, useDrawerStatus } from 'expo-router/drawer';
 import {
@@ -9,6 +9,7 @@ import { StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { useSegments } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { getScreenCornerRadius } from '@/shared/lib/screenCornerRadius';
+import { isNestedStackAtRoot } from '@/navigation/drawerGesture';
 
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -270,6 +271,7 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
 }
 
 export default function DrawerLayout() {
+  const [nestedPushed, setNestedPushed] = useState(false);
   const { width } = useWindowDimensions();
   const drawerWidth = Math.min(width * 0.82, 320);
   const [surface, border] = useThemeColor(['surface', 'separator-secondary'] as const);
@@ -281,6 +283,14 @@ export default function DrawerLayout() {
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: surface }]}>
       <Drawer
+        screenListeners={{
+          state: ({ data: { state } }) => {
+            // Screen-option routes omit child state in Expo Router's fork;
+            // the state event includes it for both JS and native tabs.
+            const route = state.routes[state.index];
+            setNestedPushed(route ? !isNestedStackAtRoot(route) : false);
+          },
+        }}
         screenOptions={{
           headerShown: false,
           drawerType: 'slide',
@@ -311,6 +321,7 @@ export default function DrawerLayout() {
           options={{
             drawerLabel: 'Wallet',
             title: 'Wallet',
+            swipeEnabled: !nestedPushed,
           }}
         />
       </Drawer>
