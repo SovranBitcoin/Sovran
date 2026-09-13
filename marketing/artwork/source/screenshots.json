@@ -116,13 +116,13 @@
   "ios/theme-preview": {
     "page": "theme-preview",
     "file": "source/screenshots/ios/theme-preview.png",
-    "run": "run-2026-09-13T01-58-39-179Z-dc8d7d7a",
-    "sha256": "209439959acb19453aaa104894f1e4822874bd3425feb98c6e8b914abf3ae5dd"
+    "run": "run-2026-09-13T11-58-32-605Z-a11221a0",
+    "sha256": "6fa9b17ed2083cb9e589482107708b548930e7326f1b85dbc9d5ea0dff59d738"
   },
   "ios/gallery": {
     "page": "gallery",
     "file": "source/screenshots/ios/gallery.png",
-    "run": "run-2026-09-13T01-58-39-179Z-dc8d7d7a",
+    "run": "run-2026-09-13T11-58-32-605Z-a11221a0",
     "sha256": "83d399920956e30ac9cc4dcb4b89859afaa8b065c2c848159235d6c46fe074ef"
   },
   "ios/stories": {
@@ -146,22 +146,22 @@
   "ios/wallet-navy": {
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-navy.png",
-    "run": "run-2026-09-13T01-58-39-179Z-dc8d7d7a",
-    "sha256": "5846ed6c1820c2adc1e53215574c9d56a435044f7018e18ca68d63b644d0927a",
+    "run": "run-2026-09-13T11-58-32-605Z-a11221a0",
+    "sha256": "161cfdda21a2e28318a677a861d91986672c75e5a33c9cd7fbda8d703c8f2cc7",
     "wallpaperId": "navy"
   },
   "ios/wallet-sunset": {
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-sunset.png",
-    "run": "run-2026-09-13T01-58-39-179Z-dc8d7d7a",
-    "sha256": "a664583d573a30214d074662c4783c1a1c407010a135badca3839c65af239206",
+    "run": "run-2026-09-13T11-58-32-605Z-a11221a0",
+    "sha256": "cb17a09e8e95e872086871d2668101a4c3c80f0865346f66c5ebb88df69e2e2c",
     "wallpaperId": "sunset"
   },
   "ios/wallet-beige": {
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-beige.png",
-    "run": "run-2026-09-13T01-58-39-179Z-dc8d7d7a",
-    "sha256": "923eb20ca26815119965816e2f0b3e386c7dbfe6f20ecccfc35cdf20e24d9738",
+    "run": "run-2026-09-13T11-58-32-605Z-a11221a0",
+    "sha256": "3b25848670e714455c4cbf51d8f43f4c2795b5de6aadfb35d9203b9df7be50f2",
     "wallpaperId": "beige"
   },
   "android/feed": {
@@ -284,8 +284,8 @@
   "ios/wallet-in-eclipse": {
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-in-eclipse.png",
-    "run": null,
-    "sha256": null,
+    "run": "run-2026-09-13T11-58-32-605Z-a11221a0",
+    "sha256": "7f1cf7aa9b3191266bf8bd2a8bb91892bf67a519d4e8b86793424a0d7e65d027",
     "wallpaperId": "in-eclipse"
   },
   "ios/wallet-looking-back-at-earth": {
@@ -298,15 +298,15 @@
   "ios/wallet-edge-of-lunar-day": {
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-edge-of-lunar-day.png",
-    "run": null,
-    "sha256": null,
+    "run": "run-2026-09-13T11-58-32-605Z-a11221a0",
+    "sha256": "7a65032cff9719ae52d12363d55b7ae8fe5d33256e458153d59f0d2ab902da7a",
     "wallpaperId": "edge-of-lunar-day"
   },
   "ios/wallet-setting-earth": {
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-setting-earth.png",
-    "run": null,
-    "sha256": null,
+    "run": "run-2026-09-13T11-58-32-605Z-a11221a0",
+    "sha256": "0c96c4c95ba58ebb97397bb854d77da69e38f8b085e82f0f55c2762aed60eada",
     "wallpaperId": "setting-earth"
   },
   "ios/backup-words": {
@@ -352,8 +352,8 @@
   "ios/wallet-new-moon": {
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-new-moon.png",
-    "run": null,
-    "sha256": null,
+    "run": "run-2026-09-13T11-58-32-605Z-a11221a0",
+    "sha256": "50fa4acc919526901d5f183f72abf3f1479731d9ff94917fe1223aab290c8a3f",
     "wallpaperId": "new-moon"
   }
 }
