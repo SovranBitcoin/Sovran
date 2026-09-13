@@ -130,15 +130,6 @@ describe('wallet surface e2e selectors', () => {
     }
   });
 
-  it('exposes transaction filter selection as semantic checked state', () => {
-    const filters = read('features/transactions/screens/FiltersScreen.tsx');
-    // Both chip components (Chip + MintSelectorChip) spread the shared
-    // chipA11y wiring, which carries the radio role + checked state.
-    expect(filters).toContain("accessibilityRole: 'radio'");
-    expect(filters).toContain('accessibilityState: { checked: isSelected }');
-    expect(filters.match(/\{\.\.\.chipA11y\(/g)?.length).toBe(2);
-  });
-
   it('exposes mint distribution toggles as native checked controls', () => {
     const distribution = read('features/mint/components/distribution/MintDistributionCards.tsx');
     expect(distribution).toContain('isSelected={enabled}');

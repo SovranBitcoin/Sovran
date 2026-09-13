@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "id": "transactions.filters",
+  "name": "Apply and reset transaction filters",
+  "description": "Open Filters from transactions, apply Incoming, reopen and reset the selection without moving funds.",
+  "lane": "simulator",
+  "tags": ["flow:history","check:filters"],
+  "requires": [],
+  "setup": [],
+  "steps": [
+    {"action":"openUrl","url":"sovran://transactions"},
+    {"action":"waitFor","selector":{"id":"transactions-filter-open"},"timeoutMs":30000},
+    {"action":"tap","selector":{"id":"transactions-filter-open"}},
+    {"action":"waitFor","selector":{"id":"filter-direction-incoming"},"timeoutMs":30000},
+    {"action":"tap","selector":{"id":"filter-direction-incoming"}},
+    {"action":"waitFor","selector":{"id":"filter-direction-incoming"},"value":"1"},
+    {"action":"tap","selector":{"id":"filters-apply"}},
+    {"action":"waitFor","selector":{"id":"transactions-filter-open"},"timeoutMs":30000},
+    {"action":"tap","selector":{"id":"transactions-filter-open"}},
+    {"action":"waitFor","selector":{"id":"filters-reset"},"timeoutMs":30000},
+    {"action":"waitFor","selector":{"id":"filter-direction-incoming"},"value":"1"},
+    {"action":"screenshot","name":"transaction-filters"},
+    {"action":"tap","selector":{"id":"filters-reset"}},
+    {"action":"waitFor","selector":{"id":"filter-direction-all"},"value":"1"},
+    {"action":"assert","that":"notVisible","selector":{"id":"filters-reset"}},
+    {"action":"tap","selector":{"id":"filters-apply"}},
+    {"action":"waitFor","selector":{"id":"transactions-filter-open"},"timeoutMs":30000},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":30000}
+  ],
+  "finally": [],
+  "endState": "wallet"
+}

@@ -20,6 +20,7 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
     onPress,
     label,
     accessibilityLabel,
+    accessibilityRole = 'button',
     color,
     isActive = false,
     filled = false,
@@ -50,7 +51,6 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
 
   return (
     <View
-      testID={testID}
       style={[
         styles.card,
         widthStyle,
@@ -61,8 +61,16 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
       <PressableFeedback
         animation={false}
         onPress={onPress}
-        accessibilityRole="button"
+        testID={testID}
+        accessible
+        accessibilityRole={accessibilityRole}
         accessibilityLabel={accessibilityLabel ?? label}
+        accessibilityState={
+          accessibilityRole === 'radio' ? { checked: isActive, selected: isActive } : undefined
+        }
+        accessibilityValue={
+          accessibilityRole === 'radio' ? { text: isActive ? '1' : '0' } : undefined
+        }
         style={[styles.pressable, widthStyle, { minHeight: height }]}>
         <CapsuleButtonContent
           {...props}
