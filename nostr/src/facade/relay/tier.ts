@@ -44,6 +44,8 @@ import {
 } from './demux';
 import { buildRelayForYouFeed } from './for-you/build';
 import type { NostrFilter, RawRelayEvent, RelayConnection } from './protocol';
+import { noteStatsFromRelayEvents, type NoteStatsRequest } from '../note-stats';
+import type { NoteStatsMap } from '@sovranbitcoin/schemas';
 
 // ---------------------------------------------------------------------------
 // Raw-relay tier (tier 3, the floor)
@@ -58,6 +60,9 @@ import type { NostrFilter, RawRelayEvent, RelayConnection } from './protocol';
 export type RelayTierConfig = {
   connection: RelayConnection;
 };
+
+/** Engagement events counted per read; beyond this the floor reports a lower bound. */
+const NOTE_STATS_RELAY_EVENT_LIMIT = 1000;
 
 export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
   return {
@@ -76,9 +81,21 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
         if (forYou) return answered(forYou);
       }
 
-      const filters = filtersForSpec(request.spec, {
+      let spec = request.spec;
+      if (spec.kind === 'following-recent' && !spec.authors && spec.viewerPubkey) {
+        const follows = await config.connection.request(
+          [{ kinds: [3], authors: [spec.viewerPubkey], limit: 1 }],
+          { signal: request.signal, timeoutMs: request.timeoutMs },
+        );
+        if (follows.isErr()) return failed(follows.error);
+        const latest = toFeedEvents(follows.value).sort((a, b) => b.created_at - a.created_at)[0];
+        const authors = latest?.tags.filter((tag) => tag[0] === 'p' && tag[1]).map((tag) => tag[1]) ?? [];
+        if (!authors.length) return answered(demuxRelayFeed([]));
+        spec = { ...spec, authors };
+      }
+      const filters = filtersForSpec(spec, {
         until: request.cursor?.createdAt,
-        limit: request.limit,
+        limit: request.cursor ? (request.limit ?? 30) + 1 : request.limit,
       });
       if (!filters) return unsupported();
 
@@ -250,6 +267,25 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
       });
       return result.match<TierOutcome<DiscoveredMint[]>>(
         (events) => answered(discoverFromReviews(toFeedEvents(events))),
+        (error) => failed(error),
+      );
+    },
+
+    async getNoteStats(request: NoteStatsRequest): Promise<TierOutcome<NoteStatsMap>> {
+      if (request.ids.length === 0) return answered({});
+      // Count the engagement events referencing the ids. A lower bound: the
+      // limit caps what one round-trip can count for a very popular note.
+      const filter: NostrFilter = {
+        kinds: [1, 6, 7, 9735],
+        '#e': request.ids,
+        limit: NOTE_STATS_RELAY_EVENT_LIMIT,
+      };
+      const result = await config.connection.request([filter], {
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<NoteStatsMap>>(
+        (events) => answered(noteStatsFromRelayEvents(request.ids, toFeedEvents(events))),
         (error) => failed(error),
       );
     },
@@ -450,7 +486,8 @@ export function filtersForSpec(
     case 'following-recent':
       // The floor can serve an explicit author list; a viewer anchor needs the
       // viewer's kind-3 resolved first (same gap as following-popular).
-      if (!spec.authors || spec.authors.length === 0) return null;
+      if (!spec.authors) return spec.viewerPubkey ? null : [{ kinds: [1], limit: paging.limit ?? 30, ...bounds }];
+      if (spec.authors.length === 0) return null;
       return [{ kinds: [1], authors: spec.authors, limit: paging.limit ?? 30, ...bounds }];
     case 'user':
       return [{ kinds: [1], authors: [spec.pubkey], limit: paging.limit ?? 30, ...bounds }];

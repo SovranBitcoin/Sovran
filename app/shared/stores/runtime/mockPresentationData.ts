@@ -53,3 +53,9 @@ export const DEMO_AI_MESSAGES: RoutstrMessage[] = [
       'Ecash is like digital cash you can hold in your wallet.\n\n• A mint issues tokens backed by funds it holds.\n• You can send tokens to someone else, much like handing over a banknote.\n• The recipient redeems them with the mint.\n\nChoose mints you trust: the mint holds the backing funds.',
   },
 ];
+
+export const DEMO_MEDIA_SOURCES: Readonly<Record<string, number>> = {
+  'https://blossom.primal.net/ab4028a4b2d17241fe65fb15e2f53e32430772b8d8574fc3b601ed42fb32adbf.jpg': require('../../../assets/demo/feed-188/image.png'),
+  'https://image.nostr.build/73a0a70de41c73241f10ab42edddeab0f2f6566a3b760a9c4abf46df797f41c2.jpg': require('../../../assets/demo/feed-159/image.png'),
+  'https://i.nostr.build/UQ4RgnqRPRLd76eQJAeajy.jpg': require('../../../assets/demo/feed-24/image.png'),
+};

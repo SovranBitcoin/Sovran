@@ -12,6 +12,7 @@ import {
   type NUT10Option,
 } from "@cashu/cashu-ts";
 import { describe, expect, it } from "vitest";
+import { bech32m } from "@scure/base";
 
 import { defaultDetectors } from "../../src/detectors";
 import {
@@ -19,6 +20,7 @@ import {
   lockableMintsFromRequest,
 } from "../../src/payment-request";
 import { parsePaymentInput } from "../../src/parse";
+import { reencodeSingleUsePaymentRequest } from "../../src/payment-request-receive";
 
 const LOCK_HEX = "a".repeat(64);
 const LOCK_KEY = `02${LOCK_HEX}`;
@@ -32,6 +34,32 @@ const MALFORMED_SINGLE_USE_TAG = "CREQB1QSQQQDTFLFU";
 const MALFORMED_SHORT_AMOUNT_TAG = "CREQB1QGQQYQGZSWP0M3";
 
 const parse = (value: string) => parsePaymentInput(value, defaultDetectors);
+
+describe("unsupported NUT-18 method constraints fail closed", () => {
+  // cashubtc/nuts tests/18-tests.md: Preferred Mint List with Supported Methods.
+  const creqA =
+    "creqApmFpdXByZWZlcnJlZF9mZWVfbWV0aG9kc2FhGGRhdWNzYXRhbYF4GGh0dHBzOi8vbWludC5leGFtcGxlLmNvbWJtcPVic22CoWJtbmZib2x0MTGiYm1uZmJvbHQxMmJtZgU=";
+  const base = bech32m.fromWords(bech32m.decode(SPEC_VECTOR, false).words);
+  // NUT-26 0x0a supported-method TLV containing mn=bolt11 (subtag 0x01).
+  const creqB = bech32m.encode(
+    "creqb",
+    bech32m.toWords(
+      Uint8Array.from([...base, 10, 0, 9, 1, 0, 6, 98, 111, 108, 116, 49, 49]),
+    ),
+    false,
+  );
+
+  it.each([creqA, creqB, creqB.toUpperCase()])(
+    "rejects constraints rather than paying without them %#",
+    (encoded) => {
+      expect(() => decodePaymentRequest(encoded)).toThrow(
+        "payment method constraints",
+      );
+      expect(decodePaymentRequestInfo(encoded)).toBeNull();
+      expect(defaultDetectors.isPaymentRequest(encoded)).toBe(false);
+    },
+  );
+});
 
 describe("NUT-18 creqA installed-codec boundary", () => {
   it("round-trips unit, mints, transports, tags, and the embedded NUT-10 lock", () => {
@@ -79,6 +107,7 @@ describe("NUT-18 creqA installed-codec boundary", () => {
     expect(decoded.nut10).toEqual(lock);
     expect(sovranInfo).toEqual({
       requestId: "request-18",
+      hasSpendingCondition: true,
       amount: 4_200,
       unit: "usd",
       mints: MINTS,
@@ -190,4 +219,80 @@ describe("NUT-26 CREQB1 installed-codec boundary", () => {
       ],
     });
   });
+});
+
+describe("NUT-18 mint preference backport", () => {
+  it.each([undefined, false, true])(
+    "round-trips mp=%s through both codecs",
+    (mintsPreferred) => {
+      const request = new PaymentRequest(
+        undefined,
+        "mp",
+        12,
+        "sat",
+        MINTS,
+        "preference",
+        true,
+        { kind: "P2PK", data: LOCK_KEY, tags: [] },
+        mintsPreferred,
+      );
+      expect(request.toRawRequest().mp).toBe(mintsPreferred);
+      expect(
+        PaymentRequest.fromRawRequest(request.toRawRequest()).mintsPreferred,
+      ).toBe(mintsPreferred);
+      for (const encoded of [
+        request.toEncodedCreqA(),
+        request.toEncodedCreqB(),
+      ]) {
+        const decoded = decodePaymentRequest(encoded);
+        expect(decoded.mintsPreferred).toBe(mintsPreferred);
+        expect(decoded.mints).toEqual(MINTS);
+        expect(decoded.amount?.toNumber()).toBe(12);
+        expect(decoded.nut10?.data).toBe(LOCK_KEY);
+        expect(decodePaymentRequestInfo(encoded)?.mintsPreferred).toBe(
+          mintsPreferred,
+        );
+      }
+    },
+  );
+
+  it("decodes tag 0x09 and ignores unrelated future TLV tags", () => {
+    const encode = (bytes: number[]) =>
+      bech32m.encode("creqb", bech32m.toWords(Uint8Array.from(bytes)), false);
+    const encoded = encode([0x09, 0, 1, 1, 0x7f, 0, 2, 42, 43]);
+    expect(decodePaymentRequest(encoded).mintsPreferred).toBe(true);
+    expect(decodePaymentRequestInfo(encoded)?.mintsPreferred).toBe(true);
+    expect(decodePaymentRequest(encode([0x09, 0, 1, 0])).mintsPreferred).toBe(
+      false,
+    );
+    expect(decodePaymentRequestInfo(encode([0x09, 0, 0]))).toBeNull();
+  });
+});
+
+it("preserves and explicitly overrides single-use mint preference", () => {
+  const source = new PaymentRequest(
+    undefined,
+    "single",
+    42,
+    "sat",
+    MINTS,
+    "memo",
+    true,
+    undefined,
+    true,
+  ).toEncodedRequest();
+  for (const mintsPreferred of [undefined, false, true]) {
+    const result = reencodeSingleUsePaymentRequest(source, {
+      mintsPreferred,
+      displayMints: [MINTS[0]],
+    });
+    for (const encoded of [result.encodedRequest, result.encodedRequestB]) {
+      const decoded = decodePaymentRequest(encoded);
+      expect(decoded.mintsPreferred).toBe(mintsPreferred ?? true);
+      expect(decoded.mints).toEqual([MINTS[0]]);
+      expect(decoded.amount?.toNumber()).toBe(42);
+      expect(decoded.singleUse).toBe(true);
+      expect(decoded.id).toBe("single");
+    }
+  }
 });

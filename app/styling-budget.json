@@ -80,8 +80,7 @@
     "stylesheet-create": 1
   },
   "features/feed/components/HomeFeed.tsx": {
-    "stylesheet-create": 1,
-    "content-container-style": 1
+    "stylesheet-create": 1
   },
   "features/feed/components/RecentPeopleSearchStrip.tsx": {
     "stylesheet-create": 1,
@@ -100,9 +99,8 @@
   },
   "features/feed/components/UserFeed.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 5,
-    "stack-layout-props": 2,
-    "content-container-style": 2
+    "inline-style": 4,
+    "stack-layout-props": 2
   },
   "features/feed/components/nostr/DeletedTombstone.tsx": {
     "stylesheet-create": 1,
@@ -183,7 +181,7 @@
   "features/feed/screens/NotificationsScreen.tsx": {
     "stylesheet-create": 1,
     "inline-style": 6,
-    "stack-layout-props": 15,
+    "stack-layout-props": 9,
     "content-container-style": 1
   },
   "features/feed/screens/StoriesScreen.tsx": {
@@ -195,8 +193,7 @@
   },
   "features/map/screens/MapScreen.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 4,
-    "stack-layout-props": 1
+    "inline-style": 4
   },
   "features/map/screens/MerchantDetailScreen.tsx": {
     "stylesheet-create": 1,
@@ -230,7 +227,7 @@
     "inline-style": 1
   },
   "features/mint/screens/MintAddScreen.tsx": {
-    "inline-style": 4
+    "inline-style": 3
   },
   "features/mint/screens/MintChangesScreen.tsx": {
     "stylesheet-create": 1,
@@ -243,8 +240,8 @@
   },
   "features/mint/screens/MintInfoScreen.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 13,
-    "stack-layout-props": 11,
+    "inline-style": 5,
+    "stack-layout-props": 1,
     "content-container-style": 1
   },
   "features/mint/screens/MintListScreen.tsx": {
@@ -255,8 +252,6 @@
     "stack-layout-props": 7
   },
   "features/mint/screens/MintReviewsScreen.tsx": {
-    "inline-style": 22,
-    "stack-layout-props": 10,
     "content-container-style": 1
   },
   "features/nearPay/components/NutDropCelebrationOverlay.tsx": {
@@ -328,9 +323,6 @@
     "inline-style": 21,
     "stack-layout-props": 4
   },
-  "features/onboarding/screens/TermsAndConditionsScreen.tsx": {
-    "stack-layout-props": 2
-  },
   "features/payments/components/NoResultsFound.tsx": {
     "stack-layout-props": 4
   },
@@ -339,9 +331,6 @@
   },
   "features/receive/components/ReceivePaymentRequestTab.tsx": {
     "inline-style": 2
-  },
-  "features/receive/components/ReceiveRailPlaceholder.tsx": {
-    "stylesheet-create": 1
   },
   "features/receive/components/ReceiveReusableQuoteTab.tsx": {
     "inline-style": 5
@@ -361,8 +350,8 @@
     "stack-layout-props": 1
   },
   "features/receive/screens/ReceiveRailListScreen.tsx": {
-    "inline-style": 5,
-    "stack-layout-props": 3,
+    "inline-style": 2,
+    "stack-layout-props": 2,
     "content-container-style": 1
   },
   "features/receive/screens/ReceiveScreen.tsx": {
@@ -459,17 +448,14 @@
   },
   "features/settings/screens/SettingsMediaScreen.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 5,
-    "stack-layout-props": 3
+    "inline-style": 3,
+    "stack-layout-props": 2
   },
   "features/settings/screens/SettingsNetworkScreen.tsx": {
     "inline-style": 4
   },
-  "features/settings/screens/SettingsProfileScreen.tsx": {
-    "inline-style": 4
-  },
   "features/settings/screens/SettingsRecoveryScreen.tsx": {
-    "inline-style": 28,
+    "inline-style": 15,
     "stack-layout-props": 22
   },
   "features/settings/screens/SettingsRoutingScreen.tsx": {
@@ -574,12 +560,6 @@
     "inline-style": 5,
     "stack-layout-props": 2
   },
-  "features/transactions/screens/FiltersScreen.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 4,
-    "stack-layout-props": 1,
-    "content-container-style": 1
-  },
   "features/transactions/screens/SwapTransactionScreen.tsx": {
     "stylesheet-create": 1,
     "inline-style": 7,
@@ -589,11 +569,11 @@
     "inline-style": 1
   },
   "features/user/screens/UserMessagesScreen.tsx": {
-    "inline-style": 3
+    "inline-style": 2
   },
   "features/user/screens/UserProfileScreen.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 19,
+    "inline-style": 18,
     "stack-layout-props": 4
   },
   "features/wallet/components/Account.tsx": {
@@ -653,8 +633,7 @@
     "stack-layout-props": 2
   },
   "shared/blocks/PaymentInfo.tsx": {
-    "inline-style": 2,
-    "stack-layout-props": 1
+    "inline-style": 2
   },
   "shared/blocks/SovranTabBar.tsx": {
     "stylesheet-create": 1,
@@ -749,7 +728,7 @@
   },
   "shared/ui/composed/AmountEntryView.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 8,
+    "inline-style": 7,
     "stack-layout-props": 5,
     "content-container-style": 1
   },
@@ -908,7 +887,7 @@
     "stylesheet-create": 1
   },
   "shared/ui/composed/QRCode.tsx": {
-    "inline-style": 15,
+    "inline-style": 14,
     "stack-layout-props": 2
   },
   "shared/ui/composed/RowStatsAccent.tsx": {
@@ -952,16 +931,15 @@
     "stack-layout-props": 4
   },
   "shared/ui/composed/chat/ChatMessageBubble.tsx": {
-    "inline-style": 11,
+    "inline-style": 10,
     "stack-layout-props": 4
   },
   "shared/ui/composed/chat/ChatScreen.tsx": {
-    "inline-style": 6,
+    "inline-style": 5,
     "content-container-style": 2
   },
   "shared/ui/composed/chat/DmChatHeader.tsx": {
-    "inline-style": 5,
-    "stack-layout-props": 1
+    "inline-style": 3
   },
   "shared/ui/composed/chat/LiquidChatComposer.tsx": {
     "inline-style": 9,

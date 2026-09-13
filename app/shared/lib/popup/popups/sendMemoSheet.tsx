@@ -32,7 +32,10 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { relays as defaultRelays } from '@/shared/ndk';
-import { useContactSearch, type DisplayResult } from '@/features/payments/hooks/useContactSearch';
+import {
+  useContactSearch,
+  type SearchResultData,
+} from '@/features/payments/hooks/useContactSearch';
 import { CONTACT_SEARCH_MIN_LENGTH } from '@/shared/lib/contactSearch';
 
 import { showActionSheet } from './bridge';
@@ -57,13 +60,11 @@ interface SendMemoContentProps extends CustomSheetSharedProps {
   payload: ActionSheetPayloads['send-memo'];
 }
 
-type MentionSearchResult = DisplayResult & {
-  profile: NonNullable<DisplayResult['profile']>;
-};
+type MentionSearchResult = SearchResultData;
 type TextSelection = { start: number; end: number };
 
-function isMentionSearchResult(result: DisplayResult): result is MentionSearchResult {
-  return !!result.profile && !!result.pubkey && !result.pubkey.startsWith('placeholder-');
+function isMentionSearchResult(result: SearchResultData): result is MentionSearchResult {
+  return !!result.profile && !!result.pubkey;
 }
 
 const mentionKeyExtractor = (item: MentionSearchResult) => item.pubkey;
@@ -298,9 +299,9 @@ function MentionSearchResults({
   onSelectResult: (result: MentionSearchResult) => void;
 }): React.ReactElement {
   const [foreground] = useThemeColor(['foreground'] as const);
-  const { displayResults, searchLoading, hasSearched } = useContactSearch(query);
+  const { results: searchResults, searchLoading, hasSearched } = useContactSearch(query);
   const trimmedQuery = query.trim();
-  const rawResults = displayResults.filter(isMentionSearchResult);
+  const rawResults = searchResults.filter(isMentionSearchResult);
   const resultPubkeys = rawResults.map((result) => result.pubkey);
   const { metadata: cachedMetadata } = useNostrProfileMetadataMany(resultPubkeys);
   const results = rawResults.map((result) => {

@@ -1,6 +1,8 @@
 import type { PaymentCopyCatalog } from "./types";
 
 export const paymentCopyDefaults = {
+  "nfc.unitSwitchFailed": "Could not select the terminal’s currency. Try again.",
+  "nfc.unitNotFunded": "This terminal wants {unit}. You have no {unit} ecash at an accepted mint.",
   "timeline.mint.unpaid.label": "Waiting for payment",
   "timeline.mint.unpaid.info": "Pay the invoice to receive funds",
   "timeline.mint.unpaid.onchainInfo": "Pay the address to receive funds",

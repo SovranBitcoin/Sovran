@@ -15,6 +15,7 @@ export type ChatBubbleRenderArgs = {
   message: ChatBubbleMessage;
   isFirstInGroup: boolean;
   isLastInGroup: boolean;
+  counterpartyAvatar?: React.ReactNode;
 };
 
 export type ChatBubbleMessage = {

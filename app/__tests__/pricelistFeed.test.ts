@@ -1,241 +1,289 @@
-/**
- * @jest-environment node
- */
-import {
-  createPricelistFeed,
-  IDLE_RETRY_MS,
-  MAX_RECONNECT_ATTEMPTS,
-  SILENT_SOCKET_MS,
-  type PricelistSocket,
-} from '@/shared/lib/pricelistFeed';
+/** @jest-environment node */
+import { err, ok } from 'neverthrow';
+import { createPricelistFeed, POLL_MS } from '@/shared/lib/pricelistFeed';
+import { ApiHttpError, fetchBtcRates } from '@/shared/lib/apiClient';
+import { log } from '@/shared/lib/logger';
+import { PRICE_STALE_MINUTES, usePricelistStore } from '@/shared/stores/global/pricelistStore';
 
+jest.mock('wallet', () => ({
+  combineSignals: (...signals: (AbortSignal | undefined)[]) => signals.find((signal) => !!signal),
+  createNostrMintEnrichment: () => ({}),
+  isAbortError: (error: Error) => error.name === 'AbortError',
+  timeoutSignal: () => new AbortController().signal,
+}));
+jest.mock('@/shared/config/backend', () => ({
+  backendConfig: { scoreApiBaseUrl: 'https://rates.example.test' },
+}));
 jest.mock('@/shared/lib/logger', () => ({
-  log: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+  log: { info: jest.fn(), warn: jest.fn() },
+  apiLog: { debug: jest.fn(), warn: jest.fn(), error: jest.fn() },
+  storeLog: { debug: jest.fn(), warn: jest.fn() },
+}));
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(async () => null),
+  setItem: jest.fn(async () => undefined),
+  removeItem: jest.fn(async () => undefined),
 }));
 
-const CONNECTING = 0;
-const OPEN = 1;
-const CLOSED = 3;
+type Rates = Awaited<ReturnType<typeof fetchBtcRates>>;
+const payload = {
+  updatedAt: 1_800_000_000,
+  degraded: false,
+  rates: {
+    USD: { price: 77_242, at: 1_800_000_000 },
+    EUR: { price: 67_000, at: 1_800_000_000 },
+    GBP: { price: 58_000, at: 1_800_000_000 },
+    CHF: { price: 61_000, at: 1_800_000_000 },
+  },
+};
 
-class FakeSocket implements PricelistSocket {
-  readyState = CONNECTING;
-  onopen: (() => void) | null = null;
-  onmessage: ((event: { data: string }) => void) | null = null;
-  onerror: ((error: unknown) => void) | null = null;
-  onclose: (() => void) | null = null;
-  closeCalls = 0;
-
-  close(): void {
-    this.closeCalls += 1;
-    this.readyState = CLOSED;
-    // `close()` only asks the native side to close; the event lands later.
-    // Every test that models a teardown fires `onclose` by hand afterwards,
-    // which is the ordering that produced the orphan socket.
-  }
-
-  open(): void {
-    this.readyState = OPEN;
-    this.onopen?.();
-  }
-
-  drop(): void {
-    this.readyState = CLOSED;
-    this.onclose?.();
-  }
-}
-
-function makeFeed() {
-  const sockets: FakeSocket[] = [];
-  const onPrices = jest.fn();
+function makeFeed(
+  fetcher = jest.fn<ReturnType<typeof fetchBtcRates>, Parameters<typeof fetchBtcRates>>()
+) {
+  const onPrices = jest.fn(usePricelistStore.getState().setBtcPrices);
   const onLoading = jest.fn();
   const onError = jest.fn();
-  const feed = createPricelistFeed({
-    onPrices,
-    onLoading,
-    onError,
-    createSocket: () => {
-      const socket = new FakeSocket();
-      sockets.push(socket);
-      return socket;
-    },
-  });
-  return { feed, sockets, onPrices, onLoading, onError };
+  const feed = createPricelistFeed({ onPrices, onLoading, onError, fetcher });
+  return { feed, fetcher, onPrices, onLoading, onError };
 }
 
-/** Walk the whole backoff ladder to its pause, dropping each dial. */
-function exhaustLadder(sockets: FakeSocket[]) {
-  sockets[sockets.length - 1].drop();
-  for (let i = 1; i < MAX_RECONNECT_ATTEMPTS; i++) {
-    jest.runOnlyPendingTimers();
-    sockets[sockets.length - 1].drop();
-  }
-  jest.runOnlyPendingTimers();
-  sockets[sockets.length - 1].drop();
-}
+beforeEach(() => {
+  jest.useFakeTimers();
+  jest.setSystemTime(payload.updatedAt * 1000);
+  jest.spyOn(Math, 'random').mockReturnValue(1);
+  usePricelistStore.setState(usePricelistStore.getInitialState());
+});
+afterEach(() => {
+  jest.clearAllTimers();
+  jest.restoreAllMocks();
+  jest.useRealTimers();
+});
 
-beforeEach(() => jest.useFakeTimers());
-afterEach(() => jest.useRealTimers());
+// Drain promise continuations without advancing to the next scheduled poll.
+const settle = () => jest.advanceTimersByTimeAsync(0);
 
-describe('pricelist feed', () => {
-  it('opens one socket and keeps it on a malformed frame', () => {
-    const { feed, sockets, onPrices, onError } = makeFeed();
-    feed.start();
-    expect(sockets).toHaveLength(1);
-    sockets[0].open();
-
-    sockets[0].onmessage?.({ data: 'not json' });
-    sockets[0].onmessage?.({ data: JSON.stringify({ nope: true }) });
-    expect(onPrices).not.toHaveBeenCalled();
-    expect(sockets[0].closeCalls).toBe(0);
-
-    sockets[0].onmessage?.({
-      data: JSON.stringify({ btcPrices: { USD: 42, GBP: 33, EUR: 39 } }),
-    });
-    expect(onPrices).toHaveBeenCalledWith({ USD: 42, GBP: 33, EUR: 39 });
-    expect(onError).toHaveBeenLastCalledWith(null);
-  });
-
-  it('does not dial a second socket while the first is still connecting', () => {
-    const { feed, sockets } = makeFeed();
+describe('pricelist polling', () => {
+  it('starts once, maps supported prices and timestamp, and polls every ten minutes', async () => {
+    const { feed, fetcher, onPrices, onLoading, onError } = makeFeed();
+    fetcher.mockResolvedValue(ok(payload));
+    feed.resume('online');
+    expect(fetcher).not.toHaveBeenCalled();
     feed.start();
     feed.start();
-    expect(sockets).toHaveLength(1);
-  });
-
-  it('leaves nothing behind after stop, even though onclose lands late', () => {
-    // The bug: cleanup ran `clearTimeout` and then `ws.close()`. `close()` is a
-    // request to the native side, so `onclose` fired after the cleanup had
-    // already returned and scheduled a reconnect nothing could cancel — one
-    // orphan socket per unmount, and this provider is remounted on every
-    // profile switch.
-    const { feed, sockets, onLoading } = makeFeed();
-    feed.start();
-    sockets[0].open();
-
-    onLoading.mockClear();
-    feed.stop();
-    expect(sockets[0].closeCalls).toBe(1);
-    sockets[0].onclose?.();
-    jest.runOnlyPendingTimers();
-
-    expect(sockets).toHaveLength(1);
-    // And the dead feed writes nothing back into the store on its way out.
-    expect(onLoading).not.toHaveBeenCalled();
-  });
-
-  it('ignores a frame that arrives after stop', () => {
-    const { feed, sockets, onPrices } = makeFeed();
-    feed.start();
-    sockets[0].open();
-    feed.stop();
-
-    sockets[0].onmessage?.({
-      data: JSON.stringify({ btcPrices: { USD: 42, GBP: 33, EUR: 39 } }),
-    });
-    expect(onPrices).not.toHaveBeenCalled();
-  });
-
-  it('climbs the fast ladder, then keeps trying slowly instead of giving up', () => {
-    const { feed, sockets, onError } = makeFeed();
-    feed.start();
-    exhaustLadder(sockets);
-
-    expect(sockets).toHaveLength(MAX_RECONNECT_ATTEMPTS + 1);
-    expect(onError).toHaveBeenLastCalledWith(
-      'Connection lost. Please check your internet connection.'
+    await settle();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(onPrices).toHaveBeenCalledWith(
+      { USD: 77_242, EUR: 67_000, GBP: 58_000 },
+      payload.updatedAt
     );
-
-    // The old code stopped here for the rest of the session. It must not dial
-    // on the fast ladder's cadence any more…
-    jest.advanceTimersByTime(IDLE_RETRY_MS - 1);
-    expect(sockets).toHaveLength(MAX_RECONNECT_ATTEMPTS + 1);
-    // …but it must still be trying. `resume()` covers a device that went
-    // offline and came back; this covers the price service alone being down
-    // while the device is online and the app never leaves the foreground.
-    jest.advanceTimersByTime(1);
-    expect(sockets).toHaveLength(MAX_RECONNECT_ATTEMPTS + 2);
-  });
-
-  it.each(['foreground', 'online'] as const)('re-arms the paused ladder on %s', (reason) => {
-    const { feed, sockets } = makeFeed();
-    feed.start();
-    exhaustLadder(sockets);
-    const exhausted = sockets.length;
-
-    feed.resume(reason);
-    expect(sockets).toHaveLength(exhausted + 1);
-
-    // And the ladder is a full ladder again, not one last attempt.
-    sockets[sockets.length - 1].drop();
-    jest.runOnlyPendingTimers();
-    expect(sockets).toHaveLength(exhausted + 2);
-  });
-
-  it('abandons a dial still hanging in CONNECTING when resumed', () => {
-    // RN's WebSocket has no connect timeout. A dial started while the network
-    // was down can sit in CONNECTING for as long as the platform's TCP
-    // timeout, and `connect()` treats CONNECTING as live — so without this the
-    // resume meant to recover the feed would queue behind the hang.
-    const { feed, sockets } = makeFeed();
-    feed.start();
-    expect(sockets[0].readyState).toBe(CONNECTING);
-
-    feed.resume('online');
-    expect(sockets).toHaveLength(2);
-    expect(sockets[0].closeCalls).toBe(1);
-
-    // And the abandoned socket cannot schedule anything on top of the new one.
-    sockets[0].onclose?.();
-    jest.runOnlyPendingTimers();
-    expect(sockets).toHaveLength(2);
-  });
-
-  it('closes a discarded dial that opens later, which Android needs', () => {
-    // `WebSocketModule` records a socket only in `onOpen`, and `close()` on an
-    // id it does not hold does nothing — so closing a CONNECTING dial is a
-    // native no-op there and the connection would open unowned.
-    const { feed, sockets } = makeFeed();
-    feed.start();
-    feed.resume('online');
-    expect(sockets).toHaveLength(2);
-
-    const abandoned = sockets[0];
-    expect(abandoned.closeCalls).toBe(1);
-    abandoned.onopen?.();
-    expect(abandoned.closeCalls).toBe(2);
-  });
-
-  it('replaces a socket that reads OPEN but has gone silent', () => {
-    // Android disables OkHttp's read timeout for web sockets and this feed is
-    // receive-only, so a blackholed connection reads OPEN forever.
-    const { feed, sockets } = makeFeed();
-    feed.start();
-    sockets[0].open();
-
-    jest.advanceTimersByTime(SILENT_SOCKET_MS);
-    feed.resume('foreground');
-    expect(sockets).toHaveLength(2);
-  });
-
-  it('does not redial a live socket on resume', () => {
-    const { feed, sockets } = makeFeed();
-    feed.start();
-    sockets[0].open();
-    sockets[0].onmessage?.({
-      data: JSON.stringify({ btcPrices: { USD: 1, GBP: 1, EUR: 1 } }),
-    });
-
-    feed.resume('foreground');
-    expect(sockets).toHaveLength(1);
-  });
-
-  it('stays stopped when resumed after stop', () => {
-    const { feed, sockets } = makeFeed();
-    feed.start();
+    expect(onLoading.mock.calls).toEqual([[true], [false]]);
+    expect(onError).toHaveBeenLastCalledWith(null);
+    await jest.advanceTimersByTimeAsync(POLL_MS - 1);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(fetcher).toHaveBeenCalledTimes(2);
     feed.stop();
+  });
 
-    feed.resume('foreground');
-    jest.runOnlyPendingTimers();
-    expect(sockets).toHaveLength(1);
+  it.each(['foreground', 'online'] as const)(
+    'debounces %s until success is older than 60s',
+    async (reason) => {
+      const { feed, fetcher } = makeFeed();
+      fetcher.mockResolvedValue(ok(payload));
+      feed.start();
+      await settle();
+      await jest.advanceTimersByTimeAsync(60_000);
+      feed.resume(reason);
+      await settle();
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      await jest.advanceTimersByTimeAsync(1);
+      feed.resume(reason);
+      feed.resume(reason);
+      await settle();
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      // Resume replaces the old poll timer.
+      await jest.advanceTimersByTimeAsync(POLL_MS - 1);
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(fetcher).toHaveBeenCalledTimes(3);
+      feed.stop();
+    }
+  );
+
+  it('retries 503 warming at 30s, 1m, 2m, then 5m capped, without an error toast', async () => {
+    const { feed, fetcher, onPrices, onError } = makeFeed();
+    fetcher.mockResolvedValue(err(new ApiHttpError(503, 'Service Unavailable')));
+    feed.start();
+    await settle();
+    let calls = 1;
+    for (const delay of [30_000, 60_000, 120_000, 300_000, 300_000]) {
+      await jest.advanceTimersByTimeAsync(delay - 1);
+      expect(fetcher).toHaveBeenCalledTimes(calls);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(fetcher).toHaveBeenCalledTimes(++calls);
+    }
+    expect(onPrices).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+    expect(log.warn).toHaveBeenCalledWith('pricelist.poll.failed', { status: 503 });
+    feed.stop();
+  });
+
+  it('jitters retries and resets the failure ladder after success', async () => {
+    jest.mocked(Math.random).mockReturnValue(0);
+    const { feed, fetcher } = makeFeed();
+    fetcher.mockResolvedValue(err(new Error('offline')));
+    feed.start();
+    await settle();
+    await jest.advanceTimersByTimeAsync(24_000 - 1);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    fetcher.mockResolvedValueOnce(ok(payload));
+    await jest.advanceTimersByTimeAsync(1);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    await jest.advanceTimersByTimeAsync(POLL_MS);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    await jest.advanceTimersByTimeAsync(24_000);
+    expect(fetcher).toHaveBeenCalledTimes(4);
+    feed.stop();
+  });
+
+  it('resumes immediately during backoff and contains rejected fetchers', async () => {
+    const { feed, fetcher } = makeFeed();
+    fetcher.mockRejectedValue(new Error('offline'));
+    feed.start();
+    await settle();
+    fetcher.mockResolvedValue(ok(payload));
+    feed.resume('online');
+    await settle();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    await jest.advanceTimersByTimeAsync(30_000);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    feed.stop();
+  });
+
+  it.each([true, false])(
+    'aborts in-flight work and ignores late completion (success=%s)',
+    async (success) => {
+      let complete!: (result: Rates) => void;
+      const { feed, fetcher, onPrices, onLoading, onError } = makeFeed();
+      fetcher.mockReturnValue(
+        new Promise((resolve) => {
+          complete = resolve;
+        })
+      );
+      feed.start();
+      await settle();
+      feed.resume('online');
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      const signal = fetcher.mock.calls[0][0]?.signal;
+      onLoading.mockClear();
+      feed.stop();
+      expect(signal?.aborted).toBe(true);
+      complete(success ? ok(payload) : err(new Error('late failure')));
+      await settle();
+      feed.resume('foreground');
+      feed.start();
+      expect(onPrices).not.toHaveBeenCalled();
+      expect(onLoading).not.toHaveBeenCalled();
+      expect(onError).not.toHaveBeenCalled();
+      expect(jest.getTimerCount()).toBe(0);
+    }
+  );
+
+  it.each([true, false])('clears scheduled work on stop (success=%s)', async (success) => {
+    const { feed, fetcher } = makeFeed();
+    fetcher.mockResolvedValue(success ? ok(payload) : err(new Error('offline')));
+    feed.start();
+    await settle();
+    feed.stop();
+    await jest.advanceTimersByTimeAsync(POLL_MS * 2);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('preserves cached currencies omitted on the first and subsequent responses', async () => {
+    usePricelistStore.getState().setBtcPrices({ USD: 70_000, EUR: 60_000, GBP: 50_000 });
+    const { feed, fetcher } = makeFeed();
+    fetcher.mockResolvedValueOnce(ok({ ...payload, rates: { EUR: payload.rates.EUR } }));
+    fetcher.mockResolvedValueOnce(ok({ ...payload, rates: { USD: payload.rates.USD } }));
+    feed.start();
+    await settle();
+    expect(usePricelistStore.getState().pricelist).toEqual({
+      usd: { btc: 70_000 },
+      eur: { btc: 67_000 },
+      gbp: { btc: 50_000 },
+    });
+    await jest.advanceTimersByTimeAsync(POLL_MS);
+    expect(usePricelistStore.getState().pricelist).toEqual({
+      usd: { btc: 77_242 },
+      eur: { btc: 67_000 },
+      gbp: { btc: 50_000 },
+    });
+    expect(usePricelistStore.getState().serverUpdatedAt).toBe(payload.updatedAt);
+    feed.stop();
+  });
+
+  it('does not invent an absent currency or refresh the store for an empty rates map', () => {
+    usePricelistStore.getState().setBtcPrices({ EUR: 67_000 }, payload.updatedAt);
+    expect(usePricelistStore.getState().getBtcPrice('usd')).toBeNull();
+    expect(usePricelistStore.getState().pricelist).toEqual({ eur: { btc: 67_000 } });
+    const previous = usePricelistStore.getState();
+    usePricelistStore.getState().setBtcPrices({}, payload.updatedAt + 60);
+    expect(usePricelistStore.getState()).toBe(previous);
+  });
+
+  it('uses the hourly server age for staleness, with local time for legacy writes', () => {
+    const { setBtcPrices, isStale } = usePricelistStore.getState();
+    expect(isStale()).toBe(true);
+    setBtcPrices({ USD: 70_000 }, payload.updatedAt - PRICE_STALE_MINUTES * 60);
+    expect(isStale()).toBe(false);
+    jest.advanceTimersByTime(1);
+    expect(isStale()).toBe(true);
+    setBtcPrices({ USD: 71_000 }, payload.updatedAt - PRICE_STALE_MINUTES * 60);
+    expect(isStale()).toBe(true);
+    setBtcPrices({ USD: 72_000 });
+    expect(isStale()).toBe(false);
+    expect(usePricelistStore.getState().serverUpdatedAt).toBeNull();
+  });
+});
+
+describe('pricelist HTTP boundary', () => {
+  it('uses the configured rates endpoint, forwards cancellation and accepts extra envelope fields', async () => {
+    const controller = new AbortController();
+    const body = { ...payload, version: 1, base: 'BTC', sources: [] };
+    const fetch = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify(body)));
+    const result = await fetchBtcRates({ signal: controller.signal });
+    expect(result).toEqual(ok(body));
+    expect(fetch).toHaveBeenCalledWith('https://rates.example.test/app/rates', {
+      signal: controller.signal,
+    });
+  });
+
+  it.each([0, -1, '77242', null])('rejects invalid prices (%s)', async (price) => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...payload,
+          rates: { USD: { price, at: payload.updatedAt } },
+        })
+      )
+    );
+    expect((await fetchBtcRates()).isErr()).toBe(true);
+  });
+
+  it('preserves the status of a real 503 warming response for retries', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('{"error":"rates warming"}', {
+        status: 503,
+        statusText: 'Service Unavailable',
+      })
+    );
+    const result = await fetchBtcRates();
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error).toBeInstanceOf(ApiHttpError);
+      expect(result.error).toMatchObject({ status: 503 });
+    }
   });
 });

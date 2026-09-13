@@ -113,6 +113,7 @@ export type AiLineup = z.infer<typeof AiLineupSchema>;
  */
 export const PersistedLineupSchema = z.object({
   derivedAt: z.number().int().nonnegative().catch(0),
+  nodeBaseUrl: z.string().max(512).nullable().optional().catch(null),
   lineup: AiLineupSchema,
 });
 export type PersistedLineup = z.infer<typeof PersistedLineupSchema>;
@@ -418,7 +419,13 @@ const NaggLineupModelSchema = z.object({
 export const NaggAiLineupSchema = z.object({
   version: z.number().int().catch(1),
   updatedAt: z.number().int().nonnegative().catch(0),
-  node: z.object({ baseUrl: z.string().max(512).catch('') }).catch({ baseUrl: '' }),
+  node: z
+    .object({
+      baseUrl: z.string().max(512).catch(''),
+      authMode: z.enum(['bearer', 'x-cashu']).optional().catch(undefined),
+      fallbackUsed: z.boolean().optional().catch(undefined),
+    })
+    .catch({ baseUrl: '' }),
   providers: z
     .array(
       z.object({
@@ -442,6 +449,7 @@ type NaggAiLineup = z.infer<typeof NaggAiLineupSchema>;
 export function lineupFromNaggPayload(payload: NaggAiLineup): {
   lineup: AiLineup | null;
   nodeBaseUrl: string | null;
+  authMode?: 'bearer' | 'x-cashu';
 } {
   const lineup = emptyLineup();
   const knownProviders = new Set<string>(AI_PROVIDER_IDS);
@@ -472,7 +480,7 @@ export function lineupFromNaggPayload(payload: NaggAiLineup): {
     }
   }
   const nodeBaseUrl = payload.node.baseUrl.trim() || null;
-  return { lineup: filled > 0 ? lineup : null, nodeBaseUrl };
+  return { lineup: filled > 0 ? lineup : null, nodeBaseUrl, authMode: payload.node.authMode };
 }
 
 /** Same `Provider:` prefix strip as `displayNameFor`, for nagg names. */

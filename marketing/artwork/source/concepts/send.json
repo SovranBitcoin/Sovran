@@ -1,0 +1,21 @@
+{
+  "id": "send",
+  "platform": "ios",
+  "screenshots": [
+    "send"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "send"
+}

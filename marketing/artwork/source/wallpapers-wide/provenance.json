@@ -1,0 +1,210 @@
+{
+  "backlit-earth": {
+    "sha256": "1d841a7cbfb6912069973c606a75f777475b58246fc9485d818a57531b5f51b7",
+    "width": 2048,
+    "height": 1024,
+    "generator": "codex exec image_generation (gpt-6-astra session, 2026-09-13)",
+    "promptSha256": "30610e75751efbc06df9fdae684b514ec97741b29b9e6704121d21cd4c226899",
+    "generatedAt": "2026-09-13T02:46:44+00:00",
+    "note": "Portrait catalog image out-painted left/right to 2:1; the renderer restores the original portrait bytes over the centre strip before use. Stored as a 2048×1024 JPEG (q90) derived from the generated PNG; the original PNG hash is kept in derivedFrom.",
+    "format": "jpeg",
+    "derivedFrom": {
+      "sha256": "e7f38228419cd1d45de174a8638069999120d1c7a42405f39c1335a059a242f4",
+      "width": 3840,
+      "height": 1920,
+      "format": "png"
+    }
+  },
+  "cratered-terrain": {
+    "sha256": "ad9f599ca8387d8d45e4e9f37ae4dac73c2a9d0e60dd0ddd9b475450466f66db",
+    "width": 2048,
+    "height": 1024,
+    "generator": "codex exec image_generation (gpt-6-astra session, 2026-09-13)",
+    "promptSha256": "7440e26cbe6176fb1212a9013fe6f2669fb6ea481dc6d2fa95ad046608835f0e",
+    "generatedAt": "2026-09-13T02:43:13+00:00",
+    "note": "Portrait catalog image out-painted left/right to 2:1; the renderer restores the original portrait bytes over the centre strip before use. Stored as a 2048×1024 JPEG (q90) derived from the generated PNG; the original PNG hash is kept in derivedFrom.",
+    "format": "jpeg",
+    "derivedFrom": {
+      "sha256": "dca19210f5975d1a6324b5ee0673e08f37bf27222a766d76c77bdb04d78649f5",
+      "width": 3840,
+      "height": 1920,
+      "format": "png"
+    }
+  },
+  "earth-views-from-the-artemis-ii-crew": {
+    "sha256": "ead87a147eb66f1ddbce7ce1557ac5f6cbe70593ae90460c36e2b08168a7e08f",
+    "width": 2048,
+    "height": 1024,
+    "generator": "codex exec image_generation (gpt-6-astra session, 2026-09-13)",
+    "promptSha256": "40b4c6935285b1749e4a549ad344490dc373b916981af14690c0e226b83f1c3d",
+    "generatedAt": "2026-09-13T02:41:49+00:00",
+    "note": "Portrait catalog image out-painted left/right to 2:1; the renderer restores the original portrait bytes over the centre strip before use. Stored as a 2048×1024 JPEG (q90) derived from the generated PNG; the original PNG hash is kept in derivedFrom.",
+    "format": "jpeg",
+    "derivedFrom": {
+      "sha256": "b3004a0b533dbcff0fa2b47067cca94e178222d6f8ec70f34eea85593ffc78ef",
+      "width": 3840,
+      "height": 1920,
+      "format": "png"
+    }
+  },
+  "edge-of-lunar-day": {
+    "sha256": "58fb19176168d27cd5b2987711ea14d7bfa1598a61c0bf951cf48a08acee3a28",
+    "width": 2048,
+    "height": 1024,
+    "generator": "codex exec image_generation (gpt-6-astra session, 2026-09-13)",
+    "promptSha256": "0f53d99079f6a92316699c78ecfaaaa0c463c9c099c7541a474fce256662d433",
+    "generatedAt": "2026-09-13T02:44:02+00:00",
+    "note": "Portrait catalog image out-painted left/right to 2:1; the renderer restores the original portrait bytes over the centre strip before use. Stored as a 2048×1024 JPEG (q90) derived from the generated PNG; the original PNG hash is kept in derivedFrom.",
+    "format": "jpeg",
+    "derivedFrom": {
+      "sha256": "7d0e1a98a01059d929367baae1d18b09ac627a1192fc2bc478b20093b3ee3331",
+      "width": 3840,
+      "height": 1920,
+      "format": "png"
+    }
+  },
+  "in-eclipse": {
+    "sha256": "f83779cfd06b4cf10384895eef3ed639b6d6d757baf0e0d1de999e737774e8a0",
+    "width": 2048,
+    "height": 1024,
+    "generator": "codex exec image_generation (gpt-6-astra session, 2026-09-13)",
+    "promptSha256": "daf3c4950d264d0e6e34b6ff60be768db6549f8da350d826d38cf8473e0697c4",
+    "generatedAt": "2026-09-13T02:39:03+00:00",
+    "note": "Portrait catalog image out-painted left/right to 2:1; the renderer restores the original portrait bytes over the centre strip before use. Stored as a 2048×1024 JPEG (q90) derived from the generated PNG; the original PNG hash is kept in derivedFrom.",
+    "format": "jpeg",
+    "derivedFrom": {
+      "sha256": "0d5eed7f074720a408fe580f0e06938688c9678b63e8f45b9cc78f366e7a7dc5",
+      "width": 3840,
+      "height": 1920,
+      "format": "png"
+    }
+  },
+  "looking-back-at-earth": {
+    "sha256": "19b1cdd832e539db9c06fe14c4fd1a87425a5ebea19b3fa8c4bb458f1dc910c5",
+    "width": 2048,
+    "height": 1024,
+    "generator": "codex exec image_generation (gpt-6-astra session, 2026-09-13)",
+    "promptSha256": "b184a3294dc0dfe2e93669d5963add2640381d9753fc79755edcdc5ca3b18b50",
+    "generatedAt": "2026-09-13T02:41:56+00:00",
+    "note": "Portrait catalog image out-painted left/right to 2:1; the renderer restores the original portrait bytes over the centre strip before use. Stored as a 2048×1024 JPEG (q90) derived from the generated PNG; the original PNG hash is kept in derivedFrom.",
+    "format": "jpeg",
+    "derivedFrom": {
+      "sha256": "dc9feb38841388c9f384ac33de0b2b77cab2753ef33947a6fec2e9833befe303",
+      "width": 2048,
+      "height": 1024,
+      "format": "png"
+    }
+  },
+  "lunar-closeup": {
+    "sha256": "d6d5754541a95ea6fec548e315f6e165d5f7f3ae5a5a7c6c2c9afb6865c4a8d8",
+    "width": 2048,
+    "height": 1024,
+    "generator": "codex exec image_generation (gpt-6-astra session, 2026-09-13)",
+    "promptSha256": "6b3e4041e720c9b1833295f03026a596711bafa8e64a78d3118918cc9fb3f556",
+    "generatedAt": "2026-09-13T02:45:00+00:00",
+    "note": "Portrait catalog image out-painted left/right to 2:1; the renderer restores the original portrait bytes over the centre strip before use. Stored as a 2048×1024 JPEG (q90) derived from the generated PNG; the original PNG hash is kept in derivedFrom.",
+    "format": "jpeg",
+    "derivedFrom": {
+      "sha256": "b74b941ca4d3ec868b9185f2fd3715edc7a6df38e5bcf3e29a8a9fa522918701",
+      "width": 3840,
+      "height": 1920,
+      "format": "png"
+    }
+  },
+  "new-eclipse": {
+    "sha256": "101fc6537b470eaa70032f351614d4f3c73f95b25343df6e73ba162c64b9039d",
+    "width": 2048,
+    "height": 1024,
+    "generator": "codex exec image_generation (gpt-6-astra session, 2026-09-13)",
+    "promptSha256": "6475b704810255186570cebfd07e7a30ad4d649a161db4ecb85d432d9fd1fe07",
+    "generatedAt": "2026-09-13T02:43:32+00:00",
+    "note": "Portrait catalog image out-painted left/right to 2:1; the renderer restores the original portrait bytes over the centre strip before use. Stored as a 2048×1024 JPEG (q90) derived from the generated PNG; the original PNG hash is kept in derivedFrom.",
+    "format": "jpeg",
+    "derivedFrom": {
+      "sha256": "f31ce3bc381c7cb6006147fce8c14d2e34eac2edef6110721821fa3c2b60aa93",
+      "width": 3840,
+      "height": 1920,
+      "format": "png"
+    }
+  },
+  "new-moon": {
+    "sha256": "93b1ed400d85384207292b55269b882e2f69797d8cc019f9e7d77b8c5e4c0fe0",
+    "width": 2048,
+    "height": 1024,
+    "generator": "codex exec image_generation (gpt-6-astra session, 2026-09-13)",
+    "promptSha256": "f45f733f94afadfb4029e48565134c17222098f3ef2a4ab3ae84ee07614b71af",
+    "generatedAt": "2026-09-13T02:42:55+00:00",
+    "note": "Portrait catalog image out-painted left/right to 2:1; the renderer restores the original portrait bytes over the centre strip before use. Stored as a 2048×1024 JPEG (q90) derived from the generated PNG; the original PNG hash is kept in derivedFrom.",
+    "format": "jpeg",
+    "derivedFrom": {
+      "sha256": "fe3dbbf64502b9c1fe58e97bd2c8232a0689a43126b5185e44851dc5aefa7153",
+      "width": 3840,
+      "height": 1920,
+      "format": "png"
+    }
+  },
+  "orientale-basin": {
+    "sha256": "989d0107fca53f74dcaa13928960c44d5ece5e879edf1db48472e20936db7820",
+    "width": 2048,
+    "height": 1024,
+    "generator": "codex exec image_generation (gpt-6-astra session, 2026-09-13)",
+    "promptSha256": "684d44b6723d38ef2d164368aed9e9594ee9677734bfa7fdfc993b20556905a8",
+    "generatedAt": "2026-09-13T02:44:50+00:00",
+    "note": "Portrait catalog image out-painted left/right to 2:1; the renderer restores the original portrait bytes over the centre strip before use. Stored as a 2048×1024 JPEG (q90) derived from the generated PNG; the original PNG hash is kept in derivedFrom.",
+    "format": "jpeg",
+    "derivedFrom": {
+      "sha256": "c538626694602739184e742cfad66c1becc9f1359c707d64d57783fab526ea9b",
+      "width": 3840,
+      "height": 1920,
+      "format": "png"
+    }
+  },
+  "peeking-at-earth": {
+    "sha256": "21922629253db2d4842e2eb663f0f3b6109b0cbf45e1eaffa778650ba0d6380d",
+    "width": 2048,
+    "height": 1024,
+    "generator": "codex exec image_generation (gpt-6-astra session, 2026-09-13)",
+    "promptSha256": "29fbe17927ad39714e2a0e9bfa0c3e5f9ebb86c44d2fcb60c00980319f4db476",
+    "generatedAt": "2026-09-13T02:42:08+00:00",
+    "note": "Portrait catalog image out-painted left/right to 2:1; the renderer restores the original portrait bytes over the centre strip before use. Stored as a 2048×1024 JPEG (q90) derived from the generated PNG; the original PNG hash is kept in derivedFrom.",
+    "format": "jpeg",
+    "derivedFrom": {
+      "sha256": "a63e6f9d29dcfc29ba073c7f103147c1f1d92c006c9f2b4ed86fa615d75be7dd",
+      "width": 3840,
+      "height": 1920,
+      "format": "png"
+    }
+  },
+  "setting-earth": {
+    "sha256": "e0b9756d5b0aac9db70200078a41fe24e48c8637c101019cd47c2d2cec7620a9",
+    "width": 2048,
+    "height": 1024,
+    "generator": "codex exec image_generation (gpt-6-astra session, 2026-09-13)",
+    "promptSha256": "b422b295617f3cfed0df026508b55bb4fb49b6371b0d00c2c0e01070c243d05b",
+    "generatedAt": "2026-09-13T02:46:04+00:00",
+    "note": "Portrait catalog image out-painted left/right to 2:1; the renderer restores the original portrait bytes over the centre strip before use. Stored as a 2048×1024 JPEG (q90) derived from the generated PNG; the original PNG hash is kept in derivedFrom.",
+    "format": "jpeg",
+    "derivedFrom": {
+      "sha256": "a56fb2835b171a14f40cd98b762e0519e521a7d63ab1101807357a0fada61fd4",
+      "width": 3840,
+      "height": 1920,
+      "format": "png"
+    }
+  },
+  "vavilov-crater": {
+    "sha256": "0828fe049022d2c6bf2a839432ef61c1b0dd3ae52df637b3d32d88b4b6d66f5a",
+    "width": 2048,
+    "height": 1024,
+    "generator": "codex exec image_generation (gpt-6-astra session, 2026-09-13)",
+    "promptSha256": "a93282cadddef64b0a20e20a30e8dbf2ca8f15b17cbc7b0b3ab95e957f21774f",
+    "generatedAt": "2026-09-13T02:46:27+00:00",
+    "note": "Portrait catalog image out-painted left/right to 2:1; the renderer restores the original portrait bytes over the centre strip before use. Stored as a 2048×1024 JPEG (q90) derived from the generated PNG; the original PNG hash is kept in derivedFrom.",
+    "format": "jpeg",
+    "derivedFrom": {
+      "sha256": "c9f52b9ae5ddb9d1fe7d6329b6900d268ba9c9fc576793c5ed08ef78113159da",
+      "width": 2048,
+      "height": 1024,
+      "format": "png"
+    }
+  }
+}

@@ -50,3 +50,7 @@ expo-env.d.ts
 targets/widget/generated.entitlements
 targets/widget/Assets.xcassets/AppIcon.appiconset/
 targets/widget/Assets.xcassets/$*.colorset/
+
+# Unified marketing/artwork sources, wallpapers and generated outputs are never build inputs.
+marketing/
+../marketing/

@@ -9,6 +9,7 @@
  * - User feed (notes)
  */
 
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import React, { useEffect, useState } from 'react';
 import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, {
@@ -21,7 +22,7 @@ import Animated, {
 import type { SharedValue } from 'react-native-reanimated';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Image as ExpoImage } from 'expo-image';
-import { Stack } from 'expo-router';
+import { Stack, useIsFocused } from 'expo-router';
 import { z } from 'zod';
 import { Hex64, HttpsUrl, Npub } from '@/shared/lib/nav/routeSchemas';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
@@ -38,7 +39,7 @@ import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { publishEvent } from '@/shared/lib/nostr/publish';
 import { Card } from '@/shared/ui/composed/Card';
 import { Section } from '@/shared/ui/composed/Section';
-import Icon, { CurrencyIcon } from 'assets/icons';
+import Icon, { CurrencyIcon } from '@/assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { openExternalUrl } from '@/shared/lib/url';
@@ -46,6 +47,7 @@ import * as Clipboard from 'expo-clipboard';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import { SkeletonLoadingShimmer } from '@/shared/ui/composed/SkeletonExitShimmer';
+import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { LightningAddress } from '@sovranbitcoin/schemas';
 import { getNpcAddress } from '@/shared/lib/cashu/npc';
 import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
@@ -95,10 +97,42 @@ import {
   mintUrlLogFields,
 } from '@/shared/lib/logger';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
+import { fontSize, iconSize } from '@/shared/styles/tokens';
 
 const BANNER_HEIGHT = 150;
 const AVATAR_SIZE = 90;
 const AVATAR_OVERLAP = AVATAR_SIZE / 4;
+const IDENTITY_LINE_HEIGHT = 20;
+
+export function UserProfileIdentityRow({
+  nip05,
+  isLoading,
+  foreground,
+}: {
+  nip05?: string | null;
+  isLoading: boolean;
+  foreground: string;
+}) {
+  return (
+    <View testID="user-profile-identity-row" className="min-h-5 self-center">
+      <HStack align="center">
+        <View testID="user-profile-identity-icon-slot" className="w-5 shrink-0">
+          {nip05 ? (
+            <Icon name="mdi:check-decagram" size={iconSize.md} color={withAlpha(foreground, 0.4)} />
+          ) : null}
+        </View>
+        <Text
+          loading={isLoading}
+          placeholder="username@relay.example"
+          fallback={'\u00A0'}
+          size={fontSize.md}
+          style={{ color: withAlpha(foreground, 0.4), lineHeight: IDENTITY_LINE_HEIGHT }}>
+          {nip05 ?? undefined}
+        </Text>
+      </HStack>
+    </View>
+  );
+}
 
 const UserProfileParamsSchema = z
   .object({
@@ -234,6 +268,8 @@ const STAT_CARD_HEIGHT = 96;
  * per-element pulse. See `shared/ui/composed/SkeletonExitShimmer`.
  */
 const SKELETON_FILL_ALPHA = 0.07;
+const BANNER_SKELETON_ALPHA = SKELETON_FILL_ALPHA;
+const COUNT_UNAVAILABLE = '—';
 
 function ProfileStatsGrid({
   followingCount,
@@ -241,6 +277,7 @@ function ProfileStatsGrid({
   reputationScore,
   joinedDate,
   isLoading,
+  countsLoading,
   visualScope,
 }: {
   followingCount?: number;
@@ -248,6 +285,8 @@ function ProfileStatsGrid({
   reputationScore?: number;
   joinedDate?: string;
   isLoading: boolean;
+  /** Follower/following still being completed from fallback sources. */
+  countsLoading: boolean;
   visualScope: string;
 }) {
   const [foreground, surfaceTertiary, surfaceSecondary] = useThemeColor([
@@ -266,16 +305,17 @@ function ProfileStatsGrid({
     {
       label: 'Following',
       description: 'Users followed',
-      value: followingCount?.toString() ?? '0',
+      // Unknown is a dash, never a zero: no source could count this profile.
+      value: followingCount?.toString() ?? COUNT_UNAVAILABLE,
       smallValue: false,
-      valueLoading: isLoading && followingCount === undefined,
+      valueLoading: (isLoading || countsLoading) && followingCount === undefined,
     },
     {
       label: 'Followers',
       description: 'Total count',
-      value: followerCount?.toString() ?? '0',
+      value: followerCount?.toString() ?? COUNT_UNAVAILABLE,
       smallValue: false,
-      valueLoading: isLoading && followerCount === undefined,
+      valueLoading: (isLoading || countsLoading) && followerCount === undefined,
     },
     {
       label: 'Reputation',
@@ -299,9 +339,9 @@ function ProfileStatsGrid({
   // would snap the grid the moment the score arrived.
   const reputationUnavailable = !isLoading && reputationScore === undefined;
 
-  const renderStatCard = (stat: (typeof stats)[0]) => (
+  const renderStatCard = (stat: (typeof stats)[0], loading: boolean) => (
     <View key={stat.label} style={styles.statItem}>
-      {showSkeleton ? (
+      {loading ? (
         // One placeholder for the whole pill (not three stacked text
         // skeletons). Thread-style: a static low-contrast box — the motion
         // comes from the SkeletonLoadingShimmer sweeping the whole grid.
@@ -341,21 +381,36 @@ function ProfileStatsGrid({
   // or joined date. Render no grid rather than misleading "0 / 0 / N/A".
   if (!isLoading && !hasValidData) return null;
 
-  // While loading: 2×2 placeholders under one shimmer sweep (thread-style),
-  // rather than four independently-pulsing boxes.
-  if (showSkeleton) {
+  // One grid in both branches (SkeletonContentCrossfade): the skeleton is the
+  // same 2×2 layout with placeholder pills, so the swap to content shifts
+  // nothing; the helper owns the shimmer sweep and the fade.
+  const renderGrid = (loading: boolean) => (
+    <View>
+      <View style={styles.statsRow}>
+        {stats.slice(0, 2).map((stat) => renderStatCard(stat, loading))}
+      </View>
+      <View style={styles.statsRow}>
+        {stats.slice(2, 4).map((stat) => renderStatCard(stat, loading))}
+      </View>
+    </View>
+  );
+  if (showSkeleton || (!reputationUnavailable && !showSkeleton)) {
     return (
       <VisualLayoutProbe
         scope={visualScope}
         surface="profile"
         component="ProfileStatsGrid"
-        itemKey="stats-skeleton"
-        itemType="skeleton"
+        itemKey={showSkeleton ? 'stats-skeleton' : 'stats-loaded'}
+        itemType={showSkeleton ? 'skeleton' : 'loaded'}
         style={styles.statsGrid}
-        extra={{ isLoading }}>
-        <View style={styles.statsRow}>{stats.slice(0, 2).map(renderStatCard)}</View>
-        <View style={styles.statsRow}>{stats.slice(2, 4).map(renderStatCard)}</View>
-        <SkeletonLoadingShimmer active />
+        extra={{ isLoading, reputationUnavailable }}>
+        <SkeletonContentCrossfade
+          loading={showSkeleton}
+          visualKey="profile-stats"
+          visualSurface="profile"
+          renderSkeleton={() => renderGrid(true)}
+          renderContent={() => renderGrid(false)}
+        />
       </VisualLayoutProbe>
     );
   }
@@ -373,8 +428,8 @@ function ProfileStatsGrid({
         style={styles.statsGrid}
         extra={{ reputationUnavailable }}>
         <View style={styles.statsRow}>
-          {renderStatCard(stats[0])}
-          {renderStatCard(stats[1])}
+          {renderStatCard(stats[0], false)}
+          {renderStatCard(stats[1], false)}
         </View>
         <Text
           size={13}
@@ -390,19 +445,7 @@ function ProfileStatsGrid({
     );
   }
 
-  return (
-    <VisualLayoutProbe
-      scope={visualScope}
-      surface="profile"
-      component="ProfileStatsGrid"
-      itemKey="stats-loaded"
-      itemType="loaded"
-      style={styles.statsGrid}
-      extra={{ reputationUnavailable }}>
-      <View style={styles.statsRow}>{stats.slice(0, 2).map(renderStatCard)}</View>
-      <View style={styles.statsRow}>{stats.slice(2, 4).map(renderStatCard)}</View>
-    </VisualLayoutProbe>
-  );
+  return null;
 }
 
 // ============================================================================
@@ -562,6 +605,7 @@ function BannerWithAvatar({
   isFollowLoading,
   onToggleFollow,
   onSendMoney,
+  onEditProfile,
   hasStories,
   onAvatarPress,
   visualScope,
@@ -581,6 +625,8 @@ function BannerWithAvatar({
   isFollowLoading: boolean;
   onToggleFollow: () => void;
   onSendMoney: () => void;
+  /** Own profile only: opens the kind-0 editor where the Follow pill would be. */
+  onEditProfile?: () => void;
   hasStories?: boolean;
   onAvatarPress?: () => void;
   visualScope: string;
@@ -657,7 +703,7 @@ function BannerWithAvatar({
   const avatarContent = (
     <View style={[styles.avatarBorder, { borderColor: background, backgroundColor: background }]}>
       <Avatar
-        state={pictureUrl ? 'image' : isLoading || isResolving ? 'loading' : 'fallback'}
+        state={avatarStateFor(pictureUrl, !(isLoading || isResolving))}
         picture={pictureUrl}
         seed={pubkey}
         size={AVATAR_SIZE}
@@ -714,8 +760,15 @@ function BannerWithAvatar({
                 onError={() => setBannerStatus('failed')}
               />
             ) : null}
+            {/* Neutral placeholder (same fill as Avatar/Text skeletons): we do
+                not yet know whether a banner exists, or it is still loading. The
+                seeded gradient below is the COLOUR placeholder, reserved for
+                "known to have none / failed". */}
             <View
-              style={[StyleSheet.absoluteFill, { backgroundColor: withAlpha(foreground, 0.5) }]}
+              style={[
+                StyleSheet.absoluteFill,
+                { backgroundColor: withAlpha(foreground, BANNER_SKELETON_ALPHA) },
+              ]}
             />
           </>
         ) : bannerState === 'image' ? (
@@ -812,22 +865,7 @@ function BannerWithAvatar({
               {displayName}
             </Text>
           </View>
-          {(isLoading || nip05) && (
-            <View style={{ alignSelf: 'center' }}>
-              <HStack align="center" gap={4}>
-                {!isLoading && (
-                  <Icon name="mdi:check-decagram" size={16} color={withAlpha(foreground, 0.4)} />
-                )}
-                <Text
-                  loading={isLoading}
-                  placeholder="username@relay.example"
-                  size={14}
-                  style={{ color: withAlpha(foreground, 0.4) }}>
-                  {nip05 || '\u00A0'}
-                </Text>
-              </HStack>
-            </View>
-          )}
+          <UserProfileIdentityRow nip05={nip05} isLoading={isLoading} foreground={foreground} />
           {showFollowButton &&
             (isLoading ? (
               <View
@@ -859,6 +897,20 @@ function BannerWithAvatar({
                 testID="profile-follow-button"
               />
             ))}
+          {onEditProfile && !isLoading && (
+            <CapsuleButton
+              label="Edit profile"
+              icon="mdi:pencil"
+              systemIcon="pencil"
+              onPress={onEditProfile}
+              fitContent
+              height={34}
+              iconSize={15}
+              textSize={13}
+              style={styles.followCapsule}
+              testID="profile-edit-button"
+            />
+          )}
           {isLoading && <SkeletonLoadingShimmer active />}
         </View>
 
@@ -1048,7 +1100,12 @@ export function UserProfileScreen() {
   const followOptimisticEntry = useNostrSocialStore((state) =>
     pubkey ? state.optimisticFollowsByPubkey[pubkey] : undefined
   );
-  const { data: profileData, isLoading: isProfileApiLoading } = useNostrProfile(pubkey || null);
+  const isFocused = useIsFocused();
+  const {
+    data: profileData,
+    isLoading: isProfileApiLoading,
+    isCountsLoading: isProfileCountsLoading,
+  } = useNostrProfile(pubkey || null, isFocused);
   const profileMintUrl = getProfileMintInfoUrl(profileData?.mintUrl, mintUrlParam);
 
   // ===========================
@@ -1368,6 +1425,9 @@ export function UserProfileScreen() {
                 isFollowLoading={followInFlight}
                 onToggleFollow={handleToggleFollow}
                 onSendMoney={handleSendMoney}
+                onEditProfile={
+                  isOwnProfile ? () => router.push('/(settings-flow)/edit-profile') : undefined
+                }
                 hasStories={hasStories}
                 onAvatarPress={handleAvatarStoryPress}
                 visualScope={profileHeaderVisualScope}
@@ -1388,6 +1448,7 @@ export function UserProfileScreen() {
                   reputationScore={reputationScore}
                   joinedDate={joinedDate}
                   isLoading={isProfileApiLoading}
+                  countsLoading={isProfileCountsLoading}
                   visualScope={profileHeaderVisualScope}
                 />
               </View>
@@ -1499,6 +1560,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   identityBlock: {
+    minHeight: IDENTITY_LINE_HEIGHT,
     alignSelf: 'stretch',
     alignItems: 'center',
   },

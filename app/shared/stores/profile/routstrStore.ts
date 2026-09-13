@@ -118,6 +118,7 @@ interface ModelsCache {
 interface RoutstrState {
   /** Cashu token or persistent wallet key */
   apiKey: string | null;
+  authMode: 'bearer' | 'x-cashu';
   /** Balance in msats */
   balance: number | null;
   /**
@@ -170,7 +171,7 @@ interface RoutstrState {
   lastKnownLineup: PersistedLineup | null;
   /**
    * Timestamp of the last applied nagg-served lineup (`/app/ai-lineup`).
-   * Session-only. While set, `setCachedModels` keeps refreshing the raw
+   * Persisted, including invalidation. While set, setCachedModels refreshes the raw
    * catalog cache (pricing lookups, vision flags) but no longer overwrites
    * `lineup` — the server-curated lineup outranks the client derivation.
    */
@@ -191,6 +192,8 @@ interface RoutstrState {
 interface RoutstrActions {
   setApiKey: (apiKey: string) => void;
   clearApiKey: () => void;
+  applyChangeToken: (token: string) => void;
+  invalidateServerLineup: () => void;
 
   setBalance: (balance: number) => void;
   clearBalance: () => void;
@@ -227,9 +230,13 @@ interface RoutstrActions {
   setCachedModels: (models: RoutstrModel[]) => void;
   /** Apply the nagg-served lineup (already mapped via
    *  `lineupFromNaggPayload`). Takes precedence over `setCachedModels`'
-   *  derivation for the rest of the session and persists the snapshot +
+   *  derivation until invalidation and persists the snapshot +
    *  node override. */
-  setServerLineup: (params: { lineup: AiLineup; nodeBaseUrl: string | null }) => void;
+  setServerLineup: (params: {
+    lineup: AiLineup;
+    nodeBaseUrl: string | null;
+    authMode?: 'bearer' | 'x-cashu';
+  }) => void;
   isCacheStale: () => boolean;
 
   createSession: () => string;
@@ -413,6 +420,8 @@ const PersistedRoutstrSession = z.looseObject({
 });
 
 const PersistedRoutstrStore = z.object({
+  authMode: z.enum(['bearer', 'x-cashu']).default('bearer').catch('bearer'),
+  serverLineupAt: z.number().int().nonnegative().nullable().default(null).catch(null),
   apiKey: z.string().max(8192).nullable().default(null),
   balance: z.number().nullable().default(null),
   selectedModel: z.string().max(256).nullable().default(null),
@@ -430,6 +439,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
   persist(
     (set, get) => ({
       apiKey: null,
+      authMode: 'bearer',
       balance: null,
       conversationHistory: [],
       activeChildren: {},
@@ -448,6 +458,16 @@ export const useRoutstrStore = create<RoutstrStore>()(
       setApiKey: (apiKey: string) => {
         storeLog.info('store.routstr.set_api_key');
         set({ apiKey });
+      },
+
+      applyChangeToken: (token) => {
+        if (!get().apiKey?.startsWith('cashu') || !token.startsWith('cashu')) return;
+        set({ apiKey: token });
+        aiLog.info('routstr.change_token.applied');
+      },
+
+      invalidateServerLineup: () => {
+        set({ serverLineupAt: null, lineup: null });
       },
 
       clearApiKey: () => {
@@ -553,8 +573,8 @@ export const useRoutstrStore = create<RoutstrStore>()(
         // zero-row results (catalog drift on a 200 — the failure class
         // that produced "cost unavailable") substitute from the previous
         // snapshot, marked `lastKnown`.
-        // A nagg-served lineup outranks the client derivation for the rest
-        // of the session: keep the raw catalog fresh (pricing lookups,
+        // A nagg-served lineup outranks derivation until invalidated by
+        // model rejection or a failed refresh after seven days. Keep the raw catalog (pricing lookups,
         // vision flags, display names) but leave `lineup` untouched.
         if (get().serverLineupAt != null) {
           aiLog.debug('ai.lineup.derive_skipped_server_lineup');
@@ -577,26 +597,29 @@ export const useRoutstrStore = create<RoutstrStore>()(
           modelsCache: { data: models, timestamp: Date.now() },
           lineup: merged,
           lastKnownLineup: lineupHasEntries(merged)
-            ? { derivedAt: Date.now(), lineup: merged }
+            ? { derivedAt: Date.now(), lineup: merged, nodeBaseUrl: get().nodeBaseUrl }
             : previous,
         });
       },
 
-      setServerLineup: ({ lineup, nodeBaseUrl }) => {
+      setServerLineup: ({ lineup, nodeBaseUrl, authMode }) => {
         if (!lineupHasEntries(lineup)) {
           aiLog.warn('ai.lineup.server_empty');
           return;
         }
         aiLog.info('ai.lineup.server_applied', {
-          nodeBaseUrl,
+          nodeChanged: nodeBaseUrl !== get().nodeBaseUrl,
           providers: PROVIDER_IDS.filter((p) => TIER_IDS.some((t) => lineup[p][t] != null)),
         });
+        const now = Date.now();
         setRoutstrNodeBaseUrl(nodeBaseUrl);
         set({
           lineup,
-          serverLineupAt: Date.now(),
+          serverLineupAt: now,
           nodeBaseUrl,
-          lastKnownLineup: { derivedAt: Date.now(), lineup },
+          authMode: authMode ?? (nodeBaseUrl === get().nodeBaseUrl ? get().authMode : 'bearer'),
+          modelsCache: nodeBaseUrl === get().nodeBaseUrl ? get().modelsCache : null,
+          lastKnownLineup: { derivedAt: now, lineup, nodeBaseUrl },
         });
       },
 
@@ -669,6 +692,8 @@ export const useRoutstrStore = create<RoutstrStore>()(
       schema: PersistedRoutstrStore,
       partialize: (state) => ({
         apiKey: state.apiKey,
+        authMode: state.authMode,
+        serverLineupAt: state.serverLineupAt,
         balance: state.balance,
         selectedModel: state.selectedModel,
         // The ceilings are applied HERE, not at each writer. Sessions grow in
@@ -687,7 +712,8 @@ export const useRoutstrStore = create<RoutstrStore>()(
         if (!state) return;
         // Re-apply the nagg-served node override before any Routstr call
         // this session — a repointed node must survive offline relaunches.
-        setRoutstrNodeBaseUrl(state.nodeBaseUrl ?? null);
+        state.nodeBaseUrl = state.nodeBaseUrl ?? state.lastKnownLineup?.nodeBaseUrl ?? null;
+        setRoutstrNodeBaseUrl(state.nodeBaseUrl);
         // Drop transient `pending: true` flags — any user message marked
         // pending at persist time (e.g. app killed mid-send) resolves to
         // "not in flight" on the next launch so the user sees a static

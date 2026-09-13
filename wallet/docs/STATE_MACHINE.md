@@ -662,13 +662,38 @@ source==='nfc':
        -> auto-pick: paymentRequest, else lightningInvoice, else first
           non-disabled  (createMachine.ts:888-890)
   selectMint
-       -> auto-pick candidates[0] (highest-balance valid; honours the receiver
-          supportedMintUrls and the preferred mint)  (createMachine.ts:912-913)
-  enterAmount   -> taken from the request
+       -> rank eligible candidates: request mint membership, enough balance,
+          higher balance, then existing order (stable ties)
+  enterAmount   -> reject amountless requests (NFC_READ_FAILED)
   navigateToPaymentRequest + nfc
        -> runNfcWriteBackEffect -> executeNfcSend -> token written to tag
        -> sendComplete
 ```
+
+Before the first transition, NFC reads the request's single unit. When it differs
+from the active unit, a trusted mint accepted by `m` must already hold at least
+`a` in that unit. Otherwise it fails with `UNIT_NOT_FUNDED`; balances at other
+mints or in other units cannot fund the tap. Empty `m` allows any trusted mint.
+When `mp=true`, `m` ranks preferred mints but does not exclude another funded
+trusted mint; preflight and final selection use the same rule. Absent/false
+`mp` keeps `m` strict. Requests with any NUT-10 spending condition fail before
+switching units or creating a token, because NFC write-back cannot currently
+preserve those conditions. Method constraints (`sm` / NUT-26 `0x0a`) fail at
+the SDK decode boundary until method/unit support and method fees are enforced.
+
+`operations.switchUnit(unit)` updates the host's active unit; the machine rereads
+its cached context before continuing. Missing or unsupported host switching
+retains the ordinary unit mismatch hard-stop. A rejected switch releases the
+session with `NFC_READ_FAILED`. Non-NFC flows keep their existing hard-stop.
+The selecting phase covers currency selection, and token creation receives the
+resolved unit explicitly. No conversion, trust change, or mint-info fetch is
+performed. Candidates expose no fee data, so ranking does not consider fees.
+
+Device evidence still required: a real numo tap in **sat** and **usd**, including
+a sat-active wallet paying a funded USD request, an unfunded accepted-mint
+failure, and the Android selecting copy/Close control. Unit tests do not prove
+native NFC timing, write-back, or settlement. No real-funds or simulator E2E was
+run for this change.
 
 | Effect / operation | When | Network |
 | --- | --- | --- |

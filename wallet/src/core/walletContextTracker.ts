@@ -81,6 +81,7 @@ export function createWalletContextTracker(
   }[] = [];
   let proofsByMint: Record<string, { amount: number; unit: string }[]> = {};
   let balancesByMintAndUnit: Record<string, Record<string, number>> = {};
+  let unitBalances: Record<string, Record<string, number>> = {};
   let revision = 0;
 
   let unitView: {
@@ -243,6 +244,12 @@ export function createWalletContextTracker(
           ),
         ]),
       );
+      unitBalances = {};
+      for (const [mintUrl, byUnit] of Object.entries(balancesByMintAndUnit)) {
+        for (const [unit, balance] of Object.entries(byUnit)) {
+          (unitBalances[unit] ??= {})[mintUrl] = balance;
+        }
+      }
       proofsByMint = proofs;
       revision += 1;
       consecutiveFailures = 0;
@@ -321,6 +328,7 @@ export function createWalletContextTracker(
       return {
         trustedMintUrls: view.trustedMintUrls,
         mintBalances: view.mintBalances,
+        unitBalances,
         mintMethodCapabilities: view.mintMethodCapabilities,
         proofAmounts: view.proofAmounts,
         preferredMintUrl: config?.getPreferredMintUrl?.(),

@@ -1,3 +1,6 @@
+import { ActionMenuHost } from '@/shared/blocks/popup/ActionMenuHost';
+import { Button } from '@/shared/ui/primitives/Button';
+import { openMnemonicRecovery } from '@/shared/lib/profile/keyRecovery';
 import React, { useCallback, useRef, useState } from 'react';
 import { View, useWindowDimensions } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -212,6 +215,8 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
         </Animated.View>
 
         <PressableFeedback
+          testID="onboarding-get-started"
+          accessibilityRole="button"
           onPress={onGetStartedPress}
           style={{
             height: 48,
@@ -228,6 +233,13 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
             Get Started
           </Text>
         </PressableFeedback>
+
+        <Button
+          testID="onboarding-recovery-phrase"
+          text="I have a recovery phrase"
+          variant="underline"
+          onPress={openMnemonicRecovery}
+        />
 
         <GestureDetector gesture={Gesture.Race(panGesture, singleTap)}>
           <OnboardingInnerCarousel
@@ -253,6 +265,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
           />
         </Animated.View>
       </View>
+      <ActionMenuHost />
     </Log>
   );
 };

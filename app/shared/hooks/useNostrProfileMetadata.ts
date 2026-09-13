@@ -1,6 +1,9 @@
+import { useOwnProfileMetadataStore } from '@/shared/stores/profile/ownProfileMetadataStore';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { getMockProfileMetadata } from '@/shared/stores/runtime/mockDataStore';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { facade } from 'nostr';
 import {
   Kind0MetadataSchema,
   cachedProfileToMetadata,
@@ -8,6 +11,63 @@ import {
 } from '@/shared/stores/global/nostrMetadataCache';
 import { useCachedNostrProfile, useProfileRecordsMany } from '@/shared/lib/nostr/useEntityCache';
 import { fetchProfilesViaFacade } from '@/shared/lib/nostr/fetchProfiles';
+import { newReadId, readEvents, readKeyHash } from '@/shared/lib/read/readLog';
+
+/** A pubkey that missed is retried after this long (a tier may have been momentarily down). */
+const RETRY_ATTEMPT_WINDOW_MS = 60_000;
+
+/** One `read.profiles.*` request/done/failed triple around a facade profile fetch. */
+async function fetchProfilesLogged(
+  pubkeys: string[],
+  cached: number,
+  stale: number,
+  trigger: 'mount' | 'poll'
+): Promise<Record<string, facade.ProfileMetadata>> {
+  const readId = newReadId('profiles');
+  const keyHash = readKeyHash(pubkeys.join(','));
+  const t0 = Date.now();
+  readEvents.request({
+    readId,
+    surface: 'profiles',
+    keyHash,
+    mode: trigger === 'poll' ? 'revalidate' : 'initial',
+    trigger,
+    action: 'fetch',
+    strategy: 'aggregate',
+    cached: cached > 0,
+    stale: stale > 0,
+    coldStart: cached === 0,
+    gen: 0,
+  });
+  try {
+    const profiles = await fetchProfilesViaFacade(pubkeys, { refresh: true, readId });
+    const count = Object.keys(profiles).length;
+    readEvents.done({
+      readId,
+      surface: 'profiles',
+      keyHash,
+      gen: 0,
+      durationMs: Date.now() - t0,
+      source: 'network',
+      count,
+      empty: count === 0,
+      degraded: count < pubkeys.length,
+      complete: true,
+    });
+    return profiles;
+  } catch (error) {
+    readEvents.failed({
+      readId,
+      surface: 'profiles',
+      keyHash,
+      gen: 0,
+      durationMs: Date.now() - t0,
+      errorType: error instanceof Error ? error.name : typeof error,
+      retained: cached > 0,
+    });
+    return {};
+  }
+}
 
 const STALE_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -35,7 +95,24 @@ export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrPro
   const mockMode = useSettingsStore((state) => state.mockMode);
   const fixture = mockMode && pubkey ? getMockProfileMetadata(pubkey) : undefined;
   const cached = useCachedNostrProfile(pubkey ?? '');
-  const metadata = fixture ?? cached.metadata;
+  const baseMetadata = fixture ?? cached.metadata;
+  const isOwn = useProfileStore(
+    (s) =>
+      !!pubkey &&
+      s.profiles.find((profile) => profile.accountIndex === s.activeAccountIndex)?.pubkey === pubkey
+  );
+  const optimistic = useOwnProfileMetadataStore((s) => (isOwn ? s.optimistic : null));
+  const metadata = optimistic
+    ? {
+        ...baseMetadata,
+        fetchedAt: baseMetadata?.fetchedAt ?? 0,
+        ...(optimistic.name !== undefined ? { displayName: optimistic.name } : {}),
+        ...(optimistic.picture !== undefined ? { picture: optimistic.picture ?? undefined } : {}),
+        ...(optimistic.lud16 !== undefined ? { lud16: optimistic.lud16 ?? undefined } : {}),
+        ...(optimistic.nip05 !== undefined ? { nip05: optimistic.nip05 ?? undefined } : {}),
+        ...(optimistic.about !== undefined ? { about: optimistic.about ?? undefined } : {}),
+      }
+    : baseMetadata;
   const isStale = !fixture && cached.isStale;
   const isMissing = !fixture && cached.isMissing;
   const [isFetching, setIsFetching] = useState(false);
@@ -51,6 +128,9 @@ export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrPro
   const [retryNonce, setRetryNonce] = useState(0);
   const attemptCount = pubkey ? (attempts.current.get(pubkey) ?? 0) : MAX_FETCH_ATTEMPTS;
   const needsFetch = !!pubkey && (isMissing || isStale) && attemptCount < MAX_FETCH_ATTEMPTS;
+  // Log inputs only: read through a ref so they are not effect dependencies.
+  const logCtxRef = useRef({ isMissing, isStale, attemptCount });
+  logCtxRef.current = { isMissing, isStale, attemptCount };
 
   useEffect(() => {
     if (!pubkey || !needsFetch) return;
@@ -66,7 +146,12 @@ export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrPro
     inFlight.current += 1;
     setIsFetching(true);
     // refresh:true so a stale/boot-seeded record is revalidated, not served back.
-    void fetchProfilesViaFacade([pubkey], { refresh: true })
+    void fetchProfilesLogged(
+      [pubkey],
+      logCtxRef.current.isMissing ? 0 : 1,
+      logCtxRef.current.isStale ? 1 : 0,
+      logCtxRef.current.attemptCount > 0 ? 'poll' : 'mount'
+    )
       .then((profiles) => {
         if (cancelled) return;
         // getProfiles already ingested any resolved profile into the entity cache
@@ -98,7 +183,7 @@ export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrPro
   // `isFetching` covers the in-flight window (needsFetch can flip false the
   // moment attempts are bumped). Settles false once resolved or attempts cap.
   const isResolving = isFetching || needsFetch;
-  return { metadata, isLoading, isResolving };
+  return { metadata, isLoading: !optimistic && isLoading, isResolving: !optimistic && isResolving };
 }
 
 /**
@@ -170,14 +255,17 @@ export function useNostrProfileMetadataMany(
     return map;
   }, [records, mockMode, pubkeys]);
 
-  // Pubkeys missing or stale in the cache and not yet attempted this lifetime.
-  const attempted = useRef<Set<string>>(new Set());
+  // Pubkeys missing or stale in the cache and not attempted within the retry
+  // window: a miss is retried after RETRY_ATTEMPT_WINDOW_MS, not never.
+  const attempted = useRef<Map<string, number>>(new Map());
   const toFetch = useMemo(() => {
     if (pubkeys.length === 0) return [];
     const now = Date.now();
     const out: string[] = [];
     for (const pk of pubkeys) {
-      if (attempted.current.has(pk) || (mockMode && getMockProfileMetadata(pk))) continue;
+      const attemptedAt = attempted.current.get(pk);
+      if (attemptedAt !== undefined && now - attemptedAt < RETRY_ATTEMPT_WINDOW_MS) continue;
+      if (mockMode && getMockProfileMetadata(pk)) continue;
       const record = records.get(pk);
       if (!record || now - (record.seenAt ?? 0) > STALE_TTL_MS) out.push(pk);
     }
@@ -188,9 +276,13 @@ export function useNostrProfileMetadataMany(
   const toFetchKey = toFetch.join(',');
   useEffect(() => {
     // Strict Mode may replay this effect before a render recomputes toFetch.
-    const batch = toFetch.filter((pk) => !attempted.current.has(pk));
+    const now = Date.now();
+    const batch = toFetch.filter((pk) => {
+      const attemptedAt = attempted.current.get(pk);
+      return attemptedAt === undefined || now - attemptedAt >= RETRY_ATTEMPT_WINDOW_MS;
+    });
     if (batch.length === 0) return;
-    for (const pk of batch) attempted.current.add(pk);
+    for (const pk of batch) attempted.current.set(pk, now);
     setPendingPubkeys((pending) => new Set([...pending, ...batch]));
     // getProfiles write-throughs into the entity cache; the reactive read above
     // picks up resolved profiles. That update can change toFetch before this
@@ -203,7 +295,8 @@ export function useNostrProfileMetadataMany(
         return remaining;
       });
     };
-    void fetchProfilesViaFacade(batch, { refresh: true }).then(finish, finish);
+    const cachedCount = batch.filter((pk) => records.has(pk)).length;
+    void fetchProfilesLogged(batch, cachedCount, cachedCount, 'mount').then(finish, finish);
     // `toFetchKey` is the serialized form of `toFetch`; depending on the array
     // itself would refire the fetch on every render that rebuilds it unchanged.
     // eslint-disable-next-line react-hooks/exhaustive-deps

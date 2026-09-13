@@ -10,19 +10,14 @@
       "environment": "development",
       "env": {
         "APP_VARIANT": "development",
-        "EXPO_NO_DEV_CLIENT": "1",
-        "EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL": "https://nagg-mint-production.up.railway.app",
-        "EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT": "https://nagg-mint-production.up.railway.app/graphql"
+        "EXPO_NO_DEV_CLIENT": "1"
       },
       "autoIncrement": true
     },
     "preview": {
       "distribution": "internal",
       "environment": "preview",
-      "env": {
-        "EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL": "https://nagg-mint-production.up.railway.app",
-        "EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT": "https://nagg-mint-production.up.railway.app/graphql"
-      },
+      "env": {},
       "autoIncrement": true
     },
     "production": {

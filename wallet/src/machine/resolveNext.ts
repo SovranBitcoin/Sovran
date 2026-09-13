@@ -10,6 +10,7 @@ import {
 import {
   pickPreferredCandidate,
   preselectMintForSend,
+  getValidMintCandidates,
   selectMint,
 } from "../mint-selection";
 import type {
@@ -607,6 +608,12 @@ export function resolveNext(
   const destination = getDestination(intent, ctx);
   const supportedMintUrls = ctx.supportedMintUrls;
   const unit = ctx.unit;
+  const preferredMint = ctx.preferredMintUrls?.length
+    ? getValidMintCandidates(walletCtx, {
+        preferredMints: ctx.preferredMintUrls,
+        minAmount: ctx.amount,
+      }).find((candidate) => ctx.preferredMintUrls?.includes(candidate.mintUrl))
+    : undefined;
   logger.info("resolveNext.routing", {
     intentType: intent.type,
     destination,
@@ -626,7 +633,12 @@ export function resolveNext(
       destination === "sendEcash" ||
       destination === "paymentRequest";
     const preselectedMintUrl = isSendDestination
-      ? preselectMintForSend(ctx.mintUrl, walletCtx)
+      ? preselectMintForSend(
+          ctx.mintUrl,
+          preferredMint
+            ? { ...walletCtx, preferredMintUrl: preferredMint.mintUrl }
+            : walletCtx,
+        )
       : (ctx.mintUrl ?? walletCtx.preferredMintUrl);
 
     logger.info("resolveNext.enterAmount.amountNeeded", {
@@ -855,7 +867,12 @@ export function resolveNext(
     const fullAmountCandidates = requirement
       ? (availableMethodCandidates ?? [])
       : needsSpendableBalance(destination)
-        ? findFullAmountCandidates(walletCtx, amount, supportedMintUrls)
+        ? ctx.preferredMintUrls?.length
+          ? getValidMintCandidates(walletCtx, {
+              preferredMints: ctx.preferredMintUrls,
+              minAmount: amount,
+            })
+          : findFullAmountCandidates(walletCtx, amount, supportedMintUrls)
         : [];
     // When a mint hasn't been chosen yet, auto-pick rather than forcing the
     // selector. For Lightning melts, honor the preferred mint (else highest
@@ -890,7 +907,10 @@ export function resolveNext(
       }
     }
     const selection = !needsSpendableBalance(destination)
-      ? selectMint(walletCtx, { allowedMints: supportedMintUrls })
+      ? selectMint(walletCtx, {
+          allowedMints: supportedMintUrls,
+          preferredMints: ctx.preferredMintUrls,
+        })
       : autoPick
         ? {
             type: "selected" as const,
@@ -904,6 +924,7 @@ export function resolveNext(
             }
           : selectMint(walletCtx, {
               allowedMints: supportedMintUrls,
+              preferredMints: ctx.preferredMintUrls,
               minAmount: amount,
             });
 

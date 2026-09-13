@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "name": "marketing-screenshots",
+  "scenarios": [
+    {"id":"marketing.screenshots","file":"scenarios/marketing-screenshots.json","order":10000,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"marketing.screenshots.wallpapers","file":"scenarios/marketing-screenshots-wallpapers.json","order":10001,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"marketing.screenshots.mints","file":"scenarios/marketing-screenshots-mints.json","order":10002,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"marketing.screenshots.media","file":"scenarios/marketing-screenshots-media.json","order":10003,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"}
+  ]
+}

@@ -29,6 +29,10 @@ export interface PaymentRequestInfo {
   /** The NUT-18 `i` payment id, when the request carries one. */
   requestId?: string;
   mints: string[];
+  /** NUT-18 advisory mint list; absent/false keeps the strict allow-list. */
+  mintsPreferred?: boolean;
+  /** True for any NUT-10 condition, including unsupported or malformed locks. */
+  hasSpendingCondition?: boolean;
   amount: number | undefined;
   unit: string;
   transports?: PaymentRequestTransport[];
@@ -52,6 +56,8 @@ export interface PaymentRequestTransport {
 export interface WalletContext {
   trustedMintUrls: string[];
   mintBalances: Record<string, number>;
+  /** Cached balances by unit, then mint. Optional for legacy single-unit hosts. */
+  unitBalances?: Record<string, Record<string, number>>;
   preferredMintUrl?: string;
   /**
    * Per-mint NUT-04/NUT-05 payment-method support derived from NUT-06 info.

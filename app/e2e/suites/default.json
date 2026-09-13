@@ -2,6 +2,9 @@
   "version": 1,
   "name": "default",
   "scenarios": [
-    {"id":"onboarding.fresh","file":"scenarios/onboarding-fresh.json","order":10,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"}
+    {"id":"onboarding.fresh","file":"scenarios/onboarding-fresh.json","order":10,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"transactions.filters","file":"scenarios/transactions-filters.json","order":20,"newInstance":false,"lane":"simulator","requires":[],"endState":"wallet"},
+    {"id":"settings.edit.profile","file":"scenarios/settings-edit-profile.json","order":30,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"settings.media.server","file":"scenarios/settings-media-server.json","order":40,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"}
   ]
 }

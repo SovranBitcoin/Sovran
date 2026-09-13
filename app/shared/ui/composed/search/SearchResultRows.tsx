@@ -27,14 +27,40 @@ import { paymentLog, cashuLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { NoResultsFound } from '@/features/payments/components/NoResultsFound';
 import { CONTACT_SEARCH_MIN_LENGTH } from '@/shared/lib/contactSearch';
 import type { TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
+import { EmptyState } from '@/shared/ui/composed/EmptyState';
+import { Button } from '@/shared/ui/primitives/Button';
+import { searchListState, type SearchStatus } from './searchListState';
 
 type SearchResultRowsProps = {
   results: AllSearchResult[];
-  loading: boolean;
+  /** The scope's read status; rows on screen always win over it. */
+  status: SearchStatus;
   /** The active query — gates the "no results" copy to non-trivial searches. */
   searchQuery: string;
+  /** Re-run the read after a failure; renders the error state's action. */
+  onRetry?: () => void;
   ListEmptyComponent?: React.ComponentType;
 };
+
+function SearchUnavailable({ onRetry }: { onRetry?: () => void }) {
+  return (
+    <EmptyState
+      icon="mdi:cloud-off-outline"
+      title="Search unavailable"
+      subtitle="Couldn't reach the search service."
+      action={
+        onRetry ? (
+          <Button
+            text="Try again"
+            variant="secondary"
+            onPress={onRetry}
+            testID="search-error-retry"
+          />
+        ) : undefined
+      }
+    />
+  );
+}
 
 const keyExtractor = (item: AllSearchResult) => item.id;
 
@@ -149,22 +175,29 @@ const PLACEHOLDER_DATA: AllSearchResult[] = Array.from({ length: 4 }, (_, i) => 
 
 export function SearchResultRows({
   results,
-  loading,
+  status,
   searchQuery,
+  onRetry,
   ListEmptyComponent = NoResultsFound,
 }: SearchResultRowsProps) {
-  // Mirror useContactSearch's internal rule: short queries don't trigger a
-  // real search, so don't flash "no results" at the user.
-  const showNoResults =
-    searchQuery.trim().length >= CONTACT_SEARCH_MIN_LENGTH && !loading && results.length === 0;
+  // One decision from status + what is already on screen: rows always win;
+  // placeholders only for a first paint; "no results" only for a settled
+  // empty answer; a failed search is an error, never a fake "no results".
+  const state = searchListState(
+    status,
+    results.length,
+    searchQuery.trim().length,
+    CONTACT_SEARCH_MIN_LENGTH
+  );
+  const showEmptyState = state === 'no-results' || state === 'error';
 
   const renderEmpty = () => {
-    if (showNoResults) return <ListEmptyComponent />;
+    if (state === 'no-results') return <ListEmptyComponent />;
+    if (state === 'error') return <SearchUnavailable onRetry={onRetry} />;
     return null;
   };
 
-  const showPlaceholders = loading && results.length === 0 && searchQuery.trim().length >= 2;
-  const listData = showPlaceholders ? PLACEHOLDER_DATA : showNoResults ? [] : results;
+  const listData = state === 'placeholders' ? PLACEHOLDER_DATA : state === 'rows' ? results : [];
 
   return (
     <View style={styles.container}>
@@ -177,7 +210,7 @@ export function SearchResultRows({
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="always"
         ListEmptyComponent={renderEmpty}
-        contentContainerStyle={showNoResults ? styles.emptyList : undefined}
+        contentContainerStyle={showEmptyState ? styles.emptyList : undefined}
       />
     </View>
   );

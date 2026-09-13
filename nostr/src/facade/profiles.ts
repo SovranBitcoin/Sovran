@@ -1,6 +1,6 @@
 import type { NostrTier } from '@sovranbitcoin/schemas';
 import type { RequestControls } from '../timeout';
-import type { TierOutcome } from '../tiers';
+import type { ReadProvenance, TierOutcome } from '../tiers';
 
 // ---------------------------------------------------------------------------
 // Profiles surface — batch kind-0 metadata for a set of pubkeys.
@@ -29,6 +29,8 @@ export type ProfilesBundle = {
 export type ResolvedProfiles = {
   tier: NostrTier;
   profiles: Record<string, ProfileMetadata>;
+  /** Aggregate reads: which tiers contributed, and whether every tier has settled. */
+  provenance?: ReadProvenance;
 };
 
 export interface ProfilesTier {

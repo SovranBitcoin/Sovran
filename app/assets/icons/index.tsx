@@ -72,6 +72,7 @@ export const icons: string[] = [
   'mdi:brain',
   'mdi:help-circle',
   'mdi:check-circle',
+  'mdi:circle-outline',
   'lucide:arrow-down-left',
   'fluent:filter-16-filled',
   'lucide:activity',

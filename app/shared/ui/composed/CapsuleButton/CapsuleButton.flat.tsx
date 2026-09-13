@@ -20,9 +20,11 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
     onPress,
     label,
     accessibilityLabel,
+    accessibilityRole = 'button',
     color,
     isActive = false,
-    filled = false,
+    filled: filledProp = false,
+    selectedVariant = 'tint',
     height = DEFAULT_HEIGHT,
     testID,
     roundedSide = 'all',
@@ -32,6 +34,8 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
 
   const cornerStyle = getCornerStyle(roundedSide);
   const widthStyle = capsuleWidthStyle(fitContent);
+  // A contrast-selected capsule paints exactly like the filled CTA.
+  const filled = filledProp || (isActive && selectedVariant === 'contrast');
 
   // filled → solid foreground CTA with inverted content; active → tinted fill;
   // default → the neutral surface used by the status pills. An explicit `color`
@@ -50,7 +54,6 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
 
   return (
     <View
-      testID={testID}
       style={[
         styles.card,
         widthStyle,
@@ -61,8 +64,16 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
       <PressableFeedback
         animation={false}
         onPress={onPress}
-        accessibilityRole="button"
+        testID={testID}
+        accessible
+        accessibilityRole={accessibilityRole}
         accessibilityLabel={accessibilityLabel ?? label}
+        accessibilityState={
+          accessibilityRole === 'radio' ? { checked: isActive, selected: isActive } : undefined
+        }
+        accessibilityValue={
+          accessibilityRole === 'radio' ? { text: isActive ? '1' : '0' } : undefined
+        }
         style={[styles.pressable, widthStyle, { minHeight: height }]}>
         <CapsuleButtonContent
           {...props}

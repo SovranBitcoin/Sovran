@@ -13,6 +13,7 @@ import {
 import { fetchJson } from '@/shared/lib/apiClient';
 import { type RequestControls } from 'wallet';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { backendConfig } from '@/shared/config/backend';
 
 // Upstream BTCMap exposes colon-keyed `osm:*` properties under the schema's
 // `passthrough()` envelope; surface the ones the detail screen actually
@@ -70,14 +71,15 @@ const PLACE_DETAILS_CACHE_TTL = 24 * 60 * 60 * 1000;
  */
 const MAX_PLACE_DETAILS_ENTRIES = 200;
 
-const SOVRAN_API_BASE = 'https://api.sovran.money/api/btcmap';
+const BTCMAP_BASE_URL = `${backendConfig.scoreApiBaseUrl}/app/btcmap`;
 
 function isCacheExpired(timestamp: number, ttl: number): boolean {
   return Date.now() - timestamp > ttl;
 }
 
-const parsePlaces = parseWith(BtcMapPlacesResponse, 'btcmap/places');
-const parsePlaceDetails = parseWith(BtcMapPlaceDetailsSchema, 'btcmap/places/:id');
+// Shared schemas tolerate new upstream fields; detail parsing preserves osm:*.
+const parsePlaces = parseWith(BtcMapPlacesResponse, 'app/btcmap/places');
+const parsePlaceDetails = parseWith(BtcMapPlaceDetailsSchema, 'app/btcmap/places/:id');
 
 interface BTCMapState {
   placesCache: PlacesCache | null;
@@ -177,9 +179,9 @@ export const useBTCMapStore = create<BTCMapStore>()(
 
         const run = async (): Promise<BtcMapPlace[]> => {
           const result = await fetchJson(
-            `${SOVRAN_API_BASE}/places`,
+            `${BTCMAP_BASE_URL}/places`,
             parsePlaces,
-            'btcmap/places',
+            'app/btcmap/places',
             undefined,
             controls
           );
@@ -247,9 +249,9 @@ export const useBTCMapStore = create<BTCMapStore>()(
         const startTime = performance.now();
 
         const result = await fetchJson(
-          `${SOVRAN_API_BASE}/places/${id}`,
+          `${BTCMAP_BASE_URL}/places/${id}`,
           parsePlaceDetails,
-          'btcmap/places/:id',
+          'app/btcmap/places/:id',
           undefined,
           controls
         );

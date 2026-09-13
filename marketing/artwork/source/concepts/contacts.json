@@ -1,0 +1,21 @@
+{
+  "id": "contacts",
+  "platform": "ios",
+  "screenshots": [
+    "contacts"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "contacts"
+}

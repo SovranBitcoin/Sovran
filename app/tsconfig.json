@@ -35,6 +35,15 @@
     // their callers at all.
     "moduleSuffixes": [".ios", ""],
     "paths": {
+      // Match Metro: workspace source, including worktrees with shared node_modules.
+      "nostr": ["../nostr/src/index.ts"],
+      "nostr/map": ["../nostr/src/map/index.ts"],
+      "nostr/recipes": ["../nostr/src/recipes/index.ts"],
+      "nostr/schemas": ["../nostr/src/schemas.ts"],
+      "wallet": ["../wallet/src/index.ts"],
+      "wallet/react": ["../wallet/src/react/index.ts"],
+      "wallet/safeFetch": ["../wallet/src/safeFetch.ts"],
+      "wallet/operations": ["../wallet/src/operations/index.ts"],
       "@/*": ["./*"],
       "@/shared/*": ["./shared/*"],
       "@/features/*": ["./features/*"],

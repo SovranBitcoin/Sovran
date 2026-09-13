@@ -102,3 +102,18 @@ describe('createProfileScopedStorage', () => {
     expect(mockStorage.size).toBe(0);
   });
 });
+
+it('pins deferred Vertex writes to the owner captured before an account change', async () => {
+  signalMigrationsComplete();
+  mockProfileState.profiles = [
+    { accountIndex: 0, pubkey: PUBKEY_P },
+    { accountIndex: 1, pubkey: PUBKEY_Q },
+  ];
+  mockProfileState.activeAccountIndex = 0;
+  const storage = createProfileScopedStorage(PUBKEY_P);
+  const write = storage.setItem('vertex-budget-store', 'budget-p');
+  mockProfileState.activeAccountIndex = 1;
+  await write;
+  expect(mockStorage.get(`vertex-budget-store:profile:${PUBKEY_P}`)).toBe('budget-p');
+  expect(mockStorage.has(`vertex-budget-store:profile:${PUBKEY_Q}`)).toBe(false);
+});

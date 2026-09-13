@@ -12,6 +12,9 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useHeaderSearch } from '@/shared/hooks/useHeaderSearch';
 import { useDebouncedMintValidation } from '@/features/mint/hooks/useDebouncedMintValidation';
 import { useMintSearch } from '@/features/mint/hooks/useMintSearch';
+import { auditScoreFromOps } from '@/features/mint/lib/auditScore';
+import { extractAvailableCurrencies } from '@/features/mint/lib/availableCurrencies';
+import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import type { MintSearchResult } from '@/shared/lib/apiClient';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { useMintProfiles } from '@/features/mint/hooks/useMintProfiles';
@@ -28,7 +31,6 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
 import { TierBadge } from '@/shared/ui/composed/TierBadge';
 import { List } from '@/shared/ui/composed/List';
-import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { LoadingIndicator } from '@/shared/blocks/status';
 import { MINT_CURRENCY_TABS_HEIGHT } from '@/features/mint/components/MintCurrencyTabs';
@@ -67,32 +69,6 @@ const noop = () => {};
 
 const keyExtractor = (item: SearchableMint) => item.url;
 const getItemType = (item: SearchableMint) => ('isSkeleton' in item ? 'skeleton' : 'mint');
-
-/** Currency-tab values shown above the results; see `availableCurrencies`. */
-function extractAvailableCurrencies(searchResults: MintSearchResult[]): string[] {
-  const units = new Set<string>(['SAT']);
-  for (const result of searchResults) {
-    for (const unit of result.supported_units) {
-      units.add(unit.toUpperCase());
-    }
-  }
-  const allowed = ['SAT', 'USD', 'EUR', 'GBP'];
-  const currencies = ['ALL', ...[...units].filter((c) => allowed.includes(c))];
-  cashuLog.debug('mint.add.currencies.extracted', {
-    currencies,
-    resultCount: searchResults.length,
-  });
-  return currencies;
-}
-
-/** Quiet period the discovered list must hold before the skeleton hands over.
- *  Operator profiles resolve one at a time and each arrival re-renders a row,
- *  so swapping in real content on the first result makes the list shift under
- *  the reader. */
-const RESULTS_SETTLE_QUIET_MS = 500;
-/** Ceiling from mount. A slow trickle of profile resolutions must never hold
- *  the skeleton open, so the quiet period stops being chased after this. */
-const RESULTS_SETTLE_CEILING_MS = 3000;
 
 /** Stable placeholder rows for the initial-search loading state. Fixed identity
  *  so FlashList keys are stable and each row's seeded placeholder width holds. */
@@ -241,13 +217,9 @@ function FallbackSearchHeader({
   );
 }
 
-// Search-result preview only: the search endpoint returns `serverStats`
-// (`n_mints`/`n_melts`/`n_errors`) without the per-swap array, so we can't
-// route through `transformAuditData` like the catalog/info paths do. The
-// resulting score is an ops-aggregate approximation; it can disagree with
-// the swap-based score the user sees once the mint is opened. That's
-// accepted — this pill is best-effort during search; authoritative scores
-// come from `getMintCatalog` and `MintInfoScreen`.
+// Search-result preview: discovery rows carry operation counts (no per-swap
+// array), so the pill uses the ops-based score from the single owner — the
+// same number the store writes for the same row, so search and detail agree.
 function computeAuditStats(mint: SearchableMint): {
   auditScore: number | undefined;
   auditTotalOps: number | undefined;
@@ -255,16 +227,14 @@ function computeAuditStats(mint: SearchableMint): {
   if (!('serverStats' in mint) || !mint.serverStats)
     return { auditScore: undefined, auditTotalOps: undefined };
   const { n_mints, n_melts, n_errors } = mint.serverStats;
-  // n_errors is a SEPARATE count of failed operations, not a subset of
-  // n_mints/n_melts (which count successes). So the success rate is
-  // successes / (successes + errors) — bounded 0..1. The old
-  // `1 - errors/successes` went deeply negative for error-heavy mints
-  // (e.g. coinos: 39 successes vs 235 errors → -503%).
-  const successOps = n_mints + n_melts;
-  const totalOps = successOps + n_errors;
-  if (totalOps <= 0) return { auditScore: undefined, auditTotalOps: undefined };
-  const successRate = Math.max(0, Math.min(1, successOps / totalOps)); // 0..1
-  return { auditScore: successRate * 5, auditTotalOps: totalOps };
+  const { score, totalOps } = auditScoreFromOps({
+    nMints: n_mints,
+    nMelts: n_melts,
+    nErrors: n_errors,
+  });
+  return score === null
+    ? { auditScore: undefined, auditTotalOps: undefined }
+    : { auditScore: score, auditTotalOps: totalOps };
 }
 
 // Pre-baked mint row — deferred to the shared `ContactRow` so search results
@@ -352,9 +322,8 @@ export function MintAddScreen() {
   const methodLabel = methodFilter === 'bolt12' ? 'BOLT 12' : 'Onchain';
   // Currency-tab values are uppercase unit codes ('SAT', 'USD', …) with 'ALL' as
   // the no-filter sentinel; the rail unit is lowercase ('sat').
-  const [selectedCurrency, setSelectedCurrency] = useState(
-    unitParam ? unitParam.trim().toUpperCase() : 'ALL'
-  );
+  const initialCurrency = unitParam?.trim().toUpperCase() || 'ALL';
+  const [selectedCurrency, setSelectedCurrency] = useState(initialCurrency);
   useEffect(() => {
     if (methodFilter) cashuLog.info('mint.add.method_filter', { method: methodFilter });
   }, [methodFilter]);
@@ -398,11 +367,14 @@ export function MintAddScreen() {
   }, [validationState, validatedUrl, customMintInfo]);
 
   // Server-side mint search
-  const { results: searchResults, loading: searchLoading } = useMintSearch(
-    searchQuery,
-    selectedCurrency,
-    { method: methodFilter }
-  );
+  const {
+    results: searchResults,
+    loading: searchLoading,
+    status: searchStatus,
+    refresh: retrySearch,
+    availableUnits,
+    matchCountByUnit,
+  } = useMintSearch(searchQuery, selectedCurrency, { method: methodFilter });
 
   const { mints: knownMints } = useMintManagement();
 
@@ -470,26 +442,6 @@ export function MintAddScreen() {
     // resolve even though the body never names the cache.
   }, [searchResults, knownMints, searchQuery, validationState, customMintInfo, mintProfileCache]);
 
-  // Hold the skeleton until the discovered list stops changing, so rows do not
-  // pop in one-by-one as operator profiles resolve. One-way: once settled the
-  // skeleton never returns over content already shown.
-  const [resultsSettled, setResultsSettled] = useState(false);
-  useEffect(() => {
-    // Do not start the quiet timer until there is something to be quiet ABOUT.
-    // Anchored to mount, a discovery round trip slower than the quiet window
-    // (routine on a cold cellular start) leaves `displayMints` unchanged, the
-    // latch closes on an empty list, and the rows then pop in one-by-one as
-    // operator profiles resolve — exactly what the hold exists to prevent.
-    // The ceiling effect below still bounds the worst case.
-    if (resultsSettled || displayMints.length === 0) return;
-    const timer = setTimeout(() => setResultsSettled(true), RESULTS_SETTLE_QUIET_MS);
-    return () => clearTimeout(timer);
-  }, [displayMints, resultsSettled]);
-  useEffect(() => {
-    const ceiling = setTimeout(() => setResultsSettled(true), RESULTS_SETTLE_CEILING_MS);
-    return () => clearTimeout(ceiling);
-  }, []);
-
   // Kick off Nostr profile fetches for any search result that has an operator
   // pubkey in NUT-06 contact info. Results land in `mintMetadataStore`
   // and the memo above re-runs once they arrive.
@@ -499,8 +451,14 @@ export function MintAddScreen() {
   }));
   useMintProfiles(profileFetchInputs);
 
-  // Extract available currencies from results
-  const availableCurrencies = extractAvailableCurrencies(searchResults);
+  // Retain the deep-linked unit even after switching to another tab.
+  const availableCurrencies = [
+    'ALL',
+    ...extractAvailableCurrencies([
+      availableUnits,
+      initialCurrency === 'ALL' ? [] : [initialCurrency],
+    ]),
+  ];
 
   const handleToggleMint = (mintUrl: string) => {
     setSelectedMints((prev) => {
@@ -529,13 +487,11 @@ export function MintAddScreen() {
     await mintImport.start(selectedMints);
   };
 
-  // Feed the result List skeleton placeholders during the first search so the
-  // loading rows render through the SAME List + ContactRow path as real rows —
-  // identical container chrome, no content shift on the data swap.
-  // `searchLoading` alone must not blank a populated list: useMintSearch
-  // refetches on a currency-tab change, and the pre-hold behaviour was to keep
-  // the visible rows through that rather than swapping them for skeletons.
-  const isInitialLoading = (searchLoading && displayMints.length === 0) || !resultsSettled;
+  // Skeleton rows are LIST ITEMS rendered through the SAME List + ContactRow
+  // path as real rows — identical chrome, no content shift on the swap, and no
+  // second list mounted to crossfade. Only a first paint with nothing cached
+  // shows them: a stale-cache revalidate keeps the rows it has (SYSTEM.md §7).
+  const isInitialLoading = searchLoading && displayMints.length === 0;
 
   const renderItem = ({ item }: { item: SearchableMint }) =>
     'isSkeleton' in item ? (
@@ -668,23 +624,43 @@ export function MintAddScreen() {
     </BottomButtons>
   );
 
-  const emptyComponent = (
-    <View className="items-center pt-5">
+  const hasUnitMatches = Object.values(matchCountByUnit).some((count) => count > 0);
+  const unitLabel = selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency;
+  const showBtcMints =
+    methodFilter &&
+    selectedCurrency !== 'ALL' &&
+    selectedCurrency !== 'SAT' &&
+    matchCountByUnit.SAT > 0;
+
+  const discoveryFailed = searchStatus === 'error' && searchResults.length === 0;
+  const emptyComponent = discoveryFailed ? (
+    <View className="items-center gap-3 pt-5">
+      <Text className="text-foreground text-center">Couldn&apos;t load mints right now.</Text>
+      <CapsuleButton testID="mint-add-retry" label="Try again" onPress={retrySearch} />
+    </View>
+  ) : (
+    <View className="items-center gap-3 pt-5">
       <Text className="text-foreground text-center">
         {searchQuery.trim()
           ? 'No mints found matching your search'
           : methodFilter
-            ? `No known mints support ${methodLabel} yet`
+            ? selectedCurrency !== 'ALL' && hasUnitMatches
+              ? `No known mints support ${methodLabel} for ${unitLabel} yet`
+              : `No known mints support ${methodLabel} yet`
             : selectedCurrency === 'ALL'
               ? 'No mints available'
               : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}
       </Text>
+      {showBtcMints && (
+        <CapsuleButton
+          testID="mint-add-empty-switch-unit"
+          label={`Show BTC ${methodLabel} mints (${matchCountByUnit.SAT})`}
+          onPress={() => setSelectedCurrency('SAT')}
+        />
+      )}
     </View>
   );
 
-  // One List renderer for both crossfade branches: the skeleton branch and the
-  // real branch render the SAME List + ContactRow path, so the swap shifts
-  // nothing. Two List instances coexist only for the ~220ms fade.
   const renderResultList = (data: SearchableMint[]) => (
     <List
       screen
@@ -812,14 +788,7 @@ export function MintAddScreen() {
       deferContent={false}>
       <Stack.Screen options={screenOptions} />
       <Spacer size={16} />
-      <SkeletonContentCrossfade
-        loading={isInitialLoading}
-        style={{ flex: 1 }}
-        visualKey="mint-add-results"
-        visualSurface="mint-add"
-        renderSkeleton={() => renderResultList(SKELETON_MINTS)}
-        renderContent={() => renderResultList(displayMints)}
-      />
+      {renderResultList(isInitialLoading ? SKELETON_MINTS : displayMints)}
     </Screen>
   );
 }

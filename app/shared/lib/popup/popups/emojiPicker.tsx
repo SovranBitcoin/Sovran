@@ -30,7 +30,7 @@ import { CurrencyIcon } from 'assets/icons';
 
 import { encode } from '@/shared/lib/third-party/emoji';
 import { log, useMountLog, useRenderLogger } from '@/shared/lib/logger';
-import { AnimatedEmoji } from '@/shared/ui/primitives/AnimatedEmoji';
+import { AnimatedEmoji, prefetchAnimatedEmojis } from '@/shared/ui/primitives/AnimatedEmoji';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -49,6 +49,9 @@ const emojiLog = log.child({ module: 'emojiPicker' });
 
 const COLS = 6;
 const CELL_WIDTH_PCT = `${100 / COLS}%` as const;
+const PREFETCH_EMOJIS = CATEGORIES.flatMap((category) => category.emojis)
+  .slice(0, 24)
+  .map((entry) => entry.emoji);
 
 /**
  * Single emoji cell. The list's row recycling must detect "same emoji +
@@ -180,6 +183,10 @@ export function EmojiPickerContent({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isSearching = searchQuery.length > 0;
+
+  useEffect(() => {
+    void prefetchAnimatedEmojis(PREFETCH_EMOJIS);
+  }, []);
 
   // Time the substring search so a slow query (the dataset is ~1500
   // emojis) shows up in `slow` / `errors` modes. The search runs on

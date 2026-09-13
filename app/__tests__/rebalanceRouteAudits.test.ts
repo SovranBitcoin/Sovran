@@ -1,4 +1,4 @@
-import type { AuditMintResponse } from '@/shared/lib/apiClient';
+import type { LegacyMintAudit } from '@/shared/stores/global/mintMetadataTypes';
 import { fetchRebalanceRouteAudits } from '@/features/mint/lib/rebalanceRouteAudits';
 
 function deferred<T>() {
@@ -11,9 +11,9 @@ function deferred<T>() {
 
 test('audit reads use at most three concurrent requests and preserve candidate order', async () => {
   const candidates = Array.from({ length: 12 }, (_, i) => `https://mint-${i}.example`);
-  const pending = candidates.map(() => deferred<AuditMintResponse | null>());
+  const pending = candidates.map(() => deferred<LegacyMintAudit | null>());
   // Reports are opaque to the loader; production graph building owns their shape.
-  const reports = candidates.map((mintUrl) => ({ mintUrl }) as unknown as AuditMintResponse);
+  const reports = candidates.map((mintUrl) => ({ mintUrl }) as unknown as LegacyMintAudit);
   let inFlight = 0;
   let maxInFlight = 0;
   const fetchAudit = jest.fn((url: string) => {
@@ -40,7 +40,7 @@ test('audit reads use at most three concurrent requests and preserve candidate o
 });
 
 test('failed best-effort audit results are omitted and the other routes remain available', async () => {
-  const report = { mintUrl: 'https://available.example' } as unknown as AuditMintResponse;
+  const report = { mintUrl: 'https://available.example' } as unknown as LegacyMintAudit;
   const fetchAudit = jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(report);
   expect(await fetchRebalanceRouteAudits(['unavailable', 'available'], fetchAudit)).toEqual([
     report,

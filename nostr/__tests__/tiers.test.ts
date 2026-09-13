@@ -146,3 +146,46 @@ describe('synthesizeRecencyManifest — relay floor', () => {
     expect(out.map((e) => e.id)).toEqual(['new', 'old']);
   });
 });
+
+describe('resolveAcrossTiers — read correlation', () => {
+  test('stamps readId + surface on every tier event when a context is passed', async () => {
+    const { setNostrLogger } = await import('../src/log');
+    const events: Array<{ event: string; data?: Record<string, unknown> }> = [];
+    const sink = {
+      debug: (event: string, data?: Record<string, unknown>) => events.push({ event, data }),
+      info: (event: string, data?: Record<string, unknown>) => events.push({ event, data }),
+      warn: (event: string, data?: Record<string, unknown>) => events.push({ event, data }),
+    };
+    setNostrLogger(sink);
+    try {
+      await resolveAcrossTiers<string>(
+        [
+          candidate('nagg', async () => failed(networkError)),
+          candidate('primal', async () => unsupported()),
+          candidate('relay', async () => answered('relay-value')),
+        ],
+        { readId: 'r1-test', surface: 'test' },
+      );
+    } finally {
+      setNostrLogger(null);
+    }
+    const names = events.map((e) => e.event);
+    expect(names).toEqual([
+      'nostr.tier.select.start',
+      'nostr.tier.try',
+      'nostr.tier.failed',
+      'nostr.tier.try',
+      'nostr.tier.unsupported',
+      'nostr.tier.try',
+      'nostr.tier.answered',
+    ]);
+    for (const entry of events) {
+      expect(entry.data).toMatchObject({ readId: 'r1-test', surface: 'test' });
+    }
+  });
+
+  test('the context is optional: events carry null ids and nothing else changes', async () => {
+    const result = await resolveAcrossTiers<string>([candidate('nagg', async () => answered('v'))]);
+    expect(result._unsafeUnwrap()).toEqual({ tier: 'nagg', value: 'v' });
+  });
+});

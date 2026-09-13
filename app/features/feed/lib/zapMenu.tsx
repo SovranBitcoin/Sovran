@@ -12,7 +12,7 @@
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
-import { AnimatedEmoji } from '@/shared/ui/primitives/AnimatedEmoji';
+import { AnimatedEmoji, prefetchAnimatedEmojis } from '@/shared/ui/primitives/AnimatedEmoji';
 import { Text } from '@/shared/ui/primitives/Text';
 
 import { formatSats } from '../components/nostr/feedFormat';
@@ -33,6 +33,7 @@ export function openZapMenu({
   onPreset: (preset: ZapPreset) => void;
   onCustom: () => void;
 }): void {
+  void prefetchAnimatedEmojis(ZAP_PRESETS.map((preset) => preset.emoji));
   actionMenuPopup({
     title: 'Zap',
     buttons: [

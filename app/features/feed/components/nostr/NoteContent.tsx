@@ -1,4 +1,5 @@
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { parseImetaTags } from '@/shared/lib/nostr/media/imeta';
 import React, { useCallback, useMemo } from 'react';
 import { useRecyclingState } from '@shopify/flash-list';
@@ -343,7 +344,7 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
         ]}>
         <HStack align="center" gap={8} style={sharedStyles.mb6}>
           <Avatar
-            state={profile?.picture ? 'image' : 'fallback'}
+            state={avatarStateFor(profile?.picture, profile !== undefined)}
             picture={profile?.picture}
             seed={event.pubkey}
             size={24}

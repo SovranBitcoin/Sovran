@@ -1,3 +1,5 @@
+import { KeyRecoveryScreen } from './KeyRecoveryScreen';
+import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import React, { useEffect, useState } from 'react';
 
 import { useSettingsStore, useSettingsHydration } from '@/shared/stores/global/settingsStore';
@@ -115,7 +117,8 @@ interface AppGateProps {
 const AppGate: React.FC<AppGateProps> = ({ children }) => {
   useInitMount('AppGate');
   useLifecycleLogger('AppGate');
-  const { isReady, isLoading } = useNostrKeysContext();
+  const locked = useSecureStoreState((s) => s.secureStoreState === 'locked');
+  const { isReady, isLoading, error } = useNostrKeysContext();
   const isTermsAccepted = useSettingsStore((state) =>
     hasCurrentLegalAcceptance(state.legalAcceptance)
   );
@@ -124,6 +127,8 @@ const AppGate: React.FC<AppGateProps> = ({ children }) => {
   const completeOnboarding = useSettingsStore((state) => state.completeOnboarding);
   const reinstallState = useReinstallDetection(hasSeenOnboarding);
   const hydration = useSettingsHydration((s) => s.status);
+  if (locked) return <KeyRecoveryScreen />;
+  if (error && !isReady) return <KeyRecoveryScreen locked={false} />;
   if (hydration === 'loading') return null;
   if (hydration === 'error') {
     return (

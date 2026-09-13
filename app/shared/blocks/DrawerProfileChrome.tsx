@@ -8,6 +8,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
  * route file only orchestrates routes.
  */
 
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { useRef } from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -210,11 +211,13 @@ export function DrawerProfileChrome({ closeDrawer }: { closeDrawer: () => void }
   const insets = useSafeAreaInsets();
   const mockMode = useSettingsStore((state) => state.mockMode);
   const pubkey = usePresentationPubkey(nostrKeys?.pubkey ?? '');
-  const { displayName, picture } = useProfileDisplay(pubkey);
+  const { displayName, picture, pictureResolved } = useProfileDisplay(pubkey);
   const { metadata, isLoading: metaLoading } = useNostrProfileMetadata(pubkey || undefined);
-  const { data: socialData, isLoading: socialLoading } = useNostrProfile(
-    mockMode ? null : pubkey || null
-  );
+  const {
+    data: socialData,
+    isLoading: socialLoading,
+    isCountsLoading: socialCountsLoading,
+  } = useNostrProfile(mockMode ? null : pubkey || null);
   // Mirror UserProfileScreen: own following count comes from the local kind-3
   // contacts store (with optimistic adjustments), not from the backend's
   // `follows` field — the backend's view of the wallet's own follows can lag.
@@ -261,7 +264,7 @@ export function DrawerProfileChrome({ closeDrawer }: { closeDrawer: () => void }
       <HStack align="flex-start" justify="space-between">
         <Pressable onPress={handleAvatarPress} hitSlop={hitSlop.default}>
           <Avatar
-            state={picture ? 'image' : 'fallback'}
+            state={avatarStateFor(picture, pictureResolved)}
             seed={pubkey}
             picture={picture}
             name={displayName}
@@ -303,14 +306,18 @@ export function DrawerProfileChrome({ closeDrawer }: { closeDrawer: () => void }
           <Text
             bold
             size={14}
-            loading={!mockMode && socialLoading && !socialData}
+            loading={
+              !mockMode &&
+              ((socialLoading && !socialData) ||
+                (socialCountsLoading && socialData?.followers === undefined))
+            }
             placeholder="0000"
             style={{ color: foreground }}>
             {mockMode
               ? DEMO_VIEWER_STATS.followers_count.toLocaleString()
-              : socialData
+              : socialData?.followers !== undefined
                 ? socialData.followers.toLocaleString()
-                : ''}
+                : '—'}
           </Text>
           <Text size={14} style={{ color: mutedColor }}>
             Followers

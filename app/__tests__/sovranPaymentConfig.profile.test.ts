@@ -8,7 +8,7 @@ import {
   createSovranHandlers,
   createSovranNotifications,
 } from '@/features/send/lib/sovranPaymentConfig';
-import { sendMemoPopup } from '@/shared/lib/popup';
+import { paramPopup, sendMemoPopup } from '@/shared/lib/popup';
 import { getEncodedToken } from '@cashu/cashu-ts';
 import { sendBLEPrivateMessageWhole } from '@/features/bitchat/lib/blePrivateDelivery';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -619,5 +619,14 @@ describe('createSovranHandlers profile routing', () => {
 
     expect(generateKeyPair).toHaveBeenCalledTimes(1);
     expect(onP2pkKeyRefreshed).toHaveBeenCalledWith(nextPublicKey);
+  });
+});
+
+it('shows the NFC unfunded-unit explanation from the wallet', () => {
+  const message = 'This terminal wants USD. You have no USD ecash at an accepted mint.';
+  void createSovranNotifications().UNIT_NOT_FUNDED?.({ code: 'UNIT_NOT_FUNDED', message });
+  expect(paramPopup).toHaveBeenCalledWith('nfc-error', {
+    title: 'Currency unavailable',
+    message,
   });
 });

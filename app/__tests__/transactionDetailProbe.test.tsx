@@ -118,6 +118,10 @@ jest.mock('@/shared/lib/popup/E2EActionMenuProbe', () => {
 });
 
 describe('TransactionDetailShell device probe', () => {
+  // The blank-QR placeholder reshuffles on an interval; keep it off the real
+  // clock so no state update lands after the test has finished.
+  beforeAll(() => jest.useFakeTimers());
+  afterAll(() => jest.useRealTimers());
   beforeEach(() => {
     mockCounterparty = null;
     mockAfterInteractions.length = 0;
@@ -216,7 +220,8 @@ describe('TransactionDetailShell device probe', () => {
     ).toBeTruthy();
     expect(renderer.root.findByProps({ 'data-testid': 'known-details' })).toBeTruthy();
     const frame = renderer.root.findByType(QRCodeFrame);
-    expect(frame.props.children.props.style).toEqual({ width: 329, height: 329 });
+    // First child is the placeholder's QR layer, sized to the live QR square.
+    expect(frame.props.children[0].props.style).toEqual({ width: 329, height: 329 });
     expect(renderer.root.findAllByProps({ 'data-testid': 'encoded-qr' })).toHaveLength(0);
     expect(renderer.root.findAllByProps({ 'data-testid': 'related-transactions' })).toHaveLength(0);
     expect(mockAfterInteractions).toHaveLength(1);

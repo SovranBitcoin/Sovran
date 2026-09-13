@@ -6,7 +6,11 @@ import type { FeedClient } from '@/features/feed/data/feedClient';
 
 jest.mock('nostr', () => ({ facade: {} }));
 jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({ buildNostrDataLayer: jest.fn() }));
-jest.mock('@/shared/lib/logger', () => ({ feedLog: { info: jest.fn(), warn: jest.fn() } }));
+jest.mock('@/shared/lib/logger', () => ({
+  feedLog: { info: jest.fn(), warn: jest.fn(), debug: jest.fn() },
+  storeLog: { info: jest.fn(), warn: jest.fn(), debug: jest.fn() },
+  redactError: (error: unknown) => error,
+}));
 jest.mock('@/shared/stores/runtime/debugTierStore', () => ({ recordDebugTiers: jest.fn() }));
 
 const PUB = 'a'.repeat(64);
@@ -55,6 +59,24 @@ function setup(...pages: facade.ResolvedFeedPage[]) {
 }
 
 describe('profile post loading', () => {
+  it.each(['nagg', 'primal'] as const)(
+    'preserves bundled engagement counts from %s on profile pages',
+    async (tier) => {
+      const { client } = setup({
+        ...page(ROOT, 100),
+        tier,
+        stats: { [ROOT]: { likes: 17, reposts: 3, replies: 8, zaps: 2, satsZapped: 2100 } },
+      });
+      const result = await client.getUserFeed({ pubkey: PUB });
+      expect(result.metricsMap.get(ROOT)).toEqual({
+        likeCount: 17,
+        repostCount: 3,
+        replyCount: 8,
+        satsZapped: 2100,
+      });
+    }
+  );
+
   it('continues past a reply-only relay page to find authored posts', async () => {
     const { client, getFeedPage } = setup(page(REPLY, 200, true), page(ROOT, 100));
     const result = await client.getUserFeed({ pubkey: PUB, limit: 50 });

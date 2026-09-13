@@ -29,16 +29,25 @@ export interface NostrMintEnrichment {
   ) => Promise<MintReviewsSummary | undefined>;
 }
 
+// Display fields are BOUNDED and TOLERANT: a kind-0 is user-authored, so a
+// reviewer can (and one Minibits reviewer does) publish an 8 KB data-URI avatar
+// or a novel-length name. That is a bad field, not a bad response — drop the
+// field and keep the reviews. Failing the whole schema here rendered
+// "Couldn't load reviews" for the most-reviewed mint while its cached rating
+// still painted above the empty list.
+const displayText = z.string().max(256).optional().catch(undefined);
+const displayUrl = z.string().max(2048).optional().catch(undefined);
+
 // nagg's `/nostr/profile` returns FULL kind-0 metadata, already parsed. We only
 // consume the display fields the mint UI shows; everything else is tolerated.
 const ProfileResponse = z
   .object({
     pubkey: z.string().optional(),
     npub: z.string().optional(),
-    name: z.string().max(256).optional(),
-    displayName: z.string().max(256).optional(),
-    picture: z.string().max(2048).optional(),
-    image: z.string().max(2048).optional(),
+    name: displayText,
+    displayName: displayText,
+    picture: displayUrl,
+    image: displayUrl,
   })
   .passthrough();
 
@@ -60,8 +69,8 @@ const MintReviewItem = z.object({
 // identity without a second round-trip per reviewer.
 const ReviewerProfile = z
   .object({
-    name: z.string().max(256).optional(),
-    picture: z.string().max(2048).optional(),
+    name: displayText,
+    picture: displayUrl,
   })
   .passthrough();
 

@@ -28,6 +28,7 @@ import type { FormattedString } from 'wallet';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ReceiveReusableQuoteTab } from '@/features/receive/components/ReceiveReusableQuoteTab';
 import { ReceivePaymentRequestTab } from '@/features/receive/components/ReceivePaymentRequestTab';
+import { useBip321RailSelection } from '@/features/receive/hooks/useBip321RailSelection';
 import { ReceiveUnifiedTab } from '@/features/receive/components/ReceiveUnifiedTab';
 import { PillTabs, PILL_TABS_HEIGHT } from '@/shared/ui/composed/PillTabs';
 import { computeReceiveTabs } from '@/features/receive/lib/receiveTabs';
@@ -388,9 +389,13 @@ function ReceiveScreenForUnit({
   const creqLockPubkey = creqMintSelection.p2pkLockEffective
     ? receiveEntryData?.p2pkKey
     : undefined;
+  const bip321 = useBip321RailSelection(unit, walletContext);
+  const creqEnabled =
+    selectedTab === 'Cashu' ||
+    bip321.selection.rails.some((rail) => rail.id === 'creq' && rail.state === 'included');
   const creqMints = walletContext.trustedMintUrls;
   const creq = useStandingPaymentRequest(
-    creqMints.length > 0
+    creqEnabled && creqMints.length > 0
       ? {
           unit,
           mints: creqMints,
@@ -516,6 +521,12 @@ function ReceiveScreenForUnit({
                     <ReceiveReusableQuoteTab
                       method="bolt12"
                       active={selectedTab === 'Lightning' && lightningMode === 'offer'}
+                      enabled={
+                        (selectedTab === 'Lightning' && lightningMode === 'offer') ||
+                        bip321.selection.rails.some(
+                          (rail) => rail.id === 'bolt12' && rail.state === 'included'
+                        )
+                      }
                       unit={unit}
                       walletContext={walletContext}
                       actions={actions}
@@ -528,7 +539,7 @@ function ReceiveScreenForUnit({
                   <ReceiveUnifiedTab
                     active={selectedTab === 'Unified'}
                     unit={unit}
-                    walletContext={walletContext}
+                    bip321={bip321}
                     muted={muted}
                     creq={creq}
                     onQrPayload={onUnifiedPayload}
@@ -538,6 +549,12 @@ function ReceiveScreenForUnit({
                   <ReceiveReusableQuoteTab
                     method="onchain"
                     active={selectedTab === 'Onchain'}
+                    enabled={
+                      selectedTab === 'Onchain' ||
+                      bip321.selection.rails.some(
+                        (rail) => rail.id === 'onchain' && rail.state === 'included'
+                      )
+                    }
                     unit={unit}
                     walletContext={walletContext}
                     actions={actions}

@@ -67,6 +67,14 @@ jest.mock('@/shared/stores/global/nostrMetadataCache', () => ({
   useNostrMetadataCache: mockProfiles,
 }));
 const mockLiveHistory = [{ id: 'real-transaction', unit: 'sat' }];
+const mockSelectLiveUnit = jest.fn();
+jest.mock('@/features/wallet/hooks/useActiveUnit', () => ({
+  useActiveUnit: () => ({
+    unit: 'sat',
+    availableUnits: ['sat'],
+    selectUnit: mockSelectLiveUnit,
+  }),
+}));
 jest.mock('wallet/react', () => ({
   useColadaTransactions: () => ({ history: mockLiveHistory, hasMore: false, isFetching: false }),
 }));
@@ -97,6 +105,41 @@ it('restores live history immediately when Mock Mode is disabled', () => {
   expect(result.current.history.some((entry) => entry.id.startsWith('demo-'))).toBe(true);
   act(() => useSettingsStore.getState().setMockMode(false));
   expect(result.current.history).toBe(mockLiveHistory);
+});
+
+it('keeps all demo currencies outside payment selection and restores live wallpaper on disable', () => {
+  const { useWalletPresentationUnit } =
+    require('@/features/wallet/hooks/useWalletPresentationUnit') as typeof import('@/features/wallet/hooks/useWalletPresentationUnit');
+  const { usePresentationUnit } =
+    require('@/shared/hooks/usePresentationUnit') as typeof import('@/shared/hooks/usePresentationUnit');
+  const { useMockDataStore } =
+    require('@/shared/stores/runtime/mockDataStore') as typeof import('@/shared/stores/runtime/mockDataStore');
+  act(() => {
+    useSettingsStore.getState().setMockMode(false);
+    useMockDataStore.getState().setWalletUnit('sat');
+  });
+  const { result } = renderHook(() => ({
+    wallet: useWalletPresentationUnit(),
+    payment: useWalletPresentationUnit(false),
+    wallpaper: usePresentationUnit('sat'),
+  }));
+  expect(result.current.wallet.availableUnits).toEqual(['sat']);
+  act(() => useSettingsStore.getState().setMockMode(true));
+  expect(result.current.wallet.availableUnits).toEqual(['sat', 'usd', 'eur', 'gbp']);
+  for (const unit of ['usd', 'eur', 'gbp'] as const) {
+    act(() => result.current.wallet.selectUnit(unit));
+    expect(result.current.wallet.unit).toBe(unit);
+    expect(result.current.wallpaper).toBe(unit);
+    expect(result.current.payment.unit).toBe('sat');
+    expect(result.current.payment.availableUnits).toEqual(['sat']);
+  }
+  expect(mockSelectLiveUnit).not.toHaveBeenCalled();
+  act(() => useSettingsStore.getState().setMockMode(false));
+  expect(result.current.wallet.unit).toBe('sat');
+  expect(result.current.wallet.availableUnits).toEqual(['sat']);
+  expect(result.current.wallpaper).toBe('sat');
+  act(() => result.current.wallet.selectUnit('sat'));
+  expect(mockSelectLiveUnit).toHaveBeenCalledWith('sat');
 });
 
 it('purges leaked fixture content without deleting a genuine profile sharing its public key', () => {
@@ -189,7 +232,7 @@ it('keeps fictional chats separate from public identities and restores private c
       result.current.displayContacts.some((c: { pubkey: string }) => c.pubkey === keys.pubkey)
     ).toBe(!enabled);
     if (enabled) {
-      expect(mockDmReader).toHaveBeenLastCalledWith(undefined, undefined);
+      expect(mockDmReader).toHaveBeenLastCalledWith(undefined, undefined, { live: false });
       expect(result.current.conversations).toEqual([]);
       expect(result.current.hasMore).toBe(false);
       expect(result.current.displayContacts).toHaveLength(6);

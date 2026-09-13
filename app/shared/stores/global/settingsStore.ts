@@ -39,6 +39,7 @@ export interface MiddlemanRoutingSettings {
 }
 
 interface SettingsState {
+  lastKnownAppVersion: z.infer<typeof PersistedLastKnownAppVersion>;
   language: string;
   displayBtc: number;
   displayCurrency: DisplayCurrency;
@@ -82,6 +83,7 @@ interface SettingsState {
    * Default on. The facade reads these when it's wired into the read paths
    * (see `nostrTierSettings`); until then they're inert.
    */
+  vertexCreditsEnabled: boolean;
   naggTierEnabled: boolean;
   primalTierEnabled: boolean;
   relayTierEnabled: boolean;
@@ -143,7 +145,19 @@ const DEFAULT_MIDDLEMAN_ROUTING_PERSISTED = {
   trustMode: 'trusted_only',
 } as const;
 
+const PersistedLastKnownAppVersion = z
+  .object({
+    version: z.string().max(32),
+    minVersion: z.string().max(32).optional(),
+    message: z.string().max(280).optional(),
+    fetchedAt: z.number().int().nonnegative(),
+  })
+  .nullable()
+  .default(null)
+  .catch(null);
+
 const PersistedSettings = z.object({
+  lastKnownAppVersion: PersistedLastKnownAppVersion,
   language: z.string().max(16).default('en').catch('en'),
   displayBtc: z.number().int().min(0).max(8).default(3).catch(3),
   displayCurrency: z.enum(['usd', 'eur', 'gbp']).default('usd').catch('usd'),
@@ -172,6 +186,7 @@ const PersistedSettings = z.object({
   regenerateP2PKOnReceive: z.boolean().default(true).catch(true),
   sendLocationEnabled: z.boolean().default(false).catch(false),
   fileLoggingEnabled: z.boolean().default(false).catch(false),
+  vertexCreditsEnabled: z.boolean().default(true).catch(true),
   naggTierEnabled: z.boolean().default(true).catch(true),
   primalTierEnabled: z.boolean().default(true).catch(true),
   relayTierEnabled: z.boolean().default(true).catch(true),
@@ -183,6 +198,7 @@ const PersistedSettings = z.object({
 
 /** Default settings used for initialization and reset. */
 const DEFAULT_SETTINGS: SettingsState = {
+  lastKnownAppVersion: null,
   language: 'en',
   displayBtc: 3,
   displayCurrency: 'usd',
@@ -201,6 +217,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   regenerateP2PKOnReceive: true,
   sendLocationEnabled: false,
   fileLoggingEnabled: false,
+  vertexCreditsEnabled: true,
   naggTierEnabled: true,
   primalTierEnabled: true,
   relayTierEnabled: true,
@@ -209,6 +226,7 @@ const DEFAULT_SETTINGS: SettingsState = {
 };
 
 interface SettingsActions {
+  setLastKnownAppVersion: (version: NonNullable<SettingsState['lastKnownAppVersion']>) => void;
   // Display settings
   setDisplayBtc: (display: number) => void;
   getDisplayBtc: () => number;
@@ -244,6 +262,7 @@ interface SettingsActions {
   setFileLoggingEnabled: (enabled: boolean) => void;
 
   // Nostr data-layer per-tier enablement (dev)
+  setVertexCreditsEnabled: (enabled: boolean) => void;
   setNaggTierEnabled: (enabled: boolean) => void;
   setPrimalTierEnabled: (enabled: boolean) => void;
   setRelayTierEnabled: (enabled: boolean) => void;
@@ -262,6 +281,16 @@ export const useSettingsStore = create<SettingsStore>()(
     persist(
       (set, get) => ({
         ...DEFAULT_SETTINGS,
+
+        setLastKnownAppVersion: (version) => {
+          set({
+            lastKnownAppVersion: {
+              ...version,
+              // The wire schema permits 512 characters; keep the durable note bounded.
+              message: version.message?.slice(0, 280),
+            },
+          });
+        },
 
         // Display
         setDisplayBtc: (display: number) => {
@@ -353,6 +382,7 @@ export const useSettingsStore = create<SettingsStore>()(
         },
 
         // Nostr data-layer tiers (dev)
+        setVertexCreditsEnabled: (enabled: boolean) => set({ vertexCreditsEnabled: enabled }),
         setNaggTierEnabled: (enabled: boolean) => {
           storeLog.info('store.settings.set_nagg_tier_enabled', { enabled });
           set({ naggTierEnabled: enabled });
@@ -422,6 +452,7 @@ export const useSettingsStore = create<SettingsStore>()(
           };
         },
         partialize: (state) => ({
+          lastKnownAppVersion: state.lastKnownAppVersion,
           language: state.language,
           displayBtc: state.displayBtc,
           displayCurrency: state.displayCurrency,
@@ -442,6 +473,7 @@ export const useSettingsStore = create<SettingsStore>()(
           fileLoggingEnabled: state.fileLoggingEnabled,
           minTransferThreshold: state.minTransferThreshold,
           middlemanRouting: state.middlemanRouting,
+          vertexCreditsEnabled: state.vertexCreditsEnabled,
           naggTierEnabled: state.naggTierEnabled,
           primalTierEnabled: state.primalTierEnabled,
           relayTierEnabled: state.relayTierEnabled,

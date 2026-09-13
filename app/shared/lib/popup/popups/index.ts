@@ -4,7 +4,6 @@ import { popup } from './engine';
 import type { PopupOverrides } from './types';
 import type { PopupIcon } from '../icons';
 import type { PopupTextSegment } from '../format';
-import { openExternalUrl } from '@/shared/lib/url';
 
 export type { CopyTarget } from './copy';
 export { copyPopup } from './copy';
@@ -15,7 +14,7 @@ export { sendMemoPopup } from './sendMemoSheet';
 export { emojiPickerPopup } from './emojiPicker';
 export { modelPickerPopup } from './modelPicker';
 export type { ProfileSwitcherAction } from '../actionSheetTypes';
-export { actionMenuPopup } from './actionMenu';
+export { actionMenuPopup, replaceActionMenuPopup } from './actionMenu';
 export { deleteStatusPopup } from './deleteStatus';
 export {
   paymentStatusPopup,
@@ -33,11 +32,6 @@ const WALLET_ICON = 'icon:solar:wallet-bold';
 const ALERT_ICON = 'icon:mdi:alert-circle-outline';
 const CAMERA_ICON = 'icon:mdi:camera';
 const QR_ICON = 'icon:mdi:qrcode';
-
-// Single download landing page (kept current server-side) so we don't need to
-// detect the user's install source — App Store, Freedom Store (AltStore), or
-// GitHub releases are all linked from there.
-const DOWNLOAD_URL = 'https://sovran.money/en/download';
 
 type PopupSpec = {
   message: string;
@@ -300,6 +294,12 @@ const STATIC_POPUPS = {
 } as const satisfies Record<string, PopupSpec>;
 
 const PARAM_POPUPS = {
+  'unified-rail-info': (p: { title: string; message: string }): PopupSpec => ({
+    message: p.title,
+    text: p.message,
+    icon: 'icon:mdi:information',
+    type: 'info',
+  }),
   'mints-added': (p: { added: number; failed?: number }): PopupSpec =>
     p.failed && p.failed > 0
       ? {
@@ -327,21 +327,7 @@ const PARAM_POPUPS = {
     type: 'warning',
   }),
 
-  'new-version': (p: { version: string; message?: string }): PopupSpec => ({
-    message: 'Update available',
-    text:
-      p.message ??
-      `Version ${p.version} is now available. Update for the latest features and fixes.`,
-    icon: 'icon:mdi:cloud-download-outline',
-    variant: 'sheet',
-    buttonLayout: 'row',
-    buttons: [
-      { text: 'Download', onPress: () => void openExternalUrl(DOWNLOAD_URL) },
-      { text: 'Later' },
-    ],
-  }),
-
-  'engagement-update-failed': (action: 'follow' | 'like' | 'repost'): PopupSpec => ({
+  'engagement-update-failed': (action: 'follow' | 'like' | 'repost' | 'profile'): PopupSpec => ({
     message: `Unable to update ${action} right now`,
     icon: 'icon:mdi:alert-circle',
     type: 'error',

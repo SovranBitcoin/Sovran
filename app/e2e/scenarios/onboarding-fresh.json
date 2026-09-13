@@ -32,6 +32,7 @@
     {"action":"screenshot","name":"onboarding-carousel"},
     {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"label":"Welcome to Sovran"},"attempts":4,"settleMs":3000},
     {"action":"screenshot","name":"welcome","stable":true,"tolerance":0.01},
+    {"action":"assert","that":"visible","selector":{"id":"onboarding-recovery-phrase"}},
     {"action":"assert","that":"ax","selector":{"label":"Get Started"},"state":{"enabled":true}},
     {"action":"tap","selector":{"label":"Get Started"}}
   ],

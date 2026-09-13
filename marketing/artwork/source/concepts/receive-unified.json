@@ -1,0 +1,21 @@
+{
+  "id": "receive-unified",
+  "platform": "ios",
+  "screenshots": [
+    "receive-qr"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "receive-unified"
+}

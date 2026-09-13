@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "id": "settings.media.server",
+  "name": "View the media upload server",
+  "description": "Open My media and the upload server menu, then dismiss without saving.",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"id":"settings-profile-row"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"settings-media-row"},"attempts":5,"settleMs":1000},
+    {"action":"tap","selector":{"id":"settings-media-row"}},
+    {"action":"waitFor","selector":{"id":"settings-media-server-row"},"timeoutMs":30000},
+    {"action":"screenshot","name":"settings-media"},
+    {"action":"tap","selector":{"id":"settings-media-server-row"}},
+    {"action":"waitFor","selector":{"id":"e2e-heroui-menu-open"},"timeoutMs":15000},
+    {"action":"assert","that":"visible","selector":{"id":"e2e-heroui-menu-open:Upload server"}},
+    {"action":"tapAt","x":0.5,"y":0.12},
+    {"action":"assert","that":"notVisible","selector":{"id":"e2e-heroui-menu-open"},"timeoutMs":15000},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

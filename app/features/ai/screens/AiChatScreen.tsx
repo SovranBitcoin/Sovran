@@ -1,13 +1,13 @@
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { DEMO_AI_MESSAGES } from '@/shared/stores/runtime/mockPresentationData';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, ScrollView, View as RNView } from 'react-native';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useScreenInsets } from '@/shared/hooks/useScreenInsets';
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { Image } from 'expo-image';
 
 import Icon from 'assets/icons';
@@ -36,6 +36,7 @@ import { resolveSelectedEntry } from '../lib/format';
 import { pickChatImage } from '../lib/attachments';
 import { MAX_INLINE_IMAGES } from '../lib/assembleApiMessages';
 import { deriveActivePath, getSiblingInfo, withSynthesisedParents } from '../lib/branching';
+import { getChatScrollReason, type ChatScrollState } from '../lib/chatScroll';
 
 const SURFACE = 'ai';
 
@@ -138,7 +139,15 @@ export function AiChatScreen() {
   const liveHistory = useRoutstrStore((s) => s.conversationHistory);
   const conversationHistory = mockMode ? demoMessages : liveHistory;
   const activeChildren = useRoutstrStore((s) => s.activeChildren);
+  const conversationId = useRoutstrStore((s) => s.currentSessionId);
   const setActiveBranch = useRoutstrStore((s) => s.setActiveBranch);
+  const activeBranchKey = JSON.stringify(
+    Object.keys(activeChildren)
+      .sort()
+      .map((parentId) => [parentId, activeChildren[parentId]])
+  );
+  const listRef = useRef<FlashListRef<RoutstrMessage>>(null);
+  const previousScrollState = useRef<ChatScrollState | null>(null);
 
   // Vision gate for the composer's [+]: image attach is only offered when
   // the model the current (provider, tier) slot resolves to accepts image
@@ -171,13 +180,9 @@ export function AiChatScreen() {
     [conversationHistory, activeChildren]
   );
 
-  // Mount visibility — narrow set, fires once. No imperative scroll-chase
-  // plumbing: FlashList's `maintainVisibleContentPosition` with
-  // `startRenderingFromBottom` docks short content and lands the first paint at
-  // the latest message, and `autoscrollToBottomThreshold` keeps the user pinned
-  // during streaming appends. Earlier attempts at setTimeout-based chasers
-  // landed mid-list when item measurements settled async — fragile for
-  // streaming content. Trust the library; reach for telemetry if it regresses.
+  // Mount visibility — narrow set, fires once. MVCP owns streaming appends;
+  // the effect below resets the position only for composer readiness and
+  // conversation/branch changes, without timers or streaming scroll chasers.
   // Mount-only refire semantics + the compiler-seam rationale live in
   // useMountLog (an inline exhaustive-deps suppression would make the
   // compiler skip this whole component).
@@ -206,6 +211,16 @@ export function AiChatScreen() {
   const [draft, setDraft] = useState('');
   const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
   const [composerHeight, handleComposerLayout] = useComposerHeight();
+  const composerHeightSettled = composerHeight > 0;
+
+  useEffect(() => {
+    const next = { conversationId, activeBranchKey, composerHeightSettled };
+    const reason = getChatScrollReason(previousScrollState.current, next);
+    previousScrollState.current = next;
+    if (!reason || !listRef.current) return;
+    void listRef.current.scrollToEnd({ animated: false });
+    aiLog.info('ai.list.scroll_to_end', { reason });
+  }, [conversationId, activeBranchKey, composerHeightSettled]);
 
   // Picked-but-unsent images are only valid against a vision-capable
   // model. If the user switches the slot to a text-only model after
@@ -350,11 +365,6 @@ export function AiChatScreen() {
     </Pressable>
   );
 
-  // FlashList's short-history alignment excludes footer/padding height from
-  // its bottom anchor. Reserve the measured composer outside the viewport so
-  // the last message cannot dock behind the input controls.
-  const listBottom = composerHeight + bottomInset + 16;
-
   return (
     <RNView style={{ flex: 1, backgroundColor: surfaceColor }}>
       <PatternBackground />
@@ -362,13 +372,16 @@ export function AiChatScreen() {
           the composer. When the keyboard opens, both shift up together so
           the latest message stays just above the composer instead of
           getting hidden behind the keyboard. */}
-      <Reanimated.View style={[{ flex: 1, marginBottom: listBottom }, keyboardLiftStyle]}>
+      <Reanimated.View className="flex-1" style={keyboardLiftStyle}>
         <RNView style={{ flex: 1 }}>
           {activeMessages.length === 0 ? (
             <RNView style={{ flex: 1 }}>{emptyContent}</RNView>
           ) : (
             <FlashList
+              ref={listRef}
+              testID="ai-message-list"
               contentInsetAdjustmentBehavior="never"
+              contentContainerStyle={{ paddingBottom: composerHeight + bottomInset + 16 }}
               data={activeMessages}
               keyExtractor={messageKeyExtractor}
               renderItem={renderItem}

@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutChangeEvent } from 'react-native';
+import { LayoutChangeEvent, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Menu } from 'heroui-native';
 import {
@@ -21,11 +21,12 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log } from '@/shared/lib/logger';
-import { scheduleAfterLayout } from '@/shared/lib/scheduleAfterLayout';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { SectionAnchorList, type AnchorSection } from '@/shared/ui/composed/SectionAnchorList';
 import {
   dismissActionMenuPopup,
+  getActionMenuSnapshot,
+  type ActionMenuPayload,
   useActionMenuPayload,
   type ActionMenuItem,
   type ActionMenuInput,
@@ -33,7 +34,9 @@ import {
   type ActionMenuSection,
 } from '@/shared/lib/popup/popups/actionMenu';
 import Icon from 'assets/icons';
+import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { markE2EHerouiMenu } from '@/shared/lib/popup/E2EActionMenuProbe';
+import { OPEN_WATCHDOG_MS } from '@/shared/lib/popup/openWatchdog';
 import { SheetMenuRowContent } from '@/shared/lib/popup/popups/sheetMenuRow';
 import { SheetSearchField } from '@/shared/lib/popup/SheetSearchField';
 import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
@@ -57,10 +60,10 @@ async function runPrimaryAction(
     setError: React.Dispatch<React.SetStateAction<string | null>>;
     setIsSubmitting: React.Dispatch<React.SetStateAction<boolean>>;
     selectedRef: React.MutableRefObject<boolean>;
-    afterCloseRef: React.MutableRefObject<(() => void) | null>;
+    close: (afterClose?: () => void) => void;
   }
 ): Promise<void> {
-  const { inputValues, isSubmitting, setError, setIsSubmitting, selectedRef, afterCloseRef } = ctx;
+  const { inputValues, isSubmitting, setError, setIsSubmitting, selectedRef, close } = ctx;
   if (isSubmitting) return;
   setError(null);
   setIsSubmitting(true);
@@ -69,8 +72,7 @@ async function runPrimaryAction(
       setError,
       close: (afterClose) => {
         selectedRef.current = true;
-        afterCloseRef.current = afterClose ?? null;
-        dismissActionMenuPopup();
+        close(afterClose);
       },
     });
   } finally {
@@ -134,6 +136,8 @@ function MenuInputField({
         <Text className="text-foreground mb-1 text-sm font-medium">{input.label}</Text>
       ) : null}
       <BottomSheetTextInput
+        testID={`action-menu-input-${input.id}`}
+        accessibilityLabel={input.label ?? input.placeholder ?? input.id}
         value={value}
         onChangeText={onChangeText}
         onFocus={() => setIsFocused(true)}
@@ -142,6 +146,7 @@ function MenuInputField({
         placeholderTextColor={placeholder}
         autoCapitalize={input.autoCapitalize}
         autoCorrect={input.autoCorrect}
+        keyboardType={input.keyboardType}
         secureTextEntry={input.secureTextEntry}
         // Mirror heroui Input's secondary variant: py-3.5 px-3 rounded-2xl
         // border-[1.5px] bg-default border-default focus:border-accent.
@@ -162,8 +167,46 @@ function MenuInputField({
 }
 
 export function ActionMenuHost() {
-  const payload = useActionMenuPayload();
-  const isOpen = payload !== null;
+  const { payload, seq } = useActionMenuPayload();
+  // Reset form, selection and native state for every new request, including
+  // requests arriving before the preceding close animation has completed.
+  return <ActionMenuInstance key={seq} currentPayload={payload} seq={seq} />;
+}
+
+type MenuPhase = 'closed' | 'presenting' | 'open' | 'closing';
+
+function ActionMenuInstance({
+  currentPayload,
+  seq,
+}: {
+  currentPayload: ActionMenuPayload | null;
+  seq: number;
+}) {
+  // Retain the last content through closing so the sheet doesn't collapse
+  // while gorhom is animating it away.
+  const [payload, setPayload] = useState(currentPayload);
+  if (currentPayload && currentPayload !== payload) setPayload(currentPayload);
+  const isOpen = currentPayload !== null;
+  const [lifecycle, setLifecycle] = useState<{
+    seq: number;
+    phase: MenuPhase;
+    attempt: number;
+  }>({ seq, phase: isOpen ? 'presenting' : 'closed', attempt: 0 });
+  const attemptRef = useRef(0);
+  const liveRef = useRef(true);
+  useEffect(() => {
+    liveRef.current = true;
+    return () => {
+      liveRef.current = false;
+    };
+  }, []);
+  // Preserve the existing handlers' identity while binding their async/native
+  // callbacks to this request generation.
+  const isCurrent = useCallback(
+    () => liveRef.current && getActionMenuSnapshot().seq === seq,
+    [seq]
+  );
+
   // Safe-area bottom inset. We disable heroui's `pb-safe-offset-3` via
   // `pb-0` further down (so the absolute `<BottomButtons>` footer can
   // extend edge-to-edge), so the no-footer paths must add this inset
@@ -171,6 +214,9 @@ export function ActionMenuHost() {
   // the sheet bottom and is clipped behind the home indicator on
   // iPhones with no notch / no home button.
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const [sheetHeight, setSheetHeight] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(0);
   // The heroui Menu sheet uses `bg-overlay` for its content background
   // (see heroui-native's bottom-sheet.styles `contentBackground`), so the
   // gradient must taper to that exact token — not `surface` or
@@ -209,16 +255,12 @@ export function ActionMenuHost() {
   useEffect(() => {
     hostLog.info('actionMenuHost.payload', {
       open: payload !== null,
-      title: payload?.title,
       sections: payload?.sections?.length ?? 0,
       buttons: payload?.buttons?.length ?? 0,
       footerButtons: payload?.footerButtons?.length ?? 0,
       hasSearchable: !!payload?.searchable,
       snapPoint: payload?.snapPoint,
     });
-    // The heroui/gorhom sheet is AX-invisible to serve-sim; mirror the open
-    // payload into the root-tree e2e probe (title only, non-secret).
-    markE2EHerouiMenu(payload ? (payload.title ?? '') : null);
     if (payload) {
       selectedRef.current = false;
       activeDismissRef.current = payload.onDismiss ?? null;
@@ -233,6 +275,12 @@ export function ActionMenuHost() {
       }
     }
   }, [payload]);
+
+  // Mirror the live request into the existing non-secret accessibility probe.
+  useEffect(() => {
+    markE2EHerouiMenu(isOpen ? (payload?.title ?? '') : null);
+    return () => markE2EHerouiMenu(null);
+  }, [isOpen, payload?.title]);
 
   useEffect(() => {
     return () => {
@@ -252,49 +300,73 @@ export function ActionMenuHost() {
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
   }, []);
 
-  const handleOpenChange = useCallback((open: boolean): void => {
-    hostLog.info('actionMenuHost.openChange', {
-      open,
-      stayOpen: stayOpenRef.current,
-      selected: selectedRef.current,
-    });
-    if (open) {
-      stayOpenRef.current = false;
-      return;
-    }
-    if (stayOpenRef.current) {
-      stayOpenRef.current = false;
-      return;
-    }
-    const picked = selectedRef.current;
-    const onDismiss = activeDismissRef.current;
-    activeDismissRef.current = null;
-    dismissActionMenuPopup();
-    if (!picked && onDismiss) onDismiss();
-  }, []);
-
-  const handleItemPress = useCallback((button: ActionMenuItem): void => {
-    if (button.disabled || button.isFailed) return;
-    selectedRef.current = true;
-    if (button.keepOpen) {
-      stayOpenRef.current = true;
-    } else {
+  const close = useCallback(
+    (afterClose?: () => void) => {
+      if (!isCurrent()) return;
+      if (afterCloseRef.current == null) afterCloseRef.current = afterClose ?? null;
       dismissActionMenuPopup();
-    }
-    void button.onPress?.(() => dismissActionMenuPopup());
-  }, []);
+    },
+    [isCurrent]
+  );
+
+  const handleOpenChange = useCallback(
+    (open: boolean): void => {
+      if (!isCurrent()) return;
+      hostLog.info('actionMenuHost.openChange', {
+        open,
+        stayOpen: stayOpenRef.current,
+        selected: selectedRef.current,
+      });
+      if (open) {
+        stayOpenRef.current = false;
+        return;
+      }
+      if (stayOpenRef.current) {
+        stayOpenRef.current = false;
+        return;
+      }
+      const picked = selectedRef.current;
+      const onDismiss = activeDismissRef.current;
+      activeDismissRef.current = null;
+      dismissActionMenuPopup();
+      if (!picked && onDismiss) onDismiss();
+    },
+    [isCurrent]
+  );
+
+  const handleItemPress = useCallback(
+    (button: ActionMenuItem): void => {
+      if (!isCurrent() || !getActionMenuSnapshot().payload || button.disabled || button.isFailed)
+        return;
+      selectedRef.current = true;
+      if (button.keepOpen) {
+        stayOpenRef.current = true;
+        // Only heroui's immediate post-press close may be swallowed; a swipe or
+        // scrim tap during a slow keepOpen handler is a genuine dismissal.
+        setTimeout(() => {
+          stayOpenRef.current = false;
+        }, 400);
+      } else {
+        dismissActionMenuPopup();
+      }
+      void button.onPress?.(close);
+    },
+    [isCurrent, close]
+  );
 
   const handlePrimaryPressInner = useCallback(
-    (action: ActionMenuPrimaryAction) =>
-      runPrimaryAction(action, {
+    (action: ActionMenuPrimaryAction) => {
+      if (!isCurrent() || !getActionMenuSnapshot().payload) return Promise.resolve();
+      return runPrimaryAction(action, {
         inputValues,
         isSubmitting,
         setError,
         setIsSubmitting,
         selectedRef,
-        afterCloseRef,
-      }),
-    [inputValues, isSubmitting]
+        close,
+      });
+    },
+    [inputValues, isSubmitting, close, isCurrent]
   );
 
   // `isSubmitting` is React state — a rapid double-tap on the primary
@@ -336,6 +408,16 @@ export function ActionMenuHost() {
   // row clears the absolutely-positioned footer. Two Menu.Items + safe
   // area easily exceed any hardcoded value, so we measure dynamically.
   const [footerHeight, setFooterHeight] = useState(0);
+  const contentBottomInset = hasFooter
+    ? footerHeight > 0
+      ? footerHeight + 16
+      : insets.bottom + 2 * 56
+    : 24;
+  useEffect(() => {
+    if (sheetHeight > 0 && viewportHeight > 0) {
+      hostLog.debug('actionMenuHost.viewport', { sheetHeight, viewportHeight, footerHeight });
+    }
+  }, [sheetHeight, viewportHeight, footerHeight]);
   const handleFooterLayout = useCallback((e: LayoutChangeEvent) => {
     const h = Math.round(e.nativeEvent.layout.height);
     setFooterHeight((prev) => (Math.abs(prev - h) > 1 ? h : prev));
@@ -362,7 +444,7 @@ export function ActionMenuHost() {
         : button.description;
     const item = (
       <Menu.Item
-        testID={button.testID}
+        testID={button.testID ?? `action-menu-item-${key}`}
         accessibilityLabel={button.accessibilityLabel}
         accessibilityHint={button.accessibilityHint}
         isDisabled={isDisabled}
@@ -428,7 +510,7 @@ export function ActionMenuHost() {
     <>
       <View className="bg-foreground/10 mx-3 my-1 h-px" />
       <Menu.Item
-        testID={payload.primaryAction.testID}
+        testID={payload.primaryAction.testID ?? 'action-menu-submit'}
         isDisabled={primaryDisabled}
         onPress={() => {
           void handlePrimaryPress(payload.primaryAction!);
@@ -479,6 +561,8 @@ export function ActionMenuHost() {
 
   const searchInputNode = payload?.searchable ? (
     <SheetSearchField
+      testID="action-menu-search"
+      clearTestID="action-menu-search-clear"
       placeholder={payload.searchable.placeholder}
       value={inputText}
       onChangeText={handleSearchChange}
@@ -526,39 +610,80 @@ export function ActionMenuHost() {
     </BottomSheetFooter>
   );
 
-  // Keep the sheet UNMOUNTED at rest. The closed Menu sheet otherwise parks at
-  // the bottom and its handle peeks on Android edge-to-edge (gorhom 5.2.14
-  // derives the closed position from the short measured container, and the
-  // height-override props are no-ops). Mount only while a menu is live; unmount
-  // after the close animation settles.
-  //
-  // `renderedOpen` lags `isOpen` by a tick on open so heroui sees the
-  // false->true transition it needs to snap the sheet open. The payload — and
-  // thus the content gorhom measures — is already set on that first closed
-  // frame, so the sheet opens to full height.
-  const [mounted, setMounted] = useState(false);
-  const [renderedOpen, setRenderedOpen] = useState(false);
-  const handleNativeClose = useCallback(() => {
-    setMounted(false);
-    const afterClose = afterCloseRef.current;
-    afterCloseRef.current = null;
-    afterClose?.();
-  }, []);
+  const { phase, attempt } = lifecycle;
+  const handleNativeClose = useCallback(
+    (seqAtMount: number, attemptAtMount: number) => {
+      if (!isCurrent() || seqAtMount !== seq || attemptAtMount !== attemptRef.current) {
+        hostLog.debug('actionMenuHost.stale_close_ignored', {
+          seq: seqAtMount,
+          attempt: attemptAtMount,
+        });
+        return;
+      }
+      // Some native closes have no preceding onOpenChange(false). Clear the
+      // request as well as the host so imperative state cannot remain orphaned.
+      const onDismiss = activeDismissRef.current;
+      activeDismissRef.current = null;
+      const hadPayload = getActionMenuSnapshot().payload !== null;
+      dismissActionMenuPopup();
+      if (hadPayload && !selectedRef.current) onDismiss?.();
+      setLifecycle((previous) => ({ ...previous, phase: 'closed' }));
+      const afterClose = afterCloseRef.current;
+      afterCloseRef.current = null;
+      afterClose?.();
+    },
+    [isCurrent, seq]
+  );
+
   useEffect(() => {
-    if (isOpen) {
-      setMounted(true);
-      // Open after a layout pass so gorhom has measured the freshly mounted
-      // content — flipping open on the next tick races the measurement and the
-      // sheet snaps to a partial height.
-      return scheduleAfterLayout(() => setRenderedOpen(true));
+    if (!isOpen) {
+      setLifecycle((previous) =>
+        previous.phase === 'closed'
+          ? previous
+          : {
+              ...previous,
+              phase: 'closing',
+            }
+      );
     }
-    setRenderedOpen(false);
   }, [isOpen]);
 
-  if (!mounted) return null;
+  // Gorhom's own animate-on-mount is the only open path (see `mountIndex`
+  // below): it waits for its layout to be calculated — container, handle and,
+  // under enableDynamicSizing, the measured content height — so there is no
+  // frame-count guess and no partial-height open. The watchdog covers gorhom
+  // #2690 / #2719 (the sheet's reanimated reactions die when it mounts under
+  // JS contention, leaving it parked at -1); only a remount brings a working
+  // instance back, so retry once, then release the request.
+  useEffect(() => {
+    if (phase !== 'presenting' || !isOpen) return;
+    const watchdog = setTimeout(() => {
+      if (getActionMenuSnapshot().seq !== seq || !getActionMenuSnapshot().payload) return;
+      hostLog.warn('actionMenuHost.open_stalled', { seq, attempt, budgetMs: OPEN_WATCHDOG_MS });
+      if (attempt === 0) {
+        attemptRef.current = 1;
+        setLifecycle({ seq, phase: 'presenting', attempt: 1 });
+      } else {
+        const onDismiss = activeDismissRef.current;
+        activeDismissRef.current = null;
+        dismissActionMenuPopup();
+        setLifecycle({ seq, phase: 'closed', attempt });
+        onDismiss?.();
+      }
+    }, OPEN_WATCHDOG_MS);
+    return () => clearTimeout(watchdog);
+  }, [phase, isOpen, seq, attempt]);
+
+  if (phase === 'closed') return null;
 
   return (
-    <Menu presentation="bottom-sheet" isOpen={renderedOpen} onOpenChange={handleOpenChange}>
+    <Menu
+      key={`${seq}:${attempt}`}
+      presentation="bottom-sheet"
+      isOpen={isOpen}
+      onOpenChange={(open) => {
+        if (attempt === attemptRef.current) handleOpenChange(open);
+      }}>
       {/*
        * Bottom-sheet presentation ignores Trigger position, but heroui still
        * requires a Trigger in the tree. A zero-size, offscreen Pressable
@@ -581,7 +706,20 @@ export function ActionMenuHost() {
         <MenuScrim />
         <Menu.Content
           presentation="bottom-sheet"
-          onClose={handleNativeClose}
+          // Patched prop (patches/heroui-native+1.0.9.patch): forwarded to
+          // gorhom `index`, so the sheet mounts open and gorhom animates it
+          // up itself once layout is calculated. heroui consumes the public
+          // `index` prop for its own isOpen-edge snap, which gorhom silently
+          // drops when layout isn't ready — the original stall.
+          mountIndex={0}
+          onClose={() => handleNativeClose(seq, attempt)}
+          onAnimate={(_from, to, _fromPosition, toPosition) => {
+            if (!isCurrent() || attempt !== attemptRef.current || to < 0) return;
+            setSheetHeight(windowHeight - toPosition);
+            setLifecycle((previous) =>
+              previous.phase === 'presenting' ? { ...previous, phase: 'open' } : previous
+            );
+          }}
           // `interactive` lifts the sheet by the keyboard height — works with
           // dynamic sizing because position becomes (highestDetent − keyboardHeight),
           // which is strictly higher than the natural content-fit position.
@@ -624,21 +762,36 @@ export function ActionMenuHost() {
           // the first list row was the wrapper's top padding. Inside
           // the scroll we re-apply 8px so the `Menu.Label`'s `-mt-2`
           // doesn't clip above the viewport.
-          contentContainerClassName={useScrollBody ? 'h-full px-0 pt-0 pb-0' : 'pt-2 pb-0'}
-          // Patched flag (see patches/heroui-native+1.0.2.patch): swap
+          contentContainerClassName={useScrollBody ? 'flex-1 px-0 pt-0 pb-0' : 'pt-2 pb-0'}
+          // Patched flag (see patches/heroui-native+1.0.9.patch): swap
           // heroui's `BottomSheetView` wrapper for a plain RN `View` so
           // the nested `BottomSheetScrollView` below stays registered
           // as the active scrollable. Without this, heroui's wrapper
           // overrides the scrollable type to `VIEW` on mount and pan
           // gestures dismiss the sheet instead of scrolling the list.
           // Only needed when there *is* a nested scroll container.
-          contentContainerProps={useScrollBody ? ({ useDirectView: true } as never) : undefined}
+          contentContainerProps={
+            useScrollBody
+              ? ({
+                  useDirectView: true,
+                  // Gorhom excludes the handle from content height, but its footer
+                  // is absolute. Reserve that lane in the section viewport itself.
+                  style: useSections ? { paddingBottom: footerHeight } : undefined,
+                } as never)
+              : undefined
+          }
           // gorhom's `BottomSheetFooter` slot — pinned absolute at the
           // sheet's animated bottom edge AND auto-tracks the keyboard
           // when a `BottomSheetTextInput` (via `MenuInputField`) gains
           // focus. Without it, the chained "Import Nostr" form's
           // submit button stays behind the keyboard.
           footerComponent={hasFooter ? renderFooter : undefined}>
+          {__DEV__ && phase === 'open' && isOpen ? (
+            <E2EAccessibilityProbe
+              testID="action-menu-presented"
+              accessibilityLabel="Action menu presented"
+            />
+          ) : null}
           {useSections ? (
             // Tabbed sections — `SectionAnchorList` owns the chrome
             // (title + optional search input + horizontal anchor bar)
@@ -649,6 +802,8 @@ export function ActionMenuHost() {
             // `BottomSheetFooter` slot so the last row isn't hidden
             // beneath sticky footer buttons.
             <SectionAnchorList<ActionMenuItem>
+              testID="action-menu-viewport"
+              onLayout={(event) => setViewportHeight(event.nativeEvent.layout.height)}
               sections={sectionsForList}
               // Each section's `data` is its `ActionMenuItem[]` (see
               // `sectionsForList`); we render one Menu.Item per button.
@@ -656,7 +811,10 @@ export function ActionMenuHost() {
               // profile list (or future >100-item picker) only mounts
               // the rows in the draw window.
               renderItem={(button, sectionId) =>
-                renderActionButton(button, `${sectionId}-${button.testID ?? button.text}`)
+                renderActionButton(
+                  button,
+                  `${sectionId}-${button.testID ?? sectionsForList.find((section) => section.id === sectionId)?.data.indexOf(button)}`
+                )
               }
               keyExtractor={(button, sectionId) => `${sectionId}-${button.testID ?? button.text}`}
               // The 12px horizontal inset that previously wrapped each
@@ -666,7 +824,9 @@ export function ActionMenuHost() {
               listContentContainerStyle={{ paddingHorizontal: 12 }}
               ScrollComponent={BottomSheetScrollView as never}
               topFadeColor={String(overlay)}
-              contentBottomInset={hasFooter ? (footerHeight > 0 ? footerHeight + 16 : 120) : 24}
+              // The measured footer is already outside the viewport. The
+              // spacer carries only the remaining gap (or the initial reserve).
+              contentBottomInset={Math.max(0, contentBottomInset - footerHeight)}
               // Tab pills align with the title text: wrapper `paddingHorizontal: 12`
               // + `Menu.Label`'s `ml-3` (12px) puts the title at 24px from the
               // menu's left edge. The anchor bar's inner ScrollView uses
@@ -720,7 +880,7 @@ export function ActionMenuHost() {
                   // the absolute footer + its safe-area inset. Falls
                   // back to a generous default until the layout pass
                   // reports the real height.
-                  paddingBottom: footerHeight > 0 ? footerHeight + 16 : 200,
+                  paddingBottom: contentBottomInset,
                 }}
                 showsVerticalScrollIndicator={false}>
                 {buttonsNode}
@@ -743,11 +903,7 @@ export function ActionMenuHost() {
             // path that doesn't have an absolute footer of its own.
             <View
               style={{
-                paddingBottom: hasFooter
-                  ? footerHeight > 0
-                    ? footerHeight + 16
-                    : 120
-                  : insets.bottom + 12,
+                paddingBottom: hasFooter ? contentBottomInset : insets.bottom + 12,
               }}>
               {labelNode}
               {headerNode}

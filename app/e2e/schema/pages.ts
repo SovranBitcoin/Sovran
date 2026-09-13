@@ -12,6 +12,8 @@
  */
 export const CANONICAL_PAGES = [
   // launch + onboarding
+  'secure-locked', // unreadable SecureStore boot gate
+  'profile-keys-error', // saved identity requires re-import
   'splash', // boot splash before the Terms gate on a fresh install
   'terms', // Terms & Conditions gate
   'privacy', // Privacy review step
@@ -20,6 +22,7 @@ export const CANONICAL_PAGES = [
   // shell
   'wallet', // wallet home (WalletScreen)
   'drawer', // profile drawer (drawer-profile-name)
+  'profile-switcher', // independently tested action-menu sheet
   // receive flow
   'receive', // receive method hub sheet (receive-method-*)
   'receive-qr', // standing receive rails QR display (ReceiveScreen: Unified/Lightning/Onchain/Cashu)
@@ -31,6 +34,11 @@ export const CANONICAL_PAGES = [
   'send-amount', // amount entry in the send flow
   'send-token', // created ecash token screen (incl. tx re-entry)
   'lightning-send', // bolt11 melt preview/confirmation
+  'cta',
+  'backup-intro',
+  'backup-words',
+  'backup-verify',
+  'backup-done',
   // shared + recovery
   'mint-select', // mint selector list (receive and send flows)
   'mint-add', // add-mints screen (search or enter URL, MintAddScreen)
@@ -42,6 +50,7 @@ export const CANONICAL_PAGES = [
   'search', // header search overlay with results (SearchOverlay)
   'settings', // settings root screen ((settings-flow), SettingsScreen)
   'feed', // home feed tab (FeedScreen: For You / Following)
+  'image-viewer', // fullscreen media overlay; no standalone route
   'thread', // post thread reader ((user-flow)/thread, ThreadView)
   'contacts', // contacts tab (ContactsScreen)
   'notifications', // notifications tab (NotificationsScreen)
@@ -91,6 +100,7 @@ export const CANONICAL_PAGES = [
   'settings-notification-policy',
   'settings-privacy',
   'settings-profile',
+  'settings-edit-profile',
   'settings-recovery',
   'settings-routing',
   'settings-storage',

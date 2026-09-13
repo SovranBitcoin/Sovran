@@ -1,0 +1,24 @@
+{
+  "id": "app-overview",
+  "platform": "ios",
+  "screenshots": [
+    "wallet",
+    "contacts",
+    "ai",
+    "lightning-receive"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "app-overview"
+}

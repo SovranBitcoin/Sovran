@@ -1,33 +1,21 @@
-import { describeError } from '@/shared/lib/errors';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useLatestRef } from '@/shared/hooks/useLatestRef';
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
+import { useCallback, useState } from 'react';
 import { RefreshControl, StyleSheet } from 'react-native';
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { withAlpha } from '@/shared/lib/color';
 
 import { tryNpubEncode } from '@/features/feed/components/nostr/feedParse';
-import type {
-  FeedNotification,
-  FeedNotificationsRequest,
-  FeedNotificationsResult,
-} from '@/features/feed/data/feedClient';
-import {
-  notificationFollowersCache,
-  notificationFollowersKey,
-} from '@/features/feed/data/notificationFollowersCache';
-import { getFeedClient } from '@/features/feed/data/useFeedClient';
+import type { FeedNotification, FeedNotificationsResult } from '@/features/feed/data/feedClient';
 import { takeNotificationFollowersSeed } from '@/features/feed/lib/notificationFollowersSeedCache';
+import { useNotificationFollowersPage } from '@/features/feed/hooks/useNotificationsPage';
+import { Button } from '@/shared/ui/primitives/Button';
 import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import {
   useVisualFlatListLogger,
   VISUAL_LIST_VIEWABILITY_CONFIG,
 } from '@/shared/lib/contentShiftLog';
-import {
-  emptyNotificationsResult,
-  filterNotificationsResult,
-  mergeNotificationsResult,
-} from '@/features/feed/lib/notificationResults';
+import { emptyNotificationsResult } from '@/features/feed/lib/notificationResults';
 import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
 import {
   notificationListStyles,
@@ -47,118 +35,9 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 
-const FOLLOW_PAGE_SIZE = 50;
-const FOLLOW_FETCH_MAX_PAGES = 4;
 const NOTIFICATION_FOLLOWERS_VISUAL_SCOPE = 'feed.notification_followers.list';
 
-type FollowFetchResult = {
-  result: FeedNotificationsResult;
-  hasMore: boolean;
-};
-
-/**
- * Walk up to {@link FOLLOW_FETCH_MAX_PAGES} pages of the ALL tab, keeping only
- * the follow notifications, with the feed client disposed whatever happens.
- *
- * At module scope: React Compiler cannot lower a `try` with a `finally`, and an
- * inline body cost this screen its memoization.
- */
-async function fetchFollowPagesFromRelay({
-  viewerPubkey,
-  policy,
-  replyScope,
-  signal,
-  until,
-  refresh,
-}: {
-  viewerPubkey: string;
-  policy: FeedNotificationsRequest['policy'];
-  replyScope: FeedNotificationsRequest['replyScope'];
-  signal: AbortSignal;
-  until?: number;
-  refresh?: boolean;
-}): Promise<FollowFetchResult | null> {
-  const client = getFeedClient();
-  let cursor = until;
-  let merged = emptyNotificationsResult();
-  let hasMore = false;
-
-  try {
-    for (let pageIndex = 0; pageIndex < FOLLOW_FETCH_MAX_PAGES; pageIndex += 1) {
-      const page = await client.getNotifications({
-        viewerPubkey,
-        tab: 'ALL',
-        policy,
-        replyScope,
-        limit: FOLLOW_PAGE_SIZE,
-        until: cursor,
-        refresh: refresh && pageIndex === 0,
-        // The detail screen needs the full ungrouped follow list, not the
-        // collapsed group the All tab renders.
-        grouped: false,
-        signal,
-      });
-      if (signal.aborted) return null;
-
-      const followPage = filterNotificationsResult(
-        page,
-        (notification) => notification.reason === 'follow'
-      );
-      merged = mergeNotificationsResult(merged, followPage);
-      merged.paginationUntil = page.paginationUntil;
-      hasMore = page.paginationUntil > 0 && page.notifications.length >= FOLLOW_PAGE_SIZE;
-      cursor = page.paginationUntil;
-
-      if (followPage.notifications.length > 0 || !hasMore || cursor <= 0) break;
-    }
-  } finally {
-    client.dispose?.();
-  }
-
-  return { result: merged, hasMore };
-}
-
-/** Append one more page of followers, or log and leave the list as it was. */
-async function appendFollowPage({
-  fetchPage,
-  signal,
-  cursor,
-  sequence,
-  loadSequenceRef,
-  hasMoreRef,
-  paginationUntilRef,
-  setResult,
-  onSettled,
-}: {
-  fetchPage: (args: {
-    signal: AbortSignal;
-    until?: number;
-    refresh?: boolean;
-  }) => Promise<FollowFetchResult | null>;
-  signal: AbortSignal;
-  cursor: number;
-  sequence: number;
-  loadSequenceRef: React.MutableRefObject<number>;
-  hasMoreRef: React.MutableRefObject<boolean>;
-  paginationUntilRef: React.MutableRefObject<number>;
-  setResult: React.Dispatch<React.SetStateAction<FeedNotificationsResult>>;
-  onSettled: () => void;
-}): Promise<void> {
-  try {
-    const page = await fetchPage({ signal, until: cursor, refresh: false });
-    if (!page || signal.aborted || sequence !== loadSequenceRef.current) return;
-
-    paginationUntilRef.current = page.result.paginationUntil;
-    hasMoreRef.current = page.hasMore;
-    setResult((previous) => mergeNotificationsResult(previous, page.result));
-  } catch (error) {
-    if (signal.aborted || sequence !== loadSequenceRef.current) return;
-    const message = error instanceof Error ? error.message : String(error);
-    feedLog.warn('feed.notification_followers.load_more_failed', { message });
-  } finally {
-    onSettled();
-  }
-}
+const EMPTY_RESULT = emptyNotificationsResult();
 
 export function NotificationFollowersScreen() {
   useLifecycleLogger('NotificationFollowersScreen', feedLog);
@@ -174,55 +53,15 @@ export function NotificationFollowersScreen() {
   // was equally true of the ref this replaced. StrictMode is off today
   // (`index.js` hands straight to Expo Router); turning it on means making the
   // take idempotent per `seedId` first, not reverting this.
-  const [seed] = useState(() => takeNotificationFollowersSeed(seedId));
+  const [seed] = useState(() => {
+    const taken = takeNotificationFollowersSeed(seedId);
+    return taken.notifications.length > 0 ? taken : undefined;
+  });
 
   const { keys: nostrKeys } = useNostrKeysContext();
   const viewerPubkey = nostrKeys?.pubkey;
   const policy = useNotificationPolicyStore((state) => state.policy);
   const replyScope = useNotificationPolicyStore((state) => state.replyScope);
-
-  // Prefer a one-shot seed handed over by the notifications screen; otherwise
-  // fall back to this session's cached Follows page (warm navigation) so a
-  // re-entry paints instantly instead of flashing a spinner.
-  const warmCached =
-    viewerPubkey && !notificationFollowersCache.isColdStart(notificationFollowersKey(viewerPubkey))
-      ? notificationFollowersCache.getEntry(notificationFollowersKey(viewerPubkey))?.data
-      : undefined;
-  const initialResult = seed.notifications.length > 0 ? seed : (warmCached ?? seed);
-
-  const [result, setResult] = useState<FeedNotificationsResult>(() => initialResult);
-  const [isInitialLoading, setIsInitialLoading] = useState(
-    () => initialResult.notifications.length === 0
-  );
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const loadSequenceRef = useRef(0);
-  const refreshControllerRef = useRef<AbortController | null>(null);
-  // True only for a real seed (fresh from the notifications screen → no fetch on
-  // first focus). A warm-cache-derived initialResult stays false so the focus
-  // effect runs loadFirstPage and applies the SWR isFresh gate.
-  const seededInitialPageRef = useRef(seed.notifications.length > 0);
-  const loadingMoreRef = useRef(false);
-  const hasMoreRef = useRef(initialResult.paginationUntil > 0);
-  const paginationUntilRef = useRef(initialResult.paginationUntil);
-
-  // Persist a freshly-handed-over seed into the session cache once, so the next
-  // focus / re-mount reads it as a warm page instead of refetching. Only write
-  // a real seed (not a value we just read back from the cache).
-  // Mount-only: this persists the seed handed over at mount. Re-running on a
-  // later `viewerPubkey` change would write a value just read back from the
-  // cache, which the comment above rules out — so the viewer is mirrored
-  // rather than depended on.
-  const viewerPubkeyRef = useLatestRef(viewerPubkey);
-  useEffect(() => {
-    const viewer = viewerPubkeyRef.current;
-    if (viewer && seed.notifications.length > 0) {
-      const key = notificationFollowersKey(viewer);
-      notificationFollowersCache.setEntry(key, seed, { viewerKey: viewer });
-      notificationFollowersCache.markTouched(key);
-    }
-  }, [viewerPubkeyRef, seed]);
   const [foreground, surface, separator, muted, surfaceTertiary] = useThemeColor([
     'foreground',
     'surface',
@@ -231,168 +70,14 @@ export function NotificationFollowersScreen() {
     'surface-tertiary',
   ] as const);
 
-  const fetchFollowPages = useCallback(
-    async ({
-      signal,
-      until,
-      refresh,
-    }: {
-      signal: AbortSignal;
-      until?: number;
-      refresh?: boolean;
-    }): Promise<FollowFetchResult | null> => {
-      if (!viewerPubkey) return null;
-      return fetchFollowPagesFromRelay({
-        viewerPubkey,
-        policy,
-        replyScope,
-        signal,
-        until,
-        refresh,
-      });
-    },
-    [policy, replyScope, viewerPubkey]
-  );
-
-  const applyFirstPage = useCallback((page: FollowFetchResult | null) => {
-    const next = page?.result ?? emptyNotificationsResult();
-    paginationUntilRef.current = next.paginationUntil;
-    hasMoreRef.current = !!page?.hasMore;
-    setResult(next);
-  }, []);
-
-  const loadFirstPage = useCallback(
-    (signal: AbortSignal, mode: 'initial' | 'refresh') => {
-      const sequence = ++loadSequenceRef.current;
-      if (!viewerPubkey) {
-        applyFirstPage(null);
-        setErrorMessage(null);
-        setIsInitialLoading(false);
-        setIsRefreshing(false);
-        setIsLoadingMore(false);
-        return;
-      }
-
-      const cacheKey = notificationFollowersKey(viewerPubkey);
-
-      // Warm navigation (key touched earlier this session): paint the cached
-      // page instantly. If still fresh, that paint is authoritative — skip the
-      // network. Cold start: show the spinner, never a stale first paint.
-      let paintedFromCache = false;
-      if (mode === 'initial') {
-        const cached = notificationFollowersCache.isColdStart(cacheKey)
-          ? undefined
-          : notificationFollowersCache.getEntry(cacheKey);
-        if (cached) {
-          applyFirstPage({ result: cached.data, hasMore: cached.data.paginationUntil > 0 });
-          setIsInitialLoading(false);
-          paintedFromCache = true;
-          if (notificationFollowersCache.isFresh(cached)) {
-            setErrorMessage(null);
-            return;
-          }
-        } else {
-          setResult(emptyNotificationsResult());
-          setIsInitialLoading(true);
-        }
-      } else {
-        setIsRefreshing(true);
-      }
-      setErrorMessage(null);
-
-      // Only an explicit pull-to-refresh forces nagg to revalidate; an initial
-      // focus reads the shared response cache (stale entries revalidate in the
-      // background), so opening the screen avoids a full recompute each mount.
-      void fetchFollowPages({ signal, refresh: mode === 'refresh' })
-        .then((page) => {
-          if (signal.aborted || sequence !== loadSequenceRef.current) return;
-          applyFirstPage(page);
-          if (page) {
-            notificationFollowersCache.setEntry(cacheKey, page.result, { viewerKey: viewerPubkey });
-            notificationFollowersCache.markTouched(cacheKey);
-          }
-        })
-        .catch((error) => {
-          if (signal.aborted || sequence !== loadSequenceRef.current) return;
-          const message = error instanceof Error ? error.message : String(error);
-          feedLog.warn('feed.notification_followers.load_failed', { message });
-          setErrorMessage(describeError(error, 'nagg').text);
-          // Keep the warm-painted page on a transient revalidate failure.
-          if (mode === 'initial' && !paintedFromCache) applyFirstPage(null);
-        })
-        .finally(() => {
-          if (signal.aborted || sequence !== loadSequenceRef.current) return;
-          if (mode === 'initial') setIsInitialLoading(false);
-          else setIsRefreshing(false);
-        });
-    },
-    [applyFirstPage, fetchFollowPages, viewerPubkey]
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      if (seededInitialPageRef.current) {
-        seededInitialPageRef.current = false;
-        setIsInitialLoading(false);
-        return () => {
-          refreshControllerRef.current?.abort();
-          refreshControllerRef.current = null;
-          loadSequenceRef.current += 1;
-        };
-      }
-
-      const controller = new AbortController();
-      loadFirstPage(controller.signal, 'initial');
-      return () => {
-        controller.abort();
-        refreshControllerRef.current?.abort();
-        refreshControllerRef.current = null;
-        loadSequenceRef.current += 1;
-      };
-    }, [loadFirstPage])
-  );
-
-  const handleRefresh = useCallback(() => {
-    if (isRefreshing) return;
-    refreshControllerRef.current?.abort();
-    const controller = new AbortController();
-    refreshControllerRef.current = controller;
-    loadFirstPage(controller.signal, 'refresh');
-  }, [isRefreshing, loadFirstPage]);
-
-  const loadMoreFollowers = useCallback(async () => {
-    if (
-      loadingMoreRef.current ||
-      isInitialLoading ||
-      isRefreshing ||
-      !viewerPubkey ||
-      !hasMoreRef.current ||
-      paginationUntilRef.current <= 0
-    ) {
-      return;
-    }
-
-    const sequence = loadSequenceRef.current;
-    const controller = new AbortController();
-    const cursor = paginationUntilRef.current;
-    loadingMoreRef.current = true;
-    setIsLoadingMore(true);
-
-    await appendFollowPage({
-      fetchPage: fetchFollowPages,
-      signal: controller.signal,
-      cursor,
-      sequence,
-      loadSequenceRef,
-      hasMoreRef,
-      paginationUntilRef,
-      setResult,
-      onSettled: () => {
-        loadingMoreRef.current = false;
-        setIsLoadingMore(false);
-      },
-    });
-  }, [fetchFollowPages, isInitialLoading, isRefreshing, viewerPubkey]);
+  // The page-0 owner: a hand-over seed from the notifications screen is this
+  // session's freshest page (no round-trip on first focus); otherwise the
+  // cached Follows page paints and revalidates when stale.
+  const page = useNotificationFollowersPage({ viewerPubkey, policy, replyScope, seed });
+  const result = page.result ?? EMPTY_RESULT;
+  const { isInitialLoading, isRefreshing, isLoadingMore, errorMessage } = page;
+  const handleRefresh = page.refresh;
+  const loadMoreFollowers = page.loadMore;
 
   const openProfile = useCallback((notification: FeedNotification) => {
     router.push({
@@ -470,7 +155,12 @@ export function NotificationFollowersScreen() {
                 itemKey={errorMessage ? 'empty:error' : 'empty:no-results'}
                 itemType={errorMessage ? 'error' : 'empty'}
                 extra={{ viewerReady: !!viewerPubkey }}>
-                <EmptyFollowers errorMessage={errorMessage} foreground={foreground} muted={muted} />
+                <EmptyFollowers
+                  errorMessage={errorMessage}
+                  onRetry={handleRefresh}
+                  foreground={foreground}
+                  muted={muted}
+                />
               </VisualLayoutProbe>
             )
           }
@@ -550,7 +240,7 @@ function FollowerRow({
     <NotificationRowPressable pressedBackground={pressedBackground} onPress={onPress}>
       <HStack align="center" gap={12}>
         <Avatar
-          state={profile?.picture ? 'image' : 'fallback'}
+          state={avatarStateFor(profile?.picture, profile !== undefined)}
           picture={profile?.picture}
           name={name}
           seed={notification.event.pubkey}
@@ -588,10 +278,12 @@ function FollowerRow({
 
 function EmptyFollowers({
   errorMessage,
+  onRetry,
   foreground,
   muted,
 }: {
   errorMessage: string | null;
+  onRetry?: () => void;
   foreground: string;
   muted: string;
 }) {
@@ -603,6 +295,9 @@ function EmptyFollowers({
       <Text size={14} style={{ color: muted, textAlign: 'center' }}>
         {errorMessage ?? 'Follow notifications will appear here.'}
       </Text>
+      {errorMessage && onRetry ? (
+        <Button text="Try again" variant="secondary" onPress={onRetry} testID="followers-retry" />
+      ) : null}
     </VStack>
   );
 }

@@ -129,6 +129,8 @@ export function resolvedFeedPageToParseResult(
     quotedEventsMap,
     missingQuotedIds: [...neededQuoteIds].filter((id) => !quotedEventsMap.has(id)),
     missingProfilePubkeys: [...neededPubkeys].filter((pk) => !profilesMap.has(pk)),
+    paginationCursor: page.cursor,
+    hasMore: page.hasMore,
     paginationUntil: page.cursor?.createdAt ?? 0,
     // Pagination advance, not display count: how many ranked slots this page
     // consumed server-side. Items the app-side include filters drop still

@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "id": "cta.preview",
+  "name": "Call-to-action modal previews",
+  "description": "Preview the optional update and backup modals, exercise close and swipe dismissal, then enter and cancel the backup intro.",
+  "details": "The optional update allows close, swipe and Android back. Preview dismissal never changes real reminder preferences. Android hardware-back requires a separate native check because this JSON harness has no hardware-back step. No updates are installed and no funds are used. The interactive swipe-to-dismiss is not asserted here: the harness swipe from mid-screen does not reliably drive the page-sheet gesture; the close button covers dismissal in automation, gesture dismissal stays a device check.",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":60000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"ACCOUNT"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"ACCOUNT"},"timeoutMs":30000},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"id":"settings-version-row"},"timeoutMs":15000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-version-row"}},{"tap":{"id":"settings-version-row"}},{"tap":{"id":"settings-version-row"}}],"until":{"id":"e2e-toast-dev-mode"},"attempts":1,"settleMs":1200},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"down"}}],"until":{"id":"settings-dev-cta"},"attempts":8,"settleMs":1000}
+  ],
+  "steps": [
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-dev-cta"}}],"until":{"id":"settings-dev-cta-update-required"},"attempts":4,"settleMs":4000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-dev-cta-update-required"}}],"until":{"id":"cta-active"},"attempts":4,"settleMs":4000},
+    {"action":"waitFor","selector":{"id":"flow-header-close"},"timeoutMs":15000},
+    {"action":"screenshot","name":"cta"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"flow-header-close"}}],"until":{"id":"settings-dev-cta"},"attempts":4,"settleMs":4000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-dev-cta"}}],"until":{"id":"settings-dev-cta-update-required"},"attempts":4,"settleMs":4000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-dev-cta-update-required"}}],"until":{"id":"cta-active"},"attempts":4,"settleMs":4000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"flow-header-close"}}],"until":{"id":"settings-dev-cta"},"attempts":4,"settleMs":4000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-dev-cta"}}],"until":{"id":"settings-dev-cta-backup-recovery-phrase"},"attempts":4,"settleMs":4000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-dev-cta-backup-recovery-phrase"}}],"until":{"id":"cta-active"},"attempts":4,"settleMs":4000},
+    {"action":"tap","selector":{"id":"cta-dont-ask"}},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"cta-secondary"}}],"until":{"id":"settings-dev-cta"},"attempts":4,"settleMs":4000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-dev-cta"}}],"until":{"id":"settings-dev-cta-backup-recovery-phrase"},"attempts":4,"settleMs":4000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-dev-cta-backup-recovery-phrase"}}],"until":{"id":"cta-active"},"attempts":4,"settleMs":4000},
+    {"action":"waitFor","selector":{"id":"cta-dismissed-no"},"timeoutMs":15000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"cta-primary"}}],"until":{"id":"backup-intro"},"attempts":4,"settleMs":4000},
+    {"action":"tap","selector":{"id":"backup-not-now"}},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":15000}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

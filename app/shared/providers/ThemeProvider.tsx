@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { useThemeStore, type ThemeMode } from '@/shared/stores/profile/themeStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { usePresentationUnit } from '@/shared/hooks/usePresentationUnit';
 import { useUnitWallpaper } from '@/shared/lib/theme/useUnitWallpaper';
 import { THEMES, THEME_NAMES, type ThemeName } from '@/themes';
 import { log, initLog, useInitMount } from '@/shared/lib/logger';
@@ -52,7 +53,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // isn't reachable here, and the persisted choice is the right key even
   // while coco boots. Falls through resolveUnitWallpaper's chain (unit →
   // album → 'dark') when the unit has no assignment.
-  const activeUnit = useMintStore((s) => s.activeUnit);
+  const liveUnit = useMintStore((s) => s.activeUnit);
+  const activeUnit = usePresentationUnit(liveUnit);
   const resolvedTheme = useUnitWallpaper(activeUnit);
   const mode = useThemeStore((s) => s.mode);
 

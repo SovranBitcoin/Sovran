@@ -7,7 +7,7 @@ import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { formatAmount } from '@/shared/lib/currency';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
-import Icon from 'assets/icons';
+import Icon from '@/assets/icons';
 import { withAlpha } from '@/shared/lib/color';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
@@ -35,11 +35,6 @@ interface MonthlyChartProps {
 
 function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate();
-}
-
-/** Format an amount using the app's currency helper. */
-function fmt(amount: number, unit: string): string {
-  return formatAmount({ amount, unit });
 }
 
 /**
@@ -242,6 +237,7 @@ function MonthlyChart({ history, unit = 'sat', mode }: MonthlyChartProps) {
   ] as const);
   const { width: screenWidth } = useWindowDimensions();
   const mockMode = useSettingsStore((s) => s.mockMode);
+  const displayPreference = useSettingsStore((s) => s.getDisplayBtc());
   const quoteIdToGroup = useSwapTransactionsStore((s) => s.quoteIdToGroup);
 
   const config = MODE_CONFIG[mode];
@@ -342,12 +338,13 @@ function MonthlyChart({ history, unit = 'sat', mode }: MonthlyChartProps) {
           <RNView style={styles.container}>
             {/* Header */}
             <RNView style={styles.header}>
-              <RNView style={styles.headerLeft}>
+              <RNView className="min-w-0 flex-1 gap-0.5">
                 <Text size={14} semibold color={withAlpha(foreground, 0.66)}>
                   {config.title}
                 </Text>
-                <RNView style={styles.amountRow}>
+                <RNView className="flex-row flex-wrap items-center gap-2 gap-y-1">
                   <AmountFormatter
+                    className="min-w-0 shrink flex-col items-stretch"
                     amount={hasData ? totalAmount : 0}
                     unit={unit}
                     size={28}
@@ -355,21 +352,32 @@ function MonthlyChart({ history, unit = 'sat', mode }: MonthlyChartProps) {
                   />
                   {dailyChange > 0 ? (
                     <RNView
+                      testID={`monthly-chart-${mode}-change`}
+                      className="min-w-0 shrink"
                       style={[
                         styles.changeChip,
                         { backgroundColor: withAlpha(actualLineColor, 0.12) },
                       ]}>
                       <Icon name={changeIcon} size={14} color={actualLineColor} />
-                      <Text overpass size={13} semibold color={actualLineColor}>
-                        {fmt(dailyChange, unit)}
+                      <Text
+                        className="min-w-0 shrink"
+                        overpass
+                        size={13}
+                        semibold
+                        color={actualLineColor}>
+                        {formatAmount(
+                          { amount: dailyChange, unit },
+                          { useUserPreference: true, displayPreference }
+                        )}
                       </Text>
                     </RNView>
                   ) : null}
                 </RNView>
               </RNView>
               {hasData && todayDay < daysInMonth ? (
-                <RNView style={styles.headerRight}>
+                <RNView className="max-w-1/2 ml-2 shrink-0 pt-1">
                   <AmountFormatter
+                    className="min-w-0 shrink flex-col items-stretch"
                     amount={projectedTotal}
                     unit={unit}
                     size={14}
@@ -472,17 +480,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-  },
-  headerLeft: {
-    gap: 2,
-  },
-  headerRight: {
-    paddingTop: 4,
-  },
-  amountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
   changeChip: {
     flexDirection: 'row',

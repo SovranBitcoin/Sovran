@@ -1,3 +1,7 @@
+import { ResultAsync } from "neverthrow";
+import { parsePaymentInput } from "../parse";
+import { rankMintCandidates } from "../mint-selection";
+import { isValidSatAmount } from "../guards";
 import { defaultDetectors } from "../detectors";
 import { isMeltUserCancelledError, isMintOfflineError } from "../errors";
 import { t } from "../formatting/locales";
@@ -140,7 +144,8 @@ function deriveExecutionState(
         code === "PAYMENT_REQUEST_FAILED" ||
         code === "NFC_WRITE_FAILED" ||
         code === "NFC_SESSION_LOST" ||
-        code === "NFC_READ_FAILED"
+        code === "NFC_READ_FAILED" ||
+        code === "UNIT_NOT_FUNDED"
           ? code
           : ("UNSUPPORTED_INPUT" as const);
       return {
@@ -954,8 +959,77 @@ export function createPaymentMachine(
     // even if transition() or an operation throws unexpectedly.
     try {
       let postDispatchTask: Promise<void> | null = null;
-      const walletCtx = getContext();
-      const unit = getUnit?.() ?? configUnit;
+      let walletCtx = getContext();
+      let unit = getUnit?.() ?? configUnit;
+      let nfcError: StepDataMap["error"] | undefined;
+      // Set when the NFC branch switched the host unit; a failed or abandoned tap
+      // must restore the user's unit instead of leaving a terminal's choice behind.
+      let revertNfcUnit: (() => Promise<void>) | null = null;
+      // A terminal chooses one unit. Switch the host's whole cached view before
+      // the ordinary transition can reject a cross-unit request (including BIP21).
+      if (event.type === "EXECUTE" && lastScanSource === "nfc" && nfcAdapter) {
+        const request = parsePaymentInput(event.input, detectors).options.find(
+          (option) => option.kind === "paymentRequest",
+        );
+        const info = request && detectors.getPaymentRequestInfo(request.value);
+        if (info) {
+          const requestedUnit = (info.unit ?? "sat").trim().toLowerCase();
+          const amount = info.amount;
+          if (info.hasSpendingCondition || info.lockP2pkPubkey) {
+            nfcError = {
+              code: "UNSUPPORTED_PAYMENT_METHOD",
+              message:
+                "This request requires locked ecash, which NFC payments do not support yet.",
+            };
+          } else if (!isValidSatAmount(amount)) {
+            nfcError = {
+              code: "NFC_READ_FAILED",
+              message: "Payment request must include an amount for NFC payment",
+            };
+          } else if (requestedUnit !== unit.trim().toLowerCase()) {
+            const funded = walletCtx.trustedMintUrls.some(
+              (mintUrl) =>
+                (info.mintsPreferred ||
+                  info.mints.length === 0 ||
+                  info.mints.includes(mintUrl)) &&
+                (walletCtx.unitBalances?.[requestedUnit]?.[mintUrl] ?? 0) >=
+                  amount,
+            );
+            if (!funded) {
+              nfcError = {
+                code: "UNIT_NOT_FUNDED",
+                message: t("UNIT_NOT_FUNDED", getLocale?.() ?? "en", {
+                  unit: requestedUnit.toUpperCase(),
+                }),
+              };
+            } else if (operations?.switchUnit) {
+              void notifications?.onNfcPaymentProgress?.({
+                phase: "selecting",
+              });
+              const switchUnit = operations.switchUnit;
+              const previousUnit = unit;
+              const switched = await ResultAsync.fromThrowable(async () =>
+                switchUnit(requestedUnit),
+              )();
+              if (switched.isOk()) {
+                revertNfcUnit = async () => {
+                  await switchUnit(previousUnit);
+                };
+              }
+              if (switched.isErr()) {
+                nfcError = {
+                  code: "NFC_READ_FAILED",
+                  message: t("NFC_UNIT_SWITCH_FAILED", getLocale?.() ?? "en"),
+                };
+              }
+              if (isStaleGeneration(sendGeneration, "nfc.switchUnit")) return;
+              walletCtx = getContext();
+              unit = getUnit?.() ?? configUnit;
+              // A missing/unsupported host switch keeps the existing unit hard-stop.
+            }
+          }
+        }
+      }
 
       // Resolve current offline status once per event. Passed into
       // transition() so every code path (EXECUTE, AMOUNT_ENTERED, etc.)
@@ -987,17 +1061,19 @@ export function createPaymentMachine(
       // post-transition resolver only fires when something actually changed.
       const prevMeltTarget = flowCtx.meltTarget;
       const prevRecipientPubkey = flowCtx.recipientPubkey;
-      const result = transition(
-        step,
-        flowCtx,
-        eventForTransition,
-        detectors,
-        walletCtx,
-        unit,
-        offline,
-        enableEcashSendMemo,
-        getSatsPerUnitMinor,
-      );
+      const result = nfcError
+        ? { step: "error" as const, context: { unit }, data: nfcError }
+        : transition(
+            step,
+            flowCtx,
+            eventForTransition,
+            detectors,
+            walletCtx,
+            unit,
+            offline,
+            enableEcashSendMemo,
+            getSatsPerUnitMinor,
+          );
 
       flowCtx = result.context;
       setStep(result.step, result.data);
@@ -1130,12 +1206,26 @@ export function createPaymentMachine(
             nfcResolved = true;
           } else if (step === "selectMint") {
             const data = stepData as StepDataMap["selectMint"];
-            const best = data.candidates[0];
+            const walletCtxInner = getContext();
+            const info = flowCtx.paymentRequest
+              ? detectors.getPaymentRequestInfo(flowCtx.paymentRequest)
+              : null;
+            const best = rankMintCandidates(
+              data.candidates.filter(
+                (candidate) => candidate.status !== "disabled",
+              ),
+              {
+                preferredMints: info?.mints ?? [],
+                amount: flowCtx.amount ?? 0,
+                unitBalances:
+                  walletCtxInner.unitBalances?.[flowCtx.unit] ??
+                  walletCtxInner.mintBalances,
+              },
+            )[0];
             if (best) {
               void notifications?.onNfcPaymentProgress?.({
                 phase: "selecting",
               });
-              const walletCtxInner = getContext();
               const unitInner = getUnit?.() ?? configUnit;
               const r = transition(
                 step,
@@ -1216,6 +1306,7 @@ export function createPaymentMachine(
               }
 
               setStep("error", effect.error.data);
+              await revertNfcUnit?.().catch(() => undefined);
             }
 
             handlerExecuting = false;
@@ -1224,6 +1315,7 @@ export function createPaymentMachine(
             // Terminal step that isn't navigateToPaymentRequest (e.g. navigateToMeltPreview,
             // error, receiveToken) — release NFC session and proceed normally.
             await nfcAdapter.releaseSession();
+            await revertNfcUnit?.().catch(() => undefined);
             nfcResolved = true;
           }
         }
@@ -1424,7 +1516,8 @@ export function createPaymentMachine(
 
       // Trust mint operation: when MINT_TRUSTED transitions to receiveToken,
       // call operations.trustMint first. On failure, redirect to error.
-      if (reviewMintData && operations?.trustMint && step === "receiveToken") {        handlerExecuting = true;
+      if (reviewMintData && operations?.trustMint && step === "receiveToken") {
+        handlerExecuting = true;
         notify();
 
         const effect = await runTrustMintEffect({
@@ -1458,10 +1551,7 @@ export function createPaymentMachine(
         ) !== "onchain"
       ) {
         const data = stepData as StepDataMap["navigateToMeltPreview"];
-        const matching = meltQuotePreviewMatches(
-          flowCtx.meltQuotePreview,
-          data,
-        )
+        const matching = meltQuotePreviewMatches(flowCtx.meltQuotePreview, data)
           ? flowCtx.meltQuotePreview
           : undefined;
         if (matching) {

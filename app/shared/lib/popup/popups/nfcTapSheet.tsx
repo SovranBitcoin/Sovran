@@ -49,8 +49,8 @@ const PHASE_TEXT: Record<NfcTapPhase, { title: string; subtitle: string }> = {
     subtitle: 'Keep holding your phone in place',
   },
   selecting: {
-    title: 'Preparing payment…',
-    subtitle: 'Keep holding your phone in place',
+    title: 'Selecting payment funds…',
+    subtitle: 'Using the currency requested by the terminal',
   },
   creating: {
     title: 'Sending payment…',
@@ -75,6 +75,7 @@ export function NfcTapContent({ close, setFooterConfig }: CustomSheetSharedProps
       buttons: [
         {
           label: 'Close',
+          testID: 'nfc-tap-close',
           onPress: () => {
             paymentLog.info('nfc.tap_sheet.close_press', { phase });
             close();

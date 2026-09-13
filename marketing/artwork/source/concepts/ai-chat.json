@@ -1,0 +1,21 @@
+{
+  "id": "ai-chat",
+  "platform": "ios",
+  "screenshots": [
+    "ai"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "ai-chat"
+}

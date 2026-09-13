@@ -26,7 +26,6 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
 const ENV_KEYS = [
   'EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL',
   'EXPO_PUBLIC_NAGG_BASE_URL',
-  'EXPO_PUBLIC_API_BASE_URL',
   'EXPO_PUBLIC_SCORE_API_BASE_URL',
   'EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT',
 ] as const;

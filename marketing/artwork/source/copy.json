@@ -1,0 +1,288 @@
+{
+  "version": 3,
+  "concepts": {
+    "app-overview": {
+      "headlines": [
+        "Bitcoin that works like cash.",
+        "Money and messages, one app.",
+        "Pay, post, and chat in bitcoin."
+      ],
+      "subtitles": [
+        "Pay friends, follow people, chat with AI. One app.",
+        "Cash, conversations, and AI in one app."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "wallet": {
+      "headlines": [
+        "Cash on your phone.",
+        "Bitcoin, ready to spend.",
+        "Spend it like cash."
+      ],
+      "subtitles": [
+        "Digital cash, ready the moment you open the app.",
+        "One balance, shown in bitcoin or your currency."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "receive-unified": {
+      "headlines": [
+        "One code, any wallet.",
+        "Get paid one way.",
+        "Show it, get paid."
+      ],
+      "subtitles": [
+        "One QR that works with whatever wallet they use.",
+        "Instant or onchain, they choose; you just hold up the code."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "send": {
+      "headlines": [
+        "Pay anyone, any way.",
+        "Paste, scan, or tap.",
+        "Send it like a message."
+      ],
+      "subtitles": [
+        "Name, code, link, or tap. Sovran picks the route.",
+        "Paste an invoice, a name, or an address and confirm."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "mint-trust": {
+      "headlines": [
+        "Know who holds it.",
+        "Know your mint.",
+        "Read before you trust."
+      ],
+      "subtitles": [
+        "Uptime checks, community reviews, and recorded mint updates.",
+        "Independent checks and reviews before you put money in."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "mint-reviews": {
+      "headlines": [
+        "What others found.",
+        "Trust, with receipts.",
+        "Read before you trust."
+      ],
+      "subtitles": [
+        "Real reviews from people who use this mint.",
+        "Independent checks and reviews before you put money in."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "mint-updates": {
+      "headlines": [
+        "See what changed.",
+        "Follow your mint\u2019s updates.",
+        "Know who holds it."
+      ],
+      "subtitles": [
+        "See recorded changes to your mint, with dates and details.",
+        "Uptime checks, community reviews, and recorded mint updates."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "payments-instant": {
+      "headlines": [
+        "Pay like it's cash.",
+        "Settled before you look up.",
+        "Instant, and nobody's watching."
+      ],
+      "subtitles": [
+        "Instant, final, and no account with your name on it.",
+        "No sign-up, no account, no waiting."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "social-feed": {
+      "headlines": [
+        "Follow people, not algorithms.",
+        "Your people, less noise.",
+        "A feed that stays calm."
+      ],
+      "subtitles": [
+        "Posts from who you follow, ranked by real engagement, no ads.",
+        "Quiet notifications, real conversations, no ads."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "social-thread": {
+      "headlines": [
+        "Every reply, in order.",
+        "Read the whole story.",
+        "Join the conversation."
+      ],
+      "subtitles": [
+        "Open a post and the whole conversation loads with it.",
+        "Tap a reply and see what it answered."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "social-dm": {
+      "headlines": [
+        "Send cash in a message.",
+        "Text them the money.",
+        "Money, mid-conversation."
+      ],
+      "subtitles": [
+        "Private messages, with bitcoin you drop straight into the chat.",
+        "End-to-end encrypted, and the cash rides inside."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "contacts": {
+      "headlines": [
+        "Pay by name.",
+        "Find them, pay them.",
+        "Your people, ready to pay."
+      ],
+      "subtitles": [
+        "Search a friend and send. No address to copy.",
+        "Contacts from your social graph, one tap from a payment."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "ai-chat": {
+      "headlines": [
+        "Ask AI, pay per answer.",
+        "AI, no subscription.",
+        "Any model, pay per use."
+      ],
+      "subtitles": [
+        "Top up from your wallet. No card, no account, no plan.",
+        "Choose the model, pay only for what you ask."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "ai-models": {
+      "headlines": [
+        "Any model, pay per use.",
+        "Pick the model, pay per answer.",
+        "AI, no subscription."
+      ],
+      "subtitles": [
+        "Choose the model, pay only for what you ask.",
+        "Top up from your wallet. No card, no account, no plan."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "themes-colors": {
+      "headlines": [
+        "Your wallet, your colors.",
+        "Dress your wallet.",
+        "Pick a look."
+      ],
+      "subtitles": [
+        "Pick a look and every screen follows.",
+        "Wallpapers and color themes that change with your mood."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "themes-artemis": {
+      "headlines": [
+        "A new perspective.",
+        "Your wallet, beyond Earth.",
+        "A view worth opening."
+      ],
+      "subtitles": [
+        "The Artemis II collection. A different wallpaper for each currency.",
+        "Bring views from Artemis II into your everyday wallet."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "portal-artemis": {
+      "headlines": [
+        "A view worth opening.",
+        "Your wallet, beyond Earth."
+      ],
+      "subtitles": [
+        "Bring the Artemis II collection into your everyday wallet."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "stories": {
+      "headlines": [
+        "Catch up in a swipe.",
+        "Moments from your people.",
+        "What they shared today."
+      ],
+      "subtitles": [
+        "Quick posts from people you follow, one tap away.",
+        "Tap through what your people shared today."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "backup": {
+      "headlines": [
+        "Keep a way back.",
+        "Start with a backup.",
+        "Write it down. Keep it safe."
+      ],
+      "subtitles": [
+        "Save your recovery phrase offline, then check every word.",
+        "A little care today helps you recover your account later."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    }
+  }
+}

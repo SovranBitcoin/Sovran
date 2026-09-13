@@ -331,3 +331,24 @@ describe("rotateStandingPaymentRequest", () => {
     expect(store.map[KEY]).toBe("op-3");
   });
 });
+
+
+describe("standing mint preference encodings", () => {
+  it("preserves preferred mints in both amountless encodings without changing the operation", async () => {
+    const manager = mockManager({ get: vi.fn().mockResolvedValue(operation()) });
+    const store = memoryStore({ [standingPaymentRequestKey("sat")]: "op-1" });
+    const result = await ensureStandingPaymentRequest(manager, {
+      unit: "sat", mints: MINTS, mintsPreferred: true,
+    }, store);
+    for (const encoded of [result.encodedRequest, result.encodedRequestB]) {
+      const decoded = decodePaymentRequest(encoded);
+      expect(decoded.mintsPreferred).toBe(true);
+      expect(decoded.amount).toBeUndefined();
+      expect(decoded.mints).toEqual(MINTS);
+      expect(decoded.id).toBe("req-1");
+    }
+    expect(manager.paymentRequests.incoming.create).not.toHaveBeenCalled();
+    const strict = await ensureStandingPaymentRequest(manager, { unit: "sat", mints: MINTS, mintsPreferred: false }, store);
+    expect(decodePaymentRequest(strict.encodedRequest).mintsPreferred).toBe(false);
+  });
+});

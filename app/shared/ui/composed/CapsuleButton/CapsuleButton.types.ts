@@ -29,6 +29,14 @@ export interface CapsuleButtonProps {
    * set, content color inverts to `background` unless `color` is given.
    */
   filled?: boolean;
+  /**
+   * How `isActive` paints. `'tint'` (default) is the translucent foreground
+   * tint; `'contrast'` inverts the capsule like a primary button — `foreground`
+   * fill, `background` content — for selection controls (the transaction
+   * filters) where the chosen option must read at a glance. Shares the
+   * vocabulary with `PillTabs`.
+   */
+  selectedVariant?: 'tint' | 'contrast';
   height?: number;
   roundedSide?: 'all' | 'left' | 'right';
   /** Size to label content instead of stretching to the full parent width. */
@@ -45,7 +53,9 @@ export interface CapsuleButtonProps {
    * Spoken name for the control. Defaults to `label`; set it where the visible
    * text is an abbreviation that does not stand alone (e.g. the wallet unit
    * pill reads "SATS" but means "Switch wallet account"). Every tier applies
-   * it identically, alongside `accessibilityRole="button"`.
+   * it identically. The role defaults to `button`.
    */
   accessibilityLabel?: string;
+  /** Radio controls expose isActive as checked/selected state. */
+  accessibilityRole?: 'button' | 'radio';
 }

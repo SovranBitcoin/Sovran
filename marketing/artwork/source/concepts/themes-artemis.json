@@ -1,0 +1,26 @@
+{
+  "id": "themes-artemis",
+  "platform": "ios",
+  "screenshots": [
+    "wallet-in-eclipse",
+    "wallet-new-moon",
+    "wallet-edge-of-lunar-day",
+    "wallet-setting-earth"
+  ],
+  "background": {
+    "kind": "wallpaper",
+    "wallpaperId": "in-eclipse",
+    "album": "artemis-ii-collection"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "themes-artemis"
+}

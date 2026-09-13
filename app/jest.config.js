@@ -13,6 +13,14 @@ module.exports = {
     '<rootDir>/jest.staticAssets.js',
   ],
   moduleNameMapper: {
+    '^nostr$': '<rootDir>/../nostr/src/index.ts',
+    '^nostr/map$': '<rootDir>/../nostr/src/map/index.ts',
+    '^nostr/recipes$': '<rootDir>/../nostr/src/recipes/index.ts',
+    '^nostr/schemas$': '<rootDir>/../nostr/src/schemas.ts',
+    '^wallet$': '<rootDir>/../wallet/src/index.ts',
+    '^wallet/react$': '<rootDir>/../wallet/src/react/index.ts',
+    '^wallet/safeFetch$': '<rootDir>/../wallet/src/safeFetch.ts',
+    '^wallet/operations$': '<rootDir>/../wallet/src/operations/index.ts',
     // A hoisted install and an isolated install must use the renderer's React.
     '^react$': require.resolve('react'),
     // bc-ur uses CommonJS while cborg exposes only an import condition.
@@ -32,9 +40,6 @@ module.exports = {
       '<rootDir>/node_modules/@cashu/coco-core/dist/index.js',
       '<rootDir>/../node_modules/@cashu/coco-core/dist/index.js',
     ],
-    // Workspace-package subpath: same resolver gap as the coco v2 subpaths
-    // below — `wallet`'s "exports" map is invisible here, so point at source.
-    '^wallet/safeFetch$': '<rootDir>/../wallet/src/safeFetch.ts',
     // v2 subpath exports (jest's resolver here predates package "exports" maps)
     '^@cashu/coco-core/adapter$': [
       '<rootDir>/node_modules/@cashu/coco-core/dist/adapter.js',

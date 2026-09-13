@@ -5,10 +5,16 @@
  * (user decision): listening is "technically always on"; the NFC button just
  * surfaces the tap-to-pay sheet, and an ambient tag arrival auto-opens it.
  *
- * Safety: a successful read enters colada's NORMAL navigation flow (no
- * executeNfcSend operation is wired), so every payment still lands on the
- * app's own review/pay screen — ambient listening can't move money by
- * itself. Do not wire executeNfcSend auto-execution without revisiting this.
+ * Safety (actual behaviour — the earlier comment claiming no executeNfcSend was
+ * wired was stale): the shared machine's operations include executeNfcSend, so
+ * a well-formed NUT-18 request read while the wallet is focused is paid
+ * contactless-card style with no review screen. Guards that apply: the request
+ * must carry an amount and a mint the wallet can fund in the request's unit,
+ * locked (P2PK) requests are refused, a host unit switch is reverted when the
+ * tap fails, and NFC diagnostics never log bearer bytes. There is deliberately
+ * NO amount ceiling or confirmation step: contactless-card behaviour is the
+ * product decision (Kelbie, 2026-09-13). Do not widen auto-execution beyond
+ * the guards above without revisiting that decision.
  *
  * Lifecycle: useFocusEffect — arming stops the moment the wallet blurs
  * (navigating into any flow, backgrounding via blur) and the held native

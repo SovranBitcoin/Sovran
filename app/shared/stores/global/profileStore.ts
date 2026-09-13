@@ -66,6 +66,7 @@ interface ProfileActions {
     source?: 'derived' | 'imported',
     externalChain?: number
   ) => boolean;
+  repairDerivedSource: (accountIndex: number, verifiedPubkey: string) => boolean;
   /** Set the active account index (caller is responsible for cleanup/resetStages before this) */
   switchProfile: (accountIndex: number) => boolean;
   /** Get the next available account index (only considers derived profiles) */
@@ -201,6 +202,18 @@ export const useProfileStore = create<ProfileStore>()(
         return true;
       },
 
+      repairDerivedSource: (accountIndex, verifiedPubkey) => {
+        const profile = get().profiles.find((p) => p.accountIndex === accountIndex);
+        if (profile?.source !== 'imported' || profile.pubkey !== verifiedPubkey) return false;
+        set((state) => ({
+          profiles: state.profiles.map((p) =>
+            p === profile ? { ...p, source: 'derived', externalChain: 0 } : p
+          ),
+        }));
+        storeLog.info('profile.source.repaired');
+        return true;
+      },
+
       switchProfile: (accountIndex: number) => {
         const { profiles } = get();
         // Only switch if the profile exists
@@ -231,7 +244,7 @@ export const useProfileStore = create<ProfileStore>()(
       },
 
       updateProfileMetadata: (accountIndex: number, displayName?: string, picture?: string) => {
-        storeLog.debug('store.profile.update_metadata', { accountIndex, displayName });
+        storeLog.debug('store.profile.update_metadata', { accountIndex });
         set((state) => ({
           profiles: state.profiles.map((p) =>
             p.accountIndex === accountIndex

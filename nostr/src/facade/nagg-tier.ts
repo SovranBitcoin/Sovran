@@ -1,3 +1,4 @@
+import { VertexFailureSchema } from '../recipes/vertex';
 import { errAsync } from 'neverthrow';
 import type { z } from 'zod';
 
@@ -67,6 +68,11 @@ import {
   type SearchRequest,
 } from './search';
 import { profileSearchAppView } from '../recipes/profile-search';
+import { eventsAggregatesAppView } from '../recipes/appview-feed';
+import { noteMetricsMapFromAggregates } from '../envelope';
+import { statsFromMetrics } from './feed';
+import type { NoteStatsRequest } from './note-stats';
+import type { NoteStatsMap } from '@sovranbitcoin/schemas';
 import type { NostrTierStrategy } from './strategy';
 
 // ---------------------------------------------------------------------------
@@ -117,6 +123,7 @@ function withCooldown(rawClient: NaggClient): NaggClient {
   let consecutiveNetworkFailures = 0;
   return {
     appViewBaseUrl: rawClient.appViewBaseUrl,
+    vertexRelay: rawClient.vertexRelay,
     rest: <TSchema extends z.ZodType>(request: NaggRestRequest<TSchema>) => {
       const now = Date.now();
       if (now < cooldownUntil) {
@@ -166,7 +173,8 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
     async feedPage(request: FeedPageRequest): Promise<TierOutcome<FeedBundle>> {
       const binding = feedBindingForSpec(request);
       nostrLog.debug('nostr.nagg.feed', { path: binding.path, spec: request.spec.kind });
-      const result = await client.rest<typeof NaggEnvelopeSchema>({
+      // Feed retry timing belongs to the pager, not the shared surface cooldown.
+      const result = await config.client.rest<typeof NaggEnvelopeSchema>({
         path: binding.path,
         method: binding.method ?? 'POST',
         body: binding.body,
@@ -180,15 +188,11 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
       return result.match<TierOutcome<FeedBundle>>(
         (envelope) => {
           const bundle = bundleFromFeedPage(feedPageFromEnvelope(envelope));
-          // An empty feed page isn't a useful answer — fall through to the next
-          // tier so a quiet/unavailable nagg appview doesn't blank the feed.
-          if (bundle.itemsById.size === 0) {
-            nostrLog.debug('nostr.nagg.feed.empty');
-            return unsupported();
-          }
           return answered(bundle);
         },
-        (error) => failed(error),
+        (error) => error.type === 'http' && (error.status === 404 || error.status === 501)
+          ? unsupported()
+          : failed(error),
       );
     },
 
@@ -292,6 +296,31 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
       return result.match<TierOutcome<OwnHistoryBundle>>(
         (envelope) => answered(bundleFromOwnEvents(orderedEnvelopeEvents(envelope))),
         (error) => failed(error),
+      );
+    },
+
+    async getNoteStats(request: NoteStatsRequest): Promise<TierOutcome<NoteStatsMap>> {
+      if (request.ids.length === 0) return answered({});
+      nostrLog.debug('nostr.nagg.noteStats', { ids: request.ids.length });
+      const binding = eventsAggregatesAppView(request.ids);
+      const result = await client.rest<typeof NaggEnvelopeSchema>({
+        path: binding.path,
+        method: binding.method ?? 'POST',
+        body: binding.body,
+        responseSchema: NaggEnvelopeSchema,
+        operationName: binding.operationName,
+        refresh: request.refresh,
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<NoteStatsMap>>(
+        // Zero values are omitted server-side: every requested id gets an entry.
+        (envelope) =>
+          answered(statsFromMetrics(noteMetricsMapFromAggregates(envelope.aggregates, request.ids))),
+        (error) =>
+          error.type === 'http' && (error.status === 404 || error.status === 501)
+            ? unsupported()
+            : failed(error),
       );
     },
 
@@ -444,7 +473,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
 
     async searchProfiles(request: SearchRequest): Promise<TierOutcome<ProfileSearchBundle>> {
       // Gold path: Vertex-pagerank-ranked profile search over the app-view.
-      const binding = profileSearchAppView({ query: request.query, limit: request.limit });
+      const binding = profileSearchAppView({ query: request.query, limit: request.limit, signedVertexRequest: request.signedVertexRequest });
       nostrLog.debug('nostr.nagg.searchProfiles', { path: binding.path, q: request.query.length });
       const result = await client.rest<typeof NaggProfilesEnvelopeSchema>({
         path: binding.path,
@@ -454,12 +483,16 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
         operationName: binding.operationName,
         refresh: request.refresh,
         signal: request.signal,
-        timeoutMs: request.timeoutMs,
+        timeoutMs: request.signedVertexRequest ? (request.timeoutMs ?? 20_000) : request.timeoutMs,
       });
       // 0 results is a valid "no match" — nagg is authoritative for profile
       // search, so we don't cascade to the relay floor on an empty answer.
       return result.match<TierOutcome<ProfileSearchBundle>>(
-        (envelope) => answered({ hits: searchHitsFromEnvelope(envelope) }),
+        (envelope) => {
+          const failure = VertexFailureSchema.safeParse(envelope);
+          if (failure.success) return failed({ type: 'vertex', reason: failure.data.reason, message: 'Vertex request failed' });
+          return answered({ hits: searchHitsFromEnvelope(envelope), vertexFresh: envelope.vertexFresh });
+        },
         (error) => failed(error),
       );
     },

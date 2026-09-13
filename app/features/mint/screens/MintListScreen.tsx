@@ -23,6 +23,7 @@ import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { MINT_CURRENCY_TABS_HEIGHT } from '@/features/mint/components/MintCurrencyTabs';
+import { extractAvailableCurrencies } from '@/features/mint/lib/availableCurrencies';
 import { useStickyCurrencyTabs } from '@/features/mint/hooks/useStickyCurrencyTabs';
 import { useShiftLogger } from '@/shared/lib/contentShiftLog';
 import { Screen } from '@/shared/ui/composed/Screen';
@@ -78,20 +79,6 @@ function getMintDisabledReasonLabel(reason: MintListItem['reason']): string | nu
   return reason?.message ?? null;
 }
 
-function extractAvailableCurrencies(items: MintRow[]): string[] {
-  const units = new Set<string>();
-  for (const item of items) {
-    for (const unit of item.supportedUnits ?? []) {
-      units.add(unit.toUpperCase());
-    }
-  }
-  // Sat first, then the rest alphabetically — stable tab order.
-  const ordered = [...units].sort((a, b) =>
-    a === 'SAT' ? -1 : b === 'SAT' ? 1 : a.localeCompare(b)
-  );
-  return ['ALL', ...ordered];
-}
-
 const keyExtractor = (item: MintListItem) => item.mintUrl;
 
 // Same liquid-glass circle as the send/receive modal action rows (icon-only,
@@ -142,7 +129,10 @@ export function MintListScreen({
   // denomination — every row carries the same value, which is why filtering
   // on it used to be a visible no-op. Fallback rows without supportedUnits
   // (pre-enrichment) contribute nothing here and pass every filter below.
-  const availableCurrencies = extractAvailableCurrencies(items);
+  const availableCurrencies = [
+    'ALL',
+    ...extractAvailableCurrencies(items.map((item) => item.supportedUnits ?? [])),
+  ];
 
   // Filter to mints that can issue the selected unit. Unknown supportedUnits
   // (fallback rows) always pass — never hide a mint on missing data.
@@ -183,12 +173,13 @@ export function MintListScreen({
   // Enrichment can shrink the tab set (e.g. an advertised-but-keyless unit
   // disappears); never leave the filter pointing at a tab that no longer
   // exists.
+  const hasSelectedCurrency = availableCurrencies.includes(selectedCurrency);
   useEffect(() => {
-    if (selectedCurrency !== 'ALL' && !availableCurrencies.includes(selectedCurrency)) {
+    if (selectedCurrency !== 'ALL' && !hasSelectedCurrency) {
       cashuLog.info('mint.list.currency.reset', { from: selectedCurrency });
       setSelectedCurrency('ALL');
     }
-  }, [availableCurrencies, selectedCurrency]);
+  }, [hasSelectedCurrency, selectedCurrency]);
 
   const handleMintPress = (item: MintListItem) => {
     if (isExecuting || item.status !== 'available') {

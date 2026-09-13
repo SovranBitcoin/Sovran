@@ -10,7 +10,7 @@ import Animated, { useEvent, useHandler } from 'react-native-reanimated';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { PrimaryBalance, type PillVisibility } from '@/features/wallet/components/PrimaryBalance';
-import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
+import { useWalletPresentationUnit } from '@/features/wallet/hooks/useWalletPresentationUnit';
 import { useThemeStore } from '@/shared/stores/profile/themeStore';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { resolveUnitWallpaper } from '@/shared/lib/theme/resolveUnitWallpaper';
@@ -75,7 +75,7 @@ interface AccountProps {
  * ThemeProvider applies the CSS vars under an already-correct wallpaper.
  */
 export function Account({ minHeight }: AccountProps): React.ReactElement {
-  const { unit, availableUnits, selectUnit } = useActiveUnit();
+  const { unit, availableUnits, selectUnit } = useWalletPresentationUnit();
   const pagerRef = useRef<PagerView>(null);
   const pageIndex = Math.max(0, availableUnits.indexOf(unit));
   // Tracks the page the PAGER currently sits on, so external unit changes
@@ -113,7 +113,7 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
   useEffect(() => {
     pagerPositionRef.current = pageIndexRef.current;
     carouselX.value = pageIndexRef.current;
-  }, [pagerKey]);
+  }, [pagerKey, pageIndexRef]);
 
   const maxPageIndex = availableUnits.length - 1;
   const scrollHandler = usePagerScrollHandler(
@@ -133,7 +133,7 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
   // (pager pages are absolutely positioned, so the container can't grow
   // naturally) — sized to the tallest account, swiping never shifts layout.
   const [pageHeights, setPageHeights] = useState<Record<string, number>>({});
-  const tallestContentHeight = Math.max(0, ...Object.values(pageHeights));
+  const tallestContentHeight = Math.max(0, ...availableUnits.map((unit) => pageHeights[unit] ?? 0));
   const containerHeight = Math.max(minHeight, tallestContentHeight + BALANCE_BOTTOM_INSET);
 
   // Deadbanded, mostly-monotonic height tracking. The unit commit repaints
@@ -163,13 +163,15 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
     });
   }, []);
   const reservePillSlots = useMemo<PillVisibility>(() => {
-    const all = Object.values(pillsByUnit);
+    // Removed pages retain their last measurement, but must not reserve empty
+    // slots after a mint/unit change or leaving the Mock Mode carousel.
+    const all = availableUnits.flatMap((unit) => (pillsByUnit[unit] ? [pillsByUnit[unit]] : []));
     return {
       pending: all.some((v) => v.pending),
       reserved: all.some((v) => v.reserved),
       redeeming: all.some((v) => v.redeeming),
     };
-  }, [pillsByUnit]);
+  }, [availableUnits, pillsByUnit]);
 
   const onPageContentLayout = useCallback((pageUnit: string, event: LayoutChangeEvent) => {
     const height = Math.ceil(event.nativeEvent.layout.height);

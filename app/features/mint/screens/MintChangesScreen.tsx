@@ -7,7 +7,7 @@
  * Reads the same cached changelog response as the list, so opening a row costs
  * no fetch.
  */
-import { StyleSheet } from 'react-native';
+import { RefreshControl, StyleSheet } from 'react-native';
 import { z } from 'zod';
 
 import { MintChangeGlyph } from '@/features/mint/components/mintChanges/MintChangeRow';
@@ -17,6 +17,7 @@ import { capitalize, type MintChangePhrase } from '@/features/mint/lib/mintChang
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatDate, formatRelativeUnixSeconds } from '@/shared/lib/date';
 import { Log, useLifecycleLogger } from '@/shared/lib/logger';
+import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
 import { alpha, fontSize, spacing } from '@/shared/styles/tokens';
@@ -26,6 +27,8 @@ import { ListRow } from '@/shared/ui/composed/ListRow';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Text } from '@/shared/ui/primitives/Text';
+import { Spinner } from '@/shared/ui/primitives/Spinner';
+import { Button } from '@/shared/ui/primitives/Button';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -84,7 +87,7 @@ function RevisionSection({ revision }: { revision: MintChangeRevision }) {
   const window = checkWindowLabel(entry.sincePrevious);
 
   return (
-    <VStack gap={spacing.xs} style={styles.section}>
+    <VStack testID={`mint-change-revision-${entry.hash}`} gap={spacing.xs} style={styles.section}>
       <HStack align="baseline" justify="space-between" gap={spacing.sm} style={styles.sectionHead}>
         <Text bold size={fontSize.md} style={{ color: foreground }}>
           {formatDate(entry.at * 1000, 'short-date-time')}
@@ -116,7 +119,8 @@ export function MintChangesScreen() {
   useLifecycleLogger('MintChangesScreen');
   const params = useRouteParams(ParamsSchema, { where: 'notifications.mint-changes' });
   const mintUrl = params?.mintUrl;
-  const revisions = useMintChangeRevisions(mintUrl);
+  const { revisions, isLoading, isRefreshing, errorMessage, refresh } =
+    useMintChangeRevisions(mintUrl);
   const metadata = useCachedMintMetadata(mintUrl);
   const [foreground, muted, surface, separator] = useThemeColor([
     'foreground',
@@ -152,6 +156,12 @@ export function MintChangesScreen() {
 
   return (
     <Screen name="MintChangesScreen" scroll="custom" bgColor={surface}>
+      {revisions.length > 0 && (
+        <E2EAccessibilityProbe
+          testID="mint-changes-populated"
+          accessibilityLabel="Mint update history loaded"
+        />
+      )}
       <Log name="MintChangesContent" style={styles.root}>
         <List
           screen
@@ -160,12 +170,26 @@ export function MintChangesScreen() {
           keyExtractor={(revision) => revision.entry.hash}
           ListHeaderComponent={revisions.length > 0 ? listHeader : null}
           ItemSeparatorComponent={renderSeparator}
+          refreshControl={
+            <RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={foreground} />
+          }
           ListEmptyComponent={
-            <EmptyState
-              icon="mingcute:bank-fill"
-              title="No updates recorded"
-              subtitle="Nothing has changed for this mint since it was first seen."
-            />
+            isLoading ? (
+              <Spinner size={22} color={foreground} />
+            ) : errorMessage ? (
+              <EmptyState
+                icon="mdi:alert-circle-outline"
+                title="Mint updates unavailable"
+                subtitle={errorMessage}
+                action={<Button text="Retry" variant="secondary" onPress={refresh} />}
+              />
+            ) : (
+              <EmptyState
+                icon="mingcute:bank-fill"
+                title="No updates recorded"
+                subtitle="Nothing has changed for this mint since it was first seen."
+              />
+            )
           }
           contentContainerStyle={[
             styles.listContent,

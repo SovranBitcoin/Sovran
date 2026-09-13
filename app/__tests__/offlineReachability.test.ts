@@ -7,8 +7,7 @@ import {
 
 jest.mock('@/shared/config/backend', () => ({
   backendConfig: {
-    apiBaseUrl: 'https://configured-api.example/api',
-    scoreApiBaseUrl: 'https://configured-nagg.example',
+    nostrAppViewBaseUrl: 'https://configured-nagg.example',
   },
 }));
 
@@ -26,10 +25,8 @@ const disconnected: NetworkState = {
 
 const primaryProbe: ReachabilityProbe = {
   name: 'primary',
-  url: 'https://api.sovran.money/api/app/latest-version',
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ storage: { version: '0.0.0' } }),
+  url: 'https://nagg.up.railway.app/livez',
+  method: 'GET',
   test: (response) => response.ok,
 };
 
@@ -38,13 +35,14 @@ function response(status: number): Response {
 }
 
 describe('offline reachability', () => {
-  it('probes the configured latest-version backend by default', async () => {
+  it('probes configured nagg liveness by default', async () => {
     const fetcher = jest.fn().mockResolvedValue(response(200));
     const result = await resolveOfflineReachability(connectedWifi, { fetcher });
     expect(result.isOffline).toBe(false);
+    expect(result.probes).toEqual([expect.objectContaining({ name: 'nagg', ok: true })]);
     expect(fetcher).toHaveBeenCalledWith(
-      'https://configured-api.example/api/app/latest-version',
-      expect.objectContaining({ method: 'POST', body: '{"storage":{"version":"0.0.0"}}' })
+      'https://configured-nagg.example/livez',
+      expect.objectContaining({ method: 'GET', body: undefined })
     );
   });
 
@@ -99,8 +97,8 @@ describe('offline reachability', () => {
     expect(fetcher).toHaveBeenCalledWith(
       primaryProbe.url,
       expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ storage: { version: '0.0.0' } }),
+        method: 'GET',
+        body: undefined,
       })
     );
   });

@@ -43,6 +43,8 @@ interface ReceiveReusableQuoteTabProps {
   method: 'bolt12' | 'onchain';
   unit: string;
   active?: boolean;
+  /** Hidden tabs must not create a quote for a method excluded from Unified. */
+  enabled?: boolean;
   walletContext: Pick<WalletContext, 'trustedMintUrls' | 'mintMethodCapabilities' | 'mintBalances'>;
   actions: UseScreenActionsResult<'receive'>['actions'];
   muted: string;
@@ -73,6 +75,7 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   method,
   unit,
   active = true,
+  enabled = true,
   walletContext,
   actions,
   muted,
@@ -109,7 +112,7 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   // `subscribe` lets the hook pick up EXTERNAL rotations (the global
   // deposit-received listener retiring a paid onchain address).
   const { quote, error, rotate } = useReusableMintQuote(
-    methodMint && mintSupports ? { mintUrl: methodMint, method, unit } : null,
+    enabled && methodMint && mintSupports ? { mintUrl: methodMint, method, unit } : null,
     standingQuoteIdentityStore
   );
 
@@ -272,7 +275,7 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   }
 
   if (!request || !qrData) {
-    return <ReceiveRailPlaceholder sectionTitle={copy.sectionTitle} />;
+    return <ReceiveRailPlaceholder sectionTitle={copy.sectionTitle} unit={unit} />;
   }
 
   // Expired per coco's own gate → no QR (deposits wouldn't be watched); offer a

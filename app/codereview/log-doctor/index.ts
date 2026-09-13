@@ -46,6 +46,7 @@
  *   crypto       Crypto/cashu amount + proof operation breakdown
  *   ops          Operation/span breakdown
  *   perf         Per-event latency distribution (p50/p95/p99 + histogram) from params.ms
+ *   reads        Read lifecycle per surface: cache-hit rate, refetch-while-fresh, TTFUD, superseded, blank flashes
  *   redaction    Read-side redaction audit: confirms secrets stripped, flags raw un-redacted values
  *   budget       Token cost meta-analysis — shows which modes fit in which context windows
  *   phone        Drive a real iPhone via WebDriverAgent (subcommands: tap, tap-id, tree, shot, …)
@@ -119,6 +120,8 @@ import {
   scanRedactionAudit,
   sparkline,
   summarizeDurations,
+  analyzeReads,
+  summarizeReads,
   type RedactionAudit,
 } from './analysis';
 
@@ -952,6 +955,7 @@ const CORRELATION_KEYS = [
   'tokenHash',
   'flowId',
   'entryId',
+  'readId',
 ] as const;
 
 function fieldString(value: unknown): string | null {
@@ -3854,6 +3858,7 @@ const SPAN_END_SUFFIXES: ReadonlyArray<{ suffix: string; ok: boolean }> = [
   { suffix: '.failed', ok: false },
   { suffix: '.error', ok: false },
   { suffix: '.exhausted', ok: false },
+  { suffix: '.superseded', ok: false },
   { suffix: '.rejected', ok: false },
   { suffix: '.timeout', ok: false },
 ];
@@ -3976,6 +3981,11 @@ function modeSpans(entries: LogEntry[], _opts: Options): string {
 
 const WASTE_VOLATILE_KEYS = new Set([
   '_t',
+  'readId',
+  'gen',
+  'byGen',
+  'currentGen',
+  'sinceRequestMs',
   '_dedup',
   '_suppressed',
   '_perf',
@@ -4300,6 +4310,43 @@ function renderRedactionAudit(audit: RedactionAudit): string[] {
   return lines;
 }
 
+function modeReads(entries: LogEntry[], _opts: Options): string {
+  const { runs, blankFlashes } = analyzeReads(entries);
+  if (runs.length === 0) {
+    return 'No read.<surface>.request events found. Is a useCachedRead / readLog path exercised in this log? (needs debug level for render/applied edges)';
+  }
+  const lines: string[] = [];
+  lines.push('=== READ LIFECYCLE (per surface) ===');
+  lines.push('');
+  lines.push(
+    '  Surface           Reads  CacheHit  Fresh  StaleRV  RefetchFresh  Fail  Superseded  Partial  Degraded  TTFUD p50/p95 ms  Sources'
+  );
+  lines.push('  ' + '-'.repeat(128));
+  for (const s of summarizeReads(runs)) {
+    const d = summarizeDurations(s.ttfudMs);
+    const ttfud = s.ttfudMs.length ? `${d.p50.toFixed(0)}/${d.p95.toFixed(0)}` : '—';
+    const sources = [...s.sources.entries()].map(([k, v]) => `${k}×${v}`).join(',') || '—';
+    lines.push(
+      `  ${s.surface.padEnd(17)} ${String(s.reads).padStart(5)}  ${pct(s.cacheHit, s.reads).padStart(8)}  ${String(s.serveFresh).padStart(5)}  ${String(s.staleRevalidate).padStart(7)}  ${String(s.refetchFresh).padStart(12)}  ${String(s.failed).padStart(4)}  ${String(s.superseded).padStart(10)}  ${String(s.partial).padStart(7)}  ${String(s.degraded).padStart(8)}  ${ttfud.padStart(16)}  ${sources}`
+    );
+  }
+  lines.push('');
+  lines.push(`BLANK FLASHES (populated → skeleton → populated on the same key within 2s): ${blankFlashes.length}`);
+  for (const b of blankFlashes.slice(0, 20)) {
+    lines.push(`  [${Math.round(b.t)}ms] ${b.surface} ${b.keyHash} re-populated after ${Math.round(b.gapMs)}ms`);
+  }
+  lines.push('');
+  lines.push('RefetchFresh = a fetch issued while a fresh cached entry existed with no user/poll trigger — "refetch happens but is not necessary".');
+  lines.push('TTFUD = read.request → first read.render{phase:populated} with the same readId (cache paints count; they are the fast ones).');
+  lines.push('CacheHit = the read found an entry for its key (fresh or stale). Fresh = served with zero round-trips. StaleRV = painted, then revalidated.');
+  return lines.join('\n');
+}
+
+function pct(part: number, whole: number): string {
+  if (whole === 0) return '—';
+  return `${Math.round((part / whole) * 100)}%`;
+}
+
 function modeRedaction(entries: LogEntry[], _opts: Options): string {
   const audit = scanRedactionAudit(entries);
   const lines: string[] = [];
@@ -4333,6 +4380,7 @@ function modeBudget(entries: LogEntry[], opts: Options): string {
     { name: 'spans', fn: modeSpans },
     { name: 'waste', fn: modeWaste },
     { name: 'tiers', fn: modeTiers },
+    { name: 'reads', fn: modeReads },
     { name: 'redaction', fn: modeRedaction },
     { name: 'full (json)', fn: (e, o) => modeFull(e, { ...o, format: 'json' }) },
     { name: 'full (md)', fn: (e, o) => modeFull(e, { ...o, format: 'md' }) },
@@ -4939,7 +4987,7 @@ async function main() {
     console.error('  2. Pipe logs: cat logs.jsonl | npm run log-doctor -- stats');
     console.error('');
     console.error(
-      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, spans, waste, tiers, redaction, phone. Run --help for details.'
+      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, spans, waste, tiers, reads, redaction, phone. Run --help for details.'
     );
     process.exit(1);
   }
@@ -5047,13 +5095,16 @@ async function main() {
     case 'tiers':
       output = modeTiers(entries, opts);
       break;
+    case 'reads':
+      output = modeReads(entries, opts);
+      break;
     case 'redaction':
       output = modeRedaction(entries, opts);
       break;
     default:
       console.error(`Unknown mode: ${opts.mode}`);
       console.error(
-        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, spans, waste, tiers, redaction, phone. Run --help for details.'
+        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, spans, waste, tiers, reads, redaction, phone. Run --help for details.'
       );
       process.exit(1);
   }

@@ -59,3 +59,12 @@ export const FEED_EMPTY_COPY: Record<Exclude<FeedEmptyMode, 'loading'>, FeedEmpt
     ctaAction: 'refresh',
   },
 };
+
+/** Status text shares the feed's existing footer/empty-state owner. */
+export function feedFooterCopy(status: {
+  retryAfterMs?: number;
+  showingRecent?: boolean;
+}): string | null {
+  if (status.retryAfterMs !== undefined) return 'Retrying…';
+  return status.showingRecent ? 'Showing recent posts' : null;
+}

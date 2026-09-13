@@ -278,6 +278,28 @@ and the JSON plan or blocker. A cited pure test proves only its own layer.
 | `profile.switch.create`                | JS    | product-run                                  | Multi-identity axis PROVEN LIVE (run `2026-07-18T10-43-29-956Z-59aa80c8`): drawer profile switcher → Generate new account restart-switches into a fresh derived profile (own empty wallet, different word-pair identity, profile 1's captured name absent from the new drawer), then the inactive-profile avatar (`drawer-profile-switch-0`) switches back and profile 1's name returns exactly. New `drawer-profile-switcher-open` / `drawer-profile-switch-<index>` testIDs. AX finding: the heroui switcher sheet's rows (`profile-create`, `profile-row-*`, `profile-tab-*`) ARE AX-addressable when presented over the drawer/base route — no coordinate tap needed; the `e2e-heroui-menu-open` probe on WalletScreen is NOT reachable there (the drawer occludes WalletScreen's whole AX subtree, and re-taps dismiss-oscillate the sheet) |
 | `wallet.deeplink.camera-permission`    | JS    | product-run                                     | Deep-link × permission composition PROVEN LIVE (run `2026-07-18T08-37-17-565Z-95d672a8`): with camera TCC revoked, `sovran://camera` lands on the camera route's own 'Camera permission required' empty state (never a broken viewfinder); Grant access surfaces the camera-permission blocked popup with Open settings, and the route stays alive — no crash, no dead-end. Authoring this scenario EXPOSED + FIXED two shipped defects: (1) the Grant access label rendered white-on-white (Text primitive's inline base color beats className — fixed via the `color` prop), and (2) the old action-menu feedback presented invisibly behind the pushed camera route (silent dead-end — fixed by switching the hook to the FWO-safe `camera-permission` popup with an iOS-Settings deep-link button) |
 
+### September feature-sweep scenarios
+
+These new scenarios are authored coverage. No iOS or Android product run is
+claimed by this inventory; passing loader and planner tests prove harness
+contracts only. The full matrix now includes 141 scenarios and 245 platform pairs
+(132 iOS, 113 Android), including the explicit deferred cases.
+
+| Scenario | Intended behavior | Status |
+| --- | --- | --- |
+| `backup.flow` | Verify all twelve recovery words | authored |
+| `cta.preview` | Call-to-action modal previews | authored |
+| `marketing.screenshots.media` | Marketing media screenshots | deferred: Thread, stories and image-viewer have no isolated navigable Mock Mode media fixture. Capture inventory only; implement fixture entry/readiness/exit before enabling. |
+| `marketing.screenshots.mints` | Marketing mint trust screenshots | authored |
+| `marketing.screenshots.wallpapers` | Marketing wallpaper screenshots | authored |
+| `marketing.screenshots` | Marketing screenshots | authored |
+| `recovery.profile-keys-error` | Open profile-keys-error recovery | authored |
+| `profile.switcher` | Scroll and dismiss the profile switcher | authored |
+| `recovery.secure-locked` | Open secure-locked recovery | authored |
+| `settings.edit.profile` | Edit own profile name | authored |
+| `settings.media.server` | View the media upload server | authored |
+| `transactions.filters` | Apply and reset transaction filters | authored |
+
 ## `STATE_MACHINE.md` section 5 — shipped flow matrix
 
 ### 5.1 Send ecash

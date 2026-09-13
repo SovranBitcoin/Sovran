@@ -31,7 +31,7 @@
     {"action":"tapUntil","sequence":[{"tap":{"id":"transactions-view-all"}}],"until":{"id":"transactions-filter-open"},"attempts":4,"settleMs":6000},
     {"action":"tapUntil","sequence":[{"tap":{"id":"transactions-filter-open"}}],"until":{"label":"Pending"},"attempts":4,"settleMs":6000},
     {"action":"tap","selector":{"label":"Pending"}},
-    {"action":"tap","selector":{"id":"filter-apply"}},
+    {"action":"tap","selector":{"id":"filters-apply"}},
     {"action":"waitFor","selector":{"id":"transaction-send-${sendTx}"},"timeoutMs":30000},
     {"action":"waitFor","selector":{"label":"Cancel 1 pending (20 SAT)"},"timeoutMs":30000},
     {"action":"screenshot","name":"transactions"},

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "name": "reinstall-recovery",
+  "defaultEndState": "onboarding",
+  "scenarios": [
+    {"id":"recovery.secure-locked","file":"scenarios/secure-locked.json","order":0,"newInstance":true,"lane":"physical","requires":[]},
+    {"id":"recovery.profile-keys-error","file":"scenarios/profile-keys-error.json","order":1,"newInstance":true,"lane":"physical","requires":[]}
+  ]
+}

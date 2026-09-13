@@ -1,3 +1,4 @@
+import type { SignedVertexRequest } from './vertex-request';
 import type { NostrTier } from '@sovranbitcoin/schemas';
 import {
   aggregateValue,
@@ -5,7 +6,7 @@ import {
   type NaggProfilesEnvelope,
 } from '../envelope';
 import type { RequestControls } from '../timeout';
-import type { TierOutcome } from '../tiers';
+import type { ReadProvenance, TierOutcome } from '../tiers';
 import { parseProfileMetadata, type ProfileMetadata } from './profiles';
 
 // ---------------------------------------------------------------------------
@@ -29,6 +30,8 @@ export type ProfileSearchHit = {
   npub?: string;
   metadata: ProfileMetadata;
   /** Vertex / app-view ranking; null on the relay floor (no global rank). */
+  vertexFetchedAt?: number | null;
+  vertexFresh?: boolean | null;
   rank?: number | null;
   score?: number | null;
   followers?: number | null;
@@ -36,14 +39,21 @@ export type ProfileSearchHit = {
 };
 
 export type SearchRequest = RequestControls & {
+  signedVertexRequest?: SignedVertexRequest;
   query: string;
   limit?: number;
   refresh?: boolean;
+  /**
+   * Aggregate reads paint at the first-paint gate and keep merging: each later
+   * tier's hits are APPENDED (never reordered) and delivered here. Also fires
+   * once more at settle with `provenance.complete === true`.
+   */
+  onUpdate?: (resolved: ResolvedProfileSearch) => void;
 };
 
-export type ProfileSearchBundle = { hits: ProfileSearchHit[] };
+export type ProfileSearchBundle = { hits: ProfileSearchHit[]; vertexFresh?: boolean | null };
 
-export type ResolvedProfileSearch = { tier: NostrTier; hits: ProfileSearchHit[] };
+export type ResolvedProfileSearch = ProfileSearchBundle & { tier: NostrTier; provenance?: ReadProvenance };
 
 export interface SearchTier {
   readonly tier: NostrTier;
@@ -71,6 +81,8 @@ export function searchHitsFromEnvelope(envelope: NaggProfilesEnvelope): ProfileS
     return {
       pubkey,
       metadata: metadataByPubkey[pubkey] ?? {},
+      vertexFetchedAt: typeof vertex?.vertexFetchedAt === 'number' ? vertex.vertexFetchedAt : typeof vertex?.fetchedAt === 'number' ? vertex.fetchedAt : null,
+      vertexFresh: envelope.vertexFresh,
       rank,
       score,
       followers: aggregateValue(envelope.aggregates, pubkey, 'followers') ?? null,

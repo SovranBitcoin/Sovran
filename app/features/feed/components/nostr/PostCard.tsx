@@ -1,4 +1,5 @@
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -36,8 +37,8 @@ import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { useCardTapGesture } from '@/features/feed/hooks/useCardTapGesture';
 import { NoteContent, NOTE_CONTENT_FONT_SIZE } from './NoteContent';
 import { NOTE_CONTENT_LINE_HEIGHT } from '@/features/feed/lib/threadListLayout';
-import { useProfile } from '@/shared/lib/nostr/useEntityCache';
-import { MetricsFooter, POST_ACTION_ICON_SIZES } from './MetricsFooter';
+import { useProfile, useNoteStats } from '@/shared/lib/nostr/useEntityCache';
+import { MetricsFooter, POST_ACTION_ICON_SIZES, type MetricsCountsState } from './MetricsFooter';
 import {
   SkeletonExitReveal,
   SkeletonLoadingShimmer,
@@ -46,6 +47,7 @@ import { sharedStyles } from './feedStyles';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
 import { seedThread, type ThreadSeed } from '@/features/feed/lib/threadSeedCache';
+import { seedProfileFeed } from '@/features/feed/lib/profileFeedSeedCache';
 import { alpha, radius, spacing } from '@/shared/styles/tokens';
 import {
   REPLY_SKELETON_VARIANTS,
@@ -207,6 +209,12 @@ interface PostCardProps {
    * post optimistically. The tapped event itself is merged in automatically.
    */
   getThreadContext?: () => ThreadSeed | null;
+  /**
+   * False when the page that rendered this card carried no counts for it.
+   * The card then reads the entity cache (filled by the cross-tier backfill)
+   * and shows a placeholder, never a zero, until a source answers.
+   */
+  metricsKnown?: boolean;
 }
 
 export const PostCard = React.memo(function PostCard(props: PostCardProps) {
@@ -219,7 +227,7 @@ export const PostCard = React.memo(function PostCard(props: PostCardProps) {
 
 const PostCardBody = React.memo(function PostCardBody({
   event,
-  metrics,
+  metrics: pageMetrics,
   quotedEvents,
   profiles,
   getMetrics,
@@ -251,8 +259,19 @@ const PostCardBody = React.memo(function PostCardBody({
   likePendingDirection,
   onNestedProfilePressIn,
   getThreadContext,
+  metricsKnown = true,
 }: PostCardProps) {
   const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
+  // Counts the page did not carry come from the single owner as they land.
+  const cachedStats = useNoteStats(metricsKnown ? undefined : event.id);
+  const metrics = metricsKnown ? pageMetrics : (cachedStats.metrics ?? pageMetrics);
+  const countsState: MetricsCountsState = metricsKnown
+    ? 'known'
+    : cachedStats.metrics
+      ? 'known'
+      : cachedStats.status === 'loading'
+        ? 'loading'
+        : 'unavailable';
 
   // We requested deletion of this note (kind:5 sent) — show the greyed
   // tombstone instead of the post. `deletedNoteIds` only ever holds our own
@@ -321,12 +340,15 @@ const PostCardBody = React.memo(function PostCardBody({
   }, [event, getThreadContext]);
 
   const navigateToProfile = useCallback(() => {
+    // Hand the author's notes this surface already has to the profile screen,
+    // so its feed paints as a partial page before the network answers.
+    seedProfileFeed(event.pubkey, getThreadContext?.() ?? null);
     // push so each profile pushes a new stack entry — see navigateToProfile.
     router.push({
       pathname: '/(user-flow)/profile',
       params: { pubkey: event.pubkey },
     });
-  }, [event.pubkey]);
+  }, [event.pubkey, getThreadContext]);
 
   const quotePost = useQuotePost();
   const handleQuotePress = useCallback(
@@ -389,9 +411,7 @@ const PostCardBody = React.memo(function PostCardBody({
             <Pressable onPressIn={handleNestedPressIn} onPress={navigateToProfile}>
               <HStack align="center" gap={10} style={sharedStyles.mb6}>
                 <Avatar
-                  state={
-                    profile?.picture ? 'image' : authorStatus === 'loading' ? 'loading' : 'fallback'
-                  }
+                  state={avatarStateFor(profile?.picture, authorStatus !== 'loading')}
                   picture={profile?.picture}
                   seed={event.pubkey}
                   size={AVATAR_SIZE}
@@ -434,6 +454,7 @@ const PostCardBody = React.memo(function PostCardBody({
 
           <Reanimated.View style={[pcStyles.targetMetrics, footerFadeStyle]}>
             <MetricsFooter
+              counts={countsState}
               {...metricsFooterShared}
               onCommentPress={onCommentPress ?? navigateToThread}
             />
@@ -462,7 +483,7 @@ const PostCardBody = React.memo(function PostCardBody({
         ) : null}
         <Pressable onPressIn={handleNestedPressIn} onPress={navigateToProfile}>
           <Avatar
-            state={profile?.picture ? 'image' : 'fallback'}
+            state={avatarStateFor(profile?.picture, authorStatus !== 'loading')}
             picture={profile?.picture}
             seed={event.pubkey}
             size={AVATAR_SIZE}
@@ -536,6 +557,7 @@ const PostCardBody = React.memo(function PostCardBody({
               showMetricsBorder && { borderBottomColor: withAlpha(foreground, 0.1) },
           ]}>
           <MetricsFooter
+            counts={countsState}
             {...metricsFooterShared}
             compact={isThread}
             showBorder={!fullBleedFooterBorder && showMetricsBorder}

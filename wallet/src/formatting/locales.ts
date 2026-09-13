@@ -7,6 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import { logger } from '../logger';
+import { paymentCopyDefaults } from '../copy/defaults';
 
 export interface LocalizedReason {
   code: string;
@@ -26,6 +27,8 @@ type TranslationMap = Record<string, string>;
 // ---------------------------------------------------------------------------
 
 const en: TranslationMap = {
+  NFC_UNIT_SWITCH_FAILED: paymentCopyDefaults["nfc.unitSwitchFailed"],
+  UNIT_NOT_FUNDED: paymentCopyDefaults["nfc.unitNotFunded"],
   // Annotation reasons
   PAYABLE_ECASH: 'Payable with Cashu — no fees',
 
@@ -33,6 +36,7 @@ const en: TranslationMap = {
   INSUFFICIENT_BALANCE: 'Insufficient balance',
   NO_BALANCE: 'No balance',
   NOT_IN_PAYMENT_REQUEST: 'Not in payment request',
+  MINT_NOT_PREFERRED: 'Receiver prefers other mints',
   UNSUPPORTED_FOR_FLOW: 'Unsupported for this flow',
   MINT_UNREACHABLE: 'Mint unreachable',
   NO_WEBSOCKET: 'Does not support live updates (NUT-17)',
@@ -68,11 +72,14 @@ const en: TranslationMap = {
 };
 
 const ar: TranslationMap = {
+  NFC_UNIT_SWITCH_FAILED: 'تعذّر اختيار عملة المحطة. حاول مرة أخرى.',
+  UNIT_NOT_FUNDED: 'تطلب هذه المحطة {unit}. ليس لديك نقد إلكتروني بعملة {unit} لدى جهة إصدار مقبولة.',
   PAYABLE_ECASH: 'يمكن الدفع بكاشو — بدون رسوم',
 
   INSUFFICIENT_BALANCE: 'رصيد غير كافٍ',
   NO_BALANCE: 'لا يوجد رصيد',
   NOT_IN_PAYMENT_REQUEST: 'غير مدرج في طلب الدفع',
+  MINT_NOT_PREFERRED: 'يفضل المستلم منتات أخرى',
   UNSUPPORTED_FOR_FLOW: 'غير مدعوم لهذا التدفق',
   MINT_UNREACHABLE: 'المنت غير متاح',
   NO_WEBSOCKET: 'لا يدعم التحديثات الفورية (NUT-17)',
@@ -105,11 +112,14 @@ const ar: TranslationMap = {
 };
 
 const de: TranslationMap = {
+  NFC_UNIT_SWITCH_FAILED: 'Die Währung des Terminals konnte nicht ausgewählt werden. Versuche es erneut.',
+  UNIT_NOT_FUNDED: 'Dieses Terminal verlangt {unit}. Du hast kein {unit}-Ecash bei einer akzeptierten Mint.',
   PAYABLE_ECASH: 'Zahlbar mit Cashu — keine Gebühren',
 
   INSUFFICIENT_BALANCE: 'Unzureichendes Guthaben',
   NO_BALANCE: 'Kein Guthaben',
   NOT_IN_PAYMENT_REQUEST: 'Nicht in Zahlungsanfrage enthalten',
+  MINT_NOT_PREFERRED: 'Empfänger bevorzugt andere Mints',
   UNSUPPORTED_FOR_FLOW: 'Für diesen Ablauf nicht unterstützt',
   MINT_UNREACHABLE: 'Mint nicht erreichbar',
   NO_WEBSOCKET: 'Unterstützt keine Live-Updates (NUT-17)',

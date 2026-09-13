@@ -20,4 +20,7 @@ export interface RecentContact {
   /** Newest message's event id — dev-only source-badge key; absent for
    *  default/mock rows (no badge renders). */
   newestMessageId?: string;
+  /** Row seeded from last-message metadata: the preview text is still being
+   *  decrypted, so the subtitle slot shows a loading bar instead of nothing. */
+  previewLoading?: boolean;
 }

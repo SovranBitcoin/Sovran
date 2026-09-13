@@ -9,16 +9,19 @@ export function ReceiveRailPlaceholder({
   sectionTitle,
   testID,
   qrTestID,
+  unit,
 }: {
   sectionTitle: string;
   testID?: string;
   qrTestID?: string;
+  /** Draws the currency logo in the placeholder's centre when known. */
+  unit?: string;
 }) {
   const muted = useThemeColor('muted');
 
   return (
     <View testID={testID}>
-      <PaymentQRCodePlaceholder testID={qrTestID} />
+      <PaymentQRCodePlaceholder testID={qrTestID} unit={unit} />
       <CopyRequestCard
         title={sectionTitle}
         icon="stash:qr-code"

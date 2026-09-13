@@ -54,8 +54,10 @@ describe('MintFaultEngine matching', () => {
   it('returns null with no rules and for non-mint traffic', () => {
     const engine = new MintFaultEngine();
     expect(engine.decide('https://testnut.cashu.space/v1/info', 'GET')).toBeNull();
-    engine.loadRuleSet(set([rule({ path: '/v1/swap' })]));
-    expect(engine.decide('https://api.sovran.money/api/app/latest-version', 'GET')).toBeNull();
+    engine.loadRuleSet(set([rule({ mint: '*' })]));
+    expect(engine.decide('https://nagg.up.railway.app/app/latest-version', 'GET')).toBeNull();
+    expect(engine.decide('https://nagg.up.railway.app/livez', 'GET')).toBeNull();
+    expect(engine.decide('https://nagg.up.railway.app/app/latest-version', 'POST')).toBeNull();
     expect(engine.decide('not a url', 'GET')).toBeNull();
   });
 

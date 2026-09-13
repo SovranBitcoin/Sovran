@@ -1,3 +1,5 @@
+import type { NostrCursor } from '@sovranbitcoin/schemas';
+import { feedPageKey } from './feedCache';
 import { facade } from 'nostr';
 
 import type { FeedEvent, FeedItem } from '@/features/feed/components/nostr/feedTypes';
@@ -28,6 +30,7 @@ import {
   type FeedParseResult,
   type ThreadResult,
 } from './feedClient';
+import { READ_DISABLED, readUnavailable } from './feedClient';
 
 // ---------------------------------------------------------------------------
 // Cache bridge: the nagg GraphQL fast-paths (thread, user feeds, posts-by-pubkey)
@@ -97,34 +100,36 @@ function ingestFeedPageIntoCache(result: FeedParseResult): void {
 // the waterfall still has Primal + relays after it.
 const FEED_READ_TIMEOUT_MS = 15_000;
 
-/**
- * The transport half of a feed-page read — everything except which feed it is.
- * Every `getFeedPage` caller below spreads this, so the timeout default and the
- * cursor encoding are decided once instead of per spec.
- *
- * `until` is falsy-checked deliberately: `0` is this codebase's "no more pages"
- * sentinel (`paginationUntil > 0` is how every caller tests for another page),
- * so a zero cursor means no cursor, not "everything before the epoch".
- */
+/** Preserve the complete event boundary; each tier owns its wire encoding. */
 function feedPageTransport(request: {
   limit?: number;
   refresh?: boolean;
   signal?: AbortSignal;
   timeoutMs?: number;
+  readId?: string;
   until?: number;
+  cursor?: NostrCursor;
 }) {
   return {
     limit: request.limit,
     refresh: request.refresh,
     signal: request.signal,
     timeoutMs: request.timeoutMs ?? FEED_READ_TIMEOUT_MS,
-    cursor: request.until ? { createdAt: request.until, id: '' } : null,
+    ...(request.readId ? { readId: request.readId } : {}),
+    cursor: request.cursor ?? null,
   };
 }
 
 export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>): FeedClient {
+  const pagers = new Map<string, facade.FeedPager>();
+  let pagerLayer: ReturnType<typeof buildNostrDataLayer>;
   return {
     ...fallback,
+    dispose() {
+      for (const pager of pagers.values()) pager.dispose();
+      pagers.clear();
+      fallback.dispose?.();
+    },
     async getFeed(request): Promise<FeedParseResult> {
       const spec = mapAppSpecToFeedSpec(request.spec, request.userPubkey);
       if (!spec) {
@@ -139,27 +144,48 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
         return emptyFeedParseResult();
       }
 
-      const result = await layer.getFeedPage({
-        spec,
-        ...feedPageTransport(request),
-        // Rank-paged specs advance by absolute offset (rank order is not
-        // chronological); the nagg tier consumes it, time-paged tiers ignore it.
-        ...(request.offset ? { offset: request.offset } : {}),
-        // Skimmable home feed: nagg drops over-long text notes server-side so
-        // the page stays full; skimmableFeedFilters below is the parity net
-        // for Primal/relay pages (and reposts of long originals).
-        maxContentLength: MAX_FEED_POST_CHARS,
-      });
-
-      return result.match(
-        (page) => resolvedFeedPageToParseResult(page, skimmableFeedFilters),
-        (error) => {
-          feedLog.warn('feed.facade.exhausted', {
-            attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
-          });
-          return emptyFeedParseResult();
-        }
-      );
+      if (pagerLayer !== layer) {
+        for (const pager of pagers.values()) pager.dispose();
+        pagers.clear();
+        pagerLayer = layer;
+      }
+      const key = feedPageKey(request.spec, request.userPubkey);
+      let pager = pagers.get(key);
+      if (!pager || request.refresh || !request.loadMore) {
+        pager?.dispose();
+        pager = layer.createFeedPager({
+          spec,
+          limit: request.limit,
+          timeoutMs: request.timeoutMs ?? FEED_READ_TIMEOUT_MS,
+          maxContentLength: MAX_FEED_POST_CHARS,
+          refresh: request.refresh,
+          seen: request.seen,
+        });
+        pagers.set(key, pager);
+      }
+      const page = await pager.nextPage(request.signal);
+      const parsed = emptyFeedParseResult();
+      for (const source of page.pages) {
+        const result = resolvedFeedPageToParseResult(source, skimmableFeedFilters);
+        parsed.orderedFeedItems.push(...result.orderedFeedItems);
+        for (const [id, value] of result.metricsMap) parsed.metricsMap.set(id, value);
+        for (const [id, value] of result.profilesMap) parsed.profilesMap.set(id, value);
+        for (const [id, value] of result.quotedEventsMap) parsed.quotedEventsMap.set(id, value);
+        parsed.missingQuotedIds.push(...result.missingQuotedIds);
+        parsed.missingProfilePubkeys.push(...result.missingProfilePubkeys);
+      }
+      return {
+        ...parsed,
+        paginationCursor: page.cursor,
+        paginationUntil: page.cursor?.createdAt ?? 0,
+        hasMore: page.hasMore,
+        sources: page.sources,
+        showingRecent: page.showingRecent,
+        retryAfterMs:
+          parsed.orderedFeedItems.length === 0 && page.hasMore
+            ? (page.retryAfterMs ?? 1_000)
+            : undefined,
+      };
     },
 
     async getThread(request): Promise<ThreadResult> {
@@ -175,16 +201,19 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
       // to an empty thread so loading always clears.
       try {
         const layer = buildNostrDataLayer();
-        if (!layer) return emptyThreadResult(request);
+        if (!layer) return emptyThreadResult(request, READ_DISABLED);
 
         const result = await layer.getThread(toFacadeThreadRequest(request));
         return result.match(
           (thread) => resolvedThreadToResult(thread, request),
           (error) => {
             feedLog.warn('thread.facade.exhausted', {
+              readId: request.readId ?? null,
               attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
             });
-            return emptyThreadResult(request);
+            // Distinct from an empty thread: the screen keeps a seeded render
+            // and shows degraded/error instead of "no replies" (SYSTEM.md F06).
+            return emptyThreadResult(request, readUnavailable(error.attempts, request.readId));
           }
         );
       } catch (error) {
@@ -260,9 +289,10 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
         },
         (error) => {
           feedLog.warn('feed.user.facade.exhausted', {
+            readId: request.readId ?? null,
             attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
           });
-          return emptyFeedParseResult();
+          return emptyFeedParseResult(readUnavailable(error.attempts, request.readId));
         }
       );
     },
@@ -288,9 +318,10 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
           }),
         (error) => {
           feedLog.warn('feed.posts_by_pubkeys.facade.exhausted', {
+            readId: request.readId ?? null,
             attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
           });
-          return emptyFeedParseResult();
+          return emptyFeedParseResult(readUnavailable(error.attempts, request.readId));
         }
       );
     },
@@ -347,7 +378,7 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
           policy: request.policy,
           replyScope: request.replyScope,
         });
-        return emptyNotificationsResult();
+        return emptyNotificationsResult(READ_DISABLED);
       }
 
       const result = await layer.getNotifications(facadeRequest);
@@ -375,12 +406,13 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
         },
         (error) => {
           feedLog.warn('notifications.facade.exhausted', {
+            readId: request.readId ?? null,
             tab: request.tab ?? 'ALL',
             policy: request.policy,
             replyScope: request.replyScope,
             attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
           });
-          return emptyNotificationsResult();
+          return emptyNotificationsResult(readUnavailable(error.attempts, request.readId));
         }
       );
     },

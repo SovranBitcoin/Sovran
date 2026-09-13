@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "id": "settings.edit.profile",
+  "name": "Edit own profile name and Lightning address",
+  "description": "Save a display name plus the one-tap npub.cash Lightning address, then verify the name in the drawer.",
+  "details": "Requires an onboarded disposable simulator identity with a signer and working relays. Save publishes kind 0 and must never be retried by the runner.",
+  "lane": "simulator",
+  "tags": ["flow:wallet"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"tap","selector":{"id":"header-profile-avatar"}},
+    {"action":"waitFor","selector":{"id":"drawer-menu-settings"},"timeoutMs":30000},
+    {"action":"tap","selector":{"id":"drawer-menu-settings"}},
+    {"action":"waitFor","selector":{"id":"settings-profile-row"},"timeoutMs":30000},
+    {"action":"tap","selector":{"id":"settings-profile-row"}},
+    {"action":"waitFor","selector":{"id":"settings-profile-edit"},"timeoutMs":30000},
+    {"action":"tap","selector":{"id":"settings-profile-edit"}},
+    {"action":"waitFor","selector":{"id":"edit-profile-name"},"timeoutMs":10000,"state":"enabled"},
+    {"action":"input","selector":{"id":"edit-profile-name"},"value":"Sovran Profile Test"},
+    {"action":"tap","selector":{"id":"edit-profile-lud16-npc"}},
+    {"action":"screenshot","name":"settings-edit-profile"},
+    {"action":"waitFor","selector":{"id":"edit-profile-save"},"state":"enabled","timeoutMs":10000},
+    {"action":"tap","selector":{"id":"edit-profile-save"}},
+    {"action":"waitFor","selector":{"id":"settings-profile-edit"},"timeoutMs":45000},
+    {"action":"goHome"},
+    {"action":"tap","selector":{"id":"header-profile-avatar"}},
+    {"action":"waitFor","selector":{"label":"Sovran Profile Test"},"timeoutMs":30000},
+    {"action":"assert","that":"ax","selector":{"id":"drawer-profile-name"},"label":"Sovran Profile Test"},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

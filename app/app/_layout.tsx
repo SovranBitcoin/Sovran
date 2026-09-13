@@ -15,6 +15,7 @@ import { Dimensions, Image, LogBox, Platform, StyleSheet, View } from 'react-nat
 import { LinearGradient } from 'expo-linear-gradient';
 
 import AppGate from '@/shared/blocks/AppGate';
+import { CtaHost } from '@/shared/blocks/CtaHost';
 import GlobalMigrationGate from '@/shared/blocks/GlobalMigrationGate';
 import {
   InitializationProvider,
@@ -373,6 +374,7 @@ function RootLayoutContent() {
           {/* All modal screens configured from MODAL_SCREENS */}
           {modalScreenElements}
         </Stack>
+        <CtaHost />
       </OfflineShell>
     </NavigationThemeProvider>
   );

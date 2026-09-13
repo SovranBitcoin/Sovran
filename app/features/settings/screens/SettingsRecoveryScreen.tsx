@@ -66,78 +66,9 @@ import {
   rowDelays,
 } from '@/features/transactions/components/detail/timeline/timelineTheme';
 import { staticPopup, paramPopup } from '@/shared/lib/popup';
-import { fetchJson } from '@/shared/lib/apiClient';
-import { MintListResponse, parseWith } from '@sovranbitcoin/schemas';
-
-// ─── Deep probe: discover mints from audit API ─────────────────────────────
-
-const SOVRAN_MINTS_API = 'https://api.sovran.money/api/cashu/mints';
-const MAX_DISCOVERED_MINTS = 100;
-
-const parseMintList = parseWith(MintListResponse, 'cashu/mints');
-
-function normalizeMintUrl(url: string): string {
-  return url.replace(/\/$/, '').toLowerCase();
-}
-
-// Hostname allowlist for backend-supplied mint URLs. Every admitted host
-// will be probed by `wallet.restore`, which sends the user's IP and derived
-// blinded messages — a compromised api.sovran.money response (or CDN MITM)
-// must not aim the wallet at LAN, loopback, link-local, or `.onion` hosts.
-function isAllowedMintHost(hostname: string): boolean {
-  const h = hostname.toLowerCase();
-  if (h === 'localhost') return false;
-  if (h.endsWith('.local') || h.endsWith('.internal') || h.endsWith('.onion')) return false;
-  // Block bare IPs entirely — public mints are reached by hostname.
-  // `URL.hostname` strips brackets from IPv6 literals, leaving colons.
-  if (h.includes(':')) return false;
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return false;
-  return true;
-}
-
-async function fetchDiscoveredMintUrls(
-  knownUrls: string[],
-  signal?: AbortSignal
-): Promise<string[]> {
-  const known = new Set(knownUrls.map(normalizeMintUrl));
-  const result = await fetchJson(SOVRAN_MINTS_API, parseMintList, 'cashu/mints', undefined, {
-    signal,
-  });
-  if (result.isErr()) return [];
-  const admitted: string[] = [];
-  let rejectedHost = 0;
-  let rejectedScheme = 0;
-  let rejectedMalformed = 0;
-  for (const raw of result.value) {
-    if (admitted.length >= MAX_DISCOVERED_MINTS) break;
-    if (!raw.startsWith('https://')) {
-      rejectedScheme++;
-      continue;
-    }
-    let parsed: URL;
-    try {
-      parsed = new URL(raw);
-    } catch {
-      rejectedMalformed++;
-      continue;
-    }
-    if (!isAllowedMintHost(parsed.hostname)) {
-      rejectedHost++;
-      continue;
-    }
-    const normalized = raw.replace(/\/$/, '');
-    if (known.has(normalized.toLowerCase())) continue;
-    admitted.push(normalized);
-  }
-  cashuLog.info('recovery.discover.admitted', {
-    admittedCount: admitted.length,
-    rejectedHost,
-    rejectedScheme,
-    rejectedMalformed,
-    totalReturned: result.value.length,
-  });
-  return admitted;
-}
+import { discoverMints } from '@/shared/lib/apiClient';
+import { fetchDiscoveredMintUrls } from '@/features/settings/lib/recoveryDiscovery';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 /** Phases where the run is doing work and must not be interrupted. */
 const ACTIVE_PHASES: ReadonlySet<RecoveryPhase> = new Set<RecoveryPhase>([
@@ -211,6 +142,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   onComplete,
 }) => {
   useLifecycleLogger('SettingsRecoveryScreen');
+  const showDevControls = useSettingsStore((s) => s.experimental) && !gateMode;
   const [foreground, mutedColor, successColor, dangerColor, warningColor, surfaceSecondary] =
     useThemeColor([
       'foreground',
@@ -262,6 +194,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
     setIsDiscovering(true);
     void fetchDiscoveredMintUrls(
       mints.map((m) => m.mintUrl),
+      discoverMints,
       controller.signal
     ).then((urls) => {
       if (controller.signal.aborted) return;
@@ -303,7 +236,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       cashuLog.warn('recovery.start.rejected', { reason: 'already_in_flight' });
       return;
     }
-    if (ACTIVE_PHASES.has(phase)) return;
+    if (ACTIVE_PHASES.has(phase) || isDiscovering) return;
     recoveryInFlight = true;
     recoveryCancelled = false;
     // Read the module variable, NOT the `useNativeCrypto` state: a stale
@@ -322,6 +255,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
 
     if (knownMintUrls.length === 0 && probeCandidates.length === 0) {
       recoveryInFlight = false;
+      endRecoverySuppression();
       staticPopup('recovery-failed', { text: 'No mints found to recover from. Add a mint first.' });
       return;
     }
@@ -708,7 +642,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       // Only count failures on known mints — discovered mint failures are expected
       const knownFailureCount = countKnownFailures(recoveryResults);
 
-      cashuLog.info('recovery.complete', {
+      cashuLog.info(recoveryCancelled ? 'recovery.cancelled' : 'recovery.complete', {
         totalMs,
         successCount,
         knownFailureCount,
@@ -716,7 +650,10 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         totalResults: recoveryResults.length,
       });
 
-      if (knownFailureCount === 0) {
+      if (recoveryCancelled) {
+        setErrorMessage('Recovery stopped. Swipe to try again.');
+        setPhase('error');
+      } else if (knownFailureCount === 0) {
         // Gate-mode owns its own UI through to AppGate's transition (SOV-00 §8).
         // The runtime popupStore survives a gate→app remount, so a toast pushed
         // here would render over the freshly-mounted wallet. The inline
@@ -769,7 +706,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
    * every restore would tax the thing it is meant to measure.
    */
   const handleRunMicroBench = async () => {
-    if (recoveryInFlight || isBenchmarking) return;
+    if (!showDevControls || recoveryInFlight || isBenchmarking) return;
     setIsBenchmarking(true);
     try {
       const rows = await runCryptoMicroBench();
@@ -801,7 +738,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             return (
               <HStack key={mint.mintUrl} gap={12} className="items-center">
                 <MintIcon iconUrl={mint.mintInfo?.icon_url} name={displayName} size={36} />
-                <Text size={14} bold numberOfLines={1} style={{ color: foreground, flex: 1 }}>
+                <Text size={14} bold numberOfLines={1} className="text-foreground flex-1">
                   {displayName}
                 </Text>
               </HStack>
@@ -817,20 +754,18 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   const renderIdleState = () => (
     <VStack gap={24} className="flex-1 px-6 pt-12">
       <VStack gap={24} className="flex-1 items-center justify-center">
-        <View
-          className="h-24 w-24 items-center justify-center self-center rounded-full"
-          style={{ backgroundColor: surfaceSecondary }}>
+        <View className="bg-surface-secondary h-24 w-24 items-center justify-center self-center rounded-full">
           <Icon name="mdi:shield" size={48} color={foreground} />
         </View>
 
         <VStack gap={8} className="items-center">
-          <Text size={24} bold style={{ color: foreground, textAlign: 'center' }}>
-            Recover Wallet
+          <Text size={24} bold className="text-foreground text-center">
+            {gateMode ? 'Welcome back' : 'Recover ecash'}
           </Text>
-          <Text
-            size={16}
-            style={{ color: withAlpha(foreground, 0.5), textAlign: 'center', lineHeight: 24 }}>
-            Recover ecash from your mints using your seed phrase.
+          <Text size={16} className="text-muted text-center leading-6">
+            {gateMode
+              ? 'Your recovery phrase is already on this device. Recover your ecash to continue.'
+              : 'Each mint is asked for ecash that belongs to your recovery phrase. This can take a few minutes and needs a connection.'}
           </Text>
         </VStack>
 
@@ -838,69 +773,77 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       </VStack>
 
       <VStack gap={12} className="w-full items-center pb-6">
-        <HStack
-          className="w-full items-center justify-between rounded-2xl px-4 py-3"
-          style={{ backgroundColor: surfaceSecondary }}>
-          <VStack gap={2} style={{ flex: 1 }}>
-            <Text size={14} bold style={{ color: foreground }}>
+        <HStack className="bg-surface-secondary w-full items-center justify-between rounded-2xl px-4 py-3">
+          <VStack gap={2} className="flex-1">
+            <Text size={14} bold className="text-foreground">
               Search all mints
             </Text>
-            <Text size={12} style={{ color: withAlpha(foreground, 0.4) }}>
-              {isDiscovering
-                ? 'Loading mint list…'
-                : deepProbe && discoveredMintUrls.length > 0
-                  ? `${discoveredMintUrls.length} extra mints to check`
-                  : 'Probe mints you may have used before'}
+            <Text size={12} className="text-muted">
+              Also check mints you may have used before
             </Text>
           </VStack>
-          {isDiscovering ? (
-            <View style={{ width: 24, alignItems: 'center' }}>
-              <LoadingIndicator size={20} phase="loading" color={foreground} />
-            </View>
-          ) : (
-            <Switch isSelected={deepProbe} onSelectedChange={setDeepProbe} />
-          )}
+          <Switch
+            testID="recovery-search-all-toggle"
+            accessibilityLabel="Search all mints"
+            isSelected={deepProbe}
+            onSelectedChange={setDeepProbe}
+          />
         </HStack>
 
-        {/* Benchmark A/B. Only offered once the self-test has proven the two
-            implementations byte-identical, so flipping it changes speed and
-            nothing else. */}
-        {nativeAvailable && (
-          <HStack
-            className="w-full items-center justify-between rounded-2xl px-4 py-3"
-            style={{ backgroundColor: surfaceSecondary }}>
-            <VStack gap={2} style={{ flex: 1 }}>
-              <Text size={14} bold style={{ color: foreground }}>
-                Native crypto
-              </Text>
-              <Text size={12} style={{ color: withAlpha(foreground, 0.4) }}>
-                {useNativeCrypto ? 'Rust CDK bindings' : 'cashu-ts fallback (slower)'}
-              </Text>
-            </VStack>
-            <Switch isSelected={useNativeCrypto} onSelectedChange={setUseNativeCrypto} />
-          </HStack>
+        {showDevControls && (
+          <>
+            {nativeAvailable && (
+              <HStack className="bg-surface-secondary w-full items-center justify-between rounded-2xl px-4 py-3">
+                <VStack gap={2} className="flex-1">
+                  <Text size={14} bold className="text-foreground">
+                    Native crypto
+                  </Text>
+                  <Text size={12} className="text-muted">
+                    {useNativeCrypto ? 'Rust CDK bindings' : 'cashu-ts fallback (slower)'}
+                  </Text>
+                </VStack>
+                <Switch
+                  testID="recovery-native-crypto-toggle"
+                  accessibilityLabel="Native crypto"
+                  isSelected={useNativeCrypto}
+                  onSelectedChange={setUseNativeCrypto}
+                />
+              </HStack>
+            )}
+            <Button
+              testID="recovery-benchmark"
+              variant="secondary"
+              className="w-full"
+              isDisabled={isBenchmarking}
+              onPress={handleRunMicroBench}>
+              <Button.Label>
+                {isBenchmarking ? 'Benchmarking…' : 'Benchmark crypto operations'}
+              </Button.Label>
+            </Button>
+          </>
         )}
-
-        <Button
-          variant="secondary"
-          className="w-full"
-          isDisabled={isBenchmarking}
-          onPress={handleRunMicroBench}>
-          <Button.Label>
-            {isBenchmarking ? 'Benchmarking…' : 'Benchmark crypto operations'}
-          </Button.Label>
-        </Button>
-        <SlideToConfirm
-          onConfirm={handleStartRecovery}
-          iconName="mdi:shield-refresh"
-          label="Swipe to recover"
-          trackColor={surfaceSecondary}
-          thumbColor={foreground}
-          textColor={foreground}
-          iconColor={surfaceSecondary}
-        />
+        {isDiscovering ? (
+          <Text size={14} className="text-muted" accessibilityLiveRegion="polite">
+            Loading mint list…
+          </Text>
+        ) : (
+          <SlideToConfirm
+            testID="recovery-swipe"
+            onConfirm={handleStartRecovery}
+            iconName="mdi:shield-refresh"
+            label="Swipe to recover"
+            trackColor={surfaceSecondary}
+            thumbColor={foreground}
+            textColor={foreground}
+            iconColor={surfaceSecondary}
+          />
+        )}
         {!gateMode && (
-          <Button variant="secondary" className="w-full" onPress={handleClose}>
+          <Button
+            testID="recovery-cancel"
+            variant="secondary"
+            className="w-full"
+            onPress={handleClose}>
             <Button.Label>Cancel</Button.Label>
           </Button>
         )}
@@ -930,6 +873,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
     // and never moves, which is what keeps the ring honest.
     const counts = computeRecoveryCounts(results);
     const successMintCount = visibleResults.filter((r) => isSuccess(r.status)).length;
+    const canContinue = successMintCount > 0 || counts.total === 0;
     const active = currentMint(results);
     const activeMint = active ? mintsByUrl[active.mint] : undefined;
     return (
@@ -1022,22 +966,18 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             <Button
               variant="primary"
               className="w-full"
-              onPress={gateMode ? onComplete : handleClose}>
+              testID="recovery-continue"
+              isDisabled={gateMode && !canContinue}
+              onPress={gateMode ? (canContinue ? onComplete : undefined) : handleClose}>
               <Button.Label>{gateMode ? 'Continue' : 'Close'}</Button.Label>
             </Button>
           ) : (
-            // Cancelling is only coherent because mints run one at a time: it
-            // stops before the next mint rather than tearing down work in
-            // flight. None of cashu.me, macadamia or minibits offers this.
-            //
-            // Never in gateMode: there, cancelling would skip mints, still
-            // reach the 'complete' state (skipped mints are not failures), and
-            // let Continue mark the restore permanently done — stranding funds
-            // on the mints that never ran.
+            // Stop between mints; a cancelled run stays available for retry.
             !gateMode && (
               <Button
                 variant="secondary"
                 className="w-full"
+                testID="recovery-stop"
                 isDisabled={recoveryCancelled}
                 onPress={handleCancelRecovery}>
                 <Button.Label>{recoveryCancelled ? 'Stopping…' : 'Cancel'}</Button.Label>
@@ -1052,8 +992,8 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   // ─── Error state (retry available) ──────────────────────────────────────
 
   const renderErrorState = () => {
-    const visibleSuccessCount = visibleResults.filter((r) => r.status === 'done').length;
-    const visibleFailureCount = visibleResults.filter((r) => r.status !== 'done').length;
+    const visibleSuccessCount = computeRecoveryCounts(visibleResults).succeeded;
+    const visibleFailureCount = countKnownFailures(visibleResults);
 
     return (
       <VStack gap={24} className="flex-1 px-6 pt-12">
@@ -1073,14 +1013,20 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
 
           <VStack gap={8} className="items-center">
             <Text size={24} bold style={{ color: foreground, textAlign: 'center' }}>
-              {visibleSuccessCount > 0 ? 'Recovery Partial' : 'Recovery Failed'}
+              {recoveryCancelled
+                ? 'Recovery stopped'
+                : visibleSuccessCount > 0
+                  ? 'Recovery Partial'
+                  : 'Recovery Failed'}
             </Text>
             <Text
               size={16}
               style={{ color: withAlpha(foreground, 0.5), textAlign: 'center', lineHeight: 24 }}>
-              {visibleSuccessCount > 0
-                ? `Recovered from ${visibleSuccessCount} mint${visibleSuccessCount !== 1 ? 's' : ''}, but ${visibleFailureCount} failed.`
-                : errorMessage || 'An unexpected error occurred during recovery.'}
+              {recoveryCancelled
+                ? 'Swipe to try again and check the remaining mints.'
+                : visibleSuccessCount > 0
+                  ? `Recovered from ${visibleSuccessCount} mint${visibleSuccessCount !== 1 ? 's' : ''}, but ${visibleFailureCount} failed.`
+                  : errorMessage || 'An unexpected error occurred during recovery.'}
             </Text>
           </VStack>
 
@@ -1129,6 +1075,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
 
         <VStack gap={12} className="w-full items-center pb-6">
           <SlideToConfirm
+            testID="recovery-swipe"
             onConfirm={handleStartRecovery}
             iconName="mdi:shield-refresh"
             label="Reswipe to try again"
@@ -1138,7 +1085,11 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             iconColor={surfaceSecondary}
           />
           {!gateMode && (
-            <Button variant="secondary" className="w-full" onPress={handleClose}>
+            <Button
+              testID="recovery-close"
+              variant="secondary"
+              className="w-full"
+              onPress={handleClose}>
               <Button.Label>Close</Button.Label>
             </Button>
           )}
@@ -1158,8 +1109,11 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         // that can be taller than the screen, freezing the scroll just makes a
         // multi-minute operation feel like a hang.
         scrollEnabled>
-        {(phase === 'idle' || phase === 'discovering') && renderIdleState()}
-        {(phase === 'restoring' || phase === 'finalizing' || phase === 'complete') &&
+        {phase === 'idle' && renderIdleState()}
+        {(phase === 'discovering' ||
+          phase === 'restoring' ||
+          phase === 'finalizing' ||
+          phase === 'complete') &&
           renderActiveOrCompleteState()}
         {phase === 'error' && renderErrorState()}
       </ScrollView>

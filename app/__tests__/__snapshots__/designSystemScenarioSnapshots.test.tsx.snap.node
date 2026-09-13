@@ -2770,202 +2770,406 @@ exports[`Design System exact structural snapshots renders foundations/notice-car
 `;
 
 exports[`Design System exact structural snapshots renders foundations/pill-tabs: pill-tabs 1`] = `
-{
-  "children": [
-    {
-      "children": [
-        {
-          "children": [
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "children": [
-                        {
-                          "children": [
-                            "All",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1 r-fontSize-1inkyih",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
+[
+  {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              "All",
+                            ],
+                            "props": {
+                              "className": "css-text-146c3p1 r-fontSize-1inkyih",
+                              "dir": "auto",
+                              "style": {
+                                "color": "rgba(16,16,16,1.00)",
+                              },
                             },
-                          },
-                          "type": "div",
-                        },
-                      ],
-                      "props": {
-                        "style": [
-                          {
-                            "alignItems": "center",
-                            "borderRadius": 999,
-                            "flexDirection": "row",
-                            "gap": 8,
-                            "justifyContent": "center",
-                            "paddingHorizontal": 16,
-                            "paddingVertical": 4,
-                          },
-                          {
-                            "backgroundColor": "rgba(0, 0, 0, 0)",
+                            "type": "div",
                           },
                         ],
-                      },
-                      "type": "View",
-                    },
-                  ],
-                  "props": {
-                    "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-cpet4d",
-                    "dir": null,
-                    "style": {
-                      "opacity": 1,
-                    },
-                    "tabIndex": 0,
-                  },
-                  "type": "div",
-                },
-              ],
-              "props": {
-                "className": "css-view-g5y9jx r-flexDirection-18u37iz",
-                "dir": null,
-              },
-              "type": "div",
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "children": [
-                        {
-                          "children": [
-                            "Recent",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1 r-fontSize-1inkyih",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
+                        "props": {
+                          "style": [
+                            {
+                              "alignItems": "center",
+                              "borderRadius": 999,
+                              "flexDirection": "row",
+                              "gap": 8,
+                              "justifyContent": "center",
+                              "paddingHorizontal": 16,
+                              "paddingVertical": 4,
                             },
-                          },
-                          "type": "div",
+                            {
+                              "backgroundColor": "rgba(0, 0, 0, 0)",
+                            },
+                          ],
                         },
-                      ],
-                      "props": {
-                        "style": [
+                        "type": "View",
+                      },
+                    ],
+                    "props": {
+                      "aria-label": "All",
+                      "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-cpet4d",
+                      "dir": null,
+                      "style": {
+                        "opacity": 1,
+                      },
+                      "tabIndex": 0,
+                    },
+                    "type": "div",
+                  },
+                ],
+                "props": {
+                  "className": "css-view-g5y9jx r-flexDirection-18u37iz",
+                  "dir": null,
+                },
+                "type": "div",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
                           {
-                            "alignItems": "center",
-                            "borderRadius": 999,
-                            "flexDirection": "row",
-                            "gap": 8,
-                            "justifyContent": "center",
-                            "paddingHorizontal": 16,
-                            "paddingVertical": 4,
-                          },
-                          {
-                            "backgroundColor": "rgba(0, 0, 0, 0)",
+                            "children": [
+                              "Recent",
+                            ],
+                            "props": {
+                              "className": "css-text-146c3p1 r-fontSize-1inkyih",
+                              "dir": "auto",
+                              "style": {
+                                "color": "rgba(16,16,16,1.00)",
+                              },
+                            },
+                            "type": "div",
                           },
                         ],
-                      },
-                      "type": "View",
-                    },
-                  ],
-                  "props": {
-                    "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-cpet4d",
-                    "dir": null,
-                    "style": {
-                      "backgroundColor": "rgba(16,16,16,0.50)",
-                      "opacity": 1,
-                    },
-                    "tabIndex": 0,
-                  },
-                  "type": "div",
-                },
-              ],
-              "props": {
-                "className": "css-view-g5y9jx r-flexDirection-18u37iz",
-                "dir": null,
-              },
-              "type": "div",
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "children": [
-                        {
-                          "children": [
-                            "Requests",
-                          ],
-                          "props": {
-                            "className": "css-text-146c3p1 r-fontSize-1inkyih",
-                            "dir": "auto",
-                            "style": {
-                              "color": "rgba(16,16,16,1.00)",
+                        "props": {
+                          "style": [
+                            {
+                              "alignItems": "center",
+                              "borderRadius": 999,
+                              "flexDirection": "row",
+                              "gap": 8,
+                              "justifyContent": "center",
+                              "paddingHorizontal": 16,
+                              "paddingVertical": 4,
                             },
-                          },
-                          "type": "div",
+                            {
+                              "backgroundColor": "rgba(0, 0, 0, 0)",
+                            },
+                          ],
                         },
-                      ],
-                      "props": {
-                        "style": [
+                        "type": "View",
+                      },
+                    ],
+                    "props": {
+                      "aria-label": "Recent",
+                      "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-cpet4d",
+                      "dir": null,
+                      "style": {
+                        "backgroundColor": "rgba(16,16,16,0.50)",
+                        "opacity": 1,
+                      },
+                      "tabIndex": 0,
+                    },
+                    "type": "div",
+                  },
+                ],
+                "props": {
+                  "className": "css-view-g5y9jx r-flexDirection-18u37iz",
+                  "dir": null,
+                },
+                "type": "div",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
                           {
-                            "alignItems": "center",
-                            "borderRadius": 999,
-                            "flexDirection": "row",
-                            "gap": 8,
-                            "justifyContent": "center",
-                            "paddingHorizontal": 16,
-                            "paddingVertical": 4,
-                          },
-                          {
-                            "backgroundColor": "rgba(0, 0, 0, 0)",
+                            "children": [
+                              "Requests",
+                            ],
+                            "props": {
+                              "className": "css-text-146c3p1 r-fontSize-1inkyih",
+                              "dir": "auto",
+                              "style": {
+                                "color": "rgba(16,16,16,1.00)",
+                              },
+                            },
+                            "type": "div",
                           },
                         ],
+                        "props": {
+                          "style": [
+                            {
+                              "alignItems": "center",
+                              "borderRadius": 999,
+                              "flexDirection": "row",
+                              "gap": 8,
+                              "justifyContent": "center",
+                              "paddingHorizontal": 16,
+                              "paddingVertical": 4,
+                            },
+                            {
+                              "backgroundColor": "rgba(0, 0, 0, 0)",
+                            },
+                          ],
+                        },
+                        "type": "View",
                       },
-                      "type": "View",
+                    ],
+                    "props": {
+                      "aria-label": "Requests",
+                      "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-cpet4d",
+                      "dir": null,
+                      "style": {
+                        "opacity": 1,
+                      },
+                      "tabIndex": 0,
                     },
-                  ],
-                  "props": {
-                    "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-cpet4d",
-                    "dir": null,
-                    "style": {
-                      "opacity": 1,
-                    },
-                    "tabIndex": 0,
+                    "type": "div",
                   },
-                  "type": "div",
+                ],
+                "props": {
+                  "className": "css-view-g5y9jx r-flexDirection-18u37iz",
+                  "dir": null,
                 },
-              ],
-              "props": {
-                "className": "css-view-g5y9jx r-flexDirection-18u37iz",
-                "dir": null,
+                "type": "div",
               },
-              "type": "div",
+            ],
+            "props": {
+              "className": "css-view-g5y9jx r-flexDirection-18u37iz r-alignItems-1awozwy r-gap-9aw3ui r-paddingInline-u9wvl5",
+              "dir": null,
             },
-          ],
-          "props": {
-            "className": "css-view-g5y9jx r-flexDirection-18u37iz r-alignItems-1awozwy r-gap-9aw3ui r-paddingInline-u9wvl5",
-            "dir": null,
+            "type": "div",
           },
-          "type": "div",
+        ],
+        "props": {
+          "className": "css-view-g5y9jx r-WebkitOverflowScrolling-150rngu r-flexDirection-18u37iz r-flexGrow-16y2uox r-flexShrink-1wbh5a2 r-overflowX-lltvgl r-overflowY-buy8e9 r-transform-agouwx r-scrollbarWidth-2eszeu",
+          "dir": null,
         },
-      ],
-      "props": {
-        "className": "css-view-g5y9jx r-WebkitOverflowScrolling-150rngu r-flexDirection-18u37iz r-flexGrow-16y2uox r-flexShrink-1wbh5a2 r-overflowX-lltvgl r-overflowY-buy8e9 r-transform-agouwx r-scrollbarWidth-2eszeu",
-        "dir": null,
+        "type": "div",
       },
-      "type": "div",
+    ],
+    "props": {
+      "className": "css-view-g5y9jx r-height-1mwlp6a r-marginInline-2psd3c",
+      "dir": null,
     },
-  ],
-  "props": {
-    "className": "css-view-g5y9jx r-height-1mwlp6a r-marginInline-2psd3c",
-    "dir": null,
+    "type": "div",
   },
-  "type": "div",
-}
+  {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              "All",
+                            ],
+                            "props": {
+                              "className": "css-text-146c3p1 r-fontSize-1inkyih",
+                              "dir": "auto",
+                              "style": {
+                                "color": "rgba(16,16,16,1.00)",
+                              },
+                            },
+                            "type": "div",
+                          },
+                        ],
+                        "props": {
+                          "style": [
+                            {
+                              "alignItems": "center",
+                              "borderRadius": 999,
+                              "flexDirection": "row",
+                              "gap": 8,
+                              "justifyContent": "center",
+                              "paddingHorizontal": 16,
+                              "paddingVertical": 4,
+                            },
+                            {
+                              "backgroundColor": "rgba(0, 0, 0, 0)",
+                            },
+                          ],
+                        },
+                        "type": "View",
+                      },
+                    ],
+                    "props": {
+                      "aria-label": "All",
+                      "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-cpet4d",
+                      "dir": null,
+                      "style": {
+                        "opacity": 1,
+                      },
+                      "tabIndex": 0,
+                    },
+                    "type": "div",
+                  },
+                ],
+                "props": {
+                  "className": "css-view-g5y9jx r-flexDirection-18u37iz",
+                  "dir": null,
+                },
+                "type": "div",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              "Recent",
+                            ],
+                            "props": {
+                              "className": "css-text-146c3p1 r-fontSize-1inkyih",
+                              "dir": "auto",
+                              "style": {
+                                "color": "rgba(8,8,8,1.00)",
+                              },
+                            },
+                            "type": "div",
+                          },
+                        ],
+                        "props": {
+                          "style": [
+                            {
+                              "alignItems": "center",
+                              "borderRadius": 999,
+                              "flexDirection": "row",
+                              "gap": 8,
+                              "justifyContent": "center",
+                              "paddingHorizontal": 16,
+                              "paddingVertical": 4,
+                            },
+                            {
+                              "backgroundColor": "rgba(0, 0, 0, 0)",
+                            },
+                          ],
+                        },
+                        "type": "View",
+                      },
+                    ],
+                    "props": {
+                      "aria-label": "Recent",
+                      "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-cpet4d",
+                      "dir": null,
+                      "style": {
+                        "backgroundColor": "rgba(16,16,16,1.00)",
+                        "opacity": 1,
+                      },
+                      "tabIndex": 0,
+                    },
+                    "type": "div",
+                  },
+                ],
+                "props": {
+                  "className": "css-view-g5y9jx r-flexDirection-18u37iz",
+                  "dir": null,
+                },
+                "type": "div",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              "Requests",
+                            ],
+                            "props": {
+                              "className": "css-text-146c3p1 r-fontSize-1inkyih",
+                              "dir": "auto",
+                              "style": {
+                                "color": "rgba(16,16,16,1.00)",
+                              },
+                            },
+                            "type": "div",
+                          },
+                        ],
+                        "props": {
+                          "style": [
+                            {
+                              "alignItems": "center",
+                              "borderRadius": 999,
+                              "flexDirection": "row",
+                              "gap": 8,
+                              "justifyContent": "center",
+                              "paddingHorizontal": 16,
+                              "paddingVertical": 4,
+                            },
+                            {
+                              "backgroundColor": "rgba(0, 0, 0, 0)",
+                            },
+                          ],
+                        },
+                        "type": "View",
+                      },
+                    ],
+                    "props": {
+                      "aria-label": "Requests",
+                      "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-cpet4d",
+                      "dir": null,
+                      "style": {
+                        "opacity": 1,
+                      },
+                      "tabIndex": 0,
+                    },
+                    "type": "div",
+                  },
+                ],
+                "props": {
+                  "className": "css-view-g5y9jx r-flexDirection-18u37iz",
+                  "dir": null,
+                },
+                "type": "div",
+              },
+            ],
+            "props": {
+              "className": "css-view-g5y9jx r-flexDirection-18u37iz r-alignItems-1awozwy r-gap-9aw3ui r-paddingInline-u9wvl5",
+              "dir": null,
+            },
+            "type": "div",
+          },
+        ],
+        "props": {
+          "className": "css-view-g5y9jx r-WebkitOverflowScrolling-150rngu r-flexDirection-18u37iz r-flexGrow-16y2uox r-flexShrink-1wbh5a2 r-overflowX-lltvgl r-overflowY-buy8e9 r-transform-agouwx r-scrollbarWidth-2eszeu",
+          "dir": null,
+        },
+        "type": "div",
+      },
+    ],
+    "props": {
+      "className": "css-view-g5y9jx r-height-1mwlp6a r-marginInline-2psd3c",
+      "dir": null,
+    },
+    "type": "div",
+  },
+]
 `;
 
 exports[`Design System exact structural snapshots renders foundations/row-stats: row-stats 1`] = `
@@ -20073,8 +20277,8 @@ exports[`Design System exact structural snapshots renders skeleton-crossfade/ava
         "className": "css-view-g5y9jx",
         "dir": null,
         "style": {
-          "overflowX": "hidden",
-          "overflowY": "hidden",
+          "overflowX": "visible",
+          "overflowY": "visible",
         },
       },
       "type": "div",
@@ -20210,8 +20414,8 @@ exports[`Design System exact structural snapshots renders skeleton-crossfade/ava
         "className": "css-view-g5y9jx",
         "dir": null,
         "style": {
-          "overflowX": "hidden",
-          "overflowY": "hidden",
+          "overflowX": "visible",
+          "overflowY": "visible",
         },
       },
       "type": "div",
@@ -20267,6 +20471,208 @@ exports[`Design System exact structural snapshots renders skeleton-crossfade/ava
       "alignItems": "center",
       "flexDirection": "row",
       "gap": "12px",
+    },
+  },
+  "type": "div",
+}
+`;
+
+exports[`Design System exact structural snapshots renders skeleton-crossfade/chat-skeleton: chat-skeleton 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+              },
+              "type": "div",
+            },
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+                "style": {
+                  "height": "40px",
+                  "width": "62%",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+            "style": {
+              "paddingLeft": "16px",
+              "paddingRight": "16px",
+            },
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+              },
+              "type": "div",
+            },
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+                "style": {
+                  "height": "40px",
+                  "width": "44%",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+            "style": {
+              "paddingLeft": "16px",
+              "paddingRight": "16px",
+            },
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+                "style": {
+                  "height": "60px",
+                  "width": "71%",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+            "style": {
+              "paddingLeft": "16px",
+              "paddingRight": "16px",
+            },
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+                "style": {
+                  "height": "40px",
+                  "width": "38%",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+            "style": {
+              "paddingLeft": "16px",
+              "paddingRight": "16px",
+            },
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+              },
+              "type": "div",
+            },
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+                "style": {
+                  "height": "40px",
+                  "width": "55%",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+            "style": {
+              "paddingLeft": "16px",
+              "paddingRight": "16px",
+            },
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+                "style": {
+                  "height": "60px",
+                  "width": "48%",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+            "style": {
+              "paddingLeft": "16px",
+              "paddingRight": "16px",
+            },
+          },
+          "type": "div",
+        },
+      ],
+      "props": {
+        "className": "css-view-g5y9jx",
+        "data-testid": "chat-skeleton",
+        "dir": null,
+        "style": {
+          "paddingBottom": "16px",
+        },
+      },
+      "type": "div",
+    },
+  ],
+  "props": {
+    "className": "css-view-g5y9jx",
+    "dir": null,
+    "style": {
+      "flexDirection": "column",
     },
   },
   "type": "div",
@@ -20357,6 +20763,139 @@ exports[`Design System exact structural snapshots renders skeleton-crossfade/inl
   "props": {
     "className": "css-view-g5y9jx",
     "dir": null,
+  },
+  "type": "div",
+}
+`;
+
+exports[`Design System exact structural snapshots renders skeleton-crossfade/marquee-text: marquee-text 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    "Satoshi",
+                  ],
+                  "props": {
+                    "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
+                    "dir": "auto",
+                    "style": {
+                      "color": "rgba(16,16,16,1.00)",
+                      "fontFamily": "OxygenBold",
+                      "fontSize": "16px",
+                    },
+                  },
+                  "type": "div",
+                },
+              ],
+              "props": {
+                "className": "css-view-g5y9jx r-flexDirection-18u37iz",
+                "dir": null,
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx r-WebkitOverflowScrolling-150rngu r-flexDirection-18u37iz r-flexGrow-16y2uox r-flexShrink-1wbh5a2 r-transform-agouwx r-overflowX-11yh6sk r-overflowY-buy8e9 r-touchAction-19z077z r-pointerEvents-633pao",
+            "dir": null,
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            "Satoshi",
+          ],
+          "props": {
+            "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
+            "dir": "auto",
+            "style": {
+              "color": "rgba(16,16,16,1.00)",
+              "fontFamily": "OxygenBold",
+              "fontSize": "16px",
+            },
+          },
+          "type": "div",
+        },
+      ],
+      "props": {
+        "aria-label": "Satoshi",
+        "className": "css-view-g5y9jx",
+        "data-testid": "marquee-fitting-sample",
+        "dir": null,
+      },
+      "type": "div",
+    },
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    "Satoshi Nakamoto · Bitcoin conversation",
+                  ],
+                  "props": {
+                    "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
+                    "dir": "auto",
+                    "style": {
+                      "color": "rgba(16,16,16,1.00)",
+                      "fontFamily": "OxygenBold",
+                      "fontSize": "16px",
+                    },
+                  },
+                  "type": "div",
+                },
+              ],
+              "props": {
+                "className": "css-view-g5y9jx r-flexDirection-18u37iz",
+                "dir": null,
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx r-WebkitOverflowScrolling-150rngu r-flexDirection-18u37iz r-flexGrow-16y2uox r-flexShrink-1wbh5a2 r-transform-agouwx r-overflowX-11yh6sk r-overflowY-buy8e9 r-touchAction-19z077z r-pointerEvents-633pao",
+            "dir": null,
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            "Satoshi Nakamoto · Bitcoin conversation",
+          ],
+          "props": {
+            "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
+            "dir": "auto",
+            "style": {
+              "color": "rgba(16,16,16,1.00)",
+              "fontFamily": "OxygenBold",
+              "fontSize": "16px",
+            },
+          },
+          "type": "div",
+        },
+      ],
+      "props": {
+        "aria-label": "Satoshi Nakamoto · Bitcoin conversation",
+        "className": "css-view-g5y9jx",
+        "data-testid": "marquee-overflow-sample",
+        "dir": null,
+      },
+      "type": "div",
+    },
+  ],
+  "props": {
+    "className": "css-view-g5y9jx",
+    "dir": null,
+    "style": {
+      "flexDirection": "column",
+    },
   },
   "type": "div",
 }
@@ -20568,8 +21107,8 @@ exports[`Design System exact structural snapshots renders skeleton-crossfade/pro
             "className": "css-view-g5y9jx",
             "dir": null,
             "style": {
-              "overflowX": "hidden",
-              "overflowY": "hidden",
+              "overflowX": "visible",
+              "overflowY": "visible",
             },
           },
           "type": "div",
@@ -20673,8 +21212,8 @@ exports[`Design System exact structural snapshots renders skeleton-crossfade/pro
               "borderTopRightRadius": "22px",
               "height": "44px",
               "justifyContent": "center",
-              "overflowX": "hidden",
-              "overflowY": "hidden",
+              "overflowX": "visible",
+              "overflowY": "visible",
               "width": "44px",
             },
           },

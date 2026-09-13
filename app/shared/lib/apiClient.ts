@@ -1,3 +1,4 @@
+import { facade } from 'nostr';
 import { GetInfoResponse } from '@cashu/cashu-ts';
 import {
   combineSignals,
@@ -13,7 +14,6 @@ import * as nip19 from 'nostr-tools/nip19';
 import { z } from 'zod';
 import { apiLog } from './logger';
 import {
-  AuditMintResponse as AuditMintResponseStrict,
   CatalogResponse,
   LatestVersionResponse,
   NostrProfileFull as NostrProfileFullStrict,
@@ -22,24 +22,12 @@ import {
   parseWith,
   type MintRecommendation as SchemaMintRecommendation,
   type MintSearchResult,
+  type NostrTier,
   type ParseError,
 } from '@sovranbitcoin/schemas';
 import { backendConfig } from '@/shared/config/backend';
 import { DEFAULT_TIMEOUT_MS } from '@/shared/lib/http/requestSignal';
 import { NaggAiLineupSchema } from '@/shared/lib/routstr/lineup';
-
-// Local relaxation: the auditor returns `info` in several shapes depending
-// on the upstream mint state — sometimes a NUT-06 object, sometimes null,
-// sometimes an empty string when it couldn't reach the mint. The strict
-// schema rejected anything but a populated object, dropping `auditScore`/
-// `auditState` whenever the auditor's mint reach failed. Match the lenient
-// shape used by `MintSearchResult.info` (unknown + optional) — downstream
-// consumers (getMintCatalog) already type-narrow before reading.
-// TODO: mirror this in `sovran-schemas` and drop the override on next publish.
-const AuditMintResponse = AuditMintResponseStrict.extend({
-  info: z.unknown().optional(),
-});
-type AuditMintResponseType = z.infer<typeof AuditMintResponse>;
 
 // Local compatibility while the shared package release catches up to the
 // live `/nostr/profile` wire shape. Vertex can return `null` when pagerank,
@@ -50,7 +38,15 @@ const TopFollower = TopFollowerStrict.extend({
   score: NullableVertexMetric.optional(),
 });
 const NostrProfileFull = NostrProfileFullStrict.extend({
+  vertexFetchedAt: z.number().nullish(),
+  vertexFresh: z.boolean().nullish(),
   score: NullableVertexMetric,
+  // Counts are absent, never 0, when nagg has no aggregate for the pubkey
+  // (nostr module off, or a profile it has not indexed). `useNostrProfile`
+  // completes them from Primal / the contact list; screens render a
+  // placeholder for `undefined` instead of a misleading zero.
+  followers: z.number().int().nonnegative().optional(),
+  follows: z.number().int().nonnegative().optional(),
   created_at: z.number().int().nullable(),
   nodes: z.number().int().nonnegative().nullable().optional(),
   topFollowers: z.array(TopFollower).max(500),
@@ -62,16 +58,21 @@ type NostrProfileFullType = z.infer<typeof NostrProfileFull>;
 export type MintRecommendation = Omit<SchemaMintRecommendation, 'score'> & {
   score: number | null;
 } & Partial<Pick<MintReviewRecommendation, 'name' | 'displayName' | 'picture' | 'image'>>;
-type MintReviewsResponseType = {
+export type MintReviewsResponse = {
   mintUrl: string;
   score: number | null;
   recommendations: MintRecommendation[];
   lastUpdated: number | null;
   fromCache: boolean;
+  /** Which tier answered; `degraded` when a fallback tier served it without
+   *  reviewer identities (the screen then names reviewers from the entity cache). */
+  tier?: NostrTier;
+  degraded?: boolean;
 };
+type MintReviewsResponseType = MintReviewsResponse;
 // nagg's rich discovery row — one call returns every mint card field (audit
 // state, units, reviews + favourite split, operator Nostr identity + Vertex
-// reputation), replacing the api.sovran.money search + per-mint review/profile
+// reputation), replacing the separate search + per-mint review/profile
 // N+1 fan-outs. Lenient (passthrough) so a nagg field addition needs no release.
 const DiscoverMint = z.looseObject({
   mintUrl: z.string().max(2048),
@@ -95,6 +96,10 @@ const DiscoverMint = z.looseObject({
   nMints: z.number().int().optional(),
   nMelts: z.number().int().optional(),
   nErrors: z.number().int().optional(),
+  uptime24h: z.number().optional(),
+  avgLatencyMs: z.number().optional(),
+  auditSource: z.enum(['ucash', '8333']).optional().catch(undefined),
+  auditUpdatedAt: z.union([z.number(), z.string().max(128)]).optional(),
   operatorPubkey: z.string().max(128).optional(),
   operatorNpub: z.string().max(128).optional(),
   followers: z.number().int().optional(),
@@ -133,12 +138,12 @@ const ReviewerProfileInfo = z.looseObject({
   name: z.string().optional(),
   picture: z.string().optional(),
 });
-const DiscoverMintsResponse = z.object({
+export const DiscoverMintsResponse = z.object({
   mints: z.array(DiscoverMint).max(10_000),
   profiles: z.record(z.string(), ReviewerProfileInfo).optional(),
 });
+export type DiscoverMintsResponse = z.infer<typeof DiscoverMintsResponse>;
 
-const API_BASE_URL = backendConfig.apiBaseUrl;
 const SCORE_API_BASE_URL = backendConfig.scoreApiBaseUrl;
 
 /**
@@ -156,14 +161,19 @@ const mintReviewsEnrichment = createNostrMintEnrichment({
 });
 // Re-export schema-derived types for callers that previously imported them
 // from this module.
-export type {
-  AuditMintResponseType as AuditMintResponse,
-  MintSearchResult,
-  NostrProfileFullType as NostrProfileFull,
-};
+export type { MintSearchResult, NostrProfileFullType as NostrProfileFull };
 export type { NostrSearchResult } from '@sovranbitcoin/schemas';
 
 type FetchOrParseError = Error | ParseError;
+
+export class ApiHttpError extends Error {
+  constructor(
+    readonly status: number,
+    statusText: string
+  ) {
+    super(`Fetch error: ${status} ${statusText}`);
+  }
+}
 
 function toError(e: FetchOrParseError): Error {
   if (e instanceof Error) return e;
@@ -226,7 +236,7 @@ export async function fetchJson<T>(
     const res = await fetch(url, { ...init, signal });
     if (!res.ok) {
       apiLog.warn('api.fetch_error', { ...route, status: res.status });
-      return err(new Error(`Fetch error: ${res.status} ${res.statusText}`));
+      return err(new ApiHttpError(res.status, res.statusText));
     }
     const raw = await res.json();
     const parsed = parser(raw);
@@ -267,7 +277,6 @@ function describeRoute(url: string): { host: string; path: string } {
 // Parsers — hoisted to module scope to avoid Zod v4 JIT cost on each call.
 // ---------------------------------------------------------------------------
 
-const parseAuditMint = parseWith(AuditMintResponse, 'cashu/mint/audit');
 // nagg v2 serves /nostr/profile as the generic providers envelope: kind-0
 // events in events[], counts under pubkey-keyed aggregates, and float
 // provider payloads (vertex rank/score, nagg firstEventAt, nip05 validity)
@@ -322,7 +331,7 @@ function metadataFields(content: string): Record<string, string> {
   }
 }
 
-const parseNostrProfileFor =
+export const parseNostrProfileFor =
   (pubkey: string) =>
   (input: unknown): Result<NostrProfileFullType, ParseError> => {
     const env = ProfileEnvelope.safeParse(input);
@@ -361,6 +370,8 @@ const parseNostrProfileFor =
 
     const agg = (rule: string, metric: string): number | undefined =>
       aggregates[pubkey]?.[rule]?.[metric];
+    const followers = agg('k3_p_latest', 'actors');
+    const follows = agg('k3_author_latest', 'sources');
     const nip05Valid = prov(pubkey, 'nip05').valid;
     const k0 = k0ByPubkey.get(pubkey);
 
@@ -369,8 +380,10 @@ const parseNostrProfileFor =
       npub: npubOrEmpty(pubkey),
       rank: num(vertex.rank) ?? 0,
       score: num(vertex.score) ?? null,
-      followers: agg('k3_p_latest', 'actors') ?? 0,
-      follows: agg('k3_author_latest', 'sources') ?? 0,
+      vertexFetchedAt: num(vertex.vertexFetchedAt) ?? num(vertex.fetchedAt) ?? null,
+      vertexFresh: typeof vertex.vertexFresh === 'boolean' ? vertex.vertexFresh : null,
+      ...(followers !== undefined ? { followers } : {}),
+      ...(follows !== undefined ? { follows } : {}),
       created_at: num(prov(pubkey, 'nagg').firstEventAt) ?? null,
       nodes: num(vertex.nodes) ?? null,
       topFollowers,
@@ -384,11 +397,36 @@ const parseNostrProfileFor =
     }
     return ok(parsed.data);
   };
-const parseLatestVersion = parseWith(LatestVersionResponse, 'app/latest-version');
+// nagg also returns minVersion, which @sovranbitcoin/schemas 2.2.0 strips.
+// Remove this extension after the shared schema includes it and the app upgrades.
+const NaggLatestVersionResponse = LatestVersionResponse.extend({
+  minVersion: z.string().max(32).optional(),
+});
+const parseLatestVersion = parseWith(NaggLatestVersionResponse, 'app/latest-version');
+// Move this shape into @sovranbitcoin/schemas in its next release and deprecate
+// PricelistWsMessage there. Remove the local schema once the app upgrades.
+const NaggRatesResponse = z.looseObject({
+  rates: z.record(
+    z.string(),
+    z.object({
+      price: z.number().positive(),
+      at: z.number().int(),
+      samples: z.number().int().optional(),
+      sources: z.array(z.string()).optional(),
+      confidence: z.string().optional(),
+    })
+  ),
+  updatedAt: z.number().int(),
+  degraded: z.boolean().optional(),
+});
+const parseRates = parseWith(NaggRatesResponse, 'app/rates');
+export const fetchBtcRates = (controls: RequestControls = {}) =>
+  fetchJson(`${SCORE_API_BASE_URL}/app/rates`, parseRates, 'app/rates', undefined, controls);
+
 const parseAiLineup = parseWith(NaggAiLineupSchema, 'app/ai-lineup');
 const parseDiscoverMints = parseWith(DiscoverMintsResponse, 'nostr/mint/discover');
 const parseMintChanges = parseWith(MintChangesResponse, 'nostr/mint/changes');
-const parseCatalog = parseWith(CatalogResponse, 'wallpapers/catalog');
+const parseCatalog = parseWith(CatalogResponse, 'app/wallpapers');
 
 /**
  * Defensive guard for arbitrary `/v1/info` responses. The full contract
@@ -423,7 +461,7 @@ const parseMintInfo = (input: unknown): Result<GetInfoResponse, ParseError> => {
  * nagg mint discovery: one app-view call returning every known mint with audit
  * state, supported units, review + favourite aggregates, and the operator's
  * Nostr identity + Vertex reputation. Served by nagg (SCORE_API_BASE_URL), so
- * the app no longer needs api.sovran.money's /cashu/mints/search + per-mint
+ * the app no longer needs separate mint search + per-mint
  * review/profile fan-outs for discovery.
  */
 export const discoverMints = ({ limit, signal }: { limit?: number; signal?: AbortSignal } = {}) =>
@@ -453,15 +491,23 @@ export const fetchMintChanges = ({
     { signal }
   );
 
-export const auditMint = ({ mintUrl, signal }: { mintUrl: string; signal?: AbortSignal }) =>
-  fetchJson(
-    `${API_BASE_URL}/cashu/mint/audit?mintUrl=${encodeURIComponent(mintUrl)}`,
-    parseAuditMint,
-    'cashu/mint/audit',
-    undefined,
-    { signal }
-  );
+/** A normalized single-mint lookup; unknown mints return no row. */
+export const discoverMint = async (mintUrl: string, controls?: RequestControls) =>
+  (
+    await fetchJson(
+      `${SCORE_API_BASE_URL}/nostr/mint/discover?mint=${encodeURIComponent(mintUrl)}`,
+      parseDiscoverMints,
+      'nostr/mint/discover',
+      undefined,
+      controls
+    )
+  ).map(({ mints }) => mints[0]);
 
+/**
+ * Reviews for one mint from nagg's REST app-view. Screens read through
+ * `fetchMintReviews` (shared/lib/nostr), which prefers the tiered facade and
+ * falls back to this when no data layer is configured.
+ */
 export const reviewMint = async ({
   mintUrl,
   signal,
@@ -484,7 +530,7 @@ export const getLatestVersion = ({
   signal?: AbortSignal;
 }) =>
   fetchJson(
-    `${API_BASE_URL}/app/latest-version`,
+    `${SCORE_API_BASE_URL}/app/latest-version`,
     parseLatestVersion,
     'app/latest-version',
     {
@@ -497,7 +543,7 @@ export const getLatestVersion = ({
 
 /**
  * nagg-served AI model lineup (see `shared/lib/routstr/lineup.ts` for the
- * schema and precedence rules). Served by nagg, not api.sovran.money, so a
+ * schema and precedence rules). Served by nagg, so a
  * nagg deploy can retune the AI tab on shipped builds.
  */
 export const getAiLineup = (controls: RequestControls = {}) =>
@@ -509,26 +555,34 @@ export const getAiLineup = (controls: RequestControls = {}) =>
     controls
   );
 
-export const fetchNostrProfile = (pubkey: string, controls: RequestControls = {}) =>
+export const fetchNostrProfile = (
+  pubkey: string,
+  controls: RequestControls & { signedVertexRequest?: facade.SignedVertexRequest } = {}
+) =>
   fetchJson(
-    `${SCORE_API_BASE_URL}/nostr/profile?pubkey=${encodeURIComponent(pubkey)}`,
+    `${SCORE_API_BASE_URL}/nostr/profile?pubkey=${encodeURIComponent(pubkey)}${controls.signedVertexRequest ? `&svr=${facade.encodeSignedVertexRequest(controls.signedVertexRequest)}` : ''}`,
     parseNostrProfileFor(pubkey),
     'nostr/profile',
-    undefined,
-    controls
+    controls.signedVertexRequest ? { cache: 'no-store' } : undefined,
+    {
+      ...controls,
+      timeoutMs: controls.timeoutMs ?? (controls.signedVertexRequest ? 20_000 : DEFAULT_TIMEOUT_MS),
+    }
   );
 
 /**
- * Fetches the wallpaper catalog and validates it against the shared Zod schema.
+ * Fetches nagg's app-module wallpaper catalog using the shared Zod schema.
+ * This route does not require nagg's optional Nostr module. wallpaperSync
+ * retains the persisted last catalog when the request or parsing fails.
  * Unknown top-level fields are silently dropped (Postel's Law); a malformed
  * envelope is coerced into an `Error` with the parse-issue count for the
  * UI layer and the detail is logged via `loggableIssues`.
  */
 export const fetchWallpaperCatalog = (controls: RequestControls = {}) =>
   fetchJson(
-    `${API_BASE_URL}/wallpapers/catalog`,
+    `${SCORE_API_BASE_URL}/app/wallpapers`,
     parseCatalog,
-    'wallpapers/catalog',
+    'app/wallpapers',
     undefined,
     controls
   );

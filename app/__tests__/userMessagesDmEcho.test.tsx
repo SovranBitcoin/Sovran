@@ -42,6 +42,7 @@ let mockThreadState: {
     isOwn: boolean;
   }[];
   loading: boolean;
+  hasLoadedOnce: boolean;
   hasMore: boolean;
   loadMore: typeof mockLoadMore;
   refresh: typeof mockRefresh;
@@ -52,6 +53,7 @@ function threadState(overrides: Partial<typeof mockThreadState> = {}): typeof mo
   return {
     messages: [],
     loading: false,
+    hasLoadedOnce: false,
     hasMore: false,
     loadMore: mockLoadMore,
     refresh: mockRefresh,

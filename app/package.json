@@ -26,13 +26,13 @@
     }
   },
   "scripts": {
-    "assets:generate": "node ../scripts/assets.mjs && node ../scripts/feature-graphic.mjs",
-    "assets:check": "node ../scripts/assets.mjs --check && node ../scripts/feature-graphic.mjs --check",
+    "assets:generate": "node ../scripts/assets.mjs && node ../scripts/artwork.mjs --allow-missing",
+    "assets:check": "node ../scripts/assets.mjs --check && node ../scripts/artwork.mjs --check --allow-missing",
     "eas-build-post-install": "node ../scripts/brand-assets.mjs --check",
     "assets:brand": "node ../scripts/brand-assets.mjs",
-    "assets:test": "node --test ../scripts/brand-assets.test.mjs",
+    "assets:test": "node --test ../scripts/brand-assets.test.mjs ../scripts/artwork.test.mjs",
     "start": "expo start --clear 2>&1 | tee log.txt",
-    "dev": "bash scripts/dev.sh",
+    "dev": "bash scripts/start-dev.sh",
     "dev:wda": "bash scripts/start-wda.sh",
     "start:emulator:ios": "expo run:ios",
     "start:emulator:android": "expo run:android",
@@ -87,8 +87,8 @@
     "test:design-system": "jest __tests__/designSystemScenarioSnapshots.test.tsx __tests__/designSystemComponentInventory.test.ts --runInBand",
     "test:release": "node --test ../release/tests/*.test.mjs && python3 -m unittest discover -s ../release/tests -p 'test_*.py'",
     "probe:nagg": "bun features/feed/data/__scripts__/probeNagg.ts",
-    "assets:feature": "node ../scripts/feature-graphic.mjs",
-    "assets:feature:check": "node ../scripts/feature-graphic.mjs --check"
+    "assets:artwork": "node ../scripts/artwork.mjs",
+    "assets:artwork:check": "node ../scripts/artwork.mjs --check"
   },
   "dependencies": {
     "@babel/runtime": "^7.28.0",
@@ -150,7 +150,7 @@
     "expo-symbols": "~56.0.6",
     "expo-system-ui": "~56.0.5",
     "expo-video": "~56.1.4",
-    "heroui-native": "1.0.4",
+    "heroui-native": "1.0.9",
     "liquid-glass-menu": "file:./modules/liquid-glass-menu",
     "liquid-glass-text": "file:./modules/liquid-glass-text",
     "neverthrow": "^8.2.0",

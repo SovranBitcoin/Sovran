@@ -38,6 +38,7 @@ const EXCLUDED: ReadonlySet<string> = new Set([
   'runtime/clearPaymentContext',
   'runtime/dmEchoStore', // DM bodies may be live bearer ecash tokens
   'runtime/legProgress', // factory: instances are created per call, not enumerable
+  'profile/vertexBudgetStore', // factory: one zustand/vanilla store per owner pubkey, not enumerable
 ]);
 
 function storeFiles(): string[] {

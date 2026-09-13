@@ -4,6 +4,8 @@
 
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
+import { ok } from 'neverthrow';
+import { discoverMints } from '@/shared/lib/apiClient';
 
 import { SettingsRecoveryScreen } from '@/features/settings/screens/SettingsRecoveryScreen';
 
@@ -14,7 +16,7 @@ const MINT_URL = 'https://mint.sovran.money';
 // hex chars, because the native CDK creator rejects those outright.
 const KEYSET_A = '00988fbe749ca4d1';
 const KEYSET_B = '00107937db0cc865';
-const mockMints = [{ mintUrl: MINT_URL, mintInfo: { name: 'Sovran Mint' } }];
+let mockMints = [{ mintUrl: MINT_URL, mintInfo: { name: 'Sovran Mint' } }];
 const mockLoadMints = jest.fn(async () => undefined);
 const mockAddMint = jest.fn(async () => ({
   mint: { mintUrl: MINT_URL },
@@ -27,6 +29,18 @@ const mockRestoreKeyset = jest.fn(async () => undefined);
 const mockBalancesByMint = jest.fn(async () => ({ [MINT_URL]: { total: 0 } }));
 const mockListPending = jest.fn(async () => []);
 const mockSetRestoreStatus = jest.fn();
+let mockExperimental = false;
+
+jest.mock('@/shared/stores/global/settingsStore', () => ({
+  useSettingsStore: (selector: (state: { experimental: boolean }) => unknown) =>
+    selector({ experimental: mockExperimental }),
+}));
+jest.mock('@/shared/lib/cashu/nativeOutputDataCreator', () => ({
+  ...jest.requireActual('@/shared/lib/cashu/nativeOutputDataCreator'),
+  isNativeCryptoAvailable: () => true,
+  setNativeCryptoEnabled: jest.fn(),
+}));
+jest.mock('@/shared/lib/cashu/cryptoMicroBench', () => ({ runCryptoMicroBench: jest.fn() }));
 
 jest.mock('@/features/mint', () => ({
   useMintManagement: () => ({ mints: mockMints, loadMints: mockLoadMints }),
@@ -70,7 +84,7 @@ jest.mock('@sovranbitcoin/schemas', () => ({
   parseWith: jest.fn(() => jest.fn()),
 }));
 
-jest.mock('@/shared/lib/apiClient', () => ({ fetchJson: jest.fn() }));
+jest.mock('@/shared/lib/apiClient', () => ({ discoverMints: jest.fn() }));
 jest.mock('@/shared/lib/logger', () => ({
   cashuLog: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
   mintUrlLogFields: jest.fn(() => ({ mintHost: 'mint.example', mintHash: 'mock-hash' })),
@@ -94,9 +108,9 @@ jest.mock('@/shared/lib/color', () => ({
 jest.mock('@/shared/ui/composed/SlideToConfirm', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   return {
-    SlideToConfirm: ({ onConfirm }: { onConfirm: () => Promise<void> }) =>
+    SlideToConfirm: ({ onConfirm, testID }: { onConfirm: () => Promise<void>; testID?: string }) =>
       ReactActual.createElement('MockSlideToConfirm', {
-        testID: 'start-recovery',
+        testID,
         onConfirm,
       }),
   };
@@ -146,8 +160,14 @@ jest.mock('assets/icons', () => ({ __esModule: true, default: () => null }));
 jest.mock('heroui-native', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   const Button = Object.assign(
-    ({ children, onPress }: React.PropsWithChildren<{ onPress?: () => void }>) =>
-      ReactActual.createElement('MockButton', { onPress }, children),
+    ({
+      children,
+      ...props
+    }: React.PropsWithChildren<{
+      onPress?: () => void;
+      testID?: string;
+      isDisabled?: boolean;
+    }>) => ReactActual.createElement('MockButton', props, children),
     {
       Label: ({ children }: React.PropsWithChildren) =>
         ReactActual.createElement('MockButtonLabel', null, children),
@@ -161,12 +181,18 @@ jest.mock('heroui-native', () => {
         ReactActual.createElement('MockCardBody', null, children),
     }
   );
-  return { Button, Card, Switch: () => null };
+  return {
+    Button,
+    Card,
+    Switch: (props: Record<string, unknown>) => ReactActual.createElement('MockSwitch', props),
+  };
 });
 
 describe('SettingsRecoveryScreen gate confirmation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockExperimental = false;
+    mockMints = [{ mintUrl: MINT_URL, mintInfo: { name: 'Sovran Mint' } }];
     // clearAllMocks does not drop implementations, so a persistent
     // mockRejectedValue in one test would silently leak into the next.
     mockRestoreKeyset.mockReset();
@@ -181,6 +207,124 @@ describe('SettingsRecoveryScreen gate confirmation', () => {
     });
   });
 
+  it.each([
+    [false, false, false],
+    [true, false, true],
+    [true, true, false],
+    [false, true, false],
+  ])(
+    'experimental=%s, gateMode=%s shows developer controls=%s',
+    async (experimental, gateMode, visible) => {
+      mockExperimental = experimental;
+      let renderer: TestRenderer.ReactTestRenderer;
+      await act(async () => {
+        renderer = TestRenderer.create(<SettingsRecoveryScreen gateMode={gateMode} />);
+      });
+      for (const testID of ['recovery-native-crypto-toggle', 'recovery-benchmark']) {
+        expect(renderer!.root.findAllByProps({ testID }).length > 0).toBe(visible);
+      }
+      expect(
+        renderer!.root.findAllByProps({ testID: 'recovery-search-all-toggle' }).length
+      ).toBeGreaterThan(0);
+      const texts = renderer!.root
+        .findAll((node) => node.type === ('MockText' as unknown))
+        .map((node) => node.props.children);
+      expect(texts).toContain(gateMode ? 'Welcome back' : 'Recover ecash');
+      expect(renderer!.root.findAllByProps({ testID: 'recovery-cancel' }).length > 0).toBe(
+        !gateMode
+      );
+      await act(async () => renderer!.unmount());
+    }
+  );
+
+  it('disables Continue when every mint was skipped with zero successes', async () => {
+    mockAddMint.mockResolvedValueOnce({
+      mint: { mintUrl: MINT_URL },
+      keysets: [{ id: 'legacy-keyset', unit: 'sat' }],
+    });
+    const onComplete = jest.fn();
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(<SettingsRecoveryScreen gateMode onComplete={onComplete} />);
+    });
+    await act(async () => {
+      await renderer!.root.findByProps({ testID: 'recovery-swipe' }).props.onConfirm();
+    });
+    const button = renderer!.root.findByProps({ testID: 'recovery-continue' });
+    expect(button.props.isDisabled).toBe(true);
+    expect(button.props.onPress).toBeUndefined();
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(mockRestoreKeyset).not.toHaveBeenCalled();
+  });
+
+  it('allows Continue when discovery finishes with no mints holding history', async () => {
+    mockMints = [];
+    jest.mocked(discoverMints).mockResolvedValueOnce(
+      ok({
+        mints: [
+          {
+            mintUrl: 'https://discovered.example',
+            hasAudit: true,
+            state: 'OK',
+            averageScore: null,
+            reviewCount: 0,
+          },
+        ],
+      })
+    );
+    const onComplete = jest.fn();
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(<SettingsRecoveryScreen gateMode onComplete={onComplete} />);
+    });
+    await act(async () => {
+      renderer!.root
+        .findByProps({ testID: 'recovery-search-all-toggle' })
+        .props.onSelectedChange(true);
+    });
+    await act(async () => {
+      await renderer!.root.findByProps({ testID: 'recovery-swipe' }).props.onConfirm();
+    });
+    const button = renderer!.root.findByProps({ testID: 'recovery-continue' });
+    expect(button.props.isDisabled).toBe(false);
+    await act(async () => {
+      button.props.onPress();
+    });
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(mockAddMint).not.toHaveBeenCalled();
+    await act(async () => renderer!.unmount());
+  });
+
+  it('never completes a cancelled run, even when the mint in flight succeeds', async () => {
+    let release: () => void = () => {};
+    mockRestoreKeyset.mockImplementationOnce(
+      () => new Promise<undefined>((resolve) => (release = () => resolve(undefined)))
+    );
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(<SettingsRecoveryScreen />);
+    });
+    let run: Promise<void>;
+    await act(async () => {
+      run = renderer!.root.findByProps({ testID: 'recovery-swipe' }).props.onConfirm();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      renderer!.root.findByProps({ testID: 'recovery-stop' }).props.onPress();
+    });
+    await act(async () => {
+      release();
+      await run!;
+    });
+    expect(renderer!.root.findAllByProps({ testID: 'recovery-continue' })).toHaveLength(0);
+    expect(renderer!.root.findByProps({ testID: 'recovery-swipe' })).toBeDefined();
+    const texts = renderer!.root
+      .findAll((node) => node.type === ('MockText' as unknown))
+      .map((node) => node.props.children);
+    expect(texts).toContain('Recovery stopped');
+    expect(texts).not.toContain('Recovery Complete');
+  });
+
   it('keeps Recovery Complete visible until the user presses Continue', async () => {
     const onComplete = jest.fn();
     let renderer: TestRenderer.ReactTestRenderer;
@@ -189,7 +333,7 @@ describe('SettingsRecoveryScreen gate confirmation', () => {
     });
 
     await act(async () => {
-      await renderer!.root.findByProps({ testID: 'start-recovery' }).props.onConfirm();
+      await renderer!.root.findByProps({ testID: 'recovery-swipe' }).props.onConfirm();
     });
 
     // Every keyset the mint advertises is restored individually — that is what
@@ -225,7 +369,7 @@ describe('SettingsRecoveryScreen gate confirmation', () => {
       renderer = TestRenderer.create(<SettingsRecoveryScreen gateMode onComplete={jest.fn()} />);
     });
     await act(async () => {
-      await renderer!.root.findByProps({ testID: 'start-recovery' }).props.onConfirm();
+      await renderer!.root.findByProps({ testID: 'recovery-swipe' }).props.onConfirm();
     });
 
     expect(mockSetRestoreStatus).not.toHaveBeenCalled();
@@ -239,7 +383,7 @@ describe('SettingsRecoveryScreen gate confirmation', () => {
       renderer = TestRenderer.create(<SettingsRecoveryScreen gateMode onComplete={jest.fn()} />);
     });
     await act(async () => {
-      await renderer!.root.findByProps({ testID: 'start-recovery' }).props.onConfirm();
+      await renderer!.root.findByProps({ testID: 'recovery-swipe' }).props.onConfirm();
     });
 
     // A failed known mint must NOT report as a clean recovery. This used to be
@@ -263,7 +407,7 @@ describe('SettingsRecoveryScreen gate confirmation', () => {
       renderer = TestRenderer.create(<SettingsRecoveryScreen gateMode onComplete={jest.fn()} />);
     });
     await act(async () => {
-      await renderer!.root.findByProps({ testID: 'start-recovery' }).props.onConfirm();
+      await renderer!.root.findByProps({ testID: 'recovery-swipe' }).props.onConfirm();
     });
 
     const texts = renderer!.root
@@ -289,7 +433,7 @@ describe('SettingsRecoveryScreen gate confirmation', () => {
       renderer = TestRenderer.create(<SettingsRecoveryScreen gateMode onComplete={jest.fn()} />);
     });
     await act(async () => {
-      await renderer!.root.findByProps({ testID: 'start-recovery' }).props.onConfirm();
+      await renderer!.root.findByProps({ testID: 'recovery-swipe' }).props.onConfirm();
     });
 
     // Only the valid keyset is attempted, and the mint still succeeds.
@@ -319,7 +463,7 @@ describe('SettingsRecoveryScreen gate confirmation', () => {
       renderer = TestRenderer.create(<SettingsRecoveryScreen gateMode onComplete={jest.fn()} />);
     });
 
-    const start = renderer!.root.findByProps({ testID: 'start-recovery' }).props
+    const start = renderer!.root.findByProps({ testID: 'recovery-swipe' }).props
       .onConfirm as () => Promise<void>;
     let first: Promise<void>;
     await act(async () => {

@@ -34,6 +34,7 @@ function makeRow(
     key: item.repostEvent.id,
     item,
     metrics: METRICS,
+    metricsKnown: true,
     engagement: ENGAGEMENT,
     profiles: new Map<string, ProfileInfo>(),
     quotedEvents: new Map<string, FeedEvent>(),

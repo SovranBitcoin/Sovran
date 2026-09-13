@@ -1,4 +1,5 @@
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { ModeratedDmBubble } from '../components/ModeratedDmBubble';
 /**
  * @fileoverview Direct Messages screen
@@ -105,15 +106,14 @@ export function UserMessagesScreen({
   // Counterparty kind-0 metadata is served from the shared SWR cache. First
   // open of a conversation per session pays one round-trip; subsequent opens
   // are instant (the cache is shared across surfaces + persisted).
-  const { metadata: counterpartyMetadata } = useNostrProfileMetadata(
-    isFictionalContact && !mockMode ? undefined : pubkey
-  );
+  const { metadata: counterpartyMetadata, isResolving: counterpartyResolving } =
+    useNostrProfileMetadata(isFictionalContact && !mockMode ? undefined : pubkey);
 
   // Shared inbox history, filtered locally to this peer and protocol. Mock threads serve
   // from local state, so the hook is disabled with an empty counterparty.
   const {
     messages: threadMessages,
-    loading: threadLoading,
+    status: threadStatus,
     hasMore,
     loadMore,
     refresh,
@@ -153,7 +153,8 @@ export function UserMessagesScreen({
 
   // Pull anything that landed while we were away (incoming arrives on nagg's
   // next index, not via a live sub). Skip the first focus — the hook already
-  // fetched on mount — and only re-fetch on RE-focus.
+  // fetched on mount — and only re-fetch on RE-focus. The refresh keeps the
+  // current messages on screen (status 'revalidating'); it never re-skeletons.
   const focusedOnceRef = useRef(false);
   useFocusEffect(
     useCallback(() => {
@@ -182,7 +183,10 @@ export function UserMessagesScreen({
     return [...server, ...pending].sort((a, b) => a.created_at - b.created_at);
   }, [isMockThread, threadMessages, localMessages, demoMessages]);
 
-  const isLoading = !isMockThread && threadLoading && messages.length === 0;
+  // Skeleton only on a true cold start: nothing cached, nothing seeded, first
+  // page still in flight. A snapshot or a refresh paints/keeps the rows.
+  const isLoading = !isMockThread && threadStatus === 'loading' && messages.length === 0;
+  const threadSettled = threadStatus === 'ready' || threadStatus === 'error';
 
   const displayName = resolveIdentityName({ pubkey, nostrProfile: counterpartyMetadata });
   const userPicture = counterpartyMetadata?.picture;
@@ -221,7 +225,7 @@ export function UserMessagesScreen({
   const counterpartyAvatar = useMemo(
     () => (
       <Avatar
-        state={userPicture ? 'image' : 'fallback'}
+        state={avatarStateFor(userPicture, !counterpartyResolving)}
         size={32}
         picture={userPicture}
         seed={pubkey}
@@ -477,6 +481,7 @@ export function UserMessagesScreen({
         composerActions={
           !blocked && !isFictionalContact && sendMoneyTarget ? (
             <Button
+              testID="dm-send-money"
               text="Send money"
               variant="primary"
               size="compact"
@@ -487,20 +492,23 @@ export function UserMessagesScreen({
         }
         counterpartyAvatar={counterpartyAvatar}
         isLoading={isLoading}
-        loadingContent={
-          <Text size={16} style={{ color: shade400, textAlign: 'center', paddingTop: 50 }}>
-            Loading messages...
-          </Text>
-        }
         emptyContent={
-          <View className="items-center gap-3 px-6 py-8">
-            <Text size={16} style={{ color: shade400, textAlign: 'center' }}>
-              {threadError ? "Couldn't load your message history." : 'No messages yet.'}
-            </Text>
-            {threadError && (
-              <Button text="Try again" variant="secondary" size="compact" onPress={refresh} />
-            )}
-          </View>
+          threadSettled && messages.length === 0 ? (
+            <View className="items-center gap-3 px-6 py-8">
+              <Text size={16} style={{ color: shade400, textAlign: 'center' }}>
+                {threadError ? "Couldn't load your message history." : 'No messages yet.'}
+              </Text>
+              {threadError && (
+                <Button
+                  testID="dm-history-retry"
+                  text="Try again"
+                  variant="secondary"
+                  size="compact"
+                  onPress={refresh}
+                />
+              )}
+            </View>
+          ) : null
         }
         historyExtras={(last) => ({
           lastIsOwn: last?.isOwn ?? null,

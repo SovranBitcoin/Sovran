@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "id": "profile.switcher",
+  "name": "Scroll and dismiss the profile switcher",
+  "description": "Open the drawer profile switcher, swipe inside its viewport, and verify the create control remains reachable before dismissal.",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"tap","selector":{"id":"header-profile-avatar"}},
+    {"action":"waitFor","selector":{"id":"drawer-profile-switcher-open"}},
+    {"action":"tap","selector":{"id":"drawer-profile-switcher-open"}},
+    {"action":"waitFor","selector":{"id":"action-menu-presented"}},
+    {"action":"waitFor","selector":{"id":"action-menu-viewport"}},
+    {"action":"drag","selector":{"id":"action-menu-viewport"},"from":{"x":0.5,"y":0.85},"to":{"x":0.5,"y":0.2},"durationMs":400},
+    {"action":"assert","that":"visible","selector":{"id":"profile-create"}},
+    {"action":"screenshot","name":"profile-switcher"},
+    {"action":"tapAt","x":0.5,"y":0.12},
+    {"action":"assert","that":"notVisible","selector":{"id":"action-menu-viewport"},"timeoutMs":5000}
+  ],
+  "verify": [
+    {"action":"assert","that":"notVisible","selector":{"id":"profile-create"}}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

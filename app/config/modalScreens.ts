@@ -160,6 +160,7 @@ const flowGroups = [
   '(receive-flow)',
   '(send-flow)',
   '(transactions-flow)',
+  '(prompt-flow)',
   '(mint-flow)',
   '(filter-flow)',
   '(map-flow)',

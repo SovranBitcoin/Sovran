@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { NostrTier } from '@sovranbitcoin/schemas';
 import type { NaggFeedEvent } from '../map/feed';
 import type { RequestControls } from '../timeout';
-import type { TierOutcome } from '../tiers';
+import type { ReadProvenance, TierOutcome } from '../tiers';
 
 // ---------------------------------------------------------------------------
 // Mint-favourites surface — NIP-87 cashu mint reviews
@@ -77,6 +77,8 @@ export type MintReviewsRequest = RequestControls & {
   mintUrl: string;
   limit?: number;
   refresh?: boolean;
+  /** Aggregate reads: later tiers' reviews are merged in and delivered here (see SearchRequest.onUpdate). */
+  onUpdate?: (resolved: ResolvedMintReviews) => void;
 };
 
 export type DiscoverMintsRequest = RequestControls & {
@@ -86,7 +88,7 @@ export type DiscoverMintsRequest = RequestControls & {
   refresh?: boolean;
 };
 
-export type ResolvedMintReviews = { tier: NostrTier } & MintReviewsSummary;
+export type ResolvedMintReviews = { tier: NostrTier; provenance?: ReadProvenance } & MintReviewsSummary;
 export type ResolvedDiscoveredMints = { tier: NostrTier; mints: DiscoveredMint[] };
 
 export interface MintReviewsTier {

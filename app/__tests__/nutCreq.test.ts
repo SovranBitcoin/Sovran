@@ -2,6 +2,8 @@
  * @jest-environment node
  */
 
+import { decodePaymentRequest } from '@cashu/cashu-ts';
+
 import {
   cashuP2pkPubkeyFromNostrHex,
   nostrPubkeyHexFromCashuP2pk,
@@ -87,4 +89,9 @@ describe('lockableMintsFromCreq capability gate', () => {
     expect(lockableMintsFromCreq(undefined, NOSTR_HEX)).toBeNull();
     expect(lockableMintsFromCreq(creq, undefined)).toBeNull();
   });
+});
+
+it('keeps NutDrop strict by default and preserves an explicit mint preference', () => {
+  const strict = buildStandingCreq({ mints: MINTS, pubkey33: PUBKEY_33 })!;
+  expect(decodePaymentRequest(strict).mintsPreferred).toBeUndefined();
 });

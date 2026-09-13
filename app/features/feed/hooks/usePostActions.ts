@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 
-import { actionMenuPopup } from '@/shared/lib/popup';
+import { actionMenuPopup, replaceActionMenuPopup } from '@/shared/lib/popup';
 import { buildShareLinks } from '@/shared/lib/nostr/njump';
 import { getOwnWriteRelays } from '@/shared/lib/nostr/outbox/relayListStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
@@ -32,11 +32,12 @@ export function usePostActions(options?: {
       const isAuthor = !!myPubkey && event.pubkey.toLowerCase() === myPubkey.toLowerCase();
       // Confirm before the irreversible kind:5 broadcast.
       const confirmDelete = (): void => {
-        actionMenuPopup({
+        replaceActionMenuPopup({
           title: 'Delete post?',
           buttons: [
             {
               text: 'Delete',
+              testID: 'post-delete-confirm',
               icon: 'mdi:trash-can-outline',
               variant: 'dangerous',
               description: 'Requests deletion from all relays. Some may keep a copy.',
@@ -112,6 +113,7 @@ export function usePostActions(options?: {
                 text: 'Report post',
                 icon: 'material-symbols:report-rounded' as const,
                 keepOpen: true,
+                testID: 'post-report',
                 onPress: () => report(event.pubkey, event.id),
               },
             ]

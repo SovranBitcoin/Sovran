@@ -3,10 +3,9 @@ import { parseBackendConfig } from '@/shared/config/backend';
 describe('backend config', () => {
   it('defaults Nostr app-view, score, and GraphQL calls when env is unset', () => {
     expect(parseBackendConfig({})).toEqual({
-      nostrAppViewBaseUrl: 'https://nagg-mint-production.up.railway.app',
-      apiBaseUrl: 'https://api.sovran.money/api',
-      scoreApiBaseUrl: 'https://nagg-mint-production.up.railway.app',
-      nostrGraphqlEndpoint: 'https://nagg-mint-production.up.railway.app/graphql',
+      nostrAppViewBaseUrl: 'https://nagg.up.railway.app',
+      scoreApiBaseUrl: 'https://nagg.up.railway.app',
+      nostrGraphqlEndpoint: 'https://nagg.up.railway.app/graphql',
       primalCacheUrl: 'wss://cache2.primal.net/v1',
     });
   });
@@ -15,13 +14,11 @@ describe('backend config', () => {
     expect(
       parseBackendConfig({
         EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL: 'http://localhost:8080/',
-        EXPO_PUBLIC_API_BASE_URL: 'https://api.example.test/api/',
         EXPO_PUBLIC_SCORE_API_BASE_URL: 'http://localhost:8080/',
         EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT: 'http://localhost:8081/graphql/',
       })
     ).toEqual({
       nostrAppViewBaseUrl: 'http://localhost:8080',
-      apiBaseUrl: 'https://api.example.test/api',
       scoreApiBaseUrl: 'http://localhost:8080',
       nostrGraphqlEndpoint: 'http://localhost:8081/graphql',
       primalCacheUrl: 'wss://cache2.primal.net/v1',
@@ -32,7 +29,6 @@ describe('backend config', () => {
     expect(
       parseBackendConfig({
         EXPO_PUBLIC_NAGG_BASE_URL: 'https://legacy-nagg.example.test',
-        EXPO_PUBLIC_API_BASE_URL: 'https://api.example.test/api',
       })
     ).toMatchObject({
       nostrAppViewBaseUrl: 'https://legacy-nagg.example.test',
@@ -44,7 +40,6 @@ describe('backend config', () => {
     expect(
       parseBackendConfig({
         EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL: 'https://nostr-index.example.test',
-        EXPO_PUBLIC_API_BASE_URL: 'https://api.example.test/api',
       }).scoreApiBaseUrl
     ).toBe('https://nostr-index.example.test');
   });

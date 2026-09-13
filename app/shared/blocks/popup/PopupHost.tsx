@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Log } from '@/shared/lib/logger';
-import { scheduleAfterLayout } from '@/shared/lib/scheduleAfterLayout';
+import { Log, log } from '@/shared/lib/logger';
 import {
   Keyboard,
   Platform,
@@ -47,6 +46,7 @@ import { NostrKeysContextBridge, useNostrKeysContext } from '@/shared/providers/
 import { alpha } from '@/shared/styles/tokens';
 import { ActionMenuSheetContent } from '@/shared/lib/popup/popups/actionMenuSheet';
 import { markE2EActionMenuPresented } from '@/shared/lib/popup/E2EActionMenuProbe';
+import { OPEN_WATCHDOG_MS } from '@/shared/lib/popup/openWatchdog';
 import { E2EStaticToastRenderMarker } from '@/shared/lib/popup/E2EToastProbe';
 import { EmojiPickerContent } from '@/shared/lib/popup/popups/emojiPicker';
 import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
@@ -439,6 +439,8 @@ function SheetActionButton({
   );
 }
 
+const popupHostLog = log.child({ module: 'popupHost' });
+
 function SheetPopup() {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
@@ -505,47 +507,47 @@ function SheetPopup() {
   // height-override props are no-ops). So we mount the BottomSheet only while a
   // popup is live, and unmount it once the exit animation settles.
   //
-  // `renderedOpen` lags the store's `isOpen` by a frame on open: heroui only
-  // snaps the sheet open on a false->true `isOpen` transition, so a freshly
-  // mounted sheet must commit closed first, then flip open. Mounting it already
-  // open would skip the snap and the sheet would never appear.
+  // Every open() nonce (openSeq) gets a FRESH gorhom instance (see the `key`
+  // on <BottomSheet> below) that mounts already open: gorhom's animate-on-
+  // mount waits for its own layout pass, so there is no frame-count guess and
+  // no partial-height snap. A sheet natively torn down without store.close()
+  // (route navigation ripping the FullWindowOverlay) leaves isOpen stuck
+  // true; keying on the nonce still remounts on the next open(), so a later
+  // open() is never a silent no-op (the amount screen's dead Next).
   const [mounted, setMounted] = useState(false);
-  const [renderedOpen, setRenderedOpen] = useState(false);
-  // True while a presentation is being forced through its rendered-closed
-  // frame. Close reports that gorhom emits during that window are the
-  // re-present itself settling, not user intent — handleOpenChange must not
-  // route them into store.close() or they'd cancel the presentation.
-  const representingRef = useRef(false);
+  const [presentAttempt, setPresentAttempt] = useState(0);
+  const [presented, setPresented] = useState(false);
   useEffect(() => {
     if (isOpen) {
       setMounted(true);
-      // Present on every open() nonce (openSeq), not just on isOpen edges: a
-      // sheet natively torn down without store.close() — route navigation
-      // ripping the FullWindowOverlay, heroui's measure/snap race — leaves
-      // isOpen stuck true, and an edge-only present turns every later open()
-      // into a silent no-op (the amount screen's dead Next). Committing
-      // closed first, then flipping open after a layout pass (so gorhom has
-      // measured the content — opening on the next tick races the
-      // measurement and the sheet snaps to a partial height), forces
-      // heroui's false→true snap in both the fresh and the stuck case.
-      representingRef.current = true;
-      setRenderedOpen(false);
-      const cancel = scheduleAfterLayout(() => {
-        representingRef.current = false;
-        setRenderedOpen(true);
-      });
-      return () => {
-        cancel();
-        representingRef.current = false;
-      };
+      setPresentAttempt(0);
+      setPresented(false);
+      return;
     }
-    representingRef.current = false;
-    setRenderedOpen(false);
     // Unmount after heroui's exit animation lands (~300ms) — matches the
     // lastPayload cache window above.
     const unmountTimer = setTimeout(() => setMounted(false), 400);
     return () => clearTimeout(unmountTimer);
   }, [isOpen, openSeq]);
+
+  // Watchdog for gorhom #2690 / #2719: under JS contention at mount the
+  // sheet's reanimated reactions can die, leaving it parked at -1 with no
+  // onAnimate. Only a remount recovers, so retry once, then release the
+  // request — same policy as ActionMenuHost.
+  useEffect(() => {
+    if (!isOpen || !mounted || presented) return;
+    const watchdog = setTimeout(() => {
+      if (usePopupStore.getState().openSeq !== openSeq) return;
+      popupHostLog.warn('popupHost.open_stalled', {
+        openSeq,
+        attempt: presentAttempt,
+        budgetMs: OPEN_WATCHDOG_MS,
+      });
+      if (presentAttempt === 0) setPresentAttempt(1);
+      else close(openSeq);
+    }, OPEN_WATCHDOG_MS);
+    return () => clearTimeout(watchdog);
+  }, [isOpen, mounted, presented, openSeq, presentAttempt, close]);
 
   const payload = current ?? lastPayload;
   const isCustom = isCustomSheetPayload(payload);
@@ -722,9 +724,6 @@ function SheetPopup() {
 
   const handleOpenChange = (open: boolean) => {
     if (!open && isOpen) {
-      // A close reported during a forced re-present is the transient
-      // rendered-closed frame settling, not a user dismissal.
-      if (representingRef.current) return;
       Keyboard.dismiss();
       scopedClose();
     }
@@ -790,6 +789,7 @@ function SheetPopup() {
                 return (
                   <Button
                     key={`${button.label}-${index}`}
+                    testID={button.testID}
                     variant={variant}
                     onPress={button.onPress}
                     className={className}
@@ -811,7 +811,10 @@ function SheetPopup() {
   if (destroyed || !mounted) return null;
 
   return (
-    <BottomSheet isOpen={renderedOpen} onOpenChange={handleOpenChange}>
+    <BottomSheet
+      key={`${openSeq}:${presentAttempt}`}
+      isOpen={isOpen}
+      onOpenChange={handleOpenChange}>
       <BottomSheet.Portal disableFullWindowOverlay={Platform.OS === 'android'}>
         <NostrKeysContextBridge value={nostrKeysContextValue}>
           <BottomSheet.Overlay
@@ -821,6 +824,13 @@ function SheetPopup() {
           />
           <BottomSheet.Content
             accessible={false}
+            // Patched prop (patches/heroui-native+1.0.9.patch): forwarded to
+            // gorhom `index` so the freshly keyed sheet mounts open and gorhom
+            // animates it up once its layout is calculated.
+            mountIndex={0}
+            onAnimate={(_from, to) => {
+              if (to >= 0) setPresented(true);
+            }}
             onChange={handleNativeSheetChange}
             onClose={handleNativeSheetClose}
             detached={!isCustom}
@@ -890,7 +900,7 @@ function SheetPopup() {
               // option".
               customContentContainerClassName
             }
-            // Patched flag (see patches/heroui-native+1.0.2.patch): snap-point
+            // Patched flag (see patches/heroui-native+1.0.9.patch): snap-point
             // custom sheets use a plain RN `View` so their nested
             // gorhom-registered scrollables stay active. Content-height sheets
             // must keep `BottomSheetView`; it is the wrapper that reports
@@ -928,6 +938,7 @@ function SheetPopup() {
                       return (
                         <Button
                           key={`${button.label}-${index}`}
+                          testID={button.testID}
                           variant={variant}
                           className={getSheetButtonClassName(variant)}
                           onPress={button.onPress}

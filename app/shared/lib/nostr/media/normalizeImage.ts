@@ -65,9 +65,12 @@ async function reencode(uri: string, target: Target): Promise<ImageResult> {
  * animated/other formats are returned unchanged.
  */
 export function normalizeImageAsset(
-  asset: PickedAsset
+  asset: PickedAsset,
+  forceReencode = false
 ): ResultAsync<PickedAsset, NormalizeImageError> {
-  const target = reencodeTarget(asset);
+  // Avatars must never pass original bytes through, including GIF comments or
+  // an unrecognized format. PNG preserves alpha when flattening those images.
+  const target = reencodeTarget(asset) ?? (forceReencode ? PNG_TARGET : null);
   if (!target) return okAsync(asset);
 
   return ResultAsync.fromPromise(reencode(asset.uri, target), () => {

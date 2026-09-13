@@ -88,7 +88,7 @@
 
 import { useSyncExternalStore } from 'react';
 import type React from 'react';
-import type { GestureResponderEvent } from 'react-native';
+import type { TextInputProps } from 'react-native';
 
 import { log } from '@/shared/lib/logger';
 
@@ -121,11 +121,12 @@ export interface ActionMenuItem {
   suffix?: React.ReactNode;
   /**
    * Skip the host's automatic dismiss after onPress. Use when chaining to another
-   * menu via `actionMenuPopup` so the surface swaps content instead of closing.
+   * menu via `replaceActionMenuPopup` so the surface swaps content instead of closing.
    */
   keepOpen?: boolean;
   /**
-   * Receives a close callback; if omitted the menu closes immediately.
+   * Receives close(afterClose?) to queue a successor until native close completes.
+   * Unless keepOpen is set, the host starts closing before invoking onPress.
    *
    * Race note: tapping a button commits the host's "user picked" flag
    * synchronously, before this `onPress` resolves. If the user then taps
@@ -135,7 +136,7 @@ export interface ActionMenuItem {
    * "user explicitly dismissed mid-action" handling into the body of
    * `onPress` itself rather than relying on `onDismiss`.
    */
-  onPress?: (close: (event?: GestureResponderEvent) => void) => void | Promise<void>;
+  onPress?: (close: (afterClose?: () => void) => void) => void | Promise<void>;
 }
 
 export interface ActionMenuInput {
@@ -146,6 +147,7 @@ export interface ActionMenuInput {
   secureTextEntry?: boolean;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   autoCorrect?: boolean;
+  keyboardType?: TextInputProps['keyboardType'];
   /** Optional helper text rendered above the input (e.g. context for the field). */
   description?: string;
 }
@@ -202,7 +204,7 @@ interface ActionMenuSearchable {
   renderResults?: (query: string) => React.ReactNode | null;
 }
 
-interface ActionMenuPayload {
+export interface ActionMenuPayload {
   /** Rendered as `Menu.Label` at the top of the sheet. */
   title?: string;
   /** Custom content rendered between the title and any items / inputs. */
@@ -244,7 +246,12 @@ interface ActionMenuPayload {
   onDismiss?: () => void;
 }
 
-let currentPayload: ActionMenuPayload | null = null;
+interface ActionMenuSnapshot {
+  payload: ActionMenuPayload | null;
+  seq: number;
+}
+
+let snapshot: ActionMenuSnapshot = { payload: null, seq: 0 };
 const listeners = new Set<() => void>();
 
 function emit(): void {
@@ -254,8 +261,7 @@ function emit(): void {
 /** Open the action menu with the given payload. */
 export function actionMenuPopup(payload: ActionMenuPayload): void {
   actionMenuLog.info('actionMenu.dispatch', {
-    title: payload.title,
-    hadPayload: currentPayload !== null,
+    hadPayload: snapshot.payload !== null,
     sections: payload.sections?.length ?? 0,
     buttons: payload.buttons?.length ?? 0,
     footerButtons: payload.footerButtons?.length ?? 0,
@@ -264,15 +270,21 @@ export function actionMenuPopup(payload: ActionMenuPayload): void {
     snapPoint: payload.snapPoint,
     listeners: listeners.size,
   });
-  currentPayload = payload;
+  snapshot = { payload, seq: snapshot.seq + 1 };
+  emit();
+}
+
+/** Replace a keepOpen menu in place, preserving its native presentation. */
+export function replaceActionMenuPopup(payload: ActionMenuPayload): void {
+  snapshot = { payload, seq: snapshot.seq };
   emit();
 }
 
 /** Dismiss the menu programmatically (the host also dismisses on overlay tap / swipe). */
 export function dismissActionMenuPopup(): void {
-  if (currentPayload === null) return;
-  actionMenuLog.info('actionMenu.dismiss', { title: currentPayload.title });
-  currentPayload = null;
+  if (snapshot.payload === null) return;
+  actionMenuLog.info('actionMenu.dismiss');
+  snapshot = { payload: null, seq: snapshot.seq };
   emit();
 }
 
@@ -283,11 +295,12 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
-function getSnapshot(): ActionMenuPayload | null {
-  return currentPayload;
+/** Read at native/async callback time so an old instance cannot dismiss a new request. */
+export function getActionMenuSnapshot(): ActionMenuSnapshot {
+  return snapshot;
 }
 
 /** Hook used by `<ActionMenuHost />` to read the current payload. */
-export function useActionMenuPayload(): ActionMenuPayload | null {
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+export function useActionMenuPayload(): ActionMenuSnapshot {
+  return useSyncExternalStore(subscribe, getActionMenuSnapshot, getActionMenuSnapshot);
 }

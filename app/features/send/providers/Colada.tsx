@@ -512,6 +512,11 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     () =>
       ({
         ...instance.operations,
+        switchUnit: (unit: string) => {
+          if (unit === 'sat' || unit === 'usd' || unit === 'eur' || unit === 'gbp') {
+            useMintStore.getState().setActiveUnit(unit);
+          }
+        },
         executeReceive: createSovranExecuteReceive(getManager, getOffline),
         executeMintQuote: createSovranExecuteMintQuote(getManager),
         // Stage 2 of recipient resolution: hex pubkey → Nostr kind-0 profile.

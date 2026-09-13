@@ -3,7 +3,10 @@
   "name": "full",
   "defaultEndState": "wallet",
   "scenarios": [
+    {"id":"backup.flow","file":"scenarios/backup-flow.json","order":17,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"cta.preview","file":"scenarios/cta-preview.json","order":16,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"onboarding.fresh","file":"scenarios/onboarding-fresh.json","order":10,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"transactions.filters","file":"scenarios/transactions-filters.json","order":11,"newInstance":false,"lane":"simulator","requires":[],"endState":"wallet"},
     {"id":"onboarding.terms-gate","file":"scenarios/onboarding-terms-gate.json","order":12,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"onboarding.relaunch-interrupt","file":"scenarios/onboarding-relaunch-interrupt.json","order":14,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"recovery.reinstall","file":"scenarios/recovery-reinstall.json","order":20,"newInstance":false,"lane":"simulator","requires":["fresh-install","reinstall.keychain-retention"],"endState":"wallet"},
@@ -82,6 +85,7 @@
     {"id":"ai.history.empty","file":"scenarios/ai-history-empty.json","order":386,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"ai.model.picker","file":"scenarios/ai-model-picker.json","order":388,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"social.empty-states","file":"scenarios/social-empty-states.json","order":384,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"profile.switcher","file":"scenarios/profile-switcher.json","order":383,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"profile.switch.create","file":"scenarios/profile-switch-create.json","order":385,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"theme.wallpaper.apply","file":"scenarios/theme-wallpaper-apply.json","order":390,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"send.mock-fail.ecash","file":"scenarios/send-mock-fail-ecash.json","order":400,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.bolt11","cocod.receive.cashu","unit.sat"],"endState":"wallet"},
@@ -131,6 +135,14 @@
     {"id":"wallet.location.permission","file":"scenarios/wallet-location-permission.json","order":560,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"store.screenshots","file":"scenarios/store-screenshots.json","order":9990,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"settings.moderation.filter","file":"scenarios/settings-moderation-filter.json","order":570,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
-    {"id":"settings.legal.navigate","file":"scenarios/settings-legal-navigate.json","order":580,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"}
+    {"id":"settings.legal.navigate","file":"scenarios/settings-legal-navigate.json","order":580,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"recovery.secure-locked","file":"scenarios/secure-locked.json","order":590,"newInstance":true,"lane":"physical","requires":[],"endState":"onboarding"},
+    {"id":"recovery.profile-keys-error","file":"scenarios/profile-keys-error.json","order":600,"newInstance":true,"lane":"physical","requires":[],"endState":"onboarding"},
+    {"id":"marketing.screenshots","file":"scenarios/marketing-screenshots.json","order":10000,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"marketing.screenshots.wallpapers","file":"scenarios/marketing-screenshots-wallpapers.json","order":10001,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"marketing.screenshots.mints","file":"scenarios/marketing-screenshots-mints.json","order":10002,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"marketing.screenshots.media","file":"scenarios/marketing-screenshots-media.json","order":10003,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"settings.edit.profile","file":"scenarios/settings-edit-profile.json","order":595,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"settings.media.server","file":"scenarios/settings-media-server.json","order":2010,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"}
   ]
 }

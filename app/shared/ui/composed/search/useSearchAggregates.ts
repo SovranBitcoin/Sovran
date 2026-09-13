@@ -17,6 +17,7 @@ import {
   type AllSearchResult,
 } from '@/features/contacts/hooks/useAllSearchResults';
 import { useMintSearch } from '@/features/mint/hooks/useMintSearch';
+import type { SearchStatus } from './searchListState';
 
 /** Shorter than the people minimum (3) — mint names are often 2-letter brands. */
 const MINT_SEARCH_MIN_LENGTH = 2;
@@ -46,14 +47,28 @@ export type SearchAggregates = {
   peopleLoading: boolean;
   /** Mint search in flight — drives the Mints scope skeletons. */
   mintsLoading: boolean;
+  /** People-search read status: placeholders / no-results / error decisions. */
+  peopleStatus: SearchStatus;
+  /** Mint-search read status. */
+  mintsStatus: SearchStatus;
+  /** Re-run the people search after a failure. */
+  retryPeople: () => void;
+  /** Re-run the mint discovery read after a failure. */
+  retryMints: () => void;
 };
 
 export function useSearchAggregates(query: string): SearchAggregates {
-  const { results, people, groups, postsAuthors, loading } = useAllSearchResults(query);
+  const { results, people, groups, postsAuthors, loading, status, retry } =
+    useAllSearchResults(query);
 
   const trimmed = query.trim();
   const mintEnabled = trimmed.length >= MINT_SEARCH_MIN_LENGTH;
-  const { results: mintResults, loading: mintLoading } = useMintSearch(query, 'ALL', {
+  const {
+    results: mintResults,
+    loading: mintLoading,
+    status: mintStatus,
+    refresh: retryMints,
+  } = useMintSearch(query, 'ALL', {
     enabled: mintEnabled,
   });
 
@@ -94,7 +109,25 @@ export function useSearchAggregates(query: string): SearchAggregates {
       loading: loading || (mintEnabled && mintLoading),
       peopleLoading: loading,
       mintsLoading: mintEnabled && mintLoading,
+      peopleStatus: status,
+      mintsStatus: mintEnabled ? mintStatus : 'idle',
+      retryPeople: retry,
+      retryMints,
     }),
-    [trimmed, all, people, groups, mints, postsAuthors, loading, mintEnabled, mintLoading]
+    [
+      trimmed,
+      all,
+      people,
+      groups,
+      mints,
+      postsAuthors,
+      loading,
+      mintEnabled,
+      mintLoading,
+      status,
+      mintStatus,
+      retry,
+      retryMints,
+    ]
   );
 }

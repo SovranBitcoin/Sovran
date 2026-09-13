@@ -75,7 +75,7 @@
         "expo-symbols": "~56.0.6",
         "expo-system-ui": "~56.0.5",
         "expo-video": "~56.1.4",
-        "heroui-native": "1.0.4",
+        "heroui-native": "1.0.9",
         "liquid-glass-menu": "file:./modules/liquid-glass-menu",
         "liquid-glass-text": "file:./modules/liquid-glass-text",
         "neverthrow": "^8.2.0",
@@ -183,6 +183,7 @@
       },
       "devDependencies": {
         "@cashu/coco-core": "2.0.0",
+        "@scure/base": "2.3.0",
         "@types/react": "~19.2.2",
         "fast-check": "^4.0.0",
         "react": "19.2.3",
@@ -203,10 +204,11 @@
     "@shopify/react-native-skia",
   ],
   "patchedDependencies": {
+    "heroui-native@1.0.9": "app/patches/heroui-native+1.0.9.patch",
     "expo-router@56.2.11": "app/patches/expo-router+56.2.11.patch",
-    "heroui-native@1.0.4": "app/patches/heroui-native+1.0.4.patch",
     "expo-modules-jsi@56.0.12": "app/patches/expo-modules-jsi+56.0.12.patch",
     "react-native-screens@4.25.2": "app/patches/react-native-screens+4.25.2.patch",
+    "@cashu/cashu-ts@5.0.0-rc.4": "app/patches/@cashu+cashu-ts+5.0.0-rc.4.patch",
     "@gorhom/bottom-sheet@5.2.14": "app/patches/@gorhom+bottom-sheet+5.2.14.patch",
   },
   "overrides": {
@@ -2004,7 +2006,7 @@
 
     "hermes-parser": ["hermes-parser@0.33.3", "", { "dependencies": { "hermes-estree": "0.33.3" } }, "sha512-Yg3HgaG4CqgyowtYjX/FsnPAuZdHOqSMtnbpylbptsQ9nwwSKsy6uRWcGO5RK0EqiX12q8HvDWKgeAVajRO5DA=="],
 
-    "heroui-native": ["heroui-native@1.0.4", "", { "peerDependencies": { "@gorhom/bottom-sheet": "^5.2.9", "react": ">=19.0.0", "react-native": ">=0.81.0", "react-native-gesture-handler": "^2.28.0", "react-native-reanimated": "^4.1.1", "react-native-safe-area-context": "^5.6.0", "react-native-screens": ">=4", "react-native-svg": "^15.12.1", "react-native-worklets": ">=0.5.1", "tailwind-merge": "^3.4.0", "tailwind-variants": "^3.2.2" }, "optionalPeers": ["@gorhom/bottom-sheet", "react-native-screens"] }, "sha512-XujbUhZNtUVv8bZSAgdjUstLB+p3kggK53FIfXXafLRVTcrq1VbwRcS1Cd1ijNOKPPF6Xqr+5W2n4fFV/U0wAw=="],
+    "heroui-native": ["heroui-native@1.0.9", "", { "peerDependencies": { "@gorhom/bottom-sheet": "^5.2.9", "expo-blur": ">=14.0.0", "react": ">=19.0.0", "react-native": ">=0.81.0", "react-native-gesture-handler": "^2.28.0", "react-native-reanimated": "^4.1.1", "react-native-safe-area-context": "^5.6.0", "react-native-screens": ">=4", "react-native-svg": "^15.12.1", "react-native-worklets": ">=0.5.1", "tailwind-merge": "^3.4.0", "tailwind-variants": "^3.2.2" }, "optionalPeers": ["@gorhom/bottom-sheet", "expo-blur", "react-native-screens"] }, "sha512-CEDHtf06y9C+Uqp6o2Pae4CkBMkzjhiRbEMJ8EZl9cwLXYTUGfBT7+srvKEtigcVy5EtsgLh2lknukAa0eUeMQ=="],
 
     "hoist-non-react-statics": ["hoist-non-react-statics@3.3.2", "", { "dependencies": { "react-is": "^16.7.0" } }, "sha512-/gGivxi8JPKWNm/W0jSmzcMPpfpPLc3dY/6GxhX2hQ9iGj3aDfklV4ET7NjKpSinLpJ5vafa9iiGIEZg10SfBw=="],
 

@@ -1,0 +1,21 @@
+{
+  "id": "mint-trust",
+  "platform": "ios",
+  "screenshots": [
+    "mint-info"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "mint-trust"
+}

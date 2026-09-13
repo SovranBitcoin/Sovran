@@ -39,9 +39,11 @@ describe('mint-fault fetch interceptor', () => {
   it('passes through everything with zero rules and non-mint traffic with rules', async () => {
     const armedButEmpty = await fetch(`${MINT}/v1/info`);
     expect(armedButEmpty.status).toBe(200);
-    loadRules([{ id: 'r', mint: MINT, path: '/v1/swap', response: { mode: 'offline' } }]);
-    await fetch('https://api.sovran.money/api/app/latest-version');
-    expect(passthroughCalls).toHaveLength(2);
+    loadRules([{ id: 'r', mint: '*', response: { mode: 'offline' } }]);
+    await fetch('https://nagg.up.railway.app/app/latest-version');
+    await fetch('https://nagg.up.railway.app/livez');
+    await fetch('https://nagg.up.railway.app/app/latest-version', { method: 'POST' });
+    expect(passthroughCalls).toHaveLength(4);
   });
 
   it('fakes a NUT-protocol error body and never touches the network', async () => {

@@ -15,8 +15,7 @@ import { copyPopup, type CopyTarget } from '@/shared/lib/popup';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Log, paymentLog } from '@/shared/lib/logger';
 
-// Threshold matches AnimatedQRCode's ANIMATE_THRESHOLD
-const ANIMATE_THRESHOLD = 500;
+import { ANIMATE_THRESHOLD } from '@/shared/lib/qr';
 
 /**
  * camelCase → kebab-case for testID generation. Keeps the AX testIDs
@@ -114,7 +113,8 @@ export function PaymentInfo({
     });
   }
 
-  if (loading || !active) return <PaymentQRCodePlaceholder testID="payment-info-qr-placeholder" />;
+  if (loading || !active)
+    return <PaymentQRCodePlaceholder testID="payment-info-qr-placeholder" unit={unit} />;
 
   return (
     <Log name="PaymentInfo">

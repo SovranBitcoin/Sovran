@@ -15,6 +15,7 @@ import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 import { useMempoolAddressCache } from '@/shared/stores/global/mempoolAddressCache';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { useRelayMetadataStore } from '@/shared/stores/global/relayMetadataStore';
+import { useCtaStore } from '@/shared/stores/global/ctaStore';
 import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
@@ -22,11 +23,13 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { useDataMigrationStore } from '@/shared/stores/profile/dataMigrationStore';
+import { useDmLastMessageStore } from '@/shared/stores/profile/dmLastMessageStore';
 import { useMintDistributionStore } from '@/shared/stores/profile/mintDistributionStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
+import { useOwnProfileMetadataStore } from '@/shared/stores/profile/ownProfileMetadataStore';
 import { useOwnContentStore } from '@/shared/stores/profile/ownContentStore';
 import { useOwnedMediaStore } from '@/shared/stores/profile/ownedMediaStore';
 import { useRecentPeopleStore } from '@/shared/stores/profile/recentPeopleStore';
@@ -47,6 +50,7 @@ import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { useNfcTapStore } from '@/shared/stores/runtime/nfcTapStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
+import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
@@ -69,6 +73,7 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'global/pricelistStore': usePricelistStore,
   'global/profileStore': useProfileStore,
   'global/settingsStore': useSettingsStore,
+  'global/ctaStore': useCtaStore,
   'global/walletLifecycleStore': useWalletLifecycleStore,
   'global/wallpaperStore': useWallpaperStore,
   'profile/dataMigrationStore': useDataMigrationStore,
@@ -77,7 +82,9 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'profile/nostrSocialStore': useNostrSocialStore,
   'profile/npcMintStore': useNpcMintStore,
   'profile/nutDropRedeemQueueStore': useNutDropRedeemQueueStore,
+  'profile/ownProfileMetadataStore': useOwnProfileMetadataStore,
   'profile/ownContentStore': useOwnContentStore,
+  'profile/dmLastMessageStore': useDmLastMessageStore,
   'profile/ownedMediaStore': useOwnedMediaStore,
   'profile/recentPeopleStore': useRecentPeopleStore,
   'profile/routstrStore': useRoutstrStore,
@@ -97,6 +104,7 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'runtime/nearPayStore': useNearPaySessionStore,
   'runtime/nfcTapStore': useNfcTapStore,
   'runtime/paymentStatusStore': usePaymentStatusStore,
+  'runtime/secureStoreState': useSecureStoreState,
   'runtime/popupStore': usePopupStore,
   'runtime/rollbackStore': useRollbackStore,
   'runtime/routstrTopUpStore': useRoutstrTopUpStore,

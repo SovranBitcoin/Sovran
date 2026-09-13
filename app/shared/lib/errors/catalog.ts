@@ -2,12 +2,11 @@
 export const ERROR_COPY = {
   'app.unknown': 'Something went wrong. If this continues, contact support.',
   'routstr.unknown': 'The AI request failed. Try again later. If this continues, contact support.',
-  'routstr.not_found':
-    'The AI service could not find the requested model or endpoint (404). Try again later. If this continues, contact support.',
+  'routstr.not_found': 'The AI provider is unreachable right now. Try again in a minute.',
   'routstr.model_unavailable': 'This AI model is unavailable. Choose another model and try again.',
   'routstr.auth': 'The AI service did not accept your credit key. Check your AI credit settings.',
   'routstr.balance': 'Your AI credit cannot cover this request. Choose a cheaper model or top up.',
-  'routstr.unavailable': 'The AI service is temporarily unavailable. Try again later.',
+  'routstr.unavailable': 'The AI provider is unreachable right now. Try again in a minute.',
   'routstr.timeout': 'The AI service took too long to respond. Try again later.',
   'routstr.invalid_request':
     'The AI service could not accept this message. Check the message and attachments, or choose another model.',

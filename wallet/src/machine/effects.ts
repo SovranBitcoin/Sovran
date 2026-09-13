@@ -1698,7 +1698,7 @@ export function runNfcWriteBackEffect({
       try {
         logger.info('effects.nfcWriteBack.progress', { phase: 'creating' });
         onProgress?.({ phase: 'creating' });
-        nfcSendResult = await executeNfcSend(data.mintUrl, data.amount);
+        nfcSendResult = await executeNfcSend(data.mintUrl, data.amount, data.unit);
         logger.info('effects.nfcWriteBack.tokenCreated', {
           operationIdPresent: nfcSendResult.operationId.length > 0,
           ...summarizeHistoryEntry(nfcSendResult.historyEntry),

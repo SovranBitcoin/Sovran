@@ -6,6 +6,7 @@
  * drawer chrome.
  */
 
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { Platform, StyleProp, ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, interpolate } from 'react-native-reanimated';
 import { useDrawerProgress } from 'expo-router/drawer';
@@ -33,7 +34,7 @@ type HeaderProfileButtonProps = {
 export function HeaderProfileButton({ onPress, style }: HeaderProfileButtonProps) {
   const { keys } = useNostrKeysContext();
   const pubkey = usePresentationPubkey(keys?.pubkey ?? '');
-  const { displayName, picture } = useProfileDisplay(pubkey);
+  const { displayName, picture, pictureResolved } = useProfileDisplay(pubkey);
   const [flatSurface, muted] = useThemeColor(['surface-secondary', 'muted'] as const);
   // Drives in lockstep with the drawer overlay + scene border-shadow:
   // 0 = closed (visible), 1 = open (hidden).
@@ -63,7 +64,7 @@ export function HeaderProfileButton({ onPress, style }: HeaderProfileButtonProps
 
   const avatar = (
     <Avatar
-      state={picture ? 'image' : 'fallback'}
+      state={avatarStateFor(picture, pictureResolved)}
       seed={pubkey}
       picture={picture}
       name={displayName}

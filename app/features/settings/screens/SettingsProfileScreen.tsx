@@ -7,7 +7,7 @@ import { ProfileDetailsScreen } from '../components/ProfileDetailsScreen';
 export function SettingsProfileScreen() {
   const { value: mnemonic, loading } = useMnemonic();
   const { keys, cashuMnemonic, isLoading } = useNostrKeysContext();
-  const { displayName, picture } = useProfileDisplay(keys?.pubkey || '');
+  const { displayName, picture, pictureResolved } = useProfileDisplay(keys?.pubkey || '');
   const profile = useProfileStore((s) => s.getActiveProfile());
   return (
     <ProfileDetailsScreen
@@ -19,6 +19,7 @@ export function SettingsProfileScreen() {
       activeProfile={profile}
       username={displayName}
       profilePicture={picture}
+      profilePictureResolved={pictureResolved}
     />
   );
 }

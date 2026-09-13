@@ -64,6 +64,12 @@ export function ChatMessageBubble({
     borderTopLeftRadius = isFirstInGroup ? radius : tightRadius;
     borderBottomLeftRadius = isLastInGroup ? radius : tightRadius;
   }
+  const cornerRadii = {
+    borderTopLeftRadius,
+    borderBottomLeftRadius,
+    borderTopRightRadius,
+    borderBottomRightRadius,
+  };
 
   const cashuToken = message.cashuToken;
   const displayContent = cashuToken
@@ -142,7 +148,7 @@ export function ChatMessageBubble({
         <VStack
           align={message.isOwn ? 'flex-end' : 'flex-start'}
           gap={2}
-          style={{ flex: 1, maxWidth: '85%' }}>
+          className="min-w-0 flex-1">
           {showName && message.sender ? (
             <Text size={12} bold style={{ color: shade400, marginBottom: 2 }}>
               {message.sender}
@@ -153,10 +159,7 @@ export function ChatMessageBubble({
             <View
               style={{
                 backgroundColor: message.isOwn ? defaultColor : surfaceTertiary,
-                borderTopLeftRadius,
-                borderBottomLeftRadius,
-                borderTopRightRadius,
-                borderBottomRightRadius,
+                ...cornerRadii,
                 paddingHorizontal: 14,
                 paddingVertical: 10,
                 alignSelf: message.isOwn ? 'flex-end' : 'flex-start',
@@ -173,7 +176,14 @@ export function ChatMessageBubble({
             </View>
           ) : null}
 
-          {cashuToken ? <CashuTokenBubble token={cashuToken} isOwn={message.isOwn} /> : null}
+          {cashuToken ? (
+            <CashuTokenBubble
+              token={cashuToken}
+              isOwn={message.isOwn}
+              hasText={hasText}
+              cornerRadii={cornerRadii}
+            />
+          ) : null}
 
           {showTimestamp ? (
             <HStack

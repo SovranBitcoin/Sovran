@@ -1,8 +1,58 @@
 import {
   discoverMintToSearchResult,
   discoveryMethodMatches,
+  useMintSearch,
 } from '@/features/mint/hooks/useMintSearch';
+import { renderHook, waitFor } from '@testing-library/react-native';
+import { ok } from 'neverthrow';
+import { discoverMints } from '@/shared/lib/apiClient';
 import type { DiscoverMint } from '@/shared/lib/apiClient';
+import { mintDiscoverCache } from '@/features/mint/data/mintDiscoverCache';
+
+jest.mock('@/shared/lib/apiClient', () => {
+  const actual =
+    jest.requireActual<typeof import('@/shared/lib/apiClient')>('@/shared/lib/apiClient');
+  return { DiscoverMintsResponse: actual.DiscoverMintsResponse, discoverMints: jest.fn() };
+});
+jest.mock('@/shared/stores/runtime/debugTierStore', () => ({ recordDebugTiers: jest.fn() }));
+jest.mock('@/shared/stores/global/mintMetadataStore', () => ({
+  useMintMetadataStore: { getState: () => ({ upsertFromDiscover: jest.fn() }) },
+}));
+jest.mock('@/shared/lib/logger', () => {
+  const sink = { info: jest.fn(), warn: jest.fn(), debug: jest.fn(), error: jest.fn() };
+  return {
+    log: { ...sink, child: () => sink },
+    storeLog: sink,
+    cashuLog: sink,
+    monotonicNow: () => Date.now(),
+  };
+});
+jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
+  createProfileScopedStorage: () => ({
+    getItem: async () => null,
+    setItem: async () => {},
+    removeItem: async () => {},
+  }),
+}));
+jest.mock('expo-router', () => ({
+  useFocusEffect: (effect: () => void | (() => void)) =>
+    jest.requireActual<typeof import('react')>('react').useEffect(effect, [effect]),
+}));
+jest.mock('@/features/mint/data/mintDiscoverCache', () => {
+  const { createQueryCacheStore } = jest.requireActual<
+    typeof import('@/shared/lib/cache/createQueryCacheStore')
+  >('@/shared/lib/cache/createQueryCacheStore');
+  return {
+    MINT_DISCOVER_CACHE_KEY: 'all',
+    mintDiscoverCache: createQueryCacheStore({
+      name: 'mint-discover-cache-mapper-test',
+      staleTtlMs: 20 * 60 * 1000,
+      maxEntries: 1,
+      hostScoped: true,
+      persist: false,
+    }),
+  };
+});
 
 const base: DiscoverMint = {
   mintUrl: 'https://mint.example',
@@ -113,5 +163,80 @@ describe('discoveryMethodMatches — unit-aware (method, unit) pair filter', () 
   it('matches case-insensitively and rejects the wrong method on the right unit', () => {
     expect(discoveryMethodMatches(satBolt12, 'BOLT12', 'sat')).toBe(true);
     expect(discoveryMethodMatches(satBolt12, 'onchain', 'SAT')).toBe(false);
+  });
+});
+
+describe('useMintSearch unit availability and counts', () => {
+  const rows: DiscoverMint[] = [
+    {
+      ...base,
+      mintUrl: 'https://alpha.example',
+      name: 'Alpha',
+      supportedUnits: ['sat', 'eur', 'jpy'],
+      nuts: {
+        '4': {
+          methods: [
+            { method: 'onchain', unit: 'sat' },
+            { method: 'onchain', unit: 'sat' },
+            { method: 'bolt11', unit: 'eur' },
+          ],
+        },
+      },
+    },
+    {
+      ...base,
+      mintUrl: 'https://beta.example',
+      name: 'Beta',
+      supportedUnits: ['SAT', 'gbp'],
+      nuts: {
+        '4': {
+          methods: [
+            { method: 'onchain', unit: 'sat' },
+            { method: 'onchain', unit: 'gbp' },
+          ],
+        },
+      },
+    },
+  ];
+
+  beforeEach(() => {
+    mintDiscoverCache.clear();
+    jest.mocked(discoverMints).mockResolvedValue(ok({ mints: rows }));
+  });
+
+  it('keeps unfiltered units and a zero-count deep-linked USD selection', async () => {
+    const { result } = renderHook(() => useMintSearch('Alpha', 'USD', { method: 'onchain' }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.results).toEqual([]);
+    expect(result.current.availableUnits).toEqual(['SAT', 'EUR', 'GBP', 'USD']);
+    expect(result.current.matchCountByUnit).toEqual({ SAT: 1, USD: 0, EUR: 0, GBP: 0 });
+  });
+
+  it('counts each matching mint once per exact method/unit pair and switches to SAT', async () => {
+    const { result, rerender } = renderHook(
+      ({ currency }: { currency: string }) => useMintSearch('', currency, { method: 'onchain' }),
+      { initialProps: { currency: 'USD' } }
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.matchCountByUnit).toEqual({ SAT: 2, USD: 0, EUR: 0, GBP: 1 });
+    rerender({ currency: 'SAT' });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.results.map((mint) => mint.name)).toEqual(['Alpha', 'Beta']);
+    expect(result.current.matchCountByUnit.SAT).toBe(2);
+  });
+
+  it('counts supported units without a method filter and matches a trimmed URL query', async () => {
+    const { result } = renderHook(() => useMintSearch('  ALPHA.EXAMPLE  ', 'ALL'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.matchCountByUnit).toEqual({ SAT: 1, USD: 0, EUR: 1, GBP: 0 });
+    expect(result.current.availableUnits).toEqual(['SAT', 'EUR', 'GBP']);
+  });
+
+  it('seeds SAT and retains the requested unit when discovery is empty', async () => {
+    jest.mocked(discoverMints).mockResolvedValue(ok({ mints: [] }));
+    const { result } = renderHook(() => useMintSearch('', 'USD', { method: 'onchain' }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.availableUnits).toEqual(['SAT', 'USD']);
+    expect(result.current.matchCountByUnit).toEqual({ SAT: 0, USD: 0, EUR: 0, GBP: 0 });
   });
 });

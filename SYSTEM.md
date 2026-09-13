@@ -226,9 +226,15 @@ Glass is decorative when a Pressable owns interaction; avoid competing native/JS
 
 Skeletons preserve the eventual row's padding, text metrics, media aspect ratio, and inset owner. Reuse the real row shell where practical. `Text loading/placeholder/fallback` supports stable geometry; placeholder wording must not become misleading accessible content. Readiness is based on usable data, not completion of every optional profile/image request.
 
+**Images have two placeholders, never one.** While it is *unknown* whether a picture exists (the kind-0 or record that carries the URL is still resolving) or its bytes are still loading, show the neutral skeleton fill. Only once the source is known to be *missing* or the load *failed* show the colour placeholder (clay silhouette, seeded gradient, glyph). A colour placeholder therefore always means "there is no image", never "we have not looked yet". Derive `Avatar`'s state with `avatarStateFor(picture, resolved)` from [imageLoadState](app/shared/lib/imageLoadState.ts) — `picture ? 'image' : 'fallback'` is the bug this rule exists to prevent — and pass `!isResolving` from `useNostrProfileMetadata`, `profile !== undefined` for a feed profiles map, or `pictureResolved` from `useProfileDisplay` for the own account.
+
+**Counts are unknown, never zero.** A follower/following/reaction total the sources could not supply stays `undefined` and renders as a placeholder or a dash; `?? 0` at a parse boundary turns "not indexed" into a wrong number that every consumer then trusts. [useNostrProfile](app/shared/hooks/useNostrProfile.ts) completes missing counts nagg → Primal → the profile's own kind-3 and exposes `isCountsLoading` for the pills.
+
 Do not blank a cached list on focus, impose arbitrary minimum skeleton delays, mount multiple full lists to crossfade, or pulse forever after a failed request. Stop visual animation when inactive; honor reduced motion. The static Android E2E skeleton is an intentional automation exception, not evidence that production pulse behavior was tested.
 
-**Follow-up:** [facadeFeedClient](app/features/feed/data/facadeFeedClient.ts) maps several exhausted-tier failures to empty results. This clears loading, but loses the distinction between an empty result and unavailable data. Evolve the adapter result contract and UI together; do not simply restore a throw that leaves seeded thread screens loading indefinitely.
+**Empty is not unavailable (F06, contract closed 2026-09-13).** Feed, thread and notification results carry an optional `read: ReadStatusMeta` (`ok | unavailable | disabled`, with the tier attempt trail); [facadeFeedClient](app/features/feed/data/facadeFeedClient.ts) sets `unavailable` on tier exhaustion and `disabled` when no tier is enabled, still resolving so loading terminates. Screens derive: unavailable with nothing retained → error with a retry action; unavailable with retained rows → keep the rows and show degraded status; ok with zero items → the empty state. `useCachedRead`'s `classify` is the seam.
+
+**Skeletons on lists are data items.** A FlashList surface renders skeleton rows as list items of their own type through the same row component with `loading`, and real rows enter with a first-arrival fade; it never mounts two full lists to crossfade and never holds a skeleton for a minimum time. Region swaps (stats grids, headers) use `SkeletonContentCrossfade` with the same component in both branches.
 
 ## 8. Error handling and user feedback
 
@@ -439,7 +445,7 @@ Zustand invokes migration for an incoming version; it does not automatically run
 
 Required existing starting points: [persist round-trip](app/__tests__/persistRoundTrip.test.ts), [schema drift](app/__tests__/persistSchemaDrift.test.ts), [enum tolerance](app/__tests__/persistedEnumTolerance.test.ts), and [settings resilience](app/__tests__/settingsStorePersistResilience.test.ts). They are evidence for the paths they test, not a universal corruption-recovery guarantee.
 
-**Follow-up:** generic merge rejection still falls back to defaults. Critical stores need a deliberate recovery/preservation path rather than treating corrupted identity/funds data like disposable cache. [apiClient](app/shared/lib/apiClient.ts) also contains explicit local relaxations of external profile/auditor schemas; reconcile them against the producer and installed shared schema before deletion.
+**Follow-up:** generic merge rejection still falls back to defaults. Critical stores need a deliberate recovery/preservation path rather than treating corrupted identity/funds data like disposable cache. [apiClient](app/shared/lib/apiClient.ts) also contains explicit local relaxations of external profile schemas; reconcile them against the producer and installed shared schema before deletion.
 
 ## 14. Cache ownership and freshness
 
@@ -458,21 +464,48 @@ Current cache choices are intentionally different: [home-feed page 0](app/featur
 | Profile boot snapshot | Debounced persistence mirror of facade data, not an independent profile authority |
 | Raw relay-event caching | NDK SQLite where that transport is used |
 | Mint/proof/quote state | Coco persistent database and operation APIs |
-| Mint metadata/catalog display | Existing metadata/fetch cache; not spendability evidence |
+| Mint metadata/catalog display | `mintMetadataStore`, seeded by Nagg discovery; single-mint misses use `/nostr/mint/discover?mint=`; not spendability evidence |
+| BTC display prices | Global `pricelistStore`; `pricelistFeed` polls Nagg `/app/rates` through `apiClient` every ten minutes, retaining omitted currencies |
+| Wallpaper catalog | Global persisted `wallpaperStore`; `wallpaperSync` refreshes Nagg `/app/wallpapers` through `apiClient`, retaining the last catalog and fetch timestamp on request/parse failure |
+| BTC Map places | Global persisted `btcMapStore`; Nagg `/app/btcmap/places` and `/app/btcmap/places/{id}`, with one-hour list and 24-hour detail freshness; failed list refreshes retain stale places |
 | HTTP image bytes | `expo-image` cache plus shared prefetch scheduler |
 | DM decrypt results | Explicit private, profile-scoped cache; see decision 19 |
 
 Every cache needs a key, scope, freshness policy, capacity, invalidation trigger, failure policy, and owner. Keys include all inputs that affect results: viewer, endpoint/tier config where relevant, filters, ordering, and cursor. Host-wide caching is allowed only when results do not depend on identity or authorization.
 
+BTC price freshness uses `serverUpdatedAt` (Unix seconds), falling back to local
+`lastUpdated` (milliseconds) for legacy cache entries. `PRICE_STALE_MINUTES = 120`
+allows two hourly upstream refresh windows; successful polling alone must not
+make an old server snapshot fresh. Foreground/online recovery fetches when the
+last successful request is older than 60 seconds. Failures, including warm-up
+503 responses, retain cached values and retry with jitter on a 30-second,
+one-minute, two-minute, then five-minute capped ladder. Teardown aborts in-flight
+work and ignores late completions. The local rates schema in `apiClient` is a
+temporary boundary until `@sovranbitcoin/schemas` publishes this shape and
+deprecates its WebSocket message schema.
+
+Mint audit reads share `getDiscoveredMintMetadata`: a fresh audit group returns
+from `mintMetadataStore`; stale/missing groups fetch single-mint discovery and
+write through `upsertFromDiscover`. Unknown mints contribute no audit fields;
+request failures retain cached metadata. Discovery stores uptime, latency,
+auditor provenance and its upstream timestamp separately from local freshness.
+Its audit score uses successful mint/melt counts divided by those successes plus
+errors, scaled to five; absent counts or zero operations have no score. Fresh
+scalars take precedence over retained legacy audit blobs. Those blobs remain
+readable for historical swap detail; discovery does not supply swap edges.
+Rebalance suggestions can use retained observations and local swap history,
+never aggregate health as proof of a route. Neither cache freshness nor an
+upstream audit timestamp establishes quote validity or proof spendability.
+
 Return usable cached data before background revalidation; retain it on transient refresh failure. Use explicit fresh checks for payment-critical decisions. A metadata TTL is not a guarantee that a quote is valid or proofs are unspent. Preserve provenance/fetched time and expose degraded/stale state when it affects a decision.
 
 Persist bounded envelopes, validate opaque payloads when reading, and evict/refetch invalid cache entries without resetting unrelated stores. Do not call the current `fetchedAt`-based eviction a true access-based LRU: it ranks write/fetch age. Select a different policy only if an actual workload needs it.
 
-**Confirmed implementation gap to test:** `createQueryCacheStore.run` permits overlapping `force` requests and writes each completion without a generation check. An older request can therefore replace a newer result if they share a key. Its current `clear()` does not invalidate an in-flight completion. Add a deterministic out-of-order test, invalidate generations on clear/scope changes, and verify the caller's identity before committing. Storage-key scoping alone does not prevent stale asynchronous writes.
+**Generation guard (F01, closed 2026-09-13):** `createQueryCacheStore.run` takes a per-key generation and a store-wide scope generation (`clear()` bumps it). A completion whose generation is no longer current never writes: it hands its awaiters the newer run's result or rejects with `SupersededError`. `run` accepts `{ force, signal, readId }` and gives the fetcher `{ signal, readId, partial }`, where `partial` writes an early value under the same guard. `clearAllQueryCaches()` runs on the profile-wipe path. Regressions: [createQueryCacheStoreGenerations](app/__tests__/createQueryCacheStoreGenerations.test.ts).
 
 The inspected `run` consumer is [useMintChanges](app/features/mint/hooks/useMintChanges.ts), whose cache is host-scoped. Its signal checks occur after the factory has written the result. This establishes a helper-level ordering weakness, not a demonstrated cross-profile leak or payment-state corruption. Home-feed/notification consumers also write entries directly and need their own lifecycle review.
 
-**Follow-up:** comments still mention a `useCachedQuery` consumer that is not present at the advertised shared-hook location. Document the actual current feature consumers before proposing another general cache hook. Do not add TanStack Query or another cache layer as a cosmetic cleanup.
+**The one React consumer is [useCachedRead](app/shared/lib/read/useCachedRead.ts).** It owns no data: `data` is the store selector, so persistence, LRU, scope and cold-start policy stay in the store. Contract: a fresh entry serves with zero round-trips (`serve-fresh`); a stale entry paints and revalidates in the background; a miss is `loading`; a key change shows that key's entry or a skeleton, never `null` plus a spinner (`keepPreviousData` opts a same-surface refinement, such as a search query, into holding the previous rows); `seed` paints a synchronous value from a prior step as `revalidating`; `refresh()` supersedes in-flight work; a viewer-key mismatch reads as absent; `classify` maps zero items to `empty` and an unavailable `read` marker to `error`. Status vocabulary for every hook and screen: `loading | revalidating | ready | empty | error` plus `partial` and `source`. Do not add TanStack Query or another cache layer; migrate hand-rolled loops onto this hook instead.
 
 ## 15. Networking, concurrency, and cancellation
 
@@ -481,6 +514,18 @@ The inspected `run` consumer is [useMintChanges](app/features/mint/hooks/useMint
 **Observed:** [apiClient](app/shared/lib/apiClient.ts) wraps app/backend calls; [requestSignal](app/shared/lib/http/requestSignal.ts) composes controls for exception-style APIs; [wallet/safeFetch](wallet/src/safeFetch.ts) bounds external wallet calls; [nostr/transport](nostr/src/transport.ts) owns Nagg transport. These different boundaries are legitimate.
 
 **Decision:** route requests through their domain transport. Screens should not each recreate HTTP parsing, timeout, logging, authentication, and retry handling. Keep the original service identity when adapting errors. Model “offline,” “backend unavailable,” “one mint unavailable,” “cancelled,” “rate limited,” and “schema invalid” separately.
+
+Wallpaper and BTC Map reads use Nagg's `app` module through
+`backendConfig.scoreApiBaseUrl`; they must work without its optional `nostr`
+module or a generic relay-query endpoint. Keep the existing shared catalog,
+places-array, and place-object schemas tolerant of extra fields; retain `osm:*`
+detail properties. See [backend services](docs/architecture/backend-services.md).
+
+Mint list and single-mint audit discovery both use the Nagg `nostr` module via
+`apiClient` and the score host. `discoverMint(mintUrl, controls)` encodes the
+`mint` query parameter, parses the same loose discovery row as the list, and
+returns no row for an unknown mint. The retired audit HTTP endpoint and its
+runtime response parser are removed; legacy cache typing stays with metadata.
 
 Use caller cancellation plus a bounded per-request deadline. The app signal helper currently defaults to 10 seconds and the wallet helper to 15 seconds; these are different boundary defaults, not values to unify blindly. A screen leaving may cancel optional reads, but cannot establish that an already-submitted financial operation stopped remotely.
 
@@ -500,6 +545,8 @@ Expected background failures have a handler; `void promise` does not contain a r
 
 **Decision:** app features consume the facade/feature adapter. Default source order is enabled **Nagg → Primal → raw relay**, skipping unsupported surfaces. Explicitly disabled tiers stay disabled. Preserve attempt/source metadata for diagnostics and degraded UI. Each tier owns its protocol quirks; screens do not implement their own fallback chain.
 
+**Two engines, chosen by the shape of the data (2026-09-13).** Ordered reads (feed pages, threads, own history, DM envelopes, mint discovery) stay **sequential**: the first answering tier is the page, because merging two rankings reshuffles rows. Gap-fillable reads (`getProfiles`, `getProfileStats`, `searchProfiles`, `getMintReviews`, `getSocialGraph`) use the **aggregate** engine [resolveAllTiers](nostr/src/tiers/aggregate.ts): every tier is opened at once, the read paints at a per-surface cap (never empty while a source pends), and later answers merge in place — append-only and rank-aware, so a better tier's fields replace a worse one's in place and a worse tier can only add. Notifications keep their own concurrent **session**. Resolved values from aggregate surfaces carry `provenance` (`sources`, `attempts`, `degraded`, `complete`); search and mint reviews deliver later merges through `onUpdate`, profiles and stats through the entity cache. The intent table is [readPolicy](app/shared/lib/read/readPolicy.ts); the decision and its consequences are [ADR 0008](app/docs/adr/0008-read-lifecycle.md). Every read carries a `readId` (`RequestControls.readId`, minted by the facade when absent) stamped on `nostr.read.*` and `nostr.tier.*` events so log-doctor's `tiers` and `reads` modes can join them.
+
 Use optimized app-view endpoints for product views. Generic GraphQL remains for generic operations/recipes when necessary. Backend indexing and ranking execution stay server-side; product mapping belongs in the typed client/app seam. New reusable transport/recipe behavior belongs in this repo's `nostr` package, not a fresh screen-local client or an obsolete sibling import.
 
 Ingest all successful paths into the same entity cache. Known content should render before optional enrichment. Keep already-applied posts if author/stats enrichment fails. Profile feed root-note filtering must advance through reply-only pages with cursor progress guards; it must not assume a filtered empty page means the author has no posts. Start with the existing [profile fallback tests](nostr/__tests__/profile-feed-fallback.test.ts).
@@ -515,6 +562,17 @@ Nostr event structure, event-ID calculation, signature, and kind-specific interp
 **Observed:** [publishEvent](app/shared/lib/nostr/publish/publishEvent.ts) provides signed-event deduplication, per-relay results, and bounded fan-out/retries. [ownContentStore](app/shared/stores/profile/ownContentStore.ts) tracks local content. Nostr [notification sessions](nostr/src/facade/session) and live tier contracts own read/subscription lifecycle. There is no reason to force these into the wallet machine.
 
 **Decision:** publish through the existing publish boundary, with app signer/relay policy supplied by its owner. Optimistic local display, signed, relay-accepted, failed, and reconciled are distinct facts. Do not show “delivered to recipient” merely because a relay accepted an event. Retry the same signed event where appropriate, rather than accidentally creating duplicates with new timestamps/IDs.
+
+**Vertex client-read exception (N8):** `shared/lib/nostr/vertex/signVertexRequest.ts`
+uses the active NDK signer for kinds 5312/5315; nagg forwards the unchanged signed
+request through the recipe transport. These DVM reads intentionally bypass ordinary
+social relay fan-out in `publishEvent`. Consent, mock/automation exclusion, captured
+identity, and a persisted 20-request daily budget gate this path. No signing material
+is read by the feature. Budget instances capture the pubkey in their storage adapter;
+lookup text and targets stay out of persistence and logs. Revisit this exception if
+`publishEvent` gains a transport for server-forwarded DVM reads. Local profile schema
+freshness fields remain nullish until the shared schema package includes nagg's
+`vertexFetchedAt`/`vertexFresh` contract.
 
 Represent each long-lived interaction as an explicit domain session: identity/config, phase, in-flight work, acknowledgement, retry/backoff, and disposal. Use typed events/transitions and expose a stable UI projection. This is a design contract, not a requirement to rename current internal state fields or adopt a new machine library.
 
@@ -539,6 +597,39 @@ Root entry to Send, Receive, scan, NFC, mint selection, or Nearby payment starts
 Cancellation of UI work invalidates stale screen updates; it does not erase an already-committed operation or assume a refund. Recovery resumes/reconciles persisted records. Keep offline exact-proof operations offline when their contract requires it. Do not add a “fresh metadata” fetch that blocks a valid offline send.
 
 Treat QR, NFC, payment requests, and public mesh as separate delivery contexts. NFC's intentional automatic resolution does not authorize skipping confirmation elsewhere. A public mesh recipient-locked transfer must never silently degrade to an unlocked bearer token. Encryption/delivery status does not prove redemption.
+
+NFC APDU diagnostics must record only byte counts, operation labels, and status
+words. Raw request/response hex can contain spendable bearer tokens and bypass
+text token redactors. Native error messages may echo the same bytes; map them to
+curated error codes before logging or displaying them. Successful status words
+do not establish a complete read: validate the two-byte NLEN and every requested
+body/chunk length before decoding. See `nfcApduPrivacy` and `nfcReadLengths` tests.
+
+**Payment-request mint preference (W12):** `wallet` preserves NUT-18 `mp` when
+paying someone else's request and ranks preferred mints without excluding other
+funded trusted mints. Sovran's own requests are always strict (no `mp`, no UI
+switch): Coco 2.0.0 cannot claim a payment from a mint the wallet has not added. Coco 2.0.0's
+outgoing parser treats every mint list as strict, so `defaultOperations` removes
+only the advisory list from its private SDK input copy; the original request
+remains the flow identity. Amount, unit, transport and NUT-10 lock are preserved.
+The installed SDK rejects NUT-18 `sm` and NUT-26 tag `0x0a` until the wallet can
+enforce both method/unit support and method fees. Never drop those constraints.
+NFC and Nostr request sends reject any NUT-10 condition before creating proofs;
+their current durable send adapters cannot preserve the complete lock contract.
+HTTP request preparation retains Coco's supported P2PK path. Nostr payloads use
+the request's `i` identifier, and sends always pass the request unit explicitly.
+Cross-unit NFC preflight honors advisory `mp` just like final mint selection.
+Until Coco's durable API can pay recipient input fees, payment-request sends
+require verified zero-fee keysets for their unit before preparation. Include
+inactive keysets because exact sends can use their proofs; missing fee data
+fails closed. Ordinary token sends retain their separate gross-amount behavior.
+Incoming `validatePayload` still rejects untrusted mints and mints outside the
+durable operation's list. Both receive screens therefore force Required even
+if the profile preference is true, and show Preferred disabled with a reason.
+Enable it only after a request claim can add/trust an unlisted mint and resume,
+or surfaces an actionable add-mint-to-claim prompt. Token receive recovery is
+not evidence for payment-request recovery. See the W12 patch handoff in
+[app/patches/README.cashu-mints-preferred.md](app/patches/README.cashu-mints-preferred.md).
 
 **Follow-up:** the app provider still overrides some default operations to obtain real persisted history IDs and app enrichment. Move reusable behavior to `wallet` only after comparing contracts, not merely to reduce file length. Preserve installed SDK types and test the actual version; direct Cashu SDK usage can be legitimate inside protocol adapters, but is not the UI default.
 
@@ -752,21 +843,43 @@ always preserves the committed bytes and hashes. No general image tolerance is
 allowed. Recheck/remove this exception when the source, sizing recipe or renderer
 changes. Both platform checks passed with this bounded exception.
 
-**Store feature graphics:** [the composition](marketing/feature-graphic/source/composition.json)
-selects four native screenshots per platform; [the generator](scripts/feature-graphic.mjs)
-uses those retained inputs plus canonical branding and bundled fonts. Keep these
-marketing files outside the runtime asset bundle. Use platform identifiers `ios`
-and `android` consistently: screenshot inputs are
-`source/screenshots/<platform>/<screen-name>.png`, outputs are
-`generated/<platform>/1024x500.png`. Drop capture-order prefixes from retained
-inputs; the composition declares ordering and preserves the original run ID and
-byte hashes. Export 1024×500 opaque RGB PNGs
-under 15 MB; preserve screenshot proportions, trim only system chrome, and verify
-complete text and all four panels visually. Use Android artwork for Google Play;
-the iPhone companion is a marketing banner, not an App Store screenshot format.
-`assets:generate`/`assets:check` include these files; `assets:feature` regenerates
-only the banners. Do not retain redundant intermediate artwork or superseded
-originals once canonical generation inputs are established.
+**Unified marketing artwork:** [the pipeline](scripts/artwork.mjs) and
+[artwork guide](marketing/artwork/README.md) replace both former marketing trees.
+`marketing/artwork/source/layouts.json` describes eight named layouts; concepts,
+copy choices, capture provenance and per-aspect selection are data alongside it.
+Every applicable concept/layout renders wide **2048×1000**, tall **1080×1920** and
+square **1080×1080**. Commit selected PNGs and labelled contact sheets (1500 px
+wide); full variants remain ignored. All six general layouts apply to every
+concept; repeat its retained capture when a composition needs more phone slots.
+Only portal (matched wallpaper) and pack (distinct album wallpapers) can be n/a.
+Absent captures produce labelled drafts. Keep full native capture bytes, status bar and home
+indicator, inside the shared bezel/rim/shadow. Rotation is 2D; assert copy boxes
+never intersect rotated phone bounds. No runtime artwork imports.
+
+`selection.featureGraphic` selects the concept for platform-specific Android/iOS
+1024×500 banners, plain Lanczos downscales of its selected wide layout. The iOS
+companion is promotional artwork, not an App Store screenshot format. Retained
+store screenshot bytes/run IDs remain pinned. Copy alternatives and selections
+live in `copy.json`; the guide records voice rules and supplied-copy exceptions.
+
+Retain the real Nagg wallpaper catalog and authenticated portrait bytes offline.
+Keep generated panoramas with their original provenance; restore portrait pixels
+into the height-matched centre strip with 24 px feathered edges before portal
+wide/square rendering (`centreRestored: true`). Tall uses the portrait. Preserve
+captured UI through a reviewed full-size mask over the sharp canvas-aligned
+wallpaper; outside is blurred/darkened. Never fabricate captures or color-key UI.
+The supplied panorama size exception (two 2048×1024, eleven 3840×1920) is recorded
+in the guide and source provenance, without altering supplied bytes.
+
+`assets:generate`/`assets:check` run this single pipeline with explicit
+`--allow-missing` while captures remain incomplete; checks rerender all committed
+outputs rather than skipping the family. Strict `scripts/artwork.mjs --check`
+fails on missing sources. Both EAS ignores and the marketing import guard keep
+artwork out of builds. Follow-up: orchestrator captures for Artemis, thread,
+stories and X1 backup; reviewed portal masks; human layout/copy review; remove
+the draft allowance once complete. Screenshot scenario names remain canonical
+`wallet`; the guide maps occurrences to wallpaper-specific retained keys because
+this task does not expand the harness screenshot schema.
 
 **Scope and exceptions:** this is a project convention, not a platform-mandated
 folder layout. Native resource tools own their generated names. Keep upstream
@@ -798,7 +911,7 @@ surface separately. Keep one original rather than duplicating source bytes.
 
 **Reviewed skills:** [code-review](skills/code-review/SKILL.md) for patch requirements versus implementation. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
-**Observed:** root [patchedDependencies](package.json) registers five [Bun patches](app/patches). The repo also has [Marmot vendored output](app/vendor/marmot-ts), [BitChat submodules](.gitmodules), and native patch/copy scripts. These are different supply paths and need different rules.
+**Observed:** root [patchedDependencies](package.json) registers six [Bun patches](app/patches). The repo also has [Marmot vendored output](app/vendor/marmot-ts), [BitChat submodules](.gitmodules), and native patch/copy scripts. These are different supply paths and need different rules.
 
 **Decision:** package-manager patches use **Bun's native patch workflow**, not patch-package. Prepare the exact package with `bun patch`, modify the prepared files, then use `bun patch --commit` and inspect the generated manifest/lock changes. Preserve the root workspace's patch registration and `app/patches` convention. Bun documents install-time application and version-associated patch registration in its [patch guide](https://bun.com/docs/pm/cli/patch). Do not edit installed files without a reproducible committed patch.
 
@@ -806,10 +919,11 @@ For every patch record package/version, affected platform, problem/reproduction,
 
 | Current patch | Source-inspected purpose |
 | --- | --- |
+| `@cashu/cashu-ts@5.0.0-rc.4` | Backport NUT-18 `mp` and NUT-26 tag `0x09`, preserving the positional constructor; remove when Coco accepts a cashu-ts release containing `mintsPreferred` |
 | `@gorhom/bottom-sheet@5.2.14` | Set sheet/backdrop `accessible` defaults to false; verify descendants and dismissal remain accessible |
 | `expo-router@56.2.11` | Expose drawer overlay styling in Router's navigation fork |
 | `react-native-screens@4.25.2` | Android form-sheet dimming adjustment |
-| `heroui-native@1.0.4` | Sheet interaction/scroll-container and related local fixes |
+| `heroui-native@1.0.9` | Both platforms. (1) `mountIndex` on bottom-sheet content forwards to gorhom `index`: heroui consumes the public `index` as its own isOpen-edge `snapToIndex`, which gorhom silently drops before layout is calculated (menus that never open / open short under JS contention; gorhom #2690, #2719). Hosts mount sheets open with `mountIndex={0}` so gorhom's animate-on-mount waits for layout. (2) `useDirectView` / `useScrollableContainer` on `contentContainerProps` keep a nested `BottomSheetScrollView` registered as the active scrollable. (3) Toast measurement clone hidden inline (runtime `opacity-0` className can fail under the monorepo Uniwind pipeline). Guarded by `app/__tests__/herouiNativePatch.test.ts`; remove each hunk when upstream forwards `index`, adopts the container flags, or fixes the clone. The 1.0.4 `isDragging` close-reaction hunk is upstream since 1.0.5 (`isClosingOnSwipe`); 1.0.6 keyed `PortalHost` portals (invisible-open-sheet reuse bug), 1.0.9 added the portal gesture root. |
 | `expo-modules-jsi@56.0.12` | Replace unsupported `weak let` declarations for the older local Swift toolchain; review removal when Xcode 26.4+ is the minimum |
 
 Patch source/runtime/type declarations as required by the package's actual resolution; do not assume only `src/` is used. Install from a clean disposable checkout with the lockfile and test that all required patches apply. Do not “fix” a patch failure by ignoring it. Do not run install/update tools merely to validate this documentation.
@@ -836,6 +950,13 @@ Use `app.json` for stable declarative config, `app.config.js` for intentional bu
 
 Public build variables are not secret storage. Validate required configuration at its boundary, distinguish development/preview/production, and make production failure explicit instead of falling back to a developer endpoint. Do not print secret values while diagnosing config. Keep ignored environments, credentials, databases, and generated build artifacts out of commits and audit documents.
 
+`backendConfig.scoreApiBaseUrl` owns Nagg app-service routing, including rates,
+version checks, AI lineup, wallpapers, BTC Map, and mint discovery. It defaults to the configured
+Nostr app-view host and supports a separate score-host override for deployment
+composition. Catalog routes require the `app` module; their availability must
+not depend on enabling generic Nostr queries. Mint discovery requires the
+`nostr` module. The separate legacy app API host setting has been removed.
+
 Scripts need a clear name, working directory, required inputs, outputs, side effects, and exit status. Read-only checks must not silently refresh dependencies, rewrite a budget, delete native projects, or submit a release. Generators should stage results and replace output only after validation. Use Node/Bun/Python/shell according to the tool's existing implementation; do not add a runtime for a trivial task.
 
 **Confirmed portability gap:** `dev` and `dev:wda` reference `app/scripts/dev.sh` and `app/scripts/start-wda.sh`. Those files exist locally but are explicitly ignored and absent from the Git index. A clean checkout cannot rely on them. Commit portable secret-free launchers, or make the local prerequisite explicit and provide a tracked default command. Do not copy local machine configuration into the repository without reviewing it.
@@ -850,7 +971,7 @@ Scripts need a clear name, working directory, required inputs, outputs, side eff
 
 **Observed:** [logger](app/shared/lib/logger.ts) and [log-doctor](app/codereview/log-doctor/OVERVIEW.md) provide scoped diagnostics; [CI](.github/workflows/ci.yml) runs workspace tests as a blocking step, with formatting/structural signals advisory. This differs from older ADR wording saying tests are nonblocking. Other workflows cover lint, both platform type checks, styling, glass headers, Compiler, and bundle size.
 
-**Decision:** use registered scoped loggers with stable event names, severity, operation correlation, counts/timings, and redacted structured errors. Keep raw payloads, private keys, bearer ecash, full invoices, DMs, and credential-bearing URLs out of logs. Disabled logging should avoid constructing expensive metadata. Do not log every successful render/conversion or enable global debug tracing for routine operation.
+**Decision:** use registered scoped loggers with stable event names, severity, operation correlation, counts/timings, and redacted structured errors. Every data arrival uses the read-lifecycle taxonomy in [readLog](app/shared/lib/read/readLog.ts): `read.<surface>.request` (with `action` = serve-fresh / serve-stale-revalidate / fetch), `.done`, `.failed`, `.superseded`, `.partial`, `.applied` and `.render` (phase edges only), joined by `readId` to `query_cache.run.*`, `nostr.read.*` and `nostr.tier.*`. Keys travel as `keyHash`, never raw. log-doctor's `reads` mode reports per-surface cache-hit rate, unnecessary refetches, time-to-first-usable-data, superseded writes and blank flashes; the acceptance bar for a loading change is zero `RefetchFresh` and zero blank flashes on the touched surface. Keep raw payloads, private keys, bearer ecash, full invoices, DMs, and credential-bearing URLs out of logs. Disabled logging should avoid constructing expensive metadata. Do not log every successful render/conversion or enable global debug tracing for routine operation.
 
 Before inspecting app logs, run log-doctor's redaction check and use a bounded relevant time/namespace slice. Do not read or copy the entire large log by default. Release source maps and build identifiers support diagnostics; friendly error text is not the diagnostic record.
 
@@ -929,7 +1050,80 @@ can change Reanimated/reduced-motion behavior and invalidate the test.
 and Android authored journeys and marks gaps. Regenerate with `bun run e2e:pages`
 from `app/`; native pass evidence is deliberately not inferred from this report.
 
+### Call-to-action gates
+
+**Observed:** `CtaHost` runs beneath AppGate and RestoreGate, using the registry
+in `app/shared/lib/cta/`. Version metadata is persisted by settingsStore.
+
+**Decision:** show one eligible CTA at a time, then re-evaluate on dismissal,
+foreground, version, lifecycle and balance changes. All CTAs use `CtaScreen` in the transactions-style modal presentation
+(iOS page sheet, Android form sheet). Dismissable CTAs allow gestures, Android back, and an explicit top close button.
+Updates use the optional “Please update” prompt. The registry retains
+`blocking-modal` plus `dismissPolicy: never` for a future explicitly forced CTA;
+those definitions retain `gestureEnabled: false` and `usePreventRemove`.
+Native gesture behavior requires device verification.
+
+**Rules:**
+
+- `shouldShow` is pure and synchronous over an injected context and clock.
+- Version prompts use persisted last-known data without waiting for a network
+  call. Records older than `LATEST_VERSION_MAX_AGE_MS` (24 hours) are unknown;
+  a missing native version never triggers an update. Version refresh is normally
+  throttled to six hours; showing the update prompt forces one immediate fresh
+  check. Re-evaluate while mounted on each version change and foreground; close
+  automatically when the update is no longer available. A fresh newer version
+  remains optional, including offline. “Not now”, close, swipe and Android back
+  defer that version for one day; a different newer version is eligible immediately.
+- Blocking CTAs have no dismissal, swipe or Android-back escape in production.
+- Dismissals are data-only. Version-triggered dismissals carry the trigger
+  version. A permanent record uses the CTA ID; a timed deferral uses its
+  `:snooze` key, with the same `{ at, version?, revision? }` shape. Definitions
+  default to revision 1. Missing/older dismissal revisions never suppress a
+  newer definition, including forever dismissals. Backup uses revision 2.
+- A primary action never dismisses a security nag. Prompts and the backup
+  screens live in one modal stack, `(prompt-flow)`, so "Back up now" pushes the
+  backup intro as the next page (never a second modal or a deferred push from
+  CtaHost) and records no persisted dismissal; an abandoned attempt has only a runtime
+  `ABANDONED_BACKUP_GRACE_MS` (30 minute) grace period. "Not now" still snoozes for
+  three days. Completing verification removes backup eligibility.
+- The navigation header owns a page's title; a screen body never repeats it as a
+  heading (`routeTitleDuplication` test). Prompt and backup bodies open with the
+  instruction or explanation instead.
+- Backup verification is additive lifecycle data; revealing the phrase alone
+  never marks it verified. The `(prompt-flow)` modal checks all 12 positions in
+  order with three choices each. Wrong answers retry only that word; returning
+  to the reveal retains progress. Success records `BACKUP_FLOW_REVISION = 2` in
+  `recoveryPhraseVerifiedRevision`; old timestamps alone do not satisfy it.
+  Intro "Not now" snoozes three days; gesture abandonment retains runtime grace.
+  The profile's backup row enters this flow; its separate copyable NIP06 reveal
+  remains available for advanced use and never certifies a backup.
+- Backup words and choices are hidden while backgrounded or unfocused. Screen
+  capture prevention is unavailable: `expo-screen-capture` is not a dependency
+  and there is no existing native prevention path. Do not claim screenshots are
+  blocked. Add prevention only with separately authorized dependency/native work.
+- A development + Mock Mode display-only BIP-39 vector exercises the quiz. It
+  never enters SecureStore, wallet derivation, or lifecycle certification. Mode
+  changes remount the session; direct success-route entry cannot certify it.
+- Mock Mode suppresses balance-derived backup nags.
+- Automation suppresses all automatic presentation. The Developer preview
+  explicitly bypasses eligibility and dismissal and offers End preview, even
+  for blocking CTAs; their normal back remains blocked. Preview state is runtime-only
+  and leaving a preview does not persist a dismissal.
+- Every CTA has semantic controls, an in-screen active probe, a registered page
+  and a JSON journey. Mnemonics never enter IDs, route params or persistence.
+
+**Hierarchy:** update (0) > security/backup (10) > tips (20+).
+
+**Follow-up:** migrate remaining nag-like popups into the registry. Native
+back/gesture, large-text and safe-area evidence is still required on both OSes.
+
 ### Mock Mode and screenshot fixtures
+
+Wallet presentation may opt into `useWalletPresentationUnit` and `usePresentationUnit`
+for a runtime-only demo currency selection. The wallet carousel, its currency pill,
+and wallpaper preview offer representative sat/USD/EUR/GBP balances in Mock Mode.
+`useActiveUnit`, mint selection, and payment contexts retain live capability semantics.
+Disabling Mock Mode restores the live selected currency and theme.
 
 **Owner:** [settingsStore.mockMode](app/shared/stores/global/settingsStore.ts) is
 the sole reactive mode selector. [mockDataStore](app/shared/stores/runtime/mockDataStore.ts)
@@ -1317,12 +1511,12 @@ The order below prioritizes data correctness/privacy, then cross-cutting contrac
 
 | ID | Priority / evidence | Follow-up and owner | Done when |
 | --- | --- | --- | --- |
-| F01 | High, confirmed helper behavior | Add request generations/invalidation to [query cache](app/shared/lib/cache/createQueryCacheStore.ts); audit scope capture with [profile storage](app/shared/lib/cashu/profileScopedStorage.ts) | Older forced read cannot overwrite newer data; clear/profile change rejects late writes; deterministic regressions pass |
+| F01 | **Done 2026-09-13** | Generation + scope guards in [query cache](app/shared/lib/cache/createQueryCacheStore.ts); `clearAllQueryCaches()` on the wipe path | [createQueryCacheStoreGenerations](app/__tests__/createQueryCacheStoreGenerations.test.ts): older forced read cannot overwrite newer data; `clear()`/abort reject late writes |
 | F02 | High, confirmed storage choice | Remove durable plaintext from [NIP-04 cache](app/shared/lib/nostr/nip04Cache.ts), or implement an explicitly justified encrypted/retained private-cache design | Safe cache migration, offline behavior, profile isolation, and plaintext-at-rest tests/documentation |
 | F03 | High, review of confirmed conversion behavior | Separate display coercion from strict amount validation in [cashu/amount](app/shared/lib/cashu/amount.ts) | Invalid/unsafe/fractional values cannot authorize a spend; all affected callers classified |
 | F04 | High, confirmed presentation bypass | Route [username claim](app/features/onboarding/screens/ClaimUsernameScreen.tsx#L348), [export alert](app/features/settings/screens/SettingsScreen.tsx#L236), and [deep-link error](app/features/send/providers/Colada.tsx#L571) through source-aware presentation | No raw upstream detail reaches those surfaces; original error preserved; classification tests cover unknown values |
 | F05 | High, review | Define critical-store behavior on [merge rejection](app/shared/lib/persist/createMergeWithSchema.ts) | Corruption cannot silently initialize/overwrite authoritative identity or funds state; unaffected preferences preserved |
-| F06 | Medium, confirmed result collapse | Preserve failure/degraded metadata through [facadeFeedClient](app/features/feed/data/facadeFeedClient.ts) | Empty, failed initial load, failed refresh, and seeded thread states remain distinct and terminate loading |
+| F06 | **Done 2026-09-13** | `read: ReadStatusMeta` on feed/thread/notification results, set by [facadeFeedClient](app/features/feed/data/facadeFeedClient.ts); every migrated surface derives error-with-Retry / degraded / empty from it ([ADR 0008](app/docs/adr/0008-read-lifecycle.md)) | [facadeFeedClient test](app/__tests__/facadeFeedClient.test.ts): exhaustion → `unavailable`, no tiers → `disabled`, untouched → ok; loading still terminates; per-surface Retry ids (`notifications-retry`, `search-error-retry`, `profile-feed-retry`, `contacts-retry`, `mint-reviews-retry`, `mint-info-audit-retry`) |
 | F07 | Medium, new shared capability | Implement decision 9's locale service, compiled catalogs, typed messages, and layout metadata | UI/error/wallet/native copy follows one locale policy; constrained messages pass native large-text/RTL/pseudolocale checks |
 | F08 | Medium, confirmed semantic inconsistencies | Fix [date](app/shared/lib/date.ts) locale/day/debug-format contracts with the locale migration | True serialization separate from display; calendar-day/DST/invalid-time/locale tests pass |
 | F09 | Medium, confirmed producer exceptions | Reconcile [apiClient schema extensions](app/shared/lib/apiClient.ts) with shared schema/producer contracts | Nullable/missing data retains useful fields; no unexplained local wire divergence |

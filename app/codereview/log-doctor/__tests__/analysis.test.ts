@@ -161,3 +161,75 @@ describe('scanRedactionAudit', () => {
     expect(audit.brandCounts.private_key).toBe(1);
   });
 });
+
+describe('analyzeReads / summarizeReads (reads mode)', () => {
+  const { analyzeReads, summarizeReads } = jest.requireActual<typeof import('../analysis')>('../analysis');
+  const e = (t: number, event: string, params: Record<string, unknown>): AnalyzableEntry => ({
+    level: 'info',
+    event,
+    _t: t,
+    params,
+  });
+  const id = (surface: string, keyHash: string, n: number) => ({ readId: `r${n}-${surface}`, surface, keyHash });
+
+  it('computes TTFUD from request → first populated render with the same readId', () => {
+    const r = id('feed', 'k_a', 1);
+    const { runs } = analyzeReads([
+      e(0, 'read.feed.request', { ...r, action: 'fetch', trigger: 'mount', cached: false, stale: false }),
+      e(2, 'read.feed.render', { ...r, phase: 'skeleton' }),
+      e(150, 'read.feed.done', { ...r, tier: 'nagg', count: 3 }),
+      e(160, 'read.feed.render', { ...r, phase: 'populated' }),
+      e(999, 'read.feed.render', { ...r, phase: 'populated' }), // later renders never move TTFUD
+    ]);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]!.firstPopulatedT).toBe(160);
+    expect(runs[0]!.ok).toBe(true);
+    expect([...runs[0]!.sources]).toEqual(['nagg']);
+    const [summary] = summarizeReads(runs);
+    expect(summary).toMatchObject({ surface: 'feed', reads: 1, cacheHit: 0, ttfudMs: [160] });
+  });
+
+  it('flags a fetch issued over a fresh entry without a user trigger as RefetchFresh', () => {
+    const fresh = id('profile', 'k_p', 2);
+    const user = id('profile', 'k_p', 3);
+    const served = id('profile', 'k_p', 4);
+    const { runs } = analyzeReads([
+      e(0, 'read.profile.request', { ...fresh, action: 'fetch', trigger: 'focus', cached: true, stale: false }),
+      e(10, 'read.profile.request', { ...user, action: 'fetch', trigger: 'user', cached: true, stale: false }),
+      e(20, 'read.profile.request', { ...served, action: 'serve-fresh', trigger: 'focus', cached: true, stale: false }),
+    ]);
+    const [summary] = summarizeReads(runs);
+    expect(summary).toMatchObject({ reads: 3, cacheHit: 3, serveFresh: 1, refetchFresh: 1 });
+  });
+
+  it('counts superseded and failed reads and collects fill sources from facade events', () => {
+    const a = id('searchProfiles', 'k_s', 5);
+    const b = id('searchProfiles', 'k_s', 6);
+    const { runs } = analyzeReads([
+      e(0, 'read.searchProfiles.request', { ...a, action: 'fetch', trigger: 'key-change', cached: false, stale: false }),
+      e(5, 'read.searchProfiles.request', { ...b, action: 'fetch', trigger: 'key-change', cached: false, stale: false }),
+      e(50, 'read.searchProfiles.superseded', { ...a, reason: 'newer-request' }),
+      e(60, 'nostr.read.searchProfiles.done', { readId: b.readId, tier: 'nagg' }),
+      e(70, 'nostr.tier.aggregate.merged', { readId: b.readId, tier: 'relay' }),
+      e(80, 'read.searchProfiles.done', { ...b, sources: ['nagg', 'relay'], degraded: false, count: 4 }),
+      e(90, 'read.searchProfiles.request', { ...id('searchProfiles', 'k_t', 7), action: 'fetch', trigger: 'key-change', cached: false, stale: false }),
+      e(95, 'read.searchProfiles.failed', { ...id('searchProfiles', 'k_t', 7), errorType: 'network', retained: false }),
+    ]);
+    const [summary] = summarizeReads(runs);
+    expect(summary).toMatchObject({ reads: 3, superseded: 1, failed: 1 });
+    expect(summary!.sources.get('nagg')).toBe(1);
+    expect(summary!.sources.get('relay')).toBe(1);
+  });
+
+  it('detects a blank flash (populated → skeleton → populated within 2s) and ignores a slow reload', () => {
+    const r = id('notifications', 'k_n', 8);
+    const { blankFlashes } = analyzeReads([
+      e(0, 'read.notifications.render', { ...r, phase: 'populated' }),
+      e(100, 'read.notifications.render', { ...r, phase: 'skeleton' }),
+      e(400, 'read.notifications.render', { ...r, phase: 'populated' }),
+      e(1000, 'read.notifications.render', { ...r, phase: 'skeleton' }),
+      e(9000, 'read.notifications.render', { ...r, phase: 'populated' }), // 8s: a reload, not a flash
+    ]);
+    expect(blankFlashes).toEqual([{ surface: 'notifications', keyHash: 'k_n', t: 100, gapMs: 300 }]);
+  });
+});

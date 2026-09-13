@@ -27,6 +27,8 @@ interface UploadMediaOptions {
   asset: PickedAsset;
   alt?: string;
   sensitive?: boolean;
+  /** Decode every avatar format instead of passing unknown/animated bytes through. */
+  forceImageReencode?: boolean;
   /** Override the configured server (e.g. for a one-off). */
   server?: string;
   /** Receives upload progress as a 0–1 fraction. */
@@ -70,7 +72,7 @@ export function uploadMedia(
   opts: UploadMediaOptions
 ): ResultAsync<MediaDescriptor, BlossomError | NormalizeImageError> {
   return preflightOriginalSize(opts.asset)
-    .andThen(() => normalizeImageAsset(opts.asset))
+    .andThen(() => normalizeImageAsset(opts.asset, opts.forceImageReencode))
     .andThen((asset) =>
       uploadToBlossom({
         ndk: opts.ndk,

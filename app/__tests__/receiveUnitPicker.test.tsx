@@ -13,8 +13,8 @@ jest.mock('@/shared/ui/composed/ScreenHeaderAction', () => ({ ScreenHeaderAction
 jest.mock('@/shared/ui/composed/CapsuleButton', () => ({ CapsuleButton: () => null }));
 jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => 'green' }));
 jest.mock('@/shared/lib/popup/popups/actionMenuSheet', () => ({ actionMenuSheet: jest.fn() }));
-jest.mock('@/features/wallet/hooks/useActiveUnit', () => ({
-  useActiveUnit: () => ({
+jest.mock('@/features/wallet/hooks/useWalletPresentationUnit', () => ({
+  useWalletPresentationUnit: () => ({
     unit: 'sat',
     availableUnits: mockAvailableUnits,
     selectUnit: mockSelectUnit,

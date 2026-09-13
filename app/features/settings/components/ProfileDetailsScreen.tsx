@@ -1,8 +1,12 @@
+import { ListRow } from '@/shared/ui/composed/ListRow';
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
+import { useShiftLogger } from '@/shared/lib/contentShiftLog';
 import React, { useEffect, useState } from 'react';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { AppState } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
-import Icon from 'assets/icons';
+import Icon from '@/assets/icons';
 import { copyPopup, type CopyTarget } from '@/shared/lib/popup';
 import { pubkeyToAccountNumber } from '@/shared/lib/nostr/keyDerivation';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -34,6 +38,7 @@ export function ProfileDetailsScreen({
   activeProfile,
   username,
   profilePicture,
+  profilePictureResolved,
   rootOnly = false,
   children,
   onBack,
@@ -45,12 +50,16 @@ export function ProfileDetailsScreen({
   activeProfile?: ProfileEntry;
   username: string;
   profilePicture?: string;
+  /** False while the own kind-0 is still being fetched (neutral placeholder). */
+  profilePictureResolved?: boolean;
   rootOnly?: boolean;
   children?: React.ReactNode;
   onBack?: () => void;
 }) {
   const mutedColor = useThemeColor('muted');
   const dangerColor = useThemeColor('danger');
+  const backgroundColor = useThemeColor('background');
+  const shift = useShiftLogger('SettingsProfileScreen');
   const [visibleFields, setVisibleFields] = useState({
     mnemonic: false,
     nsec: false,
@@ -89,13 +98,17 @@ export function ProfileDetailsScreen({
     copyTarget: CopyTarget,
     fieldKey: keyof typeof visibleFields | null = null,
     description: string | null = null,
-    isLoading: boolean = false
+    isLoading: boolean = false,
+    // Fixed per field, never derived from the value's length: the row must
+    // measure the same before and after the value arrives (no content shift).
+    lines: 1 | 3 = 3
   ) => {
     const showEyeIcon = fieldKey !== null;
     const isVisible = fieldKey ? visibleFields[fieldKey] : true;
-    const resolvedValue = isLoading ? 'Loading...' : value || 'N/A';
     const shouldObscure = showEyeIcon && !isVisible;
-    const multiline = !shouldObscure && resolvedValue.length > 56;
+    // secureTextEntry ignores multiline, so an obscured secret is one line and
+    // only grows when the user reveals it — a shift they caused.
+    const multiline = !shouldObscure && lines > 1;
 
     return (
       <Card variant="secondary" className="mb-3">
@@ -104,47 +117,46 @@ export function ProfileDetailsScreen({
             <Label>{label}</Label>
             <Input
               testID={fieldKey ? `profile-secret-value-${fieldKey}` : undefined}
-              value={shouldObscure ? '••••••••' : resolvedValue}
+              value={shouldObscure ? '••••••••' : isLoading ? '' : value || 'N/A'}
+              placeholder={isLoading ? 'Loading…' : undefined}
               editable={false}
               secureTextEntry={shouldObscure}
               multiline={multiline}
-              numberOfLines={multiline ? 3 : 1}
+              numberOfLines={multiline ? lines : 1}
               className="w-full"
             />
-            {!isLoading ? (
-              <View className="mt-2 w-full flex-row gap-2">
-                {showEyeIcon ? (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="flex-1"
-                    isDisabled={!value || loading}
-                    testID={`profile-reveal-${fieldKey}`}
-                    accessibilityRole="switch"
-                    accessibilityState={{ checked: isVisible }}
-                    accessibilityValue={{ text: isVisible ? '1' : '0' }}
-                    onPress={() => toggleFieldVisibility(fieldKey)}>
-                    <Icon
-                      name={isVisible ? 'majesticons:eye-off' : 'majesticons:eye'}
-                      size={15}
-                      color={mutedColor}
-                    />
-                    <Button.Label className="text-muted">
-                      {isVisible ? 'Hide' : 'Show'}
-                    </Button.Label>
-                  </Button>
-                ) : null}
+            {/* Always mounted: the action row is part of the card's resting
+                height, so it must not appear once the value loads. */}
+            <View className="mt-2 w-full flex-row gap-2">
+              {showEyeIcon ? (
                 <Button
                   variant="secondary"
                   size="sm"
-                  className={showEyeIcon ? 'flex-1' : 'w-full'}
-                  isDisabled={!value || loading}
-                  onPress={() => handleCopy(value, copyTarget)}>
-                  <Icon name="lets-icons:copy" size={15} color={mutedColor} />
-                  <Button.Label className="text-muted">Copy</Button.Label>
+                  className="flex-1"
+                  isDisabled={!value || loading || isLoading}
+                  testID={`profile-reveal-${fieldKey}`}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: isVisible }}
+                  accessibilityValue={{ text: isVisible ? '1' : '0' }}
+                  onPress={() => toggleFieldVisibility(fieldKey)}>
+                  <Icon
+                    name={isVisible ? 'majesticons:eye-off' : 'majesticons:eye'}
+                    size={15}
+                    color={mutedColor}
+                  />
+                  <Button.Label className="text-muted">{isVisible ? 'Hide' : 'Show'}</Button.Label>
                 </Button>
-              </View>
-            ) : null}
+              ) : null}
+              <Button
+                variant="secondary"
+                size="sm"
+                className={showEyeIcon ? 'flex-1' : 'w-full'}
+                isDisabled={!value || loading || isLoading}
+                onPress={() => handleCopy(value, copyTarget)}>
+                <Icon name="lets-icons:copy" size={15} color={mutedColor} />
+                <Button.Label className="text-muted">Copy</Button.Label>
+              </Button>
+            </View>
             {description ? <Description>{description}</Description> : null}
           </TextField>
         </Card.Body>
@@ -165,10 +177,63 @@ export function ProfileDetailsScreen({
           </View>
         ) : undefined
       }>
-      <View>
+      <View
+        onLayout={(event) => {
+          shift.report(
+            'settings.profile.shift.content.height',
+            'content.height',
+            event.nativeEvent.layout.height
+          );
+        }}>
         {children}
+        {!rootOnly && (
+          <>
+            <Text bold size={13} className="mb-2 ml-2 uppercase tracking-wide">
+              Profile info
+            </Text>
+            <Card variant="secondary" className="mb-4">
+              <Card.Body className="gap-3 py-3">
+                <View className="flex-row items-center gap-3">
+                  <Avatar
+                    state={avatarStateFor(profilePicture, profilePictureResolved ?? true)}
+                    seed={nostrKeys?.pubkey || ''}
+                    picture={profilePicture}
+                    name={username}
+                    size={56}
+                  />
+                  <View className="flex-1">
+                    <Card.Title numberOfLines={1}>{username}</Card.Title>
+                    {/* One line, middle-truncated: an npub is always 63 chars,
+                        so the row measures the same loading and loaded. */}
+                    <Card.Description className="mt-1" numberOfLines={1} ellipsizeMode="middle">
+                      {loading ? 'Loading public key…' : nostrKeys?.npub || 'N/A'}
+                    </Card.Description>
+                    {chain >= 1 && (
+                      <Text
+                        size={12}
+                        medium
+                        className="text-foreground/50 mt-1 uppercase tracking-wide">
+                        chain {chain}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+                {/* The one way in to the kind-0 editor (name, picture,
+                    Lightning address, Nostr address, about). */}
+                <Button
+                  variant="primary"
+                  testID="settings-profile-edit"
+                  accessibilityLabel="Edit profile"
+                  onPress={() => router.push('/(settings-flow)/edit-profile')}>
+                  <Icon name="mdi:pencil" size={16} color={backgroundColor} />
+                  <Button.Label>Edit profile</Button.Label>
+                </Button>
+              </Card.Body>
+            </Card>
+          </>
+        )}
         <Text bold size={13} className="mb-2 ml-2 uppercase tracking-wide">
-          Profile Details
+          Keys and recovery
         </Text>
 
         <Card variant="secondary" className="border-danger bg-danger/[0.08] mb-4 border">
@@ -187,28 +252,15 @@ export function ProfileDetailsScreen({
           </Card.Body>
         </Card>
 
-        {!rootOnly && (
-          <Card variant="secondary" className="mb-4">
-            <Card.Body className="items-center py-5">
-              <Avatar
-                state={profilePicture ? 'image' : 'fallback'}
-                seed={nostrKeys?.pubkey || ''}
-                picture={profilePicture}
-                name={username}
-                size={72}
-              />
-              <Card.Title className="mt-3">{username}</Card.Title>
-              <Card.Description className="mt-1">
-                {loading ? 'Loading public key...' : nostrKeys?.npub || 'N/A'}
-              </Card.Description>
-              {chain >= 1 && (
-                <Text size={12} medium className="text-foreground/50 mt-1 uppercase tracking-wide">
-                  chain {chain}
-                </Text>
-              )}
-            </Card.Body>
-          </Card>
-        )}
+        <ListRow
+          testID="settings-backup-row"
+          title={<Text bold>Back up recovery phrase</Text>}
+          accessibilityLabel="Back up recovery phrase"
+          onPress={() => {
+            setVisibleFields({ mnemonic: false, nsec: false, cashuMnemonic: false });
+            router.push('/(prompt-flow)/backup-intro');
+          }}
+        />
 
         {renderCopyableDetail(
           'NIP06:',
@@ -227,7 +279,8 @@ export function ProfileDetailsScreen({
               'npub',
               null,
               'Your public identifier on the Nostr network.',
-              loading
+              loading,
+              3
             )}
 
             {renderCopyableDetail(

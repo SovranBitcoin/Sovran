@@ -24,7 +24,7 @@
  */
 
 import React, { useMemo, useRef, useEffect, useCallback, useState } from 'react';
-import { StyleSheet, InteractionManager } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { seedThread, type ThreadSeed } from '@/features/feed/lib/threadSeedCache';
@@ -65,15 +65,24 @@ import type {
 import { DEFAULT_METRICS } from './nostr/feedTypes';
 import { buildDedupedVideoPosts } from './nostr/videoLayout';
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
-import { loadUserFeedImpl, type UserFeedLoadCtx } from '@/features/feed/lib/loadUserFeed';
+import {
+  enrichUserFeedPage,
+  fetchUserFeedPage,
+  type UserFeedLoadCtx,
+} from '@/features/feed/lib/loadUserFeed';
+import { feedPageCache, feedPageKey } from '@/features/feed/data/feedCache';
+import { peekProfileFeedSeed } from '@/features/feed/lib/profileFeedSeedCache';
+import { readIsUnavailable, type FeedParseResult } from '@/features/feed/data/feedClient';
+import { useCachedRead } from '@/shared/lib/read/useCachedRead';
+import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
+import { Button as PrimitiveButton } from '@/shared/ui/primitives/Button';
 import {
   DEFAULT_ENGAGEMENT_STATE,
   getFeedRowItemType,
-  getFeedRowKey,
   type FeedRow,
 } from '@/features/feed/lib/feedRows';
 
-import { PostCard } from './nostr/PostCard';
+import { PostCard, PostCardSkeleton } from './nostr/PostCard';
 import {
   ImageOverlayProvider,
   useImageOverlay,
@@ -310,6 +319,17 @@ export const RepostCard = React.memo(function RepostCard({
 // Empty State
 // ============================================================================
 
+type UserFeedListRow = FeedRow | { key: string; skeleton: true };
+
+/** Stable first-paint rows; fixed keys keep FlashList identities across the swap. */
+const SKELETON_ROWS: UserFeedListRow[] = Array.from({ length: 4 }, (_, i) => ({
+  key: `skeleton-${i}`,
+  skeleton: true as const,
+}));
+const getListRowKey = (row: UserFeedListRow) => row.key;
+const getListRowItemType = (row: UserFeedListRow) =>
+  'skeleton' in row ? 'skeleton' : getFeedRowItemType(row);
+
 function EmptyFeed({ isOwnProfile }: { isOwnProfile?: boolean }) {
   const openComposer = useOpenComposer();
   const action = isOwnProfile ? (
@@ -358,9 +378,10 @@ export function UserFeed({
     appendPage,
     applyEnrichment,
   } = useFeedContentState();
-  const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const hasMoreRef = useRef(true);
+  const paginationCursorRef =
+    useRef<import('../data/feedClient').FeedParseResult['paginationCursor']>(null);
   const paginationUntilRef = useRef(0);
   const paginationOffsetRef = useRef(0);
   const loadingMoreRef = useRef(false);
@@ -379,70 +400,78 @@ export function UserFeed({
 
   const scrollOffsetRef = useRef(0);
 
-  useEffect(() => {
-    if (!pubkey) {
-      resetContent();
-      setIsLoading(false);
-      return;
-    }
+  // Page 0 comes from the read lifecycle: the cached page for this author
+  // paints synchronously on re-entry, a hand-over seed (the author's notes the
+  // previous screen already had) paints as a partial on first open, and only a
+  // true first load shows skeleton rows. Pagination stays with the refs below.
+  const read = useCachedRead<FeedParseResult>({
+    store: feedPageCache,
+    surface: 'profileFeed',
+    key: pubkey ? feedPageKey(`user:${pubkey}`, undefined) : null,
+    viewerKey: '',
+    seed: () => peekProfileFeedSeed(pubkey),
+    classify: (page) =>
+      readIsUnavailable(page.read) && page.orderedFeedItems.length === 0
+        ? 'error'
+        : page.orderedFeedItems.length === 0
+          ? 'empty'
+          : 'ready',
+    fetcher: ({ signal, readId }) =>
+      fetchUserFeedPage({ pubkey, authorName, authorPicture, signal, readId }).then((page) => ({
+        data: page,
+      })),
+  });
+  const isLoading = read.status === 'loading';
 
-    let cancelled = false;
-    setIsLoading(true);
+  // An author switch drops the previous author's rows before the new page
+  // (cache, seed or network) applies below in the same commit.
+  const appliedPageRef = useRef<FeedParseResult | null>(null);
+  useEffect(() => {
+    resetContent();
+    appliedPageRef.current = null;
+    deletedRepostIdsRef.current = null;
+  }, [pubkey, resetContent]);
+
+  useEffect(() => {
+    const page = read.data;
+    if (!page || appliedPageRef.current === page) return;
+    appliedPageRef.current = page;
     isFirstRender.current = true;
-    hasMoreRef.current = true;
-    paginationUntilRef.current = 0;
-    paginationOffsetRef.current = 0;
-    feedItemIdsRef.current.clear();
+    hasMoreRef.current = page.paginationUntil > 0 && page.orderedFeedItems.length > 0;
+    paginationCursorRef.current = page.paginationCursor;
+    paginationUntilRef.current = page.paginationUntil;
+    paginationOffsetRef.current = page.paginationOffset;
+    feedItemIdsRef.current = new Set(
+      page.orderedFeedItems.map((item) =>
+        item.type === 'note' ? item.event.id : item.repostEvent.id
+      )
+    );
     loadingMoreRef.current = false;
     activeLoadMoreIdRef.current = null;
-    deletedRepostIdsRef.current = null;
-
-    // Body lives in module-scope `loadUserFeedImpl` — try/finally inside the
-    // component would make the React Compiler skip the whole component.
-    const task = InteractionManager.runAfterInteractions(() => {
-      void loadUserFeedImpl(
-        {
-          pubkey,
-          authorName,
-          authorPicture,
-          isOwnProfile,
-          hasMoreRef,
-          paginationUntilRef,
-          paginationOffsetRef,
-          loadingMoreRef,
-          feedItemIdsRef,
-          activeLoadMoreIdRef,
-          isFirstRender,
-          deletedRepostIdsRef,
-          quotedRef,
-          profilesRef,
-          applyPage,
-          appendPage,
-          applyEnrichment,
-          resetContent,
-          setIsLoading,
-          setIsLoadingMore,
-        },
-        () => cancelled
-      );
+    if (isOwnProfile && deletedRepostIdsRef.current === null) {
+      deletedRepostIdsRef.current = useNostrSocialStore.getState().deletedRepostOriginalIds;
+    }
+    const displayItems =
+      isOwnProfile && deletedRepostIdsRef.current
+        ? page.orderedFeedItems.filter((item) => {
+            if (item.type !== 'repost') return true;
+            return !deletedRepostIdsRef.current![item.originalEventId];
+          })
+        : page.orderedFeedItems;
+    applyPage(page, displayItems);
+    // After initial render, mark first render done so subsequent items skip animation
+    requestAnimationFrame(() => {
+      isFirstRender.current = false;
     });
-
+    // A hand-over seed is a partial page: the network page that supersedes it
+    // brings its own enrichment; enriching the seed would be wasted work.
+    if (read.source === 'seed') return;
+    let cancelled = false;
+    void enrichUserFeedPage(page, { isCancelled: () => cancelled, applyEnrichment });
     return () => {
       cancelled = true;
-      task.cancel();
     };
-  }, [
-    appendPage,
-    applyEnrichment,
-    applyPage,
-    authorName,
-    authorPicture,
-    isOwnProfile,
-    profilesRef,
-    pubkey,
-    quotedRef,
-    resetContent,
-  ]);
+  }, [read.data, read.source, isOwnProfile, applyPage, applyEnrichment]);
 
   // ── Pagination: load older items ──
 
@@ -455,6 +484,7 @@ export function UserFeed({
         isOwnProfile,
         hasMoreRef,
         paginationUntilRef,
+        paginationCursorRef,
         paginationOffsetRef,
         loadingMoreRef,
         feedItemIdsRef,
@@ -467,7 +497,6 @@ export function UserFeed({
         appendPage,
         applyEnrichment,
         resetContent,
-        setIsLoading,
         setIsLoadingMore,
       }),
     [
@@ -491,9 +520,13 @@ export function UserFeed({
     void loadMoreItems();
   }, [loadMoreItems, isLoading]);
 
+  // Live `metricsMap` state, not `metricsRef`: the ref is written after commit,
+  // so reading it here left every card on DEFAULT_METRICS (no counts) until an
+  // unrelated re-render — the same bug HomeFeed fixed. Depending on the map
+  // recomputes the rows the moment a page's stats land.
   const getMetrics = useCallback(
-    (noteId: string): NoteMetrics => metricsRef.current.get(noteId) || DEFAULT_METRICS,
-    [metricsRef]
+    (noteId: string): NoteMetrics => metricsMap.get(noteId) || DEFAULT_METRICS,
+    [metricsMap]
   );
 
   const {
@@ -681,21 +714,46 @@ export function UserFeed({
         <Text medium size={13} style={[styles.sectionTitle, { color: withAlpha(foreground, 0.5) }]}>
           Notes
         </Text>
-        {isLoading ? (
-          <Spinner size={22} style={{ marginTop: 32 }} />
-        ) : feedItems.length === 0 ? (
+        {read.status === 'error' && feedItems.length === 0 ? (
+          <EmptyState
+            icon="mdi:cloud-off-outline"
+            title="Posts unavailable"
+            subtitle="Couldn't load this profile's posts right now."
+            action={
+              <PrimitiveButton
+                text="Try again"
+                variant="secondary"
+                onPress={read.refresh}
+                testID="profile-feed-retry"
+              />
+            }
+          />
+        ) : !isLoading && feedItems.length === 0 && read.status !== 'error' ? (
           <EmptyFeed isOwnProfile={isOwnProfile} />
         ) : null}
       </View>
     </View>
   );
 
+  // First paint with nothing cached: skeleton rows as list items through the
+  // shared PostCardSkeleton, never a spinner over an empty list.
+  const listRows: UserFeedListRow[] = isLoading && feedRows.length === 0 ? SKELETON_ROWS : feedRows;
+  const renderListRow = useCallback(
+    ({ item, index }: { item: UserFeedListRow; index: number }) =>
+      'skeleton' in item ? (
+        <PostCardSkeleton variant="thread-reply" index={index} />
+      ) : (
+        renderFeedItem({ item, index })
+      ),
+    [renderFeedItem]
+  );
+
   const feedList =
-    isLoading || feedItems.length === 0 ? (
-      // Loading or empty: header-only mode (no rows to render).
+    listRows.length === 0 ? (
+      // Empty or failed: header-only mode (the header carries the state).
       <List
         screen
-        data={[] as FeedRow[]}
+        data={[] as UserFeedListRow[]}
         renderItem={() => null}
         ListHeaderComponent={feedHeader}
         style={styles.flexOne}
@@ -706,11 +764,11 @@ export function UserFeed({
     ) : (
       <List
         screen
-        data={feedRows}
-        keyExtractor={getFeedRowKey}
-        getItemType={getFeedRowItemType}
+        data={listRows}
+        keyExtractor={getListRowKey}
+        getItemType={getListRowItemType}
         drawDistance={500}
-        renderItem={renderFeedItem}
+        renderItem={renderListRow}
         ListHeaderComponent={feedHeader}
         ListFooterComponent={
           isLoadingMore ? <Spinner size={18} style={{ paddingVertical: 24 }} /> : null
@@ -754,6 +812,7 @@ async function loadMoreUserItemsImpl(ctx: UserFeedLoadCtx): Promise<FeedItem[]> 
     isOwnProfile,
     hasMoreRef,
     paginationUntilRef,
+    paginationCursorRef,
     paginationOffsetRef,
     loadingMoreRef,
     feedItemIdsRef,
@@ -780,10 +839,12 @@ async function loadMoreUserItemsImpl(ctx: UserFeedLoadCtx): Promise<FeedItem[]> 
       authorName,
       authorPicture,
       limit: 30,
+      cursor: paginationCursorRef.current,
       until: paginationUntilRef.current,
       offset: paginationOffsetRef.current > 0 ? paginationOffsetRef.current : undefined,
     });
 
+    paginationCursorRef.current = page.paginationCursor;
     if (page.orderedFeedItems.length === 0) {
       hasMoreRef.current = false;
       return [];

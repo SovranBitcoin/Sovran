@@ -4,8 +4,18 @@ import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Image } from 'expo-image';
 import { Button, Card } from 'heroui-native';
 import { withAlpha } from '@/shared/lib/color';
-import Icon from 'assets/icons';
+import Icon from '@/assets/icons';
 
+import { Section } from '@/shared/ui/composed/Section';
+import { ListRow } from '@/shared/ui/composed/ListRow';
+import { E2EHerouiMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
+import {
+  DEFAULT_BLOSSOM_SERVER,
+  isValidHttpsUrl,
+  normalizeMediaServer,
+  useMediaServerStore,
+} from '@/shared/lib/nostr/media/mediaServerStore';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -95,7 +105,8 @@ function BlobRow({
 }) {
   // A delete is in flight while the state is 'delete-requested' — show only the
   // spinning pill then, never a tappable trash that could re-fire the request.
-  const canDelete = !!onDelete && blob.deleteState !== 'delete-requested';
+  const canDelete =
+    !!onDelete && blob.deleteState !== 'delete-requested' && blob.deleteState !== 'deleted';
   return (
     <HStack align="center" gap={12} style={styles.row}>
       <Image
@@ -119,6 +130,7 @@ function BlobRow({
       {canDelete ? (
         <Pressable
           haptics
+          testID="settings-media-delete"
           hitSlop={10}
           onPress={() => onDelete?.(blob)}
           style={styles.deleteButton}
@@ -131,47 +143,48 @@ function BlobRow({
   );
 }
 
-function Section({
+function MediaSection({
   title,
-  description,
+  testID,
   blobs,
   colors,
   onDelete,
 }: {
   title: string;
-  description: string;
+  testID: string;
   blobs: OwnedBlobEntry[];
   colors: StatusColors;
-  onDelete?: (blob: OwnedBlobEntry) => void;
+  onDelete: (blob: OwnedBlobEntry) => void;
 }) {
-  if (blobs.length === 0) return null;
   return (
-    <View className="mb-4">
-      <HStack align="center" justify="space-between" className="mb-2 ml-1 mr-1">
-        <Text bold size={12} className="uppercase tracking-wide">
-          {title}
-        </Text>
-        <Text size={11} style={{ color: colors.muted }}>
-          {blobs.length}
-        </Text>
-      </HStack>
-      <Card variant="secondary">
-        <Card.Body className="gap-1">
-          <Text size={11} style={{ color: colors.muted }} className="mb-1">
-            {description}
+    <View testID={testID}>
+      <Section title={title}>
+        {blobs.length === 0 ? (
+          <Text size={13} className="text-foreground/60 px-3">
+            No images yet.
           </Text>
-          {blobs.map((blob) => (
-            <BlobRow key={blob.sha256} blob={blob} colors={colors} onDelete={onDelete} />
-          ))}
-        </Card.Body>
-      </Card>
+        ) : (
+          <Card variant="secondary">
+            <Card.Body className="gap-1">
+              {blobs.map((blob) => (
+                <BlobRow
+                  key={`${blob.host}|${blob.sha256}`}
+                  blob={blob}
+                  colors={colors}
+                  onDelete={onDelete}
+                />
+              ))}
+            </Card.Body>
+          </Card>
+        )}
+      </Section>
     </View>
   );
 }
 
 /**
- * Settings → "My media": the durable owned-blob ledger, split into "Still
- * online" and "Deleted" sections so the state is obvious at a glance. Refresh
+ * Settings → "My media": the durable owned-blob ledger, split by purpose
+ * with a status pill on each image. Refresh
  * HEAD-probes each URL to verify — disambiguating Primal's 404 ("gone" vs "not
  * owned"). Each still-online row can be deleted directly here (BUD-11), the
  * same reconciliation a post deletion runs, so a blob can be removed or retried
@@ -180,6 +193,42 @@ function Section({
 export const SettingsMediaScreen = () => {
   useLifecycleLogger('SettingsMediaScreen');
   const { ndk } = useNDK();
+  const server = useMediaServerStore((s) => s.server);
+  const currentPicture = useProfileStore(
+    (s) => s.profiles.find((p) => p.accountIndex === s.activeAccountIndex)?.cachedPicture
+  );
+  const editServer = () => {
+    actionMenuPopup({
+      title: 'Upload server',
+      inputs: [
+        {
+          id: 'server',
+          label: 'Server URL',
+          initialValue: server,
+          autoCapitalize: 'none',
+          autoCorrect: false,
+          keyboardType: 'url',
+        },
+      ],
+      primaryAction: {
+        text: 'Save',
+        testID: 'settings-media-server-save',
+        isDisabled: (values) => !isValidHttpsUrl(normalizeMediaServer(values.server)),
+        onPress: (values, { close }) => {
+          useMediaServerStore.getState().setServer(values.server);
+          close();
+        },
+      },
+      footerButtons: [
+        {
+          text: 'Restore default',
+          testID: 'settings-media-server-restore',
+          disabled: server === DEFAULT_BLOSSOM_SERVER,
+          onPress: () => useMediaServerStore.getState().restoreDefault(),
+        },
+      ],
+    });
+  };
   const [foreground, muted, success, danger] = useThemeColor([
     'foreground',
     'muted',
@@ -218,9 +267,14 @@ export const SettingsMediaScreen = () => {
   const confirmDelete = (blob: OwnedBlobEntry) => {
     actionMenuPopup({
       title: 'Delete image?',
+      header:
+        blob.url === currentPicture ? (
+          <Text testID="settings-media-delete-reason">This is your current profile picture.</Text>
+        ) : undefined,
       buttons: [
         {
           text: 'Delete',
+          testID: 'settings-media-delete-confirm',
           icon: 'mdi:trash-can-outline',
           variant: 'dangerous',
           description: 'Removes it from the media server. This cannot be undone.',
@@ -237,7 +291,9 @@ export const SettingsMediaScreen = () => {
   const all = Object.values(byBlob).sort((a, b) => b.lastSeen - a.lastSeen);
   const online = all.filter((b) => b.deleteState !== 'deleted');
   const deleted = all.filter((b) => b.deleteState === 'deleted');
-  const total = online.length + deleted.length;
+  const total = all.length;
+  const avatars = all.filter((blob) => blob.purpose === 'avatar');
+  const posts = all.filter((blob) => blob.purpose !== 'avatar');
 
   const [refreshing, setRefreshing] = useState(false);
   const handleRefresh = () => refreshOwnedBlobs(setRefreshing);
@@ -247,20 +303,33 @@ export const SettingsMediaScreen = () => {
       <ScrollView
         className="px-4"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}>
+        <Section title="Upload server">
+          <Card variant="secondary">
+            <ListRow
+              title={hostLabel(server)}
+              subtitle="Profile pictures and post images are uploaded here. Location and camera metadata are removed first."
+              wrapSubtitle
+              trailing={<Icon name="mdi:chevron-right" size={20} color={muted} />}
+              testID="settings-media-server-row"
+              onPress={editServer}
+            />
+          </Card>
+        </Section>
         <Card variant="secondary" className="mb-4">
           <Card.Body className="gap-3">
             <Text bold size={16}>
               My media
             </Text>
             <Text size={12} className="text-foreground/70">
-              Every image you&apos;ve posted, kept so a deletion can be retried or verified later.
-              Refresh re-checks each image on its server.
+              Your profile pictures and post images, kept so a deletion can be retried or verified
+              later. Refresh re-checks each image on its server.
             </Text>
             <Text size={11} className="text-foreground/50">
               {total} total · {online.length} online · {deleted.length} deleted
             </Text>
             <View className="flex-row">
               <Button
+                testID="settings-media-refresh"
                 variant="secondary"
                 size="sm"
                 isDisabled={refreshing || total === 0}
@@ -271,27 +340,21 @@ export const SettingsMediaScreen = () => {
           </Card.Body>
         </Card>
 
-        {total === 0 ? (
-          <Text size={13} className="text-foreground/60 mt-4 text-center">
-            No media yet. Images you post will appear here.
-          </Text>
-        ) : (
-          <>
-            <Section
-              title="Still online"
-              description="These images are still hosted and can be deleted."
-              blobs={online}
-              colors={colors}
-              onDelete={confirmDelete}
-            />
-            <Section
-              title="Deleted"
-              description="Confirmed removed from the server."
-              blobs={deleted}
-              colors={colors}
-            />
-          </>
-        )}
+        <MediaSection
+          title="Profile pictures"
+          testID="settings-media-section-avatar"
+          blobs={avatars}
+          colors={colors}
+          onDelete={confirmDelete}
+        />
+        <MediaSection
+          title="Post media"
+          testID="settings-media-section-post"
+          blobs={posts}
+          colors={colors}
+          onDelete={confirmDelete}
+        />
+        <E2EHerouiMenuProbe />
       </ScrollView>
     </ScreenWrapper>
   );

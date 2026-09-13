@@ -184,6 +184,21 @@ describe('receive rail presentation', () => {
     expect(mockPaymentInfo).toHaveBeenCalledTimes(1);
     act(() => renderer.unmount());
   });
+  it('does not request a quote from a hidden tab when its Unified method is excluded', () => {
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <ReceiveReusableQuoteTab {...props} active={false} enabled={false} />
+      );
+    });
+    expect(mockQuote).toHaveBeenLastCalledWith(null, {});
+    act(() => renderer.update(<ReceiveReusableQuoteTab {...props} active enabled />));
+    expect(mockQuote).toHaveBeenLastCalledWith(
+      { mintUrl: 'https://mint.example', method: 'bolt12', unit: 'sat' },
+      {}
+    );
+    act(() => renderer.unmount());
+  });
   it('opens Discover only once on a rapid double tap', () => {
     mockSupports = false;
     let renderer!: TestRenderer.ReactTestRenderer;

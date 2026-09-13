@@ -46,21 +46,24 @@ import '@/shared/lib/nostr/media/mediaServerStore';
 import '@/shared/lib/nostr/outbox/relayListStore';
 import '@/shared/stores/global/btcMapStore';
 import '@/shared/stores/global/mempoolAddressCache';
-import '@/shared/stores/global/mintMetadataStore';
 import '@/shared/stores/global/nostrMetadataCache';
 import '@/shared/stores/global/pricelistStore';
 import '@/shared/stores/global/profileStore';
 import '@/shared/stores/global/relayMetadataStore';
 import '@/shared/stores/global/settingsStore';
+import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import '@/shared/stores/global/walletLifecycleStore';
+import '@/shared/stores/global/ctaStore';
 import '@/shared/stores/global/wallpaperStore';
 import '@/shared/stores/profile/dataMigrationStore';
+import '@/shared/stores/profile/dmLastMessageStore';
 import '@/shared/stores/profile/mintDistributionStore';
 import '@/shared/stores/profile/mintStore';
 import '@/shared/stores/profile/nostrSocialStore';
 import '@/shared/stores/profile/npcMintStore';
 import '@/shared/stores/profile/nutDropRedeemQueueStore';
 import '@/shared/stores/profile/ownContentStore';
+import '@/shared/stores/profile/ownProfileMetadataStore';
 import '@/shared/stores/profile/ownedMediaStore';
 import '@/shared/stores/profile/recentPeopleStore';
 import '@/shared/stores/profile/routstrStore';
@@ -80,6 +83,9 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
 import { persistRegistry } from '@/shared/lib/persist/persistConfig';
+import { createVertexBudgetStore } from '@/shared/stores/profile/vertexBudgetStore';
+
+createVertexBudgetStore('a'.repeat(64));
 import { tolerantRecord } from '@/shared/lib/persist/tolerant';
 
 /**
@@ -367,6 +373,30 @@ function connection(clientPubkey: string, overrides: Record<string, unknown> = {
 }
 
 describe('persisted rejection is contained to the row', () => {
+  it('contains unknown Unified rail keys without losing other mint preferences', () => {
+    const merged = merge(
+      'mint-store',
+      {
+        selectedMint: 'https://mint.example',
+        activeUnit: 'eur',
+        creqP2pkLock: true,
+        bip321ExcludedRails: { futureRail: true, bolt12: true },
+      },
+      current({
+        selectedMint: undefined as string | undefined,
+        activeUnit: 'sat',
+        creqP2pkLock: false,
+        bip321ExcludedRails: {},
+      })
+    );
+    expect(merged).toMatchObject({
+      selectedMint: 'https://mint.example',
+      activeUnit: 'eur',
+      creqP2pkLock: true,
+      bip321ExcludedRails: {},
+    });
+  });
+
   it('keeps every other pairing when one connection carries an unknown value', () => {
     // The reason this matters: `encryption` is a security semantic with no
     // neutral member, so an unrecognized one must not be guessed — but bare,
@@ -454,4 +484,44 @@ describe('persisted rejection is contained to the row', () => {
     expect(parsed.success).toBe(true);
     expect(parsed.success && parsed.data).toEqual({ ok: { n: 1 } });
   });
+});
+
+describe('profile source custody tolerance', () => {
+  it.each(['bogus', null, 42])(
+    'keeps unknown source %s fail-closed without losing the profile',
+    (source) => {
+      const schema = persistRegistry.find((entry) => entry.name === 'profile-store')!.schema;
+      expect(
+        schema.parse({
+          activeAccountIndex: 7,
+          profiles: [{ accountIndex: 7, pubkey: 'a'.repeat(64), addedAt: 1, source }],
+        })
+      ).toEqual({
+        activeAccountIndex: 7,
+        profiles: [{ accountIndex: 7, pubkey: 'a'.repeat(64), addedAt: 1, source: 'imported' }],
+      });
+    }
+  );
+});
+
+test('an unknown audit source does not discard mint metadata or legacy history', () => {
+  const legacy = { swaps: [] };
+  const hydrated = useMintMetadataStore.persist.getOptions().merge!(
+    {
+      legacyMigrated: true,
+      byMintUrl: {
+        'https://mint.example': {
+          displayName: 'Retained',
+          auditSource: 'future-auditor',
+          auditData: legacy,
+        },
+      },
+    },
+    useMintMetadataStore.getInitialState()
+  );
+  expect(hydrated.byMintUrl['https://mint.example']).toEqual({
+    displayName: 'Retained',
+    auditData: legacy,
+  });
+  expect(hydrated.legacyMigrated).toBe(true);
 });

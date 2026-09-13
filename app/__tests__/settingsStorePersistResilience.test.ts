@@ -60,6 +60,59 @@ describe('settingsStore persist resilience', () => {
     for (const k of Object.keys(mockMemory)) delete mockMemory[k];
   });
 
+  it.each([
+    undefined,
+    null,
+    'invalid',
+    { version: '0.1.3', fetchedAt: -1 },
+    { version: '0.1.3', fetchedAt: 1.5 },
+    { version: '0.1.3' },
+    { version: 'x'.repeat(33), fetchedAt: 123 },
+    { version: '0.1.3', minVersion: 'x'.repeat(33), fetchedAt: 123 },
+    { version: '0.1.3', message: 'x'.repeat(281), fetchedAt: 123 },
+  ])('drops only invalid or absent version metadata: %j', async (lastKnownAppVersion) => {
+    preload(
+      {
+        lastKnownAppVersion,
+        termsAccepted: { termsAccepted: true, date: '2025-01-01' },
+        hasSeenOnboarding: true,
+        displayCurrency: 'eur',
+      },
+      4
+    );
+    const store = await loadStore();
+    expect(store.getState().lastKnownAppVersion).toBeNull();
+    expect(store.getState().isTermsAccepted()).toBe(true);
+    expect(store.getState().hasSeenOnboarding).toBe(true);
+    expect(store.getState().displayCurrency).toBe('eur');
+  });
+
+  it.each([
+    { version: '0.1.3', fetchedAt: 0 },
+    { version: '0.1.3', minVersion: '0.1.2', message: 'Please update', fetchedAt: 123 },
+  ])('rehydrates valid app version metadata: %j', async (lastKnownAppVersion) => {
+    preload({ lastKnownAppVersion }, 4);
+    const store = await loadStore();
+    expect(store.getState().lastKnownAppVersion).toEqual(lastKnownAppVersion);
+  });
+
+  it('bounds a wire message before persisting so the version survives hydration', async () => {
+    const store = await loadStore();
+    store.getState().setLastKnownAppVersion({
+      version: '0.1.3',
+      minVersion: '0.1.2',
+      message: 'x'.repeat(512),
+      fetchedAt: 123,
+    });
+    await store.persist.rehydrate();
+    expect(store.getState().lastKnownAppVersion).toEqual({
+      version: '0.1.3',
+      minVersion: '0.1.2',
+      message: 'x'.repeat(280),
+      fetchedAt: 123,
+    });
+  });
+
   it('keeps terms acceptance when a removed persisted field is still in the blob', async () => {
     // `balanceSplitVariant` was a persisted enum that no longer exists in the
     // schema. A device that persisted it must still parse cleanly (the loose
@@ -227,3 +280,17 @@ test('failed settings hydration preserves the unreadable blob and exposes retrya
   expect(useSettingsHydration.getState().status).toBe('ready');
   expect(store.getState().displayCurrency).toBe('eur');
 });
+
+it.each([undefined, false, true, 'invalid'])(
+  'preserves settings with vertexCreditsEnabled=%s',
+  async (value) => {
+    jest.resetModules();
+    preload({
+      termsAccepted: { termsAccepted: true, date: '2025-01-01T00:00:00.000Z' },
+      vertexCreditsEnabled: value,
+    });
+    const store = await loadStore();
+    expect(store.getState().isTermsAccepted()).toBe(true);
+    expect(store.getState().vertexCreditsEnabled).toBe(typeof value === 'boolean' ? value : true);
+  }
+);

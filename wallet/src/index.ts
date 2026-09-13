@@ -342,6 +342,7 @@ export { annotateOptions } from "./annotate";
 export {
   selectMint,
   selectMintForMelt,
+  rankMintCandidates,
   type MintSelectionConfig,
 } from "./mint-selection";
 export {

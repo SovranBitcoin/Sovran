@@ -463,13 +463,15 @@ function revalidateMintForAmount(
 
   const selection = selectMint(walletCtx, {
     allowedMints: ctx.supportedMintUrls,
+    preferredMints: ctx.preferredMintUrls,
     minAmount: amount,
   });
-  const fullAmountCandidates = findFullAmountCandidates(
-    walletCtx,
-    amount,
-    ctx.supportedMintUrls,
-  );
+  const fullAmountCandidates = ctx.preferredMintUrls?.length
+    ? getValidMintCandidates(walletCtx, {
+        preferredMints: ctx.preferredMintUrls,
+        minAmount: amount,
+      })
+    : findFullAmountCandidates(walletCtx, amount, ctx.supportedMintUrls);
   switch (selection.type) {
     case "selected":
       if (currentMint && selection.mintUrl !== currentMint) {

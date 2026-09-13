@@ -1,0 +1,23 @@
+{
+  "id": "payments-instant",
+  "platform": "ios",
+  "screenshots": [
+    "send",
+    "receive-qr",
+    "wallet"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "payments-instant"
+}

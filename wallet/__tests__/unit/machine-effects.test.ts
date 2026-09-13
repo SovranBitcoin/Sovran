@@ -722,7 +722,7 @@ describe('runNfcWriteBackEffect', () => {
     expect(result.isOk()).toBe(true);
     if (result.isErr()) return;
 
-    expect(executeNfcSend).toHaveBeenCalledWith('https://mint.example', 250);
+    expect(executeNfcSend).toHaveBeenCalledWith('https://mint.example', 250, 'sat');
     expect(writeToken).toHaveBeenCalledWith('cashuBnfc-token');
     expect(releaseSession).toHaveBeenCalledTimes(1);
     expect(onProgress).toHaveBeenNthCalledWith(1, { phase: 'creating' });

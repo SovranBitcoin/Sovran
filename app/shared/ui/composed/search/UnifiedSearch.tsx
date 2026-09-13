@@ -94,7 +94,8 @@ function ScopeBody({
       return (
         <SearchResultRows
           results={aggregates.people}
-          loading={aggregates.peopleLoading}
+          status={aggregates.peopleStatus}
+          onRetry={aggregates.retryPeople}
           searchQuery={searchQuery}
         />
       );
@@ -104,20 +105,23 @@ function ScopeBody({
       return (
         <SearchResultRows
           results={aggregates.mints}
-          loading={aggregates.mintsLoading}
+          status={aggregates.mintsStatus}
+          onRetry={aggregates.retryMints}
           searchQuery={searchQuery}
         />
       );
     case 'Groups':
       return (
-        <SearchResultRows results={aggregates.groups} loading={false} searchQuery={searchQuery} />
+        <SearchResultRows results={aggregates.groups} status="ready" searchQuery={searchQuery} />
       );
     case 'All':
     default:
+      // People is the primary read for the All scope; mints ride along.
       return (
         <SearchResultRows
           results={aggregates.all}
-          loading={aggregates.loading}
+          status={aggregates.peopleStatus}
+          onRetry={aggregates.retryPeople}
           searchQuery={searchQuery}
         />
       );

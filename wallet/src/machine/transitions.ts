@@ -130,7 +130,13 @@ function handleExecute(
       }
       ctx.paymentRequest = intent.option.value;
       ctx.supportedMintUrls =
-        intent.info.mints.length > 0 ? intent.info.mints : undefined;
+        !intent.info.mintsPreferred && intent.info.mints.length > 0
+          ? intent.info.mints
+          : undefined;
+      ctx.preferredMintUrls =
+        intent.info.mintsPreferred && intent.info.mints.length > 0
+          ? intent.info.mints
+          : undefined;
       if (isValidSatAmount(intent.info.amount)) {
         ctx.amount = intent.info.amount;
       } else if (intent.info.amount != null) {
@@ -238,6 +244,7 @@ function handleOptionChosen(
     mintQuoteMethod: undefined,
     meltQuoteMethod: undefined,
     supportedMintUrls: undefined,
+    preferredMintUrls: undefined,
     paymentRequest: undefined,
     meltTarget: undefined,
   };
@@ -265,7 +272,13 @@ function handleOptionChosen(
       }
       ctx.paymentRequest = intent.option.value;
       ctx.supportedMintUrls =
-        intent.info.mints.length > 0 ? intent.info.mints : undefined;
+        !intent.info.mintsPreferred && intent.info.mints.length > 0
+          ? intent.info.mints
+          : undefined;
+      ctx.preferredMintUrls =
+        intent.info.mintsPreferred && intent.info.mints.length > 0
+          ? intent.info.mints
+          : undefined;
       if (isValidSatAmount(intent.info.amount)) {
         ctx.amount = intent.info.amount;
       } else if (intent.info.amount != null) {
