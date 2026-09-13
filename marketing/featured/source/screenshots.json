@@ -26,14 +26,14 @@
   "ios/ai": {
     "page": "ai",
     "file": "source/screenshots/ios/ai.png",
-    "run": "run-2026-09-13T02-12-43-637Z-aca0af50",
-    "sha256": "ce602785362a45ec51ff82f16d610d9b9803cd0a477d06d297c9fa1c965a8678"
+    "run": "run-2026-09-11T18-03-58-075Z-813d671c",
+    "sha256": "536fcd6a98257e3b421a9b76cb54a0f511139e9730c7c2d70fb7e1e0bf4b3d3e"
   },
   "ios/contacts": {
     "page": "contacts",
     "file": "source/screenshots/ios/contacts.png",
-    "run": "run-2026-09-13T02-12-43-637Z-aca0af50",
-    "sha256": "52670191256ef4790cad3be80ca745cda5db718f58bfab13ba992ce0abbeae65"
+    "run": "run-2026-09-11T18-03-58-075Z-813d671c",
+    "sha256": "80a7a86d27e333fbc868c6ba038e49e0ca3ded4f807cbb8ca788c9351db98150"
   },
   "ios/lightning-receive": {
     "page": "lightning-receive",
@@ -44,8 +44,8 @@
   "ios/wallet": {
     "page": "wallet",
     "file": "source/screenshots/ios/wallet.png",
-    "run": "run-2026-09-13T02-12-43-637Z-aca0af50",
-    "sha256": "a41390a1e2ebee1f78dc3e7542cc95291e143636c197a41916f590c4f66d12d0"
+    "run": "run-2026-09-11T18-03-58-075Z-813d671c",
+    "sha256": "e1aacd3cb641264168ebf72297393b44ab6690bd9246223302632a37ab30ceb0"
   },
   "ios/feed": {
     "page": "feed",
