@@ -113,6 +113,71 @@ describe('createNostrMintEnrichment', () => {
     expect(url.searchParams.get('limit')).toBe('100');
   });
 
+  it('drops an oversized reviewer avatar or name instead of failing the reviews', async () => {
+    // Live regression: one Minibits reviewer publishes an 8,575-char data-URI
+    // picture. The old `.max(2048)` rejected the WHOLE response, so the screen
+    // showed "Couldn't load reviews" under a cached rating.
+    const mintUrl = 'https://mint.minibits.cash/Bitcoin';
+    const reviewerB = 'd'.repeat(64);
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        summary: { mintUrl, averageScore: 4.7, reviewCount: 2 },
+        reviews: [
+          {
+            eventId: EVENT_ID,
+            reviewerPubkey: REVIEWER,
+            mintUrl,
+            score: 5,
+            content: '[5/5] solid',
+            createdAt: 1780000000,
+          },
+          {
+            eventId: 'e'.repeat(64),
+            reviewerPubkey: reviewerB,
+            mintUrl,
+            score: 4,
+            content: '[4/5] fine',
+            createdAt: 1779999000,
+          },
+        ],
+        profiles: {
+          [REVIEWER]: { name: 'Alice', picture: `data:image/png;base64,${'A'.repeat(8_575)}` },
+          [reviewerB]: { name: 'B'.repeat(300), picture: 'https://b/pic.png' },
+        },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const enrichment = createNostrMintEnrichment({ appViewBaseUrl: BASE_URL });
+    const reviews = await enrichment.fetchMintReviews(mintUrl);
+
+    expect(reviews?.reviewCount).toBe(2);
+    expect(reviews?.recommendations).toHaveLength(2);
+    // Alice keeps her name; the oversized avatar is dropped, not fatal.
+    expect(reviews?.recommendations[0]).toMatchObject({ pubkey: REVIEWER, name: 'Alice' });
+    expect(reviews?.recommendations[0]).not.toHaveProperty('picture');
+    // B keeps the picture; the oversized name is dropped.
+    expect(reviews?.recommendations[1]).toMatchObject({ pubkey: reviewerB, picture: 'https://b/pic.png' });
+    expect(reviews?.recommendations[1]).not.toHaveProperty('name');
+  });
+
+  it('drops an oversized operator avatar from the contact profile instead of failing', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse({
+          pubkey: PUBKEY,
+          name: 'operator',
+          picture: `data:image/png;base64,${'A'.repeat(9_000)}`,
+        }),
+      ),
+    );
+    const enrichment = createNostrMintEnrichment({ appViewBaseUrl: BASE_URL });
+    const profile = await enrichment.resolveMintContactProfile(PUBKEY, 'https://mint.example.com');
+    expect(profile).toMatchObject({ pubkey: PUBKEY, name: 'operator' });
+    expect(profile).not.toHaveProperty('picture');
+  });
+
   it('clamps out-of-range scores to 0–5 at the trust boundary', async () => {
     const mintUrl = 'https://mint.example.com';
     const fetchMock = vi.fn().mockResolvedValue(
