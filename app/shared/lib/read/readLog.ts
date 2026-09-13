@@ -127,6 +127,13 @@ export interface ReadPartialParams extends ReadIdentity {
   gate: 'minItems' | 'capMs' | 'allSettled' | 'seed' | 'partial';
 }
 
+export interface ReadMergedParams extends ReadIdentity {
+  tier: NostrTier | ReadSource;
+  added: number;
+  updated: number;
+  complete: boolean;
+}
+
 export interface ReadAppliedParams {
   readId: string | null;
   surface: ReadSurface;
@@ -155,6 +162,7 @@ export const readEvents = {
   failed: (p: ReadFailedParams) => readLog.warn(`read.${p.surface}.failed`, { ...p }),
   superseded: (p: ReadSupersededParams) => readLog.debug(`read.${p.surface}.superseded`, { ...p }),
   partial: (p: ReadPartialParams) => readLog.info(`read.${p.surface}.partial`, { ...p }),
+  merged: (p: ReadMergedParams) => readLog.debug(`read.${p.surface}.merged`, { ...p }),
   applied: (p: ReadAppliedParams) => readLog.debug(`read.${p.surface}.applied`, { ...p }),
   render: (p: ReadRenderParams) => readLog.debug(`read.${p.surface}.render`, { ...p }),
 };

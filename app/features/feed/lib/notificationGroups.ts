@@ -4,6 +4,12 @@ type BatchableNotificationReason = 'follow' | 'repost' | 'reaction' | 'zap';
 
 export type NotificationListItem =
   | {
+      /** First-paint placeholder row: rendered through the same row chrome as a
+       *  real row so the skeleton→content swap shifts nothing. */
+      type: 'skeleton';
+      id: string;
+    }
+  | {
       type: 'single';
       id: string;
       notification: FeedNotification;

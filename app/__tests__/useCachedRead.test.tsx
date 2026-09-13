@@ -328,6 +328,53 @@ describe('useCachedRead', () => {
     expect(result.current.status).toBe('ready');
   });
 
+  it('a destructive seed is taken once per key, not once per render', async () => {
+    const store = makeStore();
+    const fetch = deferred<{ data: Page }>();
+    let taken = 0;
+    const { result, rerender } = renderHook(() =>
+      useCachedRead<Page>({
+        store,
+        surface: 'followers',
+        key: 'k',
+        viewerKey: 'v',
+        fetcher: () => fetch.promise,
+        seed: () => {
+          taken += 1;
+          return taken === 1 ? { items: ['handed-over'] } : undefined;
+        },
+      })
+    );
+    await flush();
+    rerender({});
+    rerender({});
+    expect(taken).toBe(1);
+    expect(result.current.data?.items).toEqual(['handed-over']);
+    expect(result.current.status).toBe('revalidating');
+  });
+
+  it('fetch context carries the read mode (refresh vs initial)', async () => {
+    const store = makeStore();
+    const modes: string[] = [];
+    const { result } = renderHook(() =>
+      useCachedRead<Page>({
+        store,
+        surface: 'mintChanges',
+        key: 'k',
+        viewerKey: 'v',
+        fetcher: async ({ mode }) => {
+          modes.push(mode);
+          return { data: { items: ['x'] } };
+        },
+      })
+    );
+    await flush();
+    await act(async () => {
+      result.current.refresh();
+    });
+    expect(modes).toEqual(['initial', 'refresh']);
+  });
+
   it('unmount aborts the in-flight run so nothing sets state afterwards', async () => {
     const store = makeStore();
     let signal: AbortSignal | undefined;

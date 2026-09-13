@@ -40,6 +40,8 @@ export type ReadStatus = 'loading' | 'revalidating' | 'ready' | 'empty' | 'error
 export interface CachedReadFetchContext<TData> extends QueryCacheRunContext<TData> {
   /** The entry that was on screen when the read started (stale-while-revalidate input). */
   cached: TData | undefined;
+  /** Why this read runs: `'refresh'` is the user's pull / retry. */
+  mode: ReadMode;
 }
 
 export interface UseCachedReadOptions<TData> {
@@ -55,6 +57,13 @@ export interface UseCachedReadOptions<TData> {
    * not written to the store, so a fetch still happens.
    */
   seed?: () => TData | undefined;
+  /**
+   * Treat a seed as this session's freshest page: it is written into the
+   * store on first commit (same viewer key), so the first focus serves it
+   * with zero round-trips instead of revalidating behind it. For a hand-over
+   * from the screen that just fetched it, never for a derived guess.
+   */
+  seedFresh?: boolean;
   /**
    * Data present but nothing to show → `'empty'`; a result carrying an
    * "unavailable" marker (SYSTEM.md F06) → `'error'`. Default: `'ready'`.
@@ -74,6 +83,12 @@ export interface UseCachedReadOptions<TData> {
   coldStart?: 'paint-stale' | 'skeleton';
   /** Revalidate on refocus when the entry is stale (default true). A fresh entry is never refetched. */
   focusRevalidate?: boolean;
+  /**
+   * Abort the in-flight run when the screen blurs (default false: the result
+   * still belongs in the cache). Set for reads bound to a resource the screen
+   * tears down on blur (a live session), whose late result would be wrong.
+   */
+  abortOnBlur?: boolean;
   enabled?: boolean;
   /** How this read resolves, for the log only. Default `'http'`. */
   strategy?: 'sequential' | 'aggregate' | 'session' | 'http';
@@ -148,6 +163,7 @@ export function useCachedRead<TData>(
     focusRevalidate = true,
     coldStart = 'paint-stale',
     strategy = 'http',
+    abortOnBlur = false,
   } = options;
   const keyHash = key ? readKeyHash(key) : 'k_none';
 
@@ -181,6 +197,25 @@ export function useCachedRead<TData>(
   useEffect(() => {
     fetcherRef.current = options.fetcher;
   });
+
+  // 3b. The seed is taken ONCE per key (it may be a destructive one-shot
+  //     hand-over), through the derived-state pattern rather than a ref written
+  //     in render. A `seedFresh` seed becomes the cached entry on first commit;
+  //     this effect is declared BEFORE the focus effect so the initial read
+  //     already finds it and serves it with zero round-trips.
+  const [seedState, setSeedState] = useState<{ key: string | null; value: TData | undefined }>(
+    () => ({ key: key ?? null, value: key ? options.seed?.() : undefined })
+  );
+  if (seedState.key !== (key ?? null)) {
+    setSeedState({ key: key ?? null, value: key ? options.seed?.() : undefined });
+  }
+  const seedFresh = options.seedFresh ?? false;
+  useEffect(() => {
+    if (!seedFresh || !key || seedState.key !== key || seedState.value === undefined) return;
+    if (store.getEntry(key)) return;
+    store.setEntry(key, seedState.value, { viewerKey });
+    store.markTouched(key);
+  }, [seedFresh, key, seedState, store, viewerKey]);
 
   const start = useCallback(
     (mode: ReadMode, trigger: ReadTrigger) => {
@@ -230,6 +265,7 @@ export function useCachedRead<TData>(
             fetcherRef.current({
               ...ctx,
               cached: cachedForViewer?.data,
+              mode,
               partial: (data, cursor) => {
                 ctx.partial(data, cursor);
                 if (controller.signal.aborted) return;
@@ -306,12 +342,17 @@ export function useCachedRead<TData>(
       focusedKeyRef.current = key;
       if (first) start('initial', hadPrevious ? 'key-change' : 'mount');
       else if (focusRevalidate) start('revalidate', 'focus');
-    }, [enabled, key, focusRevalidate, start])
+      if (!abortOnBlur) return;
+      return () => {
+        abortRef.current?.abort();
+        abortRef.current = null;
+      };
+    }, [enabled, key, focusRevalidate, abortOnBlur, start])
   );
   useEffect(() => () => abortRef.current?.abort(), []);
 
   // 5. Derive the visible value + status.
-  const seeded = !entry && !keep ? options.seed?.() : undefined;
+  const seeded = !entry && !keep ? seedState.value : undefined;
   // "In flight" ends the moment this read's result is in the store — the
   // flight state clears one commit later, and that gap must not read as a
   // revalidating→populated transition. A partial write does not end it.

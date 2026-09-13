@@ -6,27 +6,18 @@ import { collectReferencedIds } from '@/features/feed/components/nostr/feedParse
 import { DEMO_NOTIFICATIONS } from '@/shared/stores/runtime/mockPresentationData';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
-import { describeError } from '@/shared/lib/errors';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, StyleSheet } from 'react-native';
-import { useFocusEffect } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { withAlpha } from '@/shared/lib/color';
 
 import Icon from '@/assets/icons';
 import type {
-  AppNotificationsSession,
   FeedNotification,
   FeedNotificationTab,
-  FeedNotificationsRequest,
   FeedNotificationsResult,
 } from '@/features/feed/data/feedClient';
 import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
-import { getFeedClient } from '@/features/feed/data/useFeedClient';
-import {
-  notificationsPageCache,
-  notificationsPageKey,
-} from '@/features/feed/data/notificationsCache';
 import {
   notificationReasonLabel,
   notificationReplyScopeLabel,
@@ -39,10 +30,6 @@ import {
 import { List } from '@/shared/ui/composed/List';
 import { seedNotificationFollowers } from '@/features/feed/lib/notificationFollowersSeedCache';
 import {
-  mergeNotificationsResult,
-  notificationDedupeKey,
-} from '@/features/feed/lib/notificationResults';
-import {
   buildNotificationListItems,
   type NotificationListItem,
 } from '@/features/feed/lib/notificationGroups';
@@ -50,6 +37,8 @@ import { seedThread } from '@/features/feed/lib/threadSeedCache';
 import { TierBadge } from '@/shared/ui/composed/TierBadge';
 import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
 import { FeedTabButton } from '@/features/feed/components/FeedTabButton';
+import { useNotificationsPage } from '@/features/feed/hooks/useNotificationsPage';
+import { Button } from '@/shared/ui/primitives/Button';
 import { MintChangesList } from '@/features/mint/components/mintChanges/MintChangesList';
 import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import {
@@ -92,11 +81,14 @@ function isClientTab(tab: NotificationTab): tab is 'APP' | 'MINTS' {
   return tab === 'APP' || tab === 'MINTS';
 }
 
-const NOTIFICATIONS_PAGE_SIZE = 50;
 const MAX_GROUP_AVATARS = 3;
 const EMPTY_NOTIFICATIONS: readonly FeedNotification[] = [];
 
-type LoadMode = 'initial' | 'refresh';
+/** Stable first-paint rows; fixed ids keep FlashList keys stable across the swap. */
+const SKELETON_ITEMS: NotificationListItem[] = Array.from({ length: 6 }, (_, i) => ({
+  type: 'skeleton' as const,
+  id: `skeleton-${i}`,
+}));
 
 function notificationItemType(item: NotificationListItem): string {
   if (item.type === 'single') return item.notification.reason;
@@ -114,164 +106,6 @@ function notificationItemBreakdown(items: readonly NotificationListItem[]): Reco
   return counts;
 }
 
-/** Where an applied page-0 came from — the axis visual inconsistency hides on. */
-type AppliedPageSource = 'network' | 'cache' | 'client-tab' | 'error-reset';
-
-/**
- * One page of notifications from the feed client, with the client disposed
- * whatever happens.
- *
- * At module scope: React Compiler cannot lower a `try` with a `finally`, and an
- * inline body would cost this screen — a primary tab — its memoization.
- */
-async function fetchNotificationsFromRelay({
-  viewerPubkey,
-  tab,
-  policy,
-  replyScope,
-  until,
-  refresh,
-  signal,
-}: Pick<
-  FeedNotificationsRequest,
-  'viewerPubkey' | 'tab' | 'policy' | 'replyScope' | 'until' | 'refresh' | 'signal'
->) {
-  const client = getFeedClient();
-  try {
-    return await client.getNotifications({
-      viewerPubkey,
-      tab,
-      policy,
-      replyScope,
-      limit: NOTIFICATIONS_PAGE_SIZE,
-      until,
-      refresh,
-      signal,
-    });
-  } finally {
-    client.dispose?.();
-  }
-}
-
-type LoadMoreLogFields = {
-  tab: NotificationTab;
-  policy: FeedNotificationsRequest['policy'];
-  replyScope: FeedNotificationsRequest['replyScope'];
-};
-
-/**
- * Advance the concurrent session by one page.
- *
- * At module scope, like {@link loadMoreFromRelay} and
- * {@link fetchNotificationsFromRelay}: React Compiler cannot lower a `try` with
- * a `finally`, and three of them inline cost this screen — a primary tab — its
- * memoization. `onSettled` carries the caller's `finally`.
- */
-async function loadMoreFromSession({
-  session,
-  sequence,
-  loadSequenceRef,
-  hasMoreRef,
-  setResult,
-  logFields,
-  onSettled,
-}: {
-  session: AppNotificationsSession;
-  sequence: number;
-  loadSequenceRef: React.MutableRefObject<number>;
-  hasMoreRef: React.MutableRefObject<boolean>;
-  setResult: React.Dispatch<React.SetStateAction<FeedNotificationsResult | null>>;
-  logFields: LoadMoreLogFields;
-  onSettled: () => void;
-}): Promise<void> {
-  try {
-    const page = await session.loadMore();
-    if (sequence !== loadSequenceRef.current) return;
-    hasMoreRef.current = session.hasMore();
-    setResult(page);
-    feedLog.info('feed.notifications.ui.load_more', {
-      ...logFields,
-      transport: 'session',
-      pageResults: page.notifications.length,
-      pending: session.pendingCount(),
-      hasMore: hasMoreRef.current,
-    });
-  } catch (error) {
-    if (sequence !== loadSequenceRef.current) return;
-    const message = error instanceof Error ? error.message : String(error);
-    feedLog.warn('feed.notifications.load_more_failed', {
-      ...logFields,
-      transport: 'session',
-      message,
-    });
-  } finally {
-    onSettled();
-  }
-}
-
-/** Advance the relay-backed list by one page, deduping against `seenKeysRef`. */
-async function loadMoreFromRelay({
-  fetchPage,
-  signal,
-  cursor,
-  sequence,
-  loadSequenceRef,
-  hasMoreRef,
-  paginationUntilRef,
-  seenKeysRef,
-  setResult,
-  logFields,
-  onSettled,
-}: {
-  fetchPage: (args: {
-    signal: AbortSignal;
-    until?: number;
-    refresh?: boolean;
-  }) => Promise<FeedNotificationsResult | null>;
-  signal: AbortSignal;
-  cursor: number;
-  sequence: number;
-  loadSequenceRef: React.MutableRefObject<number>;
-  hasMoreRef: React.MutableRefObject<boolean>;
-  paginationUntilRef: React.MutableRefObject<number>;
-  seenKeysRef: React.MutableRefObject<Set<string>>;
-  setResult: React.Dispatch<React.SetStateAction<FeedNotificationsResult | null>>;
-  logFields: LoadMoreLogFields;
-  onSettled: () => void;
-}): Promise<void> {
-  try {
-    const page = await fetchPage({ signal, until: cursor, refresh: false });
-    if (!page || signal.aborted || sequence !== loadSequenceRef.current) return;
-
-    const newKeys = page.notifications
-      .map(notificationDedupeKey)
-      .filter((key) => !seenKeysRef.current.has(key));
-    const advanced = page.paginationUntil > 0 && page.paginationUntil < cursor;
-    // Stop only when a page adds nothing new or the cursor can't advance —
-    // grouping makes the raw item count an unreliable "has more" signal.
-    hasMoreRef.current = newKeys.length > 0 && advanced;
-    if (advanced) paginationUntilRef.current = page.paginationUntil;
-    if (newKeys.length > 0) {
-      newKeys.forEach((key) => seenKeysRef.current.add(key));
-      setResult((previous) => mergeNotificationsResult(previous, page));
-    }
-    feedLog.info('feed.notifications.ui.load_more', {
-      ...logFields,
-      cursor,
-      pageResults: page.notifications.length,
-      newItems: newKeys.length,
-      advanced,
-      hasMore: hasMoreRef.current,
-    });
-  } catch (error) {
-    if (signal.aborted || sequence !== loadSequenceRef.current) return;
-    const message = error instanceof Error ? error.message : String(error);
-    feedLog.warn('feed.notifications.load_more_failed', { ...logFields, message });
-  } finally {
-    onSettled();
-  }
-}
-
 export function NotificationsScreen() {
   const mockMode = useSettingsStore((state) => state.mockMode);
   return <NotificationsContent key={mockMode ? 'demo' : 'live'} demo={mockMode} />;
@@ -286,22 +120,6 @@ function NotificationsContent({ demo }: { demo: boolean }) {
   const replyScope = useNotificationPolicyStore((state) => state.replyScope);
   const setReplyScope = useNotificationPolicyStore((state) => state.setReplyScope);
   const [activeTab, setActiveTab] = useState<NotificationTab>('ALL');
-  const [result, setResult] = useState<FeedNotificationsResult | null>(
-    demo ? DEMO_NOTIFICATIONS : null
-  );
-  const [isInitialLoading, setIsInitialLoading] = useState(!demo);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const loadSequenceRef = useRef(0);
-  const refreshControllerRef = useRef<AbortController | null>(null);
-  const loadingMoreRef = useRef(false);
-  const hasMoreRef = useRef(false);
-  const paginationUntilRef = useRef(0);
-  // Group identities already shown, so load-more can stop when a page brings
-  // nothing new — more reliable than the server's (conservative) hasNextPage,
-  // which under-reports once grouping collapses a page below the page size.
-  const seenKeysRef = useRef<Set<string>>(new Set());
   const [foreground, surface, separator, muted, surfaceTertiary] = useThemeColor([
     'foreground',
     'surface',
@@ -313,18 +131,6 @@ function NotificationsContent({ demo }: { demo: boolean }) {
     () => `feed.notifications.${activeTab.toLowerCase()}.list`,
     [activeTab]
   );
-
-  // The unified three-source session (nagg + Primal + relays, concurrent).
-  // Owns cross-source dedupe, per-source cursors, and the pooled-new-rows
-  // no-shift contract; the refs here only manage its lifecycle.
-  const sessionRef = useRef<AppNotificationsSession | null>(null);
-  const sessionUnsubRef = useRef<(() => void) | null>(null);
-  const closeSession = useCallback(() => {
-    sessionUnsubRef.current?.();
-    sessionUnsubRef.current = null;
-    sessionRef.current?.close();
-    sessionRef.current = null;
-  }, []);
 
   // Own recent event ids power the relay floor's #e/#q backstop and flip its
   // reply/engagement classification fail-open → fail-closed.
@@ -338,285 +144,29 @@ function NotificationsContent({ demo }: { demo: boolean }) {
     [ownContentById]
   );
 
-  const fetchNotificationsPage = useCallback(
-    async ({
-      signal,
-      until,
-      refresh,
-    }: {
-      signal: AbortSignal;
-      until?: number;
-      refresh?: boolean;
-    }) => {
-      // Client-only tabs (synthetic announcements, mint changelog) never fetch.
-      if (!viewerPubkey || isClientTab(activeTab)) return null;
-      return fetchNotificationsFromRelay({
-        viewerPubkey,
-        tab: activeTab,
-        policy,
-        replyScope,
-        until,
-        refresh,
-        signal,
-      });
-    },
-    [activeTab, policy, replyScope, viewerPubkey]
-  );
-
-  const applyFirstPage = useCallback(
-    (page: FeedNotificationsResult | null, source: AppliedPageSource) => {
-      paginationUntilRef.current = page?.paginationUntil ?? 0;
-      seenKeysRef.current = new Set((page?.notifications ?? []).map(notificationDedupeKey));
-      // Optimistic: as long as there's a cursor, try to page. load-more stops as
-      // soon as a fetch brings no genuinely-new items.
-      hasMoreRef.current = !!page && page.paginationUntil > 0;
-      feedLog.info('feed.notifications.ui.applied', {
-        source,
-        tab: activeTab,
-        policy,
-        replyScope,
-        notifications: page?.notifications.length ?? 0,
-        hasPage: !!page,
-        paginationUntil: page?.paginationUntil ?? 0,
-      });
-      setResult(page);
-    },
-    [activeTab, policy, replyScope]
-  );
-
-  const loadFirstPage = useCallback(
-    (signal: AbortSignal, mode: LoadMode) => {
-      const sequence = ++loadSequenceRef.current;
-      if (demo) {
-        closeSession();
-        applyFirstPage(activeTab === 'ALL' ? DEMO_NOTIFICATIONS : null, 'client-tab');
-        setIsInitialLoading(false);
-        setIsRefreshing(false);
-        return;
-      }
-      // No viewer, or a client-only tab → nothing to fetch; the synthetic items
-      // (welcome card) and the mint changelog render without a server round-trip.
-      if (!viewerPubkey || isClientTab(activeTab)) {
-        feedLog.info('feed.notifications.ui.load', {
-          mode,
-          tab: activeTab,
-          policy,
-          replyScope,
-          viewerReady: !!viewerPubkey,
-          clientTab: isClientTab(activeTab),
-        });
-        applyFirstPage(null, 'client-tab');
-        setErrorMessage(null);
-        setIsInitialLoading(false);
-        setIsRefreshing(false);
-        setIsLoadingMore(false);
-        return;
-      }
-
-      const cacheKey = notificationsPageKey({ viewerPubkey, tab: activeTab, policy, replyScope });
-
-      // Warm navigation (key touched earlier this session): paint the cached
-      // page instantly and revalidate. Cold start (first focus this session):
-      // show loading, never a stale first paint.
-      const coldStart = notificationsPageCache.isColdStart(cacheKey);
-      const cached =
-        mode === 'initial' && !coldStart ? notificationsPageCache.getEntry(cacheKey) : undefined;
-      feedLog.info('feed.notifications.ui.load', {
-        mode,
-        tab: activeTab,
-        policy,
-        replyScope,
-        viewerReady: true,
-        clientTab: false,
-        coldStart,
-        cacheHit: !!cached,
-      });
-      let paintedFromCache = false;
-      if (mode === 'initial') {
-        if (cached) {
-          applyFirstPage(cached.data, 'cache');
-          setIsInitialLoading(false);
-          paintedFromCache = true;
-        } else {
-          setResult(null);
-          setIsInitialLoading(true);
-        }
-      } else {
-        setIsRefreshing(true);
-      }
-      setErrorMessage(null);
-
-      // Unified session first: all three sources concurrently, one merged page.
-      // Falls back to the one-shot waterfall when the client/layer can't serve
-      // a session (legacy transport, no facade layer).
-      closeSession();
-      const sessionClient = getFeedClient();
-      const session =
-        sessionClient.openNotificationsSession?.({
-          viewerPubkey,
-          tab: activeTab,
-          policy,
-          replyScope,
-          limit: NOTIFICATIONS_PAGE_SIZE,
-          refresh: mode === 'refresh',
-          ownEventIds,
-          signal,
-        }) ?? null;
-      sessionRef.current = session;
-      sessionClient.dispose?.();
-
-      // Only an explicit pull-to-refresh forces nagg to revalidate. An initial
-      // focus reads the shared response cache (which auto-revalidates a stale
-      // entry in the background), so opening the screen no longer pays the full
-      // recompute cost on every mount.
-      const firstLoad = session
-        ? session.firstPage()
-        : fetchNotificationsPage({ signal, refresh: mode === 'refresh' });
-      void firstLoad
-        .then((page) => {
-          if (signal.aborted || sequence !== loadSequenceRef.current) return;
-          applyFirstPage(page, 'network');
-          if (page) notificationsPageCache.setEntry(cacheKey, page, { viewerKey: viewerPubkey });
-          notificationsPageCache.markTouched(cacheKey);
-          if (!session) return;
-          hasMoreRef.current = session.hasMore();
-          // In-place updates only (count bumps, shape/profile upgrades, pool
-          // count changes): row ids are stable, so the list updates without
-          // remounting or shifting; new rows wait for the next load-more.
-          sessionUnsubRef.current = session.subscribe(() => {
-            if (sequence !== loadSequenceRef.current) return;
-            const snap = session.snapshot();
-            feedLog.debug('feed.notifications.session.update', {
-              tab: activeTab,
-              rows: snap.notifications.length,
-              pending: session.pendingCount(),
-            });
-            hasMoreRef.current = session.hasMore();
-            setResult(snap);
-          });
-        })
-        .catch((error) => {
-          if (signal.aborted || sequence !== loadSequenceRef.current) return;
-          const message = error instanceof Error ? error.message : String(error);
-          feedLog.warn('feed.notifications.load_failed', {
-            mode,
-            tab: activeTab,
-            policy,
-            replyScope,
-            paintedFromCache,
-            message,
-          });
-          setErrorMessage(describeError(error, 'nagg').text);
-          // Keep the warm-painted page on a transient failure.
-          if (mode === 'initial' && !paintedFromCache) applyFirstPage(null, 'error-reset');
-        })
-        .finally(() => {
-          if (signal.aborted || sequence !== loadSequenceRef.current) return;
-          if (mode === 'initial') setIsInitialLoading(false);
-          else setIsRefreshing(false);
-        });
-    },
-    [
-      demo,
-      applyFirstPage,
-      closeSession,
-      fetchNotificationsPage,
-      ownEventIds,
-      viewerPubkey,
-      activeTab,
-      policy,
-      replyScope,
-    ]
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      const controller = new AbortController();
-      loadFirstPage(controller.signal, 'initial');
-      return () => {
-        controller.abort();
-        refreshControllerRef.current?.abort();
-        refreshControllerRef.current = null;
-        loadSequenceRef.current += 1;
-        closeSession();
-      };
-    }, [loadFirstPage, closeSession])
-  );
-
-  const handleRefresh = useCallback(() => {
-    if (isRefreshing) return;
-    refreshControllerRef.current?.abort();
-    const controller = new AbortController();
-    refreshControllerRef.current = controller;
-    loadFirstPage(controller.signal, 'refresh');
-  }, [isRefreshing, loadFirstPage]);
-
-  const loadMoreNotifications = useCallback(async () => {
-    // Session path: the session owns cursors/dedupe and the pooled-row reveal;
-    // this is the sanctioned page boundary where new rows may appear.
-    const session = sessionRef.current;
-    if (session) {
-      if (loadingMoreRef.current || isInitialLoading || isRefreshing || !session.hasMore()) return;
-      const sequence = loadSequenceRef.current;
-      loadingMoreRef.current = true;
-      setIsLoadingMore(true);
-      await loadMoreFromSession({
-        session,
-        sequence,
-        loadSequenceRef,
-        hasMoreRef,
-        setResult,
-        logFields: { tab: activeTab, policy, replyScope },
-        onSettled: () => {
-          loadingMoreRef.current = false;
-          setIsLoadingMore(false);
-        },
-      });
-      return;
-    }
-
-    if (
-      loadingMoreRef.current ||
-      isInitialLoading ||
-      isRefreshing ||
-      !viewerPubkey ||
-      !hasMoreRef.current ||
-      paginationUntilRef.current <= 0
-    ) {
-      return;
-    }
-
-    const sequence = loadSequenceRef.current;
-    const cursor = paginationUntilRef.current;
-    const controller = new AbortController();
-    loadingMoreRef.current = true;
-    setIsLoadingMore(true);
-
-    await loadMoreFromRelay({
-      fetchPage: fetchNotificationsPage,
-      signal: controller.signal,
-      cursor,
-      sequence,
-      loadSequenceRef,
-      hasMoreRef,
-      paginationUntilRef,
-      seenKeysRef,
-      setResult,
-      logFields: { tab: activeTab, policy, replyScope },
-      onSettled: () => {
-        loadingMoreRef.current = false;
-        setIsLoadingMore(false);
-      },
-    });
-  }, [
-    activeTab,
-    fetchNotificationsPage,
-    isInitialLoading,
-    isRefreshing,
+  // The page-0 owner: cache-first (a cached tab paints synchronously on tab
+  // switch, a fresh one costs no round-trip), the unified three-source session
+  // behind it, pagination layered on top. Client-only tabs (synthetic
+  // announcements, mint changelog) and demo mode never read.
+  const serverTab = isClientTab(activeTab) ? 'ALL' : activeTab;
+  const page = useNotificationsPage({
+    viewerPubkey,
+    tab: serverTab,
     policy,
     replyScope,
-    viewerPubkey,
-  ]);
+    ownEventIds,
+    enabled: !demo && !isClientTab(activeTab),
+  });
+  const result: FeedNotificationsResult | null = demo
+    ? activeTab === 'ALL'
+      ? DEMO_NOTIFICATIONS
+      : null
+    : isClientTab(activeTab)
+      ? null
+      : page.result;
+  const { isInitialLoading, isRefreshing, isLoadingMore, errorMessage } = page;
+  const handleRefresh = page.refresh;
+  const loadMoreNotifications = page.loadMore;
 
   const selectTab = useCallback(
     (tab: NotificationTab) => {
@@ -627,13 +177,8 @@ function NotificationsContent({ demo }: { demo: boolean }) {
         policy,
         replyScope,
       });
-      paginationUntilRef.current = 0;
-      hasMoreRef.current = false;
-      seenKeysRef.current = new Set();
-      setResult(null);
-      setErrorMessage(null);
-      setIsLoadingMore(false);
-      setIsInitialLoading(true);
+      // No reset here: the new tab's key selects its own cached page (or a
+      // skeleton) synchronously — never a blank list plus a spinner.
       setActiveTab(tab);
     },
     [activeTab, policy, replyScope]
@@ -802,8 +347,12 @@ function NotificationsContent({ demo }: { demo: boolean }) {
         nowMs: Date.now(),
       });
     }
-    return buildNotificationListItems(notifications);
-  }, [notifications, activeTab, seedCreatedAt, termsAccepted, legalAcceptance]);
+    const items = buildNotificationListItems(notifications);
+    // First paint with nothing cached: skeleton rows through the same row
+    // chrome, never a spinner over an empty list.
+    if (items.length === 0 && isInitialLoading) return SKELETON_ITEMS;
+    return items;
+  }, [notifications, activeTab, seedCreatedAt, termsAccepted, legalAcceptance, isInitialLoading]);
   const visualPhase = isInitialLoading ? 'initial-loading' : isRefreshing ? 'refreshing' : 'ready';
   const { onListLayout, onListContentSizeChange, onListScroll, onListViewableItemsChanged } =
     useVisualFlatListLogger<NotificationListItem>({
@@ -920,36 +469,21 @@ function NotificationsContent({ demo }: { demo: boolean }) {
               <View style={[styles.separator, { backgroundColor: separator }]} />
             )}
             ListEmptyComponent={
-              isInitialLoading ? (
-                <VisualLayoutProbe
-                  scope={notificationsVisualScope}
-                  surface="notifications"
-                  component="NotificationsInitialSpinner"
-                  itemKey="empty:initial-spinner"
-                  itemType="spinner"
-                  extra={{ tab: activeTab, phase: visualPhase }}>
-                  <Spinner
-                    size={22}
-                    color={withAlpha(foreground, 0.65)}
-                    style={notificationListStyles.loader}
-                  />
-                </VisualLayoutProbe>
-              ) : (
-                <VisualLayoutProbe
-                  scope={notificationsVisualScope}
-                  surface="notifications"
-                  component="NotificationsEmptyState"
-                  itemKey={errorMessage ? 'empty:error' : 'empty:no-results'}
-                  itemType={errorMessage ? 'error' : 'empty'}
-                  extra={{ tab: activeTab, viewerReady: !!viewerPubkey }}>
-                  <EmptyNotifications
-                    viewerReady={!!viewerPubkey}
-                    errorMessage={errorMessage}
-                    foreground={foreground}
-                    muted={muted}
-                  />
-                </VisualLayoutProbe>
-              )
+              <VisualLayoutProbe
+                scope={notificationsVisualScope}
+                surface="notifications"
+                component="NotificationsEmptyState"
+                itemKey={errorMessage ? 'empty:error' : 'empty:no-results'}
+                itemType={errorMessage ? 'error' : 'empty'}
+                extra={{ tab: activeTab, viewerReady: !!viewerPubkey }}>
+                <EmptyNotifications
+                  viewerReady={!!viewerPubkey}
+                  errorMessage={errorMessage}
+                  onRetry={handleRefresh}
+                  foreground={foreground}
+                  muted={muted}
+                />
+              </VisualLayoutProbe>
             }
             ListFooterComponent={
               // Only when there's content — never stacked on the empty-state spinner.
@@ -1027,6 +561,9 @@ function NotificationListRow({
   onPressNotification: (notification: FeedNotification) => void;
   onPressFollowGroup: (notifications: FeedNotification[]) => void;
 }) {
+  if (item.type === 'skeleton') {
+    return <NotificationSkeletonRow pressedBackground={pressedBackground} muted={muted} />;
+  }
   if (item.type === 'welcome') {
     return (
       <WelcomeNotificationRow
@@ -1155,6 +692,40 @@ function LegalAcceptanceNotificationRow({
     </NotificationRowPressable>
   );
 }
+
+/**
+ * The single-row shell with every leaf in its loading state: same icon slot,
+ * avatar geometry, title/timestamp line and body reservation as a real row,
+ * so the skeleton→content swap shifts nothing.
+ */
+function NotificationSkeletonRow({
+  pressedBackground,
+  muted,
+}: {
+  pressedBackground: string;
+  muted: string;
+}) {
+  return (
+    <NotificationRowPressable pressedBackground={pressedBackground} onPress={noopPress}>
+      <VStack gap={8}>
+        <HStack align="flex-start" gap={12}>
+          <NotificationReasonIcon reason="reaction" color={muted} />
+          <View>
+            <Avatar state="loading" name="" seed="skeleton" size={42} />
+          </View>
+          <VStack gap={4} flex={1}>
+            <HStack align="flex-start" justify="space-between" gap={8}>
+              <Text size={16} loading placeholder="Someone reacted to your post" />
+              <Text size={13} loading placeholder="2h" />
+            </HStack>
+          </VStack>
+        </HStack>
+        <Text size={15} loading placeholder="A short preview of the referenced note goes here" />
+      </VStack>
+    </NotificationRowPressable>
+  );
+}
+const noopPress = () => undefined;
 
 function NotificationRow({
   notification,
@@ -1633,11 +1204,13 @@ function notificationTone(reason: string): string {
 function EmptyNotifications({
   viewerReady,
   errorMessage,
+  onRetry,
   foreground,
   muted,
 }: {
   viewerReady: boolean;
   errorMessage: string | null;
+  onRetry?: () => void;
   foreground: string;
   muted: string;
 }) {
@@ -1665,6 +1238,14 @@ function EmptyNotifications({
         <Text size={14} style={{ color: muted, textAlign: 'center' }}>
           {subtitle}
         </Text>
+      ) : null}
+      {errorMessage && onRetry ? (
+        <Button
+          text="Try again"
+          variant="secondary"
+          onPress={onRetry}
+          testID="notifications-retry"
+        />
       ) : null}
     </VStack>
   );
