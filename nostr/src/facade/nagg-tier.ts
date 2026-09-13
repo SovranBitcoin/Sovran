@@ -68,6 +68,11 @@ import {
   type SearchRequest,
 } from './search';
 import { profileSearchAppView } from '../recipes/profile-search';
+import { eventsAggregatesAppView } from '../recipes/appview-feed';
+import { noteMetricsMapFromAggregates } from '../envelope';
+import { statsFromMetrics } from './feed';
+import type { NoteStatsRequest } from './note-stats';
+import type { NoteStatsMap } from '@sovranbitcoin/schemas';
 import type { NostrTierStrategy } from './strategy';
 
 // ---------------------------------------------------------------------------
@@ -291,6 +296,31 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
       return result.match<TierOutcome<OwnHistoryBundle>>(
         (envelope) => answered(bundleFromOwnEvents(orderedEnvelopeEvents(envelope))),
         (error) => failed(error),
+      );
+    },
+
+    async getNoteStats(request: NoteStatsRequest): Promise<TierOutcome<NoteStatsMap>> {
+      if (request.ids.length === 0) return answered({});
+      nostrLog.debug('nostr.nagg.noteStats', { ids: request.ids.length });
+      const binding = eventsAggregatesAppView(request.ids);
+      const result = await client.rest<typeof NaggEnvelopeSchema>({
+        path: binding.path,
+        method: binding.method ?? 'POST',
+        body: binding.body,
+        responseSchema: NaggEnvelopeSchema,
+        operationName: binding.operationName,
+        refresh: request.refresh,
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<NoteStatsMap>>(
+        // Zero values are omitted server-side: every requested id gets an entry.
+        (envelope) =>
+          answered(statsFromMetrics(noteMetricsMapFromAggregates(envelope.aggregates, request.ids))),
+        (error) =>
+          error.type === 'http' && (error.status === 404 || error.status === 501)
+            ? unsupported()
+            : failed(error),
       );
     },
 

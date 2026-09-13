@@ -12,7 +12,10 @@ type FeedPostCardDependencies = {
   openPostActions: (event: FeedEvent) => void;
 };
 
-type FeedPostCardRow = Pick<FeedRow, 'profiles' | 'quotedEvents'>;
+type FeedPostCardRow = Pick<
+  FeedRow,
+  'profiles' | 'quotedEvents' | 'rootEvent' | 'metricsKnown' | 'rootMetricsKnown'
+>;
 
 /**
  * Builds the shared `PostCard` wiring for a post rendered inside a feed row.
@@ -28,9 +31,14 @@ export function createFeedPostCardProps(dependencies: FeedPostCardDependencies) 
     viewerState: EngagementViewState
   ) => {
     const zapState = dependencies.getZapState(event.id);
+    const metricsKnown =
+      row.rootEvent && event.id === row.rootEvent.id
+        ? (row.rootMetricsKnown ?? true)
+        : row.metricsKnown;
     return {
       event,
       metrics,
+      metricsKnown,
       index,
       feedIndex: index,
       onOverlayOpenedFromIndex: dependencies.onOverlayOpenedFromIndex,

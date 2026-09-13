@@ -232,7 +232,7 @@ it('keeps fictional chats separate from public identities and restores private c
       result.current.displayContacts.some((c: { pubkey: string }) => c.pubkey === keys.pubkey)
     ).toBe(!enabled);
     if (enabled) {
-      expect(mockDmReader).toHaveBeenLastCalledWith(undefined, undefined);
+      expect(mockDmReader).toHaveBeenLastCalledWith(undefined, undefined, { live: false });
       expect(result.current.conversations).toEqual([]);
       expect(result.current.hasMore).toBe(false);
       expect(result.current.displayContacts).toHaveLength(6);

@@ -20,24 +20,32 @@ interface NostrKeys {
   privateKey?: Uint8Array;
 }
 
-export function useNip17RecentContacts(nostrKeys: NostrKeys | null) {
+export function useNip17RecentContacts(
+  nostrKeys: NostrKeys | null,
+  options: { live?: boolean } = {}
+) {
   const mockMode = useSettingsStore((s) => s.mockMode);
-  const { conversations, loading, hasLoadedOnce, hasMore, loadMore, refresh, error } =
+  const { conversations, loading, hasLoadedOnce, hasMore, loadMore, refresh, error, status } =
     useDmConversations(
       mockMode ? undefined : nostrKeys?.pubkey,
-      mockMode ? undefined : nostrKeys?.privateKey
+      mockMode ? undefined : nostrKeys?.privateKey,
+      { live: !mockMode && (options.live ?? false) }
     );
 
   const displayContacts = useMemo<RecentContact[]>(() => {
     const recent: RecentContact[] = conversations.map((c) => ({
       type: 'contact',
       pubkey: c.counterparty,
-      // Already-decrypted preview from nagg — no client decrypt needed here.
-      dmEvent: { content: c.lastMessagePreview, isOwn: c.lastMessageIsOwn },
-      nip17Content: c.lastMessagePreview,
+      // Already-decrypted preview — or, for a row seeded from last-message
+      // metadata, no preview yet (the page walk fills it in place).
+      dmEvent: c.previewPending
+        ? null
+        : { content: c.lastMessagePreview, isOwn: c.lastMessageIsOwn },
+      nip17Content: c.previewPending ? undefined : c.lastMessagePreview,
       timestamp: c.lastMessageAt,
       protocol: c.protocol,
-      newestMessageId: c.newestMessageId,
+      ...(c.newestMessageId ? { newestMessageId: c.newestMessageId } : {}),
+      ...(c.previewPending ? { previewLoading: true } : {}),
     }));
 
     const existing = new Set(recent.map((c) => c.pubkey));
@@ -80,6 +88,7 @@ export function useNip17RecentContacts(nostrKeys: NostrKeys | null) {
     hasMore: !mockMode && hasMore,
     loadMore,
     refresh,
-    error,
+    error: mockMode ? null : error,
+    status: mockMode ? ('ready' as const) : status,
   };
 }

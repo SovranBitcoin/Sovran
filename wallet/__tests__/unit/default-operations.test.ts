@@ -531,6 +531,51 @@ describe("buildMintReviewInfo — social enrichment", () => {
     expect(info.reviewCount).toBe(1);
   });
 
+  it("reads NUT-06 through the injected fetchMintInfo (cached) instead of the raw manager call", async () => {
+    const mockManager = createMockManager({
+      mint: { getMintInfo: vi.fn().mockResolvedValue({ name: "Raw Mint" }) },
+      wallet: { balances: { byMint: vi.fn().mockResolvedValue({}) } },
+    });
+    const fetchMintInfo = vi
+      .fn()
+      .mockResolvedValue({ name: "Cached Mint", icon_url: "https://m/i.png" });
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      fetchMintInfo,
+    });
+    const info = await ops.buildMintReviewInfo!(MINT1);
+    expect(fetchMintInfo).toHaveBeenCalledWith(MINT1);
+    expect(mockManager.mint.getMintInfo).not.toHaveBeenCalled();
+    expect(info.displayName).toBe("Cached Mint");
+    expect(info.iconUrl).toBe("https://m/i.png");
+  });
+
+  it("never fabricates a swap success rate from the ops-based audit score", async () => {
+    const mockManager = createMockManager({
+      mint: { getMintInfo: vi.fn().mockResolvedValue({ name: "Mint One" }) },
+      wallet: { balances: { byMint: vi.fn().mockResolvedValue({}) } },
+    });
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+    });
+    const info = await ops.buildMintReviewInfo!(MINT1, {
+      mintUrl: MINT1,
+      displayName: "Mint One",
+      balance: 0,
+      unit: "sat",
+      status: "available",
+      reason: null,
+      isPreferred: false,
+      auditScore: 3.5,
+      auditState: "OK",
+      reviewCount: 0,
+      contactFollowers: 1,
+      contactReputation: 1,
+    });
+    expect(info.auditScore).toBe(3.5);
+    expect(info.successRate).toBeUndefined();
+  });
+
   it("skips the redundant review + profile fetches when the row already carries them", async () => {
     const contactPubkey = "a".repeat(64);
     const mockManager = createMockManager({

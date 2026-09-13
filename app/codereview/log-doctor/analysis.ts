@@ -285,3 +285,189 @@ export function scanRedactionAudit(entries: AnalyzableEntry[]): RedactionAudit {
     suspicious,
   };
 }
+
+// ─── Read lifecycle (reads mode) ─────────────────────────────────────────────
+// Joins `read.<surface>.*` (hook/screen), `query_cache.run.*` (store) and
+// `nostr.read.<surface>.done` / `nostr.tier.aggregate.merged` (facade) on
+// `params.readId`. Per surface: cache-hit rate, refetch-while-fresh, TTFUD,
+// superseded writes, blank flashes, and which tiers filled the data.
+
+interface ReadRun {
+  readId: string;
+  surface: string;
+  keyHash: string;
+  tRequest: number;
+  action: string | null;
+  trigger: string | null;
+  cached: boolean;
+  stale: boolean;
+  tDone: number | null;
+  ok: boolean | null;
+  superseded: boolean;
+  partial: boolean;
+  degraded: boolean;
+  /** `read.request` → first `read.render{phase:'populated'}` with the same readId. */
+  firstPopulatedT: number | null;
+  sources: Set<string>;
+}
+
+interface BlankFlash {
+  surface: string;
+  keyHash: string;
+  /** `_t` of the populated→skeleton dip. */
+  t: number;
+  /** ms until the same key was populated again. */
+  gapMs: number;
+}
+
+interface ReadsAnalysis {
+  runs: ReadRun[];
+  blankFlashes: BlankFlash[];
+}
+
+const READ_EVENT = /^read\.([^.]+)\.(request|done|failed|superseded|partial|merged|applied|render)$/;
+const NOSTR_READ_DONE = /^nostr\.read\.[^.]+\.done$/;
+/** A dip longer than this is a real reload, not a flash. */
+const BLANK_FLASH_MAX_MS = 2_000;
+
+export function analyzeReads(entries: AnalyzableEntry[]): ReadsAnalysis {
+  const runs = new Map<string, ReadRun>();
+  // Per (surface|keyHash): last render phase, for populated→skeleton→populated.
+  const lastPhase = new Map<string, { phase: string; dippedAt: number | null }>();
+  const blankFlashes: BlankFlash[] = [];
+
+  for (const entry of entries) {
+    if (typeof entry._t !== 'number') continue;
+    const params = entry.params ?? {};
+    const readId = typeof params.readId === 'string' ? params.readId : null;
+
+    const m = READ_EVENT.exec(entry.event);
+    if (m) {
+      const surface = m[1]!;
+      const kind = m[2]!;
+      const keyHash = typeof params.keyHash === 'string' ? params.keyHash : '?';
+      if (kind === 'render') {
+        const phase = String(params.phase);
+        const slot = `${surface}|${keyHash}`;
+        const prev = lastPhase.get(slot);
+        if (prev?.phase === 'populated' && phase === 'skeleton') {
+          lastPhase.set(slot, { phase, dippedAt: entry._t });
+        } else if (prev?.dippedAt != null && phase === 'populated') {
+          const gapMs = entry._t - prev.dippedAt;
+          if (gapMs <= BLANK_FLASH_MAX_MS) blankFlashes.push({ surface, keyHash, t: prev.dippedAt, gapMs });
+          lastPhase.set(slot, { phase, dippedAt: null });
+        } else {
+          lastPhase.set(slot, { phase, dippedAt: phase === 'populated' ? null : (prev?.dippedAt ?? null) });
+        }
+        if (phase === 'populated' && readId) {
+          const run = runs.get(readId);
+          if (run && run.firstPopulatedT === null) run.firstPopulatedT = entry._t;
+        }
+        continue;
+      }
+      if (!readId) continue;
+      if (kind === 'request') {
+        runs.set(readId, {
+          readId,
+          surface,
+          keyHash,
+          tRequest: entry._t,
+          action: typeof params.action === 'string' ? params.action : null,
+          trigger: typeof params.trigger === 'string' ? params.trigger : null,
+          cached: params.cached === true,
+          stale: params.stale === true,
+          tDone: null,
+          ok: null,
+          superseded: false,
+          partial: false,
+          degraded: false,
+          firstPopulatedT: null,
+          sources: new Set(),
+        });
+        continue;
+      }
+      const run = runs.get(readId);
+      if (!run) continue;
+      if (kind === 'done') {
+        run.tDone = entry._t;
+        run.ok = true;
+        run.degraded = params.degraded === true;
+        if (Array.isArray(params.sources)) for (const s of params.sources) run.sources.add(String(s));
+        if (typeof params.tier === 'string') run.sources.add(params.tier);
+      } else if (kind === 'failed') {
+        run.tDone = entry._t;
+        run.ok = false;
+      } else if (kind === 'superseded') {
+        run.superseded = true;
+        run.tDone = entry._t;
+      } else if (kind === 'partial') {
+        run.partial = true;
+      } else if (kind === 'merged' && typeof params.tier === 'string') {
+        run.sources.add(params.tier);
+      }
+      continue;
+    }
+
+    // Facade-side fills carry the same readId.
+    if (readId && (entry.event === 'nostr.tier.aggregate.merged' || NOSTR_READ_DONE.test(entry.event))) {
+      const run = runs.get(readId);
+      if (run && typeof params.tier === 'string') run.sources.add(params.tier);
+    }
+  }
+
+  return { runs: [...runs.values()], blankFlashes };
+}
+
+interface ReadSurfaceSummary {
+  surface: string;
+  reads: number;
+  cacheHit: number;
+  serveFresh: number;
+  staleRevalidate: number;
+  /** A fetch issued while a fresh entry existed without a user/poll trigger — the unnecessary refetch. */
+  refetchFresh: number;
+  failed: number;
+  superseded: number;
+  partial: number;
+  degraded: number;
+  ttfudMs: number[];
+  sources: Map<string, number>;
+}
+
+export function summarizeReads(runs: ReadRun[]): ReadSurfaceSummary[] {
+  const bySurface = new Map<string, ReadSurfaceSummary>();
+  for (const run of runs) {
+    let s = bySurface.get(run.surface);
+    if (!s) {
+      s = {
+        surface: run.surface,
+        reads: 0,
+        cacheHit: 0,
+        serveFresh: 0,
+        staleRevalidate: 0,
+        refetchFresh: 0,
+        failed: 0,
+        superseded: 0,
+        partial: 0,
+        degraded: 0,
+        ttfudMs: [],
+        sources: new Map(),
+      };
+      bySurface.set(run.surface, s);
+    }
+    s.reads += 1;
+    if (run.cached) s.cacheHit += 1;
+    if (run.action === 'serve-fresh') s.serveFresh += 1;
+    if (run.action === 'serve-stale-revalidate') s.staleRevalidate += 1;
+    if (run.cached && !run.stale && run.action === 'fetch' && run.trigger !== 'user' && run.trigger !== 'poll') {
+      s.refetchFresh += 1;
+    }
+    if (run.ok === false) s.failed += 1;
+    if (run.superseded) s.superseded += 1;
+    if (run.partial) s.partial += 1;
+    if (run.degraded) s.degraded += 1;
+    if (run.firstPopulatedT !== null) s.ttfudMs.push(run.firstPopulatedT - run.tRequest);
+    for (const source of run.sources) s.sources.set(source, (s.sources.get(source) ?? 0) + 1);
+  }
+  return [...bySurface.values()].sort((a, b) => b.reads - a.reads);
+}

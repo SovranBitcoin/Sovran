@@ -44,6 +44,7 @@ export function useFeedRows({
         profilesMap,
         quotedEventsMap,
         getDisplayMetrics,
+        hasMetrics: (id) => metricsMap.has(id),
         getEngagementState,
         resolveReposter,
       }),

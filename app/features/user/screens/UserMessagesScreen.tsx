@@ -113,8 +113,7 @@ export function UserMessagesScreen({
   // from local state, so the hook is disabled with an empty counterparty.
   const {
     messages: threadMessages,
-    loading: threadLoading,
-    hasLoadedOnce,
+    status: threadStatus,
     hasMore,
     loadMore,
     refresh,
@@ -154,7 +153,8 @@ export function UserMessagesScreen({
 
   // Pull anything that landed while we were away (incoming arrives on nagg's
   // next index, not via a live sub). Skip the first focus — the hook already
-  // fetched on mount — and only re-fetch on RE-focus.
+  // fetched on mount — and only re-fetch on RE-focus. The refresh keeps the
+  // current messages on screen (status 'revalidating'); it never re-skeletons.
   const focusedOnceRef = useRef(false);
   useFocusEffect(
     useCallback(() => {
@@ -183,7 +183,10 @@ export function UserMessagesScreen({
     return [...server, ...pending].sort((a, b) => a.created_at - b.created_at);
   }, [isMockThread, threadMessages, localMessages, demoMessages]);
 
-  const isLoading = !isMockThread && threadLoading && !hasLoadedOnce && messages.length === 0;
+  // Skeleton only on a true cold start: nothing cached, nothing seeded, first
+  // page still in flight. A snapshot or a refresh paints/keeps the rows.
+  const isLoading = !isMockThread && threadStatus === 'loading' && messages.length === 0;
+  const threadSettled = threadStatus === 'ready' || threadStatus === 'error';
 
   const displayName = resolveIdentityName({ pubkey, nostrProfile: counterpartyMetadata });
   const userPicture = counterpartyMetadata?.picture;
@@ -490,7 +493,7 @@ export function UserMessagesScreen({
         counterpartyAvatar={counterpartyAvatar}
         isLoading={isLoading}
         emptyContent={
-          !threadLoading && messages.length === 0 ? (
+          threadSettled && messages.length === 0 ? (
             <View className="items-center gap-3 px-6 py-8">
               <Text size={16} style={{ color: shade400, textAlign: 'center' }}>
                 {threadError ? "Couldn't load your message history." : 'No messages yet.'}

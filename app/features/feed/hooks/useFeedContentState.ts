@@ -18,6 +18,7 @@ import { useCallback, useMemo, useState, useTransition } from 'react';
 
 import type { FeedEnrichmentUpdates, FeedParseResult } from '@/features/feed/data/feedClient';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
+import { backfillNoteStats, ingestFeedMetrics } from '@/shared/lib/nostr/fetchNoteStats';
 
 import type { FeedEvent, FeedItem, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';
 
@@ -25,7 +26,24 @@ import type { FeedEvent, FeedItem, NoteMetrics, ProfileInfo } from '../component
 type FeedContentPage = Pick<
   FeedParseResult,
   'orderedFeedItems' | 'metricsMap' | 'quotedEventsMap' | 'profilesMap'
->;
+> &
+  Partial<Pick<FeedParseResult, 'sources'>>;
+
+/**
+ * A page's counts go to the entity cache (every row binding sees them), and
+ * the notes it did NOT carry counts for are backfilled across tiers — those
+ * rows show a placeholder, never a zero, until a source answers.
+ */
+function shareMetrics(page: FeedContentPage, items: readonly FeedItem[]): void {
+  ingestFeedMetrics(page.metricsMap, page.sources?.[0] ?? 'nagg');
+  const missing: string[] = [];
+  for (const item of items) {
+    const id = item.type === 'note' ? item.event.id : item.originalEventId;
+    if (!page.metricsMap.has(id)) missing.push(id);
+    if (item.rootEvent && !page.metricsMap.has(item.rootEvent.id)) missing.push(item.rootEvent.id);
+  }
+  if (missing.length > 0) void backfillNoteStats(missing);
+}
 
 function mergedMap<V>(previous: Map<string, V>, incoming: Map<string, V>): Map<string, V> {
   const next = new Map(previous);
@@ -66,10 +84,12 @@ export function useFeedContentState(seed?: FeedContentPage) {
    * for surfaces that filter rows out before display.
    */
   const applyPage = useCallback((page: FeedContentPage, items?: FeedItem[]) => {
-    setFeedItems(items ?? page.orderedFeedItems);
+    const visible = items ?? page.orderedFeedItems;
+    setFeedItems(visible);
     setMetricsMap(page.metricsMap);
     setQuotedEventsMap(page.quotedEventsMap);
     setProfilesMap(page.profilesMap);
+    shareMetrics(page, visible);
   }, []);
 
   /** Append a pagination page: new rows plus that page's lookups. */
@@ -81,6 +101,7 @@ export function useFeedContentState(seed?: FeedContentPage) {
         setQuotedEventsMap((prev) => mergedMap(prev, page.quotedEventsMap));
         setProfilesMap((prev) => mergedMap(prev, page.profilesMap));
       });
+      shareMetrics(page, items);
     },
     [startTransition]
   );
@@ -94,6 +115,7 @@ export function useFeedContentState(seed?: FeedContentPage) {
         if (metrics) setMetricsMap((prev) => mergedMap(prev, metrics));
         if (profiles) setProfilesMap((prev) => mergedMap(prev, profiles));
       });
+      if (updates.metrics) ingestFeedMetrics(updates.metrics, 'nagg');
     },
     [startTransition]
   );

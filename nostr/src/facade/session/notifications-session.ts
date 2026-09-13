@@ -39,6 +39,8 @@ export type NotificationsSessionSource = {
 
 export type NotificationsSessionOptions = {
   request: NotificationsRequest;
+  /** Log-only correlation id stamped on this session's `nostr.notifications.session.*` events. */
+  readId?: string;
   sources: ReadonlyArray<NotificationsSessionSource>;
   liveSubscribe?: (
     request: NotificationsRequest,
@@ -101,6 +103,7 @@ export function createNotificationsSession(
       return () => clearTimeout(timer);
     });
 
+  const readId = options.readId ?? null;
   const merger = createNotificationsMerger();
   const controller = new AbortController();
   const signal = combineSignals(options.request.signal, controller.signal);
@@ -224,12 +227,15 @@ export function createNotificationsSession(
   }
 
   async function firstPage(): Promise<ResolvedNotifications> {
+    const startedAt = Date.now();
     let answeredCount = 0;
+    const answeredTiers: NostrTier[] = [];
     const attempts = options.sources.map(async (source) => {
       const outcome = await source.fetch(sourceRequest(options.request.cursor ?? null));
       if (closed) return;
       if (outcome.kind === 'answered') {
         answeredCount += 1;
+        answeredTiers.push(source.tier);
         trackBest(source.tier);
         per.set(source.tier, {
           cursor: outcome.value.cursor,
@@ -240,8 +246,10 @@ export function createNotificationsSession(
         per.set(source.tier, { cursor: null, exhausted: true });
       }
       nostrLog.debug('nostr.notifications.session.source', {
+        readId,
         tier: source.tier,
         outcome: outcome.kind,
+        elapsedMs: Date.now() - startedAt,
       });
     });
     const allSettled = Promise.allSettled(attempts).then(() => undefined);
@@ -250,22 +258,34 @@ export function createNotificationsSession(
     await new Promise<void>((resolve) => {
       let done = false;
       let capExpired = false;
-      const finish = (): void => {
+      const finish = (gate: 'capMs' | 'allSettled'): void => {
         if (done) return;
         done = true;
         cancelCap();
+        // The first-paint gate made visible: which tiers had answered when the
+        // page was released, and how long the viewer waited for it.
+        nostrLog.info('nostr.notifications.session.paint', {
+          readId,
+          gate,
+          answered: [...answeredTiers],
+          pending: options.sources
+            .map((s) => s.tier)
+            .filter((tier) => !per.has(tier)),
+          count: merger.revealedCount() + merger.pooledCount(),
+          elapsedMs: Date.now() - startedAt,
+        });
         resolve();
       };
       const cancelCap = scheduleAfter(capMs, () => {
         capExpired = true;
-        if (answeredCount > 0) finish();
+        if (answeredCount > 0) finish('capMs');
       });
       for (const attempt of attempts) {
         void attempt.then(() => {
-          if (capExpired && answeredCount > 0) finish();
+          if (capExpired && answeredCount > 0) finish('capMs');
         });
       }
-      void allSettled.then(finish);
+      void allSettled.then(() => finish('allSettled'));
     });
     painted = true;
     merger.reveal(pageSize);

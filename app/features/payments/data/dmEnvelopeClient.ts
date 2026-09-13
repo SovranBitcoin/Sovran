@@ -23,6 +23,7 @@ export async function fetchDmEnvelopes(args: {
   limit?: number;
   refresh?: boolean;
   signal?: AbortSignal;
+  readId?: string;
 }): Promise<DmEnvelopePage> {
   const layer = buildNostrDataLayer();
   if (!layer) {
@@ -36,6 +37,7 @@ export async function fetchDmEnvelopes(args: {
       limit: args.limit,
       refresh: args.refresh,
       signal: args.signal,
+      readId: args.readId,
     })
   );
   return result.match(
@@ -63,4 +65,23 @@ export async function fetchDmEnvelopes(args: {
       throw new Error('Message history is unavailable', { cause: error });
     }
   );
+}
+
+/**
+ * Live push of envelopes addressed to the viewer (relay tier only; a no-op
+ * when no relay is enabled). Each arrival is delivered as a one-envelope page
+ * so the consumer's existing decrypt/bucket path handles it; dedupe is the
+ * consumer's (bucket latest-wins / seen-id set). Returns an unsubscribe.
+ */
+export function subscribeDmEnvelopesLive(
+  viewer: string,
+  onPage: (page: DmEnvelopePage) => void
+): () => void {
+  const layer = buildNostrDataLayer();
+  if (!layer || !viewer) return () => {};
+  return layer.subscribeDmEnvelopes({ viewerPubkey: viewer }, (envelope) => {
+    const page = resolvedDmEnvelopesToPage({ tier: 'relay', envelopes: [envelope], cursor: null });
+    paymentLog.debug('payment.dm.envelopes.live', { envelopes: page.envelopes.length });
+    onPage(page);
+  });
 }

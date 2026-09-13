@@ -18,6 +18,7 @@ import { useMemo } from 'react';
 import { useOverlaidContactSearch, type ContactSearchRow } from './useOverlaidContactSearch';
 import { useLocationTiers, type TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
 import type { MintSearchResult } from '@/shared/lib/apiClient';
+import type { SearchStatus } from '@/shared/ui/composed/search/searchListState';
 import { parseGeohashQuery } from '../lib/parseGeohashQuery';
 import { matchTiers } from '../lib/matchTiers';
 
@@ -40,9 +41,12 @@ interface UseAllSearchResultsResult {
   people: AllSearchResult[];
   /** Geohash-jump + tier rows only (for the Groups scope). */
   groups: AllSearchResult[];
-  /** Real (non-placeholder) pubkeys behind the contact rows, for the Posts scope. */
+  /** Pubkeys behind the contact rows, for the Posts scope. */
   postsAuthors: string[];
   loading: boolean;
+  /** People-search read status (drives placeholders / no-results / error). */
+  status: SearchStatus;
+  retry: () => void;
 }
 
 // Score constants — arrange the All feed with geohash jump on top, then
@@ -54,7 +58,7 @@ const SCORE_TIER_DISPLAYNAME = 80;
 export function useAllSearchResults(query: string): UseAllSearchResultsResult {
   // Contact hits + kind-0 overlay come from the shared owner; this hook adds the
   // location/tier + geohash dimensions the wallet/feed "All" scope needs.
-  const { contactRows, loading } = useOverlaidContactSearch(query);
+  const { contactRows, loading, status, retry } = useOverlaidContactSearch(query);
   const { tiers } = useLocationTiers();
 
   return useMemo(() => {
@@ -86,11 +90,9 @@ export function useAllSearchResults(query: string): UseAllSearchResultsResult {
     const combined: AllSearchResult[] = [...groups, ...contactRows];
     combined.sort((a, b) => b.score - a.score);
 
-    // Pubkeys with a real (non-placeholder) profile — the authors the Posts
-    // scope fetches recent posts for, and the gate for showing the Posts tab.
-    const postsAuthors = contactRows.flatMap((r) =>
-      !r.pubkey.startsWith('placeholder-') ? [r.pubkey] : []
-    );
+    // The authors the Posts scope fetches recent posts for, and the gate for
+    // showing the Posts tab.
+    const postsAuthors = contactRows.map((r) => r.pubkey);
 
     return {
       results: combined,
@@ -98,6 +100,8 @@ export function useAllSearchResults(query: string): UseAllSearchResultsResult {
       groups,
       postsAuthors,
       loading,
+      status,
+      retry,
     };
-  }, [query, contactRows, loading, tiers]);
+  }, [query, contactRows, loading, status, retry, tiers]);
 }

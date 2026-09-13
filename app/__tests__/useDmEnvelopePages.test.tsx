@@ -12,9 +12,14 @@ import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { useDmEnvelopePages } from '@/features/payments/hooks/useDmEnvelopePages';
 import type { DmEnvelopePage } from '@/features/payments/data/dmEnvelopeTypes';
 
-jest.mock('@/shared/lib/logger', () => ({
-  paymentLog: { warn: jest.fn(), debug: jest.fn(), info: jest.fn() },
-}));
+jest.mock('@/shared/lib/logger', () => {
+  const sink = { info: jest.fn(), warn: jest.fn(), debug: jest.fn(), error: jest.fn() };
+  return {
+    paymentLog: sink,
+    log: { ...sink, child: () => sink },
+    monotonicNow: () => Date.now(),
+  };
+});
 
 const PAGE_LIMIT = 3;
 
@@ -34,6 +39,7 @@ function setup(overrides: Partial<Parameters<typeof useDmEnvelopePages>[0]> = {}
   const onPage = jest.fn();
   const onReset = jest.fn();
   const options = {
+    surface: 'dmConversations' as const,
     feedKey: 'viewer',
     pageLimit: PAGE_LIMIT,
     hydrate: jest.fn(async () => {}),
@@ -56,10 +62,41 @@ describe('useDmEnvelopePages', () => {
     await waitFor(() => expect(result.current.hasLoadedOnce).toBe(true));
     expect(options.hydrate).toHaveBeenCalledTimes(1);
     expect(onReset).toHaveBeenCalledTimes(1);
-    expect(onPage).toHaveBeenCalledWith(page(['a', 'b', 'c']));
+    expect(onPage).toHaveBeenCalledWith(page(['a', 'b', 'c']), { first: true, mode: 'initial' });
     expect(result.current.hasMore).toBe(true);
     expect(result.current.loading).toBe(false);
+    expect(result.current.status).toBe('ready');
     expect(result.current.error).toBeNull();
+  });
+
+  it('reports loading only on a cold start; a snapshot revalidates instead', async () => {
+    let finish!: (p: DmEnvelopePage) => void;
+    const fetchPage = jest.fn(() => new Promise<DmEnvelopePage>((r) => (finish = r)));
+    const cold = setup({ fetchPage });
+    expect(cold.result.current.status).toBe('loading');
+    await waitFor(() => expect(fetchPage).toHaveBeenCalledTimes(1));
+    await act(async () => finish(page(['a'])));
+    expect(cold.result.current.status).toBe('ready');
+
+    const seeded = setup({ fetchPage, hasSnapshot: true });
+    await waitFor(() => expect(fetchPage).toHaveBeenCalledTimes(2));
+    expect(seeded.result.current.status).toBe('revalidating');
+    expect(seeded.result.current.hasLoadedOnce).toBe(true);
+    await act(async () => finish(page(['a'])));
+    expect(seeded.result.current.status).toBe('ready');
+  });
+
+  it('pages after the first carry the loadMore mode and never the first flag', async () => {
+    const fetchPage = jest
+      .fn<Promise<DmEnvelopePage>, [{ until?: number; refresh: boolean }]>()
+      .mockResolvedValueOnce(page(['a', 'b', 'c'], 1_000))
+      .mockResolvedValueOnce(page(['d'], 900));
+    const { result, onPage } = setup({ fetchPage });
+    await waitFor(() => expect(result.current.hasMore).toBe(true));
+    await act(async () => {
+      await result.current.loadMore();
+    });
+    expect(onPage).toHaveBeenLastCalledWith(page(['d'], 900), { first: false, mode: 'loadMore' });
   });
 
   it('pages older envelopes with an `until` cursor behind the oldest wrap time', async () => {
@@ -159,5 +196,56 @@ describe('useDmEnvelopePages', () => {
 
     await waitFor(() => expect(fetchPage).toHaveBeenCalledTimes(2));
     expect(fetchPage.mock.calls[1][0].refresh).toBe(true);
+  });
+
+  it('keeps rows on refresh: no reset, status revalidating, first page flagged as a replace', async () => {
+    let finish!: (p: DmEnvelopePage) => void;
+    const fetchPage = jest
+      .fn<Promise<DmEnvelopePage>, [{ until?: number; refresh: boolean }]>()
+      .mockResolvedValueOnce(page(['a', 'b', 'c']))
+      .mockImplementationOnce(() => new Promise<DmEnvelopePage>((r) => (finish = r)));
+    const { result, onPage, onReset } = setup({ fetchPage });
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(onReset).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      result.current.refresh();
+    });
+    await waitFor(() => expect(fetchPage).toHaveBeenCalledTimes(2));
+    expect(onReset).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe('revalidating');
+    expect(result.current.hasLoadedOnce).toBe(true);
+    expect(result.current.loading).toBe(false);
+
+    await act(async () => finish(page(['x', 'y'])));
+    expect(onPage).toHaveBeenLastCalledWith(page(['x', 'y']), { first: true, mode: 'refresh' });
+    expect(result.current.status).toBe('ready');
+  });
+
+  it('retains the loaded state when a refresh fails', async () => {
+    const fetchPage = jest
+      .fn<Promise<DmEnvelopePage>, [{ until?: number; refresh: boolean }]>()
+      .mockResolvedValueOnce(page(['a', 'b', 'c']))
+      .mockRejectedValueOnce(new Error('nagg unavailable'));
+    const { result, onReset } = setup({ fetchPage });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    act(() => {
+      result.current.refresh();
+    });
+    await waitFor(() => expect(result.current.error?.message).toBe('nagg unavailable'));
+    // Rows were never dropped, so this is a degraded-but-populated list, not an error screen.
+    expect(onReset).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe('ready');
+    expect(result.current.hasLoadedOnce).toBe(true);
+  });
+
+  it('reports error only when a failure leaves nothing to show', async () => {
+    const fetchPage = jest.fn(async () => {
+      throw new Error('nagg unavailable');
+    });
+    const { result } = setup({ fetchPage });
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+    expect(result.current.status).toBe('error');
   });
 });

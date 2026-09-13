@@ -15,6 +15,7 @@ jest.mock('@react-native-async-storage/async-storage', () => {
   };
 });
 
+jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({ buildNostrDataLayer: () => null }));
 jest.mock('@/shared/lib/apiClient', () => ({
   discoverMint: jest.fn(),
   reviewMint: jest.fn(),

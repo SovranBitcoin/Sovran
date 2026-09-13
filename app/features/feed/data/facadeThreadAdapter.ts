@@ -3,7 +3,7 @@ import { facade } from 'nostr';
 import { buildThreadStructure } from '@/features/feed/lib/buildThreadStructure';
 import type { FeedEvent, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
-import type { ThreadRequest, ThreadResult } from './feedClient';
+import type { ReadStatusMeta, ThreadRequest, ThreadResult } from './feedClient';
 
 // Pure shape bridge: facade ResolvedThread → the app's ThreadResult, for every
 // tier. nagg serves a server-windowed ranked page (its manifest order is
@@ -39,6 +39,7 @@ export function toFacadeThreadRequest(request: ThreadRequest): facade.ThreadRequ
     // network. request.limit stays the DISPLAY window size only.
     replyLimit: 0,
     ...(request.signal ? { signal: request.signal } : {}),
+    ...(request.readId ? { readId: request.readId } : {}),
     timeoutMs: request.timeoutMs ?? THREAD_TIER_TIMEOUT_MS,
   };
 }
@@ -207,8 +208,9 @@ export function resolvedThreadToResult(
 
 /** Empty result when every enabled tier is exhausted — keeps the thread screen
  *  honest (shows "no replies") rather than silently using nagg behind a toggle. */
-export function emptyThreadResult(request: ThreadRequest): ThreadResult {
+export function emptyThreadResult(request: ThreadRequest, read?: ReadStatusMeta): ThreadResult {
   return {
+    ...(read ? { read } : {}),
     allEvents: request.seed ? new Map(request.seed.allEvents) : new Map(),
     profiles: request.seed ? new Map(request.seed.profiles) : new Map(),
     metrics: request.seed ? new Map(request.seed.metrics) : new Map(),

@@ -21,7 +21,9 @@ import {
 } from 'wallet';
 
 import { projectMintMeta } from '@/features/mint/lib/auditInfo';
+import { describeError } from '@/shared/lib/errors';
 import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
+import { newReadId, readErrorType, readEvents, readKeyHash } from '@/shared/lib/read/readLog';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 import { getCachedMintInfo, useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -292,6 +294,18 @@ interface CreateSovranScreenActionsBridgeConfig {
   subscribeP2pkKeyRefreshed: (listener: (newKey: string | null) => void) => () => void;
 }
 
+// The mounted mint-info screen's "fetch NUT-06 again" hook. Set while a
+// mintInfo entry subscription is live; the screen's Retry calls the exported
+// `retryMintInfoFetch` after a failed identity read.
+let mintInfoRetry: (() => void) | null = null;
+
+/** Re-run the mint-info NUT-06 read for the mounted mint-info screen. Returns false when none is mounted. */
+export function retryMintInfoFetch(): boolean {
+  if (!mintInfoRetry) return false;
+  mintInfoRetry();
+  return true;
+}
+
 export function createSovranScreenActionsBridge({
   manager,
   requestCameraPermission,
@@ -471,9 +485,17 @@ export function createSovranScreenActionsBridge({
       if (screenType === 'mintInfo') {
         mintInfoCallback = callback;
         callback({ _mintEnrichment: true });
+        // Retry after a failed identity read: clear the "already fetching this
+        // mint" latch and re-enter the enrichment merge, which refetches
+        // because the failed read left `displayName` unset.
+        mintInfoRetry = () => {
+          mintInfoFetchingUrl = null;
+          callback({ _mintEnrichment: true });
+        };
         unsubscribes.push(() => {
           mintInfoCallback = null;
           mintInfoFetchingUrl = null;
+          mintInfoRetry = null;
         });
       }
 
@@ -525,22 +547,78 @@ export function createSovranScreenActionsBridge({
         ) {
           mintInfoFetchingUrl = mintUrl;
           const cb = mintInfoCallback;
+          const readId = newReadId('mintDetail');
+          const keyHash = readKeyHash(normalizeMintUrlKey(mintUrl));
+          const hadCachedInfo = !!useMintMetadataStore.getState().getCached(mintUrl)?.info;
+          const t0 = Date.now();
+          readEvents.request({
+            readId,
+            surface: 'mintDetail',
+            keyHash,
+            mode: 'initial',
+            trigger: 'mount',
+            action: hadCachedInfo ? 'serve-stale-revalidate' : 'fetch',
+            strategy: 'sequential',
+            cached: hadCachedInfo,
+            stale: !hadCachedInfo,
+            coldStart: !hadCachedInfo,
+            gen: 0,
+          });
           void (async () => {
+            let failure: unknown = null;
             try {
               const [mintInfo, isTrusted] = await Promise.all([
-                getCachedMintInfo((u) => manager.mint.getMintInfo(u), mintUrl).catch(
-                  () => undefined
-                ),
+                getCachedMintInfo((u) => manager.mint.getMintInfo(u), mintUrl).catch((error) => {
+                  failure = error;
+                  return undefined;
+                }),
                 manager.mint.isTrustedMint(mintUrl).catch(() => false),
               ]);
+              if (!mintInfo) {
+                // The screen keeps whatever it already has (enrichment scalars)
+                // and shows an inline error with Retry instead of a mint named
+                // by its URL that looks like a finished read.
+                paymentLog.warn('send.mint_info_fetch_failed', {
+                  ...mintUrlLogFields(mintUrl),
+                  error: failure instanceof Error ? failure : new Error(String(failure)),
+                });
+                readEvents.failed({
+                  readId,
+                  surface: 'mintDetail',
+                  keyHash,
+                  gen: 0,
+                  durationMs: Date.now() - t0,
+                  errorType: readErrorType(failure),
+                  retained: hadCachedInfo,
+                });
+                cb({
+                  _mintInfoFetched: true,
+                  _mintInfoError: describeError(failure, 'cashu').text,
+                  isTrusted,
+                });
+                return;
+              }
+              readEvents.done({
+                readId,
+                surface: 'mintDetail',
+                keyHash,
+                gen: 0,
+                durationMs: Date.now() - t0,
+                source: hadCachedInfo ? 'cache' : 'network',
+                count: 1,
+                empty: false,
+                degraded: false,
+                complete: true,
+              });
               cb({
                 _mintInfoFetched: true,
-                displayName: mintInfo?.name ?? mintUrl,
-                iconUrl: mintInfo?.icon_url,
-                description: mintInfo?.description,
-                longDescription: mintInfo?.description_long,
-                motd: mintInfo?.motd,
-                contact: mintInfo?.contact,
+                _mintInfoError: null,
+                displayName: mintInfo.name ?? mintUrl,
+                iconUrl: mintInfo.icon_url,
+                description: mintInfo.description,
+                longDescription: mintInfo.description_long,
+                motd: mintInfo.motd,
+                contact: mintInfo.contact,
                 isTrusted,
               });
             } catch (error) {
@@ -556,7 +634,10 @@ export function createSovranScreenActionsBridge({
       }
       if (updated._mintInfoFetched && typeof current?.mintUrl === 'string') {
         const { _mintInfoFetched, ...rest } = updated;
-        return { ...current, ...rest, _mintInfoFetched: true };
+        // A failed read stays retryable: `_mintInfoFetched` is left false so the
+        // next enrichment pass (Retry) fetches again.
+        const failed = typeof rest._mintInfoError === 'string';
+        return { ...current, ...rest, _mintInfoFetched: !failed };
       }
       if (updated._mintItemAdded && updated._newMintItem && Array.isArray(current.items)) {
         return applyMintItemAddedUpdate(current, updated._newMintItem as EntryRecord);

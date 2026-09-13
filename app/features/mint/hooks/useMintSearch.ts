@@ -1,11 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
-import { discoverMints, type DiscoverMint, type MintSearchResult } from '@/shared/lib/apiClient';
+import {
+  discoverMints,
+  DiscoverMintsResponse,
+  type DiscoverMint,
+  type MintSearchResult,
+} from '@/shared/lib/apiClient';
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import { mintMethodsFromNuts, mintMethodUnitPairsFromNuts } from '@/shared/lib/cashu/mintNuts';
-import { cashuLog } from '@/shared/lib/logger';
+import { useCachedRead, type ReadStatus } from '@/shared/lib/read/useCachedRead';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { extractAvailableCurrencies } from '@/features/mint/lib/availableCurrencies';
+import { MINT_DISCOVER_CACHE_KEY, mintDiscoverCache } from '@/features/mint/data/mintDiscoverCache';
 
 const DISCOVERY_UNITS = ['SAT', 'USD', 'EUR', 'GBP'];
 
@@ -21,8 +27,12 @@ type MintSearchRow = MintSearchResult & {
 
 interface UseMintSearchReturn {
   results: MintSearchRow[];
+  /** First paint with nothing cached; a refetch over cached rows is not loading. */
   loading: boolean;
+  status: ReadStatus;
   error: string | null;
+  /** Re-run discovery (retry after a failure / pull-to-refresh). */
+  refresh: () => void;
   availableUnits: string[];
   matchCountByUnit: Record<string, number>;
 }
@@ -108,8 +118,10 @@ export function discoveryMethodMatches(
  * One network call returns every mint with audit state, units, review/favourite
  * aggregates and the operator's Vertex reputation — so query + currency
  * filtering happen client-side (instant, no per-keystroke request) and the old
- * separate search + per-mint review N+1 fan-out are gone. Inline
- * operator follower/score is seeded into the mint-profile cache so the
+ * separate search + per-mint review N+1 fan-out are gone. The response lives in
+ * the persisted `mintDiscoverCache`: re-entry and currency-tab changes paint
+ * the cached rows at 0ms and a stale cache revalidates in the background.
+ * Inline operator follower/score is seeded into the mint metadata cache so the
  * operator-profile lookup is a cache hit, not another round-trip.
  */
 export function useMintSearch(
@@ -119,68 +131,50 @@ export function useMintSearch(
 ): UseMintSearchReturn {
   const enabled = options?.enabled ?? true;
   const method = options?.method;
-  const [allMints, setAllMints] = useState<MintSearchRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const fetchCountRef = useRef(0);
 
+  const read = useCachedRead<DiscoverMintsResponse>({
+    store: mintDiscoverCache,
+    surface: 'discoverMints',
+    key: enabled ? MINT_DISCOVER_CACHE_KEY : null,
+    viewerKey: '',
+    fetcher: async ({ signal }) => {
+      const res = await discoverMints({ signal });
+      if (res.isErr()) throw res.error;
+      // Dev tier badges: discovery is served by nagg's app-view only (no
+      // cache/relay fallback exists for this surface), so every row that
+      // arrives is honestly 'n'. Keyed by mint URL — the badge store keys
+      // by string, not strictly event ids.
+      recordDebugTiers(
+        res.value.mints.map((m) => m.mintUrl),
+        'nagg'
+      );
+      // Seed the unified cache from the discovery rows so the selector, audit
+      // and operator-profile lookups all become cache hits (not round-trips).
+      useMintMetadataStore.getState().upsertFromDiscover(res.value.mints);
+      return { data: res.value };
+    },
+  });
+
+  // The persisted payload is validated on read: a shape mismatch (schema
+  // drift across app versions) evicts the entry and refetches once.
+  const parsed = useMemo(() => {
+    if (!read.data) return undefined;
+    const result = DiscoverMintsResponse.safeParse(read.data);
+    return result.success ? result.data : null;
+  }, [read.data]);
+  const evictedRef = useRef(false);
+  const refresh = read.refresh;
   useEffect(() => {
-    if (!enabled) {
-      setAllMints([]);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-    const controller = new AbortController();
-    const fetchId = ++fetchCountRef.current;
-    const t0 = performance.now();
-    setLoading(true);
-    setError(null);
-    cashuLog.info('mint.discover.fetch', { fetchId });
+    if (parsed !== null || evictedRef.current) return;
+    evictedRef.current = true;
+    mintDiscoverCache.removeEntry(MINT_DISCOVER_CACHE_KEY);
+    refresh();
+  }, [parsed, refresh]);
 
-    discoverMints({ signal: controller.signal })
-      .then((res) => {
-        if (controller.signal.aborted) return;
-        const duration = Math.round(performance.now() - t0);
-        if (res.isErr()) {
-          cashuLog.warn('mint.discover.api_error', { fetchId, duration_ms: duration });
-          setError('Failed to load mints');
-          return;
-        }
-        const mapped = res.value.mints.map(discoverMintToSearchResult);
-        // Dev tier badges: discovery is served by nagg's app-view only (no
-        // cache/relay fallback exists for this surface), so every row that
-        // arrives is honestly 'n'. Keyed by mint URL — the badge store keys
-        // by string, not strictly event ids.
-        recordDebugTiers(
-          mapped.map((m) => m.url),
-          'nagg'
-        );
-        // Seed the unified cache from the discovery rows so the selector, audit
-        // and operator-profile lookups all become cache hits (not round-trips).
-        useMintMetadataStore.getState().upsertFromDiscover(res.value.mints);
-        cashuLog.info('mint.discover.results', {
-          fetchId,
-          count: mapped.length,
-          withReviews: mapped.filter((r) => r.review_score !== null).length,
-          duration_ms: duration,
-        });
-        setAllMints(mapped);
-      })
-      .catch((err) => {
-        if (controller.signal.aborted) return;
-        cashuLog.error('mint.discover.network_error', {
-          fetchId,
-          error: err instanceof Error ? err.message : String(err),
-        });
-        setError('Failed to load mints');
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [enabled, currency]);
+  const allMints = useMemo<MintSearchRow[]>(
+    () => (parsed ? parsed.mints.map(discoverMintToSearchResult) : []),
+    [parsed]
+  );
 
   const results = useMemo(() => {
     const q = query.trim();
@@ -209,5 +203,13 @@ export function useMintSearch(
     }
   }
 
-  return { results, loading, error, availableUnits, matchCountByUnit };
+  return {
+    results,
+    loading: read.status === 'loading',
+    status: read.status,
+    error: read.error ? 'Failed to load mints' : null,
+    refresh: read.refresh,
+    availableUnits,
+    matchCountByUnit,
+  };
 }

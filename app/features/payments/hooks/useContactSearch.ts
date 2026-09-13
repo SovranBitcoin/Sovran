@@ -1,174 +1,104 @@
-import { useNDK, type default as NDK } from '@nostr-dev-kit/ndk-mobile';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useNDK } from '@nostr-dev-kit/ndk-mobile';
+import { useMemo } from 'react';
 import { CONTACT_SEARCH_MIN_LENGTH } from '@/shared/lib/contactSearch';
 import { type NostrSearchResult } from '@/shared/lib/apiClient';
 import type { SearchUsersResponse } from '@sovranbitcoin/schemas';
+import { profileSearchCache, profileSearchKey } from '@/features/payments/data/profileSearchCache';
+import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
+import { useCachedRead } from '@/shared/lib/read/useCachedRead';
 import { searchProfilesViaFacade } from '@/shared/lib/nostr/searchProfiles';
-import { paymentLog, redactError } from '@/shared/lib/logger';
 import { seedLowConfidenceProfiles } from '@/shared/lib/nostr/useEntityCache';
+import type { SearchStatus } from '@/shared/ui/composed/search/searchListState';
 
-interface SearchResultData {
+export interface SearchResultData {
   pubkey: string;
   profile: NostrSearchResult;
 }
 
-interface PlaceholderResult {
-  pubkey: string;
-  profile?: undefined;
-}
+/**
+ * Pause between keystrokes before a query is sent. Short enough that a
+ * deliberate pause feels responsive, long enough to coalesce a burst; the
+ * in-flight request is NOT cancelled by a keystroke inside this window.
+ */
+export const SEARCH_DEBOUNCE_MS = 350;
 
-export type DisplayResult = SearchResultData | PlaceholderResult;
-
-const PLACEHOLDER_RESULTS: PlaceholderResult[] = Array.from({ length: 6 }, (_, i) => ({
-  pubkey: `placeholder-${i}`,
-}));
-
-// Keystrokes under this threshold don't hit the API. Matches the perceptual
-// pause between typed characters for a normal typing cadence — long enough
-// to coalesce a burst, short enough that a deliberate pause feels responsive.
-const SEARCH_DEBOUNCE_MS = 600;
-
-// Mirror the server-side `SearchQuery.min(3)` in `sovran-schemas/src/nostr-api.ts`.
-// Anything shorter is rejected upstream, so suppress the request entirely.
-
-/** The search-effect fetch body, verbatim: query the facade and seed caches. */
-async function runContactSearch(ctx: {
-  query: string;
-  ndk?: NDK;
-  signal: AbortSignal;
-  setSearchResults: (results: SearchResultData[]) => void;
-  setSearchLoading: (loading: boolean) => void;
-}): Promise<void> {
-  const { query, signal, setSearchResults, setSearchLoading } = ctx;
-  const applyResults = (data: SearchUsersResponse) => {
-    if (signal.aborted) return;
-    if (data.results && Array.isArray(data.results)) {
-      const formatted: SearchResultData[] = data.results.map((res) => ({
-        pubkey: res.pubkey,
-        profile: res,
-      }));
-      paymentLog.info('payment.contacts.search.results', {
-        resultCount: formatted.length,
-      });
-      setSearchResults(formatted);
-      if (formatted.length > 0) {
-        const seeds: Record<string, { name?: string; picture?: string }> = {};
-        for (const r of formatted) {
-          seeds[r.pubkey] = {
-            ...(r.profile.displayName || r.profile.name
-              ? { name: r.profile.displayName ?? r.profile.name }
-              : {}),
-            ...(r.profile.picture ? { picture: r.profile.picture } : {}),
-          };
-        }
-        seedLowConfidenceProfiles(seeds);
-      }
-    } else {
-      setSearchResults([]);
-    }
-  };
-  try {
-    paymentLog.debug('payment.contacts.search', { limit: 10 });
-    const result = await searchProfilesViaFacade({
-      query,
-      ndk: ctx.ndk,
-      onCached: (data) => {
-        if (signal.aborted) return;
-        applyResults(data);
-        setSearchLoading(false);
-      },
-      limit: 10,
-      signal,
-    });
-    if (signal.aborted) return;
-    if (result.isOk()) {
-      applyResults(result.value);
-    } else {
-      paymentLog.warn('payment.contacts.search.failed', {
-        error: redactError(result.error),
-      });
-      setSearchResults([]);
-    }
-  } catch (err) {
-    if (signal.aborted) return;
-    paymentLog.error('payment.contacts.search.error', {
-      error: redactError(err),
-    });
-    setSearchResults([]);
-  } finally {
-    if (!signal.aborted) setSearchLoading(false);
+/** Seed the entity cache with the hit's name/picture so rows paint before kind-0 resolves. */
+function seedProfiles(data: SearchUsersResponse): void {
+  if (!data.results.length) return;
+  const seeds: Record<string, { name?: string; picture?: string }> = {};
+  for (const res of data.results) {
+    seeds[res.pubkey] = {
+      ...(res.displayName || res.name ? { name: res.displayName ?? res.name } : {}),
+      ...(res.picture ? { picture: res.picture } : {}),
+    };
   }
+  seedLowConfidenceProfiles(seeds);
 }
 
+/**
+ * People search: debounced, cached by normalized query, stale-while-revalidate.
+ *
+ * Contract (SYSTEM.md §7/§14): rows on screen stay while a refinement loads
+ * (`keepPreviousData`); a query already searched this session paints at 0ms;
+ * a partial answer (first tier, Vertex pre-refresh) paints immediately and is
+ * upgraded in place; a failed search is `error`, never a fake "no results".
+ */
 export function useContactSearch(searchQuery: string) {
   const { ndk } = useNDK();
-  const [debouncedQuery, setDebouncedQuery] = useState({ value: '' });
-  const [searchResults, setSearchResults] = useState<SearchResultData[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
-  const requestRef = useRef<AbortController | null>(null);
+  const normalized = searchQuery.trim().toLowerCase();
+  const tooShort = normalized.length < CONTACT_SEARCH_MIN_LENGTH;
+  // A query below the minimum follows immediately (clearing must not wait out
+  // the debounce); a real query waits for the typing burst to settle.
+  const debounced = useDebouncedValue(normalized, SEARCH_DEBOUNCE_MS, { immediate: tooShort });
+  const active = debounced.length >= CONTACT_SEARCH_MIN_LENGTH ? debounced : null;
 
-  // Debounce the query: every keystroke resets the timer, only the last one
-  // in a burst flows through to the effect below. Short queries skip the
-  // wait because they'll be rejected by the length guard anyway.
-  useEffect(() => {
-    requestRef.current?.abort();
-    const trimmed = searchQuery.trim();
-    if (!trimmed || trimmed.length < CONTACT_SEARCH_MIN_LENGTH) {
-      setDebouncedQuery({ value: searchQuery });
-      return;
-    }
-    const t = setTimeout(() => setDebouncedQuery({ value: searchQuery }), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(t);
-  }, [searchQuery]);
+  const read = useCachedRead<SearchUsersResponse>({
+    store: profileSearchCache,
+    surface: 'searchProfiles',
+    key: active ? profileSearchKey(active) : null,
+    viewerKey: '',
+    strategy: 'aggregate',
+    focusRevalidate: false,
+    // A refinement is the same surface: keep the previous rows while it loads.
+    keepPreviousData: () => true,
+    classify: (data) => (data.results.length === 0 ? 'empty' : 'ready'),
+    fetcher: async ({ signal, readId, partial }) => {
+      const query = active ?? '';
+      const paint = (data: SearchUsersResponse) => {
+        seedProfiles(data);
+        partial(data);
+      };
+      const result = await searchProfilesViaFacade({
+        query,
+        ndk,
+        limit: 10,
+        signal,
+        readId,
+        onCached: paint,
+        onUpdate: paint,
+      });
+      if (result.isErr()) throw result.error;
+      seedProfiles(result.value);
+      return { data: result.value };
+    },
+  });
 
-  useEffect(() => {
-    const trimmed = debouncedQuery.value.trim();
-    if (!trimmed || trimmed.length < CONTACT_SEARCH_MIN_LENGTH) {
-      setHasSearched(false);
-      setSearchResults([]);
-      setSearchLoading(false);
-      return;
-    }
-
-    // Abort any in-flight request when the query changes or the component
-    // unmounts. Without this the radio stays warm for every keystroke in a
-    // typing burst even though only the last result is consumed.
-    const controller = new AbortController();
-    requestRef.current = controller;
-    setSearchLoading(true);
-    setHasSearched(true);
-
-    void runContactSearch({
-      query: debouncedQuery.value.trim().toLowerCase(),
-      ndk,
-      signal: controller.signal,
-      setSearchResults,
-      setSearchLoading,
-    });
-    return () => controller.abort();
-  }, [debouncedQuery, ndk]);
-
-  // Stale-while-revalidate: once the first response has landed we keep
-  // showing those results while the next query is in flight. Skeletons
-  // only appear on the very first search of a session — avoids the
-  // per-keystroke flash that makes results look like they never change.
-  const displayResults: DisplayResult[] = useMemo(() => {
-    if (!hasSearched) return PLACEHOLDER_RESULTS;
-    if (searchLoading && searchResults.length === 0) return PLACEHOLDER_RESULTS;
-    return searchResults;
-  }, [hasSearched, searchLoading, searchResults]);
-
-  const showNoResults =
-    debouncedQuery.value.trim().length > 0 &&
-    hasSearched &&
-    !searchLoading &&
-    searchResults.length === 0;
+  const results = useMemo<SearchResultData[]>(
+    () => (read.data?.results ?? []).map((profile) => ({ pubkey: profile.pubkey, profile })),
+    [read.data]
+  );
+  const status: SearchStatus = active ? read.status : 'idle';
 
   return {
-    displayResults,
-    searchLoading,
-    hasSearched,
-    showNoResults,
+    results,
+    status,
+    /** True while a real query is active (results, empty or error apply to it). */
+    hasSearched: !!active,
+    /** A request is in flight for the active query (initial or refinement). */
+    searchLoading: status === 'loading' || status === 'revalidating',
+    /** The painted rows are a first-tier / pre-Vertex answer; more may land. */
+    partial: read.partial,
+    error: read.error,
+    retry: read.refresh,
   };
 }

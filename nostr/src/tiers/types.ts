@@ -45,6 +45,28 @@ export type TierAttemptLog = {
   error?: NaggError;
 };
 
+/**
+ * Log-only correlation for one read. Optional everywhere so existing callers
+ * and tests need no change; the facade fills it from `RequestControls.readId`.
+ */
+export type TierReadContext = {
+  readId?: string;
+  surface?: string;
+};
+
+/**
+ * Where a resolved value came from, for degraded/partial UI and diagnostics.
+ * Attached (optionally) to aggregate-surface results; the sequential engine's
+ * results keep carrying only `tier`.
+ */
+export type ReadProvenance = {
+  readId: string;
+  sources: NostrTier[];
+  attempts: TierAttemptLog[];
+  degraded: boolean;
+  complete: boolean;
+};
+
 /** Raised only when no tier could serve the read. Carries the full attempt trail. */
 export type TierResolutionError = {
   type: 'all_tiers_exhausted';

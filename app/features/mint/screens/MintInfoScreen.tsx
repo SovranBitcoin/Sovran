@@ -42,11 +42,13 @@ import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { openExternalUrl } from '@/shared/lib/url';
 import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
 import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
+import { Button } from '@/shared/ui/primitives/Button';
+import { useMintDetailRead, type MintDetailGroupStatus } from '../hooks/useMintDetailRead';
 import {
   formatMintInfoNostrFallback,
-  getMintInfoNostrContactPubkey,
   getMintInfoNostrDisplayName,
   getSortedMintInfoContacts,
+  resolveMintInfoNostrContactPubkey,
 } from '../lib/mintInfoContacts';
 
 const ParamsSchema = z.object({
@@ -154,15 +156,26 @@ function AnimatedAvatar({
   );
 }
 
+/** Unknown counts render as a dash, never as a zero that reads as measured (SYSTEM.md §7). */
+const UNKNOWN = '—';
+
 function StatsGrid({
+  status,
+  onRetry,
   successRate,
+  auditScore,
   avgTimeMs,
   swapSuccess,
   swapTotal,
   totalMints,
   totalMelts,
 }: {
+  /** The audit group's read status; the block is ALWAYS mounted and swaps content in place. */
+  status: MintDetailGroupStatus;
+  onRetry: () => void;
   successRate?: number;
+  /** Ops-based 0..5 score (discovery) — the headline when no swap rate was measured. */
+  auditScore?: number;
   avgTimeMs?: number;
   swapSuccess?: number;
   swapTotal?: number;
@@ -175,18 +188,16 @@ function StatsGrid({
     'surface-tertiary',
   ] as const);
 
+  // Swap-based rate when measured; else the ops-based score, labelled as such.
+  const opsRate =
+    successRate === undefined && auditScore !== undefined ? auditScore / 5 : undefined;
+  const rate = successRate ?? opsRate;
   const displayValues = {
-    successRate: successRate !== undefined ? (successRate * 100).toFixed(1) : '0.0',
-    avgTimeMs: avgTimeMs !== undefined ? Math.round(avgTimeMs).toString() : '0',
-    totalMints: totalMints !== undefined ? Math.round(totalMints).toString() : '0',
-    totalMelts: totalMelts !== undefined ? Math.round(totalMelts).toString() : '0',
+    successRate: rate !== undefined ? `${(rate * 100).toFixed(1)}%` : UNKNOWN,
+    avgTimeMs: avgTimeMs !== undefined ? `${Math.round(avgTimeMs)} ms` : UNKNOWN,
+    totalMints: totalMints !== undefined ? Math.round(totalMints).toString() : UNKNOWN,
+    totalMelts: totalMelts !== undefined ? Math.round(totalMelts).toString() : UNKNOWN,
   };
-
-  const hasValidData =
-    successRate !== undefined ||
-    avgTimeMs !== undefined ||
-    totalMints !== undefined ||
-    totalMelts !== undefined;
 
   const stats = [
     {
@@ -194,14 +205,16 @@ function StatsGrid({
       description:
         typeof swapSuccess === 'number' && typeof swapTotal === 'number'
           ? `${swapSuccess} of ${swapTotal} swaps`
-          : 'Successful rate of swaps',
-      value: `${displayValues.successRate}%`,
+          : opsRate !== undefined
+            ? 'Of mint and melt operations'
+            : 'Successful rate of swaps',
+      value: displayValues.successRate,
       accent: true,
     },
     {
       label: 'Average time',
       description: 'For successful swaps',
-      value: `${displayValues.avgTimeMs} ms`,
+      value: displayValues.avgTimeMs,
       accent: true,
     },
     {
@@ -218,7 +231,7 @@ function StatsGrid({
     },
   ];
 
-  const showSkeleton = !hasValidData;
+  const showSkeleton = status === 'loading';
 
   // Same grid chrome for both branches (only the `loading` bars differ), so the
   // crossfade swaps content under a fading skeleton with zero shift.
@@ -271,15 +284,38 @@ function StatsGrid({
     </View>
   );
 
+  // One slot for every state so the block never unmounts (no layout shift
+  // when audit lands, is missing, or fails): skeleton → values, or an inline
+  // notice of the same width in place of the grid.
   return (
-    <SkeletonContentCrossfade
-      loading={showSkeleton}
-      surfaceColor={surfaceSecondary}
-      visualKey="mint-info-stats"
-      visualSurface="mint-info"
-      renderSkeleton={() => renderGrid(true)}
-      renderContent={() => renderGrid(false)}
-    />
+    <View
+      style={styles.statsSlot}
+      testID="mint-info-audit-status"
+      accessibilityLabel={`Audit ${status}`}>
+      {status === 'empty' ? (
+        <Card variant="info" message="No audit data for this mint yet." />
+      ) : status === 'error' ? (
+        <VStack className="w-full items-center gap-3">
+          <Card variant="warning" message="Couldn't load audit data right now." />
+          <Button
+            testID="mint-info-audit-retry"
+            text="Try again"
+            variant="secondary"
+            size="compact"
+            onPress={onRetry}
+          />
+        </VStack>
+      ) : (
+        <SkeletonContentCrossfade
+          loading={showSkeleton}
+          surfaceColor={surfaceSecondary}
+          visualKey="mint-info-stats"
+          visualSurface="mint-info"
+          renderSkeleton={() => renderGrid(true)}
+          renderContent={() => renderGrid(false)}
+        />
+      )}
+    </View>
   );
 }
 
@@ -302,12 +338,27 @@ export function MintInfoScreen() {
   // review cache the mint list rows read,
   // otherwise the reviews header action and rating chart silently vanish.
   const cachedMeta = useCachedMintMetadata(mintUrl || null);
+  const detail = useMintDetailRead(mintUrl, entry);
   const kymScore =
     typeof entry?.kymScore === 'number' ? entry.kymScore : (cachedMeta?.averageScore ?? undefined);
+  // Audit scalars: the entry (bridge enrichment) first, else the cached
+  // projection — both come from the same store, this just paints on the first
+  // frame before the bridge's enrichment pass has merged.
+  const auditScore =
+    typeof entry?.auditScore === 'number' ? entry.auditScore : detail.meta.auditScore;
+  const successRate = entry?.successRate as number | undefined;
+  const ringProgress =
+    successRate ?? (typeof auditScore === 'number' ? auditScore / 5 : undefined) ?? 0.5;
+  const identityError = detail.identityError;
   const contact = entry?.contact as
     { method: string; info: import('wallet').FormattedString }[] | undefined;
   const contactRows = getSortedMintInfoContacts(contact);
-  const nostrContactPubkey = getMintInfoNostrContactPubkey(contactRows);
+  // NUT-06 first; a placeholder there (e.g. the literal `npub…`) falls back to
+  // the operator nagg's discovery row resolved for this mint.
+  const nostrContactPubkey = resolveMintInfoNostrContactPubkey(
+    contactRows,
+    cachedMeta?.operatorPubkey
+  );
   const { data: nostrContactProfile, isLoading: nostrContactLoading } = useNostrProfile(
     nostrContactPubkey ?? null
   );
@@ -438,16 +489,16 @@ export function MintInfoScreen() {
         <VStack align="center" className="w-full pb-8 pt-6">
           <ProgressRing
             size={84}
-            progress={(entry?.successRate as number) ?? 0.5}
+            progress={ringProgress}
             successColor={success}
             errorColor={danger}>
             <AnimatedAvatar
               picture={entry?.iconUrl as string | undefined}
               name={displayName}
               alt={`${displayName} icon`}
-              status={entry?.auditState as string | undefined}
+              status={(entry?.auditState as string | undefined) ?? detail.meta.auditState}
               size={70}
-              isLoading={!entry}
+              isLoading={detail.identity === 'loading'}
             />
           </ProgressRing>
 
@@ -459,17 +510,34 @@ export function MintInfoScreen() {
             <RatingBarChart key={mintUrl} score={kymScore} />
           )}
 
-          {(entry?.auditState != null || typeof entry?.auditScore === 'number') && (
-            <StatsGrid
-              successRate={entry?.successRate as number | undefined}
-              avgTimeMs={entry?.avgTimeMs as number | undefined}
-              swapSuccess={entry?.swapSuccess as number | undefined}
-              swapTotal={entry?.swapTotal as number | undefined}
-              totalMints={entry?.totalMints as number | undefined}
-              totalMelts={entry?.totalMelts as number | undefined}
-            />
-          )}
+          <StatsGrid
+            status={detail.audit}
+            onRetry={detail.retry}
+            successRate={successRate}
+            auditScore={auditScore}
+            avgTimeMs={entry?.avgTimeMs as number | undefined}
+            swapSuccess={entry?.swapSuccess as number | undefined}
+            swapTotal={entry?.swapTotal as number | undefined}
+            totalMints={(entry?.totalMints as number | undefined) ?? detail.meta.auditMints}
+            totalMelts={(entry?.totalMelts as number | undefined) ?? detail.meta.auditMelts}
+          />
         </VStack>
+
+        {identityError && (
+          <>
+            <Card variant="warning" message={identityError} />
+            <VStack align="center" className="w-full pb-3">
+              <Button
+                testID="mint-info-retry"
+                text="Try again"
+                variant="secondary"
+                size="compact"
+                onPress={detail.retry}
+              />
+            </VStack>
+            <Spacer size={12} />
+          </>
+        )}
 
         {typeof entry?.description === 'string' && (
           <>
@@ -520,7 +588,9 @@ export function MintInfoScreen() {
           <Section title="Contact">
             <ListGroup variant="secondary">
               {contactRows.map((c) => {
-                const rowNostrPubkey = c.isNostr ? getMintInfoNostrContactPubkey([c]) : undefined;
+                const rowNostrPubkey = c.isNostr
+                  ? resolveMintInfoNostrContactPubkey([c], cachedMeta?.operatorPubkey)
+                  : undefined;
                 const rowProfile =
                   rowNostrPubkey && rowNostrPubkey === nostrContactPubkey
                     ? nostrContactProfile
@@ -619,10 +689,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  statsGrid: {
+  statsSlot: {
     width: '100%',
     alignSelf: 'stretch',
     marginTop: 16,
+  },
+  statsGrid: {
+    width: '100%',
+    alignSelf: 'stretch',
     marginHorizontal: -6,
   },
   statsRow: {

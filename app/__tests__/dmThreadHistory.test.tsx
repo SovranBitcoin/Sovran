@@ -4,21 +4,29 @@ import { useDmThread } from '@/features/payments/hooks/useDmThread';
 import { useDmConversations } from '@/features/payments/hooks/useDmConversations';
 import { useDmLastMessageStore } from '@/shared/stores/profile/dmLastMessageStore';
 import type { DmEnvelopePage } from '@/features/payments/data/dmEnvelopeTypes';
+import { dmConversationsCache, dmThreadCache } from '@/features/payments/data/dmSnapshotCaches';
 
 const mockInbox = jest.fn();
 const mockDirect = jest.fn(async (..._args: unknown[]) => ({ envelopes: [], hasNextPage: false }));
+const mockLive = jest.fn();
 jest.mock('@/features/payments/data/dmEnvelopeClient', () => ({
   fetchDmEnvelopes: (...args: unknown[]) => mockInbox(...args),
   fetchDmConversation: (...args: unknown[]) => mockDirect(...args),
+  subscribeDmEnvelopesLive: (...args: unknown[]) => mockLive(...args),
 }));
 jest.mock('@/shared/lib/nostr/giftWrapCache', () => ({
   giftWrapCache: { cache: { hydrate: async () => {} } },
 }));
 jest.mock('@/shared/lib/nostr/nip04Cache', () => ({ nip04Cache: { hydrate: async () => {} } }));
-jest.mock('@/shared/lib/logger', () => ({
-  paymentLog: { warn: jest.fn(), info: jest.fn() },
-  storeLog: { warn: jest.fn() },
-}));
+jest.mock('@/shared/lib/logger', () => {
+  const sink = { info: jest.fn(), warn: jest.fn(), debug: jest.fn(), error: jest.fn() };
+  return {
+    paymentLog: { warn: jest.fn(), info: jest.fn(), debug: jest.fn() },
+    storeLog: sink,
+    log: { ...sink, child: () => sink },
+    monotonicNow: () => Date.now(),
+  };
+});
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   createProfileScopedStorage: () => ({
     getItem: async () => null,
@@ -69,6 +77,9 @@ beforeEach(async () => {
   jest.clearAllMocks();
   mockInbox.mockReset();
   mockDirect.mockClear();
+  mockLive.mockReset().mockReturnValue(() => {});
+  dmThreadCache.clear();
+  dmConversationsCache.clear();
   await useDmLastMessageStore.persist.rehydrate();
   useDmLastMessageStore.setState({ byPeer: {} });
 });
@@ -185,4 +196,89 @@ it('settles failed first loads and resets readiness when the conversation change
   expect(result.current.hasLoadedOnce).toBe(false);
   expect(result.current.loading).toBe(true);
   expect(result.current.messages).toEqual([]);
+});
+
+it('keeps the thread on screen across a refresh and merges the replacement page', async () => {
+  let finish!: (p: DmEnvelopePage) => void;
+  mockInbox
+    .mockResolvedValueOnce(page('peer', 1, 900))
+    .mockImplementationOnce(() => new Promise<DmEnvelopePage>((r) => (finish = r)));
+  const { result } = renderHook(() => useDmThread('peer', 'viewer', key));
+  await waitFor(() => expect(result.current.status).toBe('ready'));
+  expect(result.current.messages).toHaveLength(1);
+
+  act(() => result.current.refresh());
+  await waitFor(() => expect(mockInbox).toHaveBeenCalledTimes(2));
+  expect(result.current.status).toBe('revalidating');
+  expect(result.current.messages).toHaveLength(1);
+
+  await act(async () => finish(page('peer', 2, 950)));
+  expect(result.current.status).toBe('ready');
+  expect(result.current.messages.map((m) => m.id)).toEqual(['peer-900', 'peer-949', 'peer-950']);
+});
+
+it("seeds a re-opened thread from this session's snapshot and revalidates behind it", async () => {
+  mockInbox.mockResolvedValueOnce(page('peer', 1, 900));
+  const first = renderHook(() => useDmThread('peer', 'viewer', key));
+  await waitFor(() => expect(first.result.current.status).toBe('ready'));
+  first.unmount();
+
+  mockInbox.mockImplementationOnce(() => new Promise(() => {}));
+  const second = renderHook(() => useDmThread('peer', 'viewer', key));
+  expect(second.result.current.messages).toHaveLength(1);
+  expect(second.result.current.status).toBe('revalidating');
+  expect(second.result.current.loading).toBe(false);
+});
+
+it('never seeds a thread snapshot across viewers', async () => {
+  mockInbox.mockResolvedValueOnce(page('peer', 1, 900));
+  const first = renderHook(() => useDmThread('peer', 'viewer', key));
+  await waitFor(() => expect(first.result.current.status).toBe('ready'));
+  first.unmount();
+  mockInbox.mockImplementationOnce(() => new Promise(() => {}));
+  const other = renderHook(() => useDmThread('peer', 'other-viewer', key));
+  expect(other.result.current.messages).toEqual([]);
+  expect(other.result.current.status).toBe('loading');
+});
+
+describe('conversation list seeding', () => {
+  it('paints last-message metadata rows before the first page and replaces them in place', async () => {
+    useDmLastMessageStore.getState().recordLastMessage('a'.repeat(64), {
+      protocol: 'nip17',
+      atSeconds: 500,
+      isOwn: false,
+    });
+    let finish!: (p: DmEnvelopePage) => void;
+    mockInbox.mockImplementationOnce(() => new Promise<DmEnvelopePage>((r) => (finish = r)));
+    const { result } = renderHook(() => useDmConversations('viewer', key));
+    expect(result.current.conversations).toEqual([
+      expect.objectContaining({ counterparty: 'a'.repeat(64), previewPending: true }),
+    ]);
+    expect(result.current.status).toBe('revalidating');
+
+    await waitFor(() => expect(mockInbox).toHaveBeenCalledTimes(1));
+    await act(async () => finish(page('peer', 1, 900)));
+    expect(result.current.status).toBe('ready');
+    expect(result.current.conversations).toEqual([
+      expect.objectContaining({ counterparty: 'peer', lastMessagePreview: 'Earlier message' }),
+    ]);
+    expect(result.current.conversations[0].previewPending).toBeUndefined();
+  });
+
+  it('folds live arrivals into the bucket while focused and unsubscribes on blur', async () => {
+    mockInbox.mockResolvedValueOnce(page('peer', 1, 900));
+    const unsubscribe = jest.fn();
+    mockLive.mockReturnValue(unsubscribe);
+    const { result, rerender } = renderHook(
+      ({ live }: { live: boolean }) => useDmConversations('viewer', key, { live }),
+      { initialProps: { live: true } }
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(mockLive).toHaveBeenCalledTimes(1);
+    const onPage = mockLive.mock.calls[0][1] as (p: DmEnvelopePage) => void;
+    act(() => onPage(page('newcomer', 1, 2000)));
+    expect(result.current.conversations.map((c) => c.counterparty)).toEqual(['newcomer', 'peer']);
+    rerender({ live: false });
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
 });

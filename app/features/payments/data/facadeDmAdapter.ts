@@ -20,6 +20,7 @@ export function toFacadeDmEnvelopesRequest(args: {
   limit?: number;
   refresh?: boolean;
   signal?: AbortSignal;
+  readId?: string;
 }): facade.DmEnvelopesRequest {
   return {
     viewerPubkey: args.viewer,
@@ -27,6 +28,7 @@ export function toFacadeDmEnvelopesRequest(args: {
     ...(typeof args.limit === 'number' ? { limit: args.limit } : {}),
     ...(args.refresh ? { refresh: true } : {}),
     ...(args.signal ? { signal: args.signal } : {}),
+    ...(args.readId ? { readId: args.readId } : {}),
   };
 }
 

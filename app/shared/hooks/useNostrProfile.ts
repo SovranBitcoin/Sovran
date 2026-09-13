@@ -1,6 +1,8 @@
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { refreshVertex, isVertexProfileStale } from '@/shared/lib/nostr/vertex/refreshVertex';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
+import { readEvents, readKeyHash, newReadId, readErrorType } from '@/shared/lib/read/readLog';
 
 import { aggregateValue, type facade } from 'nostr';
 
@@ -15,8 +17,10 @@ import { tryNpubEncode } from '@/features/feed/components/nostr/feedParse';
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
 import {
+  cacheProfileStats,
   fetchFollowingCountViaFacade,
   fetchProfileStatsViaFacade,
+  readCachedProfileStats,
 } from '@/shared/lib/nostr/fetchProfiles';
 import { log } from '@/shared/lib/logger';
 
@@ -82,37 +86,72 @@ function countsMissing(profile: ProfileCounts): boolean {
  * counts a source cannot supply stay undefined — never 0 — so the header shows
  * a placeholder instead of a wrong number.
  */
+/**
+ * Fill the counts nagg did not have from the other sources CONCURRENTLY —
+ * Primal `user_profile` (followers + following) and the profile's own kind-3
+ * (following) — applying each as it lands through `onCounts`, so the pills
+ * fill one at a time instead of waiting for the slowest source. Resolves once
+ * every source settled; a count no source could supply stays `undefined`.
+ */
 async function completeCounts(
   pubkey: string,
   profile: ProfileCounts,
   signal: AbortSignal,
+  readId: string,
+  onCounts: (counts: ProfileCounts, source: 'primal' | 'relay' | 'nagg' | 'contacts') => void,
   options: { skipStats?: boolean } = {}
 ): Promise<ProfileCounts> {
   let counts: ProfileCounts = { followers: profile.followers, follows: profile.follows };
+  const keyHash = readKeyHash(pubkey);
+  const apply = (next: ProfileCounts, source: 'primal' | 'relay' | 'nagg' | 'contacts') => {
+    counts = keepCounts(next, counts);
+    readEvents.partial({
+      readId,
+      surface: 'profileStats',
+      keyHash,
+      answered: [source],
+      pending: [],
+      count: (counts.followers !== undefined ? 1 : 0) + (counts.follows !== undefined ? 1 : 0),
+      gate: 'partial',
+    });
+    onCounts(counts, source);
+  };
+  const tasks: Promise<void>[] = [];
   if (countsMissing(counts) && !options.skipStats) {
-    const stats = await fetchProfileStatsViaFacade(pubkey, { signal });
-    if (signal.aborted) return counts;
-    if (stats) {
-      counts = keepCounts(
-        {
-          ...(stats.followersCount !== undefined ? { followers: stats.followersCount } : {}),
-          ...(stats.followingCount !== undefined ? { follows: stats.followingCount } : {}),
-        },
-        counts
-      );
-      log.debug('feed.profile.counts.from_stats', { pubkey, tier: stats.tier });
-    }
+    tasks.push(
+      Promise.resolve(fetchProfileStatsViaFacade(pubkey, { signal, readId })).then((stats) => {
+        if (signal.aborted || !stats) return;
+        apply(
+          {
+            ...(stats.followersCount !== undefined ? { followers: stats.followersCount } : {}),
+            ...(stats.followingCount !== undefined ? { follows: stats.followingCount } : {}),
+          },
+          stats.tier === 'primal' || stats.tier === 'nagg' ? stats.tier : 'relay'
+        );
+      })
+    );
   }
   if (counts.follows === undefined) {
-    const follows = await fetchFollowingCountViaFacade(pubkey, { signal });
-    if (signal.aborted) return counts;
-    if (follows !== undefined) {
-      counts = { ...counts, follows };
-      log.debug('feed.profile.counts.from_contacts', { pubkey, follows });
-    }
+    tasks.push(
+      Promise.resolve(fetchFollowingCountViaFacade(pubkey, { signal, readId })).then((follows) => {
+        if (signal.aborted || follows === undefined) return;
+        apply({ follows }, 'contacts');
+      })
+    );
   }
-  if (countsMissing(counts)) log.info('feed.profile.counts.unavailable', { pubkey });
+  await Promise.all(tasks);
+  if (!signal.aborted && countsMissing(counts)) {
+    log.info('feed.profile.counts.unavailable', { pubkey: readKeyHash(pubkey) });
+  }
   return counts;
+}
+
+/** Seed the header from the single owner (a previous open, a feed page, or a nagg REST answer). */
+function seedFromCache(pubkey: string | null): NostrProfileFull | null {
+  if (!pubkey) return null;
+  const stats = readCachedProfileStats(pubkey);
+  if (!stats) return null;
+  return profileFullFromStats(pubkey, { tier: 'cache', ...stats });
 }
 
 interface UseNostrProfileResult {
@@ -130,14 +169,26 @@ export function useNostrProfile(
   refreshReputation = false
 ): UseNostrProfileResult {
   const { ndk } = useNDK();
+  // Seeded from the single owner so a known profile paints its counts on the
+  // first frame (status: revalidating); an unknown one starts with skeletons.
   const [state, setState] = useState<{
     pubkey: string | null;
     data: NostrProfileFull | null;
     isLoading: boolean;
     countsLoading: boolean;
     error: Error | null;
-  }>(() => ({ pubkey, data: null, isLoading: !!pubkey, countsLoading: false, error: null }));
+  }>(() => ({
+    pubkey,
+    data: seedFromCache(pubkey),
+    isLoading: !!pubkey,
+    countsLoading: false,
+    error: null,
+  }));
   const requestRef = useRef<AbortController | null>(null);
+  // Focus is an input to the Vertex refresh only — never a reason to re-run
+  // the whole ladder (a focus/blur cycle used to refetch everything).
+  const refreshReputationRef = useLatestRef(refreshReputation);
+  const dataRef = useLatestRef(state.pubkey === pubkey ? state.data : null);
 
   // Initial loads and manual refreshes share cancellation. Starting a newer
   // request, changing profile, or unmounting retires every prior completion.
@@ -151,10 +202,40 @@ export function useNostrProfile(
       return;
     }
 
-    log.debug('feed.profile.fetch.start', { pubkey });
+    const readId = newReadId('profile');
+    const keyHash = readKeyHash(pubkey);
+    const t0 = Date.now();
+    const seeded = seedFromCache(pubkey);
+    readEvents.request({
+      readId,
+      surface: 'profile',
+      keyHash,
+      mode: 'initial',
+      trigger: 'mount',
+      action: seeded ? 'serve-stale-revalidate' : 'fetch',
+      strategy: 'aggregate',
+      cached: !!seeded,
+      stale: !!seeded,
+      coldStart: !seeded,
+      gen: 0,
+    });
+    const done = (source: 'nagg' | 'primal' | 'relay' | 'cache', degraded: boolean) =>
+      readEvents.done({
+        readId,
+        surface: 'profile',
+        keyHash,
+        gen: 0,
+        durationMs: Date.now() - t0,
+        source: 'network',
+        tier: source,
+        count: 1,
+        empty: false,
+        degraded,
+        complete: true,
+      });
     setState((previous) => ({
       pubkey,
-      data: previous.pubkey === pubkey ? previous.data : null,
+      data: previous.pubkey === pubkey ? previous.data : seeded,
       isLoading: true,
       countsLoading: false,
       error: null,
@@ -168,12 +249,27 @@ export function useNostrProfile(
         error,
       }));
     // Runs after the profile has painted: the header keeps its content while
-    // the count pills stay in their loading state until every source answered.
+    // each count pill fills as its source lands; the pills' loading state ends
+    // once every source answered.
     const fillCounts = async (profile: ProfileCounts, options?: { skipStats?: boolean }) => {
       if (!countsMissing(profile)) return;
       setState((previous) => ({ ...previous, countsLoading: true }));
-      const counts = await completeCounts(pubkey, profile, signal, options);
+      const counts = await completeCounts(
+        pubkey,
+        profile,
+        signal,
+        readId,
+        (partial) => {
+          if (signal.aborted) return;
+          setState((previous) => ({
+            ...previous,
+            data: previous.data ? keepCounts(previous.data, partial) : previous.data,
+          }));
+        },
+        options
+      );
       if (signal.aborted) return;
+      cacheProfileStats(pubkey, counts);
       setState((previous) => ({
         ...previous,
         countsLoading: false,
@@ -187,9 +283,15 @@ export function useNostrProfile(
       const result = await fetchNostrProfile(pubkey, { signal });
       if (signal.aborted) return;
       if (result.isOk()) {
-        log.debug('feed.profile.fetch.success', { pubkey, source: 'nagg' });
         recordDebugTiers([pubkey], 'nagg');
         settle(result.value);
+        done('nagg', false);
+        // The single owner learns the header so the next open seeds it.
+        cacheProfileStats(pubkey, {
+          followers: result.value.followers,
+          follows: result.value.follows,
+          joinedAt: result.value.created_at,
+        });
         // nagg without the nostr module answers a valid envelope with no
         // aggregates; the other sources fill the counts in parallel with the
         // reputation refresh.
@@ -197,7 +299,7 @@ export function useNostrProfile(
         const refreshed = await refreshVertex({
           kind: 'profile',
           target: pubkey,
-          stale: refreshReputation && isVertexProfileStale(result.value.vertexFetchedAt),
+          stale: refreshReputationRef.current && isVertexProfileStale(result.value.vertexFetchedAt),
           ndk,
           signal,
         });
@@ -208,21 +310,35 @@ export function useNostrProfile(
         await counting;
         return;
       }
-      log.warn('feed.profile.fetch.nagg_failed_fallback', { pubkey, error: result.error });
+      log.warn('feed.profile.fetch.nagg_failed_fallback', {
+        readId,
+        pubkey: keyHash,
+        errorType: readErrorType(result.error),
+      });
     }
 
-    const stats = await fetchProfileStatsViaFacade(pubkey, { signal });
+    const stats = await fetchProfileStatsViaFacade(pubkey, { signal, readId });
     if (signal.aborted) return;
     let counting: Promise<void> = Promise.resolve();
     if (stats) {
-      log.debug('feed.profile.fetch.success', { pubkey, source: stats.tier });
       recordDebugTiers([pubkey], stats.tier);
       const data = profileFullFromStats(pubkey, stats);
       settle(data);
+      done(stats.tier === 'cache' ? 'cache' : stats.tier, !!stats.provenance?.degraded);
       counting = fillCounts(data, { skipStats: true });
     } else {
-      log.warn('feed.profile.fetch.error', { pubkey });
-      settle(null, new Error('profile unavailable from all tiers'));
+      readEvents.failed({
+        readId,
+        surface: 'profile',
+        keyHash,
+        gen: 0,
+        durationMs: Date.now() - t0,
+        errorType: 'all_tiers_exhausted',
+        retained: !!seeded,
+      });
+      // Keep a seeded header on screen; only an unknown profile is an error.
+      if (seeded) settle(seeded);
+      else settle(null, new Error('profile unavailable from all tiers'));
     }
     // A missing nagg profile does not imply that Vertex has no reputation for
     // this identity. Keep fallback content visible while the consent/budget
@@ -230,7 +346,7 @@ export function useNostrProfile(
     const refreshed = await refreshVertex({
       kind: 'profile',
       target: pubkey,
-      stale: refreshReputation,
+      stale: refreshReputationRef.current,
       ndk,
       signal,
     });
@@ -264,12 +380,40 @@ export function useNostrProfile(
       }
     }
     await counting;
-  }, [pubkey, ndk, refreshReputation]);
+  }, [pubkey, ndk, refreshReputationRef]);
 
   useEffect(() => {
     void fetchProfile();
     return () => requestRef.current?.abort();
   }, [fetchProfile]);
+
+  // Focus regained: refresh reputation only (and only when stale) — the header
+  // keeps everything it has; no ladder re-run, no request when fresh.
+  useEffect(() => {
+    if (!refreshReputation || !pubkey) return;
+    const data = dataRef.current;
+    if (!data || !isVertexProfileStale(data.vertexFetchedAt)) return;
+    if (!getNostrTierConfig().nagg.enabled) return;
+    const controller = new AbortController();
+    void refreshVertex({
+      kind: 'profile',
+      target: pubkey,
+      stale: true,
+      ndk,
+      signal: controller.signal,
+    }).then((refreshed) => {
+      if (controller.signal.aborted || !refreshed) return;
+      const parsed = parseNostrProfileFor(pubkey)(refreshed);
+      if (!parsed.isOk()) return;
+      setState((previous) =>
+        previous.pubkey === pubkey && previous.data
+          ? { ...previous, data: keepCounts(parsed.value, previous.data) }
+          : previous
+      );
+    });
+    return () => controller.abort();
+    // Runs when focus is gained (refreshReputation flips true) for this pubkey.
+  }, [refreshReputation, pubkey, ndk, dataRef]);
 
   const refetch = useCallback(() => {
     void fetchProfile();

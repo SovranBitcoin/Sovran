@@ -25,6 +25,7 @@ import { alpha, spacing } from '@/shared/styles/tokens';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import { List } from '@/shared/ui/composed/List';
 import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
+import { Button } from '@/shared/ui/primitives/Button';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { View } from '@/shared/ui/primitives/View/View';
 
@@ -103,6 +104,15 @@ export function MintChangesList() {
       icon="mdi:alert-circle-outline"
       title="Mint updates unavailable"
       subtitle={errorMessage}
+      action={
+        <Button
+          testID="mint-changes-retry"
+          text="Try again"
+          variant="secondary"
+          size="compact"
+          onPress={refresh}
+        />
+      }
     />
   ) : (
     <EmptyState

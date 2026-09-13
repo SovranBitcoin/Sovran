@@ -1598,8 +1598,14 @@ export function createDefaultOperations(
         ...mintUrlFields(mintUrl),
         hasItem: !!item,
       });
+      // Same injected NUT-06 reader as the mint list (the wallet's 24h SWR
+      // cache + per-mint deadline) so a warm cache opens the screen without a
+      // mint round-trip; the raw manager call is the fallback.
+      const readMintInfo = config.fetchMintInfo
+        ? (url: string) => config.fetchMintInfo!(url).then((info) => info ?? undefined)
+        : (url: string) => mgr.mint.getMintInfo(url);
       const [mintInfo, balancesByMint, isTrusted] = await Promise.all([
-        mgr.mint.getMintInfo(mintUrl).catch((e) => {
+        readMintInfo(mintUrl).catch((e) => {
           logger.warn("operations.buildMintReviewInfo.getMintInfo.failed", {
             ...mintUrlFields(mintUrl),
             error: errField(e),
@@ -1727,16 +1733,9 @@ export function createDefaultOperations(
         ...asyncEnrichment,
       };
 
-      // Detail metrics (avgTimeMs, swap counts, totals) only exist in the
-      // local cache; when the user came straight from the selector without a
-      // warm cache, fall back to the success rate implied by auditScore so
-      // the StatsGrid's headline number stays meaningful.
-      if (
-        result.successRate === undefined &&
-        typeof result.auditScore === "number"
-      ) {
-        result.successRate = result.auditScore / 5;
-      }
+      // `successRate` is a swap-based measurement and is never fabricated
+      // from the ops-based `auditScore`: an unknown rate stays unknown so the
+      // screen shows a placeholder, not a number that looks measured.
       logger.info("operations.buildMintReviewInfo.done", {
         ...mintUrlFields(mintUrl),
         balance: result.balance,
