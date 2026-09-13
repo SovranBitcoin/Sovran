@@ -14,7 +14,7 @@ import { FlatList, Text, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { withAlpha } from '@/shared/lib/color';
 
-import Icon from 'assets/icons';
+import Icon from '@/assets/icons';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
@@ -27,6 +27,8 @@ type PillTabItemProps<F extends string> = {
   activeTab: F;
   flatListRef: RefObject<FlatList<F> | null>;
   onTabChange: (item: F) => void;
+  label: string;
+  accessibilityRole?: 'tab' | 'radio';
   icon?: string | null;
   testID?: string;
 };
@@ -38,6 +40,8 @@ function PillTabItem<F extends string>({
   flatListRef,
   onTabChange,
   icon,
+  label,
+  accessibilityRole,
   testID,
 }: PillTabItemProps<F>) {
   const isActive = activeTab === item;
@@ -58,6 +62,17 @@ function PillTabItem<F extends string>({
     <Log name="PillTabItem">
       <Pressable
         testID={testID}
+        accessible
+        accessibilityRole={accessibilityRole}
+        accessibilityLabel={label}
+        accessibilityState={
+          accessibilityRole === 'radio'
+            ? { checked: isActive, selected: isActive }
+            : { selected: isActive }
+        }
+        accessibilityValue={
+          accessibilityRole === 'radio' ? { text: isActive ? '1' : '0' } : undefined
+        }
         onPressIn={() => isPressed.set(true)}
         onPressOut={() => isPressed.set(false)}
         onPress={() => {
@@ -71,7 +86,7 @@ function PillTabItem<F extends string>({
         style={[styles.pressable, isActive && { backgroundColor: activeBg }]}>
         <Animated.View style={[styles.inner, rStyle]}>
           {icon ? <Icon name={icon} size={18} color={foreground} /> : null}
-          <Text style={[styles.label, { color: foreground }]}>{item}</Text>
+          <Text style={[styles.label, { color: foreground }]}>{label}</Text>
         </Animated.View>
       </Pressable>
     </Log>
@@ -82,6 +97,10 @@ type PillTabsProps<F extends string> = {
   tabs: readonly F[];
   activeTab: F;
   onTabChange: (tab: F) => void;
+  /** Optional display label and leading icon, keeping tab values stable. */
+  labelFor?: (tab: F) => string;
+  iconFor?: (tab: F) => string | undefined;
+  accessibilityRole?: 'tab' | 'radio';
   /** Stable per-pill accessibility identifier. */
   testIDFor?: (tab: F) => string | undefined;
   /** Extra pills rendered inline at the end of the same scrollable row. */
@@ -93,6 +112,9 @@ export function PillTabs<F extends string>({
   activeTab,
   onTabChange,
   testIDFor,
+  labelFor,
+  iconFor,
+  accessibilityRole,
   trailing = null,
 }: PillTabsProps<F>) {
   const flatListRef = useRef<FlatList<F>>(null);
@@ -107,6 +129,9 @@ export function PillTabs<F extends string>({
           renderItem={({ item, index }) => (
             <PillTabItem
               item={item}
+              label={labelFor?.(item) ?? item}
+              icon={iconFor?.(item)}
+              accessibilityRole={accessibilityRole}
               index={index}
               flatListRef={flatListRef}
               activeTab={activeTab}

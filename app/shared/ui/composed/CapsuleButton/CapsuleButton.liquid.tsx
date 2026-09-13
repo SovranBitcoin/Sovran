@@ -88,11 +88,17 @@ function useGlassTapFallback(onPress: () => void) {
   return { gesture, onTouchStart, onTouchMove, onTouchEnd };
 }
 
+const RADIO_SELECTED_STATE = { checked: true, selected: true };
+const RADIO_UNSELECTED_STATE = { checked: false, selected: false };
+const RADIO_SELECTED_VALUE = { text: '1' };
+const RADIO_UNSELECTED_VALUE = { text: '0' };
+
 export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactElement {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const {
     label,
     accessibilityLabel,
+    accessibilityRole = 'button',
     onPress,
     color,
     isActive = false,
@@ -127,8 +133,22 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
       <GlassView
         testID={testID}
         accessible
-        accessibilityRole="button"
+        accessibilityRole={accessibilityRole}
         accessibilityLabel={accessibilityLabel ?? label}
+        accessibilityState={
+          accessibilityRole === 'radio'
+            ? isActive
+              ? RADIO_SELECTED_STATE
+              : RADIO_UNSELECTED_STATE
+            : undefined
+        }
+        accessibilityValue={
+          accessibilityRole === 'radio'
+            ? isActive
+              ? RADIO_SELECTED_VALUE
+              : RADIO_UNSELECTED_VALUE
+            : undefined
+        }
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
