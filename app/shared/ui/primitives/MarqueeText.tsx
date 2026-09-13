@@ -49,20 +49,22 @@ export function MarqueeText({
   });
   const reducedMotion = useReducedMotion();
   const translateX = useSharedValue(0);
-  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ translateX: translateX.value }] }));
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ translateX: translateX.get() }] }));
 
   useVisualActivityEffect(
     () => {
-      translateX.value = 0;
-      translateX.value = withRepeat(
-        withSequence(
-          withDelay(
-            delayMs,
-            withTiming(-distancePx, { duration: durationMs, easing: Easing.linear })
+      translateX.set(0);
+      translateX.set(
+        withRepeat(
+          withSequence(
+            withDelay(
+              delayMs,
+              withTiming(-distancePx, { duration: durationMs, easing: Easing.linear })
+            ),
+            withTiming(0, { duration: 0 })
           ),
-          withTiming(0, { duration: 0 })
-        ),
-        -1
+          -1
+        )
       );
       return () => cancelAnimation(translateX);
     },
