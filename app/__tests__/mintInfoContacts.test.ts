@@ -5,6 +5,7 @@ import {
   getMintInfoNostrContactPubkey,
   getMintInfoNostrDisplayName,
   getSortedMintInfoContacts,
+  resolveMintInfoNostrContactPubkey,
 } from '@/features/mint/lib/mintInfoContacts';
 
 const PUBKEY = 'deadbeef'.repeat(8);
@@ -45,5 +46,29 @@ describe('mint info contacts', () => {
     );
     expect(getMintInfoNostrDisplayName({ name: 'operator' }, 'npub1...abc')).toBe('operator');
     expect(getMintInfoNostrDisplayName(null, 'npub1...abc')).toBe('npub1...abc');
+  });
+
+  describe('resolveMintInfoNostrContactPubkey', () => {
+    const OPERATOR = 'ab'.repeat(32);
+
+    it('prefers the NUT-06 contact over the discovered operator', () => {
+      const rows = getSortedMintInfoContacts([{ method: 'nostr', info: NPUB }]);
+      expect(resolveMintInfoNostrContactPubkey(rows, OPERATOR)).toBe(PUBKEY);
+    });
+
+    it('falls back to the discovered operator when the contact is a placeholder', () => {
+      // minibits ships the literal `npub…` in its NUT-06 contact.
+      const rows = getSortedMintInfoContacts([
+        { method: 'nostr', info: 'npub\u2026' },
+        { method: 'email', info: 'support@example.com' },
+      ]);
+      expect(resolveMintInfoNostrContactPubkey(rows, OPERATOR)).toBe(OPERATOR);
+      expect(resolveMintInfoNostrContactPubkey(rows, undefined)).toBeUndefined();
+    });
+
+    it('never invents a Nostr contact for a mint that publishes none', () => {
+      const rows = getSortedMintInfoContacts([{ method: 'email', info: 'support@example.com' }]);
+      expect(resolveMintInfoNostrContactPubkey(rows, OPERATOR)).toBeUndefined();
+    });
   });
 });

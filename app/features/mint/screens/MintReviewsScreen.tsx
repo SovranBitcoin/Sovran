@@ -1,5 +1,6 @@
 import { Screen } from '@/shared/ui/composed/Screen';
 import { useEffect } from 'react';
+import { StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
@@ -22,7 +23,6 @@ import { useCachedRead } from '@/shared/lib/read/useCachedRead';
 import { mintReviewsCache, mintReviewsKey } from '@/features/mint/data/mintReviewsCache';
 import { Button } from '@/shared/ui/primitives/Button';
 import { useIdentityName } from '@/shared/hooks/useIdentityName';
-import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { RatingBarChart } from '@/features/mint/components/RatingBarChart';
 import { RatingStars } from '@/features/mint/components/RatingStars';
@@ -124,11 +124,11 @@ function ReviewRow({
       }
       subtitle={
         loading ? (
-          <HStack className="gap-0.5">
-            {[0, 1, 2, 3, 4].map((star) => (
-              <Skeleton key={star} className="bg-surface-secondary h-3.5 w-3.5 rounded-sm" />
-            ))}
-          </HStack>
+          // The real glyph row at the real size, dimmed — identical height, so
+          // the row cannot shift when the score lands.
+          <View style={styles.skeletonStars}>
+            <RatingStars score={0} size={14} />
+          </View>
         ) : review?.score != null ? (
           <View accessible accessibilityLabel={`${review.score} out of 5 stars`}>
             <RatingStars score={review.score} size={14} />
@@ -139,7 +139,9 @@ function ReviewRow({
         loading || reviewText ? (
           <Text
             loading={loading}
-            placeholder="Share your experience with this mint."
+            // Two wrapped lines at phone width — the typical comment length —
+            // so the placeholder reserves what a real review usually needs.
+            placeholder="Fast swaps and reliable so far, no issues receiving or sending over a few weeks of daily use."
             size={14}
             className="text-foreground/60 leading-5"
             numberOfLines={10}>
@@ -323,3 +325,7 @@ export function MintReviewsScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  skeletonStars: { opacity: 0.25 },
+});

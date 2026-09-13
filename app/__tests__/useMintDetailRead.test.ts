@@ -6,6 +6,7 @@ import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { getDiscoveredMintMetadata } from '@/shared/lib/getDiscoveredMintMetadata';
 import { fetchMintReviews } from '@/shared/lib/nostr/fetchMintReviews';
 import { retryMintInfoFetch } from '@/features/send/lib/createSovranScreenActionsBridge';
+import { useMintProfiles } from '@/features/mint/hooks/useMintProfiles';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(() => Promise.resolve(null)),
@@ -123,4 +124,16 @@ it('surfaces a failed identity read and routes retry to the bridge', () => {
   expect(result.current.identityError).toBe('The mint did not respond.');
   act(() => result.current.retry());
   expect(retryMintInfoFetch).toHaveBeenCalledTimes(1);
+});
+
+it('resolves the operator from discovery when the NUT-06 contact is a placeholder', async () => {
+  stampAudit();
+  store().setSocial(MINT, 12, 80, { operatorPubkey: 'ab'.repeat(32) });
+  const { result } = renderHook(() =>
+    useMintDetailRead(MINT, { mintUrl: MINT, contact: [{ method: 'nostr', info: 'npub\u2026' }] })
+  );
+  await waitFor(() => expect(result.current.social).toBe('ready'));
+  expect(jest.mocked(useMintProfiles)).toHaveBeenLastCalledWith([
+    { url: MINT, mintInfo: { contact: [{ method: 'nostr', info: 'ab'.repeat(32) }] } },
+  ]);
 });

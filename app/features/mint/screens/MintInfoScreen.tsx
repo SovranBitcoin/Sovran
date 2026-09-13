@@ -46,9 +46,9 @@ import { Button } from '@/shared/ui/primitives/Button';
 import { useMintDetailRead, type MintDetailGroupStatus } from '../hooks/useMintDetailRead';
 import {
   formatMintInfoNostrFallback,
-  getMintInfoNostrContactPubkey,
   getMintInfoNostrDisplayName,
   getSortedMintInfoContacts,
+  resolveMintInfoNostrContactPubkey,
 } from '../lib/mintInfoContacts';
 
 const ParamsSchema = z.object({
@@ -353,7 +353,12 @@ export function MintInfoScreen() {
   const contact = entry?.contact as
     { method: string; info: import('wallet').FormattedString }[] | undefined;
   const contactRows = getSortedMintInfoContacts(contact);
-  const nostrContactPubkey = getMintInfoNostrContactPubkey(contactRows);
+  // NUT-06 first; a placeholder there (e.g. the literal `npub…`) falls back to
+  // the operator nagg's discovery row resolved for this mint.
+  const nostrContactPubkey = resolveMintInfoNostrContactPubkey(
+    contactRows,
+    cachedMeta?.operatorPubkey
+  );
   const { data: nostrContactProfile, isLoading: nostrContactLoading } = useNostrProfile(
     nostrContactPubkey ?? null
   );
@@ -583,7 +588,9 @@ export function MintInfoScreen() {
           <Section title="Contact">
             <ListGroup variant="secondary">
               {contactRows.map((c) => {
-                const rowNostrPubkey = c.isNostr ? getMintInfoNostrContactPubkey([c]) : undefined;
+                const rowNostrPubkey = c.isNostr
+                  ? resolveMintInfoNostrContactPubkey([c], cachedMeta?.operatorPubkey)
+                  : undefined;
                 const rowProfile =
                   rowNostrPubkey && rowNostrPubkey === nostrContactPubkey
                     ? nostrContactProfile

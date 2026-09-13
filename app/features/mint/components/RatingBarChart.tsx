@@ -10,7 +10,6 @@ import { RatingStars } from './RatingStars';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useCountRollIn } from '@/shared/ui/composed/AnimatedCountValue';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
-import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -68,11 +67,13 @@ export function RatingBarChart({
     }
   }, [isValidScore, goldPercentage, fadeAnim, barScaleAnim]);
 
+  // Placeholders are the same Text at the same sizes (loading bars sized by a
+  // hidden glyph run), so the skeleton and the populated chart share one height.
   const renderSkeleton = () => (
     <HStack className="w-full items-center gap-4 self-stretch px-4">
       <VStack className="shrink-0 items-center">
-        <Skeleton className="bg-surface-tertiary h-8 w-12 rounded" />
-        <Skeleton className="bg-surface-tertiary mt-2 h-3.5 w-10 rounded" />
+        <Text heavy size={28} loading placeholder="4.7" className="text-foreground" />
+        <Text size={12} loading placeholder="out of 5" className="text-foreground/50" />
       </VStack>
       <VStack className="min-w-0 flex-1 gap-1">
         {[5, 4, 3, 2, 1].map((stars) => (

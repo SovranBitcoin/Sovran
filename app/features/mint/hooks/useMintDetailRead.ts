@@ -171,17 +171,22 @@ export function useMintDetailRead(
 
   // Social: operator profile from the NUT-06 contact, through the shared hook
   // (it writes `setSocial`, which re-renders us via the cached entry).
+  // NUT-06 contact first; a placeholder there falls back to the operator nagg's
+  // discovery row resolved (the same rule the screen's Contact row uses).
   const contact = entry?.contact;
+  const discoveredOperator = cached?.operatorPubkey;
   const operatorPubkey = useMemo(
-    () => extractMintNostrPubkey({ contact: Array.isArray(contact) ? contact : undefined }),
-    [contact]
+    () =>
+      extractMintNostrPubkey({ contact: Array.isArray(contact) ? contact : undefined }) ??
+      discoveredOperator,
+    [contact, discoveredOperator]
   );
   const profileInputs = useMemo(
     () =>
       mintUrl && operatorPubkey
-        ? [{ url: mintUrl, mintInfo: { contact: contact as { method: string; info: string }[] } }]
+        ? [{ url: mintUrl, mintInfo: { contact: [{ method: 'nostr', info: operatorPubkey }] } }]
         : [],
-    [mintUrl, operatorPubkey, contact]
+    [mintUrl, operatorPubkey]
   );
   useMintProfiles(profileInputs);
 
