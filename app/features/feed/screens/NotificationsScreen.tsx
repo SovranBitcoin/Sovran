@@ -630,12 +630,12 @@ function WelcomeNotificationRow({
   }
   return (
     <View testID="notification-app-welcome" style={notificationListStyles.row}>
-      <VStack gap={8}>
-        <HStack align="flex-start" gap={12}>
+      <VStack className="gap-2">
+        <HStack align="flex-start" className="gap-3">
           <View style={[styles.welcomeGlyph, { backgroundColor: withAlpha(accent, 0.13) }]}>
             <Icon name="iconamoon:heart-fill" size={22} color={accent} />
           </View>
-          <VStack gap={4} flex={1}>
+          <VStack className="flex-1 gap-1">
             <NotificationTitleLine
               title="Thanks for downloading Sovran"
               timestamp=""
@@ -707,14 +707,14 @@ function NotificationSkeletonRow({
 }) {
   return (
     <NotificationRowPressable pressedBackground={pressedBackground} onPress={noopPress}>
-      <VStack gap={8}>
-        <HStack align="flex-start" gap={12}>
+      <VStack className="gap-2">
+        <HStack align="flex-start" className="gap-3">
           <NotificationReasonIcon reason="reaction" color={muted} />
           <View>
             <Avatar state="loading" name="" seed="skeleton" size={42} />
           </View>
-          <VStack gap={4} flex={1}>
-            <HStack align="flex-start" justify="space-between" gap={8}>
+          <VStack className="flex-1 gap-1">
+            <HStack align="flex-start" className="justify-between gap-2">
               <Text size={16} loading placeholder="Someone reacted to your post" />
               <Text size={13} loading placeholder="2h" />
             </HStack>
@@ -750,8 +750,8 @@ function NotificationRow({
 
   return (
     <NotificationRowPressable pressedBackground={pressedBackground} onPress={onPress}>
-      <VStack gap={8}>
-        <HStack align="flex-start" gap={12}>
+      <VStack className="gap-2">
+        <HStack align="flex-start" className="gap-3">
           <NotificationReasonIcon reason={notification.reason} color={tone} />
           <View>
             <Avatar
@@ -762,7 +762,7 @@ function NotificationRow({
               size={42}
             />
           </View>
-          <VStack gap={4} flex={1}>
+          <VStack className="flex-1 gap-1">
             <NotificationTitleLine
               title={title}
               timestamp={timestamp}
@@ -811,11 +811,11 @@ function NotificationGroupRow({
 
   return (
     <NotificationRowPressable pressedBackground={pressedBackground} onPress={onPress}>
-      <VStack gap={8}>
-        <HStack align="flex-start" gap={12}>
+      <VStack className="gap-2">
+        <HStack align="flex-start" className="gap-3">
           <NotificationReasonIcon reason={item.reason} color={tone} />
           <AvatarCluster notifications={item.notifications} result={result} borderColor={surface} />
-          <VStack gap={4} flex={1}>
+          <VStack className="flex-1 gap-1">
             <NotificationTitleLine
               title={title}
               timestamp={timestamp}
@@ -919,7 +919,7 @@ function NotificationTitleLine({
         style={[notificationListStyles.titleText, { color: foreground }]}>
         {title}
       </Text>
-      <HStack align="center" gap={4}>
+      <HStack className="gap-1">
         {timestamp ? (
           <Text
             numberOfLines={1}
@@ -1048,7 +1048,7 @@ function NotificationReferencedPost({
           borderColor: withAlpha(foreground, 0.08),
         },
       ]}>
-      <HStack align="center" gap={6}>
+      <HStack className="gap-1.5">
         {showAuthorAvatar ? (
           <Avatar
             state={avatarStateFor(profile?.picture, profile !== undefined)}

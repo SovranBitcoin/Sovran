@@ -3,7 +3,6 @@
  * button) must keep two native targets, with the row's press feedback running
  * the full width UNDER the control rather than stopping short of it.
  */
-import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { View } from 'react-native';
 import { ListRow } from '@/shared/ui/composed/ListRow';
@@ -19,7 +18,7 @@ jest.mock('@/shared/ui/primitives/Avatar', () => ({ Avatar: 'Avatar' }));
 jest.mock('heroui-native', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   const { View: RNView } = jest.requireActual<typeof import('react-native')>('react-native');
-  const Pressable = (props: Record<string, unknown>) =>
+  const Pressable = (props: Record<string, unknown> & { testID?: string }) =>
     ReactActual.createElement(RNView, { ...props, testID: props.testID ?? 'pressable' });
   Pressable.Scale = (props: Record<string, unknown>) =>
     ReactActual.createElement(RNView, { ...props, testID: 'scale' });

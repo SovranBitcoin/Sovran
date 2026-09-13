@@ -1,6 +1,5 @@
 import { Screen } from '@/shared/ui/composed/Screen';
 import { useEffect } from 'react';
-import { StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
@@ -126,7 +125,7 @@ function ReviewRow({
         loading ? (
           // The real glyph row at the real size, dimmed — identical height, so
           // the row cannot shift when the score lands.
-          <View style={styles.skeletonStars}>
+          <View className="opacity-25">
             <RatingStars score={0} size={14} />
           </View>
         ) : review?.score != null ? (
@@ -325,7 +324,3 @@ export function MintReviewsScreen() {
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  skeletonStars: { opacity: 0.25 },
-});

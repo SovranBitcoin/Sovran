@@ -99,7 +99,7 @@
   },
   "features/feed/components/UserFeed.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 5,
+    "inline-style": 4,
     "stack-layout-props": 2
   },
   "features/feed/components/nostr/DeletedTombstone.tsx": {
@@ -181,7 +181,7 @@
   "features/feed/screens/NotificationsScreen.tsx": {
     "stylesheet-create": 1,
     "inline-style": 6,
-    "stack-layout-props": 15,
+    "stack-layout-props": 9,
     "content-container-style": 1
   },
   "features/feed/screens/StoriesScreen.tsx": {
@@ -227,7 +227,7 @@
     "inline-style": 1
   },
   "features/mint/screens/MintAddScreen.tsx": {
-    "inline-style": 4
+    "inline-style": 3
   },
   "features/mint/screens/MintChangesScreen.tsx": {
     "stylesheet-create": 1,

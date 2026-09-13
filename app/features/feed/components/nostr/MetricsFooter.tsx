@@ -61,7 +61,7 @@ const AnimatedMetric = React.memo(function AnimatedMetric({
     <HStack align="center" gap={5}>
       <Icon name={iconName} size={iconSize} color={color} />
       {counts === 'loading' ? (
-        <Text loading placeholder="12" size={textSize} style={{ color }} />
+        <Text loading placeholder="12" size={textSize} color={color} />
       ) : (
         <AnimatedCountValue
           value={counts === 'unavailable' ? COUNT_UNAVAILABLE : text}

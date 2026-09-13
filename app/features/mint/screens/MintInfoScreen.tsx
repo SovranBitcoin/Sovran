@@ -526,7 +526,7 @@ export function MintInfoScreen() {
         {identityError && (
           <>
             <Card variant="warning" message={identityError} />
-            <VStack align="center" className="w-full pb-3">
+            <VStack className="w-full items-center pb-3">
               <Button
                 testID="mint-info-retry"
                 text="Try again"
