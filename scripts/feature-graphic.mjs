@@ -1,17 +1,14 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
-import opentype from "opentype.js";
 import {
   loadBrandInputs,
-  composeBrand,
-  rasterizeBrand,
 } from "./brand-assets.mjs";
 
+import { loadFonts, text as renderText, phone, brandLockup, hash } from "./lib/marketing-render.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const folder = join(root, "marketing/feature-graphic");
@@ -20,52 +17,18 @@ assert(
   process.argv.length === 2 || (process.argv.length === 3 && check),
   "Usage: node scripts/feature-graphic.mjs [--check]",
 );
-const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
+
 const spec = JSON.parse(
   await readFile(join(folder, "source/composition.json")),
 );
 assert.deepEqual(spec.size, [1024, 500]);
 const [W, H] = spec.size;
-const fonts = {};
-for (const name of ["ExtraBold", "Medium"]) {
-  const bytes = await readFile(
-    join(root, `app/assets/fonts/MonaSans/MonaSans-${name}.ttf`),
-  );
-  fonts[name] = opentype.parse(
-    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-  );
-}
-function text(value, x, y, size, color, weight, maxWidth) {
-  const font = fonts[weight];
-  const width = font.getAdvanceWidth(value, size, { kerning: true });
-  assert(width <= maxWidth, `Copy too wide for its column: ${value}`);
-  // Outline at design scale: tiny direct coordinates can produce NaNs in OpenType.
-  const d = font
-    .getPath(value, 0, 0, 1000, { kerning: true })
-    .toPathData({ decimalPlaces: 3, flipY: false });
-  assert(!/NaN|Infinity/.test(d), `Invalid font outline: ${value}`);
-  return `<path d="${d}" fill="${color}" transform="translate(${x} ${y}) scale(${size / 1000})"/>`;
-}
 
+const fonts = await loadFonts(root);
+const text = (...args) => renderText(fonts, ...args);
 const p = spec.presentation;
 const brand = await loadBrandInputs();
-const lockup = composeBrand(brand, "wordmark-lockup", "white-on-transparent");
-// Place the lockup by its ink bounds, not its padded canvas.
-const ink = {
-  x: Math.min(...lockup.bounds.map((b) => b.x)),
-  y: Math.min(...lockup.bounds.map((b) => b.y)),
-  height: Math.max(...lockup.bounds.map((b) => b.y + b.height)),
-};
-ink.height -= ink.y;
-const logoScale = p.copy.logoHeight / ink.height;
-const logoWidth = lockup.width * logoScale;
-const logoHeight = lockup.height * logoScale;
-const logo = await rasterizeBrand(
-  lockup.svg,
-  Math.round(logoWidth * 2),
-  Math.round(logoHeight * 2),
-  false,
-);
+const { ink, logoScale, logoWidth, logoHeight, logo } = await brandLockup(brand, p.copy.logoHeight);
 
 // Copy column: logo, two-line headline and two-line subtitle, centred as a block.
 const headlineSize = 44,
@@ -129,46 +92,12 @@ for (const [platform, inputs] of Object.entries(spec.platforms)) {
     const slot = phones[index];
     const bytes = await readFile(join(folder, shot.file));
     assert.equal(hash(bytes), shot.sha256, `Screenshot changed: ${shot.file}`);
-    const meta = await sharp(bytes).metadata();
-    // Remove system chrome only. Preserve app pixels and native aspect ratio.
-    const top = Math.round(meta.height * (platform === "ios" ? 0.054 : 0.038));
-    const bottom = Math.round(meta.height * 0.018);
-    const cropped = await sharp(bytes)
-      .extract({
-        left: 0,
-        top,
-        width: meta.width,
-        height: meta.height - top - bottom,
-      })
-      .png()
-      .toBuffer();
-    const w = slot.width,
-      h = ((meta.height - top - bottom) / meta.width) * w;
-    const bezel = Math.round(w * 0.03),
-      frameW = w + 2 * bezel,
-      frameH = h + 2 * bezel,
-      frameR = w * 0.135,
-      screenR = frameR - bezel;
-    const x = slot.x,
-      y = slot.top;
-    // Every phone runs off the bottom edge so the stack reads as one object,
-    // and the hero stays inside the right-hand safe margin.
-    assert(
-      y + frameH >= H + 8,
-      `Phone should bleed off canvas: ${platform}/${index}`,
-    );
-    assert(
-      x - bezel >= 412 && x + w + bezel <= W - 28,
-      `Phone leaves safe area: ${platform}/${index}`,
-    );
-    stack.push(`<g transform="translate(${x} ${y})">
-  <rect x="${-bezel}" y="${-bezel}" width="${frameW}" height="${frameH}" rx="${frameR}" fill="#000" filter="url(#shadow)"/>
-  <rect x="${-bezel}" y="${-bezel}" width="${frameW}" height="${frameH}" rx="${frameR}" fill="${p.frame}" stroke="${p.frameEdge}" stroke-width="1"/>
-  <clipPath id="screen${index}"><rect width="${w}" height="${h}" rx="${screenR}"/></clipPath>
-  <image width="${w}" height="${h}" href="data:image/png;base64,${cropped.toString("base64")}" clip-path="url(#screen${index})"/>
-  <rect width="${w}" height="${h}" rx="${screenR}" fill="#000" opacity="${slot.dim}"/>
-  <rect x="${-bezel + 0.5}" y="${-bezel + 0.5}" width="${frameW - 1}" height="${frameH - 1}" rx="${frameR}" fill="none" stroke="url(#rim)" stroke-width="1"/>
-  </g>`);
+    const rendered = await phone({ screenshot: bytes, platform, x: slot.x, y: slot.top,
+      width: slot.width, index, dim: slot.dim, frame: p.frame, frameEdge: p.frameEdge });
+    assert(slot.top + rendered.frameH >= H + 8, `Phone should bleed off canvas: ${platform}/${index}`);
+    assert(slot.x - rendered.bezel >= 412 && slot.x + slot.width + rendered.bezel <= W - 28,
+      `Phone leaves safe area: ${platform}/${index}`);
+    stack.push(rendered.svg);
   }
   const hero = phones[3];
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W * 2}" height="${H * 2}" viewBox="0 0 ${W} ${H}">

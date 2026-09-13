@@ -133,6 +133,10 @@
     {"id":"wallet.location.permission","file":"scenarios/wallet-location-permission.json","order":560,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"store.screenshots","file":"scenarios/store-screenshots.json","order":9990,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"settings.moderation.filter","file":"scenarios/settings-moderation-filter.json","order":570,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
-    {"id":"settings.legal.navigate","file":"scenarios/settings-legal-navigate.json","order":580,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"}
+    {"id":"settings.legal.navigate","file":"scenarios/settings-legal-navigate.json","order":580,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"marketing.screenshots","file":"scenarios/marketing-screenshots.json","order":10000,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"marketing.screenshots.wallpapers","file":"scenarios/marketing-screenshots-wallpapers.json","order":10001,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"marketing.screenshots.mints","file":"scenarios/marketing-screenshots-mints.json","order":10002,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"marketing.screenshots.media","file":"scenarios/marketing-screenshots-media.json","order":10003,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"}
   ]
 }
