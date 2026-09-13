@@ -24,6 +24,7 @@ import {
   ingestOwnProfileMetadata,
   loadOwnProfileMetadata,
   publishOwnProfileMetadata,
+  type OwnProfileLoadResult,
 } from '@/shared/lib/nostr/profile/publishOwnProfileMetadata';
 import { uploadMedia } from '@/shared/lib/nostr/media/mediaUpload';
 import { getMediaServer } from '@/shared/lib/nostr/media/mediaServerStore';
@@ -70,6 +71,8 @@ function ProfileEditor({
   const [picture, setPicture] = useState<string | null>(cachedPicture ?? null);
   const [ready, setReady] = useState(false);
   const [missingBase, setMissingBase] = useState(false);
+  const [initialLoad, setInitialLoad] = useState<OwnProfileLoadResult>({ status: 'unavailable' });
+  const [retrying, setRetrying] = useState(false);
   const [saving, setSaving] = useState(false);
   const [upload, setUpload] = useState<{ uri: string; progress: number } | null>(null);
   const controller = useRef<AbortController | null>(null);
@@ -89,8 +92,10 @@ function ProfileEditor({
   useEffect(() => {
     let canceled = false;
     if (!ndk || !isInitialized) return;
-    void loadOwnProfileMetadata(ndk, pubkey).then((snapshot) => {
+    void loadOwnProfileMetadata(ndk, pubkey).then((loaded) => {
       if (canceled) return;
+      setInitialLoad(loaded);
+      const snapshot = loaded.status === 'found' ? loaded.snapshot : null;
       if (snapshot) ingestOwnProfileMetadata(snapshot, pubkey, accountIndex);
       const next = snapshot
         ? {
@@ -101,7 +106,10 @@ function ProfileEditor({
       setBase(next);
       setName(next.name);
       setPicture(next.picture);
-      setMissingBase(!snapshot);
+      setMissingBase(
+        loaded.status === 'unavailable' ||
+          (!snapshot && (cached.current.name !== undefined || cached.current.picture !== undefined))
+      );
       setReady(true);
     });
     return () => {
@@ -109,7 +117,22 @@ function ProfileEditor({
     };
     // Cached display updates must not overwrite an in-progress draft, so the
     // effect reads them through a ref instead of depending on them.
-  }, [ndk, pubkey, isInitialized]);
+  }, [ndk, pubkey, isInitialized, accountIndex, cached]);
+
+  const retryBase = useSingleFlight(async () => {
+    if (!ndk || saving || !isOwner()) return;
+    setRetrying(true);
+    const loaded = await loadOwnProfileMetadata(ndk, pubkey);
+    if (!isOwner()) return;
+    setInitialLoad(loaded);
+    if (loaded.status === 'found') ingestOwnProfileMetadata(loaded.snapshot, pubkey, accountIndex);
+    setMissingBase(
+      loaded.status === 'unavailable' ||
+        (loaded.status === 'absent' &&
+          (cached.current.name !== undefined || cached.current.picture !== undefined))
+    );
+    setRetrying(false);
+  });
 
   function cancelUpload() {
     controller.current?.abort();
@@ -235,6 +258,7 @@ function ProfileEditor({
       ndk,
       pubkey,
       accountIndex,
+      initialLoad,
       patch: {
         ...(name !== base.name ? { name } : {}),
         ...(picture !== base.picture ? { picture } : {}),
@@ -243,6 +267,7 @@ function ProfileEditor({
     if (!isOwner()) return;
     setSaving(false);
     if (result.isOk()) router.back();
+    else if (result.error.type === 'base-unavailable') setMissingBase(true);
     else
       paramPopup('engagement-update-failed', 'profile', {
         failure: { service: 'nostr', error: result.error },
@@ -264,10 +289,22 @@ function ProfileEditor({
               loading={saving}
               disabled={!ready || !dirty || !!upload || saving}
             />
-            {ready && missingBase && !!cachedName && (
-              <Text size={13} className="text-muted">
-                {"Couldn't load your current profile; saving may drop other fields."}
-              </Text>
+            {ready && missingBase && (
+              <>
+                <Text size={13} className="text-muted" accessibilityRole="alert">
+                  {
+                    "Couldn't load your current profile. Retry before saving to preserve your other fields."
+                  }
+                </Text>
+                <Button
+                  text="Retry"
+                  testID="edit-profile-base-retry"
+                  variant="secondary"
+                  onPress={retryBase}
+                  loading={retrying}
+                  disabled={saving || retrying}
+                />
+              </>
             )}
           </View>
         </BottomButtons>

@@ -83,3 +83,9 @@ it('keeps created_at monotonic even with clock skew or same-second saves', () =>
   expect(nextProfileCreatedAt(100, 100)).toBe(101);
   expect(nextProfileCreatedAt(100, 120)).toBe(120);
 });
+
+it('caps far-future inherited timestamps at five minutes from now', () => {
+  expect(nextProfileCreatedAt(10000, 100)).toBe(400);
+  expect(nextProfileCreatedAt(400, 100)).toBe(400);
+  expect(nextProfileCreatedAt(399, 100)).toBe(400);
+});
