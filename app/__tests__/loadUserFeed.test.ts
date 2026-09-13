@@ -1,4 +1,4 @@
-import { loadUserFeedImpl, type UserFeedLoadCtx } from '@/features/feed/lib/loadUserFeed';
+import { enrichUserFeedPage, fetchUserFeedPage } from '@/features/feed/lib/loadUserFeed';
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
 import { emptyFeedParseResult, type FeedClient } from '@/features/feed/data/feedClient';
 import type { FeedItem } from '@/features/feed/components/nostr/feedTypes';
@@ -7,9 +7,6 @@ jest.mock('@/features/feed/data/useFeedClient', () => ({ getFeedClient: jest.fn(
 jest.mock('@/shared/lib/logger', () => ({
   feedLog: { info: jest.fn(), warn: jest.fn() },
   log: { error: jest.fn() },
-}));
-jest.mock('@/shared/stores/profile/nostrSocialStore', () => ({
-  useNostrSocialStore: { getState: () => ({ deletedRepostOriginalIds: {} }) },
 }));
 
 const item: Extract<FeedItem, { type: 'note' }> = {
@@ -26,8 +23,12 @@ const item: Extract<FeedItem, { type: 'note' }> = {
 };
 
 function setup() {
-  let visibleItems: FeedItem[] = [];
-  const page = { ...emptyFeedParseResult(), orderedFeedItems: [item], paginationUntil: 200 };
+  const page = {
+    ...emptyFeedParseResult(),
+    orderedFeedItems: [item],
+    paginationUntil: 200,
+    missingProfilePubkeys: [item.event.pubkey],
+  };
   const client: FeedClient = {
     getFeed: jest.fn(),
     getPostsByPubkeys: jest.fn(),
@@ -38,84 +39,91 @@ function setup() {
     dispose: jest.fn(),
   };
   jest.mocked(getFeedClient).mockReturnValue(client);
-  const ctx: UserFeedLoadCtx = {
-    pubkey: item.event.pubkey,
-    authorName: undefined,
-    authorPicture: undefined,
-    isOwnProfile: false,
-    hasMoreRef: { current: true },
-    paginationCursorRef: { current: null },
-    paginationUntilRef: { current: 0 },
-    paginationOffsetRef: { current: 0 },
-    loadingMoreRef: { current: false },
-    feedItemIdsRef: { current: new Set() },
-    activeLoadMoreIdRef: { current: null },
-    isFirstRender: { current: true },
-    deletedRepostIdsRef: { current: null },
-    quotedRef: { current: new Map() },
-    profilesRef: { current: new Map() },
-    applyPage: jest.fn((_page, items) => {
-      visibleItems = items ?? [];
-    }),
-    appendPage: jest.fn(),
-    applyEnrichment: jest.fn(),
-    resetContent: jest.fn(() => {
-      visibleItems = [];
-    }),
-    setIsLoading: jest.fn(),
-    setIsLoadingMore: jest.fn(),
-  };
-  return { client, ctx, visibleItems: () => visibleItems };
+  return { client, page };
 }
 
-describe('profile loading after posts arrive', () => {
-  beforeEach(() => {
-    jest.spyOn(global, 'requestAnimationFrame').mockImplementation(() => 0);
-  });
-  afterEach(() => {
-    jest.restoreAllMocks();
-  });
+const args = {
+  pubkey: item.event.pubkey,
+  authorName: undefined,
+  authorPicture: undefined,
+  signal: undefined,
+  readId: 'r1-profileFeed',
+};
 
-  it('keeps fetched posts visible when nagg enrichment rejects with 404', async () => {
-    const { client, ctx, visibleItems } = setup();
-    jest.mocked(client.enrich).mockRejectedValue(new Error('App-view fetch failed: 404 not found'));
-    await loadUserFeedImpl(ctx, () => false);
-    expect(visibleItems()).toEqual([item]);
-    expect(ctx.resetContent).not.toHaveBeenCalled();
-    expect(ctx.setIsLoading).toHaveBeenLastCalledWith(false);
+describe('fetchUserFeedPage', () => {
+  it('returns the page, forwards the read id, and disposes the client', async () => {
+    const { client, page } = setup();
+    await expect(fetchUserFeedPage(args)).resolves.toBe(page);
+    expect(client.getUserFeed).toHaveBeenCalledWith(
+      expect.objectContaining({ readId: 'r1-profileFeed', limit: 50 })
+    );
     expect(client.dispose).toHaveBeenCalledTimes(1);
   });
 
-  it('still applies successful enrichment to the fetched posts', async () => {
-    const { client, ctx, visibleItems } = setup();
+  it('throws on a tier-exhausted empty answer so it is never cached as "no posts"', async () => {
+    const { client } = setup();
+    jest.mocked(client.getUserFeed).mockResolvedValue({
+      ...emptyFeedParseResult(),
+      read: { status: 'unavailable', sources: [], attempts: ['nagg=failed'], degraded: true },
+    });
+    await expect(fetchUserFeedPage(args)).rejects.toThrow('profile feed unavailable');
+    expect(client.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps an unavailable answer that still carries rows (degraded, not empty)', async () => {
+    const { client, page } = setup();
+    jest.mocked(client.getUserFeed).mockResolvedValue({
+      ...page,
+      read: {
+        status: 'unavailable',
+        sources: ['relay'],
+        attempts: ['nagg=failed'],
+        degraded: true,
+      },
+    });
+    await expect(fetchUserFeedPage(args)).resolves.toMatchObject({ orderedFeedItems: [item] });
+  });
+});
+
+describe('enrichUserFeedPage', () => {
+  it('applies successful enrichment', async () => {
+    const { client, page } = setup();
     const updates = { profiles: new Map([[item.event.pubkey, { name: 'Alice' }]]) };
     jest.mocked(client.enrich).mockResolvedValue(updates);
-    await loadUserFeedImpl(ctx, () => false);
-    expect(visibleItems()).toEqual([item]);
-    expect(ctx.applyEnrichment).toHaveBeenCalledWith(updates);
+    const applyEnrichment = jest.fn();
+    await enrichUserFeedPage(page, { isCancelled: () => false, applyEnrichment });
+    expect(applyEnrichment).toHaveBeenCalledWith(updates);
+    expect(client.dispose).toHaveBeenCalledTimes(1);
   });
 
-  it('clears the previous profile content when the initial page itself fails', async () => {
-    const { client, ctx } = setup();
-    jest.mocked(client.getUserFeed).mockRejectedValue(new Error('network down'));
-    await loadUserFeedImpl(ctx, () => false);
-    expect(ctx.resetContent).toHaveBeenCalledTimes(1);
-    expect(ctx.applyPage).not.toHaveBeenCalled();
-    expect(client.enrich).not.toHaveBeenCalled();
-    expect(ctx.setIsLoading).toHaveBeenLastCalledWith(false);
+  it('never throws when nagg enrichment rejects with 404 — the posts stay', async () => {
+    const { client, page } = setup();
+    jest.mocked(client.enrich).mockRejectedValue(new Error('App-view fetch failed: 404 not found'));
+    const applyEnrichment = jest.fn();
+    await expect(
+      enrichUserFeedPage(page, { isCancelled: () => false, applyEnrichment })
+    ).resolves.toBeUndefined();
+    expect(applyEnrichment).not.toHaveBeenCalled();
   });
 
-  it('does not change a new profile after the old profile enrichment fails', async () => {
-    const { client, ctx } = setup();
+  it('does not apply enrichment that completes after cancellation', async () => {
+    const { client, page } = setup();
     let cancelled = false;
     jest.mocked(client.enrich).mockImplementation(async () => {
       cancelled = true;
-      throw new Error('late failure');
+      return { profiles: new Map() };
     });
-    await loadUserFeedImpl(ctx, () => cancelled);
-    expect(ctx.resetContent).not.toHaveBeenCalled();
-    expect(ctx.applyEnrichment).not.toHaveBeenCalled();
-    expect(ctx.setIsLoading).toHaveBeenCalledTimes(1);
-    expect(client.dispose).toHaveBeenCalledTimes(1);
+    const applyEnrichment = jest.fn();
+    await enrichUserFeedPage(page, { isCancelled: () => cancelled, applyEnrichment });
+    expect(applyEnrichment).not.toHaveBeenCalled();
+  });
+
+  it('skips the round-trip when nothing is missing', async () => {
+    const { client } = setup();
+    await enrichUserFeedPage(
+      { missingQuotedIds: [], missingProfilePubkeys: [] },
+      { isCancelled: () => false, applyEnrichment: jest.fn() }
+    );
+    expect(client.enrich).not.toHaveBeenCalled();
   });
 });

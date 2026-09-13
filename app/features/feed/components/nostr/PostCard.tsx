@@ -47,6 +47,7 @@ import { sharedStyles } from './feedStyles';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
 import { seedThread, type ThreadSeed } from '@/features/feed/lib/threadSeedCache';
+import { seedProfileFeed } from '@/features/feed/lib/profileFeedSeedCache';
 import { alpha, radius, spacing } from '@/shared/styles/tokens';
 import {
   REPLY_SKELETON_VARIANTS,
@@ -322,12 +323,15 @@ const PostCardBody = React.memo(function PostCardBody({
   }, [event, getThreadContext]);
 
   const navigateToProfile = useCallback(() => {
+    // Hand the author's notes this surface already has to the profile screen,
+    // so its feed paints as a partial page before the network answers.
+    seedProfileFeed(event.pubkey, getThreadContext?.() ?? null);
     // push so each profile pushes a new stack entry — see navigateToProfile.
     router.push({
       pathname: '/(user-flow)/profile',
       params: { pubkey: event.pubkey },
     });
-  }, [event.pubkey]);
+  }, [event.pubkey, getThreadContext]);
 
   const quotePost = useQuotePost();
   const handleQuotePress = useCallback(
