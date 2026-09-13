@@ -455,3 +455,21 @@ describe('persisted rejection is contained to the row', () => {
     expect(parsed.success && parsed.data).toEqual({ ok: { n: 1 } });
   });
 });
+
+describe('profile source custody tolerance', () => {
+  it.each(['bogus', null, 42])(
+    'keeps unknown source %s fail-closed without losing the profile',
+    (source) => {
+      const schema = persistRegistry.find((entry) => entry.name === 'profile-store')!.schema;
+      expect(
+        schema.parse({
+          activeAccountIndex: 7,
+          profiles: [{ accountIndex: 7, pubkey: 'a'.repeat(64), addedAt: 1, source }],
+        })
+      ).toEqual({
+        activeAccountIndex: 7,
+        profiles: [{ accountIndex: 7, pubkey: 'a'.repeat(64), addedAt: 1, source: 'imported' }],
+      });
+    }
+  );
+});

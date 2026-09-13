@@ -8,9 +8,16 @@
  * 'detected' and silently skipped the onboarding carousel.
  */
 
-import { renderHook, waitFor } from '@testing-library/react-native';
+import React from 'react';
+import { render, fireEvent, act, renderHook, waitFor } from '@testing-library/react-native';
 
-import { useReinstallDetection } from '@/shared/blocks/AppGate';
+import AppGate, { useReinstallDetection } from '@/shared/blocks/AppGate';
+import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
+import { actionMenuPopup } from '@/shared/lib/popup';
+import {
+  recoverMnemonicSession,
+  deleteAllProfiles,
+} from '@/shared/lib/profile/profileSessionOrchestrator';
 import { retrieveMnemonic } from '@/shared/lib/nostr/secureStorage';
 
 const mockLifecycle: { seedCreatedAt: number | null } = { seedCreatedAt: null };
@@ -20,12 +27,17 @@ jest.mock('@/shared/lib/nostr/secureStorage', () => ({
 }));
 
 jest.mock('@/shared/stores/global/settingsStore', () => ({
-  useSettingsStore: Object.assign(jest.fn(), {
-    persist: {
-      hasHydrated: () => true,
-      onFinishHydration: () => () => {},
-    },
-  }),
+  useSettingsHydration: () => 'ready',
+  useSettingsStore: Object.assign(
+    (selector: (s: unknown) => unknown) => selector({ hasSeenOnboarding: false }),
+    {
+      getState: () => ({ hasSeenOnboarding: false }),
+      persist: {
+        hasHydrated: () => true,
+        onFinishHydration: () => () => {},
+      },
+    }
+  ),
 }));
 
 jest.mock('@/shared/stores/global/walletLifecycleStore', () => ({
@@ -99,3 +111,73 @@ describe('useReinstallDetection', () => {
     expect(mockedRetrieveMnemonic).not.toHaveBeenCalled();
   });
 });
+
+jest.mock('@/shared/ui/composed/Screen', () => ({
+  Screen: ({ children }: { children: React.ReactNode }) => children,
+}));
+jest.mock('@/shared/ui/primitives/View/VStack', () => ({
+  VStack: (props: object) => jest.requireActual('react').createElement('View', props),
+}));
+jest.mock('@/shared/ui/primitives/Text', () => ({
+  Text: (props: object) => jest.requireActual('react').createElement('Text', props),
+}));
+jest.mock('@/shared/ui/primitives/Button', () => {
+  return {
+    Button: ({ text, ...props }: { text: string }) =>
+      jest.requireActual('react').createElement('View', props, text),
+  };
+});
+jest.mock('@/shared/lib/popup', () => ({ actionMenuPopup: jest.fn() }));
+jest.mock('@/shared/lib/profile/appRestart', () => ({ restartApp: jest.fn() }));
+jest.mock('@/shared/lib/profile/profileSessionOrchestrator', () => ({
+  recoverMnemonicSession: jest.fn(),
+  deleteAllProfiles: jest.fn(),
+}));
+jest.mock('@/shared/stores/global/profileStore', () => ({
+  useProfileStore: { getState: jest.fn() },
+}));
+
+describe('AppGate locked recovery', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useSecureStoreState.setState({ secureStoreState: 'locked', errorName: 'Error' });
+  });
+  afterEach(() => useSecureStoreState.setState({ secureStoreState: 'available', errorName: null }));
+
+  it('renders a blocking recovery screen and submits the phrase to session recovery', async () => {
+    jest.mocked(recoverMnemonicSession).mockResolvedValue(true);
+    const screen = render(
+      <AppGate>{React.createElement('View', { testID: 'wallet-content' })}</AppGate>
+    );
+    expect(screen.getByTestId('secure-locked-screen')).toBeTruthy();
+    expect(screen.queryByTestId('wallet-content')).toBeNull();
+    fireEvent.press(screen.getByTestId('secure-locked-import'));
+    const menu = jest.mocked(actionMenuPopup).mock.calls.at(-1)![0];
+    const close = jest.fn();
+    await act(() =>
+      menu.primaryAction!.onPress(
+        { 'recovery-phrase': 'abandon '.repeat(11) + 'about' },
+        { close, setError: jest.fn() }
+      )
+    );
+    expect(recoverMnemonicSession).toHaveBeenCalledWith('abandon '.repeat(11) + 'about');
+    expect(close).toHaveBeenCalled();
+  });
+
+  it('requires two confirmations before requesting a full reset', async () => {
+    jest.mocked(deleteAllProfiles).mockResolvedValue(true);
+    const screen = render(
+      <AppGate>{React.createElement('View', { testID: 'wallet-content' })}</AppGate>
+    );
+    fireEvent.press(screen.getByTestId('secure-locked-fresh'));
+    expect(deleteAllProfiles).not.toHaveBeenCalled();
+    const first = jest.mocked(actionMenuPopup).mock.calls.at(-1)![0];
+    await act(() => first.buttons![0].onPress!(jest.fn()));
+    expect(deleteAllProfiles).not.toHaveBeenCalled();
+    const second = jest.mocked(actionMenuPopup).mock.calls.at(-1)![0];
+    await act(() => second.buttons![0].onPress!(jest.fn()));
+    expect(deleteAllProfiles).toHaveBeenCalledTimes(1);
+  });
+});
+
+jest.mock('@/shared/blocks/popup/ActionMenuHost', () => ({ ActionMenuHost: () => null }));

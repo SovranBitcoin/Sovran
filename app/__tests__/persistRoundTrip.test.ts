@@ -139,6 +139,42 @@ for (const path of STORE_MODULES) {
 }
 
 describe('persisted store round-trip', () => {
+  it('round-trips a verified profile source repair without losing metadata', () => {
+    const { useProfileStore } =
+      require('@/shared/stores/global/profileStore') as typeof import('@/shared/stores/global/profileStore');
+    const original = useProfileStore.getState();
+    useProfileStore.setState({
+      activeAccountIndex: 7,
+      profiles: [
+        {
+          accountIndex: 7,
+          pubkey: 'a'.repeat(64),
+          source: 'imported',
+          externalChain: 1,
+          addedAt: 123,
+          cachedBalanceSats: 42,
+        },
+      ],
+    });
+    expect(useProfileStore.getState().repairDerivedSource(7, 'a'.repeat(64))).toBe(true);
+    const options = useProfileStore.persist.getOptions();
+    const persisted = JSON.parse(JSON.stringify(options.partialize!(useProfileStore.getState())));
+    expect(options.merge!(persisted, useProfileStore.getInitialState())).toMatchObject({
+      activeAccountIndex: 7,
+      profiles: [
+        {
+          accountIndex: 7,
+          pubkey: 'a'.repeat(64),
+          source: 'derived',
+          externalChain: 0,
+          addedAt: 123,
+          cachedBalanceSats: 42,
+        },
+      ],
+    });
+    useProfileStore.setState(original);
+  });
+
   it('round-trips prices and server time without persisting transient state', () => {
     const { usePricelistStore } =
       require('@/shared/stores/global/pricelistStore') as typeof import('@/shared/stores/global/pricelistStore');

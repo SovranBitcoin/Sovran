@@ -8,6 +8,7 @@ import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils.js';
 import { useCallback, useEffect, useState } from 'react';
 
 import { nostrLog, redactError } from '../logger';
+import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import { maybeExportSeedForE2E } from './e2eSeedExport';
 
 // Keys for secure storage
@@ -67,6 +68,35 @@ function assertPubkeyHex(pubkeyHex: string): void {
   if (!isNostrPubkeyHex(pubkeyHex)) {
     throw new Error('Invalid pubkeyHex: expected 64 hex chars');
   }
+}
+
+export type SecureGetResult =
+  { kind: 'value'; value: string } | { kind: 'absent' } | { kind: 'error'; error: unknown };
+
+export async function secureGetResult(key: string): Promise<SecureGetResult> {
+  try {
+    const value = await SecureStore.getItemAsync(key, secureOptions());
+    return value === null ? { kind: 'absent' } : { kind: 'value', value };
+  } catch (error) {
+    return { kind: 'error', error };
+  }
+}
+
+function lockMnemonic(error: unknown): void {
+  if (useSecureStoreState.getState().secureStoreState === 'locked') return;
+  // Never forward arbitrary native error names/messages (they can contain keys).
+  const name = error instanceof Error ? error.name : '';
+  const errorName = [
+    'Error',
+    'TypeError',
+    'RangeError',
+    'SecurityException',
+    'UnrecoverableKeyException',
+  ].includes(name)
+    ? name
+    : 'SecureStoreError';
+  useSecureStoreState.setState({ secureStoreState: 'locked', errorName });
+  nostrLog.warn('secure.mnemonic.locked', { platform: Platform.OS, errorName });
 }
 
 async function secureGet(key: string, op: string): Promise<string | null> {
@@ -276,8 +306,13 @@ export function retrieveMnemonic(): Promise<string | null> {
 }
 
 async function retrieveMnemonicInner(): Promise<string | null> {
-  const value = await secureGet(STORAGE_KEYS.USER_MNEMONIC, 'retrieve_mnemonic');
-  if (value == null) return null;
+  const result = await secureGetResult(STORAGE_KEYS.USER_MNEMONIC);
+  if (result.kind === 'error') {
+    lockMnemonic(result.error);
+    return null;
+  }
+  if (result.kind === 'absent') return null;
+  const { value } = result;
   if (!bip39.validateMnemonic(value, wordlist)) {
     nostrLog.warn('nostr.secure.mnemonic_corrupt');
     return null;
@@ -341,6 +376,7 @@ export function ensureMnemonicExists(): Promise<string | null> {
 
 async function ensureMnemonicExistsInner(): Promise<string | null> {
   try {
+    if (useSecureStoreState.getState().secureStoreState === 'locked') return null;
     // Check if mnemonic already exists
     const existingMnemonic = await retrieveMnemonic();
     if (existingMnemonic) {
@@ -357,8 +393,13 @@ async function ensureMnemonicExistsInner(): Promise<string | null> {
     // any funds derived from the corrupt mnemonic. Surface a loud failure
     // so the user can reinstall and restore from backup with the
     // correctly-typed mnemonic.
-    const rawExisting = await secureGet(STORAGE_KEYS.USER_MNEMONIC, 'check_mnemonic_exists');
-    if (rawExisting != null) {
+    if (useSecureStoreState.getState().secureStoreState === 'locked') return null;
+    const rawExisting = await secureGetResult(STORAGE_KEYS.USER_MNEMONIC);
+    if (rawExisting.kind === 'error') {
+      lockMnemonic(rawExisting.error);
+      return null;
+    }
+    if (rawExisting.kind === 'value') {
       nostrLog.error('nostr.secure.refusing_overwrite_corrupt_mnemonic');
       return null;
     }
@@ -457,15 +498,24 @@ export async function clearAllSecureData(
   const results = await Promise.all(allKeys.map((key) => secureDelete(key, 'clear_key')));
   // Drop the index itself last so a partial wipe followed by a retry still
   // sees the un-wiped keys on the second pass.
-  await secureDelete(STORAGE_KEYS.KEY_INDEX, 'clear_index');
-
-  const allOk = results.every(Boolean);
+  const keysCleared = results.every(Boolean);
+  const allOk = keysCleared && (await secureDelete(STORAGE_KEYS.KEY_INDEX, 'clear_index'));
   if (allOk) {
     nostrLog.info('nostr.secure.all_data_cleared', { count: allKeys.length });
   } else {
     nostrLog.warn('nostr.secure.all_data_cleared_with_errors', { count: allKeys.length });
   }
   return allOk;
+}
+
+/** A source repair must discard both mnemonic and PBKDF2 caches from the old chain. */
+export async function clearAccountDerivedCache(accountIndex: number): Promise<boolean> {
+  const results = await Promise.all(
+    [derivedKeysKey(accountIndex), cashuMnemonicKey(accountIndex), cashuSeedKey(accountIndex)].map(
+      (key) => secureDelete(key, 'clear_derived_cache')
+    )
+  );
+  return results.every(Boolean);
 }
 
 // ── Derived Keys Cache ──────────────────────────────────────────

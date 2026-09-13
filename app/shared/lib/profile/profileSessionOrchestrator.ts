@@ -15,11 +15,18 @@
  * AccountScopedProviders via registerKeyDerivation(). This avoids prop-threading from
  * the drawer/sheet all the way to the orchestrator.
  */
+import * as bip39 from '@scure/bip39';
+import { wordlist } from '@scure/bip39/wordlists/english.js';
+import { storeMnemonic, clearAllSecureData } from '@/shared/lib/nostr/secureStorage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ResultAsync } from 'neverthrow';
 
-import { log, redactError } from '../logger';
+import { log, nostrLog, redactError } from '../logger';
 import { CocoManager } from '@/shared/lib/cashu/manager';
+import { deriveNostrKeys } from '@/shared/lib/nostr/keyDerivation';
+import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
+import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { restartApp } from '@/shared/lib/profile/appRestart';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
@@ -323,6 +330,64 @@ export async function switchToImportedProfile(opts: {
   return switchToExistingProfile(opts);
 }
 
+/** Replace an inaccessible root, or the unused onboarding root, then boot new caches. */
+export async function recoverMnemonicSession(mnemonic: string): Promise<boolean> {
+  if (!bip39.validateMnemonic(mnemonic, wordlist) || mnemonic.split(' ').length !== 12)
+    return false;
+  if (transitionInFlight) return false;
+  transitionInFlight = true;
+  try {
+    const locked = useSecureStoreState.getState().secureStoreState === 'locked';
+    if (!locked && useSettingsStore.getState().hasSeenOnboarding) return false;
+    if (
+      locked &&
+      useProfileStore
+        .getState()
+        .profiles.some(
+          (profile) =>
+            profile.source !== 'imported' &&
+            deriveNostrKeys(mnemonic, profile.accountIndex).pubkey !== profile.pubkey
+        )
+    )
+      return false;
+    await CocoManager.cleanup();
+
+    // Persist before restart without changing the current account scope mid-flight.
+    const lifecycle = useWalletLifecycleStore.persist.getOptions();
+    await lifecycle.storage!.setItem(lifecycle.name!, {
+      version: lifecycle.version,
+      state: {
+        seedCreatedAt: null,
+        restoreStatus: 'pending',
+        lastRestoreAt: null,
+        lastRestoreError: null,
+      },
+    });
+    if (useSecureStoreState.getState().secureStoreState !== 'locked') {
+      // The carousel's auto-generated account is disposable. Its row must not
+      // point at the new mnemonic on restart; no wallet operation is available here.
+      const profiles = useProfileStore.persist.getOptions();
+      await profiles.storage!.setItem(profiles.name!, {
+        version: profiles.version,
+        state: { activeAccountIndex: 0, profiles: [] },
+      });
+    }
+    if (!(await storeMnemonic(mnemonic))) return false;
+    const settings = useSettingsStore.persist.getOptions();
+    await settings.storage!.setItem(settings.name!, {
+      version: settings.version,
+      state: { ...settings.partialize!(useSettingsStore.getState()), hasSeenOnboarding: true },
+    });
+    nostrLog.info('secure.mnemonic.recovered');
+    return restartApp();
+  } catch {
+    nostrLog.warn('secure.mnemonic.recovery_failed');
+    return false;
+  } finally {
+    transitionInFlight = false;
+  }
+}
+
 /**
  * Nuclear wipe — delete ALL app data and restart fresh.
  * Clears: all Zustand stores, all AsyncStorage, all SecureStore keys,
@@ -347,22 +412,15 @@ export async function deleteAllProfiles(opts?: {
     usePopupStore.getState().close();
 
     const profiles = useProfileStore.getState().profiles;
-    const accountIndexes = profiles.map((p) => p.accountIndex);
+    const accountIndexes = Array.from(new Set([0, ...profiles.map((p) => p.accountIndex)]));
     const importedPubkeys = profiles.filter((p) => p.source === 'imported').map((p) => p.pubkey);
 
     // 1. Close SQLite and destroy all Coco databases
-    try {
-      await CocoManager.completeReset(accountIndexes);
-    } catch (e) {
-      log.warn('profile.orchestrator.coco_reset_failed', { error: redactError(e) });
-    }
+    await CocoManager.completeReset(accountIndexes);
 
     // 2. Clear ALL secure storage (mnemonic, derived keys, cashu mnemonics, imported nsecs)
-    try {
-      const { clearAllSecureData } = await import('@/shared/lib/nostr/secureStorage');
-      await clearAllSecureData(accountIndexes, importedPubkeys);
-    } catch (e) {
-      log.warn('profile.orchestrator.clear_secure_data_failed', { error: redactError(e) });
+    if (!(await clearAllSecureData(accountIndexes, importedPubkeys))) {
+      throw new Error('Secure data reset incomplete');
     }
 
     // 3a. Per-feature wipes BEFORE the nuclear AsyncStorage.clear() so any
@@ -377,11 +435,7 @@ export async function deleteAllProfiles(opts?: {
     }
 
     // 3b. Nuclear AsyncStorage wipe — every key, every store, everything
-    try {
-      await AsyncStorage.clear();
-    } catch (e) {
-      log.warn('profile.orchestrator.async_storage_clear_failed', { error: redactError(e) });
-    }
+    await AsyncStorage.clear();
 
     // 4. Clear all Zustand in-memory state so nothing bleeds before restart
     useProfileStore.setState({

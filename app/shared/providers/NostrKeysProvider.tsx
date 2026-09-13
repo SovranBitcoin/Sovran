@@ -1,3 +1,5 @@
+import { KeyRecoveryScreen } from '@/shared/blocks/KeyRecoveryScreen';
+import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import {
   createContext,
   useContext,
@@ -11,6 +13,7 @@ import {
 import { InteractionManager } from 'react-native';
 import {
   ensureMnemonicExists,
+  clearAccountDerivedCache,
   retrieveMnemonic,
   retrieveDerivedKeys,
   storeDerivedKeys,
@@ -95,6 +98,7 @@ interface NostrKeysProviderProps {
  */
 export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKeysProviderProps) {
   useInitMount('NostrKeysProvider');
+  const locked = useSecureStoreState((s) => s.secureStoreState === 'locked');
   const stage = useInitializationStage('nostr', {
     message: 'Initializing keys...',
     dependsOn: ['global-migrations'],
@@ -273,7 +277,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
 
   // Initialize default keys when mnemonic is available, or generate one if none exists
   useEffect(() => {
-    if (mnemonicLoading) return;
+    if (mnemonicLoading || locked) return;
     if (!stage.canStart) return;
     if (hasStarted.current) return;
     hasStarted.current = true;
@@ -317,14 +321,33 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
 
         // Check if the active profile is an imported nsec profile
         const activeProfile = useProfileStore.getState().getActiveProfile();
-        const isImported = activeProfile?.source === 'imported';
+        let isImported = activeProfile?.source === 'imported';
+        let repairedSource = false;
+        let nsecValue: string | null = null;
+        if (isImported && activeProfile) {
+          nsecValue = await retrieveImportedNsec(activeProfile.pubkey);
+          if (!nsecValue) {
+            const candidate = deriveNostrKeys(mnemonicToUse, activeProfile.accountIndex);
+            if (
+              candidate.pubkey !== activeProfile.pubkey ||
+              !(await clearAccountDerivedCache(activeProfile.accountIndex)) ||
+              !useProfileStore
+                .getState()
+                .repairDerivedSource(activeProfile.accountIndex, candidate.pubkey)
+            ) {
+              throw new Error('Saved account requires re-import');
+            }
+            defaultKeys = candidate;
+            repairedSource = true;
+            isImported = false;
+          }
+        }
 
         if (isImported && activeProfile) {
           // ── Imported nsec profile: load identity from SecureStore ──
           stage.log('Loading imported profile...');
           initLog('NostrKeys', 'imported profile — loading nsec from SecureStore');
 
-          const nsecValue = await retrieveImportedNsec(activeProfile.pubkey);
           if (!nsecValue) {
             throw new Error('Imported nsec not found in secure storage');
           }
@@ -336,6 +359,8 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
 
           const privateKey = decoded.data;
           const pubkeyHex = getPublicKey(privateKey);
+          if (pubkeyHex !== activeProfile.pubkey)
+            throw new Error('Saved account requires re-import');
 
           defaultKeys = {
             npub: nip19.npubEncode(pubkeyHex),
@@ -376,7 +401,9 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
           );
 
           const cacheValid =
-            cachedDerived?.mnemonicHash === mHash && cachedCashu?.mnemonicHash === mHash;
+            !repairedSource &&
+            cachedDerived?.mnemonicHash === mHash &&
+            cachedCashu?.mnemonicHash === mHash;
           initLog('NostrKeys', `cache valid: ${cacheValid}`);
 
           if (cacheValid && cachedDerived && cachedCashu) {
@@ -391,7 +418,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
             defaultCashuMnemonic = cachedCashu.value;
           } else {
             stage.log('Deriving keys...');
-            defaultKeys = await initPhase('NostrKeys.deriveNip06', async () =>
+            defaultKeys ??= await initPhase('NostrKeys.deriveNip06', async () =>
               deriveNostrKeys(mnemonicToUse!, defaultAccountIndex)
             );
 
@@ -411,6 +438,10 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
               storeCashuMnemonic(defaultAccountIndex, defaultCashuMnemonic, mHash),
             ]).catch((e) => initLog('NostrKeys', `cache write failed: ${e}`));
           }
+        }
+
+        if (activeProfile && defaultKeys?.pubkey !== activeProfile.pubkey) {
+          throw new Error('Saved account requires re-import');
         }
 
         initLog('NostrKeys', 'setting keys in state...');
@@ -452,7 +483,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     // `stage` is memoised (moves only when `canStart` flips). `hasStarted`
     // keeps this once-only regardless, so listing every value the body reads
     // costs nothing and keeps the dependency set honest.
-  }, [mnemonic, mnemonicLoading, stage, refreshMnemonic, defaultAccountIndex]);
+  }, [mnemonic, mnemonicLoading, locked, stage, refreshMnemonic, defaultAccountIndex]);
 
   // Non-blocking: once keys are ready, refresh the user's own-account profiles
   // (kind-0 + follower/following counts) so the drawer/account switcher stay
@@ -500,6 +531,14 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
       getCashuMnemonicForAccount,
     ]
   );
+
+  if (locked || (error && !isReady)) {
+    return (
+      <NostrKeysContext.Provider value={contextValue}>
+        <KeyRecoveryScreen locked={locked} />
+      </NostrKeysContext.Provider>
+    );
+  }
 
   // Loading UI is now handled by InitializationScreen
   // Only render children when ready

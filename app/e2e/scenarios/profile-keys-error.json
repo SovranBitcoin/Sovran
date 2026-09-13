@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "id": "recovery.profile-keys-error",
+  "name": "Open profile-keys-error recovery",
+  "description": "Open the recovery form from a prepared disposable device error state.",
+  "details": "Manual prerequisite: the device is already at this boot gate. No real funds; no state injection or recovery phrase is provided by this scenario.",
+  "lane": "physical",
+  "tags": ["flow:recovery"],
+  "requires": [],
+  "setup": [],
+  "steps": [
+    {"action":"waitFor","selector":{"id":"profile-keys-error"},"timeoutMs":30000},
+    {"action":"screenshot","name":"profile-keys-error"},
+    {"action":"tap","selector":{"id":"profile-keys-reimport"}},
+    {"action":"waitFor","selector":{"id":"profile-reimport-submit"}},
+    {"action":"tap","selector":{"id":"key-recovery-cancel"}}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"id":"profile-keys-reimport"}}
+  ],
+  "finally": [],
+  "endState": "onboarding"
+}

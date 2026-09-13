@@ -132,6 +132,8 @@
     {"id":"wallet.location.permission","file":"scenarios/wallet-location-permission.json","order":560,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"store.screenshots","file":"scenarios/store-screenshots.json","order":9990,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"settings.moderation.filter","file":"scenarios/settings-moderation-filter.json","order":570,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
-    {"id":"settings.legal.navigate","file":"scenarios/settings-legal-navigate.json","order":580,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"}
+    {"id":"settings.legal.navigate","file":"scenarios/settings-legal-navigate.json","order":580,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"recovery.secure-locked","file":"scenarios/secure-locked.json","order":590,"newInstance":true,"lane":"physical","requires":[],"endState":"onboarding"},
+    {"id":"recovery.profile-keys-error","file":"scenarios/profile-keys-error.json","order":600,"newInstance":true,"lane":"physical","requires":[],"endState":"onboarding"}
   ]
 }
