@@ -297,7 +297,7 @@ const PARAM_POPUPS = {
   'unified-rail-info': (p: { title: string; message: string }): PopupSpec => ({
     message: p.title,
     text: p.message,
-    icon: 'icon:mdi:information-outline',
+    icon: 'icon:mdi:information',
     type: 'info',
   }),
   'mints-added': (p: { added: number; failed?: number }): PopupSpec =>

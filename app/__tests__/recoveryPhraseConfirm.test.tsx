@@ -24,7 +24,16 @@ jest.mock('react-native', () => ({
 jest.mock('react-native-reanimated', () => ({
   __esModule: true,
   default: { View: 'View' },
-  useSharedValue: (value: number) => ({ value }),
+  useSharedValue: (initial: number) => {
+    const shared = {
+      value: initial,
+      get: () => shared.value,
+      set: (next: number) => {
+        shared.value = next;
+      },
+    };
+    return shared;
+  },
   useAnimatedStyle: () => ({}),
   withSequence: jest.fn(),
   withTiming: jest.fn(),

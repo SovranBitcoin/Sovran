@@ -88,7 +88,8 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     const unitBalances: Record<string, Record<string, number>> = {};
     for (const [mintUrl, byUnit] of Object.entries(rawBalanceCtx.byMintAndUnit ?? {})) {
       for (const [unit, snapshot] of Object.entries(byUnit)) {
-        (unitBalances[unit] ??= {})[mintUrl] = snapshot ? amountToNumber(snapshot.total) : 0;
+        const unitEntry = unitBalances[unit] ?? (unitBalances[unit] = {});
+        unitEntry[mintUrl] = snapshot ? amountToNumber(snapshot.total) : 0;
       }
     }
     return {

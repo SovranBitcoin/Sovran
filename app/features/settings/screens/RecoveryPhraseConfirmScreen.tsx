@@ -35,11 +35,13 @@ export function RecoveryPhraseQuiz({
     if (completed.current) return;
     if (word !== question.answer) {
       setIncorrect(true);
-      offset.value = withSequence(
-        ReduceMotion.System,
-        withTiming(-8, { duration: 70 }),
-        withTiming(8, { duration: 70 }),
-        withTiming(0, { duration: 70 })
+      offset.set(
+        withSequence(
+          ReduceMotion.System,
+          withTiming(-8, { duration: 70 }),
+          withTiming(8, { duration: 70 }),
+          withTiming(0, { duration: 70 })
+        )
       );
       return;
     }

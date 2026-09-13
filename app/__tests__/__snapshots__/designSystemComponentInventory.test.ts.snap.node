@@ -104,7 +104,9 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/onboarding/components/OnboardingSlideItem.tsx",
     "features/payments/components/NoResultsFound.tsx",
     "features/payments/components/SearchTip.tsx",
+    "features/receive/components/Bip321CustomizationCard.tsx",
     "features/receive/components/CreqCustomizationCard.tsx",
+    "features/receive/components/RailsIncludedRow.tsx",
     "features/receive/components/ReceivePaymentRequestTab.tsx",
     "features/receive/components/ReceiveRailPlaceholder.tsx",
     "features/receive/components/ReceiveReusableQuoteTab.tsx",
@@ -164,6 +166,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/blocks/GlobalMigrationGate.tsx",
     "shared/blocks/HeaderProfileButton.tsx",
     "shared/blocks/InitializationGate.tsx",
+    "shared/blocks/KeyRecoveryScreen.tsx",
     "shared/blocks/LegalDocumentScreen.tsx",
     "shared/blocks/NotFoundScreen.tsx",
     "shared/blocks/PaymentInfo.tsx",
@@ -250,6 +253,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 244,
+  "total": 247,
 }
 `;
