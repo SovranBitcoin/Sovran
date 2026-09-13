@@ -66,6 +66,11 @@ describe('generateTierRingTheme', () => {
   });
 
   it('keeps every tier on its identity hue (the band is the base hue)', () => {
+    const gold = generateTierRingTheme('gold', 'x');
+    expect(hueOf(gold.inkLight)).toBe(44);
+    expect(hueOf(gold.inkDark)).toBe(44);
+    expect(lightOf(gold.inkLight)).toBeGreaterThan(lightOf(gold.base));
+    expect(lightOf(gold.inkDark)).toBeLessThan(lightOf(gold.base));
     expect(hueOf(generateTierRingTheme('gold', 'x').base)).toBe(44);
     expect(hueOf(generateTierRingTheme('new', 'x').base)).toBe(214);
     expect(hueOf(generateTierRingTheme('bronze', 'x').base)).toBe(24);

@@ -102,10 +102,11 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
   const ringRadius = size / 2 + (GAP + STROKE / 2) * scale;
   const bandWidth = STROKE * scale;
   const fontSize = LABEL_FONT * scale;
-  // Inscribed ON the band: the baseline sits on the path with glyph tops
-  // pointing at the centre, so the path runs half a cap-height outside the
-  // band's centre line and the letters sit centred in the metal.
-  const labelRadius = ringRadius + fontSize * 0.36;
+  // Inscribed ON the band: the path IS the band's centre line and the text is
+  // set on its central baseline, so the letters sit centred in the metal
+  // without guessing at font metrics.
+  const labelRadius = ringRadius;
+  const labelArcLength = (labelRadius * LABEL_SPAN * Math.PI) / 180;
   const theme = useMemo(() => (tier ? generateTierRingTheme(tier, seed) : null), [tier, seed]);
   // The blobs are clipped to the band.
   const band = useMemo(() => {
@@ -278,24 +279,26 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
                 the centre on this arc), a light face on top — the cut edge shows
                 as the dark sliver along the letters' upper-left */}
             <Text
-              fill="rgba(0,0,0,0.75)"
+              fill={theme.inkDark}
               fontSize={fontSize}
               fontWeight="800"
               letterSpacing={1.3 * scale}
               textAnchor="middle"
+              alignmentBaseline="central"
               dx={-0.45 * scale}
               dy={-0.7 * scale}>
-              <TextPath href={`#${uid}-label-path`} startOffset="50%">
+              <TextPath href={`#${uid}-label-path`} startOffset={labelArcLength / 2}>
                 {PROFILE_TIER_LABEL[tier]}
               </TextPath>
             </Text>
             <Text
-              fill="rgba(255,255,255,0.9)"
+              fill={theme.inkLight}
               fontSize={fontSize}
               fontWeight="800"
               letterSpacing={1.3 * scale}
-              textAnchor="middle">
-              <TextPath href={`#${uid}-label-path`} startOffset="50%">
+              textAnchor="middle"
+              alignmentBaseline="central">
+              <TextPath href={`#${uid}-label-path`} startOffset={labelArcLength / 2}>
                 {PROFILE_TIER_LABEL[tier]}
               </TextPath>
             </Text>

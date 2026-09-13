@@ -133,9 +133,19 @@ describe('ProfileTierRing', () => {
     expect(inscriptions.map((n) => n.props.children)).toEqual(['GOLD', 'GOLD']);
     const [shadow, face] = byTestId(root, 'svg-text');
     expect(shadow!.props.dy).toBeLessThan(0);
-    expect(shadow!.props.fill).toMatch(/^rgba\(0,0,0/);
     expect(face!.props.dy).toBeUndefined();
-    expect(face!.props.fill).toMatch(/^rgba\(255,255,255/);
+    // Both inks are tints of the band's hue (gold = 44), centred on the band's
+    // centre line and on the arc.
+    expect(shadow!.props.fill).toMatch(/^hsla\(44,/);
+    expect(face!.props.fill).toMatch(/^hsla\(44,/);
+    expect(face!.props.alignmentBaseline).toBe('central');
+    const bandRadius = byTestId(root, 'sk-circle').find((c) => c.props.color)!.props.r;
+    const d: string = byTestId(root, 'svg-path')[0]!.props.d;
+    expect(Number(d.split(' ')[4])).toBeCloseTo(bandRadius, 6);
+    expect(byTestId(root, 'svg-text-path')[0]!.props.startOffset).toBeCloseTo(
+      (bandRadius * 110 * Math.PI) / 360,
+      6
+    );
     expect(byTestId(root, 'svg-root')[0]!.props.accessibilityLabel).toBe('GOLD tier');
   });
 

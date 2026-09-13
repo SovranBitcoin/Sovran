@@ -196,6 +196,9 @@ type TierRingTheme = {
   blobs: readonly TierRingBlob[];
   /** Blurred halo behind the ring. */
   glow: string;
+  /** Inscription: the lit face and the cut's shadow, both in the band's hue. */
+  inkLight: string;
+  inkDark: string;
 };
 
 type TierBase = {
@@ -283,5 +286,7 @@ export function generateTierRingTheme(tier: ProfileTier, seedInput: string): Tie
         : hsl(base.hue, base.sat, base.finish === 'metal' ? light : light - 2),
     blobs,
     glow: hsl(base.hue, base.sat, light + 4, base.finish === 'gem' ? 0.75 : 0.7),
+    inkLight: hsl(base.hue, Math.max(base.sat - 20, 0), Math.min(light + 30, 97)),
+    inkDark: hsl(base.hue, base.sat, Math.max(light - 34, 8)),
   };
 }
