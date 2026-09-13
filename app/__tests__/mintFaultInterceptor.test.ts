@@ -40,7 +40,7 @@ describe('mint-fault fetch interceptor', () => {
     const armedButEmpty = await fetch(`${MINT}/v1/info`);
     expect(armedButEmpty.status).toBe(200);
     loadRules([{ id: 'r', mint: '*', response: { mode: 'offline' } }]);
-    await fetch('https://api.sovran.money/api/app/latest-version');
+    await fetch('https://nagg.up.railway.app/app/latest-version');
     await fetch('https://nagg.up.railway.app/livez');
     await fetch('https://nagg.up.railway.app/app/latest-version', { method: 'POST' });
     expect(passthroughCalls).toHaveLength(4);

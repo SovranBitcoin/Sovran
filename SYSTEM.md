@@ -460,6 +460,8 @@ Current cache choices are intentionally different: [home-feed page 0](app/featur
 | Mint/proof/quote state | Coco persistent database and operation APIs |
 | Mint metadata/catalog display | Existing metadata/fetch cache; not spendability evidence |
 | BTC display prices | Global `pricelistStore`; `pricelistFeed` polls Nagg `/app/rates` through `apiClient` every ten minutes, retaining omitted currencies |
+| Wallpaper catalog | Global persisted `wallpaperStore`; `wallpaperSync` refreshes Nagg `/app/wallpapers` through `apiClient`, retaining the last catalog and fetch timestamp on request/parse failure |
+| BTC Map places | Global persisted `btcMapStore`; Nagg `/app/btcmap/places` and `/app/btcmap/places/{id}`, with one-hour list and 24-hour detail freshness; failed list refreshes retain stale places |
 | HTTP image bytes | `expo-image` cache plus shared prefetch scheduler |
 | DM decrypt results | Explicit private, profile-scoped cache; see decision 19 |
 
@@ -493,6 +495,12 @@ The inspected `run` consumer is [useMintChanges](app/features/mint/hooks/useMint
 **Observed:** [apiClient](app/shared/lib/apiClient.ts) wraps app/backend calls; [requestSignal](app/shared/lib/http/requestSignal.ts) composes controls for exception-style APIs; [wallet/safeFetch](wallet/src/safeFetch.ts) bounds external wallet calls; [nostr/transport](nostr/src/transport.ts) owns Nagg transport. These different boundaries are legitimate.
 
 **Decision:** route requests through their domain transport. Screens should not each recreate HTTP parsing, timeout, logging, authentication, and retry handling. Keep the original service identity when adapting errors. Model “offline,” “backend unavailable,” “one mint unavailable,” “cancelled,” “rate limited,” and “schema invalid” separately.
+
+Wallpaper and BTC Map reads use Nagg's `app` module through
+`backendConfig.scoreApiBaseUrl`; they must work without its optional `nostr`
+module or a generic relay-query endpoint. Keep the existing shared catalog,
+places-array, and place-object schemas tolerant of extra fields; retain `osm:*`
+detail properties. See [backend services](docs/architecture/backend-services.md).
 
 Use caller cancellation plus a bounded per-request deadline. The app signal helper currently defaults to 10 seconds and the wallet helper to 15 seconds; these are different boundary defaults, not values to unify blindly. A screen leaving may cancel optional reads, but cannot establish that an already-submitted financial operation stopped remotely.
 
@@ -847,6 +855,12 @@ Metro/Babel/TS resolution must agree. Keep `@/` aliases, platform suffixes, work
 Use `app.json` for stable declarative config, `app.config.js` for intentional build-profile composition, EAS config for build profiles, plugins for generated native changes, and local modules for native behavior. Avoid manual changes in generated `ios`/`android` projects that disappear on prebuild. Plugin execution must be repeatable and scoped. Permissions, native dependencies, entitlements, or runtime compatibility changes require a rebuilt binary; JavaScript delivery cannot make an old native binary contain new code.
 
 Public build variables are not secret storage. Validate required configuration at its boundary, distinguish development/preview/production, and make production failure explicit instead of falling back to a developer endpoint. Do not print secret values while diagnosing config. Keep ignored environments, credentials, databases, and generated build artifacts out of commits and audit documents.
+
+`backendConfig.scoreApiBaseUrl` owns Nagg app-service routing, including rates,
+version checks, AI lineup, wallpapers, and BTC Map. It defaults to the configured
+Nostr app-view host and supports a separate score-host override for deployment
+composition. Catalog routes require the `app` module; their availability must
+not depend on enabling generic Nostr queries.
 
 Scripts need a clear name, working directory, required inputs, outputs, side effects, and exit status. Read-only checks must not silently refresh dependencies, rewrite a budget, delete native projects, or submit a release. Generators should stage results and replace output only after validation. Use Node/Bun/Python/shell according to the tool's existing implementation; do not add a runtime for a trivial task.
 

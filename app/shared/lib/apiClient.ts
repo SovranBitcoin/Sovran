@@ -71,7 +71,7 @@ type MintReviewsResponseType = {
 };
 // nagg's rich discovery row — one call returns every mint card field (audit
 // state, units, reviews + favourite split, operator Nostr identity + Vertex
-// reputation), replacing the api.sovran.money search + per-mint review/profile
+// reputation), replacing the separate search + per-mint review/profile
 // N+1 fan-outs. Lenient (passthrough) so a nagg field addition needs no release.
 const DiscoverMint = z.looseObject({
   mintUrl: z.string().max(2048),
@@ -422,7 +422,7 @@ export const fetchBtcRates = (controls: RequestControls = {}) =>
 const parseAiLineup = parseWith(NaggAiLineupSchema, 'app/ai-lineup');
 const parseDiscoverMints = parseWith(DiscoverMintsResponse, 'nostr/mint/discover');
 const parseMintChanges = parseWith(MintChangesResponse, 'nostr/mint/changes');
-const parseCatalog = parseWith(CatalogResponse, 'wallpapers/catalog');
+const parseCatalog = parseWith(CatalogResponse, 'app/wallpapers');
 
 /**
  * Defensive guard for arbitrary `/v1/info` responses. The full contract
@@ -457,7 +457,7 @@ const parseMintInfo = (input: unknown): Result<GetInfoResponse, ParseError> => {
  * nagg mint discovery: one app-view call returning every known mint with audit
  * state, supported units, review + favourite aggregates, and the operator's
  * Nostr identity + Vertex reputation. Served by nagg (SCORE_API_BASE_URL), so
- * the app no longer needs api.sovran.money's /cashu/mints/search + per-mint
+ * the app no longer needs separate mint search + per-mint
  * review/profile fan-outs for discovery.
  */
 export const discoverMints = ({ limit, signal }: { limit?: number; signal?: AbortSignal } = {}) =>
@@ -531,7 +531,7 @@ export const getLatestVersion = ({
 
 /**
  * nagg-served AI model lineup (see `shared/lib/routstr/lineup.ts` for the
- * schema and precedence rules). Served by nagg, not api.sovran.money, so a
+ * schema and precedence rules). Served by nagg, so a
  * nagg deploy can retune the AI tab on shipped builds.
  */
 export const getAiLineup = (controls: RequestControls = {}) =>
@@ -553,16 +553,18 @@ export const fetchNostrProfile = (pubkey: string, controls: RequestControls = {}
   );
 
 /**
- * Fetches the wallpaper catalog and validates it against the shared Zod schema.
+ * Fetches nagg's app-module wallpaper catalog using the shared Zod schema.
+ * This route does not require nagg's optional Nostr module. wallpaperSync
+ * retains the persisted last catalog when the request or parsing fails.
  * Unknown top-level fields are silently dropped (Postel's Law); a malformed
  * envelope is coerced into an `Error` with the parse-issue count for the
  * UI layer and the detail is logged via `loggableIssues`.
  */
 export const fetchWallpaperCatalog = (controls: RequestControls = {}) =>
   fetchJson(
-    `${API_BASE_URL}/wallpapers/catalog`,
+    `${SCORE_API_BASE_URL}/app/wallpapers`,
     parseCatalog,
-    'wallpapers/catalog',
+    'app/wallpapers',
     undefined,
     controls
   );

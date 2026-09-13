@@ -83,6 +83,23 @@ describe('apiClient backend config routing', () => {
     }
   );
 
+  it.each([undefined, 'https://catalog.example.test/'])(
+    'routes wallpapers through the app module with score override %s',
+    async (scoreBaseUrl) => {
+      process.env.EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL = 'http://localhost:8080/';
+      if (scoreBaseUrl) process.env.EXPO_PUBLIC_SCORE_API_BASE_URL = scoreBaseUrl;
+      const { fetchWallpaperCatalog } =
+        jest.requireActual<typeof import('@/shared/lib/apiClient')>('@/shared/lib/apiClient');
+
+      await fetchWallpaperCatalog();
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${scoreBaseUrl?.replace(/\/$/, '') ?? 'http://localhost:8080'}/app/wallpapers`,
+        expect.any(Object)
+      );
+    }
+  );
+
   it('routes Nostr profile through app-view REST', async () => {
     process.env.EXPO_PUBLIC_API_BASE_URL = 'https://api.example.test/api/';
     process.env.EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL = 'http://localhost:8080/';

@@ -108,7 +108,7 @@ export function discoveryMethodMatches(
  * One network call returns every mint with audit state, units, review/favourite
  * aggregates and the operator's Vertex reputation — so query + currency
  * filtering happen client-side (instant, no per-keystroke request) and the old
- * api.sovran.money search + per-mint review N+1 fan-out are gone. Inline
+ * separate search + per-mint review N+1 fan-out are gone. Inline
  * operator follower/score is seeded into the mint-profile cache so the
  * operator-profile lookup is a cache hit, not another round-trip.
  */

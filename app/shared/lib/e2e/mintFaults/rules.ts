@@ -40,7 +40,7 @@ const httpsMintUrl = z
   });
 
 /** `'*'` = any https host, but then only cashu-protocol `/v1/` paths match —
- * keeping api.sovran.money, relays, blossom, and loopback IPC structurally
+ * keeping Nagg, relays, blossom, and loopback IPC structurally
  * out of reach even for careless rules. */
 const mintMatch = z.union([z.literal('*'), httpsMintUrl]);
 
