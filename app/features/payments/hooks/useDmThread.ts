@@ -11,6 +11,9 @@ import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 import { fetchDmEnvelopes } from '../data/dmEnvelopeClient';
 import { decryptDmEnvelopes } from '../data/dmDecryptPipeline';
 import type { DmEnvelopePage, DmProtocol } from '../data/dmEnvelopeTypes';
+import { useDmLastMessageStore } from '@/shared/stores/profile/dmLastMessageStore';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { isMockContactPubkey } from '@/shared/stores/runtime/mockDataStore';
 import { useDmEnvelopePages } from './useDmEnvelopePages';
 
 const PAGE_LIMIT = 50;
@@ -46,6 +49,19 @@ export function useDmThread(
     (page: DmEnvelopePage) => {
       if (!viewerPubkey || !viewerPrivateKey) return 0;
       const decrypted = decryptDmEnvelopes(page.envelopes, viewerPubkey, viewerPrivateKey);
+      const profile = useProfileStore.getState();
+      const isCurrentProfile = profile.profiles.some(
+        (p) => p.accountIndex === profile.activeAccountIndex && p.pubkey === viewerPubkey
+      );
+      for (const dm of decrypted) {
+        if (isCurrentProfile && !isMockContactPubkey(dm.counterparty)) {
+          useDmLastMessageStore.getState().recordLastMessage(dm.counterparty, {
+            protocol: dm.protocol,
+            atSeconds: dm.createdAt,
+            isOwn: dm.isOwn,
+          });
+        }
+      }
       const relevant = decrypted.filter(
         (dm) => dm.counterparty === counterparty && dm.protocol === protocol
       );
@@ -73,6 +89,9 @@ export function useDmThread(
 
   const hydrate = useCallback(async () => {
     if (!viewerPubkey) return;
+    if (!useDmLastMessageStore.persist.hasHydrated()) {
+      await useDmLastMessageStore.persist.rehydrate();
+    }
     await (protocol === 'nip04'
       ? nip04Cache.hydrate(viewerPubkey)
       : giftWrapCache.cache.hydrate(viewerPubkey));

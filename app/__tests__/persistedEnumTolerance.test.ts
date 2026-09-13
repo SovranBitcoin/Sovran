@@ -55,6 +55,7 @@ import '@/shared/stores/global/settingsStore';
 import '@/shared/stores/global/walletLifecycleStore';
 import '@/shared/stores/global/wallpaperStore';
 import '@/shared/stores/profile/dataMigrationStore';
+import '@/shared/stores/profile/dmLastMessageStore';
 import '@/shared/stores/profile/mintDistributionStore';
 import '@/shared/stores/profile/mintStore';
 import '@/shared/stores/profile/nostrSocialStore';

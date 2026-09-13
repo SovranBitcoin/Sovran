@@ -318,6 +318,70 @@ exports[`persisted schema drift data-migration-store schema matches the golden s
 }
 `;
 
+exports[`persisted schema drift dm-last-message-store schema matches the golden snapshot for its version: dm-last-message-store 1`] = `
+{
+  "name": "dm-last-message-store",
+  "shape": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "byPeer": {
+          "additionalProperties": {
+            "properties": {
+              "atSeconds": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "isOwn": {
+                "type": "boolean",
+              },
+              "protocol": {
+                "enum": [
+                  "nip04",
+                  "nip17",
+                  "whitenoise",
+                  "bitchat",
+                ],
+                "type": "string",
+              },
+            },
+            "required": [
+              "protocol",
+              "atSeconds",
+              "isOwn",
+            ],
+            "type": "object",
+          },
+          "default": {},
+          "propertyNames": {
+            "type": "string",
+          },
+          "tolerantKey": {
+            "input": {},
+            "output": {},
+          },
+          "type": "object",
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "byPeer": {},
+      },
+      "required": [
+        "byPeer",
+      ],
+      "type": "object",
+    },
+  },
+  "version": 1,
+}
+`;
+
 exports[`persisted schema drift feed-ignore-store schema matches the golden snapshot for its version: feed-ignore-store 1`] = `
 {
   "name": "feed-ignore-store",
