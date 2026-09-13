@@ -1,6 +1,6 @@
 import type { NostrTier } from '@sovranbitcoin/schemas';
 import type { RequestControls } from '../timeout';
-import type { TierOutcome } from '../tiers';
+import type { ReadProvenance, TierOutcome } from '../tiers';
 import type { ProfileMetadata } from './profiles';
 
 // ---------------------------------------------------------------------------
@@ -34,7 +34,7 @@ export type ProfileStats = {
 
 export type ProfileStatsBundle = ProfileStats;
 
-export type ResolvedProfileStats = { tier: NostrTier } & ProfileStats;
+export type ResolvedProfileStats = { tier: NostrTier; provenance?: ReadProvenance } & ProfileStats;
 
 export interface ProfileStatsTier {
   readonly tier: NostrTier;

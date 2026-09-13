@@ -6,7 +6,7 @@ import {
   type NaggProfilesEnvelope,
 } from '../envelope';
 import type { RequestControls } from '../timeout';
-import type { TierOutcome } from '../tiers';
+import type { ReadProvenance, TierOutcome } from '../tiers';
 import { parseProfileMetadata, type ProfileMetadata } from './profiles';
 
 // ---------------------------------------------------------------------------
@@ -43,11 +43,17 @@ export type SearchRequest = RequestControls & {
   query: string;
   limit?: number;
   refresh?: boolean;
+  /**
+   * Aggregate reads paint at the first-paint gate and keep merging: each later
+   * tier's hits are APPENDED (never reordered) and delivered here. Also fires
+   * once more at settle with `provenance.complete === true`.
+   */
+  onUpdate?: (resolved: ResolvedProfileSearch) => void;
 };
 
 export type ProfileSearchBundle = { hits: ProfileSearchHit[]; vertexFresh?: boolean | null };
 
-export type ResolvedProfileSearch = ProfileSearchBundle & { tier: NostrTier };
+export type ResolvedProfileSearch = ProfileSearchBundle & { tier: NostrTier; provenance?: ReadProvenance };
 
 export interface SearchTier {
   readonly tier: NostrTier;

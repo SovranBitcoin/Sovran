@@ -271,7 +271,7 @@ export function createNotificationsSession(
           pending: options.sources
             .map((s) => s.tier)
             .filter((tier) => !per.has(tier)),
-          count: merger.snapshot().notifications.length,
+          count: merger.revealedCount() + merger.pooledCount(),
           elapsedMs: Date.now() - startedAt,
         });
         resolve();

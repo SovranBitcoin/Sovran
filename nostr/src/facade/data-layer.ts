@@ -1,11 +1,14 @@
 import { createFeedPager, type FeedPager, type FeedPagerOptions } from './feed-pager';
 import type { NotificationSortKey } from "./notifications";
-import { ok, type Result } from 'neverthrow';
+import { ok, err, type Result } from 'neverthrow';
 import type { NostrTier } from '@sovranbitcoin/schemas';
 import {
   resolveAcrossTiers,
+  resolveAllTiers,
   auditAcrossTiers,
   applyOrderingManifest,
+  type ReadProvenance,
+  type TierAggregate,
   type TierCandidate,
   type TierReadContext,
   type TierResolutionError,
@@ -36,11 +39,13 @@ import {
   type NotificationsSession,
 } from './session/notifications-session';
 import type { OwnHistoryBundle, OwnHistoryRequest, ResolvedOwnHistory } from './own-state';
-import type {
-  DiscoverMintsRequest,
-  DiscoveredMint,
-  MintReviewsRequest,
-  MintReviewsSummary,
+import {
+  dedupeByReviewer,
+  type DiscoverMintsRequest,
+  type DiscoveredMint,
+  type MintReview,
+  type MintReviewsRequest,
+  type MintReviewsSummary,
   ResolvedDiscoveredMints,
   ResolvedMintReviews,
 } from './mint-reviews';
@@ -49,11 +54,12 @@ import type { DmEnvelope, DmEnvelopesBundle, DmEnvelopesRequest, ResolvedDmEnvel
 import type { ProfileMetadata, ProfilesBundle, ProfilesRequest, ResolvedProfiles } from './profiles';
 import {
   profileStatsIsEmpty,
+  type ProfileStats,
   type ProfileStatsBundle,
   type ProfileStatsRequest,
   type ResolvedProfileStats,
 } from './profile-stats';
-import type { ProfileSearchBundle, SearchRequest, ResolvedProfileSearch } from './search';
+import type { ProfileSearchBundle, ProfileSearchHit, SearchRequest, ResolvedProfileSearch } from './search';
 import type { NostrTierStrategy } from './strategy';
 import {
   createNostrEntityCache,
@@ -298,9 +304,22 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
         { mintUrl: request.mintUrl },
         async (ctx) => {
           const candidates = candidatesFor<MintReviewsSummary>(config.tiers, 'getMintReviews', (t) => () => t.getMintReviews!(request));
-          return (await resolveAcrossTiers<MintReviewsSummary>(candidates, ctx)).map(({ tier, value }) => ({ tier, ...value }));
+          const resolvedOf = (agg: TierAggregate<MintReviewsSummary>): ResolvedMintReviews => ({
+            tier: agg.tier,
+            ...agg.value,
+            provenance: provenanceOf(ctx.readId, agg),
+          });
+          return (
+            await resolveAllTiers<MintReviewsSummary>(candidates, {
+              ...ctx,
+              gate: { minItems: 1, capMs: AGGREGATE_CAP_MS.mintReviews },
+              count: (summary) => summary.reviewCount,
+              merge: mergeMintReviews(),
+              onUpdate: (agg) => request.onUpdate?.(resolvedOf(agg)),
+            })
+          ).map(resolvedOf);
         },
-        (r) => ({ reviewCount: r.reviewCount, averageScore: r.averageScore }),
+        (r) => ({ reviewCount: r.reviewCount, averageScore: r.averageScore, ...describeProvenance(r.provenance) }),
       );
     },
 
@@ -324,13 +343,31 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
         { pubkey: short(request.pubkey) },
         async (ctx) => {
           const candidates = candidatesFor<SocialGraph>(config.tiers, 'getSocialGraph', (t) => () => t.getSocialGraph!(request));
-          return (await resolveAcrossTiers<SocialGraph>(candidates, ctx)).map(({ tier, value }) => {
-            const graph = { tier, ...value };
-            ingestSocialGraph(cache, graph);
-            return graph;
+          const resolvedOf = (agg: TierAggregate<SocialGraph>): ResolvedSocialGraph => ({
+            tier: agg.tier,
+            ...agg.value,
+            provenance: provenanceOf(ctx.readId, agg),
           });
+          return (
+            await resolveAllTiers<SocialGraph>(candidates, {
+              ...ctx,
+              gate: { minItems: 1, capMs: AGGREGATE_CAP_MS.socialGraph },
+              count: (graph) => graph.follows.length,
+              merge: (acc, next, tier) => {
+                // Every answer's profiles are cached under their own tier's rank.
+                ingestSocialGraph(cache, { tier, ...next });
+                return mergeSocialGraph(acc, next, tier);
+              },
+              onUpdate: (agg) => request.onUpdate?.(resolvedOf(agg)),
+            })
+          ).map(resolvedOf);
         },
-        (g) => ({ follows: g.follows.length, profiles: Object.keys(g.profiles).length, mutes: g.mutes.length }),
+        (g) => ({
+          follows: g.follows.length,
+          profiles: Object.keys(g.profiles).length,
+          mutes: g.mutes.length,
+          ...describeProvenance(g.provenance),
+        }),
       );
     },
 
@@ -364,23 +401,39 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
           if (missing.length === 0 && !request.refresh) {
             return ok<ResolvedProfiles, TierResolutionError>({ tier: 'cache', profiles: cachedMeta });
           }
-          // Otherwise fetch only the missing (or all, on refresh) and merge. Mark
-          // those pubkeys pending so a binding shows a skeleton (not a fallback)
-          // while they resolve; clear in `finally` so an error never strands them.
+          // Otherwise fan out for the missing (or all, on refresh) and merge:
+          // Primal answers most, relays fill the rest. Mark those pubkeys pending
+          // so a binding shows a skeleton (not a fallback) until every tier has
+          // settled — a slower tier may still fill a gap the first one left.
           const toFetch = request.refresh ? request.pubkeys : missing;
           const fetchReq = request.refresh ? request : { ...request, pubkeys: missing };
           cache.pendingProfiles.begin(toFetch);
-          try {
-            const candidates = candidatesFor<ProfilesBundle>(config.tiers, 'getProfiles', (t) => () => t.getProfiles!(fetchReq));
-            return (await resolveAcrossTiers<ProfilesBundle>(candidates, ctx)).map(({ tier, value }) => {
-              ingestProfiles(cache, { tier, profiles: value.profiles });
-              return { tier, profiles: { ...cachedMeta, ...value.profiles } };
-            });
-          } finally {
+          const candidates = candidatesFor<ProfilesBundle>(config.tiers, 'getProfiles', (t) => () => t.getProfiles!(fetchReq));
+          const first = await resolveAllTiers<ProfilesBundle>(candidates, {
+            ...ctx,
+            gate: { minItems: toFetch.length, capMs: AGGREGATE_CAP_MS.profiles },
+            count: (bundle) => Object.keys(bundle.profiles).length,
+            merge: (acc, next, tier) => {
+              // Cache each answer under ITS tier's rank (srcRank merge keeps the best fields).
+              ingestProfiles(cache, { tier, profiles: next.profiles });
+              return mergeProfileBundles(acc, next, tier);
+            },
+            onUpdate: (agg) => {
+              if (agg.complete) cache.pendingProfiles.end(toFetch);
+            },
+          });
+          if (first.isErr()) {
             cache.pendingProfiles.end(toFetch);
+            return err(first.error);
           }
+          if (first.value.complete) cache.pendingProfiles.end(toFetch);
+          return ok<ResolvedProfiles, TierResolutionError>({
+            tier: first.value.tier,
+            profiles: { ...cachedMeta, ...first.value.value.profiles },
+            provenance: provenanceOf(ctx.readId, first.value),
+          });
         },
-        (r) => ({ profiles: Object.keys(r.profiles).length }),
+        (r) => ({ profiles: Object.keys(r.profiles).length, ...describeProvenance(r.provenance) }),
       );
     },
 
@@ -402,22 +455,42 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
             });
           }
           cache.pendingProfiles.begin([request.pubkey]);
-          try {
-            const candidates = candidatesFor<ProfileStatsBundle>(config.tiers, 'getProfileStats', (t) => () => t.getProfileStats!(request));
-            return (await resolveAcrossTiers<ProfileStatsBundle>(candidates, ctx)).map(({ tier, value }) => {
-              const resolved = { tier, ...value };
-              ingestProfileStats(cache, resolved);
-              return resolved;
-            });
-          } finally {
+          const candidates = candidatesFor<ProfileStatsBundle>(config.tiers, 'getProfileStats', (t) => () => t.getProfileStats!(request));
+          const resolvedOf = (agg: TierAggregate<ProfileStatsBundle>): ResolvedProfileStats => ({
+            tier: agg.tier,
+            ...agg.value,
+            provenance: provenanceOf(ctx.readId, agg),
+          });
+          // Counts are unknown, never zero: each tier fills only the fields the
+          // earlier ones left undefined, and the merged header is re-cached on
+          // every answer so a binding on the entity cache sees counts land one
+          // at a time.
+          const first = await resolveAllTiers<ProfileStatsBundle>(candidates, {
+            ...ctx,
+            gate: { minItems: 1, capMs: AGGREGATE_CAP_MS.profileStats },
+            count: (stats) => (profileStatsIsEmpty(stats) ? 0 : 1),
+            merge: (acc, next, tier) => {
+              const merged = mergeProfileStats(acc, next);
+              ingestProfileStats(cache, { tier, ...merged });
+              return merged;
+            },
+            onUpdate: (agg) => {
+              if (agg.complete) cache.pendingProfiles.end([request.pubkey]);
+            },
+          });
+          if (first.isErr()) {
             cache.pendingProfiles.end([request.pubkey]);
+            return err(first.error);
           }
+          if (first.value.complete) cache.pendingProfiles.end([request.pubkey]);
+          return ok<ResolvedProfileStats, TierResolutionError>(resolvedOf(first.value));
         },
         (r) => ({
           hasMetadata: !!r.metadata,
           followers: r.followersCount ?? null,
           following: r.followingCount ?? null,
           joinedAt: r.joinedAt ?? null,
+          ...describeProvenance(r.provenance),
         }),
       );
     },
@@ -429,9 +502,22 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
         { q: request.query.length, limit: request.limit ?? null },
         async (ctx) => {
           const candidates = candidatesFor<ProfileSearchBundle>(config.tiers, 'searchProfiles', (t) => () => t.searchProfiles!(request));
-          return (await resolveAcrossTiers<ProfileSearchBundle>(candidates, ctx)).map(({ tier, value }) => ({ tier, ...value }));
+          const resolvedOf = (agg: TierAggregate<ProfileSearchBundle>): ResolvedProfileSearch => ({
+            tier: agg.tier,
+            ...agg.value,
+            provenance: provenanceOf(ctx.readId, agg),
+          });
+          return (
+            await resolveAllTiers<ProfileSearchBundle>(candidates, {
+              ...ctx,
+              gate: { minItems: 1, capMs: AGGREGATE_CAP_MS.searchProfiles },
+              count: (bundle) => bundle.hits.length,
+              merge: mergeSearchBundles(),
+              onUpdate: (agg) => request.onUpdate?.(resolvedOf(agg)),
+            })
+          ).map(resolvedOf);
         },
-        (r) => ({ hits: r.hits.length }),
+        (r) => ({ hits: r.hits.length, ...describeProvenance(r.provenance) }),
       );
     },
   };
@@ -478,6 +564,180 @@ async function runRead<R extends { tier: NostrTier }>(
       }),
   );
   return result;
+}
+
+
+// ---------------------------------------------------------------------------
+// Aggregate surfaces — gap-fill merges
+//
+// These reads fan out to every tier (see tiers/aggregate.ts). Each merge is
+// idempotent and APPEND-ONLY: a later answer may add entries or fill blanks,
+// never move or erase what an earlier answer painted.
+// ---------------------------------------------------------------------------
+
+/** First-paint caps per aggregate surface (ms). Paint waits for the first answer regardless. */
+const AGGREGATE_CAP_MS = {
+  profiles: 800,
+  profileStats: 1000,
+  searchProfiles: 300,
+  mintReviews: 800,
+  socialGraph: 800,
+} as const;
+
+const TIER_RANK_ORDER: readonly NostrTier[] = ['nagg', 'primal', 'relay', 'cache'];
+function tierRank(tier: NostrTier): number {
+  const index = TIER_RANK_ORDER.indexOf(tier);
+  return index < 0 ? TIER_RANK_ORDER.length : index;
+}
+
+function provenanceOf<T>(readId: string, agg: TierAggregate<T>): ReadProvenance {
+  return {
+    readId,
+    sources: agg.sources,
+    attempts: agg.attempts,
+    degraded: agg.degraded,
+    complete: agg.complete,
+  };
+}
+
+function describeProvenance(provenance: ReadProvenance | undefined): NostrLogData {
+  if (!provenance) return {};
+  return {
+    sources: provenance.sources,
+    degraded: provenance.degraded,
+    complete: provenance.complete,
+  };
+}
+
+/** Union by pubkey; a better-ranked tier's metadata replaces a worse one's in place. */
+function mergeProfileBundles(
+  acc: ProfilesBundle | undefined,
+  next: ProfilesBundle,
+  tier: NostrTier,
+): ProfilesBundle {
+  if (!acc) return { profiles: { ...next.profiles } };
+  const profiles = { ...acc.profiles };
+  for (const [pubkey, metadata] of Object.entries(next.profiles)) {
+    const existing = profiles[pubkey];
+    if (!existing || tierRank(tier) <= tierRank(rankOwner(existing))) {
+      profiles[pubkey] = metadata;
+      rankOwners.set(metadata, tier);
+    }
+  }
+  return { profiles };
+}
+// Which tier supplied a metadata object, so a later worse-ranked answer cannot
+// overwrite it. Keyed weakly on the object itself: no ids, no leaks.
+const rankOwners = new WeakMap<object, NostrTier>();
+function rankOwner(metadata: object): NostrTier {
+  return rankOwners.get(metadata) ?? 'relay';
+}
+
+/** Fill only the fields the earlier answers left undefined; never overwrite a number with undefined. */
+function mergeProfileStats(acc: ProfileStats | undefined, next: ProfileStats): ProfileStats {
+  if (!acc) return { ...next };
+  return {
+    pubkey: acc.pubkey,
+    metadata: acc.metadata ?? next.metadata,
+    followersCount: acc.followersCount ?? next.followersCount,
+    followingCount: acc.followingCount ?? next.followingCount,
+    noteCount: acc.noteCount ?? next.noteCount,
+    joinedAt: acc.joinedAt ?? next.joinedAt,
+  };
+}
+
+/**
+ * Union by pubkey in arrival order — painted rows keep their index; a later
+ * tier appends only pubkeys not yet shown. A better-ranked later answer
+ * upgrades an existing hit's rank/score/counts in place (no reorder).
+ */
+function mergeSearchBundles(): (
+  acc: ProfileSearchBundle | undefined,
+  next: ProfileSearchBundle,
+  tier: NostrTier,
+) => ProfileSearchBundle {
+  let bestRank: number | null = null;
+  return (acc, next, tier) => {
+    const rank = tierRank(tier);
+    const upgrades = bestRank === null || rank < bestRank;
+    if (upgrades) bestRank = rank;
+    if (!acc) return { hits: [...next.hits], vertexFresh: next.vertexFresh ?? null };
+    const index = new Map<string, number>();
+    acc.hits.forEach((hit, i) => index.set(hit.pubkey, i));
+    const hits: ProfileSearchHit[] = [...acc.hits];
+    for (const hit of next.hits) {
+      const at = index.get(hit.pubkey);
+      if (at === undefined) {
+        index.set(hit.pubkey, hits.length);
+        hits.push(hit);
+      } else if (upgrades) {
+        hits[at] = { ...hits[at]!, ...hit, metadata: { ...hits[at]!.metadata, ...hit.metadata } };
+      }
+    }
+    return {
+      hits,
+      vertexFresh: upgrades ? (next.vertexFresh ?? acc.vertexFresh ?? null) : (acc.vertexFresh ?? next.vertexFresh ?? null),
+    };
+  };
+}
+
+/**
+ * Union of review events by id (deduped per reviewer), count never below what
+ * any source reported, and the best-ranked non-null average wins (nagg's
+ * server-side aggregate is authoritative when present).
+ */
+function mergeMintReviews(): (
+  acc: MintReviewsSummary | undefined,
+  next: MintReviewsSummary,
+  tier: NostrTier,
+) => MintReviewsSummary {
+  let averageOwner: number | null = null;
+  return (acc, next, tier) => {
+    const rank = tierRank(tier);
+    if (!acc) {
+      averageOwner = next.averageScore === null ? null : rank;
+      return { ...next, reviews: [...next.reviews] };
+    }
+    const seen = new Set(acc.reviews.map((r) => r.eventId));
+    const reviews: MintReview[] = dedupeByReviewer([
+      ...acc.reviews,
+      ...next.reviews.filter((r) => !seen.has(r.eventId)),
+    ]);
+    let averageScore = acc.averageScore;
+    if (next.averageScore !== null && (averageOwner === null || rank < averageOwner)) {
+      averageScore = next.averageScore;
+      averageOwner = rank;
+    }
+    return {
+      mintUrl: acc.mintUrl,
+      averageScore,
+      reviewCount: Math.max(acc.reviewCount, next.reviewCount, reviews.length),
+      reviews,
+    };
+  };
+}
+
+/** The newest kind-3 wins the follows/relays/mutes (rank breaks ties); profiles union. */
+function mergeSocialGraph(acc: SocialGraph | undefined, next: SocialGraph, tier: NostrTier): SocialGraph {
+  if (!acc) {
+    rankOwners.set(next, tier);
+    return { ...next, profiles: { ...next.profiles } };
+  }
+  const accTier = rankOwner(acc);
+  const nextWins =
+    next.contactsUpdatedAt > acc.contactsUpdatedAt ||
+    (next.contactsUpdatedAt === acc.contactsUpdatedAt && tierRank(tier) < tierRank(accTier));
+  const base = nextWins ? next : acc;
+  const merged: SocialGraph = {
+    pubkey: base.pubkey,
+    follows: [...base.follows],
+    relayList: [...base.relayList],
+    mutes: [...base.mutes],
+    contactsUpdatedAt: base.contactsUpdatedAt,
+    profiles: { ...next.profiles, ...acc.profiles, ...(nextWins ? next.profiles : {}) },
+  };
+  rankOwners.set(merged, nextWins ? tier : accTier);
+  return merged;
 }
 
 function short(id: string): string {

@@ -4,6 +4,7 @@ import {
   type NotificationsSessionSource,
 } from '../src/facade/session/notifications-session';
 import { answered, failed, unsupported, type TierOutcome } from '../src/tiers';
+import { setNostrLogger } from '../src/log';
 import type {
   NotificationItem,
   NotificationsBundle,
@@ -87,15 +88,33 @@ describe('notifications session', () => {
     const nagg = source('nagg', [answered(bundle([flatItem('n1', 'alice', 'reply', 30)]))]);
     const relay = source('relay', [answered(bundle([flatItem('r1', 'bob', 'reaction', 20)]))]);
     const timers = manualTimers();
-    const session = createNotificationsSession({
-      request: REQUEST,
-      sources: [nagg, relay],
-      scheduleAfter: timers.scheduleAfter,
+    const logged: Array<{ event: string; data?: Record<string, unknown> }> = [];
+    setNostrLogger({
+      debug: (event, data) => logged.push({ event, data }),
+      info: (event, data) => logged.push({ event, data }),
+      warn: (event, data) => logged.push({ event, data }),
     });
-    const page = await session.firstPage();
-    expect(page.notifications).toHaveLength(2);
-    expect(page.tier).toBe('nagg');
-    session.close();
+    try {
+      const session = createNotificationsSession({
+        request: REQUEST,
+        readId: 'r-notif',
+        sources: [nagg, relay],
+        scheduleAfter: timers.scheduleAfter,
+      });
+      const page = await session.firstPage();
+      expect(page.notifications).toHaveLength(2);
+      expect(page.tier).toBe('nagg');
+      session.close();
+    } finally {
+      setNostrLogger(null);
+    }
+    // The first-paint gate is visible in the log, correlated to the read.
+    const paint = logged.find((e) => e.event === 'nostr.notifications.session.paint');
+    expect(paint?.data).toMatchObject({ readId: 'r-notif', gate: 'allSettled', count: 2 });
+    expect((paint?.data?.answered as string[]).sort()).toEqual(['nagg', 'relay']);
+    for (const e of logged.filter((e) => e.event === 'nostr.notifications.session.source')) {
+      expect(e.data).toMatchObject({ readId: 'r-notif' });
+    }
   });
 
   it('paints at the cap with what arrived; a late source upgrades in place and pools new keys', async () => {
