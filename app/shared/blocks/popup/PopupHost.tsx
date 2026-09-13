@@ -790,6 +790,7 @@ function SheetPopup() {
                 return (
                   <Button
                     key={`${button.label}-${index}`}
+                    testID={button.testID}
                     variant={variant}
                     onPress={button.onPress}
                     className={className}
@@ -928,6 +929,7 @@ function SheetPopup() {
                       return (
                         <Button
                           key={`${button.label}-${index}`}
+                          testID={button.testID}
                           variant={variant}
                           className={getSheetButtonClassName(variant)}
                           onPress={button.onPress}

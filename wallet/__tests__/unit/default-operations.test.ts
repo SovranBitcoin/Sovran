@@ -1062,3 +1062,20 @@ describe('executeSend — reservation rescue (BTC-07)', () => {
     expect(mockManager.ops.send.cancel).toHaveBeenCalledWith('prepared-send-1');
   });
 });
+
+
+it.each(['sat', 'usd'])('passes the NFC terminal unit %s to Coco token creation', async unit => {
+  const mockManager = createMockManager({ ops: { send: {
+    prepare: vi.fn().mockResolvedValue({ id: "prepared-send-1" }),
+    execute: vi.fn().mockResolvedValue({
+      operation: { id: 'op-1', createdAt: Date.now() },
+      token: { mint: MINT1, unit, proofs: [{
+        id: '009a1f293253e41e', amount: 100, secret: 'nfc-test-proof',
+        C: '02' + '11'.repeat(32),
+      }] },
+    }),
+  } } });
+  const ops = createDefaultOperations({ getManager: () => mockManager as unknown as Manager });
+  await ops.executeNfcSend!(MINT1, 100, unit);
+  expect(mockManager.ops.send.prepare).toHaveBeenCalledWith({ mintUrl: MINT1, amount: 100, unit });
+});

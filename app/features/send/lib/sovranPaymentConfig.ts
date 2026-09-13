@@ -678,6 +678,9 @@ export function createSovranNotifications(
     NFC_SESSION_LOST: ({ code: _code, message, data: _data }) => {
       paramPopup('nfc-error', { title: 'NFC Connection Lost', message });
     },
+    UNIT_NOT_FUNDED: ({ code: _code, message, data: _data }) => {
+      paramPopup('nfc-error', { title: 'Currency unavailable', message });
+    },
     NFC_READ_FAILED: ({ code: _code, message, data: _data }) => {
       paramPopup('nfc-error', { title: 'NFC Read Failed', message });
     },

@@ -10,6 +10,7 @@ export type CustomSheetPage<K extends CustomSheetId = CustomSheetId> = {
 export type CustomSheetNavDirection = 'forward' | 'back';
 
 type CustomSheetFooterButton = {
+  testID?: string;
   label: string;
   onPress: () => void;
   variant?: 'primary' | 'tertiary';

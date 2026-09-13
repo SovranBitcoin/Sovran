@@ -48,6 +48,8 @@ export interface TestMachineConfig {
   detectors?: Partial<Detectors>;
   /** Currency unit. Defaults to 'sat'. */
   unit?: string;
+  getUnit?: () => string;
+  getContext?: () => WalletContext;
   /** Whether the wallet is in offline mode. Defaults to false. */
   offline?: boolean;
   /** Locale for localization. Defaults to 'en'. */

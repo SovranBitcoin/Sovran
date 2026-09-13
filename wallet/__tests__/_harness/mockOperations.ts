@@ -196,6 +196,8 @@ export function createMockOperations(
       }
     ),
 
+    switchUnit: overrides?.switchUnit,
+
     // trustMint: adds a mint to the trusted list (no-op in tests)
     trustMint: wrap('trustMint', async () => {}),
 

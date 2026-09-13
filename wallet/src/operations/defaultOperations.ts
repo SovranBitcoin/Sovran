@@ -1171,13 +1171,13 @@ export function createDefaultOperations(
       logger.info("operations.trustMint.done", { ...mintUrlFields(mintUrl) });
     },
 
-    executeNfcSend: async (mintUrl, amount) => {
+    executeNfcSend: async (mintUrl, amount, unit = "sat") => {
       const mgr = requireManager();
       logger.info("operations.executeNfcSend.prepare", {
         ...mintUrlFields(mintUrl),
         amount,
       });
-      const prepared = await mgr.ops.send.prepare({ mintUrl, amount });
+      const prepared = await mgr.ops.send.prepare({ mintUrl, amount, unit });
       logger.info("operations.executeNfcSend.prepared", {
         operationId: prepared.id,
         needsSwap: !!prepared.needsSwap,

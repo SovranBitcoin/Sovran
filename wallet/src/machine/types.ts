@@ -334,7 +334,8 @@ export type ErrorCode =
   | "PAYMENT_REQUEST_FAILED"
   | "NFC_WRITE_FAILED"
   | "NFC_SESSION_LOST"
-  | "NFC_READ_FAILED";
+  | "NFC_READ_FAILED"
+  | "UNIT_NOT_FUNDED";
 
 // ---------------------------------------------------------------------------
 // Flow Context — accumulated data through the flow
@@ -487,7 +488,8 @@ export type ExecutionState =
         | "PAYMENT_REQUEST_FAILED"
         | "NFC_WRITE_FAILED"
         | "NFC_SESSION_LOST"
-        | "NFC_READ_FAILED";
+        | "NFC_READ_FAILED"
+        | "UNIT_NOT_FUNDED";
       message: string;
       isExecutable: false;
       isExecuting: boolean;
@@ -905,6 +907,8 @@ export type NotificationHandlerMap = {
  * resulting navigation/UI step.
  */
 export interface MachineOperations {
+  /** Update the active unit and make its cached context readable before resolving. */
+  switchUnit?: (unit: string) => void | Promise<void>;
   executeSend: (
     mintUrl: string,
     amount: number,
@@ -1026,6 +1030,7 @@ export interface MachineOperations {
   executeNfcSend?: (
     mintUrl: string,
     amount: number,
+    unit?: string,
   ) => Promise<{ token: string; historyEntry: string; operationId: string }>;
   /**
    * Roll back a pending send operation. Called when NFC write-back fails
