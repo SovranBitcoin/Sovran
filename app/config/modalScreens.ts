@@ -160,7 +160,7 @@ const flowGroups = [
   '(receive-flow)',
   '(send-flow)',
   '(transactions-flow)',
-  '(backup-flow)',
+  '(prompt-flow)',
   '(mint-flow)',
   '(filter-flow)',
   '(map-flow)',
@@ -169,7 +169,6 @@ const flowGroups = [
 ].map((name) => modalFlow(name));
 
 const standaloneScreens: ModalConfig[] = [
-  modalFlow('cta'),
   // DM thread: headerShown must be statically true — DmChatHeader only swaps
   // header CONTENT. A false→true flip while the send-flow modal is dismissing
   // makes react-native-screens remount the screen in a loop (blank DM thread).

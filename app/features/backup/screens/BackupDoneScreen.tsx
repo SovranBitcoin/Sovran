@@ -11,7 +11,8 @@ import { Button } from '@/shared/ui/primitives/Button';
 import { useBackupSession } from '../BackupFlowProvider';
 
 export function BackupDoneScreen() {
-  const { progress, demo, finish } = useBackupSession();
+  const { progress, demo, finish, ensureWords } = useBackupSession();
+  useEffect(() => ensureWords(), [ensureWords]);
   const navigation = useNavigation();
   const marked = useRef(false);
   useEffect(() => {
@@ -21,7 +22,7 @@ export function BackupDoneScreen() {
     finish();
     log.info('backup.flow.verify_complete');
   }, [progress.position, demo, finish]);
-  if (progress.position !== 12) return <Redirect href="/(backup-flow)/intro" />;
+  if (progress.position !== 12) return <Redirect href="/(prompt-flow)/backup-intro" />;
   return (
     <Screen
       name="BackupDoneScreen"

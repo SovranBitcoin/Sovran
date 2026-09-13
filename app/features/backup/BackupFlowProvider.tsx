@@ -1,4 +1,11 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { AppState } from 'react-native';
 import { validateMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
@@ -18,12 +25,17 @@ interface BackupSession {
   active: boolean;
   demo: boolean;
   finish: () => void;
+  /** Intro mount: starts the grace timer and logs the open once per session. */
+  open: () => void;
+  /** Screens that render or check words ask for the phrase; the prompt page never does. */
+  ensureWords: () => void;
 }
 const BackupContext = createContext<BackupSession | null>(null);
 
 function BackupSessionProvider({ children, mockMode }: { children: ReactNode; mockMode: boolean }) {
   const demoPhrase = getBackupDemoPhrase(mockMode);
-  const { value, loading } = useMnemonic(demoPhrase === null);
+  const [wordsWanted, setWordsWanted] = useState(false);
+  const { value, loading } = useMnemonic(demoPhrase === null && wordsWanted);
   const mnemonic = demoPhrase ?? value;
   const words = mnemonic && validateMnemonic(mnemonic, wordlist) ? mnemonic.split(' ') : [];
   const [attempt] = useState(() => (demoPhrase ? 0 : Date.now()));
@@ -31,15 +43,22 @@ function BackupSessionProvider({ children, mockMode }: { children: ReactNode; mo
   const [progress, setProgress] = useState({ position: 0, missesAtPosition: 0 });
   const [active, setActive] = useState(AppState.currentState === 'active');
   const completed = useRef(false);
-  useEffect(() => {
+  const opened = useRef(false);
+  // The compiler memoizes these; manual useCallback here could not be preserved.
+  const open = () => {
+    if (opened.current) return;
+    opened.current = true;
     useCtaStore.getState().startBackup();
     log.info('backup.flow.opened');
+  };
+  const ensureWords = () => setWordsWanted(true);
+  useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) =>
       setActive(state === 'active')
     );
     return () => {
       subscription.remove();
-      if (!completed.current) log.info('backup.flow.abandoned');
+      if (opened.current && !completed.current) log.info('backup.flow.abandoned');
     };
   }, []);
   return (
@@ -50,12 +69,14 @@ function BackupSessionProvider({ children, mockMode }: { children: ReactNode; mo
         progress,
         setProgress: ({ position, missesAtPosition }) =>
           setProgress({ position, missesAtPosition }),
-        loading: demoPhrase === null && loading,
+        loading: demoPhrase === null && (loading || !wordsWanted),
         active,
         demo: demoPhrase !== null,
         finish: () => {
           completed.current = true;
         },
+        open,
+        ensureWords,
       }}>
       {children}
     </BackupContext.Provider>

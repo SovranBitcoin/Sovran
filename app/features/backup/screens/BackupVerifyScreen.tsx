@@ -21,7 +21,8 @@ import { useBackupSession } from '../BackupFlowProvider';
 import { advanceVerify } from '../lib/verifyPlan';
 
 export function BackupVerifyScreen() {
-  const { plan, progress, setProgress, active, loading } = useBackupSession();
+  const { plan, progress, setProgress, active, loading, ensureWords } = useBackupSession();
+  useEffect(() => ensureWords(), [ensureWords]);
   const focused = useIsFocused();
   const successForeground = useThemeColor('success-foreground');
   const [accepted, setAccepted] = useState(false);
@@ -67,7 +68,7 @@ export function BackupVerifyScreen() {
       setProgress(result.state);
       setAccepted(false);
       locked.current = false;
-      if (result.outcome === 'complete') router.replace('/(backup-flow)/done');
+      if (result.outcome === 'complete') router.replace('/(prompt-flow)/backup-done');
     }, 250);
   };
   return (

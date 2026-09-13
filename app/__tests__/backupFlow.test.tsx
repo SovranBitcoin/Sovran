@@ -136,7 +136,7 @@ it('retries one word, preserves progress on reveal, blocks double taps and certi
     '3 of 12'
   );
   for (const question of plan.slice(2)) answer(question.answerIndex);
-  expect(mockReplace).toHaveBeenCalledWith('/(backup-flow)/done');
+  expect(mockReplace).toHaveBeenCalledWith('/(prompt-flow)/backup-done');
   expect(mockMark).not.toHaveBeenCalled();
   show(<BackupDoneScreen />);
   expect(mockMark).toHaveBeenCalledTimes(1);

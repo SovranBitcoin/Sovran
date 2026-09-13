@@ -6,10 +6,14 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Button } from '@/shared/ui/primitives/Button';
+import { useEffect } from 'react';
+import { useNavigation } from 'expo-router';
 import { useBackupSession } from '../BackupFlowProvider';
 
 export function BackupIntroScreen() {
-  const { demo } = useBackupSession();
+  const { demo, open } = useBackupSession();
+  const navigation = useNavigation();
+  useEffect(() => open(), [open]);
   return (
     <Screen
       name="BackupIntroScreen"
@@ -18,7 +22,7 @@ export function BackupIntroScreen() {
           <Button
             testID="backup-show-words"
             text="Show my words"
-            onPress={() => router.push('/(backup-flow)/words')}
+            onPress={() => router.push('/(prompt-flow)/backup-words')}
           />
           <Button
             testID="backup-not-now"
@@ -26,7 +30,8 @@ export function BackupIntroScreen() {
             variant="secondary"
             onPress={() => {
               if (!demo) useCtaStore.getState().dismiss('backup-recovery-phrase', false);
-              router.dismiss();
+              // Close the whole prompt flow, not just this page (a prompt may sit beneath).
+              navigation.getParent()?.goBack();
             }}
           />
         </BottomButtons>

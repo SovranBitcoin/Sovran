@@ -1072,13 +1072,14 @@ Native gesture behavior requires device verification.
   `:snooze` key, with the same `{ at, version?, revision? }` shape. Definitions
   default to revision 1. Missing/older dismissal revisions never suppress a
   newer definition, including forever dismissals. Backup uses revision 2.
-- A primary action never dismisses a security nag. "Back up now" replaces the
-  prompt with the backup flow synchronously with the tap (never a deferred push
-  from CtaHost) and records no persisted dismissal; an abandoned attempt has only a runtime
+- A primary action never dismisses a security nag. Prompts and the backup
+  screens live in one modal stack, `(prompt-flow)`, so "Back up now" pushes the
+  backup intro as the next page (never a second modal or a deferred push from
+  CtaHost) and records no persisted dismissal; an abandoned attempt has only a runtime
   `ABANDONED_BACKUP_GRACE_MS` (30 minute) grace period. "Not now" still snoozes for
   three days. Completing verification removes backup eligibility.
 - Backup verification is additive lifecycle data; revealing the phrase alone
-  never marks it verified. The `(backup-flow)` modal checks all 12 positions in
+  never marks it verified. The `(prompt-flow)` modal checks all 12 positions in
   order with three choices each. Wrong answers retry only that word; returning
   to the reveal retains progress. Success records `BACKUP_FLOW_REVISION = 2` in
   `recoveryPhraseVerifiedRevision`; old timestamps alone do not satisfy it.

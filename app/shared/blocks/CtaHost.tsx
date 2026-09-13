@@ -65,7 +65,7 @@ export function CtaHost() {
         mockMode,
         automation,
       })?.id;
-    const ctaRoute = navigation.routes.some((route) => route.name === 'cta');
+    const ctaRoute = navigation.routes.some((route) => route.name === '(prompt-flow)');
     if (ctaRoute) {
       observedRoute.current = true;
       if (activeId === 'update-required' && !previewOverride && next !== activeId) {
@@ -84,18 +84,13 @@ export function CtaHost() {
       setNowMs(Date.now());
       return;
     }
-    if (
-      next === 'backup-recovery-phrase' &&
-      navigation.routes.some((route) => route.name === '(backup-flow)')
-    )
-      return;
     if (!next || useCtaStore.getState().activeId !== null) return;
     // Fresh cycle: the flag only turns true once the navigator shows this push.
     observedRoute.current = false;
     useCtaStore.getState().setActive(next);
     // The queue reserves activeId before pushing; a just-closed CTA may legitimately
     // reopen within the tap guard's cooldown (notably Developer previews).
-    router.raw.push({ pathname: '/cta', params: { id: next } });
+    router.raw.push({ pathname: '/(prompt-flow)/cta', params: { id: next } });
   }, [
     hydrated,
     navigation,

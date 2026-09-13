@@ -12,7 +12,8 @@ import { Button } from '@/shared/ui/primitives/Button';
 import { useBackupSession } from '../BackupFlowProvider';
 
 export function BackupWordsScreen() {
-  const { words, loading, active } = useBackupSession();
+  const { words, loading, active, ensureWords } = useBackupSession();
+  useEffect(() => ensureWords(), [ensureWords]);
   const focused = useIsFocused();
   const { width, fontScale } = useWindowDimensions();
   const singleColumn = fontScale > 1.2 || width < 360;
@@ -29,7 +30,7 @@ export function BackupWordsScreen() {
             testID="backup-written"
             text="I've written them down"
             disabled={!revealed}
-            onPress={() => router.push('/(backup-flow)/verify')}
+            onPress={() => router.push('/(prompt-flow)/backup-verify')}
           />
         </BottomButtons>
       }>
