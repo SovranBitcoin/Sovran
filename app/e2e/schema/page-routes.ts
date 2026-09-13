@@ -7,6 +7,7 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
   'recovery-phrase-confirm': ['(settings-flow)/recovery-phrase-confirm.tsx'],
   'secure-locked': [], // boot gate; no route alias
   'profile-keys-error': [], // key-provider gate; no route alias
+  'profile-switcher': [], // Imperative sheet entered from the drawer; no route alias.
   ai: ['(drawer)/(tabs)/ai/index.tsx'],
   contacts: ['(drawer)/(tabs)/contacts/index.tsx'],
   feed: ['(drawer)/(tabs)/feed/index.tsx'],
@@ -96,6 +97,7 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
   'settings-network': ['(settings-flow)/network.tsx'],
   'settings-notification-policy': ['(settings-flow)/notification-policy.tsx'],
   'settings-privacy': ['(settings-flow)/privacy.tsx'],
+  'settings-edit-profile': ['(settings-flow)/edit-profile.tsx'],
   'settings-profile': ['(settings-flow)/profile.tsx'],
   'settings-recovery': ['(settings-flow)/recovery.tsx'],
   'settings-routing': ['(settings-flow)/routing.tsx'],

@@ -5,6 +5,7 @@
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
+import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
 import { ActionMenuHost } from '@/shared/blocks/popup/ActionMenuHost';
 import {
   E2EActionMenuProbe,
@@ -12,7 +13,12 @@ import {
   markE2EActionMenuPresented,
   useE2EActionMenuRenderStore,
 } from '@/shared/lib/popup/E2EActionMenuProbe';
-import { actionMenuPopup, dismissActionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
+import {
+  actionMenuPopup,
+  dismissActionMenuPopup,
+  getActionMenuSnapshot,
+  replaceActionMenuPopup,
+} from '@/shared/lib/popup/popups/actionMenu';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -31,6 +37,8 @@ jest.mock('@/shared/lib/logger', () => {
   return {
     log: { ...logger, child: () => logger },
     storeLog: logger,
+    useMountLog: jest.fn(),
+    useRenderLogger: jest.fn(),
     redactError: (error: unknown) => error,
   };
 });
@@ -95,10 +103,27 @@ jest.mock('@/shared/ui/composed/SectionAnchorList', () => ({
   },
 }));
 
-jest.mock('@/shared/blocks/popup/MenuScrim', () => ({
-  MenuScrim: () => {
+const mockMenuAnimation = { progress: { value: 0 }, isDragging: { value: false } };
+let mockMenuOpen = true;
+let mockTweenFraction = 1;
+
+jest.mock('@/shared/hooks/useColorScheme', () => ({ useColorScheme: () => 'dark' }));
+jest.mock('react-native-reanimated', () => ({
+  useSharedValue: (initial: number) => {
     const ReactActual = jest.requireActual<typeof import('react')>('react');
-    return ReactActual.createElement('MenuScrim');
+    return ReactActual.useRef({ value: initial }).current;
+  },
+  useAnimatedStyle: (worklet: () => object) => worklet(),
+  withTiming: (value: number) => value * mockTweenFraction,
+  interpolate: jest.requireActual('react-native-reanimated').interpolate,
+  Extrapolation: { CLAMP: 'clamp' },
+}));
+
+jest.mock('@/shared/ui/composed/ScrollEdgeFade', () => ({ ScrollEdgeFade: () => null }));
+jest.mock('@shopify/flash-list', () => ({
+  FlashList: (props: object) => {
+    const ReactActual = jest.requireActual<typeof import('react')>('react');
+    return ReactActual.createElement('FlashList', props);
   },
 }));
 
@@ -117,8 +142,10 @@ jest.mock('@gorhom/bottom-sheet', () => {
 
 jest.mock('heroui-native', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
-  const Menu = ({ children, ...props }: { children?: React.ReactNode }) =>
-    ReactActual.createElement('Menu', props, children);
+  const Menu = ({ children, ...props }: { children?: React.ReactNode }) => {
+    const instance = ReactActual.useRef({});
+    return ReactActual.createElement('Menu', { ...props, instance: instance.current }, children);
+  };
 
   Menu.Trigger = ({ children, ...props }: { children?: React.ReactNode }) =>
     ReactActual.createElement('Menu.Trigger', props, children);
@@ -147,7 +174,13 @@ jest.mock('heroui-native', () => {
   Menu.ItemDescription = ({ children, ...props }: { children?: React.ReactNode }) =>
     ReactActual.createElement('Menu.ItemDescription', props, children);
 
-  return { Menu };
+  Menu.Overlay = ({ children, ...props }: { children?: React.ReactNode }) =>
+    ReactActual.createElement('Menu.Overlay', props, children);
+  return {
+    Menu,
+    useMenu: () => ({ isOpen: mockMenuOpen }),
+    useMenuAnimation: () => mockMenuAnimation,
+  };
 });
 
 jest.mock('assets/icons', () => ({
@@ -180,6 +213,7 @@ describe('action-menu successor handoff', () => {
     act(() => {
       renderer?.unmount();
       renderer = undefined;
+      jest.useRealTimers();
       dismissActionMenuPopup();
       usePopupStore.getState().close();
       useE2EActionMenuRenderStore.setState({
@@ -188,6 +222,278 @@ describe('action-menu successor handoff', () => {
         presentedOpenSeq: null,
       });
     });
+  });
+
+  it('caps the scrim tween at sheet visibility and holds visibility while dragging', () => {
+    const opacity = () =>
+      renderer!.root.find((node) => String(node.type) === 'Menu.Overlay').props.style.opacity;
+    mockMenuOpen = true;
+    mockTweenFraction = 0.4;
+    mockMenuAnimation.progress.value = 0;
+    act(() => {
+      renderer = TestRenderer.create(<MenuScrim />);
+    });
+    act(() => renderer!.update(<MenuScrim />));
+    expect(opacity()).toBe(0);
+    mockMenuAnimation.progress.value = 1;
+    act(() => renderer!.update(<MenuScrim />));
+    expect(opacity()).toBe(0.4);
+    mockMenuAnimation.progress.value = 2;
+    act(() => renderer!.update(<MenuScrim />));
+    expect(opacity()).toBe(0);
+    mockMenuAnimation.isDragging.value = true;
+    act(() => renderer!.update(<MenuScrim />));
+    expect(opacity()).toBe(0.4);
+    mockMenuOpen = false;
+    act(() => renderer!.update(<MenuScrim />));
+    act(() => renderer!.update(<MenuScrim />));
+    expect(opacity()).toBe(0);
+    mockMenuAnimation.isDragging.value = false;
+    mockMenuOpen = true;
+    mockTweenFraction = 1;
+  });
+
+  it('updates list extent through a footer spacer and removes single-section anchor chrome', () => {
+    const { SectionAnchorList } = jest.requireActual<
+      typeof import('@/shared/ui/composed/SectionAnchorList')
+    >('@/shared/ui/composed/SectionAnchorList');
+    const sections = [
+      { id: 'one', anchor: { label: 'One', testID: 'anchor-one' }, data: ['first'] },
+      { id: 'two', anchor: { label: 'Two', testID: 'anchor-two' }, data: ['last'] },
+    ];
+    const content = (single: boolean, inset: number) => (
+      <SectionAnchorList
+        sections={single ? sections.slice(0, 1) : sections}
+        renderItem={(item) => item}
+        keyExtractor={(item) => item}
+        contentBottomInset={inset}
+      />
+    );
+    act(() => {
+      renderer = TestRenderer.create(content(false, 32));
+    });
+    const bar = renderer!.root.find(
+      (node) => String(node.type) === 'View' && typeof node.props.onLayout === 'function'
+    );
+    act(() => {
+      bar.props.onLayout({ nativeEvent: { layout: { height: 40 } } });
+    });
+    const list = () => renderer!.root.find((node) => String(node.type) === 'FlashList');
+    expect(list().props.contentContainerStyle.paddingTop).toBe(52);
+    act(() => renderer!.update(content(true, 144)));
+    expect(renderer!.root.findAllByProps({ testID: 'anchor-one' })).toHaveLength(0);
+    expect(list().props.contentContainerStyle.paddingTop).toBe(12);
+    expect(list().props.contentContainerStyle.paddingBottom).toBeUndefined();
+    expect(list().props.ListFooterComponent.props.style.height).toBe(144);
+    expect(list().props.extraData.contentBottomInset).toBe(144);
+  });
+
+  it('reserves a measured section footer once and keeps its remaining gap in the list spacer', () => {
+    act(() => {
+      renderer = TestRenderer.create(<ActionMenuHost />);
+      actionMenuPopup({
+        sections: [{ id: 'profiles', anchor: { label: 'Profiles' }, buttons: [] }],
+        footerButtons: [{ text: 'Create', testID: 'create' }],
+      });
+    });
+    const sectionList = () =>
+      renderer!.root.find((node) => String(node.type) === 'SectionAnchorList');
+    expect(sectionList().props.contentBottomInset).toBe(112);
+    act(() => {
+      renderer!.root
+        .find((node) => String(node.type) === 'BottomButtons')
+        .props.onLayout({
+          nativeEvent: { layout: { height: 128 } },
+        });
+    });
+    const content = renderer!.root.find((node) => String(node.type) === 'Menu.Content');
+    expect(content.props.contentContainerClassName).toBe('flex-1 px-0 pt-0 pb-0');
+    expect(content.props.contentContainerProps.style.paddingBottom).toBe(128);
+    expect(sectionList().props.contentBottomInset).toBe(16);
+  });
+
+  it('keeps the second menu visible when the first instance closes late', () => {
+    act(() => {
+      renderer = TestRenderer.create(<Harness />);
+      actionMenuPopup({ title: 'First menu' });
+    });
+    const firstClose = renderer!.root.find((node) => String(node.type) === 'Menu.Content').props
+      .onClose;
+    const second = { title: 'Second menu' };
+    act(() => actionMenuPopup(second));
+    act(() => {
+      firstClose();
+    });
+    expect(renderer!.root.find((node) => String(node.type) === 'Menu.Label').props.children).toBe(
+      'Second menu'
+    );
+    expect(getActionMenuSnapshot().payload).toBe(second);
+  });
+
+  it('clears an orphaned current request and calls onDismiss once on native close', () => {
+    const onDismiss = jest.fn();
+    act(() => {
+      renderer = TestRenderer.create(<ActionMenuHost />);
+      actionMenuPopup({ title: 'Current', onDismiss });
+    });
+    const onClose = renderer!.root.find((node) => String(node.type) === 'Menu.Content').props
+      .onClose;
+    act(() => {
+      onClose();
+    });
+    act(() => {
+      onClose();
+    });
+    expect(getActionMenuSnapshot().payload).toBeNull();
+    expect(renderer!.toJSON()).toBeNull();
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes URL keyboard and accessible label to a menu input', () => {
+    act(() => {
+      renderer = TestRenderer.create(<Harness />);
+      actionMenuPopup({
+        title: 'Upload server',
+        inputs: [{ id: 'server', label: 'Server URL', keyboardType: 'url' }],
+      });
+    });
+    const input = renderer!.root.findByProps({ testID: 'action-menu-input-server' });
+    expect(input.props.keyboardType).toBe('url');
+    expect(input.props.accessibilityLabel).toBe('Server URL');
+  });
+
+  it('reopens during closing with a fresh native instance and reset inputs', () => {
+    const menu = { title: 'Input', inputs: [{ id: 'name', initialValue: 'Initial' }] };
+    act(() => {
+      renderer = TestRenderer.create(<ActionMenuHost />);
+      actionMenuPopup(menu);
+    });
+    const firstInstance = renderer!.root.find((node) => String(node.type) === 'Menu').props
+      .instance;
+    const firstSeq = getActionMenuSnapshot().seq;
+    act(() => {
+      renderer!.root.findByProps({ testID: 'action-menu-input-name' }).props.onChangeText('Edited');
+    });
+    act(() => dismissActionMenuPopup());
+    expect(renderer!.root.find((node) => String(node.type) === 'Menu').props.isOpen).toBe(false);
+    act(() => actionMenuPopup(menu));
+    expect(getActionMenuSnapshot().seq).toBe(firstSeq + 1);
+    expect(renderer!.root.find((node) => String(node.type) === 'Menu').props.instance).not.toBe(
+      firstInstance
+    );
+    expect(renderer!.root.findByProps({ testID: 'action-menu-input-name' }).props.value).toBe(
+      'Initial'
+    );
+  });
+
+  it('runs an item successor once and only after native close', () => {
+    const next = jest.fn(() => actionMenuPopup({ title: 'Successor' }));
+    act(() => {
+      renderer = TestRenderer.create(<ActionMenuHost />);
+      actionMenuPopup({
+        buttons: [{ text: 'Next', testID: 'next', onPress: (close) => close(next) }],
+      });
+    });
+    const onClose = renderer!.root.find((node) => String(node.type) === 'Menu.Content').props
+      .onClose;
+    const press = renderer!.root.findByProps({ testID: 'next' }).props.onPress;
+    act(() => {
+      press();
+      press();
+    });
+    expect(next).not.toHaveBeenCalled();
+    act(() => {
+      onClose();
+    });
+    act(() => {
+      onClose();
+    });
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(getActionMenuSnapshot().payload?.title).toBe('Successor');
+    expect(renderer!.root.find((node) => String(node.type) === 'Menu.Label').props.children).toBe(
+      'Successor'
+    );
+  });
+
+  it('replaces keepOpen content without remounting or accepting the item auto-close', () => {
+    act(() => {
+      renderer = TestRenderer.create(<ActionMenuHost />);
+      actionMenuPopup({
+        buttons: [
+          {
+            text: 'Replace',
+            testID: 'replace',
+            keepOpen: true,
+            onPress: () => replaceActionMenuPopup({ title: 'Confirmation' }),
+          },
+        ],
+      });
+    });
+    const before = renderer!.root.find((node) => String(node.type) === 'Menu').props;
+    const seq = getActionMenuSnapshot().seq;
+    act(() => {
+      renderer!.root.findByProps({ testID: 'replace' }).props.onPress();
+      before.onOpenChange(false);
+    });
+    expect(getActionMenuSnapshot().seq).toBe(seq);
+    expect(getActionMenuSnapshot().payload?.title).toBe('Confirmation');
+    expect(renderer!.root.find((node) => String(node.type) === 'Menu').props.instance).toBe(
+      before.instance
+    );
+  });
+
+  it('remounts a stalled presentation once, ignores that attempt closing, then clears a second stall', () => {
+    jest.useFakeTimers();
+    const onDismiss = jest.fn();
+    act(() => {
+      renderer = TestRenderer.create(<ActionMenuHost />);
+      actionMenuPopup({ title: 'Stalled', onDismiss });
+    });
+    const first = renderer!.root.find((node) => String(node.type) === 'Menu').props;
+    const firstClose = renderer!.root.find((node) => String(node.type) === 'Menu.Content').props
+      .onClose;
+    act(() => jest.advanceTimersByTime(799));
+    expect(renderer!.root.find((node) => String(node.type) === 'Menu').props.instance).toBe(
+      first.instance
+    );
+    act(() => jest.advanceTimersByTime(1));
+    expect(renderer!.root.find((node) => String(node.type) === 'Menu').props.instance).not.toBe(
+      first.instance
+    );
+    act(() => {
+      firstClose();
+      first.onOpenChange(false);
+    });
+    expect(getActionMenuSnapshot().payload?.title).toBe('Stalled');
+    act(() => jest.advanceTimersByTime(800));
+    expect(renderer!.toJSON()).toBeNull();
+    expect(getActionMenuSnapshot().payload).toBeNull();
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels the watchdog when gorhom starts presenting the sheet', () => {
+    jest.useFakeTimers();
+    act(() => {
+      renderer = TestRenderer.create(<ActionMenuHost />);
+      actionMenuPopup({ title: 'Presented' });
+    });
+    const instance = renderer!.root.find((node) => String(node.type) === 'Menu').props.instance;
+    expect(renderer!.root.findAllByProps({ testID: 'action-menu-presented' })).toHaveLength(0);
+    act(() => {
+      renderer!.root
+        .find((node) => String(node.type) === 'Menu.Content')
+        .props.onAnimate(-1, 0, 800, 400);
+    });
+    act(() => jest.advanceTimersByTime(1600));
+    expect(renderer!.root.find((node) => String(node.type) === 'Menu').props.instance).toBe(
+      instance
+    );
+    expect(getActionMenuSnapshot().payload?.title).toBe('Presented');
+    expect(
+      renderer!.root.findAllByProps({ testID: 'action-menu-presented' }).length
+    ).toBeGreaterThan(0);
+    act(() => dismissActionMenuPopup());
+    expect(renderer!.root.findAllByProps({ testID: 'action-menu-presented' })).toHaveLength(0);
   });
 
   it('presents a queued successor only after the native menu finishes closing', async () => {

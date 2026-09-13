@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export type NaggError =
+  | { type: 'vertex'; reason: 'insufficient_credits' | 'rejected' | 'timeout' | 'unavailable'; message: string }
   | { type: 'endpoint_required'; message: string }
   | { type: 'network'; message: string; cause: unknown }
   | { type: 'http'; message: string; status: number; statusText: string }

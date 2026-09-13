@@ -1,3 +1,4 @@
+import type { FeedParseResult } from '../data/feedClient';
 import type { useFeedContentState } from '../hooks/useFeedContentState';
 import { getFeedClient } from '../data/useFeedClient';
 import { feedLog, log } from '@/shared/lib/logger';
@@ -11,6 +12,7 @@ export interface UserFeedLoadCtx {
   authorPicture: string | undefined;
   isOwnProfile: boolean | undefined;
   hasMoreRef: { current: boolean };
+  paginationCursorRef: { current: FeedParseResult['paginationCursor'] };
   paginationUntilRef: { current: number };
   paginationOffsetRef: { current: number };
   loadingMoreRef: { current: boolean };
@@ -39,6 +41,7 @@ export async function loadUserFeedImpl(
     isOwnProfile,
     hasMoreRef,
     paginationUntilRef,
+    paginationCursorRef,
     paginationOffsetRef,
     feedItemIdsRef,
     isFirstRender,
@@ -60,6 +63,7 @@ export async function loadUserFeedImpl(
     });
     if (isCancelled()) return;
 
+    paginationCursorRef.current = phase1.paginationCursor;
     paginationUntilRef.current = phase1.paginationUntil;
     hasMoreRef.current = phase1.paginationUntil > 0 && phase1.orderedFeedItems.length > 0;
     paginationOffsetRef.current = phase1.paginationOffset;

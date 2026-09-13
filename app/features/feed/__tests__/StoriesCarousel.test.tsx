@@ -99,6 +99,8 @@ jest.mock('../components/nostr/StoriesContainer', () => ({
   StoriesContainer: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }));
 jest.mock('../components/nostr/StoryProgressBar', () => ({ StoryProgressBar: 'StoryProgressBar' }));
+jest.mock('../components/nostr/stories/StoryCaption', () => ({ StoryCaption: 'StoryCaption' }));
+jest.mock('@/shared/lib/date', () => ({ formatRelative: () => '2h' }));
 jest.mock('@/shared/lib/logger', () => ({
   Log: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }));

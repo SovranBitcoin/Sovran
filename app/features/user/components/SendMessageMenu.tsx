@@ -5,7 +5,13 @@ import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
 import { useWhitenoiseSetup } from '@/features/whitenoise/hooks/useWhitenoiseSetup';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { buildProfileHref, useActiveProfileFlowGroup } from '@/shared/lib/nav/profileRoutes';
-import Icon from 'assets/icons';
+import Icon from '@/assets/icons';
+import { useDmLastMessage } from '@/shared/stores/profile/dmLastMessageStore';
+import {
+  annotateSendMessageOptions,
+  formatSendOptionReason,
+  type SendTransport,
+} from '@/features/user/lib/sendMessageRecommendation';
 import { nostrLog } from '@/shared/lib/logger';
 
 type Props = {
@@ -33,6 +39,7 @@ type Props = {
  */
 export function SendMessageMenu({ pubkey, displayName, variant = 'primary', circle }: Props) {
   const { peers } = useBLEPeers();
+  const lastMessage = useDmLastMessage(pubkey);
   const { isReady: whitenoiseReady } = useWhitenoiseSetup();
   const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled);
   const profileFlowGroup = useActiveProfileFlowGroup();
@@ -44,27 +51,29 @@ export function SendMessageMenu({ pubkey, displayName, variant = 'primary', circ
     return peers.find((p) => p.isConnected && p.nickname.trim().toLowerCase() === lower);
   }, [peers, displayName]);
 
-  const variants: ActionMenuVariant[] = useMemo(() => {
-    const list: ActionMenuVariant[] = [
+  const variants = useMemo(() => {
+    const list: (ActionMenuVariant & { transport: SendTransport })[] = [
       {
         id: 'nostr',
+        transport: 'nip17',
         label: 'Nostr DM (NIP-17)',
         description: 'Encrypted (NIP-17 gift wrap)',
         icon: 'mdi:message-text',
         testID: 'send-message-menu-nostr',
         onPress: () => {
-          nostrLog.info('user.profile.send_message', { pubkey, transport: 'nip17' });
+          nostrLog.info('user.profile.send_message', { transport: 'nip17' });
           router.navigate(buildProfileHref('userMessages', { pubkey }, profileFlowGroup) as never);
         },
       },
       {
         id: 'nip04',
+        transport: 'nip04',
         label: 'Legacy DM (NIP-04)',
         description: 'Encrypted (NIP-04) — compatible with older clients',
         icon: 'mdi:message-outline',
         testID: 'send-message-menu-nip04',
         onPress: () => {
-          nostrLog.info('user.profile.send_message', { pubkey, transport: 'nip04' });
+          nostrLog.info('user.profile.send_message', { transport: 'nip04' });
           router.navigate(
             buildProfileHref(
               'userMessages',
@@ -78,6 +87,7 @@ export function SendMessageMenu({ pubkey, displayName, variant = 'primary', circ
     if (whitenoiseEnabled) {
       list.push({
         id: 'whitenoise',
+        transport: 'whitenoise',
         label: 'White Noise',
         description: whitenoiseReady
           ? 'MLS encrypted via Marmot'
@@ -86,7 +96,6 @@ export function SendMessageMenu({ pubkey, displayName, variant = 'primary', circ
         testID: 'send-message-menu-whitenoise',
         onPress: () => {
           nostrLog.info('user.profile.send_message', {
-            pubkey,
             transport: 'whitenoise',
             ready: whitenoiseReady,
           });
@@ -100,6 +109,7 @@ export function SendMessageMenu({ pubkey, displayName, variant = 'primary', circ
     }
     list.push({
       id: 'bitchat',
+      transport: 'bitchat',
       label: 'BitChat',
       description: bitchatPeer ? `Bluetooth mesh — nearby (matched by nickname)` : 'Bluetooth mesh',
       icon: 'mdi:bluetooth',
@@ -109,9 +119,7 @@ export function SendMessageMenu({ pubkey, displayName, variant = 'primary', circ
       onPress: () => {
         if (!bitchatPeer) return;
         nostrLog.info('user.profile.send_message', {
-          pubkey,
           transport: 'bitchat',
-          peerID: bitchatPeer.peerID.slice(0, 8),
         });
         router.push(
           buildProfileHref(
@@ -129,12 +137,33 @@ export function SendMessageMenu({ pubkey, displayName, variant = 'primary', circ
     return list;
   }, [pubkey, whitenoiseEnabled, whitenoiseReady, bitchatPeer, profileFlowGroup]);
 
+  const nowMs = Date.now();
+  const recommendedVariants = annotateSendMessageOptions({
+    options: variants.map((option) => option.transport),
+    lastMessage,
+    whitenoiseReady,
+    bitchatReachable: !!bitchatPeer,
+    nowMs,
+  }).map((option): ActionMenuVariant => {
+    const original = variants.find((variant) => variant.transport === option.transport)!;
+    const reason = formatSendOptionReason(option.reason, nowMs);
+    return {
+      ...original,
+      description:
+        option.status === 'recommended'
+          ? `Recommended · ${reason}`
+          : reason || original.description,
+      isDisabled: option.status === 'disabled',
+      reason: option.status === 'disabled' ? reason : original.reason,
+    };
+  });
+
   return (
     <ActionMenuButton
       label="Send Message"
       variant={variant}
       testID="send-message-menu"
-      variants={variants}
+      variants={recommendedVariants}
       menuTitle="Send via"
       presentation="bottom-sheet"
       collapsedPressOpensMenu

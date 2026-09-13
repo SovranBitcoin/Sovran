@@ -555,6 +555,17 @@ Nostr event structure, event-ID calculation, signature, and kind-specific interp
 
 **Decision:** publish through the existing publish boundary, with app signer/relay policy supplied by its owner. Optimistic local display, signed, relay-accepted, failed, and reconciled are distinct facts. Do not show “delivered to recipient” merely because a relay accepted an event. Retry the same signed event where appropriate, rather than accidentally creating duplicates with new timestamps/IDs.
 
+**Vertex client-read exception (N8):** `shared/lib/nostr/vertex/signVertexRequest.ts`
+uses the active NDK signer for kinds 5312/5315; nagg forwards the unchanged signed
+request through the recipe transport. These DVM reads intentionally bypass ordinary
+social relay fan-out in `publishEvent`. Consent, mock/automation exclusion, captured
+identity, and a persisted 20-request daily budget gate this path. No signing material
+is read by the feature. Budget instances capture the pubkey in their storage adapter;
+lookup text and targets stay out of persistence and logs. Revisit this exception if
+`publishEvent` gains a transport for server-forwarded DVM reads. Local profile schema
+freshness fields remain nullish until the shared schema package includes nagg's
+`vertexFetchedAt`/`vertexFresh` contract.
+
 Represent each long-lived interaction as an explicit domain session: identity/config, phase, in-flight work, acknowledgement, retry/backoff, and disposal. Use typed events/transitions and expose a stable UI projection. This is a design contract, not a requirement to rename current internal state fields or adopt a new machine library.
 
 Live `dmLiveSubscribe` and `notificationsLiveSubscribe` return unsubscribe functions; the [strategy contract](nostr/src/facade/strategy.ts) explicitly says they do not auto-reconnect. Where loss matters, pair the stream with the existing bounded catch-up/poll mechanism, deduplicate by event identity, and resume from a cursor. Do not assume a reconnect resumes a previous request.

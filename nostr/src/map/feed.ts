@@ -61,6 +61,7 @@ export type NaggFeedPage<
   metrics: Record<string, NaggNoteMetrics>;
   profiles: Record<string, TProfile>;
   quoted: Record<string, TEvent>;
+  hasMore?: boolean;
   paginationUntil: number;
   paginationOffset: number;
 };

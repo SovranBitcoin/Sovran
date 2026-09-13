@@ -1,35 +1,21 @@
-/**
- * Drop-in replacement for `<Menu.Overlay>` that drives the dim scrim with a
- * 200ms tween on `isOpen` instead of heroui's progress-tracking opacity.
- *
- * Why: heroui's bottom-sheet overlay opacity is interpolated from gorhom's
- * snap `progress` (0=idle, 1=open, 2=close). Gorhom's spring is fast, so the
- * fade-in feels instantaneous, and the boundary at progress=1 plus the
- * `isDragging && progress <= 1` override produces a flash on drag-dismiss.
- *
- * `isAnimatedStyleActive={false}` strips heroui's progress-driven `opacity`
- * from the overlay style. We supply our own `withTiming(isOpen ? 1 : 0, 200ms)`
- * via an animated `style`, so:
- * - Open: smooth 200ms fade-in independent of gorhom snap speed.
- * - Tap dismiss: smooth 200ms fade-out.
- * - Drag dismiss: scrim holds full opacity during drag, fades out the moment
- *   gorhom commits to closing (matches native iOS sheet behavior).
- *
- * Placement matches `<Menu.Overlay>` exactly — same JSX position inside
- * `<Menu.Portal>`, same z-order, so the menu Content stacks above as
- * expected.
- */
-
+/** A 200ms scrim tween capped by the sheet's actual visibility. */
 import { useEffect } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
-import { Menu, useMenu } from 'heroui-native';
-import { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { Menu, useMenu, useMenuAnimation } from 'heroui-native';
+import {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  interpolate,
+  Extrapolation,
+} from 'react-native-reanimated';
 
 import { alpha, duration } from '@/shared/styles/tokens';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
 
 export function MenuScrim() {
   const { isOpen } = useMenu();
+  const { progress, isDragging } = useMenuAnimation();
   const opacity = useSharedValue(0);
   const scrimColor =
     useColorScheme() === 'light'
@@ -42,12 +28,21 @@ export function MenuScrim() {
 
   const animatedStyle = useAnimatedStyle(() => ({
     backgroundColor: scrimColor,
-    opacity: opacity.value,
+    opacity: Math.min(
+      opacity.value,
+      isDragging.value ? 1 : interpolate(progress.value, [0, 1, 2], [0, 1, 0], Extrapolation.CLAMP)
+    ),
   }));
 
   // SDK 56 / reanimated 4.3: useAnimatedStyle returns an AnimatedStyleHandle;
   // Menu.Overlay forwards it to an Animated view but types style as StyleProp.
   return (
-    <Menu.Overlay isAnimatedStyleActive={false} style={animatedStyle as StyleProp<ViewStyle>} />
+    <Menu.Overlay
+      testID="action-menu-dismiss"
+      accessibilityLabel="Dismiss menu"
+      accessibilityRole="button"
+      isAnimatedStyleActive={false}
+      style={animatedStyle as StyleProp<ViewStyle>}
+    />
   );
 }

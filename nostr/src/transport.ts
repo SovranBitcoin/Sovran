@@ -1,3 +1,5 @@
+import { vertexRelay, VertexRelayResponseSchema, VertexFailureSchema } from './recipes/vertex';
+import type { SignedVertexRequest } from './facade/vertex-request';
 import { err, errAsync, ok, ResultAsync, type Result } from 'neverthrow';
 import type { z } from 'zod';
 import {
@@ -84,6 +86,7 @@ export interface NaggClient {
   rest<TSchema extends z.ZodType>(
     request: NaggRestRequest<TSchema>
   ): ResultAsync<z.infer<TSchema>, NaggError>;
+  vertexRelay(event: SignedVertexRequest, controls?: RequestControls): ResultAsync<z.infer<typeof VertexRelayResponseSchema>, NaggError>;
   /** REST app-view base. */
   appViewBaseUrl: string;
 }
@@ -92,6 +95,10 @@ export function createNaggClient(config: NaggClientConfig): NaggClient {
   const appViewBaseUrl = config.appView.baseUrl.trim();
   return {
     appViewBaseUrl,
+    vertexRelay: (event, controls = {}) => fetchAppViewRest(config, appViewBaseUrl, {
+      ...vertexRelay(event), ...controls, timeoutMs: controls.timeoutMs ?? 20_000,
+      refresh: true, responseSchema: VertexRelayResponseSchema,
+    }),
     rest: <TSchema extends z.ZodType>(request: NaggRestRequest<TSchema>) => {
       if (!appViewBaseUrl) {
         return errAsync<z.infer<TSchema>, NaggError>({
@@ -153,14 +160,16 @@ function fetchAppViewRaw(
   opts: AppViewFetchOptions
 ): ResultAsync<unknown, NaggError> {
   const fetchImpl = config.fetchImpl ?? fetch;
-  const refresh = opts.refresh === true;
+  const refresh = opts.refresh === true || !!opts.searchParams?.svr;
+  // Signed URLs contain public lookup activity: never pass them to loggers.
+  const logEndpoint = opts.searchParams?.svr ? opts.path : undefined;
   const url = appViewUrl(baseUrl, config.appView.version, opts.path, opts.searchParams, refresh);
   const timeoutMs = opts.timeoutMs ?? config.defaultTimeoutMs ?? DEFAULT_TIMEOUT_MS;
   const signal = combineSignals(opts.signal, timeoutSignal(timeoutMs));
   const startedAt = Date.now();
   config.logger?.onRequestStart?.({
     operationName: opts.operationName,
-    endpoint: url,
+    endpoint: logEndpoint ?? url,
     variables: {},
     refresh,
   });
@@ -192,16 +201,23 @@ function fetchAppViewRaw(
         status: response.status,
         statusText: response.statusText,
       };
-      logAppViewEnd(config, url, opts.operationName, refresh, startedAt, false, response.status, error.type);
+      logAppViewEnd(config, logEndpoint ?? url, opts.operationName, refresh, startedAt, false, response.status, error.type);
+      if (opts.path === '/nostr/vertex/relay' || opts.searchParams?.svr) {
+        return ResultAsync.fromPromise(response.json() as Promise<unknown>, toNaggNetworkError)
+          .andThen((raw) => {
+            const failure = VertexFailureSchema.safeParse(raw);
+            return failure.success ? ok(failure.data) : err(error);
+          });
+      }
       return errAsync(error);
     }
     return ResultAsync.fromPromise(response.json() as Promise<unknown>, toNaggNetworkError)
       .map((raw) => {
-        logAppViewEnd(config, url, opts.operationName, refresh, startedAt, true, response.status);
+        logAppViewEnd(config, logEndpoint ?? url, opts.operationName, refresh, startedAt, true, response.status);
         return raw;
       })
       .mapErr((error) => {
-        logAppViewEnd(config, url, opts.operationName, refresh, startedAt, false, response.status, error.type);
+        logAppViewEnd(config, logEndpoint ?? url, opts.operationName, refresh, startedAt, false, response.status, error.type);
         return error;
       });
   });

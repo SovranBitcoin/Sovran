@@ -15,6 +15,10 @@
  *   kind 6/7 → nostrSocialStore.ingestOwnReposts/ingestOwnLikes (global upsert)
  *   kind 5 → nostrSocialStore.applyOwnDeletions
  */
+import {
+  ingestOwnProfileMetadata,
+  parseOwnProfileSnapshot,
+} from '@/shared/lib/nostr/profile/publishOwnProfileMetadata';
 import { useEffect, useMemo, useRef } from 'react';
 import { useMuteListSync } from './useMuteListSync';
 
@@ -57,17 +61,9 @@ function toOwnSyncEvent(raw: {
 }
 
 function applyProfile(event: OwnSyncEvent, accountIndex: number): void {
-  try {
-    const parsed = JSON.parse(event.content) as {
-      display_name?: string;
-      name?: string;
-      picture?: string;
-    };
-    const displayName = parsed.display_name || parsed.name || undefined;
-    const picture = parsed.picture || undefined;
-    useProfileStore.getState().updateProfileMetadata(accountIndex, displayName, picture);
-  } catch {
-    // Malformed kind:0 content — ignore.
+  const snapshot = parseOwnProfileSnapshot(event);
+  if (snapshot && useProfileStore.getState().getActiveProfile()?.pubkey === event.pubkey) {
+    ingestOwnProfileMetadata(snapshot, event.pubkey, accountIndex);
   }
 }
 

@@ -14,7 +14,7 @@ export { sendMemoPopup } from './sendMemoSheet';
 export { emojiPickerPopup } from './emojiPicker';
 export { modelPickerPopup } from './modelPicker';
 export type { ProfileSwitcherAction } from '../actionSheetTypes';
-export { actionMenuPopup } from './actionMenu';
+export { actionMenuPopup, replaceActionMenuPopup } from './actionMenu';
 export { deleteStatusPopup } from './deleteStatus';
 export {
   paymentStatusPopup,
@@ -327,7 +327,7 @@ const PARAM_POPUPS = {
     type: 'warning',
   }),
 
-  'engagement-update-failed': (action: 'follow' | 'like' | 'repost'): PopupSpec => ({
+  'engagement-update-failed': (action: 'follow' | 'like' | 'repost' | 'profile'): PopupSpec => ({
     message: `Unable to update ${action} right now`,
     icon: 'icon:mdi:alert-circle',
     type: 'error',

@@ -244,7 +244,7 @@ export const useProfileStore = create<ProfileStore>()(
       },
 
       updateProfileMetadata: (accountIndex: number, displayName?: string, picture?: string) => {
-        storeLog.debug('store.profile.update_metadata', { accountIndex, displayName });
+        storeLog.debug('store.profile.update_metadata', { accountIndex });
         set((state) => ({
           profiles: state.profiles.map((p) =>
             p.accountIndex === accountIndex

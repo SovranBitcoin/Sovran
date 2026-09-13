@@ -1,5 +1,5 @@
 import type { RequestControls } from 'wallet';
-import type { NostrTier } from '@sovranbitcoin/schemas';
+import type { NostrCursor, NostrTier } from '@sovranbitcoin/schemas';
 import type {
   FeedEvent,
   FeedItem,
@@ -17,6 +17,11 @@ export type FeedParseResult = {
   missingProfilePubkeys: string[];
   paginationUntil: number;
   paginationOffset: number;
+  paginationCursor: NostrCursor;
+  hasMore: boolean | undefined;
+  retryAfterMs?: number;
+  sources?: NostrTier[];
+  showingRecent?: boolean;
 };
 
 export type FeedEnrichmentUpdates = {
@@ -27,8 +32,11 @@ export type FeedEnrichmentUpdates = {
 
 export type FeedPageRequest = RequestControls & {
   spec: string;
+  loadMore?: boolean;
+  seen?: Iterable<string>;
   userPubkey?: string;
   limit?: number;
+  cursor?: NostrCursor;
   until?: number;
   offset?: number;
   refresh?: boolean;
@@ -39,6 +47,7 @@ export type UserFeedPageRequest = RequestControls & {
   authorName?: string;
   authorPicture?: string;
   limit?: number;
+  cursor?: NostrCursor;
   until?: number;
   offset?: number;
   refresh?: boolean;
@@ -47,6 +56,7 @@ export type UserFeedPageRequest = RequestControls & {
 export type PostsByPubkeysRequest = RequestControls & {
   pubkeys: string[];
   limit?: number;
+  cursor?: NostrCursor;
   until?: number;
   offset?: number;
   refresh?: boolean;
@@ -200,5 +210,7 @@ export function emptyFeedParseResult(): FeedParseResult {
     missingProfilePubkeys: [],
     paginationUntil: 0,
     paginationOffset: 0,
+    paginationCursor: null,
+    hasMore: false,
   };
 }

@@ -83,6 +83,7 @@ interface SettingsState {
    * Default on. The facade reads these when it's wired into the read paths
    * (see `nostrTierSettings`); until then they're inert.
    */
+  vertexCreditsEnabled: boolean;
   naggTierEnabled: boolean;
   primalTierEnabled: boolean;
   relayTierEnabled: boolean;
@@ -185,6 +186,7 @@ const PersistedSettings = z.object({
   regenerateP2PKOnReceive: z.boolean().default(true).catch(true),
   sendLocationEnabled: z.boolean().default(false).catch(false),
   fileLoggingEnabled: z.boolean().default(false).catch(false),
+  vertexCreditsEnabled: z.boolean().default(true).catch(true),
   naggTierEnabled: z.boolean().default(true).catch(true),
   primalTierEnabled: z.boolean().default(true).catch(true),
   relayTierEnabled: z.boolean().default(true).catch(true),
@@ -215,6 +217,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   regenerateP2PKOnReceive: true,
   sendLocationEnabled: false,
   fileLoggingEnabled: false,
+  vertexCreditsEnabled: true,
   naggTierEnabled: true,
   primalTierEnabled: true,
   relayTierEnabled: true,
@@ -259,6 +262,7 @@ interface SettingsActions {
   setFileLoggingEnabled: (enabled: boolean) => void;
 
   // Nostr data-layer per-tier enablement (dev)
+  setVertexCreditsEnabled: (enabled: boolean) => void;
   setNaggTierEnabled: (enabled: boolean) => void;
   setPrimalTierEnabled: (enabled: boolean) => void;
   setRelayTierEnabled: (enabled: boolean) => void;
@@ -378,6 +382,7 @@ export const useSettingsStore = create<SettingsStore>()(
         },
 
         // Nostr data-layer tiers (dev)
+        setVertexCreditsEnabled: (enabled: boolean) => set({ vertexCreditsEnabled: enabled }),
         setNaggTierEnabled: (enabled: boolean) => {
           storeLog.info('store.settings.set_nagg_tier_enabled', { enabled });
           set({ naggTierEnabled: enabled });
@@ -468,6 +473,7 @@ export const useSettingsStore = create<SettingsStore>()(
           fileLoggingEnabled: state.fileLoggingEnabled,
           minTransferThreshold: state.minTransferThreshold,
           middlemanRouting: state.middlemanRouting,
+          vertexCreditsEnabled: state.vertexCreditsEnabled,
           naggTierEnabled: state.naggTierEnabled,
           primalTierEnabled: state.primalTierEnabled,
           relayTierEnabled: state.relayTierEnabled,

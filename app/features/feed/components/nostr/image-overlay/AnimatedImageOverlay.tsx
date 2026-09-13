@@ -32,13 +32,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { ThreadReplyBar } from '@/features/feed/components/ThreadReplyBar';
-import { Log } from '@/shared/lib/logger';
+import { feedLog, Log } from '@/shared/lib/logger';
 import Icon from 'assets/icons';
 import type { ImageOverlayContextValue } from './types';
 import { IMAGE_OVERLAY_TIMING_CONFIG, useImageOverlay } from './provider';
 import { clearAndroidOverlayNode, setAndroidOverlayNode } from './AndroidImageOverlayHost';
 import { MemoizedMediaPagerPage } from './MediaPagerPage';
 import { OverlayDot } from './PagerDots';
+import { computeDismissDecision } from './dismissDecision';
 import { duration, zIndex } from '@/shared/styles/tokens';
 import { ImageOverlayBottomPanelContent, ImageOverlayAbsoluteBar } from './BottomPanel';
 import {
@@ -48,9 +49,12 @@ import {
   DISMISS_CLOSE_BTN_FADE_DURATION_MS,
   DISMISS_DRAG_FOLLOW,
   DISMISS_DRAG_RANGE_FRACTION,
+  DISMISS_FLICK_MIN_DISTANCE,
+  DISMISS_FLICK_VELOCITY_PX_S,
   DISMISS_MIN_DISTANCE,
   DISMISS_SCALE_AT_DRAG,
   DISMISS_THRESHOLD_FRACTION,
+  DISMISS_VELOCITY_WEIGHT_S,
   DOTS_ACTIVE_COLOR,
   IMAGE_WRAP_BORDER_RADIUS,
   PAGER_ACTIVE_OFFSET_X,
@@ -82,6 +86,14 @@ import {
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
+
+function logDismissDecision(
+  distance: number,
+  velocity: number,
+  decision: ReturnType<typeof computeDismissDecision>
+) {
+  feedLog.info('imageOverlay.dismiss', { distance, velocity, decision });
+}
 
 function AnimatedImageOverlayContent({
   ctx,
@@ -495,19 +507,34 @@ function AnimatedImageOverlayContent({
           imageScale.set(scale);
           blurIntensity.set(blur);
         })
-        .onFinalize(() => {
+        .onFinalize((event) => {
           const wasActive = dismissPanActive.get() === 1;
           dismissPanActive.set(0);
+          scheduleOnRN(setDismissPanActive, false);
+          if (!wasActive) return;
           const deltaX = imageXCoord.get() - panStartX.get();
           const deltaY = imageYCoord.get() - panStartY.get();
           const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
           const ew = expandedWidthSv.get() || expandedWidth;
           const eh = expandedHeightSv.get() || expandedHeight;
           const threshold = Math.max(ew, eh) * DISMISS_THRESHOLD_FRACTION;
-          const dismissed = distance > threshold;
-          scheduleOnRN(setDismissPanActive, false);
-          if (!wasActive) return;
-          if (dismissed) {
+          const decision = computeDismissDecision({
+            dx: deltaX,
+            dy: deltaY,
+            vx: event.velocityX,
+            vy: event.velocityY,
+            threshold,
+            minFlickDistance: DISMISS_FLICK_MIN_DISTANCE,
+            velocityWeightS: DISMISS_VELOCITY_WEIGHT_S,
+            flickVelocityPxS: DISMISS_FLICK_VELOCITY_PX_S,
+          });
+          scheduleOnRN(
+            logDismissDecision,
+            distance,
+            Math.hypot(event.velocityX, event.velocityY),
+            decision
+          );
+          if (decision === 'dismiss') {
             // Avoid transform-origin drift while closing; return animation should be driven by x/y/size only.
             imageScale.set(1);
             cancelAnimation(pagerOffsetSv);
@@ -1079,7 +1106,9 @@ function AnimatedImageOverlayContent({
       pointerEvents={activeUrl ? 'auto' : 'none'}>
       <Animated.View style={[StyleSheet.absoluteFill, rSwipeUpWrapperStyle]}>
         <GestureDetector gesture={composed}>
-          <AnimatedPressable style={[StyleSheet.absoluteFill, rContainerStyle]}>
+          <AnimatedPressable
+            testID="image-overlay-dismiss-surface"
+            style={[StyleSheet.absoluteFill, rContainerStyle]}>
             {/* box-none so taps on the blur fall through to the gesture (tapBackdrop → triggerClose); overlay root still blocks content behind */}
             <View style={StyleSheet.absoluteFill} pointerEvents="box-none" />
             {Platform.OS === 'android' ? (
@@ -1101,7 +1130,12 @@ function AnimatedImageOverlayContent({
                 { top: insets.top + CLOSE_BUTTON_TOP_OFFSET },
                 rCloseBtnStyle,
               ]}>
-              <Pressable onPress={() => triggerClose()} style={StyleSheet.absoluteFill}>
+              <Pressable
+                testID="image-overlay-close"
+                accessibilityRole="button"
+                accessibilityLabel="Close image viewer"
+                onPress={() => triggerClose()}
+                style={StyleSheet.absoluteFill}>
                 <Icon name="material-symbols:close-rounded" size={22} color="#fff" />
               </Pressable>
             </Animated.View>
@@ -1217,6 +1251,11 @@ function AnimatedImageOverlayContent({
                   {pagePost ? (
                     <GestureDetector gesture={barDismissPan}>
                       <Animated.View
+                        testID={
+                          index === videoFeedLayoutIndex
+                            ? 'image-overlay-bar-dismiss-surface'
+                            : undefined
+                        }
                         style={[
                           overlayStyles.absoluteOverlayBar,
                           rAbsoluteOverlayBarOpacityStyle,

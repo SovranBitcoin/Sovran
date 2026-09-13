@@ -1,8 +1,14 @@
+import { useNDK } from '@nostr-dev-kit/ndk-mobile';
+import { refreshVertex, isVertexProfileStale } from '@/shared/lib/nostr/vertex/refreshVertex';
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 import type { facade } from 'nostr';
 
-import { fetchNostrProfile, type NostrProfileFull } from '@/shared/lib/apiClient';
+import {
+  fetchNostrProfile,
+  parseNostrProfileFor,
+  type NostrProfileFull,
+} from '@/shared/lib/apiClient';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { tryNpubEncode } from '@/features/feed/components/nostr/feedParse';
@@ -52,7 +58,11 @@ interface UseNostrProfileResult {
   refetch: () => void;
 }
 
-export function useNostrProfile(pubkey: string | null): UseNostrProfileResult {
+export function useNostrProfile(
+  pubkey: string | null,
+  refreshReputation = false
+): UseNostrProfileResult {
+  const { ndk } = useNDK();
   const [state, setState] = useState<{
     pubkey: string | null;
     data: NostrProfileFull | null;
@@ -90,6 +100,16 @@ export function useNostrProfile(pubkey: string | null): UseNostrProfileResult {
         log.debug('feed.profile.fetch.success', { pubkey, source: 'nagg' });
         recordDebugTiers([pubkey], 'nagg');
         setState({ pubkey, data: result.value, isLoading: false, error: null });
+        const refreshed = await refreshVertex({
+          kind: 'profile',
+          target: pubkey,
+          stale: refreshReputation && isVertexProfileStale(result.value.vertexFetchedAt),
+          ndk,
+          signal,
+        });
+        if (signal.aborted || !refreshed) return;
+        const parsed = parseNostrProfileFor(pubkey)(refreshed);
+        if (parsed.isOk()) setState({ pubkey, data: parsed.value, isLoading: false, error: null });
         return;
       }
       log.warn('feed.profile.fetch.nagg_failed_fallback', { pubkey, error: result.error });
@@ -115,7 +135,7 @@ export function useNostrProfile(pubkey: string | null): UseNostrProfileResult {
         error: new Error('profile unavailable from all tiers'),
       });
     }
-  }, [pubkey]);
+  }, [pubkey, ndk, refreshReputation]);
 
   useEffect(() => {
     void fetchProfile();

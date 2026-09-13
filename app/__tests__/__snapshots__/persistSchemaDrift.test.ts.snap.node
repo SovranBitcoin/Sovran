@@ -394,6 +394,70 @@ exports[`persisted schema drift data-migration-store schema matches the golden s
 }
 `;
 
+exports[`persisted schema drift dm-last-message-store schema matches the golden snapshot for its version: dm-last-message-store 1`] = `
+{
+  "name": "dm-last-message-store",
+  "shape": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "byPeer": {
+          "additionalProperties": {
+            "properties": {
+              "atSeconds": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "isOwn": {
+                "type": "boolean",
+              },
+              "protocol": {
+                "enum": [
+                  "nip04",
+                  "nip17",
+                  "whitenoise",
+                  "bitchat",
+                ],
+                "type": "string",
+              },
+            },
+            "required": [
+              "protocol",
+              "atSeconds",
+              "isOwn",
+            ],
+            "type": "object",
+          },
+          "default": {},
+          "propertyNames": {
+            "type": "string",
+          },
+          "tolerantKey": {
+            "input": {},
+            "output": {},
+          },
+          "type": "object",
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "byPeer": {},
+      },
+      "required": [
+        "byPeer",
+      ],
+      "type": "object",
+    },
+  },
+  "version": 1,
+}
+`;
+
 exports[`persisted schema drift feed-ignore-store schema matches the golden snapshot for its version: feed-ignore-store 1`] = `
 {
   "name": "feed-ignore-store",
@@ -2973,6 +3037,102 @@ exports[`persisted schema drift own-content-store schema matches the golden snap
 }
 `;
 
+exports[`persisted schema drift own-profile-metadata-store schema matches the golden snapshot for its version: own-profile-metadata-store 1`] = `
+{
+  "name": "own-profile-metadata-store",
+  "shape": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "latest": {
+          "anyOf": [
+            {
+              "properties": {
+                "content": {
+                  "additionalProperties": {},
+                  "propertyNames": {
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "createdAt": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "eventId": {
+                  "maxLength": 64,
+                  "minLength": 64,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "content",
+                "createdAt",
+                "eventId",
+              ],
+              "type": "object",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "latest": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "content": {
+                  "additionalProperties": {},
+                  "propertyNames": {
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "createdAt": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "eventId": {
+                  "maxLength": 64,
+                  "minLength": 64,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "content",
+                "createdAt",
+                "eventId",
+              ],
+              "type": "object",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
+      },
+      "required": [
+        "latest",
+      ],
+      "type": "object",
+    },
+  },
+  "version": 1,
+}
+`;
+
 exports[`persisted schema drift owned-media-store schema matches the golden snapshot for its version: owned-media-store 1`] = `
 {
   "name": "owned-media-store",
@@ -3014,6 +3174,13 @@ exports[`persisted schema drift owned-media-store schema matches the golden snap
               },
               "mimeType": {
                 "maxLength": 256,
+                "type": "string",
+              },
+              "purpose": {
+                "enum": [
+                  "avatar",
+                  "post",
+                ],
                 "type": "string",
               },
               "sha256": {
@@ -7840,6 +8007,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           ],
           "default": null,
         },
+        "vertexCreditsEnabled": {
+          "default": true,
+          "type": "boolean",
+        },
         "whitenoiseEnabled": {
           "default": false,
           "type": "boolean",
@@ -8079,6 +8250,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           ],
           "default": null,
         },
+        "vertexCreditsEnabled": {
+          "default": true,
+          "type": "boolean",
+        },
         "whitenoiseEnabled": {
           "default": false,
           "type": "boolean",
@@ -8104,6 +8279,7 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
         "regenerateP2PKOnReceive",
         "sendLocationEnabled",
         "fileLoggingEnabled",
+        "vertexCreditsEnabled",
         "naggTierEnabled",
         "primalTierEnabled",
         "relayTierEnabled",
@@ -8741,6 +8917,80 @@ exports[`persisted schema drift transaction-location-store schema matches the go
       },
       "required": [
         "locations",
+      ],
+      "type": "object",
+    },
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift vertex-budget-store schema matches the golden snapshot for its version: vertex-budget-store 1`] = `
+{
+  "name": "vertex-budget-store",
+  "shape": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "blockedUntilDay": {
+          "default": "9999-12-31",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string",
+        },
+        "day": {
+          "anyOf": [
+            {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string",
+            },
+            {
+              "const": "",
+              "type": "string",
+            },
+          ],
+          "default": "9999-12-31",
+        },
+        "used": {
+          "default": 20,
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "blockedUntilDay": {
+          "default": "9999-12-31",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string",
+        },
+        "day": {
+          "anyOf": [
+            {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string",
+            },
+            {
+              "const": "",
+              "type": "string",
+            },
+          ],
+          "default": "9999-12-31",
+        },
+        "used": {
+          "default": 20,
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+      },
+      "required": [
+        "day",
+        "used",
       ],
       "type": "object",
     },

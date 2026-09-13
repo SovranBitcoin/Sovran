@@ -28,6 +28,7 @@ import '@/shared/stores/profile/transactionAnnotationStore';
 import '@/shared/stores/profile/ownedMediaStore';
 import '@/shared/stores/profile/nostrSocialStore';
 import '@/shared/stores/profile/dataMigrationStore';
+import '@/shared/stores/profile/dmLastMessageStore';
 import '@/shared/stores/global/mintMetadataStore';
 import '@/shared/stores/global/relayMetadataStore';
 import '@/shared/stores/profile/mintStore';
@@ -41,6 +42,7 @@ import '@/shared/stores/profile/mintDistributionStore';
 import '@/shared/stores/profile/npcMintStore';
 import '@/shared/stores/profile/nutDropRedeemQueueStore';
 import '@/shared/stores/profile/ownContentStore';
+import '@/shared/stores/profile/ownProfileMetadataStore';
 import '@/shared/stores/profile/searchHistoryStore';
 import '@/shared/stores/profile/sendReachabilityStore';
 import '@/shared/stores/profile/swapTransactionsStore';
@@ -70,6 +72,9 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { persistRegistry } from '@/shared/lib/persist/persistConfig';
+import { createVertexBudgetStore } from '@/shared/stores/profile/vertexBudgetStore';
+
+createVertexBudgetStore('a'.repeat(64));
 
 // Files that call persistConfig but deliberately do NOT register here.
 // Every entry needs a reason — this is the visible exception list the

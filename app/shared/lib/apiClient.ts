@@ -1,3 +1,4 @@
+import { facade } from 'nostr';
 import { GetInfoResponse } from '@cashu/cashu-ts';
 import {
   combineSignals,
@@ -36,6 +37,8 @@ const TopFollower = TopFollowerStrict.extend({
   score: NullableVertexMetric.optional(),
 });
 const NostrProfileFull = NostrProfileFullStrict.extend({
+  vertexFetchedAt: z.number().nullish(),
+  vertexFresh: z.boolean().nullish(),
   score: NullableVertexMetric,
   created_at: z.number().int().nullable(),
   nodes: z.number().int().nonnegative().nullable().optional(),
@@ -315,7 +318,7 @@ function metadataFields(content: string): Record<string, string> {
   }
 }
 
-const parseNostrProfileFor =
+export const parseNostrProfileFor =
   (pubkey: string) =>
   (input: unknown): Result<NostrProfileFullType, ParseError> => {
     const env = ProfileEnvelope.safeParse(input);
@@ -362,6 +365,8 @@ const parseNostrProfileFor =
       npub: npubOrEmpty(pubkey),
       rank: num(vertex.rank) ?? 0,
       score: num(vertex.score) ?? null,
+      vertexFetchedAt: num(vertex.vertexFetchedAt) ?? num(vertex.fetchedAt) ?? null,
+      vertexFresh: typeof vertex.vertexFresh === 'boolean' ? vertex.vertexFresh : null,
       followers: agg('k3_p_latest', 'actors') ?? 0,
       follows: agg('k3_author_latest', 'sources') ?? 0,
       created_at: num(prov(pubkey, 'nagg').firstEventAt) ?? null,
@@ -530,13 +535,19 @@ export const getAiLineup = (controls: RequestControls = {}) =>
     controls
   );
 
-export const fetchNostrProfile = (pubkey: string, controls: RequestControls = {}) =>
+export const fetchNostrProfile = (
+  pubkey: string,
+  controls: RequestControls & { signedVertexRequest?: facade.SignedVertexRequest } = {}
+) =>
   fetchJson(
-    `${SCORE_API_BASE_URL}/nostr/profile?pubkey=${encodeURIComponent(pubkey)}`,
+    `${SCORE_API_BASE_URL}/nostr/profile?pubkey=${encodeURIComponent(pubkey)}${controls.signedVertexRequest ? `&svr=${facade.encodeSignedVertexRequest(controls.signedVertexRequest)}` : ''}`,
     parseNostrProfileFor(pubkey),
     'nostr/profile',
-    undefined,
-    controls
+    controls.signedVertexRequest ? { cache: 'no-store' } : undefined,
+    {
+      ...controls,
+      timeoutMs: controls.timeoutMs ?? (controls.signedVertexRequest ? 20_000 : DEFAULT_TIMEOUT_MS),
+    }
   );
 
 /**

@@ -1,3 +1,6 @@
+import { useFeedRetry } from '@/features/feed/hooks/useFeedRetry';
+import { facade } from 'nostr';
+import { Text } from '@/shared/ui/primitives/Text';
 /**
  * @fileoverview Home Feed ("For You") Component
  *
@@ -20,11 +23,12 @@ import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Button } from 'heroui-native';
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
-import type { FeedParseResult } from '@/features/feed/data/feedClient';
+import type { FeedClient, FeedParseResult } from '@/features/feed/data/feedClient';
 import {
   advancedPaginationState,
   emptyPaginationState,
-  isRankedFeedSpec,
+  type FeedPaginationState,
+  createFeedRetryTimer,
   seededPaginationState,
 } from '@/features/feed/data/feedPagination';
 import { feedPageCache, feedPageKey } from '@/features/feed/data/feedCache';
@@ -34,6 +38,7 @@ import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import {
   selectFeedEmptyMode,
+  feedFooterCopy,
   FEED_EMPTY_COPY,
   type FeedEmptyMode,
 } from '@/features/feed/lib/feedEmptyStates';
@@ -120,6 +125,9 @@ function EmptyFeed({
     <Button
       variant="secondary"
       size="sm"
+      testID={copy.ctaAction === 'find-people' ? 'feed-find-people' : 'feed-refresh'}
+      accessibilityRole="button"
+      accessibilityLabel={copy.ctaLabel}
       onPress={copy.ctaAction === 'find-people' ? onFindPeople : onRefresh}>
       <Button.Label>{copy.ctaLabel}</Button.Label>
     </Button>
@@ -218,22 +226,17 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [pageStatus, setPageStatus] = useState<FeedPageStatus>({});
+  const clientRef = useRef<FeedClient | null>(null);
+  const [retryTimer] = useState(() => createFeedRetryTimer());
   const followCount = useNostrSocialStore((s) => Object.keys(s.followingPubkeys).length);
   const isFollowingFeed =
     activeFilter === FEED_FILTER_FOLLOWING_POPULAR || activeFilter === FEED_FILTER_FOLLOWING_RECENT;
   const openPostActions = usePostActions();
-  const paginationRef = useRef(
-    seed ? seededPaginationState(seed, isRankedFeedSpec(initialSpec)) : emptyPaginationState()
-  );
+  const paginationRef = useRef(seed ? seededPaginationState(seed) : emptyPaginationState());
   const loadingMoreRef = useRef(false);
   const feedItemIdsRef = useRef(
-    new Set<string>(
-      seed
-        ? seed.orderedFeedItems.map((item) =>
-            item.type === 'note' ? item.event.id : item.repostEvent.id
-          )
-        : []
-    )
+    new Set<string>(seed ? seed.orderedFeedItems.map((item) => facade.feedItemId(item)) : [])
   );
   // Tracks the request prefix of the most recently started loadFeed/loadMoreItems
   // — onUpdate callbacks captured by an older request bail out when this drifts.
@@ -261,11 +264,14 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
 
   useEffect(() => {
     return () => {
+      retryTimer.clear();
+      clientRef.current?.dispose?.();
+      clientRef.current = null;
       activeLoadIdRef.current = null;
       activeAbortControllerRef.current?.abort();
       activeAbortControllerRef.current = null;
     };
-  }, []);
+  }, [retryTimer]);
 
   // ── Phase 1–3: Load feed content for selected spec ──
   // Body lives in module-scope `loadFeedImpl` — try/finally inside the
@@ -276,6 +282,9 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       loadFeedImpl(
         {
           userPubkey,
+          clientRef,
+          retryTimer,
+          setPageStatus,
           paginationRef,
           feedItemIdsRef,
           loadingMoreRef,
@@ -307,6 +316,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       profilesRef,
       quotedRef,
       resetContent,
+      retryTimer,
       userPubkey,
     ]
   );
@@ -344,6 +354,9 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       loadMoreItemsImpl(
         {
           userPubkey,
+          clientRef,
+          retryTimer,
+          setPageStatus,
           paginationRef,
           feedItemIdsRef,
           loadingMoreRef,
@@ -375,17 +388,22 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       profilesRef,
       quotedRef,
       resetContent,
+      retryTimer,
       userPubkey,
     ]
   );
+
+  useFeedRetry(pageStatus, loadMoreItems, retryTimer);
+
+  const footerCopy = feedFooterCopy(pageStatus);
 
   const handleEndReached = useCallback(() => {
     // Don't start pagination while the first page is still loading or a refresh
     // is in flight — otherwise the footer spinner stacks on top of the
     // empty-state / refresh spinner (duplicate spinners).
-    if (isLoading || isRefreshing) return;
+    if (isLoading || isRefreshing || pageStatus.retryAfterMs !== undefined) return;
     void loadMoreItems();
-  }, [loadMoreItems, isLoading, isRefreshing]);
+  }, [loadMoreItems, isLoading, isRefreshing, pageStatus.retryAfterMs]);
 
   // ── Derived data ──
 
@@ -662,7 +680,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             ListEmptyComponent={
               isLoading ? (
                 <Spinner size={22} style={styles.loader} />
-              ) : (
+              ) : pageStatus.retryAfterMs !== undefined ? null : (
                 <EmptyFeed
                   mode={selectFeedEmptyMode({
                     isLoading,
@@ -679,7 +697,14 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             ListFooterComponent={
               // Only show the pagination spinner once there's content — never
               // alongside the empty-state spinner.
-              isLoadingMore && feedRows.length > 0 ? (
+              footerCopy ? (
+                <Text
+                  testID="feed-pagination-status"
+                  accessibilityLiveRegion="polite"
+                  className="text-foreground/60 py-4 text-center">
+                  {footerCopy}
+                </Text>
+              ) : isLoadingMore && feedRows.length > 0 ? (
                 <Spinner size={18} style={styles.loadMoreSpinner} />
               ) : null
             }
@@ -725,10 +750,14 @@ const DEFAULT_FEED_SPECS: FeedSpec[] = [
 // component. Hoisted here, the component compiles and the loaders stay plain
 // async functions over an explicit context.
 
-type FeedPaginationState = ReturnType<typeof emptyPaginationState>;
 type FeedContentState = ReturnType<typeof useFeedContentState>;
 
+type FeedPageStatus = Pick<FeedParseResult, 'retryAfterMs' | 'showingRecent'>;
+
 interface HomeFeedLoadCtx {
+  clientRef: { current: FeedClient | null };
+  retryTimer: ReturnType<typeof createFeedRetryTimer>;
+  setPageStatus: (value: FeedPageStatus) => void;
   userPubkey: string | undefined;
   paginationRef: { current: FeedPaginationState };
   feedItemIdsRef: { current: Set<string> };
@@ -757,6 +786,9 @@ async function loadFeedImpl(
 ): Promise<void> {
   const {
     userPubkey,
+    clientRef,
+    retryTimer,
+    setPageStatus,
     paginationRef,
     feedItemIdsRef,
     loadingMoreRef,
@@ -782,17 +814,22 @@ async function loadFeedImpl(
     isRefresh,
     hasViewer: !!userPubkey,
   });
+  retryTimer.clear();
+  setPageStatus({});
+  activeAbortControllerRef.current?.abort();
+  activeLoadIdRef.current = null;
+  clientRef.current?.dispose?.();
+  clientRef.current = null;
   const cacheKey = feedPageKey(spec, userPubkey);
 
   // Applies a page-0 result to state + pagination refs. Used both for the
   // instant warm-nav paint and for the fresh fetch.
   const applyPhase1 = (phase1: FeedParseResult) => {
-    paginationRef.current = seededPaginationState(phase1, isRankedFeedSpec(spec));
+    paginationRef.current = seededPaginationState(phase1);
     feedItemIdsRef.current = new Set(
-      phase1.orderedFeedItems.map((item) =>
-        item.type === 'note' ? item.event.id : item.repostEvent.id
-      )
+      phase1.orderedFeedItems.map((item) => facade.feedItemId(item))
     );
+    setPageStatus({ retryAfterMs: phase1.retryAfterMs, showingRecent: phase1.showingRecent });
     applyPage(phase1);
   };
 
@@ -840,7 +877,7 @@ async function loadFeedImpl(
   }
 
   const { requestId, controller } = beginNetworkLoad();
-  const client = getFeedClient();
+  const client = clientRef.current ?? (clientRef.current = getFeedClient());
   let didApplyPage = paintedFromCache;
 
   try {
@@ -905,7 +942,6 @@ async function loadFeedImpl(
     if (activeAbortControllerRef.current === controller) {
       activeAbortControllerRef.current = null;
     }
-    client.dispose?.();
   }
 }
 
@@ -915,6 +951,9 @@ async function loadMoreItemsImpl(
 ): Promise<FeedItem[]> {
   const {
     userPubkey,
+    clientRef,
+    retryTimer,
+    setPageStatus,
     paginationRef,
     feedItemIdsRef,
     loadingMoreRef,
@@ -927,48 +966,43 @@ async function loadMoreItemsImpl(
     beginNetworkLoad,
     isActiveLoad,
   } = ctx;
-  const ranked = isRankedFeedSpec(currentSpec);
-  if (
-    loadingMoreRef.current ||
-    !paginationRef.current.hasMore ||
-    !currentSpec ||
-    (!ranked && paginationRef.current.until === 0)
-  )
-    return [];
+  if (loadingMoreRef.current || !paginationRef.current.hasMore || !currentSpec) return [];
 
+  retryTimer.clear();
   loadingMoreRef.current = true;
   setIsLoadingMore(true);
   const { requestId, controller } = beginNetworkLoad();
-  const client = getFeedClient();
+  const client = clientRef.current ?? (clientRef.current = getFeedClient());
 
   try {
     const page = await client.getFeed({
       spec: currentSpec,
       userPubkey,
       limit: FEED_PAGE_LIMIT,
-      until: paginationRef.current.until > 0 ? paginationRef.current.until : undefined,
-      offset: paginationRef.current.offset > 0 ? paginationRef.current.offset : undefined,
+      cursor: paginationRef.current.cursor,
+      until: paginationRef.current.cursor?.createdAt,
+      loadMore: true,
+      seen: feedItemIdsRef.current,
       signal: controller.signal,
     });
 
     if (!isActiveLoad(requestId)) return [];
 
-    const advanced = advancedPaginationState(paginationRef.current, page, ranked);
+    const advanced = advancedPaginationState(paginationRef.current, page);
     paginationRef.current = advanced;
-    if (!advanced.hasMore) return [];
+    setPageStatus({ retryAfterMs: page.retryAfterMs, showingRecent: page.showingRecent });
 
     const newItems = page.orderedFeedItems.filter((item) => {
-      const id = item.type === 'note' ? item.event.id : item.repostEvent.id;
+      const id = facade.feedItemId(item);
       return !feedItemIdsRef.current.has(id);
     });
 
     if (newItems.length === 0) {
-      paginationRef.current = { ...paginationRef.current, hasMore: false };
       return [];
     }
 
     for (const item of newItems) {
-      feedItemIdsRef.current.add(item.type === 'note' ? item.event.id : item.repostEvent.id);
+      feedItemIdsRef.current.add(facade.feedItemId(item));
     }
 
     // Appending a page extends the list below the fold. With a stable
@@ -1002,9 +1036,10 @@ async function loadMoreItemsImpl(
     if (activeAbortControllerRef.current === controller) {
       activeAbortControllerRef.current = null;
     }
-    client.dispose?.();
-    loadingMoreRef.current = false;
-    setIsLoadingMore(false);
+    if (isActiveLoad(requestId)) {
+      loadingMoreRef.current = false;
+      setIsLoadingMore(false);
+    }
   }
 }
 

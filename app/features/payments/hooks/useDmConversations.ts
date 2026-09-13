@@ -10,6 +10,9 @@ import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 import { fetchDmEnvelopes } from '../data/dmEnvelopeClient';
 import { decryptDmEnvelopes } from '../data/dmDecryptPipeline';
 import type { DmEnvelopePage, DmProtocol } from '../data/dmEnvelopeTypes';
+import { useDmLastMessageStore } from '@/shared/stores/profile/dmLastMessageStore';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { isMockContactPubkey } from '@/shared/stores/runtime/mockDataStore';
 import { useDmEnvelopePages } from './useDmEnvelopePages';
 
 /** Fetched DM kinds: NIP-04 (kind 4) + NIP-17 gift wraps (kind 1059). */
@@ -45,7 +48,18 @@ export function useDmConversations(viewerPubkey?: string, viewerPrivateKey?: Uin
     (page: DmEnvelopePage) => {
       if (!viewerPubkey || !viewerPrivateKey) return;
       const decrypted = decryptDmEnvelopes(page.envelopes, viewerPubkey, viewerPrivateKey);
+      const profile = useProfileStore.getState();
+      const isCurrentProfile = profile.profiles.some(
+        (p) => p.accountIndex === profile.activeAccountIndex && p.pubkey === viewerPubkey
+      );
       for (const dm of decrypted) {
+        if (isCurrentProfile && !isMockContactPubkey(dm.counterparty)) {
+          useDmLastMessageStore.getState().recordLastMessage(dm.counterparty, {
+            protocol: dm.protocol,
+            atSeconds: dm.createdAt,
+            isOwn: dm.isOwn,
+          });
+        }
         // One conversation per counterparty across protocols; the most recent
         // message wins (and sets the displayed protocol). Per-protocol threads
         // are opened from the profile's send-message picker.
@@ -70,6 +84,9 @@ export function useDmConversations(viewerPubkey?: string, viewerPrivateKey?: Uin
 
   const hydrate = useCallback(async () => {
     if (!viewerPubkey) return;
+    if (!useDmLastMessageStore.persist.hasHydrated()) {
+      await useDmLastMessageStore.persist.rehydrate();
+    }
     await Promise.all([
       giftWrapCache.cache.hydrate(viewerPubkey),
       nip04Cache.hydrate(viewerPubkey),

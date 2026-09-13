@@ -11,6 +11,10 @@ import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 import { fetchDmEnvelopes } from '../data/dmEnvelopeClient';
 import { decryptDmEnvelopes } from '../data/dmDecryptPipeline';
 import type { DmEnvelopePage, DmProtocol } from '../data/dmEnvelopeTypes';
+import { useDmLastMessageStore } from '@/shared/stores/profile/dmLastMessageStore';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { isMockContactPubkey } from '@/shared/stores/runtime/mockDataStore';
+import { paymentLog } from '@/shared/lib/logger';
 import { useDmEnvelopePages } from './useDmEnvelopePages';
 
 const PAGE_LIMIT = 50;
@@ -35,9 +39,11 @@ export function useDmThread(
   // The paging cursor walks ALL envelope wrap times (not the decrypted rumor
   // time, which uses a different clock); seenMsgIds dedups the messages
   // actually shown for this counterparty.
+  const firstPageStartedAtRef = useRef<number | null>(null);
   const seenMsgIdsRef = useRef(new Set<string>());
 
   const onReset = useCallback(() => {
+    firstPageStartedAtRef.current = Date.now();
     seenMsgIdsRef.current = new Set();
     setMessages([]);
   }, []);
@@ -46,10 +52,30 @@ export function useDmThread(
     (page: DmEnvelopePage) => {
       if (!viewerPubkey || !viewerPrivateKey) return 0;
       const decrypted = decryptDmEnvelopes(page.envelopes, viewerPubkey, viewerPrivateKey);
+      const profile = useProfileStore.getState();
+      const isCurrentProfile = profile.profiles.some(
+        (p) => p.accountIndex === profile.activeAccountIndex && p.pubkey === viewerPubkey
+      );
+      for (const dm of decrypted) {
+        if (isCurrentProfile && !isMockContactPubkey(dm.counterparty)) {
+          useDmLastMessageStore.getState().recordLastMessage(dm.counterparty, {
+            protocol: dm.protocol,
+            atSeconds: dm.createdAt,
+            isOwn: dm.isOwn,
+          });
+        }
+      }
       const relevant = decrypted.filter(
         (dm) => dm.counterparty === counterparty && dm.protocol === protocol
       );
       const fresh = relevant.filter((dm) => !seenMsgIdsRef.current.has(dm.id));
+      if (firstPageStartedAtRef.current !== null) {
+        paymentLog.info('dm.thread.first_page', {
+          ms: Date.now() - firstPageStartedAtRef.current,
+          count: fresh.length,
+        });
+        firstPageStartedAtRef.current = null;
+      }
       if (fresh.length === 0) return 0;
       fresh.forEach((dm) => seenMsgIdsRef.current.add(dm.id));
       setMessages((prev) => {
@@ -73,6 +99,9 @@ export function useDmThread(
 
   const hydrate = useCallback(async () => {
     if (!viewerPubkey) return;
+    if (!useDmLastMessageStore.persist.hasHydrated()) {
+      await useDmLastMessageStore.persist.rehydrate();
+    }
     await (protocol === 'nip04'
       ? nip04Cache.hydrate(viewerPubkey)
       : giftWrapCache.cache.hydrate(viewerPubkey));
@@ -88,7 +117,7 @@ export function useDmThread(
     [viewerPubkey]
   );
 
-  const { loading, hasMore, loadMore, refresh, error } = useDmEnvelopePages({
+  const { loading, hasLoadedOnce, hasMore, loadMore, refresh, error } = useDmEnvelopePages({
     feedKey:
       viewerPubkey && viewerPrivateKey && counterparty
         ? `${viewerPubkey}:${protocol}:${counterparty}`
@@ -102,5 +131,5 @@ export function useDmThread(
     failureEvent: 'payment.dm.thread.failed',
   });
 
-  return { messages, loading, hasMore, loadMore, refresh, error };
+  return { messages, loading, hasLoadedOnce, hasMore, loadMore, refresh, error };
 }

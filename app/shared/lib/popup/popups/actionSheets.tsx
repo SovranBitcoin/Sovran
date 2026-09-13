@@ -112,15 +112,7 @@ export function profileSwitcherPopup(payload: ProfileSwitcherPopupPayload): void
         testID: 'profile-import',
         text: 'Import Nostr',
         icon: 'mdi:key-variant',
-        // Open the nsec input as a *separate* menu — the host
-        // auto-dismisses this one (no `keepOpen`); we wait out the
-        // close animation, then dispatch the second `actionMenuPopup`.
-        // The delay is sized to gorhom's default sheet close (~200ms)
-        // plus a small buffer so the open isn't cancelled by the
-        // still-running close.
-        onPress: () => {
-          setTimeout(() => openProfileImportMenu(payload), 300);
-        },
+        onPress: (close) => close(() => openProfileImportMenu(payload)),
       },
     ],
   });

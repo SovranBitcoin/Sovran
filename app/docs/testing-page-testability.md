@@ -90,8 +90,14 @@ Generated from the route catalog and authored screenshot scenarios. These are ca
 | signer-connect | `(signer-flow)/connect.tsx` | **Gap** | **Gap** |
 | signer-requests | `(signer-flow)/requests.tsx` | **Gap** | **Gap** |
 | signer-share | `(signer-flow)/share.tsx` | **Gap** | **Gap** |
-| stories | `(stories-flow)/stories.tsx` | **Gap** | **Gap** |
+| stories | `(stories-flow)/stories.tsx` | **Gap** — no bundled demo video | **Gap** — no bundled demo video |
 | theme-background | `(theme-flow)/background.tsx` | **Gap** | **Gap** |
 | transaction-filters | `(filter-flow)/filters.tsx` | **Gap** | **Gap** |
 | whitenoise-dm | `(profile-flow)/whitenoiseDM.tsx`<br>`(user-flow)/whitenoiseDM.tsx` | **Gap** | **Gap** |
 | whitenoise-setup | `(profile-flow)/whitenoiseSetup.tsx`<br>`(user-flow)/whitenoiseSetup.tsx` | **Gap** | **Gap** |
+
+Stories caption coverage: no bundled video asset is available, so S12 adds no fictional
+video fixture or native scenario. A reviewed bundled demo video is required before
+a fixture-only, read-only journey can enter stories, assert `story-caption`, expand
+and collapse it, verify paused/resumed `story-progress`, and exit via `story-close`
+on both platforms. Component tests do not establish native gesture or layout evidence.

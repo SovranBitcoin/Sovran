@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { AppState } from 'react-native';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { AppState } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import * as Clipboard from 'expo-clipboard';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
-import Icon from 'assets/icons';
+import Icon from '@/assets/icons';
 import { copyPopup, type CopyTarget } from '@/shared/lib/popup';
 import { pubkeyToAccountNumber } from '@/shared/lib/nostr/keyDerivation';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -190,24 +191,35 @@ export function ProfileDetailsScreen({
 
         {!rootOnly && (
           <Card variant="secondary" className="mb-4">
-            <Card.Body className="items-center py-5">
+            <Pressable
+              testID="settings-profile-edit"
+              accessibilityRole="button"
+              accessibilityLabel="Edit profile"
+              onPress={() => router.push('/(settings-flow)/edit-profile')}
+              className="flex-row items-center gap-3 py-3">
               <Avatar
                 state={profilePicture ? 'image' : 'fallback'}
                 seed={nostrKeys?.pubkey || ''}
                 picture={profilePicture}
                 name={username}
-                size={72}
+                size={56}
               />
-              <Card.Title className="mt-3">{username}</Card.Title>
-              <Card.Description className="mt-1">
-                {loading ? 'Loading public key...' : nostrKeys?.npub || 'N/A'}
-              </Card.Description>
-              {chain >= 1 && (
-                <Text size={12} medium className="text-foreground/50 mt-1 uppercase tracking-wide">
-                  chain {chain}
-                </Text>
-              )}
-            </Card.Body>
+              <View className="flex-1">
+                <Card.Title>{username}</Card.Title>
+                <Card.Description className="mt-1">
+                  {loading ? 'Loading public key...' : nostrKeys?.npub || 'N/A'}
+                </Card.Description>
+                {chain >= 1 && (
+                  <Text
+                    size={12}
+                    medium
+                    className="text-foreground/50 mt-1 uppercase tracking-wide">
+                    chain {chain}
+                  </Text>
+                )}
+              </View>
+              <Icon name="mdi:chevron-right" size={20} color={mutedColor} />
+            </Pressable>
           </Card>
         )}
 

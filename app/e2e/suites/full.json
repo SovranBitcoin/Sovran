@@ -84,6 +84,7 @@
     {"id":"ai.history.empty","file":"scenarios/ai-history-empty.json","order":386,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"ai.model.picker","file":"scenarios/ai-model-picker.json","order":388,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"social.empty-states","file":"scenarios/social-empty-states.json","order":384,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"profile.switcher","file":"scenarios/profile-switcher.json","order":383,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"profile.switch.create","file":"scenarios/profile-switch-create.json","order":385,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"theme.wallpaper.apply","file":"scenarios/theme-wallpaper-apply.json","order":390,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"send.mock-fail.ecash","file":"scenarios/send-mock-fail-ecash.json","order":400,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.bolt11","cocod.receive.cashu","unit.sat"],"endState":"wallet"},
@@ -139,6 +140,8 @@
     {"id":"marketing.screenshots","file":"scenarios/marketing-screenshots.json","order":10000,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"marketing.screenshots.wallpapers","file":"scenarios/marketing-screenshots-wallpapers.json","order":10001,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"marketing.screenshots.mints","file":"scenarios/marketing-screenshots-mints.json","order":10002,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
-    {"id":"marketing.screenshots.media","file":"scenarios/marketing-screenshots-media.json","order":10003,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"}
+    {"id":"marketing.screenshots.media","file":"scenarios/marketing-screenshots-media.json","order":10003,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"settings.edit.profile","file":"scenarios/settings-edit-profile.json","order":595,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"settings.media.server","file":"scenarios/settings-media-server.json","order":2010,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"}
   ]
 }

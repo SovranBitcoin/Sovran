@@ -42,6 +42,7 @@ export interface OwnedBlobEntry {
   url: string;
   host: string;
   mimeType?: string;
+  purpose?: 'avatar' | 'post';
   /** Notes that referenced this blob (dedup set). */
   sourceNoteIds: string[];
   firstSeen: number;
@@ -54,7 +55,7 @@ export interface OwnedBlobEntry {
 interface OwnedMediaStore {
   byBlob: Record<string, OwnedBlobEntry>;
   /** Upsert blobs; merges note ids + refreshes lastSeen, never downgrades deleteState. */
-  recordBlobs: (blobs: OwnedBlob[], sourceNoteId?: string) => void;
+  recordBlobs: (blobs: OwnedBlob[], sourceNoteId?: string, purpose?: 'avatar' | 'post') => void;
   setDeleteState: (host: string, sha256: string, state: BlobDeleteState) => void;
   /** Fold an on-demand existence probe: gone → deleted; still-there after a
    *  delete attempt → delete-failed; a live blob stays live. */
@@ -68,6 +69,7 @@ const PersistedEntry = z.looseObject({
   url: z.string().max(2048),
   host: z.string().max(512),
   mimeType: z.string().max(256).optional(),
+  purpose: z.enum(['avatar', 'post']).optional().catch(undefined),
   sourceNoteIds: z.array(z.string().max(128)).max(2000).default([]),
   firstSeen: z.number().int().nonnegative(),
   lastSeen: z.number().int().nonnegative(),
@@ -92,7 +94,7 @@ export const useOwnedMediaStore = create<OwnedMediaStore>()(
     (set) => ({
       ...INITIAL,
 
-      recordBlobs: (blobs, sourceNoteId) => {
+      recordBlobs: (blobs, sourceNoteId, purpose = 'post') => {
         if (blobs.length === 0) return;
         set((state) => {
           const now = Date.now();
@@ -112,6 +114,7 @@ export const useOwnedMediaStore = create<OwnedMediaStore>()(
                 url: blob.url || existing.url,
                 mimeType: existing.mimeType ?? blob.mimeType,
                 sourceNoteIds,
+                purpose,
                 lastSeen: now,
               };
             } else {
@@ -121,6 +124,7 @@ export const useOwnedMediaStore = create<OwnedMediaStore>()(
                 url: blob.url,
                 host: blob.host,
                 mimeType: blob.mimeType,
+                purpose,
                 sourceNoteIds: sourceNoteId ? [sourceNoteId] : [],
                 firstSeen: now,
                 lastSeen: now,

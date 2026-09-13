@@ -58,12 +58,14 @@ const STORE_MODULES = [
   '@/shared/stores/global/ctaStore',
   '@/shared/stores/global/wallpaperStore',
   '@/shared/stores/profile/dataMigrationStore',
+  '@/shared/stores/profile/dmLastMessageStore',
   '@/shared/stores/profile/mintDistributionStore',
   '@/shared/stores/profile/mintStore',
   '@/shared/stores/profile/nostrSocialStore',
   '@/shared/stores/profile/npcMintStore',
   '@/shared/stores/profile/nutDropRedeemQueueStore',
   '@/shared/stores/profile/ownContentStore',
+  '@/shared/stores/profile/ownProfileMetadataStore',
   '@/shared/stores/profile/ownedMediaStore',
   '@/shared/stores/profile/recentPeopleStore',
   '@/shared/stores/profile/routstrStore',
@@ -81,18 +83,17 @@ const STORE_MODULES = [
  * Files that call `persistConfig` but register no fixed store name, so they
  * cannot appear in the module list above.
  */
-const NOT_A_CONCRETE_STORE = ['shared/lib/cache/createQueryCacheStore.ts'];
+const NOT_A_CONCRETE_STORE = [
+  'shared/lib/cache/createQueryCacheStore.ts',
+  'shared/stores/profile/vertexBudgetStore.ts', // captured-owner factory, registered below
+];
 
 /**
  * Registered stores whose Zustand store object is not exported, so the test
  * cannot reach their initial state to round-trip it. Keep this list empty
  * where possible — an entry here is a real coverage gap, not a waiver.
  */
-const UNREACHABLE_STORE_NAMES = [
-  // `mediaServerStore` keeps its store module-private and exposes only
-  // `getMediaServer()` / `setMediaServer()`.
-  'nostr-media-server-store',
-];
+const UNREACHABLE_STORE_NAMES: string[] = [];
 
 function sourceFilesCalling(pattern: RegExp): string[] {
   const hits: string[] = [];
@@ -129,6 +130,9 @@ function isPersistedStore(value: unknown): value is PersistedStore {
  * module having already been pulled in transitively.
  */
 const statesByStoreName = new Map<string, unknown>();
+const { createVertexBudgetStore } = require('@/shared/stores/profile/vertexBudgetStore');
+const vertexBudget = createVertexBudgetStore('a'.repeat(64));
+statesByStoreName.set(vertexBudget.persist.getOptions().name, vertexBudget.getState());
 
 for (const path of STORE_MODULES) {
   const mod = require(path) as Record<string, unknown>;

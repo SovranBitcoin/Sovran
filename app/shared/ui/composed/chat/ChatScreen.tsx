@@ -6,7 +6,7 @@ import {
   KeyboardStickyView,
   useReanimatedKeyboardAnimation,
 } from 'react-native-keyboard-controller';
-import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
+import Reanimated, { FadeIn, useAnimatedStyle } from 'react-native-reanimated';
 import { FlashList } from '@shopify/flash-list';
 
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -16,6 +16,9 @@ import type { Logger } from '@/shared/lib/logger';
 
 import { LiquidChatComposer } from './LiquidChatComposer';
 import { ChatMessageBubble } from './ChatMessageBubble';
+import { ChatSkeleton } from './ChatSkeleton';
+import { MESSAGE_ROW_STYLE } from './chatLayout';
+import { duration } from '@/shared/styles/tokens';
 import {
   useChatKeyboardAnimationLogger,
   useChatSurfacePerfLogger,
@@ -76,8 +79,8 @@ interface ChatScreenProps {
   renderBubble?: (args: ChatBubbleRenderArgs) => React.ReactNode;
   /**
    * Avatar override for non-own messages. Pass `null` to hide the avatar
-   * column entirely (e.g. ephemeral group chats with no identity). Ignored
-   * when `renderBubble` is supplied.
+   * column entirely (e.g. ephemeral group chats with no identity). Forwarded
+   * through the render args when `renderBubble` is supplied.
    */
   counterpartyAvatar?: React.ReactNode | null;
   historyExtras?: (last: ChatBubbleMessage | undefined) => Record<string, unknown>;
@@ -90,10 +93,6 @@ interface ChatScreenProps {
   onStartReached?: () => void;
   onStartReachedThreshold?: number;
 }
-
-// Horizontal gutter applied to every message row (FlashList rows have no
-// padding of their own). Stable module ref so recycled cells don't re-create it.
-const MESSAGE_ROW_STYLE = { paddingHorizontal: 16 } as const;
 
 /**
  * Shared chat surface backed by `@shopify/flash-list`. Used by BitChat, Nostr
@@ -247,7 +246,7 @@ export function ChatScreen({
       return (
         <RNView style={MESSAGE_ROW_STYLE}>
           {renderBubble ? (
-            renderBubble({ message: item, isFirstInGroup, isLastInGroup })
+            renderBubble({ message: item, isFirstInGroup, isLastInGroup, counterpartyAvatar })
           ) : (
             <ChatMessageBubble
               message={item}
@@ -313,11 +312,7 @@ export function ChatScreen({
         pointerEvents="none"
       />
       {banner}
-      {isLoading ? (
-        (loadingContent ?? null)
-      ) : (
-        <>
-          {/* List wrapper. Layout-based keyboard lift (`top: -keyboardH`)
+      {/* List wrapper. Layout-based keyboard lift (`top: -keyboardH`)
               shifts the whole wrapper up so FlashList's items — which it
               positions in absolute content coordinates — ride along.
               Padding-based avoidance only shrinks the viewport without
@@ -325,47 +320,54 @@ export function ChatScreen({
               transform that iOS 26 captures backdrop snapshots of during
               keyboard dismissal. `top` is a Yoga property — no separate
               layer, no snapshot. */}
-          <Reanimated.View
-            style={[
-              {
-                flex: 1,
-                paddingTop: resolvedTopInset,
-              },
-              listKeyboardLiftStyle,
-            ]}>
-            <RNView style={{ flex: 1 }}>
-              {messages.length === 0 ? (
-                <RNView style={{ flex: 1 }}>{wrappedEmptyContent}</RNView>
-              ) : (
-                <FlashList
-                  data={messages}
-                  // Android form-sheet: top-edge drag dismisses, mid-scroll scrolls.
-                  nestedScrollEnabled
-                  keyExtractor={keyExtractor}
-                  renderItem={renderItem}
-                  // Chat-bottom behavior via FlashList v2's maintainVisibleContentPosition:
-                  // - `startRenderingFromBottom` lands the first paint at the latest
-                  //   message AND docks short histories to the bottom (replacing
-                  //   FlashList's `initialScrollAtEnd` + `alignItemsAtEnd`).
-                  // - `autoscrollToBottomThreshold` keeps the viewport pinned to the
-                  //   latest when new messages append, as long as the user is near the
-                  //   bottom (replacing `maintainScrollAtEnd` + threshold).
-                  // mVCP also keeps the visible item anchored when items above the
-                  // viewport resize/load late (bubble-height measurements, etc.).
-                  maintainVisibleContentPosition={{
-                    startRenderingFromBottom: true,
-                    autoscrollToBottomThreshold: 0.1,
-                  }}
-                  showsVerticalScrollIndicator={false}
-                  onStartReached={onStartReached}
-                  onStartReachedThreshold={onStartReachedThreshold}
-                  contentContainerStyle={listContentContainerStyle}
-                />
-              )}
-            </RNView>
+      <Reanimated.View
+        style={[
+          {
+            flex: 1,
+            paddingTop: resolvedTopInset,
+          },
+          listKeyboardLiftStyle,
+        ]}>
+        {isLoading ? (
+          (loadingContent ?? (
+            <ChatSkeleton bottomPadding={listContentContainerStyle.paddingBottom} />
+          ))
+        ) : (
+          <Reanimated.View className="flex-1" entering={FadeIn.duration(duration.quick)}>
+            {messages.length === 0 ? (
+              <RNView style={{ flex: 1 }}>{wrappedEmptyContent}</RNView>
+            ) : (
+              <FlashList
+                testID="chat-message-list"
+                data={messages}
+                // Android form-sheet: top-edge drag dismisses, mid-scroll scrolls.
+                nestedScrollEnabled
+                keyExtractor={keyExtractor}
+                renderItem={renderItem}
+                // Chat-bottom behavior via FlashList v2's maintainVisibleContentPosition:
+                // - `startRenderingFromBottom` lands the first paint at the latest
+                //   message AND docks short histories to the bottom (replacing
+                //   FlashList's `initialScrollAtEnd` + `alignItemsAtEnd`).
+                // - `autoscrollToBottomThreshold` keeps the viewport pinned to the
+                //   latest when new messages append, as long as the user is near the
+                //   bottom (replacing `maintainScrollAtEnd` + threshold).
+                // mVCP also keeps the visible item anchored when items above the
+                // viewport resize/load late (bubble-height measurements, etc.).
+                maintainVisibleContentPosition={{
+                  startRenderingFromBottom: true,
+                  autoscrollToBottomThreshold: 0.1,
+                }}
+                showsVerticalScrollIndicator={false}
+                onStartReached={onStartReached}
+                onStartReachedThreshold={onStartReachedThreshold}
+                contentContainerStyle={listContentContainerStyle}
+              />
+            )}
           </Reanimated.View>
+        )}
+      </Reanimated.View>
 
-          {/* Composer rides the keyboard via `<KeyboardStickyView />` from
+      {/* Composer rides the keyboard via `<KeyboardStickyView />` from
               react-native-keyboard-controller — replaces the previous
               Reanimated `translateY` on a `position: 'absolute'` wrapper,
               which (combined with the list-wrapper transform) was painting
@@ -376,38 +378,36 @@ export function ChatScreen({
               slides it up to the keyboard top when focused and back to rest
               on dismiss. The list bubbles can scroll *under* its translucent
               glass instead of clipping at a hard cut-off. */}
-          <KeyboardStickyView
-            offset={{ closed: 0, opened: 0 }}
-            style={{ position: 'absolute', left: 0, right: 0, bottom: resolvedBottomInset }}>
-            <RNView onLayout={handleComposerLayout}>
-              {composerActions ? (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
-                  contentContainerStyle={{
-                    paddingHorizontal: 12,
-                    gap: 8,
-                    alignItems: 'center',
-                  }}
-                  style={{ flexGrow: 0 }}>
-                  {composerActions}
-                </ScrollView>
-              ) : null}
-              <LiquidChatComposer
-                value={draft}
-                onChangeText={setDraft}
-                onSend={handleSubmit}
-                disabled={composerDisabled}
-                placeholder={composerPlaceholder}
-                bottomPadding={8}
-                testID={composerTestID}
-                surface={surface}
-              />
-            </RNView>
-          </KeyboardStickyView>
-        </>
-      )}
+      <KeyboardStickyView
+        offset={{ closed: 0, opened: 0 }}
+        style={{ position: 'absolute', left: 0, right: 0, bottom: resolvedBottomInset }}>
+        <RNView onLayout={handleComposerLayout}>
+          {composerActions ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{
+                paddingHorizontal: 12,
+                gap: 8,
+                alignItems: 'center',
+              }}
+              style={{ flexGrow: 0 }}>
+              {composerActions}
+            </ScrollView>
+          ) : null}
+          <LiquidChatComposer
+            value={draft}
+            onChangeText={setDraft}
+            onSend={handleSubmit}
+            disabled={composerDisabled}
+            placeholder={composerPlaceholder}
+            bottomPadding={8}
+            testID={composerTestID}
+            surface={surface}
+          />
+        </RNView>
+      </KeyboardStickyView>
     </View>
   );
 }

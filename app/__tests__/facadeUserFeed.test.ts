@@ -6,7 +6,11 @@ import type { FeedClient } from '@/features/feed/data/feedClient';
 
 jest.mock('nostr', () => ({ facade: {} }));
 jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({ buildNostrDataLayer: jest.fn() }));
-jest.mock('@/shared/lib/logger', () => ({ feedLog: { info: jest.fn(), warn: jest.fn() } }));
+jest.mock('@/shared/lib/logger', () => ({
+  feedLog: { info: jest.fn(), warn: jest.fn(), debug: jest.fn() },
+  storeLog: { info: jest.fn(), warn: jest.fn(), debug: jest.fn() },
+  redactError: (error: unknown) => error,
+}));
 jest.mock('@/shared/stores/runtime/debugTierStore', () => ({ recordDebugTiers: jest.fn() }));
 
 const PUB = 'a'.repeat(64);

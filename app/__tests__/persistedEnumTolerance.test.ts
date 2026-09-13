@@ -56,12 +56,14 @@ import '@/shared/stores/global/walletLifecycleStore';
 import '@/shared/stores/global/ctaStore';
 import '@/shared/stores/global/wallpaperStore';
 import '@/shared/stores/profile/dataMigrationStore';
+import '@/shared/stores/profile/dmLastMessageStore';
 import '@/shared/stores/profile/mintDistributionStore';
 import '@/shared/stores/profile/mintStore';
 import '@/shared/stores/profile/nostrSocialStore';
 import '@/shared/stores/profile/npcMintStore';
 import '@/shared/stores/profile/nutDropRedeemQueueStore';
 import '@/shared/stores/profile/ownContentStore';
+import '@/shared/stores/profile/ownProfileMetadataStore';
 import '@/shared/stores/profile/ownedMediaStore';
 import '@/shared/stores/profile/recentPeopleStore';
 import '@/shared/stores/profile/routstrStore';
@@ -81,6 +83,9 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
 import { persistRegistry } from '@/shared/lib/persist/persistConfig';
+import { createVertexBudgetStore } from '@/shared/stores/profile/vertexBudgetStore';
+
+createVertexBudgetStore('a'.repeat(64));
 import { tolerantRecord } from '@/shared/lib/persist/tolerant';
 
 /**
