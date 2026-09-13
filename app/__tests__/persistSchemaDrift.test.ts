@@ -28,6 +28,7 @@ import '@/shared/stores/profile/transactionAnnotationStore';
 import '@/shared/stores/profile/ownedMediaStore';
 import '@/shared/stores/profile/nostrSocialStore';
 import '@/shared/stores/profile/dataMigrationStore';
+import '@/shared/stores/profile/dmLastMessageStore';
 import '@/shared/stores/global/mintMetadataStore';
 import '@/shared/stores/global/relayMetadataStore';
 import '@/shared/stores/profile/mintStore';

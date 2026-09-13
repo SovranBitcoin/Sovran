@@ -57,6 +57,7 @@ const STORE_MODULES = [
   '@/shared/stores/global/walletLifecycleStore',
   '@/shared/stores/global/wallpaperStore',
   '@/shared/stores/profile/dataMigrationStore',
+  '@/shared/stores/profile/dmLastMessageStore',
   '@/shared/stores/profile/mintDistributionStore',
   '@/shared/stores/profile/mintStore',
   '@/shared/stores/profile/nostrSocialStore',

@@ -151,8 +151,8 @@ export function formatDate(input: DateInput, style: AbsoluteDateStyle): string {
   return getDateTimeFormat(resolveLocale(), ABSOLUTE_OPTIONS[style]).format(date);
 }
 
-function formatVerboseRelative(timestampMs: number, locale: string): string {
-  const delta = Date.now() - timestampMs;
+function formatVerboseRelative(timestampMs: number, locale: string, nowMs: number): string {
+  const delta = nowMs - timestampMs;
   const abs = Math.abs(delta);
   const isPast = delta >= 0;
 
@@ -174,8 +174,8 @@ function formatVerboseRelative(timestampMs: number, locale: string): string {
   return `${minutes}m ago`;
 }
 
-function formatCompactRelative(timestampMs: number, locale: string): string {
-  const diff = (Date.now() - timestampMs) / 1000;
+function formatCompactRelative(timestampMs: number, locale: string, nowMs: number): string {
+  const diff = (nowMs - timestampMs) / 1000;
   if (diff < 60) return 'now';
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
@@ -186,17 +186,17 @@ function formatCompactRelative(timestampMs: number, locale: string): string {
   );
 }
 
-function formatChatBubble(timestampMs: number): string {
+function formatChatBubble(timestampMs: number, nowMs: number): string {
   const date = new Date(timestampMs);
-  const diffHours = (Date.now() - date.getTime()) / 3_600_000;
+  const diffHours = (nowMs - date.getTime()) / 3_600_000;
   if (diffHours < 24) return formatDate(date, 'time');
   if (diffHours < 48) return 'Yesterday';
   return formatDate(date, 'short-date');
 }
 
-function formatConversationList(timestampMs: number): string {
+function formatConversationList(timestampMs: number, nowMs: number): string {
   const date = new Date(timestampMs);
-  const now = new Date();
+  const now = new Date(nowMs);
   const sameDay =
     date.getFullYear() === now.getFullYear() &&
     date.getMonth() === now.getMonth() &&
@@ -227,16 +227,20 @@ export function formatRelativeUnixSeconds(seconds: number): string {
  * a `Date`, or anything `new Date(input)` parses; non-millisecond inputs
  * are coerced first.
  */
-export function formatRelative(input: DateInput, style: RelativeDateStyle): string {
+export function formatRelative(
+  input: DateInput,
+  style: RelativeDateStyle,
+  nowMs: number = Date.now()
+): string {
   const ms = input instanceof Date ? input.getTime() : new Date(input).getTime();
   switch (style) {
     case 'verbose':
-      return formatVerboseRelative(ms, resolveLocale());
+      return formatVerboseRelative(ms, resolveLocale(), nowMs);
     case 'compact':
-      return formatCompactRelative(ms, resolveLocale());
+      return formatCompactRelative(ms, resolveLocale(), nowMs);
     case 'chat-bubble':
-      return formatChatBubble(ms);
+      return formatChatBubble(ms, nowMs);
     case 'conversation-list':
-      return formatConversationList(ms);
+      return formatConversationList(ms, nowMs);
   }
 }
