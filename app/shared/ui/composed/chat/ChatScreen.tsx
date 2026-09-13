@@ -76,8 +76,8 @@ interface ChatScreenProps {
   renderBubble?: (args: ChatBubbleRenderArgs) => React.ReactNode;
   /**
    * Avatar override for non-own messages. Pass `null` to hide the avatar
-   * column entirely (e.g. ephemeral group chats with no identity). Ignored
-   * when `renderBubble` is supplied.
+   * column entirely (e.g. ephemeral group chats with no identity). Forwarded
+   * through the render args when `renderBubble` is supplied.
    */
   counterpartyAvatar?: React.ReactNode | null;
   historyExtras?: (last: ChatBubbleMessage | undefined) => Record<string, unknown>;
@@ -247,7 +247,7 @@ export function ChatScreen({
       return (
         <RNView style={MESSAGE_ROW_STYLE}>
           {renderBubble ? (
-            renderBubble({ message: item, isFirstInGroup, isLastInGroup })
+            renderBubble({ message: item, isFirstInGroup, isLastInGroup, counterpartyAvatar })
           ) : (
             <ChatMessageBubble
               message={item}
