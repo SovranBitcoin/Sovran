@@ -140,6 +140,52 @@ for (const path of STORE_MODULES) {
 }
 
 describe('persisted store round-trip', () => {
+  it.each([
+    {},
+    {
+      uptime24h: 0,
+      avgLatencyMs: 0,
+      auditSource: 'ucash',
+      auditUpdatedAt: 123,
+    },
+    {
+      uptime24h: 99.5,
+      avgLatencyMs: 250,
+      auditSource: '8333',
+      auditUpdatedAt: '2026-09-13T00:00:00Z',
+    },
+  ])('round-trips optional discovery audit metrics %j alongside legacy data', (metrics) => {
+    const { useMintMetadataStore } =
+      require('@/shared/stores/global/mintMetadataStore') as typeof import('@/shared/stores/global/mintMetadataStore');
+    const entry = { displayName: 'Mint', auditScore: 0, auditData: { swaps: [] }, ...metrics };
+    const state = { byMintUrl: { 'https://mint.example': entry }, legacyMigrated: true };
+    const options = useMintMetadataStore.persist.getOptions();
+    const schema = persistRegistry.find((item) => item.name === 'mint-metadata-store')!.schema;
+    const parsed = schema.parse(JSON.parse(JSON.stringify(state)));
+    expect(options.merge!(parsed, useMintMetadataStore.getInitialState())).toMatchObject(state);
+  });
+
+  it('contains malformed new discovery metrics to their fields during hydration', () => {
+    const { useMintMetadataStore } =
+      require('@/shared/stores/global/mintMetadataStore') as typeof import('@/shared/stores/global/mintMetadataStore');
+    const merged = useMintMetadataStore.persist.getOptions().merge!(
+      {
+        legacyMigrated: true,
+        byMintUrl: {
+          'https://mint.example': {
+            displayName: 'Retained',
+            uptime24h: 'invalid',
+            avgLatencyMs: {},
+            auditUpdatedAt: [],
+          },
+        },
+      },
+      useMintMetadataStore.getInitialState()
+    );
+    expect(merged.byMintUrl['https://mint.example']).toEqual({ displayName: 'Retained' });
+    expect(merged.legacyMigrated).toBe(true);
+  });
+
   it('round-trips a verified profile source repair without losing metadata', () => {
     const { useProfileStore } =
       require('@/shared/stores/global/profileStore') as typeof import('@/shared/stores/global/profileStore');

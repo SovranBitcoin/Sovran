@@ -46,12 +46,12 @@ import '@/shared/lib/nostr/media/mediaServerStore';
 import '@/shared/lib/nostr/outbox/relayListStore';
 import '@/shared/stores/global/btcMapStore';
 import '@/shared/stores/global/mempoolAddressCache';
-import '@/shared/stores/global/mintMetadataStore';
 import '@/shared/stores/global/nostrMetadataCache';
 import '@/shared/stores/global/pricelistStore';
 import '@/shared/stores/global/profileStore';
 import '@/shared/stores/global/relayMetadataStore';
 import '@/shared/stores/global/settingsStore';
+import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import '@/shared/stores/global/walletLifecycleStore';
 import '@/shared/stores/global/ctaStore';
 import '@/shared/stores/global/wallpaperStore';
@@ -497,4 +497,26 @@ describe('profile source custody tolerance', () => {
       });
     }
   );
+});
+
+test('an unknown audit source does not discard mint metadata or legacy history', () => {
+  const legacy = { swaps: [] };
+  const hydrated = useMintMetadataStore.persist.getOptions().merge!(
+    {
+      legacyMigrated: true,
+      byMintUrl: {
+        'https://mint.example': {
+          displayName: 'Retained',
+          auditSource: 'future-auditor',
+          auditData: legacy,
+        },
+      },
+    },
+    useMintMetadataStore.getInitialState()
+  );
+  expect(hydrated.byMintUrl['https://mint.example']).toEqual({
+    displayName: 'Retained',
+    auditData: legacy,
+  });
+  expect(hydrated.legacyMigrated).toBe(true);
 });

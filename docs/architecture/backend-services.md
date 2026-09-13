@@ -26,9 +26,26 @@ this migration; compatibility was checked against the installed shared schemas
 and the local Nagg counterpart's source. Deployment and live upstream availability
 still require backend integration verification.
 
-The remaining audit migration is a prerequisite for removing the separate
-backend configuration: `apiClient.auditMint()` still calls `/cashu/mint/audit`
-on this task's base. The inspected Nagg checkout exposes mint discovery, reviews,
-history, and changes, but no equivalent per-mint audit response. Preserve this
-caller until its replacement route and schema, or the sibling migration commit,
-are available. Recovery already consumes `discoverMints()`.
+Mint audit discovery uses `GET /nostr/mint/discover?mint=<encoded-url>` on the
+same score host. Unlike the app catalogs, this requires Nagg's `nostr` module.
+`apiClient.discoverMint` parses the same loose row as bulk discovery and returns
+no row when `mints` is empty. `getDiscoveredMintMetadata` checks the shared
+`mintMetadataStore` audit freshness first, then writes misses through
+`upsertFromDiscover`; failures preserve cached data. Recovery continues to use
+bulk `discoverMints()`.
+
+Discovery audit fields include state, operation counts, `uptime24h`,
+`avgLatencyMs`, `auditSource`, and `auditUpdatedAt`. The last four are tolerant
+optional persisted fields; older cache rows remain valid. Upstream timestamps
+are retained verbatim, separate from the local fetch timestamp. The operation
+score is successes / (successes + errors), scaled to five; absent counts or no
+operations leave it unknown. Unknown mints have no new audit fields. A direct
+NUT-06 info lookup remains available when operator identity is missing.
+
+The former audit HTTP client, runtime parser, and separate backend host setting
+are retired. Legacy cached audit blobs remain readable, including their swap
+observations; discovery aggregates cannot supply route edges. Rebalance routing
+uses retained observations and local swap history, with existing quality and
+trust checks. Metadata TTL and audit health are never spendability evidence.
+The deployed single-mint route could not be reached from this implementation
+environment; local regression fixtures cover the supplied discovery contract.

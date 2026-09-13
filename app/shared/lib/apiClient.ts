@@ -13,7 +13,6 @@ import * as nip19 from 'nostr-tools/nip19';
 import { z } from 'zod';
 import { apiLog } from './logger';
 import {
-  AuditMintResponse as AuditMintResponseStrict,
   CatalogResponse,
   LatestVersionResponse,
   NostrProfileFull as NostrProfileFullStrict,
@@ -27,19 +26,6 @@ import {
 import { backendConfig } from '@/shared/config/backend';
 import { DEFAULT_TIMEOUT_MS } from '@/shared/lib/http/requestSignal';
 import { NaggAiLineupSchema } from '@/shared/lib/routstr/lineup';
-
-// Local relaxation: the auditor returns `info` in several shapes depending
-// on the upstream mint state — sometimes a NUT-06 object, sometimes null,
-// sometimes an empty string when it couldn't reach the mint. The strict
-// schema rejected anything but a populated object, dropping `auditScore`/
-// `auditState` whenever the auditor's mint reach failed. Match the lenient
-// shape used by `MintSearchResult.info` (unknown + optional) — downstream
-// consumers (getMintCatalog) already type-narrow before reading.
-// TODO: mirror this in `sovran-schemas` and drop the override on next publish.
-const AuditMintResponse = AuditMintResponseStrict.extend({
-  info: z.unknown().optional(),
-});
-type AuditMintResponseType = z.infer<typeof AuditMintResponse>;
 
 // Local compatibility while the shared package release catches up to the
 // live `/nostr/profile` wire shape. Vertex can return `null` when pagerank,
@@ -95,6 +81,10 @@ const DiscoverMint = z.looseObject({
   nMints: z.number().int().optional(),
   nMelts: z.number().int().optional(),
   nErrors: z.number().int().optional(),
+  uptime24h: z.number().optional(),
+  avgLatencyMs: z.number().optional(),
+  auditSource: z.enum(['ucash', '8333']).optional(),
+  auditUpdatedAt: z.union([z.number(), z.string().max(128)]).optional(),
   operatorPubkey: z.string().max(128).optional(),
   operatorNpub: z.string().max(128).optional(),
   followers: z.number().int().optional(),
@@ -138,7 +128,6 @@ const DiscoverMintsResponse = z.object({
   profiles: z.record(z.string(), ReviewerProfileInfo).optional(),
 });
 
-const API_BASE_URL = backendConfig.apiBaseUrl;
 const SCORE_API_BASE_URL = backendConfig.scoreApiBaseUrl;
 
 /**
@@ -156,11 +145,7 @@ const mintReviewsEnrichment = createNostrMintEnrichment({
 });
 // Re-export schema-derived types for callers that previously imported them
 // from this module.
-export type {
-  AuditMintResponseType as AuditMintResponse,
-  MintSearchResult,
-  NostrProfileFullType as NostrProfileFull,
-};
+export type { MintSearchResult, NostrProfileFullType as NostrProfileFull };
 export type { NostrSearchResult } from '@sovranbitcoin/schemas';
 
 type FetchOrParseError = Error | ParseError;
@@ -276,7 +261,6 @@ function describeRoute(url: string): { host: string; path: string } {
 // Parsers — hoisted to module scope to avoid Zod v4 JIT cost on each call.
 // ---------------------------------------------------------------------------
 
-const parseAuditMint = parseWith(AuditMintResponse, 'cashu/mint/audit');
 // nagg v2 serves /nostr/profile as the generic providers envelope: kind-0
 // events in events[], counts under pubkey-keyed aggregates, and float
 // provider payloads (vertex rank/score, nagg firstEventAt, nip05 validity)
@@ -487,14 +471,17 @@ export const fetchMintChanges = ({
     { signal }
   );
 
-export const auditMint = ({ mintUrl, signal }: { mintUrl: string; signal?: AbortSignal }) =>
-  fetchJson(
-    `${API_BASE_URL}/cashu/mint/audit?mintUrl=${encodeURIComponent(mintUrl)}`,
-    parseAuditMint,
-    'cashu/mint/audit',
-    undefined,
-    { signal }
-  );
+/** A normalized single-mint lookup; unknown mints return no row. */
+export const discoverMint = async (mintUrl: string, controls?: RequestControls) =>
+  (
+    await fetchJson(
+      `${SCORE_API_BASE_URL}/nostr/mint/discover?mint=${encodeURIComponent(mintUrl)}`,
+      parseDiscoverMints,
+      'nostr/mint/discover',
+      undefined,
+      controls
+    )
+  ).map(({ mints }) => mints[0]);
 
 export const reviewMint = async ({
   mintUrl,

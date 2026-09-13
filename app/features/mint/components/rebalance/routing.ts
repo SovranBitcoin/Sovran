@@ -1,4 +1,4 @@
-import type { AuditMintResponse } from '@/shared/lib/apiClient';
+import type { LegacyMintAudit } from '@/shared/stores/global/mintMetadataTypes';
 import type { MiddlemanRoutingSettings } from '@/shared/stores/global/settingsStore';
 import type { SwapGroup } from '@/shared/stores/profile/swapTransactionsStore';
 
@@ -40,7 +40,7 @@ function parseTs(createdAt: string): number {
   return Number.isFinite(ts) ? ts : 0;
 }
 
-function isSuccessfulSwap(swap: AuditMintResponse['swaps'][number]): boolean {
+function isSuccessfulSwap(swap: LegacyMintAudit['swaps'][number]): boolean {
   if (!swap) return false;
   if (swap.error) return false;
   const state = (swap.state || '').toLowerCase();
@@ -94,7 +94,7 @@ function addEdge(
  * Build a directed graph from auditor swap history.
  * Includes ALL swaps (successful and failed) so we can compute success rates.
  */
-export function buildSwapGraph(audits: AuditMintResponse[]): SwapGraph {
+export function buildSwapGraph(audits: LegacyMintAudit[]): SwapGraph {
   const graph: SwapGraph = new Map();
 
   for (const audit of audits) {

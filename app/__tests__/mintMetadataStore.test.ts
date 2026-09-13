@@ -216,3 +216,31 @@ describe('upsertFromDiscover stamps a group fresh only when it carried data', ()
     expect(useMintMetadataStore.getState().getCached(MINT)?.contactReputation).toBe(88);
   });
 });
+
+describe('discovery audit metrics', () => {
+  it.each([
+    [{ nMints: 3, nMelts: 2, nErrors: 5 }, 2.5],
+    [{ nMints: 0, nMelts: 0, nErrors: 5 }, 0],
+    [{ nMints: 0, nMelts: 0, nErrors: 0 }, null],
+    [{ nMints: 3, nMelts: 2 }, null],
+  ])('projects operation counts %j without inventing success', (counts, auditScore) => {
+    useMintMetadataStore.getState().upsertFromDiscover([
+      discoverRow({
+        ...counts,
+        state: 'OK',
+        uptime24h: 0,
+        avgLatencyMs: 0,
+        auditSource: '8333',
+        auditUpdatedAt: 123,
+      }),
+    ]);
+    expect(useMintMetadataStore.getState().getCached(MINT)).toMatchObject({
+      auditScore,
+      uptime24h: 0,
+      avgLatencyMs: 0,
+      auditSource: '8333',
+      auditUpdatedAt: 123,
+    });
+    expect(useMintMetadataStore.getState().getCached(MINT)?.auditData).toBeUndefined();
+  });
+});

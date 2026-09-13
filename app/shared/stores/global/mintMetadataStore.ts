@@ -33,8 +33,8 @@ import { create } from 'zustand';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 
 import { transformAuditData } from '@/features/mint/lib/auditInfo';
-import type { MintMetadataEntry } from './mintMetadataTypes';
-import type { AuditMintResponse, DiscoverMint } from '@/shared/lib/apiClient';
+import type { LegacyMintAudit, MintMetadataEntry } from './mintMetadataTypes';
+import type { DiscoverMint } from '@/shared/lib/apiClient';
 import { evictLruOverCap } from '@/shared/lib/cache/evictLruOverCap';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
@@ -75,7 +75,7 @@ interface MintMetadataState {
 
   // Thin group setters — 1:1 replacements for the old stores' `setCached`.
   setIdentity: (mintUrl: string, info: GetInfoResponse) => void;
-  setAudit: (mintUrl: string, auditData: AuditMintResponse, info?: GetInfoResponse) => void;
+  setAudit: (mintUrl: string, auditData: LegacyMintAudit, info?: GetInfoResponse) => void;
   setReviewsAggregate: (
     mintUrl: string,
     averageScore: number | null,
@@ -118,6 +118,13 @@ const PersistedMintMetadataEntry = z.looseObject({
   nMelts: z.number().int().optional(),
   nErrors: z.number().int().optional(),
   auditAt: z.number().int().nonnegative().optional(),
+  uptime24h: z.number().optional().catch(undefined),
+  avgLatencyMs: z.number().optional().catch(undefined),
+  auditSource: z.enum(['ucash', '8333']).optional().catch(undefined),
+  auditUpdatedAt: z
+    .union([z.number(), z.string().max(128)])
+    .optional()
+    .catch(undefined),
   contactFollowers: z.number().int().nonnegative().optional(),
   contactReputation: z.number().nullable().optional(),
   operatorPubkey: z.string().max(128).optional(),
@@ -159,7 +166,7 @@ function identityFromInfo(info: GetInfoResponse): Partial<MintMetadataEntry> {
 }
 
 /** Audit scalars projected from a raw auditor response. */
-function auditScalarsFrom(auditData: AuditMintResponse): Partial<MintMetadataEntry> {
+function auditScalarsFrom(auditData: LegacyMintAudit): Partial<MintMetadataEntry> {
   const { score } = transformAuditData(auditData);
   return {
     auditData,
@@ -256,7 +263,20 @@ export const useMintMetadataStore = create<MintMetadataState>()(
                 m.state !== undefined ||
                 m.nMints !== undefined ||
                 m.nMelts !== undefined ||
-                m.nErrors !== undefined;
+                m.nErrors !== undefined ||
+                m.uptime24h !== undefined ||
+                m.avgLatencyMs !== undefined;
+              // Match discovery's operation score: successful mints + melts,
+              // with errors counted separately. No operations means no score.
+              const successes = (m.nMints ?? 0) + (m.nMelts ?? 0);
+              const total = successes + (m.nErrors ?? 0);
+              const auditScore =
+                m.nMints !== undefined &&
+                m.nMelts !== undefined &&
+                m.nErrors !== undefined &&
+                total > 0
+                  ? Math.max(0, Math.min(1, successes / total)) * 5
+                  : null;
               // A follower COUNT alone is not "social resolved": `resolveNostrProfile`
               // reads the `social` group to decide whether the operator-profile
               // fetch (which yields reputation) can be skipped. A discover row that
@@ -293,7 +313,11 @@ export const useMintMetadataStore = create<MintMetadataState>()(
                 ...(m.nMints !== undefined ? { nMints: m.nMints } : {}),
                 ...(m.nMelts !== undefined ? { nMelts: m.nMelts } : {}),
                 ...(m.nErrors !== undefined ? { nErrors: m.nErrors } : {}),
-                ...(hasAudit ? { auditAt: now } : {}),
+                ...(hasAudit ? { auditScore, auditAt: now } : {}),
+                ...(m.uptime24h !== undefined ? { uptime24h: m.uptime24h } : {}),
+                ...(m.avgLatencyMs !== undefined ? { avgLatencyMs: m.avgLatencyMs } : {}),
+                ...(m.auditSource !== undefined ? { auditSource: m.auditSource } : {}),
+                ...(m.auditUpdatedAt !== undefined ? { auditUpdatedAt: m.auditUpdatedAt } : {}),
                 // social — guard reputation on a real number so a `null`
                 // ("unknown") row can't clobber a previously-resolved reputation.
                 ...(m.followers !== undefined ? { contactFollowers: m.followers } : {}),
@@ -514,7 +538,7 @@ export async function migrateLegacyMintCaches(): Promise<void> {
   }
   for (const [k, v] of Object.entries(audit)) {
     const e = v as {
-      auditData?: AuditMintResponse;
+      auditData?: LegacyMintAudit;
       mintInfo?: GetInfoResponse;
       timestamp?: number;
     };

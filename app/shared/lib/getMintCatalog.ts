@@ -8,11 +8,9 @@
  *
  * Network refresh preference:
  *
- *   1. **Audit endpoint** (`/cashu/mint/audit`) — preferred because one
- *      response carries both audit aggregates (n_mints / n_melts / n_errors)
- *      AND the mint's NUT-06 `info` (with `contact` for the operator's
- *      Nostr pubkey). Reviewed mints get audit + score + nostr in two HTTP
- *      calls (audit + reviews) instead of three (audit + reviews + info).
+ *   1. **Nagg discovery** (`/nostr/mint/discover?mint=`) — on an audit
+ *      cache miss, seed the same metadata store used by bulk discovery.
+ *      Carries audit aggregates and operator identity, but no full NUT-06 info.
  *
  *   2. **Coco `getMintInfo`** — fallback for mints the auditor doesn't track
  *      in its database. Returns NUT-06 info directly from the mint, so we
@@ -30,8 +28,9 @@
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import type { MintCatalogEntry } from 'wallet';
 
-import { projectMintMeta, transformAuditData } from '@/features/mint/lib/auditInfo';
-import { auditMint, fetchNostrProfile, reviewMint } from '@/shared/lib/apiClient';
+import { projectMintMeta } from '@/features/mint/lib/auditInfo';
+import { fetchNostrProfile, reviewMint } from '@/shared/lib/apiClient';
+import { getDiscoveredMintMetadata } from '@/shared/lib/getDiscoveredMintMetadata';
 import { log, mintUrlLogFields } from '@/shared/lib/logger';
 import {
   extractMintNostrPubkey,
@@ -138,8 +137,8 @@ async function fetchEntry(
     hasCachedFields: hasCatalogFields(cached.entry),
     hasCachedInfo: isMintInfoObject(cached.info),
   });
-  const [auditRes, reviewRes] = await Promise.all([
-    auditMint({ mintUrl, signal }).catch((err) => {
+  const [metadata, reviewRes] = await Promise.all([
+    getDiscoveredMintMetadata(mintUrl, { signal }).catch((err) => {
       log.warn('mint.catalog.entry.audit_failed', {
         ...mintUrlLogFields(mintUrl),
         error: err instanceof Error ? err : new Error(String(err)),
@@ -155,64 +154,31 @@ async function fetchEntry(
     }),
   ]);
 
-  const entry: MintCatalogEntry = { ...cached.entry };
-  let info: unknown = isMintInfoObject(cached.info) ? cached.info : null;
+  if (signal?.aborted) return cached.entry;
 
-  // Audit data + info from the audit endpoint when available …
-  if (auditRes && auditRes.isOk()) {
-    const audit = auditRes.value;
-    const { score } = transformAuditData(audit);
-    entry.auditScore = score;
-    entry.auditState = audit.state;
-    entry.auditTotalOps = audit.n_mints + audit.n_melts;
-    // The auditor returns `info` in inconsistent shapes (object, null, "")
-    // depending on whether it could reach the upstream mint. Only treat a
-    // populated NUT-06-shaped object as usable; otherwise fetch direct so
-    // operator pubkey resolution and the cached `mintInfo` stay populated.
-    info = isMintInfoObject(audit.info) ? audit.info : null;
-    if (!info) {
-      log.debug('mint.catalog.entry.audit_missing_info_fetch_direct', {
-        ...mintUrlLogFields(mintUrl),
-      });
-      info = await getMintInfo(mintUrl).catch((err) => {
-        log.warn('mint.catalog.entry.direct_info_failed', {
-          ...mintUrlLogFields(mintUrl),
-          source: 'audit_missing_info',
-          error: err instanceof Error ? err : new Error(String(err)),
-        });
-        return null;
-      });
-    }
-    if (info) {
-      useMintMetadataStore.getState().setAudit(mintUrl, audit, info as unknown as GetInfoResponse);
-    }
-    log.info('mint.catalog.entry.audit_ok', {
-      ...mintUrlLogFields(mintUrl),
-      auditState: audit.state,
-      hasInfo: isMintInfoObject(info),
-    });
-  } else {
-    // … otherwise hit the mint directly for NUT-06 info so we can still
-    // resolve the operator's Nostr profile. No audit data is available
-    // in this path — the row will render without the audit pill.
-    log.debug('mint.catalog.entry.audit_unavailable_fetch_direct', {
-      ...mintUrlLogFields(mintUrl),
-    });
+  const entry: MintCatalogEntry = { ...readCachedEntry(mintUrl).entry };
+  let info: unknown = metadata?.info ?? cached.info;
+
+  // Discovery's operator identity avoids a direct info fetch. When neither
+  // source knows the operator, preserve the direct NUT-06 fallback.
+  if (!isMintInfoObject(info) && !metadata?.operatorPubkey) {
     info = await getMintInfo(mintUrl).catch((err) => {
       log.warn('mint.catalog.entry.direct_info_failed', {
         ...mintUrlLogFields(mintUrl),
-        source: 'audit_unavailable',
         error: err instanceof Error ? err : new Error(String(err)),
       });
       return null;
     });
+    if (signal?.aborted) return cached.entry;
+    if (isMintInfoObject(info)) {
+      useMintMetadataStore.getState().setIdentity(mintUrl, info as unknown as GetInfoResponse);
+    }
   }
 
   if (reviewRes && reviewRes.isOk()) {
     const review = reviewRes.value;
-    if (review.score !== null) {
-      entry.kymScore = review.score;
-    }
+    if (review.score !== null) entry.kymScore = review.score;
+    else delete entry.kymScore;
     // `recommendations` is the authoritative source for the count regardless
     // of whether `score` was computable — keep it visible either way.
     entry.reviewCount = review.recommendations.length;
@@ -234,7 +200,7 @@ async function fetchEntry(
     log.debug('mint.catalog.entry.review_unavailable', { ...mintUrlLogFields(mintUrl) });
   }
 
-  const pubkey = extractMintNostrPubkey(info as MintInfoForNostr);
+  const pubkey = metadata?.operatorPubkey ?? extractMintNostrPubkey(info as MintInfoForNostr);
   if (pubkey) {
     const profile = await resolveNostrProfile(mintUrl, pubkey, signal);
     if (profile) {

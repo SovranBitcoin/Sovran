@@ -3,7 +3,6 @@ import { z } from 'zod';
 // Development, preview, and production share one Nagg host. Override with
 // EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL only for local development.
 const DEFAULT_NOSTR_APPVIEW_BASE_URL = 'https://nagg.up.railway.app';
-const DEFAULT_API_BASE_URL = 'https://api.sovran.money/api';
 /**
  * Primal's PUBLIC cache server (Primal operates it; we only connect). Tier 2 of
  * the resilient Nostr data layer — the `nagg → Primal cache → raw relays`
@@ -16,11 +15,6 @@ const emptyStringToUndefined = (value: unknown) =>
 
 const stripTrailingSlashes = (value: string) => value.replace(/\/+$/, '');
 
-const RequiredUrl = (fallback: string) =>
-  z
-    .preprocess(emptyStringToUndefined, z.string().trim().url().default(fallback))
-    .transform(stripTrailingSlashes);
-
 const OptionalUrl = z
   .preprocess(emptyStringToUndefined, z.string().trim().url().optional())
   .transform((value) => (value ? stripTrailingSlashes(value) : undefined));
@@ -28,7 +22,6 @@ const OptionalUrl = z
 const BackendEnv = z.object({
   EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL: OptionalUrl,
   EXPO_PUBLIC_NAGG_BASE_URL: OptionalUrl,
-  EXPO_PUBLIC_API_BASE_URL: RequiredUrl(DEFAULT_API_BASE_URL),
   EXPO_PUBLIC_SCORE_API_BASE_URL: OptionalUrl,
   EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT: OptionalUrl,
   // Primal public cache server (tier 2). Defaults to wss://cache2.primal.net/v1.
@@ -39,7 +32,6 @@ type BackendEnvInput = Partial<Record<keyof z.input<typeof BackendEnv>, string |
 
 type BackendConfig = {
   nostrAppViewBaseUrl: string;
-  apiBaseUrl: string;
   scoreApiBaseUrl: string;
   /**
    * nagg's GraphQL endpoint. The feed/thread/notifications/DM data layer is
@@ -57,7 +49,6 @@ function readBackendEnv(): BackendEnvInput {
   return {
     EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL: process.env.EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL,
     EXPO_PUBLIC_NAGG_BASE_URL: process.env.EXPO_PUBLIC_NAGG_BASE_URL,
-    EXPO_PUBLIC_API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL,
     EXPO_PUBLIC_SCORE_API_BASE_URL: process.env.EXPO_PUBLIC_SCORE_API_BASE_URL,
     EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT: process.env.EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT,
     EXPO_PUBLIC_PRIMAL_CACHE_URL: process.env.EXPO_PUBLIC_PRIMAL_CACHE_URL,
@@ -82,7 +73,6 @@ export function parseBackendConfig(env: BackendEnvInput = readBackendEnv()): Bac
     DEFAULT_NOSTR_APPVIEW_BASE_URL;
   return {
     nostrAppViewBaseUrl,
-    apiBaseUrl: parsed.data.EXPO_PUBLIC_API_BASE_URL,
     scoreApiBaseUrl: parsed.data.EXPO_PUBLIC_SCORE_API_BASE_URL ?? nostrAppViewBaseUrl,
     nostrGraphqlEndpoint:
       parsed.data.EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT ?? `${nostrAppViewBaseUrl}/graphql`,

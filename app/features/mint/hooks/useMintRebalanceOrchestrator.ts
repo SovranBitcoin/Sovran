@@ -7,7 +7,8 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import { getReadyProofs, getWallet } from '@/shared/lib/cashu/managerInternals';
 import { amountToNumber, toSafeSatAmount } from '@/shared/lib/cashu/amount';
 import { prepareBolt11MeltQuote, prepareBolt11MintQuote } from '@/shared/lib/cashu/cocoOperations';
-import { auditMint, type AuditMintResponse } from '@/shared/lib/apiClient';
+import { getDiscoveredMintMetadata } from '@/shared/lib/getDiscoveredMintMetadata';
+import type { LegacyMintAudit } from '@/shared/stores/global/mintMetadataTypes';
 import { extractDomain } from '@/shared/lib/url';
 import { mintLocalId } from '@/shared/lib/id';
 import { cashuLog, mintUrlLogFields } from '@/shared/lib/logger';
@@ -104,7 +105,6 @@ export function useMintRebalanceOrchestrator({
   const runIdRef = useRef(0);
   const abortRef = useRef(false);
   const executionLockRef = useRef(false);
-  const auditCacheRef = useRef<Map<string, AuditMintResponse>>(new Map());
   const isRunningRef = useRef(false);
   const swapGroupIdRef = useRef<string | null>(null);
   const swapLegIdByStepIdRef = useRef<Record<string, string>>({});
@@ -136,16 +136,11 @@ export function useMintRebalanceOrchestrator({
     setStepStates((prev) => mergeStepState(prev, stepId, update));
   }, []);
 
-  const fetchAudit = useCallback(async (mintUrl: string): Promise<AuditMintResponse | null> => {
-    const cached = auditCacheRef.current.get(mintUrl);
-    if (cached) return cached;
-
-    const res = await auditMint({ mintUrl });
-    if (res.isOk()) {
-      auditCacheRef.current.set(mintUrl, res.value);
-      return res.value;
-    }
-    return null;
+  const fetchAudit = useCallback(async (mintUrl: string): Promise<LegacyMintAudit | null> => {
+    const metadata = await getDiscoveredMintMetadata(mintUrl);
+    // Discovery aggregates cannot establish edges between mints. Use only
+    // retained swap observations here; local history is merged below.
+    return metadata?.auditData ?? null;
   }, []);
 
   const computeRouteSuggestion = useCallback(
@@ -167,7 +162,7 @@ export function useMintRebalanceOrchestrator({
 
       /**
        * Keep this bounded:
-       * - Each mint candidate can require an auditor call.
+       * - Each mint candidate can require a discovery call.
        * - This runs after a failure, so we want a quick suggestion, not a full graph crawl.
        */
       const candidates = Array.from(
