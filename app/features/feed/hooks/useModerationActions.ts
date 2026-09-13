@@ -1,6 +1,6 @@
 import { useNostrNDKContext } from '@/shared/providers/NostrNDKProvider';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
-import { actionMenuPopup, popup } from '@/shared/lib/popup';
+import { actionMenuPopup, replaceActionMenuPopup, popup } from '@/shared/lib/popup';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import {
   BlockSyncError,
@@ -51,18 +51,20 @@ export function useModerationActions() {
   };
 
   const report = (pubkey: string, publicEventId?: string) => {
-    actionMenuPopup({
+    replaceActionMenuPopup({
       title: 'Report reason',
       buttons: Object.entries(REPORT_REASONS).map(([reason, label]) => ({
         text: label,
+        testID: `report-reason-${reason}`,
         icon: 'material-symbols:report-rounded',
         keepOpen: true,
         onPress: () =>
-          actionMenuPopup({
+          replaceActionMenuPopup({
             title: 'Publish a public report?',
             buttons: [
               {
                 text: 'Publish report',
+                testID: 'report-publish',
                 icon: 'material-symbols:report-rounded',
                 variant: 'dangerous',
                 description:

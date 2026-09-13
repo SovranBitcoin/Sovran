@@ -120,8 +120,10 @@ interface SectionAnchorListProps<T> {
    * compose their own `FlashList` here.
    */
   overrideContent?: ReactNode;
-  /** Bottom content-container padding — clears a floating bottom bar. */
+  /** Bottom footer spacer — clears a floating bottom bar. */
   contentBottomInset?: number;
+  testID?: string;
+  onLayout?: (event: LayoutChangeEvent) => void;
   /**
    * Injected scroll container. Defaults to react-native's `ScrollView`.
    * Pass `BottomSheetScrollView` when rendering inside @gorhom/bottom-sheet
@@ -141,7 +143,7 @@ interface SectionAnchorListProps<T> {
   /**
    * Extra style on the FlashList's `contentContainerStyle`. Useful for
    * `paddingHorizontal` when the rendered rows shouldn't carry their
-   * own inset. Merged with this component's own paddingTop/paddingBottom.
+   * own inset. Merged with this component's own paddingTop.
    */
   listContentContainerStyle?: StyleProp<ViewStyle>;
   /**
@@ -251,6 +253,8 @@ export function SectionAnchorList<T>({
   aboveAnchors,
   overrideContent,
   contentBottomInset = 24,
+  testID,
+  onLayout,
   ScrollComponent,
   topFadeColor,
   anchorBarStyle,
@@ -280,7 +284,17 @@ export function SectionAnchorList<T>({
   // over the scroll viewport and carries a `ScrollEdgeFade` backdrop.
   const [aboveAnchorsHeight, setAboveAnchorsHeight] = useState(0);
   const [anchorBarHeight, setAnchorBarHeight] = useState(0);
-  const chromeHeight = aboveAnchorsHeight + anchorBarHeight;
+  // Keep the anchor bar visible during the override path (e.g. emoji
+  // search results) so the chrome stays visually continuous as the
+  // body content flips. The tabs are not actionable while the override
+  // is active — tapping one is a no-op since `scrollToIndex` only
+  // operates on the section flatlist — but the visual continuity is
+  // worth more than hiding them. Caller can clear the override (close
+  // the search) to re-enable tab interaction.
+
+  const showAnchors = sections.length > 1;
+  const visibleAnchorBarHeight = showAnchors ? anchorBarHeight : 0;
+  const chromeHeight = aboveAnchorsHeight + visibleAnchorBarHeight;
 
   const handleAboveAnchorsLayout = (e: LayoutChangeEvent) => {
     const h = e.nativeEvent.layout.height;
@@ -352,15 +366,6 @@ export function SectionAnchorList<T>({
     'sectionList.unmount',
     sectionListLog
   );
-
-  // Keep the anchor bar visible during the override path (e.g. emoji
-  // search results) so the chrome stays visually continuous as the
-  // body content flips. The tabs are not actionable while the override
-  // is active — tapping one is a no-op since `scrollToIndex` only
-  // operates on the section flatlist — but the visual continuity is
-  // worth more than hiding them. Caller can clear the override (close
-  // the search) to re-enable tab interaction.
-  const showAnchors = sections.length > 0;
 
   // Viewport "top" for list-reading purposes is just below the chrome
   // + headroom — same offset value drives the FlashList's scroll
@@ -434,12 +439,12 @@ export function SectionAnchorList<T>({
     }, PROGRAMMATIC_SCROLL_SUPPRESS_MS);
   };
 
-  // Merge component-managed paddingTop/paddingBottom with caller-supplied
+  // Merge component-managed paddingTop with caller-supplied
   // listContentContainerStyle (the latter typically carries
   // paddingHorizontal).
   const listContentContainerStyleMerged = StyleSheet.flatten([
     listContentContainerStyle,
-    { paddingTop: viewportTopOffset, paddingBottom: contentBottomInset },
+    { paddingTop: viewportTopOffset },
   ]);
 
   // Counter incremented every time FlashList invokes `renderListItem`
@@ -491,7 +496,7 @@ export function SectionAnchorList<T>({
   );
 
   return (
-    <View style={{ flex: 1 }}>
+    <View className="flex-1" testID={testID} onLayout={onLayout}>
       {/* Body — virtualized FlashList for sections, or wholesale
           `overrideContent` (e.g. search-results mode). Chrome is
           absolute-positioned over the top edge regardless. */}
@@ -507,7 +512,8 @@ export function SectionAnchorList<T>({
           renderItem={renderListItem}
           keyExtractor={listKeyExtractor}
           getItemType={getItemType}
-          extraData={extraData}
+          extraData={{ extraData, contentBottomInset }}
+          ListFooterComponent={<View style={{ height: contentBottomInset }} />}
           // Tuned down from 250 → 150 after a stress test showed that
           // continuous fast scroll across many sections caused 6s+ JS
           // thread blocks: the bigger the over-render buffer, the more
@@ -534,8 +540,8 @@ export function SectionAnchorList<T>({
           edge="top"
           height={chromeHeight > 0 ? chromeHeight : 1}
           fadeSize={
-            anchorBarHeight > 0
-              ? Math.max(1, Math.round(anchorBarHeight * FADE_RATIO))
+            visibleAnchorBarHeight > 0
+              ? Math.max(1, Math.round(visibleAnchorBarHeight * FADE_RATIO))
               : chromeHeight
           }
           color={topFadeColor}
@@ -556,7 +562,10 @@ export function SectionAnchorList<T>({
                   return (
                     <Pressable
                       key={s.id}
-                      testID={s.anchor.testID}
+                      testID={s.anchor.testID ?? `section-anchor-${s.id}`}
+                      accessibilityRole="tab"
+                      accessibilityLabel={s.anchor.label}
+                      accessibilityState={{ selected: isSelected }}
                       onPress={() => handleAnchorPress(s.id)}
                       onLayout={(e) => {
                         tabOffsets.current[s.id] = {
