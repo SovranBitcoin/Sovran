@@ -26,16 +26,23 @@ jest.mock('@/shared/stores/runtime/debugTierStore', () => ({ recordDebugTiers: j
 jest.mock('@/shared/lib/nostr/nostrTierConfig', () => ({
   getNostrTierConfig: () => ({ nagg: { enabled: true } }),
 }));
+const mockReadCachedStats = jest.fn();
+const mockCacheStats = jest.fn();
 jest.mock('@/shared/lib/nostr/fetchProfiles', () => ({
   fetchProfileStatsViaFacade: (...args: unknown[]) => mockFetchStats(...args),
   fetchFollowingCountViaFacade: (...args: unknown[]) => mockFetchFollowing(...args),
+  readCachedProfileStats: (...args: unknown[]) => mockReadCachedStats(...args),
+  cacheProfileStats: (...args: unknown[]) => mockCacheStats(...args),
 }));
 const mockFetchFollowing = jest.fn();
-jest.mock('@/shared/lib/logger', () => ({
-  log: { debug: jest.fn(), info: jest.fn(), warn: jest.fn() },
-}));
+jest.mock('@/shared/lib/logger', () => {
+  const sink = { debug: jest.fn(), info: jest.fn(), warn: jest.fn() };
+  return { log: { ...sink, child: () => sink }, monotonicNow: () => Date.now() };
+});
 
 beforeEach(() => {
+  mockReadCachedStats.mockReset().mockReturnValue(undefined);
+  mockCacheStats.mockReset();
   mockFetchProfile.mockReset();
   mockFetchStats.mockReset();
   mockFetchFollowing.mockReset().mockResolvedValue(undefined);
@@ -171,9 +178,10 @@ it('completes counts nagg lacks from Primal, then the contact list, without ever
   expect(result.current.isLoading).toBe(false);
   expect(result.current.isCountsLoading).toBe(true);
   expect(result.current.data?.followers).toBeUndefined();
-  expect(result.current.data?.follows).toBeUndefined();
+  // The kind-3 following count lands first and paints on its own (never 0).
+  expect(result.current.data?.follows).toBe(17);
 
-  // Primal knows followers only; following comes from the kind-3 fallback.
+  // Primal knows followers only; following came from the kind-3 fallback.
   await act(async () => stats({ tier: 'primal', followersCount: 120 }));
   expect(result.current.isCountsLoading).toBe(false);
   expect(result.current.data).toMatchObject({ followers: 120, follows: 17, score: 0.5 });
@@ -202,4 +210,57 @@ it('keeps completed counts when a Vertex refresh answers without aggregates', as
   expect(result.current.data).toMatchObject({ followers: 120, follows: 9 });
   await act(async () => complete({ pubkeys: ['alice'], aggregates: {} }));
   expect(result.current.data).toMatchObject({ followers: 120, follows: 9, score: 0.9 });
+});
+
+it('seeds the header from cached profile stats on the first frame and keeps it while revalidating', async () => {
+  mockReadCachedStats.mockReturnValue({ pubkey: 'carol', followersCount: 40, followingCount: 12 });
+  let finish!: (value: unknown) => void;
+  mockFetchProfile.mockImplementation(() => new Promise((resolve) => (finish = resolve)));
+  const { result } = renderHook(() => useNostrProfile('carol'));
+  expect(result.current.data).toMatchObject({ followers: 40, follows: 12 });
+  expect(result.current.isLoading).toBe(true); // revalidating behind a seeded header
+  await act(async () => finish(ok({ pubkey: 'carol', score: 0.2, rank: 1, followers: 41 })));
+  expect(result.current.data).toMatchObject({ followers: 41, follows: 12, score: 0.2 });
+  expect(mockCacheStats).toHaveBeenCalledWith('carol', expect.objectContaining({ followers: 41 }));
+});
+
+it('a focus change does not restart the ladder', async () => {
+  mockFetchProfile.mockResolvedValue(
+    ok({
+      pubkey: 'dave',
+      score: 0.1,
+      rank: 1,
+      followers: 1,
+      follows: 1,
+      vertexFetchedAt: Date.now() / 1000,
+    })
+  );
+  const { rerender } = renderHook(
+    ({ focused }: { focused: boolean }) => useNostrProfile('dave', focused),
+    {
+      initialProps: { focused: false },
+    }
+  );
+  await act(async () => {});
+  expect(mockFetchProfile).toHaveBeenCalledTimes(1);
+  rerender({ focused: true });
+  await act(async () => {});
+  rerender({ focused: false });
+  await act(async () => {});
+  expect(mockFetchProfile).toHaveBeenCalledTimes(1);
+});
+
+it('counts land independently: the kind-3 following count paints before Primal answers', async () => {
+  mockFetchProfile.mockResolvedValue(ok({ pubkey: 'erin', score: 0.5, rank: 3 }));
+  let stats!: (value: object | null) => void;
+  mockFetchStats.mockImplementation(() => new Promise((resolve) => (stats = resolve)));
+  mockFetchFollowing.mockResolvedValue(7);
+  const { result } = renderHook(() => useNostrProfile('erin'));
+  await act(async () => {});
+  expect(result.current.isCountsLoading).toBe(true);
+  expect(result.current.data?.follows).toBe(7);
+  expect(result.current.data?.followers).toBeUndefined();
+  await act(async () => stats({ tier: 'primal', followersCount: 99 }));
+  expect(result.current.data).toMatchObject({ followers: 99, follows: 7 });
+  expect(result.current.isCountsLoading).toBe(false);
 });

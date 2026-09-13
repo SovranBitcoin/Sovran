@@ -47,6 +47,7 @@ import * as Clipboard from 'expo-clipboard';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import { SkeletonLoadingShimmer } from '@/shared/ui/composed/SkeletonExitShimmer';
+import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { LightningAddress } from '@sovranbitcoin/schemas';
 import { getNpcAddress } from '@/shared/lib/cashu/npc';
 import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
@@ -338,9 +339,9 @@ function ProfileStatsGrid({
   // would snap the grid the moment the score arrived.
   const reputationUnavailable = !isLoading && reputationScore === undefined;
 
-  const renderStatCard = (stat: (typeof stats)[0]) => (
+  const renderStatCard = (stat: (typeof stats)[0], loading: boolean) => (
     <View key={stat.label} style={styles.statItem}>
-      {showSkeleton ? (
+      {loading ? (
         // One placeholder for the whole pill (not three stacked text
         // skeletons). Thread-style: a static low-contrast box — the motion
         // comes from the SkeletonLoadingShimmer sweeping the whole grid.
@@ -380,21 +381,36 @@ function ProfileStatsGrid({
   // or joined date. Render no grid rather than misleading "0 / 0 / N/A".
   if (!isLoading && !hasValidData) return null;
 
-  // While loading: 2×2 placeholders under one shimmer sweep (thread-style),
-  // rather than four independently-pulsing boxes.
-  if (showSkeleton) {
+  // One grid in both branches (SkeletonContentCrossfade): the skeleton is the
+  // same 2×2 layout with placeholder pills, so the swap to content shifts
+  // nothing; the helper owns the shimmer sweep and the fade.
+  const renderGrid = (loading: boolean) => (
+    <View>
+      <View style={styles.statsRow}>
+        {stats.slice(0, 2).map((stat) => renderStatCard(stat, loading))}
+      </View>
+      <View style={styles.statsRow}>
+        {stats.slice(2, 4).map((stat) => renderStatCard(stat, loading))}
+      </View>
+    </View>
+  );
+  if (showSkeleton || (!reputationUnavailable && !showSkeleton)) {
     return (
       <VisualLayoutProbe
         scope={visualScope}
         surface="profile"
         component="ProfileStatsGrid"
-        itemKey="stats-skeleton"
-        itemType="skeleton"
+        itemKey={showSkeleton ? 'stats-skeleton' : 'stats-loaded'}
+        itemType={showSkeleton ? 'skeleton' : 'loaded'}
         style={styles.statsGrid}
-        extra={{ isLoading }}>
-        <View style={styles.statsRow}>{stats.slice(0, 2).map(renderStatCard)}</View>
-        <View style={styles.statsRow}>{stats.slice(2, 4).map(renderStatCard)}</View>
-        <SkeletonLoadingShimmer active />
+        extra={{ isLoading, reputationUnavailable }}>
+        <SkeletonContentCrossfade
+          loading={showSkeleton}
+          visualKey="profile-stats"
+          visualSurface="profile"
+          renderSkeleton={() => renderGrid(true)}
+          renderContent={() => renderGrid(false)}
+        />
       </VisualLayoutProbe>
     );
   }
@@ -412,8 +428,8 @@ function ProfileStatsGrid({
         style={styles.statsGrid}
         extra={{ reputationUnavailable }}>
         <View style={styles.statsRow}>
-          {renderStatCard(stats[0])}
-          {renderStatCard(stats[1])}
+          {renderStatCard(stats[0], false)}
+          {renderStatCard(stats[1], false)}
         </View>
         <Text
           size={13}
@@ -429,19 +445,7 @@ function ProfileStatsGrid({
     );
   }
 
-  return (
-    <VisualLayoutProbe
-      scope={visualScope}
-      surface="profile"
-      component="ProfileStatsGrid"
-      itemKey="stats-loaded"
-      itemType="loaded"
-      style={styles.statsGrid}
-      extra={{ reputationUnavailable }}>
-      <View style={styles.statsRow}>{stats.slice(0, 2).map(renderStatCard)}</View>
-      <View style={styles.statsRow}>{stats.slice(2, 4).map(renderStatCard)}</View>
-    </VisualLayoutProbe>
-  );
+  return null;
 }
 
 // ============================================================================

@@ -11,7 +11,7 @@ type ProfileMetadata = facade.ProfileMetadata;
  */
 export async function fetchProfilesViaFacade(
   pubkeys: string[],
-  options: { refresh?: boolean } = {}
+  options: { refresh?: boolean; readId?: string; signal?: AbortSignal } = {}
 ): Promise<Record<string, ProfileMetadata>> {
   if (pubkeys.length === 0) return {};
   const layer = buildNostrDataLayer();
@@ -23,6 +23,8 @@ export async function fetchProfilesViaFacade(
   const result = await layer.getProfiles({
     pubkeys,
     ...(options.refresh ? { refresh: true } : {}),
+    ...(options.readId ? { readId: options.readId } : {}),
+    ...(options.signal ? { signal: options.signal } : {}),
   });
   return result.match(
     (resolved) => resolved.profiles,
@@ -39,7 +41,7 @@ export async function fetchProfilesViaFacade(
  */
 export async function fetchProfileStatsViaFacade(
   pubkey: string,
-  options: { viewerPubkey?: string; signal?: AbortSignal } = {}
+  options: { viewerPubkey?: string; signal?: AbortSignal; readId?: string } = {}
 ): Promise<facade.ResolvedProfileStats | null> {
   const layer = buildNostrDataLayer();
   if (!layer) return null;
@@ -47,6 +49,7 @@ export async function fetchProfileStatsViaFacade(
     pubkey,
     ...(options.viewerPubkey ? { viewerPubkey: options.viewerPubkey } : {}),
     ...(options.signal ? { signal: options.signal } : {}),
+    ...(options.readId ? { readId: options.readId } : {}),
   });
   return result.match(
     (resolved) => resolved,
@@ -63,16 +66,45 @@ export async function fetchProfileStatsViaFacade(
  */
 export async function fetchFollowingCountViaFacade(
   pubkey: string,
-  options: { signal?: AbortSignal } = {}
+  options: { signal?: AbortSignal; readId?: string } = {}
 ): Promise<number | undefined> {
   const layer = buildNostrDataLayer();
   if (!layer) return undefined;
   const result = await layer.getSocialGraph({
     pubkey,
     ...(options.signal ? { signal: options.signal } : {}),
+    ...(options.readId ? { readId: options.readId } : {}),
   });
   return result.match(
     (graph) => (graph.contactsUpdatedAt > 0 ? graph.follows.length : undefined),
     () => undefined
   );
+}
+
+/** The cached profile header (counts + joined date) for a pubkey, if any tier ever supplied one. */
+export function readCachedProfileStats(pubkey: string): facade.CachedProfileStats | undefined {
+  return buildNostrDataLayer()?.cache.getProfileStats(pubkey);
+}
+
+/**
+ * Write a header the app obtained OUTSIDE the facade (nagg's REST profile
+ * endpoint) into the single owner, so the next open of this profile seeds its
+ * counts synchronously. Only defined counts are written: an unknown count is
+ * never recorded as anything.
+ */
+export function cacheProfileStats(
+  pubkey: string,
+  stats: { followers?: number; follows?: number; joinedAt?: number | null }
+): void {
+  const cache = buildNostrDataLayer()?.cache;
+  if (!cache) return;
+  const existing = cache.getProfileStats(pubkey);
+  cache.ingestProfileStats({
+    pubkey,
+    metadata: existing?.metadata,
+    followersCount: stats.followers ?? existing?.followersCount,
+    followingCount: stats.follows ?? existing?.followingCount,
+    noteCount: existing?.noteCount,
+    joinedAt: stats.joinedAt ?? existing?.joinedAt,
+  });
 }

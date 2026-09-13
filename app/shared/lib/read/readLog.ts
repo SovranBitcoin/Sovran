@@ -121,7 +121,8 @@ export interface ReadSupersededParams extends ReadIdentity {
 }
 
 export interface ReadPartialParams extends ReadIdentity {
-  answered: readonly (NostrTier | ReadSource)[];
+  /** Sources that have answered so far (tiers, or a named app-side source such as 'contacts'). */
+  answered: readonly string[];
   pending: readonly NostrTier[];
   count: number;
   gate: 'minItems' | 'capMs' | 'allSettled' | 'seed' | 'partial';

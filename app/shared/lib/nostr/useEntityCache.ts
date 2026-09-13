@@ -149,6 +149,22 @@ export function useProfileRecordsMany(
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
+/**
+ * The cached profile header (follower/following counts, joined date) for a
+ * pubkey, read reactively from the single owner, plus whether a fetch that may
+ * fill it is in flight. Counts are unknown, never zero: a missing field stays
+ * `undefined` until a source supplies it.
+ */
+export function useProfileStats(pubkey: string | undefined): {
+  stats: facade.CachedProfileStats | undefined;
+  pending: boolean;
+} {
+  const cache = buildNostrDataLayer()?.cache;
+  const stats = useCachedRecord(cache?.profileStats, pubkey);
+  const pending = usePendingProfile(cache?.pendingProfiles, pubkey);
+  return useMemo(() => ({ stats, pending }), [stats, pending]);
+}
+
 /** Non-reactive read of one full profile record (for getState-style callers). */
 export function readProfileRecord(pubkey: string): facade.CachedProfile | undefined {
   return buildNostrDataLayer()?.cache.getProfile(pubkey);
