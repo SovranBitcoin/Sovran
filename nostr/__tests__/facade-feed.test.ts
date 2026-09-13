@@ -268,7 +268,10 @@ describe('nagg tier cooldown circuit-breaker', () => {
     expect(calls).toBe(4);
   });
 
-  test('consecutive network failures arm the cooldown; subsequent reads short-circuit without fetching', async () => {
+  test('feed reads bypass the shared cooldown: the pager owns feed retry timing', async () => {
+    // Since the per-tier feed pager (feed-pager.ts) schedules lane backoff
+    // (1s/4s/15s/60s) itself, feed reads no longer arm or consult the shared
+    // surface cooldown; every read that the pager decides to make reaches nagg.
     let fetchCalls = 0;
     const client = createNaggClient({
       appView: { baseUrl: 'https://nagg.test' },
@@ -279,20 +282,11 @@ describe('nagg tier cooldown circuit-breaker', () => {
     });
     const tier = createNaggTier({ client });
 
-    // First failure: below the threshold — the next read still probes nagg.
-    const first = await tier.feedPage!({ spec: FEED_SPEC });
-    expect(first.kind).toBe('failed');
-    expect(fetchCalls).toBe(1);
-
-    // Second consecutive failure opens the breaker …
-    const second = await tier.feedPage!({ spec: FEED_SPEC });
-    expect(second.kind).toBe('failed');
-    expect(fetchCalls).toBe(2);
-
-    // … so the third read fails fast without touching the network.
-    const third = await tier.feedPage!({ spec: FEED_SPEC });
-    expect(third.kind).toBe('failed');
-    expect(fetchCalls).toBe(2);
+    for (const expected of [1, 2, 3]) {
+      const read = await tier.feedPage!({ spec: FEED_SPEC });
+      expect(read.kind).toBe('failed');
+      expect(fetchCalls).toBe(expected);
+    }
   });
 
   test('a single slow/timed-out read does NOT poison later reads (success resets the count)', async () => {
