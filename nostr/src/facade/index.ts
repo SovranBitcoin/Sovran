@@ -22,3 +22,4 @@ export * from './session/notifications-merger';
 export * from './session/notifications-session';
 export * as primal from './primal';
 export * as relay from './relay';
+export * from './vertex-request';

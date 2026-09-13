@@ -35,6 +35,11 @@
     // their callers at all.
     "moduleSuffixes": [".ios", ""],
     "paths": {
+      // Resolve this checkout, including when node_modules links to another worktree.
+      "nostr": ["../nostr/src/index.ts"],
+      "nostr/recipes": ["../nostr/src/recipes/index.ts"],
+      "nostr/map": ["../nostr/src/map/index.ts"],
+      "nostr/schemas": ["../nostr/src/schemas.ts"],
       "@/*": ["./*"],
       "@/shared/*": ["./shared/*"],
       "@/features/*": ["./features/*"],

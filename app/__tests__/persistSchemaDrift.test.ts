@@ -70,6 +70,9 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { persistRegistry } from '@/shared/lib/persist/persistConfig';
+import { createVertexBudgetStore } from '@/shared/stores/profile/vertexBudgetStore';
+
+createVertexBudgetStore('a'.repeat(64));
 
 // Files that call persistConfig but deliberately do NOT register here.
 // Every entry needs a reason — this is the visible exception list the

@@ -81,7 +81,10 @@ const STORE_MODULES = [
  * Files that call `persistConfig` but register no fixed store name, so they
  * cannot appear in the module list above.
  */
-const NOT_A_CONCRETE_STORE = ['shared/lib/cache/createQueryCacheStore.ts'];
+const NOT_A_CONCRETE_STORE = [
+  'shared/lib/cache/createQueryCacheStore.ts',
+  'shared/stores/profile/vertexBudgetStore.ts', // captured-owner factory, registered below
+];
 
 /**
  * Registered stores whose Zustand store object is not exported, so the test
@@ -129,6 +132,9 @@ function isPersistedStore(value: unknown): value is PersistedStore {
  * module having already been pulled in transitively.
  */
 const statesByStoreName = new Map<string, unknown>();
+const { createVertexBudgetStore } = require('@/shared/stores/profile/vertexBudgetStore');
+const vertexBudget = createVertexBudgetStore('a'.repeat(64));
+statesByStoreName.set(vertexBudget.persist.getOptions().name, vertexBudget.getState());
 
 for (const path of STORE_MODULES) {
   const mod = require(path) as Record<string, unknown>;

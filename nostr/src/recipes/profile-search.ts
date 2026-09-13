@@ -1,8 +1,10 @@
+import { encodeSignedVertexRequest, type SignedVertexRequest } from '../facade/vertex-request';
 import type { EventQueryInput } from './rank';
 import type { NaggAppViewBinding } from '../transport';
 
 export type ProfileSearchInput = {
   query: string;
+  signedVertexRequest?: SignedVertexRequest;
   limit?: number;
   sort?: string;
   source?: string;
@@ -16,6 +18,7 @@ export function profileSearchAppView(input: ProfileSearchInput): NaggAppViewBind
     operationName: 'ProfileSearch',
     searchParams: {
       query: input.query,
+      ...(input.signedVertexRequest ? { svr: encodeSignedVertexRequest(input.signedVertexRequest) } : {}),
       limit: input.limit ?? 10,
       sort: input.sort ?? 'globalPagerank',
       ...(input.source ? { source: input.source } : {}),

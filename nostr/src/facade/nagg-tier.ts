@@ -1,3 +1,4 @@
+import { VertexFailureSchema } from '../recipes/vertex';
 import { errAsync } from 'neverthrow';
 import type { z } from 'zod';
 
@@ -117,6 +118,7 @@ function withCooldown(rawClient: NaggClient): NaggClient {
   let consecutiveNetworkFailures = 0;
   return {
     appViewBaseUrl: rawClient.appViewBaseUrl,
+    vertexRelay: rawClient.vertexRelay,
     rest: <TSchema extends z.ZodType>(request: NaggRestRequest<TSchema>) => {
       const now = Date.now();
       if (now < cooldownUntil) {
@@ -444,7 +446,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
 
     async searchProfiles(request: SearchRequest): Promise<TierOutcome<ProfileSearchBundle>> {
       // Gold path: Vertex-pagerank-ranked profile search over the app-view.
-      const binding = profileSearchAppView({ query: request.query, limit: request.limit });
+      const binding = profileSearchAppView({ query: request.query, limit: request.limit, signedVertexRequest: request.signedVertexRequest });
       nostrLog.debug('nostr.nagg.searchProfiles', { path: binding.path, q: request.query.length });
       const result = await client.rest<typeof NaggProfilesEnvelopeSchema>({
         path: binding.path,
@@ -454,12 +456,16 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
         operationName: binding.operationName,
         refresh: request.refresh,
         signal: request.signal,
-        timeoutMs: request.timeoutMs,
+        timeoutMs: request.signedVertexRequest ? (request.timeoutMs ?? 20_000) : request.timeoutMs,
       });
       // 0 results is a valid "no match" — nagg is authoritative for profile
       // search, so we don't cascade to the relay floor on an empty answer.
       return result.match<TierOutcome<ProfileSearchBundle>>(
-        (envelope) => answered({ hits: searchHitsFromEnvelope(envelope) }),
+        (envelope) => {
+          const failure = VertexFailureSchema.safeParse(envelope);
+          if (failure.success) return failed({ type: 'vertex', reason: failure.data.reason, message: 'Vertex request failed' });
+          return answered({ hits: searchHitsFromEnvelope(envelope), vertexFresh: envelope.vertexFresh });
+        },
         (error) => failed(error),
       );
     },

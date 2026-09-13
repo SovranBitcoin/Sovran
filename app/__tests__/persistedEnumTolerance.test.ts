@@ -81,6 +81,9 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
 import { persistRegistry } from '@/shared/lib/persist/persistConfig';
+import { createVertexBudgetStore } from '@/shared/stores/profile/vertexBudgetStore';
+
+createVertexBudgetStore('a'.repeat(64));
 import { tolerantRecord } from '@/shared/lib/persist/tolerant';
 
 /**
