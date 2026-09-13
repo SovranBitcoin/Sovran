@@ -84,6 +84,15 @@ describe('generateTierRingTheme', () => {
     }
   });
 
+  it('staggers blob start angles evenly so they never open bunched', () => {
+    const { blobs } = generateTierRingTheme('gold', 'seed-a');
+    const angles = blobs.map((b) => b.angle).sort((x, y) => x - y);
+    const slot = (Math.PI * 2) / blobs.length;
+    for (let i = 1; i < angles.length; i += 1) {
+      expect(angles[i]! - angles[i - 1]!).toBeGreaterThan(slot * 0.5);
+    }
+  });
+
   it('diamond is near-white ice with prismatic blobs', () => {
     const a = generateTierRingTheme('diamond', 'seed-a');
     expect(lightOf(a.base)).toBeGreaterThanOrEqual(82); // 86 ± the per-seed jitter

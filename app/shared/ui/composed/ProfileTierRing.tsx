@@ -52,6 +52,8 @@ const LOOP_MS = 24_000;
 const INTRO_MS = 900;
 const INTRO_LOOP = 0.12;
 const TAU = Math.PI * 2;
+/** Blobs are washes, not spots. */
+const BLOB_OPACITY = 0.55;
 
 /** How far the ring layout extends beyond the avatar on each side. */
 export function profileTierRingInset(size: number): number {
@@ -347,8 +349,15 @@ function FilmBlob({
       (1 + 0.25 * Math.sin(TAU * blob.breathCycles * clock.value + blob.phase))
   );
   return (
-    <Circle c={c} r={r}>
-      <RadialGradient c={c} r={r} colors={[blob.color, 'transparent']} />
+    // Translucent with a long, gentle falloff: the colour diffuses into the
+    // band rather than sitting on it as a spot.
+    <Circle c={c} r={r} opacity={BLOB_OPACITY}>
+      <RadialGradient
+        c={c}
+        r={r}
+        colors={[blob.color, blob.color, 'transparent']}
+        positions={[0, 0.3, 1]}
+      />
       {blur !== undefined ? <BlurMask blur={blur} style="normal" /> : null}
     </Circle>
   );

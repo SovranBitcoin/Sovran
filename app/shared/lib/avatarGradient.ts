@@ -256,15 +256,19 @@ export function generateTierRingTheme(tier: ProfileTier, seedInput: string): Tie
           ]
         : [hsl(325, 85, 78), hsl(262, 80, 74), hsl(190, 90, 72), hsl(42, 90, 76), hsl(0, 0, 100)];
 
+  // Start angles are staggered evenly (with a little jitter) so the blobs
+  // never open bunched together; opposite directions pass through each other
+  // only briefly. Large and translucent: the colours diffuse into the band.
+  const slot = TAU / colors.length;
   const blobs: TierRingBlob[] = colors.map((color, index) => {
     const turns = (1 + Math.floor(random() * 2)) * (random() > 0.5 ? 1 : -1);
     return {
       color,
-      angle: random() * TAU,
+      angle: index * slot + (random() - 0.5) * slot * 0.4,
       turns,
-      wobble: 0.25 + random() * 0.35,
+      wobble: 0.1 + random() * 0.2,
       wobbleCycles: 2 + Math.floor(random() * 3),
-      radius: (index === colors.length - 1 ? 0.9 : 1.4) + random() * 0.6,
+      radius: (index === colors.length - 1 ? 1.6 : 2.4) + random() * 0.8,
       breathCycles: 1 + Math.floor(random() * 3),
       phase: random() * TAU,
     };
