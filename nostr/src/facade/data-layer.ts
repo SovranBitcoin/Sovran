@@ -7,9 +7,11 @@ import {
   auditAcrossTiers,
   applyOrderingManifest,
   type TierCandidate,
+  type TierReadContext,
   type TierResolutionError,
 } from '../tiers';
 import { nostrLog, type NostrLogData } from '../log';
+import type { RequestControls } from '../timeout';
 import type { NaggFeedEvent } from '../map/feed';
 import {
   assembleFeedPage, type FeedBundle, type FeedItem, type FeedPageRequest, type ResolvedFeedPage } from './feed';
@@ -188,10 +190,11 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
     async getFeedPage(request) {
       return runRead(
         'feed',
+        request,
         { spec: request.spec.kind, limit: request.limit ?? null, paged: !!request.cursor },
-        async () => {
+        async (ctx) => {
           const candidates = candidatesFor(config.tiers, 'feedPage', (t) => () => t.feedPage!(request));
-          return (await resolveAcrossTiers<FeedBundle>(candidates)).map(({ tier, value }) => {
+          return (await resolveAcrossTiers<FeedBundle>(candidates, ctx)).map(({ tier, value }) => {
             const page = assembleFeedPage(tier, value);
             ingestFeedPage(cache, page);
             return page;
@@ -205,10 +208,11 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
       const sort: ThreadSort = request.sort ?? 'relevant';
       return runRead(
         'thread',
+        request,
         { noteId: short(request.noteId), sort, offset: request.offset ?? 0 },
-        async () => {
+        async (ctx) => {
           const candidates = candidatesFor(config.tiers, 'thread', (t) => () => t.thread!(request));
-          return (await resolveAcrossTiers<ThreadBundle>(candidates)).map(({ tier, value }) => {
+          return (await resolveAcrossTiers<ThreadBundle>(candidates, ctx)).map(({ tier, value }) => {
             const thread = assembleThread(tier, value, sort);
             ingestThread(cache, thread);
             return thread;
@@ -239,6 +243,7 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
       );
       return createNotificationsSession({
         request,
+        readId: request.readId ?? mintReadId('notifications'),
         sources,
         cache,
         ...(notifLiveTier
@@ -257,10 +262,11 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
     async getNotifications(request) {
       return runRead(
         'notifications',
+        request,
         { tab: request.tab ?? 'ALL', grouped: request.grouped !== false, paged: !!request.cursor },
-        async () => {
+        async (ctx) => {
           const candidates = candidatesFor(config.tiers, 'notifications', (t) => () => t.notifications!(request));
-          return (await resolveAcrossTiers<NotificationsBundle>(candidates)).map(({ tier, value }) => {
+          return (await resolveAcrossTiers<NotificationsBundle>(candidates, ctx)).map(({ tier, value }) => {
             const notifs = assembleNotifications(tier, value);
             ingestNotifications(cache, notifs);
             return notifs;
@@ -273,10 +279,11 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
     async getOwnHistory(request) {
       return runRead(
         'ownHistory',
+        request,
         { actionType: request.actionType, paged: !!request.cursor },
-        async () => {
+        async (ctx) => {
           const candidates = candidatesFor(config.tiers, 'ownHistory', (t) => () => t.ownHistory!(request));
-          return (await resolveAcrossTiers<OwnHistoryBundle>(candidates)).map(({ tier, value }) =>
+          return (await resolveAcrossTiers<OwnHistoryBundle>(candidates, ctx)).map(({ tier, value }) =>
             assembleOwnHistory(tier, request.actionType, value),
           );
         },
@@ -287,10 +294,11 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
     async getMintReviews(request) {
       return runRead(
         'mintReviews',
+        request,
         { mintUrl: request.mintUrl },
-        async () => {
+        async (ctx) => {
           const candidates = candidatesFor<MintReviewsSummary>(config.tiers, 'getMintReviews', (t) => () => t.getMintReviews!(request));
-          return (await resolveAcrossTiers<MintReviewsSummary>(candidates)).map(({ tier, value }) => ({ tier, ...value }));
+          return (await resolveAcrossTiers<MintReviewsSummary>(candidates, ctx)).map(({ tier, value }) => ({ tier, ...value }));
         },
         (r) => ({ reviewCount: r.reviewCount, averageScore: r.averageScore }),
       );
@@ -299,10 +307,11 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
     async discoverMints(request) {
       return runRead(
         'discoverMints',
+        request,
         { limit: request.limit ?? null },
-        async () => {
+        async (ctx) => {
           const candidates = candidatesFor<DiscoveredMint[]>(config.tiers, 'discoverMints', (t) => () => t.discoverMints!(request));
-          return (await resolveAcrossTiers<DiscoveredMint[]>(candidates)).map(({ tier, value }) => ({ tier, mints: value }));
+          return (await resolveAcrossTiers<DiscoveredMint[]>(candidates, ctx)).map(({ tier, value }) => ({ tier, mints: value }));
         },
         (r) => ({ mints: r.mints.length }),
       );
@@ -311,10 +320,11 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
     async getSocialGraph(request) {
       return runRead(
         'socialGraph',
+        request,
         { pubkey: short(request.pubkey) },
-        async () => {
+        async (ctx) => {
           const candidates = candidatesFor<SocialGraph>(config.tiers, 'getSocialGraph', (t) => () => t.getSocialGraph!(request));
-          return (await resolveAcrossTiers<SocialGraph>(candidates)).map(({ tier, value }) => {
+          return (await resolveAcrossTiers<SocialGraph>(candidates, ctx)).map(({ tier, value }) => {
             const graph = { tier, ...value };
             ingestSocialGraph(cache, graph);
             return graph;
@@ -327,10 +337,11 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
     async getDmEnvelopes(request) {
       return runRead(
         'dmEnvelopes',
+        request,
         { viewer: short(request.viewerPubkey), paged: !!request.cursor },
-        async () => {
+        async (ctx) => {
           const candidates = candidatesFor<DmEnvelopesBundle>(config.tiers, 'getDmEnvelopes', (t) => () => t.getDmEnvelopes!(request));
-          return (await resolveAcrossTiers<DmEnvelopesBundle>(candidates)).map(({ tier, value }) => ({ tier, envelopes: value.envelopes, cursor: value.cursor }));
+          return (await resolveAcrossTiers<DmEnvelopesBundle>(candidates, ctx)).map(({ tier, value }) => ({ tier, envelopes: value.envelopes, cursor: value.cursor }));
         },
         (d) => ({ envelopes: d.envelopes.length }),
       );
@@ -343,8 +354,9 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
     async getProfiles(request) {
       return runRead(
         'profiles',
+        request,
         { pubkeys: request.pubkeys.length },
-        async () => {
+        async (ctx) => {
           // Cache-first: split into what we already hold vs what to fetch.
           const { profiles: cached, missing } = cache.readProfiles(request.pubkeys);
           const cachedMeta = metadataMapOf(cached);
@@ -360,7 +372,7 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
           cache.pendingProfiles.begin(toFetch);
           try {
             const candidates = candidatesFor<ProfilesBundle>(config.tiers, 'getProfiles', (t) => () => t.getProfiles!(fetchReq));
-            return (await resolveAcrossTiers<ProfilesBundle>(candidates)).map(({ tier, value }) => {
+            return (await resolveAcrossTiers<ProfilesBundle>(candidates, ctx)).map(({ tier, value }) => {
               ingestProfiles(cache, { tier, profiles: value.profiles });
               return { tier, profiles: { ...cachedMeta, ...value.profiles } };
             });
@@ -375,8 +387,9 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
     async getProfileStats(request) {
       return runRead(
         'profileStats',
+        request,
         { pubkey: short(request.pubkey) },
-        async () => {
+        async (ctx) => {
           // Cache-first: if we fetched this header before, serve it now —
           // overlaying the freshest accumulated profile metadata.
           const cachedStats = cache.getProfileStats(request.pubkey);
@@ -391,7 +404,7 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
           cache.pendingProfiles.begin([request.pubkey]);
           try {
             const candidates = candidatesFor<ProfileStatsBundle>(config.tiers, 'getProfileStats', (t) => () => t.getProfileStats!(request));
-            return (await resolveAcrossTiers<ProfileStatsBundle>(candidates)).map(({ tier, value }) => {
+            return (await resolveAcrossTiers<ProfileStatsBundle>(candidates, ctx)).map(({ tier, value }) => {
               const resolved = { tier, ...value };
               ingestProfileStats(cache, resolved);
               return resolved;
@@ -412,10 +425,11 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
     async searchProfiles(request) {
       return runRead(
         'searchProfiles',
+        request,
         { q: request.query.length, limit: request.limit ?? null },
-        async () => {
+        async (ctx) => {
           const candidates = candidatesFor<ProfileSearchBundle>(config.tiers, 'searchProfiles', (t) => () => t.searchProfiles!(request));
-          return (await resolveAcrossTiers<ProfileSearchBundle>(candidates)).map(({ tier, value }) => ({ tier, ...value }));
+          return (await resolveAcrossTiers<ProfileSearchBundle>(candidates, ctx)).map(({ tier, value }) => ({ tier, ...value }));
         },
         (r) => ({ hits: r.hits.length }),
       );
@@ -423,19 +437,43 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
   };
 }
 
-/** Log a read's request + outcome (answering tier + counts, or the exhaustion trail). */
+let readSeq = 0;
+/** Facade-minted correlation id when the caller did not supply one: `f<seq>-<surface>`. */
+function mintReadId(surface: string): string {
+  readSeq += 1;
+  return `f${readSeq.toString(36)}-${surface}`;
+}
+
+/**
+ * Log a read's request + outcome (answering tier + counts, or the exhaustion
+ * trail), correlated by `readId` so log-doctor can join the `nostr.tier.*`
+ * attempts underneath it. The id is the caller's (`RequestControls.readId`)
+ * when present, otherwise minted here.
+ */
 async function runRead<R extends { tier: NostrTier }>(
   surface: string,
+  request: RequestControls,
   summary: NostrLogData,
-  run: () => Promise<Result<R, TierResolutionError>>,
+  run: (ctx: Required<TierReadContext>) => Promise<Result<R, TierResolutionError>>,
   describe: (resolved: R) => NostrLogData,
 ): Promise<Result<R, TierResolutionError>> {
-  nostrLog.info(`nostr.read.${surface}.request`, summary);
-  const result = await run();
+  const ctx = { readId: request.readId ?? mintReadId(surface), surface };
+  const startedAt = Date.now();
+  nostrLog.info(`nostr.read.${surface}.request`, { readId: ctx.readId, ...summary });
+  const result = await run(ctx);
+  const durationMs = Date.now() - startedAt;
   result.match(
-    (resolved) => nostrLog.info(`nostr.read.${surface}.done`, { tier: resolved.tier, ...describe(resolved) }),
+    (resolved) =>
+      nostrLog.info(`nostr.read.${surface}.done`, {
+        readId: ctx.readId,
+        tier: resolved.tier,
+        durationMs,
+        ...describe(resolved),
+      }),
     (error) =>
       nostrLog.warn(`nostr.read.${surface}.exhausted`, {
+        readId: ctx.readId,
+        durationMs,
         attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
       }),
   );
@@ -519,7 +557,9 @@ async function runThreadAudit(
     return EMPTY_THREAD_AUDIT;
   }
 
+  const readId = request.readId ?? mintReadId('threadAudit');
   nostrLog.info('nostr.read.threadAudit.request', {
+    readId,
     noteId: short(request.noteId),
     primary: request.primaryTier,
     tiers: below.map((t) => t.tier),
@@ -536,9 +576,15 @@ async function runThreadAudit(
   };
   const answer = await auditAcrossTiers<ThreadBundle>(
     below.map((t) => ({ tier: t.tier, attempt: () => t.thread!(auditRequest) })),
+    { readId, surface: 'threadAudit' },
   );
   if (!answer) {
-    nostrLog.info('nostr.read.threadAudit.done', { noteId: short(request.noteId), tier: null, extras: 0 });
+    nostrLog.info('nostr.read.threadAudit.done', {
+      readId,
+      noteId: short(request.noteId),
+      tier: null,
+      extras: 0,
+    });
     return EMPTY_THREAD_AUDIT;
   }
 
@@ -576,6 +622,7 @@ async function runThreadAudit(
   cache.ingestProfileInfos(bundle.profiles, tier);
 
   nostrLog.info('nostr.read.threadAudit.done', {
+    readId,
     noteId: short(request.noteId),
     tier,
     extras: extras.length,

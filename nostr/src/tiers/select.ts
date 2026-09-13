@@ -2,6 +2,7 @@ import { ok, err, type Result } from 'neverthrow';
 import { nostrLog } from '../log';
 import type {
   TierCandidate,
+  TierReadContext,
   TierResolution,
   TierResolutionError,
   TierAttemptLog,
@@ -24,25 +25,29 @@ import type {
 
 export async function resolveAcrossTiers<T>(
   candidates: ReadonlyArray<TierCandidate<T>>,
+  context: TierReadContext = {},
 ): Promise<Result<TierResolution<T>, TierResolutionError>> {
   const attempts: TierAttemptLog[] = [];
-  nostrLog.debug('nostr.tier.select.start', { tiers: candidates.map((c) => c.tier) });
+  // Correlation only: lets log-doctor join each tier attempt to its read.
+  const ctx = { readId: context.readId ?? null, surface: context.surface ?? null };
+  nostrLog.debug('nostr.tier.select.start', { ...ctx, tiers: candidates.map((c) => c.tier) });
 
   for (const candidate of candidates) {
-    nostrLog.debug('nostr.tier.try', { tier: candidate.tier });
+    nostrLog.debug('nostr.tier.try', { ...ctx, tier: candidate.tier });
     const startedAt = Date.now();
     const outcome = await candidate.attempt();
     const durationMs = Date.now() - startedAt;
     switch (outcome.kind) {
       case 'answered':
-        nostrLog.info('nostr.tier.answered', { tier: candidate.tier, durationMs });
+        nostrLog.info('nostr.tier.answered', { ...ctx, tier: candidate.tier, durationMs });
         return ok({ tier: candidate.tier, value: outcome.value });
       case 'unsupported':
-        nostrLog.debug('nostr.tier.unsupported', { tier: candidate.tier, durationMs });
+        nostrLog.debug('nostr.tier.unsupported', { ...ctx, tier: candidate.tier, durationMs });
         attempts.push({ tier: candidate.tier, outcome: 'unsupported' });
         continue;
       case 'failed':
         nostrLog.warn('nostr.tier.failed', {
+          ...ctx,
           tier: candidate.tier,
           durationMs,
           errorType: outcome.error.type,
@@ -54,6 +59,7 @@ export async function resolveAcrossTiers<T>(
   }
 
   nostrLog.warn('nostr.tier.exhausted', {
+    ...ctx,
     attempts: attempts.map((a) => `${a.tier}=${a.outcome}`),
   });
   return err({

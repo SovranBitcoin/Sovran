@@ -3,6 +3,12 @@ export const DEFAULT_TIMEOUT_MS = 30_000;
 export interface RequestControls {
   signal?: AbortSignal;
   timeoutMs?: number;
+  /**
+   * Caller-supplied read correlation id; the facade mints one when absent.
+   * Log-only — it never affects behavior — so `nostr.read.*` / `nostr.tier.*`
+   * events can be joined to the app's `read.<surface>.*` lifecycle events.
+   */
+  readId?: string;
 }
 
 export function combineSignals(...signals: Array<AbortSignal | undefined>): AbortSignal {
