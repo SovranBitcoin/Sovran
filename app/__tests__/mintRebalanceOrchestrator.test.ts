@@ -17,7 +17,9 @@ jest.mock('@/shared/lib/cashu/managerInternals', () => ({
   }),
 }));
 jest.mock('@/shared/lib/cashu/cocoFeedback', () => ({ reportCocoApiFailure: jest.fn() }));
-jest.mock('@/shared/lib/apiClient', () => ({ auditMint: jest.fn() }));
+jest.mock('@/shared/lib/getDiscoveredMintMetadata', () => ({
+  getDiscoveredMintMetadata: jest.fn(),
+}));
 jest.mock('@/shared/lib/logger', () => ({
   cashuLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn() },
   mintUrlLogFields: () => ({}),

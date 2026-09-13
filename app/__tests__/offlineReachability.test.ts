@@ -7,7 +7,6 @@ import {
 
 jest.mock('@/shared/config/backend', () => ({
   backendConfig: {
-    apiBaseUrl: 'https://configured-api.example/api',
     nostrAppViewBaseUrl: 'https://configured-nagg.example',
   },
 }));

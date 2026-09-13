@@ -6,7 +6,10 @@
  * without the two importing each other.
  */
 import type { GetInfoResponse } from '@cashu/cashu-ts';
-import type { AuditMintResponse } from '@/shared/lib/apiClient';
+import type { AuditMintResponse } from '@sovranbitcoin/schemas';
+
+/** Historical cache payload only; no live endpoint returns this shape anymore. */
+export type LegacyMintAudit = Omit<AuditMintResponse, 'info'> & { info?: unknown };
 
 export interface MintMetadataEntry {
   // identity (NUT-06 info + discover identity) — 24h
@@ -30,13 +33,18 @@ export interface MintMetadataEntry {
   favouriteCount?: number;
   reviewsAt?: number;
   // audit — raw blob (swap detail) + derived scalars — 60m
-  auditData?: AuditMintResponse;
+  auditData?: LegacyMintAudit;
   auditScore?: number | null;
   auditState?: string;
   nMints?: number;
   nMelts?: number;
   nErrors?: number;
   auditAt?: number;
+  uptime24h?: number;
+  avgLatencyMs?: number;
+  auditSource?: 'ucash' | '8333';
+  /** Upstream timestamp retained verbatim, distinct from local auditAt. */
+  auditUpdatedAt?: number | string;
   // social / operator — 30m
   contactFollowers?: number;
   contactReputation?: number | null;

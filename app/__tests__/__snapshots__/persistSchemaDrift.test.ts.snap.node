@@ -768,9 +768,27 @@ exports[`persisted schema drift mint-metadata-store schema matches the golden sn
                   },
                 ],
               },
+              "auditSource": {
+                "enum": [
+                  "8333",
+                  "ucash",
+                ],
+                "type": "string",
+              },
               "auditState": {
                 "maxLength": 32,
                 "type": "string",
+              },
+              "auditUpdatedAt": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                  },
+                  {
+                    "maxLength": 128,
+                    "type": "string",
+                  },
+                ],
               },
               "averageScore": {
                 "anyOf": [
@@ -781,6 +799,9 @@ exports[`persisted schema drift mint-metadata-store schema matches the golden sn
                     "type": "null",
                   },
                 ],
+              },
+              "avgLatencyMs": {
+                "type": "number",
               },
               "contactFollowers": {
                 "maximum": 9007199254740991,
@@ -872,6 +893,9 @@ exports[`persisted schema drift mint-metadata-store schema matches the golden sn
                 },
                 "maxItems": 64,
                 "type": "array",
+              },
+              "uptime24h": {
+                "type": "number",
               },
               "vertexRank": {
                 "type": "number",
@@ -917,9 +941,27 @@ exports[`persisted schema drift mint-metadata-store schema matches the golden sn
                   },
                 ],
               },
+              "auditSource": {
+                "enum": [
+                  "8333",
+                  "ucash",
+                ],
+                "type": "string",
+              },
               "auditState": {
                 "maxLength": 32,
                 "type": "string",
+              },
+              "auditUpdatedAt": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                  },
+                  {
+                    "maxLength": 128,
+                    "type": "string",
+                  },
+                ],
               },
               "averageScore": {
                 "anyOf": [
@@ -930,6 +972,9 @@ exports[`persisted schema drift mint-metadata-store schema matches the golden sn
                     "type": "null",
                   },
                 ],
+              },
+              "avgLatencyMs": {
+                "type": "number",
               },
               "contactFollowers": {
                 "maximum": 9007199254740991,
@@ -1021,6 +1066,9 @@ exports[`persisted schema drift mint-metadata-store schema matches the golden sn
                 },
                 "maxItems": 64,
                 "type": "array",
+              },
+              "uptime24h": {
+                "type": "number",
               },
               "vertexRank": {
                 "type": "number",

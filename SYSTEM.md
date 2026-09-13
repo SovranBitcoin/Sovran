@@ -439,7 +439,7 @@ Zustand invokes migration for an incoming version; it does not automatically run
 
 Required existing starting points: [persist round-trip](app/__tests__/persistRoundTrip.test.ts), [schema drift](app/__tests__/persistSchemaDrift.test.ts), [enum tolerance](app/__tests__/persistedEnumTolerance.test.ts), and [settings resilience](app/__tests__/settingsStorePersistResilience.test.ts). They are evidence for the paths they test, not a universal corruption-recovery guarantee.
 
-**Follow-up:** generic merge rejection still falls back to defaults. Critical stores need a deliberate recovery/preservation path rather than treating corrupted identity/funds data like disposable cache. [apiClient](app/shared/lib/apiClient.ts) also contains explicit local relaxations of external profile/auditor schemas; reconcile them against the producer and installed shared schema before deletion.
+**Follow-up:** generic merge rejection still falls back to defaults. Critical stores need a deliberate recovery/preservation path rather than treating corrupted identity/funds data like disposable cache. [apiClient](app/shared/lib/apiClient.ts) also contains explicit local relaxations of external profile schemas; reconcile them against the producer and installed shared schema before deletion.
 
 ## 14. Cache ownership and freshness
 
@@ -458,7 +458,7 @@ Current cache choices are intentionally different: [home-feed page 0](app/featur
 | Profile boot snapshot | Debounced persistence mirror of facade data, not an independent profile authority |
 | Raw relay-event caching | NDK SQLite where that transport is used |
 | Mint/proof/quote state | Coco persistent database and operation APIs |
-| Mint metadata/catalog display | Existing metadata/fetch cache; not spendability evidence |
+| Mint metadata/catalog display | `mintMetadataStore`, seeded by Nagg discovery; single-mint misses use `/nostr/mint/discover?mint=`; not spendability evidence |
 | BTC display prices | Global `pricelistStore`; `pricelistFeed` polls Nagg `/app/rates` through `apiClient` every ten minutes, retaining omitted currencies |
 | Wallpaper catalog | Global persisted `wallpaperStore`; `wallpaperSync` refreshes Nagg `/app/wallpapers` through `apiClient`, retaining the last catalog and fetch timestamp on request/parse failure |
 | BTC Map places | Global persisted `btcMapStore`; Nagg `/app/btcmap/places` and `/app/btcmap/places/{id}`, with one-hour list and 24-hour detail freshness; failed list refreshes retain stale places |
@@ -477,6 +477,19 @@ one-minute, two-minute, then five-minute capped ladder. Teardown aborts in-fligh
 work and ignores late completions. The local rates schema in `apiClient` is a
 temporary boundary until `@sovranbitcoin/schemas` publishes this shape and
 deprecates its WebSocket message schema.
+
+Mint audit reads share `getDiscoveredMintMetadata`: a fresh audit group returns
+from `mintMetadataStore`; stale/missing groups fetch single-mint discovery and
+write through `upsertFromDiscover`. Unknown mints contribute no audit fields;
+request failures retain cached metadata. Discovery stores uptime, latency,
+auditor provenance and its upstream timestamp separately from local freshness.
+Its audit score uses successful mint/melt counts divided by those successes plus
+errors, scaled to five; absent counts or zero operations have no score. Fresh
+scalars take precedence over retained legacy audit blobs. Those blobs remain
+readable for historical swap detail; discovery does not supply swap edges.
+Rebalance suggestions can use retained observations and local swap history,
+never aggregate health as proof of a route. Neither cache freshness nor an
+upstream audit timestamp establishes quote validity or proof spendability.
 
 Return usable cached data before background revalidation; retain it on transient refresh failure. Use explicit fresh checks for payment-critical decisions. A metadata TTL is not a guarantee that a quote is valid or proofs are unspent. Preserve provenance/fetched time and expose degraded/stale state when it affects a decision.
 
@@ -501,6 +514,12 @@ Wallpaper and BTC Map reads use Nagg's `app` module through
 module or a generic relay-query endpoint. Keep the existing shared catalog,
 places-array, and place-object schemas tolerant of extra fields; retain `osm:*`
 detail properties. See [backend services](docs/architecture/backend-services.md).
+
+Mint list and single-mint audit discovery both use the Nagg `nostr` module via
+`apiClient` and the score host. `discoverMint(mintUrl, controls)` encodes the
+`mint` query parameter, parses the same loose discovery row as the list, and
+returns no row for an unknown mint. The retired audit HTTP endpoint and its
+runtime response parser are removed; legacy cache typing stays with metadata.
 
 Use caller cancellation plus a bounded per-request deadline. The app signal helper currently defaults to 10 seconds and the wallet helper to 15 seconds; these are different boundary defaults, not values to unify blindly. A screen leaving may cancel optional reads, but cannot establish that an already-submitted financial operation stopped remotely.
 
@@ -874,10 +893,11 @@ Use `app.json` for stable declarative config, `app.config.js` for intentional bu
 Public build variables are not secret storage. Validate required configuration at its boundary, distinguish development/preview/production, and make production failure explicit instead of falling back to a developer endpoint. Do not print secret values while diagnosing config. Keep ignored environments, credentials, databases, and generated build artifacts out of commits and audit documents.
 
 `backendConfig.scoreApiBaseUrl` owns Nagg app-service routing, including rates,
-version checks, AI lineup, wallpapers, and BTC Map. It defaults to the configured
+version checks, AI lineup, wallpapers, BTC Map, and mint discovery. It defaults to the configured
 Nostr app-view host and supports a separate score-host override for deployment
 composition. Catalog routes require the `app` module; their availability must
-not depend on enabling generic Nostr queries.
+not depend on enabling generic Nostr queries. Mint discovery requires the
+`nostr` module. The separate legacy app API host setting has been removed.
 
 Scripts need a clear name, working directory, required inputs, outputs, side effects, and exit status. Read-only checks must not silently refresh dependencies, rewrite a budget, delete native projects, or submit a release. Generators should stage results and replace output only after validation. Use Node/Bun/Python/shell according to the tool's existing implementation; do not add a runtime for a trivial task.
 

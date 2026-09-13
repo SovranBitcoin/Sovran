@@ -16,7 +16,6 @@ const PUBKEY = '82341f05fdb1dffbc78894993292171ed03abbed34a95f22f55f9b6371723ee6
 const ENV_KEYS = [
   'EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL',
   'EXPO_PUBLIC_NAGG_BASE_URL',
-  'EXPO_PUBLIC_API_BASE_URL',
   'EXPO_PUBLIC_SCORE_API_BASE_URL',
   'EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT',
 ] as const;
@@ -64,7 +63,6 @@ describe('apiClient backend config routing', () => {
   it.each([undefined, '0.1.2'])(
     'routes version checks to nagg and preserves minVersion=%s',
     async (minVersion) => {
-      process.env.EXPO_PUBLIC_API_BASE_URL = 'https://api.example.test/api/';
       process.env.EXPO_PUBLIC_SCORE_API_BASE_URL = 'https://score.example.test/';
       const { getLatestVersion } =
         jest.requireActual<typeof import('@/shared/lib/apiClient')>('@/shared/lib/apiClient');
@@ -100,26 +98,59 @@ describe('apiClient backend config routing', () => {
     }
   );
 
+  it('encodes a single mint query on the score host and parses discovery metrics', async () => {
+    process.env.EXPO_PUBLIC_SCORE_API_BASE_URL = 'https://score.example.test/';
+    const { discoverMint } =
+      jest.requireActual<typeof import('@/shared/lib/apiClient')>('@/shared/lib/apiClient');
+    const mintUrl = 'https://mint.example.test/path?unit=sat&other=1';
+    const row = {
+      mintUrl,
+      averageScore: null,
+      reviewCount: 0,
+      state: 'OK',
+      uptime24h: 0,
+      avgLatencyMs: 0,
+      auditSource: '8333',
+      auditUpdatedAt: 123,
+      nuts: { '4': { methods: [{ method: 'bolt11', unit: 'sat' }] } },
+      futureField: true,
+    };
+    const signal = new AbortController().signal;
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ mints: [row] }) });
+    const result = await discoverMint(mintUrl, { signal, timeoutMs: 100 });
+    expect(mockFetch).toHaveBeenCalledWith(
+      `https://score.example.test/nostr/mint/discover?mint=${encodeURIComponent(mintUrl)}`,
+      expect.objectContaining({ signal })
+    );
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) expect(result.value).toEqual(row);
+  });
+
+  it('returns no discovery row for an unknown mint', async () => {
+    const { discoverMint } =
+      jest.requireActual<typeof import('@/shared/lib/apiClient')>('@/shared/lib/apiClient');
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ mints: [] }) });
+    const result = await discoverMint('https://unknown.example');
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) expect(result.value).toBeUndefined();
+  });
+
   it('routes Nostr profile through app-view REST', async () => {
-    process.env.EXPO_PUBLIC_API_BASE_URL = 'https://api.example.test/api/';
     process.env.EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL = 'http://localhost:8080/';
 
-    const { auditMint, fetchNostrProfile } =
+    const { fetchNostrProfile } =
       jest.requireActual<typeof import('@/shared/lib/apiClient')>('@/shared/lib/apiClient');
 
     await fetchNostrProfile(PUBKEY);
-    await auditMint({ mintUrl: 'https://mint.example.test' });
 
     // Profile search moved to the tier-selecting facade (searchProfilesViaFacade),
     // so apiClient no longer issues a GraphQL ProfileSearch here.
     expect(mockFetch.mock.calls.map(([url]) => url)).toEqual([
       `http://localhost:8080/nostr/profile?pubkey=${PUBKEY}`,
-      'https://api.example.test/api/cashu/mint/audit?mintUrl=https%3A%2F%2Fmint.example.test',
     ]);
   });
 
   it('routes mint reviews through the REST app-view', async () => {
-    process.env.EXPO_PUBLIC_API_BASE_URL = 'https://api.example.test/api/';
     process.env.EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL = 'http://localhost:8080/';
     mockFetchMintReviews.mockResolvedValueOnce({
       mintUrl: 'https://mint.example.test',

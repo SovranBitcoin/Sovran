@@ -1,5 +1,4 @@
-import type { AuditMintResponse } from '@/shared/lib/apiClient';
-import type { MintMetadataEntry } from '@/shared/stores/global/mintMetadataTypes';
+import type { LegacyMintAudit, MintMetadataEntry } from '@/shared/stores/global/mintMetadataTypes';
 
 interface AuditInfo {
   url: string;
@@ -30,7 +29,7 @@ interface AuditInfo {
  * Identical results were hand-coded twice in `useAuditedMint` and
  * `useAuditedMints`; this is the single canonical implementation.
  */
-export function transformAuditData(auditData: AuditMintResponse): AuditInfo {
+export function transformAuditData(auditData: LegacyMintAudit): AuditInfo {
   const swaps = auditData.swaps || [];
   const swapTotal = swaps.length;
   const swapSuccess = swaps.reduce((acc, s) => acc + (s.state === 'OK' ? 1 : 0), 0);
@@ -86,8 +85,8 @@ interface MintMetaProjection {
  * presentation scalars." Both the catalog reader (`getMintCatalog`) and the
  * send-flow enrichment bridge project the same audit/review/social fields;
  * centralizing the raw-blob-vs-discover-scalars fallback and the reputation
- * rounding here keeps them from drifting (the swap-score formula lives only in
- * `transformAuditData`). Lives next to that transform — a runtime leaf — so
+ * rounding here keeps them from drifting. Legacy swap scores live in
+ * `transformAuditData`; discovery operation scores are written by the store. Lives next to that transform — a runtime leaf — so
  * importing it never drags the network layer into a consumer.
  */
 export function projectMintMeta(meta: MintMetadataEntry | undefined): MintMetaProjection {
@@ -101,19 +100,16 @@ export function projectMintMeta(meta: MintMetadataEntry | undefined): MintMetaPr
     p.contactReputation = Math.round(meta.contactReputation);
   }
 
-  if (meta.auditData) {
-    const audit = transformAuditData(meta.auditData);
-    p.audit = audit;
-    if (audit.score !== undefined) p.auditScore = audit.score;
-    p.auditState = audit.state;
-    p.auditMints = audit.auditorData.mints;
-    p.auditMelts = audit.auditorData.melts;
-  } else if (meta.auditState !== undefined || meta.auditScore != null) {
-    // Discover-seeded entries carry audit scalars without the raw swap blob.
-    if (meta.auditScore != null) p.auditScore = meta.auditScore;
-    if (meta.auditState !== undefined) p.auditState = meta.auditState;
-    if (meta.nMints != null) p.auditMints = meta.nMints;
-    if (meta.nMelts != null) p.auditMelts = meta.nMelts;
-  }
+  // Legacy swap detail remains available, but fresh discovery scalars win.
+  const audit = meta.auditData ? transformAuditData(meta.auditData) : undefined;
+  if (audit) p.audit = audit;
+  const score = meta.auditScore !== undefined ? meta.auditScore : audit?.score;
+  if (score != null) p.auditScore = score;
+  const state = meta.auditState ?? audit?.state;
+  if (state !== undefined) p.auditState = state;
+  const mints = meta.nMints ?? audit?.auditorData.mints;
+  const melts = meta.nMelts ?? audit?.auditorData.melts;
+  if (mints != null) p.auditMints = mints;
+  if (melts != null) p.auditMelts = melts;
   return p;
 }
