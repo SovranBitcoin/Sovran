@@ -24,8 +24,7 @@ describe('service error presentation', () => {
     expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
         label: 'Failed to send message',
-        description:
-          'The AI service could not find the requested model or endpoint (404). Try again later. If this continues, contact support.',
+        description: 'The AI provider is unreachable right now. Try again in a minute.',
       })
     );
     expect(showSheet).not.toHaveBeenCalled();

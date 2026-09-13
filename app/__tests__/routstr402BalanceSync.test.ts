@@ -72,6 +72,7 @@ function stubFetch402(body: unknown) {
 }
 
 describe('402 → balance truth-sync', () => {
+  beforeEach(() => useRoutstrStore.getState().setApiKey('sk-test'));
   // eslint-disable-next-line no-restricted-properties -- restore seam for the stub
   const realFetch = global.fetch;
   afterEach(() => {
@@ -87,6 +88,29 @@ describe('402 → balance truth-sync', () => {
       sendMessage('sk-test', [{ role: 'user', content: 'hi' }], { model: 'gemma-4-26b-a4b-it' })
     ).rejects.toMatchObject({ status: 402 });
 
+    expect(useRoutstrStore.getState().balance).toBe(216);
+  });
+
+  it.each([
+    [{ reason: 'Insufficient balance', amount_required_msat: 85577, balance_msat: 216 }, 216],
+    [{ reason: 'Insufficient balance', amount_required_msat: 85577 }, 299841],
+    [{ message: 'Insufficient balance', amount_required_msat: 85577, balance_msat: 0 }, 0],
+    [{ reason: 'Insufficient balance', amount_required_msat: 85577, balance_msat: -1 }, 299841],
+  ])('parses the v0.4.7 detail object without inventing a balance', async (detail, expected) => {
+    useRoutstrStore.getState().setBalance(299841);
+    stubFetch402({ detail });
+    await expect(sendMessage('sk-test', [], { model: 'test-model' })).rejects.toMatchObject({
+      status: 402,
+      error: { message: 'Insufficient balance', details: { required: 85577 } },
+    });
+    expect(useRoutstrStore.getState().balance).toBe(expected);
+  });
+
+  it('keeps the legacy FastAPI string balance extraction', async () => {
+    stubFetch402({ detail: 'Insufficient balance: 85577 mSats required, 216 available' });
+    await expect(sendMessage('sk-test', [], { model: 'test-model' })).rejects.toMatchObject({
+      error: { details: { required: 85577, available: 216 } },
+    });
     expect(useRoutstrStore.getState().balance).toBe(216);
   });
 

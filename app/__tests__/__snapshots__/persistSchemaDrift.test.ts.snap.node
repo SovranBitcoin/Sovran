@@ -3704,6 +3704,14 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
           ],
           "default": null,
         },
+        "authMode": {
+          "default": "bearer",
+          "enum": [
+            "bearer",
+            "x-cashu",
+          ],
+          "type": "string",
+        },
         "balance": {
           "anyOf": [
             {
@@ -5184,6 +5192,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                   ],
                   "type": "object",
                 },
+                "nodeBaseUrl": {
+                  "anyOf": [
+                    {
+                      "maxLength": 512,
+                      "type": "string",
+                    },
+                    {
+                      "type": "null",
+                    },
+                  ],
+                  "default": null,
+                },
               },
               "required": [
                 "lineup",
@@ -5213,6 +5233,19 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
             {
               "maxLength": 256,
               "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
+        "serverLineupAt": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
             },
             {
               "type": "null",
@@ -5375,6 +5408,14 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
             },
           ],
           "default": null,
+        },
+        "authMode": {
+          "default": "bearer",
+          "enum": [
+            "bearer",
+            "x-cashu",
+          ],
+          "type": "string",
         },
         "balance": {
           "anyOf": [
@@ -7026,6 +7067,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                   ],
                   "type": "object",
                 },
+                "nodeBaseUrl": {
+                  "anyOf": [
+                    {
+                      "maxLength": 512,
+                      "type": "string",
+                    },
+                    {
+                      "type": "null",
+                    },
+                  ],
+                  "default": null,
+                },
               },
               "required": [
                 "derivedAt",
@@ -7056,6 +7109,19 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
             {
               "maxLength": 256,
               "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
+        "serverLineupAt": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
             },
             {
               "type": "null",
@@ -7107,6 +7173,8 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
         },
       },
       "required": [
+        "authMode",
+        "serverLineupAt",
         "apiKey",
         "balance",
         "selectedModel",

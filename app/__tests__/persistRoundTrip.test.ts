@@ -208,6 +208,33 @@ describe('persisted store round-trip', () => {
     expect(entry.schema.parse(persisted)).toMatchObject({ lastKnownAppVersion });
   });
 
+  it('round-trips Routstr auth and the last working node with its server timestamp', () => {
+    const { useRoutstrStore } =
+      require('@/shared/stores/profile/routstrStore') as typeof import('@/shared/stores/profile/routstrStore');
+    const { emptyLineup } =
+      require('@/shared/lib/routstr/lineup') as typeof import('@/shared/lib/routstr/lineup');
+    const entry = persistRegistry.find((store) => store.name === 'routstr-store')!;
+    const lastKnownLineup = {
+      derivedAt: 123,
+      lineup: emptyLineup(),
+      nodeBaseUrl: 'https://working.example',
+    };
+    const state = {
+      ...useRoutstrStore.getState(),
+      authMode: 'x-cashu' as const,
+      serverLineupAt: 123,
+      lastKnownLineup,
+    };
+    const persisted = JSON.parse(
+      JSON.stringify(useRoutstrStore.persist.getOptions().partialize!(state))
+    );
+    expect(entry.schema.parse(persisted)).toMatchObject({
+      authMode: 'x-cashu',
+      serverLineupAt: 123,
+      lastKnownLineup,
+    });
+  });
+
   it('covers every persistConfig caller in the source tree', () => {
     const callers = sourceFilesCalling(/persistConfig\s*[<(]/).filter(
       (f) => !f.endsWith('persist/persistConfig.ts') && !NOT_A_CONCRETE_STORE.includes(f)

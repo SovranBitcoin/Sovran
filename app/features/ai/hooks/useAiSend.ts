@@ -6,11 +6,15 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import {
   sendMessage,
+  isModelRejectedError,
+  isRoutstrNodeFailure,
   checkBalance,
   measureMessageContent,
   ROUTSTR_MAX_COMPLETION_TOKENS,
   type RoutstrChatMessage,
 } from '@/shared/lib/routstr/api';
+import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { isAbortError } from 'wallet/safeFetch';
 import { pickFinalizeMessage } from '../lib/finalize';
 import { actionMenuPopup, staticPopup, paramPopup } from '@/shared/lib/popup';
@@ -62,43 +66,6 @@ const STREAM_STALL_THRESHOLD_MS = 500;
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
- * Whether a connect-time failure should bump the request to the next
- * candidate model in the same tier. Auth (401), payment (402), and rate
- * limit (429) all repeat across providers — retrying just wastes balance.
- * Network failures and gateway/server errors (502/503/504/500) are the
- * cases where the next provider in the tier is genuinely worth a shot.
- *
- * Mid-stream errors are NOT retried here: by then the assistant placeholder
- * has shown to the user and we'd have to discard partial state.
- */
-function isRetryableConnectError(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false;
-  const status = (err as { status?: number }).status;
-  if (status == null) return false;
-  if (status === 0) return true; // network_error / fetch threw
-  return status >= 500 && status <= 599;
-}
-
-/**
- * Whether a connect-time failure means THIS model id is bad rather than
- * the request as a whole — a retired/unknown id on an OpenAI-compatible
- * API surfaces as 404, or 400 with a model-referencing message. These
- * must also advance the candidate chain: the dynamic lineup's last-known
- * fallback can legitimately hold an id the catalog has since dropped, and
- * without this the very first dead candidate would hard-fail the send the
- * chain exists to absorb. Auth (401), payment (402), and rate limit (429)
- * stay non-retryable — they repeat identically across models.
- */
-function isModelRejectedError(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false;
-  const status = (err as { status?: number }).status;
-  if (status === 404) return true;
-  if (status !== 400) return false;
-  const message = (err as { error?: { message?: string } }).error?.message ?? '';
-  return /model/i.test(message);
-}
-
-/**
  * Encapsulates the routstr send + stream + balance-refresh flow for the AI
  * tab. Two entry points share the same streaming core:
  *
@@ -117,8 +84,8 @@ function isModelRejectedError(err: unknown): boolean {
  *   - Persist the final assistant payload (content + reasoning + thinking
  *     duration + cost) in ONE atomic write via `finalizeAssistantMessage`,
  *     preserving the placeholder's id / parentId / role / timestamp.
- *   - Walk the tier candidate list on connect-time failures (5xx/network)
- *     to fall through to the next provider before surfacing an error.
+ *   - Refresh the lineup on connect-time node/model failures, retrying
+ *     once with the refreshed Auto entry. Never replay a started stream.
  *   - Snapshot balance before send, compute `costSats` from the post-stream
  *     `checkBalance()` diff, and stamp it on the message asynchronously.
  *   - Cashu-token-redeem flow is intentionally out of scope (still lives in
@@ -207,6 +174,7 @@ export function useAiSend() {
         return;
       }
 
+      const profile = useProfileStore.getState().activeAccountIndex;
       const storeState = useRoutstrStore.getState();
       const balanceBeforeMsats = storeState.balance ?? 0;
       const balanceSats = Math.floor(balanceBeforeMsats / 1000);
@@ -262,7 +230,7 @@ export function useAiSend() {
         }
       }
       const primaryModel = primaryEntry.modelId;
-      const candidateChain = candidateEntries.map((e) => e.modelId);
+      let candidateChain = candidateEntries.map((e) => e.modelId);
 
       setStatus({ isSending: true, streamingMessageId: assistantMessageId });
       // Captures `Date.now()` for the live "Thinking for X seconds"
@@ -341,8 +309,13 @@ export function useAiSend() {
 
         let stream: AsyncIterable<any> | undefined;
         let lastConnectErr: unknown = null;
+        let recoveryRetried = false;
         for (let i = 0; i < candidateChain.length; i++) {
+          if (useProfileStore.getState().activeAccountIndex !== profile) return;
+          if (controller.signal.aborted) throw { status: 0, error: { type: 'aborted' } };
           const candidate = candidateChain[i];
+          modelToUse = candidate;
+          const requestNode = useRoutstrStore.getState().nodeBaseUrl;
           // Always send max_tokens: Routstr only discounts the completion
           // side of its upfront balance reservation when the request bounds
           // it — omitting max_tokens makes the node demand the model's FULL
@@ -355,7 +328,9 @@ export function useAiSend() {
               ? Math.min(ROUTSTR_MAX_COMPLETION_TOKENS, candidateCeiling)
               : ROUTSTR_MAX_COMPLETION_TOKENS;
           try {
-            const result = await sendMessage(apiKey, apiMessages, {
+            const currentKey = useRoutstrStore.getState().apiKey;
+            if (!currentKey) throw { status: 401, error: { message: 'Missing key', type: 'auth' } };
+            const result = await sendMessage(currentKey, apiMessages, {
               model: candidate,
               temperature: 0.7,
               max_tokens: maxTokens,
@@ -376,9 +351,33 @@ export function useAiSend() {
             break;
           } catch (err) {
             lastConnectErr = err;
-            if (isAbortError(err)) throw err;
-            const advance = isRetryableConnectError(err) || isModelRejectedError(err);
-            if (!advance || i === candidateChain.length - 1) throw err;
+            if (isAbortError(err) || controller.signal.aborted) throw err;
+            const modelRejected = isModelRejectedError(err, candidate);
+            const nodeFailed = isRoutstrNodeFailure(err);
+            if (!modelRejected && !nodeFailed) throw err;
+            const refreshed = await refreshRoutstrLineup('failure');
+            if (useProfileStore.getState().activeAccountIndex !== profile) return;
+            if (controller.signal.aborted) throw { status: 0, error: { type: 'aborted' } };
+            const current = useRoutstrStore.getState();
+            const nodeChanged = current.nodeBaseUrl !== requestNode;
+            if (!recoveryRetried && (nodeChanged || (modelRejected && refreshed))) {
+              const entry = resolveSelectedEntry(
+                provider.id,
+                'auto',
+                Math.floor((current.balance ?? 0) / 1000),
+                current.lineup
+              );
+              if (entry && (imageCount === 0 || entry.visionInput)) {
+                recoveryRetried = true;
+                candidateEntries = [entry];
+                candidateChain = [entry.modelId];
+                i = -1;
+                aiLog.info('ai.send.lineup_retry', { flowId, nodeChanged });
+                continue;
+              }
+            }
+            // Repeating a node-level failure across models cannot repair the node.
+            if (nodeFailed || recoveryRetried || i === candidateChain.length - 1) throw err;
             aiLog.warn('ai.send.candidate_failed', {
               flowId,
               tier: tier.id,
@@ -556,8 +555,12 @@ export function useAiSend() {
         // call awaits it before snapshotting balanceBeforeMsats — without that
         // a retry tap during balance refresh re-uses the stale store balance
         // and double-counts the cost diff.
-        const balancePromise = checkBalance(apiKey, { signal: controller.signal })
+        const balanceKey = useRoutstrStore.getState().apiKey;
+        if (!balanceKey) return;
+        const balancePromise = checkBalance(balanceKey, { signal: controller.signal })
           .then((data) => {
+            if (useProfileStore.getState().activeAccountIndex !== profile) return;
+            if (controller.signal.aborted) return;
             setBalance(data.balance);
             const costMsats = balanceBeforeMsats - data.balance;
             const costSats = costMsats > 0 ? Math.ceil(costMsats / 1000) : undefined;
@@ -612,13 +615,14 @@ export function useAiSend() {
           })
           .catch((err) => {
             if (isAbortError(err)) return;
-            aiLog.warn('ai.send.balance_refresh_failed', { flowId, err });
+            aiLog.warn('ai.send.balance_refresh_failed', { flowId });
           });
         balancePromiseRef.current = balancePromise;
 
         span.end({ outcome: 'ok', chunks: chunkCount, chars: fullContent.length });
       } catch (err: any) {
-        if (isAbortError(err)) {
+        if (useProfileStore.getState().activeAccountIndex !== profile) return;
+        if (isAbortError(err) || controller.signal.aborted) {
           aiLog.info('ai.send.aborted', { flowId });
           removeMessages(new Set([assistantMessageId]));
           span.end({ outcome: 'aborted' });
@@ -628,7 +632,6 @@ export function useAiSend() {
           flowId,
           status: err?.status,
           type: err?.error?.type,
-          err,
         });
         span.end({ outcome: 'error', status: err?.status });
         // Drop the placeholder on failure so the chat list doesn't show an
@@ -656,6 +659,7 @@ export function useAiSend() {
             title: 'Insufficient balance',
             buttons: [
               {
+                testID: 'ai-insufficient-balance-auto',
                 text: 'Switch to Auto',
                 description: detail,
                 icon: AUTO_ICON,
@@ -673,6 +677,7 @@ export function useAiSend() {
                 },
               },
               {
+                testID: 'ai-insufficient-balance-topup',
                 text: 'Top up',
                 icon: 'fluent:wallet-20-filled',
                 onPress: (close) => {
