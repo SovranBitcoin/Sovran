@@ -50,7 +50,7 @@ test('marketing source and generated artwork never enter the app import graph', 
 
 test('the guard recognizes static, dynamic, CommonJS and re-export paths', () => {
   const source = [
-    "import art from '../../marketing/featured/generated/wide.png';",
+    "import art from '../../marketing/artwork/generated/wallet/wide.png';",
     "export { art } from '../marketing/art';",
     "const art = require('../../marketing/art.png');",
     "void import('../../marketing/art');",

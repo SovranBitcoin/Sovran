@@ -1,0 +1,21 @@
+{
+  "id": "ai-models",
+  "platform": "ios",
+  "screenshots": [
+    "ai-model-picker"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "ai-models"
+}

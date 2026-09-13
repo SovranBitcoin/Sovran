@@ -17,10 +17,10 @@
     "nostr-tools": "2.24.2"
   },
   "scripts": {
-    "assets:generate": "node scripts/assets.mjs && node scripts/feature-graphic.mjs && node scripts/featured-artwork.mjs --skip-missing",
-    "assets:check": "node scripts/assets.mjs --check && node scripts/feature-graphic.mjs --check && node scripts/featured-artwork.mjs --check --skip-missing",
+    "assets:generate": "node scripts/assets.mjs && node scripts/artwork.mjs --allow-missing",
+    "assets:check": "node scripts/assets.mjs --check && node scripts/artwork.mjs --check --allow-missing",
     "assets:brand": "node scripts/brand-assets.mjs",
-    "assets:test": "node --test scripts/brand-assets.test.mjs scripts/featured-artwork.test.mjs",
+    "assets:test": "node --test scripts/brand-assets.test.mjs scripts/artwork.test.mjs",
     "postinstall": "cd app && node scripts/dedupe-coco.js && node modules/bitchat-module/scripts/patch-bitchat-imports.js && node modules/bitchat-module/scripts/sync-bitchat-android.js && node ../scripts/brand-assets.mjs",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
@@ -48,8 +48,8 @@
     "legal:sync": "node scripts/legal.mjs --sync-site",
     "legal:check": "node scripts/legal.mjs --check-site",
     "legal:publication-check": "node scripts/legal.mjs --publication-check",
-    "assets:feature": "node scripts/feature-graphic.mjs",
-    "assets:feature:check": "node scripts/feature-graphic.mjs --check"
+    "assets:artwork": "node scripts/artwork.mjs",
+    "assets:artwork:check": "node scripts/artwork.mjs --check"
   },
   "devDependencies": {
     "opentype.js": "2.0.0",

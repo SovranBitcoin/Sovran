@@ -1,0 +1,23 @@
+{
+  "id": "portal-artemis",
+  "platform": "ios",
+  "screenshots": [
+    "wallet-in-eclipse"
+  ],
+  "background": {
+    "kind": "wallpaper",
+    "wallpaperId": "in-eclipse",
+    "album": "artemis-ii-collection"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "portal-artemis"
+}
