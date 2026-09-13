@@ -4,7 +4,8 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import * as ImagePicker from 'expo-image-picker';
-import { Input, Label, TextField } from 'heroui-native';
+import { Description, Input, Label, TextField } from 'heroui-native';
+import * as nip19 from 'nostr-tools/nip19';
 import { ResultAsync } from 'neverthrow';
 import { z } from 'zod';
 import Svg, { Circle } from 'react-native-svg';
@@ -21,6 +22,19 @@ import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useOwnedMediaStore } from '@/shared/stores/profile/ownedMediaStore';
 import {
+  useOwnProfileMetadataStore,
+  type ProfileHistoryField,
+} from '@/shared/stores/profile/ownProfileMetadataStore';
+import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
+import { getNpcAddress } from '@/shared/lib/cashu/npc';
+import {
+  checkAbout,
+  checkLud16,
+  checkNip05,
+  ABOUT_MAX_LENGTH,
+  type ProfileFieldCheck,
+} from '@/shared/lib/nostr/profile/profileFieldValidation';
+import {
   ingestOwnProfileMetadata,
   loadOwnProfileMetadata,
   publishOwnProfileMetadata,
@@ -34,6 +48,72 @@ import { nostrLog } from '@/shared/lib/logger';
 
 const ImageUrlSchema = z.url().refine((value) => new URL(value).protocol === 'https:');
 const textValue = (value: unknown): string => (typeof value === 'string' ? value : '');
+
+/** The editable kind-0 fields, as the editor holds them (empty = absent). */
+interface ProfileDraft {
+  name: string;
+  picture: string | null;
+  lud16: string;
+  nip05: string;
+  about: string;
+}
+function draftFromContent(content: Record<string, unknown>): ProfileDraft {
+  return {
+    name: textValue(content.display_name) || textValue(content.name),
+    picture: textValue(content.picture) || null,
+    lud16: textValue(content.lud16),
+    nip05: textValue(content.nip05),
+    about: textValue(content.about),
+  };
+}
+/** Empty string → key removed (`null`); unchanged fields are left out. */
+function patchBetween(base: ProfileDraft, next: ProfileDraft) {
+  const text = (field: 'lud16' | 'nip05' | 'about') =>
+    next[field] !== base[field] ? { [field]: next[field] || null } : {};
+  return {
+    ...(next.name !== base.name ? { name: next.name } : {}),
+    ...(next.picture !== base.picture ? { picture: next.picture } : {}),
+    ...text('lud16'),
+    ...text('nip05'),
+    ...text('about'),
+  };
+}
+
+/** Previous values of one field as one-tap chips (newest first). */
+function HistoryChips({
+  field,
+  current,
+  disabled,
+  onPick,
+}: {
+  field: ProfileHistoryField;
+  current: string;
+  disabled: boolean;
+  onPick: (value: string) => void;
+}) {
+  const entries = useOwnProfileMetadataStore((s) => s.history[field]);
+  const choices = (entries ?? []).filter((entry) => entry.value !== current);
+  if (choices.length === 0) return null;
+  return (
+    <View className="mt-2 flex-row flex-wrap gap-2">
+      {choices.map((entry, index) => (
+        <CapsuleButton
+          key={entry.value}
+          label={entry.value}
+          fitContent
+          height={32}
+          textSize={13}
+          labelNumberOfLines={1}
+          accessibilityLabel={`Use previous ${field}: ${entry.value}`}
+          testID={`edit-profile-history-${field}-${index}`}
+          onPress={() => {
+            if (!disabled) onPick(entry.value);
+          }}
+        />
+      ))}
+    </View>
+  );
+}
 
 export function SettingsEditProfileScreen() {
   const profile = useProfileStore((s) => s.getActiveProfile());
@@ -63,12 +143,20 @@ function ProfileEditor({
   const { ndk } = useNDK();
   const { isInitialized } = useNostrNDKContext();
   const foreground = useThemeColor('foreground');
-  const [base, setBase] = useState<{ name: string; picture: string | null }>({
+  const cachedDraft: ProfileDraft = {
     name: cachedName ?? '',
     picture: cachedPicture ?? null,
-  });
-  const [name, setName] = useState(cachedName ?? '');
-  const [picture, setPicture] = useState<string | null>(cachedPicture ?? null);
+    lud16: '',
+    nip05: '',
+    about: '',
+  };
+  const [base, setBase] = useState<ProfileDraft>(cachedDraft);
+  const [draft, setDraft] = useState<ProfileDraft>(cachedDraft);
+  const { name, picture, lud16, nip05, about } = draft;
+  const setField = <K extends keyof ProfileDraft>(field: K, value: ProfileDraft[K]) =>
+    setDraft((previous) => ({ ...previous, [field]: value }));
+  const setName = (value: string) => setField('name', value);
+  const setPicture = (value: string | null) => setField('picture', value);
   const [ready, setReady] = useState(false);
   const [missingBase, setMissingBase] = useState(false);
   const [initialLoad, setInitialLoad] = useState<OwnProfileLoadResult>({ status: 'unavailable' });
@@ -97,15 +185,17 @@ function ProfileEditor({
       setInitialLoad(loaded);
       const snapshot = loaded.status === 'found' ? loaded.snapshot : null;
       if (snapshot) ingestOwnProfileMetadata(snapshot, pubkey, accountIndex);
-      const next = snapshot
-        ? {
-            name: textValue(snapshot.content.display_name) || textValue(snapshot.content.name),
-            picture: textValue(snapshot.content.picture) || null,
-          }
-        : { name: cached.current.name ?? '', picture: cached.current.picture ?? null };
+      const next: ProfileDraft = snapshot
+        ? draftFromContent(snapshot.content)
+        : {
+            name: cached.current.name ?? '',
+            picture: cached.current.picture ?? null,
+            lud16: '',
+            nip05: '',
+            about: '',
+          };
       setBase(next);
-      setName(next.name);
-      setPicture(next.picture);
+      setDraft(next);
       setMissingBase(
         loaded.status === 'unavailable' ||
           (!snapshot && (cached.current.name !== undefined || cached.current.picture !== undefined))
@@ -252,18 +342,32 @@ function ProfileEditor({
       ],
     });
   }
+  // Sanity checks run on every keystroke; Save stays disabled until each
+  // address parses. Normalised values (lowercase) are what gets published.
+  const checks: Record<'lud16' | 'nip05' | 'about', ProfileFieldCheck> = {
+    lud16: checkLud16(lud16),
+    nip05: checkNip05(nip05),
+    about: checkAbout(about),
+  };
+  const invalid = Object.values(checks).some((check) => !check.ok);
+  const npub = nip19.npubEncode(pubkey);
+  const npcAddress = getNpcAddress(undefined, npub);
   const save = useSingleFlight(async () => {
-    if (!ndk || !ready || upload || !isOwner()) return;
+    if (!ndk || !ready || upload || invalid || !isOwner()) return;
     setSaving(true);
+    const normalized: ProfileDraft = {
+      ...draft,
+      name: name.trim(),
+      lud16: checks.lud16.ok ? checks.lud16.value : lud16,
+      nip05: checks.nip05.ok ? checks.nip05.value : nip05,
+      about: checks.about.ok ? checks.about.value : about,
+    };
     const result = await publishOwnProfileMetadata({
       ndk,
       pubkey,
       accountIndex,
       initialLoad,
-      patch: {
-        ...(name !== base.name ? { name } : {}),
-        ...(picture !== base.picture ? { picture } : {}),
-      },
+      patch: patchBetween(base, normalized),
     });
     if (!isOwner()) return;
     setSaving(false);
@@ -275,7 +379,8 @@ function ProfileEditor({
       });
   });
   const preview = upload?.uri ?? picture ?? undefined;
-  const dirty = name !== base.name || picture !== base.picture;
+  const dirty = Object.keys(patchBetween(base, draft)).length > 0;
+  const fieldsLocked = !ready || saving;
   return (
     <Screen
       name="SettingsEditProfileScreen"
@@ -288,7 +393,7 @@ function ProfileEditor({
               testID="edit-profile-save"
               onPress={save}
               loading={saving}
-              disabled={!ready || !dirty || !!upload || saving}
+              disabled={!ready || !dirty || !!upload || saving || invalid}
             />
             {ready && missingBase && (
               <>
@@ -356,18 +461,124 @@ function ProfileEditor({
           </View>
         </Pressable>
       </View>
-      <TextField isDisabled={!ready || saving}>
-        <Label>Name</Label>
-        <Input
-          testID="edit-profile-name"
-          accessibilityLabel="Name"
-          value={name}
-          onChangeText={setName}
-          maxLength={64}
-          returnKeyType="done"
-          editable={ready && !saving}
-        />
-      </TextField>
+      <View className="gap-5">
+        <TextField isDisabled={fieldsLocked}>
+          <Label>Name</Label>
+          <Input
+            testID="edit-profile-name"
+            accessibilityLabel="Name"
+            value={name}
+            onChangeText={setName}
+            maxLength={64}
+            returnKeyType="done"
+            editable={!fieldsLocked}
+          />
+          <HistoryChips field="name" current={name} disabled={fieldsLocked} onPick={setName} />
+        </TextField>
+
+        <TextField isDisabled={fieldsLocked}>
+          <Label>About</Label>
+          <Input
+            testID="edit-profile-about"
+            accessibilityLabel="About"
+            value={about}
+            onChangeText={(value) => setField('about', value)}
+            maxLength={ABOUT_MAX_LENGTH}
+            multiline
+            numberOfLines={3}
+            editable={!fieldsLocked}
+          />
+          {!checks.about.ok ? (
+            <Text size={12} className="text-danger mt-1" accessibilityRole="alert">
+              {checks.about.message}
+            </Text>
+          ) : null}
+          <HistoryChips
+            field="about"
+            current={about}
+            disabled={fieldsLocked}
+            onPick={(value) => setField('about', value)}
+          />
+        </TextField>
+
+        <TextField isDisabled={fieldsLocked}>
+          <Label>Lightning address</Label>
+          <Input
+            testID="edit-profile-lud16"
+            accessibilityLabel="Lightning address"
+            value={lud16}
+            onChangeText={(value) => setField('lud16', value)}
+            placeholder="name@domain.com"
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            maxLength={256}
+            editable={!fieldsLocked}
+          />
+          {!checks.lud16.ok ? (
+            <Text size={12} className="text-danger mt-1" accessibilityRole="alert">
+              {checks.lud16.message}
+            </Text>
+          ) : (
+            <Description>Where people can pay you over Lightning.</Description>
+          )}
+          {lud16.trim().toLowerCase() !== npcAddress ? (
+            // One tap: the npub.cash address every Sovran account already has
+            // (ecash arrives in this wallet, no server account needed).
+            <View className="mt-2 flex-row">
+              <CapsuleButton
+                label="Use my npub.cash address"
+                icon="mdi:lightning-bolt"
+                fitContent
+                height={32}
+                textSize={13}
+                testID="edit-profile-lud16-npc"
+                onPress={() => {
+                  if (!fieldsLocked) setField('lud16', npcAddress);
+                }}
+              />
+            </View>
+          ) : null}
+          <HistoryChips
+            field="lud16"
+            current={lud16}
+            disabled={fieldsLocked}
+            onPick={(value) => setField('lud16', value)}
+          />
+        </TextField>
+
+        <TextField isDisabled={fieldsLocked}>
+          <Label>Nostr address</Label>
+          <Input
+            testID="edit-profile-nip05"
+            accessibilityLabel="Nostr address"
+            value={nip05}
+            onChangeText={(value) => setField('nip05', value)}
+            placeholder="name@domain.com"
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            maxLength={256}
+            editable={!fieldsLocked}
+          />
+          {!checks.nip05.ok ? (
+            <Text size={12} className="text-danger mt-1" accessibilityRole="alert">
+              {checks.nip05.message}
+            </Text>
+          ) : (
+            <Description>
+              A NIP-05 name the domain has published for your key. It only verifies once the domain
+              lists this public key.
+            </Description>
+          )}
+          <HistoryChips
+            field="nip05"
+            current={nip05}
+            disabled={fieldsLocked}
+            onPick={(value) => setField('nip05', value)}
+          />
+        </TextField>
+      </View>
     </Screen>
   );
 }

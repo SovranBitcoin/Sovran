@@ -102,7 +102,8 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
     onPress,
     color,
     isActive = false,
-    filled = false,
+    filled: filledProp = false,
+    selectedVariant = 'tint',
     height = DEFAULT_HEIGHT,
     testID,
     roundedSide = 'all',
@@ -111,6 +112,8 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
   } = props;
   const cornerStyle = getCornerStyle(roundedSide);
   const widthStyle = capsuleWidthStyle(fitContent);
+  // A contrast-selected capsule renders as the prominent (filled) glass.
+  const filled = filledProp || (isActive && selectedVariant === 'contrast');
 
   // filled → a heavily foreground-tinted "prominent" glass (the inverted CTA),
   // with content flipped to `background`; active → a subtle foreground tint;

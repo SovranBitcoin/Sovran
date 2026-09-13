@@ -34,11 +34,11 @@ export function QRCodeFrame({ children }: { children: ReactNode }) {
 /** Junk payload whose QR version (module density) is close to the request that
  * will replace it: every frame is a different digit string of the same length,
  * so the placeholder reads as a live, shimmering code — never real data. */
-export const QR_PLACEHOLDER_LENGTH = 260;
-export const QR_PLACEHOLDER_FRAME_MS = 200;
+const QR_PLACEHOLDER_LENGTH = 260;
+const QR_PLACEHOLDER_FRAME_MS = 200;
 /** Deterministic digit noise per frame: every frame reshuffles most modules so the
  * placeholder visibly animates (a repeated digit would only nudge a few cells). */
-export function qrPlaceholderPayload(frame: number, length = QR_PLACEHOLDER_LENGTH): string {
+function qrPlaceholderPayload(frame: number, length = QR_PLACEHOLDER_LENGTH): string {
   let seed = (frame + 1) * 2654435761;
   let out = '';
   while (out.length < length) {

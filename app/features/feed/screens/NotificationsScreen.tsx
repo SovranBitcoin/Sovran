@@ -1,4 +1,5 @@
 import { notificationPreviewText } from '@/features/feed/lib/notificationPreviewText';
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { buildAppNotificationRows } from '@/features/feed/lib/appNotificationRows';
 import { legalRevisions } from '@/shared/lib/legal/legalDocuments';
 import { collectReferencedIds } from '@/features/feed/components/nostr/feedParse';
@@ -1183,7 +1184,7 @@ function NotificationRow({
           <NotificationReasonIcon reason={notification.reason} color={tone} />
           <View>
             <Avatar
-              state={profile?.picture ? 'image' : 'fallback'}
+              state={avatarStateFor(profile?.picture, profile !== undefined)}
               picture={profile?.picture}
               name={name}
               seed={notification.event.pubkey}
@@ -1300,7 +1301,7 @@ function AvatarCluster({
               },
             ]}>
             <Avatar
-              state={profile?.picture ? 'image' : 'fallback'}
+              state={avatarStateFor(profile?.picture, profile !== undefined)}
               picture={profile?.picture}
               name={name}
               seed={notification.event.pubkey}
@@ -1479,7 +1480,7 @@ function NotificationReferencedPost({
       <HStack align="center" gap={6}>
         {showAuthorAvatar ? (
           <Avatar
-            state={profile?.picture ? 'image' : 'fallback'}
+            state={avatarStateFor(profile?.picture, profile !== undefined)}
             picture={profile?.picture}
             name={name}
             seed={event.pubkey}

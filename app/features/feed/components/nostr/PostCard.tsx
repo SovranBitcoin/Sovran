@@ -1,4 +1,5 @@
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -389,9 +390,7 @@ const PostCardBody = React.memo(function PostCardBody({
             <Pressable onPressIn={handleNestedPressIn} onPress={navigateToProfile}>
               <HStack align="center" gap={10} style={sharedStyles.mb6}>
                 <Avatar
-                  state={
-                    profile?.picture ? 'image' : authorStatus === 'loading' ? 'loading' : 'fallback'
-                  }
+                  state={avatarStateFor(profile?.picture, authorStatus !== 'loading')}
                   picture={profile?.picture}
                   seed={event.pubkey}
                   size={AVATAR_SIZE}
@@ -462,7 +461,7 @@ const PostCardBody = React.memo(function PostCardBody({
         ) : null}
         <Pressable onPressIn={handleNestedPressIn} onPress={navigateToProfile}>
           <Avatar
-            state={profile?.picture ? 'image' : 'fallback'}
+            state={avatarStateFor(profile?.picture, authorStatus !== 'loading')}
             picture={profile?.picture}
             seed={event.pubkey}
             size={AVATAR_SIZE}

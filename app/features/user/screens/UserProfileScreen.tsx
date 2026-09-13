@@ -9,6 +9,7 @@
  * - User feed (notes)
  */
 
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import React, { useEffect, useState } from 'react';
 import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, {
@@ -266,6 +267,8 @@ const STAT_CARD_HEIGHT = 96;
  * per-element pulse. See `shared/ui/composed/SkeletonExitShimmer`.
  */
 const SKELETON_FILL_ALPHA = 0.07;
+const BANNER_SKELETON_ALPHA = SKELETON_FILL_ALPHA;
+const COUNT_UNAVAILABLE = '—';
 
 function ProfileStatsGrid({
   followingCount,
@@ -273,6 +276,7 @@ function ProfileStatsGrid({
   reputationScore,
   joinedDate,
   isLoading,
+  countsLoading,
   visualScope,
 }: {
   followingCount?: number;
@@ -280,6 +284,8 @@ function ProfileStatsGrid({
   reputationScore?: number;
   joinedDate?: string;
   isLoading: boolean;
+  /** Follower/following still being completed from fallback sources. */
+  countsLoading: boolean;
   visualScope: string;
 }) {
   const [foreground, surfaceTertiary, surfaceSecondary] = useThemeColor([
@@ -298,16 +304,17 @@ function ProfileStatsGrid({
     {
       label: 'Following',
       description: 'Users followed',
-      value: followingCount?.toString() ?? '0',
+      // Unknown is a dash, never a zero: no source could count this profile.
+      value: followingCount?.toString() ?? COUNT_UNAVAILABLE,
       smallValue: false,
-      valueLoading: isLoading && followingCount === undefined,
+      valueLoading: (isLoading || countsLoading) && followingCount === undefined,
     },
     {
       label: 'Followers',
       description: 'Total count',
-      value: followerCount?.toString() ?? '0',
+      value: followerCount?.toString() ?? COUNT_UNAVAILABLE,
       smallValue: false,
-      valueLoading: isLoading && followerCount === undefined,
+      valueLoading: (isLoading || countsLoading) && followerCount === undefined,
     },
     {
       label: 'Reputation',
@@ -689,7 +696,7 @@ function BannerWithAvatar({
   const avatarContent = (
     <View style={[styles.avatarBorder, { borderColor: background, backgroundColor: background }]}>
       <Avatar
-        state={pictureUrl ? 'image' : isLoading || isResolving ? 'loading' : 'fallback'}
+        state={avatarStateFor(pictureUrl, !(isLoading || isResolving))}
         picture={pictureUrl}
         seed={pubkey}
         size={AVATAR_SIZE}
@@ -746,8 +753,15 @@ function BannerWithAvatar({
                 onError={() => setBannerStatus('failed')}
               />
             ) : null}
+            {/* Neutral placeholder (same fill as Avatar/Text skeletons): we do
+                not yet know whether a banner exists, or it is still loading. The
+                seeded gradient below is the COLOUR placeholder, reserved for
+                "known to have none / failed". */}
             <View
-              style={[StyleSheet.absoluteFill, { backgroundColor: withAlpha(foreground, 0.5) }]}
+              style={[
+                StyleSheet.absoluteFill,
+                { backgroundColor: withAlpha(foreground, BANNER_SKELETON_ALPHA) },
+              ]}
             />
           </>
         ) : bannerState === 'image' ? (
@@ -1066,10 +1080,11 @@ export function UserProfileScreen() {
     pubkey ? state.optimisticFollowsByPubkey[pubkey] : undefined
   );
   const isFocused = useIsFocused();
-  const { data: profileData, isLoading: isProfileApiLoading } = useNostrProfile(
-    pubkey || null,
-    isFocused
-  );
+  const {
+    data: profileData,
+    isLoading: isProfileApiLoading,
+    isCountsLoading: isProfileCountsLoading,
+  } = useNostrProfile(pubkey || null, isFocused);
   const profileMintUrl = getProfileMintInfoUrl(profileData?.mintUrl, mintUrlParam);
 
   // ===========================
@@ -1409,6 +1424,7 @@ export function UserProfileScreen() {
                   reputationScore={reputationScore}
                   joinedDate={joinedDate}
                   isLoading={isProfileApiLoading}
+                  countsLoading={isProfileCountsLoading}
                   visualScope={profileHeaderVisualScope}
                 />
               </View>

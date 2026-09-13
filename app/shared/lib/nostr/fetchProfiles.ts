@@ -53,3 +53,26 @@ export async function fetchProfileStatsViaFacade(
     () => null
   );
 }
+
+/**
+ * Following count from the profile's own kind-3 through whichever tier serves
+ * social graphs (relays included). Last resort for the profile header when
+ * neither nagg nor Primal has counts: a contact list is a plain replaceable
+ * event, so the relay floor can answer it. Returns undefined when no kind-3
+ * was found (an unknown list must not read as "follows nobody").
+ */
+export async function fetchFollowingCountViaFacade(
+  pubkey: string,
+  options: { signal?: AbortSignal } = {}
+): Promise<number | undefined> {
+  const layer = buildNostrDataLayer();
+  if (!layer) return undefined;
+  const result = await layer.getSocialGraph({
+    pubkey,
+    ...(options.signal ? { signal: options.signal } : {}),
+  });
+  return result.match(
+    (graph) => (graph.contactsUpdatedAt > 0 ? graph.follows.length : undefined),
+    () => undefined
+  );
+}

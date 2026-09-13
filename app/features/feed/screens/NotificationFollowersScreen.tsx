@@ -1,4 +1,5 @@
 import { describeError } from '@/shared/lib/errors';
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { RefreshControl, StyleSheet } from 'react-native';
@@ -550,7 +551,7 @@ function FollowerRow({
     <NotificationRowPressable pressedBackground={pressedBackground} onPress={onPress}>
       <HStack align="center" gap={12}>
         <Avatar
-          state={profile?.picture ? 'image' : 'fallback'}
+          state={avatarStateFor(profile?.picture, profile !== undefined)}
           picture={profile?.picture}
           name={name}
           seed={notification.event.pubkey}

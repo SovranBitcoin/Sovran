@@ -1,6 +1,7 @@
 import { useOwnProfileMetadataStore } from '@/shared/stores/profile/ownProfileMetadataStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { PUBLIC_DEMO_METADATA } from '@/shared/stores/runtime/mockPublicProfile';
+import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { resolveIdentityName } from '@/shared/lib/identity';
 
@@ -13,7 +14,13 @@ import { resolveIdentityName } from '@/shared/lib/identity';
  * `nostrMetadataCache`. In presentation Mock Mode, the reviewed public snapshot
  * can supply display metadata without creating an account or changing keys.
  */
-export function useProfileDisplay(pubkey: string): { displayName: string; picture?: string } {
+export function useProfileDisplay(pubkey: string): {
+  displayName: string;
+  picture?: string;
+  /** False while the own kind-0 that decides whether a picture exists is still
+   *  being fetched — avatars show the neutral placeholder, not the silhouette. */
+  pictureResolved: boolean;
+} {
   const profile = useProfileStore((s) => s.profiles.find((p) => p.pubkey === pubkey));
   const isOwn = useProfileStore(
     (s) =>
@@ -22,16 +29,19 @@ export function useProfileDisplay(pubkey: string): { displayName: string; pictur
   const optimistic = useOwnProfileMetadataStore((s) => (isOwn ? s.optimistic : null));
   const mockMode = useSettingsStore((s) => s.mockMode);
   const demo = mockMode ? PUBLIC_DEMO_METADATA.get(pubkey) : undefined;
+  const { isResolving } = useNostrProfileMetadata(pubkey || undefined);
   const displayName = resolveIdentityName({
     pubkey,
     overrideName:
       optimistic?.name ?? (demo?.displayName || demo?.name || profile?.cachedDisplayName),
   });
+  const picture =
+    optimistic?.picture !== undefined
+      ? (optimistic.picture ?? undefined)
+      : (demo?.picture ?? profile?.cachedPicture);
   return {
     displayName,
-    picture:
-      optimistic?.picture !== undefined
-        ? (optimistic.picture ?? undefined)
-        : (demo?.picture ?? profile?.cachedPicture),
+    picture,
+    pictureResolved: !!picture || !!optimistic || !!demo || !isResolving,
   };
 }

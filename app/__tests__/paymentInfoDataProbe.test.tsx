@@ -61,10 +61,15 @@ jest.mock('@/shared/ui/primitives/Haptics', () => ({
 }));
 jest.mock('@/shared/lib/logger', () => ({
   paymentLog: { debug: jest.fn(), info: jest.fn() },
+  themeLog: { error: jest.fn(), warn: jest.fn(), debug: jest.fn() },
   Log: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }));
 
 describe('PaymentInfo device data probe', () => {
+  // The empty-state placeholder reshuffles its junk QR on an interval; fake
+  // timers keep that off the real clock so nothing ticks after the test ends.
+  beforeAll(() => jest.useFakeTimers());
+  afterAll(() => jest.useRealTimers());
   beforeEach(() => Dimensions.set({ window: mockDimensions, screen: mockDimensions }));
   it.each(['dark', 'light'])(
     'reserves the shared QR frame while empty in %s mode without encoding or exposing a payload',
@@ -76,7 +81,8 @@ describe('PaymentInfo device data probe', () => {
         renderer = TestRenderer.create(<PaymentInfo unit="sat" data="" copyTarget="token" />);
       });
       const frame = renderer.root.findByType(QRCodeFrame);
-      expect(frame.props.children.props.style).toEqual({ width: 329, height: 329 });
+      // First child is the placeholder's QR layer, sized to the live QR square.
+      expect(frame.props.children[0].props.style).toEqual({ width: 329, height: 329 });
       expect(mockQrRendered).not.toHaveBeenCalled();
       expect(renderer.root.findAllByProps({ testID: 'payment-info-token-data' })).toHaveLength(0);
       act(() =>

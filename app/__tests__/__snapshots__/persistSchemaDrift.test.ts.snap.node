@@ -3045,6 +3045,42 @@ exports[`persisted schema drift own-profile-metadata-store schema matches the go
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
+        "history": {
+          "additionalProperties": {
+            "items": {
+              "properties": {
+                "createdAt": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "value": {
+                  "maxLength": 4096,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "value",
+                "createdAt",
+              ],
+              "type": "object",
+            },
+            "maxItems": 5,
+            "type": "array",
+          },
+          "default": {},
+          "propertyNames": {
+            "enum": [
+              "name",
+              "picture",
+              "lud16",
+              "nip05",
+              "about",
+            ],
+            "type": "string",
+          },
+          "type": "object",
+        },
         "latest": {
           "anyOf": [
             {
@@ -3087,6 +3123,43 @@ exports[`persisted schema drift own-profile-metadata-store schema matches the go
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
+        "history": {
+          "additionalProperties": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "createdAt": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "value": {
+                  "maxLength": 4096,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "value",
+                "createdAt",
+              ],
+              "type": "object",
+            },
+            "maxItems": 5,
+            "type": "array",
+          },
+          "default": {},
+          "propertyNames": {
+            "enum": [
+              "name",
+              "picture",
+              "lud16",
+              "nip05",
+              "about",
+            ],
+            "type": "string",
+          },
+          "type": "object",
+        },
         "latest": {
           "anyOf": [
             {
@@ -3126,6 +3199,7 @@ exports[`persisted schema drift own-profile-metadata-store schema matches the go
       },
       "required": [
         "latest",
+        "history",
       ],
       "type": "object",
     },

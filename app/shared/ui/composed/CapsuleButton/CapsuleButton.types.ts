@@ -29,6 +29,14 @@ export interface CapsuleButtonProps {
    * set, content color inverts to `background` unless `color` is given.
    */
   filled?: boolean;
+  /**
+   * How `isActive` paints. `'tint'` (default) is the translucent foreground
+   * tint; `'contrast'` inverts the capsule like a primary button — `foreground`
+   * fill, `background` content — for selection controls (the transaction
+   * filters) where the chosen option must read at a glance. Shares the
+   * vocabulary with `PillTabs`.
+   */
+  selectedVariant?: 'tint' | 'contrast';
   height?: number;
   roundedSide?: 'all' | 'left' | 'right';
   /** Size to label content instead of stretching to the full parent width. */

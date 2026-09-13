@@ -5,6 +5,7 @@
  * Each "user" is a followed nostr account with video posts as their "stories".
  */
 
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import React, { useCallback, useEffect, useRef, useState, type FC } from 'react';
 // Tolerated seam exception: horizontal story rail driven by Animated.FlatList
 // (reanimated scroll handler); the List seam wraps plain FlashList only.
@@ -601,7 +602,7 @@ const UserStoriesItem: FC<UserItemProps> = ({
           </View>
           <View style={styles.profileRow} pointerEvents="box-none">
             <Avatar
-              state={profilePicture ? 'image' : 'fallback'}
+              state={avatarStateFor(profilePicture, user.profile !== undefined)}
               picture={profilePicture}
               seed={user.pubkey}
               name={profileName}

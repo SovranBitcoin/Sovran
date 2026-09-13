@@ -1,8 +1,8 @@
 {
   "version": 1,
   "id": "settings.edit.profile",
-  "name": "Edit own profile name",
-  "description": "Save a display name once and verify it appears in the drawer.",
+  "name": "Edit own profile name and Lightning address",
+  "description": "Save a display name plus the one-tap npub.cash Lightning address, then verify the name in the drawer.",
   "details": "Requires an onboarded disposable simulator identity with a signer and working relays. Save publishes kind 0 and must never be retried by the runner.",
   "lane": "simulator",
   "tags": ["flow:wallet"],
@@ -20,6 +20,7 @@
     {"action":"tap","selector":{"id":"settings-profile-edit"}},
     {"action":"waitFor","selector":{"id":"edit-profile-name"},"timeoutMs":10000,"state":"enabled"},
     {"action":"input","selector":{"id":"edit-profile-name"},"value":"Sovran Profile Test"},
+    {"action":"tap","selector":{"id":"edit-profile-lud16-npc"}},
     {"action":"screenshot","name":"settings-edit-profile"},
     {"action":"waitFor","selector":{"id":"edit-profile-save"},"state":"enabled","timeoutMs":10000},
     {"action":"tap","selector":{"id":"edit-profile-save"}},

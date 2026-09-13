@@ -17,6 +17,17 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { spacing } from '@/shared/styles/tokens';
 import { ClaySilhouetteAvatar } from './ClaySilhouetteAvatar';
 
+/**
+ * - `loading`  → neutral placeholder: we do not yet know whether a picture
+ *                exists, or its bytes are still arriving
+ * - `fallback` → colour placeholder (clay silhouette): known to have none,
+ *                or the load failed
+ * - `image`    → the picture
+ *
+ * Derive it with `avatarStateFor(picture, resolved)` from
+ * `@/shared/lib/imageLoadState` rather than `picture ? 'image' : 'fallback'`,
+ * which turns "not looked yet" into a silhouette.
+ */
 export type AvatarState = 'loading' | 'fallback' | 'image';
 
 interface AvatarProps {

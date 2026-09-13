@@ -14,6 +14,25 @@ import { paramPopup } from '@/shared/lib/popup';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const mockProfile = { pubkey: 'a'.repeat(64), accountIndex: 0 };
 const mockState = { getActiveProfile: () => mockProfile };
+let mockHistory: Record<string, { value: string; createdAt: number }[]> = {};
+jest.mock('@/shared/stores/profile/ownProfileMetadataStore', () => ({
+  useOwnProfileMetadataStore: (selector: (state: { history: typeof mockHistory }) => unknown) =>
+    selector({ history: mockHistory }),
+}));
+jest.mock('@/shared/lib/cashu/npc', () => ({
+  getNpcAddress: (username: string | undefined, npub: string) => `${username ?? npub}@npub.cash`,
+}));
+jest.mock('@/shared/ui/composed/CapsuleButton', () => ({
+  CapsuleButton: ({
+    testID,
+    label,
+    onPress,
+  }: {
+    testID?: string;
+    label: string;
+    onPress: () => void;
+  }) => require('react').createElement('capsule', { testID, label, onPress }),
+}));
 const mockNdk = {};
 jest.mock('@/shared/stores/global/profileStore', () => ({
   useProfileStore: Object.assign(
@@ -77,12 +96,14 @@ jest.mock('@/shared/ui/primitives/Text', () => ({
 jest.mock('heroui-native', () => ({
   TextField: ({ children }: React.PropsWithChildren) => children,
   Label: ({ children }: React.PropsWithChildren) => children,
+  Description: ({ children }: React.PropsWithChildren) => children,
   Input: () => null,
 }));
 
 let renderer: TestRenderer.ReactTestRenderer;
 beforeEach(() => {
   jest.clearAllMocks();
+  mockHistory = {};
   jest.mocked(loadOwnProfileMetadata).mockResolvedValue({ status: 'absent' });
   jest.mocked(publishOwnProfileMetadata).mockReturnValue(errAsync({ type: 'base-unavailable' }));
 });
@@ -149,4 +170,95 @@ it('shows save-time base failure inline and retries the shared loader without lo
     })
   );
   expect(guardedRouter.back).toHaveBeenCalledTimes(1);
+});
+
+it('validates the addresses, fills npub.cash in one tap, and publishes normalised values', async () => {
+  const snapshot = {
+    content: { name: 'Old', lud16: 'old@ln.example', nip05: 'old@id.example', about: 'Bio' },
+    createdAt: 10,
+    eventId: 'b'.repeat(64),
+  };
+  jest.mocked(loadOwnProfileMetadata).mockResolvedValue({ status: 'found', snapshot });
+  await act(async () => {
+    renderer = TestRenderer.create(<SettingsEditProfileScreen />);
+  });
+  const control = (testID: string) => renderer.root.findByProps({ testID });
+  expect(control('edit-profile-lud16').props.value).toBe('old@ln.example');
+  expect(control('edit-profile-nip05').props.value).toBe('old@id.example');
+  expect(control('edit-profile-about').props.value).toBe('Bio');
+  expect(control('edit-profile-save').props.disabled).toBe(true);
+
+  // An unparsable address blocks Save and explains itself inline.
+  act(() => {
+    control('edit-profile-nip05').props.onChangeText('not an address');
+  });
+  expect(control('edit-profile-save').props.disabled).toBe(true);
+  expect(
+    renderer.root
+      .findAllByProps({ accessibilityRole: 'alert' })
+      .some((node) => String(node.props.children).includes('Nostr address'))
+  ).toBe(true);
+
+  // One tap fills the account's npub.cash Lightning address.
+  act(() => {
+    control('edit-profile-nip05').props.onChangeText('Me@Example.COM');
+    control('edit-profile-lud16-npc').props.onPress();
+  });
+  expect(control('edit-profile-lud16').props.value).toMatch(/^npub1[a-z0-9]+@npub\.cash$/);
+  expect(renderer.root.findAllByProps({ testID: 'edit-profile-lud16-npc' })).toHaveLength(0);
+  expect(control('edit-profile-save').props.disabled).toBe(false);
+
+  jest.mocked(publishOwnProfileMetadata).mockReturnValue(
+    okAsync({
+      eventId: 'c'.repeat(64),
+      anyAccepted: true,
+      accepted: [],
+      failed: [],
+      relayResults: [],
+    })
+  );
+  act(() => {
+    control('edit-profile-about').props.onChangeText('   ');
+  });
+  await act(async () => {
+    await control('edit-profile-save').props.onPress();
+  });
+  expect(publishOwnProfileMetadata).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      // lowercase-normalised nip05, npub.cash lud16, cleared about → removed key
+      patch: {
+        lud16: expect.stringMatching(/@npub\.cash$/),
+        nip05: 'me@example.com',
+        about: null,
+      },
+    })
+  );
+});
+
+it('offers previous values as one-tap chips and hides the current one', async () => {
+  mockHistory = {
+    name: [
+      { value: 'Older', createdAt: 5 },
+      { value: 'Old', createdAt: 8 },
+    ],
+    lud16: [{ value: 'prev@ln.example', createdAt: 5 }],
+  };
+  jest.mocked(loadOwnProfileMetadata).mockResolvedValue({
+    status: 'found',
+    snapshot: { content: { name: 'Old' }, createdAt: 10, eventId: 'b'.repeat(64) },
+  });
+  await act(async () => {
+    renderer = TestRenderer.create(<SettingsEditProfileScreen />);
+  });
+  const control = (testID: string) => renderer.root.findByProps({ testID });
+  // 'Old' is the current name, so only 'Older' is offered.
+  expect(renderer.root.findAllByProps({ testID: 'edit-profile-history-name-1' })).toHaveLength(0);
+  expect(control('edit-profile-history-name-0').props.label).toBe('Older');
+  act(() => {
+    control('edit-profile-history-name-0').props.onPress();
+    control('edit-profile-history-lud16-0').props.onPress();
+  });
+  expect(control('edit-profile-name').props.value).toBe('Older');
+  expect(control('edit-profile-lud16').props.value).toBe('prev@ln.example');
+  expect(control('edit-profile-save').props.disabled).toBe(false);
 });

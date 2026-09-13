@@ -78,6 +78,19 @@ it('removes the picture key and preserves the original object', () => {
   expect(applyProfilePatch(base, { picture: null })).toEqual({ name: 'handle' });
   expect(base.picture).toBeTruthy();
 });
+it('sets, keeps and removes the address and about fields independently', () => {
+  const base = { name: 'n', lud16: 'old@ln.example', nip05: 'old@id.example', about: 'Old' };
+  expect(applyProfilePatch(base, { lud16: 'new@ln.example' })).toEqual({
+    ...base,
+    lud16: 'new@ln.example',
+  });
+  expect(applyProfilePatch(base, { nip05: null, about: null })).toEqual({
+    name: 'n',
+    lud16: 'old@ln.example',
+  });
+  expect(applyProfilePatch(base, {})).toEqual(base);
+  expect(base.nip05).toBe('old@id.example');
+});
 it('keeps created_at monotonic even with clock skew or same-second saves', () => {
   expect(nextProfileCreatedAt(100, 50)).toBe(101);
   expect(nextProfileCreatedAt(100, 100)).toBe(101);

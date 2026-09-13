@@ -50,6 +50,9 @@ export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrPro
         fetchedAt: baseMetadata?.fetchedAt ?? 0,
         ...(optimistic.name !== undefined ? { displayName: optimistic.name } : {}),
         ...(optimistic.picture !== undefined ? { picture: optimistic.picture ?? undefined } : {}),
+        ...(optimistic.lud16 !== undefined ? { lud16: optimistic.lud16 ?? undefined } : {}),
+        ...(optimistic.nip05 !== undefined ? { nip05: optimistic.nip05 ?? undefined } : {}),
+        ...(optimistic.about !== undefined ? { about: optimistic.about ?? undefined } : {}),
       }
     : baseMetadata;
   const isStale = !fixture && cached.isStale;

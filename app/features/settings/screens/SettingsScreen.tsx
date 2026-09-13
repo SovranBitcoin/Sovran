@@ -1,4 +1,5 @@
 import React, { useRef, useCallback } from 'react';
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { ScrollView, Alert } from 'react-native';
 import { openExternalUrl } from '@/shared/lib/url';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -35,7 +36,7 @@ const buildNumber = Application.nativeBuildVersion;
 
 const ProfileButton = () => {
   const { keys: nostrKeys } = useNostrKeysContext();
-  const { displayName, picture } = useProfileDisplay(nostrKeys?.pubkey || '');
+  const { displayName, picture, pictureResolved } = useProfileDisplay(nostrKeys?.pubkey || '');
   const muted = useThemeColor('muted');
 
   return (
@@ -51,7 +52,7 @@ const ProfileButton = () => {
           <ListGroup.Item disabled>
             <ListGroup.ItemPrefix>
               <Avatar
-                state={picture ? 'image' : 'fallback'}
+                state={avatarStateFor(picture, pictureResolved)}
                 seed={nostrKeys?.pubkey || ''}
                 picture={picture}
                 name={displayName}

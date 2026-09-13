@@ -13,6 +13,9 @@ const mockProfiles = [
     cachedPicture: 'https://example.com/real.png',
   },
 ];
+jest.mock('@/shared/hooks/useNostrProfileMetadata', () => ({
+  useNostrProfileMetadata: () => ({ metadata: undefined, isLoading: false, isResolving: false }),
+}));
 jest.mock('@/shared/stores/global/settingsStore', () => ({
   useSettingsStore: (selector: (state: { mockMode: boolean }) => unknown) => selector({ mockMode }),
 }));

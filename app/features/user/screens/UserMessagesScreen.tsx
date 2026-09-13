@@ -1,4 +1,5 @@
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { ModeratedDmBubble } from '../components/ModeratedDmBubble';
 /**
  * @fileoverview Direct Messages screen
@@ -105,9 +106,8 @@ export function UserMessagesScreen({
   // Counterparty kind-0 metadata is served from the shared SWR cache. First
   // open of a conversation per session pays one round-trip; subsequent opens
   // are instant (the cache is shared across surfaces + persisted).
-  const { metadata: counterpartyMetadata } = useNostrProfileMetadata(
-    isFictionalContact && !mockMode ? undefined : pubkey
-  );
+  const { metadata: counterpartyMetadata, isResolving: counterpartyResolving } =
+    useNostrProfileMetadata(isFictionalContact && !mockMode ? undefined : pubkey);
 
   // Shared inbox history, filtered locally to this peer and protocol. Mock threads serve
   // from local state, so the hook is disabled with an empty counterparty.
@@ -222,7 +222,7 @@ export function UserMessagesScreen({
   const counterpartyAvatar = useMemo(
     () => (
       <Avatar
-        state={userPicture ? 'image' : 'fallback'}
+        state={avatarStateFor(userPicture, !counterpartyResolving)}
         size={32}
         picture={userPicture}
         seed={pubkey}

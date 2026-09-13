@@ -7,6 +7,8 @@
  * `ComposeConfig`; the char meter enforces the relay-sourced budget; send goes
  * through the outbox-aware publish seam.
  */
+import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -231,6 +233,7 @@ export function PostComposer() {
     'default',
   ] as const);
   const ownProfile = useProfileStore((s) => s.getActiveProfile());
+  const { pictureResolved: ownPictureResolved } = useProfileDisplay(ownProfile?.pubkey ?? '');
 
   const isReply = target?.mode === 'reply' && !!parentEvent;
   const isQuote = target?.mode === 'quote' && !!parentEvent;
@@ -434,7 +437,7 @@ export function PostComposer() {
                   ]}
                 />
                 <Avatar
-                  state={ownProfile?.cachedPicture ? 'image' : 'fallback'}
+                  state={avatarStateFor(ownProfile?.cachedPicture, ownPictureResolved)}
                   picture={ownProfile?.cachedPicture}
                   seed={ownProfile?.pubkey ?? ''}
                   size={AVATAR_SIZE}
@@ -708,7 +711,7 @@ function ReplyOriginalPost({
       extra={{ contentLength: event.content.length }}>
       <View style={styles.gutterCol}>
         <Avatar
-          state={profile?.picture ? 'image' : 'fallback'}
+          state={avatarStateFor(profile?.picture, profile !== undefined)}
           picture={profile?.picture}
           seed={event.pubkey}
           size={AVATAR_SIZE}

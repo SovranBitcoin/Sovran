@@ -54,7 +54,11 @@ it('updates both own display surfaces and reverses an optimistic picture removal
       .getState()
       .setOptimistic({ name: 'Pending', picture: null, createdAt: 2, eventId: 'c'.repeat(64) })
   );
-  expect(result.current.display).toEqual({ displayName: 'Pending', picture: undefined });
+  expect(result.current.display).toEqual({
+    displayName: 'Pending',
+    picture: undefined,
+    pictureResolved: true,
+  });
   expect(result.current.profile.metadata).toMatchObject({
     displayName: 'Pending',
     picture: undefined,
@@ -64,6 +68,7 @@ it('updates both own display surfaces and reverses an optimistic picture removal
   expect(result.current.display).toEqual({
     displayName: 'Original',
     picture: 'https://example.com/original',
+    pictureResolved: true,
   });
   expect(result.current.profile.metadata?.picture).toBe('https://example.com/original');
 });

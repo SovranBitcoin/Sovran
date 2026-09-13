@@ -28,12 +28,17 @@ jest.mock('@/shared/lib/nostr/nostrTierConfig', () => ({
 }));
 jest.mock('@/shared/lib/nostr/fetchProfiles', () => ({
   fetchProfileStatsViaFacade: (...args: unknown[]) => mockFetchStats(...args),
+  fetchFollowingCountViaFacade: (...args: unknown[]) => mockFetchFollowing(...args),
 }));
-jest.mock('@/shared/lib/logger', () => ({ log: { debug: jest.fn(), warn: jest.fn() } }));
+const mockFetchFollowing = jest.fn();
+jest.mock('@/shared/lib/logger', () => ({
+  log: { debug: jest.fn(), info: jest.fn(), warn: jest.fn() },
+}));
 
 beforeEach(() => {
   mockFetchProfile.mockReset();
   mockFetchStats.mockReset();
+  mockFetchFollowing.mockReset().mockResolvedValue(undefined);
   mockRefreshVertex.mockReset().mockResolvedValue(null);
   mockParseProfile.mockReset();
 });
@@ -153,4 +158,48 @@ it('preserves fallback content when Vertex cannot refresh', async () => {
   await act(async () => {});
   expect(result.current.data?.displayName).toBe('Alice');
   expect(result.current.error).toBeNull();
+});
+
+it('completes counts nagg lacks from Primal, then the contact list, without ever showing 0', async () => {
+  // nagg without the nostr module: a valid profile with no aggregates.
+  mockFetchProfile.mockResolvedValue(ok({ pubkey: 'alice', score: 0.5, rank: 3 }));
+  let stats!: (value: object | null) => void;
+  mockFetchStats.mockImplementation(() => new Promise((resolve) => (stats = resolve)));
+  mockFetchFollowing.mockResolvedValue(17);
+  const { result } = renderHook(() => useNostrProfile('alice'));
+  await act(async () => {});
+  expect(result.current.isLoading).toBe(false);
+  expect(result.current.isCountsLoading).toBe(true);
+  expect(result.current.data?.followers).toBeUndefined();
+  expect(result.current.data?.follows).toBeUndefined();
+
+  // Primal knows followers only; following comes from the kind-3 fallback.
+  await act(async () => stats({ tier: 'primal', followersCount: 120 }));
+  expect(result.current.isCountsLoading).toBe(false);
+  expect(result.current.data).toMatchObject({ followers: 120, follows: 17, score: 0.5 });
+  expect(mockFetchFollowing).toHaveBeenCalledWith('alice', expect.anything());
+});
+
+it('reports unknown counts as undefined when no source can count', async () => {
+  mockFetchProfile.mockResolvedValue(ok({ pubkey: 'bob', score: null, rank: 0 }));
+  mockFetchStats.mockResolvedValue(null);
+  mockFetchFollowing.mockResolvedValue(undefined);
+  const { result } = renderHook(() => useNostrProfile('bob'));
+  await act(async () => {});
+  expect(result.current.isCountsLoading).toBe(false);
+  expect(result.current.data?.followers).toBeUndefined();
+  expect(result.current.data?.follows).toBeUndefined();
+});
+
+it('keeps completed counts when a Vertex refresh answers without aggregates', async () => {
+  mockFetchProfile.mockResolvedValue(ok({ pubkey: 'alice', score: 0.5, rank: 3 }));
+  mockFetchStats.mockResolvedValue({ tier: 'primal', followersCount: 120, followingCount: 9 });
+  let complete!: (value: object) => void;
+  mockRefreshVertex.mockImplementationOnce(() => new Promise((resolve) => (complete = resolve)));
+  mockParseProfile.mockReturnValue(ok({ pubkey: 'alice', score: 0.9, rank: 12 }));
+  const { result } = renderHook(() => useNostrProfile('alice', true));
+  await act(async () => {});
+  expect(result.current.data).toMatchObject({ followers: 120, follows: 9 });
+  await act(async () => complete({ pubkeys: ['alice'], aggregates: {} }));
+  expect(result.current.data).toMatchObject({ followers: 120, follows: 9, score: 0.9 });
 });

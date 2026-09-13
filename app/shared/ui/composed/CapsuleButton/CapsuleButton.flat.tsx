@@ -23,7 +23,8 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
     accessibilityRole = 'button',
     color,
     isActive = false,
-    filled = false,
+    filled: filledProp = false,
+    selectedVariant = 'tint',
     height = DEFAULT_HEIGHT,
     testID,
     roundedSide = 'all',
@@ -33,6 +34,8 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
 
   const cornerStyle = getCornerStyle(roundedSide);
   const widthStyle = capsuleWidthStyle(fitContent);
+  // A contrast-selected capsule paints exactly like the filled CTA.
+  const filled = filledProp || (isActive && selectedVariant === 'contrast');
 
   // filled → solid foreground CTA with inverted content; active → tinted fill;
   // default → the neutral surface used by the status pills. An explicit `color`

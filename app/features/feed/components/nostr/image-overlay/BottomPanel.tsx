@@ -9,6 +9,7 @@
  * - InlinePanelImage: image with blurred letterbox for aspect ratio mismatch
  */
 
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -147,7 +148,7 @@ function OverlayAuthorRow({
       }}
       style={styles.authorRow}>
       <Avatar
-        state={profile?.picture ? 'image' : 'fallback'}
+        state={avatarStateFor(profile?.picture, profile !== undefined)}
         picture={profile?.picture}
         seed={event.pubkey}
         size={avatarSize}

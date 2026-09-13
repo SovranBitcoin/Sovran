@@ -12,6 +12,7 @@
  * length-bounded before display and never logged.
  */
 
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { useState } from 'react';
 import { Platform } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
@@ -98,7 +99,7 @@ function PeerIdentityRow({
         </Text>
       ) : null}
       <Avatar
-        state={picture ? 'image' : 'fallback'}
+        state={avatarStateFor(picture, pictureOverride !== undefined || !person.isLoading)}
         picture={picture}
         seed={pubkey}
         size={size}
@@ -278,7 +279,7 @@ export function DecryptPeerCard({
     <View className="bg-surface rounded-2xl p-3">
       <HStack gap={10} style={CENTER_ROW_STYLE}>
         <Avatar
-          state={person.picture ? 'image' : 'fallback'}
+          state={avatarStateFor(person.picture, !person.isLoading)}
           picture={person.picture}
           seed={peerPubkey}
           size={36}

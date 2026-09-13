@@ -16,7 +16,8 @@ export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement
 
   // A filled CTA is opaque, so the blur would be hidden — render the same solid
   // capsule the flat tier does. (After the hook call to satisfy rules-of-hooks.)
-  if (props.filled) return <CapsuleButtonFlat {...props} />;
+  if (props.filled || (props.isActive && props.selectedVariant === 'contrast'))
+    return <CapsuleButtonFlat {...props} />;
 
   const {
     onPress,

@@ -40,6 +40,12 @@ const NostrProfileFull = NostrProfileFullStrict.extend({
   vertexFetchedAt: z.number().nullish(),
   vertexFresh: z.boolean().nullish(),
   score: NullableVertexMetric,
+  // Counts are absent, never 0, when nagg has no aggregate for the pubkey
+  // (nostr module off, or a profile it has not indexed). `useNostrProfile`
+  // completes them from Primal / the contact list; screens render a
+  // placeholder for `undefined` instead of a misleading zero.
+  followers: z.number().int().nonnegative().optional(),
+  follows: z.number().int().nonnegative().optional(),
   created_at: z.number().int().nullable(),
   nodes: z.number().int().nonnegative().nullable().optional(),
   topFollowers: z.array(TopFollower).max(500),
@@ -357,6 +363,8 @@ export const parseNostrProfileFor =
 
     const agg = (rule: string, metric: string): number | undefined =>
       aggregates[pubkey]?.[rule]?.[metric];
+    const followers = agg('k3_p_latest', 'actors');
+    const follows = agg('k3_author_latest', 'sources');
     const nip05Valid = prov(pubkey, 'nip05').valid;
     const k0 = k0ByPubkey.get(pubkey);
 
@@ -367,8 +375,8 @@ export const parseNostrProfileFor =
       score: num(vertex.score) ?? null,
       vertexFetchedAt: num(vertex.vertexFetchedAt) ?? num(vertex.fetchedAt) ?? null,
       vertexFresh: typeof vertex.vertexFresh === 'boolean' ? vertex.vertexFresh : null,
-      followers: agg('k3_p_latest', 'actors') ?? 0,
-      follows: agg('k3_author_latest', 'sources') ?? 0,
+      ...(followers !== undefined ? { followers } : {}),
+      ...(follows !== undefined ? { follows } : {}),
       created_at: num(prov(pubkey, 'nagg').firstEventAt) ?? null,
       nodes: num(vertex.nodes) ?? null,
       topFollowers,

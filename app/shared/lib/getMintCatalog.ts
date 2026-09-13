@@ -105,7 +105,7 @@ async function resolveNostrProfile(
     });
     return null;
   });
-  if (profile && profile.isOk()) {
+  if (profile && profile.isOk() && profile.value.followers !== undefined) {
     const { followers, score } = profile.value;
     useMintMetadataStore.getState().setSocial(mintUrl, followers, score);
     log.info('mint.catalog.profile.fetch_success', {

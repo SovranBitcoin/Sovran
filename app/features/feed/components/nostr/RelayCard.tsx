@@ -47,10 +47,14 @@ function relayDomain(url: string): string {
 const RelayIcon = React.memo(function RelayIcon({
   icon,
   ink,
+  resolved,
 }: {
   icon: string | undefined;
   /** Brand ink — set on branded surfaces so the fallback glyph reads on them. */
   ink?: string;
+  /** False while the NIP-11 document is still loading: neutral placeholder,
+   *  not the glyph (the glyph means "this relay has no icon"). */
+  resolved: boolean;
 }) {
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
   const [failed, setFailed] = useState(false);
@@ -91,6 +95,9 @@ const RelayIcon = React.memo(function RelayIcon({
       </RNView>
     );
   }
+  if (!safeUri && !resolved) {
+    return <RNView style={[styles.icon, { backgroundColor: withAlpha(foreground, 0.07) }]} />;
+  }
   return (
     <RNView style={containerStyle}>
       <Icon name={RELAY_GLYPH} size={20} color={ink ?? withAlpha(foreground, 0.4)} />
@@ -98,7 +105,15 @@ const RelayIcon = React.memo(function RelayIcon({
   );
 });
 
-function RelayCardBody({ url, info }: { url: string; info: RelayInformation | undefined }) {
+function RelayCardBody({
+  url,
+  info,
+  resolved,
+}: {
+  url: string;
+  info: RelayInformation | undefined;
+  resolved: boolean;
+}) {
   const [foreground, surface, surfaceTertiary] = useThemeColor([
     'foreground',
     'surface',
@@ -127,7 +142,7 @@ function RelayCardBody({ url, info }: { url: string; info: RelayInformation | un
           : { backgroundColor: surface, borderColor: surfaceTertiary },
       ]}>
       <HStack align="center" gap={10}>
-        <RelayIcon icon={info?.icon} ink={brand?.ink} />
+        <RelayIcon icon={info?.icon} ink={brand?.ink} resolved={resolved} />
         <Text bold size={14} numberOfLines={1} style={[sharedStyles.flex1, { color: textColor }]}>
           {info?.name || domain}
         </Text>
@@ -142,8 +157,8 @@ function RelayCardBody({ url, info }: { url: string; info: RelayInformation | un
 }
 
 function RelayCardLive({ url }: { url: string }) {
-  const { entry } = useRelayMetadata(url);
-  return <RelayCardBody url={url} info={entry?.info} />;
+  const { entry, status } = useRelayMetadata(url);
+  return <RelayCardBody url={url} info={entry?.info} resolved={status !== 'loading'} />;
 }
 
 export const RelayCard = React.memo(function RelayCard({
@@ -154,7 +169,7 @@ export const RelayCard = React.memo(function RelayCard({
   /** Per-note fan-out cap: render without mounting the SWR hook (domain-only card). */
   noFetch?: boolean;
 }) {
-  if (noFetch) return <RelayCardBody url={url} info={undefined} />;
+  if (noFetch) return <RelayCardBody url={url} info={undefined} resolved />;
   return <RelayCardLive url={url} />;
 });
 

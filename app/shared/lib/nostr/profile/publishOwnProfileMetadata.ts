@@ -25,8 +25,11 @@ export function applyProfilePatch(
     content.display_name = patch.name;
     if (!Object.hasOwn(base, 'name') || base.name === base.display_name) content.name = patch.name;
   }
-  if (patch.picture === null) delete content.picture;
-  else if (patch.picture !== undefined) content.picture = patch.picture;
+  for (const field of ['picture', 'lud16', 'nip05', 'about'] as const) {
+    const value = patch[field];
+    if (value === null) delete content[field];
+    else if (value !== undefined) content[field] = value;
+  }
   return content;
 }
 export const PROFILE_CREATED_AT_MAX_SKEW_SECONDS = 300;

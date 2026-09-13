@@ -32,6 +32,7 @@ type PillTabItemProps<F extends string> = {
   icon?: string | null;
   testID?: string;
   disabled?: boolean;
+  selectedVariant: 'tint' | 'contrast';
 };
 
 function PillTabItem<F extends string>({
@@ -45,18 +46,31 @@ function PillTabItem<F extends string>({
   accessibilityRole,
   testID,
   disabled = false,
+  selectedVariant,
 }: PillTabItemProps<F>) {
   const isActive = activeTab === item;
+  const contrast = isActive && selectedVariant === 'contrast';
   const isPressed = useSharedValue(false);
-  const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
+  const [foreground, background, surfaceTertiary] = useThemeColor([
+    'foreground',
+    'background',
+    'surface-tertiary',
+  ] as const);
 
   // Pre-compute colors on JS thread so they can be used safely in worklets
   const pressedBg = useMemo(() => withAlpha(surfaceTertiary, 0.6), [surfaceTertiary]);
-  const activeBg = useMemo(() => withAlpha(surfaceTertiary, 0.5), [surfaceTertiary]);
+  const activeBg = useMemo(
+    // `contrast` inverts the pill like a primary button (foreground fill,
+    // background text) so the chosen option reads at a glance; `tint` is the
+    // translucent sub-tab treatment.
+    () => (selectedVariant === 'contrast' ? foreground : withAlpha(surfaceTertiary, 0.5)),
+    [foreground, selectedVariant, surfaceTertiary]
+  );
+  const contentColor = contrast ? background : foreground;
 
   const rStyle = useAnimatedStyle(() => {
     return {
-      backgroundColor: isPressed.get() ? pressedBg : 'rgba(0, 0, 0, 0)',
+      backgroundColor: isPressed.get() && !contrast ? pressedBg : 'rgba(0, 0, 0, 0)',
     };
   });
 
@@ -88,9 +102,12 @@ function PillTabItem<F extends string>({
         }}
         style={[styles.pressable, isActive && { backgroundColor: activeBg }]}>
         <Animated.View style={[styles.inner, rStyle]}>
-          {icon ? <Icon name={icon} size={18} color={foreground} /> : null}
+          {icon ? <Icon name={icon} size={18} color={contentColor} /> : null}
           <Text
-            style={[styles.label, { color: disabled ? withAlpha(foreground, 0.5) : foreground }]}>
+            style={[
+              styles.label,
+              { color: disabled ? withAlpha(contentColor, 0.5) : contentColor },
+            ]}>
             {label}
           </Text>
         </Animated.View>
@@ -112,6 +129,9 @@ type PillTabsProps<F extends string> = {
   disabledFor?: (tab: F) => boolean;
   /** Extra pills rendered inline at the end of the same scrollable row. */
   trailing?: React.ReactElement | null;
+  /** `'contrast'` paints the active pill like a primary button; see
+   *  `CapsuleButton.selectedVariant`. Default `'tint'`. */
+  selectedVariant?: 'tint' | 'contrast';
 };
 
 export function PillTabs<F extends string>({
@@ -124,6 +144,7 @@ export function PillTabs<F extends string>({
   iconFor,
   accessibilityRole,
   trailing = null,
+  selectedVariant = 'tint',
 }: PillTabsProps<F>) {
   const flatListRef = useRef<FlatList<F>>(null);
 
@@ -146,6 +167,7 @@ export function PillTabs<F extends string>({
               onTabChange={onTabChange}
               testID={testIDFor?.(item)}
               disabled={disabledFor?.(item)}
+              selectedVariant={selectedVariant}
             />
           )}
           horizontal

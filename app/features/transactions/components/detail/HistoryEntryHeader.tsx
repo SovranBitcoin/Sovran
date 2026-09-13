@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { HistoryEntry } from '@cashu/coco-core';
 import { getCounterparty } from 'wallet';
 import { withAlpha } from '@/shared/lib/color';
@@ -56,7 +57,8 @@ export function HistoryEntryHeader({
   const counterparty = historyEntry ? getCounterparty(historyEntry) : null;
   const effectiveRecipientPubkey = recipientPubkey ?? counterparty?.pubkey ?? undefined;
   const avatarRecipientPubkey = showRecipientAvatar ? effectiveRecipientPubkey : undefined;
-  const { metadata: recipientMetadata } = useNostrProfileMetadata(avatarRecipientPubkey);
+  const { metadata: recipientMetadata, isResolving: recipientResolving } =
+    useNostrProfileMetadata(avatarRecipientPubkey);
   const [foreground, surface, background, danger, success] = useThemeColor([
     'foreground',
     'surface',
@@ -118,7 +120,7 @@ export function HistoryEntryHeader({
       return (
         <View>
           <Avatar
-            state={recipientPicture ? 'image' : 'fallback'}
+            state={avatarStateFor(recipientPicture, !recipientResolving)}
             picture={recipientPicture}
             seed={avatarRecipientPubkey}
             size={avatarSize}

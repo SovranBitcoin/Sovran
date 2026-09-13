@@ -496,9 +496,13 @@ export function UserFeed({
     void loadMoreItems();
   }, [loadMoreItems, isLoading]);
 
+  // Live `metricsMap` state, not `metricsRef`: the ref is written after commit,
+  // so reading it here left every card on DEFAULT_METRICS (no counts) until an
+  // unrelated re-render — the same bug HomeFeed fixed. Depending on the map
+  // recomputes the rows the moment a page's stats land.
   const getMetrics = useCallback(
-    (noteId: string): NoteMetrics => metricsRef.current.get(noteId) || DEFAULT_METRICS,
-    [metricsRef]
+    (noteId: string): NoteMetrics => metricsMap.get(noteId) || DEFAULT_METRICS,
+    [metricsMap]
   );
 
   const {

@@ -266,6 +266,7 @@ export function FiltersScreen() {
                     ) : undefined
                   }
                   isActive={mintUrl === mint.mintUrl}
+                  selectedVariant="contrast"
                   fitContent
                   accessibilityRole="radio"
                   onPress={() => setMintUrl(mint.mintUrl)}
@@ -278,6 +279,7 @@ export function FiltersScreen() {
 
         <Section title="Currency">
           <PillTabs
+            selectedVariant="contrast"
             tabs={SUPPORTED_CURRENCIES}
             activeTab={currency.toUpperCase()}
             onTabChange={(value) => setCurrency(value.toLowerCase())}
@@ -288,6 +290,7 @@ export function FiltersScreen() {
 
         <Section title="Type">
           <PillTabs
+            selectedVariant="contrast"
             tabs={['all', 'lightning', 'ecash', 'onchain'] as const}
             activeTab={paymentType}
             onTabChange={setPaymentType}
@@ -300,6 +303,7 @@ export function FiltersScreen() {
 
         <Section title="Direction">
           <PillTabs
+            selectedVariant="contrast"
             tabs={['all', 'incoming', 'outgoing'] as const}
             activeTab={direction}
             onTabChange={setDirection}
@@ -312,6 +316,7 @@ export function FiltersScreen() {
 
         <Section title="Status">
           <PillTabs
+            selectedVariant="contrast"
             tabs={['All', 'Confirmed', 'Pending', 'Expired'] as const}
             activeTab={status}
             onTabChange={setStatus}
@@ -324,6 +329,7 @@ export function FiltersScreen() {
 
         <Section title="Source">
           <PillTabs
+            selectedVariant="contrast"
             tabs={['all', 'qr', 'nfc', 'ble', 'paste', 'deeplink'] as const}
             activeTab={source}
             onTabChange={setSource}
@@ -336,6 +342,7 @@ export function FiltersScreen() {
 
         <Section title="Lock">
           <PillTabs
+            selectedVariant="contrast"
             tabs={['all', 'locked', 'unlocked'] as const}
             activeTab={lock}
             onTabChange={setLock}
@@ -348,6 +355,7 @@ export function FiltersScreen() {
 
         <Section title="Counterparty">
           <PillTabs
+            selectedVariant="contrast"
             tabs={['all', 'with'] as const}
             activeTab={counterparty}
             onTabChange={setCounterparty}
@@ -360,6 +368,7 @@ export function FiltersScreen() {
 
         <Section title="Zaps">
           <PillTabs
+            selectedVariant="contrast"
             tabs={['all', 'zaps'] as const}
             activeTab={zap}
             onTabChange={setZap}

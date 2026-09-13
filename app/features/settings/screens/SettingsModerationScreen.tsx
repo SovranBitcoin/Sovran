@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { RefreshControl } from 'react-native';
 import { Button, Card, Input, Label, ListGroup, Separator, Switch, TextField } from 'heroui-native';
 import { npubEncode } from 'nostr-tools/nip19';
@@ -24,7 +25,7 @@ function BlockedPerson({
   blocked: boolean;
   onChange: (blocked: boolean) => Promise<void>;
 }) {
-  const { metadata } = useNostrProfileMetadata(pubkey);
+  const { metadata, isResolving } = useNostrProfileMetadata(pubkey);
   const name = metadata?.displayName || metadata?.name || 'Nostr account';
   const [syncing, setSyncing] = useState(false);
   const retry = async () => {
@@ -37,7 +38,7 @@ function BlockedPerson({
       <View className="flex-row items-center gap-3">
         <Avatar
           size={40}
-          state={metadata?.picture ? 'image' : 'fallback'}
+          state={avatarStateFor(metadata?.picture, !isResolving)}
           picture={metadata?.picture}
           seed={pubkey}
           name={name}

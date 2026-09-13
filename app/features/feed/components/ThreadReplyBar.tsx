@@ -8,6 +8,8 @@
  * full composer (carrying the typed draft + the original post for context).
  * Sticks above the keyboard via `KeyboardStickyView`, like the chat composer.
  */
+import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Keyboard, StyleSheet, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
@@ -130,6 +132,7 @@ export function ThreadReplyBar({
     'accent',
   ] as const);
   const ownProfile = useProfileStore((s) => s.getActiveProfile());
+  const { pictureResolved: ownPictureResolved } = useProfileDisplay(ownProfile?.pubkey ?? '');
   const inputRef = useRef<TextInput>(null);
   const uploadsRef = useUploadAbortMap();
   const shift = useShiftLogger('ThreadReplyBar');
@@ -376,7 +379,7 @@ export function ThreadReplyBar({
 
       <HStack gap={8} align="center">
         <Avatar
-          state={ownProfile?.cachedPicture ? 'image' : 'fallback'}
+          state={avatarStateFor(ownProfile?.cachedPicture, ownPictureResolved)}
           picture={ownProfile?.cachedPicture}
           seed={ownProfile?.pubkey ?? ''}
           size={30}

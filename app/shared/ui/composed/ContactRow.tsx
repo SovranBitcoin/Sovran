@@ -18,6 +18,7 @@
  * Spec: see `docs/contact-row.md`.
  */
 
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { ReactNode, useEffect } from 'react';
 import { withAlpha } from '@/shared/lib/color';
 import type { MintListItem } from 'wallet';
@@ -679,7 +680,7 @@ export function ContactRow({
   const picture = resolvePicture(identities);
   const seed = resolveAvatarSeed(identities);
   const name = resolveName(identities);
-  const avatarState = resolvedLoading ? 'loading' : picture ? 'image' : 'fallback';
+  const avatarState = avatarStateFor(picture, !resolvedLoading);
 
   let leadingNode: ReactNode | undefined;
   let avatarProp: ListRowAvatar | undefined;

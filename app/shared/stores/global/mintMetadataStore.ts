@@ -84,7 +84,8 @@ interface MintMetadataState {
   ) => void;
   setSocial: (
     mintUrl: string,
-    followers: number,
+    /** Undefined when no source could count (kept from the previous entry). */
+    followers: number | undefined,
     reputation: number | null,
     extra?: { operatorPubkey?: string; operatorNpub?: string; vertexRank?: number }
   ) => void;
@@ -239,7 +240,7 @@ export const useMintMetadataStore = create<MintMetadataState>()(
           get().mergeCached(
             mintUrl,
             {
-              contactFollowers: followers,
+              ...(followers !== undefined ? { contactFollowers: followers } : {}),
               contactReputation: reputation,
               ...(extra?.operatorPubkey ? { operatorPubkey: extra.operatorPubkey } : {}),
               ...(extra?.operatorNpub ? { operatorNpub: extra.operatorNpub } : {}),

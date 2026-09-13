@@ -229,7 +229,17 @@ export const FOUNDATION_SCENARIOS = [
     id: 'pill-tabs',
     title: 'Pill tabs',
     covers: [SOURCES.pillTabs],
-    render: () => <PillTabs tabs={PILL_TABS} activeTab="Recent" onTabChange={noop} />,
+    render: () => (
+      <>
+        <PillTabs tabs={PILL_TABS} activeTab="Recent" onTabChange={noop} />
+        <PillTabs
+          tabs={PILL_TABS}
+          activeTab="Recent"
+          onTabChange={noop}
+          selectedVariant="contrast"
+        />
+      </>
+    ),
   },
   {
     id: 'sheet-grabber',

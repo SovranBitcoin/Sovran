@@ -14,7 +14,10 @@ import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { tryNpubEncode } from '@/features/feed/components/nostr/feedParse';
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
-import { fetchProfileStatsViaFacade } from '@/shared/lib/nostr/fetchProfiles';
+import {
+  fetchFollowingCountViaFacade,
+  fetchProfileStatsViaFacade,
+} from '@/shared/lib/nostr/fetchProfiles';
 import { log } from '@/shared/lib/logger';
 
 export type TopFollower = NostrProfileFull['topFollowers'][number];
@@ -35,8 +38,8 @@ function profileFullFromStats(
     npub: tryNpubEncode(pubkey),
     rank: 0,
     score: null,
-    followers: stats.followersCount ?? 0,
-    follows: stats.followingCount ?? 0,
+    ...(stats.followersCount !== undefined ? { followers: stats.followersCount } : {}),
+    ...(stats.followingCount !== undefined ? { follows: stats.followingCount } : {}),
     created_at: stats.joinedAt ?? null,
     topFollowers: [],
     fromCache: false,
@@ -51,9 +54,73 @@ function profileFullFromStats(
   };
 }
 
+type ProfileCounts = Pick<NostrProfileFull, 'followers' | 'follows'>;
+
+/** Newer profile data with any count it lacks carried over from the previous
+ *  snapshot, so a Vertex-refreshed nagg envelope (no aggregates) cannot erase
+ *  counts already completed from Primal or the contact list. */
+function keepCounts<T extends ProfileCounts>(next: T, previous: ProfileCounts | null): T {
+  return {
+    ...next,
+    ...(next.followers === undefined && previous?.followers !== undefined
+      ? { followers: previous.followers }
+      : {}),
+    ...(next.follows === undefined && previous?.follows !== undefined
+      ? { follows: previous.follows }
+      : {}),
+  };
+}
+
+function countsMissing(profile: ProfileCounts): boolean {
+  return profile.followers === undefined || profile.follows === undefined;
+}
+
+/**
+ * Fill the counts nagg did not have from the other sources, in order: Primal
+ * `user_profile` (followers + following) → the profile's own kind-3 off the
+ * relays (following only; followers need a reverse index relays lack). The
+ * counts a source cannot supply stay undefined — never 0 — so the header shows
+ * a placeholder instead of a wrong number.
+ */
+async function completeCounts(
+  pubkey: string,
+  profile: ProfileCounts,
+  signal: AbortSignal,
+  options: { skipStats?: boolean } = {}
+): Promise<ProfileCounts> {
+  let counts: ProfileCounts = { followers: profile.followers, follows: profile.follows };
+  if (countsMissing(counts) && !options.skipStats) {
+    const stats = await fetchProfileStatsViaFacade(pubkey, { signal });
+    if (signal.aborted) return counts;
+    if (stats) {
+      counts = keepCounts(
+        {
+          ...(stats.followersCount !== undefined ? { followers: stats.followersCount } : {}),
+          ...(stats.followingCount !== undefined ? { follows: stats.followingCount } : {}),
+        },
+        counts
+      );
+      log.debug('feed.profile.counts.from_stats', { pubkey, tier: stats.tier });
+    }
+  }
+  if (counts.follows === undefined) {
+    const follows = await fetchFollowingCountViaFacade(pubkey, { signal });
+    if (signal.aborted) return counts;
+    if (follows !== undefined) {
+      counts = { ...counts, follows };
+      log.debug('feed.profile.counts.from_contacts', { pubkey, follows });
+    }
+  }
+  if (countsMissing(counts)) log.info('feed.profile.counts.unavailable', { pubkey });
+  return counts;
+}
+
 interface UseNostrProfileResult {
   data: NostrProfileFull | null;
   isLoading: boolean;
+  /** True while follower/following counts are still being completed from
+   *  fallback sources after the profile itself has rendered. */
+  isCountsLoading: boolean;
   error: Error | null;
   refetch: () => void;
 }
@@ -67,8 +134,9 @@ export function useNostrProfile(
     pubkey: string | null;
     data: NostrProfileFull | null;
     isLoading: boolean;
+    countsLoading: boolean;
     error: Error | null;
-  }>(() => ({ pubkey, data: null, isLoading: !!pubkey, error: null }));
+  }>(() => ({ pubkey, data: null, isLoading: !!pubkey, countsLoading: false, error: null }));
   const requestRef = useRef<AbortController | null>(null);
 
   // Initial loads and manual refreshes share cancellation. Starting a newer
@@ -79,7 +147,7 @@ export function useNostrProfile(
     requestRef.current = controller;
     const { signal } = controller;
     if (!pubkey) {
-      setState({ pubkey, data: null, isLoading: false, error: null });
+      setState({ pubkey, data: null, isLoading: false, countsLoading: false, error: null });
       return;
     }
 
@@ -88,8 +156,30 @@ export function useNostrProfile(
       pubkey,
       data: previous.pubkey === pubkey ? previous.data : null,
       isLoading: true,
+      countsLoading: false,
       error: null,
     }));
+    const settle = (data: NostrProfileFull | null, error: Error | null = null) =>
+      setState((previous) => ({
+        pubkey,
+        data: data ? keepCounts(data, previous.pubkey === pubkey ? previous.data : null) : null,
+        isLoading: false,
+        countsLoading: previous.pubkey === pubkey ? previous.countsLoading : false,
+        error,
+      }));
+    // Runs after the profile has painted: the header keeps its content while
+    // the count pills stay in their loading state until every source answered.
+    const fillCounts = async (profile: ProfileCounts, options?: { skipStats?: boolean }) => {
+      if (!countsMissing(profile)) return;
+      setState((previous) => ({ ...previous, countsLoading: true }));
+      const counts = await completeCounts(pubkey, profile, signal, options);
+      if (signal.aborted) return;
+      setState((previous) => ({
+        ...previous,
+        countsLoading: false,
+        data: previous.data ? keepCounts(previous.data, counts) : previous.data,
+      }));
+    };
 
     // Only nagg supplies reputation + top followers; honor tier settings and
     // preserve the existing Primal/relay fallback when nagg is unavailable.
@@ -99,7 +189,11 @@ export function useNostrProfile(
       if (result.isOk()) {
         log.debug('feed.profile.fetch.success', { pubkey, source: 'nagg' });
         recordDebugTiers([pubkey], 'nagg');
-        setState({ pubkey, data: result.value, isLoading: false, error: null });
+        settle(result.value);
+        // nagg without the nostr module answers a valid envelope with no
+        // aggregates; the other sources fill the counts in parallel with the
+        // reputation refresh.
+        const counting = fillCounts(result.value);
         const refreshed = await refreshVertex({
           kind: 'profile',
           target: pubkey,
@@ -107,9 +201,11 @@ export function useNostrProfile(
           ndk,
           signal,
         });
-        if (signal.aborted || !refreshed) return;
-        const parsed = parseNostrProfileFor(pubkey)(refreshed);
-        if (parsed.isOk()) setState({ pubkey, data: parsed.value, isLoading: false, error: null });
+        if (!signal.aborted && refreshed) {
+          const parsed = parseNostrProfileFor(pubkey)(refreshed);
+          if (parsed.isOk()) settle(parsed.value);
+        }
+        await counting;
         return;
       }
       log.warn('feed.profile.fetch.nagg_failed_fallback', { pubkey, error: result.error });
@@ -117,23 +213,16 @@ export function useNostrProfile(
 
     const stats = await fetchProfileStatsViaFacade(pubkey, { signal });
     if (signal.aborted) return;
+    let counting: Promise<void> = Promise.resolve();
     if (stats) {
       log.debug('feed.profile.fetch.success', { pubkey, source: stats.tier });
       recordDebugTiers([pubkey], stats.tier);
-      setState({
-        pubkey,
-        data: profileFullFromStats(pubkey, stats),
-        isLoading: false,
-        error: null,
-      });
+      const data = profileFullFromStats(pubkey, stats);
+      settle(data);
+      counting = fillCounts(data, { skipStats: true });
     } else {
       log.warn('feed.profile.fetch.error', { pubkey });
-      setState({
-        pubkey,
-        data: null,
-        isLoading: false,
-        error: new Error('profile unavailable from all tiers'),
-      });
+      settle(null, new Error('profile unavailable from all tiers'));
     }
     // A missing nagg profile does not imply that Vertex has no reputation for
     // this identity. Keep fallback content visible while the consent/budget
@@ -145,27 +234,36 @@ export function useNostrProfile(
       ndk,
       signal,
     });
-    if (signal.aborted || !refreshed) return;
-    const parsed = parseNostrProfileFor(pubkey)(refreshed);
-    if (parsed.isOk())
-      setState((previous) => ({
-        pubkey,
-        data: {
-          ...previous.data,
-          ...parsed.value,
-          followers:
+    if (!signal.aborted && refreshed) {
+      const parsed = parseNostrProfileFor(pubkey)(refreshed);
+      if (parsed.isOk()) {
+        setState((previous) => {
+          const known = previous.pubkey === pubkey ? previous.data : null;
+          const followers =
             aggregateValue(refreshed.aggregates, pubkey, 'followers') ??
-            previous.data?.followers ??
-            parsed.value.followers,
-          follows:
+            known?.followers ??
+            parsed.value.followers;
+          const follows =
             aggregateValue(refreshed.aggregates, pubkey, 'following') ??
-            previous.data?.follows ??
-            parsed.value.follows,
-          created_at: parsed.value.created_at ?? previous.data?.created_at ?? null,
-        },
-        isLoading: false,
-        error: null,
-      }));
+            known?.follows ??
+            parsed.value.follows;
+          return {
+            pubkey,
+            data: {
+              ...known,
+              ...parsed.value,
+              ...(followers !== undefined ? { followers } : {}),
+              ...(follows !== undefined ? { follows } : {}),
+              created_at: parsed.value.created_at ?? known?.created_at ?? null,
+            },
+            isLoading: false,
+            countsLoading: known ? previous.countsLoading : false,
+            error: null,
+          };
+        });
+      }
+    }
+    await counting;
   }, [pubkey, ndk, refreshReputation]);
 
   useEffect(() => {
@@ -182,6 +280,7 @@ export function useNostrProfile(
   return {
     data: current ? state.data : null,
     isLoading: current ? state.isLoading : !!pubkey,
+    isCountsLoading: current ? state.countsLoading : false,
     error: current ? state.error : null,
     refetch,
   };

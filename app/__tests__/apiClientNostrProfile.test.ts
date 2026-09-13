@@ -61,7 +61,8 @@ describe('fetchNostrProfile', () => {
     if (result.isOk()) {
       expect(result.value.score).toBeNull();
       expect(result.value.created_at).toBeNull();
-      expect(result.value.followers).toBe(0);
+      // No aggregate means unknown, never 0 — the hook completes it elsewhere.
+      expect(result.value.followers).toBeUndefined();
     }
   });
   it('maps the live envelope into NostrProfileFull', async () => {
@@ -80,8 +81,8 @@ describe('fetchNostrProfile', () => {
     expect(p.nip05Valid).toBe(true);
     // following count from the pubkey-keyed aggregates.
     expect(p.follows).toBeGreaterThan(0);
-    // Zero-omitted followers map to 0, not a parse failure.
-    expect(typeof p.followers).toBe('number');
+    // An omitted followers aggregate stays absent (not 0, not a parse failure).
+    expect(p.followers).toBeUndefined();
   });
 
   it('rejects a non-envelope body', async () => {
