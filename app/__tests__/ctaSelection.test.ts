@@ -5,7 +5,7 @@ import type { CtaContext } from '@/shared/lib/cta/types';
 const ctx: CtaContext = {
   nowMs: 10 * DAY_MS,
   nativeVersion: '1.0.0',
-  latest: { version: '2.0.0' },
+  latest: { version: '2.0.0', fetchedAt: 10 * DAY_MS },
   lifecycle: { seedCreatedAt: 0, recoveryPhraseVerifiedAt: null, restoreStatus: 'complete' },
   balanceTotalSat: 1,
   dismissed: {},
@@ -92,4 +92,17 @@ it.each([
   ['1.0.0', '', false],
 ])('compares %s against %s', (candidate, current, expected) => {
   expect(isNewerVersion(candidate, current)).toBe(expected);
+});
+
+it('treats a version record older than 24 hours as unknown', () => {
+  const input = { ...ctx, mockMode: true };
+  expect(
+    selectNextCta({ ...input, latest: { version: '2.0.0', fetchedAt: ctx.nowMs - DAY_MS - 1 } })
+  ).toBeNull();
+  expect(
+    selectNextCta({ ...input, latest: { version: '2.0.0', fetchedAt: ctx.nowMs - DAY_MS } })?.id
+  ).toBe('update-required');
+});
+it('does not block without a native version, even with fresh newer metadata', () => {
+  expect(selectNextCta({ ...ctx, nativeVersion: '', mockMode: true })).toBeNull();
 });

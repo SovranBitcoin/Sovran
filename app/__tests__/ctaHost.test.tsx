@@ -1,36 +1,103 @@
 import { StrictMode } from 'react';
-import { act, render } from '@testing-library/react-native';
-import { AppState } from 'react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
+import { AppState, BackHandler } from 'react-native';
+import { err, ok } from 'neverthrow';
+import { CtaScreen } from '@/shared/blocks/CtaScreen';
+import { getLatestVersion } from '@/shared/lib/apiClient';
 import { CtaHost } from '@/shared/blocks/CtaHost';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
-import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import { BACKUP_SNOOZE_MS } from '@/shared/lib/cta/definitions';
+import { useSettingsHydration, useSettingsStore } from '@/shared/stores/global/settingsStore';
+import {
+  ABANDONED_BACKUP_GRACE_MS,
+  BACKUP_SNOOZE_MS,
+  LATEST_VERSION_MAX_AGE_MS,
+} from '@/shared/lib/cta/definitions';
 let mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
 const mockPush = jest.fn();
+const mockBack = jest.fn();
+const mockReplace = jest.fn();
+const mockPreventRemove = jest.fn();
+const mockSetOptions = jest.fn();
+const mockAddListener = jest.fn((_event: string, _listener: () => void) => jest.fn());
+const mockScreenNavigation = { setOptions: mockSetOptions, addListener: mockAddListener };
+
 let mockBalance = 100;
 jest.mock('expo-router', () => ({
-  router: { push: (...args: unknown[]) => mockPush(...args) },
+  router: {
+    push: (...args: unknown[]) => mockPush(...args),
+    back: () => mockBack(),
+    replace: (...args: unknown[]) => mockReplace(...args),
+    canGoBack: () => true,
+  },
+  useNavigation: () => mockScreenNavigation,
   useRootNavigationState: () => mockNavigation,
 }));
 jest.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.0' }));
 jest.mock('wallet/react', () => ({ useColadaBalance: () => ({ total: mockBalance }) }), {
   virtual: true,
 });
-jest.mock('@/shared/hooks/useLatestVersionFetch', () => ({ useLatestVersionFetch: () => {} }));
+jest.mock('@/shared/lib/qrButtonAnchor', () => ({ useBootMorphCompleted: () => true }));
+jest.mock('@/shared/providers/OfflineProvider', () => ({
+  useOfflineStatus: () => ({ isOffline: false }),
+}));
+jest.mock('@/shared/lib/apiClient', () => ({ getLatestVersion: jest.fn() }));
+jest.mock('expo-router/react-navigation', () => ({
+  usePreventRemove: (blocked: boolean) => mockPreventRemove(blocked),
+}));
 jest.mock('@/shared/stores/runtime/mockDataStore', () => ({ purgeLegacyMockData: jest.fn() }));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
   setItem: jest.fn(async () => undefined),
   removeItem: jest.fn(async () => undefined),
 }));
+jest.mock('@/assets/icons', () => 'Icon');
+jest.mock('@/shared/ui/composed/Screen', () => ({
+  Screen: ({ children, footer }: React.PropsWithChildren<{ footer: React.ReactNode }>) => (
+    <>
+      {children}
+      {footer}
+    </>
+  ),
+}));
+jest.mock('@/shared/ui/composed/ScreenScrollView', () => ({ ScreenScrollView: 'ScrollView' }));
+jest.mock('@/shared/ui/composed/BottomButtons', () => ({ BottomButtons: 'Footer' }));
+jest.mock('@/shared/ui/primitives/View/View', () => ({ View: 'View' }));
+jest.mock('@/shared/ui/primitives/Text', () => ({ Text: 'Text' }));
+jest.mock('@/shared/ui/primitives/Button', () => ({ Button: 'Button' }));
+jest.mock('@/shared/ui/primitives/Pressable', () => ({ Pressable: 'Pressable' }));
+jest.mock('@/shared/ui/primitives/SelectableCheck', () => ({ SelectableCheck: 'Check' }));
+jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => 'foreground' }));
+jest.mock('@/shared/lib/e2e/E2EAccessibilityProbe', () => ({ E2EAccessibilityProbe: 'Probe' }));
+jest.mock('@/shared/lib/url', () => ({ openExternalUrl: jest.fn() }));
+function HostWithScreen({ id }: { id?: 'update-required' | 'backup-recovery-phrase' }) {
+  return (
+    <>
+      <CtaHost />
+      {id && <CtaScreen id={id} />}
+    </>
+  );
+}
 beforeEach(async () => {
+  jest.spyOn(BackHandler, 'addEventListener').mockReturnValue({ remove: jest.fn() });
+  jest.clearAllMocks();
+  jest.mocked(getLatestVersion).mockResolvedValue(err(new Error('offline')));
+  mockBack.mockImplementation(() => {
+    expect(mockPreventRemove).toHaveBeenLastCalledWith(false);
+  });
   jest.spyOn(AppState, 'addEventListener').mockReturnValue({ remove: jest.fn() });
   await useCtaStore.persist.rehydrate();
   await useSettingsStore.persist.rehydrate();
   await useWalletLifecycleStore.persist.rehydrate();
-  useCtaStore.setState({ activeId: null, previewOverride: null, dismissed: {} });
+  useCtaStore.setState({
+    activeId: null,
+    previewOverride: null,
+    dismissed: {},
+    closingId: null,
+    backupStartedAt: null,
+  });
   useSettingsStore.setState({ lastKnownAppVersion: null, mockMode: false });
+  useSettingsHydration.setState({ status: 'ready' });
   useWalletLifecycleStore.setState({
     seedCreatedAt: Date.now(),
     restoreStatus: 'complete',
@@ -46,16 +113,19 @@ afterEach(() => {
   delete process.env.EXPO_PUBLIC_E2E_STATE_MIRROR;
 });
 it('reserves one modal and re-evaluates on close with a version received while covered', async () => {
-  const view = render(<CtaHost />);
+  const view = render(<HostWithScreen />);
   expect(mockPush).toHaveBeenCalledTimes(1);
   mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: 'cta' }] };
-  view.rerender(<CtaHost />);
+  view.rerender(<HostWithScreen />);
   await act(async () =>
     useSettingsStore.getState().setLastKnownAppVersion({ version: '2.0.0', fetchedAt: Date.now() })
   );
   expect(mockPush).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    useCtaStore.getState().dismiss('backup-recovery-phrase', false);
+  });
   mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
-  view.rerender(<CtaHost />);
+  view.rerender(<HostWithScreen />);
   expect(mockPush).toHaveBeenLastCalledWith({
     pathname: '/cta',
     params: { id: 'update-required' },
@@ -68,7 +138,7 @@ it('re-evaluates an expired snooze on foreground', async () => {
   const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
   useCtaStore.setState({ dismissed: { 'backup-recovery-phrase:snooze': { at: now } } });
   const listener = jest.spyOn(AppState, 'addEventListener');
-  const view = render(<CtaHost />);
+  const view = render(<HostWithScreen />);
   expect(mockPush).not.toHaveBeenCalled();
   clock.mockReturnValue(now + BACKUP_SNOOZE_MS);
   await act(async () => listener.mock.calls.at(-1)![1]('active'));
@@ -77,7 +147,7 @@ it('re-evaluates an expired snooze on foreground', async () => {
 });
 it('does nothing during pending/failed RestoreGate and evaluates once ready', async () => {
   useWalletLifecycleStore.setState({ restoreStatus: 'pending' });
-  render(<CtaHost />);
+  render(<HostWithScreen />);
   expect(mockPush).not.toHaveBeenCalled();
   await act(async () => useWalletLifecycleStore.setState({ restoreStatus: 'failed' }));
   expect(mockPush).not.toHaveBeenCalled();
@@ -86,11 +156,11 @@ it('does nothing during pending/failed RestoreGate and evaluates once ready', as
 });
 it('reacts to balance and verification changes without showing in Mock Mode', async () => {
   mockBalance = 0;
-  const view = render(<CtaHost />);
+  const view = render(<HostWithScreen />);
   expect(mockPush).not.toHaveBeenCalled();
   await act(async () => useSettingsStore.setState({ mockMode: true }));
   mockBalance = 100;
-  view.rerender(<CtaHost />);
+  view.rerender(<HostWithScreen />);
   expect(mockPush).not.toHaveBeenCalled();
   await act(async () => useWalletLifecycleStore.getState().markRecoveryPhraseVerified());
   await act(async () => useSettingsStore.setState({ mockMode: false }));
@@ -99,14 +169,14 @@ it('reacts to balance and verification changes without showing in Mock Mode', as
 it('suppresses automation but allows preview, close and reopening a dismissed CTA', async () => {
   process.env.EXPO_PUBLIC_E2E_STATE_MIRROR = '1';
   useCtaStore.getState().dismiss('backup-recovery-phrase', true);
-  const view = render(<CtaHost />);
+  const view = render(<HostWithScreen />);
   expect(mockPush).not.toHaveBeenCalled();
   await act(async () => useCtaStore.getState().preview('backup-recovery-phrase'));
   expect(mockPush).toHaveBeenCalledTimes(1);
   mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: 'cta' }] };
-  view.rerender(<CtaHost />);
+  view.rerender(<HostWithScreen />);
   mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
-  view.rerender(<CtaHost />);
+  view.rerender(<HostWithScreen />);
   expect(useCtaStore.getState().previewOverride).toBeNull();
   expect(mockPush).toHaveBeenCalledTimes(1);
   await act(async () => useCtaStore.getState().preview('backup-recovery-phrase'));
@@ -116,8 +186,97 @@ it('suppresses automation but allows preview, close and reopening a dismissed CT
 it('does not push twice when mount effects replay in Strict Mode', () => {
   render(
     <StrictMode>
-      <CtaHost />
+      <HostWithScreen />
     </StrictMode>
   );
   expect(mockPush).toHaveBeenCalledTimes(1);
+});
+
+it('forces a fresh check and releases the blocking route when the corrected version arrives', async () => {
+  mockBalance = 0;
+  useSettingsStore.setState({ lastKnownAppVersion: { version: '2.0.0', fetchedAt: Date.now() } });
+  let finish!: (value: Awaited<ReturnType<typeof getLatestVersion>>) => void;
+  jest.mocked(getLatestVersion).mockReturnValueOnce(
+    new Promise((resolve) => {
+      finish = resolve;
+    })
+  );
+  const view = render(<HostWithScreen />);
+  expect(getLatestVersion).toHaveBeenCalledTimes(1);
+  mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: 'cta' }] };
+  view.rerender(<HostWithScreen id="update-required" />);
+  expect(mockPreventRemove).toHaveBeenLastCalledWith(true);
+  await act(async () => finish(ok({ version: '1.0.0' })));
+  expect(mockPreventRemove).toHaveBeenLastCalledWith(false);
+  expect(mockBack).toHaveBeenCalledTimes(1);
+  mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
+  view.rerender(<HostWithScreen />);
+  expect(useCtaStore.getState().activeId).toBeNull();
+  expect(mockPush).toHaveBeenCalledTimes(1);
+});
+
+it.each(['confirmed', 'unavailable'])(
+  'keeps a fresh update gate blocked when the network is %s',
+  async (result) => {
+    useSettingsStore.setState({ lastKnownAppVersion: { version: '2.0.0', fetchedAt: Date.now() } });
+    jest
+      .mocked(getLatestVersion)
+      .mockResolvedValue(
+        result === 'confirmed' ? ok({ version: '2.0.0' }) : err(new Error('offline'))
+      );
+    const view = render(<HostWithScreen />);
+    mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: 'cta' }] };
+    view.rerender(<HostWithScreen id="update-required" />);
+    await act(async () => {});
+    expect(getLatestVersion).toHaveBeenCalledTimes(1);
+    expect(mockPreventRemove).toHaveBeenLastCalledWith(true);
+    expect(mockBack).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['primary', 'secondary'])(
+  'backup %s preserves its dismissal policy through route removal and foreground',
+  async (action) => {
+    const now = Date.now();
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
+    const view = render(<HostWithScreen />);
+    mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: 'cta' }] };
+    view.rerender(<HostWithScreen id="backup-recovery-phrase" />);
+    await act(async () => fireEvent.press(view.UNSAFE_getByProps({ testID: `cta-${action}` })));
+    act(() => mockAddListener.mock.calls.at(-1)![1]());
+    mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
+    view.rerender(<HostWithScreen />);
+    if (action === 'primary') {
+      expect(useCtaStore.getState().dismissed).toEqual({});
+      expect(useWalletLifecycleStore.getState().recoveryPhraseVerifiedAt).toBeNull();
+      expect(mockReplace).toHaveBeenCalledWith('/(settings-flow)/profile');
+    } else {
+      expect(useCtaStore.getState().dismissed['backup-recovery-phrase:snooze']).toEqual({
+        at: now,
+      });
+    }
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    const foreground = jest.mocked(AppState.addEventListener).mock.calls.at(-1)![1];
+    clock.mockReturnValue(now + ABANDONED_BACKUP_GRACE_MS - 1);
+    await act(async () => foreground('active'));
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    clock.mockReturnValue(now + ABANDONED_BACKUP_GRACE_MS);
+    await act(async () => foreground('active'));
+    expect(mockPush).toHaveBeenCalledTimes(action === 'primary' ? 2 : 1);
+  }
+);
+
+it('releases an offline blocking gate when its cache becomes stale on foreground', async () => {
+  const now = Date.now();
+  const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
+  useSettingsStore.setState({ lastKnownAppVersion: { version: '2.0.0', fetchedAt: now } });
+  const view = render(<HostWithScreen />);
+  mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: 'cta' }] };
+  view.rerender(<HostWithScreen id="update-required" />);
+  await act(async () => {});
+  const foreground = jest.mocked(AppState.addEventListener).mock.calls[1][1];
+  clock.mockReturnValue(now + LATEST_VERSION_MAX_AGE_MS + 1);
+  await act(async () => foreground('active'));
+  expect(mockPreventRemove).toHaveBeenLastCalledWith(false);
+  expect(mockBack).toHaveBeenCalledTimes(1);
 });

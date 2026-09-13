@@ -1,6 +1,8 @@
 import type { CtaDefinition, CtaId } from './types';
 import { isNewerVersion } from './version';
 export const DAY_MS = 24 * 60 * 60 * 1000;
+export const LATEST_VERSION_MAX_AGE_MS = DAY_MS;
+export const ABANDONED_BACKUP_GRACE_MS = 30 * 60 * 1000;
 export const BACKUP_SNOOZE_MS = 3 * DAY_MS;
 export const CTA_DEFINITIONS: readonly CtaDefinition[] = [
   {
@@ -9,7 +11,10 @@ export const CTA_DEFINITIONS: readonly CtaDefinition[] = [
     presentation: 'blocking-modal',
     dismissPolicy: 'never',
     shouldShow: (ctx) =>
-      ctx.latest !== null && isNewerVersion(ctx.latest.version, ctx.nativeVersion),
+      !!ctx.nativeVersion &&
+      ctx.latest !== null &&
+      ctx.nowMs - ctx.latest.fetchedAt <= LATEST_VERSION_MAX_AGE_MS &&
+      isNewerVersion(ctx.latest.version, ctx.nativeVersion),
     content: {
       icon: 'mdi:cloud-download-outline',
       title: 'Update required',
@@ -22,10 +27,11 @@ export const CTA_DEFINITIONS: readonly CtaDefinition[] = [
     priority: 10,
     presentation: 'dismissable-modal',
     dismissPolicy: 'do-not-ask-again',
-    shouldShow: ({ lifecycle, mockMode, balanceTotalSat, nowMs }) =>
+    shouldShow: ({ lifecycle, mockMode, balanceTotalSat, nowMs, backupStartedAt }) =>
       lifecycle.recoveryPhraseVerifiedAt == null &&
       lifecycle.restoreStatus !== 'pending' &&
       !mockMode &&
+      (backupStartedAt == null || nowMs - backupStartedAt >= ABANDONED_BACKUP_GRACE_MS) &&
       (balanceTotalSat > 0 ||
         (lifecycle.seedCreatedAt !== null && nowMs - lifecycle.seedCreatedAt > 7 * DAY_MS)),
     content: {

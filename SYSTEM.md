@@ -984,11 +984,20 @@ foreground, version, lifecycle and balance changes. All CTAs use `CtaScreen`.
 
 - `shouldShow` is pure and synchronous over an injected context and clock.
 - Blocking CTAs use persisted last-known data; showing one never waits for a
-  network call. Version refresh is separate and throttled to six hours.
+  network call. Records older than `LATEST_VERSION_MAX_AGE_MS` (24 hours) are
+  unknown, and a missing native version never blocks. Version refresh is normally
+  throttled to six hours; showing the update gate forces one immediate fresh
+  check. Re-evaluate while mounted on each version change and foreground; release
+  the removal guard and close automatically when the update is no longer required.
+  A confirmed newer version, or a fresh cached record while offline, still blocks.
 - Blocking CTAs have no dismissal, swipe or Android-back escape in production.
 - Dismissals are data-only. Version-triggered dismissals carry the trigger
   version. A permanent record uses the CTA ID; a three-day deferral uses its
   `:snooze` key, with the same `{ at, version? }` shape.
+- A primary action never dismisses a security nag. "Back up now" opens the backup
+  flow without a persisted dismissal; an abandoned attempt has only a runtime
+  `ABANDONED_BACKUP_GRACE_MS` (30 minute) grace period. "Not now" still snoozes for
+  three days. Completing verification removes backup eligibility.
 - Backup verification is additive lifecycle data; revealing the phrase alone
   never marks it verified. Three correct quiz answers do.
 - Mock Mode suppresses balance-derived backup nags.

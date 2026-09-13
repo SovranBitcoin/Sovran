@@ -9,6 +9,10 @@ interface CtaState {
   dismissed: CtaDismissals;
   activeId: CtaId | null;
   previewOverride: CtaId | null;
+  closingId: CtaId | null;
+  backupStartedAt: number | null;
+  closeActive: () => void;
+  startBackup: () => void;
   dismiss: (id: CtaId, forever: boolean, version?: string) => void;
   setActive: (id: CtaId | null) => void;
   preview: (id: CtaId | null) => void;
@@ -19,6 +23,10 @@ export const useCtaStore = create<CtaState>()(
       dismissed: {},
       activeId: null,
       previewOverride: null,
+      closingId: null,
+      backupStartedAt: null,
+      closeActive: () => set((state) => ({ closingId: state.activeId })),
+      startBackup: () => set({ backupStartedAt: Date.now() }),
       dismiss: (id, forever, version) =>
         set((state) => ({
           dismissed: {
@@ -26,7 +34,7 @@ export const useCtaStore = create<CtaState>()(
             [forever ? id : `${id}:snooze`]: { at: Date.now(), ...(version ? { version } : {}) },
           },
         })),
-      setActive: (activeId) => set({ activeId }),
+      setActive: (activeId) => set({ activeId, closingId: null }),
       preview: (previewOverride) => set({ previewOverride }),
     }),
     persistConfig({

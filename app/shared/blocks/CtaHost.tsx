@@ -8,11 +8,9 @@ import { useCtaStore } from '@/shared/stores/global/ctaStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { useLatestVersionFetch } from '@/shared/hooks/useLatestVersionFetch';
-import { BACKUP_SNOOZE_MS } from '@/shared/lib/cta/definitions';
 import { selectNextCta } from '@/shared/lib/cta/selectNextCta';
 
 export function CtaHost() {
-  useLatestVersionFetch();
   const navigation = useRootNavigationState();
   const latest = useSettingsStore((s) => s.lastKnownAppVersion);
   const mockMode = useSettingsStore((s) => s.mockMode);
@@ -22,7 +20,9 @@ export function CtaHost() {
   const balance = useColadaBalance('sat');
   const dismissed = useCtaStore((s) => s.dismissed);
   const activeId = useCtaStore((s) => s.activeId);
+  const backupStartedAt = useCtaStore((s) => s.backupStartedAt);
   const previewOverride = useCtaStore((s) => s.previewOverride);
+  useLatestVersionFetch(activeId === 'update-required' && previewOverride === null);
   const [hydrated, setHydrated] = useState(useCtaStore.persist.hasHydrated);
   const [nowMs, setNowMs] = useState(Date.now);
   const observedRoute = useRef(false);
@@ -43,40 +43,38 @@ export function CtaHost() {
   useEffect(() => {
     if (!hydrated || !navigation?.key || restoreStatus === 'pending' || restoreStatus === 'failed')
       return;
+    const next =
+      previewOverride ??
+      selectNextCta({
+        nowMs: Date.now(),
+        nativeVersion: Application.nativeApplicationVersion ?? '',
+        latest,
+        lifecycle: { seedCreatedAt, recoveryPhraseVerifiedAt, restoreStatus },
+        balanceTotalSat: balance.total,
+        backupStartedAt,
+        dismissed,
+        mockMode,
+        automation,
+      })?.id;
     const ctaRoute = navigation.routes.some((route) => route.name === 'cta');
     if (ctaRoute) {
       observedRoute.current = true;
+      if (activeId === 'update-required' && !previewOverride && next !== activeId) {
+        // CtaScreen releases its removal guard before navigating back.
+        useCtaStore.getState().closeActive();
+      }
       return;
     }
     if (activeId) {
       if (!observedRoute.current) return; // push reserved, waiting for navigator
       observedRoute.current = false;
       const store = useCtaStore.getState();
-      // Back/swipe is the same three-day deferral as Not now.
-      if (
-        activeId === 'backup-recovery-phrase' &&
-        !store.dismissed[activeId] &&
-        Date.now() - (store.dismissed[`${activeId}:snooze`]?.at ?? 0) >= BACKUP_SNOOZE_MS
-      ) {
-        store.dismiss(activeId, false);
-      }
+      // CtaScreen owns explicit dismissals; starting backup must never snooze.
       store.preview(null);
       store.setActive(null);
       setNowMs(Date.now());
       return;
     }
-    const next =
-      previewOverride ??
-      selectNextCta({
-        nowMs,
-        nativeVersion: Application.nativeApplicationVersion ?? '',
-        latest,
-        lifecycle: { seedCreatedAt, recoveryPhraseVerifiedAt, restoreStatus },
-        balanceTotalSat: balance.total,
-        dismissed,
-        mockMode,
-        automation,
-      })?.id;
     if (!next || useCtaStore.getState().activeId !== null) return;
     useCtaStore.getState().setActive(next);
     // The queue reserves activeId before pushing; a just-closed CTA may legitimately
@@ -93,6 +91,7 @@ export function CtaHost() {
     recoveryPhraseVerifiedAt,
     restoreStatus,
     balance.total,
+    backupStartedAt,
     dismissed,
     mockMode,
     automation,
