@@ -134,6 +134,8 @@ function MenuInputField({
         <Text className="text-foreground mb-1 text-sm font-medium">{input.label}</Text>
       ) : null}
       <BottomSheetTextInput
+        testID={input.id}
+        accessibilityLabel={input.label ?? input.placeholder}
         value={value}
         onChangeText={onChangeText}
         onFocus={() => setIsFocused(true)}

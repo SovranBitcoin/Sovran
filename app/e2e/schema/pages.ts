@@ -12,6 +12,8 @@
  */
 export const CANONICAL_PAGES = [
   // launch + onboarding
+  'secure-locked', // unreadable SecureStore boot gate
+  'profile-keys-error', // saved identity requires re-import
   'splash', // boot splash before the Terms gate on a fresh install
   'terms', // Terms & Conditions gate
   'privacy', // Privacy review step

@@ -4,6 +4,8 @@ import type { CANONICAL_PAGES } from './pages';
 export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], readonly string[]>> = {
   cta: ['cta.tsx'],
   'recovery-phrase-confirm': ['(settings-flow)/recovery-phrase-confirm.tsx'],
+  'secure-locked': [], // boot gate; no route alias
+  'profile-keys-error': [], // key-provider gate; no route alias
   ai: ['(drawer)/(tabs)/ai/index.tsx'],
   contacts: ['(drawer)/(tabs)/contacts/index.tsx'],
   feed: ['(drawer)/(tabs)/feed/index.tsx'],

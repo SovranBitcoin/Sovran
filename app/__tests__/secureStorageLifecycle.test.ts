@@ -23,9 +23,12 @@ jest.mock('@/shared/lib/logger', () => ({
   redactError: (error: unknown) => error,
 }));
 
+import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
+import { nostrLog } from '@/shared/lib/logger';
 import * as SecureStore from 'expo-secure-store';
 import {
   clearAllSecureData,
+  clearAccountDerivedCache,
   ensureMnemonicExists,
   retrieveCashuSeed,
   retrieveMnemonic,
@@ -49,6 +52,7 @@ describe('secureStorage mnemonic and seed lifecycle', () => {
     await flushBookkeeping();
     mockSecureBacking.clear();
     jest.clearAllMocks();
+    useSecureStoreState.setState({ secureStoreState: 'available', errorName: null });
   });
 
   afterEach(() => {
@@ -76,6 +80,46 @@ describe('secureStorage mnemonic and seed lifecycle', () => {
     expect(entropy).toBeInstanceOf(Uint8Array);
     expect(entropy).toHaveLength(16);
     expect(mockSecureBacking.get('user_mnemonic')).toBe(VALID_MNEMONIC);
+  });
+
+  it.each([0, 1])(
+    'locks on a decrypt error at read %i without RNG, writes or deletes',
+    async (successfulReads) => {
+      const getRandomValues = jest.fn();
+      Object.defineProperty(globalThis, 'crypto', {
+        configurable: true,
+        value: { getRandomValues },
+      });
+      if (successfulReads) jest.mocked(SecureStore.getItemAsync).mockResolvedValueOnce(null);
+      jest
+        .mocked(SecureStore.getItemAsync)
+        .mockRejectedValueOnce(new Error('private native detail'));
+      await expect(ensureMnemonicExists()).resolves.toBeNull();
+      // A later absent read cannot turn a session known to be locked into a fresh wallet.
+      await expect(ensureMnemonicExists()).resolves.toBeNull();
+      expect(useSecureStoreState.getState()).toEqual({
+        secureStoreState: 'locked',
+        errorName: 'Error',
+      });
+      expect(getRandomValues).not.toHaveBeenCalled();
+      expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+      expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+      expect(nostrLog.warn).toHaveBeenCalledTimes(1);
+      expect(nostrLog.warn).toHaveBeenCalledWith('secure.mnemonic.locked', {
+        platform: expect.any(String),
+        errorName: 'Error',
+      });
+    }
+  );
+
+  it('keeps an existing valid seed without RNG or writes', async () => {
+    mockSecureBacking.set('user_mnemonic', VALID_MNEMONIC);
+    const getRandomValues = jest.fn();
+    Object.defineProperty(globalThis, 'crypto', { configurable: true, value: { getRandomValues } });
+    await expect(ensureMnemonicExists()).resolves.toBe(VALID_MNEMONIC);
+    expect(getRandomValues).not.toHaveBeenCalled();
+    expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+    expect(useSecureStoreState.getState().secureStoreState).toBe('available');
   });
 
   it('fails closed when crypto.getRandomValues is unavailable', async () => {
@@ -180,4 +224,22 @@ describe('secureStorage mnemonic and seed lifecycle', () => {
     expect(deleted.at(-1)).toBe('secure_key_index');
     expect(mockSecureBacking.size).toBe(0);
   });
+});
+
+it('clears every derived cache before source repair, including the PBKDF2 seed', async () => {
+  jest.clearAllMocks();
+  await expect(clearAccountDerivedCache(7)).resolves.toBe(true);
+  expect(jest.mocked(SecureStore.deleteItemAsync).mock.calls.map(([key]) => key)).toEqual([
+    'derived_keys_7',
+    'cashu_mnemonic_7',
+    'cashu_seed_7',
+  ]);
+});
+
+it('retains the key index when any secure deletion fails so retry can enumerate leftovers', async () => {
+  jest.clearAllMocks();
+  mockSecureBacking.set('secure_key_index', JSON.stringify(['cashu_seed_7']));
+  jest.mocked(SecureStore.deleteItemAsync).mockRejectedValueOnce(new Error('delete failed'));
+  await expect(clearAllSecureData([0])).resolves.toBe(false);
+  expect(mockSecureBacking.has('secure_key_index')).toBe(true);
 });

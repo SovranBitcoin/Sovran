@@ -47,6 +47,7 @@
       "supportsTablet": false
     },
     "android": {
+      "allowBackup": false,
       "versionCode": 2,
       "userInterfaceStyle": "dark",
       "adaptiveIcon": {
