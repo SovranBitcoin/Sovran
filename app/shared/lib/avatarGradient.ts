@@ -174,30 +174,42 @@ export function generateClayAvatarTheme(seedInput: string): ClayAvatarTheme {
 }
 
 type TierRingTheme = {
-  /** Ring stroke gradient, light → base → deep. */
-  colors: readonly [string, string, string];
-  start: GradientPoint;
-  end: GradientPoint;
+  /**
+   * Seamless sweep (first stop == last stop) around the ring. Metals alternate
+   * light / base / deep like a turned band; gems and "new" drift through
+   * neighbouring hues like a soap film.
+   */
+  sweep: readonly string[];
+  /** Where the seam of the sweep sits, in degrees — per pubkey. */
+  startAngle: number;
+  /** Blurred halo behind the ring. */
+  glow: string;
   /** Coin-rim lettering: the tier's deep tone. */
   label: string;
-  /** Soft halo behind the ring. */
-  halo: string;
 };
 
-type TierBase = { hue: number; sat: number; light: number; spread: number };
+type TierBase = {
+  hue: number;
+  sat: number;
+  light: number;
+  /** Hue drift of the film around the ring. */
+  spread: number;
+  /** 'metal' alternates light/deep bands; 'film' drifts through hues. */
+  finish: 'metal' | 'film';
+};
 
 // Each rung has a fixed identity hue (gold must read as gold) at the same
 // matte, mid-saturation register as the clay avatar palette; everything else
-// about the ring — hue spread and direction, lightness, gradient axis — is
-// drawn per pubkey so two golds are siblings, not twins.
+// about the ring — hue drift and direction, lightness, where the seam sits —
+// is drawn per pubkey so two golds are siblings, not twins.
 const TIER_BASE: Record<ProfileTier, TierBase> = {
-  new: { hue: 214, sat: 64, light: 64, spread: 18 },
-  iron: { hue: 222, sat: 10, light: 58, spread: 10 },
-  bronze: { hue: 22, sat: 54, light: 56, spread: 14 },
-  silver: { hue: 208, sat: 8, light: 76, spread: 10 },
-  gold: { hue: 44, sat: 70, light: 60, spread: 12 },
-  platinum: { hue: 168, sat: 28, light: 74, spread: 16 },
-  diamond: { hue: 196, sat: 64, light: 70, spread: 40 },
+  new: { hue: 214, sat: 70, light: 64, spread: 40, finish: 'film' },
+  iron: { hue: 222, sat: 10, light: 58, spread: 8, finish: 'metal' },
+  bronze: { hue: 24, sat: 60, light: 54, spread: 14, finish: 'metal' },
+  silver: { hue: 208, sat: 8, light: 78, spread: 8, finish: 'metal' },
+  gold: { hue: 44, sat: 78, light: 60, spread: 14, finish: 'metal' },
+  platinum: { hue: 170, sat: 32, light: 76, spread: 36, finish: 'film' },
+  diamond: { hue: 196, sat: 70, light: 70, spread: 110, finish: 'film' },
 };
 
 /**
@@ -209,24 +221,34 @@ export function generateTierRingTheme(tier: ProfileTier, seedInput: string): Tie
   const random = createSeededRandom(`${tier}:${seedInput}`);
   const base = TIER_BASE[tier];
 
-  const spread = base.spread * (0.6 + random() * 0.8);
+  const spread = base.spread * (0.7 + random() * 0.6);
   const direction = random() > 0.5 ? 1 : -1;
-  const lightJitter = (random() - 0.5) * 6;
-  const axis = AXES[Math.floor(random() * AXES.length)]!;
+  const light = base.light + (random() - 0.5) * 6;
+  const startAngle = random() * 360;
 
-  const hueA = base.hue + spread * direction;
-  const hueB = base.hue - spread * 0.6 * direction;
-  const light = base.light + lightJitter;
+  const h = (offset: number) => base.hue + offset * direction;
+  const sweep =
+    base.finish === 'metal'
+      ? [
+          hsl(h(0), base.sat, light + 14),
+          hsl(h(spread), base.sat, light),
+          hsl(h(spread * 0.4), Math.max(base.sat - 8, 0), light - 16),
+          hsl(h(-spread * 0.5), base.sat, light + 4),
+          hsl(h(0), base.sat, light + 14),
+        ]
+      : [
+          hsl(h(0), base.sat, light + 8),
+          hsl(h(spread * 0.5), base.sat, light),
+          hsl(h(spread), Math.max(base.sat - 10, 0), light + 10),
+          hsl(h(spread * 0.5), base.sat, light - 6),
+          hsl(h(-spread * 0.35), base.sat, light + 2),
+          hsl(h(0), base.sat, light + 8),
+        ];
 
   return {
-    colors: [
-      hsl(hueA, base.sat, light + 10),
-      hsl(base.hue, base.sat, light),
-      hsl(hueB, Math.max(base.sat - 6, 0), light - 9),
-    ],
-    start: axis[0],
-    end: axis[1],
+    sweep,
+    startAngle,
+    glow: hsl(base.hue, base.sat, light + 4, 0.7),
     label: hsl(base.hue, Math.min(base.sat + 10, 80), Math.max(light - 30, 18)),
-    halo: hsl(base.hue, base.sat, light, 0.28),
   };
 }

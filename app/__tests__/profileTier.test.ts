@@ -60,15 +60,17 @@ describe('generateTierRingTheme', () => {
     expect(generateTierRingTheme('gold', 'seed-a')).toEqual(a);
     const b = generateTierRingTheme('gold', 'seed-b');
     expect(b).not.toEqual(a);
-    expect(a.colors).toHaveLength(3);
-    expect(a.colors.every((c) => c.startsWith('hsla('))).toBe(true);
+    // A seamless sweep: it ends where it starts.
+    expect(a.sweep.length).toBeGreaterThanOrEqual(5);
+    expect(a.sweep[0]).toBe(a.sweep[a.sweep.length - 1]);
+    expect(a.sweep.every((c) => c.startsWith('hsla('))).toBe(true);
   });
 
-  it('keeps every tier on its identity hue (mid stop is the base hue)', () => {
+  it('keeps every tier on its identity hue (the seam stop is the base hue)', () => {
     const hueOf = (c: string) => Number(/hsla\((\d+),/.exec(c)?.[1]);
-    expect(hueOf(generateTierRingTheme('gold', 'x').colors[1])).toBe(44);
-    expect(hueOf(generateTierRingTheme('new', 'x').colors[1])).toBe(214);
-    expect(hueOf(generateTierRingTheme('bronze', 'x').colors[1])).toBe(22);
-    expect(hueOf(generateTierRingTheme('diamond', 'x').colors[1])).toBe(196);
+    expect(hueOf(generateTierRingTheme('gold', 'x').sweep[0]!)).toBe(44);
+    expect(hueOf(generateTierRingTheme('new', 'x').sweep[0]!)).toBe(214);
+    expect(hueOf(generateTierRingTheme('bronze', 'x').sweep[0]!)).toBe(24);
+    expect(hueOf(generateTierRingTheme('diamond', 'x').sweep[0]!)).toBe(196);
   });
 });
