@@ -1,4 +1,6 @@
 import { notificationPreviewText } from '@/features/feed/lib/notificationPreviewText';
+import { buildAppNotificationRows } from '@/features/feed/lib/appNotificationRows';
+import { legalRevisions } from '@/shared/lib/legal/legalDocuments';
 import { collectReferencedIds } from '@/features/feed/components/nostr/feedParse';
 import { DEMO_NOTIFICATIONS } from '@/shared/stores/runtime/mockPresentationData';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
@@ -63,6 +65,8 @@ import { useOwnContentStore } from '@/shared/stores/profile/ownContentStore';
 import { actionMenuPopup } from '@/shared/lib/popup';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { Badge } from '@/shared/ui/primitives/Badge';
+import { iconSize } from '@/shared/styles/tokens';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -96,7 +100,7 @@ type LoadMode = 'initial' | 'refresh';
 function notificationItemType(item: NotificationListItem): string {
   if (item.type === 'single') return item.notification.reason;
   if (item.type === 'group') return `group:${item.reason}`;
-  return 'welcome';
+  return item.type;
 }
 
 /** Per-type row counts (e.g. {reaction: 3, "group:follow": 1}) for render logs. */
@@ -711,7 +715,8 @@ function NotificationsContent({ demo }: { demo: boolean }) {
   );
 
   const seedCreatedAt = useWalletLifecycleStore((s) => s.seedCreatedAt);
-  const termsDate = useSettingsStore((s) => s.termsAccepted?.date ?? null);
+  const termsAccepted = useSettingsStore((s) => s.termsAccepted);
+  const legalAcceptance = useSettingsStore((s) => s.legalAcceptance);
 
   const ignoredPeople = useFeedIgnoreStore((s) => s.ignoredPubkeys);
   const ignoredEvents = useFeedIgnoreStore((s) => s.ignoredEventIds);
@@ -788,10 +793,16 @@ function NotificationsContent({ demo }: { demo: boolean }) {
     // The App tab is purely app announcements — the welcome card lives here, not
     // mixed into the real notifications on All.
     if (activeTab === 'APP') {
-      return [{ type: 'welcome', id: 'welcome-sovran', installDate: seedCreatedAt, termsDate }];
+      return buildAppNotificationRows({
+        seedCreatedAt,
+        termsAccepted,
+        legalAcceptance,
+        currentRevisions: legalRevisions,
+        nowMs: Date.now(),
+      });
     }
     return buildNotificationListItems(notifications);
-  }, [notifications, activeTab, seedCreatedAt, termsDate]);
+  }, [notifications, activeTab, seedCreatedAt, termsAccepted, legalAcceptance]);
   const visualPhase = isInitialLoading ? 'initial-loading' : isRefreshing ? 'refreshing' : 'ready';
   const { onListLayout, onListContentSizeChange, onListScroll, onListViewableItemsChanged } =
     useVisualFlatListLogger<NotificationListItem>({
@@ -868,6 +879,7 @@ function NotificationsContent({ demo }: { demo: boolean }) {
               {NOTIFICATION_TABS.map((tab) => (
                 <FeedTabButton
                   key={tab.id}
+                  testID={`notifications-tab-${tab.id.toLowerCase()}`}
                   label={tab.label}
                   active={activeTab === tab.id}
                   showChevron={tab.id === 'MENTIONS' && activeTab === 'MENTIONS'}
@@ -1024,6 +1036,9 @@ function NotificationListRow({
       />
     );
   }
+  if (item.type === 'legal') {
+    return <LegalAcceptanceNotificationRow item={item} pressedBackground={pressedBackground} />;
+  }
   if (item.type === 'group') {
     return (
       <NotificationGroupRow
@@ -1076,7 +1091,7 @@ function WelcomeNotificationRow({
     }
   }
   return (
-    <View style={notificationListStyles.row}>
+    <View testID="notification-app-welcome" style={notificationListStyles.row}>
       <VStack gap={8}>
         <HStack align="flex-start" gap={12}>
           <View style={[styles.welcomeGlyph, { backgroundColor: withAlpha(accent, 0.13) }]}>
@@ -1098,6 +1113,45 @@ function WelcomeNotificationRow({
         </HStack>
       </VStack>
     </View>
+  );
+}
+
+function LegalAcceptanceNotificationRow({
+  item,
+  pressedBackground,
+}: {
+  item: Extract<NotificationListItem, { type: 'legal' }>;
+  pressedBackground: string;
+}) {
+  const [accent, muted] = useThemeColor(['accent', 'muted'] as const);
+  const date =
+    item.acceptedAtMs === null ? 'Date unknown' : formatDate(item.acceptedAtMs, 'short-date');
+  const subtitle = item.revisionKnown
+    ? `${date} · Terms ${item.termsRevisionShort} · Privacy ${item.privacyRevisionShort}`
+    : `${date} · Revision unknown`;
+  const status = item.isCurrent ? 'Up to date' : 'Updated — review';
+
+  return (
+    <NotificationRowPressable
+      testID="notification-app-legal"
+      accessibilityLabel={`Terms and Privacy accepted. ${subtitle}. ${status}. View terms.`}
+      pressedBackground={pressedBackground}
+      onPress={() => router.push('/(settings-flow)/terms')}>
+      <View className="flex-row items-start gap-3">
+        <View className="bg-accent/10 size-10 shrink-0 items-center justify-center rounded-full">
+          <Icon name="mdi:check-circle-outline" size={iconSize.lg} color={accent} />
+        </View>
+        <View className="min-w-0 flex-1 gap-1">
+          <Text size={16}>Terms and Privacy accepted</Text>
+          <Text size={14} color={muted}>
+            {subtitle}
+          </Text>
+        </View>
+        <Badge className="max-w-32 shrink" color={item.isCurrent ? muted : accent}>
+          {status}
+        </Badge>
+      </View>
+    </NotificationRowPressable>
   );
 }
 

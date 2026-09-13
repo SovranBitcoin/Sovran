@@ -23,12 +23,20 @@ export type NotificationListItem =
       clientGrouped?: true;
     }
   | {
-      /** Synthetic, client-injected "thanks for downloading" card, pinned to the
-       *  top of the ALL tab. Carries the install + terms-agreed dates. */
+      /** Synthetic welcome card in the App tab. */
       type: 'welcome';
       id: string;
       installDate: number | null;
       termsDate: string | null;
+    }
+  | {
+      type: 'legal';
+      id: 'legal-acceptance';
+      acceptedAtMs: number | null;
+      termsRevisionShort: string | null;
+      privacyRevisionShort: string | null;
+      isCurrent: boolean;
+      revisionKnown: boolean;
     };
 
 function batchableReason(reason: string): BatchableNotificationReason | null {
