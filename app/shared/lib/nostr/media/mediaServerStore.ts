@@ -14,7 +14,7 @@ import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStor
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 /** Default Blossom server (BUD-02). */
-const DEFAULT_BLOSSOM_SERVER = 'https://blossom.primal.net';
+export const DEFAULT_BLOSSOM_SERVER = 'https://blossom.primal.net';
 
 interface MediaServerState {
   server: string;
@@ -26,16 +26,34 @@ const PersistedMediaServerStore = z.object({
   server: z.url().default(DEFAULT_BLOSSOM_SERVER),
 });
 
-function normalizeServer(server: string): string {
-  const trimmed = server.trim().replace(/\/+$/, '');
-  return /^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`;
+export function normalizeMediaServer(server: string): string {
+  const trimmed = server.trim();
+  const withScheme = /^[a-z][a-z\d+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  return withScheme.replace(/\/+$/, '');
 }
 
-const useMediaServerStore = create<MediaServerState>()(
+const ServerUrl = z.url();
+
+/** Upload endpoints must be HTTPS origins, without credentials or URL suffixes. */
+export function isValidHttpsUrl(server: string): boolean {
+  if (!/^https:\/\//i.test(server) || !ServerUrl.safeParse(server).success) return false;
+  const url = new URL(server);
+  return (
+    url.protocol === 'https:' &&
+    !url.username &&
+    !url.password &&
+    /^https:\/\/[^/?#\\\s]+\/?$/i.test(server)
+  );
+}
+
+export const useMediaServerStore = create<MediaServerState>()(
   persist(
     (set) => ({
       server: DEFAULT_BLOSSOM_SERVER,
-      setServer: (server) => set({ server: normalizeServer(server) }),
+      setServer: (server) => {
+        const normalized = normalizeMediaServer(server);
+        if (isValidHttpsUrl(normalized)) set({ server: normalized });
+      },
       restoreDefault: () => set({ server: DEFAULT_BLOSSOM_SERVER }),
     }),
     persistConfig({

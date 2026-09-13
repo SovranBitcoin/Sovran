@@ -89,11 +89,7 @@ const NOT_A_CONCRETE_STORE = ['shared/lib/cache/createQueryCacheStore.ts'];
  * cannot reach their initial state to round-trip it. Keep this list empty
  * where possible — an entry here is a real coverage gap, not a waiver.
  */
-const UNREACHABLE_STORE_NAMES = [
-  // `mediaServerStore` keeps its store module-private and exposes only
-  // `getMediaServer()` / `setMediaServer()`.
-  'nostr-media-server-store',
-];
+const UNREACHABLE_STORE_NAMES: string[] = [];
 
 function sourceFilesCalling(pattern: RegExp): string[] {
   const hits: string[] = [];

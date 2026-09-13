@@ -23,6 +23,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
 import { notificationPolicyLabel } from '@/features/feed/lib/notificationCopy';
+import { useMediaServerStore } from '@/shared/lib/nostr/media/mediaServerStore';
 import { useNip46RequestsStore } from '@/features/nostrSigner';
 
 const name = Application.applicationName;
@@ -183,6 +184,8 @@ const BelowFold = ({ children }: { children: React.ReactNode }) => {
 
 export const SettingsScreen = () => {
   useLifecycleLogger('SettingsScreen');
+  const mediaServer = useMediaServerStore((s) => s.server);
+  const mediaHost = new URL(mediaServer).host;
   const sendLocationEnabled = useSettingsStore((state) => state.sendLocationEnabled);
   const setSendLocationEnabled = useSettingsStore((state) => state.setSendLocationEnabled);
   const devMode = useSettingsStore((state) => state.experimental);
@@ -315,7 +318,8 @@ export const SettingsScreen = () => {
               <SettingsListLinkItem
                 href="/(settings-flow)/media"
                 title="My media"
-                description="Images you've posted and their deletion status"
+                testID="settings-media-row"
+                description={`Images you've posted · uploads via ${mediaHost}`}
               />
             </ListGroup>
           </Section>

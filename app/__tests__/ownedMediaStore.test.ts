@@ -8,6 +8,7 @@ import {
   selectOwnedBlobs,
   useOwnedMediaStore,
 } from '@/shared/stores/profile/ownedMediaStore';
+import { persistRegistry } from '@/shared/lib/persist/persistConfig';
 import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
 
 jest.mock('@/shared/lib/logger', () => ({
@@ -35,6 +36,7 @@ describe('ownedMediaStore', () => {
     const s = useOwnedMediaStore.getState();
     s.recordBlobs([blob], 'note1');
     expect(entry()?.deleteState).toBe('live');
+    expect(entry()?.purpose).toBe('post');
     expect(entry()?.sourceNoteIds).toEqual(['note1']);
 
     s.recordBlobs([blob], 'note2');
@@ -109,4 +111,41 @@ describe('ingestOwnMediaBlobs', () => {
     expect(all[0].sha256).toBe(SHA);
     expect(all[0].sourceNoteIds).toEqual(['n']);
   });
+});
+
+describe('owned media purpose persistence', () => {
+  it('records profile pictures explicitly', () => {
+    useOwnedMediaStore.getState().recordBlobs([blob], undefined, 'avatar');
+    expect(entry()?.purpose).toBe('avatar');
+    expect(entry()?.sourceNoteIds).toEqual([]);
+  });
+
+  it.each([undefined, 'future-purpose'])('keeps the entry with purpose %s', (purpose) => {
+    useOwnedMediaStore.getState().recordBlobs([blob], 'note1');
+    const original = entry()!;
+    const persisted = JSON.parse(
+      JSON.stringify({
+        byBlob: { [`${HOST}|${SHA}`]: { ...original, purpose } },
+      })
+    );
+    const merge = useOwnedMediaStore.persist.getOptions().merge!;
+    const hydrated = merge(persisted, { ...useOwnedMediaStore.getState(), byBlob: {} });
+    expect(hydrated.byBlob[`${HOST}|${SHA}`]).toEqual({ ...original, purpose: undefined });
+    expect(JSON.parse(JSON.stringify(hydrated.byBlob[`${HOST}|${SHA}`]))).not.toHaveProperty(
+      'purpose'
+    );
+  });
+
+  it.each(['avatar', 'post'] as const)(
+    'round-trips %s through the registered projection',
+    (purpose) => {
+      useOwnedMediaStore.getState().recordBlobs([blob], 'note1', purpose);
+      const registration = persistRegistry.find((item) => item.name === 'owned-media-store')!;
+      const projected = useOwnedMediaStore.persist.getOptions().partialize!(
+        useOwnedMediaStore.getState()
+      );
+      const result = registration.schema.parse(JSON.parse(JSON.stringify(projected)));
+      expect(result).toEqual(projected);
+    }
+  );
 });
