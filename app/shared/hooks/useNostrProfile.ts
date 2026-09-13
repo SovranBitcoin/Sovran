@@ -118,17 +118,23 @@ async function completeCounts(
   };
   const tasks: Promise<void>[] = [];
   if (countsMissing(counts) && !options.skipStats) {
+    // `refresh`: the nagg answer was just written to the entity cache WITHOUT
+    // the missing count (nagg omits zero-valued aggregates, and has no
+    // follower count for pubkeys outside its kind-3 corpus). Cache-first would
+    // hand that same header straight back and Primal would never be asked.
     tasks.push(
-      Promise.resolve(fetchProfileStatsViaFacade(pubkey, { signal, readId })).then((stats) => {
-        if (signal.aborted || !stats) return;
-        apply(
-          {
-            ...(stats.followersCount !== undefined ? { followers: stats.followersCount } : {}),
-            ...(stats.followingCount !== undefined ? { follows: stats.followingCount } : {}),
-          },
-          stats.tier === 'primal' || stats.tier === 'nagg' ? stats.tier : 'relay'
-        );
-      })
+      Promise.resolve(fetchProfileStatsViaFacade(pubkey, { signal, readId, refresh: true })).then(
+        (stats) => {
+          if (signal.aborted || !stats) return;
+          apply(
+            {
+              ...(stats.followersCount !== undefined ? { followers: stats.followersCount } : {}),
+              ...(stats.followingCount !== undefined ? { follows: stats.followingCount } : {}),
+            },
+            stats.tier === 'primal' || stats.tier === 'nagg' ? stats.tier : 'relay'
+          );
+        }
+      )
     );
   }
   if (counts.follows === undefined) {

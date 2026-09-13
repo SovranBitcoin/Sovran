@@ -41,12 +41,19 @@ export async function fetchProfilesViaFacade(
  */
 export async function fetchProfileStatsViaFacade(
   pubkey: string,
-  options: { viewerPubkey?: string; signal?: AbortSignal; readId?: string } = {}
+  options: {
+    viewerPubkey?: string;
+    signal?: AbortSignal;
+    readId?: string;
+    /** Skip the cache-first answer and ask the tiers (a cached header may lack a count). */
+    refresh?: boolean;
+  } = {}
 ): Promise<facade.ResolvedProfileStats | null> {
   const layer = buildNostrDataLayer();
   if (!layer) return null;
   const result = await layer.getProfileStats({
     pubkey,
+    ...(options.refresh ? { refresh: true } : {}),
     ...(options.viewerPubkey ? { viewerPubkey: options.viewerPubkey } : {}),
     ...(options.signal ? { signal: options.signal } : {}),
     ...(options.readId ? { readId: options.readId } : {}),

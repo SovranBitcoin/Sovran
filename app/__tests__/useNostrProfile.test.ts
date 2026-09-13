@@ -199,6 +199,19 @@ it('reports unknown counts as undefined when no source can count', async () => {
   expect(result.current.data?.follows).toBeUndefined();
 });
 
+it('asks the tiers afresh for a count nagg omitted, bypassing the header it just cached', async () => {
+  // nagg drops zero-valued aggregates and has no follower count for pubkeys
+  // outside its kind-3 corpus; the answer is cached WITHOUT followers, so a
+  // cache-first stats read would hand it straight back and never ask Primal.
+  mockFetchProfile.mockResolvedValue(ok({ pubkey: 'dave', follows: 12, created_at: 1700000000 }));
+  mockFetchStats.mockResolvedValue({ tier: 'primal', followersCount: 0, followingCount: 12 });
+  const { result } = renderHook(() => useNostrProfile('dave'));
+  await act(async () => {});
+  expect(mockFetchStats).toHaveBeenCalledWith('dave', expect.objectContaining({ refresh: true }));
+  expect(result.current.data).toMatchObject({ followers: 0, follows: 12 });
+  expect(result.current.isCountsLoading).toBe(false);
+});
+
 it('keeps completed counts when a Vertex refresh answers without aggregates', async () => {
   mockFetchProfile.mockResolvedValue(ok({ pubkey: 'alice', score: 0.5, rank: 3 }));
   mockFetchStats.mockResolvedValue({ tier: 'primal', followersCount: 120, followingCount: 9 });
