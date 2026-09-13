@@ -788,6 +788,23 @@ the iPhone companion is a marketing banner, not an App Store screenshot format.
 only the banners. Do not retain redundant intermediate artwork or superseded
 originals once canonical generation inputs are established.
 
+**Featured artwork:** [the generator](scripts/featured-artwork.mjs) reads one JSON
+per family from `marketing/featured/source/compositions/` and writes
+`generated/<id>/<aspect>.png` plus `generated/manifest.json`: wide 1920×1080,
+tall 1080×1920, square 1080×1080, opaque RGB under 15 MB. Retain native captures
+with run IDs/hashes in `source/screenshots.json`; fractions and per-aspect
+layouts preserve designed phone angles. Portals use one canvas-aligned wallpaper
+(sharp under a reviewed UI mask; blurred/darkened outside); theme packs use 3–5
+different wallpapers from one album. The first album is synthetic Colors;
+image wallpapers come from the downloaded catalog, not bundled image files.
+See [capture/provenance instructions](marketing/featured/README.md), including
+portal mask requirements and explicitly deferred media fixtures. `--allow-missing`
+produces visibly marked drafts; strict checks fail on missing inputs. Asset
+scripts temporarily use an explicit missing-input skip until captures land.
+Both EAS ignore files exclude marketing, and `marketingNotBundled.test.ts`
+guards the app import graph. Follow-up: complete isolated media-fixture captures,
+review portal masks and remove the transitional skip after the batch is complete.
+
 **Scope and exceptions:** this is a project convention, not a platform-mandated
 folder layout. Native resource tools own their generated names. Keep upstream
 font filenames/PostScript identities, semantic icon IDs, public-media hash IDs,

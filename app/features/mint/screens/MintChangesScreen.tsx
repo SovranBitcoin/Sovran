@@ -84,7 +84,7 @@ function RevisionSection({ revision }: { revision: MintChangeRevision }) {
   const window = checkWindowLabel(entry.sincePrevious);
 
   return (
-    <VStack gap={spacing.xs} style={styles.section}>
+    <VStack testID={`mint-change-revision-${entry.hash}`} gap={spacing.xs} style={styles.section}>
       <HStack align="baseline" justify="space-between" gap={spacing.sm} style={styles.sectionHead}>
         <Text bold size={fontSize.md} style={{ color: foreground }}>
           {formatDate(entry.at * 1000, 'short-date-time')}

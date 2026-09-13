@@ -26,11 +26,11 @@
     }
   },
   "scripts": {
-    "assets:generate": "node ../scripts/assets.mjs && node ../scripts/feature-graphic.mjs",
-    "assets:check": "node ../scripts/assets.mjs --check && node ../scripts/feature-graphic.mjs --check",
+    "assets:generate": "node ../scripts/assets.mjs && node ../scripts/feature-graphic.mjs && node ../scripts/featured-artwork.mjs --skip-missing",
+    "assets:check": "node ../scripts/assets.mjs --check && node ../scripts/feature-graphic.mjs --check && node ../scripts/featured-artwork.mjs --check --skip-missing",
     "eas-build-post-install": "node ../scripts/brand-assets.mjs --check",
     "assets:brand": "node ../scripts/brand-assets.mjs",
-    "assets:test": "node --test ../scripts/brand-assets.test.mjs",
+    "assets:test": "node --test ../scripts/brand-assets.test.mjs ../scripts/featured-artwork.test.mjs",
     "start": "expo start --clear 2>&1 | tee log.txt",
     "dev": "bash scripts/dev.sh",
     "dev:wda": "bash scripts/start-wda.sh",

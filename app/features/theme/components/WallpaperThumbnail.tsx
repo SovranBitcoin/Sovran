@@ -103,6 +103,10 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
   return (
     <PressableFeedback
       onPress={onPress}
+      testID={`wallpaper-option-${themeName}`}
+      accessibilityRole="button"
+      accessibilityLabel={themeName}
+      accessibilityState={{ selected: !!selected, disabled: !onPress || inProgress }}
       isDisabled={!onPress || inProgress}
       animation={false}
       style={{ width, height }}>

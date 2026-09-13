@@ -1,0 +1,69 @@
+{
+  "id": "social-feed",
+  "theme": "social",
+  "aspects": [
+    "wide",
+    "tall",
+    "square"
+  ],
+  "headline": [
+    "A feed of",
+    "your own."
+  ],
+  "subtitle": [
+    "Follow conversations on Nostr."
+  ],
+  "platform": "ios",
+  "background": {
+    "kind": "brand"
+  },
+  "phones": [
+    {
+      "screenshot": "feed",
+      "x": 0.62,
+      "y": 0.13,
+      "width": 0.26,
+      "rotate": -7,
+      "depth": 0.8,
+      "mask": "frame"
+    }
+  ],
+  "perAspect": {
+    "tall": {
+      "copy": {
+        "x": 0.08,
+        "y": 0.065,
+        "width": 0.84
+      },
+      "phones": [
+        {
+          "screenshot": "feed",
+          "x": 0.22,
+          "y": 0.35,
+          "width": 0.58,
+          "rotate": -7,
+          "depth": 0.8,
+          "mask": "frame"
+        }
+      ]
+    },
+    "square": {
+      "copy": {
+        "x": 0.065,
+        "y": 0.095,
+        "width": 0.52
+      },
+      "phones": [
+        {
+          "screenshot": "feed",
+          "x": 0.58,
+          "y": 0.37,
+          "width": 0.35,
+          "rotate": -7,
+          "depth": 0.8,
+          "mask": "frame"
+        }
+      ]
+    }
+  }
+}

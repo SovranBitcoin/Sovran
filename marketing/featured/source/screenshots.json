@@ -1,0 +1,284 @@
+{
+  "android/ai": {
+    "page": "ai",
+    "file": "source/screenshots/android/ai.png",
+    "run": "run-2026-09-11T18-14-26-766Z-b2d378ae",
+    "sha256": "afa0101acb091dffbc6496010c11e44c1841c8d09e9ac1332603ee1ce216b6ab"
+  },
+  "android/contacts": {
+    "page": "contacts",
+    "file": "source/screenshots/android/contacts.png",
+    "run": "run-2026-09-11T18-14-26-766Z-b2d378ae",
+    "sha256": "62bb7b9a48624a9d7c0bc96b0f85d05f341a3f1f7a50c0c2ea7c828946700626"
+  },
+  "android/lightning-receive": {
+    "page": "lightning-receive",
+    "file": "source/screenshots/android/lightning-receive.png",
+    "run": "run-2026-09-11T18-14-26-766Z-b2d378ae",
+    "sha256": "f97e01d71e6b660902089014024e9eac104749268d445ac8fb4fcfe6bc003b7a"
+  },
+  "android/wallet": {
+    "page": "wallet",
+    "file": "source/screenshots/android/wallet.png",
+    "run": "run-2026-09-11T18-14-26-766Z-b2d378ae",
+    "sha256": "a5bc1fe44ebfee0da5bdf7bc64fd2414ec2b36a06363cebd8ea11f83e9a6d865"
+  },
+  "ios/ai": {
+    "page": "ai",
+    "file": "source/screenshots/ios/ai.png",
+    "run": "run-2026-09-11T18-03-58-075Z-813d671c",
+    "sha256": "536fcd6a98257e3b421a9b76cb54a0f511139e9730c7c2d70fb7e1e0bf4b3d3e"
+  },
+  "ios/contacts": {
+    "page": "contacts",
+    "file": "source/screenshots/ios/contacts.png",
+    "run": "run-2026-09-11T18-03-58-075Z-813d671c",
+    "sha256": "80a7a86d27e333fbc868c6ba038e49e0ca3ded4f807cbb8ca788c9351db98150"
+  },
+  "ios/lightning-receive": {
+    "page": "lightning-receive",
+    "file": "source/screenshots/ios/lightning-receive.png",
+    "run": "run-2026-09-11T18-03-58-075Z-813d671c",
+    "sha256": "29fa0e4c002974d6c7448acadfd291acbc30a992139e78d246d6358f1b6052a9"
+  },
+  "ios/wallet": {
+    "page": "wallet",
+    "file": "source/screenshots/ios/wallet.png",
+    "run": "run-2026-09-11T18-03-58-075Z-813d671c",
+    "sha256": "e1aacd3cb641264168ebf72297393b44ab6690bd9246223302632a37ab30ceb0"
+  },
+  "ios/feed": {
+    "page": "feed",
+    "file": "source/screenshots/ios/feed.png",
+    "run": null,
+    "sha256": null
+  },
+  "ios/thread": {
+    "page": "thread",
+    "file": "source/screenshots/ios/thread.png",
+    "run": null,
+    "sha256": null
+  },
+  "ios/dm-chat": {
+    "page": "dm-chat",
+    "file": "source/screenshots/ios/dm-chat.png",
+    "run": null,
+    "sha256": null
+  },
+  "ios/receive-qr": {
+    "page": "receive-qr",
+    "file": "source/screenshots/ios/receive-qr.png",
+    "run": null,
+    "sha256": null
+  },
+  "ios/send": {
+    "page": "send",
+    "file": "source/screenshots/ios/send.png",
+    "run": null,
+    "sha256": null
+  },
+  "ios/mint-select": {
+    "page": "mint-select",
+    "file": "source/screenshots/ios/mint-select.png",
+    "run": null,
+    "sha256": null
+  },
+  "ios/mint-info": {
+    "page": "mint-info",
+    "file": "source/screenshots/ios/mint-info.png",
+    "run": null,
+    "sha256": null
+  },
+  "ios/notification-mint-changes": {
+    "page": "notification-mint-changes",
+    "file": "source/screenshots/ios/notification-mint-changes.png",
+    "run": null,
+    "sha256": null
+  },
+  "ios/mint-reviews": {
+    "page": "mint-reviews",
+    "file": "source/screenshots/ios/mint-reviews.png",
+    "run": null,
+    "sha256": null
+  },
+  "ios/notifications": {
+    "page": "notifications",
+    "file": "source/screenshots/ios/notifications.png",
+    "run": null,
+    "sha256": null
+  },
+  "ios/settings": {
+    "page": "settings",
+    "file": "source/screenshots/ios/settings.png",
+    "run": null,
+    "sha256": null
+  },
+  "ios/theme-preview": {
+    "page": "theme-preview",
+    "file": "source/screenshots/ios/theme-preview.png",
+    "run": null,
+    "sha256": null
+  },
+  "ios/gallery": {
+    "page": "gallery",
+    "file": "source/screenshots/ios/gallery.png",
+    "run": null,
+    "sha256": null
+  },
+  "ios/stories": {
+    "page": "stories",
+    "file": "source/screenshots/ios/stories.png",
+    "run": null,
+    "sha256": null
+  },
+  "ios/image-viewer": {
+    "page": "image-viewer",
+    "file": "source/screenshots/ios/image-viewer.png",
+    "run": null,
+    "sha256": null
+  },
+  "ios/ai-model-picker": {
+    "page": "ai",
+    "file": "source/screenshots/ios/ai-model-picker.png",
+    "run": null,
+    "sha256": null
+  },
+  "ios/wallet-navy": {
+    "page": "wallet",
+    "file": "source/screenshots/ios/wallet-navy.png",
+    "run": null,
+    "sha256": null,
+    "wallpaperId": "navy"
+  },
+  "ios/wallet-sunset": {
+    "page": "wallet",
+    "file": "source/screenshots/ios/wallet-sunset.png",
+    "run": null,
+    "sha256": null,
+    "wallpaperId": "sunset"
+  },
+  "ios/wallet-beige": {
+    "page": "wallet",
+    "file": "source/screenshots/ios/wallet-beige.png",
+    "run": null,
+    "sha256": null,
+    "wallpaperId": "beige"
+  },
+  "android/feed": {
+    "page": "feed",
+    "file": "source/screenshots/android/feed.png",
+    "run": null,
+    "sha256": null
+  },
+  "android/thread": {
+    "page": "thread",
+    "file": "source/screenshots/android/thread.png",
+    "run": null,
+    "sha256": null
+  },
+  "android/dm-chat": {
+    "page": "dm-chat",
+    "file": "source/screenshots/android/dm-chat.png",
+    "run": null,
+    "sha256": null
+  },
+  "android/receive-qr": {
+    "page": "receive-qr",
+    "file": "source/screenshots/android/receive-qr.png",
+    "run": null,
+    "sha256": null
+  },
+  "android/send": {
+    "page": "send",
+    "file": "source/screenshots/android/send.png",
+    "run": null,
+    "sha256": null
+  },
+  "android/mint-select": {
+    "page": "mint-select",
+    "file": "source/screenshots/android/mint-select.png",
+    "run": null,
+    "sha256": null
+  },
+  "android/mint-info": {
+    "page": "mint-info",
+    "file": "source/screenshots/android/mint-info.png",
+    "run": null,
+    "sha256": null
+  },
+  "android/notification-mint-changes": {
+    "page": "notification-mint-changes",
+    "file": "source/screenshots/android/notification-mint-changes.png",
+    "run": null,
+    "sha256": null
+  },
+  "android/mint-reviews": {
+    "page": "mint-reviews",
+    "file": "source/screenshots/android/mint-reviews.png",
+    "run": null,
+    "sha256": null
+  },
+  "android/notifications": {
+    "page": "notifications",
+    "file": "source/screenshots/android/notifications.png",
+    "run": null,
+    "sha256": null
+  },
+  "android/settings": {
+    "page": "settings",
+    "file": "source/screenshots/android/settings.png",
+    "run": null,
+    "sha256": null
+  },
+  "android/theme-preview": {
+    "page": "theme-preview",
+    "file": "source/screenshots/android/theme-preview.png",
+    "run": null,
+    "sha256": null
+  },
+  "android/gallery": {
+    "page": "gallery",
+    "file": "source/screenshots/android/gallery.png",
+    "run": null,
+    "sha256": null
+  },
+  "android/stories": {
+    "page": "stories",
+    "file": "source/screenshots/android/stories.png",
+    "run": null,
+    "sha256": null
+  },
+  "android/image-viewer": {
+    "page": "image-viewer",
+    "file": "source/screenshots/android/image-viewer.png",
+    "run": null,
+    "sha256": null
+  },
+  "android/ai-model-picker": {
+    "page": "ai",
+    "file": "source/screenshots/android/ai-model-picker.png",
+    "run": null,
+    "sha256": null
+  },
+  "android/wallet-navy": {
+    "page": "wallet",
+    "file": "source/screenshots/android/wallet-navy.png",
+    "run": null,
+    "sha256": null,
+    "wallpaperId": "navy"
+  },
+  "android/wallet-sunset": {
+    "page": "wallet",
+    "file": "source/screenshots/android/wallet-sunset.png",
+    "run": null,
+    "sha256": null,
+    "wallpaperId": "sunset"
+  },
+  "android/wallet-beige": {
+    "page": "wallet",
+    "file": "source/screenshots/android/wallet-beige.png",
+    "run": null,
+    "sha256": null,
+    "wallpaperId": "beige"
+  }
+}

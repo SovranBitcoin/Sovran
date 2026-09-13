@@ -17,10 +17,10 @@
     "nostr-tools": "2.24.2"
   },
   "scripts": {
-    "assets:generate": "node scripts/assets.mjs && node scripts/feature-graphic.mjs",
-    "assets:check": "node scripts/assets.mjs --check && node scripts/feature-graphic.mjs --check",
+    "assets:generate": "node scripts/assets.mjs && node scripts/feature-graphic.mjs && node scripts/featured-artwork.mjs --skip-missing",
+    "assets:check": "node scripts/assets.mjs --check && node scripts/feature-graphic.mjs --check && node scripts/featured-artwork.mjs --check --skip-missing",
     "assets:brand": "node scripts/brand-assets.mjs",
-    "assets:test": "node --test scripts/brand-assets.test.mjs",
+    "assets:test": "node --test scripts/brand-assets.test.mjs scripts/featured-artwork.test.mjs",
     "postinstall": "cd app && node scripts/dedupe-coco.js && node modules/bitchat-module/scripts/patch-bitchat-imports.js && node modules/bitchat-module/scripts/sync-bitchat-android.js && node ../scripts/brand-assets.mjs",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
