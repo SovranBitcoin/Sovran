@@ -1,3 +1,4 @@
+import { BACKUP_FLOW_REVISION } from '@/features/backup/lib/revision';
 import type { CtaDefinition, CtaId } from './types';
 import { isNewerVersion } from './version';
 const HOUR_MS = 60 * 60 * 1000;
@@ -26,11 +27,13 @@ export const CTA_DEFINITIONS: readonly CtaDefinition[] = [
   },
   {
     id: 'backup-recovery-phrase',
+    revision: BACKUP_FLOW_REVISION,
     priority: 10,
     presentation: 'dismissable-modal',
     dismissPolicy: 'do-not-ask-again',
     shouldShow: ({ lifecycle, mockMode, balanceTotalSat, nowMs, backupStartedAt }) =>
-      lifecycle.recoveryPhraseVerifiedAt == null &&
+      (lifecycle.recoveryPhraseVerifiedRevision == null ||
+        lifecycle.recoveryPhraseVerifiedRevision < BACKUP_FLOW_REVISION) &&
       lifecycle.restoreStatus !== 'pending' &&
       !mockMode &&
       (backupStartedAt == null || nowMs - backupStartedAt >= ABANDONED_BACKUP_GRACE_MS) &&
@@ -38,8 +41,9 @@ export const CTA_DEFINITIONS: readonly CtaDefinition[] = [
         (lifecycle.seedCreatedAt !== null && nowMs - lifecycle.seedCreatedAt > 7 * DAY_MS)),
     content: {
       icon: 'mdi:shield',
-      title: 'Back up your recovery phrase',
-      body: 'Without your recovery phrase, you may lose access to your wallet if you lose this device.',
+      title: 'Back up your wallet',
+      body: (balanceTotalSat) =>
+        `${balanceTotalSat > 0 ? 'You have money here now. ' : ''}A 2-minute backup means a lost phone doesn't mean lost funds.`,
       primary: { label: 'Back up now', action: 'back-up' },
       secondary: { label: 'Not now' },
     },

@@ -359,6 +359,7 @@ export async function recoverMnemonicSession(mnemonic: string): Promise<boolean>
       state: {
         seedCreatedAt: null,
         recoveryPhraseVerifiedAt: null,
+        recoveryPhraseVerifiedRevision: null,
         restoreStatus: 'pending',
         lastRestoreAt: null,
         lastRestoreError: null,

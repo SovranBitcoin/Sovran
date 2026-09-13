@@ -35,7 +35,10 @@ export const CANONICAL_PAGES = [
   'send-token', // created ecash token screen (incl. tx re-entry)
   'lightning-send', // bolt11 melt preview/confirmation
   'cta',
-  'recovery-phrase-confirm',
+  'backup-intro',
+  'backup-words',
+  'backup-verify',
+  'backup-done',
   // shared + recovery
   'mint-select', // mint selector list (receive and send flows)
   'mint-add', // add-mints screen (search or enter URL, MintAddScreen)

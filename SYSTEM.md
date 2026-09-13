@@ -1023,7 +1023,10 @@ from `app/`; native pass evidence is deliberately not inferred from this report.
 in `app/shared/lib/cta/`. Version metadata is persisted by settingsStore.
 
 **Decision:** show one eligible CTA at a time, then re-evaluate on dismissal,
-foreground, version, lifecycle and balance changes. All CTAs use `CtaScreen`.
+foreground, version, lifecycle and balance changes. All CTAs use `CtaScreen` in the transactions-style modal presentation
+(iOS page sheet, Android form sheet). Dismissable CTAs allow gestures; the update
+gate retains `gestureEnabled: false` and `usePreventRemove` on the same route.
+Native swipe rejection has not been verified for this change (no simulators).
 
 **Rules:**
 
@@ -1038,13 +1041,28 @@ foreground, version, lifecycle and balance changes. All CTAs use `CtaScreen`.
 - Blocking CTAs have no dismissal, swipe or Android-back escape in production.
 - Dismissals are data-only. Version-triggered dismissals carry the trigger
   version. A permanent record uses the CTA ID; a three-day deferral uses its
-  `:snooze` key, with the same `{ at, version? }` shape.
+  `:snooze` key, with the same `{ at, version?, revision? }` shape. Definitions
+  default to revision 1. Missing/older dismissal revisions never suppress a
+  newer definition, including forever dismissals. Backup uses revision 2.
 - A primary action never dismisses a security nag. "Back up now" opens the backup
   flow without a persisted dismissal; an abandoned attempt has only a runtime
   `ABANDONED_BACKUP_GRACE_MS` (30 minute) grace period. "Not now" still snoozes for
   three days. Completing verification removes backup eligibility.
 - Backup verification is additive lifecycle data; revealing the phrase alone
-  never marks it verified. Three correct quiz answers do.
+  never marks it verified. The `(backup-flow)` modal checks all 12 positions in
+  order with three choices each. Wrong answers retry only that word; returning
+  to the reveal retains progress. Success records `BACKUP_FLOW_REVISION = 2` in
+  `recoveryPhraseVerifiedRevision`; old timestamps alone do not satisfy it.
+  Intro "Not now" snoozes three days; gesture abandonment retains runtime grace.
+  The profile's backup row enters this flow; its separate copyable NIP06 reveal
+  remains available for advanced use and never certifies a backup.
+- Backup words and choices are hidden while backgrounded or unfocused. Screen
+  capture prevention is unavailable: `expo-screen-capture` is not a dependency
+  and there is no existing native prevention path. Do not claim screenshots are
+  blocked. Add prevention only with separately authorized dependency/native work.
+- A development + Mock Mode display-only BIP-39 vector exercises the quiz. It
+  never enters SecureStore, wallet derivation, or lifecycle certification. Mode
+  changes remount the session; direct success-route entry cannot certify it.
 - Mock Mode suppresses balance-derived backup nags.
 - Automation suppresses all automatic presentation. The Developer preview
   explicitly bypasses eligibility and dismissal and offers End preview, even

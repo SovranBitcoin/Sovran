@@ -1,3 +1,5 @@
+import { useColadaBalance } from 'wallet/react';
+import { SheetGrabber } from '@/shared/ui/composed/SheetGrabber';
 import { useEffect, useRef, useState } from 'react';
 import { BackHandler } from 'react-native';
 import { useNavigation } from 'expo-router';
@@ -22,6 +24,7 @@ import { DOWNLOAD_URL } from '@/shared/config/download';
 
 export function CtaScreen({ id }: { id: CtaId }) {
   const cta = CTA_DEFINITIONS.find((definition) => definition.id === id)!;
+  const balance = useColadaBalance('sat');
   const navigation = useNavigation();
   const foreground = useThemeColor('foreground');
   const previewOverride = useCtaStore((s) => s.previewOverride);
@@ -65,8 +68,7 @@ export function CtaScreen({ id }: { id: CtaId }) {
       return;
     }
     dismissalHandled.current = true;
-    useCtaStore.getState().startBackup();
-    router.replace('/(settings-flow)/profile');
+    useCtaStore.getState().requestBackup();
   };
   return (
     <Screen
@@ -107,6 +109,7 @@ export function CtaScreen({ id }: { id: CtaId }) {
         </BottomButtons>
       }>
       <ScreenScrollView>
+        {!blocking && <SheetGrabber />}
         <View testID="cta-screen" className="gap-6 px-6 py-12">
           <View className="bg-surface-secondary h-24 w-24 items-center justify-center self-center rounded-full">
             <Icon name={cta.content.icon} size={48} color={foreground} />
@@ -115,7 +118,9 @@ export function CtaScreen({ id }: { id: CtaId }) {
             {cta.content.title}
           </Text>
           <Text size={16} className="text-foreground/70 text-center">
-            {cta.content.body}
+            {typeof cta.content.body === 'function'
+              ? cta.content.body(balance.total)
+              : cta.content.body}
           </Text>
           {updateError && (
             <Text accessibilityRole="alert" className="text-center">

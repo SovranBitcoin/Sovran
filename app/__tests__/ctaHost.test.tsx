@@ -51,6 +51,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   setItem: jest.fn(async () => undefined),
   removeItem: jest.fn(async () => undefined),
 }));
+jest.mock('@/shared/ui/composed/SheetGrabber', () => ({ SheetGrabber: 'Grabber' }));
 jest.mock('@/assets/icons', () => 'Icon');
 jest.mock('@/shared/ui/composed/Screen', () => ({
   Screen: ({ children, footer }: React.PropsWithChildren<{ footer: React.ReactNode }>) => (
@@ -102,6 +103,7 @@ beforeEach(async () => {
     seedCreatedAt: Date.now(),
     restoreStatus: 'complete',
     recoveryPhraseVerifiedAt: null,
+    recoveryPhraseVerifiedRevision: null,
   });
   mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
   mockPush.mockClear();
@@ -136,7 +138,9 @@ it('reserves one modal and re-evaluates on close with a version received while c
 it('re-evaluates an expired snooze on foreground', async () => {
   const now = Date.now();
   const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
-  useCtaStore.setState({ dismissed: { 'backup-recovery-phrase:snooze': { at: now } } });
+  useCtaStore.setState({
+    dismissed: { 'backup-recovery-phrase:snooze': { revision: 2, at: now } },
+  });
   const listener = jest.spyOn(AppState, 'addEventListener');
   const view = render(<HostWithScreen />);
   expect(mockPush).not.toHaveBeenCalled();
@@ -249,20 +253,21 @@ it.each(['primary', 'secondary'])(
     if (action === 'primary') {
       expect(useCtaStore.getState().dismissed).toEqual({});
       expect(useWalletLifecycleStore.getState().recoveryPhraseVerifiedAt).toBeNull();
-      expect(mockReplace).toHaveBeenCalledWith('/(settings-flow)/profile');
+      expect(mockPush).toHaveBeenCalledWith('/(backup-flow)');
     } else {
       expect(useCtaStore.getState().dismissed['backup-recovery-phrase:snooze']).toEqual({
         at: now,
+        revision: 2,
       });
     }
-    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledTimes(action === 'primary' ? 2 : 1);
     const foreground = jest.mocked(AppState.addEventListener).mock.calls.at(-1)![1];
     clock.mockReturnValue(now + ABANDONED_BACKUP_GRACE_MS - 1);
     await act(async () => foreground('active'));
-    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledTimes(action === 'primary' ? 2 : 1);
     clock.mockReturnValue(now + ABANDONED_BACKUP_GRACE_MS);
     await act(async () => foreground('active'));
-    expect(mockPush).toHaveBeenCalledTimes(action === 'primary' ? 2 : 1);
+    expect(mockPush).toHaveBeenCalledTimes(action === 'primary' ? 3 : 1);
   }
 );
 
@@ -279,4 +284,24 @@ it('releases an offline blocking gate when its cache becomes stale on foreground
   await act(async () => foreground('active'));
   expect(mockPreventRemove).toHaveBeenLastCalledWith(false);
   expect(mockBack).toHaveBeenCalledTimes(1);
+});
+
+it('hands off a directly opened CTA route even without a reserved active ID', async () => {
+  mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: 'cta' }] };
+  const view = render(<HostWithScreen id="backup-recovery-phrase" />);
+  expect(useCtaStore.getState().activeId).toBeNull();
+  await act(async () => fireEvent.press(view.UNSAFE_getByProps({ testID: 'cta-primary' })));
+  mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
+  view.rerender(<HostWithScreen />);
+  expect(mockPush).toHaveBeenCalledWith('/(backup-flow)');
+  expect(useCtaStore.getState().backupRequested).toBe(false);
+});
+it('allows a required update to interrupt backup, but never stacks another backup nag', async () => {
+  mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: '(backup-flow)' }] };
+  render(<HostWithScreen />);
+  expect(mockPush).not.toHaveBeenCalled();
+  await act(async () =>
+    useSettingsStore.getState().setLastKnownAppVersion({ version: '2.0.0', fetchedAt: Date.now() })
+  );
+  expect(mockPush).toHaveBeenCalledWith({ pathname: '/cta', params: { id: 'update-required' } });
 });

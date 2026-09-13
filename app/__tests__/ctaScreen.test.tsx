@@ -26,6 +26,8 @@ jest.mock('expo-router/react-navigation', () => ({
 jest.mock('react-native', () => ({
   BackHandler: { addEventListener: jest.fn(() => ({ remove: jest.fn() })) },
 }));
+jest.mock('wallet/react', () => ({ useColadaBalance: () => ({ total: 1 }) }), { virtual: true });
+jest.mock('@/shared/ui/composed/SheetGrabber', () => ({ SheetGrabber: 'Grabber' }));
 jest.mock('@/assets/icons', () => 'Icon');
 jest.mock('@/shared/ui/composed/Screen', () => ({
   Screen: ({ children, footer }: React.PropsWithChildren<{ footer: React.ReactNode }>) => (
@@ -104,12 +106,13 @@ it('persists do-not-ask and otherwise snoozes for later', async () => {
   expect(useCtaStore.getState().dismissed['backup-recovery-phrase']).toBeDefined();
   expect(mockBack).toHaveBeenCalledTimes(1);
 });
-it('Back up now opens profile without snoozing, even when removal follows', async () => {
+it('Back up now requests the backup flow without snoozing, even when removal follows', async () => {
   mount('backup-recovery-phrase');
   await press('cta-primary');
   act(() => mockAddListener.mock.calls.at(-1)![1]());
   expect(useCtaStore.getState().dismissed).toEqual({});
-  expect(mockReplace).toHaveBeenCalledWith('/(settings-flow)/profile');
+  expect(useCtaStore.getState().backupRequested).toBe(true);
+  expect(mockBack).toHaveBeenCalledTimes(1);
 });
 
 it('honors Do not ask me again when the user leaves by swipe or back', async () => {

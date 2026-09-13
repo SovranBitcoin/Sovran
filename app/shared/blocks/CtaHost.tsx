@@ -16,6 +16,9 @@ export function CtaHost() {
   const mockMode = useSettingsStore((s) => s.mockMode);
   const seedCreatedAt = useWalletLifecycleStore((s) => s.seedCreatedAt);
   const recoveryPhraseVerifiedAt = useWalletLifecycleStore((s) => s.recoveryPhraseVerifiedAt);
+  const recoveryPhraseVerifiedRevision = useWalletLifecycleStore(
+    (s) => s.recoveryPhraseVerifiedRevision
+  );
   const restoreStatus = useWalletLifecycleStore((s) => s.restoreStatus);
   const balance = useColadaBalance('sat');
   const dismissed = useCtaStore((s) => s.dismissed);
@@ -49,7 +52,12 @@ export function CtaHost() {
         nowMs: Date.now(),
         nativeVersion: Application.nativeApplicationVersion ?? '',
         latest,
-        lifecycle: { seedCreatedAt, recoveryPhraseVerifiedAt, restoreStatus },
+        lifecycle: {
+          seedCreatedAt,
+          recoveryPhraseVerifiedAt,
+          recoveryPhraseVerifiedRevision,
+          restoreStatus,
+        },
         balanceTotalSat: balance.total,
         backupStartedAt,
         dismissed,
@@ -65,16 +73,23 @@ export function CtaHost() {
       }
       return;
     }
-    if (activeId) {
+    if (activeId || useCtaStore.getState().backupRequested) {
       if (!observedRoute.current) return; // push reserved, waiting for navigator
       observedRoute.current = false;
       const store = useCtaStore.getState();
       // CtaScreen owns explicit dismissals; starting backup must never snooze.
+      const openBackup = store.backupRequested;
       store.preview(null);
       store.setActive(null);
+      if (openBackup) router.raw.push('/(backup-flow)');
       setNowMs(Date.now());
       return;
     }
+    if (
+      next === 'backup-recovery-phrase' &&
+      navigation.routes.some((route) => route.name === '(backup-flow)')
+    )
+      return;
     if (!next || useCtaStore.getState().activeId !== null) return;
     useCtaStore.getState().setActive(next);
     // The queue reserves activeId before pushing; a just-closed CTA may legitimately
@@ -89,6 +104,7 @@ export function CtaHost() {
     latest,
     seedCreatedAt,
     recoveryPhraseVerifiedAt,
+    recoveryPhraseVerifiedRevision,
     restoreStatus,
     balance.total,
     backupStartedAt,

@@ -1,8 +1,8 @@
 {
   "version": 1,
   "id": "cta.preview",
-  "name": "Call-to-action previews and backup check",
-  "description": "Preview both CTAs, exercise blocked navigation back, reopen and verify permanent dismissal, then enter and cancel the backup check on a disposable fresh wallet.",
+  "name": "Call-to-action modal previews",
+  "description": "Preview both modal CTAs, exercise blocked navigation and permanent dismissal, then enter and cancel the backup intro.",
   "details": "The Back preview control dispatches the real navigator back action; swipe checks gesture rejection. Android hardware-back needs native verification; the JSON harness has no hardware-back step. No updates are installed and no funds are used.",
   "lane": "simulator",
   "tags": ["flow:wallet","check:navigation"],
@@ -54,15 +54,8 @@
     {"action":"waitFor","selector":{"id":"cta-active"},"timeoutMs":15000,"value":"backup-recovery-phrase"},
     {"action":"waitFor","selector":{"id":"cta-dismissed"},"timeoutMs":15000,"value":"1"},
     {"action":"tap","selector":{"id":"cta-primary"}},
-    {"action":"waitFor","selector":{"id":"profile-reveal-mnemonic"},"timeoutMs":15000},
-    {"action":"tap","selector":{"id":"profile-reveal-mnemonic"}},
-    {"action":"waitFor","selector":{"id":"profile-recovery-written"},"timeoutMs":15000},
-    {"action":"tap","selector":{"id":"profile-recovery-written"}},
-    {"action":"waitFor","selector":{"id":"recovery-phrase-confirm"},"timeoutMs":15000},
-    {"action":"screenshot","name":"recovery-phrase-confirm"},
-    {"action":"tap","selector":{"id":"recovery-choice-0"}},
-    {"action":"tap","selector":{"id":"recovery-confirm-cancel"}},
-    {"action":"waitFor","selector":{"id":"profile-reveal-mnemonic"},"timeoutMs":15000},
+    {"action":"waitFor","selector":{"id":"backup-intro"},"timeoutMs":15000},
+    {"action":"tap","selector":{"id":"backup-not-now"}},
     {"action":"goHome"}
   ],
   "verify": [
