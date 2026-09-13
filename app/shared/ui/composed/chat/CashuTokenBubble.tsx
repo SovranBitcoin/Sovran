@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, type ViewStyle } from 'react-native';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { withAlpha } from '@/shared/lib/color';
 import { getTokenMetadata } from '@cashu/cashu-ts';
@@ -22,6 +22,14 @@ import { alpha, radius, spacing } from '@/shared/styles/tokens';
 interface CashuTokenBubbleProps {
   token: string;
   isOwn: boolean;
+  hasText?: boolean;
+  cornerRadii?: Pick<
+    ViewStyle,
+    | 'borderTopLeftRadius'
+    | 'borderBottomLeftRadius'
+    | 'borderTopRightRadius'
+    | 'borderBottomRightRadius'
+  >;
 }
 
 interface DecodedCashuTokenBubble {
@@ -111,10 +119,15 @@ function buildReceiveEntrySafe(
  * surface (NIP-04, NIP-17, MLS, BitChat nostr-dm/ble-dm) can present the
  * same Redeem/Cancel card.
  */
-export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
-  const [foreground, surfaceSecondary, surfaceTertiary, success] = useThemeColor([
+export function CashuTokenBubble({
+  token,
+  isOwn,
+  hasText = false,
+  cornerRadii,
+}: CashuTokenBubbleProps) {
+  const [foreground, defaultColor, surfaceTertiary, success] = useThemeColor([
     'foreground',
-    'surface-secondary',
+    'default',
     'surface-tertiary',
     'success',
   ] as const);
@@ -169,20 +182,15 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
     return null;
   }
 
-  // Quiet flat card: a single `surface-secondary` fill with a hairline border —
-  // no nested gradients, modest type — so an ecash drop reads as a calm
-  // affordance in the message stream rather than a loud hero banner. The action
-  // is a subtle tinted pill (success for Redeem, muted for Cancel).
+  // Share the message bubble's fill and grouping, with one subtle action pill.
   const actionColor = isOwn ? withAlpha(foreground, alpha.strong) : success;
   const { amount, unit, mintUrl } = decodedToken;
 
   return (
     <View
+      className="mb-0 min-w-0 self-stretch"
       style={{
-        marginTop: spacing.sm,
-        marginBottom: spacing.sm,
-        alignSelf: isOwn ? 'flex-end' : 'flex-start',
-        maxWidth: '85%',
+        marginTop: hasText ? spacing.sm : 0,
       }}>
       <Pressable
         onPress={handlePress}
@@ -191,16 +199,16 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
         accessibilityLabel={isOwn ? 'Sent ecash token' : 'Received ecash token'}>
         <VStack
           gap={spacing.sm}
+          className="min-w-0 self-stretch p-3"
           style={{
-            backgroundColor: surfaceSecondary,
+            backgroundColor: isOwn ? defaultColor : surfaceTertiary,
             borderRadius: radius.lg,
+            ...cornerRadii,
             borderWidth: StyleSheet.hairlineWidth,
-            borderColor: surfaceTertiary,
-            padding: spacing.md,
-            minWidth: 200,
+            borderColor: withAlpha(foreground, alpha.subtle),
           }}>
           {mintUrl ? (
-            <HStack align="center" gap={spacing.xs}>
+            <HStack align="center" gap={spacing.xs} className="min-w-0 shrink">
               <Icon
                 name="mingcute:bank-fill"
                 size={13}
@@ -215,8 +223,9 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
             </HStack>
           ) : null}
 
-          <VStack gap={2}>
+          <VStack gap={2} className="min-w-0 shrink">
             <AmountFormatter
+              className="min-w-0 shrink flex-wrap"
               amount={amount}
               unit={unit}
               size={24}
@@ -232,6 +241,9 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
 
           <Pressable
             onPress={handlePress}
+            testID={isOwn ? 'cashu-bubble-cancel' : 'cashu-bubble-redeem'}
+            accessibilityRole="button"
+            accessibilityLabel={isOwn ? 'Cancel' : 'Redeem'}
             style={{
               marginTop: spacing.xs,
               paddingVertical: spacing.sm,
