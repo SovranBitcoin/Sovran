@@ -31,6 +31,15 @@ export const DISMISS_BLUR_AT_REST = 100;
 /** Dismiss is confirmed when drag distance exceeds this fraction of max(expandedWidth, expandedHeight). */
 export const DISMISS_THRESHOLD_FRACTION = 1 / 4;
 
+/** Seconds of outward release velocity projected into dismiss travel. */
+export const DISMISS_VELOCITY_WEIGHT_S = 0.12;
+
+/** Outward release speed (px/s) that confirms a flick beyond its minimum distance. */
+export const DISMISS_FLICK_VELOCITY_PX_S = 1100;
+
+/** Minimum drag distance (px) required for the velocity-only flick override. */
+export const DISMISS_FLICK_MIN_DISTANCE = DISMISS_MIN_DISTANCE * 2;
+
 /** Duration (ms) to fade out the close button when dismiss pan starts. */
 export const DISMISS_CLOSE_BTN_FADE_DURATION_MS = 200;
 
