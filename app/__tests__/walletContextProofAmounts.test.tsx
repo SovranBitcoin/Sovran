@@ -214,3 +214,16 @@ it('ignores other mints and detaches old manager subscriptions on replacement an
   unmount();
   expect(mockManager.listenerCount()).toBe(0);
 });
+
+it('exposes all unit balances independently of the active-unit view', async () => {
+  mockGetReadyProofs.mockResolvedValue([]);
+  const { result, rerender } = renderHook(useWalletContext, { wrapper });
+  await act(async () => {});
+  expect(result.current.unitBalances).toEqual({ sat: { mint: 16 }, usd: { mint: 3 } });
+  expect(result.current.mintBalances).toEqual({ mint: 16 });
+  mockUnit = 'usd';
+  rerender(undefined);
+  await act(async () => {});
+  expect(result.current.unitBalances).toEqual({ sat: { mint: 16 }, usd: { mint: 3 } });
+  expect(result.current.mintBalances).toEqual({ mint: 3 });
+});

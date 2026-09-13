@@ -259,6 +259,9 @@ describe('createWalletContextTracker', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     await tracker.refresh();
 
+    expect(tracker.getContext().unitBalances).toEqual({
+      sat: { [MINT1]: 1000 }, usd: { [MINT1]: 250 },
+    });
     // sat view: usd proofs and balances are invisible
     expect(tracker.getContext().mintBalances[MINT1]).toBe(1000);
     expect(tracker.getContext().proofAmounts[MINT1]).toEqual([8, 64]);

@@ -84,16 +84,23 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
   // multi-unit): balances, method capabilities, and proof amounts below all
   // read the active unit's slice.
   const { unit: activeUnit, setUnit: setActiveUnit } = useActiveUnit();
-  const rawMintBalances = useMemo(
-    () =>
-      Object.fromEntries(
+  const { mintBalances: rawMintBalances, unitBalances } = useMemo(() => {
+    const unitBalances: Record<string, Record<string, number>> = {};
+    for (const [mintUrl, byUnit] of Object.entries(rawBalanceCtx.byMintAndUnit ?? {})) {
+      for (const [unit, snapshot] of Object.entries(byUnit)) {
+        (unitBalances[unit] ??= {})[mintUrl] = snapshot ? amountToNumber(snapshot.total) : 0;
+      }
+    }
+    return {
+      mintBalances: Object.fromEntries(
         Object.entries(rawBalanceCtx.byMintAndUnit ?? {}).map(([url, byUnit]) => [
           url,
           byUnit[activeUnit] ? amountToNumber(byUnit[activeUnit].total) : 0,
         ])
-      ) as Record<string, number>,
-    [rawBalanceCtx, activeUnit]
-  );
+      ),
+      unitBalances,
+    };
+  }, [rawBalanceCtx, activeUnit]);
   const manager = useManager();
   const preferredMintUrl = useMintStore((state) => state.selectedMint);
 
@@ -279,11 +286,19 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     return {
       trustedMintUrls: stableMintUrls,
       mintBalances: mintBalancesOnly,
+      unitBalances,
       preferredMintUrl,
       mintMethodCapabilities,
       proofAmounts,
     };
-  }, [stableMintUrls, mintBalancesOnly, preferredMintUrl, mintMethodCapabilities, proofAmounts]);
+  }, [
+    stableMintUrls,
+    mintBalancesOnly,
+    unitBalances,
+    preferredMintUrl,
+    mintMethodCapabilities,
+    proofAmounts,
+  ]);
 
   return <WalletContextCtx.Provider value={value}>{children}</WalletContextCtx.Provider>;
 }

@@ -1,3 +1,4 @@
+import { rankMintCandidates } from "../../src/mint-selection";
 /**
  * DO NOT modify tests to make them pass.
  * Tests define expected behavior — they are the specification.
@@ -377,5 +378,22 @@ describe('preselectMintForSend', () => {
 
   it('returns undefined for a wallet with no mints and no preference', () => {
     expect(preselectMintForSend(undefined, WALLETS.noMints)).toBeUndefined();
+  });
+});
+
+
+describe('rankMintCandidates', () => {
+  it('ranks preferred membership, funding, balance, then original order without mutation', () => {
+    const candidates = ['a', 'b', 'c', 'd', 'e'].map(mintUrl => ({ mintUrl, balance: 999 }));
+    expect(rankMintCandidates(candidates, {
+      preferredMints: ['e', 'd', 'c'], amount: 10,
+      unitBalances: { a: 100, b: 200, c: 5, d: 20, e: 20 },
+    }).map(c => c.mintUrl)).toEqual(['d', 'e', 'c', 'b', 'a']);
+    expect(candidates.map(c => c.mintUrl)).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+  it('keeps ties stable, treats missing balances as zero and handles no candidates', () => {
+    const candidates = ['a', 'b'].map(mintUrl => ({ mintUrl, balance: 100 }));
+    expect(rankMintCandidates(candidates, { amount: 1, unitBalances: {} })).toEqual(candidates);
+    expect(rankMintCandidates([], { amount: 1, unitBalances: {} })).toEqual([]);
   });
 });

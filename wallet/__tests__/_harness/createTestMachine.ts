@@ -181,8 +181,8 @@ export function createTestMachine(config?: TestMachineConfig): TestMachine {
     handlers: createRecordingHandlers(handlerCalls),
     detectors,
     // getContext returns the wallet state — called on every transition
-    getContext: () => walletCtx,
-    getUnit: () => config?.unit ?? 'sat',
+    getContext: config?.getContext ?? (() => walletCtx),
+    getUnit: config?.getUnit ?? (() => config?.unit ?? 'sat'),
     getOffline: () => config?.offline ?? false,
     getLocale: () => config?.locale ?? 'en',
     enableEcashSendMemo: config?.enableEcashSendMemo ?? false,

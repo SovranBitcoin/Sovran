@@ -14,6 +14,25 @@ import type {
   MintCandidate,
 } from "./types";
 
+/** Rank eligible mints without mutating the caller's order or fetching metadata. */
+export function rankMintCandidates(
+  candidates: readonly MintCandidate[],
+  { preferredMints = [], amount, unitBalances }: {
+    preferredMints?: readonly string[];
+    amount: number;
+    /** Balances for the terminal's single requested unit. */
+    unitBalances: Record<string, number>;
+  },
+): MintCandidate[] {
+  const preferred = new Set(preferredMints);
+  const balance = (candidate: MintCandidate) => unitBalances[candidate.mintUrl] ?? 0;
+  return [...candidates].sort((a, b) =>
+    Number(preferred.has(b.mintUrl)) - Number(preferred.has(a.mintUrl)) ||
+    Number(balance(b) >= amount) - Number(balance(a) >= amount) ||
+    balance(b) - balance(a)
+  );
+}
+
 export interface MintSelectionConfig {
   /** Mints allowed by the payment request. Empty/undefined = any trusted mint. */
   allowedMints?: string[];

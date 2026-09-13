@@ -52,6 +52,8 @@ export interface PaymentRequestTransport {
 export interface WalletContext {
   trustedMintUrls: string[];
   mintBalances: Record<string, number>;
+  /** Cached balances by unit, then mint. Optional for legacy single-unit hosts. */
+  unitBalances?: Record<string, Record<string, number>>;
   preferredMintUrl?: string;
   /**
    * Per-mint NUT-04/NUT-05 payment-method support derived from NUT-06 info.
