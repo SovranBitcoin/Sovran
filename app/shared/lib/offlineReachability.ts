@@ -43,13 +43,10 @@ type ResolveOfflineOptions = {
 
 const DEFAULT_REACHABILITY_PROBES: readonly ReachabilityProbe[] = [
   {
-    name: 'sovran-api',
-    url: `${backendConfig.apiBaseUrl}/app/latest-version`,
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ storage: { version: '0.0.0' } }),
+    name: 'nagg',
+    url: `${backendConfig.nostrAppViewBaseUrl}/livez`,
+    method: 'GET',
+    timeoutMs: REACHABILITY_TIMEOUT_MS,
     test: (response) => response.ok,
   },
 ];

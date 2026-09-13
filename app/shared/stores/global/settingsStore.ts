@@ -39,6 +39,7 @@ export interface MiddlemanRoutingSettings {
 }
 
 interface SettingsState {
+  lastKnownAppVersion: z.infer<typeof PersistedLastKnownAppVersion>;
   language: string;
   displayBtc: number;
   displayCurrency: DisplayCurrency;
@@ -143,7 +144,19 @@ const DEFAULT_MIDDLEMAN_ROUTING_PERSISTED = {
   trustMode: 'trusted_only',
 } as const;
 
+const PersistedLastKnownAppVersion = z
+  .object({
+    version: z.string().max(32),
+    minVersion: z.string().max(32).optional(),
+    message: z.string().max(280).optional(),
+    fetchedAt: z.number().int().nonnegative(),
+  })
+  .nullable()
+  .default(null)
+  .catch(null);
+
 const PersistedSettings = z.object({
+  lastKnownAppVersion: PersistedLastKnownAppVersion,
   language: z.string().max(16).default('en').catch('en'),
   displayBtc: z.number().int().min(0).max(8).default(3).catch(3),
   displayCurrency: z.enum(['usd', 'eur', 'gbp']).default('usd').catch('usd'),
@@ -183,6 +196,7 @@ const PersistedSettings = z.object({
 
 /** Default settings used for initialization and reset. */
 const DEFAULT_SETTINGS: SettingsState = {
+  lastKnownAppVersion: null,
   language: 'en',
   displayBtc: 3,
   displayCurrency: 'usd',
@@ -209,6 +223,7 @@ const DEFAULT_SETTINGS: SettingsState = {
 };
 
 interface SettingsActions {
+  setLastKnownAppVersion: (version: NonNullable<SettingsState['lastKnownAppVersion']>) => void;
   // Display settings
   setDisplayBtc: (display: number) => void;
   getDisplayBtc: () => number;
@@ -262,6 +277,16 @@ export const useSettingsStore = create<SettingsStore>()(
     persist(
       (set, get) => ({
         ...DEFAULT_SETTINGS,
+
+        setLastKnownAppVersion: (version) => {
+          set({
+            lastKnownAppVersion: {
+              ...version,
+              // The wire schema permits 512 characters; keep the durable note bounded.
+              message: version.message?.slice(0, 280),
+            },
+          });
+        },
 
         // Display
         setDisplayBtc: (display: number) => {
@@ -422,6 +447,7 @@ export const useSettingsStore = create<SettingsStore>()(
           };
         },
         partialize: (state) => ({
+          lastKnownAppVersion: state.lastKnownAppVersion,
           language: state.language,
           displayBtc: state.displayBtc,
           displayCurrency: state.displayCurrency,

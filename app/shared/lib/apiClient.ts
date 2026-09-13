@@ -384,7 +384,12 @@ const parseNostrProfileFor =
     }
     return ok(parsed.data);
   };
-const parseLatestVersion = parseWith(LatestVersionResponse, 'app/latest-version');
+// nagg also returns minVersion, which @sovranbitcoin/schemas 2.2.0 strips.
+// Remove this extension after the shared schema includes it and the app upgrades.
+const NaggLatestVersionResponse = LatestVersionResponse.extend({
+  minVersion: z.string().max(32).optional(),
+});
+const parseLatestVersion = parseWith(NaggLatestVersionResponse, 'app/latest-version');
 const parseAiLineup = parseWith(NaggAiLineupSchema, 'app/ai-lineup');
 const parseDiscoverMints = parseWith(DiscoverMintsResponse, 'nostr/mint/discover');
 const parseMintChanges = parseWith(MintChangesResponse, 'nostr/mint/changes');
@@ -484,7 +489,7 @@ export const getLatestVersion = ({
   signal?: AbortSignal;
 }) =>
   fetchJson(
-    `${API_BASE_URL}/app/latest-version`,
+    `${SCORE_API_BASE_URL}/app/latest-version`,
     parseLatestVersion,
     'app/latest-version',
     {
