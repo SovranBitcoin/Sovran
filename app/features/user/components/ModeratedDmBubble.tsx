@@ -8,6 +8,7 @@ export function ModeratedDmBubble({
   message,
   isFirstInGroup,
   isLastInGroup,
+  counterpartyAvatar,
   enabled,
   words,
   scope,
@@ -38,6 +39,7 @@ export function ModeratedDmBubble({
       message={message}
       isFirstInGroup={isFirstInGroup}
       isLastInGroup={isLastInGroup}
+      counterpartyAvatar={counterpartyAvatar}
     />
   );
 }
