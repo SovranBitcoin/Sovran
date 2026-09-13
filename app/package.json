@@ -150,7 +150,7 @@
     "expo-symbols": "~56.0.6",
     "expo-system-ui": "~56.0.5",
     "expo-video": "~56.1.4",
-    "heroui-native": "1.0.4",
+    "heroui-native": "1.0.9",
     "liquid-glass-menu": "file:./modules/liquid-glass-menu",
     "liquid-glass-text": "file:./modules/liquid-glass-text",
     "neverthrow": "^8.2.0",

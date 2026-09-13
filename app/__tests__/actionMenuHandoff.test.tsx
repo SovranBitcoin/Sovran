@@ -19,6 +19,7 @@ import {
   getActionMenuSnapshot,
   replaceActionMenuPopup,
 } from '@/shared/lib/popup/popups/actionMenu';
+import { OPEN_WATCHDOG_MS } from '@/shared/lib/popup/openWatchdog';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -42,13 +43,6 @@ jest.mock('@/shared/lib/logger', () => {
     redactError: (error: unknown) => error,
   };
 });
-
-jest.mock('@/shared/lib/scheduleAfterLayout', () => ({
-  scheduleAfterLayout: (callback: () => void) => {
-    callback();
-    return undefined;
-  },
-}));
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
@@ -312,6 +306,26 @@ describe('action-menu successor handoff', () => {
     expect(sectionList().props.contentBottomInset).toBe(16);
   });
 
+  it('mounts the menu already open and lets gorhom animate on mount', () => {
+    act(() => {
+      renderer = TestRenderer.create(<ActionMenuHost />);
+      actionMenuPopup({ title: 'Mounted open' });
+    });
+    const menu = renderer!.root.find((node) => String(node.type) === 'Menu');
+    const content = renderer!.root.find((node) => String(node.type) === 'Menu.Content');
+    // No closed → open flip: gorhom opens the sheet itself once its layout is
+    // calculated, so the first commit is already `isOpen` with gorhom index 0.
+    expect(menu.props.isOpen).toBe(true);
+    expect(content.props.mountIndex).toBe(0);
+    act(() => replaceActionMenuPopup({ title: 'Replaced' }));
+    const after = renderer!.root.find((node) => String(node.type) === 'Menu');
+    expect(after.props.isOpen).toBe(true);
+    expect(after.props.instance).toBe(menu.props.instance);
+    expect(renderer!.root.find((node) => String(node.type) === 'Menu.Label').props.children).toBe(
+      'Replaced'
+    );
+  });
+
   it('keeps the second menu visible when the first instance closes late', () => {
     act(() => {
       renderer = TestRenderer.create(<Harness />);
@@ -452,7 +466,7 @@ describe('action-menu successor handoff', () => {
     const first = renderer!.root.find((node) => String(node.type) === 'Menu').props;
     const firstClose = renderer!.root.find((node) => String(node.type) === 'Menu.Content').props
       .onClose;
-    act(() => jest.advanceTimersByTime(799));
+    act(() => jest.advanceTimersByTime(OPEN_WATCHDOG_MS - 1));
     expect(renderer!.root.find((node) => String(node.type) === 'Menu').props.instance).toBe(
       first.instance
     );
@@ -465,7 +479,7 @@ describe('action-menu successor handoff', () => {
       first.onOpenChange(false);
     });
     expect(getActionMenuSnapshot().payload?.title).toBe('Stalled');
-    act(() => jest.advanceTimersByTime(800));
+    act(() => jest.advanceTimersByTime(OPEN_WATCHDOG_MS));
     expect(renderer!.toJSON()).toBeNull();
     expect(getActionMenuSnapshot().payload).toBeNull();
     expect(onDismiss).toHaveBeenCalledTimes(1);
@@ -484,7 +498,7 @@ describe('action-menu successor handoff', () => {
         .find((node) => String(node.type) === 'Menu.Content')
         .props.onAnimate(-1, 0, 800, 400);
     });
-    act(() => jest.advanceTimersByTime(1600));
+    act(() => jest.advanceTimersByTime(OPEN_WATCHDOG_MS * 2));
     expect(renderer!.root.find((node) => String(node.type) === 'Menu').props.instance).toBe(
       instance
     );

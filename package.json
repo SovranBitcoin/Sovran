@@ -61,7 +61,7 @@
   },
   "patchedDependencies": {
     "@cashu/cashu-ts@5.0.0-rc.4": "app/patches/@cashu+cashu-ts+5.0.0-rc.4.patch",
-    "heroui-native@1.0.4": "app/patches/heroui-native+1.0.4.patch",
+    "heroui-native@1.0.9": "app/patches/heroui-native+1.0.9.patch",
     "expo-modules-jsi@56.0.12": "app/patches/expo-modules-jsi+56.0.12.patch",
     "react-native-screens@4.25.2": "app/patches/react-native-screens+4.25.2.patch",
     "expo-router@56.2.11": "app/patches/expo-router+56.2.11.patch",

@@ -18,7 +18,7 @@
     {"action":"drag","selector":{"id":"action-menu-viewport"},"from":{"x":0.5,"y":0.85},"to":{"x":0.5,"y":0.2},"durationMs":400},
     {"action":"assert","that":"visible","selector":{"id":"profile-create"}},
     {"action":"screenshot","name":"profile-switcher"},
-    {"action":"tap","selector":{"id":"action-menu-dismiss"}},
+    {"action":"tapAt","x":0.5,"y":0.12},
     {"action":"assert","that":"notVisible","selector":{"id":"action-menu-viewport"},"timeoutMs":5000}
   ],
   "verify": [
