@@ -1,4 +1,4 @@
-import { BACKUP_FLOW_REVISION } from '@/features/backup/lib/revision';
+import { BACKUP_FLOW_REVISION } from '@/shared/lib/backup/revision';
 import type { CtaDefinition, CtaId } from './types';
 import { isNewerVersion } from './version';
 const HOUR_MS = 60 * 60 * 1000;

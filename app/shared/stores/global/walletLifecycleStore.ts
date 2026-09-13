@@ -1,4 +1,4 @@
-import { BACKUP_FLOW_REVISION } from '@/features/backup/lib/revision';
+import { BACKUP_FLOW_REVISION } from '@/shared/lib/backup/revision';
 import * as React from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
