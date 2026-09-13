@@ -5,7 +5,7 @@ export default function BackupFlowLayout() {
   return (
     <BackupFlowProvider>
       <AndroidSheetFlowStack>
-        <Stack.Screen name="index" />
+        <Stack.Screen name="intro" />
       </AndroidSheetFlowStack>
     </BackupFlowProvider>
   );

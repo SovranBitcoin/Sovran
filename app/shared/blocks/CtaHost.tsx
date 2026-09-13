@@ -81,7 +81,7 @@ export function CtaHost() {
       const openBackup = store.backupRequested;
       store.preview(null);
       store.setActive(null);
-      if (openBackup) router.raw.push('/(backup-flow)');
+      if (openBackup) router.raw.push('/(backup-flow)/intro');
       setNowMs(Date.now());
       return;
     }

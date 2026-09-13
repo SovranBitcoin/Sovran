@@ -20,7 +20,7 @@ export function BackupDoneScreen() {
     finish();
     log.info('backup.flow.verify_complete');
   }, [progress.position, demo, finish]);
-  if (progress.position !== 12) return <Redirect href="/(backup-flow)" />;
+  if (progress.position !== 12) return <Redirect href="/(backup-flow)/intro" />;
   return (
     <Screen
       name="BackupDoneScreen"

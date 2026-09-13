@@ -253,7 +253,7 @@ it.each(['primary', 'secondary'])(
     if (action === 'primary') {
       expect(useCtaStore.getState().dismissed).toEqual({});
       expect(useWalletLifecycleStore.getState().recoveryPhraseVerifiedAt).toBeNull();
-      expect(mockPush).toHaveBeenCalledWith('/(backup-flow)');
+      expect(mockPush).toHaveBeenCalledWith('/(backup-flow)/intro');
     } else {
       expect(useCtaStore.getState().dismissed['backup-recovery-phrase:snooze']).toEqual({
         at: now,
@@ -293,7 +293,7 @@ it('hands off a directly opened CTA route even without a reserved active ID', as
   await act(async () => fireEvent.press(view.UNSAFE_getByProps({ testID: 'cta-primary' })));
   mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
   view.rerender(<HostWithScreen />);
-  expect(mockPush).toHaveBeenCalledWith('/(backup-flow)');
+  expect(mockPush).toHaveBeenCalledWith('/(backup-flow)/intro');
   expect(useCtaStore.getState().backupRequested).toBe(false);
 });
 it('allows a required update to interrupt backup, but never stacks another backup nag', async () => {
