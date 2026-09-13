@@ -307,3 +307,45 @@ describe('annotateOptions — paymentRequest rules', () => {
     expect(result[0].status).toBe('recommended');
   });
 });
+
+
+describe('payment-request preferred mints', () => {
+  const option = makeOption('paymentRequest', 'creq-preferred');
+  const otherMint = 'https://other.example';
+  const wallet = { ...WALLETS.default, trustedMintUrls: [otherMint], mintBalances: { [otherMint]: 100 } };
+  const detectors = (mintsPreferred?: boolean, mints = [MINT1], amount = 50) => ({
+    ...defaultDetectors,
+    getPaymentRequestInfo: () => ({ mints, amount, unit: 'sat', mintsPreferred }),
+  });
+
+  it('keeps a funded non-listed mint available without promoting it', () => {
+    expect(annotateOptions([option], wallet, detectors(true))[0]).toMatchObject({
+      status: 'available', reason: { code: 'MINT_NOT_PREFERRED', message: 'Receiver prefers other mints' },
+    });
+  });
+  it.each([false, undefined])('keeps strict mp=%s disabled', (mp) => {
+    expect(annotateOptions([option], wallet, detectors(mp))[0]).toMatchObject({ status: 'disabled', reason: { code: 'NO_VALID_MINT' } });
+  });
+  it('recommends a funded listed mint and ignores mp with no list', () => {
+    for (const mints of [[otherMint], []]) {
+      expect(annotateOptions([option], wallet, detectors(true, mints))[0].status).toBe('recommended');
+    }
+  });
+  it('does not recommend an empty preferred mint for an amountless request', () => {
+    const empty = { ...wallet, mintBalances: { [otherMint]: 0 } };
+    expect(annotateOptions([option], empty, detectors(true, [otherMint], 0))[0].status).toBe('disabled');
+  });
+  it('still requires enough balance on one trusted mint', () => {
+    expect(annotateOptions([option], wallet, detectors(true, [MINT1], 101))[0].status).toBe('disabled');
+  });
+});
+
+
+it('ignores mp when no mint list is supplied', () => {
+  const option = makeOption('paymentRequest', 'creq-no-list');
+  const wallet = { ...WALLETS.default, mintBalances: {} };
+  const annotate = (mintsPreferred?: boolean) => annotateOptions([option], wallet, {
+    ...defaultDetectors, getPaymentRequestInfo: () => ({ amount: 100, unit: 'sat', mints: [], mintsPreferred }),
+  });
+  expect(annotate(true)).toEqual(annotate(undefined));
+});

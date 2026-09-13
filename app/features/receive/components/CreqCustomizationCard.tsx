@@ -5,9 +5,10 @@
  * single-use "Fixed Amount → as Ecash" screen so both offer the SAME
  * customization with one implementation.
  *
- * The card is presentational: the caller owns the request encoding and the
- * customization state (global preference for the hub, or per-request), and
- * feeds a derived `CreqMintSelection` in. Toggling only re-encodes the
+ * The caller owns the request encoding and lock/mint selection state (global
+ * preference for the hub, or per-request), and feeds `CreqMintSelection` in.
+ * The profile's mint acceptance mode stays Required until incoming claims
+ * support recovering payments from unlisted mints. Toggling only re-encodes the
  * displayed request; the durable coco operation keeps its full mint list and
  * stays lock-free (coco rejects nut10 on incoming — the lock rides the display
  * encoding, and the claim path signs the keyring 'p2pk' key transparently).
@@ -28,7 +29,11 @@ import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { copyPopup } from '@/shared/lib/popup';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { paymentLog } from '@/shared/lib/logger';
-import Icon from 'assets/icons';
+import Icon from '@/assets/icons';
+import { PillTabs } from '@/shared/ui/composed/PillTabs';
+import { Text } from '@/shared/ui/primitives/Text';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { ANIMATE_THRESHOLD } from '@/shared/lib/qr';
 
 interface CreqCustomizationCardProps {
   /** The (already re-encoded) request string shown in the copy row. */
@@ -67,6 +72,9 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
   sectionTitle = 'CASHU PAYMENT REQUEST',
 }: CreqCustomizationCardProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const setCreqMintsPreferred = useMintStore((s) => s.setCreqMintsPreferred);
+  // Coco 2.0.0 validatePayload rejects untrusted AND non-operation mints.
+  // Enable Preferred only after incoming claims have an add-mint recovery path.
 
   // Contradictory persisted state: the lock is on but every NUT-11-capable mint
   // was toggled off earlier (while the lock was off). The selection already
@@ -127,6 +135,8 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
           animation={false}
           testID="receive-creq-p2pk-toggle"
           accessibilityLabel="Toggle P2PK lock"
+          accessibilityRole="switch"
+          accessibilityState={{ checked: p2pkEffectiveOn, disabled: p2pkDisabled }}
           isDisabled={p2pkDisabled}
           onPress={handleP2pkToggle}>
           <PressableFeedback.Scale>
@@ -154,7 +164,13 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
           <PressableFeedback.Ripple />
         </PressableFeedback>
         <Separator className="mx-4" />
-        <PressableFeedback animation={false} onPress={handleAdvancedToggle}>
+        <PressableFeedback
+          animation={false}
+          testID="receive-creq-advanced"
+          accessibilityRole="button"
+          accessibilityLabel="Advanced"
+          accessibilityState={{ expanded: advancedOpen }}
+          onPress={handleAdvancedToggle}>
           <PressableFeedback.Scale>
             <ListGroup.Item disabled>
               <ListGroup.ItemPrefix>
@@ -180,7 +196,7 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
           <PressableFeedback.Ripple />
         </PressableFeedback>
         {advancedOpen
-          ? mintSelection.options.map((option) => (
+          ? mintSelection.options.map((option, index) => (
               <React.Fragment key={option.mintUrl}>
                 <Separator className="mx-4" />
                 <ListGroup.Item>
@@ -200,6 +216,8 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
                   </ListGroup.ItemContent>
                   <ListGroup.ItemSuffix>
                     <HeroSwitch
+                      testID={`receive-creq-mint-${index}`}
+                      accessibilityLabel={`Include ${option.displayName}`}
                       isSelected={option.enabled}
                       isDisabled={option.switchDisabled}
                       onSelectedChange={(value) => onMintToggle(option.mintUrl, value)}
@@ -209,6 +227,30 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
               </React.Fragment>
             ))
           : null}
+        {advancedOpen ? (
+          <View className="px-4 pb-4">
+            <Text testID="receive-creq-size" size={12} className="text-muted py-3">
+              {`Request size: ${encodedRequest.length} chars · ${encodedRequest.length >= ANIMATE_THRESHOLD ? 'animated' : 'static'} QR`}
+            </Text>
+            <View testID="receive-creq-mints-mode">
+              <Text size={14}>Accepted mints</Text>
+              <PillTabs
+                tabs={['Required', 'Preferred']}
+                activeTab="Required"
+                accessibilityRole="radio"
+                testIDFor={(mode) => `receive-creq-mints-mode-${mode.toLowerCase()}`}
+                disabledFor={(mode) => mode === 'Preferred'}
+                onTabChange={() => setCreqMintsPreferred(false)}
+              />
+              <Text size={12} className="text-muted">
+                Payers can only use the mints above.
+              </Text>
+              <Text size={12} className="text-muted mt-2">
+                Preferred is unavailable until payments from other mints can be claimed.
+              </Text>
+            </View>
+          </View>
+        ) : null}
       </ListGroup>
     </GradientCard>
   );

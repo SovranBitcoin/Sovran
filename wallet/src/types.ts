@@ -29,6 +29,8 @@ export interface PaymentRequestInfo {
   /** The NUT-18 `i` payment id, when the request carries one. */
   requestId?: string;
   mints: string[];
+  /** NUT-18 advisory mint list; absent/false keeps the strict allow-list. */
+  mintsPreferred?: boolean;
   amount: number | undefined;
   unit: string;
   transports?: PaymentRequestTransport[];

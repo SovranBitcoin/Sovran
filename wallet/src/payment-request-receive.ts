@@ -49,6 +49,8 @@ export interface StandingPaymentRequestInput {
    * re-encodes; it never rotates the operation.
    */
   displayMints?: string[];
+  /** Display encoding only; callers must verify they can claim unlisted mints. */
+  mintsPreferred?: boolean;
 }
 
 export interface StandingPaymentRequest {
@@ -121,6 +123,7 @@ function toAmountlessEncodings(
   encodedRequest: string,
   lockP2pkPubkey?: string,
   displayMints?: string[],
+  mintsPreferred?: boolean,
 ): {
   encodedRequest: string;
   encodedRequestB: string;
@@ -137,6 +140,7 @@ function toAmountlessEncodings(
     lockP2pkPubkey
       ? { kind: "P2PK", data: lockP2pkPubkey, tags: [] }
       : undefined,
+    mintsPreferred ?? decoded.mintsPreferred,
   );
   return encodeDisplay(display);
 }
@@ -155,6 +159,8 @@ export interface SingleUseReencodeOptions {
    * payment from a de-advertised-but-trusted mint still claims).
    */
   displayMints?: string[];
+  /** Display encoding only; callers must verify they can claim unlisted mints. */
+  mintsPreferred?: boolean;
 }
 
 /**
@@ -179,6 +185,7 @@ export function reencodeSingleUsePaymentRequest(
     options.lockP2pkPubkey
       ? { kind: "P2PK", data: options.lockP2pkPubkey, tags: [] }
       : undefined,
+    options.mintsPreferred ?? decoded.mintsPreferred,
   );
   return encodeDisplay(display);
 }
@@ -189,7 +196,10 @@ type IncomingOp = Awaited<
 
 function toStanding(
   operation: IncomingOp,
-  input: Pick<StandingPaymentRequestInput, "lockP2pkPubkey" | "displayMints">,
+  input: Pick<
+    StandingPaymentRequestInput,
+    "lockP2pkPubkey" | "displayMints" | "mintsPreferred"
+  >,
 ): StandingPaymentRequest {
   return {
     operationId: operation.id,
@@ -198,6 +208,7 @@ function toStanding(
       operation.encodedRequest,
       input.lockP2pkPubkey,
       input.displayMints,
+      input.mintsPreferred,
     ),
     mints: operation.mints,
     unit: operation.unit,
@@ -252,7 +263,7 @@ function cacheFor(manager: Manager): Map<string, StandingPaymentRequest> {
 }
 
 function cacheKey(input: StandingPaymentRequestInput): string {
-  return `${standingPaymentRequestKey(input.unit)}|${input.lockP2pkPubkey ?? ""}|${input.displayMints?.join(",") ?? ""}`;
+  return `${standingPaymentRequestKey(input.unit)}|${input.lockP2pkPubkey ?? ""}|${input.displayMints?.join(",") ?? ""}|${input.mintsPreferred ?? ""}`;
 }
 
 /** Synchronous read of the last resolved standing request (per lock state)

@@ -46,6 +46,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { PaymentRequest } from '@cashu/cashu-ts';
 import { transition, type TransitionResult } from '../../src/machine/transitions';
 import { defaultDetectors } from '../../src/detectors';
 import { parsePaymentInput } from '../../src/parse';
@@ -1692,4 +1693,52 @@ describe('transition — unhandled events', () => {
     expect(result.step).toBe('navigateToMeltPreview');
     expect(result.context).toBe(ctx);
   });
+});
+
+
+describe('payment-request mint preference transitions', () => {
+  const wallet = { ...WALLETS.default, trustedMintUrls: [MINT1, MINT2],
+    mintBalances: { [MINT1]: 100, [MINT2]: 1000 }, preferredMintUrl: undefined };
+  const request = (mp?: boolean, amount: number | undefined = 50, mints = [MINT1]) =>
+    new PaymentRequest(undefined, 'mp', amount, 'sat', mints, undefined, false, undefined, mp).toEncodedRequest();
+
+  it('ranks preferred first while retaining the better-funded alternative', () => {
+    const result = tx('idle', idle, { type: 'EXECUTE', input: request(true) }, wallet);
+    expect(result.context.supportedMintUrls).toBeUndefined();
+    expect(result.context.preferredMintUrls).toEqual([MINT1]);
+    expect(result.step).toBe('selectMint');
+    const data = result.data as { candidates: { mintUrl: string }[] };
+    expect(data.candidates.map((c) => c.mintUrl)).toEqual([MINT1, MINT2]);
+  });
+  it.each([false, undefined])('retains strict allow-list with mp=%s', (mp) => {
+    const result = tx('idle', idle, { type: 'EXECUTE', input: request(mp) }, wallet);
+    expect(result.context.supportedMintUrls).toEqual([MINT1]);
+    expect(result.context.preferredMintUrls).toBeUndefined();
+  });
+  it('can pay when no preferred mint is trusted', () => {
+    const result = tx('idle', idle, { type: 'EXECUTE', input: request(true, 50, [MINT3]) }, wallet);
+    expect(result.step).toBe('selectMint');
+    expect(result.context.supportedMintUrls).toBeUndefined();
+  });
+  it('clears preferred ranking on option change and RESET', () => {
+    const current = tx('idle', idle, { type: 'EXECUTE', input: request(true) }, wallet);
+    const strictOption = parsePaymentInput(request(false), defaultDetectors).options[0];
+    const changed = tx('chooseOption', current.context, { type: 'OPTION_CHOSEN', option: strictOption }, wallet);
+    expect(changed.context.preferredMintUrls).toBeUndefined();
+    expect(changed.context.supportedMintUrls).toEqual([MINT1]);
+    expect(tx(current.step, current.context, { type: 'RESET' }, wallet).context.preferredMintUrls).toBeUndefined();
+  });
+});
+
+
+it('uses preferred mint ranking for OPTION_CHOSEN and amountless entry', () => {
+  const wallet = { ...WALLETS.default, trustedMintUrls: [MINT1, MINT2],
+    mintBalances: { [MINT1]: 100, [MINT2]: 1000 }, preferredMintUrl: MINT2 };
+  const encoded = new PaymentRequest(undefined, 'amountless', undefined, 'sat', [MINT1], undefined, false, undefined, true).toEncodedRequest();
+  const option = parsePaymentInput(encoded, defaultDetectors).options[0];
+  const result = tx('chooseOption', { ...idle, parsed: parsePaymentInput(encoded, defaultDetectors), supportedMintUrls: [MINT3] }, { type: 'OPTION_CHOSEN', option }, wallet);
+  expect(result.context.supportedMintUrls).toBeUndefined();
+  expect(result.context.preferredMintUrls).toEqual([MINT1]);
+  expect(result.step).toBe('enterAmount');
+  expect(result.data).toMatchObject({ preselectedMintUrl: MINT1 });
 });

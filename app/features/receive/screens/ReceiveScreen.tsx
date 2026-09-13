@@ -401,6 +401,7 @@ function ReceiveScreenForUnit({
           mints: creqMints,
           lockP2pkPubkey: creqLockPubkey,
           displayMints: creqMintSelection.displayMints,
+          mintsPreferred: false, // Enable only after incoming add-mint claim recovery exists.
         }
       : null,
     standingQuoteIdentityStore,

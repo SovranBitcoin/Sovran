@@ -184,6 +184,11 @@ export function compareMintDisplayOrder(
   const aDisabled = a.status === "disabled";
   const bDisabled = b.status === "disabled";
   if (aDisabled !== bDisabled) return aDisabled ? 1 : -1;
+  if (!aDisabled && !bDisabled) {
+    const aNotPreferred = a.reason?.code === "MINT_NOT_PREFERRED";
+    const bNotPreferred = b.reason?.code === "MINT_NOT_PREFERRED";
+    if (aNotPreferred !== bNotPreferred) return aNotPreferred ? 1 : -1;
+  }
   if (aDisabled && bDisabled) {
     const aBelowMin = a.reason?.code === "AMOUNT_BELOW_MINT_MIN";
     const bBelowMin = b.reason?.code === "AMOUNT_BELOW_MINT_MIN";

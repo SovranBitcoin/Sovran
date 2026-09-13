@@ -31,6 +31,7 @@ type PillTabItemProps<F extends string> = {
   accessibilityRole?: 'tab' | 'radio';
   icon?: string | null;
   testID?: string;
+  disabled?: boolean;
 };
 
 function PillTabItem<F extends string>({
@@ -43,6 +44,7 @@ function PillTabItem<F extends string>({
   label,
   accessibilityRole,
   testID,
+  disabled = false,
 }: PillTabItemProps<F>) {
   const isActive = activeTab === item;
   const isPressed = useSharedValue(false);
@@ -63,12 +65,13 @@ function PillTabItem<F extends string>({
       <Pressable
         testID={testID}
         accessible
+        disabled={disabled}
         accessibilityRole={accessibilityRole}
         accessibilityLabel={label}
         accessibilityState={
           accessibilityRole === 'radio'
-            ? { checked: isActive, selected: isActive }
-            : { selected: isActive }
+            ? { checked: isActive, selected: isActive, ...(disabled ? { disabled } : {}) }
+            : { selected: isActive, ...(disabled ? { disabled } : {}) }
         }
         accessibilityValue={
           accessibilityRole === 'radio' ? { text: isActive ? '1' : '0' } : undefined
@@ -86,7 +89,10 @@ function PillTabItem<F extends string>({
         style={[styles.pressable, isActive && { backgroundColor: activeBg }]}>
         <Animated.View style={[styles.inner, rStyle]}>
           {icon ? <Icon name={icon} size={18} color={foreground} /> : null}
-          <Text style={[styles.label, { color: foreground }]}>{label}</Text>
+          <Text
+            style={[styles.label, { color: disabled ? withAlpha(foreground, 0.5) : foreground }]}>
+            {label}
+          </Text>
         </Animated.View>
       </Pressable>
     </Log>
@@ -103,6 +109,7 @@ type PillTabsProps<F extends string> = {
   accessibilityRole?: 'tab' | 'radio';
   /** Stable per-pill accessibility identifier. */
   testIDFor?: (tab: F) => string | undefined;
+  disabledFor?: (tab: F) => boolean;
   /** Extra pills rendered inline at the end of the same scrollable row. */
   trailing?: React.ReactElement | null;
 };
@@ -112,6 +119,7 @@ export function PillTabs<F extends string>({
   activeTab,
   onTabChange,
   testIDFor,
+  disabledFor,
   labelFor,
   iconFor,
   accessibilityRole,
@@ -137,6 +145,7 @@ export function PillTabs<F extends string>({
               activeTab={activeTab}
               onTabChange={onTabChange}
               testID={testIDFor?.(item)}
+              disabled={disabledFor?.(item)}
             />
           )}
           horizontal

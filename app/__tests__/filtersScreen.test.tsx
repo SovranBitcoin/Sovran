@@ -270,3 +270,26 @@ it.each([CapsuleButtonFlat, CapsuleButtonBlur])(
     expect(onPress).toHaveBeenCalledTimes(1);
   }
 );
+
+it('exposes a disabled mint-preference segment without disabling Required', () => {
+  act(() => {
+    renderer = TestRenderer.create(
+      <PillTabs
+        tabs={['Required', 'Preferred']}
+        activeTab="Required"
+        onTabChange={jest.fn()}
+        accessibilityRole="radio"
+        testIDFor={(tab) => `mode-${tab}`}
+        disabledFor={(tab) => tab === 'Preferred'}
+      />
+    );
+  });
+  expect(control('mode-Preferred').props.disabled).toBe(true);
+  expect(control('mode-Preferred').props.accessibilityState).toEqual({
+    checked: false,
+    selected: false,
+    disabled: true,
+  });
+  expect(control('mode-Required').props.disabled).toBe(false);
+  expect(control('mode-Required').props.accessibilityState.checked).toBe(true);
+});

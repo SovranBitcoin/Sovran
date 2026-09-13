@@ -18,6 +18,7 @@
 
 import {
   getTokenMetadata,
+  decodePaymentRequest,
   type MeltQuoteOnchainFeeOption as OnchainMeltFeeOption,
 } from "@cashu/cashu-ts";
 import type {
@@ -39,6 +40,7 @@ import type {
   MintReviewsFetcher,
 } from "../types";
 import { defaultDetectors } from "../detectors";
+import { localizeReason } from "../formatting/locales";
 import { errField, logger, mintUrlFields } from "../logger";
 import {
   requestInvoiceFromLnurl,
@@ -988,6 +990,12 @@ export function createDefaultOperations(
           ),
         );
 
+      const requestInfo = data.paymentRequest
+        ? defaultDetectors.getPaymentRequestInfo(data.paymentRequest)
+        : null;
+      const preferredSet = requestInfo?.mintsPreferred && requestInfo.mints.length
+        ? new Set(requestInfo.mints)
+        : null;
       const supportedSet = data.supportedMintUrls
         ? new Set(data.supportedMintUrls)
         : null;
@@ -1080,6 +1088,9 @@ export function createDefaultOperations(
           reason = { code: "NO_BALANCE", message: "No balance" };
         }
 
+        if (status === "available" && preferredSet && !preferredSet.has(mintUrl)) {
+          reason = localizeReason("MINT_NOT_PREFERRED");
+        }
         const entry = catalog[mintUrl] ?? {};
         return {
           mintUrl,
@@ -1860,7 +1871,15 @@ export function createDefaultOperations(
           transport: "http",
         });
         // HTTP / transport-less payment request: use the paymentRequests API
-        const parsed = await mgr.paymentRequests.parse(paymentRequest);
+        let requestForCoco = paymentRequest;
+        if (info?.mintsPreferred) {
+          // Coco 2.0.0 treats every m list as strict. Remove only the advisory
+          // list in its input copy; the original request remains the flow identity.
+          const sdkRequest = decodePaymentRequest(paymentRequest);
+          sdkRequest.mints = undefined;
+          requestForCoco = sdkRequest.toEncodedRequest();
+        }
+        const parsed = await mgr.paymentRequests.parse(requestForCoco);
         logger.info("operations.executePaymentRequest.http.parsed", {
           ...mintUrlFields(mintUrl),
           amount,

@@ -136,6 +136,7 @@ export function useStandingPaymentRequest(
   const mintsKey = input ? input.mints.join("|") : null;
   const mintsRef = useLatestRef<string[]>(input?.mints ?? []);
   const lockP2pkPubkey = input?.lockP2pkPubkey;
+  const mintsPreferred = input?.mintsPreferred;
   // Display-mint identity: like the lock, a change only re-ENCODEs the same
   // operation (never rotates), so it triggers the effect but stays out of
   // the fresh key.
@@ -168,6 +169,7 @@ export function useStandingPaymentRequest(
         unit,
         mints: mintsRef.current,
         lockP2pkPubkey,
+        mintsPreferred,
         displayMints: displayMintsRef.current,
       })
     ) {
@@ -182,6 +184,7 @@ export function useStandingPaymentRequest(
           unit,
           mints: mintsRef.current,
           lockP2pkPubkey,
+          mintsPreferred,
           displayMints: displayMintsRef.current,
         },
         identityStoreRef.current,
@@ -206,6 +209,7 @@ export function useStandingPaymentRequest(
     unit,
     mintsKey,
     lockP2pkPubkey,
+    mintsPreferred,
     displayMintsKey,
     generation,
     freshOnMount,
@@ -238,6 +242,7 @@ export function useStandingPaymentRequest(
         unit,
         mints: mintsRef.current,
         lockP2pkPubkey,
+        mintsPreferred,
         displayMints: displayMintsRef.current,
       },
       identityStoreRef.current,
@@ -249,6 +254,7 @@ export function useStandingPaymentRequest(
     manager,
     unit,
     lockP2pkPubkey,
+    mintsPreferred,
     mintsRef,
     displayMintsRef,
     identityStoreRef,
