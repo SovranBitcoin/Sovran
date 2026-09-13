@@ -72,7 +72,9 @@ it('refreshes an explicitly stale nagg page and retains it on failure', async ()
   });
   const fresh = (await searchProfilesViaFacade({ query: 'alice' }))._unsafeUnwrap();
   expect(fresh.results).toHaveLength(3);
-  expect(fresh.results[0].score).toBe(1);
+  // The refreshed score lands on its row; the painted order does not move.
+  expect(fresh.results.map((r) => r.pubkey)).toEqual([C, B, A]);
+  expect(fresh.results.find((r) => r.pubkey === A)?.score).toBe(1);
 });
 it('keeps contact keys tied to pubkeys when refreshed scores reorder results', () => {
   mockRows = [A, C].map((pubkey) => ({ pubkey, profile: { pubkey } }));
@@ -153,4 +155,76 @@ it('never applies a refresh completed after cancellation', async () => {
     await searchProfilesViaFacade({ query: 'alice', signal: controller.signal })
   )._unsafeUnwrap();
   expect(response.results[0].score).toBe(0);
+});
+
+describe('one search never reorders or drops a painted row', () => {
+  type SearchArgs = {
+    onUpdate?: (resolved: { tier: string; hits: typeof hits; vertexFresh?: boolean }) => void;
+  };
+  const naggScored = [
+    { pubkey: A, metadata: {}, score: 0 },
+    { pubkey: B, metadata: {} },
+    { pubkey: C, metadata: {}, score: 0.9 },
+  ];
+
+  it('resolves with the latest merged answer, not the first-paint snapshot', async () => {
+    // A slower tier settles between the facade resolving and the caller's
+    // continuation running: its rows were painted and must survive the final write.
+    mockSearch.mockImplementationOnce((args: SearchArgs) => {
+      args.onUpdate?.({ tier: 'nagg', hits: naggScored, vertexFresh: true });
+      return Promise.resolve(ok({ tier: 'relay', hits: [hits[0]] }));
+    });
+    const onUpdate = jest.fn();
+    const final = (await searchProfilesViaFacade({ query: 'alice', onUpdate }))._unsafeUnwrap();
+    expect(onUpdate.mock.calls[0][0].results.map((r: { pubkey: string }) => r.pubkey)).toEqual([
+      C,
+      B,
+      A,
+    ]);
+    expect(final.results.map((r) => r.pubkey)).toEqual([C, B, A]);
+    expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  it('keeps the painted order when a better-ranked tier lands later, appending only newcomers', async () => {
+    let onUpdate!: NonNullable<SearchArgs['onUpdate']>;
+    mockSearch.mockImplementationOnce((args: SearchArgs) => {
+      onUpdate = args.onUpdate!;
+      return Promise.resolve(ok({ tier: 'relay', hits: [hits[0], hits[1]] })); // A, B
+    });
+    const D = 'd'.repeat(64);
+    const painted: string[][] = [];
+    mockRefresh.mockImplementationOnce(async () => {
+      // nagg answers during the Vertex round-trip with scores that would sort C first.
+      onUpdate({ tier: 'nagg', hits: [...naggScored, { pubkey: D, metadata: {}, score: 0.5 }] });
+      return null;
+    });
+    const final = (
+      await searchProfilesViaFacade({
+        query: 'alice',
+        onCached: (r) => painted.push(r.results.map((x) => x.pubkey)),
+        onUpdate: (r) => painted.push(r.results.map((x) => x.pubkey)),
+      })
+    )._unsafeUnwrap();
+    expect(painted).toEqual([
+      [A, B],
+      [A, B, C, D],
+    ]);
+    expect(final.results.map((r) => r.pubkey)).toEqual([A, B, C, D]);
+  });
+
+  it('applies refreshed Vertex scores in place without reordering or cutting painted rows', async () => {
+    mockSearch.mockResolvedValueOnce(ok({ tier: 'primal', hits })); // A, B, C
+    mockRefresh.mockResolvedValueOnce({
+      pubkeys: [C, B],
+      providers: { [C]: { vertex: { score: 1 } }, [B]: { vertex: { score: 0.7 } } },
+      events: [],
+      order: [],
+      aggregates: {},
+    });
+    const final = (
+      await searchProfilesViaFacade({ query: 'alice', limit: 2, onCached: jest.fn() })
+    )._unsafeUnwrap();
+    expect(final.results.map((r) => r.pubkey)).toEqual([A, B, C]);
+    expect(final.results.map((r) => r.score)).toEqual([0, 0.7, 1]);
+  });
 });

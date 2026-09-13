@@ -16,6 +16,20 @@ export const profileSearchCache = createQueryCacheStore<SearchUsersResponse>({
   persist: false,
 });
 
+const KEY_PREFIX = 'search:people:';
+
 export function profileSearchKey(normalizedQuery: string): string {
-  return `search:people:${normalizedQuery}`;
+  return `${KEY_PREFIX}${normalizedQuery}`;
+}
+
+/**
+ * True when the next query extends or unwinds the previous one — the same
+ * search still being typed ("ali" → "alic", "alice" → "alic"). Only then may
+ * the previous rows stay on screen while the new key loads; an unrelated
+ * query must not open on somebody else's people.
+ */
+export function isProfileSearchRefinement(previousKey: string, nextKey: string): boolean {
+  const previous = previousKey.slice(KEY_PREFIX.length);
+  const next = nextKey.slice(KEY_PREFIX.length);
+  return next.startsWith(previous) || previous.startsWith(next);
 }

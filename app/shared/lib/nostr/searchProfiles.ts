@@ -50,11 +50,21 @@ function hitToSearchResult(hit: facade.ProfileSearchHit): NostrSearchResult | nu
   return parsed.success ? parsed.data : null;
 }
 
+/**
+ * Rows already on screen for this search, in the order they were painted.
+ * Every later answer for the same query (a slower tier, the Vertex refresh)
+ * keeps those rows in place and appends only what is new: a list that
+ * reorders or shrinks under the reader's eyes is the flicker this exists to
+ * prevent. Ranking therefore decides order only for the FIRST paint.
+ */
+type PaintedOrder = Map<string, number>;
+
 /** The app's `SearchUsersResponse` from one facade answer (possibly partial). */
 function responseFrom(
   resolved: facade.ResolvedProfileSearch,
   query: string,
-  limit: number | undefined
+  limit: number | undefined,
+  painted: PaintedOrder
 ): SearchUsersResponse {
   const results: NostrSearchResult[] = [];
   // Sort scored hits stably, leaving unknown-score slots in API order.
@@ -63,13 +73,20 @@ function responseFrom(
       ? resolved.hits.filter((hit) => hit.score != null).sort((a, b) => b.score! - a.score!)
       : [];
   let scoredIndex = 0;
-  const hits =
+  const ranked =
     resolved.tier === 'nagg'
       ? resolved.hits.map((hit) => (hit.score != null ? scored[scoredIndex++]! : hit))
       : resolved.hits;
-  for (const hit of hits) {
+  // Painted rows first, in painted order; newcomers after, in ranked order.
+  const kept = ranked
+    .filter((hit) => painted.has(hit.pubkey))
+    .sort((a, b) => painted.get(a.pubkey)! - painted.get(b.pubkey)!);
+  const added = ranked.filter((hit) => !painted.has(hit.pubkey));
+  for (const hit of [...kept, ...added]) {
     const mapped = hitToSearchResult(hit);
-    if (mapped) results.push(mapped);
+    if (!mapped) continue;
+    results.push(mapped);
+    if (!painted.has(mapped.pubkey)) painted.set(mapped.pubkey, painted.size);
   }
   return {
     query,
@@ -80,14 +97,29 @@ function responseFrom(
   };
 }
 
+/** `base` plus any hit of `extra` it lacks (append-only union by pubkey). */
+function unionHits(
+  base: readonly facade.ProfileSearchHit[],
+  extra: readonly facade.ProfileSearchHit[]
+): facade.ProfileSearchHit[] {
+  const seen = new Set(base.map((hit) => hit.pubkey));
+  return [...base, ...extra.filter((hit) => !seen.has(hit.pubkey))];
+}
+
 /**
  * Tier-selecting profile search. The facade fans out to every tier and paints
  * at the first answer; later tiers' hits are APPENDED and delivered through
  * `onUpdate`. A Vertex two-phase refresh follows when the answer was not a
  * fresh nagg one: the current answer is delivered through `onCached` first so
- * the UI paints, then the refreshed ranking replaces it. Exhaustion (every
+ * the UI paints, then the refreshed scores are merged in. Exhaustion (every
  * tier disabled, failed or unreachable) is an ERROR, distinct from a healthy
  * empty answer (SYSTEM.md F06).
+ *
+ * Every answer this emits for one call — partial, refreshed, final — is a
+ * superset of the previous one in the same row order (see `PaintedOrder`):
+ * the resolved value is the LATEST merged answer, never the first-paint
+ * snapshot, so the final write can neither drop nor reorder rows a later
+ * tier already painted.
  */
 export async function searchProfilesViaFacade(args: {
   query: string;
@@ -103,20 +135,38 @@ export async function searchProfilesViaFacade(args: {
   const layer = buildNostrDataLayer();
   if (!layer) return err(new Error('profile search disabled: no tiers enabled'));
 
-  let result = await layer.searchProfiles({
+  const painted: PaintedOrder = new Map();
+  const emit = (resolved: facade.ResolvedProfileSearch): SearchUsersResponse =>
+    responseFrom(resolved, args.query, args.limit, painted);
+  // The most recent merged answer from the tiers. A slower tier can settle
+  // between the facade resolving and this continuation running, so it is
+  // tracked from the first update, not from the awaited value.
+  const tiers: { latest: facade.ResolvedProfileSearch | null } = { latest: null };
+  const first = await layer.searchProfiles({
     query: args.query,
     ...(typeof args.limit === 'number' ? { limit: args.limit } : {}),
     ...(args.signal ? { signal: args.signal } : {}),
     ...(args.readId ? { readId: args.readId } : {}),
     onUpdate: (resolved) => {
       if (args.signal?.aborted) return;
-      args.onUpdate?.(responseFrom(resolved, args.query, args.limit));
+      tiers.latest = resolved;
+      args.onUpdate?.(emit(resolved));
     },
   });
+  let result = first.map((resolved) => tiers.latest ?? resolved);
 
   const toResponse = (): Result<SearchUsersResponse, Error> =>
     result.match(
-      (resolved) => ok<SearchUsersResponse, Error>(responseFrom(resolved, args.query, args.limit)),
+      (resolved) =>
+        ok<SearchUsersResponse, Error>(
+          // A tier that settled during the Vertex refresh painted its rows
+          // already; the final answer keeps them.
+          emit(
+            tiers.latest
+              ? { ...resolved, hits: unionHits(resolved.hits, tiers.latest.hits) }
+              : resolved
+          )
+        ),
       (exhausted) =>
         err<SearchUsersResponse, Error>(
           new Error(`profile search unavailable: ${exhausted.message}`, { cause: exhausted })
@@ -142,18 +192,21 @@ export async function searchProfilesViaFacade(args: {
       if (hits.length) {
         // A DVM can know the score without having kind-0 metadata. Preserve
         // usable fallback names/pictures and results absent from its answer.
-        const previous = new Map(
-          result.isOk() ? result.value.hits.map((hit) => [hit.pubkey, hit]) : []
-        );
+        const known = result.isOk()
+          ? unionHits(result.value.hits, tiers.latest?.hits ?? [])
+          : (tiers.latest?.hits ?? []);
+        const previous = new Map(known.map((hit) => [hit.pubkey, hit]));
         const merged = hits.map((hit) => {
           const cached = previous.get(hit.pubkey);
           previous.delete(hit.pubkey);
           return { ...cached, ...hit, metadata: { ...cached?.metadata, ...hit.metadata } };
         });
+        // No `slice(limit)` here: a painted row must never be cut by a later
+        // ranking; each tier already bounds its own answer by the limit.
         result = ok({
           tier: 'nagg',
           vertexFresh: refreshed.vertexFresh,
-          hits: [...merged, ...previous.values()].slice(0, args.limit ?? 10),
+          hits: [...merged, ...previous.values()],
         });
       }
     }

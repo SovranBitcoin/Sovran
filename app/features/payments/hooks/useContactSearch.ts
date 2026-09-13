@@ -3,7 +3,11 @@ import { useMemo } from 'react';
 import { CONTACT_SEARCH_MIN_LENGTH } from '@/shared/lib/contactSearch';
 import { type NostrSearchResult } from '@/shared/lib/apiClient';
 import type { SearchUsersResponse } from '@sovranbitcoin/schemas';
-import { profileSearchCache, profileSearchKey } from '@/features/payments/data/profileSearchCache';
+import {
+  isProfileSearchRefinement,
+  profileSearchCache,
+  profileSearchKey,
+} from '@/features/payments/data/profileSearchCache';
 import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
 import { useCachedRead } from '@/shared/lib/read/useCachedRead';
 import { searchProfilesViaFacade } from '@/shared/lib/nostr/searchProfiles';
@@ -39,7 +43,8 @@ function seedProfiles(data: SearchUsersResponse): void {
  * People search: debounced, cached by normalized query, stale-while-revalidate.
  *
  * Contract (SYSTEM.md §7/§14): rows on screen stay while a refinement loads
- * (`keepPreviousData`); a query already searched this session paints at 0ms;
+ * (`keepPreviousData`, refinements only — an unrelated query never opens on
+ * the previous query's people); a query already searched this session paints at 0ms;
  * a partial answer (first tier, Vertex pre-refresh) paints immediately and is
  * upgraded in place; a failed search is `error`, never a fake "no results".
  */
@@ -60,7 +65,8 @@ export function useContactSearch(searchQuery: string) {
     strategy: 'aggregate',
     focusRevalidate: false,
     // A refinement is the same surface: keep the previous rows while it loads.
-    keepPreviousData: () => true,
+    // An unrelated query is not — it starts from the loading state.
+    keepPreviousData: isProfileSearchRefinement,
     classify: (data) => (data.results.length === 0 ? 'empty' : 'ready'),
     fetcher: async ({ signal, readId, partial }) => {
       const query = active ?? '';

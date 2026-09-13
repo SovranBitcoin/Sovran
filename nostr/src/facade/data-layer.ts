@@ -519,7 +519,10 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
           return (
             await resolveAllTiers<ProfileSearchBundle>(candidates, {
               ...ctx,
-              gate: { minItems: 1, capMs: AGGREGATE_CAP_MS.searchProfiles },
+              // A full page from one tier paints at once; otherwise the first
+              // answer paints at the cap. Painting on the first single hit
+              // and appending the rest a moment later reads as a flicker.
+              gate: { minItems: request.limit ?? 10, capMs: AGGREGATE_CAP_MS.searchProfiles },
               count: (bundle) => bundle.hits.length,
               merge: mergeSearchBundles(),
               onUpdate: (agg) => request.onUpdate?.(resolvedOf(agg)),

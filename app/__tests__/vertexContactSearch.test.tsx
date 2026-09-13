@@ -115,6 +115,42 @@ it('keeps the previous rows on screen (revalidating) while a refinement loads', 
   expect(result.current.results.map((r) => r.pubkey)).toEqual(['a1', 'a2']);
 });
 
+it("an unrelated query starts from loading — never on the previous query's people", async () => {
+  const first = deferred<Result<SearchUsersResponse, Error>>();
+  mockSearch
+    .mockImplementationOnce(() => first.promise)
+    .mockImplementation(() => new Promise(() => {}));
+  const { result, rerender } = renderHook(
+    ({ query }: { query: string }) => useContactSearch(query),
+    {
+      initialProps: { query: 'alice' },
+    }
+  );
+  await act(async () => {
+    jest.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+  });
+  await act(async () => {
+    first.resolve(ok(response('alice', ['a1', 'a2'])));
+  });
+  expect(result.current.results.map((r) => r.pubkey)).toEqual(['a1', 'a2']);
+
+  // Backspacing to a prefix is still the same search: rows stay.
+  rerender({ query: 'alic' });
+  await act(async () => {
+    jest.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+  });
+  expect(result.current.status).toBe('revalidating');
+  expect(result.current.results.map((r) => r.pubkey)).toEqual(['a1', 'a2']);
+
+  // A different name is a different search: nothing to keep.
+  rerender({ query: 'bob' });
+  await act(async () => {
+    jest.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+  });
+  expect(result.current.status).toBe('loading');
+  expect(result.current.results).toEqual([]);
+});
+
 it('drops an out-of-order answer: the superseded query cannot paint over the newer one', async () => {
   const first = deferred<Result<SearchUsersResponse, Error>>();
   const second = deferred<Result<SearchUsersResponse, Error>>();
