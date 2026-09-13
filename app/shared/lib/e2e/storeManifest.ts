@@ -48,6 +48,7 @@ import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { useNfcTapStore } from '@/shared/stores/runtime/nfcTapStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
+import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
@@ -99,6 +100,7 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'runtime/nearPayStore': useNearPaySessionStore,
   'runtime/nfcTapStore': useNfcTapStore,
   'runtime/paymentStatusStore': usePaymentStatusStore,
+  'runtime/secureStoreState': useSecureStoreState,
   'runtime/popupStore': usePopupStore,
   'runtime/rollbackStore': useRollbackStore,
   'runtime/routstrTopUpStore': useRoutstrTopUpStore,
