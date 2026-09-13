@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "concepts": {
     "app-overview": {
       "headlines": [
@@ -68,7 +68,7 @@
         "Read before you trust."
       ],
       "subtitles": [
-        "Uptime checks, real reviews, and every change your mint makes.",
+        "Uptime checks, community reviews, and recorded mint updates.",
         "Independent checks and reviews before you put money in."
       ],
       "chosen": {
@@ -94,12 +94,12 @@
     "mint-updates": {
       "headlines": [
         "See what changed.",
-        "Every change, on record.",
+        "Follow your mint\u2019s updates.",
         "Know who holds it."
       ],
       "subtitles": [
-        "Every change your mint makes, dated and explained.",
-        "Uptime checks, real reviews, and every change your mint makes."
+        "See recorded changes to your mint, with dates and details.",
+        "Uptime checks, community reviews, and recorded mint updates."
       ],
       "chosen": {
         "headline": 0,

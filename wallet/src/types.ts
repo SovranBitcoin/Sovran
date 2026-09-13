@@ -31,6 +31,8 @@ export interface PaymentRequestInfo {
   mints: string[];
   /** NUT-18 advisory mint list; absent/false keeps the strict allow-list. */
   mintsPreferred?: boolean;
+  /** True for any NUT-10 condition, including unsupported or malformed locks. */
+  hasSpendingCondition?: boolean;
   amount: number | undefined;
   unit: string;
   transports?: PaymentRequestTransport[];

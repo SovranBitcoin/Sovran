@@ -1,21 +1,20 @@
-diff --git a/node_modules/@cashu/cashu-ts/.bun-tag-ce72a8a6c9a1baf9 b/.bun-tag-ce72a8a6c9a1baf9
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/lib/cashu-ts.es.js b/lib/cashu-ts.es.js
-index 4951a27b2d41959d433a8ae41740d83a579cf8b0..e4fa1fe0f52cfc9a3f938d80d8bb951802435264 100644
+index 4951a27b2d41959d433a8ae41740d83a579cf8b0..7237b25a86c2d59ec5658dce81f8cbeded672246 100644
 --- a/lib/cashu-ts.es.js
 +++ b/lib/cashu-ts.es.js
-@@ -2020,6 +2020,9 @@ function Hr(e) {
+@@ -2020,6 +2020,11 @@ function Hr(e) {
  		case Or:
  			n.mints || (n.mints = []), n.mints.push(B(e.value));
  			break;
 +		case 0x09:
 +			n.mintsPreferred = Kr(e.value) === 1;
 +			break;
++		case 0x0a:
++			throw new y("unsupported pr: payment method constraints");
  		case kr:
  			n.description = B(e.value);
  			break;
-@@ -2143,6 +2146,7 @@ function Qr(e) {
+@@ -2143,6 +2148,7 @@ function Qr(e) {
  	if (e.id && t.push(V(wr, $r(e.id))), e.amount !== void 0 && t.push(V(Tr, ei(e.amount))), e.unit && (e.unit === "sat" ? t.push(V(Er, new Uint8Array([0]))) : t.push(V(Er, $r(e.unit)))), e.singleUse !== void 0 && t.push(V(Dr, ti(+!!e.singleUse))), e.mints && e.mints.length > 0) for (let n of e.mints) t.push(V(Or, $r(n)));
  	if (e.description && t.push(V(kr, $r(e.description))), e.transports && e.transports.length > 0) for (let n of e.transports) t.push(V(Ar, ii(n)));
  	e.nut10 && t.push(V(jr, ai(e.nut10)));
@@ -23,7 +22,7 @@ index 4951a27b2d41959d433a8ae41740d83a579cf8b0..e4fa1fe0f52cfc9a3f938d80d8bb9518
  	let n = t.reduce((e, t) => e + t.length, 0), r = new Uint8Array(n), i = 0;
  	for (let e of t) r.set(e, i), i += e.length;
  	return r;
-@@ -2247,8 +2251,8 @@ function li(e, t) {
+@@ -2247,8 +2253,8 @@ function li(e, t) {
  //#endregion
  //#region src/model/PaymentRequest.ts
  var ui = class e {
@@ -34,7 +33,7 @@ index 4951a27b2d41959d433a8ae41740d83a579cf8b0..e4fa1fe0f52cfc9a3f938d80d8bb9518
  	}
  	toRawRequest() {
  		let e = {};
-@@ -2256,7 +2260,7 @@ var ui = class e {
+@@ -2256,7 +2262,7 @@ var ui = class e {
  			t: e.type,
  			a: e.target,
  			g: e.tags
@@ -43,7 +42,7 @@ index 4951a27b2d41959d433a8ae41740d83a579cf8b0..e4fa1fe0f52cfc9a3f938d80d8bb9518
  			k: this.nut10.kind,
  			d: this.nut10.data,
  			t: this.nut10.tags
-@@ -2276,6 +2280,7 @@ var ui = class e {
+@@ -2276,6 +2282,7 @@ var ui = class e {
  			unit: this.unit,
  			singleUse: this.singleUse,
  			mints: this.mints,
@@ -51,7 +50,15 @@ index 4951a27b2d41959d433a8ae41740d83a579cf8b0..e4fa1fe0f52cfc9a3f938d80d8bb9518
  			description: this.description,
  			transports: this.transport,
  			nut10: this.nut10 ? {
-@@ -2315,7 +2320,7 @@ var ui = class e {
+@@ -2306,6 +2313,7 @@ var ui = class e {
+ 		return a.length > 0 && (i.additionalTags = a), i;
+ 	}
+ 	static fromRawRequest(t) {
++		if (t.sm !== void 0) throw new y("unsupported pr: payment method constraints");
+ 		let n = t.t ? t.t.map((e) => ({
+ 			type: e.t,
+ 			target: e.a,
+@@ -2315,7 +2323,7 @@ var ui = class e {
  			data: t.nut10.d,
  			tags: t.nut10.t
  		} : void 0;
@@ -60,7 +67,7 @@ index 4951a27b2d41959d433a8ae41740d83a579cf8b0..e4fa1fe0f52cfc9a3f938d80d8bb9518
  	}
  	static fromEncodedRequest(t) {
  		let n = t.toLowerCase();
-@@ -2325,7 +2330,7 @@ var ui = class e {
+@@ -2325,7 +2333,7 @@ var ui = class e {
  				data: t.nut10.data,
  				tags: t.nut10.tags ?? []
  			} : void 0;

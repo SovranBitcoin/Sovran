@@ -63,10 +63,8 @@ function useNutsResolver(): (mintUrl: string) => NutsMap {
   );
 }
 
-export function useMintChanges(): UseMintChangesResult {
-  const { trustedMints } = useMints();
+function useMintChangesSource() {
   const response = useCachedMintChanges();
-  const nutsFor = useNutsResolver();
 
   const [isLoading, setIsLoading] = useState(
     () => !mintChangesCache.getEntry(MINT_CHANGES_CACHE_KEY)
@@ -142,6 +140,14 @@ export function useMintChanges(): UseMintChangesResult {
     load('refresh', controller.signal);
   }, [isRefreshing, load]);
 
+  return { response, isLoading, isRefreshing, errorMessage, refresh };
+}
+
+export function useMintChanges(): UseMintChangesResult {
+  const { trustedMints } = useMints();
+  const { response, isLoading, isRefreshing, errorMessage, refresh } = useMintChangesSource();
+  const nutsFor = useNutsResolver();
+
   // `trustedMints` is a fresh array on every coco emit; key the memo on the URLs
   // themselves so the decode/group pass doesn't re-run for an identical wallet.
   const trustedMintsKey = trustedMints
@@ -177,13 +183,13 @@ export function useMintChanges(): UseMintChangesResult {
 
 /**
  * Every recorded revision of ONE mint, newest first, already phrased — the
- * detail screen's data. Reads the same cached response as the list, so opening
- * a row costs no fetch.
+ * detail screen's data. Reuses the list cache when fresh and fetches on cold
+ * direct navigation, so a deep link does not falsely show empty history.
  */
-export function useMintChangeRevisions(mintUrl: string | undefined): MintChangeRevision[] {
-  const response = useCachedMintChanges();
+export function useMintChangeRevisions(mintUrl: string | undefined) {
+  const { response, ...status } = useMintChangesSource();
   const nutsFor = useNutsResolver();
-  return useMemo(() => {
+  const revisions = useMemo<MintChangeRevision[]>(() => {
     if (!response || !mintUrl) return [];
     const key = normalizeMintUrlKey(mintUrl);
     const entries = decodeFeed(response).entries.filter(
@@ -191,4 +197,5 @@ export function useMintChangeRevisions(mintUrl: string | undefined): MintChangeR
     );
     return buildMintChangeListItems(entries, nutsFor)[0]?.revisions ?? [];
   }, [response, mintUrl, nutsFor]);
+  return { revisions, ...status };
 }

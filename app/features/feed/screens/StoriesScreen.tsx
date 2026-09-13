@@ -7,6 +7,8 @@ import { StoriesCarousel, type StoryUser } from '@/features/feed/components/nost
 import { Log, feedLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { INVARIANT_BLACK } from '@/shared/lib/brandColors';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { getMockStoryUsers } from '@/shared/stores/runtime/mockDataStore';
 
 const CLOSE_DELAY_MS = 350;
 
@@ -16,6 +18,7 @@ const ParamsSchema = z.object({
     .regex(/^\d{1,5}$/)
     .optional(),
   storyUsersJson: z.string().min(1).max(64_000).optional(),
+  preview: z.literal('demo').optional(),
 });
 
 export function StoriesScreen() {
@@ -25,11 +28,14 @@ export function StoriesScreen() {
   const params = useRouteParams(ParamsSchema, { where: 'stories-flow.stories' });
   const startIndex = params?.startIndex;
   const storyUsersJson = params?.storyUsersJson;
+  const preview = params?.preview === 'demo';
+  const mockMode = useSettingsStore((state) => state.mockMode);
 
   const [isClosing, setIsClosing] = useState(false);
   const closeRequestedRef = useRef(false);
 
   const storyUsers = useMemo<StoryUser[]>(() => {
+    if (preview) return mockMode ? getMockStoryUsers() : [];
     if (!storyUsersJson) return [];
     try {
       return JSON.parse(storyUsersJson);
@@ -39,7 +45,7 @@ export function StoriesScreen() {
       });
       return [];
     }
-  }, [storyUsersJson]);
+  }, [storyUsersJson, preview, mockMode]);
 
   feedLog.debug('feed.stories.open', {
     startIndex: Number(startIndex) || 0,

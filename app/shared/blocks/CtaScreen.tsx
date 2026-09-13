@@ -133,7 +133,7 @@ export function CtaScreen({ id }: { id: CtaId }) {
             </Pressable>
           </View>
         )}
-        <View testID="cta-screen" className="gap-6 px-6 py-12">
+        <View testID="cta-screen" className="gap-6 px-6 py-6">
           <View className="bg-surface-secondary h-24 w-24 items-center justify-center self-center rounded-full">
             <Icon name={cta.content.icon} size={48} color={foreground} />
           </View>

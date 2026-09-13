@@ -48,6 +48,7 @@ import { easeGradient } from '@/shared/lib/easeGradient';
 import type { ProfileInfo, VideoPostRecord } from './feedTypes';
 import { Log } from '@/shared/lib/logger';
 import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
+import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import {
   remeasureVisualLayoutScope,
   useVisualListLogger,
@@ -350,6 +351,7 @@ const UserStoriesItem: FC<UserItemProps> = ({
   isClosing = false,
 }) => {
   const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
+  const [renderedVideoUrl, setRenderedVideoUrl] = useState<string>();
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const captionExpandedRef = useRef(false);
   const { width: screenWidth } = useWindowDimensions();
@@ -565,12 +567,19 @@ const UserStoriesItem: FC<UserItemProps> = ({
             ) : (
               <VideoView
                 player={player}
+                onFirstFrameRender={() => setRenderedVideoUrl(currentVideo?.videoUrl)}
                 style={[StyleSheet.absoluteFill, styles.videoRadius]}
                 contentFit="contain"
                 nativeControls={false}
               />
             )}
           </Animated.View>
+          {isActive && currentVideo?.videoUrl === renderedVideoUrl && (
+            <E2EAccessibilityProbe
+              testID="story-video-ready"
+              accessibilityLabel="Story video ready"
+            />
+          )}
 
           <LinearGradient
             colors={TOP_GRADIENT.colors}

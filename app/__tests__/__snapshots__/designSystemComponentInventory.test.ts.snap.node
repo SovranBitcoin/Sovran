@@ -55,6 +55,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/contacts/components/SearchPostsList.tsx",
     "features/contacts/components/search/SearchFilters.tsx",
     "features/feed/components/DemoHomeFeed.tsx",
+    "features/feed/components/DemoThreadView.tsx",
     "features/feed/components/FeedTabButton.tsx",
     "features/feed/components/HomeFeed.tsx",
     "features/feed/components/RecentPeopleSearchStrip.tsx",
@@ -256,6 +257,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 250,
+  "total": 251,
 }
 `;

@@ -310,7 +310,7 @@
     "wallpaperId": "setting-earth"
   },
   "ios/backup-words": {
-    "page": "settings-recovery",
+    "page": "backup-words",
     "file": "source/screenshots/ios/backup-words.png",
     "run": null,
     "sha256": null
@@ -344,7 +344,7 @@
     "wallpaperId": "setting-earth"
   },
   "android/backup-words": {
-    "page": "settings-recovery",
+    "page": "backup-words",
     "file": "source/screenshots/android/backup-words.png",
     "run": null,
     "sha256": null

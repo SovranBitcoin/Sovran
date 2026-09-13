@@ -47,6 +47,14 @@ function createMockManager(overrides: MockManagerOverrides = {}) {
   };
 
   return {
+    mintService: {
+      keysetRepo: {
+        getKeysetsByMintUrl: vi.fn().mockResolvedValue([
+          { id: "sat-keyset", unit: "sat", feePpk: 0 },
+          { id: "usd-keyset", unit: "usd", feePpk: 0 },
+        ]),
+      },
+    },
     history: {
       getHistoryEntryById: vi.fn().mockResolvedValue({
         id: "send:op-1",
@@ -152,12 +160,130 @@ const mockGetPRInfo = defaultDetectors.getPaymentRequestInfo as ReturnType<
 // Nostr transport — sendNostrDM is called with correct payload
 // ---------------------------------------------------------------------------
 
+describe("payment request recipient fees", () => {
+  it.each(["nfc", "nostr", "post"])(
+    "rejects fee-bearing %s payments before preparing or delivering",
+    async (transport) => {
+      const manager = createMockManager();
+      manager.mintService.keysetRepo.getKeysetsByMintUrl.mockResolvedValue([
+        { id: "free-active", unit: "sat", feePpk: 0 },
+        { id: "old-charged", unit: "sat", feePpk: 100 },
+      ]);
+      mockGetPRInfo.mockReturnValue({
+        mints: [MINT1],
+        amount: 100,
+        unit: "sat",
+        transports: [{ type: transport, target: "https://receiver.example" }],
+      });
+      const sendNostrDM = vi.fn();
+      const ops = createDefaultOperations({
+        getManager: () => manager as unknown as Manager,
+        sendNostrDM,
+      });
+      const payment =
+        transport === "nfc"
+          ? ops.executeNfcSend!(MINT1, 100, "sat")
+          : ops.executePaymentRequest!(MINT1, "creqFees", 100, "sat");
+      await expect(payment).rejects.toThrow("without ecash redemption fees");
+      expect(manager.ops.send.prepare).not.toHaveBeenCalled();
+      expect(manager.paymentRequests.prepare).not.toHaveBeenCalled();
+      expect(sendNostrDM).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([{ keysets: [] }, { keysets: [{ id: "unknown", unit: "sat" }] }])(
+    "rejects unverified keyset fees before preparation %#",
+    async ({ keysets }) => {
+      const manager = createMockManager();
+      manager.mintService.keysetRepo.getKeysetsByMintUrl.mockResolvedValue(
+        keysets,
+      );
+      const ops = createDefaultOperations({
+        getManager: () => manager as unknown as Manager,
+      });
+      await expect(ops.executeNfcSend!(MINT1, 100, "sat")).rejects.toThrow(
+        "without ecash redemption fees",
+      );
+      expect(manager.ops.send.prepare).not.toHaveBeenCalled();
+    },
+  );
+
+  it("ignores redemption fees in unrelated units", async () => {
+    const manager = createMockManager();
+    manager.mintService.keysetRepo.getKeysetsByMintUrl.mockResolvedValue([
+      { id: "sat-free", unit: "sat", feePpk: 0 },
+      { id: "usd-charged", unit: "usd", feePpk: 100 },
+    ]);
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 100,
+      unit: "sat",
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const ops = createDefaultOperations({
+      getManager: () => manager as unknown as Manager,
+      sendNostrDM: vi.fn().mockResolvedValue(undefined),
+    });
+    await ops.executePaymentRequest!(MINT1, "creqFree", 100, "sat");
+    expect(manager.ops.send.prepare).toHaveBeenCalledWith({
+      mintUrl: MINT1,
+      amount: 100,
+      unit: "sat",
+    });
+  });
+});
+
 describe("executePaymentRequest — Nostr transport", () => {
+  it("prepares fiat proofs in the request unit and omits an absent request id", async () => {
+    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+    const manager = createMockManager();
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 100,
+      unit: "usd",
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const ops = createDefaultOperations({
+      getManager: () => manager as unknown as Manager,
+      sendNostrDM,
+    });
+    await ops.executePaymentRequest!(MINT1, "creqUSD", 100, "usd");
+    expect(manager.ops.send.prepare).toHaveBeenCalledWith({
+      mintUrl: MINT1,
+      amount: 100,
+      unit: "usd",
+    });
+    const payload = JSON.parse(sendNostrDM.mock.calls[0][1]);
+    expect(payload.unit).toBe("usd");
+    expect(payload).not.toHaveProperty("id");
+  });
+
+  it("rejects unsupported spending conditions before creating or delivering ecash", async () => {
+    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+    const manager = createMockManager();
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 100,
+      unit: "sat",
+      hasSpendingCondition: true,
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const ops = createDefaultOperations({
+      getManager: () => manager as unknown as Manager,
+      sendNostrDM,
+    });
+    await expect(
+      ops.executePaymentRequest!(MINT1, "creqLocked", 100, "sat"),
+    ).rejects.toThrow("requires locked ecash");
+    expect(manager.ops.send.prepare).not.toHaveBeenCalled();
+    expect(sendNostrDM).not.toHaveBeenCalled();
+  });
   it("calls sendNostrDM with the Nostr target and token payload", async () => {
     const sendNostrDM = vi.fn().mockResolvedValue(undefined);
     const mockManager = createMockManager();
 
     mockGetPRInfo.mockReturnValue({
+      requestId: "request-123",
       mints: [MINT1],
       amount: 100,
       unit: "sat",
@@ -179,6 +305,7 @@ describe("executePaymentRequest — Nostr transport", () => {
     expect(mockManager.ops.send.prepare).toHaveBeenCalledWith({
       mintUrl: MINT1,
       amount: 100,
+      unit: "sat",
     });
     expect(mockManager.ops.send.execute).toHaveBeenCalledWith(
       "prepared-send-1",
@@ -189,7 +316,7 @@ describe("executePaymentRequest — Nostr transport", () => {
 
     const payload = JSON.parse(payloadStr);
     expect(payload).toMatchObject({
-      id: "creqABC",
+      id: "request-123",
       mint: MINT1,
       unit: "sat",
     });
@@ -243,6 +370,7 @@ describe("executePaymentRequest — Nostr transport", () => {
     expect(mockManager.ops.send.prepare).toHaveBeenCalledWith({
       mintUrl: MINT1,
       amount: 500,
+      unit: "sat",
     });
   });
 

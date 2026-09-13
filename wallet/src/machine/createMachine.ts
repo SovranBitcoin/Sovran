@@ -972,15 +972,25 @@ export function createPaymentMachine(
         if (info) {
           const requestedUnit = (info.unit ?? "sat").trim().toLowerCase();
           const amount = info.amount;
-          if (!isValidSatAmount(amount)) {
+          if (info.hasSpendingCondition || info.lockP2pkPubkey) {
+            nfcError = {
+              code: "UNSUPPORTED_PAYMENT_METHOD",
+              message:
+                "This request requires locked ecash, which NFC payments do not support yet.",
+            };
+          } else if (!isValidSatAmount(amount)) {
             nfcError = {
               code: "NFC_READ_FAILED",
               message: "Payment request must include an amount for NFC payment",
             };
           } else if (requestedUnit !== unit.trim().toLowerCase()) {
-            const funded = walletCtx.trustedMintUrls.some((mintUrl) =>
-              (info.mints.length === 0 || info.mints.includes(mintUrl)) &&
-              (walletCtx.unitBalances?.[requestedUnit]?.[mintUrl] ?? 0) >= amount,
+            const funded = walletCtx.trustedMintUrls.some(
+              (mintUrl) =>
+                (info.mintsPreferred ||
+                  info.mints.length === 0 ||
+                  info.mints.includes(mintUrl)) &&
+                (walletCtx.unitBalances?.[requestedUnit]?.[mintUrl] ?? 0) >=
+                  amount,
             );
             if (!funded) {
               nfcError = {
@@ -990,10 +1000,12 @@ export function createPaymentMachine(
                 }),
               };
             } else if (operations?.switchUnit) {
-              void notifications?.onNfcPaymentProgress?.({ phase: "selecting" });
+              void notifications?.onNfcPaymentProgress?.({
+                phase: "selecting",
+              });
               const switchUnit = operations.switchUnit;
-              const switched = await ResultAsync.fromThrowable(
-                async () => switchUnit(requestedUnit),
+              const switched = await ResultAsync.fromThrowable(async () =>
+                switchUnit(requestedUnit),
               )();
               if (switched.isErr()) {
                 nfcError = {
@@ -1190,11 +1202,15 @@ export function createPaymentMachine(
               ? detectors.getPaymentRequestInfo(flowCtx.paymentRequest)
               : null;
             const best = rankMintCandidates(
-              data.candidates.filter((candidate) => candidate.status !== "disabled"),
+              data.candidates.filter(
+                (candidate) => candidate.status !== "disabled",
+              ),
               {
                 preferredMints: info?.mints ?? [],
                 amount: flowCtx.amount ?? 0,
-                unitBalances: walletCtxInner.unitBalances?.[flowCtx.unit] ?? walletCtxInner.mintBalances,
+                unitBalances:
+                  walletCtxInner.unitBalances?.[flowCtx.unit] ??
+                  walletCtxInner.mintBalances,
               },
             )[0];
             if (best) {
@@ -1489,7 +1505,8 @@ export function createPaymentMachine(
 
       // Trust mint operation: when MINT_TRUSTED transitions to receiveToken,
       // call operations.trustMint first. On failure, redirect to error.
-      if (reviewMintData && operations?.trustMint && step === "receiveToken") {        handlerExecuting = true;
+      if (reviewMintData && operations?.trustMint && step === "receiveToken") {
+        handlerExecuting = true;
         notify();
 
         const effect = await runTrustMintEffect({
@@ -1523,10 +1540,7 @@ export function createPaymentMachine(
         ) !== "onchain"
       ) {
         const data = stepData as StepDataMap["navigateToMeltPreview"];
-        const matching = meltQuotePreviewMatches(
-          flowCtx.meltQuotePreview,
-          data,
-        )
+        const matching = meltQuotePreviewMatches(flowCtx.meltQuotePreview, data)
           ? flowCtx.meltQuotePreview
           : undefined;
         if (matching) {

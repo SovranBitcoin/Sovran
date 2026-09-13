@@ -13,15 +13,25 @@ function setup({
   mints = [accepted],
   balances = { [accepted]: 100 },
   switchEnabled = true,
+  mintsPreferred = false,
+  hasSpendingCondition = false,
 }: {
   unit?: string;
   amount?: number | null;
   mints?: string[];
   balances?: Record<string, number>;
   switchEnabled?: boolean;
+  mintsPreferred?: boolean;
+  hasSpendingCondition?: boolean;
 } = {}) {
   let activeUnit = "sat";
-  const info: PaymentRequestInfo = { unit, amount: amount ?? undefined, mints };
+  const info: PaymentRequestInfo = {
+    unit,
+    amount: amount ?? undefined,
+    mints,
+    mintsPreferred,
+    hasSpendingCondition,
+  };
   const unitBalances: Record<string, Record<string, number>> = {
     sat: { [accepted]: 500, [other]: 1000, [third]: 2000 },
     [unit]: balances,
@@ -55,6 +65,29 @@ const sentMint = (tm: ReturnType<typeof createTestMachine>) =>
   tm.operationCalls.find((call) => call.name === "executeNfcSend");
 
 describe("NFC terminal unit and mints", () => {
+  it("rejects spending conditions before switching units or creating bearer ecash", async () => {
+    const { tm, switchUnit, adapter } = setup({
+      unit: "usd",
+      hasSpendingCondition: true,
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertExecution({ code: "UNSUPPORTED_PAYMENT_METHOD" });
+    expect(switchUnit).not.toHaveBeenCalled();
+    expect(sentMint(tm)).toBeUndefined();
+    expect(adapter.writeToken).not.toHaveBeenCalled();
+    expect(adapter.releaseSession).toHaveBeenCalled();
+  });
+  it("switches to a funded non-preferred mint for an advisory cross-unit request", async () => {
+    const { tm, switchUnit } = setup({
+      unit: "usd",
+      balances: { [other]: 100 },
+      mintsPreferred: true,
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    expect(switchUnit).toHaveBeenCalledWith("usd");
+    tm.assertStep("sendComplete");
+    expect(sentMint(tm)?.args).toEqual([other, 50, "usd"]);
+  });
   it("honours strict m even when a different trusted mint holds more", async () => {
     const { tm } = setup({ balances: { [accepted]: 100, [other]: 1000 } });
     await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });

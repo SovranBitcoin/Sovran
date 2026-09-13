@@ -5,16 +5,12 @@ import { List } from '@/shared/ui/composed/List';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import {
   DEMO_FEED,
+  DEMO_MEDIA_SOURCES,
   DEMO_METRICS,
   DEMO_PROFILES,
 } from '@/shared/stores/runtime/mockPresentationData';
 import { PostCard } from './nostr/PostCard';
 import { DEFAULT_METRICS } from './nostr/feedTypes';
-const sources: Readonly<Record<string, number>> = {
-  'https://blossom.primal.net/ab4028a4b2d17241fe65fb15e2f53e32430772b8d8574fc3b601ed42fb32adbf.jpg': require('../../../assets/demo/feed-188/image.png'),
-  'https://image.nostr.build/73a0a70de41c73241f10ab42edddeab0f2f6566a3b760a9c4abf46df797f41c2.jpg': require('../../../assets/demo/feed-159/image.png'),
-  'https://i.nostr.build/UQ4RgnqRPRLd76eQJAeajy.jpg': require('../../../assets/demo/feed-24/image.png'),
-};
 const firstImageUrl =
   'https://image.nostr.build/73a0a70de41c73241f10ab42edddeab0f2f6566a3b760a9c4abf46df797f41c2.jpg';
 const quotedEvents = new Map();
@@ -25,7 +21,7 @@ export function DemoHomeFeed() {
   const [imageReady, setImageReady] = useState(false);
   const media = useMemo(
     () => ({
-      sources,
+      sources: DEMO_MEDIA_SOURCES,
       onLoad: (url: string) => {
         if (url === firstImageUrl) setImageReady(true);
       },

@@ -41,6 +41,9 @@ const PUBLIC_TEST_IDENTIFIERS = new Set([
   'ec8cffdc71b36063e2c971a061a03ce886932bb7db8782bf5f6384348e9f7db3',
   // Synthetic NIP-46 client pubkey for the signer pairing scenario — not a key.
   'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  // Public Nostr EVENT id of the retained demo thread snapshot (Mock Mode media
+  // capture) — an event hash, not key material.
+  'dd16895574a90bc50ec19ea2740c4f9f9c8d570c9d931e8e17d4c2b5bdc6b572',
 ]);
 
 export function scanSecrets(node: unknown, path = ''): Issue[] {

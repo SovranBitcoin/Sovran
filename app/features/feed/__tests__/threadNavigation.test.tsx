@@ -160,6 +160,9 @@ jest.mock('@/shared/lib/date', () => ({
 jest.mock('@/shared/lib/popup', () => ({ actionMenuPopup: jest.fn() }));
 jest.mock('@/shared/lib/logger', () => ({
   feedLog: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+  storeLog: { info: jest.fn(), warn: jest.fn(), debug: jest.fn(), error: jest.fn() },
+  log: { info: jest.fn(), warn: jest.fn(), debug: jest.fn(), error: jest.fn() },
+  redactError: (e: unknown) => e,
   paymentLog: { debug: jest.fn() },
   useLifecycleLogger: jest.fn(),
   Log: ({ children }: { children: ReactNode }) => children,

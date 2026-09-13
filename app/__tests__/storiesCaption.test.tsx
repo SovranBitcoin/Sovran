@@ -13,7 +13,10 @@ jest.mock('uniwind', () => ({ withUniwind: (component: unknown) => component }))
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 34 }) }));
 jest.mock('@/shared/ui/composed/ScrollEdgeFade', () => ({ ScrollEdgeFade: 'ScrollEdgeFade' }));
 jest.mock('@/shared/lib/date', () => ({ formatRelative: () => '2h' }));
-jest.mock('@/shared/lib/logger', () => ({ Log: 'Log' }));
+jest.mock('@/shared/lib/logger', () => {
+  const noop = { info: jest.fn(), warn: jest.fn(), debug: jest.fn(), error: jest.fn() };
+  return { Log: 'Log', log: noop, storeLog: noop, feedLog: noop, redactError: (e: unknown) => e };
+});
 jest.mock('@/shared/ui/composed/VisualLayoutProbe', () => ({
   VisualLayoutProbe: 'VisualLayoutProbe',
 }));

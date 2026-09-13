@@ -3,7 +3,7 @@
   "id": "marketing.screenshots.media",
   "name": "Marketing media screenshots",
   "description": "Marketing media screenshots in Mock Mode; captures only, no payments or publishing.",
-  "details": "MEDIA FIXTURES REQUIRED: thread, stories and image-viewer need isolated, navigable read-only media fixtures. Existing DemoHomeFeed blocks pointer events; ThreadView uses live reads; StoriesScreen requires storyUsersJson; image viewer is an overlay, not a route. This scenario is an explicit capture inventory pending that fixture seam. Replace these inventory steps with real entry/readiness/exit actions before removing deferredReason. Never inject public snapshot events into live caches or disable Mock Mode to fabricate coverage. Both iOS and Android: --evidence screenshots --no-record. Captures are presentation evidence only.",
+  "details": "Mock Mode only. Opens an isolated thread target from the retained public snapshot and a fictional Maya story with a bundled Artemis II video. Both reuse production renderers. No live thread reads, cache seeding, composer or publishing. Waits for decoded image/video before capturing. Disabling Mock Mode removes fixture content. Image-overlay capture is separate from these two canonical pages.",
   "lane": "simulator",
   "tags": ["flow:wallet","check:navigation"],
   "requires": ["fresh-install"],
@@ -23,18 +23,19 @@
     {"action":"swipe","dir":"up"},
     {"action":"waitFor","selector":{"id":"settings-mock-mode-toggle"},"value":"0","timeoutMs":20000},
     {"action":"tapUntil","sequence":[{"tap":{"id":"settings-mock-mode-toggle"}}],"until":{"id":"settings-mock-mode-toggle"},"untilValue":"1","attempts":4,"settleMs":6000},
-    {"action":"goHome"},
-    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000},
-    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
-    {"action":"waitFor","selector":{"idPrefix":"transaction-"},"timeoutMs":30000},
-    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-mint-selector"}}],"until":{"id":"mint-select-add"},"attempts":4,"settleMs":6000},
-    {"action":"waitFor","selector":{"id":"contact-row:mint:https://mint.macadamia.cash"},"timeoutMs":30000},
-    {"action":"tapUntil","sequence":[{"tap":{"id":"contact-row:mint:https://mint.macadamia.cash"}}],"until":{"id":"wallet-selected-mint:mint.macadamia.cash"},"attempts":4,"settleMs":6000}
+    {"action":"goHome"}
   ],
   "steps": [
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"openUrl","url":"sovran:///(user-flow)/thread?eventId=dd16895574a90bc50ec19ea2740c4f9f9c8d570c9d931e8e17d4c2b5bdc6b572&preview=demo"},
+    {"action":"waitFor","selector":{"id":"demo-thread-ready"},"timeoutMs":45000},
     {"action":"screenshot","name":"thread","delayMs":1200},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"openUrl","url":"sovran:///(stories-flow)/stories?preview=demo"},
+    {"action":"waitFor","selector":{"id":"story-video-ready"},"timeoutMs":45000},
     {"action":"screenshot","name":"stories","delayMs":1200},
-    {"action":"screenshot","name":"image-viewer","delayMs":1200},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"story-close"}}],"until":{"id":"wallet-send"},"attempts":4,"settleMs":4000},
     {"action":"goHome"},
     {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
   ],
@@ -64,6 +65,5 @@
   "finally": [
     {"use":"flow.return-to-wallet"}
   ],
-  "endState": "wallet",
-  "deferredReason": "Thread, stories and image-viewer have no isolated navigable Mock Mode media fixture. Capture inventory only; implement fixture entry/readiness/exit before enabling."
+  "endState": "wallet"
 }

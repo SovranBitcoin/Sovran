@@ -113,7 +113,7 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
   useEffect(() => {
     pagerPositionRef.current = pageIndexRef.current;
     carouselX.value = pageIndexRef.current;
-  }, [pagerKey]);
+  }, [pagerKey, pageIndexRef]);
 
   const maxPageIndex = availableUnits.length - 1;
   const scrollHandler = usePagerScrollHandler(
@@ -133,7 +133,7 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
   // (pager pages are absolutely positioned, so the container can't grow
   // naturally) — sized to the tallest account, swiping never shifts layout.
   const [pageHeights, setPageHeights] = useState<Record<string, number>>({});
-  const tallestContentHeight = Math.max(0, ...Object.values(pageHeights));
+  const tallestContentHeight = Math.max(0, ...availableUnits.map((unit) => pageHeights[unit] ?? 0));
   const containerHeight = Math.max(minHeight, tallestContentHeight + BALANCE_BOTTOM_INSET);
 
   // Deadbanded, mostly-monotonic height tracking. The unit commit repaints
@@ -163,13 +163,15 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
     });
   }, []);
   const reservePillSlots = useMemo<PillVisibility>(() => {
-    const all = Object.values(pillsByUnit);
+    // Removed pages retain their last measurement, but must not reserve empty
+    // slots after a mint/unit change or leaving the Mock Mode carousel.
+    const all = availableUnits.flatMap((unit) => (pillsByUnit[unit] ? [pillsByUnit[unit]] : []));
     return {
       pending: all.some((v) => v.pending),
       reserved: all.some((v) => v.reserved),
       redeeming: all.some((v) => v.redeeming),
     };
-  }, [pillsByUnit]);
+  }, [availableUnits, pillsByUnit]);
 
   const onPageContentLayout = useCallback((pageUnit: string, event: LayoutChangeEvent) => {
     const height = Math.ceil(event.nativeEvent.layout.height);

@@ -44,7 +44,7 @@ export const CTA_DEFINITIONS: readonly CtaDefinition[] = [
       icon: 'mdi:shield',
       title: 'Back up your wallet',
       body: (balanceTotalSat) =>
-        `${balanceTotalSat > 0 ? 'You have money here now. ' : ''}A 2-minute backup means a lost phone doesn't mean lost funds.`,
+        `${balanceTotalSat > 0 ? 'You have money here now. ' : ''}Write down your recovery phrase and check each word to keep a way back to your wallet.`,
       primary: { label: 'Back up now', action: 'back-up' },
       secondary: { label: 'Not now' },
     },

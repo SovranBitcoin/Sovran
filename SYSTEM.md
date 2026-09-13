@@ -602,6 +602,17 @@ ranks preferred mints without excluding other funded trusted mints. Coco 2.0.0's
 outgoing parser treats every mint list as strict, so `defaultOperations` removes
 only the advisory list from its private SDK input copy; the original request
 remains the flow identity. Amount, unit, transport and NUT-10 lock are preserved.
+The installed SDK rejects NUT-18 `sm` and NUT-26 tag `0x0a` until the wallet can
+enforce both method/unit support and method fees. Never drop those constraints.
+NFC and Nostr request sends reject any NUT-10 condition before creating proofs;
+their current durable send adapters cannot preserve the complete lock contract.
+HTTP request preparation retains Coco's supported P2PK path. Nostr payloads use
+the request's `i` identifier, and sends always pass the request unit explicitly.
+Cross-unit NFC preflight honors advisory `mp` just like final mint selection.
+Until Coco's durable API can pay recipient input fees, payment-request sends
+require verified zero-fee keysets for their unit before preparation. Include
+inactive keysets because exact sends can use their proofs; missing fee data
+fails closed. Ordinary token sends retain their separate gross-amount behavior.
 Incoming `validatePayload` still rejects untrusted mints and mints outside the
 durable operation's list. Both receive screens therefore force Required even
 if the profile preference is true, and show Preferred disabled with a reason.
@@ -828,8 +839,10 @@ changes. Both platform checks passed with this bounded exception.
 copy choices, capture provenance and per-aspect selection are data alongside it.
 Every applicable concept/layout renders wide **2048×1000**, tall **1080×1920** and
 square **1080×1080**. Commit selected PNGs and labelled contact sheets (1500 px
-wide); full variants remain ignored. Phone counts determine n/a, absent captures
-produce labelled drafts. Keep full native capture bytes, status bar and home
+wide); full variants remain ignored. All six general layouts apply to every
+concept; repeat its retained capture when a composition needs more phone slots.
+Only portal (matched wallpaper) and pack (distinct album wallpapers) can be n/a.
+Absent captures produce labelled drafts. Keep full native capture bytes, status bar and home
 indicator, inside the shared bezel/rim/shadow. Rotation is 2D; assert copy boxes
 never intersect rotated phone bounds. No runtime artwork imports.
 

@@ -58,6 +58,7 @@ import {
   deriveSupportedUnitsFromInfo,
 } from "../mint-capabilities";
 import { getKeysetUnits } from "../core/keysetUnits";
+import { assertPaymentRequestFeesSupported } from "../core/paymentRequestFees";
 import { parseHistoryEntryOnce } from "./historyEntry";
 
 // MintInfo is the cashu-ts GetInfoResponse — coco-core re-derives but does
@@ -770,14 +771,10 @@ export function createDefaultOperations(
         throw new Error("Offline send requires exact proof match");
       }
 
-      const { operation, token } = await executeSendWithRescue(
-        mgr,
-        prepared,
-        {
-          logPrefix: "executeOfflineSend",
-          executeOptions: { memo: normalizeMemo(memo) },
-        },
-      );
+      const { operation, token } = await executeSendWithRescue(mgr, prepared, {
+        logPrefix: "executeOfflineSend",
+        executeOptions: { memo: normalizeMemo(memo) },
+      });
       const tokenWithMemo = applyTokenMemo(token, memo);
       logger.info("operations.executeOfflineSend.complete", {
         operationId: operation.id,
@@ -993,9 +990,10 @@ export function createDefaultOperations(
       const requestInfo = data.paymentRequest
         ? defaultDetectors.getPaymentRequestInfo(data.paymentRequest)
         : null;
-      const preferredSet = requestInfo?.mintsPreferred && requestInfo.mints.length
-        ? new Set(requestInfo.mints)
-        : null;
+      const preferredSet =
+        requestInfo?.mintsPreferred && requestInfo.mints.length
+          ? new Set(requestInfo.mints)
+          : null;
       const supportedSet = data.supportedMintUrls
         ? new Set(data.supportedMintUrls)
         : null;
@@ -1088,7 +1086,11 @@ export function createDefaultOperations(
           reason = { code: "NO_BALANCE", message: "No balance" };
         }
 
-        if (status === "available" && preferredSet && !preferredSet.has(mintUrl)) {
+        if (
+          status === "available" &&
+          preferredSet &&
+          !preferredSet.has(mintUrl)
+        ) {
           reason = localizeReason("MINT_NOT_PREFERRED");
         }
         const entry = catalog[mintUrl] ?? {};
@@ -1184,6 +1186,7 @@ export function createDefaultOperations(
 
     executeNfcSend: async (mintUrl, amount, unit = "sat") => {
       const mgr = requireManager();
+      await assertPaymentRequestFeesSupported(mgr, mintUrl, unit);
       logger.info("operations.executeNfcSend.prepare", {
         ...mintUrlFields(mintUrl),
         amount,
@@ -1787,9 +1790,16 @@ export function createDefaultOperations(
         );
       }
 
+      await assertPaymentRequestFeesSupported(mgr, mintUrl, unit);
+
       let operationId: string;
 
       if (nostrTransport && !httpTransport) {
+        if (info.hasSpendingCondition || info.lockP2pkPubkey) {
+          throw new Error(
+            "This request requires locked ecash, which Nostr payment requests do not support yet.",
+          );
+        }
         logger.info("operations.executePaymentRequest.transport", {
           transport: "nostr",
         });
@@ -1814,6 +1824,7 @@ export function createDefaultOperations(
         const prepared = await mgr.ops.send.prepare({
           mintUrl,
           amount,
+          unit,
         });
         logger.info("operations.executePaymentRequest.nostr.prepared", {
           operationId: prepared.id,
@@ -1830,7 +1841,7 @@ export function createDefaultOperations(
         });
 
         const payload = {
-          id: paymentRequest,
+          id: info.requestId,
           mint: mintUrl,
           unit,
           proofs: token.proofs,

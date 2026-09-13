@@ -6,23 +6,37 @@ import { Screen } from '@/shared/ui/composed/Screen';
 import { feedLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { DemoThreadView } from '../components/DemoThreadView';
 
 const ParamsSchema = z.object({
   eventId: Hex64,
+  preview: z.literal('demo').optional(),
 });
 
 export function ThreadScreen() {
   useLifecycleLogger('ThreadScreen', feedLog);
   const surface = useThemeColor('surface');
+  const mockMode = useSettingsStore((state) => state.mockMode);
 
   const params = useRouteParams(ParamsSchema, { where: 'user-flow.thread' });
   if (!params) return null;
+  const preview = params.preview === 'demo';
+  if (preview && !mockMode) return null;
 
   feedLog.info('feed.thread.view', { eventId: params.eventId });
 
   return (
-    <Screen name="ThreadScreen" scroll="custom" bgColor={surface} deferContent={false}>
-      <ThreadView eventId={params.eventId} />
+    <Screen
+      name="ThreadScreen"
+      scroll={preview ? 'auto' : 'custom'}
+      bgColor={surface}
+      deferContent={false}>
+      {preview ? (
+        <DemoThreadView eventId={params.eventId} />
+      ) : (
+        <ThreadView eventId={params.eventId} />
+      )}
     </Screen>
   );
 }

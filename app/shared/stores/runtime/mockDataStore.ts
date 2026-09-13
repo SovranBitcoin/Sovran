@@ -25,6 +25,7 @@ import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
 // (it reads mock state via getMockState() below), so there's no cycle.
 import type { RecentContact } from '@/features/payments/data/recentContactTypes';
 import type { ActiveUnit } from '@/shared/stores/profile/mintStore';
+import type { StoryUser } from '@/features/feed/components/nostr/StoriesCarousel';
 
 // ---------------------------------------------------------------------------
 // Demo row definition — single source of truth for all mock data.
@@ -349,6 +350,29 @@ const MOCK_DM = buildMockContactsAndThreads(Date.now());
 /** Mock RecentContact rows. Consumed by `useRecentContacts` when mockMode is on. */
 export function getMockContacts(): RecentContact[] {
   return MOCK_DM.recentContacts;
+}
+
+/** Fictional, local-only story; never enters the public event graph or a signer. */
+export function getMockStoryUsers(): StoryUser[] {
+  const contact = EFFECTIVE_MOCK_CONTACTS[0];
+  return [
+    {
+      pubkey: contact.pubkey,
+      profile: {
+        name: contact.metadata.displayName ?? contact.metadata.name ?? 'Maya',
+        picture: contact.metadata.picture,
+      },
+      videoPosts: [
+        {
+          eventId: 'demo-artemis-story',
+          pubkey: contact.pubkey,
+          created_at: Math.floor(Date.now() / 1000) - 3600,
+          videoUrl: Asset.fromModule(require('../../../assets/demo/story-artemis/video.mp4')).uri,
+          content: 'A little perspective. Looking back at Earth with the Artemis II collection.',
+        },
+      ],
+    },
+  ];
 }
 
 /** Mock DM thread for a counterparty pubkey, oldest-first. */

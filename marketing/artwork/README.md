@@ -46,7 +46,10 @@ paints the first screenshot in front; pack uses distinct images of one album.
 Tall pack layouts use two-column rows instead of shrinking a landscape row into the
 upper half of a portrait canvas. Tall triptychs use a broad descending zigzag; lower
 phones paint above earlier screens so every phone header stays visible.
-Insufficient phone counts are n/a, not duplicated captures. Missing registered
+Every concept renders all six general layouts, repeating its retained screenshot
+when additional phone slots are needed. Portal requires a matching wallpaper;
+pack requires distinct screenshots from the same album. These two material
+requirements are the only n/a cases. Missing registered
 captures are drafts, not n/a.
 
 All phones use the shared bezel/rim/shadow and **full native screenshots**,

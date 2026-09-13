@@ -101,9 +101,16 @@ jest.mock('../components/nostr/StoriesContainer', () => ({
 jest.mock('../components/nostr/StoryProgressBar', () => ({ StoryProgressBar: 'StoryProgressBar' }));
 jest.mock('../components/nostr/stories/StoryCaption', () => ({ StoryCaption: 'StoryCaption' }));
 jest.mock('@/shared/lib/date', () => ({ formatRelative: () => '2h' }));
-jest.mock('@/shared/lib/logger', () => ({
-  Log: ({ children }: React.PropsWithChildren) => <>{children}</>,
-}));
+jest.mock('@/shared/lib/logger', () => {
+  const noop = { info: jest.fn(), warn: jest.fn(), debug: jest.fn(), error: jest.fn() };
+  return {
+    Log: ({ children }: React.PropsWithChildren) => <>{children}</>,
+    log: noop,
+    storeLog: noop,
+    feedLog: noop,
+    redactError: (e: unknown) => e,
+  };
+});
 jest.mock('@/shared/ui/composed/VisualLayoutProbe', () => ({
   VisualLayoutProbe: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }));

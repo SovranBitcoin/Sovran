@@ -101,7 +101,7 @@ export function validateLayouts(catalog) {
 }
 export function applicability(spec, layout, project) {
   if (!spec.layouts.includes(layout.id)) return "Not listed by concept";
-  if (spec.screenshots.length < layout.phones.min)
+  if (layout.id === "pack" && spec.screenshots.length < layout.phones.min)
     return `Needs ${layout.phones.min} phones; concept provides ${spec.screenshots.length}`;
   const ids = spec.screenshots.map(
     (key) => project.screenshots[`${spec.platform}/${key}`]?.wallpaperId,
@@ -773,7 +773,15 @@ export async function renderArtwork(
               spec.background.wallpaperId,
           ),
         ]
-      : spec.screenshots.slice(0, layout.phones.max);
+      : Array.from(
+          {
+            length: Math.max(
+              layout.phones.min,
+              Math.min(spec.screenshots.length, layout.phones.max),
+            ),
+          },
+          (_, index) => spec.screenshots[index % spec.screenshots.length],
+        );
   const missing = [],
     screenshots = [],
     ratios = [];
