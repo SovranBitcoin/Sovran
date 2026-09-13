@@ -5,6 +5,9 @@ import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import { mintMethodsFromNuts, mintMethodUnitPairsFromNuts } from '@/shared/lib/cashu/mintNuts';
 import { cashuLog } from '@/shared/lib/logger';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
+import { extractAvailableCurrencies } from '@/features/mint/lib/availableCurrencies';
+
+const DISCOVERY_UNITS = ['SAT', 'USD', 'EUR', 'GBP'];
 
 /** Discovery row + the app-local method field (the shared MintSearchResult
  *  schema predates the capability data; extend locally rather than changing
@@ -20,6 +23,8 @@ interface UseMintSearchReturn {
   results: MintSearchRow[];
   loading: boolean;
   error: string | null;
+  availableUnits: string[];
+  matchCountByUnit: Record<string, number>;
 }
 
 /**
@@ -187,5 +192,22 @@ export function useMintSearch(
     );
   }, [allMints, query, currency, method]);
 
-  return { results, loading, error };
+  // Keep the selected rail unit visible even when discovery has no rows for it.
+  const availableUnits = extractAvailableCurrencies([
+    ['SAT', currency],
+    ...allMints.map((mint) => mint.supported_units),
+  ]).filter((unit) => DISCOVERY_UNITS.includes(unit));
+  const matchCountByUnit: Record<string, number> = Object.fromEntries(
+    DISCOVERY_UNITS.map((unit) => [unit, 0])
+  );
+  for (const mint of allMints) {
+    if (!matchesQuery(mint, query.trim())) continue;
+    for (const unit of DISCOVERY_UNITS) {
+      if (matchesCurrency(mint, unit) && discoveryMethodMatches(mint, method, unit)) {
+        matchCountByUnit[unit] += 1;
+      }
+    }
+  }
+
+  return { results, loading, error, availableUnits, matchCountByUnit };
 }

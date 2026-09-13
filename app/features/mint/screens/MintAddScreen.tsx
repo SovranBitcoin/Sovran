@@ -12,6 +12,8 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useHeaderSearch } from '@/shared/hooks/useHeaderSearch';
 import { useDebouncedMintValidation } from '@/features/mint/hooks/useDebouncedMintValidation';
 import { useMintSearch } from '@/features/mint/hooks/useMintSearch';
+import { extractAvailableCurrencies } from '@/features/mint/lib/availableCurrencies';
+import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import type { MintSearchResult } from '@/shared/lib/apiClient';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { useMintProfiles } from '@/features/mint/hooks/useMintProfiles';
@@ -67,23 +69,6 @@ const noop = () => {};
 
 const keyExtractor = (item: SearchableMint) => item.url;
 const getItemType = (item: SearchableMint) => ('isSkeleton' in item ? 'skeleton' : 'mint');
-
-/** Currency-tab values shown above the results; see `availableCurrencies`. */
-function extractAvailableCurrencies(searchResults: MintSearchResult[]): string[] {
-  const units = new Set<string>(['SAT']);
-  for (const result of searchResults) {
-    for (const unit of result.supported_units) {
-      units.add(unit.toUpperCase());
-    }
-  }
-  const allowed = ['SAT', 'USD', 'EUR', 'GBP'];
-  const currencies = ['ALL', ...[...units].filter((c) => allowed.includes(c))];
-  cashuLog.debug('mint.add.currencies.extracted', {
-    currencies,
-    resultCount: searchResults.length,
-  });
-  return currencies;
-}
 
 /** Quiet period the discovered list must hold before the skeleton hands over.
  *  Operator profiles resolve one at a time and each arrival re-renders a row,
@@ -352,9 +337,8 @@ export function MintAddScreen() {
   const methodLabel = methodFilter === 'bolt12' ? 'BOLT 12' : 'Onchain';
   // Currency-tab values are uppercase unit codes ('SAT', 'USD', …) with 'ALL' as
   // the no-filter sentinel; the rail unit is lowercase ('sat').
-  const [selectedCurrency, setSelectedCurrency] = useState(
-    unitParam ? unitParam.trim().toUpperCase() : 'ALL'
-  );
+  const initialCurrency = unitParam?.trim().toUpperCase() || 'ALL';
+  const [selectedCurrency, setSelectedCurrency] = useState(initialCurrency);
   useEffect(() => {
     if (methodFilter) cashuLog.info('mint.add.method_filter', { method: methodFilter });
   }, [methodFilter]);
@@ -398,11 +382,12 @@ export function MintAddScreen() {
   }, [validationState, validatedUrl, customMintInfo]);
 
   // Server-side mint search
-  const { results: searchResults, loading: searchLoading } = useMintSearch(
-    searchQuery,
-    selectedCurrency,
-    { method: methodFilter }
-  );
+  const {
+    results: searchResults,
+    loading: searchLoading,
+    availableUnits,
+    matchCountByUnit,
+  } = useMintSearch(searchQuery, selectedCurrency, { method: methodFilter });
 
   const { mints: knownMints } = useMintManagement();
 
@@ -499,8 +484,14 @@ export function MintAddScreen() {
   }));
   useMintProfiles(profileFetchInputs);
 
-  // Extract available currencies from results
-  const availableCurrencies = extractAvailableCurrencies(searchResults);
+  // Retain the deep-linked unit even after switching to another tab.
+  const availableCurrencies = [
+    'ALL',
+    ...extractAvailableCurrencies([
+      availableUnits,
+      initialCurrency === 'ALL' ? [] : [initialCurrency],
+    ]),
+  ];
 
   const handleToggleMint = (mintUrl: string) => {
     setSelectedMints((prev) => {
@@ -668,17 +659,34 @@ export function MintAddScreen() {
     </BottomButtons>
   );
 
+  const hasUnitMatches = Object.values(matchCountByUnit).some((count) => count > 0);
+  const unitLabel = selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency;
+  const showBtcMints =
+    methodFilter &&
+    selectedCurrency !== 'ALL' &&
+    selectedCurrency !== 'SAT' &&
+    matchCountByUnit.SAT > 0;
+
   const emptyComponent = (
-    <View className="items-center pt-5">
+    <View className="items-center gap-3 pt-5">
       <Text className="text-foreground text-center">
         {searchQuery.trim()
           ? 'No mints found matching your search'
           : methodFilter
-            ? `No known mints support ${methodLabel} yet`
+            ? selectedCurrency !== 'ALL' && hasUnitMatches
+              ? `No known mints support ${methodLabel} for ${unitLabel} yet`
+              : `No known mints support ${methodLabel} yet`
             : selectedCurrency === 'ALL'
               ? 'No mints available'
               : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}
       </Text>
+      {showBtcMints && (
+        <CapsuleButton
+          testID="mint-add-empty-switch-unit"
+          label={`Show BTC ${methodLabel} mints (${matchCountByUnit.SAT})`}
+          onPress={() => setSelectedCurrency('SAT')}
+        />
+      )}
     </View>
   );
 
