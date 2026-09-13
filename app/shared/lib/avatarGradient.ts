@@ -237,37 +237,39 @@ export function generateTierRingTheme(tier: ProfileTier, seedInput: string): Tie
   const direction = random() > 0.5 ? 1 : -1;
   const h = (offset: number) => base.hue + offset * direction;
 
+  // Quiet tints a step or two from the band, plus one white sheen.
   const colors: string[] =
     base.finish === 'metal'
       ? [
-          hsl(h(0), base.sat, light + 18),
-          hsl(h(base.spread), Math.max(base.sat - 6, 0), light - 14),
+          hsl(h(0), base.sat, light + 14),
+          hsl(h(base.spread), Math.max(base.sat - 6, 0), light - 10),
           hsl(0, 0, 100),
-          hsl(h(-base.spread * 0.6), base.sat, light + 8),
-          hsl(h(base.spread * 0.4), base.sat, light - 6),
+          hsl(h(-base.spread * 0.6), base.sat, light + 7),
+          hsl(h(base.spread * 0.4), base.sat, light - 5),
         ]
       : base.finish === 'film'
         ? [
-            hsl(h(base.spread), base.sat, light + 10),
-            hsl(h(-base.spread * 0.7), base.sat, light + 4),
-            hsl(h(base.spread * 1.6), Math.max(base.sat - 10, 0), light + 12),
+            hsl(h(base.spread), base.sat - 10, light + 8),
+            hsl(h(-base.spread * 0.7), base.sat - 10, light + 4),
+            hsl(h(base.spread * 1.6), Math.max(base.sat - 20, 0), light + 10),
             hsl(0, 0, 100),
-            hsl(h(base.spread * 0.3), base.sat, light - 8),
+            hsl(h(base.spread * 0.3), base.sat - 10, light - 6),
           ]
-        : [hsl(325, 85, 78), hsl(262, 80, 74), hsl(190, 90, 72), hsl(42, 90, 76), hsl(0, 0, 100)];
+        : [hsl(325, 70, 82), hsl(262, 65, 80), hsl(190, 75, 78), hsl(42, 75, 80), hsl(0, 0, 100)];
 
   // Start angles are staggered evenly (with a little jitter) so the blobs
   // never open bunched together; opposite directions pass through each other
   // only briefly. Large and translucent: the colours diffuse into the band.
   const slot = TAU / colors.length;
   const blobs: TierRingBlob[] = colors.map((color, index) => {
-    const turns = (1 + Math.floor(random() * 2)) * (random() > 0.5 ? 1 : -1);
+    // One turn per loop, either way: at a 60 s loop that is a drift.
+    const turns = random() > 0.5 ? 1 : -1;
     return {
       color,
       angle: index * slot + (random() - 0.5) * slot * 0.4,
       turns,
-      wobble: 0.1 + random() * 0.2,
-      wobbleCycles: 2 + Math.floor(random() * 3),
+      wobble: 0.06 + random() * 0.12,
+      wobbleCycles: 1 + Math.floor(random() * 2),
       radius: (index === colors.length - 1 ? 1.6 : 2.4) + random() * 0.8,
       breathCycles: 1 + Math.floor(random() * 3),
       phase: random() * TAU,

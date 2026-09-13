@@ -46,14 +46,15 @@ const LABEL_SPAN = 110;
  * drawn larger than the box (a bleed) so no side ever clips it.
  */
 const BLEED = GLOW_STROKE / 2 + GLOW_BLUR * 2.5;
-/** One seamless loop of the film; slow enough to read as light moving, not spinning. */
-const LOOP_MS = 24_000;
+/** One seamless loop of the film: a slow sheen, never something you watch. */
+const LOOP_MS = 60_000;
 /** Entrance: the film rushes through a stretch of its loop while the ring fades and scales in. */
 const INTRO_MS = 900;
-const INTRO_LOOP = 0.12;
+const INTRO_LOOP = 0.04;
 const TAU = Math.PI * 2;
-/** Blobs are washes, not spots. */
-const BLOB_OPACITY = 0.55;
+/** Blobs are a sheen, not patches. */
+const BLOB_OPACITY = 0.3;
+const BREATH = 0.12;
 
 /** How far the ring layout extends beyond the avatar on each side. */
 export function profileTierRingInset(size: number): number {
@@ -346,7 +347,7 @@ function FilmBlob({
     () =>
       blob.radius *
       bandWidth *
-      (1 + 0.25 * Math.sin(TAU * blob.breathCycles * clock.value + blob.phase))
+      (1 + BREATH * Math.sin(TAU * blob.breathCycles * clock.value + blob.phase))
   );
   return (
     // Translucent with a long, gentle falloff: the colour diffuses into the
