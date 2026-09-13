@@ -8,9 +8,8 @@
   "tags": ["flow:wallet","check:navigation"],
   "requires": ["fresh-install"],
   "setup": [
-    {"use":"flow.fresh-install"},
-    {"action":"waitFor","selector":{"label":"Get Started"},"timeoutMs":60000},
-    {"action":"tapUntil","sequence":[{"tap":{"label":"Get Started"}}],"until":{"id":"wallet-send"},"attempts":4,"settleMs":8000},
+    {"use":"flow.onboard"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":60000},
     {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
     {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"ACCOUNT"},"attempts":4,"settleMs":6000},
     {"action":"waitFor","selector":{"label":"ACCOUNT"},"timeoutMs":30000},
