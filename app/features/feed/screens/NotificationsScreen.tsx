@@ -84,12 +84,6 @@ function isClientTab(tab: NotificationTab): tab is 'APP' | 'MINTS' {
 const MAX_GROUP_AVATARS = 3;
 const EMPTY_NOTIFICATIONS: readonly FeedNotification[] = [];
 
-/** Stable first-paint rows; fixed ids keep FlashList keys stable across the swap. */
-const SKELETON_ITEMS: NotificationListItem[] = Array.from({ length: 6 }, (_, i) => ({
-  type: 'skeleton' as const,
-  id: `skeleton-${i}`,
-}));
-
 function notificationItemType(item: NotificationListItem): string {
   if (item.type === 'single') return item.notification.reason;
   if (item.type === 'group') return `group:${item.reason}`;
@@ -177,8 +171,8 @@ function NotificationsContent({ demo }: { demo: boolean }) {
         policy,
         replyScope,
       });
-      // No reset here: the new tab's key selects its own cached page (or a
-      // skeleton) synchronously — never a blank list plus a spinner.
+      // No reset here: the new tab's key selects its own cached page
+      // synchronously; only a tab with nothing cached shows the spinner.
       setActiveTab(tab);
     },
     [activeTab, policy, replyScope]
@@ -347,12 +341,8 @@ function NotificationsContent({ demo }: { demo: boolean }) {
         nowMs: Date.now(),
       });
     }
-    const items = buildNotificationListItems(notifications);
-    // First paint with nothing cached: skeleton rows through the same row
-    // chrome, never a spinner over an empty list.
-    if (items.length === 0 && isInitialLoading) return SKELETON_ITEMS;
-    return items;
-  }, [notifications, activeTab, seedCreatedAt, termsAccepted, legalAcceptance, isInitialLoading]);
+    return buildNotificationListItems(notifications);
+  }, [notifications, activeTab, seedCreatedAt, termsAccepted, legalAcceptance]);
   const visualPhase = isInitialLoading ? 'initial-loading' : isRefreshing ? 'refreshing' : 'ready';
   const { onListLayout, onListContentSizeChange, onListScroll, onListViewableItemsChanged } =
     useVisualFlatListLogger<NotificationListItem>({
@@ -469,21 +459,40 @@ function NotificationsContent({ demo }: { demo: boolean }) {
               <View style={[styles.separator, { backgroundColor: separator }]} />
             )}
             ListEmptyComponent={
-              <VisualLayoutProbe
-                scope={notificationsVisualScope}
-                surface="notifications"
-                component="NotificationsEmptyState"
-                itemKey={errorMessage ? 'empty:error' : 'empty:no-results'}
-                itemType={errorMessage ? 'error' : 'empty'}
-                extra={{ tab: activeTab, viewerReady: !!viewerPubkey }}>
-                <EmptyNotifications
-                  viewerReady={!!viewerPubkey}
-                  errorMessage={errorMessage}
-                  onRetry={handleRefresh}
-                  foreground={foreground}
-                  muted={muted}
-                />
-              </VisualLayoutProbe>
+              // First paint with nothing cached: the shared spinner (the same
+              // one the followers list and load-more use), never skeleton rows
+              // guessing at a shape the real rows will not match.
+              isInitialLoading ? (
+                <VisualLayoutProbe
+                  scope={notificationsVisualScope}
+                  surface="notifications"
+                  component="NotificationsInitialSpinner"
+                  itemKey="empty:initial-spinner"
+                  itemType="spinner"
+                  extra={{ tab: activeTab, phase: visualPhase }}>
+                  <Spinner
+                    size={22}
+                    color={withAlpha(foreground, 0.65)}
+                    style={notificationListStyles.loader}
+                  />
+                </VisualLayoutProbe>
+              ) : (
+                <VisualLayoutProbe
+                  scope={notificationsVisualScope}
+                  surface="notifications"
+                  component="NotificationsEmptyState"
+                  itemKey={errorMessage ? 'empty:error' : 'empty:no-results'}
+                  itemType={errorMessage ? 'error' : 'empty'}
+                  extra={{ tab: activeTab, viewerReady: !!viewerPubkey }}>
+                  <EmptyNotifications
+                    viewerReady={!!viewerPubkey}
+                    errorMessage={errorMessage}
+                    onRetry={handleRefresh}
+                    foreground={foreground}
+                    muted={muted}
+                  />
+                </VisualLayoutProbe>
+              )
             }
             ListFooterComponent={
               // Only when there's content — never stacked on the empty-state spinner.
@@ -561,9 +570,6 @@ function NotificationListRow({
   onPressNotification: (notification: FeedNotification) => void;
   onPressFollowGroup: (notifications: FeedNotification[]) => void;
 }) {
-  if (item.type === 'skeleton') {
-    return <NotificationSkeletonRow pressedBackground={pressedBackground} muted={muted} />;
-  }
   if (item.type === 'welcome') {
     return (
       <WelcomeNotificationRow
@@ -692,40 +698,6 @@ function LegalAcceptanceNotificationRow({
     </NotificationRowPressable>
   );
 }
-
-/**
- * The single-row shell with every leaf in its loading state: same icon slot,
- * avatar geometry, title/timestamp line and body reservation as a real row,
- * so the skeleton→content swap shifts nothing.
- */
-function NotificationSkeletonRow({
-  pressedBackground,
-  muted,
-}: {
-  pressedBackground: string;
-  muted: string;
-}) {
-  return (
-    <NotificationRowPressable pressedBackground={pressedBackground} onPress={noopPress}>
-      <VStack className="gap-2">
-        <HStack align="flex-start" className="gap-3">
-          <NotificationReasonIcon reason="reaction" color={muted} />
-          <View>
-            <Avatar state="loading" name="" seed="skeleton" size={42} />
-          </View>
-          <VStack className="flex-1 gap-1">
-            <HStack align="flex-start" className="justify-between gap-2">
-              <Text size={16} loading placeholder="Someone reacted to your post" />
-              <Text size={13} loading placeholder="2h" />
-            </HStack>
-          </VStack>
-        </HStack>
-        <Text size={15} loading placeholder="A short preview of the referenced note goes here" />
-      </VStack>
-    </NotificationRowPressable>
-  );
-}
-const noopPress = () => undefined;
 
 function NotificationRow({
   notification,
