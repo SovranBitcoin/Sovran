@@ -597,8 +597,10 @@ curated error codes before logging or displaying them. Successful status words
 do not establish a complete read: validate the two-byte NLEN and every requested
 body/chunk length before decoding. See `nfcApduPrivacy` and `nfcReadLengths` tests.
 
-**Payment-request mint preference (W12):** `wallet` preserves NUT-18 `mp` and
-ranks preferred mints without excluding other funded trusted mints. Coco 2.0.0's
+**Payment-request mint preference (W12):** `wallet` preserves NUT-18 `mp` when
+paying someone else's request and ranks preferred mints without excluding other
+funded trusted mints. Sovran's own requests are always strict (no `mp`, no UI
+switch): Coco 2.0.0 cannot claim a payment from a mint the wallet has not added. Coco 2.0.0's
 outgoing parser treats every mint list as strict, so `defaultOperations` removes
 only the advisory list from its private SDK input copy; the original request
 remains the flow identity. Amount, unit, transport and NUT-10 lock are preserved.

@@ -32,6 +32,17 @@ jest.mock('react-native', () => ({
 }));
 jest.mock('wallet/react', () => ({ useColadaBalance: () => ({ total: 1 }) }), { virtual: true });
 jest.mock('@/shared/ui/composed/SheetGrabber', () => ({ SheetGrabber: 'Grabber' }));
+jest.mock('heroui-native', () => {
+  const React = require('react');
+  const host = (name: string) =>
+    function MockHost(props: Record<string, unknown>) {
+      return React.createElement(name, props);
+    };
+  return {
+    ControlField: Object.assign(host('Checkbox'), { Indicator: 'Indicator' }),
+    Label: Object.assign(host('Label'), { Text: 'LabelText' }),
+  };
+});
 jest.mock('@/assets/icons', () => 'Icon');
 jest.mock('@/shared/ui/composed/Screen', () => ({
   Screen: ({ children, footer }: React.PropsWithChildren<{ footer: React.ReactNode }>) => (
@@ -81,7 +92,11 @@ function mount(id: 'update-required' | 'backup-recovery-phrase') {
   });
 }
 async function press(id: string) {
-  await act(async () => view.root.findByProps({ testID: id }).props.onPress());
+  await act(async () => {
+    const node = view.root.findByProps({ testID: id });
+    if (node.props.onPress) node.props.onPress();
+    else node.props.onSelectedChange(!node.props.isSelected);
+  });
 }
 it('allows gesture, Android back and close after opening the optional Update action', async () => {
   mount('update-required');

@@ -94,6 +94,4 @@ describe('lockableMintsFromCreq capability gate', () => {
 it('keeps NutDrop strict by default and preserves an explicit mint preference', () => {
   const strict = buildStandingCreq({ mints: MINTS, pubkey33: PUBKEY_33 })!;
   expect(decodePaymentRequest(strict).mintsPreferred).toBeUndefined();
-  const preferred = buildStandingCreq({ mints: MINTS, pubkey33: PUBKEY_33, mintsPreferred: true })!;
-  expect(decodePaymentRequest(preferred).mintsPreferred).toBe(true);
 });

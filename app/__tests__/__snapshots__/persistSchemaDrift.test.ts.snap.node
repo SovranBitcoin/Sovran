@@ -1216,10 +1216,6 @@ exports[`persisted schema drift mint-store schema matches the golden snapshot fo
           },
           "type": "object",
         },
-        "creqMintsPreferred": {
-          "default": false,
-          "type": "boolean",
-        },
         "creqP2pkLock": {
           "default": false,
           "type": "boolean",
@@ -1293,10 +1289,6 @@ exports[`persisted schema drift mint-store schema matches the golden snapshot fo
           },
           "type": "object",
         },
-        "creqMintsPreferred": {
-          "default": false,
-          "type": "boolean",
-        },
         "creqP2pkLock": {
           "default": false,
           "type": "boolean",
@@ -1333,7 +1325,6 @@ exports[`persisted schema drift mint-store schema matches the golden snapshot fo
         "standingQuotes",
         "receiveMintByMethod",
         "creqP2pkLock",
-        "creqMintsPreferred",
         "creqExcludedMints",
         "bip321ExcludedRails",
       ],

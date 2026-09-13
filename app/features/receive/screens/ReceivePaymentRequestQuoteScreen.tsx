@@ -230,7 +230,6 @@ export const ReceivePaymentRequestQuoteScreen = memo(function ReceivePaymentRequ
   const displayedRequest = useMemo(() => {
     if (!entry) return '';
     const options: SingleUseReencodeOptions = {
-      mintsPreferred: false, // Coco incoming claims still enforce the durable mint list.
       displayMints: mintSelection.displayMints,
       lockP2pkPubkey: mintSelection.p2pkLockEffective ? p2pkKey : undefined,
     };

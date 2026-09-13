@@ -31,8 +31,6 @@ const MAX_ADVERTISED_MINTS = 5;
 export function buildStandingCreq(params: {
   mints: string[];
   pubkey33: CashuP2pkPubkey;
-  /** Defaults to strict for NutDrop; only opt in for receivers accepting other mints. */
-  mintsPreferred?: boolean;
 }): string | null {
   const mints = Array.from(new Set(params.mints.filter(Boolean))).slice(0, MAX_ADVERTISED_MINTS);
   const base = {
@@ -58,8 +56,7 @@ export function buildStandingCreq(params: {
       mints,
       undefined, // description
       false, // singleUse
-      { kind: 'P2PK', data: params.pubkey33, tags: [] } satisfies NUT10Option,
-      params.mintsPreferred
+      { kind: 'P2PK', data: params.pubkey33, tags: [] } satisfies NUT10Option
     );
     const creq = request.toEncodedRequest();
     cashuLog.info('cashu.creq.build.done', {

@@ -30,7 +30,6 @@ interface MintState {
   /** Cashu rail: advertise a NUT-10 P2PK lock in the standing payment
    *  request so payers lock ecash to this wallet's key. */
   creqP2pkLock: boolean;
-  creqMintsPreferred: boolean;
   /** Cashu rail: mints the user toggled OFF in the payment request's
    *  Advanced section (url → true). Advertisement-only — the mint stays
    *  trusted, so payments sent to an old copy of the request still claim. */
@@ -45,7 +44,6 @@ interface MintActions {
   setStandingQuote: (key: string, quoteId: string) => void;
   setReceiveMintForMethod: (method: 'bolt12' | 'onchain', mintUrl: string) => void;
   setCreqP2pkLock: (enabled: boolean) => void;
-  setCreqMintsPreferred: (enabled: boolean) => void;
   setCreqMintExcluded: (mintUrl: string, excluded: boolean) => void;
   setBip321RailExcluded: (rail: Bip321RailId, excluded: boolean) => void;
   resetBip321RailExclusions: (rails: Bip321RailId[]) => void;
@@ -68,7 +66,6 @@ const PersistedMintStore = z.object({
   receiveMintByMethod: z.record(z.string(), z.string().max(2048)).default({}).catch({}),
   // Additive tolerant field: corrupt value degrades to false (lock off).
   creqP2pkLock: z.boolean().default(false).catch(false),
-  creqMintsPreferred: z.boolean().default(false).catch(false),
   // Additive tolerant field: a corrupt map degrades to {} (all mints
   // advertised again) instead of wiping the store.
   creqExcludedMints: z.record(z.string().max(2048), z.boolean()).default({}).catch({}),
@@ -111,7 +108,6 @@ export const useMintStore = create<MintStore>()(
       standingQuotes: {},
       receiveMintByMethod: {},
       creqP2pkLock: false,
-      creqMintsPreferred: false,
       creqExcludedMints: {},
       bip321ExcludedRails: {},
 
@@ -130,11 +126,6 @@ export const useMintStore = create<MintStore>()(
       setStandingQuote: (key: string, quoteId: string) => {
         storeLog.info('store.mint.set_standing_quote', { keyLength: key.length });
         set((state) => ({ standingQuotes: { ...state.standingQuotes, [key]: quoteId } }));
-      },
-
-      setCreqMintsPreferred: (enabled: boolean) => {
-        storeLog.info('store.mint.set_creq_mints_preferred', { enabled });
-        set({ creqMintsPreferred: enabled });
       },
 
       setCreqP2pkLock: (enabled: boolean) => {
@@ -196,7 +187,6 @@ export const useMintStore = create<MintStore>()(
         standingQuotes: state.standingQuotes,
         receiveMintByMethod: state.receiveMintByMethod,
         creqP2pkLock: state.creqP2pkLock,
-        creqMintsPreferred: state.creqMintsPreferred,
         creqExcludedMints: state.creqExcludedMints,
         bip321ExcludedRails: state.bip321ExcludedRails,
       }),

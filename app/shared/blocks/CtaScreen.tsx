@@ -13,7 +13,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Button } from '@/shared/ui/primitives/Button';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { SelectableCheck } from '@/shared/ui/primitives/SelectableCheck';
+import { ControlField, Label } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { CTA_DEFINITIONS } from '@/shared/lib/cta/definitions';
@@ -163,16 +163,21 @@ export function CtaScreen({ id }: { id: CtaId }) {
             </Text>
           )}
           {cta.dismissPolicy === 'do-not-ask-again' && (
-            <Pressable
+            <ControlField
               testID="cta-dont-ask"
               accessibilityRole="checkbox"
               accessibilityLabel="Do not ask me again"
               accessibilityState={{ checked: dontAsk }}
-              onPress={() => setDontAsk(!dontAsk)}
-              className="min-h-12 flex-row items-center justify-center gap-3">
-              <SelectableCheck selected={dontAsk} />
-              <Text>Do not ask me again</Text>
-            </Pressable>
+              accessibilityValue={{ text: dontAsk ? '1' : '0' }}
+              isSelected={dontAsk}
+              onSelectedChange={setDontAsk}>
+              <View className="flex-1">
+                <Label>
+                  <Label.Text className="text-sm">Do not ask me again</Label.Text>
+                </Label>
+              </View>
+              <ControlField.Indicator />
+            </ControlField>
           )}
         </View>
       </ScreenScrollView>

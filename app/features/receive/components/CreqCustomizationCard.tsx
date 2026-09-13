@@ -30,9 +30,7 @@ import { copyPopup } from '@/shared/lib/popup';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { paymentLog } from '@/shared/lib/logger';
 import Icon from '@/assets/icons';
-import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { Text } from '@/shared/ui/primitives/Text';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { ANIMATE_THRESHOLD } from '@/shared/lib/qr';
 
 interface CreqCustomizationCardProps {
@@ -72,10 +70,8 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
   sectionTitle = 'CASHU PAYMENT REQUEST',
 }: CreqCustomizationCardProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [preferredExplained, setPreferredExplained] = useState(false);
-  const setCreqMintsPreferred = useMintStore((s) => s.setCreqMintsPreferred);
-  // Coco 2.0.0 validatePayload rejects untrusted AND non-operation mints.
-  // Enable Preferred only after incoming claims have an add-mint recovery path.
+  // Requests are always strict (NUT-18 `mp` absent): Coco 2.0.0 cannot claim a
+  // payment from a mint the wallet has not added, so "Preferred" is not offered.
 
   // Contradictory persisted state: the lock is on but every NUT-11-capable mint
   // was toggled off earlier (while the lock was off). The selection already
@@ -233,30 +229,6 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
             <Text testID="receive-creq-size" size={12} className="text-muted py-3">
               {`Request size: ${encodedRequest.length} chars · ${encodedRequest.length >= ANIMATE_THRESHOLD ? 'animated' : 'static'} QR`}
             </Text>
-            <View testID="receive-creq-mints-mode" className="gap-2">
-              <Text size={14}>Accepted mints</Text>
-              <UnderlineTabs
-                tabs={['Required', 'Preferred']}
-                selectedTab="Required"
-                testIDFor={(mode) => `receive-creq-mints-mode-${mode.toLowerCase()}`}
-                handleTabPress={(mode) => {
-                  setCreqMintsPreferred(false);
-                  setPreferredExplained(mode === 'Preferred');
-                }}
-              />
-              <Text size={12} className="text-muted">
-                Required: the payer must pay from one of the mints above. Anything else is refused.
-              </Text>
-              <Text size={12} className="text-muted">
-                Preferred: the payer should use these mints but may pay from another one.
-              </Text>
-              {preferredExplained ? (
-                <Text testID="receive-creq-mints-mode-note" size={12} className="text-muted">
-                  Preferred is not available yet: Sovran cannot claim a payment from a mint you have
-                  not added, so requests stay Required for now.
-                </Text>
-              ) : null}
-            </View>
           </View>
         ) : null}
       </ListGroup>
