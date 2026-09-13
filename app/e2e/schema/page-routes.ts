@@ -2,6 +2,7 @@
  * coverage claim. The audit gate rejects unregistered new routes. */
 import type { CANONICAL_PAGES } from './pages';
 export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], readonly string[]>> = {
+  'profile-switcher': [], // Imperative sheet entered from the drawer; no route alias.
   ai: ['(drawer)/(tabs)/ai/index.tsx'],
   contacts: ['(drawer)/(tabs)/contacts/index.tsx'],
   feed: ['(drawer)/(tabs)/feed/index.tsx'],
