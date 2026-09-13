@@ -559,9 +559,34 @@ export function arrange(layout, aspect, size, ratios, copyBottom) {
     add(1, region.width / 2 - w * 0.2, 0, w * 0.94, 5, 0.18);
     add(0, region.width / 2 - w * 0.87, region.height * 0.14, w, -5);
   } else if (layout.id === "triptych" && aspect === "tall") {
-    for (let i = 2; i >= 0; i--) {
-      const w = (region.height * (0.42 - i * 0.055)) / ratios[i];
-      add(i, (region.width - w) / 2, i * region.height * 0.3, w, 0, i * 0.1);
+    for (let i = 0; i < 3; i++) {
+      const w = region.width * (0.53 - i * 0.025);
+      add(
+        i,
+        [0, region.width - w, region.width * 0.16][i],
+        i * region.height * 0.24,
+        w,
+        0,
+        (2 - i) * 0.08,
+      );
+    }
+  } else if (layout.id === "pack" && aspect === "tall") {
+    const rows = Math.ceil(n / 2),
+      gap = unit * 0.045,
+      cellHeight = (region.height - gap * (rows - 1)) / rows,
+      w = Math.min((region.width - gap) / 2, cellHeight / Math.max(...ratios));
+    for (let i = 0; i < n; i++) {
+      const row = Math.floor(i / 2),
+        lastSingle = i === n - 1 && n % 2 === 1;
+      add(
+        i,
+        lastSingle
+          ? (region.width - w) / 2
+          : (region.width - w * 2 - gap) / 2 + (i % 2) * (w + gap),
+        row * (cellHeight + gap),
+        w,
+        lastSingle ? 0 : i % 2 === 0 ? -2 : 2,
+      );
     }
   } else if (layout.id === "triptych" || layout.id === "pack") {
     const step = region.width / n;
@@ -594,6 +619,22 @@ export function arrange(layout, aspect, size, ratios, copyBottom) {
     add(0, (region.width - w) / 2, 0, w);
   }
   let bounds = positions.map(phoneBounds);
+  if (aspect === "tall" && ["pack", "triptych"].includes(layout.id)) {
+    const left = Math.min(...bounds.map((b) => b.x)),
+      top = Math.min(...bounds.map((b) => b.y)),
+      width = Math.max(...bounds.map((b) => b.x + b.width)) - left,
+      height = Math.max(...bounds.map((b) => b.y + b.height)) - top,
+      scale = Math.min(region.width / width, region.height / height);
+    for (const p of positions) {
+      p.x =
+        region.x + (region.width - width * scale) / 2 + (p.x - left) * scale;
+      p.y =
+        region.y + (region.height - height * scale) / 2 + (p.y - top) * scale;
+      p.width *= scale;
+      p.height *= scale;
+    }
+    bounds = positions.map(phoneBounds);
+  }
   const left = Math.min(...bounds.map((b) => b.x)),
     right = Math.max(...bounds.map((b) => b.x + b.width));
   if (right - left > region.width && layout.id !== "closeup") {

@@ -14,6 +14,8 @@ import {
   applicability,
   renderArtwork,
   assertNoCollision,
+  arrange,
+  phoneBounds,
   restoreCentre,
   portalCanvas,
   main,
@@ -136,6 +138,55 @@ test("copy collision guard includes the rotated bezel, not only the unrotated sc
     () => assertNoCollision(copy, [{ ...p, rotate: 30 }]),
     /collides/,
   );
+});
+
+test("tall album packs fill the canvas while keeping every complete phone in frame", () => {
+  const pack = project.layouts.layouts.find((l) => l.id === "pack");
+  for (const count of [3, 4, 5]) {
+    const positions = arrange(
+      pack,
+      "tall",
+      ASPECTS.tall,
+      Array(count).fill(2.17),
+      350,
+    );
+    assertNoCollision(
+      { x: 67.5, y: 67.5, width: 945, height: 282.5 },
+      positions,
+    );
+    const bounds = positions.map(phoneBounds);
+    assert(Math.max(...bounds.map((b) => b.y + b.height)) > 1800);
+    for (const b of bounds) {
+      assert(b.x >= 66 && b.x + b.width <= 1014);
+      assert(b.y >= 400 && b.y + b.height <= 1854);
+    }
+    for (const [index, b] of bounds.entries()) {
+      assertNoCollision(b, positions.slice(index + 1));
+    }
+  }
+});
+
+test("tall triptychs spread across the canvas and paint lower phones above earlier screens", () => {
+  const triptych = project.layouts.layouts.find((l) => l.id === "triptych");
+  const positions = arrange(
+    triptych,
+    "tall",
+    ASPECTS.tall,
+    [2.17, 2.17, 2.17],
+    350,
+  );
+  const bounds = positions.map(phoneBounds);
+  assert.deepEqual(
+    positions.map((p) => p.index),
+    [0, 1, 2],
+  );
+  assert(
+    Math.max(...bounds.map((b) => b.x + b.width)) -
+      Math.min(...bounds.map((b) => b.x)) >
+      800,
+  );
+  assert(Math.max(...bounds.map((b) => b.y + b.height)) > 1800);
+  assertNoCollision({ x: 67.5, y: 67.5, width: 945, height: 282.5 }, positions);
 });
 
 test("missing sources fail strict checks, including missing masks on unselected portal variants", async () => {

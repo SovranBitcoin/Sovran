@@ -18,7 +18,7 @@
   "layouts": [
     {
       "id": "hero-fan",
-      "description": "Reference look of the current feature graphic: copy column left; 3–4 phones stepped to the right, receding in depth (dimmer, smaller behind).",
+      "description": "Reference look of the current feature graphic: copy column left; 3\u20134 phones stepped to the right, receding in depth (dimmer, smaller behind).",
       "phones": {
         "min": 3,
         "max": 4
@@ -44,7 +44,7 @@
     },
     {
       "id": "duo",
-      "description": "Two phones overlapping — front lower-left, back upper-right; copy top-left.",
+      "description": "Two phones overlapping \u2014 front lower-left, back upper-right; copy top-left.",
       "phones": {
         "min": 2,
         "max": 2
@@ -57,7 +57,7 @@
     },
     {
       "id": "triptych",
-      "description": "Three upright phones in a row, even spacing, no rotation; copy centred above. Tall: stacked vertically with scale falloff.",
+      "description": "Three upright phones in a row, even spacing, no rotation; copy centred above. Tall: a broad, descending zigzag with overlapping lower edges.",
       "phones": {
         "min": 3,
         "max": 3
@@ -96,7 +96,7 @@
     },
     {
       "id": "portal",
-      "description": "Wallpaper background (blurred σ≈24, darkened 35 %) with the phone screen showing the same wallpaper sharp and canvas-aligned; wide/square canvases use the wide panorama, tall uses the portrait. Needs the matching wallet-<themeName> capture.",
+      "description": "Wallpaper background (blurred \u03c3\u224824, darkened 35 %) with the phone screen showing the same wallpaper sharp and canvas-aligned; wide/square canvases use the wide panorama, tall uses the portrait. Needs the matching wallet-<themeName> capture.",
       "phones": {
         "min": 1,
         "max": 1
@@ -109,7 +109,7 @@
     },
     {
       "id": "pack",
-      "description": "Album showcase: 3–5 phones each with a different wallpaper of one album on the album hero's blurred background; copy above.",
+      "description": "Album showcase: 3\u20135 phones with different wallpapers on the album hero's blurred background; copy above. Tall: balanced two-column rows, with a final single phone centred.",
       "phones": {
         "min": 3,
         "max": 5

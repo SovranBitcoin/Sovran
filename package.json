@@ -49,7 +49,8 @@
     "legal:check": "node scripts/legal.mjs --check-site",
     "legal:publication-check": "node scripts/legal.mjs --publication-check",
     "assets:artwork": "node scripts/artwork.mjs",
-    "assets:artwork:check": "node scripts/artwork.mjs --check"
+    "assets:artwork:check": "node scripts/artwork.mjs --check",
+    "assets:wallpapers": "node scripts/fetch-wallpapers.mjs"
   },
   "devDependencies": {
     "opentype.js": "2.0.0",

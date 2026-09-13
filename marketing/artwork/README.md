@@ -43,6 +43,9 @@ portal and pack. Every applicable layout renders in all three aspects. A concept
 lists ordered screenshots, background (`brand`, `wallpaper`, `tint`), allowed
 layouts and its copy key. One-phone layouts use the first screenshot; hero-fan
 paints the first screenshot in front; pack uses distinct images of one album.
+Tall pack layouts use two-column rows instead of shrinking a landscape row into the
+upper half of a portrait canvas. Tall triptychs use a broad descending zigzag; lower
+phones paint above earlier screens so every phone header stays visible.
 Insufficient phone counts are n/a, not duplicated captures. Missing registered
 captures are drafts, not n/a.
 
@@ -74,7 +77,10 @@ one sentence, one full stop; no exclamation marks or chains of period fragments.
 all alternatives and independent zero-based headline/subtitle choices, initially
 zero. Some supplied choices themselves exceed the preferred word count or use
 multiple sentences; they are explicit editorial exceptions, not silently rewritten.
-Changing choices is a human editorial decision. Increment the copy version when
+Revision 2 tightens the backup language: a phrase is not a guarantee that all funds,
+accounts or message history can be restored. Artemis concepts now name the collection
+and its per-currency wallpapers. The original selection indexes remain unchanged.
+Increment the copy version when
 revising wording; hashes also detect choice/content changes. These files record
 the supplied copy direction, not a new independent product-claims certification.
 
@@ -88,8 +94,8 @@ already supplied the snapshot and portrait bytes. For an explicit refresh in a
 network-enabled environment:
 
 ```sh
-node scripts/fetch-wallpapers.mjs                    # download pinned portraits
-node scripts/fetch-wallpapers.mjs --refresh-catalog  # deliberately refresh snapshot
+bun run assets:wallpapers                    # download pinned portraits
+bun run assets:wallpapers --refresh-catalog  # deliberately refresh snapshot
 ```
 
 Review the refreshed catalog and acquire corresponding panoramas/provenance before

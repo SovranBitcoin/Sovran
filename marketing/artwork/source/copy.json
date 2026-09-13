@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "concepts": {
     "app-overview": {
       "headlines": [
@@ -228,13 +228,13 @@
     },
     "themes-artemis": {
       "headlines": [
-        "Pick a look.",
-        "Dress your wallet.",
-        "Your wallet, your colors."
+        "A new perspective.",
+        "Your wallet, beyond Earth.",
+        "A view worth opening."
       ],
       "subtitles": [
-        "Wallpapers and color themes that change with your mood.",
-        "Pick a look and every screen follows."
+        "The Artemis II collection. A different wallpaper for each currency.",
+        "Bring views from Artemis II into your everyday wallet."
       ],
       "chosen": {
         "headline": 0,
@@ -243,11 +243,11 @@
     },
     "portal-artemis": {
       "headlines": [
-        "Your wallet, your colors.",
-        "Pick a look."
+        "A view worth opening.",
+        "Your wallet, beyond Earth."
       ],
       "subtitles": [
-        "Pick a look and every screen follows."
+        "Bring the Artemis II collection into your everyday wallet."
       ],
       "chosen": {
         "headline": 0,
@@ -271,13 +271,13 @@
     },
     "backup": {
       "headlines": [
-        "Lose the phone, not the money.",
-        "One phrase brings it back.",
-        "Twelve words, everything back."
+        "Keep a way back.",
+        "Start with a backup.",
+        "Write it down. Keep it safe."
       ],
       "subtitles": [
-        "Write down twelve words once. Every account comes back with them.",
-        "Wallets, identity, and messages restore from a single recovery phrase."
+        "Save your recovery phrase offline, then check every word.",
+        "A little care today helps you recover your account later."
       ],
       "chosen": {
         "headline": 0,
