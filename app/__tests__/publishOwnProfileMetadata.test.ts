@@ -1,9 +1,13 @@
+import { EventEmitter } from 'node:events';
+import { nostrLog } from '@/shared/lib/logger';
 import type { PublishResult, PublishError } from '@/shared/lib/nostr/publish/types';
 import { errAsync, okAsync, ResultAsync, ok, type Result } from 'neverthrow';
 import {
   publishOwnProfileMetadata,
   ingestOwnProfileMetadata,
   loadOwnProfileMetadata,
+  PROFILE_CREATED_AT_MAX_SKEW_SECONDS,
+  type OwnProfileLoadResult,
 } from '@/shared/lib/nostr/profile/publishOwnProfileMetadata';
 import { useOwnProfileMetadataStore } from '@/shared/stores/profile/ownProfileMetadataStore';
 import { publishEvent } from '@/shared/lib/nostr/publish/publishEvent';
@@ -47,6 +51,7 @@ jest.mock(
     __esModule: true,
     default: jest.fn(),
     normalizeRelayUrl: (url: string) => url,
+    NDKSubscriptionCacheUsage: { ONLY_RELAY: 'ONLY_RELAY' },
     NDKEvent: class {
       id = 'e'.repeat(64);
       sign = jest.fn(async () => {});
@@ -63,17 +68,34 @@ const accepted = {
   failed: [],
   relayResults: [],
 };
-const makeNdk = () =>
-  Object.assign(new NDK(), {
-    signer: { user: async () => ({ pubkey }) },
-    fetchEvent: jest.fn(async () => null),
+const makeNdk = () => {
+  const relay = { url: 'wss://relay.example/' };
+  const subscription = Object.assign(new EventEmitter(), {
+    relayFilters: new Map([[relay.url, []]]),
+    eosesSeen: new Set<{ url: string }>(),
+    stop: jest.fn(),
+    start: jest.fn(async () => {
+      eose();
+    }),
   });
-const publish = (ndk: NDK = makeNdk()) =>
+  const eose = () => {
+    subscription.eosesSeen.add(relay);
+    subscription.emit('eose');
+  };
+  return Object.assign(new NDK(), {
+    signer: { user: async () => ({ pubkey }) },
+    subscribe: jest.fn(() => subscription),
+    subscription,
+    eose,
+  });
+};
+const publish = (ndk: NDK = makeNdk(), initialLoad: OwnProfileLoadResult = { status: 'absent' }) =>
   publishOwnProfileMetadata({
     ndk,
     pubkey,
     accountIndex: 0,
     patch: { name: 'New', picture: null },
+    initialLoad,
   });
 beforeEach(() => {
   jest.clearAllMocks();
@@ -150,12 +172,15 @@ it('a same-id relay echo is idempotent and an older echo cannot regress the prof
   expect(mockIngest).not.toHaveBeenCalled();
 });
 it('a profile switch during the base lookup prevents publishing', async () => {
-  let finish!: (value: null) => void;
+  let finish!: () => void;
   const ndk = makeNdk();
-  ndk.fetchEvent.mockImplementation(
+  ndk.subscription.start.mockImplementation(
     () =>
       new Promise((resolve) => {
-        finish = resolve;
+        finish = () => {
+          ndk.eose();
+          resolve();
+        };
       })
   );
   const result = publish(ndk);
@@ -165,7 +190,7 @@ it('a profile switch during the base lookup prevents publishing', async () => {
     .spyOn(useProfileStore, 'getState')
     .mockReturnValue({ ...useProfileStore.getState(), getActiveProfile: () => undefined });
   listener(useProfileStore.getState(), useProfileStore.getState());
-  finish(null);
+  finish();
   expect((await result)._unsafeUnwrapErr().type).toBe('profile-changed');
   spy.mockRestore();
   expect(publishEvent).not.toHaveBeenCalled();
@@ -173,12 +198,13 @@ it('a profile switch during the base lookup prevents publishing', async () => {
 it('a stalled base fetch settles at three seconds and retains the local snapshot', async () => {
   jest.useFakeTimers();
   const ndk = makeNdk();
-  ndk.fetchEvent.mockImplementation(() => new Promise(() => {}));
+  ndk.subscription.start.mockImplementation(() => new Promise(() => {}));
   const latest = { content: { about: 'keep' }, createdAt: 20, eventId: 'b'.repeat(64) };
   useOwnProfileMetadataStore.getState().setLatest(latest);
   const loading = loadOwnProfileMetadata(ndk, pubkey);
   await jest.advanceTimersByTimeAsync(3000);
-  expect(await loading).toEqual(latest);
+  expect(await loading).toEqual({ status: 'found', snapshot: latest });
+  expect(ndk.subscription.stop).toHaveBeenCalledTimes(1);
   jest.useRealTimers();
 });
 
@@ -186,11 +212,11 @@ it('preserves the freshest fetched base, including fields unseen by the editor',
   useOwnProfileMetadataStore
     .getState()
     .setLatest({ content: { about: 'Old' }, createdAt: 10, eventId: 'b'.repeat(64) });
-  const ndk = new NDK();
-  Object.assign(ndk, {
-    signer: { user: async () => ({ pubkey }) },
-    fetchEvent: async () => ({
+  const ndk = makeNdk();
+  ndk.subscription.start.mockImplementation(async () => {
+    ndk.subscription.emit('event', {
       pubkey,
+      kind: 0,
       id: 'c'.repeat(64),
       created_at: 20,
       content: JSON.stringify({
@@ -199,7 +225,8 @@ it('preserves the freshest fetched base, including fields unseen by the editor',
         display_name: 'Old',
         extension: { keep: true },
       }),
-    }),
+    });
+    ndk.eose();
   });
   await publish(ndk);
   const event = jest.mocked(publishEvent).mock.calls[0][0].event;
@@ -247,4 +274,114 @@ it('a profile switch while publishing clears optimism and ignores late acceptanc
   spy.mockRestore();
   expect(mockUpdate).not.toHaveBeenCalled();
   expect(mockIngest).not.toHaveBeenCalled();
+});
+
+it('refuses a timed-out base lookup when a cached name proves a profile exists', async () => {
+  jest.useFakeTimers();
+  const spy = jest.spyOn(useProfileStore, 'getState').mockReturnValue({
+    ...useProfileStore.getState(),
+    getActiveProfile: () => ({
+      pubkey,
+      accountIndex: 0,
+      addedAt: 0,
+      cachedDisplayName: 'Existing',
+    }),
+  });
+  const ndk = makeNdk();
+  ndk.subscription.start.mockImplementation(() => new Promise(() => {}));
+  const pending = publish(ndk);
+  await jest.advanceTimersByTimeAsync(3000);
+  const result = await pending;
+  spy.mockRestore();
+  jest.useRealTimers();
+  expect(result.isErr() && result.error.type).toBe('base-unavailable');
+  expect(publishEvent).not.toHaveBeenCalled();
+  expect(useOwnProfileMetadataStore.getState().optimistic).toBeNull();
+});
+
+it('publishes an empty base only after mount and save both receive empty relay EOSE', async () => {
+  const ndk = makeNdk();
+  const initialLoad = await loadOwnProfileMetadata(ndk, pubkey);
+  expect(initialLoad).toEqual({ status: 'absent' });
+  expect((await publish(ndk, initialLoad)).isOk()).toBe(true);
+  expect(ndk.subscribe).toHaveBeenCalledTimes(2);
+  expect(ndk.subscribe).toHaveBeenCalledWith(
+    { kinds: [0], authors: [pubkey] },
+    { cacheUsage: 'ONLY_RELAY', closeOnEose: false },
+    undefined,
+    false
+  );
+  expect(JSON.parse(jest.mocked(publishEvent).mock.calls[0][0].event.content)).toEqual({
+    name: 'New',
+    display_name: 'New',
+  });
+});
+it('refuses an empty save lookup after an unavailable mount lookup', async () => {
+  expect((await publish(makeNdk(), { status: 'unavailable' }))._unsafeUnwrapErr().type).toBe(
+    'base-unavailable'
+  );
+  expect(publishEvent).not.toHaveBeenCalled();
+});
+it.each(['cachedDisplayName', 'cachedPicture'] as const)(
+  'refuses two empty lookups when %s is cached',
+  async (field) => {
+    const spy = jest.spyOn(useProfileStore, 'getState').mockReturnValue({
+      ...useProfileStore.getState(),
+      getActiveProfile: () => ({ pubkey, accountIndex: 0, addedAt: 0, [field]: 'existing' }),
+    });
+    const result = await publish();
+    spy.mockRestore();
+    expect(result._unsafeUnwrapErr().type).toBe('base-unavailable');
+    expect(publishEvent).not.toHaveBeenCalled();
+  }
+);
+it.each(['timeout', 'error', 'invalid', 'synthetic-eose', 'partial-eose'])(
+  'does not classify %s as no kind-0',
+  async (failure) => {
+    jest.useFakeTimers();
+    const ndk = makeNdk();
+    ndk.subscription.start.mockImplementation(async () => {
+      if (failure === 'error') throw new Error('offline');
+      if (failure === 'invalid') {
+        ndk.subscription.emit('event', { pubkey, kind: 0, content: 'not json' });
+        ndk.eose();
+      }
+      if (failure === 'synthetic-eose') ndk.subscription.emit('eose');
+      if (failure === 'partial-eose') {
+        ndk.subscription.relayFilters.set('wss://other.example/', []);
+        ndk.eose();
+      }
+    });
+    const pending = publish(ndk);
+    await jest.advanceTimersByTimeAsync(3000);
+    const result = await pending;
+    jest.useRealTimers();
+    expect(result._unsafeUnwrapErr().type).toBe('base-unavailable');
+    expect(ndk.subscription.stop).toHaveBeenCalledTimes(1);
+    expect(publishEvent).not.toHaveBeenCalled();
+  }
+);
+it('clamps a future base and logs only its delta once per publish', async () => {
+  jest.useFakeTimers().setSystemTime(1000000);
+  const createdAt = 100000;
+  useOwnProfileMetadataStore.getState().setLatest({
+    content: { lud16: 'keep', nip05: 'keep', banner: 'keep', about: 'keep', website: 'keep' },
+    createdAt,
+    eventId: 'b'.repeat(64),
+  });
+  await publish();
+  const event = jest.mocked(publishEvent).mock.calls[0][0].event;
+  expect(event.created_at).toBe(1000 + PROFILE_CREATED_AT_MAX_SKEW_SECONDS);
+  expect(JSON.parse(event.content)).toMatchObject({
+    lud16: 'keep',
+    nip05: 'keep',
+    banner: 'keep',
+    about: 'keep',
+    website: 'keep',
+  });
+  expect(nostrLog.warn).toHaveBeenCalledTimes(1);
+  expect(nostrLog.warn).toHaveBeenCalledWith('nostr.profile.publish.clock_skew', {
+    deltaSeconds: createdAt - 1000,
+  });
+  jest.useRealTimers();
 });
