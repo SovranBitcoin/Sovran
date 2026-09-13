@@ -1,3 +1,4 @@
+import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { useEffect } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { useIsFocused } from 'expo-router/react-navigation';
@@ -32,7 +33,8 @@ export function BackupWordsScreen() {
           />
         </BottomButtons>
       }>
-      <View testID="backup-words" className="gap-6 px-4 py-6">
+      <View className="gap-6 px-4 py-6">
+        <E2EAccessibilityProbe testID="backup-words" accessibilityLabel="Backup words" value="1" />
         <Text size={24} bold>
           Write down these 12 words in order
         </Text>

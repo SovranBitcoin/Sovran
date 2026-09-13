@@ -1,3 +1,4 @@
+import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
 import { Screen } from '@/shared/ui/composed/Screen';
@@ -30,7 +31,8 @@ export function BackupIntroScreen() {
           />
         </BottomButtons>
       }>
-      <View testID="backup-intro" className="gap-6 px-4 py-6">
+      <View className="gap-6 px-4 py-6">
+        <E2EAccessibilityProbe testID="backup-intro" accessibilityLabel="Backup intro" value="1" />
         <Text size={24} bold>
           Back up your wallet
         </Text>

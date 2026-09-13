@@ -1,3 +1,4 @@
+import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import Icon from '@/assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useEffect, useRef, useState } from 'react';
@@ -71,7 +72,8 @@ export function BackupVerifyScreen() {
   };
   return (
     <Screen name="BackupVerifyScreen">
-      <View testID="backup-verify" className="gap-6 px-4 py-6">
+      <View className="gap-6 px-4 py-6">
+        <E2EAccessibilityProbe testID="backup-verify" accessibilityLabel="Backup verify" value="1" />
         <Text size={24} bold>
           Quick check
         </Text>
