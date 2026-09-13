@@ -136,9 +136,10 @@ the JSON harness has no loop instruction.
 
 The harness currently only accepts canonical page names for screenshot `name`.
 Keep `name: "wallet"`; retain the seven wallet occurrences as these source keys,
-in order: `wallet-navy`, `wallet-sunset`, `wallet-beige`, `wallet-looking-back-at-earth`,
-`wallet-edge-of-lunar-day`, `wallet-setting-earth`, `wallet-in-eclipse` (the album's
-first wallpaper is already active after applying the album, so it is selected last).
+in order: `wallet-navy`, `wallet-sunset`, `wallet-beige`, then the Artemis captures
+per mock currency — sat `wallet-setting-earth`, usd `wallet-edge-of-lunar-day`,
+eur `wallet-looking-back-at-earth`, gbp `wallet-in-eclipse` — taken by switching
+the wallet unit after each currency received its own collection wallpaper.
 All provenance entries use `page: wallet` and the matching `wallpaperId`. This
 avoids changing runtime or harness schema for a marketing task. Copy exact PNG
 bytes from the capture run and fill in `run`/`sha256`; never relabel an unrelated

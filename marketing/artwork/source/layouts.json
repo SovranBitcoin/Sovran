@@ -89,7 +89,7 @@
         "max": 1
       },
       "copyBlock": {
-        "wide": "top",
+        "wide": "left",
         "tall": "top",
         "square": "top"
       }

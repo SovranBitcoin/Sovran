@@ -532,7 +532,7 @@ export function arrange(layout, aspect, size, ratios, copyBottom) {
       const depth = (n - 1 - i) / (n - 1);
       const w =
         region.width *
-        (aspect === "wide" ? 0.3 + depth * 0.14 : 0.44 + depth * 0.2);
+        (aspect === "wide" ? 0.4 + depth * 0.16 : 0.44 + depth * 0.2);
       add(
         i,
         region.width * depth * (aspect === "wide" ? 0.56 : 0.36),
@@ -543,7 +543,10 @@ export function arrange(layout, aspect, size, ratios, copyBottom) {
       );
     }
   } else if (layout.id === "spotlight" || layout.id === "portal") {
-    const w = Math.min(region.width * 0.7, (region.height / ratios[0]) * 0.92);
+    // Side-copy canvases let the phone run off the bottom edge (reference
+    // feature graphic); tall keeps the whole phone visible.
+    const bleed = layout.id === "portal" ? 0.92 : aspect === "tall" ? 0.92 : 1.28;
+    const w = Math.min(region.width * 0.72, (region.height / ratios[0]) * bleed);
     add(
       0,
       (region.width - w) / 2,
@@ -553,8 +556,8 @@ export function arrange(layout, aspect, size, ratios, copyBottom) {
     );
   } else if (layout.id === "duo") {
     const w = Math.min(
-      region.width * 0.43,
-      (region.height / Math.max(...ratios)) * 0.9,
+      region.width * 0.46,
+      (region.height / Math.max(...ratios)) * (aspect === "tall" ? 0.9 : 1.34),
     );
     add(1, region.width / 2 - w * 0.2, 0, w * 0.94, 5, 0.18);
     add(0, region.width / 2 - w * 0.87, region.height * 0.14, w, -5);
@@ -591,7 +594,10 @@ export function arrange(layout, aspect, size, ratios, copyBottom) {
   } else if (layout.id === "triptych" || layout.id === "pack") {
     const step = region.width / n;
     for (let i = 0; i < n; i++) {
-      const w = Math.min(step * 0.88, (region.height / ratios[i]) * 0.96);
+      const w = Math.min(
+        step * 0.88,
+        (region.height / ratios[i]) * (aspect === "wide" ? 1.1 : 0.96),
+      );
       add(
         i,
         step * i + (step - w) / 2,
@@ -602,8 +608,8 @@ export function arrange(layout, aspect, size, ratios, copyBottom) {
     }
   } else if (layout.id === "stack") {
     const w = Math.min(
-      region.width * 0.5,
-      (region.height / Math.max(...ratios)) * 0.95,
+      region.width * 0.52,
+      (region.height / Math.max(...ratios)) * (aspect === "tall" ? 0.95 : 1.25),
     );
     for (let i = 2; i >= 0; i--)
       add(
@@ -615,7 +621,8 @@ export function arrange(layout, aspect, size, ratios, copyBottom) {
         i * 0.15,
       );
   } else if (layout.id === "closeup") {
-    const w = (H - region.y) / (ratios[0] * 0.6);
+    const visible = aspect === "tall" ? 0.6 : 0.55;
+    const w = Math.min(region.width * 0.9, (H - region.y) / (ratios[0] * visible));
     add(0, (region.width - w) / 2, 0, w);
   }
   let bounds = positions.map(phoneBounds);
@@ -810,7 +817,9 @@ export async function renderArtwork(
     wallpaper,
     centreRestored = false,
     centreStrip = null;
-  const id = spec.background.wallpaperId;
+  // Wallpaper and palette backgrounds belong to the album layouts only; every
+  // other layout keeps the brand spotlight so a concept does not go navy for no reason.
+  const id = ["pack", "portal"].includes(layout.id) ? spec.background.wallpaperId : undefined;
   if (id && inputs.wallpapers[id]) {
     let source = inputs.wallpapers[id];
     if (layout.id === "portal" && aspect !== "tall" && project.wide[id]) {
