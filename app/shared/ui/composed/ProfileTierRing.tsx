@@ -274,20 +274,23 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
             <Defs>
               <Path id={`${uid}-label-path`} d={labelPath} />
             </Defs>
-            {/* engraved: a light lip a hair below, dark ink on top */}
+            {/* engraved: a dark copy offset toward the light (up-left, i.e. toward
+                the centre on this arc), a light face on top — the cut edge shows
+                as the dark sliver along the letters' upper-left */}
             <Text
-              fill="rgba(255,255,255,0.55)"
+              fill="rgba(0,0,0,0.75)"
               fontSize={fontSize}
               fontWeight="800"
               letterSpacing={1.3 * scale}
               textAnchor="middle"
-              dy={0.6 * scale}>
+              dx={-0.45 * scale}
+              dy={-0.7 * scale}>
               <TextPath href={`#${uid}-label-path`} startOffset="50%">
                 {PROFILE_TIER_LABEL[tier]}
               </TextPath>
             </Text>
             <Text
-              fill="rgba(0,0,0,0.55)"
+              fill="rgba(255,255,255,0.9)"
               fontSize={fontSize}
               fontWeight="800"
               letterSpacing={1.3 * scale}

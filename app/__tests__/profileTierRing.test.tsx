@@ -128,9 +128,14 @@ describe('ProfileTierRing', () => {
     // Bevel arcs, kisses and rim sit OUTSIDE the film group.
     expect(byTestId(root, 'sk-path')).toHaveLength(2);
     expect(byTestId(film!, 'sk-path')).toHaveLength(0);
-    // Engraved: the same word twice (light lip under dark ink).
+    // Engraved: the same word twice — an offset dark copy under a light face.
     const inscriptions = byTestId(root, 'svg-text-path');
     expect(inscriptions.map((n) => n.props.children)).toEqual(['GOLD', 'GOLD']);
+    const [shadow, face] = byTestId(root, 'svg-text');
+    expect(shadow!.props.dy).toBeLessThan(0);
+    expect(shadow!.props.fill).toMatch(/^rgba\(0,0,0/);
+    expect(face!.props.dy).toBeUndefined();
+    expect(face!.props.fill).toMatch(/^rgba\(255,255,255/);
     expect(byTestId(root, 'svg-root')[0]!.props.accessibilityLabel).toBe('GOLD tier');
   });
 
