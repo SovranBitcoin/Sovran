@@ -6,6 +6,7 @@ import { RatingBarChart } from '@/features/mint/components/RatingBarChart';
 import { reviewMint, type MintRecommendation } from '@/shared/lib/apiClient';
 import { formatRelative } from '@/shared/lib/date';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
+import { mintReviewsCache } from '@/features/mint/data/mintReviewsCache';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -15,7 +16,13 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn(() => Promise.resolve()),
 }));
 jest.mock('@/shared/lib/apiClient', () => ({ reviewMint: jest.fn() }));
-jest.mock('expo-router', () => ({ Stack: { Screen: () => null } }));
+// No data layer in Jest: the facade path falls back to the REST seam mocked above.
+jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({ buildNostrDataLayer: () => null }));
+jest.mock('expo-router', () => ({
+  Stack: { Screen: () => null },
+  useFocusEffect: (effect: () => void | (() => void)) =>
+    jest.requireActual<typeof import('react')>('react').useEffect(effect, [effect]),
+}));
 jest.mock('@/shared/hooks/useGuardedRouter', () => ({
   guardedRouter: { push: jest.fn(), back: jest.fn() },
 }));
@@ -64,6 +71,7 @@ jest.mock('@/shared/ui/primitives/Text', () => ({ Text: 'Text' }));
 jest.mock('@/shared/ui/primitives/Skeleton', () => ({ Skeleton: 'Skeleton' }));
 jest.mock('@/shared/ui/primitives/Avatar', () => ({ Avatar: 'Avatar' }));
 jest.mock('@/shared/ui/primitives/Pressable', () => ({ Pressable: 'Pressable' }));
+jest.mock('@/shared/ui/primitives/Button', () => ({ Button: 'Button' }));
 jest.mock('@/shared/ui/primitives/View/View', () => ({ View: 'View' }));
 jest.mock('@/shared/ui/primitives/View/HStack', () => ({ HStack: 'View' }));
 jest.mock('@/shared/ui/primitives/View/VStack', () => ({ VStack: 'View' }));
@@ -153,6 +161,7 @@ function seedAggregate(favouriteCount?: number) {
 }
 beforeEach(() => {
   jest.clearAllMocks();
+  mintReviewsCache.clear();
   useMintMetadataStore.setState({ byMintUrl: {} });
   jest.mocked(reviewMint).mockImplementation(() => new Promise(() => {}));
 });
@@ -190,19 +199,25 @@ it('shows the shared empty state after a successful empty response', async () =>
   expect(textContent()).toContain('Be the first to share your experience.');
   expect(renderer.root.findAllByType(RatingBarChart)).toHaveLength(0);
 });
-it('renders event identity and compact dates, and refetches ephemeral rows per open', async () => {
+it('renders event identity and compact dates, and serves a re-open from the session cache', async () => {
   jest.mocked(reviewMint).mockResolvedValue(response([review]));
   await renderScreen();
   expect(hosts(`mint-reviews-row-${review.eventId}`)).toHaveLength(1);
   expect(hosts(`mint-reviews-profile-${review.eventId}`)).toHaveLength(1);
   expect(textContent()).toContain('Recommended');
   expect(formatRelative).toHaveBeenCalledWith(review.created_at! * 1000, 'compact');
+  // Rows never reach the durable store; only the aggregate does.
   expect(useMintMetadataStore.getState().getCached(MINT)).not.toHaveProperty('recommendations');
+  expect(useMintMetadataStore.getState().getCached(MINT)?.reviewCount).toBe(1);
   act(() => renderer.unmount());
+  // Fresh in the session cache: paints the same rows with no second round-trip.
+  jest.mocked(reviewMint).mockImplementation(() => new Promise(() => {}));
   await renderScreen();
-  expect(reviewMint).toHaveBeenCalledTimes(2);
+  expect(hosts(`mint-reviews-row-${review.eventId}`)).toHaveLength(1);
+  expect(renderer.root.findAllByProps({ state: 'loading', size: 44 })).toHaveLength(0);
+  expect(reviewMint).toHaveBeenCalledTimes(1);
 });
-it('keeps the aggregate on failure without claiming there are no reviews', async () => {
+it('keeps the aggregate on failure without claiming there are no reviews, and offers a retry', async () => {
   seedAggregate(3);
   jest.mocked(reviewMint).mockResolvedValue(err(new Error('offline')));
   await renderScreen();
@@ -210,6 +225,13 @@ it('keeps the aggregate on failure without claiming there are no reviews', async
   expect(textContent()).toContain("Couldn't load reviews right now.");
   expect(hosts('mint-reviews-empty')).toHaveLength(0);
   expect(renderer.root.findAllByProps({ state: 'loading' })).toHaveLength(0);
+  const retry = renderer.root.findByProps({ testID: 'mint-reviews-retry' });
+  jest.mocked(reviewMint).mockResolvedValue(response([review]));
+  await act(async () => {
+    retry.props.onPress();
+  });
+  expect(reviewMint).toHaveBeenCalledTimes(2);
+  expect(hosts(`mint-reviews-row-${review.eventId}`)).toHaveLength(1);
 });
 it('shows a load failure when a cold request fails', async () => {
   jest.mocked(reviewMint).mockRejectedValue(new Error('offline'));
@@ -229,7 +251,7 @@ it('renders scoreless endorsements without a zero-star rating', async () => {
   expect(renderer.root.findAllByType(RatingBarChart)).toHaveLength(0);
 });
 
-it('aborts an unfinished fetch and ignores its result after unmount', async () => {
+it('aborts an unfinished fetch on unmount and writes nothing from its late result', async () => {
   let resolve!: (value: Awaited<ReturnType<typeof reviewMint>>) => void;
   jest.mocked(reviewMint).mockImplementation(
     () =>
@@ -244,5 +266,10 @@ it('aborts an unfinished fetch and ignores its result after unmount', async () =
   await act(async () => {
     resolve(response([review]));
   });
+  // Neither the durable aggregate nor the session rows: an aborted run is
+  // never written (generation guard), so the next open fetches again.
   expect(useMintMetadataStore.getState().getCached(MINT)).toBeUndefined();
+  expect(mintReviewsCache.getEntry(`reviews:${MINT}`)).toBeUndefined();
+  await renderScreen();
+  expect(reviewMint).toHaveBeenCalledTimes(2);
 });

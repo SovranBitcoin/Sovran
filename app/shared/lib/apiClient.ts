@@ -22,6 +22,7 @@ import {
   parseWith,
   type MintRecommendation as SchemaMintRecommendation,
   type MintSearchResult,
+  type NostrTier,
   type ParseError,
 } from '@sovranbitcoin/schemas';
 import { backendConfig } from '@/shared/config/backend';
@@ -57,13 +58,18 @@ type NostrProfileFullType = z.infer<typeof NostrProfileFull>;
 export type MintRecommendation = Omit<SchemaMintRecommendation, 'score'> & {
   score: number | null;
 } & Partial<Pick<MintReviewRecommendation, 'name' | 'displayName' | 'picture' | 'image'>>;
-type MintReviewsResponseType = {
+export type MintReviewsResponse = {
   mintUrl: string;
   score: number | null;
   recommendations: MintRecommendation[];
   lastUpdated: number | null;
   fromCache: boolean;
+  /** Which tier answered; `degraded` when a fallback tier served it without
+   *  reviewer identities (the screen then names reviewers from the entity cache). */
+  tier?: NostrTier;
+  degraded?: boolean;
 };
+type MintReviewsResponseType = MintReviewsResponse;
 // nagg's rich discovery row — one call returns every mint card field (audit
 // state, units, reviews + favourite split, operator Nostr identity + Vertex
 // reputation), replacing the separate search + per-mint review/profile
@@ -497,6 +503,11 @@ export const discoverMint = async (mintUrl: string, controls?: RequestControls) 
     )
   ).map(({ mints }) => mints[0]);
 
+/**
+ * Reviews for one mint from nagg's REST app-view. Screens read through
+ * `fetchMintReviews` (shared/lib/nostr), which prefers the tiered facade and
+ * falls back to this when no data layer is configured.
+ */
 export const reviewMint = async ({
   mintUrl,
   signal,

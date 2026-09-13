@@ -1,5 +1,5 @@
 import { Screen } from '@/shared/ui/composed/Screen';
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
@@ -12,11 +12,15 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { reviewMint, type MintRecommendation } from '@/shared/lib/apiClient';
+import type { MintRecommendation, MintReviewsResponse } from '@/shared/lib/apiClient';
+import { fetchMintReviews } from '@/shared/lib/nostr/fetchMintReviews';
 import {
   useCachedMintMetadata,
   useMintMetadataStore,
 } from '@/shared/stores/global/mintMetadataStore';
+import { useCachedRead } from '@/shared/lib/read/useCachedRead';
+import { mintReviewsCache, mintReviewsKey } from '@/features/mint/data/mintReviewsCache';
+import { Button } from '@/shared/ui/primitives/Button';
 import { useIdentityName } from '@/shared/hooks/useIdentityName';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
@@ -28,7 +32,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { List } from '@/shared/ui/composed/List';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { cashuLog, redactError, useLifecycleLogger, mintUrlLogFields } from '@/shared/lib/logger';
+import { cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { formatRelative } from '@/shared/lib/date';
 
 /** Commented reviews first, each group newest-first. */
@@ -164,84 +168,42 @@ export function MintReviewsScreen() {
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.reviews' });
   const mintUrl = params?.mintUrl;
 
-  const [kymLoading, setKymLoading] = useState(true);
-  const [loadFailed, setLoadFailed] = useState(false);
-  // Review ROWS are ephemeral — fetched fresh on every open, never persisted
-  // (the raw list is "junk to store forever"). Only the AGGREGATE (score +
-  // count) is durable, read from the unified cache so it survives a failed
-  // fetch and paints the header immediately on a warm open.
-  const [rawReviews, setRawReviews] = useState<MintRecommendation[]>([]);
+  // Review ROWS live in the session-only reviews cache (never persisted); a
+  // re-opened screen paints them at 0ms and revalidates once they are stale.
+  // The AGGREGATE (score + count) is durable in the unified metadata cache so
+  // the header survives a failed row fetch and paints on a warm open.
   const meta = useCachedMintMetadata(mintUrl);
   const kymScore = meta?.averageScore ?? null;
   const aggregateCount = meta?.reviewCount;
-
   useEffect(() => {
-    if (!mintUrl) {
-      cashuLog.warn('mint.reviews.fetch.skipped', { reason: 'missing_mint_url' });
-      setKymLoading(false);
-      setLoadFailed(true);
-      return;
-    }
-    const cachedAtStart = useMintMetadataStore.getState().getCached(mintUrl);
-    setKymLoading(true);
-    setLoadFailed(false);
-    setRawReviews([]);
-    // Always fetch fresh review rows from server. Abort on unmount or if mintUrl
-    // changes mid-flight so a slow fetch doesn't write into a stale screen.
-    const controller = new AbortController();
-    cashuLog.info('mint.reviews.fetch.start', {
-      ...mintUrlLogFields(mintUrl),
-      hasCachedAggregate: !!cachedAtStart?.reviewsAt,
-      cachedScore: cachedAtStart?.averageScore ?? null,
-      cachedReviewCount: cachedAtStart?.reviewCount ?? 0,
-    });
-    reviewMint({ mintUrl, signal: controller.signal })
-      .then((result) => {
-        if (controller.signal.aborted) {
-          cashuLog.debug('mint.reviews.fetch.stale', {
-            ...mintUrlLogFields(mintUrl),
-            reason: 'aborted_before_result',
-          });
-          return;
-        }
-        cashuLog.info('mint.reviews.fetch.result', {
-          ...mintUrlLogFields(mintUrl),
-          ok: result.isOk(),
-          hasScore: result.isOk() && result.value.score !== null,
-          recommendationCount: result.isOk() ? result.value.recommendations.length : 0,
-        });
-        // Rows → local state (ephemeral); aggregate → durable cache. Always
-        // overwrite with the fresh successful result (even a null score / empty
-        // list) so a stale aggregate can't outlive the source. (audit F3)
-        setLoadFailed(result.isErr());
-        if (result.isOk()) {
-          setRawReviews(result.value.recommendations);
-          useMintMetadataStore
-            .getState()
-            .setReviewsAggregate(mintUrl, result.value.score, result.value.recommendations.length);
-        }
-      })
-      .catch((error) => {
-        if (controller.signal.aborted) return;
-        setLoadFailed(true);
-        // On failure the cached aggregate header stays visible; only the row
-        // list falls back to its empty/last-known state.
-        cashuLog.warn('mint.reviews.fetch.failed', {
-          ...mintUrlLogFields(mintUrl),
-          error: redactError(error),
-        });
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setKymLoading(false);
-      });
-    return () => {
-      cashuLog.debug('mint.reviews.fetch.abort', { ...mintUrlLogFields(mintUrl) });
-      controller.abort();
-    };
+    if (!mintUrl) cashuLog.warn('mint.reviews.fetch.skipped', { reason: 'missing_mint_url' });
   }, [mintUrl]);
 
-  const isLoading = kymLoading;
-  const reviews = sortReviews(rawReviews);
+  const read = useCachedRead<MintReviewsResponse>({
+    store: mintReviewsCache,
+    surface: 'mintReviews',
+    key: mintUrl ? mintReviewsKey(mintUrl) : null,
+    viewerKey: '',
+    fetcher: async ({ signal, readId }) => {
+      const result = await fetchMintReviews({ mintUrl: mintUrl ?? '', signal, readId });
+      if (result.isErr()) throw result.error;
+      if (signal?.aborted) return { data: result.value };
+      // Always overwrite the aggregate with the fresh successful result (even
+      // a null score / empty list) so a stale aggregate can't outlive the source.
+      useMintMetadataStore
+        .getState()
+        .setReviewsAggregate(
+          mintUrl ?? '',
+          result.value.score,
+          result.value.recommendations.length
+        );
+      return { data: result.value };
+    },
+  });
+
+  const isLoading = !mintUrl ? false : read.status === 'loading';
+  const loadFailed = !mintUrl || (!!read.error && !read.data);
+  const reviews = sortReviews(read.data?.recommendations ?? []);
   // Header count prefers the durable aggregate (survives a failed row fetch),
   // falling back to the freshly-fetched rows before the first aggregate lands.
   const totalReviews = aggregateCount ?? reviews.length;
@@ -270,10 +232,11 @@ export function MintReviewsScreen() {
     </VStack>
   );
 
-  // Footer-only skeletons: the real reviews populate the list body, so there's
-  // no in-place content to fade into. Route through the canonical helper for
-  // the region wave; `exit="none"` lets them unmount as the list fills.
-  const skeletonCount = reviews.length > 0 ? 2 : 3;
+  // Footer-only skeletons on a cold open (nothing cached yet): the real reviews
+  // populate the list body, so there's no in-place content to fade into. Route
+  // through the canonical helper for the region wave; `exit="none"` lets them
+  // unmount as the list fills. A revalidation keeps the cached rows instead.
+  const skeletonCount = 3;
   const ListFooter = isLoading ? (
     <SkeletonContentCrossfade
       loading
@@ -295,9 +258,20 @@ export function MintReviewsScreen() {
 
   // A failed fetch is distinct from a confirmed empty result, even on a cold open.
   const listEmpty = !isLoading ? (
-    <Text size={14} className="text-foreground/50 mt-6 px-8 text-center">
-      Couldn&apos;t load reviews right now. Reopen to try again.
-    </Text>
+    <VStack className="mt-6 items-center gap-3 px-8">
+      <Text size={14} className="text-foreground/50 text-center">
+        Couldn&apos;t load reviews right now.
+      </Text>
+      {mintUrl ? (
+        <Button
+          testID="mint-reviews-retry"
+          text="Try again"
+          variant="secondary"
+          size="compact"
+          onPress={read.refresh}
+        />
+      ) : null}
+    </VStack>
   ) : null;
 
   return (

@@ -1,4 +1,5 @@
 import type { LegacyMintAudit, MintMetadataEntry } from '@/shared/stores/global/mintMetadataTypes';
+import { auditScoreFromSwaps } from './auditScore';
 
 interface AuditInfo {
   url: string;
@@ -34,7 +35,7 @@ export function transformAuditData(auditData: LegacyMintAudit): AuditInfo {
   const swapTotal = swaps.length;
   const swapSuccess = swaps.reduce((acc, s) => acc + (s.state === 'OK' ? 1 : 0), 0);
   const successRate = swapTotal > 0 ? swapSuccess / swapTotal : undefined;
-  const score = typeof successRate === 'number' ? successRate * 5 : undefined;
+  const score = auditScoreFromSwaps(successRate);
 
   const successfulTimes = swaps
     .filter((s) => s.state === 'OK' && typeof s.time_taken === 'number' && s.time_taken > 0)

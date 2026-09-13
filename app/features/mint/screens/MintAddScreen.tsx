@@ -12,6 +12,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useHeaderSearch } from '@/shared/hooks/useHeaderSearch';
 import { useDebouncedMintValidation } from '@/features/mint/hooks/useDebouncedMintValidation';
 import { useMintSearch } from '@/features/mint/hooks/useMintSearch';
+import { auditScoreFromOps } from '@/features/mint/lib/auditScore';
 import { extractAvailableCurrencies } from '@/features/mint/lib/availableCurrencies';
 import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import type { MintSearchResult } from '@/shared/lib/apiClient';
@@ -216,13 +217,9 @@ function FallbackSearchHeader({
   );
 }
 
-// Search-result preview only: the search endpoint returns `serverStats`
-// (`n_mints`/`n_melts`/`n_errors`) without the per-swap array, so we can't
-// route through `transformAuditData` like the catalog/info paths do. The
-// resulting score is an ops-aggregate approximation; it can disagree with
-// the swap-based score the user sees once the mint is opened. That's
-// accepted — this pill is best-effort during search; authoritative scores
-// come from `getMintCatalog` and `MintInfoScreen`.
+// Search-result preview: discovery rows carry operation counts (no per-swap
+// array), so the pill uses the ops-based score from the single owner — the
+// same number the store writes for the same row, so search and detail agree.
 function computeAuditStats(mint: SearchableMint): {
   auditScore: number | undefined;
   auditTotalOps: number | undefined;
@@ -230,16 +227,14 @@ function computeAuditStats(mint: SearchableMint): {
   if (!('serverStats' in mint) || !mint.serverStats)
     return { auditScore: undefined, auditTotalOps: undefined };
   const { n_mints, n_melts, n_errors } = mint.serverStats;
-  // n_errors is a SEPARATE count of failed operations, not a subset of
-  // n_mints/n_melts (which count successes). So the success rate is
-  // successes / (successes + errors) — bounded 0..1. The old
-  // `1 - errors/successes` went deeply negative for error-heavy mints
-  // (e.g. coinos: 39 successes vs 235 errors → -503%).
-  const successOps = n_mints + n_melts;
-  const totalOps = successOps + n_errors;
-  if (totalOps <= 0) return { auditScore: undefined, auditTotalOps: undefined };
-  const successRate = Math.max(0, Math.min(1, successOps / totalOps)); // 0..1
-  return { auditScore: successRate * 5, auditTotalOps: totalOps };
+  const { score, totalOps } = auditScoreFromOps({
+    nMints: n_mints,
+    nMelts: n_melts,
+    nErrors: n_errors,
+  });
+  return score === null
+    ? { auditScore: undefined, auditTotalOps: undefined }
+    : { auditScore: score, auditTotalOps: totalOps };
 }
 
 // Pre-baked mint row — deferred to the shared `ContactRow` so search results

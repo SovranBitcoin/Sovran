@@ -33,6 +33,7 @@ import { create } from 'zustand';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 
 import { transformAuditData } from '@/features/mint/lib/auditInfo';
+import { auditScoreFromOps } from '@/features/mint/lib/auditScore';
 import type { LegacyMintAudit, MintMetadataEntry } from './mintMetadataTypes';
 import type { DiscoverMint } from '@/shared/lib/apiClient';
 import { evictLruOverCap } from '@/shared/lib/cache/evictLruOverCap';
@@ -267,17 +268,9 @@ export const useMintMetadataStore = create<MintMetadataState>()(
                 m.nErrors !== undefined ||
                 m.uptime24h !== undefined ||
                 m.avgLatencyMs !== undefined;
-              // Match discovery's operation score: successful mints + melts,
-              // with errors counted separately. No operations means no score.
-              const successes = (m.nMints ?? 0) + (m.nMelts ?? 0);
-              const total = successes + (m.nErrors ?? 0);
-              const auditScore =
-                m.nMints !== undefined &&
-                m.nMelts !== undefined &&
-                m.nErrors !== undefined &&
-                total > 0
-                  ? Math.max(0, Math.min(1, successes / total)) * 5
-                  : null;
+              // Discovery's operation score (successes vs errors) — one owner
+              // for the formula so search, store and detail can never disagree.
+              const auditScore = auditScoreFromOps(m).score;
               // A follower COUNT alone is not "social resolved": `resolveNostrProfile`
               // reads the `social` group to decide whether the operator-profile
               // fetch (which yields reputation) can be skipped. A discover row that

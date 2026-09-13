@@ -29,6 +29,27 @@ describe('mint info screen source', () => {
     expect(source).toContain('picture={rowPicture}');
   });
 
+  it('keeps the audit block mounted in one slot for every read state', () => {
+    // The stats block used to mount only once audit scalars existed, so the
+    // page shifted when they landed. Now the slot is always there and swaps
+    // skeleton / values / empty / error content in place, with a Retry.
+    expect(source).not.toContain(
+      "entry?.auditState != null || typeof entry?.auditScore === 'number'"
+    );
+    expect(source).toContain('testID="mint-info-audit-status"');
+    expect(source).toContain('testID="mint-info-audit-retry"');
+    expect(source).toContain('status={detail.audit}');
+    // Unknown counts never render as zero.
+    expect(source).toContain("const UNKNOWN = '—';");
+    expect(source).not.toContain(": '0.0'");
+  });
+
+  it('shows a failed identity read inline with a retry instead of a URL-named mint', () => {
+    expect(source).toContain('testID="mint-info-retry"');
+    expect(source).toContain('onPress={detail.retry}');
+    expect(source).toContain("isLoading={detail.identity === 'loading'}");
+  });
+
   it('renders the shared status dot for every audit state', () => {
     expect(source).toContain('<AvatarStatusDot status={status} size={badgeSize} />');
     expect(source).not.toContain('STATUS_BADGE_CONFIG');

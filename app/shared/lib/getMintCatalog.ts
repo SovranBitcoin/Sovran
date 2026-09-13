@@ -29,7 +29,8 @@ import type { GetInfoResponse } from '@cashu/cashu-ts';
 import type { MintCatalogEntry } from 'wallet';
 
 import { projectMintMeta } from '@/features/mint/lib/auditInfo';
-import { fetchNostrProfile, reviewMint } from '@/shared/lib/apiClient';
+import { fetchNostrProfile } from '@/shared/lib/apiClient';
+import { fetchMintReviews } from '@/shared/lib/nostr/fetchMintReviews';
 import { getDiscoveredMintMetadata } from '@/shared/lib/getDiscoveredMintMetadata';
 import { log, mintUrlLogFields } from '@/shared/lib/logger';
 import {
@@ -145,7 +146,7 @@ async function fetchEntry(
       });
       return null;
     }),
-    reviewMint({ mintUrl, signal }).catch((err) => {
+    fetchMintReviews({ mintUrl, signal }).catch((err) => {
       log.warn('mint.catalog.entry.review_failed', {
         ...mintUrlLogFields(mintUrl),
         error: err instanceof Error ? err : new Error(String(err)),
