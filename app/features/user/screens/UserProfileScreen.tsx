@@ -38,7 +38,7 @@ import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { publishEvent } from '@/shared/lib/nostr/publish';
 import { Card } from '@/shared/ui/composed/Card';
 import { Section } from '@/shared/ui/composed/Section';
-import Icon, { CurrencyIcon } from 'assets/icons';
+import Icon, { CurrencyIcon } from '@/assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { openExternalUrl } from '@/shared/lib/url';
@@ -95,10 +95,42 @@ import {
   mintUrlLogFields,
 } from '@/shared/lib/logger';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
+import { fontSize, iconSize } from '@/shared/styles/tokens';
 
 const BANNER_HEIGHT = 150;
 const AVATAR_SIZE = 90;
 const AVATAR_OVERLAP = AVATAR_SIZE / 4;
+const IDENTITY_LINE_HEIGHT = 20;
+
+export function UserProfileIdentityRow({
+  nip05,
+  isLoading,
+  foreground,
+}: {
+  nip05?: string | null;
+  isLoading: boolean;
+  foreground: string;
+}) {
+  return (
+    <View testID="user-profile-identity-row" className="min-h-5 self-center">
+      <HStack align="center">
+        <View testID="user-profile-identity-icon-slot" className="w-5 shrink-0">
+          {nip05 ? (
+            <Icon name="mdi:check-decagram" size={iconSize.md} color={withAlpha(foreground, 0.4)} />
+          ) : null}
+        </View>
+        <Text
+          loading={isLoading}
+          placeholder="username@relay.example"
+          fallback={'\u00A0'}
+          size={fontSize.md}
+          style={{ color: withAlpha(foreground, 0.4), lineHeight: IDENTITY_LINE_HEIGHT }}>
+          {nip05 ?? undefined}
+        </Text>
+      </HStack>
+    </View>
+  );
+}
 
 const UserProfileParamsSchema = z
   .object({
@@ -812,22 +844,7 @@ function BannerWithAvatar({
               {displayName}
             </Text>
           </View>
-          {(isLoading || nip05) && (
-            <View style={{ alignSelf: 'center' }}>
-              <HStack align="center" gap={4}>
-                {!isLoading && (
-                  <Icon name="mdi:check-decagram" size={16} color={withAlpha(foreground, 0.4)} />
-                )}
-                <Text
-                  loading={isLoading}
-                  placeholder="username@relay.example"
-                  size={14}
-                  style={{ color: withAlpha(foreground, 0.4) }}>
-                  {nip05 || '\u00A0'}
-                </Text>
-              </HStack>
-            </View>
-          )}
+          <UserProfileIdentityRow nip05={nip05} isLoading={isLoading} foreground={foreground} />
           {showFollowButton &&
             (isLoading ? (
               <View
@@ -1499,6 +1516,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   identityBlock: {
+    minHeight: IDENTITY_LINE_HEIGHT,
     alignSelf: 'stretch',
     alignItems: 'center',
   },
