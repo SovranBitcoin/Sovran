@@ -7,17 +7,24 @@
  *     `z.unknown()`, re-validated on read by the consumer).
  *   - profile-scoped storage by default (`createProfileScopedStorage`),
  *     host-scoped (bare AsyncStorage) when the data isn't viewer-specific.
- *   - LRU eviction by `fetchedAt`, in-flight dedupe, SWR via `useCachedQuery`.
+ *   - LRU eviction by `fetchedAt`, in-flight dedupe, SWR via `useCachedRead`
+ *     (`shared/lib/read/useCachedRead.ts`) — the one React consumer.
  *
  * Cold-start vs warm navigation is tracked here via an in-memory touched-epoch
  * map (never persisted), so the cold-start gate costs no AsyncStorage writes.
+ *
+ * Writes are generation-guarded (SYSTEM.md F01): every `run` for a key takes a
+ * new generation, `clear()` bumps a store-wide scope generation, and a
+ * completion whose generation is no longer current never writes — an older
+ * forced read cannot overwrite a newer result, and a late completion after
+ * `clear()` cannot resurrect a wiped entry.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create, type StateCreator, type StoreApi, type UseBoundStore } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { storeLog } from '@/shared/lib/logger';
+import { monotonicNow, storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { currentCacheEpoch } from './cacheSession';
 import { evictLruOverCap } from './evictLruOverCap';
@@ -50,7 +57,39 @@ interface QueryCacheState<TData> {
   clear: () => void;
 }
 
-interface QueryCacheStore<TData> {
+export interface QueryCacheRunOptions {
+  /** Start even if a run for this key is in flight; the older run's write is superseded. */
+  force?: boolean;
+  /** Caller cancellation: an aborted run never writes and rejects with `SupersededError('abort')`. */
+  signal?: AbortSignal;
+  /** Correlation id for `query_cache.run.*` and the caller's `read.*` events; minted when absent. */
+  readId?: string;
+}
+
+/** What a `run` fetcher receives. `partial` writes an early value under the same generation guard. */
+export interface QueryCacheRunContext<TData> {
+  signal: AbortSignal | undefined;
+  readId: string;
+  partial: (data: TData, cursor?: string) => void;
+}
+
+export type QueryCacheSupersededReason = 'newer-request' | 'clear' | 'abort';
+
+/** A run whose completion was no longer current: nothing was written. */
+export class SupersededError extends Error {
+  readonly reason: QueryCacheSupersededReason;
+  constructor(reason: QueryCacheSupersededReason) {
+    super(`query cache run superseded: ${reason}`);
+    this.name = 'SupersededError';
+    this.reason = reason;
+  }
+}
+
+export function isSupersededError(error: unknown): error is SupersededError {
+  return error instanceof Error && error.name === 'SupersededError';
+}
+
+export interface QueryCacheStore<TData> {
   /** Zustand hook — subscribe to `s.byKey[key]` for reactive reads. */
   use: UseBoundStore<StoreApi<QueryCacheState<TData>>>;
   getEntry: (key: string) => QueryCacheEntry<TData> | undefined;
@@ -62,15 +101,28 @@ interface QueryCacheStore<TData> {
   markTouched: (key: string) => void;
   /**
    * Run the fetcher, store the result, and mark the key touched. Concurrent
-   * calls for the same key are deduped unless `force` is set (pull-to-refresh).
+   * calls for the same key join the in-flight run unless `force` is set
+   * (pull-to-refresh), in which case the older run is superseded: its
+   * completion is not written and its awaiters receive the newer result.
    */
   run: (
     key: string,
-    fetcher: () => Promise<{ data: TData; cursor?: string }>,
+    fetcher: (ctx: QueryCacheRunContext<TData>) => Promise<{ data: TData; cursor?: string }>,
     viewerKey: string,
-    force?: boolean
+    opts?: QueryCacheRunOptions
   ) => Promise<TData>;
+  /** Current per-key generation (tests + the read hook's log params). */
+  generation: (key: string) => number;
   staleTtlMs: number;
+}
+
+// Every store created this session, so a profile wipe can invalidate all
+// in-flight completions at once (`clearAllQueryCaches`).
+const registry = new Set<{ clear: () => void }>();
+
+/** Clear every query cache and reject every in-flight completion. */
+export function clearAllQueryCaches(): void {
+  for (const store of registry) store.clear();
 }
 
 const PersistedEntry = z.looseObject({
@@ -154,9 +206,14 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
       }),
     clear: () => {
       const beforeCount = Object.keys(use.getState().byKey).length;
+      scopeGen += 1;
+      genByKey.clear();
+      inFlight.clear();
+      latestRun.clear();
       storeLog.info('query_cache.clear', {
         ...logCtx,
         beforeCount,
+        scopeGen,
       });
       set({ byKey: {} });
     },
@@ -180,7 +237,14 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
 
   // In-memory only (never persisted): which keys were touched this session.
   const touchedEpochByKey = new Map<string, number>();
-  const inFlight = new Map<string, Promise<TData>>();
+  // Generation guards. `genByKey` advances per run; `scopeGen` advances on
+  // clear(). A completion writes only if both still match what it started with.
+  const genByKey = new Map<string, number>();
+  let scopeGen = 0;
+  const inFlight = new Map<string, { gen: number; promise: Promise<TData> }>();
+  // The newest run per key, kept after it settles so a superseded older run can
+  // still hand its awaiters the result that actually won (cleared on clear()).
+  const latestRun = new Map<string, { gen: number; promise: Promise<TData> }>();
 
   const getEntry = (key: string): QueryCacheEntry<TData> | undefined => use.getState().byKey[key];
   const isFresh = (entry: QueryCacheEntry<TData> | undefined): boolean =>
@@ -193,65 +257,111 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
       ...keyMeta(key),
     });
   };
+  const generation = (key: string): number => genByKey.get(key) ?? 0;
 
-  const run = (
-    key: string,
-    fetcher: () => Promise<{ data: TData; cursor?: string }>,
-    viewerKey: string,
-    force = false
-  ): Promise<TData> => {
-    if (!force) {
-      const existing = inFlight.get(key);
-      if (existing) {
-        storeLog.debug('query_cache.run.join_inflight', {
-          ...logCtx,
-          ...keyMeta(key),
-          viewerKeyLength: viewerKey.length,
-        });
-        return existing;
-      }
+  const run: QueryCacheStore<TData>['run'] = (key, fetcher, viewerKey, runOpts = {}) => {
+    const existing = inFlight.get(key);
+    if (existing && !runOpts.force) {
+      storeLog.debug('query_cache.run.join_inflight', {
+        ...logCtx,
+        ...keyMeta(key),
+        readId: runOpts.readId ?? null,
+        gen: existing.gen,
+        viewerKeyLength: viewerKey.length,
+      });
+      return existing.promise;
     }
+    const gen = generation(key) + 1;
+    genByKey.set(key, gen);
+    const myScope = scopeGen;
+    const readId = runOpts.readId ?? `qc${gen.toString(36)}-${logKey}`;
+    const t0 = monotonicNow();
+    const elapsed = () => Math.round((monotonicNow() - t0) * 100) / 100;
     storeLog.info('query_cache.run.start', {
       ...logCtx,
       ...keyMeta(key),
-      force,
+      readId,
+      gen,
+      force: !!runOpts.force,
       viewerKeyLength: viewerKey.length,
       hadEntry: !!getEntry(key),
       fresh: isFresh(getEntry(key)),
     });
-    const promise = fetcher().then(({ data, cursor }) => {
+
+    const currency = (): 'ok' | QueryCacheSupersededReason => {
+      if (runOpts.signal?.aborted) return 'abort';
+      if (scopeGen !== myScope) return 'clear';
+      if (genByKey.get(key) !== gen) return 'newer-request';
+      return 'ok';
+    };
+
+    const partial = (data: TData, cursor?: string): void => {
+      if (currency() !== 'ok') return;
       use.getState().setEntry(key, data, { viewerKey, cursor });
-      markTouched(key);
-      storeLog.info('query_cache.run.done', {
-        ...logCtx,
-        ...keyMeta(key),
-        hasCursor: !!cursor,
-        dataKind: Array.isArray(data) ? 'array' : typeof data,
-      });
-      return data;
-    });
-    inFlight.set(key, promise);
+      storeLog.debug('query_cache.run.partial', { ...logCtx, ...keyMeta(key), readId, gen });
+    };
+
+    const promise = fetcher({ signal: runOpts.signal, readId, partial }).then(
+      ({ data, cursor }): TData | Promise<TData> => {
+        const state = currency();
+        if (state !== 'ok') {
+          storeLog.info('query_cache.run.superseded', {
+            ...logCtx,
+            ...keyMeta(key),
+            readId,
+            gen,
+            currentGen: generation(key),
+            reason: state,
+            duration_ms: elapsed(),
+          });
+          // A newer run for the same key exists: hand its result to whoever awaited us.
+          const newer = state === 'newer-request' ? latestRun.get(key) : undefined;
+          if (newer && newer.gen !== gen) return newer.promise;
+          throw new SupersededError(state);
+        }
+        use.getState().setEntry(key, data, { viewerKey, cursor });
+        markTouched(key);
+        storeLog.info('query_cache.run.done', {
+          ...logCtx,
+          ...keyMeta(key),
+          readId,
+          gen,
+          duration_ms: elapsed(),
+          hasCursor: !!cursor,
+          dataKind: Array.isArray(data) ? 'array' : typeof data,
+        });
+        return data;
+      },
+      (error: unknown) => {
+        storeLog.warn('query_cache.run.failed', {
+          ...logCtx,
+          ...keyMeta(key),
+          readId,
+          gen,
+          duration_ms: elapsed(),
+          superseded: currency() !== 'ok',
+          error: error instanceof Error ? error : new Error(String(error)),
+        });
+        throw error;
+      }
+    );
+    inFlight.set(key, { gen, promise });
+    latestRun.set(key, { gen, promise });
     const cleanup = () => {
-      if (inFlight.get(key) === promise) {
+      if (inFlight.get(key)?.promise === promise) {
         inFlight.delete(key);
         storeLog.debug('query_cache.run.cleanup', {
           ...logCtx,
           ...keyMeta(key),
+          readId,
         });
       }
     };
-    promise.then(cleanup, (error) => {
-      storeLog.warn('query_cache.run.failed', {
-        ...logCtx,
-        ...keyMeta(key),
-        error: error instanceof Error ? error : new Error(String(error)),
-      });
-      cleanup();
-    });
+    promise.then(cleanup, cleanup);
     return promise;
   };
 
-  return {
+  const store: QueryCacheStore<TData> = {
     use,
     getEntry,
     setEntry: (key, data, meta) => use.getState().setEntry(key, data, meta),
@@ -261,6 +371,9 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
     isColdStart,
     markTouched,
     run,
+    generation,
     staleTtlMs: opts.staleTtlMs,
   };
+  registry.add(store);
+  return store;
 }

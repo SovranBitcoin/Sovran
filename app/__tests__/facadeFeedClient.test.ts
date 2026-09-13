@@ -57,3 +57,48 @@ it('starts fresh after a data-layer/profile replacement and seeds warm-page iden
   expect(make).toHaveBeenCalledWith(expect.objectContaining({ seen: ['already-rendered'] }));
   client.dispose?.();
 });
+
+describe('read status (SYSTEM.md F06): empty vs unavailable vs disabled', () => {
+  it('marks tier exhaustion as unavailable with the attempt trail, not as an empty page', async () => {
+    // A layer with no tiers exhausts every read.
+    const layer = facade.createNostrDataLayer({ tiers: [] });
+    jest.mocked(buildNostrDataLayer).mockReturnValue(layer);
+    const client = createFacadeFeedClient(fallback);
+
+    const userFeed = await client.getUserFeed({ pubkey: 'a'.repeat(64), readId: 'r1-profileFeed' });
+    expect(userFeed.orderedFeedItems).toEqual([]);
+    expect(userFeed.read).toMatchObject({
+      status: 'unavailable',
+      degraded: true,
+      readId: 'r1-profileFeed',
+    });
+
+    const posts = await client.getPostsByPubkeys({ pubkeys: ['b'.repeat(64)] });
+    expect(posts.read?.status).toBe('unavailable');
+
+    const thread = await client.getThread({ eventId: 'c'.repeat(64) });
+    expect(thread.tier).toBeNull();
+    expect(thread.read?.status).toBe('unavailable');
+
+    const notifications = await client.getNotifications({
+      viewerPubkey: 'v'.repeat(64),
+      tab: 'ALL',
+    });
+    expect(notifications.notifications).toEqual([]);
+    expect(notifications.read?.status).toBe('unavailable');
+  });
+
+  it('marks "no tiers enabled" as disabled and a healthy empty answer as ok', async () => {
+    jest.mocked(buildNostrDataLayer).mockReturnValue(null);
+    const client = createFacadeFeedClient(fallback);
+    const thread = await client.getThread({ eventId: 'c'.repeat(64) });
+    expect(thread.read?.status).toBe('disabled');
+    const notifications = await client.getNotifications({
+      viewerPubkey: 'v'.repeat(64),
+      tab: 'ALL',
+    });
+    expect(notifications.read?.status).toBe('disabled');
+    // Untouched results carry no read meta: absent means ok.
+    expect(emptyFeedParseResult().read).toBeUndefined();
+  });
+});

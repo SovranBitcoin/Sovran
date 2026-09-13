@@ -8,9 +8,12 @@ import { describeError } from '@/shared/lib/errors';
  * fetch is cached once (`mintChangesCache`) and every consumer filters it down
  * locally. Decoding stays a pure `useMemo` over the cached wire response —
  * cache the fetch, not the derived rows.
+ *
+ * The read itself is `useCachedRead` (the reference consumer): a fresh
+ * persisted entry paints with zero round-trips, a stale one paints and
+ * revalidates, and every arrival is logged under `read.mintChanges.*`.
  */
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useCallback, useMemo } from 'react';
 import { useMints } from '@cashu/coco-react';
 
 import { MINT_CHANGES_CACHE_KEY, mintChangesCache } from '@/features/mint/data/mintChangesCache';
@@ -22,8 +25,8 @@ import {
   type MintChangeUpdate,
 } from '@/features/mint/lib/mintChanges/groupEntries';
 import type { NutsMap } from '@/features/mint/lib/mintChanges/interpret';
-import { fetchMintChanges } from '@/shared/lib/apiClient';
-import { cashuLog } from '@/shared/lib/logger';
+import { fetchMintChanges, type MintChangesResponse } from '@/shared/lib/apiClient';
+import { useCachedRead } from '@/shared/lib/read/useCachedRead';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 
@@ -36,11 +39,6 @@ interface UseMintChangesResult {
   isRefreshing: boolean;
   errorMessage: string | null;
   refresh: () => void;
-}
-
-/** Reactive read of the cached changelog response. */
-function useCachedMintChanges() {
-  return mintChangesCache.use((state) => state.byKey[MINT_CHANGES_CACHE_KEY]?.data);
 }
 
 /**
@@ -64,83 +62,25 @@ function useNutsResolver(): (mintUrl: string) => NutsMap {
 }
 
 function useMintChangesSource() {
-  const response = useCachedMintChanges();
-
-  const [isLoading, setIsLoading] = useState(
-    () => !mintChangesCache.getEntry(MINT_CHANGES_CACHE_KEY)
-  );
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const load = useCallback((mode: 'initial' | 'refresh', signal: AbortSignal) => {
-    const cached = mintChangesCache.getEntry(MINT_CHANGES_CACHE_KEY);
-    // Persisted data paints immediately; a fresh entry needs no round-trip.
-    if (mode === 'initial' && mintChangesCache.isFresh(cached)) {
-      setIsLoading(false);
-      return;
-    }
-    if (mode === 'refresh') setIsRefreshing(true);
-    else setIsLoading(!cached);
-
-    void mintChangesCache
-      .run(
-        MINT_CHANGES_CACHE_KEY,
-        async () => {
-          const result = await fetchMintChanges({ signal });
-          if (result.isErr()) throw result.error;
-          return { data: result.value };
-        },
-        '',
-        mode === 'refresh'
-      )
-      .then((data) => {
-        if (signal.aborted) return;
-        setErrorMessage(null);
-        cashuLog.info('mint.changes.loaded', {
-          mode,
-          changes: data.changes.length,
-          trackedMints: data.trackedMints,
-        });
-      })
-      .catch((error: unknown) => {
-        if (signal.aborted) return;
-        const message = error instanceof Error ? error.message : String(error);
-        cashuLog.warn('mint.changes.load_failed', { mode, message });
-        setErrorMessage(describeError(error, 'nagg').text);
-      })
-      .finally(() => {
-        if (signal.aborted) return;
-        setIsLoading(false);
-        setIsRefreshing(false);
-      });
-  }, []);
-
-  // A pull-to-refresh outlives its own effect, so its controller is held here
-  // and aborted when the screen loses focus — otherwise a slow refresh lands on
-  // an unmounted list.
-  const refreshControllerRef = useRef<AbortController | null>(null);
-
-  useFocusEffect(
-    useCallback(() => {
-      const controller = new AbortController();
-      load('initial', controller.signal);
-      return () => {
-        controller.abort();
-        refreshControllerRef.current?.abort();
-        refreshControllerRef.current = null;
-      };
-    }, [load])
-  );
-
-  const refresh = useCallback(() => {
-    if (isRefreshing) return;
-    refreshControllerRef.current?.abort();
-    const controller = new AbortController();
-    refreshControllerRef.current = controller;
-    load('refresh', controller.signal);
-  }, [isRefreshing, load]);
-
-  return { response, isLoading, isRefreshing, errorMessage, refresh };
+  const read = useCachedRead<MintChangesResponse>({
+    store: mintChangesCache,
+    surface: 'mintChanges',
+    key: MINT_CHANGES_CACHE_KEY,
+    viewerKey: '',
+    fetcher: async ({ signal }) => {
+      const result = await fetchMintChanges({ signal });
+      if (result.isErr()) throw result.error;
+      return { data: result.value };
+    },
+  });
+  const errorMessage = read.error ? describeError(read.error, 'nagg').text : null;
+  return {
+    response: read.data,
+    isLoading: read.status === 'loading',
+    isRefreshing: read.isFetching && read.mode === 'refresh',
+    errorMessage,
+    refresh: read.refresh,
+  };
 }
 
 export function useMintChanges(): UseMintChangesResult {

@@ -30,6 +30,7 @@ import {
   type FeedParseResult,
   type ThreadResult,
 } from './feedClient';
+import { READ_DISABLED, readUnavailable } from './feedClient';
 
 // ---------------------------------------------------------------------------
 // Cache bridge: the nagg GraphQL fast-paths (thread, user feeds, posts-by-pubkey)
@@ -105,6 +106,7 @@ function feedPageTransport(request: {
   refresh?: boolean;
   signal?: AbortSignal;
   timeoutMs?: number;
+  readId?: string;
   until?: number;
   cursor?: NostrCursor;
 }) {
@@ -113,6 +115,7 @@ function feedPageTransport(request: {
     refresh: request.refresh,
     signal: request.signal,
     timeoutMs: request.timeoutMs ?? FEED_READ_TIMEOUT_MS,
+    ...(request.readId ? { readId: request.readId } : {}),
     cursor: request.cursor ?? null,
   };
 }
@@ -198,16 +201,19 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
       // to an empty thread so loading always clears.
       try {
         const layer = buildNostrDataLayer();
-        if (!layer) return emptyThreadResult(request);
+        if (!layer) return emptyThreadResult(request, READ_DISABLED);
 
         const result = await layer.getThread(toFacadeThreadRequest(request));
         return result.match(
           (thread) => resolvedThreadToResult(thread, request),
           (error) => {
             feedLog.warn('thread.facade.exhausted', {
+              readId: request.readId ?? null,
               attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
             });
-            return emptyThreadResult(request);
+            // Distinct from an empty thread: the screen keeps a seeded render
+            // and shows degraded/error instead of "no replies" (SYSTEM.md F06).
+            return emptyThreadResult(request, readUnavailable(error.attempts, request.readId));
           }
         );
       } catch (error) {
@@ -283,9 +289,10 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
         },
         (error) => {
           feedLog.warn('feed.user.facade.exhausted', {
+            readId: request.readId ?? null,
             attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
           });
-          return emptyFeedParseResult();
+          return emptyFeedParseResult(readUnavailable(error.attempts, request.readId));
         }
       );
     },
@@ -311,9 +318,10 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
           }),
         (error) => {
           feedLog.warn('feed.posts_by_pubkeys.facade.exhausted', {
+            readId: request.readId ?? null,
             attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
           });
-          return emptyFeedParseResult();
+          return emptyFeedParseResult(readUnavailable(error.attempts, request.readId));
         }
       );
     },
@@ -370,7 +378,7 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
           policy: request.policy,
           replyScope: request.replyScope,
         });
-        return emptyNotificationsResult();
+        return emptyNotificationsResult(READ_DISABLED);
       }
 
       const result = await layer.getNotifications(facadeRequest);
@@ -398,12 +406,13 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
         },
         (error) => {
           feedLog.warn('notifications.facade.exhausted', {
+            readId: request.readId ?? null,
             tab: request.tab ?? 'ALL',
             policy: request.policy,
             replyScope: request.replyScope,
             attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
           });
-          return emptyNotificationsResult();
+          return emptyNotificationsResult(readUnavailable(error.attempts, request.readId));
         }
       );
     },

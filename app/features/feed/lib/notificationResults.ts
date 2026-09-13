@@ -1,6 +1,10 @@
-import type { FeedNotification, FeedNotificationsResult } from '@/features/feed/data/feedClient';
+import type {
+  FeedNotification,
+  FeedNotificationsResult,
+  ReadStatusMeta,
+} from '@/features/feed/data/feedClient';
 
-export function emptyNotificationsResult(): FeedNotificationsResult {
+export function emptyNotificationsResult(read?: ReadStatusMeta): FeedNotificationsResult {
   return {
     notifications: [],
     profilesMap: new Map(),
@@ -8,6 +12,7 @@ export function emptyNotificationsResult(): FeedNotificationsResult {
     quotedEventsMap: new Map(),
     paginationUntil: 0,
     hasNextPage: false,
+    ...(read ? { read } : {}),
   };
 }
 

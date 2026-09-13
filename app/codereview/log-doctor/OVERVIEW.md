@@ -82,7 +82,15 @@ to paste into an LLM:
 **Rules when adding logs:**
 - Use scoped loggers from `shared/lib/logger`; never `console.log`.
 - Event names are queryable prefixes: `payment.*`, `nostr.*`, `wallet.*`,
-  `perf.*`, `theme.*`, `feed.*`, `visual.*`.
+  `perf.*`, `theme.*`, `feed.*`, `visual.*`, `read.*`.
+- Every data arrival goes through the read lifecycle taxonomy
+  (`shared/lib/read/readLog.ts`): `read.<surface>.request` (with `action`:
+  serve-fresh / serve-stale-revalidate / fetch), `.done`, `.failed`,
+  `.superseded`, `.partial`, `.applied` (value committed to React) and `.render`
+  (skeleton / populated / empty / error edges only). All carry a `readId` that
+  the facade forwards onto `nostr.read.*` / `nostr.tier.*` and the store onto
+  `query_cache.run.*`. Keys travel as `keyHash`, never raw. `useCachedRead`
+  emits these for you; a hand-rolled read uses `readEvents.*` directly.
 - Never log raw secrets, raw ecash tokens, full invoices, or imported nsecs.
 - Narrow unknown errors with `redactError(e)`; don't dump arbitrary nested objects.
 
@@ -142,6 +150,7 @@ session (it detects restarts via `_t` resets), so you're not mixing three runs.
 | `spans` | small | Durations synthesized by pairing `.start`/`.request` entries with their `.done`/`.failed`-style ends (correlation-id match, FIFO fallback). Covers ops that never log a single-entry duration. |
 | `waste` | small | Repeated identical work: same event with the SAME identifying params ≥ `--min-repeats` (default 3) across the session, with a wasted-ms rollup from repeat durations. Catches re-decodes, re-unwraps, re-run migrations that consecutive-dup checks miss. |
 | `tiers` | small | Nostr tier waterfall from `nostr.tier.*` / `nostr.read.*`: per-tier tries/answers/failures with latency, failover cost (time burned in dead tiers before an answer), per-surface serving tier. |
+| `reads` | small | Read lifecycle per surface from `read.<surface>.*` joined on `readId` to `query_cache.run.*` / `nostr.read.*` / `nostr.tier.aggregate.*`: cache-hit rate, serve-fresh vs stale-revalidate, **RefetchFresh** (a fetch issued over a fresh entry with no user/poll trigger), superseded writes, partial/degraded reads, **TTFUD** p50/p95 (request → first populated render), tier fill sources, and **blank flashes** (populated → skeleton → populated on one key within 2s). Needs debug level in the capture for the `render`/`applied` edges. |
 | `renders` | ~200 | Re-render counts + why-did-update hints. |
 
 ### Domain-specific

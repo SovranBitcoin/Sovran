@@ -1,5 +1,6 @@
-import type { RequestControls } from 'wallet';
+import type { RequestControls as WalletRequestControls } from 'wallet';
 import type { NostrCursor, NostrTier } from '@sovranbitcoin/schemas';
+
 import type {
   FeedEvent,
   FeedItem,
@@ -7,6 +8,56 @@ import type {
   ProfileInfo,
 } from '@/features/feed/components/nostr/feedTypes';
 import type { ThreadStructure } from '@/features/feed/lib/buildThreadStructure';
+
+/**
+ * Wallet's request controls plus the read-lifecycle correlation id
+ * (`shared/lib/read/readLog.ts`), forwarded to the facade so `nostr.read.*` and
+ * `nostr.tier.*` events join the caller's `read.<surface>.*` events.
+ */
+export type RequestControls = WalletRequestControls & { readId?: string };
+
+/**
+ * How a read resolved, distinct from what it returned (SYSTEM.md F06): an
+ * empty page from a healthy source and an empty page because every tier was
+ * exhausted must render differently. Absent means `ok`.
+ */
+export type ReadStatusMeta = {
+  status: 'ok' | 'unavailable' | 'disabled';
+  readId?: string;
+  /** Tiers that contributed rows. */
+  sources: NostrTier[];
+  /** `tier=outcome` trail when tiers were exhausted. */
+  attempts: string[];
+  /** Some tier failed (even if another answered). */
+  degraded: boolean;
+};
+
+export const READ_OK: ReadStatusMeta = { status: 'ok', sources: [], attempts: [], degraded: false };
+
+export function readUnavailable(
+  attempts: readonly { tier: NostrTier; outcome: string }[],
+  readId?: string
+): ReadStatusMeta {
+  return {
+    status: 'unavailable',
+    ...(readId ? { readId } : {}),
+    sources: [],
+    attempts: attempts.map((a) => `${a.tier}=${a.outcome}`),
+    degraded: true,
+  };
+}
+
+export const READ_DISABLED: ReadStatusMeta = {
+  status: 'disabled',
+  sources: [],
+  attempts: [],
+  degraded: false,
+};
+
+/** `unavailable` with nothing retained on screen → the screen's error state; otherwise keep rows. */
+export function readIsUnavailable(read: ReadStatusMeta | undefined): boolean {
+  return read?.status === 'unavailable' || read?.status === 'disabled';
+}
 
 export type FeedParseResult = {
   orderedFeedItems: FeedItem[];
@@ -22,6 +73,8 @@ export type FeedParseResult = {
   retryAfterMs?: number;
   sources?: NostrTier[];
   showingRecent?: boolean;
+  /** Absent = ok. See `ReadStatusMeta`. */
+  read?: ReadStatusMeta;
 };
 
 export type FeedEnrichmentUpdates = {
@@ -121,6 +174,8 @@ export type FeedNotificationsResult = {
   /** Server's hasNextPage — grouping collapses item counts below the page size,
    *  so the count alone can't decide whether to keep paging. */
   hasNextPage: boolean;
+  /** Absent = ok. See `ReadStatusMeta`. */
+  read?: ReadStatusMeta;
 };
 
 export type ThreadSeedBuckets = {
@@ -150,6 +205,8 @@ export type ThreadResult = ThreadSeedBuckets & {
   hasMoreReplies: boolean;
   /** Tier that served this page; null when every tier was exhausted. */
   tier: NostrTier | null;
+  /** Absent = ok. See `ReadStatusMeta`. */
+  read?: ReadStatusMeta;
   /** The source's full acknowledged reply-id set — the spam-audit diff baseline. */
   knownReplyIds: string[];
   /**
@@ -200,7 +257,7 @@ export interface FeedClient {
   dispose?(): void;
 }
 
-export function emptyFeedParseResult(): FeedParseResult {
+export function emptyFeedParseResult(read?: ReadStatusMeta): FeedParseResult {
   return {
     orderedFeedItems: [] as FeedItem[],
     metricsMap: new Map(),
@@ -212,5 +269,6 @@ export function emptyFeedParseResult(): FeedParseResult {
     paginationOffset: 0,
     paginationCursor: null,
     hasMore: false,
+    ...(read ? { read } : {}),
   };
 }
