@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { apiLog } from '../logger';
 import { buildAbortSignal } from '@/shared/lib/http/requestSignal';
 import { isAbortError, type RequestControls } from 'wallet/safeFetch';
@@ -10,7 +11,7 @@ const ROUTSTR_DEFAULT_BASE_URL = 'https://api.routstr.com/v1';
  * persisted `routstrStore.nodeBaseUrl` on hydrate). Lets a nagg deploy
  * repoint already-shipped builds at a different Routstr node if the default
  * one dies — the strongest OTA lever the lineup endpoint carries. Module
- * state rather than a store read so this shared lib never imports a store.
+ * state keeps request origins stable while the store applies lineup/hydration changes.
  */
 let routstrBaseUrlOverride: string | null = null;
 
@@ -160,58 +161,81 @@ interface RoutstrError {
   };
 }
 
-interface ParsedErrorData {
-  code?: string;
-  message: string;
-  type: string;
-  details?: Record<string, unknown>;
-  error?: { message?: string };
-}
+const ErrorDetailsSchema = z.object({
+  required: undef(z.number().nonnegative()),
+  available: undef(z.number().nonnegative()),
+  retry_after: undef(z.number().nonnegative()),
+});
+const ErrorBodySchema = z.union([
+  z.object({
+    error: z.object({
+      message: z.string(),
+      type: undef(z.string()),
+      code: undef(z.string()),
+      details: undef(ErrorDetailsSchema),
+    }),
+  }),
+  z.object({
+    detail: z.union([
+      z.string(),
+      z.object({
+        reason: undef(z.string()),
+        message: undef(z.string()),
+        amount_required_msat: undef(z.number().nonnegative()),
+        balance_msat: undef(z.number().nonnegative()),
+      }),
+    ]),
+  }),
+  z.object({ message: z.string(), type: undef(z.string()), details: undef(ErrorDetailsSchema) }),
+]);
+
+type ParsedErrorData = RoutstrError['error'];
 
 // ── Error Handling ───────────────────────────────────────────────────────
 
 async function parseErrorResponse(response: Response): Promise<ParsedErrorData> {
-  const contentType = response.headers.get('content-type') || '';
-  if (contentType.includes('text/html')) {
-    const message = await extractErrorMessageFromHTML(response);
+  const fallback = {
+    message: response.statusText || `HTTP ${response.status}`,
+    type: 'unknown_error',
+  };
+  if (response.headers.get('content-type')?.includes('text/html')) {
     return {
-      message,
+      message: await extractErrorMessageFromHTML(response),
       type: response.status >= 500 ? 'server_error' : 'client_error',
     };
   }
-
   try {
-    const raw = await response.json();
-    // Normalize: server may return {"error": {...}} (OpenAI format)
-    // or {"detail": "..."} (FastAPI format). Flatten into ParsedErrorData.
-    if (raw.error && typeof raw.error === 'object') {
-      let details = raw.error.details;
-      // Extract required/available from "Insufficient balance: X mSats required ... Y available."
-      if (!details && raw.error.message && typeof raw.error.message === 'string') {
-        const match = raw.error.message.match(/(\d+)\s*mSats?\s*required.*?(\d+)\s*available/i);
-        if (match) {
-          details = { required: parseInt(match[1], 10), available: parseInt(match[2], 10) };
-        }
-      }
-      return {
-        message: raw.error.message || raw.detail || '',
-        type: raw.error.type || raw.error.code || 'unknown_error',
-        code: typeof raw.error.code === 'string' ? raw.error.code : undefined,
-        details,
-        error: raw.error,
-      };
+    const parsed = ErrorBodySchema.safeParse(await response.json());
+    if (!parsed.success) return fallback;
+    const body = parsed.data;
+    let result: ParsedErrorData;
+    if ('error' in body) {
+      result = { ...body.error, type: body.error.type ?? body.error.code ?? 'unknown_error' };
+    } else if ('detail' in body) {
+      result =
+        typeof body.detail === 'string'
+          ? { message: body.detail, type: 'unknown_error' }
+          : {
+              message: body.detail.reason || body.detail.message || fallback.message,
+              type: 'unknown_error',
+              details: {
+                required: body.detail.amount_required_msat,
+                available: body.detail.balance_msat,
+              },
+            };
+    } else {
+      result = { ...body, type: body.type ?? 'unknown_error' };
     }
-    return {
-      message: raw.detail || raw.message || '',
-      type: raw.type || 'unknown_error',
-      details: raw.details,
-      error: raw.error,
-    };
+    const match = result.message.match(/(\d+)\s*mSats?\s*required.*?(\d+)\s*available/i);
+    if (match)
+      result.details = {
+        ...result.details,
+        required: result.details?.required ?? Number(match[1]),
+        available: result.details?.available ?? Number(match[2]),
+      };
+    return result;
   } catch {
-    return {
-      message: response.statusText || `HTTP ${response.status}`,
-      type: 'unknown_error',
-    };
+    return fallback;
   }
 }
 
@@ -246,25 +270,78 @@ function routstrStoreState() {
   return useRoutstrStore.getState();
 }
 
+function captureRequestScope(): () => boolean {
+  const profile = useProfileStore.getState().activeAccountIndex;
+  const node = routstrBaseUrl();
+  return () =>
+    useProfileStore.getState().activeAccountIndex === profile && routstrBaseUrl() === node;
+}
+
+function applyResponseChange(
+  response: Response,
+  requestKey: string,
+  ownsScope: () => boolean
+): string {
+  const token = response.headers.get('x-cashu');
+  if (token && ownsScope() && routstrStoreState().apiKey === requestKey) {
+    routstrStoreState().applyChangeToken(token);
+    return routstrStoreState().apiKey ?? requestKey;
+  }
+  return requestKey;
+}
+
+const ErrorEvidenceSchema = z.object({
+  status: z.number(),
+  error: z.object({ message: z.string().optional(), type: z.string().optional() }).optional(),
+});
+
+export function isModelRejectedError(error: unknown, model: string): boolean {
+  const parsed = ErrorEvidenceSchema.safeParse(error);
+  if (!parsed.success || ![400, 404].includes(parsed.data.status)) return false;
+  const message = parsed.data.error?.message?.toLowerCase() ?? '';
+  return /model/i.test(message) || (model.length > 0 && message.includes(model.toLowerCase()));
+}
+
+export function isRoutstrNodeFailure(error: unknown): boolean {
+  const parsed = ErrorEvidenceSchema.safeParse(error);
+  if (!parsed.success) return false;
+  const { status, error: detail } = parsed.data;
+  return (
+    (status === 0 && detail?.type !== 'aborted') ||
+    status === 404 ||
+    (status >= 500 && status < 600)
+  );
+}
+
 /**
  * Throw a typed RoutstrError from a failed fetch Response.
  * Shared by all API functions to avoid duplicating the parse → format → throw chain.
  */
-async function throwResponseError(response: Response): Promise<never> {
+async function throwResponseError(
+  response: Response,
+  requestKey?: string,
+  balanceKey = requestKey,
+  ownsScope: () => boolean = () => true
+): Promise<never> {
   const errorData = await parseErrorResponse(response);
   const status = response.status;
   apiLog.warn('api.routstr.http_error', {
     status,
     type: errorData.type,
-    message: errorData.message,
-    details: errorData.details,
+    requiredMsats: errorData.details?.required,
+    availableMsats: errorData.details?.available,
   });
 
   // 401 with expired/spent key — clear stored API key so user can re-authenticate
-  if (status === 401) {
-    apiLog.warn('api.routstr.api_key_expired');
-    routstrStoreState().clearApiKey();
-    routstrStoreState().clearBalance();
+  const ownsKey = ownsScope() && requestKey != null && routstrStoreState().apiKey === requestKey;
+  if (status === 401 && ownsKey) {
+    if (/invalid|expired|spent|unknown|not found|revoked/i.test(errorData.message)) {
+      apiLog.warn('api.routstr.api_key_expired');
+      routstrStoreState().clearApiKey();
+      routstrStoreState().clearBalance();
+    } else {
+      apiLog.warn('routstr.auth.kept_key');
+    }
   }
 
   // 402 carries the server's true available balance ("X mSats required …
@@ -275,7 +352,12 @@ async function throwResponseError(response: Response): Promise<never> {
   // send 402s, and the insufficient-balance popup loops. Syncing here
   // makes the balance pill, picker fades, and estimates truthful the
   // moment the server disagrees.
-  if (status === 402) {
+  if (
+    status === 402 &&
+    ownsScope() &&
+    balanceKey != null &&
+    routstrStoreState().apiKey === balanceKey
+  ) {
     const available = errorData.details?.available;
     if (typeof available === 'number' && isFinite(available) && available >= 0) {
       apiLog.info('api.routstr.balance_synced_from_402', { availableMsats: available });
@@ -372,9 +454,12 @@ interface ModelsResponse {
 async function readRoutstrEnvelope<TSpine extends z.ZodType>(
   response: Response,
   spine: TSpine,
-  meta: { route: string; invalidShapeEvent: string }
+  meta: { route: string; invalidShapeEvent: string },
+  requestKey?: string,
+  balanceKey = requestKey,
+  ownsScope: () => boolean = () => true
 ): Promise<z.infer<TSpine>> {
-  if (!response.ok) await throwResponseError(response);
+  if (!response.ok) await throwResponseError(response, requestKey, balanceKey, ownsScope);
 
   const validated = spine.safeParse(await response.json());
   if (!validated.success) {
@@ -389,6 +474,7 @@ async function readRoutstrEnvelope<TSpine extends z.ZodType>(
 export async function getModels(controls: RequestControls = {}): Promise<RoutstrModel[]> {
   apiLog.info('api.routstr.models.start');
   const start = performance.now();
+  const ownsScope = captureRequestScope();
   try {
     const response = await fetch(`${routstrBaseUrl()}/models`, {
       method: 'GET',
@@ -406,8 +492,18 @@ export async function getModels(controls: RequestControls = {}): Promise<Routstr
     });
     return enabled;
   } catch (error) {
+    // Resolve lazily to avoid api → refresh → store → api initialisation cycles.
+    const nodeError =
+      error && typeof error === 'object' && 'status' in error
+        ? error
+        : { status: 0, error: { type: isAbortError(error) ? 'aborted' : 'network_error' } };
+    if (ownsScope() && isRoutstrNodeFailure(nodeError)) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- Lazy cycle boundary, supported by Metro and Jest CJS.
+      const refreshModule = require('./refreshLineup') as typeof import('./refreshLineup');
+      await refreshModule.refreshRoutstrLineup('failure');
+    }
     apiLog.error('api.routstr.models.failed', {
-      error,
+      status: error && typeof error === 'object' && 'status' in error ? error.status : 0,
       duration_ms: Math.round((performance.now() - start) * 100) / 100,
     });
     toRoutstrError(error);
@@ -420,6 +516,7 @@ export async function checkBalance(
 ): Promise<BalanceResponse> {
   apiLog.debug('api.routstr.balance.start', { hasApiKey: !!apiKey, keyLength: apiKey?.length });
   const start = performance.now();
+  const ownsScope = captureRequestScope();
   try {
     const response = await fetch(`${routstrBaseUrl()}/wallet/info`, {
       method: 'GET',
@@ -428,14 +525,22 @@ export async function checkBalance(
       },
       signal: buildAbortSignal({ timeoutMs: ROUTSTR_TIMEOUT_MS, ...controls }),
     });
+    const balanceKey = applyResponseChange(response, apiKey, ownsScope);
     apiLog.debug('api.routstr.balance.response', {
       status: response.status,
       duration_ms: Math.round(performance.now() - start),
     });
-    const data = await readRoutstrEnvelope(response, BalanceSpine, {
-      route: '/wallet/info',
-      invalidShapeEvent: 'api.routstr.balance.invalid_shape',
-    });
+    const data = await readRoutstrEnvelope(
+      response,
+      BalanceSpine,
+      {
+        route: '/wallet/info',
+        invalidShapeEvent: 'api.routstr.balance.invalid_shape',
+      },
+      apiKey,
+      balanceKey,
+      ownsScope
+    );
     const result = {
       balance: data.balance ?? 0,
       total_spent: data.total_spent ?? 0,
@@ -452,7 +557,7 @@ export async function checkBalance(
     return result;
   } catch (error) {
     apiLog.error('api.routstr.balance.failed', {
-      error,
+      status: error && typeof error === 'object' && 'status' in error ? error.status : 0,
       duration_ms: Math.round(performance.now() - start),
     });
     toRoutstrError(error);
@@ -466,6 +571,7 @@ export async function topUpBalance(
 ): Promise<TopUpResponse> {
   apiLog.info('api.routstr.wallet.topup.start', { tokenLength: cashuToken?.length });
   const start = performance.now();
+  const ownsScope = captureRequestScope();
   try {
     const response = await fetch(`${routstrBaseUrl()}/wallet/topup`, {
       method: 'POST',
@@ -476,14 +582,22 @@ export async function topUpBalance(
       body: JSON.stringify({ cashu_token: cashuToken }),
       signal: buildAbortSignal({ timeoutMs: ROUTSTR_TIMEOUT_MS, ...controls }),
     });
+    const balanceKey = applyResponseChange(response, apiKey, ownsScope);
     apiLog.debug('api.routstr.wallet.topup.response', {
       status: response.status,
       duration_ms: Math.round(performance.now() - start),
     });
-    const data = await readRoutstrEnvelope(response, TopUpSpine, {
-      route: '/wallet/topup',
-      invalidShapeEvent: 'api.routstr.wallet.topup.invalid_shape',
-    });
+    const data = await readRoutstrEnvelope(
+      response,
+      TopUpSpine,
+      {
+        route: '/wallet/topup',
+        invalidShapeEvent: 'api.routstr.wallet.topup.invalid_shape',
+      },
+      apiKey,
+      balanceKey,
+      ownsScope
+    );
     const result = { added_amount: data.msats ?? 0 };
     apiLog.info('api.routstr.wallet.topup.success', {
       addedAmount: result.added_amount,
@@ -492,7 +606,7 @@ export async function topUpBalance(
     return result;
   } catch (error) {
     apiLog.error('api.routstr.wallet.topup.failed', {
-      error,
+      status: error && typeof error === 'object' && 'status' in error ? error.status : 0,
       duration_ms: Math.round(performance.now() - start),
     });
     toRoutstrError(error);
@@ -528,14 +642,13 @@ function tryParseSSELine(line: string): ChatCompletionChunk | 'done' | null {
   try {
     raw = JSON.parse(data);
   } catch {
-    apiLog.warn('routstr.sse.parse_failed', { preview: data.substring(0, 100) });
+    apiLog.warn('routstr.sse.parse_failed');
     return null;
   }
   const validated = ChatCompletionChunkSpine.safeParse(raw);
   if (!validated.success) {
     apiLog.warn('routstr.sse.invalid_shape', {
       issues: validated.error.issues.length,
-      preview: data.substring(0, 100),
     });
     return null;
   }
@@ -594,7 +707,7 @@ async function* parseSSEFromReadableStream(
     apiLog.error('routstr.sse.stream_error', {
       chunks: chunkCount,
       duration_ms: Math.round(performance.now() - streamStart),
-      error,
+      status: error && typeof error === 'object' && 'status' in error ? error.status : 0,
     });
     throw new Error(
       'Failed to stream response: ' + (error instanceof Error ? error.message : String(error))
@@ -659,13 +772,13 @@ export async function sendMessage(
   apiKey: string,
   messages: RoutstrChatMessage[],
   options: {
-    model?: string;
+    model: string;
     temperature?: number;
     max_tokens?: number;
     signal?: AbortSignal;
-  } = {}
+  }
 ): Promise<{ stream: AsyncIterable<ChatCompletionChunk> }> {
-  const { model = 'gpt-3.5-turbo', temperature = 0.7, max_tokens, signal } = options;
+  const { model, temperature = 0.7, max_tokens, signal } = options;
   const { textChars, imageParts } = measureMessageContent(messages);
   apiLog.info('api.routstr.chat.start', {
     model,
@@ -676,12 +789,15 @@ export async function sendMessage(
     max_tokens,
   });
   const start = performance.now();
+  const ownsScope = captureRequestScope();
 
   try {
     const response = await fetch(`${routstrBaseUrl()}/chat/completions`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        ...(routstrStoreState().authMode === 'x-cashu' && apiKey.startsWith('cashu')
+          ? { 'X-Cashu': apiKey }
+          : { Authorization: `Bearer ${apiKey}` }),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -693,13 +809,14 @@ export async function sendMessage(
       }),
       signal,
     });
+    const balanceKey = applyResponseChange(response, apiKey, ownsScope);
     const requestId = response.headers.get('x-routstr-request-id') || undefined;
     apiLog.debug('api.routstr.chat.response_received', {
       status: response.status,
       requestId,
       duration_ms: Math.round(performance.now() - start),
     });
-    if (!response.ok) await throwResponseError(response);
+    if (!response.ok) await throwResponseError(response, apiKey, balanceKey, ownsScope);
 
     apiLog.info('api.routstr.chat.stream_started', {
       model,
@@ -710,9 +827,11 @@ export async function sendMessage(
   } catch (error: unknown) {
     apiLog.error('api.routstr.chat.failed', {
       model,
-      error,
+      status: error && typeof error === 'object' && 'status' in error ? error.status : 0,
       duration_ms: Math.round(performance.now() - start),
     });
+    if (ownsScope() && isModelRejectedError(error, model))
+      routstrStoreState().invalidateServerLineup();
     toRoutstrError(error);
   }
 }

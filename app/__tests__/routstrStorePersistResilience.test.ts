@@ -8,6 +8,8 @@
  * balanceSplitVariant wipe is the canonical prior incident).
  */
 
+import { emptyLineup } from '@/shared/lib/routstr/lineup';
+
 const mockMemory: Record<string, string> = {};
 
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
@@ -81,6 +83,86 @@ describe('routstrStore persist resilience', () => {
     // Working copy restored from the active session row.
     expect(store.getState().conversationHistory).toHaveLength(1);
   });
+
+  it.each([undefined, 'future', null, 42])(
+    'keeps credentials and sessions with absent/invalid authMode (%s)',
+    async (authMode) => {
+      preload({ apiKey: 'sk-key', sessions: [baseSession], authMode });
+      const store = await loadStore();
+      expect(store.getState()).toMatchObject({
+        apiKey: 'sk-key',
+        authMode: 'bearer',
+        sessions: [baseSession],
+      });
+    }
+  );
+
+  it('rehydrates server freshness and the last working snapshot node', async () => {
+    preload({
+      apiKey: 'sk-key',
+      sessions: [baseSession],
+      authMode: 'x-cashu',
+      serverLineupAt: 123,
+      lastKnownLineup: {
+        derivedAt: 123,
+        lineup: emptyLineup(),
+        nodeBaseUrl: 'https://working.example',
+      },
+    });
+    const store = await loadStore();
+    expect(store.getState()).toMatchObject({
+      nodeBaseUrl: 'https://working.example',
+      serverLineupAt: 123,
+      authMode: 'x-cashu',
+      apiKey: 'sk-key',
+    });
+  });
+
+  it('drops invalid snapshot metadata without losing the lineup or credentials', async () => {
+    preload({
+      apiKey: 'sk-key',
+      sessions: [baseSession],
+      lastKnownLineup: {
+        derivedAt: 123,
+        lineup: emptyLineup(),
+        nodeBaseUrl: 42,
+      },
+    });
+    const store = await loadStore();
+    expect(store.getState()).toMatchObject({
+      apiKey: 'sk-key',
+      sessions: [baseSession],
+      lastKnownLineup: { derivedAt: 123, nodeBaseUrl: null },
+    });
+  });
+
+  it('persists invalidation without dropping the offline snapshot', async () => {
+    const snapshot = {
+      derivedAt: 123,
+      lineup: emptyLineup(),
+      nodeBaseUrl: 'https://working.example',
+    };
+    preload({ apiKey: 'sk-key', serverLineupAt: 123, lastKnownLineup: snapshot });
+    const store = await loadStore();
+    store.getState().invalidateServerLineup();
+    await store.persist.rehydrate();
+    expect(store.getState().serverLineupAt).toBeNull();
+    expect(store.getState().lastKnownLineup).toEqual(snapshot);
+    expect(store.getState().apiKey).toBe('sk-key');
+  });
+
+  it.each([undefined, 'future', -1])(
+    'tolerates missing/invalid server timestamps (%s)',
+    async (serverLineupAt) => {
+      preload({ apiKey: 'sk-key', sessions: [baseSession], serverLineupAt });
+      const store = await loadStore();
+      expect(store.getState()).toMatchObject({
+        apiKey: 'sk-key',
+        sessions: [baseSession],
+        serverLineupAt: null,
+      });
+    }
+  );
 
   it('keeps apiKey + sessions when a message carries malformed attachments', async () => {
     preload({

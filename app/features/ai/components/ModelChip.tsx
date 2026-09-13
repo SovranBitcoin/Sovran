@@ -4,8 +4,8 @@ import { Keyboard } from 'react-native';
 import Icon from 'assets/icons';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { checkBalance, getModels, type RoutstrModel } from '@/shared/lib/routstr/api';
-import { getAiLineup } from '@/shared/lib/apiClient';
-import { lineupFromNaggPayload } from '@/shared/lib/routstr/lineup';
+import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
+import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
 import { modelPickerPopup } from '@/shared/lib/popup';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Button } from '@/shared/ui/primitives/Button';
@@ -56,6 +56,7 @@ export function ModelChip() {
   const selectedTier = useRoutstrStore((s) => s.selectedTier);
   const selectedProvider = useRoutstrStore((s) => s.selectedProvider);
   const balanceMsats = useRoutstrStore((s) => s.balance);
+  const nodeBaseUrl = useRoutstrStore((s) => s.nodeBaseUrl);
   const cachedModels = useRoutstrStore((s) => s.modelsCache?.data ?? null);
   const setCachedModels = useRoutstrStore((s) => s.setCachedModels);
   const isCacheStale = useRoutstrStore((s) => s.isCacheStale);
@@ -81,9 +82,11 @@ export function ModelChip() {
     const key = apiKeyRef.current;
     if (!key) return;
     let cancelled = false;
+    const requestNode = useRoutstrStore.getState().nodeBaseUrl;
     checkBalance(key)
       .then((data) => {
-        if (!cancelled) setBalance(data.balance);
+        if (!cancelled && useRoutstrStore.getState().nodeBaseUrl === requestNode)
+          setBalance(data.balance);
       })
       .catch(() => {
         // Silent — offline keeps the last-known balance, same policy as
@@ -94,29 +97,9 @@ export function ModelChip() {
     };
   }, [apiKeyRef, setBalance]);
 
-  // Server-curated lineup first: nagg's /app/ai-lineup outranks the
-  // client-side derivation (it carries the pinned/curated tier picks and
-  // the Routstr node override). Mount-only; a failure is silent — the
-  // catalog-derived lineup below remains the fallback, then the persisted
-  // last-known snapshot.
-  useEffect(() => {
-    if (useRoutstrStore.getState().serverLineupAt != null) return;
-    let cancelled = false;
-    getAiLineup()
-      .then((result) => {
-        if (cancelled || result.isErr()) return;
-        const { lineup: serverLineup, nodeBaseUrl } = lineupFromNaggPayload(result.value);
-        if (!serverLineup) return;
-        useRoutstrStore.getState().setServerLineup({ lineup: serverLineup, nodeBaseUrl });
-      })
-      .catch(() => {
-        // Silent — the derived/persisted lineup keeps the menu working.
-      });
-    return () => {
-      cancelled = true;
-    };
-    // Mount-only, same rationale as the catalog fetch below.
-  }, []);
+  useVisualActivityEffect(() => {
+    void refreshRoutstrLineup();
+  });
 
   useEffect(() => {
     if (cachedModels && !isCacheStale()) {
@@ -126,7 +109,7 @@ export function ModelChip() {
     let cancelled = false;
     getModels()
       .then((next) => {
-        if (cancelled) return;
+        if (cancelled || useRoutstrStore.getState().nodeBaseUrl !== nodeBaseUrl) return;
         setCachedModels(next);
         setModels(next);
       })
@@ -136,7 +119,7 @@ export function ModelChip() {
     return () => {
       cancelled = true;
     };
-  }, [cachedModels, isCacheStale, setCachedModels]);
+  }, [cachedModels, isCacheStale, nodeBaseUrl, setCachedModels]);
 
   const balanceSats = balanceMsats != null ? Math.floor(balanceMsats / 1000) : 0;
   const currentTier = getTierById(selectedTier);

@@ -1,0 +1,79 @@
+# Routstr client diagnosis
+
+Task N5 uses nagg's `/app/ai-lineup` as the node and model authority. No community
+node is embedded in the app. The only built-in default remains
+`https://api.routstr.com/v1`.
+
+## Operator checklist (manual, not run by this task)
+
+Use a tiny disposable **test-mint** token accepted by the node. Keep credentials,
+returned `x-cashu`, and any `/wallet/info` `api_key` out of terminal history,
+shared captures, and application logs. Use the returned change token for the next
+request; do not replay its spent predecessor. Use separate fresh test tokens when
+comparing auth modes if a prior request did not return usable change.
+
+1. Check `GET https://api.routstr.com/v1/models` and the configured nagg's
+   `/app/ai-lineup`. Record status only and whether `node.baseUrl` differs from the
+   public default. If the public node still returns route-level 404s, record that
+   result; repeat the completion checks against the active origin from nagg.
+   Do not add that origin to app source.
+2. Choose an enabled model returned by the active node or lineup. POST
+   `/v1/chat/completions` with JSON
+   `{"model":"<selected-id>","messages":[{"role":"user","content":"Reply OK"}],"max_tokens":8,"stream":false}`.
+   Send `Authorization: Bearer <test-token>` and `Content-Type: application/json`.
+   Verify non-stream content, status, and the presence of change/cost headers.
+3. Repeat with `stream:true`. Verify initial response headers carry `x-cashu`
+   when change is returned, then valid SSE chunks and `[DONE]`. Check
+   `x-routstr-cost-msats`, `x-routstr-input-cost-msats`,
+   `x-routstr-output-cost-msats`, and `x-routstr-request-id` when present.
+   Missing optional cost headers alone are not a failed completion.
+4. Repeat both non-stream and stream requests with `X-Cashu: <test-token>` and
+   **no Authorization header**. The app uses this mode only when nagg supplies
+   `node.authMode: "x-cashu"`; an `sk-` key always remains Bearer.
+5. GET `/v1/wallet/info` with the current Bearer credential. Verify balance units
+   are msats; privately retain any returned `api_key`/change. A returned `sk-` key
+   must never be replaced by a later change-token header.
+6. Force a 402 using insufficient disposable test credit and a valid model with
+   a reservation above that credit. Expect `detail.reason` and
+   `detail.amount_required_msat`; `detail.balance_msat` is optional. Verify the
+   app preserves its balance when available balance is omitted, and uses an
+   explicit available value (including zero) when supplied. Older string errors
+   containing required/available mSats remain supported.
+7. Exercise node recovery in a controlled test setup: route-level 404, network
+   failure, or 5xx causes an immediate nagg refresh, at most once per five minutes.
+   A changed node gets one retry with its refreshed Auto model. An unchanged
+   failed node stops; a started stream is never replayed. A rejected model id
+   invalidates the live lineup while retaining the offline snapshot.
+8. With mocked device time, confirm fresh lineup foregrounds skip fetches, a
+   lineup older than 24 hours refreshes, and failed refresh after seven days
+   permits catalog derivation. Cold-start offline and verify the saved node is
+   used. Simulator/device checks were intentionally not run by the implementation.
+
+## Log evidence
+
+- `api.routstr.http_error`: status/type and numeric required/available msats;
+  raw upstream messages are excluded.
+- `routstr.change_token.applied`: change adopted, with no token contents.
+- `routstr.auth.kept_key`: ambiguous 401 retained the current credential.
+- `api.routstr.api_key_expired`: explicit invalid/expired/spent/unknown/revoked key.
+- `routstr.lineup.refresh_failed`: nagg refresh failed (warn).
+- `ai.lineup.server_applied`: lineup applied; `nodeChanged` reports repointing
+  without logging the origin.
+- `ai.send.request`, `ai.send.lineup_retry`, `ai.send.candidate_failed`,
+  `ai.send.failed`, `ai.send.actual_cost`, and `ai.stream.complete`: correlate the
+  attempt, bounded recovery, completion, and balance-difference estimate.
+
+The unavailable-provider popup comes from the shared Routstr error catalog:
+“The AI provider is unreachable right now. Try again in a minute.”
+
+## Persistence and remaining system work
+
+`authMode` defaults/catches to `bearer`. Optional `lastKnownLineup.nodeBaseUrl`
+and the tolerant store `serverLineupAt` preserve older snapshots and malformed
+metadata without discarding credentials or sessions. The existing top-level
+`nodeBaseUrl` is retained for compatibility. Persisting timestamp invalidation prevents a rejected lineup becoming fresh again after restart. The `persistSchemaDrift` snapshot
+was deliberately blessed for these additive fields, with populated round-trip
+and enum/resilience regressions.
+
+SYSTEM.md F05 (critical-store recovery after whole-blob merge rejection) remains
+out of scope. These tolerant additions do not solve that broader recovery policy.

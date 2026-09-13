@@ -65,7 +65,7 @@ const TRANSPORT_COPY: Record<
     unavailable: 'cashu.unavailable',
   },
   routstr: {
-    network: 'network',
+    network: 'routstr.unavailable',
     timeout: 'routstr.timeout',
     cancelled: 'cancelled',
     unavailable: 'routstr.unavailable',
