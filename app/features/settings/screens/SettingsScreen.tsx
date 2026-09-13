@@ -8,7 +8,8 @@ import { type Href } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
-import { useDeferredMount } from '@/shared/hooks/useDeferredMount';
+import { LayoutShiftProbe } from '@/shared/ui/composed/LayoutShiftProbe';
+import { useShiftLogger, VISUAL_LOGGING_ENABLED } from '@/shared/lib/contentShiftLog';
 import { Section } from '@/shared/ui/composed/Section';
 import * as Application from 'expo-application';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -32,6 +33,7 @@ const buildNumber = Application.nativeBuildVersion;
 const ProfileButton = () => {
   const { keys: nostrKeys } = useNostrKeysContext();
   const { displayName, picture } = useProfileDisplay(nostrKeys?.pubkey || '');
+  const muted = useThemeColor('muted');
 
   return (
     <ListGroup variant="secondary">
@@ -39,6 +41,7 @@ const ProfileButton = () => {
         animation={false}
         testID="settings-profile-row"
         accessible
+        accessibilityRole="button"
         accessibilityLabel="Profile and keys"
         onPress={() => router.navigate('/(settings-flow)/profile')}>
         <PressableFeedback.Scale>
@@ -53,10 +56,25 @@ const ProfileButton = () => {
               />
             </ListGroup.ItemPrefix>
             <ListGroup.ItemContent>
-              <ListGroup.ItemTitle>{displayName}</ListGroup.ItemTitle>
-              <ListGroup.ItemDescription>
-                {truncateMiddle(nostrKeys?.npub || '', 14)}
-              </ListGroup.ItemDescription>
+              <Text
+                size={16}
+                medium
+                className="leading-6"
+                numberOfLines={1}
+                loading={!displayName}
+                placeholder="Profile name"
+                accessible={false}>
+                {displayName || undefined}
+              </Text>
+              <Text
+                className="leading-5"
+                color={muted}
+                numberOfLines={1}
+                loading={!nostrKeys?.npub}
+                placeholder="npub1…publickey"
+                accessible={false}>
+                {nostrKeys?.npub ? truncateMiddle(nostrKeys.npub, 14) : undefined}
+              </Text>
             </ListGroup.ItemContent>
             <ListGroup.ItemSuffix />
           </ListGroup.Item>
@@ -82,10 +100,11 @@ function signerRowDescription(pendingCount: number): string {
 const SettingsListActionItem: React.FC<{
   title: string;
   description?: string;
+  descriptionNumberOfLines?: number;
   onPress: () => void;
   isDanger?: boolean;
   testID?: string;
-}> = ({ title, description, onPress, isDanger, testID }) => {
+}> = ({ title, description, descriptionNumberOfLines, onPress, isDanger, testID }) => {
   const danger = useThemeColor('danger');
   return (
     <PressableFeedback
@@ -95,10 +114,8 @@ const SettingsListActionItem: React.FC<{
       // already defaults it to true, so the gate never did anything — stating
       // it keeps the "one actionable outer row" invariant visible.
       accessible
-      // Role is unconditional: it is what a screen reader needs, and gating it
-      // on `testID` made accessibility a side effect of e2e instrumentation
-      // (18 of 22 rows carry no testID). The explicit label stays gated — where
-      // it is absent RN synthesizes the same "title, description" string.
+      // Keep semantics independent of instrumentation. When the explicit label
+      // is absent, RN synthesizes the same "title, description" string.
       accessibilityRole="button"
       accessibilityLabel={testID ? `${title}${description ? `, ${description}` : ''}` : undefined}
       onPress={onPress}>
@@ -109,7 +126,9 @@ const SettingsListActionItem: React.FC<{
               {isDanger ? <Text style={{ color: danger }}>{title}</Text> : title}
             </ListGroup.ItemTitle>
             {description ? (
-              <ListGroup.ItemDescription>{description}</ListGroup.ItemDescription>
+              <ListGroup.ItemDescription numberOfLines={descriptionNumberOfLines}>
+                {description}
+              </ListGroup.ItemDescription>
             ) : null}
           </ListGroup.ItemContent>
           <ListGroup.ItemSuffix />
@@ -124,6 +143,7 @@ const SettingsListLinkItem: React.FC<{
   href: Href;
   title: string;
   description?: string;
+  descriptionNumberOfLines?: number;
   isDanger?: boolean;
   testID?: string;
 }> = ({ href, ...item }) => (
@@ -144,7 +164,7 @@ const SettingsToggleItem: React.FC<{
     accessible
     // Role and checked-state are unconditional — without them a screen reader
     // cannot tell a toggle from static text, nor read whether it is on. They
-    // were gated on `testID`, so 5 of the 8 toggles announced neither.
+    // must not depend on whether the row is instrumented.
     // `accessibilityValue` is dropped: RN derives the iOS 1/0 value from the
     // switch role plus `checked`, and Android exposes the checked state.
     accessibilityRole="switch"
@@ -167,22 +187,9 @@ const SettingsToggleItem: React.FC<{
   </PressableFeedback>
 );
 
-/**
- * Phase-2 of the deferred mount. Screen's deferContent already delays the
- * whole tree one tick so the card can present instantly; this stages the
- * fill itself so the VISIBLE commit stays small — the sections above the
- * fold mount first, and everything below (Privacy onward, including the
- * 8-switch Developer section) mounts on the next interaction tick. Each
- * heroui row registers ~10 Reanimated objects at mount, so halving the
- * commit visibly tightens the blank-to-content beat on Android.
- */
-const BelowFold = ({ children }: { children: React.ReactNode }) => {
-  const ready = useDeferredMount();
-  return ready ? <>{children}</> : null;
-};
-
 export const SettingsScreen = () => {
   useLifecycleLogger('SettingsScreen');
+  const shift = useShiftLogger('SettingsScreen');
   const sendLocationEnabled = useSettingsStore((state) => state.sendLocationEnabled);
   const setSendLocationEnabled = useSettingsStore((state) => state.setSendLocationEnabled);
   const devMode = useSettingsStore((state) => state.experimental);
@@ -239,67 +246,101 @@ export const SettingsScreen = () => {
 
   return (
     <ScreenWrapper name="SettingsScreen" scroll="custom" safeArea>
-      <ScrollView className="px-4">
-        <Section title="Account">
-          <ProfileButton />
-        </Section>
-        <Section title="Preferences">
-          <ListGroup variant="secondary">
-            <SettingsListLinkItem href="/(settings-flow)/routing" title="Swap routing" />
-            <Separator className="mx-4" />
-            <SettingsListLinkItem
-              href="/(settings-flow)/notification-policy"
-              title="Notifications"
-              description={notificationPolicyLabel(notificationPolicy)}
-            />
-            <Separator className="mx-4" />
-            <SettingsListLinkItem
-              href="/(settings-flow)/network"
-              title="Network"
-              description="Aggregators, caching, and relays"
-            />
-          </ListGroup>
-        </Section>
-        <Section title="App Information">
-          <ListGroup variant="secondary">
-            <SettingsListActionItem
-              title="View source on GitHub"
-              onPress={() => {
-                void openExternalUrl('https://github.com/SovranBitcoin/Sovran');
-              }}
-            />
-            <Separator className="mx-4" />
-            <SettingsListActionItem
-              title="Contact the Developer"
-              onPress={() => {
-                void openExternalUrl('https://x.com/SovranBitcoin');
-              }}
-            />
-          </ListGroup>
-        </Section>
-        <Section title="Security">
-          <ListGroup variant="secondary">
-            <SettingsListLinkItem
-              href="/(signer-flow)"
-              title="Remote Login"
-              description={signerRowDescription(signerPendingCount)}
-            />
-            <Separator className="mx-4" />
-            <SettingsListLinkItem href="/(settings-flow)/keyring" title="P2PK Keys" />
-            <Separator className="mx-4" />
-            <SettingsListLinkItem
-              href="/(settings-flow)/recovery"
-              title="Recover wallet"
-              description="Restore ecash from all mints using your seed"
-            />
-          </ListGroup>
-        </Section>
+      <ScrollView
+        className="px-4"
+        onContentSizeChange={
+          VISUAL_LOGGING_ENABLED
+            ? (width, height) => {
+                shift.report('settings.shift.content.width', 'content.width', width);
+                shift.report('settings.shift.content.height', 'content.height', height);
+              }
+            : undefined
+        }>
+        <LayoutShiftProbe tag="settings.account">
+          <Section title="Account">
+            <ProfileButton />
+          </Section>
+        </LayoutShiftProbe>
+        <LayoutShiftProbe tag="settings.preferences">
+          <Section title="Preferences">
+            <ListGroup variant="secondary">
+              <SettingsListLinkItem
+                href="/(settings-flow)/routing"
+                title="Swap routing"
+                testID="settings-routing-row"
+              />
+              <Separator className="mx-4" />
+              <SettingsListLinkItem
+                href="/(settings-flow)/notification-policy"
+                title="Notifications"
+                testID="settings-notifications-row"
+                description={notificationPolicyLabel(notificationPolicy)}
+                descriptionNumberOfLines={1}
+              />
+              <Separator className="mx-4" />
+              <SettingsListLinkItem
+                href="/(settings-flow)/network"
+                title="Network"
+                testID="settings-network-row"
+                description="Aggregators, caching, and relays"
+              />
+            </ListGroup>
+          </Section>
+        </LayoutShiftProbe>
+        <LayoutShiftProbe tag="settings.app-information">
+          <Section title="App Information">
+            <ListGroup variant="secondary">
+              <SettingsListActionItem
+                title="View source on GitHub"
+                testID="settings-source-row"
+                onPress={() => {
+                  void openExternalUrl('https://github.com/SovranBitcoin/Sovran');
+                }}
+              />
+              <Separator className="mx-4" />
+              <SettingsListActionItem
+                title="Contact the Developer"
+                testID="settings-contact-row"
+                onPress={() => {
+                  void openExternalUrl('https://x.com/SovranBitcoin');
+                }}
+              />
+            </ListGroup>
+          </Section>
+        </LayoutShiftProbe>
+        <LayoutShiftProbe tag="settings.security">
+          <Section title="Security">
+            <ListGroup variant="secondary">
+              <SettingsListLinkItem
+                href="/(signer-flow)"
+                title="Remote Login"
+                testID="settings-remote-login-row"
+                description={signerRowDescription(signerPendingCount)}
+                descriptionNumberOfLines={1}
+              />
+              <Separator className="mx-4" />
+              <SettingsListLinkItem
+                href="/(settings-flow)/keyring"
+                title="P2PK Keys"
+                testID="settings-keyring-row"
+              />
+              <Separator className="mx-4" />
+              <SettingsListLinkItem
+                href="/(settings-flow)/recovery"
+                title="Recover wallet"
+                testID="settings-recovery-row"
+                description="Restore ecash from all mints using your seed"
+              />
+            </ListGroup>
+          </Section>
+        </LayoutShiftProbe>
 
-        <BelowFold>
+        <LayoutShiftProbe tag="settings.privacy">
           <Section title="Privacy">
             <ListGroup variant="secondary">
               <SettingsToggleItem
                 title="Location Stamps"
+                testID="settings-location-stamps-toggle"
                 description="Attach your approximate location when making transactions. (metadata only stored on your device)"
                 isSelected={sendLocationEnabled ?? false}
                 onSelectedChange={setSendLocationEnabled}
@@ -315,11 +356,14 @@ export const SettingsScreen = () => {
               <SettingsListLinkItem
                 href="/(settings-flow)/media"
                 title="My media"
+                testID="settings-media-row"
                 description="Images you've posted and their deletion status"
               />
             </ListGroup>
           </Section>
+        </LayoutShiftProbe>
 
+        <LayoutShiftProbe tag="settings.legal">
           <Section title="Legal">
             <ListGroup variant="secondary">
               <SettingsListLinkItem
@@ -335,16 +379,23 @@ export const SettingsScreen = () => {
               />
             </ListGroup>
           </Section>
+        </LayoutShiftProbe>
 
-          {devMode ? (
+        {devMode ? (
+          <LayoutShiftProbe tag="settings.developer">
             <Section title="Developer">
               <ListGroup variant="secondary">
-                <SettingsListActionItem title="Export database" onPress={handleExportDatabase} />
+                <SettingsListActionItem
+                  title="Export database"
+                  testID="settings-export-database-row"
+                  onPress={handleExportDatabase}
+                />
                 <Separator className="mx-4" />
                 <Separator className="mx-4" />
                 <SettingsListLinkItem
                   href="/(settings-flow)/storage"
                   title="Storage inventory"
+                  testID="settings-storage-row"
                   description="View persisted storage keys and coco database files"
                 />
                 <Separator className="mx-4" />
@@ -385,39 +436,48 @@ export const SettingsScreen = () => {
                 <Separator className="mx-4" />
                 <SettingsToggleItem
                   title="Mock Fail Payment Request"
+                  testID="settings-mock-fail-payment-request-toggle"
                   isSelected={mockFailPaymentRequest}
                   onSelectedChange={setMockFailPaymentRequest}
                 />
                 <Separator className="mx-4" />
                 <SettingsToggleItem
                   title="White Noise"
+                  testID="settings-white-noise-toggle"
                   isSelected={whitenoiseEnabled}
                   onSelectedChange={setWhitenoiseEnabled}
                 />
                 <Separator className="mx-4" />
                 <SettingsToggleItem
                   title="Mock no-glass"
+                  testID="settings-mock-no-glass-toggle"
                   isSelected={mockNoGlass}
                   onSelectedChange={setMockNoGlass}
                 />
               </ListGroup>
             </Section>
-          ) : null}
+          </LayoutShiftProbe>
+        ) : null}
 
+        <LayoutShiftProbe tag="settings.danger-zone">
           <Section title="Danger Zone" isDanger>
             <ListGroup variant="secondary">
               <SettingsListLinkItem
                 href="/(settings-flow)/delete"
                 title="Delete account"
+                testID="settings-delete-row"
                 isDanger
               />
             </ListGroup>
           </Section>
+        </LayoutShiftProbe>
 
+        <LayoutShiftProbe tag="settings.version">
           <Pressable
             onPress={handleVersionPress}
             testID="settings-version-row"
             accessible
+            accessibilityRole="button"
             accessibilityLabel="App version">
             <VStack gap={4}>
               <Text className="text-foreground/50 text-center" bold size={13}>
@@ -428,7 +488,7 @@ export const SettingsScreen = () => {
               </Text>
             </VStack>
           </Pressable>
-        </BelowFold>
+        </LayoutShiftProbe>
       </ScrollView>
     </ScreenWrapper>
   );
