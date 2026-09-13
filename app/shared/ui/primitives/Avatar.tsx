@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { withAlpha } from '@/shared/lib/color';
 
-import Icon from 'assets/icons';
+import Icon from '@/assets/icons';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { sanitizeAvatarFallbackSeed } from '@/shared/lib/avatarFallback';
 import { prefetchImage } from '@/shared/lib/imageCache';
@@ -14,8 +14,7 @@ import {
   type VisualLayoutConfig,
 } from '@/shared/lib/contentShiftLog';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { Badge } from './Badge';
-import { zIndex } from '@/shared/styles/tokens';
+import { spacing } from '@/shared/styles/tokens';
 import { ClaySilhouetteAvatar } from './ClaySilhouetteAvatar';
 
 export type AvatarState = 'loading' | 'fallback' | 'image';
@@ -72,21 +71,66 @@ function LoadingContent({ borderRadius, color }: { borderRadius: number; color: 
 // child swap, NOT a remount — a remount forces a relayout that nudges neighbours
 // a couple px ("padding-top"-like content shift when a pfp finishes loading).
 // Do not switch any of these roots back to `VStack` (a different component type).
-const avatarFrameStyle = { overflow: 'hidden' as const };
+const avatarFrameStyle = { overflow: 'visible' as const };
 /** Fade duration (ms) for a profile picture loading in over its placeholder.
  *  expo-image skips this for memory-cached images, so recycled avatars stay
  *  instant — only a real network/disk load fades. */
 const AVATAR_IMAGE_FADE_MS = 200;
 
-const STATUS_BADGE_CONFIG: Record<
-  string,
-  { variant: 'success' | 'error' | 'secondary'; icon: string; badge: boolean }
-> = {
-  OK: { variant: 'success', icon: 'fluent:checkmark-16-filled', badge: true },
-  ERROR: { variant: 'error', icon: 'nonicons:error-16', badge: true },
-  OFFLINE: { variant: 'secondary', icon: 'feather:wifi', badge: true },
-  VERIFIED: { variant: 'success', icon: 'material-symbols:verified-rounded', badge: false },
-};
+type AvatarStatus = 'OK' | 'ERROR' | 'OFFLINE';
+
+const STATUS_DOT_BY_STATUS = {
+  OK: {
+    className: 'bg-success',
+    icon: 'fluent:checkmark-16-filled',
+    iconColor: 'success-foreground',
+    label: 'OK',
+  },
+  ERROR: {
+    className: 'bg-danger',
+    icon: 'mdi:alert-circle',
+    iconColor: 'danger-foreground',
+    label: 'Error',
+  },
+  OFFLINE: {
+    className: 'bg-muted',
+    icon: 'feather:wifi-off',
+    iconColor: 'background',
+    label: 'Offline',
+  },
+} as const satisfies Record<
+  AvatarStatus,
+  {
+    className: string;
+    icon: string;
+    iconColor: 'success-foreground' | 'danger-foreground' | 'background';
+    label: string;
+  }
+>;
+
+export function AvatarStatusDot({ status, size }: { status?: string; size: number }) {
+  const dot =
+    status === 'OK' || status === 'ERROR' || status === 'OFFLINE'
+      ? STATUS_DOT_BY_STATUS[status]
+      : null;
+  const iconColor = useThemeColor(dot?.iconColor ?? 'foreground');
+  if (!dot) return null;
+
+  // Preserve the mint header's icon padding and 4-point page-colored ring.
+  // Borders paint inside the box, so reserve both sides outside the disc.
+  const outerSize = size + spacing.xs * 3;
+
+  return (
+    <View
+      testID="avatar-status-dot"
+      accessibilityRole="image"
+      accessibilityLabel={dot.label}
+      className={`border-surface items-center justify-center rounded-full border-4 ${dot.className}`}
+      style={{ width: outerSize, height: outerSize }}>
+      <Icon name={dot.icon} size={size} color={iconColor} />
+    </View>
+  );
+}
 
 export const Avatar = ({
   state,
@@ -137,20 +181,12 @@ export const Avatar = ({
 
   const fallbackSeed = sanitizeAvatarFallbackSeed(seed ?? name ?? alt ?? 'avatar');
 
-  const statusBadge = status ? (STATUS_BADGE_CONFIG[status] ?? null) : null;
-
-  const StatusBadgeWrapper = statusBadge ? (
-    <VStack
-      style={{
-        position: 'absolute',
-        bottom: -2,
-        right: -2,
-        zIndex: zIndex.dropdown,
-      }}>
-      {statusBadge.badge ? (
-        <Badge variant={statusBadge.variant} icon={statusBadge.icon} size={statusIconSize} />
+  const StatusBadgeWrapper = status ? (
+    <VStack className="z-100 absolute -bottom-0.5 -right-0.5">
+      {status === 'VERIFIED' ? (
+        <Icon name="material-symbols:verified-rounded" size={statusIconSize} />
       ) : (
-        <Icon name={statusBadge.icon} size={statusIconSize} />
+        <AvatarStatusDot status={status} size={statusIconSize} />
       )}
     </VStack>
   ) : null;
@@ -198,7 +234,7 @@ export const Avatar = ({
       <View
         ref={visualHostRef}
         collapsable={false}
-        style={containerStyle}
+        style={[containerStyle, avatarFrameStyle]}
         accessibilityRole="image"
         onLayout={reportVisualLayout}>
         <LoadingContent borderRadius={borderRadius} color={loadingColor} />

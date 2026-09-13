@@ -24,12 +24,11 @@ import { Card } from '@/shared/ui/composed/Card';
 import { Section } from '@/shared/ui/composed/Section';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
-import Icon from 'assets/icons';
-import { Badge } from '@/shared/ui/primitives/Badge';
+import Icon from '@/assets/icons';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { useCountRollIn } from '@/shared/ui/composed/AnimatedCountValue';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { Avatar, AvatarStatusDot } from '@/shared/ui/primitives/Avatar';
 import * as Clipboard from 'expo-clipboard';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -120,9 +119,6 @@ function AnimatedAvatar({
   status,
   size = 70,
   isLoading = false,
-  okBg,
-  okIcon,
-  okOutline,
 }: {
   picture?: string;
   name?: string;
@@ -130,14 +126,6 @@ function AnimatedAvatar({
   status?: string;
   size?: number;
   isLoading?: boolean;
-  /** Solid-disc tint for the OK badge — overrides Badge variant="success"
-   *  (now blue) so the verified mint reads as green. */
-  okBg?: string;
-  /** Checkmark glyph color — paired with `okBg` for the OK badge. */
-  okIcon?: string;
-  /** Optional outline color for the checkmark — usually the screen background
-   *  so the glyph carries the same visual gap as the disc-to-avatar seam. */
-  okOutline?: string;
 }) {
   const badgeAnim = useSharedValue(0);
   const badgeStyle = useAnimatedStyle(() => ({
@@ -148,8 +136,6 @@ function AnimatedAvatar({
     transform: [{ scale: badgeAnim.get() }],
   }));
 
-  const statusBadge = status ? STATUS_BADGE_CONFIG[status] : null;
-
   useEffect(() => {
     if (status && !isLoading) {
       badgeAnim.set(withDelay(80, withSpring(1, { damping: 14, stiffness: 260 })));
@@ -157,54 +143,18 @@ function AnimatedAvatar({
   }, [status, isLoading, badgeAnim]);
 
   const badgeSize = size * 0.33;
-  // OK gets a custom solid green disc — Badge variant="success" is hardcoded
-  // to a translucent blue wash + blue icon (deliberate app-wide retint), but
-  // the verified mint badge reads as "good" in green here.
-  // Ring around the disc in the screen background color — same visual weight
-  // as the seam between the avatar and the badge, just continued all the way
-  // around. `borderWidth` paints inside the box, so we add 2*ring to the
-  // total width to keep the green disc itself the same size as before.
-  const ring = okOutline ? 4 : 0;
-  const okOuter = badgeSize + 4 + ring * 2;
-  const okBadge =
-    statusBadge?.variant === 'success' && okBg && okIcon ? (
-      <View
-        style={{
-          width: okOuter,
-          height: okOuter,
-          borderRadius: okOuter / 2,
-          backgroundColor: okBg,
-          borderWidth: ring,
-          borderColor: okOutline,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-        <Icon name={statusBadge.icon} size={badgeSize} color={okIcon} />
-      </View>
-    ) : null;
 
   return (
     <View>
       <MintIcon iconUrl={picture} size={size} name={name} alt={alt} isLoading={isLoading} />
-      {statusBadge && (
+      {status && (
         <Animated.View style={badgeStyle}>
-          {okBadge ?? (
-            <Badge variant={statusBadge.variant} icon={statusBadge.icon} size={badgeSize} />
-          )}
+          <AvatarStatusDot status={status} size={badgeSize} />
         </Animated.View>
       )}
     </View>
   );
 }
-
-const STATUS_BADGE_CONFIG: Record<
-  string,
-  { variant: 'success' | 'error' | 'secondary'; icon: string }
-> = {
-  OK: { variant: 'success', icon: 'fluent:checkmark-16-filled' },
-  ERROR: { variant: 'error', icon: 'nonicons:error-16' },
-  OFFLINE: { variant: 'secondary', icon: 'feather:wifi' },
-};
 
 function StatsGrid({
   successRate,
@@ -476,18 +426,10 @@ function RatingBarChart({ score }: { score: number }) {
 export function MintInfoScreen() {
   useLifecycleLogger('MintInfoScreen');
   const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
-  // The mint-status ring + OK badge intentionally diverge from the theme
-  // `success` token (which is blue app-wide after the retint commit). A
-  // verified mint reads as "good" in green here, so pull the static green
-  // scale instead. Ring uses the vivid `green-300` (a thin stroke needs the
-  // brighter shade to register); the solid OK disc uses saturated `green-400`
-  // with a pale `green-100` checkmark for tonal contrast.
-  const [danger, success, starColor, okBadgeBg, okBadgeIcon] = useThemeColor([
+  const [danger, success, starColor] = useThemeColor([
     'danger',
     'green-300',
     'yellow-300',
-    'green-400',
-    'green-100',
   ] as const);
   const insets = useSafeAreaInsets();
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.info' });
@@ -646,9 +588,6 @@ export function MintInfoScreen() {
               status={entry?.auditState as string | undefined}
               size={70}
               isLoading={!entry}
-              okBg={okBadgeBg}
-              okIcon={okBadgeIcon}
-              okOutline={background}
             />
           </ProgressRing>
 
