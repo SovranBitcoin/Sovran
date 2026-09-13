@@ -92,14 +92,14 @@
   "ios/notification-mint-changes": {
     "page": "notification-mint-changes",
     "file": "source/screenshots/ios/notification-mint-changes.png",
-    "run": null,
-    "sha256": null
+    "run": "run-2026-09-13T02-24-08-447Z-c65a1a58",
+    "sha256": "f0bc4af6e492cc0dc3daaf224601dcc41f9f5c304bee5c4e03028649db8f3829"
   },
   "ios/mint-reviews": {
     "page": "mint-reviews",
     "file": "source/screenshots/ios/mint-reviews.png",
-    "run": null,
-    "sha256": null
+    "run": "run-2026-09-13T02-24-08-447Z-c65a1a58",
+    "sha256": "d1a8cdfaece1459f0df9c607dc3c63fbf6b9e8d8e980b9c2f205df3de09b02fd"
   },
   "ios/notifications": {
     "page": "notifications",

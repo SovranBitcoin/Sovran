@@ -7,7 +7,7 @@
         "source/screenshots/ios/ai.png": "536fcd6a98257e3b421a9b76cb54a0f511139e9730c7c2d70fb7e1e0bf4b3d3e"
       },
       "provenance": {
-        "screenshots": "f8bca9bad2e42e02fc175867a9d52b1f29f0fbb604e1272a79a8ccedd1fcda80",
+        "screenshots": "62c6b83dc411941617441d3b109c02c6486496bd32f8e19e9fa31e0d21b2dd66",
         "wallpapers": "3163962fe980af3061775152cd7be01afa1888a085e145583e72d794ddd9e736"
       },
       "missing": [],
@@ -63,7 +63,7 @@
         "source/screenshots/ios/ai-model-picker.png": "2c8880bf2cdb2565001ae407983bf6293ffe5ae24ae3136b05507095f709da6c"
       },
       "provenance": {
-        "screenshots": "f8bca9bad2e42e02fc175867a9d52b1f29f0fbb604e1272a79a8ccedd1fcda80",
+        "screenshots": "62c6b83dc411941617441d3b109c02c6486496bd32f8e19e9fa31e0d21b2dd66",
         "wallpapers": "3163962fe980af3061775152cd7be01afa1888a085e145583e72d794ddd9e736"
       },
       "missing": [],
@@ -119,7 +119,7 @@
         "source/screenshots/ios/mint-info.png": "d63004d7b462a4ccb281b83c903cb52ad0c0113af7d651e5f7db849acccf5dbe"
       },
       "provenance": {
-        "screenshots": "f8bca9bad2e42e02fc175867a9d52b1f29f0fbb604e1272a79a8ccedd1fcda80",
+        "screenshots": "62c6b83dc411941617441d3b109c02c6486496bd32f8e19e9fa31e0d21b2dd66",
         "wallpapers": "3163962fe980af3061775152cd7be01afa1888a085e145583e72d794ddd9e736"
       },
       "missing": [],
@@ -171,14 +171,14 @@
     },
     "mint-reviews": {
       "composition": "8871fc48911bcd97add4b99bca0264f73ad3d148c9da031bd5ef54cdd3ece668",
-      "sources": {},
+      "sources": {
+        "source/screenshots/ios/mint-reviews.png": "d1a8cdfaece1459f0df9c607dc3c63fbf6b9e8d8e980b9c2f205df3de09b02fd"
+      },
       "provenance": {
-        "screenshots": "f8bca9bad2e42e02fc175867a9d52b1f29f0fbb604e1272a79a8ccedd1fcda80",
+        "screenshots": "62c6b83dc411941617441d3b109c02c6486496bd32f8e19e9fa31e0d21b2dd66",
         "wallpapers": "3163962fe980af3061775152cd7be01afa1888a085e145583e72d794ddd9e736"
       },
-      "missing": [
-        "source/screenshots/ios/mint-reviews.png"
-      ],
+      "missing": [],
       "renderer": {
         "scripts/featured-artwork.mjs": "eb34ec3ecdcab7181e91091c029c446009819c03267b9119de7c98db5e1ba3a5",
         "scripts/lib/marketing-render.mjs": "1dbb8097c80a5d96cabc80440c6c3e77d7534acfac340c997e58b4072ab2def0",
@@ -199,9 +199,9 @@
             1920,
             1080
           ],
-          "bytes": 87857,
-          "sha256": "7f1c919cbf6877cce3ac3ef4efcff1e395bce0fd30da66d3743bd5e2370d4dca",
-          "draft": true
+          "bytes": 198994,
+          "sha256": "b0471c74e07ca900c8bd58f57d3b2bd2a7cc9e7fa06c2ae725e87ad6ce2a7b1c",
+          "draft": false
         },
         {
           "file": "mint-reviews/tall.png",
@@ -209,9 +209,9 @@
             1080,
             1920
           ],
-          "bytes": 80947,
-          "sha256": "1f3f090bbd18705124b4f16e99d91146ce015fe79b6de7b4dce9f7fe94f412eb",
-          "draft": true
+          "bytes": 242542,
+          "sha256": "a9c261ce4438eec41f652f13e75015a7cbe24d72b40ee47871407481d526b265",
+          "draft": false
         },
         {
           "file": "mint-reviews/square.png",
@@ -219,22 +219,22 @@
             1080,
             1080
           ],
-          "bytes": 70777,
-          "sha256": "f01fce126248139f2e0d794e2fc65e3fbb720fcbc6c9f82f1e03336fc392476f",
-          "draft": true
+          "bytes": 137534,
+          "sha256": "bcb5b2d11364a9e4656d3c4a5ce4133d2ddabce2a438a4e4bdf4b73a1af218bc",
+          "draft": false
         }
       ]
     },
     "mint-updates": {
       "composition": "df58077b3951c8ced02e7b33346f3d7fc7c755abc4cc8e084252423c7bea139c",
-      "sources": {},
+      "sources": {
+        "source/screenshots/ios/notification-mint-changes.png": "f0bc4af6e492cc0dc3daaf224601dcc41f9f5c304bee5c4e03028649db8f3829"
+      },
       "provenance": {
-        "screenshots": "f8bca9bad2e42e02fc175867a9d52b1f29f0fbb604e1272a79a8ccedd1fcda80",
+        "screenshots": "62c6b83dc411941617441d3b109c02c6486496bd32f8e19e9fa31e0d21b2dd66",
         "wallpapers": "3163962fe980af3061775152cd7be01afa1888a085e145583e72d794ddd9e736"
       },
-      "missing": [
-        "source/screenshots/ios/notification-mint-changes.png"
-      ],
+      "missing": [],
       "renderer": {
         "scripts/featured-artwork.mjs": "eb34ec3ecdcab7181e91091c029c446009819c03267b9119de7c98db5e1ba3a5",
         "scripts/lib/marketing-render.mjs": "1dbb8097c80a5d96cabc80440c6c3e77d7534acfac340c997e58b4072ab2def0",
@@ -255,9 +255,9 @@
             1920,
             1080
           ],
-          "bytes": 89756,
-          "sha256": "c47679ea74b2cab324bb65691ca326987cb65750cddedfe22f847dd1e35a7907",
-          "draft": true
+          "bytes": 107850,
+          "sha256": "13c7a2b2e1a4395aaa7ee9f8a700f55d70c29ad1abab4fd408680495561845af",
+          "draft": false
         },
         {
           "file": "mint-updates/tall.png",
@@ -265,9 +265,9 @@
             1080,
             1920
           ],
-          "bytes": 82553,
-          "sha256": "c45897f90dd1f7bc0a2324eccb8698ef49b425308befc59aa55aa2d8ab14df04",
-          "draft": true
+          "bytes": 122890,
+          "sha256": "441553f8acc92c079e3d4826565473165cc6c9f6ae696c09a5d93a01c294d6d4",
+          "draft": false
         },
         {
           "file": "mint-updates/square.png",
@@ -275,9 +275,9 @@
             1080,
             1080
           ],
-          "bytes": 71504,
-          "sha256": "ec97d3ad54d25d8902e37d4b64affae439397273318485cfb5e120c2aa656c70",
-          "draft": true
+          "bytes": 80904,
+          "sha256": "108de71695375293029aad7fc7b25c0cc350ab7f013ba2072de419f5b7145544",
+          "draft": false
         }
       ]
     },
@@ -287,7 +287,7 @@
         "source/screenshots/ios/receive-qr.png": "8eed5d331360b65718a52abe89fc9672ed74bd2a64ffb5f5982901c5a2bf454e"
       },
       "provenance": {
-        "screenshots": "f8bca9bad2e42e02fc175867a9d52b1f29f0fbb604e1272a79a8ccedd1fcda80",
+        "screenshots": "62c6b83dc411941617441d3b109c02c6486496bd32f8e19e9fa31e0d21b2dd66",
         "wallpapers": "3163962fe980af3061775152cd7be01afa1888a085e145583e72d794ddd9e736"
       },
       "missing": [],
@@ -343,7 +343,7 @@
         "source/screenshots/ios/send.png": "a20b6599478a5cb33ad70b1069e1bd3a72b86e300a5aa0d9b9f60df856afdb1d"
       },
       "provenance": {
-        "screenshots": "f8bca9bad2e42e02fc175867a9d52b1f29f0fbb604e1272a79a8ccedd1fcda80",
+        "screenshots": "62c6b83dc411941617441d3b109c02c6486496bd32f8e19e9fa31e0d21b2dd66",
         "wallpapers": "3163962fe980af3061775152cd7be01afa1888a085e145583e72d794ddd9e736"
       },
       "missing": [],
@@ -400,7 +400,7 @@
         "source/screenshots/ios/wallet.png": "e1aacd3cb641264168ebf72297393b44ab6690bd9246223302632a37ab30ceb0"
       },
       "provenance": {
-        "screenshots": "f8bca9bad2e42e02fc175867a9d52b1f29f0fbb604e1272a79a8ccedd1fcda80",
+        "screenshots": "62c6b83dc411941617441d3b109c02c6486496bd32f8e19e9fa31e0d21b2dd66",
         "wallpapers": "3163962fe980af3061775152cd7be01afa1888a085e145583e72d794ddd9e736"
       },
       "missing": [],
@@ -457,7 +457,7 @@
         "source/wallpapers/navy.svg": "93a7ce3133efc2fa61ca8d3af29768688452344e060962375608e458b6e976f7"
       },
       "provenance": {
-        "screenshots": "f8bca9bad2e42e02fc175867a9d52b1f29f0fbb604e1272a79a8ccedd1fcda80",
+        "screenshots": "62c6b83dc411941617441d3b109c02c6486496bd32f8e19e9fa31e0d21b2dd66",
         "wallpapers": "3163962fe980af3061775152cd7be01afa1888a085e145583e72d794ddd9e736"
       },
       "missing": [
@@ -515,7 +515,7 @@
         "source/screenshots/ios/contacts.png": "80a7a86d27e333fbc868c6ba038e49e0ca3ded4f807cbb8ca788c9351db98150"
       },
       "provenance": {
-        "screenshots": "f8bca9bad2e42e02fc175867a9d52b1f29f0fbb604e1272a79a8ccedd1fcda80",
+        "screenshots": "62c6b83dc411941617441d3b109c02c6486496bd32f8e19e9fa31e0d21b2dd66",
         "wallpapers": "3163962fe980af3061775152cd7be01afa1888a085e145583e72d794ddd9e736"
       },
       "missing": [],
@@ -571,7 +571,7 @@
         "source/screenshots/ios/dm-chat.png": "3e777819635b553baf691031825e2f6c58dc60dbf7a29564065ada3a48ed9058"
       },
       "provenance": {
-        "screenshots": "f8bca9bad2e42e02fc175867a9d52b1f29f0fbb604e1272a79a8ccedd1fcda80",
+        "screenshots": "62c6b83dc411941617441d3b109c02c6486496bd32f8e19e9fa31e0d21b2dd66",
         "wallpapers": "3163962fe980af3061775152cd7be01afa1888a085e145583e72d794ddd9e736"
       },
       "missing": [],
@@ -627,7 +627,7 @@
         "source/screenshots/ios/feed.png": "14c590079dd94b5546f9617de5e5d3583ff5a72e8e5de01e2415bf04e4e79cec"
       },
       "provenance": {
-        "screenshots": "f8bca9bad2e42e02fc175867a9d52b1f29f0fbb604e1272a79a8ccedd1fcda80",
+        "screenshots": "62c6b83dc411941617441d3b109c02c6486496bd32f8e19e9fa31e0d21b2dd66",
         "wallpapers": "3163962fe980af3061775152cd7be01afa1888a085e145583e72d794ddd9e736"
       },
       "missing": [],
@@ -681,7 +681,7 @@
       "composition": "41d3775a0f462c25091a0eb8804e146c3f7423bede378f28e1b8032fa27c4e48",
       "sources": {},
       "provenance": {
-        "screenshots": "f8bca9bad2e42e02fc175867a9d52b1f29f0fbb604e1272a79a8ccedd1fcda80",
+        "screenshots": "62c6b83dc411941617441d3b109c02c6486496bd32f8e19e9fa31e0d21b2dd66",
         "wallpapers": "3163962fe980af3061775152cd7be01afa1888a085e145583e72d794ddd9e736"
       },
       "missing": [
@@ -742,7 +742,7 @@
         "source/wallpapers/navy.svg": "93a7ce3133efc2fa61ca8d3af29768688452344e060962375608e458b6e976f7"
       },
       "provenance": {
-        "screenshots": "f8bca9bad2e42e02fc175867a9d52b1f29f0fbb604e1272a79a8ccedd1fcda80",
+        "screenshots": "62c6b83dc411941617441d3b109c02c6486496bd32f8e19e9fa31e0d21b2dd66",
         "wallpapers": "3163962fe980af3061775152cd7be01afa1888a085e145583e72d794ddd9e736"
       },
       "missing": [],
