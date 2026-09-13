@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import * as Clipboard from 'expo-clipboard';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import Icon from 'assets/icons';
@@ -217,6 +218,18 @@ export function ProfileDetailsScreen({
           'mnemonic',
           'Root recovery phrase for profiles derived by Sovran. Imported Nostr identities need their own private-key backup. Keep profile identifiers and mint information too.',
           loading
+        )}
+
+        {visibleFields.mnemonic && mnemonic && !loading && (
+          <Button
+            testID="profile-recovery-written"
+            accessibilityLabel="I've written it down"
+            onPress={() => {
+              setVisibleFields({ mnemonic: false, nsec: false, cashuMnemonic: false });
+              router.push('/(settings-flow)/recovery-phrase-confirm');
+            }}>
+            <Button.Label>{"I've written it down"}</Button.Label>
+          </Button>
         )}
 
         {!rootOnly && (

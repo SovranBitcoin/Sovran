@@ -36,6 +36,7 @@ import '@/shared/stores/profile/mintStore';
 import '@/shared/stores/profile/routstrStore';
 import '@/shared/stores/global/profileStore';
 import '@/shared/stores/global/walletLifecycleStore';
+import '@/shared/stores/global/ctaStore';
 import '@/shared/stores/profile/mintDistributionStore';
 import '@/shared/stores/profile/npcMintStore';
 import '@/shared/stores/profile/nutDropRedeemQueueStore';

@@ -1,9 +1,9 @@
+import { AppState } from 'react-native';
 import { act, renderHook } from '@testing-library/react-native';
 import { err, ok } from 'neverthrow';
 
 import { getLatestVersion } from '@/shared/lib/apiClient';
-import { paramPopup } from '@/shared/lib/popup';
-import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
+import { useLatestVersionFetch } from '@/shared/hooks/useLatestVersionFetch';
 import { useSettingsHydration, useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 let mockBootDone = true;
@@ -34,12 +34,13 @@ const mockGetLatestVersion = jest.mocked(getLatestVersion);
 const cached = { version: '0.1.3', minVersion: '0.1.2', message: 'Please update', fetchedAt: 123 };
 
 async function mount() {
-  const view = renderHook(useVersionCheck);
+  const view = renderHook(useLatestVersionFetch);
   await act(async () => {});
   return view;
 }
 
 beforeEach(async () => {
+  jest.spyOn(AppState, 'addEventListener').mockReturnValue({ remove: jest.fn() });
   await useSettingsStore.persist.rehydrate();
   jest.clearAllMocks();
   useSettingsStore.setState({ lastKnownAppVersion: null });
@@ -50,7 +51,7 @@ beforeEach(async () => {
   mockGetLatestVersion.mockResolvedValue(ok({ version: '0.1.3' }));
 });
 
-it('waits for boot and settings hydration, then persists success and shows the advisory', async () => {
+it('waits for boot and settings hydration, then persists success', async () => {
   mockBootDone = false;
   useSettingsHydration.setState({ status: 'loading' });
   const view = await mount();
@@ -76,51 +77,40 @@ it('waits for boot and settings hydration, then persists success and shows the a
   expect(useSettingsStore.getState().lastKnownAppVersion?.fetchedAt).toBeGreaterThanOrEqual(
     beforeFetch
   );
-  expect(paramPopup).toHaveBeenCalledWith('new-version', {
-    version: payload.version,
-    message: payload.message,
-  });
 });
 
-it('compares the persisted version offline without fetching or changing its timestamp', async () => {
+it('retains the persisted version offline without fetching or changing its timestamp', async () => {
   mockIsOffline = true;
   useSettingsStore.setState({ lastKnownAppVersion: cached });
   await mount();
   expect(mockGetLatestVersion).not.toHaveBeenCalled();
   expect(useSettingsStore.getState().lastKnownAppVersion).toEqual(cached);
-  expect(paramPopup).toHaveBeenCalledWith('new-version', {
-    version: cached.version,
-    message: cached.message,
-  });
 });
 
 it('does nothing offline without a cached version', async () => {
   mockIsOffline = true;
   await mount();
   expect(mockGetLatestVersion).not.toHaveBeenCalled();
-  expect(paramPopup).not.toHaveBeenCalled();
 });
 
 it.each(['0.1.3', '0.1.10'])(
-  'does not prompt offline when native version %s is current',
+  'does not fetch offline when native version %s is current',
   async (version) => {
     mockIsOffline = true;
     mockNativeVersion = version;
     useSettingsStore.setState({ lastKnownAppVersion: cached });
     await mount();
-    expect(paramPopup).not.toHaveBeenCalled();
   }
 );
 
-it('retains and compares the cache if a fetch fails before offline detection', async () => {
+it('retains the cache if a fetch fails before offline detection', async () => {
   useSettingsStore.setState({ lastKnownAppVersion: cached });
   mockGetLatestVersion.mockResolvedValueOnce(err(new Error('Network request failed')));
   await mount();
   expect(useSettingsStore.getState().lastKnownAppVersion).toEqual(cached);
-  expect(paramPopup).toHaveBeenCalledTimes(1);
 });
 
-it('refreshes on reconnect without prompting twice for the same version', async () => {
+it('refreshes on reconnect with one fetch', async () => {
   mockIsOffline = true;
   useSettingsStore.setState({ lastKnownAppVersion: cached });
   const view = await mount();
@@ -128,7 +118,6 @@ it('refreshes on reconnect without prompting twice for the same version', async 
   view.rerender({});
   await act(async () => {});
   expect(mockGetLatestVersion).toHaveBeenCalledTimes(1);
-  expect(paramPopup).toHaveBeenCalledTimes(1);
   expect(useSettingsStore.getState().lastKnownAppVersion?.fetchedAt).toBeGreaterThan(123);
 });
 
@@ -136,7 +125,6 @@ it('persists a successful response even when the native version is current', asy
   mockNativeVersion = '0.1.3';
   await mount();
   expect(useSettingsStore.getState().lastKnownAppVersion?.version).toBe('0.1.3');
-  expect(paramPopup).not.toHaveBeenCalled();
 });
 
 it('does not fetch without a native version', async () => {
@@ -157,5 +145,21 @@ it('discards a late response after unmount', async () => {
   expect(mockGetLatestVersion.mock.calls[0][0].signal?.aborted).toBe(true);
   await act(async () => finish(ok({ version: '0.1.4' })));
   expect(useSettingsStore.getState().lastKnownAppVersion).toBeNull();
-  expect(paramPopup).not.toHaveBeenCalled();
+});
+
+it('throttles foreground refreshes for six hours, including failed attempts', async () => {
+  const clock = jest.spyOn(Date, 'now').mockReturnValue(1_800_000_000_000);
+  const listener = jest.spyOn(AppState, 'addEventListener');
+  const view = await mount();
+  const foreground = listener.mock.calls.at(-1)![1];
+  await act(async () => foreground('active'));
+  expect(mockGetLatestVersion).toHaveBeenCalledTimes(1);
+  clock.mockReturnValue(1_800_000_000_000 + 6 * 60 * 60 * 1000);
+  mockGetLatestVersion.mockResolvedValueOnce(err(new Error('offline')));
+  await act(async () => foreground('active'));
+  await act(async () => foreground('active'));
+  expect(mockGetLatestVersion).toHaveBeenCalledTimes(2);
+  view.unmount();
+  clock.mockRestore();
+  listener.mockRestore();
 });

@@ -53,6 +53,7 @@ import '@/shared/stores/global/profileStore';
 import '@/shared/stores/global/relayMetadataStore';
 import '@/shared/stores/global/settingsStore';
 import '@/shared/stores/global/walletLifecycleStore';
+import '@/shared/stores/global/ctaStore';
 import '@/shared/stores/global/wallpaperStore';
 import '@/shared/stores/profile/dataMigrationStore';
 import '@/shared/stores/profile/mintDistributionStore';

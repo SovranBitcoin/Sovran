@@ -16,6 +16,8 @@ interface WalletLifecycleState {
    * counter.
    */
   seedCreatedAt: number | null;
+  recoveryPhraseVerifiedAt: number | null;
+  markRecoveryPhraseVerified: () => void;
   restoreStatus: RestoreStatus;
   /** Last successful restore completion (UNIX ms). */
   lastRestoreAt: number | null;
@@ -29,6 +31,7 @@ interface WalletLifecycleState {
 
 const PersistedWalletLifecycleStore = z.object({
   seedCreatedAt: z.number().int().nonnegative().nullable().default(null),
+  recoveryPhraseVerifiedAt: z.number().int().nonnegative().nullable().default(null).catch(null),
   // `.catch('unknown')`: 'unknown' is the genuine neutral member — AppGate
   // re-resolves it. Without the catch, an unrecognized status fails the
   // whole-blob parse and wipes `seedCreatedAt` too, which is exactly the
@@ -45,6 +48,8 @@ export const useWalletLifecycleStore = create<WalletLifecycleState>()(
   persist(
     (set) => ({
       seedCreatedAt: null,
+      recoveryPhraseVerifiedAt: null,
+      markRecoveryPhraseVerified: () => set({ recoveryPhraseVerifiedAt: Date.now() }),
       restoreStatus: 'unknown',
       lastRestoreAt: null,
       lastRestoreError: null,
@@ -65,6 +70,7 @@ export const useWalletLifecycleStore = create<WalletLifecycleState>()(
       logKey: 'wallet_lifecycle',
       partialize: (s) => ({
         seedCreatedAt: s.seedCreatedAt,
+        recoveryPhraseVerifiedAt: s.recoveryPhraseVerifiedAt,
         restoreStatus: s.restoreStatus,
         lastRestoreAt: s.lastRestoreAt,
         lastRestoreError: s.lastRestoreError,

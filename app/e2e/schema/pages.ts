@@ -31,6 +31,8 @@ export const CANONICAL_PAGES = [
   'send-amount', // amount entry in the send flow
   'send-token', // created ecash token screen (incl. tx re-entry)
   'lightning-send', // bolt11 melt preview/confirmation
+  'cta',
+  'recovery-phrase-confirm',
   // shared + recovery
   'mint-select', // mint selector list (receive and send flows)
   'mint-add', // add-mints screen (search or enter URL, MintAddScreen)

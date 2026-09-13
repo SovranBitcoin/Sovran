@@ -4,7 +4,6 @@ import { popup } from './engine';
 import type { PopupOverrides } from './types';
 import type { PopupIcon } from '../icons';
 import type { PopupTextSegment } from '../format';
-import { openExternalUrl } from '@/shared/lib/url';
 
 export type { CopyTarget } from './copy';
 export { copyPopup } from './copy';
@@ -33,11 +32,6 @@ const WALLET_ICON = 'icon:solar:wallet-bold';
 const ALERT_ICON = 'icon:mdi:alert-circle-outline';
 const CAMERA_ICON = 'icon:mdi:camera';
 const QR_ICON = 'icon:mdi:qrcode';
-
-// Single download landing page (kept current server-side) so we don't need to
-// detect the user's install source — App Store, Freedom Store (AltStore), or
-// GitHub releases are all linked from there.
-const DOWNLOAD_URL = 'https://sovran.money/en/download';
 
 type PopupSpec = {
   message: string;
@@ -325,20 +319,6 @@ const PARAM_POPUPS = {
     text: `Recovered from ${p.successCount}, failed for ${p.failureCount}.`,
     icon: 'icon:mdi:shield',
     type: 'warning',
-  }),
-
-  'new-version': (p: { version: string; message?: string }): PopupSpec => ({
-    message: 'Update available',
-    text:
-      p.message ??
-      `Version ${p.version} is now available. Update for the latest features and fixes.`,
-    icon: 'icon:mdi:cloud-download-outline',
-    variant: 'sheet',
-    buttonLayout: 'row',
-    buttons: [
-      { text: 'Download', onPress: () => void openExternalUrl(DOWNLOAD_URL) },
-      { text: 'Later' },
-    ],
   }),
 
   'engagement-update-failed': (action: 'follow' | 'like' | 'repost'): PopupSpec => ({
