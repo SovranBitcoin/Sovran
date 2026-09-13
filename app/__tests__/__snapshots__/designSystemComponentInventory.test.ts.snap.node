@@ -29,9 +29,11 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/composed/SheetGrabber.tsx",
     "shared/ui/composed/SkeletonContentCrossfade.tsx",
     "shared/ui/composed/SkeletonExitShimmer.tsx",
+    "shared/ui/composed/chat/ChatSkeleton.tsx",
     "shared/ui/primitives/Avatar.tsx",
     "shared/ui/primitives/Badge.tsx",
     "shared/ui/primitives/Button.tsx",
+    "shared/ui/primitives/MarqueeText.tsx",
     "shared/ui/primitives/SelectableCheck/SelectableCheck.circle.tsx",
     "shared/ui/primitives/SelectableCheck/SelectableCheck.square.tsx",
     "shared/ui/primitives/SelectableCheck/index.tsx",
@@ -246,6 +248,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 240,
+  "total": 242,
 }
 `;

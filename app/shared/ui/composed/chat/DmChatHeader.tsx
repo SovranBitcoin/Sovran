@@ -6,6 +6,7 @@ import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import * as nip19 from 'nostr-tools/nip19';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { MarqueeText } from '@/shared/ui/primitives/MarqueeText';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -119,6 +120,7 @@ export function DmChatHeader({
         icon="stash:qr-code"
         size={20}
         onPress={handleShareQr}
+        testID="dm-header-share"
         accessibilityLabel="Share profile QR"
       />
     ) : null);
@@ -136,6 +138,7 @@ export function DmChatHeader({
           <ScreenHeaderAction
             icon="material-symbols:arrow-back-rounded"
             onPress={onBack}
+            testID="dm-header-back"
             accessibilityLabel="Go back"
           />
         ),
@@ -154,24 +157,8 @@ export function DmChatHeader({
               seed={seed ?? pubkey ?? nickname ?? displayName}
               name={displayName}
             />
-            <VStack
-              gap={2}
-              style={{
-                marginLeft: 8,
-                flex: 1,
-                minWidth: 0,
-                justifyContent: 'flex-start',
-                alignItems: 'flex-start',
-              }}>
-              <Text
-                loading={shouldShowAvatarLoading}
-                placeholder="Display Name"
-                size={16}
-                bold
-                style={{ color: foreground, textAlign: 'left' }}
-                numberOfLines={1}>
-                {displayName}
-              </Text>
+            <VStack className="ml-2 min-w-0 flex-1 items-start justify-start gap-0.5">
+              <MarqueeText text={displayName} size={16} weight="bold" testID="dm-header-title" />
               {subtitle ? (
                 <Text
                   size={12}
@@ -196,6 +183,7 @@ export function DmChatHeader({
             {pubkey && (
               <ScreenHeaderAction
                 icon="material-symbols:report-rounded"
+                testID="dm-header-moderation"
                 accessibilityLabel="Block or report person"
                 onPress={() => personMenu(pubkey)}
               />
