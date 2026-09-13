@@ -941,6 +941,37 @@ can change Reanimated/reduced-motion behavior and invalidate the test.
 and Android authored journeys and marks gaps. Regenerate with `bun run e2e:pages`
 from `app/`; native pass evidence is deliberately not inferred from this report.
 
+### Call-to-action gates
+
+**Observed:** `CtaHost` runs beneath AppGate and RestoreGate, using the registry
+in `app/shared/lib/cta/`. Version metadata is persisted by settingsStore.
+
+**Decision:** show one eligible CTA at a time, then re-evaluate on dismissal,
+foreground, version, lifecycle and balance changes. All CTAs use `CtaScreen`.
+
+**Rules:**
+
+- `shouldShow` is pure and synchronous over an injected context and clock.
+- Blocking CTAs use persisted last-known data; showing one never waits for a
+  network call. Version refresh is separate and throttled to six hours.
+- Blocking CTAs have no dismissal, swipe or Android-back escape in production.
+- Dismissals are data-only. Version-triggered dismissals carry the trigger
+  version. A permanent record uses the CTA ID; a three-day deferral uses its
+  `:snooze` key, with the same `{ at, version? }` shape.
+- Backup verification is additive lifecycle data; revealing the phrase alone
+  never marks it verified. Three correct quiz answers do.
+- Mock Mode suppresses balance-derived backup nags.
+- Automation suppresses all automatic presentation. The Developer preview
+  explicitly bypasses eligibility and dismissal and offers End preview, even
+  for blocking CTAs; normal back remains blocked. Preview state is runtime-only.
+- Every CTA has semantic controls, an in-screen active probe, a registered page
+  and a JSON journey. Mnemonics never enter IDs, route params or persistence.
+
+**Hierarchy:** update (0) > security/backup (10) > tips (20+).
+
+**Follow-up:** migrate remaining nag-like popups into the registry. Native
+back/gesture, large-text and safe-area evidence is still required on both OSes.
+
 ### Mock Mode and screenshot fixtures
 
 **Owner:** [settingsStore.mockMode](app/shared/stores/global/settingsStore.ts) is

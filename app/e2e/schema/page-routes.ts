@@ -2,6 +2,8 @@
  * coverage claim. The audit gate rejects unregistered new routes. */
 import type { CANONICAL_PAGES } from './pages';
 export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], readonly string[]>> = {
+  cta: ['cta.tsx'],
+  'recovery-phrase-confirm': ['(settings-flow)/recovery-phrase-confirm.tsx'],
   ai: ['(drawer)/(tabs)/ai/index.tsx'],
   contacts: ['(drawer)/(tabs)/contacts/index.tsx'],
   feed: ['(drawer)/(tabs)/feed/index.tsx'],

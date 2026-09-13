@@ -43,6 +43,7 @@ export default function SettingsFlowLayout() {
     <Stack screenOptions={screenOptions}>
       <Stack.Screen name="index" options={INDEX_OPTIONS} />
       <Stack.Screen name="profile" options={PROFILE_OPTIONS} />
+      <Stack.Screen name="recovery-phrase-confirm" options={{ title: 'Check your backup' }} />
       <Stack.Screen name="notification-policy" options={NOTIFICATION_POLICY_OPTIONS} />
       <Stack.Screen name="routing" options={ROUTING_OPTIONS} />
       <Stack.Screen name="network" options={NETWORK_OPTIONS} />

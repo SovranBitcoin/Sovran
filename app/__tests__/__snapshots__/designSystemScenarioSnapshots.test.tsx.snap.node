@@ -2816,6 +2816,7 @@ exports[`Design System exact structural snapshots renders foundations/pill-tabs:
                     },
                   ],
                   "props": {
+                    "aria-label": "All",
                     "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-cpet4d",
                     "dir": null,
                     "style": {
@@ -2872,6 +2873,7 @@ exports[`Design System exact structural snapshots renders foundations/pill-tabs:
                     },
                   ],
                   "props": {
+                    "aria-label": "Recent",
                     "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-cpet4d",
                     "dir": null,
                     "style": {
@@ -2929,6 +2931,7 @@ exports[`Design System exact structural snapshots renders foundations/pill-tabs:
                     },
                   ],
                   "props": {
+                    "aria-label": "Requests",
                     "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-cpet4d",
                     "dir": null,
                     "style": {
@@ -20073,8 +20076,8 @@ exports[`Design System exact structural snapshots renders skeleton-crossfade/ava
         "className": "css-view-g5y9jx",
         "dir": null,
         "style": {
-          "overflowX": "hidden",
-          "overflowY": "hidden",
+          "overflowX": "visible",
+          "overflowY": "visible",
         },
       },
       "type": "div",
@@ -20210,8 +20213,8 @@ exports[`Design System exact structural snapshots renders skeleton-crossfade/ava
         "className": "css-view-g5y9jx",
         "dir": null,
         "style": {
-          "overflowX": "hidden",
-          "overflowY": "hidden",
+          "overflowX": "visible",
+          "overflowY": "visible",
         },
       },
       "type": "div",
@@ -20568,8 +20571,8 @@ exports[`Design System exact structural snapshots renders skeleton-crossfade/pro
             "className": "css-view-g5y9jx",
             "dir": null,
             "style": {
-              "overflowX": "hidden",
-              "overflowY": "hidden",
+              "overflowX": "visible",
+              "overflowY": "visible",
             },
           },
           "type": "div",
@@ -20673,8 +20676,8 @@ exports[`Design System exact structural snapshots renders skeleton-crossfade/pro
               "borderTopRightRadius": "22px",
               "height": "44px",
               "justifyContent": "center",
-              "overflowX": "hidden",
-              "overflowY": "hidden",
+              "overflowX": "visible",
+              "overflowY": "visible",
               "width": "44px",
             },
           },

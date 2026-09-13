@@ -281,6 +281,82 @@ exports[`persisted schema drift btcmap-store schema matches the golden snapshot 
 }
 `;
 
+exports[`persisted schema drift cta-store schema matches the golden snapshot for its version: cta-store 1`] = `
+{
+  "name": "cta-store",
+  "shape": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "dismissed": {
+          "additionalProperties": {
+            "properties": {
+              "at": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "version": {
+                "maxLength": 32,
+                "type": "string",
+              },
+            },
+            "required": [
+              "at",
+            ],
+            "type": "object",
+          },
+          "default": {},
+          "propertyNames": {
+            "maxLength": 64,
+            "type": "string",
+          },
+          "type": "object",
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "dismissed": {
+          "additionalProperties": {
+            "additionalProperties": false,
+            "properties": {
+              "at": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "version": {
+                "maxLength": 32,
+                "type": "string",
+              },
+            },
+            "required": [
+              "at",
+            ],
+            "type": "object",
+          },
+          "default": {},
+          "propertyNames": {
+            "maxLength": 64,
+            "type": "string",
+          },
+          "type": "object",
+        },
+      },
+      "required": [
+        "dismissed",
+      ],
+      "type": "object",
+    },
+  },
+  "version": 1,
+}
+`;
+
 exports[`persisted schema drift data-migration-store schema matches the golden snapshot for its version: data-migration-store 1`] = `
 {
   "name": "data-migration-store",
@@ -8549,6 +8625,19 @@ exports[`persisted schema drift wallet-lifecycle schema matches the golden snaps
           ],
           "default": null,
         },
+        "recoveryPhraseVerifiedAt": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
         "restoreStatus": {
           "default": "unknown",
           "enum": [
@@ -8606,6 +8695,19 @@ exports[`persisted schema drift wallet-lifecycle schema matches the golden snaps
           ],
           "default": null,
         },
+        "recoveryPhraseVerifiedAt": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
         "restoreStatus": {
           "default": "unknown",
           "enum": [
@@ -8634,6 +8736,7 @@ exports[`persisted schema drift wallet-lifecycle schema matches the golden snaps
       },
       "required": [
         "seedCreatedAt",
+        "recoveryPhraseVerifiedAt",
         "restoreStatus",
         "lastRestoreAt",
         "lastRestoreError",

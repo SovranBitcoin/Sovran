@@ -8,7 +8,6 @@ import {
   SpentThisMonth,
   Transactions,
 } from '@/features/transactions';
-import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
 import { Account } from '@/features/wallet/components/Account';
 import { BitcoinNearYou } from '@/features/wallet/components/BitcoinNearYou';
@@ -92,7 +91,6 @@ export function WalletScreen() {
     void refresh();
   };
   const pullToAi = usePullToAiRefreshControl({ onRefresh: handlePullToAiRefresh });
-  useVersionCheck();
 
   const { handlePermission } = useHandleCameraPermission();
   const walletContext = useWalletContext();

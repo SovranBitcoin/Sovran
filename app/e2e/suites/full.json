@@ -3,6 +3,7 @@
   "name": "full",
   "defaultEndState": "wallet",
   "scenarios": [
+    {"id":"cta.preview","file":"scenarios/cta-preview.json","order":16,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"onboarding.fresh","file":"scenarios/onboarding-fresh.json","order":10,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"transactions.filters","file":"scenarios/transactions-filters.json","order":11,"newInstance":false,"lane":"simulator","requires":[],"endState":"wallet"},
     {"id":"onboarding.terms-gate","file":"scenarios/onboarding-terms-gate.json","order":12,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},

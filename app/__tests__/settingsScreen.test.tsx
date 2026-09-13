@@ -37,6 +37,8 @@ jest.mock('@/shared/lib/logger', () => ({
   useLifecycleLogger: jest.fn(),
   log: { info: jest.fn(), error: jest.fn() },
   walletLog: { info: jest.fn() },
+  storeLog: { info: jest.fn(), warn: jest.fn(), debug: jest.fn() },
+  redactError: (error: unknown) => error,
 }));
 jest.mock('@/shared/lib/contentShiftLog', () => ({
   useShiftLogger: () => ({ report: jest.fn() }),

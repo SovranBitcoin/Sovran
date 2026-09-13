@@ -29,7 +29,8 @@ describe('mint info screen source', () => {
     expect(source).toContain('picture={rowPicture}');
   });
 
-  it('keeps the verified mint check ring visibly thicker', () => {
-    expect(source).toContain('const ring = okOutline ? 4 : 0;');
+  it('renders the shared status dot for every audit state', () => {
+    expect(source).toContain('<AvatarStatusDot status={status} size={badgeSize} />');
+    expect(source).not.toContain('STATUS_BADGE_CONFIG');
   });
 });

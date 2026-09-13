@@ -17,7 +17,9 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { CocoManager } from '@/shared/lib/cashu/manager';
-import { paramPopup } from '@/shared/lib/popup';
+import { actionMenuPopup, paramPopup } from '@/shared/lib/popup';
+import { useCtaStore } from '@/shared/stores/global/ctaStore';
+import { CTA_DEFINITIONS } from '@/shared/lib/cta/definitions';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -385,6 +387,21 @@ export const SettingsScreen = () => {
           <LayoutShiftProbe tag="settings.developer">
             <Section title="Developer">
               <ListGroup variant="secondary">
+                <SettingsListActionItem
+                  title="Preview call-to-action"
+                  testID="settings-dev-cta"
+                  onPress={() =>
+                    actionMenuPopup({
+                      title: 'Preview call-to-action',
+                      buttons: CTA_DEFINITIONS.map((cta) => ({
+                        text: cta.content.title,
+                        testID: `settings-dev-cta-${cta.id}`,
+                        onPress: () => useCtaStore.getState().preview(cta.id),
+                      })),
+                    })
+                  }
+                />
+                <Separator className="mx-4" />
                 <SettingsListActionItem
                   title="Export database"
                   testID="settings-export-database-row"
