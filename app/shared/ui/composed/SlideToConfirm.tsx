@@ -28,6 +28,8 @@ interface SlideToConfirmProps {
   textColor: string;
   iconColor: string;
   label?: string;
+  /** Semantic ID for the draggable thumb; the track retains slide-to-confirm. */
+  testID?: string;
 }
 
 export const SlideToConfirm: React.FC<SlideToConfirmProps> = ({
@@ -38,6 +40,7 @@ export const SlideToConfirm: React.FC<SlideToConfirmProps> = ({
   textColor,
   iconColor,
   label = 'Swipe to confirm',
+  testID,
 }) => {
   const { width: windowWidth } = useWindowDimensions();
   const sliderWidth = windowWidth - SCREEN_PADDING_X;
@@ -90,6 +93,7 @@ export const SlideToConfirm: React.FC<SlideToConfirmProps> = ({
       </Animated.View>
       <GestureDetector gesture={panGesture}>
         <Animated.View
+          testID={testID}
           className="h-10 w-10 items-center justify-center rounded-full"
           style={[thumbAnimatedStyle, { backgroundColor: thumbColor }]}>
           <Icon name={iconName} size={24} color={iconColor} />
