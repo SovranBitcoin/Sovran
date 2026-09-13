@@ -8,8 +8,11 @@ export type FeedRow = {
   item: FeedItem;
   rootEvent?: FeedEvent;
   metrics: NoteMetrics;
+  /** False when no source has supplied this note's counts yet (render a placeholder, not 0). */
+  metricsKnown: boolean;
   engagement: EngagementViewState;
   rootMetrics?: NoteMetrics;
+  rootMetricsKnown?: boolean;
   rootEngagement?: EngagementViewState;
   profiles: Map<string, ProfileInfo>;
   quotedEvents: Map<string, FeedEvent>;
@@ -32,6 +35,8 @@ export type BuildFeedRowsOptions = {
   profilesMap: Map<string, ProfileInfo>;
   quotedEventsMap: Map<string, FeedEvent>;
   getDisplayMetrics: (eventId: string) => NoteMetrics;
+  /** Whether a page/enrichment supplied counts for the id. Default: always known. */
+  hasMetrics?: (eventId: string) => boolean;
   getEngagementState: (eventId: string) => EngagementViewState;
   resolveReposter?: (item: Extract<FeedItem, { type: 'repost' }>) => {
     name: string;
@@ -45,6 +50,7 @@ export function buildFeedRows({
   profilesMap,
   quotedEventsMap,
   getDisplayMetrics,
+  hasMetrics = () => true,
   getEngagementState,
   resolveReposter = defaultResolveReposter,
 }: BuildFeedRowsOptions): FeedRow[] {
@@ -62,8 +68,10 @@ export function buildFeedRows({
       item,
       rootEvent,
       metrics: getDisplayMetrics(primaryEventId),
+      metricsKnown: hasMetrics(primaryEventId),
       engagement: getEngagementState(primaryEventId),
       rootMetrics: rootEvent ? getDisplayMetrics(rootEvent.id) : undefined,
+      rootMetricsKnown: rootEvent ? hasMetrics(rootEvent.id) : undefined,
       rootEngagement: rootEvent ? getEngagementState(rootEvent.id) : undefined,
       profiles: localMaps.profiles,
       quotedEvents: localMaps.quotedEvents,
@@ -213,7 +221,9 @@ function feedRowContentEqual(previous: FeedRow, next: FeedRow): boolean {
     previous.item === next.item &&
     previous.rootEvent === next.rootEvent &&
     optionalMetricsEqual(previous.metrics, next.metrics) &&
+    previous.metricsKnown === next.metricsKnown &&
     optionalMetricsEqual(previous.rootMetrics, next.rootMetrics) &&
+    previous.rootMetricsKnown === next.rootMetricsKnown &&
     engagementEqual(previous.engagement, next.engagement) &&
     optionalEngagementEqual(previous.rootEngagement, next.rootEngagement) &&
     mapEntriesEqual(previous.profiles, next.profiles) &&

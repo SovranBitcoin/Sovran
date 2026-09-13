@@ -8,6 +8,7 @@ export * from "./dm";
 export * from "./profiles";
 export * from "./profile-stats";
 export * from "./search";
+export * from "./note-stats";
 export * from "./strategy";
 export * from "./nagg-tier";
 export * from "./placeholders";

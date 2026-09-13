@@ -16,6 +16,8 @@ import type { DmEnvelope, DmEnvelopesBundle, DmEnvelopesRequest } from './dm';
 import type { ProfilesBundle, ProfilesRequest } from './profiles';
 import type { ProfileStatsBundle, ProfileStatsRequest } from './profile-stats';
 import type { ProfileSearchBundle, SearchRequest } from './search';
+import type { NoteStatsRequest } from './note-stats';
+import type { NoteStatsMap } from '@sovranbitcoin/schemas';
 
 // ---------------------------------------------------------------------------
 // Tier strategy — one deep module per source, implementing the surfaces it can
@@ -68,4 +70,6 @@ export interface NostrTierStrategy {
   getProfiles?(request: ProfilesRequest): Promise<TierOutcome<ProfilesBundle>>;
   getProfileStats?(request: ProfileStatsRequest): Promise<TierOutcome<ProfileStatsBundle>>;
   searchProfiles?(request: SearchRequest): Promise<TierOutcome<ProfileSearchBundle>>;
+  /** Per-note engagement counts for a bounded id batch (see note-stats.ts). */
+  getNoteStats?(request: NoteStatsRequest): Promise<TierOutcome<NoteStatsMap>>;
 }

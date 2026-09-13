@@ -52,7 +52,13 @@ describe('feed post card props', () => {
       openPostActions,
     });
 
-    const props = feedPostCardProps({ profiles, quotedEvents }, 7, event, metrics, viewerState);
+    const props = feedPostCardProps(
+      { metricsKnown: true, profiles, quotedEvents },
+      7,
+      event,
+      metrics,
+      viewerState
+    );
 
     expect(props).toMatchObject({
       event,

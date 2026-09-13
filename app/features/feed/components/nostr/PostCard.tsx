@@ -37,8 +37,8 @@ import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { useCardTapGesture } from '@/features/feed/hooks/useCardTapGesture';
 import { NoteContent, NOTE_CONTENT_FONT_SIZE } from './NoteContent';
 import { NOTE_CONTENT_LINE_HEIGHT } from '@/features/feed/lib/threadListLayout';
-import { useProfile } from '@/shared/lib/nostr/useEntityCache';
-import { MetricsFooter, POST_ACTION_ICON_SIZES } from './MetricsFooter';
+import { useProfile, useNoteStats } from '@/shared/lib/nostr/useEntityCache';
+import { MetricsFooter, POST_ACTION_ICON_SIZES, type MetricsCountsState } from './MetricsFooter';
 import {
   SkeletonExitReveal,
   SkeletonLoadingShimmer,
@@ -209,6 +209,12 @@ interface PostCardProps {
    * post optimistically. The tapped event itself is merged in automatically.
    */
   getThreadContext?: () => ThreadSeed | null;
+  /**
+   * False when the page that rendered this card carried no counts for it.
+   * The card then reads the entity cache (filled by the cross-tier backfill)
+   * and shows a placeholder, never a zero, until a source answers.
+   */
+  metricsKnown?: boolean;
 }
 
 export const PostCard = React.memo(function PostCard(props: PostCardProps) {
@@ -221,7 +227,7 @@ export const PostCard = React.memo(function PostCard(props: PostCardProps) {
 
 const PostCardBody = React.memo(function PostCardBody({
   event,
-  metrics,
+  metrics: pageMetrics,
   quotedEvents,
   profiles,
   getMetrics,
@@ -253,8 +259,19 @@ const PostCardBody = React.memo(function PostCardBody({
   likePendingDirection,
   onNestedProfilePressIn,
   getThreadContext,
+  metricsKnown = true,
 }: PostCardProps) {
   const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
+  // Counts the page did not carry come from the single owner as they land.
+  const cachedStats = useNoteStats(metricsKnown ? undefined : event.id);
+  const metrics = metricsKnown ? pageMetrics : (cachedStats.metrics ?? pageMetrics);
+  const countsState: MetricsCountsState = metricsKnown
+    ? 'known'
+    : cachedStats.metrics
+      ? 'known'
+      : cachedStats.status === 'loading'
+        ? 'loading'
+        : 'unavailable';
 
   // We requested deletion of this note (kind:5 sent) — show the greyed
   // tombstone instead of the post. `deletedNoteIds` only ever holds our own
@@ -437,6 +454,7 @@ const PostCardBody = React.memo(function PostCardBody({
 
           <Reanimated.View style={[pcStyles.targetMetrics, footerFadeStyle]}>
             <MetricsFooter
+              counts={countsState}
               {...metricsFooterShared}
               onCommentPress={onCommentPress ?? navigateToThread}
             />
@@ -539,6 +557,7 @@ const PostCardBody = React.memo(function PostCardBody({
               showMetricsBorder && { borderBottomColor: withAlpha(foreground, 0.1) },
           ]}>
           <MetricsFooter
+            counts={countsState}
             {...metricsFooterShared}
             compact={isThread}
             showBorder={!fullBleedFooterBorder && showMetricsBorder}

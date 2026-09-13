@@ -4,6 +4,7 @@ import { alpha, iconSize } from '@/shared/styles/tokens';
 import { AnimatedCountValue } from '@/shared/ui/composed/AnimatedCountValue';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -26,6 +27,14 @@ export const POST_ACTION_ICON_SIZES = {
   },
 } as const;
 
+/**
+ * Whether the counts are real numbers, still being counted (placeholder bar,
+ * never a zero), or could not be counted by any source (a dash).
+ */
+export type MetricsCountsState = 'known' | 'loading' | 'unavailable';
+
+const COUNT_UNAVAILABLE = '—';
+
 const AnimatedMetric = React.memo(function AnimatedMetric({
   iconName,
   iconSize,
@@ -35,6 +44,7 @@ const AnimatedMetric = React.memo(function AnimatedMetric({
   textSize,
   isActive,
   pending: _pending,
+  counts = 'known',
 }: {
   iconName: string;
   iconSize: number;
@@ -44,12 +54,21 @@ const AnimatedMetric = React.memo(function AnimatedMetric({
   textSize: number;
   isActive: boolean;
   pending: boolean;
+  counts?: MetricsCountsState;
 }) {
   const color = isActive ? activeColor : inactiveColor;
   return (
     <HStack align="center" gap={5}>
       <Icon name={iconName} size={iconSize} color={color} />
-      <AnimatedCountValue value={text} size={textSize} color={color} />
+      {counts === 'loading' ? (
+        <Text loading placeholder="12" size={textSize} style={{ color }} />
+      ) : (
+        <AnimatedCountValue
+          value={counts === 'unavailable' ? COUNT_UNAVAILABLE : text}
+          size={textSize}
+          color={color}
+        />
+      )}
     </HStack>
   );
 });
@@ -75,8 +94,11 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   likePendingDirection: _likePendingDirection,
   onActionPressIn,
   onActionPressOut,
+  counts = 'known',
 }: {
   metrics: NoteMetrics;
+  /** See MetricsCountsState; defaults to real numbers. */
+  counts?: MetricsCountsState;
   borderColor: string;
   compact?: boolean;
   showBorder?: boolean;
@@ -97,6 +119,8 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   onActionPressIn?: () => void;
   onActionPressOut?: () => void;
 }) {
+  // A zero from an unknown source is a lie; the placeholder/dash carry the truth.
+  const countsState: MetricsCountsState = counts;
   const repostedColor = useThemeColor('success');
   const repliedColor = COMMENT_ACCENT;
   const iconColor = withAlpha(borderColor, alpha.disabled);
@@ -138,6 +162,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
             textSize={textSize}
             isActive={replied}
             pending={false}
+            counts={countsState}
           />
         </Pressable>
         <Pressable
@@ -157,6 +182,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
             textSize={textSize}
             isActive={reposted}
             pending={repostPending}
+            counts={countsState}
           />
         </Pressable>
         <Pressable
@@ -176,6 +202,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
             textSize={textSize}
             isActive={liked}
             pending={likePending}
+            counts={countsState}
           />
         </Pressable>
         <Pressable

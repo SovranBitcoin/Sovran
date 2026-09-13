@@ -44,6 +44,8 @@ import {
 } from './demux';
 import { buildRelayForYouFeed } from './for-you/build';
 import type { NostrFilter, RawRelayEvent, RelayConnection } from './protocol';
+import { noteStatsFromRelayEvents, type NoteStatsRequest } from '../note-stats';
+import type { NoteStatsMap } from '@sovranbitcoin/schemas';
 
 // ---------------------------------------------------------------------------
 // Raw-relay tier (tier 3, the floor)
@@ -58,6 +60,9 @@ import type { NostrFilter, RawRelayEvent, RelayConnection } from './protocol';
 export type RelayTierConfig = {
   connection: RelayConnection;
 };
+
+/** Engagement events counted per read; beyond this the floor reports a lower bound. */
+const NOTE_STATS_RELAY_EVENT_LIMIT = 1000;
 
 export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
   return {
@@ -262,6 +267,25 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
       });
       return result.match<TierOutcome<DiscoveredMint[]>>(
         (events) => answered(discoverFromReviews(toFeedEvents(events))),
+        (error) => failed(error),
+      );
+    },
+
+    async getNoteStats(request: NoteStatsRequest): Promise<TierOutcome<NoteStatsMap>> {
+      if (request.ids.length === 0) return answered({});
+      // Count the engagement events referencing the ids. A lower bound: the
+      // limit caps what one round-trip can count for a very popular note.
+      const filter: NostrFilter = {
+        kinds: [1, 6, 7, 9735],
+        '#e': request.ids,
+        limit: NOTE_STATS_RELAY_EVENT_LIMIT,
+      };
+      const result = await config.connection.request([filter], {
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<NoteStatsMap>>(
+        (events) => answered(noteStatsFromRelayEvents(request.ids, toFeedEvents(events))),
         (error) => failed(error),
       );
     },

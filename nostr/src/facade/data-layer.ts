@@ -60,6 +60,8 @@ import {
   type ResolvedProfileStats,
 } from './profile-stats';
 import type { ProfileSearchBundle, ProfileSearchHit, SearchRequest, ResolvedProfileSearch } from './search';
+import type { NoteStatsRequest, ResolvedNoteStats } from './note-stats';
+import type { NoteStatsMap } from '@sovranbitcoin/schemas';
 import type { NostrTierStrategy } from './strategy';
 import {
   createNostrEntityCache,
@@ -165,6 +167,13 @@ export interface NostrDataLayer {
   searchProfiles(
     request: SearchRequest,
   ): Promise<Result<ResolvedProfileSearch, TierResolutionError>>;
+  /**
+   * Per-note engagement counts for ids a page did not carry. Aggregate: nagg
+   * and the relay floor are asked at once, the first answer resolves, later
+   * ones merge into the entity cache under their own rank. Ids are marked
+   * pending until every tier settled (placeholder vs unknown, for bindings).
+   */
+  getNoteStats(request: NoteStatsRequest): Promise<Result<ResolvedNoteStats, TierResolutionError>>;
 }
 
 export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLayer {
@@ -520,6 +529,48 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
         (r) => ({ hits: r.hits.length, ...describeProvenance(r.provenance) }),
       );
     },
+
+    async getNoteStats(request) {
+      return runRead(
+        'noteStats',
+        request,
+        { ids: request.ids.length },
+        async (ctx) => {
+          const ids = [...new Set(request.ids)];
+          if (ids.length === 0) {
+            return ok<ResolvedNoteStats, TierResolutionError>({ tier: 'cache', stats: {} });
+          }
+          cache.pendingNoteStats.begin(ids);
+          const candidates = candidatesFor<NoteStatsMap>(config.tiers, 'getNoteStats', (t) => () => t.getNoteStats!({ ...request, ids }));
+          const resolvedOf = (agg: TierAggregate<NoteStatsMap>): ResolvedNoteStats => ({
+            tier: agg.tier,
+            stats: agg.value,
+            provenance: provenanceOf(ctx.readId, agg),
+          });
+          const first = await resolveAllTiers<NoteStatsMap>(candidates, {
+            ...ctx,
+            gate: { minItems: 1, capMs: AGGREGATE_CAP_MS.noteStats },
+            count: (stats) => Object.keys(stats).length,
+            merge: (acc, next, tier) => {
+              // Each answer lands in the cache under ITS rank (a relay lower
+              // bound never overwrites nagg's aggregate).
+              cache.ingestNoteStats(next, tier);
+              return mergeNoteStatsByRank(acc, next, tier);
+            },
+            onUpdate: (agg) => {
+              if (agg.complete) cache.pendingNoteStats.end(ids);
+            },
+          });
+          if (first.isErr()) {
+            cache.pendingNoteStats.end(ids);
+            return err(first.error);
+          }
+          if (first.value.complete) cache.pendingNoteStats.end(ids);
+          return ok<ResolvedNoteStats, TierResolutionError>(resolvedOf(first.value));
+        },
+        (r) => ({ stats: Object.keys(r.stats).length, ...describeProvenance(r.provenance) }),
+      );
+    },
   };
 }
 
@@ -582,6 +633,7 @@ const AGGREGATE_CAP_MS = {
   searchProfiles: 300,
   mintReviews: 800,
   socialGraph: 800,
+  noteStats: 800,
 } as const;
 
 const TIER_RANK_ORDER: readonly NostrTier[] = ['nagg', 'primal', 'relay', 'cache'];
@@ -631,6 +683,23 @@ function mergeProfileBundles(
 const rankOwners = new WeakMap<object, NostrTier>();
 function rankOwner(metadata: object): NostrTier {
   return rankOwners.get(metadata) ?? 'relay';
+}
+
+/** Union by note id; a better-ranked tier's counts replace a worse one's, a worse one only adds ids. */
+function mergeNoteStatsByRank(
+  acc: NoteStatsMap | undefined,
+  next: NoteStatsMap,
+  tier: NostrTier,
+): NoteStatsMap {
+  if (!acc) {
+    rankOwners.set(next, tier);
+    return { ...next };
+  }
+  const accTier = rankOwner(acc);
+  const nextWins = tierRank(tier) <= tierRank(accTier);
+  const merged: NoteStatsMap = nextWins ? { ...acc, ...next } : { ...next, ...acc };
+  rankOwners.set(merged, nextWins ? tier : accTier);
+  return merged;
 }
 
 /** Fill only the fields the earlier answers left undefined; never overwrite a number with undefined. */

@@ -159,6 +159,8 @@ export interface NostrEntityCache {
   readonly profileStats: NormalizingStore<CachedProfileStats>;
   /** Which profile pubkeys have a fetch in flight (loading vs absent, for bindings). */
   readonly pendingProfiles: PendingSet;
+  /** Which note ids have a stats fetch in flight (placeholder vs unknown, for bindings). */
+  readonly pendingNoteStats: PendingSet;
 
   /** Seed minimal name+picture (feed/notification profiles) at low confidence, tagged by source. */
   ingestProfileInfos(infos: Record<string, NaggProfileInfo>, source: CacheSource): void;
@@ -204,6 +206,7 @@ export function createNostrEntityCache(limits: EntityCacheLimits = {}): NostrEnt
   });
 
   const pendingProfiles = createPendingSet();
+  const pendingNoteStats = createPendingSet();
 
   return {
     profiles,
@@ -211,6 +214,7 @@ export function createNostrEntityCache(limits: EntityCacheLimits = {}): NostrEnt
     noteStats,
     profileStats,
     pendingProfiles,
+    pendingNoteStats,
 
     ingestProfileInfos(infos, source) {
       const srcRank = sourceRank(source);
