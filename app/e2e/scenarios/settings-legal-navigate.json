@@ -13,6 +13,8 @@
   "steps": [
     {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
     {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"ACCOUNT"},"attempts":4,"settleMs":6000},
+    {"action":"assert","that":"visible","selector":{"id":"settings-profile-row"}},
+    {"action":"assert","that":"visible","selector":{"id":"settings-notifications-row"}},
     {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"settings-terms-row"},"attempts":8,"settleMs":1000},
     {"action":"tapUntil","sequence":[{"tap":{"id":"settings-terms-row"}}],"until":{"id":"legal-document-terms"},"attempts":4,"settleMs":1500},
     {"action":"screenshot","name":"settings-terms"},
@@ -27,6 +29,8 @@
     {"action":"screenshot","name":"settings-privacy"},
     {"action":"tapUntil","sequence":[{"tap":{"id":"flow-header-back"}}],"until":{"id":"settings-privacy-row"},"attempts":4,"settleMs":1500},
     {"action":"screenshot","name":"settings"},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"settings-version-row"},"attempts":8,"settleMs":1000},
+    {"action":"assert","that":"visible","selector":{"id":"settings-delete-row"}},
     {"action":"goHome"},
     {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
   ],
