@@ -342,6 +342,11 @@ function ActionMenuInstance({
       selectedRef.current = true;
       if (button.keepOpen) {
         stayOpenRef.current = true;
+        // Only heroui's immediate post-press close may be swallowed; a swipe or
+        // scrim tap during a slow keepOpen handler is a genuine dismissal.
+        setTimeout(() => {
+          stayOpenRef.current = false;
+        }, 400);
       } else {
         dismissActionMenuPopup();
       }

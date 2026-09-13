@@ -99,7 +99,9 @@ export function createFeedPager(options: FeedPagerOptions): FeedPager {
             ranked && lane.tier !== "nagg"
               ? {
                   kind: "following-recent" as const,
-                  ...(spec.kind === "following-popular"
+                  // Without the viewer the relay tier falls back to a global
+                  // kind-1 firehose, which is not "the viewer's recent follows".
+                  ...("viewerPubkey" in spec && spec.viewerPubkey
                     ? { viewerPubkey: spec.viewerPubkey }
                     : {}),
                 }

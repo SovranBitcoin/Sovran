@@ -30,15 +30,14 @@ export function applyProfilePatch(
   return content;
 }
 export const PROFILE_CREATED_AT_MAX_SKEW_SECONDS = 300;
-// Prefer a newer timestamp, but never inherit an unbounded future clock.
+// Kind-0 is replaceable: a lower created_at than the current event is ignored
+// by every relay, so the new event must always be newer than its base. A base
+// beyond the skew window is logged (clock_skew) but still superseded by +1;
+// capping below it would make every later edit unpublishable.
 export const nextProfileCreatedAt = (
   baseCreatedAt = 0,
   nowSeconds = Math.floor(Date.now() / 1000)
-) =>
-  Math.min(
-    nowSeconds + PROFILE_CREATED_AT_MAX_SKEW_SECONDS,
-    Math.max(nowSeconds, baseCreatedAt + 1)
-  );
+) => Math.max(nowSeconds, baseCreatedAt + 1);
 
 export function parseOwnProfileSnapshot(event: {
   content: string;

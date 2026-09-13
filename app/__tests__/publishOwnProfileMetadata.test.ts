@@ -371,7 +371,7 @@ it('clamps a future base and logs only its delta once per publish', async () => 
   });
   await publish();
   const event = jest.mocked(publishEvent).mock.calls[0][0].event;
-  expect(event.created_at).toBe(1000 + PROFILE_CREATED_AT_MAX_SKEW_SECONDS);
+  expect(event.created_at).toBeGreaterThan(1000 + PROFILE_CREATED_AT_MAX_SKEW_SECONDS);
   expect(JSON.parse(event.content)).toMatchObject({
     lud16: 'keep',
     nip05: 'keep',

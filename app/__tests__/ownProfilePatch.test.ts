@@ -84,8 +84,10 @@ it('keeps created_at monotonic even with clock skew or same-second saves', () =>
   expect(nextProfileCreatedAt(100, 120)).toBe(120);
 });
 
-it('caps far-future inherited timestamps at five minutes from now', () => {
-  expect(nextProfileCreatedAt(10000, 100)).toBe(400);
-  expect(nextProfileCreatedAt(400, 100)).toBe(400);
+it('always supersedes a future-dated base instead of capping below it', () => {
+  // Kind-0 is replaceable: a lower created_at than the current event is ignored
+  // by relays, so a stray future base is still superseded by +1 (and logged).
+  expect(nextProfileCreatedAt(10000, 100)).toBe(10001);
+  expect(nextProfileCreatedAt(400, 100)).toBe(401);
   expect(nextProfileCreatedAt(399, 100)).toBe(400);
 });

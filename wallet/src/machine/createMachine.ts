@@ -962,6 +962,9 @@ export function createPaymentMachine(
       let walletCtx = getContext();
       let unit = getUnit?.() ?? configUnit;
       let nfcError: StepDataMap["error"] | undefined;
+      // Set when the NFC branch switched the host unit; a failed or abandoned tap
+      // must restore the user's unit instead of leaving a terminal's choice behind.
+      let revertNfcUnit: (() => Promise<void>) | null = null;
       // A terminal chooses one unit. Switch the host's whole cached view before
       // the ordinary transition can reject a cross-unit request (including BIP21).
       if (event.type === "EXECUTE" && lastScanSource === "nfc" && nfcAdapter) {
@@ -1004,9 +1007,15 @@ export function createPaymentMachine(
                 phase: "selecting",
               });
               const switchUnit = operations.switchUnit;
+              const previousUnit = unit;
               const switched = await ResultAsync.fromThrowable(async () =>
                 switchUnit(requestedUnit),
               )();
+              if (switched.isOk()) {
+                revertNfcUnit = async () => {
+                  await switchUnit(previousUnit);
+                };
+              }
               if (switched.isErr()) {
                 nfcError = {
                   code: "NFC_READ_FAILED",
@@ -1297,6 +1306,7 @@ export function createPaymentMachine(
               }
 
               setStep("error", effect.error.data);
+              await revertNfcUnit?.().catch(() => undefined);
             }
 
             handlerExecuting = false;
@@ -1305,6 +1315,7 @@ export function createPaymentMachine(
             // Terminal step that isn't navigateToPaymentRequest (e.g. navigateToMeltPreview,
             // error, receiveToken) — release NFC session and proceed normally.
             await nfcAdapter.releaseSession();
+            await revertNfcUnit?.().catch(() => undefined);
             nfcResolved = true;
           }
         }
