@@ -268,7 +268,6 @@
     "reason": "Hosted screenshots came from the stale APP_IPHONE_69 set; re-host from APP_IPHONE_65 (PR #266). Package files are unchanged and remain hosted; the seven stale media PNGs stay as immutable orphans.",
     "reviewedBy": "operator"
   },
-  "playEdit": "13953961103830622998",
   "screenshots": [
     "https://sovran.money/ios/media/11d79f15862e845c00da3345b495ba9af9c6016fe357e30d5849fb157fbf2cb6.png",
     "https://sovran.money/ios/media/4dfb68874e3802cc2140cf5f94f51c87cfe8deb981f05c63d4098a86d50dbbf8.png",
