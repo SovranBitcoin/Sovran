@@ -3,13 +3,14 @@ export type CtaDismissals = Record<string, { at: number; version?: string }>;
 export interface CtaContext {
   nowMs: number;
   nativeVersion: string;
-  latest: { version: string; minVersion?: string } | null;
+  latest: { version: string; minVersion?: string; fetchedAt: number } | null;
   lifecycle: {
     seedCreatedAt: number | null;
     recoveryPhraseVerifiedAt: number | null;
     restoreStatus: string;
   };
   balanceTotalSat: number;
+  backupStartedAt?: number | null;
   dismissed: CtaDismissals;
   mockMode: boolean;
   automation: boolean;

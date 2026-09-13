@@ -12,6 +12,8 @@ it('round trips populated dismissals, omits runtime state, and retains unknown f
   store.getState().dismiss('backup-recovery-phrase', false);
   store.getState().preview('update-required');
   store.getState().setActive('update-required');
+  store.getState().closeActive();
+  store.getState().startBackup();
   const options = store.persist.getOptions();
   const projection = JSON.parse(JSON.stringify(options.partialize!(store.getState())));
   expect(Object.keys(projection)).toEqual(['dismissed']);

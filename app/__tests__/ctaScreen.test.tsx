@@ -14,7 +14,11 @@ const mockAddListener = jest.fn((_event: string, _listener: () => void) => jest.
 const mockNavigation = { setOptions: mockSetOptions, addListener: mockAddListener };
 jest.mock('expo-router', () => ({ useNavigation: () => mockNavigation }));
 jest.mock('@/shared/hooks/useGuardedRouter', () => ({
-  guardedRouter: { back: () => mockBack(), replace: (...args: unknown[]) => mockReplace(...args) },
+  guardedRouter: {
+    canGoBack: () => true,
+    back: () => mockBack(),
+    replace: (...args: unknown[]) => mockReplace(...args),
+  },
 }));
 jest.mock('expo-router/react-navigation', () => ({
   usePreventRemove: (blocked: boolean) => mockPreventRemove(blocked),
@@ -50,7 +54,13 @@ let view: TestRenderer.ReactTestRenderer;
 beforeEach(async () => {
   jest.spyOn(BackHandler, 'addEventListener').mockReturnValue({ remove: jest.fn() });
   await useCtaStore.persist.rehydrate();
-  useCtaStore.setState({ dismissed: {}, activeId: null, previewOverride: null });
+  useCtaStore.setState({
+    dismissed: {},
+    activeId: null,
+    previewOverride: null,
+    closingId: null,
+    backupStartedAt: null,
+  });
   jest.clearAllMocks();
   jest.mocked(openExternalUrl).mockReturnValue(okAsync(undefined));
 });
@@ -94,10 +104,11 @@ it('persists do-not-ask and otherwise snoozes for later', async () => {
   expect(useCtaStore.getState().dismissed['backup-recovery-phrase']).toBeDefined();
   expect(mockBack).toHaveBeenCalledTimes(1);
 });
-it('Back up now defers the reminder and opens profile without marking it verified', async () => {
+it('Back up now opens profile without snoozing, even when removal follows', async () => {
   mount('backup-recovery-phrase');
   await press('cta-primary');
-  expect(useCtaStore.getState().dismissed['backup-recovery-phrase:snooze']).toBeDefined();
+  act(() => mockAddListener.mock.calls.at(-1)![1]());
+  expect(useCtaStore.getState().dismissed).toEqual({});
   expect(mockReplace).toHaveBeenCalledWith('/(settings-flow)/profile');
 });
 
@@ -107,4 +118,10 @@ it('honors Do not ask me again when the user leaves by swipe or back', async () 
   const calls = mockAddListener.mock.calls;
   act(() => calls.at(-1)![1]());
   expect(useCtaStore.getState().dismissed['backup-recovery-phrase']).toBeDefined();
+});
+
+it('Not now records the three-day snooze', async () => {
+  mount('backup-recovery-phrase');
+  await press('cta-secondary');
+  expect(useCtaStore.getState().dismissed['backup-recovery-phrase:snooze']).toBeDefined();
 });

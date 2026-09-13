@@ -34,7 +34,7 @@ const mockGetLatestVersion = jest.mocked(getLatestVersion);
 const cached = { version: '0.1.3', minVersion: '0.1.2', message: 'Please update', fetchedAt: 123 };
 
 async function mount() {
-  const view = renderHook(useLatestVersionFetch);
+  const view = renderHook(() => useLatestVersionFetch());
   await act(async () => {});
   return view;
 }
@@ -162,4 +162,39 @@ it('throttles foreground refreshes for six hours, including failed attempts', as
   view.unmount();
   clock.mockRestore();
   listener.mockRestore();
+});
+
+it('bypasses a fresh cache once for a blocking gate and then resumes the six-hour throttle', async () => {
+  useSettingsStore.setState({ lastKnownAppVersion: { ...cached, fetchedAt: Date.now() } });
+  const view = renderHook(
+    ({ blocking }: { blocking: boolean }) => useLatestVersionFetch(blocking),
+    { initialProps: { blocking: false } }
+  );
+  expect(mockGetLatestVersion).not.toHaveBeenCalled();
+  view.rerender({ blocking: true });
+  await act(async () => {});
+  expect(mockGetLatestVersion).toHaveBeenCalledTimes(1);
+  const foreground = jest.mocked(AppState.addEventListener).mock.calls.at(-1)![1];
+  await act(async () => foreground('active'));
+  view.rerender({ blocking: true });
+  expect(mockGetLatestVersion).toHaveBeenCalledTimes(1);
+});
+
+it('does not let an aborted older response replace a forced correction', async () => {
+  let finish!: (value: Awaited<ReturnType<typeof getLatestVersion>>) => void;
+  mockGetLatestVersion.mockReturnValueOnce(
+    new Promise((resolve) => {
+      finish = resolve;
+    })
+  );
+  const view = renderHook(
+    ({ blocking }: { blocking: boolean }) => useLatestVersionFetch(blocking),
+    { initialProps: { blocking: false } }
+  );
+  mockGetLatestVersion.mockResolvedValueOnce(ok({ version: '0.1.1' }));
+  view.rerender({ blocking: true });
+  await act(async () => {});
+  expect(mockGetLatestVersion.mock.calls[0][0].signal?.aborted).toBe(true);
+  await act(async () => finish(ok({ version: '9.0.0' })));
+  expect(useSettingsStore.getState().lastKnownAppVersion?.version).toBe('0.1.1');
 });

@@ -26,12 +26,13 @@ export function CtaScreen({ id }: { id: CtaId }) {
   const foreground = useThemeColor('foreground');
   const previewOverride = useCtaStore((s) => s.previewOverride);
   const preview = previewOverride === id;
+  const closing = useCtaStore((s) => s.closingId === id);
   const permanentlyDismissed = useCtaStore((s) => !!s.dismissed[id]);
   const [exitingPreview, setExitingPreview] = useState(false);
   const [dontAsk, setDontAsk] = useState(false);
   const dismissalHandled = useRef(false);
   const [updateError, setUpdateError] = useState(false);
-  const blocking = cta.presentation === 'blocking-modal' && !exitingPreview;
+  const blocking = cta.presentation === 'blocking-modal' && !exitingPreview && !closing;
   usePreventRemove(blocking, () => {});
   useEffect(() => {
     navigation.setOptions({ gestureEnabled: !blocking });
@@ -40,8 +41,11 @@ export function CtaScreen({ id }: { id: CtaId }) {
     return () => subscription.remove();
   }, [blocking, navigation]);
   useEffect(() => {
-    if (exitingPreview) router.back();
-  }, [exitingPreview]);
+    if (!exitingPreview && !closing) return;
+    // Release usePreventRemove before dispatching the automatic navigation.
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  }, [exitingPreview, closing]);
   useEffect(() => {
     if (cta.presentation === 'blocking-modal') return;
     return navigation.addListener('beforeRemove', () => {
@@ -61,7 +65,7 @@ export function CtaScreen({ id }: { id: CtaId }) {
       return;
     }
     dismissalHandled.current = true;
-    useCtaStore.getState().dismiss(id, false);
+    useCtaStore.getState().startBackup();
     router.replace('/(settings-flow)/profile');
   };
   return (
