@@ -75,6 +75,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/feed/components/nostr/image-overlay/PagerDots.tsx",
     "features/feed/components/nostr/image-overlay/provider.tsx",
     "features/feed/components/nostr/poll/PollCard.tsx",
+    "features/feed/components/nostr/stories/StoryCaption.tsx",
     "features/feed/components/notificationRowChrome.tsx",
     "features/feed/components/thread-embed/EmbedActionBar.tsx",
     "features/feed/components/thread-embed/LinkEmbedView.tsx",
@@ -248,6 +249,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 242,
+  "total": 243,
 }
 `;

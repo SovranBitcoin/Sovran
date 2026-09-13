@@ -38,7 +38,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Text } from '@/shared/ui/primitives/Text';
-import Icon from 'assets/icons';
+import Icon from '@/assets/icons';
+import { formatRelative } from '@/shared/lib/date';
+import { buildStoryCaption } from '@/features/feed/lib/storyCaption';
+import { StoryCaption } from './stories/StoryCaption';
 import { StoriesContainer } from './StoriesContainer';
 import { StoryProgressBar } from './StoryProgressBar';
 import { easeGradient } from '@/shared/lib/easeGradient';
@@ -347,6 +350,8 @@ const UserStoriesItem: FC<UserItemProps> = ({
   isClosing = false,
 }) => {
   const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
+  const [captionExpanded, setCaptionExpanded] = useState(false);
+  const captionExpandedRef = useRef(false);
   const { width: screenWidth } = useWindowDimensions();
   const mountedRef = useRef(true);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -393,7 +398,7 @@ const UserStoriesItem: FC<UserItemProps> = ({
   }, [isActive, isClosing, player]);
 
   useEventListener(player, 'timeUpdate', ({ currentTime }) => {
-    if (!isActive || isClosing) return;
+    if (!isActive || isClosing || captionExpandedRef.current) return;
     safePlayerCall(player, (p) => {
       const dur = p.duration ?? 0;
       if (dur > 0) storyProgress.set(currentTime / dur);
@@ -401,6 +406,8 @@ const UserStoriesItem: FC<UserItemProps> = ({
   });
 
   useEffect(() => {
+    captionExpandedRef.current = false;
+    setCaptionExpanded(false);
     if (isActive && !isClosing) {
       storyProgress.set(0);
       safePlayerCall(player, (p) => {
@@ -413,7 +420,7 @@ const UserStoriesItem: FC<UserItemProps> = ({
   }, [currentStoryIndex, isActive, isClosing, player, storyProgress]);
 
   useEventListener(player, 'playToEnd', () => {
-    if (!isActive || isClosing || !mountedRef.current) return;
+    if (!isActive || isClosing || captionExpandedRef.current || !mountedRef.current) return;
     if (currentStoryIndex < user.videoPosts.length - 1) {
       setCurrentStoryIndex(currentStoryIndex + 1);
     } else if (userIndex < totalUsers - 1) {
@@ -433,9 +440,16 @@ const UserStoriesItem: FC<UserItemProps> = ({
   }, [player]);
 
   const resumePlayer = useCallback(() => {
-    if (!isActive || isClosing) return;
+    if (!isActive || isClosing || isDragging.get() || captionExpandedRef.current) return;
     safePlayerCall(player, (p) => p.play());
-  }, [isActive, isClosing, player]);
+  }, [isActive, isClosing, isDragging, player]);
+
+  const changeCaptionExpanded = (expanded: boolean) => {
+    captionExpandedRef.current = expanded;
+    setCaptionExpanded(expanded);
+    if (expanded) pausePlayer();
+    else resumePlayer();
+  };
 
   useAnimatedReaction(
     () => isDragging.get(),
@@ -450,6 +464,12 @@ const UserStoriesItem: FC<UserItemProps> = ({
 
   const onStoryPress = useCallback(
     (e: GestureResponderEvent) => {
+      if (captionExpandedRef.current) {
+        captionExpandedRef.current = false;
+        setCaptionExpanded(false);
+        resumePlayer();
+        return;
+      }
       const isLeft = e.nativeEvent.pageX < screenWidth / 2;
       const isLastStory = currentStoryIndex === user.videoPosts.length - 1;
       const isFirstStory = currentStoryIndex === 0;
@@ -475,6 +495,7 @@ const UserStoriesItem: FC<UserItemProps> = ({
     },
     [
       currentStoryIndex,
+      resumePlayer,
       userIndex,
       totalUsers,
       scrollRef,
@@ -498,6 +519,9 @@ const UserStoriesItem: FC<UserItemProps> = ({
     onClose?.();
   }, [player, onClose]);
 
+  const caption = currentVideo
+    ? buildStoryCaption(currentVideo.content, currentVideo.videoUrl)
+    : null;
   const profileName = user.profile?.name || user.pubkey.slice(0, 12) + '…';
   const profilePicture = user.profile?.picture;
   const visualKey = `story:${userIndex}:${user.pubkey.slice(0, 12)}`;
@@ -520,6 +544,10 @@ const UserStoriesItem: FC<UserItemProps> = ({
           hasVideo: !!currentVideo,
         }}>
         <Pressable
+          testID="story-video"
+          accessibilityRole="button"
+          accessibilityLabel={captionExpanded ? 'Collapse caption' : 'Navigate stories'}
+          accessibilityHint="Tap the left or right side to change stories. Hold to pause."
           style={styles.flex1}
           onPress={onStoryPress}
           onLongPress={onStoryLongPress}
@@ -552,7 +580,7 @@ const UserStoriesItem: FC<UserItemProps> = ({
         </Pressable>
 
         <View style={styles.header} pointerEvents="box-none">
-          <View style={styles.progressRow} pointerEvents="none">
+          <View testID="story-progress" style={styles.progressRow} pointerEvents="none">
             {user.videoPosts.map((_, idx) => (
               <StoryProgressBar
                 key={idx}
@@ -570,14 +598,35 @@ const UserStoriesItem: FC<UserItemProps> = ({
               name={profileName}
               size={36}
             />
-            <Text size={14} bold style={[styles.profileName, styles.flex1]} numberOfLines={1}>
-              {profileName}
-            </Text>
-            <Pressable onPress={handleClose} hitSlop={12} style={styles.closeButton}>
+            <View className="flex-1 flex-row items-center gap-2">
+              <Text size={14} bold color="white" className="shrink" numberOfLines={1}>
+                {profileName}
+              </Text>
+              {currentVideo && (
+                <Text size={13} color="white" className="shrink-0 opacity-70" numberOfLines={1}>
+                  {formatRelative(currentVideo.created_at * 1000, 'chat-bubble')}
+                </Text>
+              )}
+            </View>
+            <Pressable
+              testID="story-close"
+              accessibilityRole="button"
+              accessibilityLabel="Close stories"
+              onPress={handleClose}
+              hitSlop={12}
+              style={styles.closeButton}>
               <Icon name="mdi:close" size={22} color="#fff" />
             </Pressable>
           </View>
         </View>
+        {caption && isActive && !isClosing && (
+          <StoryCaption
+            key={`${currentVideo.eventId}:${currentStoryIndex}`}
+            caption={caption}
+            expanded={captionExpanded}
+            onExpandedChange={changeCaptionExpanded}
+          />
+        )}
       </VisualLayoutProbe>
     </StoriesContainer>
   );
@@ -616,9 +665,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  profileName: {
-    color: '#fff',
   },
   closeButton: {
     width: 32,
