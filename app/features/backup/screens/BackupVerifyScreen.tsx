@@ -73,7 +73,11 @@ export function BackupVerifyScreen() {
   return (
     <Screen name="BackupVerifyScreen">
       <View className="gap-6 px-4 py-6">
-        <E2EAccessibilityProbe testID="backup-verify" accessibilityLabel="Backup verify" value="1" />
+        <E2EAccessibilityProbe
+          testID="backup-verify"
+          accessibilityLabel="Backup verify"
+          value="1"
+        />
         <Text size={24} bold>
           Quick check
         </Text>
