@@ -275,7 +275,7 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   }
 
   if (!request || !qrData) {
-    return <ReceiveRailPlaceholder sectionTitle={copy.sectionTitle} />;
+    return <ReceiveRailPlaceholder sectionTitle={copy.sectionTitle} unit={unit} />;
   }
 
   // Expired per coco's own gate → no QR (deposits wouldn't be watched); offer a

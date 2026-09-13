@@ -113,7 +113,8 @@ export function PaymentInfo({
     });
   }
 
-  if (loading || !active) return <PaymentQRCodePlaceholder testID="payment-info-qr-placeholder" />;
+  if (loading || !active)
+    return <PaymentQRCodePlaceholder testID="payment-info-qr-placeholder" unit={unit} />;
 
   return (
     <Log name="PaymentInfo">

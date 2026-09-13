@@ -1078,6 +1078,9 @@ Native gesture behavior requires device verification.
   CtaHost) and records no persisted dismissal; an abandoned attempt has only a runtime
   `ABANDONED_BACKUP_GRACE_MS` (30 minute) grace period. "Not now" still snoozes for
   three days. Completing verification removes backup eligibility.
+- The navigation header owns a page's title; a screen body never repeats it as a
+  heading (`routeTitleDuplication` test). Prompt and backup bodies open with the
+  instruction or explanation instead.
 - Backup verification is additive lifecycle data; revealing the phrase alone
   never marks it verified. The `(prompt-flow)` modal checks all 12 positions in
   order with three choices each. Wrong answers retry only that word; returning

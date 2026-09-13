@@ -37,9 +37,6 @@ export function BackupDoneScreen() {
       }>
       <View className="gap-6 px-4 py-6">
         <E2EAccessibilityProbe testID="backup-done" accessibilityLabel="Backup done" value="1" />
-        <Text size={24} bold>
-          Backup done
-        </Text>
         <Text>
           {demo
             ? 'Practice complete. Your real wallet has not been marked as backed up.'

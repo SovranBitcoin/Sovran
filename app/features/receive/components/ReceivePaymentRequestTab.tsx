@@ -150,7 +150,7 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
   }
 
   if (!request) {
-    return <ReceiveRailPlaceholder sectionTitle="CASHU PAYMENT REQUEST" />;
+    return <ReceiveRailPlaceholder sectionTitle="CASHU PAYMENT REQUEST" unit={unit} />;
   }
 
   return (

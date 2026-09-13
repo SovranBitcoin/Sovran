@@ -163,7 +163,7 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
   if (!active) return null;
 
   if (!settled) {
-    return <ReceiveRailPlaceholder sectionTitle="Unified" />;
+    return <ReceiveRailPlaceholder sectionTitle="Unified" unit={unit} />;
   }
 
   return (

@@ -38,15 +38,12 @@ export function BackupIntroScreen() {
       }>
       <View className="gap-6 px-4 py-6">
         <E2EAccessibilityProbe testID="backup-intro" accessibilityLabel="Backup intro" value="1" />
-        <Text size={24} bold>
-          Back up your wallet
-        </Text>
         {demo && (
-          <Text testID="backup-demo">
+          <Text testID="backup-demo" size={13} className="text-muted">
             Mock Mode — practice words only. This does not back up your wallet.
           </Text>
         )}
-        <Text>
+        <Text size={16}>
           Your wallet has 12 recovery words. They&apos;re the only way to get your money back if you
           lose this phone. Write them on paper — not a screenshot, not a note. Anyone with the words
           has your money. They can&apos;t be changed or reset.

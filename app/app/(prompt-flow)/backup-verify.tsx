@@ -3,7 +3,7 @@ import { BackupVerifyScreen } from '@/features/backup/screens/BackupVerifyScreen
 export default function BackupVerifyRoute() {
   return (
     <>
-      <Stack.Screen options={{ title: 'Quick check' }} />
+      <Stack.Screen options={{ title: 'Check your words' }} />
       <BackupVerifyScreen />
     </>
   );

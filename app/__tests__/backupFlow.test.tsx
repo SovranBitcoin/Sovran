@@ -68,6 +68,27 @@ jest.mock('@/shared/ui/composed/BottomButtons', () => ({ BottomButtons: 'Footer'
 jest.mock('@/shared/ui/primitives/View/View', () => ({ View: 'View' }));
 jest.mock('@/shared/ui/primitives/Text', () => ({ Text: 'Text' }));
 jest.mock('@/shared/ui/primitives/Button', () => ({ Button: 'Button' }));
+jest.mock('@/shared/ui/composed/GradientCard', () => ({ GradientCard: 'GradientCard' }));
+jest.mock('heroui-native', () => {
+  const React = require('react');
+  const host = (name: string) =>
+    function MockHost(props: Record<string, unknown>) {
+      return React.createElement(name, props);
+    };
+  return {
+    ListGroup: Object.assign(host('ListGroup'), {
+      Item: 'ListGroupItem',
+      ItemContent: 'ListGroupItemContent',
+      ItemTitle: 'ListGroupItemTitle',
+      ItemSuffix: 'ListGroupItemSuffix',
+    }),
+    PressableFeedback: Object.assign(host('PressableFeedback'), {
+      Scale: 'Scale',
+      Ripple: 'Ripple',
+    }),
+    Separator: 'Separator',
+  };
+});
 let view: TestRenderer.ReactTestRenderer;
 let current: React.ReactNode;
 function show(screen: React.ReactNode) {

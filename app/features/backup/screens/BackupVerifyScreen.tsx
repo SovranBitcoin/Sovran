@@ -1,9 +1,10 @@
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import Icon from '@/assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useIsFocused } from 'expo-router/react-navigation';
 import * as Haptics from 'expo-haptics';
+import { ListGroup, PressableFeedback, Separator } from 'heroui-native';
 import Animated, {
   ReduceMotion,
   useAnimatedStyle,
@@ -14,17 +15,44 @@ import Animated, {
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { log } from '@/shared/lib/logger';
 import { Screen } from '@/shared/ui/composed/Screen';
+import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Button } from '@/shared/ui/primitives/Button';
 import { useBackupSession } from '../BackupFlowProvider';
 import { advanceVerify } from '../lib/verifyPlan';
 
+/** One row per position: fills as the user gets each word right. */
+function StepProgress({
+  total,
+  done,
+  accepted,
+}: {
+  total: number;
+  done: number;
+  accepted: boolean;
+}) {
+  return (
+    <View
+      className="flex-row gap-1"
+      accessible={false}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants">
+      {Array.from({ length: total }, (_, index) => (
+        <View
+          key={index}
+          className={`h-1.5 flex-1 rounded-full ${index < done || (accepted && index === done) ? 'bg-success' : 'bg-surface-secondary'}`}
+        />
+      ))}
+    </View>
+  );
+}
+
 export function BackupVerifyScreen() {
   const { plan, progress, setProgress, active, loading, ensureWords } = useBackupSession();
   useEffect(() => ensureWords(), [ensureWords]);
   const focused = useIsFocused();
-  const successForeground = useThemeColor('success-foreground');
+  const [muted, success] = useThemeColor(['muted', 'success'] as const);
   const [accepted, setAccepted] = useState(false);
   const locked = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -73,61 +101,74 @@ export function BackupVerifyScreen() {
   };
   return (
     <Screen name="BackupVerifyScreen">
-      <View className="gap-6 px-4 py-6">
+      <View className="gap-5 px-4 py-6">
         <E2EAccessibilityProbe
           testID="backup-verify"
           accessibilityLabel="Backup verify"
           value="1"
         />
-        <Text size={24} bold>
-          Quick check
-        </Text>
         {loading ? (
-          <Text loading placeholder="Loading quick check" />
+          <Text loading placeholder="Loading your words" />
         ) : visible && question ? (
-          <>
-            <Text accessibilityLiveRegion="polite">
-              Tap word {question.position} from your paper.
-            </Text>
-            <Text testID="backup-verify-progress" accessibilityLabel={`${question.position} of 12`}>
-              {question.position} of 12
-            </Text>
-            <View
-              className="flex-row gap-1"
-              accessible={false}
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants">
-              {plan.map((entry, index) => (
-                <View
-                  key={entry.position}
-                  className={`h-6 flex-1 items-center justify-center rounded-sm ${index < progress.position || (accepted && index === progress.position) ? 'bg-success' : 'bg-surface-secondary'}`}>
-                  {accepted && index === progress.position && (
-                    <Icon name="mdi:check" size={16} color={successForeground} />
-                  )}
-                </View>
-              ))}
+          <Fragment>
+            <View className="gap-3">
+              <View className="flex-row items-baseline justify-between">
+                <Text size={18} medium accessibilityLiveRegion="polite">
+                  Tap word {question.position} from your paper
+                </Text>
+                <Text
+                  testID="backup-verify-progress"
+                  accessibilityLabel={`${question.position} of 12`}
+                  size={13}
+                  className="text-muted">
+                  {question.position} of 12
+                </Text>
+              </View>
+              <StepProgress total={12} done={progress.position} accepted={accepted} />
             </View>
             <Animated.View style={shakeStyle}>
-              <View className="gap-3">
-                {question.choices.map((word, index) => (
-                  <Button
-                    key={index}
-                    testID={`backup-choice-${index}`}
-                    text={word}
-                    accessibilityLabel={`Option ${index + 1}, ${word}`}
-                    variant="secondary"
-                    disabled={accepted}
-                    onPress={() => pick(index)}
-                  />
-                ))}
-              </View>
+              <GradientCard>
+                <ListGroup>
+                  {question.choices.map((word, index) => (
+                    <Fragment key={index}>
+                      {index > 0 ? <Separator className="mx-4" /> : null}
+                      <PressableFeedback
+                        testID={`backup-choice-${index}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Option ${index + 1}, ${word}`}
+                        isDisabled={accepted}
+                        onPress={() => pick(index)}>
+                        <PressableFeedback.Scale>
+                          <ListGroup.Item disabled>
+                            <ListGroup.ItemContent>
+                              <ListGroup.ItemTitle>{word}</ListGroup.ItemTitle>
+                            </ListGroup.ItemContent>
+                            <ListGroup.ItemSuffix>
+                              <Icon
+                                name={
+                                  accepted && index === question.answerIndex
+                                    ? 'mdi:check-circle'
+                                    : 'mdi:circle-outline'
+                                }
+                                size={22}
+                                color={accepted && index === question.answerIndex ? success : muted}
+                              />
+                            </ListGroup.ItemSuffix>
+                          </ListGroup.Item>
+                        </PressableFeedback.Scale>
+                        <PressableFeedback.Ripple />
+                      </PressableFeedback>
+                    </Fragment>
+                  ))}
+                </ListGroup>
+              </GradientCard>
             </Animated.View>
-            {progress.missesAtPosition > 0 && !accepted && (
-              <Text accessibilityRole="alert">
+            {progress.missesAtPosition > 0 && !accepted ? (
+              <Text accessibilityRole="alert" size={14} className="text-muted">
                 Not quite — look at word {question.position} on your paper.
               </Text>
-            )}
-            {progress.missesAtPosition >= 2 && (
+            ) : null}
+            {progress.missesAtPosition >= 2 ? (
               <Button
                 testID="backup-show-again"
                 text="Show my words again"
@@ -135,8 +176,8 @@ export function BackupVerifyScreen() {
                 disabled={accepted}
                 onPress={() => router.back()}
               />
-            )}
-          </>
+            ) : null}
+          </Fragment>
         ) : active && focused ? (
           <Text>Could not load your recovery phrase. Close this screen and try again.</Text>
         ) : null}
