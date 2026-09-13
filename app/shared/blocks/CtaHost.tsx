@@ -74,15 +74,13 @@ export function CtaHost() {
       }
       return;
     }
-    if (activeId || useCtaStore.getState().backupRequested) {
+    if (activeId) {
       if (!observedRoute.current) return; // push reserved, waiting for navigator
       observedRoute.current = false;
       const store = useCtaStore.getState();
-      // CtaScreen owns explicit dismissals; starting backup must never snooze.
-      const openBackup = store.backupRequested;
+      // CtaScreen owns explicit dismissals and navigates to the backup flow itself.
       store.preview(null);
       store.setActive(null);
-      if (openBackup) router.raw.push('/(backup-flow)/intro');
       setNowMs(Date.now());
       return;
     }
@@ -92,6 +90,8 @@ export function CtaHost() {
     )
       return;
     if (!next || useCtaStore.getState().activeId !== null) return;
+    // Fresh cycle: the flag only turns true once the navigator shows this push.
+    observedRoute.current = false;
     useCtaStore.getState().setActive(next);
     // The queue reserves activeId before pushing; a just-closed CTA may legitimately
     // reopen within the tap guard's cooldown (notably Developer previews).

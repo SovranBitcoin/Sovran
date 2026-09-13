@@ -144,13 +144,14 @@ it('persists do-not-ask and otherwise snoozes for later', async () => {
   expect(useCtaStore.getState().dismissed['backup-recovery-phrase']).toBeDefined();
   expect(mockBack).toHaveBeenCalledTimes(1);
 });
-it('Back up now requests the backup flow without snoozing, even when removal follows', async () => {
+it('Back up now opens the backup flow directly without snoozing, even when removal follows', async () => {
   mount('backup-recovery-phrase');
   await press('cta-primary');
   act(() => mockAddListener.mock.calls.at(-1)![1]());
   expect(useCtaStore.getState().dismissed).toEqual({});
-  expect(useCtaStore.getState().backupRequested).toBe(true);
-  expect(mockBack).toHaveBeenCalledTimes(1);
+  expect(mockReplace).toHaveBeenCalledWith('/(backup-flow)/intro');
+  expect(useCtaStore.getState().backupStartedAt).not.toBeNull();
+  expect(useCtaStore.getState().activeId).toBeNull();
 });
 
 it('honors Do not ask me again when the user leaves by swipe or back', async () => {

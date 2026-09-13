@@ -12,8 +12,6 @@ interface CtaState {
   previewOverride: CtaId | null;
   closingId: CtaId | null;
   backupStartedAt: number | null;
-  backupRequested: boolean;
-  requestBackup: () => void;
   closeActive: () => void;
   startBackup: () => void;
   dismiss: (id: CtaId, forever: boolean, version?: string) => void;
@@ -31,13 +29,6 @@ export const useCtaStore = create<CtaState>()(
       previewSeq: 0,
       closingId: null,
       backupStartedAt: null,
-      backupRequested: false,
-      requestBackup: () =>
-        set({
-          backupRequested: true,
-          backupStartedAt: Date.now(),
-          closingId: 'backup-recovery-phrase',
-        }),
       closeActive: () => set((state) => ({ closingId: state.activeId })),
       startBackup: () => set({ backupStartedAt: Date.now() }),
       dismiss: (id, forever, version) =>
@@ -51,14 +42,14 @@ export const useCtaStore = create<CtaState>()(
             },
           },
         })),
-      setActive: (activeId) => set({ activeId, closingId: null, backupRequested: false }),
+      setActive: (activeId) => set({ activeId, closingId: null }),
       // A preview request must always open: clear any stranded active/closing
       // state from the previous CTA so CtaHost goes straight to the push branch.
       preview: (previewOverride) =>
         set((state) => ({
           previewOverride,
           previewSeq: state.previewSeq + 1,
-          ...(previewOverride ? { activeId: null, closingId: null, backupRequested: false } : {}),
+          ...(previewOverride ? { activeId: null, closingId: null } : {}),
         })),
     }),
     persistConfig({

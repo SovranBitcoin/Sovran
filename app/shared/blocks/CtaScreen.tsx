@@ -79,7 +79,13 @@ export function CtaScreen({ id }: { id: CtaId }) {
       return;
     }
     dismissalHandled.current = true;
-    useCtaStore.getState().requestBackup();
+    removalRequested.current = true;
+    const store = useCtaStore.getState();
+    // Navigate here, synchronously with the tap: deferring the push to CtaHost's
+    // route-removal effect left "Back up now" doing nothing on a real device.
+    store.startBackup();
+    store.setActive(null);
+    router.replace('/(backup-flow)/intro');
   };
   return (
     <Screen
