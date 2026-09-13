@@ -6,7 +6,6 @@ import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { deriveBip321RailSelection } from '@/features/receive/lib/bip321RailSelection';
 import type { Bip321ExcludedRails } from '@/shared/stores/profile/mintStore';
 import { setStringAsync } from 'expo-clipboard';
-import { paramPopup } from '@/shared/lib/popup';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -113,7 +112,7 @@ describe('Unified rail controls and payload', () => {
     renderer.root.findAllByProps({ testID: id }).find((node) => typeof node.type === 'string')!;
   const qr = () => renderer.root.findByType(PaymentInfo).props.data as string;
 
-  it('switches BOLT 12 off/on through row controls and keeps QR, copy, pills and AX state aligned', async () => {
+  it('switches BOLT 12 off/on through row controls and keeps QR, copy and AX state aligned', async () => {
     act(() => {
       renderer = TestRenderer.create(<ReceiveUnifiedTab {...props()} />);
     });
@@ -134,7 +133,10 @@ describe('Unified rail controls and payload', () => {
     expect(mockQuote).toHaveBeenLastCalledWith(null, {});
     expect(qr()).toBe('bitcoin:bc1fixture?creq=creqBfixture');
     expect(offProps.onQrPayload).toHaveBeenLastCalledWith({ value: qr(), copyTarget: 'bip321' });
-    expect(control('receive-unified-rail-bolt12').props.accessibilityLabel).toBe('BOLT 12, off');
+    expect(control('receive-unified-rail-switch-bolt12').props.accessibilityState).toEqual({
+      checked: false,
+      disabled: false,
+    });
     expect(control('receive-unified-rails-state').props.accessibilityValue.text).toBe(
       'onchain:1,bolt12:0,creq:1'
     );
@@ -151,7 +153,7 @@ describe('Unified rail controls and payload', () => {
     );
   });
 
-  it('locks the last enabled method and explains unavailable pills', () => {
+  it('locks the last enabled method and explains unavailable rails in Advanced', () => {
     const input = props({ onchain: true }, { ...allAvailable, bolt12: false });
     input.bip321.selection.rails[1].reason = 'No trusted mint supports BOLT 12 for sat';
     act(() => {
@@ -167,13 +169,10 @@ describe('Unified rail controls and payload', () => {
       cashu.props.onPress();
     });
     expect(mockSetExcluded).not.toHaveBeenCalled();
-    act(() => {
-      control('receive-unified-rail-bolt12').props.onPress();
-    });
-    expect(paramPopup).toHaveBeenCalledWith('unified-rail-info', {
-      title: 'BOLT 12',
-      message: input.bip321.selection.rails[1].reason,
-    });
+    const bolt12 = control('receive-unified-rail-switch-bolt12');
+    expect(bolt12.props.accessibilityState).toEqual({ checked: false, disabled: true });
+    expect(bolt12.props.accessibilityHint).toBe(input.bip321.selection.rails[1].reason);
+    expect(JSON.stringify(renderer.toJSON())).toContain(input.bip321.selection.rails[1].reason);
   });
 
   it('waits for enabled methods only and never includes an excluded Cashu request', () => {
@@ -212,9 +211,6 @@ describe('Unified rail controls and payload', () => {
       renderer = TestRenderer.create(<ReceiveUnifiedTab {...input} />);
     });
     expect(renderer.root.findAllByType(PaymentInfo)).toHaveLength(0);
-    expect(control('receive-unified-rail-onchain').props.accessibilityLabel).toBe(
-      'Onchain, unavailable'
-    );
     expect(control('receive-unified-advanced-toggle')).toBeDefined();
     expect(JSON.stringify(renderer.toJSON())).not.toContain('private upstream detail');
   });

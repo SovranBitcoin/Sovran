@@ -110,7 +110,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/payments/components/SearchTip.tsx",
     "features/receive/components/Bip321CustomizationCard.tsx",
     "features/receive/components/CreqCustomizationCard.tsx",
-    "features/receive/components/RailsIncludedRow.tsx",
     "features/receive/components/ReceivePaymentRequestTab.tsx",
     "features/receive/components/ReceiveRailPlaceholder.tsx",
     "features/receive/components/ReceiveReusableQuoteTab.tsx",
@@ -257,6 +256,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 251,
+  "total": 250,
 }
 `;

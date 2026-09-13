@@ -20,7 +20,6 @@ import { useReusableMintQuote, type UseStandingPaymentRequestResult } from 'wall
 import { paymentLog } from '@/shared/lib/logger';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { Bip321CustomizationCard } from '@/features/receive/components/Bip321CustomizationCard';
-import { RailsIncludedRow } from '@/features/receive/components/RailsIncludedRow';
 import type { useBip321RailSelection } from '@/features/receive/hooks/useBip321RailSelection';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { ReceiveRailPlaceholder } from '@/features/receive/components/ReceiveRailPlaceholder';
@@ -90,17 +89,6 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
     (bolt12Enabled && bolt12.isLoading) ||
     (creqEnabled && creq.isLoading);
   // Pills describe the actual URI, including a failed or still-loading quote.
-  // Advanced switches continue to express the capability-gated preference.
-  const payloads = { onchain: address, bolt12: offer, creq: request };
-  const includedRails = selection.rails.map((rail) =>
-    rail.state === 'included' && !payloads[rail.id]
-      ? {
-          ...rail,
-          state: 'unavailable' as const,
-          reason: `${rail.label} request is not available yet`,
-        }
-      : rail
-  );
 
   // As the DEFAULT tab this must not stutter: hold the placeholder until
   // every rail settles ONCE, then render the fully composed QR in a single
@@ -193,7 +181,6 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
           </View>
         </View>
       )}
-      <RailsIncludedRow rails={includedRails} />
       <Bip321CustomizationCard
         selection={selection}
         display={uri ? truncateMiddle(uri, 10) : undefined}

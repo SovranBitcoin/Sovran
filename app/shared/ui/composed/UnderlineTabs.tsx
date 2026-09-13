@@ -13,6 +13,8 @@ interface UnderlineTabsProps {
   tabs: readonly string[];
   selectedTab: string;
   handleTabPress: (tab: string, index: number) => void;
+  /** Optional per-tab testID (e2e selectors). */
+  testIDFor?: (tab: string) => string;
   /** Override the active underline color. Defaults to the theme `accent` token. */
   accentColor?: string;
 }
@@ -36,6 +38,7 @@ const LABEL_SIZE = 15;
 export function UnderlineTabs({
   tabs,
   selectedTab,
+  testIDFor,
   handleTabPress,
   accentColor,
 }: UnderlineTabsProps) {
@@ -108,6 +111,9 @@ export function UnderlineTabs({
           return (
             <Pressable
               key={tab}
+              testID={testIDFor?.(tab)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
               onPress={() => handleTabPress(tab, tabs.indexOf(tab))}
               style={[
                 styles.tab,
