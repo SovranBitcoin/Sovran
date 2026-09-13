@@ -292,7 +292,7 @@ export function scanRedactionAudit(entries: AnalyzableEntry[]): RedactionAudit {
 // `params.readId`. Per surface: cache-hit rate, refetch-while-fresh, TTFUD,
 // superseded writes, blank flashes, and which tiers filled the data.
 
-export interface ReadRun {
+interface ReadRun {
   readId: string;
   surface: string;
   keyHash: string;
@@ -311,7 +311,7 @@ export interface ReadRun {
   sources: Set<string>;
 }
 
-export interface BlankFlash {
+interface BlankFlash {
   surface: string;
   keyHash: string;
   /** `_t` of the populated→skeleton dip. */
@@ -320,7 +320,7 @@ export interface BlankFlash {
   gapMs: number;
 }
 
-export interface ReadsAnalysis {
+interface ReadsAnalysis {
   runs: ReadRun[];
   blankFlashes: BlankFlash[];
 }
@@ -328,7 +328,7 @@ export interface ReadsAnalysis {
 const READ_EVENT = /^read\.([^.]+)\.(request|done|failed|superseded|partial|merged|applied|render)$/;
 const NOSTR_READ_DONE = /^nostr\.read\.[^.]+\.done$/;
 /** A dip longer than this is a real reload, not a flash. */
-export const BLANK_FLASH_MAX_MS = 2_000;
+const BLANK_FLASH_MAX_MS = 2_000;
 
 export function analyzeReads(entries: AnalyzableEntry[]): ReadsAnalysis {
   const runs = new Map<string, ReadRun>();
@@ -418,7 +418,7 @@ export function analyzeReads(entries: AnalyzableEntry[]): ReadsAnalysis {
   return { runs: [...runs.values()], blankFlashes };
 }
 
-export interface ReadSurfaceSummary {
+interface ReadSurfaceSummary {
   surface: string;
   reads: number;
   cacheHit: number;

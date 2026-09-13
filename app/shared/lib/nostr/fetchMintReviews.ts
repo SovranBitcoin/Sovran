@@ -5,7 +5,7 @@ import { reviewMint, type MintReviewsResponse } from '@/shared/lib/apiClient';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 
 /** Facade answer → the app's review response (the wallet's summary shape). */
-export function reviewsFromFacade(resolved: facade.ResolvedMintReviews): MintReviewsResponse {
+function reviewsFromFacade(resolved: facade.ResolvedMintReviews): MintReviewsResponse {
   return {
     mintUrl: resolved.mintUrl,
     score: resolved.averageScore,

@@ -14,15 +14,15 @@
  * - `each`: no page at all — every datum paints as it lands through an entity
  *   cache key subscription (counts, per-row stats).
  */
-import type { ReadSurface } from './readLog';
+import type { ReadStrategy, ReadSurface } from './readLog';
 
-export type FirstPaintGate =
+type FirstPaintGate =
   | { kind: 'sequential' }
   | { kind: 'session'; capMs: number }
   | { kind: 'aggregate'; minItems: number | 'requested'; capMs: number; requireAll?: boolean }
   | { kind: 'each' };
 
-export const READ_GATES: Record<ReadSurface, FirstPaintGate> = {
+const READ_GATES: Record<ReadSurface, FirstPaintGate> = {
   feed: { kind: 'sequential' },
   thread: { kind: 'sequential' },
   notifications: { kind: 'session', capMs: 400 },
@@ -44,3 +44,9 @@ export const READ_GATES: Record<ReadSurface, FirstPaintGate> = {
   mintAudit: { kind: 'sequential' },
   mintChanges: { kind: 'sequential' },
 };
+
+/** The `strategy` a surface's `read.<surface>.request` carries by default (its gate's engine). */
+export function readStrategyFor(surface: ReadSurface): ReadStrategy {
+  const kind = READ_GATES[surface].kind;
+  return kind === 'each' ? 'http' : kind;
+}

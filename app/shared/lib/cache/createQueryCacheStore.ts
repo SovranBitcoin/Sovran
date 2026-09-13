@@ -73,10 +73,10 @@ export interface QueryCacheRunContext<TData> {
   partial: (data: TData, cursor?: string) => void;
 }
 
-export type QueryCacheSupersededReason = 'newer-request' | 'clear' | 'abort';
+type QueryCacheSupersededReason = 'newer-request' | 'clear' | 'abort';
 
 /** A run whose completion was no longer current: nothing was written. */
-export class SupersededError extends Error {
+class SupersededError extends Error {
   readonly reason: QueryCacheSupersededReason;
   constructor(reason: QueryCacheSupersededReason) {
     super(`query cache run superseded: ${reason}`);

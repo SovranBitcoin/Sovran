@@ -147,6 +147,7 @@ jest.mock('@/shared/stores/profile/nostrSocialStore', () => ({
 }));
 jest.mock('@/shared/lib/nostr/useEntityCache', () => ({
   useProfile: () => ({ profile: { name: 'Known author' }, status: 'ready' }),
+  useNoteStats: () => ({ status: 'absent' }),
 }));
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (value: string | string[]) =>

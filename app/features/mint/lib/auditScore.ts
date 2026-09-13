@@ -11,7 +11,7 @@
  * Runtime leaf: no store or network imports, so any consumer can use it.
  */
 
-export interface AuditOpsCounts {
+interface AuditOpsCounts {
   nMints?: number;
   nMelts?: number;
   nErrors?: number;

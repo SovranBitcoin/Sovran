@@ -29,7 +29,7 @@ import {
 
 export type MintDetailGroupStatus = 'loading' | 'ready' | 'empty' | 'error';
 
-export interface MintDetailRead {
+interface MintDetailRead {
   identity: MintDetailGroupStatus;
   /** Curated copy for a failed identity read (the bridge's `describeError`). */
   identityError: string | null;

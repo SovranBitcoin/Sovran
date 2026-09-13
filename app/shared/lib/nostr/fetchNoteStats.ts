@@ -24,7 +24,7 @@ function attemptedFor(layer: object): Set<string> {
 }
 
 /** NoteMetrics (the feed's shape) → the shared NoteStats contract. */
-export function noteStatsFromMetrics(metrics: NoteMetrics): NoteStats {
+function noteStatsFromMetrics(metrics: NoteMetrics): NoteStats {
   return {
     likes: metrics.likeCount,
     reposts: metrics.repostCount,

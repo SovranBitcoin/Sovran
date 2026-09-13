@@ -13,7 +13,9 @@ jest.mock('@/features/feed/stores/ignoreStore', () => ({
     selector: (s: { ignoredPubkeys: string[]; ignoredEventIds: string[] }) => unknown
   ) => selector({ ignoredPubkeys: [], ignoredEventIds: [] }),
 }));
-jest.mock('@/features/feed/lib/moderation', () => ({ moderateFeedItems: (items: unknown[]) => items }));
+jest.mock('@/features/feed/lib/moderation', () => ({
+  moderateFeedItems: (items: unknown[]) => items,
+}));
 
 const note = (id: string): FeedItem => ({
   type: 'note',
@@ -30,7 +32,9 @@ it("shares a page's counts with the entity cache and backfills the notes the pag
   const page = {
     ...emptyFeedParseResult(),
     orderedFeedItems: [note(withStats), note(without)],
-    metricsMap: new Map([[withStats, { likeCount: 2, repostCount: 0, replyCount: 0, satsZapped: 0 }]]),
+    metricsMap: new Map([
+      [withStats, { likeCount: 2, repostCount: 0, replyCount: 0, satsZapped: 0 }],
+    ]),
     sources: ['relay' as const],
   };
   act(() => result.current.applyPage(page));

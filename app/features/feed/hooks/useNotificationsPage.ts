@@ -43,7 +43,7 @@ import {
   notificationDedupeKey,
 } from '@/features/feed/lib/notificationResults';
 
-export const NOTIFICATIONS_PAGE_SIZE = 50;
+const NOTIFICATIONS_PAGE_SIZE = 50;
 const FOLLOW_PAGE_SIZE = 50;
 const FOLLOW_FETCH_MAX_PAGES = 4;
 
@@ -162,7 +162,7 @@ async function runLoadMore(args: {
   }
 }
 
-export interface NotificationsPageArgs {
+interface NotificationsPageArgs {
   viewerPubkey: string | undefined;
   tab: ServerTab;
   policy: Policy;
@@ -172,7 +172,7 @@ export interface NotificationsPageArgs {
   enabled: boolean;
 }
 
-export interface NotificationsPage {
+interface NotificationsPage {
   /** The visible page (page 0 from the cache, plus any loaded-more pages). */
   result: FeedNotificationsResult | null;
   /** First paint with nothing cached for this key. */
@@ -434,7 +434,7 @@ async function runLoadMoreFollowers(args: {
   }
 }
 
-export interface FollowersPageArgs {
+interface FollowersPageArgs {
   viewerPubkey: string | undefined;
   policy: Policy;
   replyScope: ReplyScope;

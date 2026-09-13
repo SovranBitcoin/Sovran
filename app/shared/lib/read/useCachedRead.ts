@@ -34,17 +34,18 @@ import {
   type ReadTrigger,
   type RenderPhase,
 } from './readLog';
+import { readStrategyFor } from './readPolicy';
 
 export type ReadStatus = 'loading' | 'revalidating' | 'ready' | 'empty' | 'error';
 
-export interface CachedReadFetchContext<TData> extends QueryCacheRunContext<TData> {
+interface CachedReadFetchContext<TData> extends QueryCacheRunContext<TData> {
   /** The entry that was on screen when the read started (stale-while-revalidate input). */
   cached: TData | undefined;
   /** Why this read runs: `'refresh'` is the user's pull / retry. */
   mode: ReadMode;
 }
 
-export interface UseCachedReadOptions<TData> {
+interface UseCachedReadOptions<TData> {
   store: QueryCacheStore<TData>;
   surface: ReadSurface;
   /** `null`/`undefined` disables the read (no viewer yet, client-only tab). */
@@ -94,7 +95,7 @@ export interface UseCachedReadOptions<TData> {
   strategy?: 'sequential' | 'aggregate' | 'session' | 'http';
 }
 
-export interface UseCachedReadResult<TData> {
+interface UseCachedReadResult<TData> {
   data: TData | undefined;
   status: ReadStatus;
   /** Where the visible data came from. */
@@ -124,7 +125,7 @@ type Flight<TData> = {
 };
 
 /** Usable-item count for the `count` log params. Arrays and common list envelopes. */
-export function countOf(data: unknown): number {
+function countOf(data: unknown): number {
   if (Array.isArray(data)) return data.length;
   if (data && typeof data === 'object') {
     const o = data as Record<string, unknown>;
@@ -162,7 +163,7 @@ export function useCachedRead<TData>(
     enabled = true,
     focusRevalidate = true,
     coldStart = 'paint-stale',
-    strategy = 'http',
+    strategy = readStrategyFor(surface),
     abortOnBlur = false,
   } = options;
   const keyHash = key ? readKeyHash(key) : 'k_none';

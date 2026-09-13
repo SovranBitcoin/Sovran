@@ -32,7 +32,7 @@ export type DmPageMeta = {
   mode: 'initial' | 'refresh' | 'loadMore' | 'live';
 };
 
-export type DmPagesStatus = 'idle' | 'loading' | 'revalidating' | 'ready' | 'error';
+type DmPagesStatus = 'idle' | 'loading' | 'revalidating' | 'ready' | 'error';
 
 interface DmEnvelopePagesOptions {
   /** Read-lifecycle surface for the `read.<surface>.*` events. */

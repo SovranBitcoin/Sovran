@@ -19,7 +19,7 @@
 import { log, monotonicNow } from '@/shared/lib/logger';
 import type { NostrTier } from '@sovranbitcoin/schemas';
 
-export const readLog = log.child({ module: 'read' });
+const readLog = log.child({ module: 'read' });
 
 /**
  * Closed set so log-doctor can group. Names match the facade's own
@@ -81,7 +81,7 @@ interface ReadIdentity {
   keyHash: string;
 }
 
-export interface ReadRequestParams extends ReadIdentity {
+interface ReadRequestParams extends ReadIdentity {
   mode: ReadMode;
   trigger: ReadTrigger;
   action: ReadAction;
@@ -92,7 +92,7 @@ export interface ReadRequestParams extends ReadIdentity {
   gen: number;
 }
 
-export interface ReadDoneParams extends ReadIdentity {
+interface ReadDoneParams extends ReadIdentity {
   gen: number;
   durationMs: number;
   source: ReadSource;
@@ -105,7 +105,7 @@ export interface ReadDoneParams extends ReadIdentity {
   attempts?: string[];
 }
 
-export interface ReadFailedParams extends ReadIdentity {
+interface ReadFailedParams extends ReadIdentity {
   gen: number;
   durationMs: number;
   errorType: string;
@@ -114,13 +114,13 @@ export interface ReadFailedParams extends ReadIdentity {
   attempts?: string[];
 }
 
-export interface ReadSupersededParams extends ReadIdentity {
+interface ReadSupersededParams extends ReadIdentity {
   gen: number;
   byGen?: number;
   reason: 'newer-request' | 'clear' | 'scope-change' | 'abort' | 'unmount';
 }
 
-export interface ReadPartialParams extends ReadIdentity {
+interface ReadPartialParams extends ReadIdentity {
   /** Sources that have answered so far (tiers, or a named app-side source such as 'contacts'). */
   answered: readonly string[];
   pending: readonly NostrTier[];
@@ -128,14 +128,14 @@ export interface ReadPartialParams extends ReadIdentity {
   gate: 'minItems' | 'capMs' | 'allSettled' | 'seed' | 'partial';
 }
 
-export interface ReadMergedParams extends ReadIdentity {
+interface ReadMergedParams extends ReadIdentity {
   tier: NostrTier | ReadSource;
   added: number;
   updated: number;
   complete: boolean;
 }
 
-export interface ReadAppliedParams {
+interface ReadAppliedParams {
   readId: string | null;
   surface: ReadSurface;
   keyHash: string;
@@ -146,7 +146,7 @@ export interface ReadAppliedParams {
   sinceRequestMs?: number;
 }
 
-export interface ReadRenderParams {
+interface ReadRenderParams {
   readId: string | null;
   surface: ReadSurface;
   keyHash: string;

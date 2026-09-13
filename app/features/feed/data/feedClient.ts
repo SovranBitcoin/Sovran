@@ -32,8 +32,6 @@ export type ReadStatusMeta = {
   degraded: boolean;
 };
 
-export const READ_OK: ReadStatusMeta = { status: 'ok', sources: [], attempts: [], degraded: false };
-
 export function readUnavailable(
   attempts: readonly { tier: NostrTier; outcome: string }[],
   readId?: string

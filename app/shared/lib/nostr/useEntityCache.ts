@@ -150,22 +150,6 @@ export function useProfileRecordsMany(
 }
 
 /**
- * The cached profile header (follower/following counts, joined date) for a
- * pubkey, read reactively from the single owner, plus whether a fetch that may
- * fill it is in flight. Counts are unknown, never zero: a missing field stays
- * `undefined` until a source supplies it.
- */
-export function useProfileStats(pubkey: string | undefined): {
-  stats: facade.CachedProfileStats | undefined;
-  pending: boolean;
-} {
-  const cache = buildNostrDataLayer()?.cache;
-  const stats = useCachedRecord(cache?.profileStats, pubkey);
-  const pending = usePendingProfile(cache?.pendingProfiles, pubkey);
-  return useMemo(() => ({ stats, pending }), [stats, pending]);
-}
-
-/**
  * Engagement counts for one note, read reactively from the single owner, plus
  * whether a backfill that may fill them is in flight. `cached` → real counts;
  * `loading` → show a placeholder (never a zero); `absent` → no source has

@@ -3,7 +3,7 @@ import type { ReadStatus } from '@/shared/lib/read/useCachedRead';
 /** A search scope's read status; `idle` = the query is too short to search. */
 export type SearchStatus = 'idle' | ReadStatus;
 
-export type SearchListState = 'rows' | 'placeholders' | 'no-results' | 'error' | 'nothing';
+type SearchListState = 'rows' | 'placeholders' | 'no-results' | 'error' | 'nothing';
 
 /**
  * What a search result list shows for a scope, from its read status and
