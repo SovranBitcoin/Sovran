@@ -3,8 +3,11 @@ import { shouldCensorDm } from '@/features/feed/lib/moderation';
 import { WhitenoiseSetupBanner } from '@/features/whitenoise/components/WhitenoiseSetupBanner';
 import { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useIsFocused } from 'expo-router';
 import { List } from '@/shared/ui/composed/List';
 import Icon from 'assets/icons';
+import { Button } from '@/shared/ui/primitives/Button';
+import { Text as UiText } from '@/shared/ui/primitives/Text';
 
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintManagement } from '@/features/mint';
@@ -122,15 +125,17 @@ export const ContactsScreen = () => {
 
   const { keys: nostrKeys } = useNostrKeysContext();
   const { mints, getMintInfo } = useMintManagement();
+  const isFocused = useIsFocused();
 
   const {
     displayContacts,
     contactPubkeys,
     conversations: dmConversations,
-    hasLoadedOnce: contactsHasLoadedOnce,
     hasMore: hasMoreContacts,
     loadMore: loadMoreContacts,
-  } = useNip17RecentContacts(nostrKeys);
+    refresh: refreshContacts,
+    status: contactsStatus,
+  } = useNip17RecentContacts(nostrKeys, { live: isFocused });
   const { displayMints, mintPubkeys, mintInfoLoading } = useMintContacts(
     nostrKeys,
     mints,
@@ -138,19 +143,14 @@ export const ContactsScreen = () => {
     dmConversations
   );
 
-  // Single loading gate for the idle contacts list: show one centered spinner
-  // until the first DM-conversation fetch genuinely settles AND mint-info has
-  // loaded, instead of the staggered per-source layout shifting. We gate on the
-  // hook's `hasLoadedOnce` (not `!loading`) because `loading` starts false and
-  // only flips true once the fetch effect runs — gating on `!loading` hid the
-  // spinner on the first render and flashed cached mint rows before contacts
-  // arrived. After the first settle the list owns its own pull-to-refresh; we
-  // never flash the spinner again.
-  const [contactsLoadedOnce, setContactsLoadedOnce] = useState(false);
-  useEffect(() => {
-    if (contactsHasLoadedOnce && !mintInfoLoading) setContactsLoadedOnce(true);
-  }, [contactsHasLoadedOnce, mintInfoLoading]);
-  const showContactsSpinner = !mockMode && !contactsLoadedOnce;
+  // Loading gate for the idle contacts list (SYSTEM.md §7): the spinner shows
+  // only while the first conversation read is in flight AND nothing is on
+  // screen yet. A snapshot / last-message seed paints rows at 0ms with status
+  // `revalidating`, and a refresh never blanks the list. Mint-info loading is
+  // covered by the Mints pill's own empty state.
+  const showContactsSpinner =
+    !mockMode && contactsStatus === 'loading' && dmConversations.length === 0;
+  const showContactsError = !mockMode && contactsStatus === 'error' && dmConversations.length === 0;
 
   // Pending White Noise (Marmot MLS) DM invites — surfaced as the 'Requests'
   // pill on the idle Contacts tab. The InviteReader (mounted by
@@ -279,6 +279,7 @@ export const ContactsScreen = () => {
     }
 
     const profile = item.pubkey ? profilesMap.get(item.pubkey) : undefined;
+    const previewLoading = item.type === 'contact' && item.previewLoading === true;
     const rawMessage = typeof item.dmEvent?.content === 'string' ? item.dmEvent.content : undefined;
     const lastMessage =
       rawMessage &&
@@ -291,7 +292,7 @@ export const ContactsScreen = () => {
       item.type === 'contact' &&
       typeof item.timestamp === 'number' &&
       item.timestamp > 0 &&
-      lastMessage
+      (lastMessage || previewLoading)
         ? formatRelativeUnixSeconds(item.timestamp)
         : undefined;
     // Label non-default DM protocols so a NIP-04 / White Noise conversation is
@@ -337,8 +338,14 @@ export const ContactsScreen = () => {
     return (
       <ContactRow
         identity={identity}
-        subtitle={lastMessage}
-        hideMetadata={!!lastMessage}
+        subtitle={
+          previewLoading ? (
+            <UiText loading placeholder="Decrypting the last message" size={13} />
+          ) : (
+            lastMessage
+          )
+        }
+        hideMetadata={!!lastMessage || previewLoading}
         titleTrailing={
           protocolLabel || lastMessageAt || sourceBadge ? (
             <View style={styles.titleTrailingRow}>
@@ -426,8 +433,25 @@ export const ContactsScreen = () => {
   // --- Render helpers ---
 
   const renderContactsList = () => {
-    // One centered spinner during the initial idle load — no per-source layout
-    // shift. After the first settle the list owns its own pull-to-refresh.
+    if (showContactsError) {
+      return (
+        <View style={styles.emptyContainer} testID="contacts-error">
+          <Icon name="mdi:alert-circle-outline" size={30} color={muted} />
+          <Text style={[styles.emptyText, { color: muted }]}>
+            Couldn&apos;t load your conversations.
+          </Text>
+          <Button
+            testID="contacts-retry"
+            text="Try again"
+            variant="secondary"
+            size="compact"
+            onPress={refreshContacts}
+          />
+        </View>
+      );
+    }
+    // One centered spinner only while the first read is in flight with nothing
+    // to paint — never after rows have been shown (a refresh keeps them).
     if (showContactsSpinner) {
       return (
         <View style={styles.emptyContainer}>

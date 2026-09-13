@@ -15,11 +15,12 @@ import { useDmLastMessageStore } from '@/shared/stores/profile/dmLastMessageStor
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { isMockContactPubkey } from '@/shared/stores/runtime/mockDataStore';
 import { paymentLog } from '@/shared/lib/logger';
-import { useDmEnvelopePages } from './useDmEnvelopePages';
+import { dmThreadCache, dmThreadKey } from '../data/dmSnapshotCaches';
+import { useDmEnvelopePages, type DmPageMeta } from './useDmEnvelopePages';
 
 const PAGE_LIMIT = 50;
 
-interface DmThreadMessage {
+export interface DmThreadMessage {
   id: string;
   content: string;
   senderPubkey: string;
@@ -34,13 +35,25 @@ export function useDmThread(
   viewerPrivateKey?: Uint8Array,
   protocol: DmProtocol = 'nip17'
 ) {
-  const [messages, setMessages] = useState<DmThreadMessage[]>([]);
+  const cacheKey =
+    viewerPubkey && counterparty ? dmThreadKey(viewerPubkey, protocol, counterparty) : null;
+  // This session's snapshot of the conversation paints on the first frame; the
+  // page walk revalidates behind it and merges by message id.
+  const [initial] = useState<{ key: string | null; rows: DmThreadMessage[] }>(() => {
+    const cached = cacheKey ? dmThreadCache.getEntry(cacheKey) : undefined;
+    return cached && cached.viewerKey === viewerPubkey
+      ? { key: cacheKey, rows: cached.data }
+      : { key: cacheKey, rows: [] };
+  });
+  const [messages, setMessages] = useState<DmThreadMessage[]>(
+    initial.key === cacheKey ? initial.rows : []
+  );
 
   // The paging cursor walks ALL envelope wrap times (not the decrypted rumor
   // time, which uses a different clock); seenMsgIds dedups the messages
   // actually shown for this counterparty.
   const firstPageStartedAtRef = useRef<number | null>(null);
-  const seenMsgIdsRef = useRef(new Set<string>());
+  const seenMsgIdsRef = useRef(new Set<string>(initial.rows.map((m) => m.id)));
 
   const onReset = useCallback(() => {
     firstPageStartedAtRef.current = Date.now();
@@ -49,7 +62,7 @@ export function useDmThread(
   }, []);
 
   const onPage = useCallback(
-    (page: DmEnvelopePage) => {
+    (page: DmEnvelopePage, _meta: DmPageMeta) => {
       if (!viewerPubkey || !viewerPrivateKey) return 0;
       const decrypted = decryptDmEnvelopes(page.envelopes, viewerPubkey, viewerPrivateKey);
       const profile = useProfileStore.getState();
@@ -90,11 +103,12 @@ export function useDmThread(
           })),
         ];
         merged.sort((a, b) => a.createdAt - b.createdAt);
+        if (cacheKey) dmThreadCache.setEntry(cacheKey, merged, { viewerKey: viewerPubkey });
         return merged;
       });
       return fresh.length;
     },
-    [counterparty, protocol, viewerPubkey, viewerPrivateKey]
+    [counterparty, protocol, viewerPubkey, viewerPrivateKey, cacheKey]
   );
 
   const hydrate = useCallback(async () => {
@@ -117,7 +131,9 @@ export function useDmThread(
     [viewerPubkey]
   );
 
-  const { loading, hasLoadedOnce, hasMore, loadMore, refresh, error } = useDmEnvelopePages({
+  const pages = useDmEnvelopePages({
+    surface: 'dmThread',
+    hasSnapshot: initial.key === cacheKey && initial.rows.length > 0,
     feedKey:
       viewerPubkey && viewerPrivateKey && counterparty
         ? `${viewerPubkey}:${protocol}:${counterparty}`
@@ -131,5 +147,5 @@ export function useDmThread(
     failureEvent: 'payment.dm.thread.failed',
   });
 
-  return { messages, loading, hasLoadedOnce, hasMore, loadMore, refresh, error };
+  return { messages, ...pages };
 }
