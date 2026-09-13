@@ -5,6 +5,7 @@ import { err, ok } from 'neverthrow';
 import { BACKUP_HANDOFF_MS, CtaScreen } from '@/shared/blocks/CtaScreen';
 import { getLatestVersion } from '@/shared/lib/apiClient';
 import { CtaHost } from '@/shared/blocks/CtaHost';
+import { __resetGuardForTests } from '@/shared/hooks/useGuardedRouter';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { useSettingsHydration, useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -80,6 +81,7 @@ function HostWithScreen({ id }: { id?: 'update-required' | 'backup-recovery-phra
   );
 }
 beforeEach(async () => {
+  __resetGuardForTests();
   jest.spyOn(BackHandler, 'addEventListener').mockReturnValue({ remove: jest.fn() });
   jest.clearAllMocks();
   jest.mocked(getLatestVersion).mockResolvedValue(err(new Error('offline')));
