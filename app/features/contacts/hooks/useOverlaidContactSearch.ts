@@ -19,9 +19,10 @@
 
 import { useMemo } from 'react';
 
-import { useContactSearch, type DisplayResult } from '@/features/payments/hooks/useContactSearch';
+import { useContactSearch } from '@/features/payments/hooks/useContactSearch';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 import type { NostrSearchResult } from '@/shared/lib/apiClient';
+import type { SearchStatus } from '@/shared/ui/composed/search/searchListState';
 
 /**
  * One overlaid contact-search row. Structurally the `'contact'` arm of
@@ -45,57 +46,50 @@ const SCORE_CONTACT_BASE = 100;
 export function useOverlaidContactSearch(query: string): {
   contactRows: ContactSearchRow[];
   loading: boolean;
+  status: SearchStatus;
+  retry: () => void;
 } {
-  const { displayResults, searchLoading, hasSearched } = useContactSearch(query);
+  const { results, searchLoading, status, retry } = useContactSearch(query);
 
-  // Pubkeys with a real (non-placeholder) row. The GraphQL profile search
-  // endpoint can return sparse / stale profile data — sometimes just a pubkey
-  // with none of `displayName`/`picture`/`nip05` populated — so we layer the
-  // shared kind-0 metadata cache on top. Cache hits paint immediately;
-  // missing/stale entries trigger a relay subscription.
-  const realPubkeys = useMemo(
-    () =>
-      displayResults
-        .filter((r) => !!r.profile && !r.pubkey.startsWith('placeholder-'))
-        .map((r) => r.pubkey),
-    [displayResults]
-  );
-  const { metadata: cachedMetadata } = useNostrProfileMetadataMany(realPubkeys);
+  // The API row can be sparse (sometimes just a pubkey), so the shared kind-0
+  // metadata cache is layered on top. Cache hits paint immediately; missing or
+  // stale entries trigger a fetch.
+  const pubkeys = useMemo(() => results.map((r) => r.pubkey), [results]);
+  const { metadata: cachedMetadata } = useNostrProfileMetadataMany(pubkeys);
 
   const contactRows = useMemo<ContactSearchRow[]>(() => {
     // `isLoadingProfile` reflects whether *this row's* profile is absent — not
-    // whether *some* query is in flight. `useContactSearch` keeps prior results
-    // visible during a new query (stale-while-revalidate), so flagging every row
-    // loading on every keystroke would re-skeleton real results.
-    return displayResults.map((r: DisplayResult, i) => {
-      // Overlay relay-cached kind-0 metadata over the GraphQL snapshot: cache
-      // values win when defined (they're authoritative), falling back to the API
-      // row otherwise.
-      const cached = r.profile ? cachedMetadata.get(r.pubkey) : undefined;
-      const profile: NostrSearchResult | undefined =
-        r.profile && cached
-          ? {
-              ...r.profile,
-              displayName: cached.displayName ?? r.profile.displayName,
-              name: cached.name ?? r.profile.name,
-              picture: cached.picture ?? r.profile.picture,
-              nip05: cached.nip05 ?? r.profile.nip05,
-              banner: cached.banner ?? r.profile.banner,
-              lud16: cached.lud16 ?? r.profile.lud16,
-              about: cached.about ?? r.profile.about,
-              website: cached.website ?? r.profile.website,
-            }
-          : r.profile;
+    // whether *some* query is in flight. Prior results stay visible during a
+    // refinement (stale-while-revalidate), so flagging every row loading on
+    // every keystroke would re-skeleton real results.
+    return results.map((r, i) => {
+      // Overlay relay-cached kind-0 metadata over the search snapshot: cache
+      // values win when defined (they're authoritative), falling back to the
+      // API row otherwise.
+      const cached = cachedMetadata.get(r.pubkey);
+      const profile: NostrSearchResult = cached
+        ? {
+            ...r.profile,
+            displayName: cached.displayName ?? r.profile.displayName,
+            name: cached.name ?? r.profile.name,
+            picture: cached.picture ?? r.profile.picture,
+            nip05: cached.nip05 ?? r.profile.nip05,
+            banner: cached.banner ?? r.profile.banner,
+            lud16: cached.lud16 ?? r.profile.lud16,
+            about: cached.about ?? r.profile.about,
+            website: cached.website ?? r.profile.website,
+          }
+        : r.profile;
       return {
         type: 'contact' as const,
         id: `contact:${r.pubkey}`,
         pubkey: r.pubkey,
         profile,
-        isLoadingProfile: !hasSearched || !r.profile,
+        isLoadingProfile: false,
         score: SCORE_CONTACT_BASE - i, // preserve order from API
       };
     });
-  }, [displayResults, cachedMetadata, hasSearched]);
+  }, [results, cachedMetadata]);
 
-  return { contactRows, loading: searchLoading };
+  return { contactRows, loading: searchLoading, status, retry };
 }

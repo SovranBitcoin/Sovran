@@ -132,10 +132,11 @@ const ReviewerProfileInfo = z.looseObject({
   name: z.string().optional(),
   picture: z.string().optional(),
 });
-const DiscoverMintsResponse = z.object({
+export const DiscoverMintsResponse = z.object({
   mints: z.array(DiscoverMint).max(10_000),
   profiles: z.record(z.string(), ReviewerProfileInfo).optional(),
 });
+export type DiscoverMintsResponse = z.infer<typeof DiscoverMintsResponse>;
 
 const SCORE_API_BASE_URL = backendConfig.scoreApiBaseUrl;
 

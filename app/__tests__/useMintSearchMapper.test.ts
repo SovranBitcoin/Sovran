@@ -7,15 +7,52 @@ import { renderHook, waitFor } from '@testing-library/react-native';
 import { ok } from 'neverthrow';
 import { discoverMints } from '@/shared/lib/apiClient';
 import type { DiscoverMint } from '@/shared/lib/apiClient';
+import { mintDiscoverCache } from '@/features/mint/data/mintDiscoverCache';
 
-jest.mock('@/shared/lib/apiClient', () => ({ discoverMints: jest.fn() }));
+jest.mock('@/shared/lib/apiClient', () => {
+  const actual =
+    jest.requireActual<typeof import('@/shared/lib/apiClient')>('@/shared/lib/apiClient');
+  return { DiscoverMintsResponse: actual.DiscoverMintsResponse, discoverMints: jest.fn() };
+});
 jest.mock('@/shared/stores/runtime/debugTierStore', () => ({ recordDebugTiers: jest.fn() }));
 jest.mock('@/shared/stores/global/mintMetadataStore', () => ({
   useMintMetadataStore: { getState: () => ({ upsertFromDiscover: jest.fn() }) },
 }));
-jest.mock('@/shared/lib/logger', () => ({
-  cashuLog: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+jest.mock('@/shared/lib/logger', () => {
+  const sink = { info: jest.fn(), warn: jest.fn(), debug: jest.fn(), error: jest.fn() };
+  return {
+    log: { ...sink, child: () => sink },
+    storeLog: sink,
+    cashuLog: sink,
+    monotonicNow: () => Date.now(),
+  };
+});
+jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
+  createProfileScopedStorage: () => ({
+    getItem: async () => null,
+    setItem: async () => {},
+    removeItem: async () => {},
+  }),
 }));
+jest.mock('expo-router', () => ({
+  useFocusEffect: (effect: () => void | (() => void)) =>
+    jest.requireActual<typeof import('react')>('react').useEffect(effect, [effect]),
+}));
+jest.mock('@/features/mint/data/mintDiscoverCache', () => {
+  const { createQueryCacheStore } = jest.requireActual<
+    typeof import('@/shared/lib/cache/createQueryCacheStore')
+  >('@/shared/lib/cache/createQueryCacheStore');
+  return {
+    MINT_DISCOVER_CACHE_KEY: 'all',
+    mintDiscoverCache: createQueryCacheStore({
+      name: 'mint-discover-cache-mapper-test',
+      staleTtlMs: 20 * 60 * 1000,
+      maxEntries: 1,
+      hostScoped: true,
+      persist: false,
+    }),
+  };
+});
 
 const base: DiscoverMint = {
   mintUrl: 'https://mint.example',
@@ -163,6 +200,7 @@ describe('useMintSearch unit availability and counts', () => {
   ];
 
   beforeEach(() => {
+    mintDiscoverCache.clear();
     jest.mocked(discoverMints).mockResolvedValue(ok({ mints: rows }));
   });
 

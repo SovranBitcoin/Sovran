@@ -30,7 +30,6 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
 import { TierBadge } from '@/shared/ui/composed/TierBadge';
 import { List } from '@/shared/ui/composed/List';
-import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { LoadingIndicator } from '@/shared/blocks/status';
 import { MINT_CURRENCY_TABS_HEIGHT } from '@/features/mint/components/MintCurrencyTabs';
@@ -69,15 +68,6 @@ const noop = () => {};
 
 const keyExtractor = (item: SearchableMint) => item.url;
 const getItemType = (item: SearchableMint) => ('isSkeleton' in item ? 'skeleton' : 'mint');
-
-/** Quiet period the discovered list must hold before the skeleton hands over.
- *  Operator profiles resolve one at a time and each arrival re-renders a row,
- *  so swapping in real content on the first result makes the list shift under
- *  the reader. */
-const RESULTS_SETTLE_QUIET_MS = 500;
-/** Ceiling from mount. A slow trickle of profile resolutions must never hold
- *  the skeleton open, so the quiet period stops being chased after this. */
-const RESULTS_SETTLE_CEILING_MS = 3000;
 
 /** Stable placeholder rows for the initial-search loading state. Fixed identity
  *  so FlashList keys are stable and each row's seeded placeholder width holds. */
@@ -385,6 +375,8 @@ export function MintAddScreen() {
   const {
     results: searchResults,
     loading: searchLoading,
+    status: searchStatus,
+    refresh: retrySearch,
     availableUnits,
     matchCountByUnit,
   } = useMintSearch(searchQuery, selectedCurrency, { method: methodFilter });
@@ -455,26 +447,6 @@ export function MintAddScreen() {
     // resolve even though the body never names the cache.
   }, [searchResults, knownMints, searchQuery, validationState, customMintInfo, mintProfileCache]);
 
-  // Hold the skeleton until the discovered list stops changing, so rows do not
-  // pop in one-by-one as operator profiles resolve. One-way: once settled the
-  // skeleton never returns over content already shown.
-  const [resultsSettled, setResultsSettled] = useState(false);
-  useEffect(() => {
-    // Do not start the quiet timer until there is something to be quiet ABOUT.
-    // Anchored to mount, a discovery round trip slower than the quiet window
-    // (routine on a cold cellular start) leaves `displayMints` unchanged, the
-    // latch closes on an empty list, and the rows then pop in one-by-one as
-    // operator profiles resolve — exactly what the hold exists to prevent.
-    // The ceiling effect below still bounds the worst case.
-    if (resultsSettled || displayMints.length === 0) return;
-    const timer = setTimeout(() => setResultsSettled(true), RESULTS_SETTLE_QUIET_MS);
-    return () => clearTimeout(timer);
-  }, [displayMints, resultsSettled]);
-  useEffect(() => {
-    const ceiling = setTimeout(() => setResultsSettled(true), RESULTS_SETTLE_CEILING_MS);
-    return () => clearTimeout(ceiling);
-  }, []);
-
   // Kick off Nostr profile fetches for any search result that has an operator
   // pubkey in NUT-06 contact info. Results land in `mintMetadataStore`
   // and the memo above re-runs once they arrive.
@@ -520,13 +492,11 @@ export function MintAddScreen() {
     await mintImport.start(selectedMints);
   };
 
-  // Feed the result List skeleton placeholders during the first search so the
-  // loading rows render through the SAME List + ContactRow path as real rows —
-  // identical container chrome, no content shift on the data swap.
-  // `searchLoading` alone must not blank a populated list: useMintSearch
-  // refetches on a currency-tab change, and the pre-hold behaviour was to keep
-  // the visible rows through that rather than swapping them for skeletons.
-  const isInitialLoading = (searchLoading && displayMints.length === 0) || !resultsSettled;
+  // Skeleton rows are LIST ITEMS rendered through the SAME List + ContactRow
+  // path as real rows — identical chrome, no content shift on the swap, and no
+  // second list mounted to crossfade. Only a first paint with nothing cached
+  // shows them: a stale-cache revalidate keeps the rows it has (SYSTEM.md §7).
+  const isInitialLoading = searchLoading && displayMints.length === 0;
 
   const renderItem = ({ item }: { item: SearchableMint }) =>
     'isSkeleton' in item ? (
@@ -667,7 +637,13 @@ export function MintAddScreen() {
     selectedCurrency !== 'SAT' &&
     matchCountByUnit.SAT > 0;
 
-  const emptyComponent = (
+  const discoveryFailed = searchStatus === 'error' && searchResults.length === 0;
+  const emptyComponent = discoveryFailed ? (
+    <View className="items-center gap-3 pt-5">
+      <Text className="text-foreground text-center">Couldn&apos;t load mints right now.</Text>
+      <CapsuleButton testID="mint-add-retry" label="Try again" onPress={retrySearch} />
+    </View>
+  ) : (
     <View className="items-center gap-3 pt-5">
       <Text className="text-foreground text-center">
         {searchQuery.trim()
@@ -690,9 +666,6 @@ export function MintAddScreen() {
     </View>
   );
 
-  // One List renderer for both crossfade branches: the skeleton branch and the
-  // real branch render the SAME List + ContactRow path, so the swap shifts
-  // nothing. Two List instances coexist only for the ~220ms fade.
   const renderResultList = (data: SearchableMint[]) => (
     <List
       screen
@@ -820,14 +793,7 @@ export function MintAddScreen() {
       deferContent={false}>
       <Stack.Screen options={screenOptions} />
       <Spacer size={16} />
-      <SkeletonContentCrossfade
-        loading={isInitialLoading}
-        style={{ flex: 1 }}
-        visualKey="mint-add-results"
-        visualSurface="mint-add"
-        renderSkeleton={() => renderResultList(SKELETON_MINTS)}
-        renderContent={() => renderResultList(displayMints)}
-      />
+      {renderResultList(isInitialLoading ? SKELETON_MINTS : displayMints)}
     </Screen>
   );
 }

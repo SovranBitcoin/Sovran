@@ -1,107 +1,78 @@
 /**
  * "Posts" scope of search: recent posts authored by the people matching the
  * query. The matched pubkeys are supplied by the caller (the unified search
- * aggregates), and the feed client's `getPostsByPubkeys` (deployed `events`
- * resolver) fetches their posts, rendered read-only with `PostCard` — tapping a
- * post opens its thread.
+ * aggregates), and the feed client's `getPostsByPubkeys` fetches their posts,
+ * rendered read-only with `PostCard` — tapping a post opens its thread.
+ *
+ * The read is `useCachedRead` over `searchPostsCache`: returning to the Posts
+ * tab for the same people paints at 0ms (fresh → no round-trip, stale →
+ * silent revalidate); a tier-exhausted answer is an error with a retry, not
+ * "no posts" (SYSTEM.md F06).
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useShallowMemo } from '@/shared/hooks/useShallowMemo';
 import { List } from '@/shared/ui/composed/List';
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
-import type { FeedParseResult } from '@/features/feed/data/feedClient';
+import { readIsUnavailable, type FeedParseResult } from '@/features/feed/data/feedClient';
 import { searchPostsCache, searchPostsKey } from '@/features/contacts/data/searchPostsCache';
-import {
-  DEFAULT_METRICS,
-  type FeedEvent,
-  type FeedItem,
-  type NoteMetrics,
-  type ProfileInfo,
-} from '@/features/feed/components/nostr/feedTypes';
+import { DEFAULT_METRICS, type FeedItem } from '@/features/feed/components/nostr/feedTypes';
 import { PostCard } from '@/features/feed/components/nostr/PostCard';
+import { useCachedRead } from '@/shared/lib/read/useCachedRead';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
+import { Button } from '@/shared/ui/primitives/Button';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
+
+/** One posts read; a client per call, disposed after. Module-level so the
+ *  try/finally stays out of the component (React Compiler cannot lower it). */
+async function fetchPostsByPubkeys(
+  pubkeys: string[],
+  signal: AbortSignal | undefined,
+  readId: string
+): Promise<{ data: FeedParseResult }> {
+  const client = getFeedClient();
+  try {
+    const res = await client.getPostsByPubkeys({ pubkeys, limit: 30, signal, readId });
+    // Do not cache an unavailable answer: the next open should retry.
+    if (readIsUnavailable(res.read)) throw new Error('posts unavailable');
+    return { data: res };
+  } finally {
+    client.dispose?.();
+  }
+}
 
 export function SearchPostsList({ pubkeys }: { pubkeys: string[] }) {
   // Stabilised by content, not identity: callers rebuild the array on every
-  // render, and the fetch below must not refire for an equal list.
+  // render, and the read below must not refire for an equal list.
   const stablePubkeys = useShallowMemo(pubkeys);
   const pubkeysKey = stablePubkeys.join(',');
 
-  // Warm-navigation seed: if these matched pubkeys were fetched earlier this
-  // session, initialise from the cached posts so returning to the Posts tab
-  // paints instantly instead of flashing a spinner.
-  const initialCacheKey = stablePubkeys.length ? searchPostsKey(pubkeysKey) : null;
-  const seed =
-    initialCacheKey && !searchPostsCache.isColdStart(initialCacheKey)
-      ? searchPostsCache.getEntry(initialCacheKey)?.data
-      : undefined;
+  const read = useCachedRead<FeedParseResult>({
+    store: searchPostsCache,
+    surface: 'searchPosts',
+    key: stablePubkeys.length ? searchPostsKey(pubkeysKey) : null,
+    viewerKey: '',
+    focusRevalidate: false,
+    classify: (res) =>
+      readIsUnavailable(res.read)
+        ? 'error'
+        : res.orderedFeedItems.some((item) => item.type === 'note')
+          ? 'ready'
+          : 'empty',
+    fetcher: ({ signal, readId }) => fetchPostsByPubkeys(stablePubkeys, signal, readId),
+  });
 
-  const [noteItems, setNoteItems] = useState<FeedItem[]>(() =>
-    seed ? seed.orderedFeedItems.filter((item) => item.type === 'note') : []
+  const noteItems = useMemo(
+    () => (read.data?.orderedFeedItems ?? []).filter((item) => item.type === 'note'),
+    [read.data]
   );
-  const [metricsMap, setMetricsMap] = useState<Map<string, NoteMetrics>>(
-    () => seed?.metricsMap ?? new Map()
-  );
-  const [profilesMap, setProfilesMap] = useState<Map<string, ProfileInfo>>(
-    () => seed?.profilesMap ?? new Map()
-  );
-  const [quotedMap, setQuotedMap] = useState<Map<string, FeedEvent>>(
-    () => seed?.quotedEventsMap ?? new Map()
-  );
-  const [loading, setLoading] = useState(() => !!initialCacheKey && !seed);
-
-  useEffect(() => {
-    if (pubkeys.length === 0) {
-      setNoteItems([]);
-      return;
-    }
-
-    const apply = (res: FeedParseResult) => {
-      setNoteItems(res.orderedFeedItems.filter((item) => item.type === 'note'));
-      setMetricsMap(res.metricsMap);
-      setProfilesMap(res.profilesMap);
-      setQuotedMap(res.quotedEventsMap);
-    };
-
-    // Warm navigation: paint cached posts for these pubkeys instantly. Fresh →
-    // skip the network; stale → revalidate silently (no spinner). Cold → spinner.
-    const cacheKey = searchPostsKey(pubkeysKey);
-    const cached = searchPostsCache.isColdStart(cacheKey)
-      ? undefined
-      : searchPostsCache.getEntry(cacheKey);
-    if (cached) {
-      apply(cached.data);
-      setLoading(false);
-      if (searchPostsCache.isFresh(cached)) return;
-    } else {
-      setLoading(true);
-    }
-
-    const controller = new AbortController();
-    const client = getFeedClient();
-    void client
-      .getPostsByPubkeys({ pubkeys: stablePubkeys, limit: 30, signal: controller.signal })
-      .then((res) => {
-        if (controller.signal.aborted) return;
-        apply(res);
-        searchPostsCache.setEntry(cacheKey, res, { viewerKey: '' });
-        searchPostsCache.markTouched(cacheKey);
-      })
-      .catch(() => {
-        /* best-effort; an empty state covers the failure */
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-        client.dispose?.();
-      });
-    return () => controller.abort();
-  }, [stablePubkeys, pubkeysKey]);
+  const metricsMap = read.data?.metricsMap;
+  const profilesMap = read.data?.profilesMap;
+  const quotedMap = read.data?.quotedEventsMap;
 
   const getMetrics = useMemo(
-    () => (id: string) => metricsMap.get(id) ?? DEFAULT_METRICS,
+    () => (id: string) => metricsMap?.get(id) ?? DEFAULT_METRICS,
     [metricsMap]
   );
 
@@ -113,8 +84,8 @@ export function SearchPostsList({ pubkeys }: { pubkeys: string[] }) {
           variant="feed"
           event={item.event}
           metrics={getMetrics(item.event.id)}
-          quotedEvents={quotedMap}
-          profiles={profilesMap}
+          quotedEvents={quotedMap ?? EMPTY_QUOTED}
+          profiles={profilesMap ?? EMPTY_PROFILES}
           getMetrics={getMetrics}
           showFooterBorder
         />
@@ -123,8 +94,8 @@ export function SearchPostsList({ pubkeys }: { pubkeys: string[] }) {
     [getMetrics, profilesMap, quotedMap]
   );
 
-  const renderEmptyPeople = useMemo(
-    () => (
+  if (pubkeys.length === 0) {
+    return (
       <View style={styles.center}>
         <EmptyState
           icon="mdi:magnify"
@@ -132,34 +103,44 @@ export function SearchPostsList({ pubkeys }: { pubkeys: string[] }) {
           subtitle="Search for people to see their recent posts."
         />
       </View>
-    ),
-    []
-  );
-  const renderEmptyPosts = useMemo(
-    () => (
-      <View style={styles.center}>
-        <EmptyState
-          icon="mdi:message-text"
-          title="No posts"
-          subtitle="The people matching your search haven't posted recently."
-        />
-      </View>
-    ),
-    []
-  );
-
-  if (pubkeys.length === 0) {
-    return renderEmptyPeople;
+    );
   }
-  if (loading && noteItems.length === 0) {
+  if (noteItems.length === 0) {
+    if (read.status === 'error') {
+      return (
+        <View style={styles.center}>
+          <EmptyState
+            icon="mdi:cloud-off-outline"
+            title="Posts unavailable"
+            subtitle="Couldn't load recent posts right now."
+            action={
+              <Button
+                text="Try again"
+                variant="secondary"
+                onPress={read.refresh}
+                testID="search-posts-retry"
+              />
+            }
+          />
+        </View>
+      );
+    }
+    if (read.status === 'empty' || read.status === 'ready') {
+      return (
+        <View style={styles.center}>
+          <EmptyState
+            icon="mdi:message-text"
+            title="No posts"
+            subtitle="The people matching your search haven't posted recently."
+          />
+        </View>
+      );
+    }
     return (
       <View style={styles.center}>
         <Spinner />
       </View>
     );
-  }
-  if (noteItems.length === 0) {
-    return renderEmptyPosts;
   }
 
   return (
@@ -171,6 +152,9 @@ export function SearchPostsList({ pubkeys }: { pubkeys: string[] }) {
     />
   );
 }
+
+const EMPTY_QUOTED: FeedParseResult['quotedEventsMap'] = new Map();
+const EMPTY_PROFILES: FeedParseResult['profilesMap'] = new Map();
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },

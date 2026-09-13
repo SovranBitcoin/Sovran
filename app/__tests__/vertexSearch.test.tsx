@@ -13,7 +13,15 @@ jest.mock('@/shared/lib/nostr/vertex/refreshVertex', () => ({
   refreshVertex: (...args: unknown[]) => mockRefresh(...args),
 }));
 jest.mock('@/features/payments/hooks/useContactSearch', () => ({
-  useContactSearch: () => ({ displayResults: mockRows, hasSearched: true, searchLoading: false }),
+  useContactSearch: () => ({
+    results: mockRows,
+    status: 'ready',
+    hasSearched: true,
+    searchLoading: false,
+    partial: false,
+    error: null,
+    retry: jest.fn(),
+  }),
 }));
 jest.mock('@/shared/hooks/useNostrProfileMetadata', () => ({
   useNostrProfileMetadataMany: () => ({ metadata: new Map() }),

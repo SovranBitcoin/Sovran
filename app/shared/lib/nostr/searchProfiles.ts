@@ -1,5 +1,5 @@
 import * as nip19 from 'nostr-tools/nip19';
-import { ok, type Result } from 'neverthrow';
+import { ok, err, type Result } from 'neverthrow';
 import { facade } from 'nostr';
 import type NDK from '@nostr-dev-kit/ndk-mobile';
 import { refreshVertex } from '@/shared/lib/nostr/vertex/refreshVertex';
@@ -14,14 +14,6 @@ import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 // so callers (useContactSearch + the split-bill picker) are unchanged. Which
 // tiers run is gated by the Network settings toggles via buildNostrDataLayer.
 // ---------------------------------------------------------------------------
-
-const EMPTY: SearchUsersResponse = {
-  query: '',
-  limit: 0,
-  sort: 'facade',
-  results: [],
-  fromCache: false,
-};
 
 /** Derive a bech32 npub, preferring the tier-supplied one; null if underivable. */
 function resolveNpub(hit: facade.ProfileSearchHit): string | null {
@@ -58,51 +50,77 @@ function hitToSearchResult(hit: facade.ProfileSearchHit): NostrSearchResult | nu
   return parsed.success ? parsed.data : null;
 }
 
+/** The app's `SearchUsersResponse` from one facade answer (possibly partial). */
+function responseFrom(
+  resolved: facade.ResolvedProfileSearch,
+  query: string,
+  limit: number | undefined
+): SearchUsersResponse {
+  const results: NostrSearchResult[] = [];
+  // Sort scored hits stably, leaving unknown-score slots in API order.
+  const scored =
+    resolved.tier === 'nagg'
+      ? resolved.hits.filter((hit) => hit.score != null).sort((a, b) => b.score! - a.score!)
+      : [];
+  let scoredIndex = 0;
+  const hits =
+    resolved.tier === 'nagg'
+      ? resolved.hits.map((hit) => (hit.score != null ? scored[scoredIndex++]! : hit))
+      : resolved.hits;
+  for (const hit of hits) {
+    const mapped = hitToSearchResult(hit);
+    if (mapped) results.push(mapped);
+  }
+  return {
+    query,
+    limit: limit ?? results.length,
+    sort: `facade:${resolved.tier}`,
+    results,
+    fromCache: false,
+  };
+}
+
+/**
+ * Tier-selecting profile search. The facade fans out to every tier and paints
+ * at the first answer; later tiers' hits are APPENDED and delivered through
+ * `onUpdate`. A Vertex two-phase refresh follows when the answer was not a
+ * fresh nagg one: the current answer is delivered through `onCached` first so
+ * the UI paints, then the refreshed ranking replaces it. Exhaustion (every
+ * tier disabled, failed or unreachable) is an ERROR, distinct from a healthy
+ * empty answer (SYSTEM.md F06).
+ */
 export async function searchProfilesViaFacade(args: {
   query: string;
   limit?: number;
   signal?: AbortSignal;
   ndk?: NDK;
+  /** Read-lifecycle correlation id, forwarded to the facade. */
+  readId?: string;
   onCached?: (data: SearchUsersResponse) => void;
+  /** A later tier's hits merged into the painted answer (append-only). */
+  onUpdate?: (data: SearchUsersResponse) => void;
 }): Promise<Result<SearchUsersResponse, Error>> {
   const layer = buildNostrDataLayer();
-  if (!layer) return ok({ ...EMPTY, query: args.query });
+  if (!layer) return err(new Error('profile search disabled: no tiers enabled'));
 
   let result = await layer.searchProfiles({
     query: args.query,
     ...(typeof args.limit === 'number' ? { limit: args.limit } : {}),
     ...(args.signal ? { signal: args.signal } : {}),
+    ...(args.readId ? { readId: args.readId } : {}),
+    onUpdate: (resolved) => {
+      if (args.signal?.aborted) return;
+      args.onUpdate?.(responseFrom(resolved, args.query, args.limit));
+    },
   });
 
-  // Exhaustion (every tier disabled/failed/no-match) is an empty answer, not an
-  // error — the search UI shows "no results" rather than a failure toast.
-  const toResponse = () =>
+  const toResponse = (): Result<SearchUsersResponse, Error> =>
     result.match(
-      (resolved) => {
-        const results: NostrSearchResult[] = [];
-        // Sort scored hits stably, leaving unknown-score slots in API order.
-        const scored =
-          resolved.tier === 'nagg'
-            ? resolved.hits.filter((hit) => hit.score != null).sort((a, b) => b.score! - a.score!)
-            : [];
-        let scoredIndex = 0;
-        const hits =
-          resolved.tier === 'nagg'
-            ? resolved.hits.map((hit) => (hit.score != null ? scored[scoredIndex++]! : hit))
-            : resolved.hits;
-        for (const hit of hits) {
-          const mapped = hitToSearchResult(hit);
-          if (mapped) results.push(mapped);
-        }
-        return ok<SearchUsersResponse, Error>({
-          query: args.query,
-          limit: args.limit ?? results.length,
-          sort: `facade:${resolved.tier}`,
-          results,
-          fromCache: false,
-        });
-      },
-      () => ok<SearchUsersResponse, Error>({ ...EMPTY, query: args.query })
+      (resolved) => ok<SearchUsersResponse, Error>(responseFrom(resolved, args.query, args.limit)),
+      (exhausted) =>
+        err<SearchUsersResponse, Error>(
+          new Error(`profile search unavailable: ${exhausted.message}`, { cause: exhausted })
+        )
     );
 
   if (
