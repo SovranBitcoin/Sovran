@@ -88,6 +88,7 @@
 
 import { useSyncExternalStore } from 'react';
 import type React from 'react';
+import type { TextInputProps } from 'react-native';
 
 import { log } from '@/shared/lib/logger';
 
@@ -146,6 +147,7 @@ export interface ActionMenuInput {
   secureTextEntry?: boolean;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   autoCorrect?: boolean;
+  keyboardType?: TextInputProps['keyboardType'];
   /** Optional helper text rendered above the input (e.g. context for the field). */
   description?: string;
 }

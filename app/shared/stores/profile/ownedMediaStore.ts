@@ -94,7 +94,7 @@ export const useOwnedMediaStore = create<OwnedMediaStore>()(
     (set) => ({
       ...INITIAL,
 
-      recordBlobs: (blobs, sourceNoteId, purpose) => {
+      recordBlobs: (blobs, sourceNoteId, purpose = 'post') => {
         if (blobs.length === 0) return;
         set((state) => {
           const now = Date.now();
@@ -114,7 +114,7 @@ export const useOwnedMediaStore = create<OwnedMediaStore>()(
                 url: blob.url || existing.url,
                 mimeType: existing.mimeType ?? blob.mimeType,
                 sourceNoteIds,
-                purpose: purpose ?? existing.purpose,
+                purpose,
                 lastSeen: now,
               };
             } else {

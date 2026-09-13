@@ -349,6 +349,19 @@ describe('action-menu successor handoff', () => {
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
+  it('passes URL keyboard and accessible label to a menu input', () => {
+    act(() => {
+      renderer = TestRenderer.create(<Harness />);
+      actionMenuPopup({
+        title: 'Upload server',
+        inputs: [{ id: 'server', label: 'Server URL', keyboardType: 'url' }],
+      });
+    });
+    const input = renderer!.root.findByProps({ testID: 'action-menu-input-server' });
+    expect(input.props.keyboardType).toBe('url');
+    expect(input.props.accessibilityLabel).toBe('Server URL');
+  });
+
   it('reopens during closing with a fresh native instance and reset inputs', () => {
     const menu = { title: 'Input', inputs: [{ id: 'name', initialValue: 'Initial' }] };
     act(() => {

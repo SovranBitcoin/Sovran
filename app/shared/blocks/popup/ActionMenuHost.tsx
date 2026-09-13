@@ -146,6 +146,7 @@ function MenuInputField({
         placeholderTextColor={placeholder}
         autoCapitalize={input.autoCapitalize}
         autoCorrect={input.autoCorrect}
+        keyboardType={input.keyboardType}
         secureTextEntry={input.secureTextEntry}
         // Mirror heroui Input's secondary variant: py-3.5 px-3 rounded-2xl
         // border-[1.5px] bg-default border-default focus:border-accent.

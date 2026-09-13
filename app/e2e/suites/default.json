@@ -3,6 +3,7 @@
   "name": "default",
   "scenarios": [
     {"id":"onboarding.fresh","file":"scenarios/onboarding-fresh.json","order":10,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
-    {"id":"settings.edit.profile","file":"scenarios/settings-edit-profile.json","order":20,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"}
+    {"id":"settings.edit.profile","file":"scenarios/settings-edit-profile.json","order":20,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"settings.media.server","file":"scenarios/settings-media-server.json","order":30,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"}
   ]
 }
