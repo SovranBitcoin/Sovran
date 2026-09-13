@@ -15,9 +15,8 @@
  *      calls (audit + reviews) instead of three (audit + reviews + info).
  *
  *   2. **Coco `getMintInfo`** — fallback for mints the auditor doesn't track
- *      (e.g. `mint.sovran.money` is excluded from `api.sovran.money`'s audit
- *      DB). Returns NUT-06 info directly from the mint, so we still get the
- *      operator pubkey and can resolve their Nostr profile.
+ *      in its database. Returns NUT-06 info directly from the mint, so we
+ *      still get the operator pubkey and can resolve their Nostr profile.
  *
  *   3. **Nostr GraphQL mint reviews** — independent of audit, runs in
  *      parallel for every mint. Provides KYM score + review count.

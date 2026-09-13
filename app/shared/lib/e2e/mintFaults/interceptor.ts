@@ -6,7 +6,7 @@
  * injectable through any public CocoConfig seam (Manager hardcodes it), so
  * this patch is the one choke point that reaches every mint request. Rules
  * are mint-URL-scoped (wildcard rules require a `/v1/` cashu path), so
- * api.sovran.money, relays, blossom, and the harness's loopback IPC always
+ * Nagg, relays, blossom, and the harness's loopback IPC always
  * pass through untouched. A matched request never reaches the network.
  *
  * Future upstream: once CocoConfig grows a mintRequestProvider/fetch option,
