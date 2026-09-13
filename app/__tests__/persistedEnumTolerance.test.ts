@@ -367,6 +367,30 @@ function connection(clientPubkey: string, overrides: Record<string, unknown> = {
 }
 
 describe('persisted rejection is contained to the row', () => {
+  it('contains unknown Unified rail keys without losing other mint preferences', () => {
+    const merged = merge(
+      'mint-store',
+      {
+        selectedMint: 'https://mint.example',
+        activeUnit: 'eur',
+        creqP2pkLock: true,
+        bip321ExcludedRails: { futureRail: true, bolt12: true },
+      },
+      current({
+        selectedMint: undefined as string | undefined,
+        activeUnit: 'sat',
+        creqP2pkLock: false,
+        bip321ExcludedRails: {},
+      })
+    );
+    expect(merged).toMatchObject({
+      selectedMint: 'https://mint.example',
+      activeUnit: 'eur',
+      creqP2pkLock: true,
+      bip321ExcludedRails: {},
+    });
+  });
+
   it('keeps every other pairing when one connection carries an unknown value', () => {
     // The reason this matters: `encryption` is a security semantic with no
     // neutral member, so an unrecognized one must not be guessed — but bare,
