@@ -139,6 +139,24 @@ for (const path of STORE_MODULES) {
 }
 
 describe('persisted store round-trip', () => {
+  it('round-trips populated app version metadata through the settings projection', () => {
+    const entry = persistRegistry.find((store) => store.name === 'settings-store')!;
+    const lastKnownAppVersion = {
+      version: '0.1.3',
+      minVersion: '0.1.2',
+      message: 'Please update',
+      fetchedAt: 123,
+    };
+    const { useSettingsStore } =
+      require('@/shared/stores/global/settingsStore') as typeof import('@/shared/stores/global/settingsStore');
+    const state = { ...useSettingsStore.getState(), lastKnownAppVersion };
+    const persisted = JSON.parse(
+      JSON.stringify(useSettingsStore.persist.getOptions().partialize!(state))
+    );
+    expect(persisted.lastKnownAppVersion).toEqual(lastKnownAppVersion);
+    expect(entry.schema.parse(persisted)).toMatchObject({ lastKnownAppVersion });
+  });
+
   it('covers every persistConfig caller in the source tree', () => {
     const callers = sourceFilesCalling(/persistConfig\s*[<(]/).filter(
       (f) => !f.endsWith('persist/persistConfig.ts') && !NOT_A_CONCRETE_STORE.includes(f)

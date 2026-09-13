@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import * as Application from 'expo-application';
 
@@ -6,6 +6,8 @@ import { getLatestVersion } from '@/shared/lib/apiClient';
 import { paramPopup } from '@/shared/lib/popup';
 import { log } from '@/shared/lib/logger';
 import { useBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
+import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { useSettingsHydration, useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 /**
  * Checks for app updates and shows a popup when a newer version exists.
@@ -29,8 +31,12 @@ function isNewerVersion(candidate: string, current: string): boolean {
 
 export const useVersionCheck = () => {
   const bootDone = useBootMorphCompleted();
+  const { isOffline } = useOfflineStatus();
+  const hydration = useSettingsHydration((state) => state.status);
+  const setLastKnownAppVersion = useSettingsStore((state) => state.setLastKnownAppVersion);
+  const lastPromptedVersion = useRef<string | null>(null);
   useEffect(() => {
-    if (!bootDone) return;
+    if (!bootDone || hydration !== 'ready') return;
     const controller = new AbortController();
     const checkForUpdates = async () => {
       const currentVersion = Application.nativeApplicationVersion;
@@ -41,24 +47,26 @@ export const useVersionCheck = () => {
 
       log.debug('hook.version_check.start', { currentVersion });
 
-      const result = await getLatestVersion({
-        storage: { version: currentVersion },
-        signal: controller.signal,
-      });
+      let payload = useSettingsStore.getState().lastKnownAppVersion;
+      if (!isOffline) {
+        const result = await getLatestVersion({
+          storage: { version: currentVersion },
+          signal: controller.signal,
+        });
 
-      if (controller.signal.aborted) return;
-      if (!result.isOk()) {
-        log.warn('hook.version_check.api_error', { currentVersion });
-        return;
+        if (controller.signal.aborted) return;
+        if (result.isOk()) {
+          payload = { ...result.value, fetchedAt: Date.now() };
+          setLastKnownAppVersion(payload);
+        } else {
+          log.warn('hook.version_check.api_error', { currentVersion });
+        }
       }
 
-      const payload = result.value;
-      if (
-        payload &&
-        typeof payload === 'object' &&
-        'version' in payload &&
-        isNewerVersion(payload.version, currentVersion)
-      ) {
+      if (!payload) return;
+      if (isNewerVersion(payload.version, currentVersion)) {
+        if (lastPromptedVersion.current === payload.version) return;
+        lastPromptedVersion.current = payload.version;
         log.info('hook.version_check.update_available', {
           currentVersion,
           latestVersion: payload.version,
@@ -72,5 +80,5 @@ export const useVersionCheck = () => {
 
     void checkForUpdates();
     return () => controller.abort();
-  }, [bootDone]);
+  }, [bootDone, hydration, isOffline, setLastKnownAppVersion]);
 };

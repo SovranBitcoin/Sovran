@@ -61,19 +61,27 @@ describe('apiClient backend config routing', () => {
     Reflect.deleteProperty(globalThis, 'fetch');
   });
 
-  it('routes version checks to the app API independently of the Nostr app-view', async () => {
-    process.env.EXPO_PUBLIC_API_BASE_URL = 'https://api.example.test/api/';
-    process.env.EXPO_PUBLIC_SCORE_API_BASE_URL = 'https://score.example.test/';
-    const { getLatestVersion } =
-      jest.requireActual<typeof import('@/shared/lib/apiClient')>('@/shared/lib/apiClient');
+  it.each([undefined, '0.1.2'])(
+    'routes version checks to nagg and preserves minVersion=%s',
+    async (minVersion) => {
+      process.env.EXPO_PUBLIC_API_BASE_URL = 'https://api.example.test/api/';
+      process.env.EXPO_PUBLIC_SCORE_API_BASE_URL = 'https://score.example.test/';
+      const { getLatestVersion } =
+        jest.requireActual<typeof import('@/shared/lib/apiClient')>('@/shared/lib/apiClient');
 
-    await getLatestVersion({ storage: { version: '0.1.1' } });
+      const payload = { version: '0.1.3', message: 'Update available', minVersion };
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => payload });
+      const result = await getLatestVersion({ storage: { version: '0.1.1' } });
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://api.example.test/api/app/latest-version',
-      expect.objectContaining({ method: 'POST', body: '{"storage":{"version":"0.1.1"}}' })
-    );
-  });
+      expect(result.isOk()).toBe(true);
+      if (result.isOk()) expect(result.value).toEqual(payload);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://score.example.test/app/latest-version',
+        expect.objectContaining({ method: 'POST', body: '{"storage":{"version":"0.1.1"}}' })
+      );
+    }
+  );
 
   it('routes Nostr profile through app-view REST', async () => {
     process.env.EXPO_PUBLIC_API_BASE_URL = 'https://api.example.test/api/';

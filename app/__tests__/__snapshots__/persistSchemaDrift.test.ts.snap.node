@@ -7395,6 +7395,40 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           "maxLength": 16,
           "type": "string",
         },
+        "lastKnownAppVersion": {
+          "anyOf": [
+            {
+              "properties": {
+                "fetchedAt": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "message": {
+                  "maxLength": 280,
+                  "type": "string",
+                },
+                "minVersion": {
+                  "maxLength": 32,
+                  "type": "string",
+                },
+                "version": {
+                  "maxLength": 32,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "version",
+                "fetchedAt",
+              ],
+              "type": "object",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
         "legalAcceptance": {
           "anyOf": [
             {
@@ -7590,6 +7624,41 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           "maxLength": 16,
           "type": "string",
         },
+        "lastKnownAppVersion": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "fetchedAt": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "message": {
+                  "maxLength": 280,
+                  "type": "string",
+                },
+                "minVersion": {
+                  "maxLength": 32,
+                  "type": "string",
+                },
+                "version": {
+                  "maxLength": 32,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "version",
+                "fetchedAt",
+              ],
+              "type": "object",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
         "legalAcceptance": {
           "anyOf": [
             {
@@ -7757,6 +7826,7 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
         },
       },
       "required": [
+        "lastKnownAppVersion",
         "language",
         "displayBtc",
         "displayCurrency",
