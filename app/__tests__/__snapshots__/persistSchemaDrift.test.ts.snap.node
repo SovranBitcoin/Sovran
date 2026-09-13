@@ -2873,6 +2873,102 @@ exports[`persisted schema drift own-content-store schema matches the golden snap
 }
 `;
 
+exports[`persisted schema drift own-profile-metadata-store schema matches the golden snapshot for its version: own-profile-metadata-store 1`] = `
+{
+  "name": "own-profile-metadata-store",
+  "shape": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "latest": {
+          "anyOf": [
+            {
+              "properties": {
+                "content": {
+                  "additionalProperties": {},
+                  "propertyNames": {
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "createdAt": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "eventId": {
+                  "maxLength": 64,
+                  "minLength": 64,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "content",
+                "createdAt",
+                "eventId",
+              ],
+              "type": "object",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "latest": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "content": {
+                  "additionalProperties": {},
+                  "propertyNames": {
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "createdAt": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "eventId": {
+                  "maxLength": 64,
+                  "minLength": 64,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "content",
+                "createdAt",
+                "eventId",
+              ],
+              "type": "object",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
+      },
+      "required": [
+        "latest",
+      ],
+      "type": "object",
+    },
+  },
+  "version": 1,
+}
+`;
+
 exports[`persisted schema drift owned-media-store schema matches the golden snapshot for its version: owned-media-store 1`] = `
 {
   "name": "owned-media-store",
@@ -2914,6 +3010,13 @@ exports[`persisted schema drift owned-media-store schema matches the golden snap
               },
               "mimeType": {
                 "maxLength": 256,
+                "type": "string",
+              },
+              "purpose": {
+                "enum": [
+                  "avatar",
+                  "post",
+                ],
                 "type": "string",
               },
               "sha256": {

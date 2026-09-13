@@ -341,7 +341,7 @@ const PARAM_POPUPS = {
     ],
   }),
 
-  'engagement-update-failed': (action: 'follow' | 'like' | 'repost'): PopupSpec => ({
+  'engagement-update-failed': (action: 'follow' | 'like' | 'repost' | 'profile'): PopupSpec => ({
     message: `Unable to update ${action} right now`,
     icon: 'icon:mdi:alert-circle',
     type: 'error',

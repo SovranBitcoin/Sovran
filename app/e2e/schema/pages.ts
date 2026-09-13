@@ -91,6 +91,7 @@ export const CANONICAL_PAGES = [
   'settings-notification-policy',
   'settings-privacy',
   'settings-profile',
+  'settings-edit-profile',
   'settings-recovery',
   'settings-routing',
   'settings-storage',

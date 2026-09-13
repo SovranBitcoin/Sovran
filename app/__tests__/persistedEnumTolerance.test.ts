@@ -62,6 +62,7 @@ import '@/shared/stores/profile/nostrSocialStore';
 import '@/shared/stores/profile/npcMintStore';
 import '@/shared/stores/profile/nutDropRedeemQueueStore';
 import '@/shared/stores/profile/ownContentStore';
+import '@/shared/stores/profile/ownProfileMetadataStore';
 import '@/shared/stores/profile/ownedMediaStore';
 import '@/shared/stores/profile/recentPeopleStore';
 import '@/shared/stores/profile/routstrStore';
