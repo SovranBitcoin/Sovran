@@ -16,17 +16,21 @@ export function FeedTabButton({
   active,
   showChevron = false,
   onPress,
+  testID,
 }: {
   label: string;
   active: boolean;
   showChevron?: boolean;
   onPress?: () => void;
+  testID?: string;
 }) {
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
   const activeBg = useMemo(() => withAlpha(surfaceTertiary, 0.5), [surfaceTertiary]);
   const pressedBg = useMemo(() => withAlpha(surfaceTertiary, 0.65), [surfaceTertiary]);
   return (
     <Pressable
+      testID={testID}
+      accessibilityLabel={label}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       onPress={onPress}

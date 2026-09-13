@@ -28,9 +28,12 @@ export interface LegalAcceptance {
   acceptedAt: string;
 }
 
-export function hasCurrentLegalAcceptance(acceptance: LegalAcceptance | null): boolean {
+export function hasCurrentLegalAcceptance(
+  acceptance: LegalAcceptance | null,
+  currentRevisions: typeof legalRevisions = legalRevisions
+): boolean {
   return (
-    acceptance?.termsRevision === legalRevisions.terms &&
-    acceptance.privacyRevision === legalRevisions.privacy
+    acceptance?.termsRevision === currentRevisions.terms &&
+    acceptance.privacyRevision === currentRevisions.privacy
   );
 }
