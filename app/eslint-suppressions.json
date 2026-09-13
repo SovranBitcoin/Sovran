@@ -29,7 +29,7 @@
       "count": 1
     },
     "no-restricted-syntax": {
-      "count": 3
+      "count": 2
     }
   },
   "features/feed/components/nostr/StoryProgressBar.tsx": {
