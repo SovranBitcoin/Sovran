@@ -114,6 +114,7 @@ export function UserMessagesScreen({
   const {
     messages: threadMessages,
     loading: threadLoading,
+    hasLoadedOnce,
     hasMore,
     loadMore,
     refresh,
@@ -182,7 +183,7 @@ export function UserMessagesScreen({
     return [...server, ...pending].sort((a, b) => a.created_at - b.created_at);
   }, [isMockThread, threadMessages, localMessages, demoMessages]);
 
-  const isLoading = !isMockThread && threadLoading && messages.length === 0;
+  const isLoading = !isMockThread && threadLoading && !hasLoadedOnce && messages.length === 0;
 
   const displayName = resolveIdentityName({ pubkey, nostrProfile: counterpartyMetadata });
   const userPicture = counterpartyMetadata?.picture;
@@ -477,6 +478,7 @@ export function UserMessagesScreen({
         composerActions={
           !blocked && !isFictionalContact && sendMoneyTarget ? (
             <Button
+              testID="dm-send-money"
               text="Send money"
               variant="primary"
               size="compact"
@@ -487,20 +489,23 @@ export function UserMessagesScreen({
         }
         counterpartyAvatar={counterpartyAvatar}
         isLoading={isLoading}
-        loadingContent={
-          <Text size={16} style={{ color: shade400, textAlign: 'center', paddingTop: 50 }}>
-            Loading messages...
-          </Text>
-        }
         emptyContent={
-          <View className="items-center gap-3 px-6 py-8">
-            <Text size={16} style={{ color: shade400, textAlign: 'center' }}>
-              {threadError ? "Couldn't load your message history." : 'No messages yet.'}
-            </Text>
-            {threadError && (
-              <Button text="Try again" variant="secondary" size="compact" onPress={refresh} />
-            )}
-          </View>
+          !threadLoading && messages.length === 0 ? (
+            <View className="items-center gap-3 px-6 py-8">
+              <Text size={16} style={{ color: shade400, textAlign: 'center' }}>
+                {threadError ? "Couldn't load your message history." : 'No messages yet.'}
+              </Text>
+              {threadError && (
+                <Button
+                  testID="dm-history-retry"
+                  text="Try again"
+                  variant="secondary"
+                  size="compact"
+                  onPress={refresh}
+                />
+              )}
+            </View>
+          ) : null
         }
         historyExtras={(last) => ({
           lastIsOwn: last?.isOwn ?? null,

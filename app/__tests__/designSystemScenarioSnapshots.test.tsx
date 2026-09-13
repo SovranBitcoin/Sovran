@@ -444,6 +444,8 @@ describe('Design System exact structural snapshots', () => {
 
   it('keeps the skeleton/content parity catalog complete', () => {
     expect(SKELETON_CROSSFADE_FAMILY.scenarios.map((scenario) => scenario.id)).toEqual([
+      'chat-skeleton',
+      'marquee-text',
       'profile-skeleton-region',
       'profile-content-parity',
       'inline-skeleton',

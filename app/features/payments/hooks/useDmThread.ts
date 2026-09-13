@@ -11,6 +11,7 @@ import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 import { fetchDmEnvelopes } from '../data/dmEnvelopeClient';
 import { decryptDmEnvelopes } from '../data/dmDecryptPipeline';
 import type { DmEnvelopePage, DmProtocol } from '../data/dmEnvelopeTypes';
+import { paymentLog } from '@/shared/lib/logger';
 import { useDmEnvelopePages } from './useDmEnvelopePages';
 
 const PAGE_LIMIT = 50;
@@ -35,9 +36,11 @@ export function useDmThread(
   // The paging cursor walks ALL envelope wrap times (not the decrypted rumor
   // time, which uses a different clock); seenMsgIds dedups the messages
   // actually shown for this counterparty.
+  const firstPageStartedAtRef = useRef<number | null>(null);
   const seenMsgIdsRef = useRef(new Set<string>());
 
   const onReset = useCallback(() => {
+    firstPageStartedAtRef.current = Date.now();
     seenMsgIdsRef.current = new Set();
     setMessages([]);
   }, []);
@@ -50,6 +53,13 @@ export function useDmThread(
         (dm) => dm.counterparty === counterparty && dm.protocol === protocol
       );
       const fresh = relevant.filter((dm) => !seenMsgIdsRef.current.has(dm.id));
+      if (firstPageStartedAtRef.current !== null) {
+        paymentLog.info('dm.thread.first_page', {
+          ms: Date.now() - firstPageStartedAtRef.current,
+          count: fresh.length,
+        });
+        firstPageStartedAtRef.current = null;
+      }
       if (fresh.length === 0) return 0;
       fresh.forEach((dm) => seenMsgIdsRef.current.add(dm.id));
       setMessages((prev) => {
@@ -88,7 +98,7 @@ export function useDmThread(
     [viewerPubkey]
   );
 
-  const { loading, hasMore, loadMore, refresh, error } = useDmEnvelopePages({
+  const { loading, hasLoadedOnce, hasMore, loadMore, refresh, error } = useDmEnvelopePages({
     feedKey:
       viewerPubkey && viewerPrivateKey && counterparty
         ? `${viewerPubkey}:${protocol}:${counterparty}`
@@ -102,5 +112,5 @@ export function useDmThread(
     failureEvent: 'payment.dm.thread.failed',
   });
 
-  return { messages, loading, hasMore, loadMore, refresh, error };
+  return { messages, loading, hasLoadedOnce, hasMore, loadMore, refresh, error };
 }

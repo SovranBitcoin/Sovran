@@ -1,4 +1,5 @@
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
+import { paymentLog } from '@/shared/lib/logger';
 import { useDmThread } from '@/features/payments/hooks/useDmThread';
 import type { DmEnvelopePage } from '@/features/payments/data/dmEnvelopeTypes';
 
@@ -12,7 +13,7 @@ jest.mock('@/shared/lib/nostr/giftWrapCache', () => ({
   giftWrapCache: { cache: { hydrate: async () => {} } },
 }));
 jest.mock('@/shared/lib/nostr/nip04Cache', () => ({ nip04Cache: { hydrate: async () => {} } }));
-jest.mock('@/shared/lib/logger', () => ({ paymentLog: { warn: jest.fn() } }));
+jest.mock('@/shared/lib/logger', () => ({ paymentLog: { warn: jest.fn(), info: jest.fn() } }));
 jest.mock('@/features/payments/data/dmDecryptPipeline', () => ({
   decryptDmEnvelopes: (envelopes: DmEnvelopePage['envelopes']) =>
     envelopes.map((e) => ({
@@ -40,6 +41,7 @@ function page(peer: string, count: number, newest: number): DmEnvelopePage {
   };
 }
 beforeEach(() => {
+  jest.clearAllMocks();
   mockInbox.mockReset();
   mockDirect.mockClear();
 });
@@ -64,5 +66,46 @@ it('stops searching when a source repeats its page', async () => {
   await waitFor(() => expect(mockInbox).toHaveBeenCalledTimes(2));
   await waitFor(() => expect(result.current.loading).toBe(false));
   expect(result.current.hasMore).toBe(false);
+  expect(result.current.messages).toEqual([]);
+});
+
+it('settles the first empty page while later inbox pages are still pending', async () => {
+  let finishSecond!: (page: DmEnvelopePage) => void;
+  mockInbox.mockResolvedValueOnce(page('other', 50, 1000)).mockImplementationOnce(
+    () =>
+      new Promise<DmEnvelopePage>((resolve) => {
+        finishSecond = resolve;
+      })
+  );
+  const { result } = renderHook(() => useDmThread('peer', 'viewer', key));
+  await waitFor(() => expect(mockInbox).toHaveBeenCalledTimes(2));
+  expect(result.current.hasLoadedOnce).toBe(true);
+  expect(result.current.loading).toBe(true);
+  expect(result.current.messages).toEqual([]);
+  expect(paymentLog.info).toHaveBeenCalledWith('dm.thread.first_page', {
+    ms: expect.any(Number),
+    count: 0,
+  });
+  await act(async () => finishSecond(page('peer', 1, 900)));
+  expect(result.current.loading).toBe(false);
+  expect(result.current.messages).toHaveLength(1);
+  expect(paymentLog.info).toHaveBeenCalledTimes(1);
+});
+
+it('settles failed first loads and resets readiness when the conversation changes', async () => {
+  mockInbox.mockRejectedValueOnce(new Error('Unavailable'));
+  const { result, rerender } = renderHook(
+    ({ peer }: { peer: string }) => useDmThread(peer, 'viewer', key),
+    {
+      initialProps: { peer: 'peer' },
+    }
+  );
+  await waitFor(() => expect(result.current.hasLoadedOnce).toBe(true));
+  expect(result.current.loading).toBe(false);
+  expect(result.current.error).toBeInstanceOf(Error);
+  mockInbox.mockImplementationOnce(() => new Promise(() => {}));
+  rerender({ peer: 'another-peer' });
+  expect(result.current.hasLoadedOnce).toBe(false);
+  expect(result.current.loading).toBe(true);
   expect(result.current.messages).toEqual([]);
 });

@@ -10,6 +10,7 @@ import { chatLog } from '@/shared/lib/logger';
 
 jest.mock('react-native', () => ({
   View: 'View',
+  Platform: { OS: 'ios', select: (values: { default: unknown }) => values.default },
   Text: 'Text',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -28,6 +29,7 @@ jest.mock('react-native-reanimated', () => ({
   __esModule: true,
   default: { View: jest.requireMock<typeof import('react-native')>('react-native').View },
   useAnimatedStyle: (factory: () => object) => factory(),
+  FadeIn: { duration: () => undefined },
 }));
 jest.mock('@shopify/flash-list', () => ({
   FlashList: ({
@@ -86,6 +88,7 @@ jest.mock('@/shared/ui/primitives/Avatar', () => ({
         `${state} avatar`
       ),
 }));
+jest.mock('@/shared/ui/primitives/Skeleton', () => ({ Skeleton: () => null }));
 jest.mock('@/shared/ui/primitives/Button', () => ({ Button: () => null }));
 jest.mock('@/shared/ui/primitives/Spinner', () => ({ Spinner: () => null }));
 jest.mock('assets/icons', () => () => null);

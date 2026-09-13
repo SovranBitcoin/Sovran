@@ -82,8 +82,8 @@ export function useDmEnvelopePages({
   // `loading` starts false and only flips true once the fetch effect runs, so a
   // consumer that gates a first-load spinner on `!loading` would hide it on the
   // very first render (before the fetch starts) and flash partial data. This
-  // latches true only after the first real fetch settles, so a list can wait for
-  // genuine results instead of rendering early.
+  // latches true after the first page settles, even if more unrelated inbox
+  // pages must be searched before the caller has visible messages.
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -116,6 +116,7 @@ export function useDmEnvelopePages({
     const onPage = onPageRef.current;
     onResetRef.current();
     setError(null);
+    setHasLoadedOnce(false);
     setLoading(true);
     void (async () => {
       await hydrateRef.current();
@@ -125,7 +126,11 @@ export function useDmEnvelopePages({
         pageLimit,
         cursor,
         fetchPage,
-        onPage,
+        onPage: (page) => {
+          const visible = onPage(page);
+          setHasLoadedOnce(true);
+          return visible;
+        },
         signal: controller.signal,
         continueWhileEmpty,
       });

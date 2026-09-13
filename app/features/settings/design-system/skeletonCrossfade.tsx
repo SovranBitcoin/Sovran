@@ -97,7 +97,45 @@ function InlineCrossfadePreview({ loading }: { loading: boolean }) {
   );
 }
 
+function ChatLoadingPreview() {
+  const { ChatSkeleton } =
+    require('@/shared/ui/composed/chat/ChatSkeleton') as typeof import('@/shared/ui/composed/chat/ChatSkeleton');
+  return (
+    <VStack className="h-[400px]">
+      <ChatSkeleton bottomPadding={16} />
+    </VStack>
+  );
+}
+
+function MarqueePreview() {
+  const { MarqueeText } =
+    require('@/shared/ui/primitives/MarqueeText') as typeof import('@/shared/ui/primitives/MarqueeText');
+  return (
+    <VStack className="w-48 gap-3">
+      <MarqueeText text="Satoshi" size={16} weight="bold" testID="marquee-fitting-sample" />
+      <MarqueeText
+        text="Satoshi Nakamoto · Bitcoin conversation"
+        size={16}
+        weight="bold"
+        testID="marquee-overflow-sample"
+      />
+    </VStack>
+  );
+}
+
 export const SKELETON_CROSSFADE_SCENARIOS = [
+  {
+    id: 'chat-skeleton',
+    title: 'Chat · Loading history',
+    covers: ['shared/ui/composed/chat/ChatSkeleton.tsx'],
+    render: () => <ChatLoadingPreview />,
+  },
+  {
+    id: 'marquee-text',
+    title: 'Chat title · Fitting and scrolling text',
+    covers: ['shared/ui/primitives/MarqueeText.tsx'],
+    render: () => <MarqueePreview />,
+  },
   {
     id: 'profile-skeleton-region',
     title: 'Profile row · Skeleton + region wave',

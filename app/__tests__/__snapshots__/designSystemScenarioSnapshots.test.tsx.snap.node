@@ -20273,6 +20273,208 @@ exports[`Design System exact structural snapshots renders skeleton-crossfade/ava
 }
 `;
 
+exports[`Design System exact structural snapshots renders skeleton-crossfade/chat-skeleton: chat-skeleton 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+              },
+              "type": "div",
+            },
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+                "style": {
+                  "height": "40px",
+                  "width": "62%",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+            "style": {
+              "paddingLeft": "16px",
+              "paddingRight": "16px",
+            },
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+              },
+              "type": "div",
+            },
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+                "style": {
+                  "height": "40px",
+                  "width": "44%",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+            "style": {
+              "paddingLeft": "16px",
+              "paddingRight": "16px",
+            },
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+                "style": {
+                  "height": "60px",
+                  "width": "71%",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+            "style": {
+              "paddingLeft": "16px",
+              "paddingRight": "16px",
+            },
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+                "style": {
+                  "height": "40px",
+                  "width": "38%",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+            "style": {
+              "paddingLeft": "16px",
+              "paddingRight": "16px",
+            },
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+              },
+              "type": "div",
+            },
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+                "style": {
+                  "height": "40px",
+                  "width": "55%",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+            "style": {
+              "paddingLeft": "16px",
+              "paddingRight": "16px",
+            },
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+                "style": {
+                  "height": "60px",
+                  "width": "48%",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+            "style": {
+              "paddingLeft": "16px",
+              "paddingRight": "16px",
+            },
+          },
+          "type": "div",
+        },
+      ],
+      "props": {
+        "className": "css-view-g5y9jx",
+        "data-testid": "chat-skeleton",
+        "dir": null,
+        "style": {
+          "paddingBottom": "16px",
+        },
+      },
+      "type": "div",
+    },
+  ],
+  "props": {
+    "className": "css-view-g5y9jx",
+    "dir": null,
+    "style": {
+      "flexDirection": "column",
+    },
+  },
+  "type": "div",
+}
+`;
+
 exports[`Design System exact structural snapshots renders skeleton-crossfade/inline-content: inline-content 1`] = `
 {
   "children": [
@@ -20357,6 +20559,139 @@ exports[`Design System exact structural snapshots renders skeleton-crossfade/inl
   "props": {
     "className": "css-view-g5y9jx",
     "dir": null,
+  },
+  "type": "div",
+}
+`;
+
+exports[`Design System exact structural snapshots renders skeleton-crossfade/marquee-text: marquee-text 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    "Satoshi",
+                  ],
+                  "props": {
+                    "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
+                    "dir": "auto",
+                    "style": {
+                      "color": "rgba(16,16,16,1.00)",
+                      "fontFamily": "OxygenBold",
+                      "fontSize": "16px",
+                    },
+                  },
+                  "type": "div",
+                },
+              ],
+              "props": {
+                "className": "css-view-g5y9jx r-flexDirection-18u37iz",
+                "dir": null,
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx r-WebkitOverflowScrolling-150rngu r-flexDirection-18u37iz r-flexGrow-16y2uox r-flexShrink-1wbh5a2 r-transform-agouwx r-overflowX-11yh6sk r-overflowY-buy8e9 r-touchAction-19z077z r-pointerEvents-633pao",
+            "dir": null,
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            "Satoshi",
+          ],
+          "props": {
+            "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
+            "dir": "auto",
+            "style": {
+              "color": "rgba(16,16,16,1.00)",
+              "fontFamily": "OxygenBold",
+              "fontSize": "16px",
+            },
+          },
+          "type": "div",
+        },
+      ],
+      "props": {
+        "aria-label": "Satoshi",
+        "className": "css-view-g5y9jx",
+        "data-testid": "marquee-fitting-sample",
+        "dir": null,
+      },
+      "type": "div",
+    },
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    "Satoshi Nakamoto · Bitcoin conversation",
+                  ],
+                  "props": {
+                    "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
+                    "dir": "auto",
+                    "style": {
+                      "color": "rgba(16,16,16,1.00)",
+                      "fontFamily": "OxygenBold",
+                      "fontSize": "16px",
+                    },
+                  },
+                  "type": "div",
+                },
+              ],
+              "props": {
+                "className": "css-view-g5y9jx r-flexDirection-18u37iz",
+                "dir": null,
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx r-WebkitOverflowScrolling-150rngu r-flexDirection-18u37iz r-flexGrow-16y2uox r-flexShrink-1wbh5a2 r-transform-agouwx r-overflowX-11yh6sk r-overflowY-buy8e9 r-touchAction-19z077z r-pointerEvents-633pao",
+            "dir": null,
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            "Satoshi Nakamoto · Bitcoin conversation",
+          ],
+          "props": {
+            "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
+            "dir": "auto",
+            "style": {
+              "color": "rgba(16,16,16,1.00)",
+              "fontFamily": "OxygenBold",
+              "fontSize": "16px",
+            },
+          },
+          "type": "div",
+        },
+      ],
+      "props": {
+        "aria-label": "Satoshi Nakamoto · Bitcoin conversation",
+        "className": "css-view-g5y9jx",
+        "data-testid": "marquee-overflow-sample",
+        "dir": null,
+      },
+      "type": "div",
+    },
+  ],
+  "props": {
+    "className": "css-view-g5y9jx",
+    "dir": null,
+    "style": {
+      "flexDirection": "column",
+    },
   },
   "type": "div",
 }
