@@ -337,7 +337,7 @@ export async function loadInputs(project, specs) {
     if (id && !Object.hasOwn(wide, id)) {
       if (project.wide[id]) {
         wide[id] = await readHashed(
-          { ...project.wide[id], file: `source/wallpapers-wide/${id}.png` },
+          { ...project.wide[id], file: `source/wallpapers-wide/${id}.jpg` },
           `${id} panorama`,
         );
         if (wide[id]) {

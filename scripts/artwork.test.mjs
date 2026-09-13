@@ -239,7 +239,7 @@ test("all 13 portraits and supplied panoramas authenticate against the retained 
       join(FOLDER, `source/wallpapers/${entry.themeName}.jpg`),
     );
     const panorama = await readFile(
-      join(FOLDER, `source/wallpapers-wide/${entry.themeName}.png`),
+      join(FOLDER, `source/wallpapers-wide/${entry.themeName}.jpg`),
     );
     assert.equal(hash(portrait), entry.sha256);
     assert.equal(hash(panorama), project.wide[entry.themeName].sha256);
@@ -256,7 +256,7 @@ test("restored wide centre strips match original portraits below 2/255 mean erro
       join(FOLDER, `source/wallpapers/${entry.themeName}.jpg`),
     );
     const wide = await readFile(
-      join(FOLDER, `source/wallpapers-wide/${entry.themeName}.png`),
+      join(FOLDER, `source/wallpapers-wide/${entry.themeName}.jpg`),
     );
     const meta = await sharp(wide).metadata();
     const p = await sharp(portrait).metadata();
