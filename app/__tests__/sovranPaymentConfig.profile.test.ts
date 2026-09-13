@@ -624,7 +624,7 @@ describe('createSovranHandlers profile routing', () => {
 
 it('shows the NFC unfunded-unit explanation from the wallet', () => {
   const message = 'This terminal wants USD. You have no USD ecash at an accepted mint.';
-  createSovranNotifications().UNIT_NOT_FUNDED?.({ code: 'UNIT_NOT_FUNDED', message });
+  void createSovranNotifications().UNIT_NOT_FUNDED?.({ code: 'UNIT_NOT_FUNDED', message });
   expect(paramPopup).toHaveBeenCalledWith('nfc-error', {
     title: 'Currency unavailable',
     message,
