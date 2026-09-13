@@ -1,3 +1,4 @@
+import { applyOrderingManifest } from '../tiers';
 import type {
   NoteStats,
   NoteStatsMap,
@@ -78,6 +79,7 @@ export type FeedBundle = {
   profiles: Record<string, NaggProfileInfo>;
   quoted: Record<string, NaggFeedEvent>;
   cursor: NostrCursor;
+  hasMore?: boolean;
 };
 
 /** What the facade returns: an ordered, validated page tagged with the answering tier. */
@@ -89,6 +91,7 @@ export type ResolvedFeedPage = {
   profiles: Record<string, NaggProfileInfo>;
   quoted: Record<string, NaggFeedEvent>;
   cursor: NostrCursor;
+  hasMore?: boolean;
   /** Manifest ids we were told to render but didn't receive — for lazy backfill. */
   missingIds: string[];
 };
@@ -159,5 +162,25 @@ export function bundleFromFeedPage(page: NaggFeedPage): FeedBundle {
     profiles: page.profiles,
     quoted: page.quoted,
     cursor,
+    hasMore: page.hasMore,
+  };
+}
+
+/** Apply the manifest once for both one-shot reads and pager lanes. */
+export function assembleFeedPage(tier: NostrTier, bundle: FeedBundle): ResolvedFeedPage {
+  const missingIds: string[] = [];
+  const items = applyOrderingManifest(bundle.manifest, bundle.itemsById, {
+    onMissing: (id) => missingIds.push(id),
+  });
+  return {
+    tier,
+    items,
+    stats: bundle.stats,
+    ...(bundle.actions ? { actions: bundle.actions } : {}),
+    profiles: bundle.profiles,
+    quoted: bundle.quoted,
+    cursor: bundle.cursor,
+    hasMore: bundle.hasMore,
+    missingIds,
   };
 }

@@ -59,6 +59,7 @@ export const NaggEnvelopeSchema = z
     events: arrayOrEmpty(NaggFeedEventSchema),
     aggregates: NaggAggregatesSchema,
     cursor: z.string().nullish(),
+    hasMore: z.boolean().nullish(),
   })
   .passthrough();
 
@@ -493,6 +494,7 @@ export function feedPageFromEnvelope(envelope: NaggEnvelope): NaggFeedPage {
     metrics: noteMetricsMapFromAggregates(envelope.aggregates, metricIds),
     profiles: profileInfoMapFromEnvelope(envelope),
     quoted: quotedMap(byId, contentEvents),
+    hasMore: envelope.hasMore ?? undefined,
     paginationUntil: cursor?.until ?? 0,
     paginationOffset: cursor?.offset ?? 0,
   };

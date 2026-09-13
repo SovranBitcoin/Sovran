@@ -44,6 +44,7 @@ function setup() {
     authorPicture: undefined,
     isOwnProfile: false,
     hasMoreRef: { current: true },
+    paginationCursorRef: { current: null },
     paginationUntilRef: { current: 0 },
     paginationOffsetRef: { current: 0 },
     loadingMoreRef: { current: false },

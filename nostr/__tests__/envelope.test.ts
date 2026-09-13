@@ -659,3 +659,16 @@ describe('threadFromEnvelope — thread envelope extension', () => {
     expect(threadFromEnvelope(parsed)).toBeNull();
   });
 });
+
+
+describe('feed continuation capability', () => {
+  test.each([true, false, null, undefined])('preserves hasMore=%s independently of cursor', (hasMore) => {
+    const envelope = NaggEnvelopeSchema.parse({ hasMore });
+    expect(envelope.hasMore).toBe(hasMore);
+    expect(feedPageFromEnvelope(envelope).hasMore).toBe(hasMore ?? undefined);
+    expect(envelope.cursor).toBeUndefined();
+  });
+  test('rejects malformed continuation hints', () => {
+    expect(NaggEnvelopeSchema.safeParse({ hasMore: 'false' }).success).toBe(false);
+  });
+});
