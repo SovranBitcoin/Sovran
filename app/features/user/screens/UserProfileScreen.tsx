@@ -21,7 +21,7 @@ import Animated, {
 import type { SharedValue } from 'react-native-reanimated';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Image as ExpoImage } from 'expo-image';
-import { Stack } from 'expo-router';
+import { Stack, useIsFocused } from 'expo-router';
 import { z } from 'zod';
 import { Hex64, HttpsUrl, Npub } from '@/shared/lib/nav/routeSchemas';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
@@ -1065,7 +1065,11 @@ export function UserProfileScreen() {
   const followOptimisticEntry = useNostrSocialStore((state) =>
     pubkey ? state.optimisticFollowsByPubkey[pubkey] : undefined
   );
-  const { data: profileData, isLoading: isProfileApiLoading } = useNostrProfile(pubkey || null);
+  const isFocused = useIsFocused();
+  const { data: profileData, isLoading: isProfileApiLoading } = useNostrProfile(
+    pubkey || null,
+    isFocused
+  );
   const profileMintUrl = getProfileMintInfoUrl(profileData?.mintUrl, mintUrlParam);
 
   // ===========================

@@ -11,3 +11,4 @@ export * from './follow-status';
 export * from './own-profiles';
 export * from './posts-by-pubkeys';
 export * from './wallpapers';
+export * from './vertex';

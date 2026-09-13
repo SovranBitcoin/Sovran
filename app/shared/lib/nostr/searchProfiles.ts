@@ -1,6 +1,8 @@
 import * as nip19 from 'nostr-tools/nip19';
 import { ok, type Result } from 'neverthrow';
-import type { facade } from 'nostr';
+import { facade } from 'nostr';
+import type NDK from '@nostr-dev-kit/ndk-mobile';
+import { refreshVertex } from '@/shared/lib/nostr/vertex/refreshVertex';
 import { NostrSearchResult, type SearchUsersResponse } from '@sovranbitcoin/schemas';
 
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
@@ -60,6 +62,8 @@ export async function searchProfilesViaFacade(args: {
   query: string;
   limit?: number;
   signal?: AbortSignal;
+  ndk?: NDK;
+  onCached?: (data: SearchUsersResponse) => void;
 }): Promise<Result<SearchUsersResponse, Error>> {
   const layer = buildNostrDataLayer();
   if (!layer) return ok({ ...EMPTY, query: args.query });
@@ -72,21 +76,50 @@ export async function searchProfilesViaFacade(args: {
 
   // Exhaustion (every tier disabled/failed/no-match) is an empty answer, not an
   // error — the search UI shows "no results" rather than a failure toast.
-  return result.match(
-    (resolved) => {
-      const results: NostrSearchResult[] = [];
-      for (const hit of resolved.hits) {
-        const mapped = hitToSearchResult(hit);
-        if (mapped) results.push(mapped);
-      }
-      return ok<SearchUsersResponse, Error>({
-        query: args.query,
-        limit: args.limit ?? results.length,
-        sort: `facade:${resolved.tier}`,
-        results,
-        fromCache: false,
-      });
-    },
-    () => ok<SearchUsersResponse, Error>({ ...EMPTY, query: args.query })
-  );
+  const toResponse = () =>
+    result.match(
+      (resolved) => {
+        const results: NostrSearchResult[] = [];
+        // Sort scored hits stably, leaving unknown-score slots in API order.
+        const scored =
+          resolved.tier === 'nagg'
+            ? resolved.hits.filter((hit) => hit.score != null).sort((a, b) => b.score! - a.score!)
+            : [];
+        let scoredIndex = 0;
+        const hits =
+          resolved.tier === 'nagg'
+            ? resolved.hits.map((hit) => (hit.score != null ? scored[scoredIndex++]! : hit))
+            : resolved.hits;
+        for (const hit of hits) {
+          const mapped = hitToSearchResult(hit);
+          if (mapped) results.push(mapped);
+        }
+        return ok<SearchUsersResponse, Error>({
+          query: args.query,
+          limit: args.limit ?? results.length,
+          sort: `facade:${resolved.tier}`,
+          results,
+          fromCache: false,
+        });
+      },
+      () => ok<SearchUsersResponse, Error>({ ...EMPTY, query: args.query })
+    );
+
+  if (result.isOk() && result.value.tier === 'nagg' && result.value.vertexFresh === false) {
+    const cached = toResponse();
+    if (cached.isOk()) args.onCached?.(cached.value);
+    const refreshed = await refreshVertex({
+      kind: 'search',
+      query: args.query.trim().toLowerCase(),
+      limit: args.limit ?? 10,
+      stale: true,
+      ndk: args.ndk,
+      signal: args.signal,
+    });
+    if (refreshed) {
+      result.value.hits = facade.searchHitsFromEnvelope(refreshed);
+    }
+  }
+
+  return toResponse();
 }

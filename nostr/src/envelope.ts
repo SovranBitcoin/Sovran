@@ -113,6 +113,7 @@ export const NaggProfilesEnvelopeSchema = NaggEnvelopeSchema.extend({
     (v): z.infer<typeof NaggProvidersSchema> => v ?? {},
   ),
   fromCache: z.boolean().optional(),
+  vertexFresh: z.boolean().nullish(),
 });
 
 export const NaggFollowStatusEnvelopeSchema = NaggEnvelopeSchema.extend({

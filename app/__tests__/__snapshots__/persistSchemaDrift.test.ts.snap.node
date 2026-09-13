@@ -7714,6 +7714,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           ],
           "default": null,
         },
+        "vertexCreditsEnabled": {
+          "default": true,
+          "type": "boolean",
+        },
         "whitenoiseEnabled": {
           "default": false,
           "type": "boolean",
@@ -7918,6 +7922,10 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           ],
           "default": null,
         },
+        "vertexCreditsEnabled": {
+          "default": true,
+          "type": "boolean",
+        },
         "whitenoiseEnabled": {
           "default": false,
           "type": "boolean",
@@ -7942,6 +7950,7 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
         "regenerateP2PKOnReceive",
         "sendLocationEnabled",
         "fileLoggingEnabled",
+        "vertexCreditsEnabled",
         "naggTierEnabled",
         "primalTierEnabled",
         "relayTierEnabled",
@@ -8579,6 +8588,80 @@ exports[`persisted schema drift transaction-location-store schema matches the go
       },
       "required": [
         "locations",
+      ],
+      "type": "object",
+    },
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift vertex-budget-store schema matches the golden snapshot for its version: vertex-budget-store 1`] = `
+{
+  "name": "vertex-budget-store",
+  "shape": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "blockedUntilDay": {
+          "default": "9999-12-31",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string",
+        },
+        "day": {
+          "anyOf": [
+            {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string",
+            },
+            {
+              "const": "",
+              "type": "string",
+            },
+          ],
+          "default": "9999-12-31",
+        },
+        "used": {
+          "default": 20,
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "blockedUntilDay": {
+          "default": "9999-12-31",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string",
+        },
+        "day": {
+          "anyOf": [
+            {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string",
+            },
+            {
+              "const": "",
+              "type": "string",
+            },
+          ],
+          "default": "9999-12-31",
+        },
+        "used": {
+          "default": 20,
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+      },
+      "required": [
+        "day",
+        "used",
       ],
       "type": "object",
     },

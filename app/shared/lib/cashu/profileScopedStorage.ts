@@ -78,15 +78,16 @@ function getActiveProfilePubkey(): string | undefined {
 }
 
 /**
- * Create a StateStorage adapter that scopes read/write to the active profile.
+ * Create a StateStorage adapter scoped to the active profile, or a captured
+ * owner for async services that must survive active-profile changes.
  * Use this with `createJSONStorage(() => createProfileScopedStorage())` in Zustand persist.
  */
-export function createProfileScopedStorage(): StateStorage {
+export function createProfileScopedStorage(ownerPubkey?: string): StateStorage {
   return {
     getItem: async (name: string) => {
       await _migrationGate;
       await ensureProfileStoreHydrated();
-      const pubkey = getActiveProfilePubkey();
+      const pubkey = ownerPubkey ?? getActiveProfilePubkey();
       const key = pubkey ? `${name}:profile:${pubkey}` : name;
       return AsyncStorage.getItem(key);
     },
@@ -94,14 +95,14 @@ export function createProfileScopedStorage(): StateStorage {
       if (_skipPersistWrite) return;
       await _migrationGate;
       await ensureProfileStoreHydrated();
-      const pubkey = getActiveProfilePubkey();
+      const pubkey = ownerPubkey ?? getActiveProfilePubkey();
       const key = pubkey ? `${name}:profile:${pubkey}` : name;
       await AsyncStorage.setItem(key, value);
     },
     removeItem: async (name: string) => {
       await _migrationGate;
       await ensureProfileStoreHydrated();
-      const pubkey = getActiveProfilePubkey();
+      const pubkey = ownerPubkey ?? getActiveProfilePubkey();
       const key = pubkey ? `${name}:profile:${pubkey}` : name;
       await AsyncStorage.removeItem(key);
     },
@@ -124,6 +125,7 @@ export const PROFILE_SCOPED_STORE_KEYS = [
   'nostr-social-store',
   'own-content-store',
   'own-profile-metadata-store',
+  'vertex-budget-store',
   'nostr-relay-list-store',
   'nostr-media-server-store',
   'nostr-metadata-cache',

@@ -415,7 +415,7 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
         { q: request.query.length, limit: request.limit ?? null },
         async () => {
           const candidates = candidatesFor<ProfileSearchBundle>(config.tiers, 'searchProfiles', (t) => () => t.searchProfiles!(request));
-          return (await resolveAcrossTiers<ProfileSearchBundle>(candidates)).map(({ tier, value }) => ({ tier, hits: value.hits }));
+          return (await resolveAcrossTiers<ProfileSearchBundle>(candidates)).map(({ tier, value }) => ({ tier, ...value }));
         },
         (r) => ({ hits: r.hits.length }),
       );

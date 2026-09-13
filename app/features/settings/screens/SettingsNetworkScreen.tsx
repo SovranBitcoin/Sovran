@@ -13,7 +13,16 @@ import React, { useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import type NDK from '@nostr-dev-kit/ndk-mobile';
-import { Button, Card, Input, ListGroup, Separator, Switch, TextField } from 'heroui-native';
+import {
+  Button,
+  Card,
+  Input,
+  ListGroup,
+  PressableFeedback,
+  Separator,
+  Switch,
+  TextField,
+} from 'heroui-native';
 
 import Icon from 'assets/icons';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -31,6 +40,9 @@ import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import { Text } from '@/shared/ui/primitives/Text';
+
+const VERTEX_CREDITS_DESCRIPTION =
+  "Uses your Nostr identity's free Vertex credits to refresh reputation scores for everyone. Vertex and nagg see which profiles you look up; your keys never leave the device.";
 
 async function publishRelayList(ctx: {
   ndk: NDK;
@@ -65,6 +77,8 @@ async function publishRelayList(ctx: {
 export function SettingsNetworkScreen() {
   useLifecycleLogger('SettingsNetworkScreen');
   const { ndk } = useNDK();
+  const vertexCreditsEnabled = useSettingsStore((s) => s.vertexCreditsEnabled);
+  const setVertexCreditsEnabled = useSettingsStore((s) => s.setVertexCreditsEnabled);
   const naggTierEnabled = useSettingsStore((s) => s.naggTierEnabled);
   const setNaggTierEnabled = useSettingsStore((s) => s.setNaggTierEnabled);
   const primalTierEnabled = useSettingsStore((s) => s.primalTierEnabled);
@@ -170,6 +184,39 @@ export function SettingsNetworkScreen() {
                 </ListGroup.Item>
               </React.Fragment>
             ))}
+          </ListGroup>
+        </Section>
+
+        <Section title="Reputation">
+          <ListGroup variant="secondary">
+            <PressableFeedback
+              animation={false}
+              testID="settings-vertex-credits-toggle"
+              accessible
+              accessibilityRole="switch"
+              accessibilityLabel="Refresh reputation with my Nostr credits"
+              accessibilityHint={VERTEX_CREDITS_DESCRIPTION}
+              accessibilityState={{ checked: vertexCreditsEnabled }}
+              onPress={() => setVertexCreditsEnabled(!vertexCreditsEnabled)}>
+              <ListGroup.Item disabled>
+                <ListGroup.ItemContent>
+                  <ListGroup.ItemTitle>
+                    Refresh reputation with my Nostr credits
+                  </ListGroup.ItemTitle>
+                  <ListGroup.ItemDescription>
+                    {VERTEX_CREDITS_DESCRIPTION}
+                  </ListGroup.ItemDescription>
+                </ListGroup.ItemContent>
+                <ListGroup.ItemSuffix>
+                  <View
+                    pointerEvents="none"
+                    accessibilityElementsHidden
+                    importantForAccessibility="no-hide-descendants">
+                    <Switch isSelected={vertexCreditsEnabled} />
+                  </View>
+                </ListGroup.ItemSuffix>
+              </ListGroup.Item>
+            </PressableFeedback>
           </ListGroup>
         </Section>
 

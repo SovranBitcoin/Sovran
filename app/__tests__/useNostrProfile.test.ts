@@ -3,6 +3,14 @@ import { err, ok } from 'neverthrow';
 import { useLayoutEffect } from 'react';
 import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
 
+jest.mock('@nostr-dev-kit/ndk-mobile', () => ({ useNDK: () => ({ ndk: undefined }) }), {
+  virtual: true,
+});
+jest.mock('@/shared/lib/nostr/vertex/refreshVertex', () => ({
+  refreshVertex: async () => null,
+  isVertexProfileStale: () => false,
+}));
+
 const mockFetchProfile = jest.fn();
 const mockFetchStats = jest.fn();
 jest.mock('@/shared/lib/apiClient', () => ({

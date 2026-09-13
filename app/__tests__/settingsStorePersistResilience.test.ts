@@ -227,3 +227,17 @@ test('failed settings hydration preserves the unreadable blob and exposes retrya
   expect(useSettingsHydration.getState().status).toBe('ready');
   expect(store.getState().displayCurrency).toBe('eur');
 });
+
+it.each([undefined, false, true, 'invalid'])(
+  'preserves settings with vertexCreditsEnabled=%s',
+  async (value) => {
+    jest.resetModules();
+    preload({
+      termsAccepted: { termsAccepted: true, date: '2025-01-01T00:00:00.000Z' },
+      vertexCreditsEnabled: value,
+    });
+    const store = await loadStore();
+    expect(store.getState().isTermsAccepted()).toBe(true);
+    expect(store.getState().vertexCreditsEnabled).toBe(typeof value === 'boolean' ? value : true);
+  }
+);
