@@ -348,5 +348,12 @@
     "file": "source/screenshots/android/backup-words.png",
     "run": null,
     "sha256": null
+  },
+  "ios/wallet-new-moon": {
+    "page": "wallet",
+    "file": "source/screenshots/ios/wallet-new-moon.png",
+    "run": null,
+    "sha256": null,
+    "wallpaperId": "new-moon"
   }
 }

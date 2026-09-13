@@ -138,7 +138,7 @@ The harness currently only accepts canonical page names for screenshot `name`.
 Keep `name: "wallet"`; retain the seven wallet occurrences as these source keys,
 in order: `wallet-navy`, `wallet-sunset`, `wallet-beige`, then the Artemis captures
 per mock currency — sat `wallet-in-eclipse` (album default), usd `wallet-edge-of-lunar-day`,
-eur `wallet-setting-earth`, gbp `wallet-looking-back-at-earth` — taken by switching
+eur `wallet-setting-earth`, gbp `wallet-new-moon` — taken by switching
 the wallet unit after each currency received its own collection wallpaper.
 All provenance entries use `page: wallet` and the matching `wallpaperId`. This
 avoids changing runtime or harness schema for a marketing task. Copy exact PNG

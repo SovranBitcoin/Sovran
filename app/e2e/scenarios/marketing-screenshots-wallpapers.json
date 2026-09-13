@@ -3,7 +3,7 @@
   "id": "marketing.screenshots.wallpapers",
   "name": "Marketing wallpaper screenshots",
   "description": "Marketing wallpaper screenshots in Mock Mode; captures only, no payments or publishing.",
-  "details": "WALLPAPER SELECTION: Colors navy/sunset/beige then Artemis II looking-back-at-earth, edge-of-lunar-day, setting-earth, in-eclipse. The screenshot schema requires canonical page names: the seven wallet occurrences map in that order to wallet-<themeName> in marketing/artwork/source/screenshots.json. Image captures wait for Wallpaper image loaded for <themeName>; palette captures wait for none. No persistence or app-state injection. Both platforms: --evidence screenshots --no-record. Capture only; no payments or publishing. Artemis: sat keeps the album default (in-eclipse) and is captured first; usd, eur and gbp get edge-of-lunar-day, setting-earth and looking-back-at-earth through the unit background picker (each differs from that unit's album default so Apply appears; the first list item is never picked because the tabs bar occludes its tap target), then the wallet is captured per currency via the unit switcher.",
+  "details": "WALLPAPER SELECTION: Colors navy/sunset/beige then Artemis II new-moon, edge-of-lunar-day, setting-earth, in-eclipse. The screenshot schema requires canonical page names: the seven wallet occurrences map in that order to wallet-<themeName> in marketing/artwork/source/screenshots.json. Image captures wait for Wallpaper image loaded for <themeName>; palette captures wait for none. No persistence or app-state injection. Both platforms: --evidence screenshots --no-record. Capture only; no payments or publishing. Artemis: sat keeps the album default (in-eclipse) and is captured first; usd, eur and gbp get edge-of-lunar-day, setting-earth and new-moon through the unit background picker (each differs from that unit's album default so Apply appears; the first row of the picker is never picked because the tabs bar occludes its tap targets), then the wallet is captured per currency via the unit switcher.",
   "lane": "simulator",
   "tags": ["flow:wallet","check:navigation"],
   "requires": ["fresh-install"],
@@ -92,7 +92,7 @@
     {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-unit-menu-eur"}}],"until":{"label":"Wallpaper image loaded for setting-earth"},"attempts":4,"settleMs":4000},
     {"action":"screenshot","name":"wallet","delayMs":1200},
     {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-unit-switcher"}}],"until":{"id":"wallet-unit-menu-gbp"},"attempts":4,"settleMs":3000},
-    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-unit-menu-gbp"}}],"until":{"label":"Wallpaper image loaded for looking-back-at-earth"},"attempts":4,"settleMs":4000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-unit-menu-gbp"}}],"until":{"label":"Wallpaper image loaded for new-moon"},"attempts":4,"settleMs":4000},
     {"action":"screenshot","name":"wallet","delayMs":1200},
     {"action":"goHome"}
   ],
