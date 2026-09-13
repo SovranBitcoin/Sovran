@@ -2,7 +2,7 @@ import { formatRelative } from '@/shared/lib/date';
 
 export type SendTransport = 'nip17' | 'nip04' | 'whitenoise' | 'bitchat';
 
-export interface LastMessage {
+interface LastMessage {
   protocol: SendTransport;
   atSeconds: number;
   isOwn: boolean;
@@ -15,7 +15,7 @@ type SendOptionReason =
     }
   | { code: 'MOST_COMPATIBLE' | 'BLE_OUT_OF_RANGE' | 'NEEDS_SETUP' };
 
-export interface AnnotatedSendOption {
+interface AnnotatedSendOption {
   transport: SendTransport;
   status: 'recommended' | 'available' | 'disabled';
   reason: SendOptionReason | null;

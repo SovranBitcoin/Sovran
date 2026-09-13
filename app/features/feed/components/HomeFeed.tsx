@@ -27,6 +27,7 @@ import type { FeedClient, FeedParseResult } from '@/features/feed/data/feedClien
 import {
   advancedPaginationState,
   emptyPaginationState,
+  type FeedPaginationState,
   createFeedRetryTimer,
   seededPaginationState,
 } from '@/features/feed/data/feedPagination';
@@ -749,7 +750,6 @@ const DEFAULT_FEED_SPECS: FeedSpec[] = [
 // component. Hoisted here, the component compiles and the loaders stay plain
 // async functions over an explicit context.
 
-type FeedPaginationState = ReturnType<typeof emptyPaginationState>;
 type FeedContentState = ReturnType<typeof useFeedContentState>;
 
 type FeedPageStatus = Pick<FeedParseResult, 'retryAfterMs' | 'showingRecent'>;

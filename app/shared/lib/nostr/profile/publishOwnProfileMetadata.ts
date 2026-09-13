@@ -157,7 +157,7 @@ export async function loadOwnProfileMetadata(
   return remote;
 }
 
-export type OwnProfilePublishError =
+type OwnProfilePublishError =
   | (PublishError & { cause?: unknown })
   | { type: 'profile-changed' | 'base-unavailable' | 'unexpected'; cause?: unknown };
 const inFlight = new Map<string, ResultAsync<PublishResult, OwnProfilePublishError>>();
