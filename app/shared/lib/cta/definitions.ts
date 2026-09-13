@@ -1,7 +1,9 @@
 import type { CtaDefinition, CtaId } from './types';
 import { isNewerVersion } from './version';
-export const DAY_MS = 24 * 60 * 60 * 1000;
-export const LATEST_VERSION_MAX_AGE_MS = DAY_MS;
+const HOUR_MS = 60 * 60 * 1000;
+export const DAY_MS = 24 * HOUR_MS;
+/** A cached latest-version record older than this is treated as unknown, never as "newer". */
+export const LATEST_VERSION_MAX_AGE_MS = 24 * HOUR_MS;
 export const ABANDONED_BACKUP_GRACE_MS = 30 * 60 * 1000;
 export const BACKUP_SNOOZE_MS = 3 * DAY_MS;
 export const CTA_DEFINITIONS: readonly CtaDefinition[] = [

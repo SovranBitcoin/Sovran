@@ -70,10 +70,10 @@ function assertPubkeyHex(pubkeyHex: string): void {
   }
 }
 
-export type SecureGetResult =
+type SecureGetResult =
   { kind: 'value'; value: string } | { kind: 'absent' } | { kind: 'error'; error: unknown };
 
-export async function secureGetResult(key: string): Promise<SecureGetResult> {
+async function secureGetResult(key: string): Promise<SecureGetResult> {
   try {
     const value = await SecureStore.getItemAsync(key, secureOptions());
     return value === null ? { kind: 'absent' } : { kind: 'value', value };
