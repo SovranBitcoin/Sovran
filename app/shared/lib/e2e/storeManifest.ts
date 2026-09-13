@@ -22,6 +22,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { useDataMigrationStore } from '@/shared/stores/profile/dataMigrationStore';
+import { useDmLastMessageStore } from '@/shared/stores/profile/dmLastMessageStore';
 import { useMintDistributionStore } from '@/shared/stores/profile/mintDistributionStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
@@ -80,6 +81,7 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'profile/nutDropRedeemQueueStore': useNutDropRedeemQueueStore,
   'profile/ownProfileMetadataStore': useOwnProfileMetadataStore,
   'profile/ownContentStore': useOwnContentStore,
+  'profile/dmLastMessageStore': useDmLastMessageStore,
   'profile/ownedMediaStore': useOwnedMediaStore,
   'profile/recentPeopleStore': useRecentPeopleStore,
   'profile/routstrStore': useRoutstrStore,
