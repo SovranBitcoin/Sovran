@@ -19,6 +19,10 @@ import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { CTA_DEFINITIONS } from '@/shared/lib/cta/definitions';
 import type { CtaId } from '@/shared/lib/cta/types';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
+
+/** Modal dismissal must finish before the backup flow is presented, or the
+ * native stack mounts the flow underneath the still-presented prompt. */
+export const BACKUP_HANDOFF_MS = 450;
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { openExternalUrl } from '@/shared/lib/url';
 import { DOWNLOAD_URL } from '@/shared/config/download';
@@ -81,11 +85,13 @@ export function CtaScreen({ id }: { id: CtaId }) {
     dismissalHandled.current = true;
     removalRequested.current = true;
     const store = useCtaStore.getState();
-    // Navigate here, synchronously with the tap: deferring the push to CtaHost's
-    // route-removal effect left "Back up now" doing nothing on a real device.
     store.startBackup();
     store.setActive(null);
-    router.replace('/(backup-flow)/intro');
+    // Dismiss the prompt, then present the flow once the sheet is gone: replacing
+    // the presented modal mounted the flow beneath it, and a deferred push from
+    // CtaHost never fired on device.
+    router.back();
+    setTimeout(() => router.raw.push('/(backup-flow)/intro'), BACKUP_HANDOFF_MS);
   };
   return (
     <Screen

@@ -2,7 +2,7 @@ import { StrictMode } from 'react';
 import { act, fireEvent, render } from '@testing-library/react-native';
 import { AppState, BackHandler } from 'react-native';
 import { err, ok } from 'neverthrow';
-import { CtaScreen } from '@/shared/blocks/CtaScreen';
+import { BACKUP_HANDOFF_MS, CtaScreen } from '@/shared/blocks/CtaScreen';
 import { getLatestVersion } from '@/shared/lib/apiClient';
 import { CtaHost } from '@/shared/blocks/CtaHost';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
@@ -264,21 +264,25 @@ it.each(['primary', 'secondary'])(
     if (action === 'primary') {
       expect(useCtaStore.getState().dismissed).toEqual({});
       expect(useWalletLifecycleStore.getState().recoveryPhraseVerifiedAt).toBeNull();
-      expect(mockReplace).toHaveBeenCalledWith('/(backup-flow)/intro');
+      // The flow is presented after the sheet dismisses (BACKUP_HANDOFF_MS); the
+      // host itself never pushes it.
+      await act(async () => new Promise((r) => setTimeout(r, BACKUP_HANDOFF_MS + 50)));
+      expect(mockPush).toHaveBeenCalledWith('/(backup-flow)/intro');
     } else {
       expect(useCtaStore.getState().dismissed['backup-recovery-phrase:snooze']).toEqual({
         at: now,
         revision: 2,
       });
     }
-    expect(mockPush).toHaveBeenCalledTimes(1);
+    // primary: the cta push plus the backup-flow push; secondary: the cta push only.
+    expect(mockPush).toHaveBeenCalledTimes(action === 'primary' ? 2 : 1);
     const foreground = jest.mocked(AppState.addEventListener).mock.calls.at(-1)![1];
     clock.mockReturnValue(now + ABANDONED_BACKUP_GRACE_MS - 1);
     await act(async () => foreground('active'));
-    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledTimes(action === 'primary' ? 2 : 1);
     clock.mockReturnValue(now + ABANDONED_BACKUP_GRACE_MS);
     await act(async () => foreground('active'));
-    expect(mockPush).toHaveBeenCalledTimes(action === 'primary' ? 2 : 1);
+    expect(mockPush).toHaveBeenCalledTimes(action === 'primary' ? 3 : 1);
   }
 );
 
@@ -304,8 +308,9 @@ it('hands off a directly opened CTA route even without a reserved active ID', as
   await act(async () => fireEvent.press(view.UNSAFE_getByProps({ testID: 'cta-primary' })));
   mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
   view.rerender(<HostWithScreen />);
-  expect(mockReplace).toHaveBeenCalledWith('/(backup-flow)/intro');
-  expect(mockPush).not.toHaveBeenCalledWith('/(backup-flow)/intro');
+  expect(mockBack).toHaveBeenCalledTimes(1);
+  await act(async () => new Promise((r) => setTimeout(r, BACKUP_HANDOFF_MS + 50)));
+  expect(mockPush).toHaveBeenCalledWith('/(backup-flow)/intro');
 });
 it('allows an optional update prompt during backup, but never stacks another backup nag', async () => {
   mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: '(backup-flow)' }] };

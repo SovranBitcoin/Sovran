@@ -1,7 +1,7 @@
 import TestRenderer, { act } from 'react-test-renderer';
 import { BackHandler } from 'react-native';
 import { okAsync } from 'neverthrow';
-import { CtaScreen } from '@/shared/blocks/CtaScreen';
+import { BACKUP_HANDOFF_MS, CtaScreen } from '@/shared/blocks/CtaScreen';
 import { CTA_DEFINITIONS } from '@/shared/lib/cta/definitions';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
@@ -9,6 +9,7 @@ import { openExternalUrl } from '@/shared/lib/url';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const mockBack = jest.fn();
+const mockPush = jest.fn();
 const mockReplace = jest.fn();
 const mockSetOptions = jest.fn();
 const mockPreventRemove = jest.fn();
@@ -20,6 +21,7 @@ jest.mock('@/shared/hooks/useGuardedRouter', () => ({
     canGoBack: () => true,
     back: () => mockBack(),
     replace: (...args: unknown[]) => mockReplace(...args),
+    raw: { push: (...args: unknown[]) => mockPush(...args) },
   },
 }));
 jest.mock('expo-router/react-navigation', () => ({
@@ -144,14 +146,22 @@ it('persists do-not-ask and otherwise snoozes for later', async () => {
   expect(useCtaStore.getState().dismissed['backup-recovery-phrase']).toBeDefined();
   expect(mockBack).toHaveBeenCalledTimes(1);
 });
-it('Back up now opens the backup flow directly without snoozing, even when removal follows', async () => {
-  mount('backup-recovery-phrase');
-  await press('cta-primary');
-  act(() => mockAddListener.mock.calls.at(-1)![1]());
-  expect(useCtaStore.getState().dismissed).toEqual({});
-  expect(mockReplace).toHaveBeenCalledWith('/(backup-flow)/intro');
-  expect(useCtaStore.getState().backupStartedAt).not.toBeNull();
-  expect(useCtaStore.getState().activeId).toBeNull();
+it('Back up now dismisses the prompt and presents the backup flow after the handoff', async () => {
+  jest.useFakeTimers();
+  try {
+    mount('backup-recovery-phrase');
+    await press('cta-primary');
+    act(() => mockAddListener.mock.calls.at(-1)![1]());
+    expect(useCtaStore.getState().dismissed).toEqual({});
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockPush).not.toHaveBeenCalled();
+    act(() => jest.advanceTimersByTime(BACKUP_HANDOFF_MS));
+    expect(mockPush).toHaveBeenCalledWith('/(backup-flow)/intro');
+    expect(useCtaStore.getState().backupStartedAt).not.toBeNull();
+    expect(useCtaStore.getState().activeId).toBeNull();
+  } finally {
+    jest.useRealTimers();
+  }
 });
 
 it('honors Do not ask me again when the user leaves by swipe or back', async () => {
