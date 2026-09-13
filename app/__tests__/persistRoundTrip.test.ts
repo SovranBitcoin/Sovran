@@ -139,6 +139,56 @@ for (const path of STORE_MODULES) {
 }
 
 describe('persisted store round-trip', () => {
+  it('round-trips prices and server time without persisting transient state', () => {
+    const { usePricelistStore } =
+      require('@/shared/stores/global/pricelistStore') as typeof import('@/shared/stores/global/pricelistStore');
+    const state = {
+      ...usePricelistStore.getState(),
+      pricelist: { usd: { btc: 77_242 }, eur: { btc: 67_000 } },
+      lastUpdated: 1_800_000_060_000,
+      serverUpdatedAt: 1_800_000_000,
+      isLoading: true,
+      error: 'offline',
+    };
+    const options = usePricelistStore.persist.getOptions();
+    const persisted = JSON.parse(JSON.stringify(options.partialize!(state)));
+    expect(persisted).toEqual({
+      pricelist: state.pricelist,
+      lastUpdated: state.lastUpdated,
+      serverUpdatedAt: state.serverUpdatedAt,
+    });
+    expect(options.merge!(persisted, usePricelistStore.getInitialState())).toMatchObject({
+      ...persisted,
+      isLoading: false,
+      error: null,
+    });
+  });
+
+  it.each([undefined, null, -1, 'invalid', 1.5])(
+    'hydrates legacy prices with serverUpdatedAt=%s without discarding the cache',
+    (serverUpdatedAt) => {
+      const { usePricelistStore } =
+        require('@/shared/stores/global/pricelistStore') as typeof import('@/shared/stores/global/pricelistStore');
+      const legacy = JSON.parse(
+        JSON.stringify({
+          pricelist: { usd: { btc: 77_242 }, gbp: { btc: 58_000 } },
+          lastUpdated: 1_800_000_000_000,
+          serverUpdatedAt,
+        })
+      );
+      const hydrated = usePricelistStore.persist.getOptions().merge!(
+        legacy,
+        usePricelistStore.getInitialState()
+      );
+      expect(hydrated).toMatchObject({
+        pricelist: legacy.pricelist,
+        lastUpdated: legacy.lastUpdated,
+        serverUpdatedAt: null,
+      });
+      expect(hydrated.setBtcPrices).toBe(usePricelistStore.getState().setBtcPrices);
+    }
+  );
+
   it('round-trips populated app version metadata through the settings projection', () => {
     const entry = persistRegistry.find((store) => store.name === 'settings-store')!;
     const lastKnownAppVersion = {

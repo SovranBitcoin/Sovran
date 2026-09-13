@@ -6,7 +6,7 @@ import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 interface PricelistData {
-  usd: {
+  usd?: {
     btc: number;
   };
   eur?: {
@@ -21,6 +21,7 @@ interface PricelistState {
   pricelist: PricelistData | null;
   isLoading: boolean;
   lastUpdated: number | null;
+  serverUpdatedAt: number | null;
   error: string | null;
 }
 
@@ -32,8 +33,11 @@ export interface BitcoinPrices {
 
 type SupportedCurrency = keyof PricelistData;
 
+// Nagg refreshes upstream prices hourly; allow two refresh windows before stale.
+export const PRICE_STALE_MINUTES = 120;
+
 interface PricelistActions {
-  setBtcPrices: (prices: BitcoinPrices) => void;
+  setBtcPrices: (prices: Partial<BitcoinPrices>, serverUpdatedAtSeconds?: number) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   getBtcPrice: (currency?: SupportedCurrency) => number | null;
@@ -52,6 +56,7 @@ const PersistedPricelistStore = z.object({
     .nullable()
     .default(null),
   lastUpdated: z.number().int().nonnegative().nullable().default(null),
+  serverUpdatedAt: z.number().int().nonnegative().nullable().default(null).catch(null),
 });
 
 export const usePricelistStore = create<PricelistStore>()(
@@ -60,23 +65,28 @@ export const usePricelistStore = create<PricelistStore>()(
       pricelist: null,
       isLoading: false,
       lastUpdated: null,
+      serverUpdatedAt: null,
       error: null,
 
-      setBtcPrices: (prices: BitcoinPrices) => {
+      setBtcPrices: (prices, serverUpdatedAtSeconds) => {
+        if (prices.USD === undefined && prices.EUR === undefined && prices.GBP === undefined)
+          return;
         storeLog.debug('store.pricelist.set_btc_prices', {
           usd: prices.USD,
           eur: prices.EUR,
           gbp: prices.GBP,
         });
-        set({
+        set((state) => ({
           pricelist: {
-            usd: { btc: prices.USD },
-            eur: { btc: prices.EUR },
-            gbp: { btc: prices.GBP },
+            ...state.pricelist,
+            ...(prices.USD !== undefined ? { usd: { btc: prices.USD } } : {}),
+            ...(prices.EUR !== undefined ? { eur: { btc: prices.EUR } } : {}),
+            ...(prices.GBP !== undefined ? { gbp: { btc: prices.GBP } } : {}),
           },
           lastUpdated: Date.now(),
+          serverUpdatedAt: serverUpdatedAtSeconds ?? null,
           error: null,
-        });
+        }));
       },
 
       setLoading: (loading: boolean) => {
@@ -93,10 +103,11 @@ export const usePricelistStore = create<PricelistStore>()(
         return pricelist?.[currency]?.btc ?? null;
       },
 
-      isStale: (maxAgeMinutes: number = 5) => {
-        const { lastUpdated } = get();
-        if (!lastUpdated) return true;
-        return (Date.now() - lastUpdated) / (1000 * 60) > maxAgeMinutes;
+      isStale: (maxAgeMinutes: number = PRICE_STALE_MINUTES) => {
+        const { lastUpdated, serverUpdatedAt } = get();
+        const updatedAtMs = serverUpdatedAt === null ? lastUpdated : serverUpdatedAt * 1000;
+        if (updatedAtMs === null) return true;
+        return (Date.now() - updatedAtMs) / (1000 * 60) > maxAgeMinutes;
       },
     }),
     persistConfig({
@@ -106,6 +117,7 @@ export const usePricelistStore = create<PricelistStore>()(
       partialize: (state) => ({
         pricelist: state.pricelist,
         lastUpdated: state.lastUpdated,
+        serverUpdatedAt: state.serverUpdatedAt,
       }),
     })
   )

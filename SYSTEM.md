@@ -459,10 +459,22 @@ Current cache choices are intentionally different: [home-feed page 0](app/featur
 | Raw relay-event caching | NDK SQLite where that transport is used |
 | Mint/proof/quote state | Coco persistent database and operation APIs |
 | Mint metadata/catalog display | Existing metadata/fetch cache; not spendability evidence |
+| BTC display prices | Global `pricelistStore`; `pricelistFeed` polls Nagg `/app/rates` through `apiClient` every ten minutes, retaining omitted currencies |
 | HTTP image bytes | `expo-image` cache plus shared prefetch scheduler |
 | DM decrypt results | Explicit private, profile-scoped cache; see decision 19 |
 
 Every cache needs a key, scope, freshness policy, capacity, invalidation trigger, failure policy, and owner. Keys include all inputs that affect results: viewer, endpoint/tier config where relevant, filters, ordering, and cursor. Host-wide caching is allowed only when results do not depend on identity or authorization.
+
+BTC price freshness uses `serverUpdatedAt` (Unix seconds), falling back to local
+`lastUpdated` (milliseconds) for legacy cache entries. `PRICE_STALE_MINUTES = 120`
+allows two hourly upstream refresh windows; successful polling alone must not
+make an old server snapshot fresh. Foreground/online recovery fetches when the
+last successful request is older than 60 seconds. Failures, including warm-up
+503 responses, retain cached values and retry with jitter on a 30-second,
+one-minute, two-minute, then five-minute capped ladder. Teardown aborts in-flight
+work and ignores late completions. The local rates schema in `apiClient` is a
+temporary boundary until `@sovranbitcoin/schemas` publishes this shape and
+deprecates its WebSocket message schema.
 
 Return usable cached data before background revalidation; retain it on transient refresh failure. Use explicit fresh checks for payment-critical decisions. A metadata TTL is not a guarantee that a quote is valid or proofs are unspent. Preserve provenance/fetched time and expose degraded/stale state when it affects a decision.
 
