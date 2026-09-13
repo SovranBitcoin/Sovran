@@ -1,3 +1,5 @@
+import { useOwnProfileMetadataStore } from '@/shared/stores/profile/ownProfileMetadataStore';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { getMockProfileMetadata } from '@/shared/stores/runtime/mockDataStore';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -35,7 +37,21 @@ export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrPro
   const mockMode = useSettingsStore((state) => state.mockMode);
   const fixture = mockMode && pubkey ? getMockProfileMetadata(pubkey) : undefined;
   const cached = useCachedNostrProfile(pubkey ?? '');
-  const metadata = fixture ?? cached.metadata;
+  const baseMetadata = fixture ?? cached.metadata;
+  const isOwn = useProfileStore(
+    (s) =>
+      !!pubkey &&
+      s.profiles.find((profile) => profile.accountIndex === s.activeAccountIndex)?.pubkey === pubkey
+  );
+  const optimistic = useOwnProfileMetadataStore((s) => (isOwn ? s.optimistic : null));
+  const metadata = optimistic
+    ? {
+        ...baseMetadata,
+        fetchedAt: baseMetadata?.fetchedAt ?? 0,
+        ...(optimistic.name !== undefined ? { displayName: optimistic.name } : {}),
+        ...(optimistic.picture !== undefined ? { picture: optimistic.picture ?? undefined } : {}),
+      }
+    : baseMetadata;
   const isStale = !fixture && cached.isStale;
   const isMissing = !fixture && cached.isMissing;
   const [isFetching, setIsFetching] = useState(false);
@@ -98,7 +114,7 @@ export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrPro
   // `isFetching` covers the in-flight window (needsFetch can flip false the
   // moment attempts are bumped). Settles false once resolved or attempts cap.
   const isResolving = isFetching || needsFetch;
-  return { metadata, isLoading, isResolving };
+  return { metadata, isLoading: !optimistic && isLoading, isResolving: !optimistic && isResolving };
 }
 
 /**

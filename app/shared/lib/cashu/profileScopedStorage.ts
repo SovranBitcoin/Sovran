@@ -123,6 +123,7 @@ export const PROFILE_SCOPED_STORE_KEYS = [
   'transaction-distribution-store',
   'nostr-social-store',
   'own-content-store',
+  'own-profile-metadata-store',
   'nostr-relay-list-store',
   'nostr-media-server-store',
   'nostr-metadata-cache',

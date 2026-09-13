@@ -1,3 +1,4 @@
+import { useOwnProfileMetadataStore } from '@/shared/stores/profile/ownProfileMetadataStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { PUBLIC_DEMO_METADATA } from '@/shared/stores/runtime/mockPublicProfile';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
@@ -14,11 +15,23 @@ import { resolveIdentityName } from '@/shared/lib/identity';
  */
 export function useProfileDisplay(pubkey: string): { displayName: string; picture?: string } {
   const profile = useProfileStore((s) => s.profiles.find((p) => p.pubkey === pubkey));
+  const isOwn = useProfileStore(
+    (s) =>
+      s.profiles.find((profile) => profile.accountIndex === s.activeAccountIndex)?.pubkey === pubkey
+  );
+  const optimistic = useOwnProfileMetadataStore((s) => (isOwn ? s.optimistic : null));
   const mockMode = useSettingsStore((s) => s.mockMode);
   const demo = mockMode ? PUBLIC_DEMO_METADATA.get(pubkey) : undefined;
   const displayName = resolveIdentityName({
     pubkey,
-    overrideName: demo?.displayName || demo?.name || profile?.cachedDisplayName,
+    overrideName:
+      optimistic?.name ?? (demo?.displayName || demo?.name || profile?.cachedDisplayName),
   });
-  return { displayName, picture: demo?.picture ?? profile?.cachedPicture };
+  return {
+    displayName,
+    picture:
+      optimistic?.picture !== undefined
+        ? (optimistic.picture ?? undefined)
+        : (demo?.picture ?? profile?.cachedPicture),
+  };
 }

@@ -64,6 +64,7 @@ const STORE_MODULES = [
   '@/shared/stores/profile/npcMintStore',
   '@/shared/stores/profile/nutDropRedeemQueueStore',
   '@/shared/stores/profile/ownContentStore',
+  '@/shared/stores/profile/ownProfileMetadataStore',
   '@/shared/stores/profile/ownedMediaStore',
   '@/shared/stores/profile/recentPeopleStore',
   '@/shared/stores/profile/routstrStore',

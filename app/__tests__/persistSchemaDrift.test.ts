@@ -41,6 +41,7 @@ import '@/shared/stores/profile/mintDistributionStore';
 import '@/shared/stores/profile/npcMintStore';
 import '@/shared/stores/profile/nutDropRedeemQueueStore';
 import '@/shared/stores/profile/ownContentStore';
+import '@/shared/stores/profile/ownProfileMetadataStore';
 import '@/shared/stores/profile/searchHistoryStore';
 import '@/shared/stores/profile/sendReachabilityStore';
 import '@/shared/stores/profile/swapTransactionsStore';
