@@ -601,6 +601,7 @@ function BannerWithAvatar({
   isFollowLoading,
   onToggleFollow,
   onSendMoney,
+  onEditProfile,
   hasStories,
   onAvatarPress,
   visualScope,
@@ -620,6 +621,8 @@ function BannerWithAvatar({
   isFollowLoading: boolean;
   onToggleFollow: () => void;
   onSendMoney: () => void;
+  /** Own profile only: opens the kind-0 editor where the Follow pill would be. */
+  onEditProfile?: () => void;
   hasStories?: boolean;
   onAvatarPress?: () => void;
   visualScope: string;
@@ -890,6 +893,20 @@ function BannerWithAvatar({
                 testID="profile-follow-button"
               />
             ))}
+          {onEditProfile && !isLoading && (
+            <CapsuleButton
+              label="Edit profile"
+              icon="mdi:pencil"
+              systemIcon="pencil"
+              onPress={onEditProfile}
+              fitContent
+              height={34}
+              iconSize={15}
+              textSize={13}
+              style={styles.followCapsule}
+              testID="profile-edit-button"
+            />
+          )}
           {isLoading && <SkeletonLoadingShimmer active />}
         </View>
 
@@ -1404,6 +1421,9 @@ export function UserProfileScreen() {
                 isFollowLoading={followInFlight}
                 onToggleFollow={handleToggleFollow}
                 onSendMoney={handleSendMoney}
+                onEditProfile={
+                  isOwnProfile ? () => router.push('/(settings-flow)/edit-profile') : undefined
+                }
                 hasStories={hasStories}
                 onAvatarPress={handleAvatarStoryPress}
                 visualScope={profileHeaderVisualScope}

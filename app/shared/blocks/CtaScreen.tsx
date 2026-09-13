@@ -1,5 +1,4 @@
 import { useColadaBalance } from 'wallet/react';
-import { SheetGrabber } from '@/shared/ui/composed/SheetGrabber';
 import { useEffect, useRef, useState } from 'react';
 import { BackHandler } from 'react-native';
 import { useNavigation } from 'expo-router';
@@ -12,7 +11,6 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Button } from '@/shared/ui/primitives/Button';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { ControlField, Label } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
@@ -43,7 +41,12 @@ export function CtaScreen({ id }: { id: CtaId }) {
   const blocking = cta.presentation === 'blocking-modal' && !exitingPreview && !closing;
   usePreventRemove(blocking, () => {});
   useEffect(() => {
-    navigation.setOptions({ gestureEnabled: !blocking });
+    // The flow stack's header owns the close action (the same one every modal
+    // page shows); a blocking prompt takes it away along with the gesture.
+    navigation.setOptions({
+      gestureEnabled: !blocking,
+      ...(blocking ? { headerLeft: () => null } : {}),
+    });
     if (!blocking) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
     return () => subscription.remove();
@@ -124,19 +127,6 @@ export function CtaScreen({ id }: { id: CtaId }) {
         </BottomButtons>
       }>
       <ScreenScrollView>
-        {!blocking && <SheetGrabber />}
-        {!blocking && (
-          <View className="items-end px-4 pt-2">
-            <Pressable
-              testID="cta-close"
-              accessibilityRole="button"
-              accessibilityLabel="Close"
-              onPress={dismiss}
-              className="bg-surface-secondary h-11 w-11 items-center justify-center rounded-full">
-              <Icon name="mdi:close" size={24} color={foreground} />
-            </Pressable>
-          </View>
-        )}
         <View testID="cta-screen" className="gap-6 px-6 py-6">
           <View className="bg-surface-secondary h-24 w-24 items-center justify-center self-center rounded-full">
             <Icon name={cta.content.icon} size={48} color={foreground} />

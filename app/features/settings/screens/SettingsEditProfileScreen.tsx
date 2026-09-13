@@ -92,25 +92,40 @@ function HistoryChips({
   onPick: (value: string) => void;
 }) {
   const entries = useOwnProfileMetadataStore((s) => s.history[field]);
+  const muted = useThemeColor('muted');
   const choices = (entries ?? []).filter((entry) => entry.value !== current);
   if (choices.length === 0) return null;
+  // Read as recall, not as a selected option: a "Previously used" caption,
+  // a clock glyph and muted content on every chip; tapping one fills the
+  // field above, nothing is "on".
   return (
-    <View className="mt-2 flex-row flex-wrap gap-2">
-      {choices.map((entry, index) => (
-        <CapsuleButton
-          key={entry.value}
-          label={entry.value}
-          fitContent
-          height={32}
-          textSize={13}
-          labelNumberOfLines={1}
-          accessibilityLabel={`Use previous ${field}: ${entry.value}`}
-          testID={`edit-profile-history-${field}-${index}`}
-          onPress={() => {
-            if (!disabled) onPick(entry.value);
-          }}
-        />
-      ))}
+    <View className="mt-2 gap-1.5">
+      <View className="flex-row items-center gap-1">
+        <Icon name="mdi:clock-outline" size={12} color={muted} />
+        <Text size={12} className="text-muted">
+          Previously used
+        </Text>
+      </View>
+      <View className="flex-row flex-wrap gap-2">
+        {choices.map((entry, index) => (
+          <CapsuleButton
+            key={entry.value}
+            label={entry.value}
+            icon="mdi:clock-outline"
+            color={muted}
+            fitContent
+            height={32}
+            iconSize={13}
+            textSize={13}
+            labelNumberOfLines={1}
+            accessibilityLabel={`Previously used ${field}: ${entry.value}`}
+            testID={`edit-profile-history-${field}-${index}`}
+            onPress={() => {
+              if (!disabled) onPick(entry.value);
+            }}
+          />
+        ))}
+      </View>
     </View>
   );
 }

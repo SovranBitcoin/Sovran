@@ -105,19 +105,24 @@ it('allows gesture, Android back and close after opening the optional Update act
   expect(mockSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: true });
   expect(BackHandler.addEventListener).not.toHaveBeenCalled();
   expect(view.root.findAllByProps({ testID: 'cta-secondary' })).toHaveLength(1);
-  expect(view.root.findAllByProps({ testID: 'cta-close' })).toHaveLength(1);
+  // The close action is the flow header's shared one, so nothing here hides it.
+  expect(mockSetOptions).not.toHaveBeenLastCalledWith(
+    expect.objectContaining({ headerLeft: expect.anything() })
+  );
   await press('cta-primary');
   expect(openExternalUrl).toHaveBeenCalledTimes(1);
   expect(mockBack).not.toHaveBeenCalled();
-  await press('cta-close');
+  // Header close → the stack removes the screen; the snooze is recorded then.
+  act(() => mockAddListener.mock.calls.at(-1)![1]());
   expect(useCtaStore.getState().dismissed['update-required:snooze']).toMatchObject({
     version: '2.0.0',
   });
+  // The stack already removed the screen: a later closeActive must not
+  // navigate a second time.
   act(() => {
     useCtaStore.getState().closeActive();
   });
-  act(() => mockAddListener.mock.calls.at(-1)![1]());
-  expect(mockBack).toHaveBeenCalledTimes(1);
+  expect(mockBack).not.toHaveBeenCalled();
 });
 it('records the trigger version when leaving by swipe or Android back', () => {
   mount('update-required');
@@ -136,9 +141,11 @@ it('supports an explicitly forced definition and End preview escape', async () =
     useCtaStore.getState().preview('update-required');
     mount('update-required');
     expect(mockPreventRemove).toHaveBeenLastCalledWith(true);
-    expect(mockSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: false });
+    const forced = mockSetOptions.mock.calls.at(-1)![0];
+    expect(forced.gestureEnabled).toBe(false);
+    // A blocking prompt takes the header close away.
+    expect(forced.headerLeft()).toBeNull();
     expect(jest.mocked(BackHandler.addEventListener).mock.calls.at(-1)![1]()).toBe(true);
-    expect(view.root.findAllByProps({ testID: 'cta-close' })).toHaveLength(0);
     await press('cta-preview-close');
     expect(mockPreventRemove).toHaveBeenLastCalledWith(false);
     expect(mockBack).toHaveBeenCalledTimes(1);
@@ -150,7 +157,6 @@ it('supports an explicitly forced definition and End preview escape', async () =
 it('leaves an optional preview without persisting a dismissal', async () => {
   useCtaStore.getState().preview('update-required');
   mount('update-required');
-  await press('cta-close');
   act(() => mockAddListener.mock.calls.at(-1)![1]());
   expect(useCtaStore.getState().dismissed).toEqual({});
 });
