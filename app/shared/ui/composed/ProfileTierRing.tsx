@@ -9,13 +9,15 @@ import {
   SweepGradient,
   vec,
 } from '@shopify/react-native-skia';
-import {
+import Animated, {
   cancelAnimation,
   Easing,
+  useAnimatedStyle,
   useDerivedValue,
   useReducedMotion,
   useSharedValue,
   withRepeat,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 import Svg, { Defs, Path, Text, TextPath } from 'react-native-svg';
@@ -28,10 +30,10 @@ import { PROFILE_TIER_LABEL, type ProfileTier } from '@/shared/lib/profile/profi
 // with `size` so the ring keeps its proportions at any avatar size.
 const REFERENCE_SIZE = 90;
 const GAP = 3; // background gap between the picture and the ring (story-ring look)
-const STROKE = 7.5; // wide enough to carry the inscription
-const GLOW_STROKE = 12;
+const STROKE = 6.4; // just wide enough to carry the inscription
+const GLOW_STROKE = 11;
 const GLOW_BLUR = 8;
-const LABEL_FONT = 5.6;
+const LABEL_FONT = 5.2;
 const OUTER_MARGIN = 3; // layout reserved outside the band
 /** Where the lettering is centred, in degrees (0 = right, 90 = bottom). */
 const LABEL_ANGLE = 45;
@@ -43,6 +45,9 @@ const LABEL_SPAN = 110;
 const BLEED = GLOW_STROKE / 2 + GLOW_BLUR * 2.5;
 /** One full turn of the film; slow enough to read as light moving, not spinning. */
 const TURN_MS = 16_000;
+/** Entrance: the film swirls a third of a turn while the ring fades and scales in. */
+const INTRO_MS = 900;
+const INTRO_TURN = (Math.PI * 2) / 3;
 
 /** How far the ring layout extends beyond the avatar on each side. */
 export function profileTierRingInset(size: number): number {
@@ -94,23 +99,46 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
   const labelRadius = ringRadius + fontSize * 0.36;
   const theme = tier ? generateTierRingTheme(tier, seed) : null;
 
-  // The film turns; a perpetual tick is skipped under reduced motion and on
-  // the Android e2e lane (uiautomator never reaches idle with one running).
+  // The tier is rarely known on the first frame (counts and score land after
+  // the header). When it resolves the ring fades and scales in while the film
+  // swirls a third of a turn, then settles into its slow perpetual turn. The
+  // perpetual tick is skipped under reduced motion and on the Android e2e
+  // lane (uiautomator never reaches idle with one running); the entrance is
+  // instant under reduced motion.
   const turn = useSharedValue(0);
-  const animate = !!theme && !reducedMotion && !IS_ANDROID_E2E;
+  const appear = useSharedValue(0);
+  const animate = !!tier && !reducedMotion && !IS_ANDROID_E2E;
+  // Keyed on the tier and seed, never the theme object (a fresh object every
+  // render — this header re-renders constantly and must not replay the entrance).
   useEffect(() => {
-    if (!animate) {
+    if (!tier) {
+      appear.value = 0;
       turn.value = 0;
       return;
     }
-    turn.value = withRepeat(
-      withTiming(Math.PI * 2, { duration: TURN_MS, easing: Easing.linear }),
-      -1,
-      false
+    if (!animate) {
+      appear.value = 1;
+      turn.value = 0;
+      return;
+    }
+    appear.value = 0;
+    appear.value = withTiming(1, { duration: INTRO_MS * 0.7, easing: Easing.out(Easing.cubic) });
+    turn.value = -INTRO_TURN;
+    turn.value = withSequence(
+      withTiming(0, { duration: INTRO_MS, easing: Easing.out(Easing.cubic) }),
+      // The loop restarts from 0 on every repeat: seamless.
+      withRepeat(withTiming(Math.PI * 2, { duration: TURN_MS, easing: Easing.linear }), -1, false)
     );
-    return () => cancelAnimation(turn);
-  }, [animate, turn]);
+    return () => {
+      cancelAnimation(turn);
+      cancelAnimation(appear);
+    };
+  }, [animate, appear, seed, tier, turn]);
   const filmTransform = useDerivedValue(() => [{ rotate: turn.value }]);
+  const entrance = useAnimatedStyle(() => ({
+    opacity: appear.value,
+    transform: [{ scale: 0.9 + 0.1 * appear.value }],
+  }));
 
   // Lower-right arc travelled bottom → right (decreasing angle, sweep 0), so
   // the glyph tops point at the centre and the word reads upright-ish where a
@@ -126,7 +154,7 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
   return (
     <View style={{ width: outer, height: outer }} testID="profile-tier-ring">
       {theme && tier ? (
-        <>
+        <Animated.View style={[StyleSheet.absoluteFill, entrance]} pointerEvents="none">
           <Canvas
             style={{
               position: 'absolute',
@@ -148,6 +176,7 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
                 <SweepGradient
                   c={vec(center, center)}
                   colors={[...theme.sweep]}
+                  {...(theme.positions ? { positions: [...theme.positions] } : {})}
                   transform={[{ rotate: (theme.startAngle * Math.PI) / 180 }]}
                   origin={vec(center, center)}
                 />
@@ -163,6 +192,7 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
                 <SweepGradient
                   c={vec(center, center)}
                   colors={[...theme.sweep]}
+                  {...(theme.positions ? { positions: [...theme.positions] } : {})}
                   transform={[{ rotate: (theme.startAngle * Math.PI) / 180 }]}
                   origin={vec(center, center)}
                 />
@@ -241,7 +271,7 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
               </TextPath>
             </Text>
           </Svg>
-        </>
+        </Animated.View>
       ) : null}
       <View
         style={[

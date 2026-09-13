@@ -39,8 +39,12 @@ jest.mock('@shopify/react-native-skia', () => ({
 let mockReducedMotion = false;
 const mockCancel = jest.fn();
 jest.mock('react-native-reanimated', () => ({
-  Easing: { linear: 'linear' },
+  __esModule: true,
+  default: { View: host('animated-view') },
+  Easing: { linear: 'linear', cubic: 'cubic', out: (e: unknown) => e },
   cancelAnimation: (...args: unknown[]) => mockCancel(...args),
+  useAnimatedStyle: (fn: () => unknown) => fn(),
+  withSequence: (...steps: unknown[]) => steps[steps.length - 1],
   useDerivedValue: (fn: () => unknown) => ({
     get value() {
       return fn();

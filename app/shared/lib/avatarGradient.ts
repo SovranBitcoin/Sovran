@@ -180,6 +180,8 @@ type TierRingTheme = {
    * neighbouring hues like a soap film.
    */
   sweep: readonly string[];
+  /** Stop positions (0..1) matching `sweep`; even spacing when absent. */
+  positions?: readonly number[];
   /** Where the seam of the sweep sits, in degrees — per pubkey. */
   startAngle: number;
   /** Blurred halo behind the ring. */
@@ -192,8 +194,9 @@ type TierBase = {
   light: number;
   /** Hue drift of the film around the ring. */
   spread: number;
-  /** 'metal' alternates light/deep bands; 'film' drifts through hues. */
-  finish: 'metal' | 'film';
+  /** 'metal' alternates light/deep bands; 'film' drifts through hues;
+   *  'gem' is near-white ice with thin prismatic flashes. */
+  finish: 'metal' | 'film' | 'gem';
 };
 
 // Each rung has a fixed identity hue (gold must read as gold) at the same
@@ -207,7 +210,7 @@ const TIER_BASE: Record<ProfileTier, TierBase> = {
   silver: { hue: 208, sat: 8, light: 78, spread: 8, finish: 'metal' },
   gold: { hue: 44, sat: 78, light: 60, spread: 14, finish: 'metal' },
   platinum: { hue: 170, sat: 32, light: 76, spread: 36, finish: 'film' },
-  diamond: { hue: 196, sat: 70, light: 70, spread: 110, finish: 'film' },
+  diamond: { hue: 204, sat: 55, light: 86, spread: 0, finish: 'gem' },
 };
 
 /**
@@ -225,6 +228,45 @@ export function generateTierRingTheme(tier: ProfileTier, seedInput: string): Tie
   const startAngle = random() * 360;
 
   const h = (offset: number) => base.hue + offset * direction;
+  if (base.finish === 'gem') {
+    // Cut stone: near-white ice with two thin prismatic flashes (pink / violet
+    // / cyan, then amber / green) whose place on the ring is per pubkey.
+    const ice = hsl(base.hue, base.sat, light);
+    const pale = hsl(base.hue, base.sat - 20, light + 8);
+    const flashAt = 0.18 + random() * 0.2;
+    const flash2At = flashAt + 0.4 + random() * 0.1;
+    const w = 0.035;
+    return {
+      sweep: [
+        pale,
+        ice,
+        hsl(325, 85, 78),
+        hsl(262, 80, 74),
+        hsl(190, 90, 72),
+        ice,
+        pale,
+        hsl(42, 90, 76),
+        hsl(150, 70, 74),
+        ice,
+        pale,
+      ],
+      positions: [
+        0,
+        flashAt - w * 1.5,
+        flashAt - w * 0.5,
+        flashAt,
+        flashAt + w * 0.5,
+        flashAt + w * 1.5,
+        flash2At - w * 1.5,
+        flash2At - w * 0.4,
+        flash2At + w * 0.4,
+        flash2At + w * 1.5,
+        1,
+      ],
+      startAngle,
+      glow: hsl(base.hue, base.sat, light - 4, 0.75),
+    };
+  }
   const sweep =
     base.finish === 'metal'
       ? [

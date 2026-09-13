@@ -71,6 +71,18 @@ describe('generateTierRingTheme', () => {
     expect(hueOf(generateTierRingTheme('gold', 'x').sweep[0]!)).toBe(44);
     expect(hueOf(generateTierRingTheme('new', 'x').sweep[0]!)).toBe(214);
     expect(hueOf(generateTierRingTheme('bronze', 'x').sweep[0]!)).toBe(24);
-    expect(hueOf(generateTierRingTheme('diamond', 'x').sweep[0]!)).toBe(196);
+    expect(hueOf(generateTierRingTheme('diamond', 'x').sweep[0]!)).toBe(204);
+  });
+
+  it('diamond is near-white ice with prismatic flashes at per-seed positions', () => {
+    const a = generateTierRingTheme('diamond', 'seed-a');
+    const lightOf = (c: string) => Number(/hsla\(\d+, \d+%, (\d+)%/.exec(c)?.[1]);
+    expect(lightOf(a.sweep[0]!)).toBeGreaterThanOrEqual(85);
+    expect(a.positions).toHaveLength(a.sweep.length);
+    expect(a.positions![0]).toBe(0);
+    expect(a.positions![a.positions!.length - 1]).toBe(1);
+    expect([...a.positions!]).toEqual([...a.positions!].sort((x, y) => x - y));
+    expect(a.positions).not.toEqual(generateTierRingTheme('diamond', 'seed-b').positions);
+    expect(generateTierRingTheme('gold', 'seed-a').positions).toBeUndefined();
   });
 });
