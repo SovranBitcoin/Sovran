@@ -1,0 +1,218 @@
+diff --git a/lib/module/components/toast/toast.js b/lib/module/components/toast/toast.js
+index 97ace7707c94c142514d05fbf5c24f8465c9ffe1..b215a40d206e82e101931d45839280282e47c9d1 100644
+--- a/lib/module/components/toast/toast.js
++++ b/lib/module/components/toast/toast.js
+@@ -169,7 +169,11 @@ const ToastRoot = /*#__PURE__*/forwardRef((props, ref) => {
+           }), /*#__PURE__*/_jsx(AnimatedToastRoot, {
+             pointerEvents: "none",
+             className: cn(rootClassName, 'absolute opacity-0'),
+-            style: [toastStyleSheet.root, style],
++            // sovran patch: inline hide for the measurement clone (see src).
++            style: [toastStyleSheet.root, style, {
++              position: 'absolute',
++              opacity: 0
++            }],
+             onLayout: event => {
+               const measuredHeight = event.nativeEvent.layout.height;
+               heights.modify(value => {
+diff --git a/lib/module/helpers/internal/components/bottom-sheet-content-container.js b/lib/module/helpers/internal/components/bottom-sheet-content-container.js
+index f9ea035e3b30eafe5eb281e8c0b9aae8149d9daf..0d7aab01224ff3cf00ed296fe2a1d4a48ddf026f 100644
+--- a/lib/module/helpers/internal/components/bottom-sheet-content-container.js
++++ b/lib/module/helpers/internal/components/bottom-sheet-content-container.js
+@@ -1,7 +1,7 @@
+ "use strict";
+ 
+ import { useEffect, useRef } from 'react';
+-import { BackHandler } from 'react-native';
++import { BackHandler, View } from 'react-native';
+ import { useAnimatedReaction } from 'react-native-reanimated';
+ import { scheduleOnRN } from 'react-native-worklets';
+ import GorhomBottomSheetPackage from "../../../optional/gorhom-bottom-sheet.js";
+@@ -81,9 +81,28 @@ export function BottomSheetContentContainer({
+     // We only want to snap when isOpen or initialIndex changes.
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [isOpen, initialIndex]);
+-  return /*#__PURE__*/_jsx(BottomSheetView, {
++  // sovran-app patch: see src/helpers/internal/components/bottom-sheet-content-container.tsx
++  // (`useDirectView` keeps a nested BottomSheetScrollView registered as the
++  // active scrollable; `useScrollableContainer` swaps in BottomSheetScrollView).
++  const {
++    useDirectView,
++    useScrollableContainer,
++    ...restContentContainerProps
++  } = contentContainerProps ?? {};
++  const BottomSheetScrollView = GorhomBottomSheetPackage?.BottomSheetScrollView;
++  if (useScrollableContainer && BottomSheetScrollView) {
++    return /*#__PURE__*/_jsx(BottomSheetScrollView, {
++      ...restContentContainerProps,
++      children: /*#__PURE__*/_jsx(View, {
++        className: contentContainerClassName,
++        children: children
++      })
++    });
++  }
++  const Container = useDirectView ? View : BottomSheetView;
++  return /*#__PURE__*/_jsx(Container, {
+     className: contentContainerClassName,
+-    ...contentContainerProps,
++    ...restContentContainerProps,
+     children: children
+   });
+ }
+diff --git a/lib/module/helpers/internal/components/bottom-sheet-content.js b/lib/module/helpers/internal/components/bottom-sheet-content.js
+index 62a7fc7ecf64d48bc555f7dd14c854b2c75cc34e..6af20033d4821fc3464ce3eae0e930aba1145717 100644
+--- a/lib/module/helpers/internal/components/bottom-sheet-content.js
++++ b/lib/module/helpers/internal/components/bottom-sheet-content.js
+@@ -102,6 +102,12 @@ export const BottomSheetContent = /*#__PURE__*/forwardRef(({
+   progress,
+   isDragging,
+   onOpenChange,
++  // sovran patch: forwarded to gorhom `index`. heroui consumes the public
++  // `index` prop as its own `initialIndex` (used only for the isOpen-edge
++  // snapToIndex), so `index={0}` from a caller is silently dropped. Passing
++  // `mountIndex={0}` lets gorhom's animate-on-mount open the sheet once its
++  // layout is calculated. -1 keeps upstream behaviour.
++  mountIndex,
+   ...restProps
+ }, ref) => {
+   const {
+@@ -144,7 +150,7 @@ export const BottomSheetContent = /*#__PURE__*/forwardRef(({
+     },
+     children: /*#__PURE__*/_jsx(StyledBottomSheet, {
+       ref: ref,
+-      index: -1,
++      index: mountIndex ?? -1,
+       backgroundClassName: contentBackgroundClassName,
+       backgroundStyle: backgroundStyle,
+       handleIndicatorClassName: contentHandleIndicatorClassName,
+diff --git a/lib/typescript/src/helpers/internal/types/bottom-sheet.d.ts b/lib/typescript/src/helpers/internal/types/bottom-sheet.d.ts
+index db2a3bc9ea981e9cadf38303de920c6b7b9301b9..13b77a0a3ede508d12c4358c2481a78b40d7bb41 100644
+--- a/lib/typescript/src/helpers/internal/types/bottom-sheet.d.ts
++++ b/lib/typescript/src/helpers/internal/types/bottom-sheet.d.ts
+@@ -64,6 +64,11 @@ export interface BaseBottomSheetContentProps {
+      * The bottom sheet content
+      */
+     children?: ReactNode;
++    /**
++     * sovran patch: gorhom `index` to mount at. heroui consumes `index` as its
++     * own `initialIndex`, so this is the only way to let gorhom animate-on-mount.
++     */
++    mountIndex?: number;
+     /**
+      * Additional CSS class for the bottom sheet
+      */
+diff --git a/src/components/toast/toast.tsx b/src/components/toast/toast.tsx
+index 76d16ac8f1f8366f1c351284cf4035586741e5a5..0ccc50025e9906204a868f3d22d02cd39708dd4a 100644
+--- a/src/components/toast/toast.tsx
++++ b/src/components/toast/toast.tsx
+@@ -225,7 +225,12 @@ const ToastRoot = forwardRef<ViewRef, ToastRootProps>((props, ref) => {
+             <AnimatedToastRoot
+               pointerEvents="none"
+               className={cn(rootClassName, 'absolute opacity-0')}
+-              style={[toastStyleSheet.root, style]}
++              // sovran patch: keep the measurement clone hidden via an inline
++              // style, not just the runtime-composed `absolute opacity-0`
++              // className. Under the monorepo Metro/Uniwind pipeline that
++              // runtime className can fail to apply, leaving this clone
++              // visible as an empty duplicate toast.
++              style={[toastStyleSheet.root, style, { position: 'absolute', opacity: 0 }]}
+               onLayout={(event) => {
+                 const measuredHeight = event.nativeEvent.layout.height;
+                 heights.modify((value) => {
+diff --git a/src/helpers/internal/components/bottom-sheet-content-container.tsx b/src/helpers/internal/components/bottom-sheet-content-container.tsx
+index 23de843229d5420194ae3e9eef5a19b94c22fe02..f6d8fb8d3bbb4d00bebdba348f0f346ef2230a2e 100644
+--- a/src/helpers/internal/components/bottom-sheet-content-container.tsx
++++ b/src/helpers/internal/components/bottom-sheet-content-container.tsx
+@@ -1,5 +1,5 @@
+ import { useEffect, useRef } from 'react';
+-import { BackHandler } from 'react-native';
++import { BackHandler, View } from 'react-native';
+ import { useAnimatedReaction } from 'react-native-reanimated';
+ import { scheduleOnRN } from 'react-native-worklets';
+ import GorhomBottomSheetPackage from '../../../optional/gorhom-bottom-sheet';
+@@ -90,12 +90,40 @@ export function BottomSheetContentContainer({
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [isOpen, initialIndex]);
+ 
++  // sovran-app patch: opt-in flag to use a plain RN View instead of
++  // gorhom's BottomSheetView. BottomSheetView unconditionally registers
++  // the active scrollable type as VIEW in its mount effect, which runs
++  // *after* a nested BottomSheetScrollView's effect (parent effects fire
++  // after child effects). The override turns the inner scrollable into
++  // a no-op — sheet pan gestures consume the swipe instead of scrolling
++  // the inner list. Setting `useDirectView: true` on contentContainerProps
++  // skips that registration so `<BottomSheetScrollView>` works inside
++  // heroui Menu / BottomSheet content.
++  // sovran-app patch: `useScrollableContainer: true` swaps the container for
++  // gorhom's BottomSheetScrollView. Under enableDynamicSizing it still
++  // reports content height (the sheet auto-fits short content) AND becomes
++  // scrollable once the sheet caps at maxDynamicContentSize — BottomSheetView
++  // just clips there. The nativewind className stays on an inner plain View
++  // (the scrollable is not css-interop'd).
++  const { useDirectView, useScrollableContainer, ...restContentContainerProps } =
++    (contentContainerProps as
++      | { useDirectView?: boolean; useScrollableContainer?: boolean }
++      | undefined) ?? {};
++  const BottomSheetScrollView = GorhomBottomSheetPackage?.BottomSheetScrollView;
++  if (useScrollableContainer && BottomSheetScrollView) {
++    return (
++      <BottomSheetScrollView {...restContentContainerProps}>
++        <View className={contentContainerClassName}>{children}</View>
++      </BottomSheetScrollView>
++    );
++  }
++  const Container = useDirectView ? View : BottomSheetView;
+   return (
+-    <BottomSheetView
++    <Container
+       className={contentContainerClassName}
+-      {...contentContainerProps}
++      {...restContentContainerProps}
+     >
+       {children}
+-    </BottomSheetView>
++    </Container>
+   );
+ }
+diff --git a/src/helpers/internal/components/bottom-sheet-content.tsx b/src/helpers/internal/components/bottom-sheet-content.tsx
+index dd9ebcc316ff621254249138d3bfa5636f976ea0..8f2e787af87449a950c8f34a64ac41a1ca469a49 100644
+--- a/src/helpers/internal/components/bottom-sheet-content.tsx
++++ b/src/helpers/internal/components/bottom-sheet-content.tsx
+@@ -143,6 +143,12 @@ export const BottomSheetContent = forwardRef<
+       progress,
+       isDragging,
+       onOpenChange,
++      // sovran patch: forwarded to gorhom `index`. heroui consumes the public
++      // `index` prop as its own `initialIndex` (used only for the isOpen-edge
++      // snapToIndex), so `index={0}` from a caller is silently dropped. Passing
++      // `mountIndex={0}` lets gorhom's animate-on-mount open the sheet once its
++      // layout is calculated. -1 keeps upstream behaviour.
++      mountIndex,
+       ...restProps
+     },
+     ref
+@@ -195,7 +201,7 @@ export const BottomSheetContent = forwardRef<
+       <BottomSheetIsDraggingProvider value={{ isDragging }}>
+         <StyledBottomSheet
+           ref={ref}
+-          index={-1}
++          index={mountIndex ?? -1}
+           backgroundClassName={contentBackgroundClassName}
+           backgroundStyle={backgroundStyle}
+           handleIndicatorClassName={contentHandleIndicatorClassName}
+diff --git a/src/helpers/internal/types/bottom-sheet.ts b/src/helpers/internal/types/bottom-sheet.ts
+index e763b4164ff924f23fb59fbc1813043a4fbde147..d3852bf55959cbfa2e08e7b7a8753eb87c94e49b 100644
+--- a/src/helpers/internal/types/bottom-sheet.ts
++++ b/src/helpers/internal/types/bottom-sheet.ts
+@@ -67,6 +67,11 @@ export interface BaseBottomSheetContentProps {
+    * The bottom sheet content
+    */
+   children?: ReactNode;
++  /**
++   * sovran patch: gorhom `index` to mount at. heroui consumes `index` as its
++   * own `initialIndex`, so this is the only way to let gorhom animate-on-mount.
++   */
++  mountIndex?: number;
+   /**
+    * Additional CSS class for the bottom sheet
+    */

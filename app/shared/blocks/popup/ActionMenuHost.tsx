@@ -21,7 +21,6 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log } from '@/shared/lib/logger';
-import { scheduleAfterLayout } from '@/shared/lib/scheduleAfterLayout';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { SectionAnchorList, type AnchorSection } from '@/shared/ui/composed/SectionAnchorList';
 import {
@@ -37,6 +36,7 @@ import {
 import Icon from 'assets/icons';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { markE2EHerouiMenu } from '@/shared/lib/popup/E2EActionMenuProbe';
+import { OPEN_WATCHDOG_MS } from '@/shared/lib/popup/openWatchdog';
 import { SheetMenuRowContent } from '@/shared/lib/popup/popups/sheetMenuRow';
 import { SheetSearchField } from '@/shared/lib/popup/SheetSearchField';
 import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
@@ -191,8 +191,7 @@ function ActionMenuInstance({
     seq: number;
     phase: MenuPhase;
     attempt: number;
-    openRequested: boolean;
-  }>({ seq, phase: isOpen ? 'presenting' : 'closed', attempt: 0, openRequested: false });
+  }>({ seq, phase: isOpen ? 'presenting' : 'closed', attempt: 0 });
   const attemptRef = useRef(0);
   const liveRef = useRef(true);
   useEffect(() => {
@@ -611,7 +610,7 @@ function ActionMenuInstance({
     </BottomSheetFooter>
   );
 
-  const { phase, attempt, openRequested } = lifecycle;
+  const { phase, attempt } = lifecycle;
   const handleNativeClose = useCallback(
     (seqAtMount: number, attemptAtMount: number) => {
       if (!isCurrent() || seqAtMount !== seq || attemptAtMount !== attemptRef.current) {
@@ -628,7 +627,7 @@ function ActionMenuInstance({
       const hadPayload = getActionMenuSnapshot().payload !== null;
       dismissActionMenuPopup();
       if (hadPayload && !selectedRef.current) onDismiss?.();
-      setLifecycle((previous) => ({ ...previous, phase: 'closed', openRequested: false }));
+      setLifecycle((previous) => ({ ...previous, phase: 'closed' }));
       const afterClose = afterCloseRef.current;
       afterCloseRef.current = null;
       afterClose?.();
@@ -644,36 +643,35 @@ function ActionMenuInstance({
           : {
               ...previous,
               phase: 'closing',
-              openRequested: false,
             }
       );
     }
   }, [isOpen]);
 
+  // Gorhom's own animate-on-mount is the only open path (see `mountIndex`
+  // below): it waits for its layout to be calculated — container, handle and,
+  // under enableDynamicSizing, the measured content height — so there is no
+  // frame-count guess and no partial-height open. The watchdog covers gorhom
+  // #2690 / #2719 (the sheet's reanimated reactions die when it mounts under
+  // JS contention, leaving it parked at -1); only a remount brings a working
+  // instance back, so retry once, then release the request.
   useEffect(() => {
     if (phase !== 'presenting' || !isOpen) return;
-    // HeroUI needs a false -> true edge after its container has measured.
-    const cancelLayout = scheduleAfterLayout(() => {
-      setLifecycle((previous) => ({ ...previous, openRequested: true }));
-    });
     const watchdog = setTimeout(() => {
       if (getActionMenuSnapshot().seq !== seq || !getActionMenuSnapshot().payload) return;
-      hostLog.warn('actionMenuHost.open_stalled', { seq, attempt });
+      hostLog.warn('actionMenuHost.open_stalled', { seq, attempt, budgetMs: OPEN_WATCHDOG_MS });
       if (attempt === 0) {
         attemptRef.current = 1;
-        setLifecycle({ seq, phase: 'presenting', attempt: 1, openRequested: false });
+        setLifecycle({ seq, phase: 'presenting', attempt: 1 });
       } else {
         const onDismiss = activeDismissRef.current;
         activeDismissRef.current = null;
         dismissActionMenuPopup();
-        setLifecycle({ seq, phase: 'closed', attempt, openRequested: false });
+        setLifecycle({ seq, phase: 'closed', attempt });
         onDismiss?.();
       }
-    }, 800);
-    return () => {
-      cancelLayout?.();
-      clearTimeout(watchdog);
-    };
+    }, OPEN_WATCHDOG_MS);
+    return () => clearTimeout(watchdog);
   }, [phase, isOpen, seq, attempt]);
 
   if (phase === 'closed') return null;
@@ -682,7 +680,7 @@ function ActionMenuInstance({
     <Menu
       key={`${seq}:${attempt}`}
       presentation="bottom-sheet"
-      isOpen={isOpen && openRequested}
+      isOpen={isOpen}
       onOpenChange={(open) => {
         if (attempt === attemptRef.current) handleOpenChange(open);
       }}>
@@ -708,6 +706,12 @@ function ActionMenuInstance({
         <MenuScrim />
         <Menu.Content
           presentation="bottom-sheet"
+          // Patched prop (patches/heroui-native+1.0.9.patch): forwarded to
+          // gorhom `index`, so the sheet mounts open and gorhom animates it
+          // up itself once layout is calculated. heroui consumes the public
+          // `index` prop for its own isOpen-edge snap, which gorhom silently
+          // drops when layout isn't ready — the original stall.
+          mountIndex={0}
           onClose={() => handleNativeClose(seq, attempt)}
           onAnimate={(_from, to, _fromPosition, toPosition) => {
             if (!isCurrent() || attempt !== attemptRef.current || to < 0) return;
@@ -759,7 +763,7 @@ function ActionMenuInstance({
           // the scroll we re-apply 8px so the `Menu.Label`'s `-mt-2`
           // doesn't clip above the viewport.
           contentContainerClassName={useScrollBody ? 'flex-1 px-0 pt-0 pb-0' : 'pt-2 pb-0'}
-          // Patched flag (see patches/heroui-native+1.0.2.patch): swap
+          // Patched flag (see patches/heroui-native+1.0.9.patch): swap
           // heroui's `BottomSheetView` wrapper for a plain RN `View` so
           // the nested `BottomSheetScrollView` below stays registered
           // as the active scrollable. Without this, heroui's wrapper
