@@ -98,6 +98,8 @@ import {
 } from '@/shared/lib/logger';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { fontSize, iconSize } from '@/shared/styles/tokens';
+import { resolveProfileTier, type ProfileTier } from '@/shared/lib/profile/profileTier';
+import { ProfileTierRing, profileTierRingInset } from '@/shared/ui/composed/ProfileTierRing';
 
 const BANNER_HEIGHT = 150;
 const AVATAR_SIZE = 90;
@@ -274,7 +276,6 @@ const COUNT_UNAVAILABLE = '—';
 function ProfileStatsGrid({
   followingCount,
   followerCount,
-  reputationScore,
   joinedDate,
   isLoading,
   countsLoading,
@@ -282,7 +283,6 @@ function ProfileStatsGrid({
 }: {
   followingCount?: number;
   followerCount?: number;
-  reputationScore?: number;
   joinedDate?: string;
   isLoading: boolean;
   /** Follower/following still being completed from fallback sources. */
@@ -296,10 +296,7 @@ function ProfileStatsGrid({
   ] as const);
 
   const hasValidData =
-    followingCount !== undefined ||
-    followerCount !== undefined ||
-    reputationScore !== undefined ||
-    joinedDate !== undefined;
+    followingCount !== undefined || followerCount !== undefined || joinedDate !== undefined;
 
   const stats = [
     {
@@ -307,44 +304,24 @@ function ProfileStatsGrid({
       description: 'Users followed',
       // Unknown is a dash, never a zero: no source could count this profile.
       value: followingCount?.toString() ?? COUNT_UNAVAILABLE,
-      smallValue: false,
       valueLoading: (isLoading || countsLoading) && followingCount === undefined,
     },
     {
       label: 'Followers',
       description: 'Total count',
       value: followerCount?.toString() ?? COUNT_UNAVAILABLE,
-      smallValue: false,
       valueLoading: (isLoading || countsLoading) && followerCount === undefined,
-    },
-    {
-      label: 'Reputation',
-      description: 'Network score',
-      value: reputationScore !== undefined ? `${Math.round(reputationScore)} / 100` : 'N/A',
-      smallValue: false,
-      valueLoading: isLoading && reputationScore === undefined,
-    },
-    {
-      label: 'Joined',
-      description: 'Account created',
-      value: joinedDate || 'Unknown',
-      smallValue: true,
-      valueLoading: isLoading && joinedDate === undefined,
     },
   ];
 
   const showSkeleton = isLoading && !hasValidData;
-  // Collapse to a two-pill layout only once loading has settled — during a
-  // partial load `reputationScore` is still undefined, and flipping layout then
-  // would snap the grid the moment the score arrived.
-  const reputationUnavailable = !isLoading && reputationScore === undefined;
 
   const renderStatCard = (stat: (typeof stats)[0], loading: boolean) => (
     <View key={stat.label} style={styles.statItem}>
       {loading ? (
         // One placeholder for the whole pill (not three stacked text
         // skeletons). Thread-style: a static low-contrast box — the motion
-        // comes from the SkeletonLoadingShimmer sweeping the whole grid.
+        // comes from the SkeletonLoadingShimmer sweeping the whole row.
         <View
           style={[
             styles.statCardSkeleton,
@@ -364,7 +341,7 @@ function ProfileStatsGrid({
             loading={stat.valueLoading}
             placeholder="1,234"
             bold
-            size={stat.smallValue ? 16 : 20}
+            size={20}
             style={{ color: foreground, marginBottom: 2 }}>
             {stat.value}
           </Text>
@@ -377,84 +354,48 @@ function ProfileStatsGrid({
   );
 
   // Settled with nothing reliable to show — relay-only mode can't fetch
-  // follower/following counts (a reverse index relays don't have), reputation,
-  // or joined date. Render no grid rather than misleading "0 / 0 / N/A".
+  // follower/following counts (a reverse index relays don't have) or the
+  // joined date. Render no grid rather than misleading "0 / 0".
   if (!isLoading && !hasValidData) return null;
 
-  // One grid in both branches (SkeletonContentCrossfade): the skeleton is the
-  // same 2×2 layout with placeholder pills, so the swap to content shifts
-  // nothing; the helper owns the shimmer sweep and the fade.
-  const renderGrid = (loading: boolean) => (
-    <View>
-      <View style={styles.statsRow}>
-        {stats.slice(0, 2).map((stat) => renderStatCard(stat, loading))}
-      </View>
-      <View style={styles.statsRow}>
-        {stats.slice(2, 4).map((stat) => renderStatCard(stat, loading))}
-      </View>
-    </View>
+  // Reputation is not a number here any more — it is the tier ring around the
+  // avatar. One row in both branches (SkeletonContentCrossfade): the skeleton
+  // is the same two placeholder pills, so the swap to content shifts nothing.
+  const renderRow = (loading: boolean) => (
+    <View style={styles.statsRow}>{stats.map((stat) => renderStatCard(stat, loading))}</View>
   );
-  if (showSkeleton || (!reputationUnavailable && !showSkeleton)) {
-    return (
-      <VisualLayoutProbe
-        scope={visualScope}
-        surface="profile"
-        component="ProfileStatsGrid"
-        itemKey={showSkeleton ? 'stats-skeleton' : 'stats-loaded'}
-        itemType={showSkeleton ? 'skeleton' : 'loaded'}
-        style={styles.statsGrid}
-        extra={{ isLoading, reputationUnavailable }}>
-        <SkeletonContentCrossfade
-          loading={showSkeleton}
-          visualKey="profile-stats"
-          visualSurface="profile"
-          renderSkeleton={() => renderGrid(true)}
-          renderContent={() => renderGrid(false)}
-        />
-      </VisualLayoutProbe>
-    );
-  }
-
-  // Reputation unavailable → Following/Followers stay as pills, Joined drops to
-  // a small caption beneath them so we show two pills + text instead of "N/A".
-  if (reputationUnavailable) {
-    return (
-      <VisualLayoutProbe
-        scope={visualScope}
-        surface="profile"
-        component="ProfileStatsGrid"
-        itemKey="stats-loaded-compact"
-        itemType="loaded"
-        style={styles.statsGrid}
-        extra={{ reputationUnavailable }}>
-        <View style={styles.statsRow}>
-          {renderStatCard(stats[0], false)}
-          {renderStatCard(stats[1], false)}
-        </View>
-        <Text
-          size={13}
-          style={{
-            color: withAlpha(foreground, 0.5),
-            textAlign: 'center',
-            marginTop: 12,
-            paddingHorizontal: 6,
-          }}>
-          Joined {joinedDate || 'Unknown'}
-        </Text>
-      </VisualLayoutProbe>
-    );
-  }
-
-  return null;
+  return (
+    <VisualLayoutProbe
+      scope={visualScope}
+      surface="profile"
+      component="ProfileStatsGrid"
+      itemKey={showSkeleton ? 'stats-skeleton' : 'stats-loaded'}
+      itemType={showSkeleton ? 'skeleton' : 'loaded'}
+      style={styles.statsGrid}
+      extra={{ isLoading }}>
+      <SkeletonContentCrossfade
+        loading={showSkeleton}
+        visualKey="profile-stats"
+        visualSurface="profile"
+        renderSkeleton={() => renderRow(true)}
+        renderContent={() => renderRow(false)}
+      />
+      <Text
+        size={13}
+        loading={isLoading && joinedDate === undefined}
+        placeholder="Joined May 16, 2026"
+        style={{
+          color: withAlpha(foreground, 0.5),
+          textAlign: 'center',
+          marginTop: 12,
+          paddingHorizontal: 6,
+        }}>
+        Joined {joinedDate || 'Unknown'}
+      </Text>
+    </VisualLayoutProbe>
+  );
 }
 
-// ============================================================================
-// Top Followers Section
-// ============================================================================
-
-// Module-scope so the shared-value write stays outside component render
-// functions (the React Compiler bails on any function containing a
-// `sharedValue.value =` assignment).
 function startFadeReveal(fadeAnim: SharedValue<number>, durationMs: number, onSettled: () => void) {
   fadeAnim.value = withTiming(
     1,
@@ -608,6 +549,7 @@ function BannerWithAvatar({
   onEditProfile,
   hasStories,
   onAvatarPress,
+  tier,
   visualScope,
 }: {
   bannerUrl?: string;
@@ -616,6 +558,8 @@ function BannerWithAvatar({
   displayName: string;
   nip05?: string;
   isLoading: boolean;
+  /** Ring around the avatar; null until enough of the profile is known. */
+  tier: ProfileTier | null;
   /** Kind-0 fetch still needed/in flight (see useNostrProfileMetadata). While
    *  true, avatar/banner without an image stay on the loading placeholder
    *  instead of revealing the generative fallback a fetch may replace. */
@@ -701,7 +645,11 @@ function BannerWithAvatar({
   useFadeRevealProbe('profile.avatar', fadeAnim, { deadlineMs: 1500 });
 
   const avatarContent = (
-    <View style={[styles.avatarBorder, { borderColor: background, backgroundColor: background }]}>
+    <ProfileTierRing
+      tier={tier}
+      seed={pubkey || 'default'}
+      size={AVATAR_SIZE}
+      background={background}>
       <Avatar
         state={avatarStateFor(pictureUrl, !(isLoading || isResolving))}
         picture={pictureUrl}
@@ -709,7 +657,7 @@ function BannerWithAvatar({
         size={AVATAR_SIZE}
         name={displayName}
       />
-    </View>
+    </ProfileTierRing>
   );
 
   const seededGradientFill = (
@@ -1107,6 +1055,8 @@ export function UserProfileScreen() {
     isCountsLoading: isProfileCountsLoading,
   } = useNostrProfile(pubkey || null, isFocused);
   const profileMintUrl = getProfileMintInfoUrl(profileData?.mintUrl, mintUrlParam);
+  // Clock for the "new account" check, read once on mount (never in render).
+  const [openedAtSec] = useState(() => Math.floor(Date.now() / 1000));
 
   // ===========================
   // DERIVED STATE
@@ -1167,6 +1117,12 @@ export function UserProfileScreen() {
 
   const followerCount = profileData?.followers;
   const reputationScore = typeof profileData?.score === 'number' ? profileData.score : undefined;
+  const profileTier = resolveProfileTier({
+    followers: followerCount,
+    score: reputationScore,
+    firstEventAt: profileData?.created_at,
+    nowSec: openedAtSec,
+  });
   const joinedDate =
     typeof profileData?.created_at === 'number'
       ? formatDate(profileData.created_at * 1000, 'long-date')
@@ -1430,6 +1386,7 @@ export function UserProfileScreen() {
                 }
                 hasStories={hasStories}
                 onAvatarPress={handleAvatarStoryPress}
+                tier={profileTier}
                 visualScope={profileHeaderVisualScope}
               />
 
@@ -1445,7 +1402,6 @@ export function UserProfileScreen() {
                 <ProfileStatsGrid
                   followingCount={followingCount}
                   followerCount={followerCount}
-                  reputationScore={reputationScore}
                   joinedDate={joinedDate}
                   isLoading={isProfileApiLoading}
                   countsLoading={isProfileCountsLoading}
@@ -1515,12 +1471,9 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     alignItems: 'center',
-    marginTop: -(AVATAR_SIZE - AVATAR_OVERLAP),
-  },
-  avatarBorder: {
-    borderRadius: AVATAR_SIZE / 2 + 4,
-    borderWidth: 4,
-    padding: 0,
+    // The ring reserves its band around the picture; pull it up by that band
+    // so the picture itself overlaps the banner exactly as before.
+    marginTop: -(AVATAR_SIZE - AVATAR_OVERLAP) - profileTierRingInset(AVATAR_SIZE),
   },
   statsGrid: {
     marginHorizontal: -6,
