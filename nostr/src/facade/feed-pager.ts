@@ -171,8 +171,10 @@ export function createFeedPager(options: FeedPagerOptions): FeedPager {
             } else {
               lane.state = "exhausted";
             }
-            if (served.items.length < limit * 2 || served.hasMore === false)
-              lane.state = "exhausted";
+            // Relays and caches may cap a response below our requested limit.
+            // An advancing cursor still represents more history to try; only
+            // an explicit terminal response (or no cursor progress above) ends it.
+            if (served.hasMore === false) lane.state = "exhausted";
           }
           log.info("nostr.feed.pager.page", {
             seq: seq + 1,

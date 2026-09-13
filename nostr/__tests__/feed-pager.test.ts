@@ -55,6 +55,32 @@ const ids = (
 ) => page.pages.flatMap((p) => p.items.map(feedItemId));
 
 describe("per-tier feed pager", () => {
+  it.each(["primal", "relay"] as const)(
+    "continues %s history when the provider caps pages below the requested size",
+    async (source) => {
+      const provider = tier(
+        source,
+        answered(bundle([note("newer", 200)])),
+        answered(bundle([note("older", 100)])),
+        answered(bundle([])),
+      );
+      const pager = createFeedPager({
+        tiers: [provider],
+        spec: { kind: "following-recent", authors: ["a".repeat(64)] },
+        limit: 30,
+      });
+      const first = await pager.nextPage();
+      expect(ids(first)).toEqual(["newer"]);
+      expect(first.hasMore).toBe(true);
+      expect(ids(await pager.nextPage())).toEqual(["older"]);
+      expect(provider.feedPage.mock.calls[1][0].cursor).toEqual({
+        createdAt: 200,
+        id: "newer",
+      });
+      expect((await pager.nextPage()).hasMore).toBe(false);
+    },
+  );
+
   it("falls back on page 2 then retries nagg after 1s ahead of Primal", async () => {
     let now = 0;
     const nagg = tier(
