@@ -31,8 +31,16 @@ const GAP = 3; // background gap between the picture and the ring (story-ring lo
 const STROKE = 5;
 const GLOW_STROKE = 11;
 const GLOW_BLUR = 8;
-const LABEL_FONT = 9;
-const LABEL_BAND = 14; // reserved outside the ring for the coin-rim lettering
+const LABEL_FONT = 7.5;
+const LABEL_BAND = 12; // reserved outside the ring for the coin-rim lettering
+/** Where the lettering is centred, in degrees (0 = right, 90 = bottom). */
+const LABEL_ANGLE = 45;
+const LABEL_SPAN = 110;
+/**
+ * The glow's blurred stroke reaches well past the layout box; the canvas is
+ * drawn larger than the box (a bleed) so no side ever clips it.
+ */
+const BLEED = GLOW_STROKE / 2 + GLOW_BLUR * 2.5;
 /** One full turn of the film; slow enough to read as light moving, not spinning. */
 const TURN_MS = 16_000;
 
@@ -63,7 +71,7 @@ interface ProfileTierRingProps {
  *
  * Layers, bottom to top: glow → film ring (slowly turning) → bevel (light
  * arc upper-left, shade arc lower-right) → specular kisses → inner rim →
- * the tier name curved along the bottom rim like the lettering on a coin.
+ * the tier name curved along the lower-right rim like the lettering on a coin.
  * The lighting layers do NOT turn with the film, so the ring reads as a lit
  * object with colour moving through it. Layout is reserved even without a
  * tier, so the avatar never moves when the tier resolves.
@@ -74,7 +82,9 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
   const scale = size / REFERENCE_SIZE;
   const inset = profileTierRingInset(size);
   const outer = size + inset * 2;
-  const center = outer / 2;
+  const bleed = BLEED * scale;
+  const canvas = outer + bleed * 2;
+  const center = canvas / 2;
   const ringRadius = size / 2 + (GAP + STROKE / 2) * scale;
   const fontSize = LABEL_FONT * scale;
   // Baseline on the path with glyph tops pointing at the centre: the path sits
@@ -100,8 +110,12 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
   }, [animate, turn]);
   const filmTransform = useDerivedValue(() => [{ rotate: turn.value }]);
 
-  // Bottom half, left → right (sweep 0): text along it reads upright.
-  const labelPath = `M ${center - labelRadius} ${center} A ${labelRadius} ${labelRadius} 0 0 0 ${center + labelRadius} ${center}`;
+  // Lower-right arc travelled bottom → right (decreasing angle, sweep 0), so
+  // the glyph tops point at the centre and the word reads upright-ish where a
+  // coin's rim lettering would.
+  const labelFrom = polar(center, center, labelRadius, LABEL_ANGLE + LABEL_SPAN / 2);
+  const labelTo = polar(center, center, labelRadius, LABEL_ANGLE - LABEL_SPAN / 2);
+  const labelPath = `M ${labelFrom.x} ${labelFrom.y} A ${labelRadius} ${labelRadius} 0 0 0 ${labelTo.x} ${labelTo.y}`;
   const light = arc(center, center, ringRadius + 1.1 * scale, 195, 300);
   const shade = arc(center, center, ringRadius - 1.1 * scale, 15, 120);
   const kiss = polar(center, center, ringRadius, 225);
@@ -111,7 +125,15 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
     <View style={{ width: outer, height: outer }} testID="profile-tier-ring">
       {theme && tier ? (
         <>
-          <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Canvas
+            style={{
+              position: 'absolute',
+              left: -bleed,
+              top: -bleed,
+              width: canvas,
+              height: canvas,
+            }}
+            pointerEvents="none">
             <Group transform={filmTransform} origin={vec(center, center)}>
               {/* glow: the same film, wide and blurred, under everything */}
               <Circle
@@ -179,10 +201,16 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
             />
           </Canvas>
           <Svg
-            style={StyleSheet.absoluteFill}
-            width={outer}
-            height={outer}
-            viewBox={`0 0 ${outer} ${outer}`}
+            style={{
+              position: 'absolute',
+              left: -bleed,
+              top: -bleed,
+              width: canvas,
+              height: canvas,
+            }}
+            width={canvas}
+            height={canvas}
+            viewBox={`0 0 ${canvas} ${canvas}`}
             pointerEvents="none"
             accessibilityLabel={`${PROFILE_TIER_LABEL[tier]} tier`}>
             <Defs>
@@ -192,7 +220,7 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
               fill={theme.label}
               fontSize={fontSize}
               fontWeight="700"
-              letterSpacing={2 * scale}
+              letterSpacing={1.6 * scale}
               textAnchor="middle">
               <TextPath href={`#${uid}-label-path`} startOffset="50%">
                 {PROFILE_TIER_LABEL[tier]}

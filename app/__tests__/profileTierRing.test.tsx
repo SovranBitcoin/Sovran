@@ -103,6 +103,23 @@ describe('ProfileTierRing', () => {
     expect(byTestId(root, 'svg-root')[0]!.props.accessibilityLabel).toBe('GOLD tier');
   });
 
+  it('bleeds the canvas past the layout box so the glow is never clipped, lettering lower-right', () => {
+    const { root } = mount('gold');
+    const outer = 90 + profileTierRingInset(90) * 2;
+    const canvas = byTestId(root, 'sk-canvas')[0]!.props.style;
+    expect(canvas.left).toBeLessThan(0);
+    expect(canvas.top).toBe(canvas.left);
+    expect(canvas.width).toBe(outer - 2 * canvas.left);
+    // The word's arc runs from below the centre to the right of it.
+    const d: string = byTestId(root, 'svg-path')[0]!.props.d;
+    const [, mx, my, , , , , , , ex, ey] = d.split(' ').map(Number);
+    const c = canvas.width / 2;
+    expect(my).toBeGreaterThan(c);
+    expect(mx).toBeLessThan(c);
+    expect(ex).toBeGreaterThan(c);
+    expect(ey).toBeLessThan(c);
+  });
+
   it('turns the film, and holds still under reduced motion', () => {
     expect(byTestId(mount('new').root, 'sk-group')[0]!.props.transform.value).toEqual([
       { rotate: Math.PI * 2 },
