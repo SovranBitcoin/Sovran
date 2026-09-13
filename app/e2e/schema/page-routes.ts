@@ -4,7 +4,10 @@ import type { CANONICAL_PAGES } from './pages';
 export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], readonly string[]>> = {
   'image-viewer': [], // overlay opened from post media, not a route
   cta: ['cta.tsx'],
-  'recovery-phrase-confirm': ['(settings-flow)/recovery-phrase-confirm.tsx'],
+  'backup-intro': ['(backup-flow)/index.tsx'],
+  'backup-words': ['(backup-flow)/words.tsx'],
+  'backup-verify': ['(backup-flow)/verify.tsx'],
+  'backup-done': ['(backup-flow)/done.tsx'],
   'secure-locked': [], // boot gate; no route alias
   'profile-keys-error': [], // key-provider gate; no route alias
   'profile-switcher': [], // Imperative sheet entered from the drawer; no route alias.

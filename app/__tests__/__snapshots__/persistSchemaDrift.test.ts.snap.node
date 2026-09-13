@@ -296,6 +296,11 @@ exports[`persisted schema drift cta-store schema matches the golden snapshot for
                 "minimum": 0,
                 "type": "integer",
               },
+              "revision": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer",
+              },
               "version": {
                 "maxLength": 32,
                 "type": "string",
@@ -327,6 +332,11 @@ exports[`persisted schema drift cta-store schema matches the golden snapshot for
               "at": {
                 "maximum": 9007199254740991,
                 "minimum": 0,
+                "type": "integer",
+              },
+              "revision": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
                 "type": "integer",
               },
               "version": {
@@ -9044,6 +9054,19 @@ exports[`persisted schema drift wallet-lifecycle schema matches the golden snaps
           ],
           "default": null,
         },
+        "recoveryPhraseVerifiedRevision": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
         "restoreStatus": {
           "default": "unknown",
           "enum": [
@@ -9114,6 +9137,19 @@ exports[`persisted schema drift wallet-lifecycle schema matches the golden snaps
           ],
           "default": null,
         },
+        "recoveryPhraseVerifiedRevision": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
         "restoreStatus": {
           "default": "unknown",
           "enum": [
@@ -9143,6 +9179,7 @@ exports[`persisted schema drift wallet-lifecycle schema matches the golden snaps
       "required": [
         "seedCreatedAt",
         "recoveryPhraseVerifiedAt",
+        "recoveryPhraseVerifiedRevision",
         "restoreStatus",
         "lastRestoreAt",
         "lastRestoreError",

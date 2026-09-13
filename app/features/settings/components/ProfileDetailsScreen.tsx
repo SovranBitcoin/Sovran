@@ -1,3 +1,4 @@
+import { ListRow } from '@/shared/ui/composed/ListRow';
 import React, { useEffect, useState } from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { AppState } from 'react-native';
@@ -223,6 +224,16 @@ export function ProfileDetailsScreen({
           </Card>
         )}
 
+        <ListRow
+          testID="settings-backup-row"
+          title={<Text bold>Back up recovery phrase</Text>}
+          accessibilityLabel="Back up recovery phrase"
+          onPress={() => {
+            setVisibleFields({ mnemonic: false, nsec: false, cashuMnemonic: false });
+            router.push('/(backup-flow)');
+          }}
+        />
+
         {renderCopyableDetail(
           'NIP06:',
           mnemonic || '',
@@ -230,18 +241,6 @@ export function ProfileDetailsScreen({
           'mnemonic',
           'Root recovery phrase for profiles derived by Sovran. Imported Nostr identities need their own private-key backup. Keep profile identifiers and mint information too.',
           loading
-        )}
-
-        {visibleFields.mnemonic && mnemonic && !loading && (
-          <Button
-            testID="profile-recovery-written"
-            accessibilityLabel="I've written it down"
-            onPress={() => {
-              setVisibleFields({ mnemonic: false, nsec: false, cashuMnemonic: false });
-              router.push('/(settings-flow)/recovery-phrase-confirm');
-            }}>
-            <Button.Label>{"I've written it down"}</Button.Label>
-          </Button>
         )}
 
         {!rootOnly && (

@@ -5,6 +5,11 @@ import * as Clipboard from 'expo-clipboard';
 import { ProfileDetailsScreen } from '@/features/settings/components/ProfileDetailsScreen';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+const mockPush = jest.fn();
+jest.mock('@/shared/hooks/useGuardedRouter', () => ({
+  guardedRouter: { push: (...args: unknown[]) => mockPush(...args) },
+}));
+jest.mock('@/shared/ui/composed/ListRow', () => ({ ListRow: 'ListRow' }));
 jest.mock('@/shared/ui/composed/Screen', () => ({ Screen: 'Screen' }));
 jest.mock('@/shared/ui/primitives/Text', () => ({ Text: 'Text' }));
 jest.mock('@/shared/ui/primitives/View/View', () => ({ View: 'View' }));
@@ -68,5 +73,13 @@ test('shared Settings recovery fields mask before reveal, hide on background, an
     )!;
   await act(async () => copy.props.onPress());
   expect(Clipboard.setStringAsync).toHaveBeenCalledWith('test-root-placeholder');
+  void act(() => reveal().props.onPress());
+  expect(input().props.value).toBe('test-root-placeholder');
+  void act(() => {
+    screen.root.findByProps({ testID: 'settings-backup-row' }).props.onPress();
+  });
+  expect(mockPush).toHaveBeenCalledWith('/(backup-flow)');
+  expect(input().props.value).not.toBe('test-root-placeholder');
+  expect(screen.root.findAllByProps({ testID: 'profile-recovery-written' })).toHaveLength(0);
   void act(() => screen.unmount());
 });

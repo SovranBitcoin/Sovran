@@ -22,18 +22,24 @@ it('queues update before backup regardless of registry order and ignores blockin
   expect(selectNextCta({ ...ctx, nativeVersion: '2.0.0' })?.id).toBe('backup-recovery-phrase');
 });
 it('honors permanent dismissal and ignores one for a different trigger version', () => {
-  const backup = { ...ctx, latest: null, dismissed: { 'backup-recovery-phrase': { at: 0 } } };
+  const backup = {
+    ...ctx,
+    latest: null,
+    dismissed: { 'backup-recovery-phrase': { revision: 2, at: 0 } },
+  };
   expect(selectNextCta(backup)).toBeNull();
   expect(
-    selectNextCta({ ...backup, dismissed: { 'backup-recovery-phrase': { at: 0, version: 'old' } } })
-      ?.id
+    selectNextCta({
+      ...backup,
+      dismissed: { 'backup-recovery-phrase': { revision: 2, at: 0, version: 'old' } },
+    })?.id
   ).toBe('backup-recovery-phrase');
 });
 it('expires a three-day snooze at its boundary', () => {
   const snoozed = {
     ...ctx,
     latest: null,
-    dismissed: { 'backup-recovery-phrase:snooze': { at: ctx.nowMs } },
+    dismissed: { 'backup-recovery-phrase:snooze': { revision: 2, at: ctx.nowMs } },
   };
   expect(selectNextCta(snoozed)).toBeNull();
   expect(selectNextCta({ ...snoozed, nowMs: ctx.nowMs + BACKUP_SNOOZE_MS - 1 })).toBeNull();
@@ -46,7 +52,7 @@ it('supports a registry policy with a custom snooze duration', () => {
   const input = {
     ...ctx,
     latest: null,
-    dismissed: { 'backup-recovery-phrase': { at: ctx.nowMs } },
+    dismissed: { 'backup-recovery-phrase': { revision: 2, at: ctx.nowMs } },
   };
   expect(selectNextCta(input, definitions)).toBeNull();
   expect(selectNextCta({ ...input, nowMs: ctx.nowMs + 100 }, definitions)).not.toBeNull();
@@ -58,7 +64,7 @@ it('suppresses auto-show under automation and backup under Mock Mode', () => {
 });
 it('requires an unverified, eligible lifecycle and balance or a known seed older than seven days', () => {
   for (const lifecycle of [
-    { ...ctx.lifecycle, recoveryPhraseVerifiedAt: 0 },
+    { ...ctx.lifecycle, recoveryPhraseVerifiedAt: 0, recoveryPhraseVerifiedRevision: 2 },
     { ...ctx.lifecycle, restoreStatus: 'pending' },
   ])
     expect(selectNextCta({ ...ctx, latest: null, lifecycle })).toBeNull();
@@ -105,4 +111,41 @@ it('treats a version record older than 24 hours as unknown', () => {
 });
 it('does not block without a native version, even with fresh newer metadata', () => {
   expect(selectNextCta({ ...ctx, nativeVersion: '', mockMode: true })).toBeNull();
+});
+
+it.each([undefined, 1])(
+  'ignores legacy dismissal revision %s for both permanent and snoozed reminders',
+  (revision) => {
+    for (const key of ['backup-recovery-phrase', 'backup-recovery-phrase:snooze']) {
+      expect(
+        selectNextCta({ ...ctx, latest: null, dismissed: { [key]: { at: ctx.nowMs, revision } } })
+          ?.id
+      ).toBe('backup-recovery-phrase');
+    }
+  }
+);
+it.each([undefined, null, 1])(
+  'requires the new verification even with an old timestamp and revision %s',
+  (recoveryPhraseVerifiedRevision) => {
+    expect(
+      selectNextCta({
+        ...ctx,
+        latest: null,
+        lifecycle: {
+          ...ctx.lifecycle,
+          recoveryPhraseVerifiedAt: 123,
+          recoveryPhraseVerifiedRevision,
+        },
+      })?.id
+    ).toBe('backup-recovery-phrase');
+  }
+);
+it('uses revision 1 for definitions without an explicit revision', () => {
+  const definitions = [{ ...CTA_DEFINITIONS[1], revision: undefined }];
+  expect(
+    selectNextCta(
+      { ...ctx, latest: null, dismissed: { 'backup-recovery-phrase': { at: 0, revision: 1 } } },
+      definitions
+    )
+  ).toBeNull();
 });

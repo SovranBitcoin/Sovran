@@ -11,8 +11,11 @@ export function selectNextCta(
       .filter((cta) => {
         if (!cta.shouldShow(ctx)) return false;
         if (cta.dismissPolicy === 'never') return true;
-        const applies = (entry: { at: number; version?: string } | undefined) =>
-          entry && (entry.version === undefined || entry.version === ctx.latest?.version);
+        const applies = (entry: { at: number; version?: string; revision?: number } | undefined) =>
+          entry &&
+          entry.revision !== undefined &&
+          entry.revision >= (cta.revision ?? 1) &&
+          (entry.version === undefined || entry.version === ctx.latest?.version);
         const dismissal = ctx.dismissed[cta.id];
         if (applies(dismissal)) {
           if (cta.dismissPolicy === 'do-not-ask-again') return false;

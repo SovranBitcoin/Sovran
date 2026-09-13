@@ -144,6 +144,20 @@ for (const path of STORE_MODULES) {
 }
 
 describe('persisted store round-trip', () => {
+  it('round-trips the all-word backup revision and CTA dismissal revisions', () => {
+    const { useWalletLifecycleStore } = require('@/shared/stores/global/walletLifecycleStore');
+    const { useCtaStore } = require('@/shared/stores/global/ctaStore');
+    useWalletLifecycleStore.getState().markRecoveryPhraseVerified();
+    useCtaStore.getState().dismiss('backup-recovery-phrase', true);
+    for (const store of [useWalletLifecycleStore, useCtaStore]) {
+      const options = store.persist.getOptions();
+      const persisted = JSON.parse(JSON.stringify(options.partialize(store.getState())));
+      expect(options.merge(persisted, store.getInitialState())).toMatchObject(persisted);
+    }
+    expect(useWalletLifecycleStore.getState().recoveryPhraseVerifiedRevision).toBe(2);
+    expect(useCtaStore.getState().dismissed['backup-recovery-phrase'].revision).toBe(2);
+  });
+
   it.each([
     {},
     {
