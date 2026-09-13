@@ -86,7 +86,7 @@ const DiscoverMint = z.looseObject({
   nErrors: z.number().int().optional(),
   uptime24h: z.number().optional(),
   avgLatencyMs: z.number().optional(),
-  auditSource: z.enum(['ucash', '8333']).optional(),
+  auditSource: z.enum(['ucash', '8333']).optional().catch(undefined),
   auditUpdatedAt: z.union([z.number(), z.string().max(128)]).optional(),
   operatorPubkey: z.string().max(128).optional(),
   operatorNpub: z.string().max(128).optional(),
