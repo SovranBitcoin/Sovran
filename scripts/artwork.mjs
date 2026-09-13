@@ -384,6 +384,10 @@ export async function loadInputs(project, specs) {
   };
 }
 // Restore catalog pixels at native panorama height; only 24-pixel vertical edges blend.
+// The blend is integer arithmetic on raw pixels rather than a libvips composite:
+// libvips premultiplies in floating point and its x86 and arm64 vector paths
+// round differently by ±1–2 levels inside the feather, which made the same
+// source render different bytes on macOS and on the CI runner.
 export async function restoreCentre(portrait, panorama) {
   const meta = await sharp(panorama).metadata();
   const original = await sharp(portrait)
@@ -392,6 +396,7 @@ export async function restoreCentre(portrait, panorama) {
     .raw()
     .toBuffer({ resolveWithObject: true });
   assert(original.info.width < meta.width, "Portrait must fit panorama");
+  assert.equal(original.info.channels, 3);
   // Feather outwards: the entire original strip remains opaque and exact.
   // Extend its edge pixels only into the generated flanks, then fade over 24 px.
   const feather = 24,
@@ -406,31 +411,29 @@ export async function restoreCentre(portrait, panorama) {
     })
     .raw()
     .toBuffer();
-  const alpha = Buffer.alloc(overlayWidth * meta.height, 255);
-  for (let y = 0; y < meta.height; y++)
-    for (let x = 0; x < overlayWidth; x++)
-      alpha[y * overlayWidth + x] = Math.round(
-        255 * Math.min(1, x / feather, (overlayWidth - 1 - x) / feather),
-      );
-  const overlay = await sharp(extended, {
-    raw: { ...original.info, width: overlayWidth },
-  })
-    .joinChannel(alpha, {
-      raw: { width: overlayWidth, height: meta.height, channels: 1 },
-    })
-    .png()
-    .toBuffer();
-  return sharp(panorama)
-    .composite([
-      {
-        input: overlay,
-        left: Math.round((meta.width - original.info.width) / 2) - feather,
-        top: 0,
-      },
-    ])
+  const base = await sharp(panorama)
     .removeAlpha()
-    .png()
-    .toBuffer();
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  assert.equal(base.info.channels, 3);
+  const left = Math.round((meta.width - original.info.width) / 2) - feather;
+  const alpha = new Uint8Array(overlayWidth);
+  for (let x = 0; x < overlayWidth; x++)
+    alpha[x] = Math.round(
+      255 * Math.min(1, x / feather, (overlayWidth - 1 - x) / feather),
+    );
+  const out = Buffer.from(base.data);
+  for (let y = 0; y < meta.height; y++)
+    for (let x = 0; x < overlayWidth; x++) {
+      const a = alpha[x],
+        src = (y * overlayWidth + x) * 3,
+        dst = (y * meta.width + left + x) * 3;
+      for (let c = 0; c < 3; c++)
+        out[dst + c] = Math.round(
+          (extended[src + c] * a + out[dst + c] * (255 - a)) / 255,
+        );
+    }
+  return sharp(out, { raw: base.info }).png().toBuffer();
 }
 // Position the restored portrait behind the phone, then use this identical crop
 // for both the blurred background and the sharp masked screen. A centred canvas
