@@ -361,6 +361,8 @@ export function UserFeed({
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const hasMoreRef = useRef(true);
+  const paginationCursorRef =
+    useRef<import('../data/feedClient').FeedParseResult['paginationCursor']>(null);
   const paginationUntilRef = useRef(0);
   const paginationOffsetRef = useRef(0);
   const loadingMoreRef = useRef(false);
@@ -390,6 +392,7 @@ export function UserFeed({
     setIsLoading(true);
     isFirstRender.current = true;
     hasMoreRef.current = true;
+    paginationCursorRef.current = null;
     paginationUntilRef.current = 0;
     paginationOffsetRef.current = 0;
     feedItemIdsRef.current.clear();
@@ -408,6 +411,7 @@ export function UserFeed({
           isOwnProfile,
           hasMoreRef,
           paginationUntilRef,
+          paginationCursorRef,
           paginationOffsetRef,
           loadingMoreRef,
           feedItemIdsRef,
@@ -455,6 +459,7 @@ export function UserFeed({
         isOwnProfile,
         hasMoreRef,
         paginationUntilRef,
+        paginationCursorRef,
         paginationOffsetRef,
         loadingMoreRef,
         feedItemIdsRef,
@@ -754,6 +759,7 @@ async function loadMoreUserItemsImpl(ctx: UserFeedLoadCtx): Promise<FeedItem[]> 
     isOwnProfile,
     hasMoreRef,
     paginationUntilRef,
+    paginationCursorRef,
     paginationOffsetRef,
     loadingMoreRef,
     feedItemIdsRef,
@@ -780,10 +786,12 @@ async function loadMoreUserItemsImpl(ctx: UserFeedLoadCtx): Promise<FeedItem[]> 
       authorName,
       authorPicture,
       limit: 30,
+      cursor: paginationCursorRef.current,
       until: paginationUntilRef.current,
       offset: paginationOffsetRef.current > 0 ? paginationOffsetRef.current : undefined,
     });
 
+    paginationCursorRef.current = page.paginationCursor;
     if (page.orderedFeedItems.length === 0) {
       hasMoreRef.current = false;
       return [];

@@ -17,9 +17,21 @@ export function mapNaggFeedPage(
   page: NaggFeedPage<FeedEvent, ProfileInfo>,
   options: MapNaggFeedPageOptions = {}
 ): FeedParseResult {
-  return mapNaggFeedPageBase(page, {
+  const mapped = mapNaggFeedPageBase(page, {
     ...options,
     collectReferences: collectReferencedIds,
     defaultMetrics: DEFAULT_METRICS,
   });
+  const last = mapped.orderedFeedItems.at(-1);
+  return {
+    ...mapped,
+    hasMore: page.hasMore,
+    paginationCursor:
+      last && page.paginationUntil > 0
+        ? {
+            createdAt: page.paginationUntil,
+            id: last.type === 'note' ? last.event.id : last.repostEvent.id,
+          }
+        : null,
+  };
 }

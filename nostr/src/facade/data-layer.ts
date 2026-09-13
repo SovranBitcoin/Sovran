@@ -1,3 +1,4 @@
+import { createFeedPager, type FeedPager, type FeedPagerOptions } from './feed-pager';
 import type { NotificationSortKey } from "./notifications";
 import { ok, type Result } from 'neverthrow';
 import type { NostrTier } from '@sovranbitcoin/schemas';
@@ -11,7 +12,7 @@ import {
 import { nostrLog, type NostrLogData } from '../log';
 import type { NaggFeedEvent } from '../map/feed';
 import {
-  type FeedBundle, type FeedItem, type FeedPageRequest, type ResolvedFeedPage } from './feed';
+  assembleFeedPage, type FeedBundle, type FeedItem, type FeedPageRequest, type ResolvedFeedPage } from './feed';
 import {
   partitionOpFirst,
   isDirectReplyTo,
@@ -100,6 +101,7 @@ export interface NostrDataLayer {
    * ranked reply delta. Returns `root: undefined` when the note isn't cached.
    */
   readThread(noteId: string): CachedThreadView;
+  createFeedPager(request: Omit<FeedPagerOptions, 'tiers' | 'ingest'>): FeedPager;
   getFeedPage(request: FeedPageRequest): Promise<Result<ResolvedFeedPage, TierResolutionError>>;
   getThread(request: ThreadRequest): Promise<Result<ResolvedThread, TierResolutionError>>;
   /**
@@ -173,6 +175,14 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
 
     readThread(noteId) {
       return readThreadFromCache(cache, noteId);
+    },
+
+    createFeedPager(request) {
+      return createFeedPager({
+        ...request,
+        tiers: config.tiers,
+        ingest: (page) => ingestFeedPage(cache, page),
+      });
     },
 
     async getFeedPage(request) {
@@ -457,24 +467,6 @@ function candidatesFor<T>(
   return tiers
     .filter((tier) => typeof tier[surface] === 'function')
     .map((tier) => ({ tier: tier.tier, attempt: attempt(tier) }));
-}
-
-/** Apply the manifest to the unordered bundle — ordering happens in ONE place. */
-function assembleFeedPage(tier: NostrTier, bundle: FeedBundle): ResolvedFeedPage {
-  const missingIds: string[] = [];
-  const items = applyOrderingManifest(bundle.manifest, bundle.itemsById, {
-    onMissing: (id) => missingIds.push(id),
-  });
-  return {
-    tier,
-    items,
-    stats: bundle.stats,
-    ...(bundle.actions ? { actions: bundle.actions } : {}),
-    profiles: bundle.profiles,
-    quoted: bundle.quoted,
-    cursor: bundle.cursor,
-    missingIds,
-  };
 }
 
 const THREAD_AUDIT_TTL_MS = 5 * 60_000;

@@ -30,6 +30,7 @@ describe('resolvedFeedPageToParseResult', () => {
   it('maps notes + reposts (adding timestamp), stats→metrics, and cursor', () => {
     const page = {
       tier: 'relay' as const,
+      hasMore: false,
       items: [
         { type: 'note' as const, event: event(NOTE, 200, [['q', QUOTED]]) },
         {
@@ -47,6 +48,8 @@ describe('resolvedFeedPageToParseResult', () => {
     };
 
     const result = resolvedFeedPageToParseResult(page);
+    expect(result.paginationCursor).toEqual(page.cursor);
+    expect(result.hasMore).toBe(page.hasMore);
 
     // notes carry a timestamp from created_at
     const note = result.orderedFeedItems[0];

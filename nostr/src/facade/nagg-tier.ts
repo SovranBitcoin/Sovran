@@ -166,7 +166,8 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
     async feedPage(request: FeedPageRequest): Promise<TierOutcome<FeedBundle>> {
       const binding = feedBindingForSpec(request);
       nostrLog.debug('nostr.nagg.feed', { path: binding.path, spec: request.spec.kind });
-      const result = await client.rest<typeof NaggEnvelopeSchema>({
+      // Feed retry timing belongs to the pager, not the shared surface cooldown.
+      const result = await config.client.rest<typeof NaggEnvelopeSchema>({
         path: binding.path,
         method: binding.method ?? 'POST',
         body: binding.body,
@@ -180,15 +181,11 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
       return result.match<TierOutcome<FeedBundle>>(
         (envelope) => {
           const bundle = bundleFromFeedPage(feedPageFromEnvelope(envelope));
-          // An empty feed page isn't a useful answer — fall through to the next
-          // tier so a quiet/unavailable nagg appview doesn't blank the feed.
-          if (bundle.itemsById.size === 0) {
-            nostrLog.debug('nostr.nagg.feed.empty');
-            return unsupported();
-          }
           return answered(bundle);
         },
-        (error) => failed(error),
+        (error) => error.type === 'http' && (error.status === 404 || error.status === 501)
+          ? unsupported()
+          : failed(error),
       );
     },
 

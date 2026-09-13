@@ -274,8 +274,11 @@ function defaultResolveFeedSpec(
         params: pagedParams({ id: 'latest', kind: 'notes' }, spec.viewerPubkey),
       };
     case 'following-recent':
-      // Explicit author sets are served by the relay floor.
-      return null;
+      if (spec.authors) return null;
+      return {
+        verb: 'mega_feed_directive',
+        params: pagedParams({ id: spec.viewerPubkey ? 'latest' : 'all-notes', kind: 'notes' }, spec.viewerPubkey),
+      };
     case 'user':
       return {
         verb: 'feed',

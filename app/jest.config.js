@@ -13,6 +13,10 @@ module.exports = {
     '<rootDir>/jest.staticAssets.js',
   ],
   moduleNameMapper: {
+    '^nostr$': '<rootDir>/../nostr/src/index.ts',
+    '^nostr/map$': '<rootDir>/../nostr/src/map/index.ts',
+    '^nostr/recipes$': '<rootDir>/../nostr/src/recipes/index.ts',
+    '^nostr/schemas$': '<rootDir>/../nostr/src/schemas.ts',
     // A hoisted install and an isolated install must use the renderer's React.
     '^react$': require.resolve('react'),
     // bc-ur uses CommonJS while cborg exposes only an import condition.

@@ -76,9 +76,21 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
         if (forYou) return answered(forYou);
       }
 
-      const filters = filtersForSpec(request.spec, {
+      let spec = request.spec;
+      if (spec.kind === 'following-recent' && !spec.authors && spec.viewerPubkey) {
+        const follows = await config.connection.request(
+          [{ kinds: [3], authors: [spec.viewerPubkey], limit: 1 }],
+          { signal: request.signal, timeoutMs: request.timeoutMs },
+        );
+        if (follows.isErr()) return failed(follows.error);
+        const latest = toFeedEvents(follows.value).sort((a, b) => b.created_at - a.created_at)[0];
+        const authors = latest?.tags.filter((tag) => tag[0] === 'p' && tag[1]).map((tag) => tag[1]) ?? [];
+        if (!authors.length) return answered(demuxRelayFeed([]));
+        spec = { ...spec, authors };
+      }
+      const filters = filtersForSpec(spec, {
         until: request.cursor?.createdAt,
-        limit: request.limit,
+        limit: request.cursor ? (request.limit ?? 30) + 1 : request.limit,
       });
       if (!filters) return unsupported();
 
@@ -450,7 +462,8 @@ export function filtersForSpec(
     case 'following-recent':
       // The floor can serve an explicit author list; a viewer anchor needs the
       // viewer's kind-3 resolved first (same gap as following-popular).
-      if (!spec.authors || spec.authors.length === 0) return null;
+      if (!spec.authors) return spec.viewerPubkey ? null : [{ kinds: [1], limit: paging.limit ?? 30, ...bounds }];
+      if (spec.authors.length === 0) return null;
       return [{ kinds: [1], authors: spec.authors, limit: paging.limit ?? 30, ...bounds }];
     case 'user':
       return [{ kinds: [1], authors: [spec.pubkey], limit: paging.limit ?? 30, ...bounds }];
