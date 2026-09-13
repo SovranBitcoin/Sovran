@@ -1,6 +1,6 @@
 import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { Screen } from '@/shared/ui/composed/Screen';
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, {
   Easing,
@@ -17,7 +17,6 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Text } from '@/shared/ui/primitives/Text';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Card } from '@/shared/ui/composed/Card';
@@ -26,11 +25,10 @@ import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import Icon from '@/assets/icons';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
-import { useCountRollIn } from '@/shared/ui/composed/AnimatedCountValue';
+import { RatingBarChart } from '@/features/mint/components/RatingBarChart';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { Avatar, AvatarStatusDot } from '@/shared/ui/primitives/Avatar';
 import * as Clipboard from 'expo-clipboard';
-import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
@@ -281,144 +279,6 @@ function StatsGrid({
       visualSurface="mint-info"
       renderSkeleton={() => renderGrid(true)}
       renderContent={() => renderGrid(false)}
-    />
-  );
-}
-
-/** Score with staggered star rows and distribution bars to the edge. */
-function RatingBarChart({ score }: { score: number }) {
-  const [foreground, defaultColor, surfaceTertiary, starColor] = useThemeColor([
-    'foreground',
-    'default',
-    'surface-tertiary',
-    'yellow-300',
-  ] as const);
-
-  const fadeAnim = useSharedValue(0);
-  const barScaleAnim = useSharedValue(0);
-
-  const fadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.get(), alignItems: 'center' }));
-  const starFadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.get() }));
-  const barFillStyle = useAnimatedStyle(() => ({
-    width: '100%',
-    height: '100%',
-    borderRadius: 4,
-    transform: [{ scaleX: barScaleAnim.get() }],
-    transformOrigin: 'left center',
-  }));
-
-  const isValidScore = score >= 0;
-  const showSkeleton = !isValidScore;
-
-  const targetRow = isValidScore ? Math.max(1, Math.min(5, Math.ceil(score))) : 0;
-  const goldPercentage = isValidScore && targetRow > 0 ? Math.min(1, score / targetRow) : 0;
-
-  const formattedScore = isValidScore ? score.toFixed(1) : '0.0';
-  // Rolls the headline score when a background refresh replaces the cached one
-  // (the bar-fill reveal below stays a one-shot mount-entrance animation).
-  const scoreRoll = useCountRollIn(formattedScore);
-
-  const hasAnimatedRef = useRef(false);
-  useEffect(() => {
-    if (isValidScore && !hasAnimatedRef.current) {
-      hasAnimatedRef.current = true;
-
-      fadeAnim.set(0);
-      barScaleAnim.set(0);
-
-      fadeAnim.set(withTiming(1, { duration: 400 }));
-      barScaleAnim.set(
-        withDelay(
-          200,
-          withTiming(goldPercentage, { duration: 800, easing: Easing.out(Easing.cubic) })
-        )
-      );
-    }
-  }, [isValidScore, goldPercentage, fadeAnim, barScaleAnim]);
-
-  const renderSkeleton = () => (
-    <HStack align="center" gap={16} className="w-full self-stretch px-4">
-      <VStack align="center" className="shrink-0">
-        <Skeleton className="bg-surface-tertiary h-8 w-12 rounded" />
-        <Skeleton className="bg-surface-tertiary mt-2 h-3.5 w-10 rounded" />
-      </VStack>
-      <VStack gap={4} className="min-w-0 flex-1" style={{ flex: 1 }}>
-        {[5, 4, 3, 2, 1].map((stars) => (
-          <HStack key={stars} align="center" gap={2} className="w-full min-w-0">
-            <HStack gap={2} className="shrink-0">
-              {Array.from({ length: stars }).map((_, i) => (
-                <Icon key={i} name="ic:round-star" size={12} color={defaultColor} />
-              ))}
-            </HStack>
-            <View
-              className="bg-surface-tertiary min-w-0 flex-1 rounded"
-              style={{ height: 8, minWidth: 24 }}
-            />
-          </HStack>
-        ))}
-      </VStack>
-    </HStack>
-  );
-
-  const renderContent = () => (
-    <HStack align="center" gap={16} className="w-full self-stretch px-4">
-      <VStack align="center" className="shrink-0">
-        <Animated.View style={fadeStyle}>
-          <Animated.View style={scoreRoll}>
-            <Text heavy size={28} style={{ color: foreground }}>
-              {formattedScore}
-            </Text>
-          </Animated.View>
-          <Text size={12} style={{ color: withAlpha(foreground, 0.5) }}>
-            out of 5
-          </Text>
-        </Animated.View>
-      </VStack>
-
-      <VStack gap={4} className="min-w-0 flex-1" style={{ flex: 1 }}>
-        {[5, 4, 3, 2, 1].map((stars) => {
-          const isTargetRow = stars === targetRow;
-          return (
-            <HStack key={stars} align="center" gap={2} className="w-full min-w-0">
-              <HStack gap={2} className="shrink-0">
-                {Array.from({ length: stars }).map((_, i) =>
-                  isTargetRow ? (
-                    <Animated.View key={i} style={starFadeStyle}>
-                      <Icon name="ic:round-star" size={12} color={starColor} />
-                    </Animated.View>
-                  ) : (
-                    <View key={i}>
-                      <Icon name="ic:round-star" size={12} color={withAlpha(foreground, 0.4)} />
-                    </View>
-                  )
-                )}
-              </HStack>
-              <View
-                className="min-w-0 flex-1 overflow-hidden rounded"
-                style={{
-                  height: 8,
-                  minWidth: 24,
-                  backgroundColor: surfaceTertiary,
-                  borderRadius: 4,
-                }}>
-                {isTargetRow && (
-                  <Animated.View style={[barFillStyle, { backgroundColor: starColor }]} />
-                )}
-              </View>
-            </HStack>
-          );
-        })}
-      </VStack>
-    </HStack>
-  );
-
-  return (
-    <SkeletonContentCrossfade
-      loading={showSkeleton}
-      visualKey="mint-info-rating"
-      visualSurface="mint-info"
-      renderSkeleton={renderSkeleton}
-      renderContent={renderContent}
     />
   );
 }

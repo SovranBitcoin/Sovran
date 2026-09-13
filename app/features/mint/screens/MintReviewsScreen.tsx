@@ -1,6 +1,5 @@
 import { Screen } from '@/shared/ui/composed/Screen';
 import { useState, useEffect } from 'react';
-import Animated from 'react-native-reanimated';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
@@ -12,8 +11,6 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { Spacer } from '@/shared/ui/primitives/View/Spacer';
-import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { reviewMint, type MintRecommendation } from '@/shared/lib/apiClient';
 import {
@@ -23,14 +20,16 @@ import {
 import { useIdentityName } from '@/shared/hooks/useIdentityName';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
-import { useCountRollIn } from '@/shared/ui/composed/AnimatedCountValue';
+import { RatingBarChart } from '@/features/mint/components/RatingBarChart';
+import { RatingStars } from '@/features/mint/components/RatingStars';
+import { ListRow } from '@/shared/ui/composed/ListRow';
+import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { List } from '@/shared/ui/composed/List';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { withAlpha } from '@/shared/lib/color';
 import { cashuLog, redactError, useLifecycleLogger, mintUrlLogFields } from '@/shared/lib/logger';
-import { formatDate } from '@/shared/lib/date';
+import { formatRelative } from '@/shared/lib/date';
 
 /** Commented reviews first, each group newest-first. */
 function sortReviews(rawReviews: MintRecommendation[]): MintRecommendation[] {
@@ -41,7 +40,7 @@ function sortReviews(rawReviews: MintRecommendation[]): MintRecommendation[] {
   return [...withContent.sort(byDate), ...withoutContent.sort(byDate)];
 }
 
-const keyExtractor = (item: MintRecommendation, index: number) => item.pubkey || `review-${index}`;
+const keyExtractor = (item: MintRecommendation) => item.eventId;
 
 const ParamsSchema = z.object({
   mintUrl: z
@@ -51,284 +50,122 @@ const ParamsSchema = z.object({
     .regex(/^https?:\/\//, 'mintUrl must be http(s)'),
 });
 
-function StarRating({ score, size = 16 }: { score: number; size?: number }) {
-  const [defaultColor, warning] = useThemeColor(['default', 'yellow-300'] as const);
-  const filledStars = Math.round(score);
-
-  return (
-    <HStack gap={2}>
-      {[0, 1, 2, 3, 4].map((i) => (
-        <Icon
-          key={i}
-          name="ic:round-star"
-          size={size}
-          color={i < filledStars ? warning : defaultColor}
-        />
-      ))}
-    </HStack>
-  );
-}
-
-function ReviewItem({ review, isLast }: { review: MintRecommendation; isLast: boolean }) {
-  const [foreground, surfaceSecondary] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-  ] as const);
-
-  const reviewText = review.comment?.trim() || '';
-  // null score = a NIP-87 recommendation without a [n/5] marker; show it as an
-  // endorsement (no misleading 0-star rating), just the reviewer + comment.
-  const reviewScore = review.score;
-  // Reviewer names: prefer Nostr metadata (cached in the shared SWR
-  // store, populated by other surfaces), fall back to the deterministic
-  // word pair so reviews never render anonymous-looking hex.
-  const { displayName: fallbackDisplayName } = useIdentityName(review.pubkey);
-  const displayName = review.displayName ?? review.name ?? fallbackDisplayName;
-  const reviewerPicture = review.picture ?? review.image;
-
-  const formattedDate = review.created_at
-    ? formatDate(review.created_at * 1000, 'short-date')
-    : null;
-  const handleAvatarPress = () => {
-    router.push(buildModalProfileHref({ pubkey: review.pubkey }));
-  };
-
-  return (
-    <View className="py-4">
-      <HStack align="flex-start" gap={12}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Open ${displayName} profile`}
-          activeOpacity={0.75}
-          className="shrink-0"
-          haptics
-          onPress={handleAvatarPress}>
-          <Avatar
-            state={reviewerPicture ? 'image' : 'fallback'}
-            picture={reviewerPicture}
-            seed={review.pubkey}
-            name={displayName}
-            size={40}
-          />
-        </Pressable>
-
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <View
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text
-              size={14}
-              bold
-              style={{ color: foreground, flex: 1, marginRight: 8 }}
-              numberOfLines={1}
-              ellipsizeMode="tail">
-              {displayName}
-            </Text>
-            {formattedDate && (
-              <Text size={12} style={{ color: withAlpha(foreground, 0.35), flexShrink: 0 }}>
-                {formattedDate}
-              </Text>
-            )}
-          </View>
-
-          {reviewScore !== null && (
-            <View style={{ marginTop: 4 }}>
-              <StarRating score={reviewScore} size={14} />
-            </View>
-          )}
-
-          {reviewText.length > 0 && (
-            <Text
-              size={14}
-              style={{ color: withAlpha(foreground, 0.6), lineHeight: 20, marginTop: 6 }}
-              numberOfLines={10}>
-              {reviewText}
-            </Text>
-          )}
-        </View>
-      </HStack>
-
-      {!isLast && <View className="mt-4 h-px" style={{ backgroundColor: surfaceSecondary }} />}
-    </View>
-  );
-}
-
-function ReviewSkeleton({ isLast = false }: { isLast?: boolean }) {
-  const surfaceSecondary = useThemeColor('surface-secondary');
-
-  return (
-    <View className="py-4">
-      <HStack align="flex-start" gap={12} className="flex-1">
-        <View className="shrink-0">
-          <Skeleton
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 24,
-              backgroundColor: surfaceSecondary,
-            }}
-          />
-        </View>
-
-        <VStack gap={6} className="min-w-0 flex-1">
-          <HStack align="center" justify="space-between" className="flex-1">
-            <Skeleton
-              style={{
-                width: 120,
-                height: 15,
-                borderRadius: 4,
-                backgroundColor: surfaceSecondary,
-              }}
-            />
-            <Skeleton
-              style={{
-                width: 70,
-                height: 12,
-                borderRadius: 4,
-                backgroundColor: surfaceSecondary,
-              }}
-            />
-          </HStack>
-
-          <HStack gap={2}>
-            {[0, 1, 2, 3, 4].map((i) => (
-              <Skeleton
-                key={i}
-                style={{
-                  width: 16,
-                  height: 16,
-                  borderRadius: 2,
-                  backgroundColor: surfaceSecondary,
-                }}
-              />
-            ))}
-          </HStack>
-
-          <VStack gap={4}>
-            <Skeleton
-              style={{
-                width: '100%',
-                height: 14,
-                borderRadius: 4,
-                backgroundColor: surfaceSecondary,
-              }}
-            />
-            <Skeleton
-              style={{
-                width: '80%',
-                height: 14,
-                borderRadius: 4,
-                backgroundColor: surfaceSecondary,
-              }}
-            />
-          </VStack>
-        </VStack>
-      </HStack>
-
-      {!isLast && <View className="mt-4 h-px" style={{ backgroundColor: surfaceSecondary }} />}
-    </View>
-  );
-}
-
-function EmptyState() {
-  const [foreground, yellow500] = useThemeColor(['foreground', 'yellow-500'] as const);
-
-  return (
-    <VStack align="center" justify="center" className="flex-1 py-12">
-      <Icon name="ic:round-star" size={64} color={yellow500} />
-      <Spacer size={16} />
-      <Text size={18} bold style={{ color: foreground, textAlign: 'center' }}>
-        No Reviews Yet
-      </Text>
-      <Spacer size={8} />
-      <Text
-        size={14}
-        style={{
-          color: withAlpha(foreground, 0.4),
-          textAlign: 'center',
-          paddingHorizontal: 32,
-        }}>
-        This mint has not received any reviews yet. Be the first to share your experience!
-      </Text>
-    </VStack>
-  );
-}
-
-function HeaderStats({
-  score,
-  totalReviews,
-  loading,
+/** Shared shell keeps loading placeholders aligned with the populated row. */
+function ReviewRow({
+  review,
+  displayName,
+  loading = false,
 }: {
-  score: number | null;
-  totalReviews: number;
-  loading: boolean;
+  review?: MintRecommendation;
+  displayName?: string;
+  loading?: boolean;
 }) {
-  const [foreground, surfaceSecondary, warning] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-    'yellow-300',
-  ] as const);
-
-  const displayScore = score !== null ? score.toFixed(1) : '0.0';
-  const hasScore = score !== null && score >= 0;
-  const reviewsLabel = `${totalReviews} ${totalReviews === 1 ? 'review' : 'reviews'}`;
-  // Cached aggregate paints immediately; a fresh fetch rolls it in (feed metric).
-  const scoreRoll = useCountRollIn(displayScore);
-  const countRoll = useCountRollIn(reviewsLabel);
+  const picture = review?.picture ?? review?.image;
+  const avatar = (
+    <Avatar
+      state={loading ? 'loading' : picture ? 'image' : 'fallback'}
+      picture={picture}
+      seed={review?.pubkey}
+      name={displayName}
+      size={44}
+    />
+  );
+  const reviewText = review?.comment?.trim() ?? '';
+  const formattedDate = review?.created_at
+    ? formatRelative(review.created_at * 1000, 'compact')
+    : null;
 
   return (
-    <View className="items-center pb-6 pt-4">
-      <VStack align="center" gap={4}>
-        <Animated.View style={scoreRoll}>
+    <ListRow
+      testID={review ? `mint-reviews-row-${review.eventId}` : undefined}
+      paddingHorizontal={0}
+      leading={
+        review ? (
+          <Pressable
+            testID={`mint-reviews-profile-${review.eventId}`}
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${displayName} profile`}
+            activeOpacity={0.75}
+            className="shrink-0"
+            haptics
+            onPress={() => router.push(buildModalProfileHref({ pubkey: review.pubkey }))}>
+            {avatar}
+          </Pressable>
+        ) : (
+          avatar
+        )
+      }
+      title={
+        <HStack className="items-center justify-between gap-2">
           <Text
-            loading={loading && !hasScore}
-            placeholder="0.0"
-            heavy
-            size={48}
-            style={{ color: warning, lineHeight: 52 }}>
-            {displayScore}
+            loading={loading}
+            placeholder="Display name"
+            size={16}
+            bold
+            className="text-foreground min-w-0 flex-1"
+            numberOfLines={1}
+            ellipsizeMode="tail">
+            {displayName}
           </Text>
-        </Animated.View>
-
-        {loading && !hasScore ? (
-          <HStack gap={4}>
-            {[0, 1, 2, 3, 4].map((i) => (
-              <Skeleton
-                key={i}
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 4,
-                  backgroundColor: surfaceSecondary,
-                }}
-              />
+          {(loading || formattedDate) && (
+            <Text
+              loading={loading}
+              placeholder="2d"
+              size={12}
+              className="text-foreground/50 shrink-0">
+              {formattedDate}
+            </Text>
+          )}
+        </HStack>
+      }
+      subtitle={
+        loading ? (
+          <HStack className="gap-0.5">
+            {[0, 1, 2, 3, 4].map((star) => (
+              <Skeleton key={star} className="bg-surface-secondary h-3.5 w-3.5 rounded-sm" />
             ))}
           </HStack>
-        ) : hasScore ? (
-          <StarRating score={score} size={24} />
-        ) : null}
-
-        <Animated.View style={countRoll}>
+        ) : review?.score != null ? (
+          <View accessible accessibilityLabel={`${review.score} out of 5 stars`}>
+            <RatingStars score={review.score} size={14} />
+          </View>
+        ) : undefined
+      }
+      accent={
+        loading || reviewText ? (
           <Text
-            loading={loading && totalReviews === 0}
-            placeholder="0 reviews"
+            loading={loading}
+            placeholder="Share your experience with this mint."
             size={14}
-            style={{ color: withAlpha(foreground, 0.4), marginTop: 4 }}>
-            {reviewsLabel}
+            className="text-foreground/60 leading-5"
+            numberOfLines={10}>
+            {reviewText}
           </Text>
-        </Animated.View>
-      </VStack>
-    </View>
+        ) : undefined
+      }
+    />
+  );
+}
+
+function ReviewItem({ review }: { review: MintRecommendation }) {
+  const { displayName: fallbackDisplayName } = useIdentityName(review.pubkey);
+  return (
+    <ReviewRow
+      review={review}
+      displayName={review.displayName ?? review.name ?? fallbackDisplayName}
+    />
   );
 }
 
 export function MintReviewsScreen() {
   useLifecycleLogger('MintReviewsScreen');
-  const [background, foreground] = useThemeColor(['surface', 'foreground'] as const);
+  const background = useThemeColor('surface');
   const insets = useSafeAreaInsets();
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.reviews' });
   const mintUrl = params?.mintUrl;
 
   const [kymLoading, setKymLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   // Review ROWS are ephemeral — fetched fresh on every open, never persisted
   // (the raw list is "junk to store forever"). Only the AGGREGATE (score +
   // count) is durable, read from the unified cache so it survives a failed
@@ -342,11 +179,13 @@ export function MintReviewsScreen() {
     if (!mintUrl) {
       cashuLog.warn('mint.reviews.fetch.skipped', { reason: 'missing_mint_url' });
       setKymLoading(false);
+      setLoadFailed(true);
       return;
     }
     const cachedAtStart = useMintMetadataStore.getState().getCached(mintUrl);
-    // Show the cached aggregate immediately if we have one.
-    if (cachedAtStart?.reviewsAt) setKymLoading(false);
+    setKymLoading(true);
+    setLoadFailed(false);
+    setRawReviews([]);
     // Always fetch fresh review rows from server. Abort on unmount or if mintUrl
     // changes mid-flight so a slow fetch doesn't write into a stale screen.
     const controller = new AbortController();
@@ -374,6 +213,7 @@ export function MintReviewsScreen() {
         // Rows → local state (ephemeral); aggregate → durable cache. Always
         // overwrite with the fresh successful result (even a null score / empty
         // list) so a stale aggregate can't outlive the source. (audit F3)
+        setLoadFailed(result.isErr());
         if (result.isOk()) {
           setRawReviews(result.value.recommendations);
           useMintMetadataStore
@@ -383,6 +223,7 @@ export function MintReviewsScreen() {
       })
       .catch((error) => {
         if (controller.signal.aborted) return;
+        setLoadFailed(true);
         // On failure the cached aggregate header stays visible; only the row
         // list falls back to its empty/last-known state.
         cashuLog.warn('mint.reviews.fetch.failed', {
@@ -405,12 +246,28 @@ export function MintReviewsScreen() {
   // falling back to the freshly-fetched rows before the first aggregate lands.
   const totalReviews = aggregateCount ?? reviews.length;
 
-  const renderItem = ({ item, index }: { item: MintRecommendation; index: number }) => (
-    <ReviewItem review={item} isLast={!isLoading && index === reviews.length - 1} />
-  );
+  const renderItem = ({ item }: { item: MintRecommendation }) => <ReviewItem review={item} />;
+  const aggregateLoading = isLoading && !meta?.reviewsAt;
+  const favouriteCount = meta?.favouriteCount ?? 0;
+  const reviewsLabel = `${totalReviews} ${totalReviews === 1 ? 'review' : 'reviews'}`;
+  const favouritesLabel =
+    favouriteCount > 0
+      ? ` · ${favouriteCount} ${favouriteCount === 1 ? 'favourite' : 'favourites'}`
+      : '';
 
   const ListHeader = (
-    <HeaderStats score={kymScore ?? null} totalReviews={totalReviews} loading={isLoading} />
+    <VStack testID="mint-reviews-summary" className="gap-3 pb-6 pt-4">
+      {(aggregateLoading || kymScore !== null) && (
+        <RatingBarChart key={mintUrl} score={kymScore ?? -1} visualSurface="mint-reviews" />
+      )}
+      <Text
+        loading={aggregateLoading}
+        placeholder="0 reviews · 0 favourites"
+        size={14}
+        className="text-foreground/50 text-center">
+        {reviewsLabel + favouritesLabel}
+      </Text>
+    </VStack>
   );
 
   // Footer-only skeletons: the real reviews populate the list body, so there's
@@ -426,7 +283,7 @@ export function MintReviewsScreen() {
       renderSkeleton={() => (
         <View>
           {Array.from({ length: skeletonCount }).map((_, i) => (
-            <ReviewSkeleton key={`skeleton-${i}`} isLast={i === skeletonCount - 1} />
+            <ReviewRow key={`skeleton-${i}`} loading />
           ))}
         </View>
       )}
@@ -434,20 +291,11 @@ export function MintReviewsScreen() {
     />
   ) : null;
 
-  const showEmptyState = !isLoading && totalReviews === 0;
+  const showEmptyState = !isLoading && !loadFailed && reviews.length === 0;
 
-  // We're in the list branch (a cached aggregate says reviews exist) but the
-  // fresh row fetch returned nothing — distinguish "couldn't load" from the
-  // genuine no-reviews EmptyState above, instead of a silent blank body.
+  // A failed fetch is distinct from a confirmed empty result, even on a cold open.
   const listEmpty = !isLoading ? (
-    <Text
-      size={14}
-      style={{
-        color: withAlpha(foreground, 0.4),
-        textAlign: 'center',
-        paddingHorizontal: 32,
-        marginTop: 24,
-      }}>
+    <Text size={14} className="text-foreground/50 mt-6 px-8 text-center">
       Couldn&apos;t load reviews right now. Reopen to try again.
     </Text>
   ) : null;
@@ -462,6 +310,7 @@ export function MintReviewsScreen() {
           <ButtonHandler
             buttons={[
               {
+                testID: 'mint-reviews-close',
                 text: 'Close',
                 variant: 'secondary',
                 onPress: async () => router.back(),
@@ -479,7 +328,19 @@ export function MintReviewsScreen() {
         keyExtractor={keyExtractor}
         ListHeaderComponent={ListHeader}
         ListFooterComponent={showEmptyState ? null : ListFooter}
-        ListEmptyComponent={showEmptyState ? <EmptyState /> : listEmpty}
+        ListEmptyComponent={
+          showEmptyState ? (
+            <View testID="mint-reviews-empty">
+              <EmptyState
+                icon="ic:round-star"
+                title="No reviews yet"
+                subtitle="Be the first to share your experience."
+              />
+            </View>
+          ) : (
+            listEmpty
+          )
+        }
         contentContainerStyle={{
           paddingHorizontal: 16,
           paddingTop: insets.top + 48,
