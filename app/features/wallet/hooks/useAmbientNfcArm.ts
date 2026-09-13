@@ -11,9 +11,10 @@
  * contactless-card style with no review screen. Guards that apply: the request
  * must carry an amount and a mint the wallet can fund in the request's unit,
  * locked (P2PK) requests are refused, a host unit switch is reverted when the
- * tap fails, and NFC diagnostics never log bearer bytes. There is NO amount
- * ceiling or confirmation step yet — that is an open product decision
- * (SYSTEM.md follow-up register); do not widen auto-execution without it.
+ * tap fails, and NFC diagnostics never log bearer bytes. There is deliberately
+ * NO amount ceiling or confirmation step: contactless-card behaviour is the
+ * product decision (Kelbie, 2026-09-13). Do not widen auto-execution beyond
+ * the guards above without revisiting that decision.
  *
  * Lifecycle: useFocusEffect — arming stops the moment the wallet blurs
  * (navigating into any flow, backgrounding via blur) and the held native
