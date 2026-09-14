@@ -14,6 +14,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useStore } from 'zustand';
 
 import {
   isSupersededError,
@@ -170,7 +171,11 @@ export function useCachedRead<TData>(
 
   // 1. The visible value IS the store entry. A viewer-key mismatch reads as
   //    absent so a late completion for another profile can never paint here.
-  const rawEntry = store.use((s) => (key ? s.byKey[key] : undefined));
+  //    Subscribe through zustand's static `useStore(api, selector)`: `store` is
+  //    an argument, so calling a hook hanging off it (`store.useX()`) is a
+  //    dynamic hook — the compiler either memoises it away (a member named
+  //    `use` was cached and skipped → hooks-order crash) or bails out.
+  const rawEntry = useStore(store.useCacheState, (s) => (key ? s.byKey[key] : undefined));
   const entry = rawEntry && rawEntry.viewerKey === viewerKey ? rawEntry : undefined;
 
   // 2. The last key that had data, so a key change can keep it on screen when
@@ -181,7 +186,9 @@ export function useCachedRead<TData>(
     if (entry && key) setLastKeyWithData(key);
   }, [entry, key]);
   const previousKey = lastKeyWithData && key && lastKeyWithData !== key ? lastKeyWithData : null;
-  const previousEntry = store.use((s) => (previousKey ? s.byKey[previousKey] : undefined));
+  const previousEntry = useStore(store.useCacheState, (s) =>
+    previousKey ? s.byKey[previousKey] : undefined
+  );
   const keep =
     !entry &&
     !!key &&

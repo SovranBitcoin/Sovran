@@ -108,7 +108,7 @@ it('reuses a fresh list cache on detail navigation with zero round-trips', async
   expect(request?.[1]).toMatchObject({ action: 'serve-fresh', cached: true });
 });
 it('paints a stale cached list immediately and revalidates in the background', async () => {
-  mintChangesCache.use.setState({
+  mintChangesCache.useCacheState.setState({
     byKey: { [MINT_CHANGES_CACHE_KEY]: { data: response, fetchedAt: 0, viewerKey: '' } },
   });
   jest.mocked(fetchMintChanges).mockImplementation(() => new Promise(() => {}));

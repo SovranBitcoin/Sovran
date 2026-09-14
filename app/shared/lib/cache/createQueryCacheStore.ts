@@ -90,8 +90,18 @@ export function isSupersededError(error: unknown): error is SupersededError {
 }
 
 export interface QueryCacheStore<TData> {
-  /** Zustand hook — subscribe to `s.byKey[key]` for reactive reads. */
-  use: UseBoundStore<StoreApi<QueryCacheState<TData>>>;
+  /**
+   * Zustand bound store — subscribe to `s.byKey[key]` for reactive reads.
+   *
+   * Inside a hook that receives the store as an argument, read it through
+   * zustand's static `useStore(store.useCacheState, selector)`, never as
+   * `store.useCacheState(selector)`: a hook reached through a parameter is a
+   * dynamic hook. The React Compiler classifies hooks by NAME, so the old field
+   * `use` was treated as a plain call, memoised behind `$[i] === previousKey`
+   * and skipped on re-render — the "change in the order of Hooks" crash in
+   * MintReviewsScreen (2026-09-13); a hook-named member bails compilation.
+   */
+  useCacheState: UseBoundStore<StoreApi<QueryCacheState<TData>>>;
   getEntry: (key: string) => QueryCacheEntry<TData> | undefined;
   setEntry: (key: string, data: TData, meta: { viewerKey: string; cursor?: string }) => void;
   removeEntry: (key: string) => void;
@@ -362,7 +372,7 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
   };
 
   const store: QueryCacheStore<TData> = {
-    use,
+    useCacheState: use,
     getEntry,
     setEntry: (key, data, meta) => use.getState().setEntry(key, data, meta),
     removeEntry: (key) => use.getState().removeEntry(key),

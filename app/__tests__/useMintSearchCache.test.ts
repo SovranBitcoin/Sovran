@@ -98,7 +98,7 @@ it('a currency-tab change filters locally and never refetches', async () => {
 });
 
 it('a failed refresh keeps the cached rows and reports the error', async () => {
-  mintDiscoverCache.use.setState({
+  mintDiscoverCache.useCacheState.setState({
     byKey: {
       [MINT_DISCOVER_CACHE_KEY]: {
         data: { mints: [row('Alpha', ['sat'])] },
