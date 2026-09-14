@@ -134,4 +134,14 @@ describe('subscribeDmEnvelopes — relay live', () => {
     });
     expect(() => unsubscribe()).not.toThrow();
   });
+
+test('getDmEnvelopes: a nagg without the nostr module (404) is unsupported, not a failure', async () => {
+    const client = createNaggClient({
+      appView: { baseUrl: 'https://nagg.test' },
+      fetchImpl: (async () =>
+        ({ ok: false, status: 404, statusText: 'Not Found', json: async () => ({}) }) as unknown as Response) as unknown as typeof fetch,
+    });
+    const outcome = await createNaggTier({ client }).getDmEnvelopes!({ viewerPubkey: ME });
+    expect(outcome.kind).toBe('unsupported');
+  });
 });

@@ -75,6 +75,16 @@ import type { NoteStatsRequest } from './note-stats';
 import type { NoteStatsMap } from '@sovranbitcoin/schemas';
 import type { NostrTierStrategy } from './strategy';
 
+/**
+ * A route this nagg does not mount — the module is off (`NAGG_MODULES`) or the
+ * deployment predates it — is "not served", never a failure: the waterfall
+ * falls through to the next tier silently instead of warning on every poll.
+ */
+const notServed = <T>(error: NaggError): TierOutcome<T> =>
+  error.type === 'http' && (error.status === 404 || error.status === 501)
+    ? unsupported<T>()
+    : failed<T>(error);
+
 // ---------------------------------------------------------------------------
 // nagg tier (tier 1, gold)
 //
@@ -190,9 +200,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
           const bundle = bundleFromFeedPage(feedPageFromEnvelope(envelope));
           return answered(bundle);
         },
-        (error) => error.type === 'http' && (error.status === 404 || error.status === 501)
-          ? unsupported()
-          : failed(error),
+        notServed,
       );
     },
 
@@ -238,7 +246,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
           }
           return answered(bundleFromThread(thread));
         },
-        (error) => failed(error),
+        notServed,
       );
     },
 
@@ -268,7 +276,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
       return result.match<TierOutcome<NotificationsBundle>>(
         (envelope) =>
           answered(bundleFromNotifications(notificationsPageFromEnvelope(envelope), grouped)),
-        (error) => failed(error),
+        notServed,
       );
     },
 
@@ -295,7 +303,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
       // out of the history by resolving through it.
       return result.match<TierOutcome<OwnHistoryBundle>>(
         (envelope) => answered(bundleFromOwnEvents(orderedEnvelopeEvents(envelope))),
-        (error) => failed(error),
+        notServed,
       );
     },
 
@@ -317,10 +325,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
         // Zero values are omitted server-side: every requested id gets an entry.
         (envelope) =>
           answered(statsFromMetrics(noteMetricsMapFromAggregates(envelope.aggregates, request.ids))),
-        (error) =>
-          error.type === 'http' && (error.status === 404 || error.status === 501)
-            ? unsupported()
-            : failed(error),
+        notServed,
       );
     },
 
@@ -360,7 +365,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
             reviews,
           });
         },
-        (error) => failed(error),
+        notServed,
       );
     },
 
@@ -410,7 +415,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
           });
           return answered(mints);
         },
-        (error) => failed(error),
+        notServed,
       );
     },
 
@@ -441,7 +446,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
           const graph = socialGraphFromEvents(request.pubkey, envelope.events);
           return answered({ ...graph, profiles: profileInfoMapFromEnvelope(envelope) });
         },
-        (error) => failed(error),
+        notServed,
       );
     },
 
@@ -467,7 +472,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
       });
       return result.match<TierOutcome<DmEnvelopesBundle>>(
         (envelope) => answered(bundleFromDmEnvelope(envelope)),
-        (error) => failed(error),
+        notServed,
       );
     },
 
@@ -493,7 +498,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
           if (failure.success) return failed({ type: 'vertex', reason: failure.data.reason, message: 'Vertex request failed' });
           return answered({ hits: searchHitsFromEnvelope(envelope), vertexFresh: envelope.vertexFresh });
         },
-        (error) => failed(error),
+        notServed,
       );
     },
   };

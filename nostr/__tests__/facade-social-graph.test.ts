@@ -92,4 +92,21 @@ describe('getSocialGraph through the facade', () => {
     expect(graph.follows).toEqual([F1, F2]);
     expect(graph.profiles).toEqual({}); // floor fetches profiles separately
   });
+
+test('a nagg without the nostr module (404) is unsupported, not a failure: the floor answers', async () => {
+    const client = createNaggClient({
+      appView: { baseUrl: 'https://nagg.test' },
+      fetchImpl: (async () =>
+        ({ ok: false, status: 404, statusText: 'Not Found', json: async () => ({}) }) as unknown as Response) as unknown as typeof fetch,
+    });
+    const nagg = createNaggTier({ client });
+    const outcome = await nagg.getSocialGraph!({ pubkey: ME });
+    expect(outcome.kind).toBe('unsupported');
+
+    const layer = createNostrDataLayer({
+      tiers: [nagg, createRelayTier({ connection: fakeRelay([CONTACTS, RELAYS, MUTES]) })],
+    });
+    const result = await layer.getSocialGraph({ pubkey: ME });
+    expect(result._unsafeUnwrap().tier).toBe('relay');
+  });
 });
