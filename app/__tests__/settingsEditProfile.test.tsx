@@ -7,6 +7,7 @@ import {
   loadOwnProfileMetadata,
   publishOwnProfileMetadata,
   ingestOwnProfileMetadata,
+  type OwnProfileLoadResult,
 } from '@/shared/lib/nostr/profile/publishOwnProfileMetadata';
 import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { paramPopup } from '@/shared/lib/popup';
@@ -15,9 +16,14 @@ import { paramPopup } from '@/shared/lib/popup';
 const mockProfile = { pubkey: 'a'.repeat(64), accountIndex: 0 };
 const mockState = { getActiveProfile: () => mockProfile };
 let mockHistory: Record<string, { value: string; createdAt: number }[]> = {};
+let mockLatest: { content: Record<string, unknown>; createdAt: number; eventId: string } | null =
+  null;
 jest.mock('@/shared/stores/profile/ownProfileMetadataStore', () => ({
-  useOwnProfileMetadataStore: (selector: (state: { history: typeof mockHistory }) => unknown) =>
-    selector({ history: mockHistory }),
+  useOwnProfileMetadataStore: Object.assign(
+    (selector: (state: { history: typeof mockHistory }) => unknown) =>
+      selector({ history: mockHistory }),
+    { getState: () => ({ latest: mockLatest }) }
+  ),
 }));
 jest.mock('@/shared/lib/cashu/npc', () => ({
   getNpcAddress: (username: string | undefined, npub: string) => `${username ?? npub}@npub.cash`,
@@ -104,6 +110,7 @@ let renderer: TestRenderer.ReactTestRenderer;
 beforeEach(() => {
   jest.clearAllMocks();
   mockHistory = {};
+  mockLatest = null;
   jest.mocked(loadOwnProfileMetadata).mockResolvedValue({ status: 'absent' });
   jest.mocked(publishOwnProfileMetadata).mockReturnValue(errAsync({ type: 'base-unavailable' }));
 });
@@ -231,6 +238,68 @@ it('validates the addresses, fills npub.cash in one tap, and publishes normalise
         nip05: 'me@example.com',
         about: null,
       },
+    })
+  );
+});
+
+it('opens on the stored kind-0 at once and a newer relay copy fills only untouched fields', async () => {
+  mockLatest = {
+    content: { name: 'Stored', lud16: 'stored@ln.example', about: 'Stored bio' },
+    createdAt: 10,
+    eventId: 'b'.repeat(64),
+  };
+  let resolveLoad!: (result: OwnProfileLoadResult) => void;
+  jest.mocked(loadOwnProfileMetadata).mockReturnValue(
+    new Promise((resolve) => {
+      resolveLoad = resolve;
+    })
+  );
+  await act(async () => {
+    renderer = TestRenderer.create(<SettingsEditProfileScreen />);
+  });
+  const control = (testID: string) => renderer.root.findByProps({ testID });
+  // The relay load is still pending: the stored values are shown and editable.
+  expect(control('edit-profile-name').props.value).toBe('Stored');
+  expect(control('edit-profile-about').props.value).toBe('Stored bio');
+  expect(control('edit-profile-name').props.editable).toBe(true);
+  act(() => {
+    control('edit-profile-about').props.onChangeText('My draft bio');
+  });
+
+  // Edited on another client: name and nip05 changed remotely.
+  const remote = {
+    content: {
+      name: 'Remote',
+      lud16: 'stored@ln.example',
+      nip05: 'me@id.example',
+      about: 'Remote bio',
+    },
+    createdAt: 20,
+    eventId: 'c'.repeat(64),
+  };
+  await act(async () => {
+    resolveLoad({ status: 'found', snapshot: remote });
+  });
+  expect(control('edit-profile-name').props.value).toBe('Remote');
+  expect(control('edit-profile-nip05').props.value).toBe('me@id.example');
+  expect(control('edit-profile-about').props.value).toBe('My draft bio');
+
+  jest.mocked(publishOwnProfileMetadata).mockReturnValue(
+    okAsync({
+      eventId: 'd'.repeat(64),
+      anyAccepted: true,
+      accepted: [],
+      failed: [],
+      relayResults: [],
+    })
+  );
+  await act(async () => {
+    await control('edit-profile-save').props.onPress();
+  });
+  expect(publishOwnProfileMetadata).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      initialLoad: { status: 'found', snapshot: remote },
+      patch: { about: 'My draft bio' },
     })
   );
 });

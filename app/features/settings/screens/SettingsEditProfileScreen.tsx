@@ -78,6 +78,19 @@ function patchBetween(base: ProfileDraft, next: ProfileDraft) {
     ...text('about'),
   };
 }
+/** A newer kind-0 arrived while the editor was open: fields the user has not
+ *  touched follow it, fields they already edited keep their draft. */
+function rebaseDraft(base: ProfileDraft, draft: ProfileDraft, next: ProfileDraft): ProfileDraft {
+  const pick = <K extends keyof ProfileDraft>(field: K) =>
+    draft[field] === base[field] ? next[field] : draft[field];
+  return {
+    name: pick('name'),
+    picture: pick('picture'),
+    lud16: pick('lud16'),
+    nip05: pick('nip05'),
+    about: pick('about'),
+  };
+}
 
 /** Previous values of one field as one-tap chips (newest first). */
 function HistoryChips({
@@ -158,23 +171,25 @@ function ProfileEditor({
   const { ndk } = useNDK();
   const { isInitialized } = useNostrNDKContext();
   const foreground = useThemeColor('foreground');
-  const cachedDraft: ProfileDraft = {
-    name: cachedName ?? '',
-    picture: cachedPicture ?? null,
-    lud16: '',
-    nip05: '',
-    about: '',
-  };
-  const [base, setBase] = useState<ProfileDraft>(cachedDraft);
-  const [draft, setDraft] = useState<ProfileDraft>(cachedDraft);
+  // The last confirmed kind-0 stored for this profile (persisted per profile,
+  // kept fresh by useOwnEventsSync). The editor opens on it, unlocked, while
+  // the relay load below refreshes it in the background.
+  const [stored] = useState(() => useOwnProfileMetadataStore.getState().latest);
+  const initialDraft: ProfileDraft = stored
+    ? draftFromContent(stored.content)
+    : { name: cachedName ?? '', picture: cachedPicture ?? null, lud16: '', nip05: '', about: '' };
+  const [base, setBase] = useState<ProfileDraft>(initialDraft);
+  const [draft, setDraft] = useState<ProfileDraft>(initialDraft);
   const { name, picture, lud16, nip05, about } = draft;
   const setField = <K extends keyof ProfileDraft>(field: K, value: ProfileDraft[K]) =>
     setDraft((previous) => ({ ...previous, [field]: value }));
   const setName = (value: string) => setField('name', value);
   const setPicture = (value: string | null) => setField('picture', value);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(stored !== null);
   const [missingBase, setMissingBase] = useState(false);
-  const [initialLoad, setInitialLoad] = useState<OwnProfileLoadResult>({ status: 'unavailable' });
+  const [initialLoad, setInitialLoad] = useState<OwnProfileLoadResult>(
+    stored ? { status: 'found', snapshot: stored } : { status: 'unavailable' }
+  );
   const [retrying, setRetrying] = useState(false);
   const [saving, setSaving] = useState(false);
   const [upload, setUpload] = useState<{ uri: string; progress: number } | null>(null);
@@ -184,6 +199,7 @@ function ProfileEditor({
     mounted.current && useProfileStore.getState().getActiveProfile()?.pubkey === pubkey;
 
   const cached = useLatestRef({ name: cachedName, picture: cachedPicture });
+  const baseRef = useLatestRef(base);
   useEffect(() => {
     mounted.current = true;
     nostrLog.info('nostr.profile.edit.open');
@@ -209,8 +225,10 @@ function ProfileEditor({
             nip05: '',
             about: '',
           };
+      // The fields may already be open on the stored copy and edited.
+      const previousBase = baseRef.current;
       setBase(next);
-      setDraft(next);
+      setDraft((previous) => rebaseDraft(previousBase, previous, next));
       setMissingBase(
         loaded.status === 'unavailable' ||
           (!snapshot && (cached.current.name !== undefined || cached.current.picture !== undefined))
@@ -222,7 +240,7 @@ function ProfileEditor({
     };
     // Cached display updates must not overwrite an in-progress draft, so the
     // effect reads them through a ref instead of depending on them.
-  }, [ndk, pubkey, isInitialized, accountIndex, cached]);
+  }, [ndk, pubkey, isInitialized, accountIndex, cached, baseRef]);
 
   const retryBase = useSingleFlight(async () => {
     if (!ndk || saving || !isOwner()) return;
@@ -479,7 +497,11 @@ function ProfileEditor({
       <View className="gap-5">
         <TextField isDisabled={fieldsLocked}>
           <Label>Name</Label>
+          {/* Secondary variant, like ActionMenuHost's inputs: the primary
+              field token sits one palette step off the page canvas and
+              blends into it when the input is not inside a card. */}
           <Input
+            variant="secondary"
             testID="edit-profile-name"
             accessibilityLabel="Name"
             value={name}
@@ -494,6 +516,7 @@ function ProfileEditor({
         <TextField isDisabled={fieldsLocked}>
           <Label>About</Label>
           <Input
+            variant="secondary"
             testID="edit-profile-about"
             accessibilityLabel="About"
             value={about}
@@ -519,6 +542,7 @@ function ProfileEditor({
         <TextField isDisabled={fieldsLocked}>
           <Label>Lightning address</Label>
           <Input
+            variant="secondary"
             testID="edit-profile-lud16"
             accessibilityLabel="Lightning address"
             value={lud16}
@@ -565,6 +589,7 @@ function ProfileEditor({
         <TextField isDisabled={fieldsLocked}>
           <Label>Nostr address</Label>
           <Input
+            variant="secondary"
             testID="edit-profile-nip05"
             accessibilityLabel="Nostr address"
             value={nip05}
