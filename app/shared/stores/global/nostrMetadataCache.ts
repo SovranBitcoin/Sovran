@@ -63,20 +63,24 @@ interface NostrMetadataCacheState {
 
 /**
  * The kind-0 profile fields, with the length caps that bound what a relay can
- * push into the persisted cache. Declared once and spread into both schemas
- * below: the wire parse and the persisted validator have to accept the same
- * fields at the same caps, and one shared object is what makes that structural
- * rather than a "keep these in sync" comment.
+ * push into the persisted cache. Each field is `.catch(undefined)`: one
+ * oversized or malformed value drops THAT field, never the entry and never the
+ * whole persisted blob (the standard merge discards everything on a single
+ * parse failure — one 3 KB picture URL used to wipe every cached name on boot).
+ * Declared once and spread into both schemas below: the wire parse and the
+ * persisted validator have to accept the same fields at the same caps, and one
+ * shared object is what makes that structural rather than a "keep these in
+ * sync" comment.
  */
 const NOSTR_PROFILE_FIELDS = {
-  displayName: z.string().max(512).optional(),
-  name: z.string().max(512).optional(),
-  picture: z.string().max(2048).optional(),
-  banner: z.string().max(2048).optional(),
-  nip05: z.string().max(512).optional(),
-  lud16: z.string().max(512).optional(),
-  website: z.string().max(2048).optional(),
-  about: z.string().max(4096).optional(),
+  displayName: z.string().max(512).optional().catch(undefined),
+  name: z.string().max(512).optional().catch(undefined),
+  picture: z.string().max(2048).optional().catch(undefined),
+  banner: z.string().max(2048).optional().catch(undefined),
+  nip05: z.string().max(512).optional().catch(undefined),
+  lud16: z.string().max(512).optional().catch(undefined),
+  website: z.string().max(2048).optional().catch(undefined),
+  about: z.string().max(4096).optional().catch(undefined),
 };
 
 /**
