@@ -143,7 +143,6 @@ export const RepostCard = React.memo(function RepostCard({
   onMorePress,
   getThreadContext,
   showLineAbove = false,
-  fullBleedFooterBorder = false,
 }: {
   repostEvent: FeedEvent;
   originalEvent: FeedEvent | undefined;
@@ -172,7 +171,6 @@ export const RepostCard = React.memo(function RepostCard({
   onMorePress?: () => void;
   getThreadContext?: () => ThreadSeed | null;
   showLineAbove?: boolean;
-  fullBleedFooterBorder?: boolean;
 }) {
   const [foreground, surface, surfaceTertiary] = useThemeColor([
     'foreground',
@@ -274,7 +272,6 @@ export const RepostCard = React.memo(function RepostCard({
             onNestedProfilePressIn={suppressThreadTapStart}
             getThreadContext={getThreadContext}
             showLineAbove={showLineAbove}
-            fullBleedFooterBorder={fullBleedFooterBorder}
           />
         ) : (
           <View

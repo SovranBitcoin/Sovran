@@ -550,7 +550,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           )}
           getThreadContext={() => getThreadContextRef.current()}
           showFooterBorder={false}
-          fullBleedFooterBorder
         />
       );
       if (item.type === 'note') {
@@ -567,7 +566,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                   {...feedPostCardProps(row, index, item.event, metrics, engagement)}
                   getThreadContext={() => getThreadContextRef.current(replyPreviewEvents)}
                   showFooterBorder={false}
-                  fullBleedFooterBorder
                 />
               }
               second={
@@ -589,7 +587,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                         )}
                         getThreadContext={() => getThreadContextRef.current()}
                         showFooterBorder={isLastReply}
-                        fullBleedFooterBorder
                       />
                     );
                   })}
@@ -607,7 +604,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                   variant="feed"
                   {...feedPostCardProps(row, index, item.event, metrics, engagement)}
                   getThreadContext={() => getThreadContextRef.current()}
-                  fullBleedFooterBorder
                 />
               }
             />
@@ -618,7 +614,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             variant="feed"
             {...feedPostCardProps(row, index, item.event, metrics, engagement)}
             getThreadContext={() => getThreadContextRef.current()}
-            fullBleedFooterBorder
           />
         );
       }
@@ -635,7 +630,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                 {...repostCardProps(row, index, item)}
                 onMorePress={() => openPostActions(originalEvent)}
                 getThreadContext={() => getThreadContextRef.current()}
-                fullBleedFooterBorder
               />
             }
           />
@@ -645,7 +639,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
         <RepostCard
           {...repostCardProps(row, index, item)}
           getThreadContext={() => getThreadContextRef.current()}
-          fullBleedFooterBorder
         />
       );
     },

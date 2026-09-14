@@ -20,7 +20,6 @@ import { openRepostMenu } from '@/features/feed/lib/repostMenu';
 import { POST_FONT_FAMILY, postInk, postType } from '@/features/feed/lib/postTypography';
 import type { NoteMetrics } from './feedTypes';
 import { formatCount, formatSats } from './feedFormat';
-import { sharedStyles } from './feedStyles';
 
 /** Glyph sizes: 20 in the feed / thread target, 18 on compact thread replies. */
 export const POST_ACTION_ICON_SIZES = {
@@ -215,7 +214,6 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   metrics,
   borderColor,
   compact = false,
-  showBorder = true,
   onCommentPress,
   onRepostPress,
   onQuotePress,
@@ -241,7 +239,6 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   counts?: MetricsCountsState;
   borderColor: string;
   compact?: boolean;
-  showBorder?: boolean;
   onCommentPress?: () => void;
   onRepostPress?: () => void;
   onQuotePress?: () => void;
@@ -300,12 +297,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   const handleBarTouchStart = useCallback(() => onActionPressIn?.(), [onActionPressIn]);
 
   return (
-    <View
-      onTouchStart={handleBarTouchStart}
-      style={[
-        showBorder && sharedStyles.footerBorder,
-        showBorder && { borderBottomColor: withAlpha(borderColor, postInk.tertiary) },
-      ]}>
+    <View onTouchStart={handleBarTouchStart}>
       <LayoutAnimationConfig skipEntering skipExiting>
         <HStack align="center" justify="space-between" className={BAR_CLASS}>
           <ActionColumn

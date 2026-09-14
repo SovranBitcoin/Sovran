@@ -30,11 +30,13 @@ export const postType = {
   count: { size: fontSize.sm, lineHeight: 18 },
 } as const;
 
-/** Three-step ink ladder — nothing on the card uses any other alpha. */
+/** Three-step ink ladder plus the divider — nothing on the card uses any other alpha. */
 export const postInk = {
   primary: 0.9,
   secondary: alpha.disabled,
   tertiary: alpha.soft,
+  /** The full-width hairline that closes a post; quieter than any ink. */
+  divider: alpha.subtle,
 } as const;
 
 /** Height (px) of one rendered content line in a note/reply body. The reply

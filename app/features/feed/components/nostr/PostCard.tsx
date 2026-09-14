@@ -184,8 +184,9 @@ interface PostCardProps {
 
   showLineAbove?: boolean;
   showLineBelow?: boolean;
+  /** Draw the full-width divider under the card (skipped anyway when a
+   *  connector line runs on into the next card). */
   showFooterBorder?: boolean;
-  fullBleedFooterBorder?: boolean;
 
   /** Feed list index (when in feed); used so swipe-up can scroll to next video post. */
   feedIndex?: number;
@@ -247,7 +248,6 @@ const PostCardBody = React.memo(function PostCardBody({
   showLineAbove = false,
   showLineBelow = false,
   showFooterBorder = true,
-  fullBleedFooterBorder = false,
   feedIndex,
   onOverlayOpenedFromIndex,
   onVideoTap,
@@ -308,6 +308,10 @@ const PostCardBody = React.memo(function PostCardBody({
   // Pre-compute opacity color styles to avoid inline object creation
   const textPrimary = { color: withAlpha(foreground, postInk.primary) };
   const textMuted = { color: withAlpha(foreground, postInk.secondary) };
+  const dividerStyle = [
+    sharedStyles.footerBorder,
+    { borderBottomColor: withAlpha(foreground, postInk.divider) },
+  ];
 
   // Thread target: crossfade the in-sheet footer out as the embed sheet
   // collapses. No-op (opacity 1) when not driven.
@@ -377,7 +381,7 @@ const PostCardBody = React.memo(function PostCardBody({
   }
 
   // Interaction wiring shared by both layouts' MetricsFooter; layout-specific
-  // props (compact/showBorder/onCommentPress) stay at each site.
+  // props (compact/onCommentPress) stay at each site.
   const metricsFooterShared = {
     metrics,
     borderColor: foreground,
@@ -457,7 +461,8 @@ const PostCardBody = React.memo(function PostCardBody({
             ) : null}
           </View>
 
-          <Reanimated.View style={[pcStyles.targetMetrics, footerFadeStyle]}>
+          <Reanimated.View
+            style={[pcStyles.targetMetrics, showFooterBorder && dividerStyle, footerFadeStyle]}>
             <MetricsFooter
               counts={countsState}
               {...metricsFooterShared}
@@ -470,8 +475,9 @@ const PostCardBody = React.memo(function PostCardBody({
   }
 
   // ── Gutter layout (feed, repost-original, thread-reply) ──
-  const hasConnectingBars = showLineAbove || showLineBelow;
-  const showMetricsBorder = showFooterBorder && (isThread ? !hasConnectingBars : true);
+  // One divider rule on every surface: full row width, and never under a card
+  // whose connector line continues into the next one.
+  const showDivider = showFooterBorder && !showLineBelow;
   const lineColor = defaultColor;
 
   const gutterContent = (
@@ -551,20 +557,11 @@ const PostCardBody = React.memo(function PostCardBody({
 
         <Spacer size={spacing.sm} />
 
-        <View
-          style={[
-            fullBleedFooterBorder
-              ? pcStyles.inlineMetricsWrapFullBleed
-              : pcStyles.inlineMetricsWrap,
-            fullBleedFooterBorder && showMetricsBorder && pcStyles.inlineMetricsWrapFullBleedBorder,
-            fullBleedFooterBorder &&
-              showMetricsBorder && { borderBottomColor: withAlpha(foreground, postInk.tertiary) },
-          ]}>
+        <View style={[pcStyles.inlineMetricsWrap, showDivider && dividerStyle]}>
           <MetricsFooter
             counts={countsState}
             {...metricsFooterShared}
             compact={isThread}
-            showBorder={!fullBleedFooterBorder && showMetricsBorder}
             // Reply opens the thread (reply box focused) on every variant. It used
             // to be disabled in the feed and rely on the tap falling through to
             // the card, which the action bar now deliberately blocks.
@@ -621,6 +618,13 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
   const targetDateStyle = useMemo(
     () => [pcStyles.timeText, textMuted, pcStyles.targetDate],
     [textMuted]
+  );
+  const dividerStyle = useMemo(
+    () => [
+      sharedStyles.footerBorder,
+      { borderBottomColor: withAlpha(foreground, postInk.divider) },
+    ],
+    [foreground]
   );
   const replyVariant = REPLY_SKELETON_VARIANTS[index % REPLY_SKELETON_VARIANTS.length];
 
@@ -689,7 +693,7 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
           />
         </View>
 
-        <View style={pcStyles.targetMetrics}>
+        <View style={[pcStyles.targetMetrics, dividerStyle]}>
           <MetricsFooterSkeleton
             compact={false}
             borderColor={foreground}
@@ -737,7 +741,7 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
 
             <Spacer size={spacing.sm} />
 
-            <View style={pcStyles.inlineMetricsWrap}>
+            <View style={[pcStyles.inlineMetricsWrap, dividerStyle]}>
               <MetricsFooterSkeleton
                 compact
                 borderColor={foreground}
@@ -768,14 +772,6 @@ const MetricsFooterSkeleton = React.memo(function MetricsFooterSkeleton({
   // text replaced the skeleton.
   const labelTextSize = postType.count.size;
   const skeletonFill = useMemo(() => withAlpha(borderColor, 0.07), [borderColor]);
-  const footerStyle = useMemo(
-    () => [
-      sharedStyles.noteFooter,
-      sharedStyles.footerBorder,
-      { borderBottomColor: withAlpha(borderColor, postInk.tertiary) },
-    ],
-    [borderColor]
-  );
   const glyphStyle = useMemo(
     () => ({
       width: glyph,
@@ -791,7 +787,7 @@ const MetricsFooterSkeleton = React.memo(function MetricsFooterSkeleton({
   );
 
   return (
-    <View style={footerStyle} pointerEvents="none">
+    <View pointerEvents="none">
       <HStack align="center" justify="space-between">
         {METRIC_SKELETON_ITEMS.map((item) => (
           <HStack key={item} align="center" gap={spacing.xs}>
@@ -863,21 +859,13 @@ const pcStyles = StyleSheet.create({
     marginRight: -6,
     borderRadius: 14,
   },
+  // Cancels the gutter row's padding so the divider drawn on this wrapper spans
+  // the full row; the padding puts the action row back on the text column.
   inlineMetricsWrap: {
-    marginLeft: -POST_CONTENT_INDENT,
-    marginRight: -POST_PADDING_H,
-    paddingLeft: POST_CONTENT_INDENT,
-    paddingRight: POST_PADDING_H,
-  },
-  inlineMetricsWrapFullBleed: {
     marginLeft: -(POST_CONTENT_INDENT + POST_PADDING_H),
     marginRight: -POST_PADDING_H,
     paddingLeft: POST_CONTENT_INDENT + POST_PADDING_H,
     paddingRight: POST_PADDING_H,
-  },
-  inlineMetricsWrapFullBleedBorder: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingBottom: spacing.sm,
   },
   noteTextLine: {
     lineHeight: NOTE_CONTENT_LINE_HEIGHT,

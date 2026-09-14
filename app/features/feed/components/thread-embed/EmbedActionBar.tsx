@@ -126,7 +126,6 @@ export const EmbedActionBar = React.memo(function EmbedActionBar({
         <MetricsFooter
           metrics={metrics}
           borderColor={foreground}
-          showBorder={false}
           onCommentPress={onCommentPress}
           onRepostPress={onRepostPress}
           onQuotePress={onQuotePress}
