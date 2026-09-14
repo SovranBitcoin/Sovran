@@ -53,6 +53,10 @@ type RelativeDateStyle =
    *  are intentional — feed/post cards rely on each label fitting in one
    *  short line. */
   | 'compact'
+  /** Terse row form for feed/notification/contact rows: `now`, `5m`, `3h`,
+   *  `2d`, `1w`, then a short locale-aware date. No `ago` — the row's
+   *  position already says it is in the past (Bluesky/Primal/Damus form). */
+  | 'terse'
   /** Chat bubble: locale time today, `Yesterday` up to 48h, short date
    *  older. Shared by every chat surface so bubbles read consistently. */
   | 'chat-bubble'
@@ -186,6 +190,18 @@ function formatCompactRelative(timestampMs: number, locale: string, nowMs: numbe
   );
 }
 
+function formatTerseRelative(timestampMs: number, locale: string, nowMs: number): string {
+  const diff = (nowMs - timestampMs) / 1000;
+  if (diff < 60) return 'now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
+  if (diff < 2592000) return `${Math.floor(diff / 604800)}w`;
+  return getDateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(
+    new Date(timestampMs)
+  );
+}
+
 function formatChatBubble(timestampMs: number, nowMs: number): string {
   const date = new Date(timestampMs);
   const diffHours = (nowMs - date.getTime()) / 3_600_000;
@@ -215,11 +231,11 @@ function formatConversationList(timestampMs: number, nowMs: number): string {
 }
 
 /**
- * Compact relative timestamp from a unix-seconds value (Nostr `created_at`,
+ * Terse relative timestamp from a unix-seconds value (Nostr `created_at`,
  * mint-update `at`, contact `timestamp`); '' when the time is unknown (≤ 0).
  */
 export function formatRelativeUnixSeconds(seconds: number): string {
-  return seconds > 0 ? formatRelative(seconds * 1000, 'compact') : '';
+  return seconds > 0 ? formatRelative(seconds * 1000, 'terse') : '';
 }
 
 /**
@@ -238,6 +254,8 @@ export function formatRelative(
       return formatVerboseRelative(ms, resolveLocale(), nowMs);
     case 'compact':
       return formatCompactRelative(ms, resolveLocale(), nowMs);
+    case 'terse':
+      return formatTerseRelative(ms, resolveLocale(), nowMs);
     case 'chat-bubble':
       return formatChatBubble(ms, nowMs);
     case 'conversation-list':

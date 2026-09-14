@@ -19,11 +19,6 @@
       "count": 6
     }
   },
-  "features/feed/components/nostr/MetricsFooter.tsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
   "features/feed/components/nostr/StoriesCarousel.tsx": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
@@ -38,11 +33,6 @@
     }
   },
   "features/feed/components/nostr/image-overlay/AnimatedImageOverlay.tsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "features/feed/components/nostr/image-overlay/BottomPanel.tsx": {
     "no-restricted-syntax": {
       "count": 1
     }

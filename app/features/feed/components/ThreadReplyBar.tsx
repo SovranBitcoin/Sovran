@@ -10,7 +10,7 @@
  */
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { avatarStateFor } from '@/shared/lib/imageLoadState';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Keyboard, StyleSheet, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -92,6 +92,12 @@ interface ThreadReplyBarProps {
    * reaches the home indicator without floating far above it.
    */
   bottomInset?: number;
+  /**
+   * Bump to focus the input (the target's reply button, or a thread opened
+   * from a feed reply button). Applied once the target post has resolved and
+   * this screen is focused; each value focuses at most once.
+   */
+  focusRequest?: number;
 }
 
 let mediaSeq = 0;
@@ -113,6 +119,7 @@ export function ThreadReplyBar({
   scopeId,
   insideOverlay = false,
   bottomInset,
+  focusRequest = 0,
 }: ThreadReplyBarProps) {
   const { ndk } = useNDK();
   const insets = useSafeAreaInsets();
@@ -134,6 +141,13 @@ export function ThreadReplyBar({
   const ownProfile = useProfileStore((s) => s.getActiveProfile());
   const { pictureResolved: ownPictureResolved } = useProfileDisplay(ownProfile?.pubkey ?? '');
   const inputRef = useRef<TextInput>(null);
+  const handledFocusRequestRef = useRef(0);
+  const canFocusInput = !!targetEvent && isFocused;
+  useEffect(() => {
+    if (focusRequest <= handledFocusRequestRef.current || !canFocusInput) return;
+    handledFocusRequestRef.current = focusRequest;
+    inputRef.current?.focus();
+  }, [focusRequest, canFocusInput]);
   const uploadsRef = useUploadAbortMap();
   const shift = useShiftLogger('ThreadReplyBar');
 

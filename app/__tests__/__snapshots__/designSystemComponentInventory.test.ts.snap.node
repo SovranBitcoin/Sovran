@@ -253,11 +253,12 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/ClaySilhouetteAvatar.tsx",
     "shared/ui/primitives/Haptics.tsx",
     "shared/ui/primitives/Image.tsx",
+    "shared/ui/primitives/PressScale.tsx",
     "shared/ui/primitives/Pressable.tsx",
     "shared/ui/primitives/ScrambleText.tsx",
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 252,
+  "total": 253,
 }
 `;

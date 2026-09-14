@@ -25,6 +25,23 @@ jest.mock('@/shared/ui/primitives/Haptics', () => ({
 }));
 jest.mock('@/shared/lib/logger', () => ({ log: { warn: jest.fn() } }));
 
+beforeEach(() => jest.useFakeTimers());
+afterEach(() => jest.useRealTimers());
+
+function setup() {
+  const navigate = jest.fn();
+  const { result } = renderHook(() => useCardTapGesture(navigate));
+  const recognise = (success = true) =>
+    act(() => {
+      mockEnd({}, success);
+    });
+  const flush = () =>
+    act(() => {
+      jest.runAllTimers();
+    });
+  return { navigate, card: () => result.current, recognise, flush };
+}
+
 it('gives nested controls press ownership without waiting for haptic completion', () => {
   const onPressIn = jest.fn();
   const view = render(<Pressable testID="menu" haptics onPressIn={onPressIn} />);
@@ -34,28 +51,82 @@ it('gives nested controls press ownership without waiting for haptic completion'
   expect(onPressIn).toHaveBeenCalledTimes(1);
 });
 
-it('keeps a nested press suppressed after press-out, even if JS recognition is delayed', () => {
-  jest.useFakeTimers();
-  const navigate = jest.fn();
-  const { result } = renderHook(() => useCardTapGesture(navigate));
-  act(() => {
-    result.current.suppress();
-    jest.runAllTimers();
-    mockEnd({}, true);
-  });
+it('opens the thread for a body tap once pending touch events have landed', () => {
+  const { navigate, card, recognise, flush } = setup();
+  card().begin();
+  card().probe();
+  recognise();
   expect(navigate).not.toHaveBeenCalled();
-  act(() => {
-    expect(result.current.begin()).toBe(false);
-    mockEnd({}, true);
-  });
+  flush();
   expect(navigate).toHaveBeenCalledTimes(1);
-  jest.useRealTimers();
+});
+
+it('never opens when a nested control claimed the responder', () => {
+  const { navigate, card, recognise, flush } = setup();
+  card().begin(); // descendant claimed, so the root probe is never asked
+  recognise();
+  flush();
+  expect(navigate).not.toHaveBeenCalled();
+});
+
+it('never opens for a disabled action that only latches suppression on touch start', () => {
+  const { navigate, card, recognise, flush } = setup();
+  card().begin();
+  card().suppress(); // action bar touch start
+  card().probe(); // the disabled Pressable declined, so the root was asked
+  recognise();
+  flush();
+  expect(navigate).not.toHaveBeenCalled();
+});
+
+it('still sees the RN touch events when recognition outruns them', () => {
+  const body = setup();
+  body.recognise();
+  body.card().begin();
+  body.card().probe();
+  body.flush();
+  expect(body.navigate).toHaveBeenCalledTimes(1);
+
+  const nested = setup();
+  nested.recognise();
+  nested.card().begin();
+  nested.card().suppress();
+  nested.flush();
+  expect(nested.navigate).not.toHaveBeenCalled();
+});
+
+it('keeps a nested press suppressed after press-out, until the next touch begins', () => {
+  const { navigate, card, recognise, flush } = setup();
+  card().begin();
+  card().suppress();
+  flush();
+  recognise();
+  flush();
+  expect(navigate).not.toHaveBeenCalled();
+  card().begin();
+  card().probe();
+  recognise();
+  flush();
+  expect(navigate).toHaveBeenCalledTimes(1);
+});
+
+it('does not reuse a consumed body touch for a recognition with no new touch', () => {
+  const { navigate, card, recognise, flush } = setup();
+  card().begin();
+  card().probe();
+  recognise();
+  flush();
+  recognise(); // e.g. tapping a flinging list to stop it
+  flush();
+  expect(navigate).toHaveBeenCalledTimes(1);
 });
 
 it('never opens a thread for a failed or cancelled recognizer', () => {
-  const navigate = jest.fn();
-  renderHook(() => useCardTapGesture(navigate));
-  act(() => mockEnd({}, false));
+  const { navigate, card, recognise, flush } = setup();
+  card().begin();
+  card().probe();
+  recognise(false);
+  flush();
   expect(navigate).not.toHaveBeenCalled();
 });
 

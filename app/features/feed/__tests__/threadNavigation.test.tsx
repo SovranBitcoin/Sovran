@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Jest hoists module factories before static imports. */
 import type { ReactNode } from 'react';
 import { InteractionManager } from 'react-native';
-import { fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
 import { PostCard } from '../components/nostr/PostCard';
 import { ThreadScreen } from '../screens/ThreadScreen';
 import { DEFAULT_METRICS, type FeedEvent } from '../components/nostr/feedTypes';
@@ -9,9 +9,10 @@ import { __resetGuardForTests } from '@/shared/hooks/useGuardedRouter';
 
 const mockPush = jest.fn();
 const mockGetThread = jest.fn();
-let mockParams: { eventId: string };
+let mockParams: { eventId: string; focusReply?: string };
 const mockIgnored = { ignoredPubkeys: [], ignoredEventIds: [] };
 const mockListProps: { initialScrollIndex?: number; data: { type: string }[] }[] = [];
+const mockFooterProps: { onCommentPress?: () => void }[] = [];
 
 jest.mock('react-native/Libraries/Utilities/Platform', () => ({
   OS: 'ios',
@@ -110,8 +111,11 @@ jest.mock('../components/nostr/NoteContent', () => ({
   NOTE_CONTENT_FONT_SIZE: 16,
 }));
 jest.mock('../components/nostr/MetricsFooter', () => ({
-  MetricsFooter: () => null,
-  POST_ACTION_ICON_SIZES: { compact: { base: 16 }, regular: { base: 20 } },
+  MetricsFooter: (props: { onCommentPress?: () => void }) => {
+    mockFooterProps.push(props);
+    return null;
+  },
+  POST_ACTION_ICON_SIZES: { compact: 18, regular: 20 },
 }));
 jest.mock('../components/nostr/image-overlay', () => ({
   ImageOverlayProvider: ({ children }: { children: ReactNode }) => children,
@@ -205,6 +209,7 @@ beforeEach(() => {
   __resetGuardForTests();
   mockPush.mockReset();
   mockListProps.length = 0;
+  mockFooterProps.length = 0;
   mockGetThread.mockReset().mockImplementation(() => new Promise(() => {}));
   jest
     .spyOn(InteractionManager, 'runAfterInteractions')
@@ -221,7 +226,6 @@ test('a real post tap mounts its known content at the top before deferred work',
       quotedEvents={new Map()}
       profiles={new Map()}
       getMetrics={() => DEFAULT_METRICS}
-      skipAnimation
       getThreadContext={() => ({
         allEvents: new Map([
           [parent.id, parent],
@@ -243,4 +247,37 @@ test('a real post tap mounts its known content at the top before deferred work',
   expect(mockListProps[0].data[0].type).toBe('target');
   expect(mockListProps[0].initialScrollIndex).toBeUndefined();
   expect(mockGetThread).not.toHaveBeenCalled();
+});
+
+test('a card reply button opens its thread with the reply box focused', () => {
+  const source = render(
+    <PostCard
+      variant="feed"
+      event={target}
+      metrics={DEFAULT_METRICS}
+      quotedEvents={new Map()}
+      profiles={new Map()}
+      getMetrics={() => DEFAULT_METRICS}
+      getThreadContext={() => ({
+        allEvents: new Map([[target.id, target]]),
+        profiles: new Map(),
+        metrics: new Map(),
+        quotedEvents: new Map(),
+      })}
+    />
+  );
+
+  const onCommentPress = mockFooterProps.at(-1)?.onCommentPress;
+  expect(onCommentPress).toBeDefined();
+  act(() => onCommentPress?.());
+  expect(mockPush).toHaveBeenCalledTimes(1);
+  expect(mockPush.mock.calls[0][0]).toEqual({
+    pathname: '/(user-flow)/thread',
+    params: { eventId: target.id, focusReply: '1' },
+  });
+
+  mockParams = mockPush.mock.calls[0][0].params;
+  source.unmount();
+  const destination = render(<ThreadScreen />);
+  expect(destination.getByTestId('note-Clicked post')).toBeTruthy();
 });

@@ -1,3 +1,4 @@
+import { POST_AVATAR_SIZE } from '@/features/feed/lib/postTypography';
 import { StyleSheet } from 'react-native';
 import { withAlpha } from '@/shared/lib/color';
 
@@ -10,7 +11,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
 
 /** Matches PostCard's avatar so the tombstone lines up with real post rows. */
-const AVATAR_SIZE = 36;
+const AVATAR_SIZE = POST_AVATAR_SIZE;
 
 /**
  * Greyed placeholder shown in our OWN feed in place of a note we've requested

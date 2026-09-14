@@ -178,6 +178,22 @@ export function useNoteStats(eventId: string | undefined): {
   }, [record, pending]);
 }
 
+/**
+ * Non-reactive read of one note's counts from the single owner, in the feed's
+ * shape — the base every surface's optimistic overlay is applied to, so a feed
+ * row and a thread showing the same note start from the same numbers.
+ */
+export function readNoteMetrics(eventId: string): NoteMetrics | undefined {
+  const stats = buildNostrDataLayer()?.cache.getNoteStats(eventId);
+  if (!stats) return undefined;
+  return {
+    likeCount: stats.likes,
+    repostCount: stats.reposts,
+    replyCount: stats.replies,
+    satsZapped: stats.satsZapped,
+  };
+}
+
 /** Non-reactive read of one full profile record (for getState-style callers). */
 export function readProfileRecord(pubkey: string): facade.CachedProfile | undefined {
   return buildNostrDataLayer()?.cache.getProfile(pubkey);

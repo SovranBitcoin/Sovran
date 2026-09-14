@@ -26,11 +26,12 @@ import type { ContentSegment } from '../feedTypes';
 import type { ImageOverlayPost } from './types';
 import { BOTTOM_PANEL_PADDING_HORIZONTAL, BOTTOM_PANEL_PADDING_TOP } from './config';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { COMMENT_ACCENT, ZAP_ACCENT } from '@/shared/lib/brandColors';
+import { COMMENT_ACCENT, LIKE_ACCENT, ZAP_ACCENT } from '@/shared/lib/brandColors';
 import { openRepostMenu } from '@/features/feed/lib/repostMenu';
 import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { Log } from '@/shared/lib/logger';
 import { POST_ACTION_ICON_SIZES } from '../MetricsFooter';
+import { POST_FONT_FAMILY, postType } from '@/features/feed/lib/postTypography';
 
 const METRIC_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
 
@@ -52,24 +53,29 @@ const OverlayMetric = React.memo(function OverlayMetric({
   active = false,
   activeColor,
   inactiveColor,
-  overpass = false,
 }: {
   iconName: string;
   iconSize: number;
+  /** '' hides the count — a zero is never shown. */
   text: string;
   /** Absent reads as inactive: the overlay's post flags are optional. */
   active?: boolean;
   activeColor: string;
   inactiveColor: string;
-  overpass?: boolean;
 }) {
   const color = active ? activeColor : inactiveColor;
   return (
     <>
       <Icon name={iconName} size={iconSize} color={color} />
-      <Text overpass={overpass} size={13} style={{ color }}>
-        {text}
-      </Text>
+      {text ? (
+        <Text
+          family={POST_FONT_FAMILY}
+          semibold={active}
+          size={postType.count.size}
+          style={[overlayCountStyle, { color }]}>
+          {text}
+        </Text>
+      ) : null}
     </>
   );
 });
@@ -165,7 +171,10 @@ function OverlayAuthorRow({
     </Pressable>
   );
 }
-const LIKED_COLOR = '#ff5a7a';
+const overlayCountStyle = {
+  lineHeight: postType.count.lineHeight,
+  fontVariant: ['tabular-nums' as const],
+};
 
 const PANEL_CONTENT_TRUNCATE_LIMIT = 120;
 const PANEL_INLINE_IMAGE_MAX_HEIGHT = 200;
@@ -361,9 +370,9 @@ const OverlayMetricsRow = React.memo(function OverlayMetricsRow({
       {children}
       <Pressable onPress={handleRepostPress} hitSlop={METRIC_HIT_SLOP} style={styles.metricBtn}>
         <OverlayMetric
-          iconName="garden:arrow-retweet-fill-16"
-          iconSize={POST_ACTION_ICON_SIZES.regular.repost}
-          text={formatCount(metrics.repostCount)}
+          iconName="tabler:repeat"
+          iconSize={POST_ACTION_ICON_SIZES.regular}
+          text={metrics.repostCount > 0 ? formatCount(metrics.repostCount) : ''}
           active={reposted}
           activeColor={repostedColor}
           inactiveColor={inactiveColor}
@@ -371,11 +380,11 @@ const OverlayMetricsRow = React.memo(function OverlayMetricsRow({
       </Pressable>
       <Pressable onPress={onLikePress} hitSlop={METRIC_HIT_SLOP} style={styles.metricBtn}>
         <OverlayMetric
-          iconName="iconamoon:heart-fill"
-          iconSize={POST_ACTION_ICON_SIZES.regular.base}
-          text={formatCount(metrics.likeCount)}
+          iconName={liked ? 'tabler:heart-filled' : 'tabler:heart'}
+          iconSize={POST_ACTION_ICON_SIZES.regular}
+          text={metrics.likeCount > 0 ? formatCount(metrics.likeCount) : ''}
           active={liked}
-          activeColor={LIKED_COLOR}
+          activeColor={LIKE_ACCENT}
           inactiveColor={inactiveColor}
         />
       </Pressable>
@@ -385,13 +394,12 @@ const OverlayMetricsRow = React.memo(function OverlayMetricsRow({
         hitSlop={METRIC_HIT_SLOP}
         style={styles.metricBtn}>
         <OverlayMetric
-          iconName="mingcute:lightning-fill"
-          iconSize={POST_ACTION_ICON_SIZES.regular.base}
-          text={metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : '0'}
+          iconName={zapped ? 'tabler:bolt-filled' : 'tabler:bolt'}
+          iconSize={POST_ACTION_ICON_SIZES.regular}
+          text={metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : ''}
           active={zapped}
           activeColor={ZAP_ACCENT}
           inactiveColor={inactiveColor}
-          overpass
         />
       </Pressable>
     </View>
@@ -515,9 +523,9 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
           {/* Reply is inert in the panel: the live composer is the ThreadReplyBar below. */}
           <View style={styles.metricBtn}>
             <OverlayMetric
-              iconName="iconamoon:comment-fill"
-              iconSize={POST_ACTION_ICON_SIZES.regular.comment}
-              text={formatCount(metrics.replyCount)}
+              iconName={replied ? 'tabler:message-circle-filled' : 'tabler:message-circle'}
+              iconSize={POST_ACTION_ICON_SIZES.regular}
+              text={metrics.replyCount > 0 ? formatCount(metrics.replyCount) : ''}
               active={replied}
               activeColor={repliedColor}
               inactiveColor={muted}
@@ -599,9 +607,9 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
             hitSlop={METRIC_HIT_SLOP}
             style={styles.metricBtn}>
             <OverlayMetric
-              iconName="iconamoon:comment-fill"
-              iconSize={POST_ACTION_ICON_SIZES.regular.comment}
-              text={formatCount(metrics.replyCount)}
+              iconName={replied ? 'tabler:message-circle-filled' : 'tabler:message-circle'}
+              iconSize={POST_ACTION_ICON_SIZES.regular}
+              text={metrics.replyCount > 0 ? formatCount(metrics.replyCount) : ''}
               active={replied}
               activeColor={repliedColor}
               inactiveColor={PANEL_TEXT_MUTED}

@@ -43,12 +43,17 @@ import { RelayCard } from './RelayCard';
 import { POLL_KIND } from './poll/pollParse';
 import { formatRelativeUnixSeconds } from '@/shared/lib/date';
 import { sharedStyles } from './feedStyles';
-import { fontSize } from '@/shared/styles/tokens';
-import { NOTE_CONTENT_LINE_HEIGHT } from '@/features/feed/lib/threadListLayout';
+import { spacing } from '@/shared/styles/tokens';
+import {
+  NOTE_CONTENT_LINE_HEIGHT,
+  POST_FONT_FAMILY,
+  postInk,
+  postType,
+} from '@/features/feed/lib/postTypography';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 
 const EMPTY_QUOTED_EVENTS: Map<string, FeedEvent> = new Map();
-export const NOTE_CONTENT_FONT_SIZE = fontSize.lg;
+export const NOTE_CONTENT_FONT_SIZE = postType.body.size;
 
 // ─── Inline renderers ────────────────────────────────────────────────────────
 
@@ -65,15 +70,15 @@ const InlineMention = React.memo(function InlineMention({
   onPressIn?: () => void;
   onPressOut?: () => void;
 }) {
-  const foreground = useThemeColor('foreground');
+  const accent = useThemeColor('accent');
   const profile = profiles.get(pubkey);
   const label = profile?.name || `${bech32.slice(0, 12)}…`;
 
   return (
     <Text
-      bold
+      family={POST_FONT_FAMILY}
       size={NOTE_CONTENT_FONT_SIZE}
-      style={{ color: withAlpha(foreground, 0.5) }}
+      style={{ color: accent }}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={() => {
@@ -85,9 +90,9 @@ const InlineMention = React.memo(function InlineMention({
 });
 
 const InlineHashtag = React.memo(function InlineHashtag({ tag }: { tag: string }) {
-  const foreground = useThemeColor('foreground');
+  const accent = useThemeColor('accent');
   return (
-    <Text bold size={NOTE_CONTENT_FONT_SIZE} style={{ color: withAlpha(foreground, 0.5) }}>
+    <Text family={POST_FONT_FAMILY} size={NOTE_CONTENT_FONT_SIZE} style={{ color: accent }}>
       #{tag}
     </Text>
   );
@@ -106,11 +111,12 @@ const InlineLink = React.memo(function InlineLink({
   onPressIn?: () => void;
   onPressOut?: () => void;
 }) {
-  const foreground = useThemeColor('foreground');
+  const accent = useThemeColor('accent');
   return (
     <Text
+      family={POST_FONT_FAMILY}
       size={NOTE_CONTENT_FONT_SIZE}
-      style={{ color: withAlpha(foreground, 0.5) }}
+      style={{ color: accent }}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={async () => {
@@ -232,12 +238,15 @@ const LightningBlock = React.memo(function LightningBlock({ meltTarget }: { melt
           { backgroundColor: surface, borderColor: surfaceTertiary },
         ]}>
         <HStack align="center" gap={8}>
-          <Icon name="mingcute:lightning-fill" size={20} color={withAlpha(foreground, 0.2)} />
+          <Icon name="tabler:bolt" size={20} color={withAlpha(foreground, postInk.tertiary)} />
           <VStack style={sharedStyles.flex1}>
-            <Text bold size={13} style={{ color: withAlpha(foreground, 0.4) }}>
+            <Text bold size={13} style={{ color: withAlpha(foreground, postInk.secondary) }}>
               Invalid Lightning invoice
             </Text>
-            <Text size={11} numberOfLines={1} style={{ color: withAlpha(foreground, 0.25) }}>
+            <Text
+              size={11}
+              numberOfLines={1}
+              style={{ color: withAlpha(foreground, postInk.tertiary) }}>
               {meltTarget.slice(0, 30)}…
             </Text>
           </VStack>
@@ -259,16 +268,19 @@ const LightningBlock = React.memo(function LightningBlock({ meltTarget }: { melt
       }}
       style={[sharedStyles.mediaCard, { backgroundColor: surface, borderColor: surfaceTertiary }]}>
       <HStack align="center" gap={8}>
-        <Icon name="mingcute:lightning-fill" size={20} color={withAlpha(foreground, 0.4)} />
+        <Icon name="tabler:bolt" size={20} color={withAlpha(foreground, postInk.secondary)} />
         <VStack style={sharedStyles.flex1}>
-          <Text bold size={13} style={{ color: withAlpha(foreground, 0.66) }}>
+          <Text bold size={13} style={{ color: withAlpha(foreground, postInk.primary) }}>
             Lightning Invoice
           </Text>
-          <Text size={11} numberOfLines={1} style={{ color: withAlpha(foreground, 0.33) }}>
+          <Text
+            size={11}
+            numberOfLines={1}
+            style={{ color: withAlpha(foreground, postInk.tertiary) }}>
             {subtitle}
           </Text>
         </VStack>
-        <Icon name="mdi:chevron-right" size={18} color={withAlpha(foreground, 0.33)} />
+        <Icon name="mdi:chevron-right" size={18} color={withAlpha(foreground, postInk.tertiary)} />
       </HStack>
     </Pressable>
   );
@@ -319,8 +331,8 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
           { backgroundColor: surface, borderColor: surfaceTertiary },
         ]}>
         <HStack align="center" gap={6}>
-          <Icon name="mdi:message-text" size={14} color={withAlpha(foreground, 0.33)} />
-          <Text size={13} italic style={{ color: withAlpha(foreground, 0.33) }}>
+          <Icon name="mdi:message-text" size={14} color={withAlpha(foreground, postInk.tertiary)} />
+          <Text size={13} italic style={{ color: withAlpha(foreground, postInk.tertiary) }}>
             Quoted post
           </Text>
         </HStack>
@@ -342,7 +354,7 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
           sharedStyles.quotedCard,
           { backgroundColor: surface, borderColor: surfaceTertiary },
         ]}>
-        <HStack align="center" gap={8} style={sharedStyles.mb6}>
+        <HStack align="flex-end" gap={spacing.xs} style={sharedStyles.mb6}>
           <Avatar
             state={avatarStateFor(profile?.picture, profile !== undefined)}
             picture={profile?.picture}
@@ -351,21 +363,22 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
             name={displayName}
           />
           <Text
-            bold
-            size={13}
-            style={{ color: withAlpha(foreground, 0.66), flex: 1 }}
+            family={POST_FONT_FAMILY}
+            semibold
+            size={postType.meta.size}
+            className="ml-1 min-w-0 shrink leading-[18px]"
+            color={withAlpha(foreground, postInk.primary)}
             numberOfLines={1}>
             {displayName}
           </Text>
           {timestamp ? (
-            <>
-              <Text bold size={11} style={{ color: withAlpha(foreground, 0.25), marginRight: 4 }}>
-                {'•'}
-              </Text>
-              <Text size={11} style={{ color: withAlpha(foreground, 0.33) }}>
-                {timestamp}
-              </Text>
-            </>
+            <Text
+              family={POST_FONT_FAMILY}
+              size={postType.meta.size}
+              className="shrink-0 leading-[18px]"
+              color={withAlpha(foreground, postInk.secondary)}>
+              {`· ${timestamp}`}
+            </Text>
           ) : null}
         </HStack>
         <NoteContent
@@ -675,8 +688,9 @@ export const NoteContent = React.memo(function NoteContent({
 
   const activeSegments = expanded ? inlineSegments : displaySegments;
 
-  const textColor = { color: withAlpha(foreground, 0.9) };
-  const accentColor = { color: withAlpha(foreground, 0.5) };
+  const accent = useThemeColor('accent');
+  const textColor = { color: withAlpha(foreground, postInk.primary) };
+  const accentColor = { color: accent };
 
   const renderSegment = (seg: ContentSegment, i: number) => {
     switch (seg.kind) {
@@ -710,7 +724,7 @@ export const NoteContent = React.memo(function NoteContent({
         );
       case 'naddr':
         return (
-          <Text key={i} bold size={NOTE_CONTENT_FONT_SIZE} style={accentColor}>
+          <Text key={i} family={POST_FONT_FAMILY} size={NOTE_CONTENT_FONT_SIZE} style={accentColor}>
             [article]
           </Text>
         );
@@ -756,6 +770,7 @@ export const NoteContent = React.memo(function NoteContent({
     <VStack ref={attachVisualLayoutNode} gap={0} onLayout={noteLayoutHandler}>
       {hasInline && (
         <Text
+          family={POST_FONT_FAMILY}
           size={NOTE_CONTENT_FONT_SIZE}
           style={[textColor, { lineHeight: NOTE_CONTENT_LINE_HEIGHT }]}>
           {activeSegments.map((seg, i) => renderSegment(seg, i))}
@@ -764,6 +779,7 @@ export const NoteContent = React.memo(function NoteContent({
           )}
           {!expanded && isTruncated && (
             <Text
+              family={POST_FONT_FAMILY}
               size={NOTE_CONTENT_FONT_SIZE}
               style={accentColor}
               onPressIn={onInlineActionPressIn}
@@ -774,6 +790,7 @@ export const NoteContent = React.memo(function NoteContent({
           )}
           {expanded && isTruncated && (
             <Text
+              family={POST_FONT_FAMILY}
               size={NOTE_CONTENT_FONT_SIZE}
               style={accentColor}
               onPressIn={onInlineActionPressIn}

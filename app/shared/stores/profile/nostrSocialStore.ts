@@ -678,7 +678,14 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
             optimisticZapsByEventId: withOptimisticEntry(state.optimisticZapsByEventId, eventId, {
               deltaSats,
               pending: false,
-              expectedSats: (baseSats ?? 0) + deltaSats,
+              // `baseSats` is the post's DISPLAYED sats when this zap started, which
+              // already includes earlier optimistic zaps; an overlapping zap that
+              // started before the first confirmed carries the older base, so the
+              // running expectation wins when it is higher.
+              expectedSats: Math.max(
+                (optExisting?.expectedSats ?? 0) + sats,
+                (baseSats ?? 0) + sats
+              ),
             }),
           };
         });

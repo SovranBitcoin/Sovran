@@ -77,7 +77,6 @@ describe('repost card props', () => {
       repostEvent,
       originalEvent,
       originalMetrics: METRICS,
-      index: 4,
       feedIndex: 4,
       reposterName: 'Fallback',
       reposterPubkey: repostEvent.pubkey,

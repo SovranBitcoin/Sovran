@@ -32,7 +32,6 @@ export function createRepostCardProps(dependencies: RepostCardDependencies) {
       repostEvent: item.repostEvent,
       originalEvent,
       originalMetrics: row.metrics,
-      index,
       feedIndex: index,
       onOverlayOpenedFromIndex: dependencies.onOverlayOpenedFromIndex,
       quotedEvents: row.quotedEvents,

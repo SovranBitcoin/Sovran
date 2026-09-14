@@ -1,21 +1,22 @@
 import { StyleSheet } from 'react-native';
+import { radius, spacing } from '@/shared/styles/tokens';
 
 export const sharedStyles = StyleSheet.create({
   noteFooter: {},
   footerBorder: {
-    borderBottomWidth: 1,
-    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingBottom: spacing.sm,
   },
   quotedCard: {
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
     marginTop: 6,
   },
   mediaCard: {
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
     marginTop: 6,
   },
   imageBlockOuter: {

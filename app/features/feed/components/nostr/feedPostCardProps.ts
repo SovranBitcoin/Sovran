@@ -39,7 +39,6 @@ export function createFeedPostCardProps(dependencies: FeedPostCardDependencies) 
       event,
       metrics,
       metricsKnown,
-      index,
       feedIndex: index,
       onOverlayOpenedFromIndex: dependencies.onOverlayOpenedFromIndex,
       quotedEvents: row.quotedEvents,

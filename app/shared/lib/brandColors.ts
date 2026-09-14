@@ -20,6 +20,11 @@ export const CONNECTED_ACCENT = '#34C759';
  *  the theme-derived `link` token which can render greyish). */
 export const COMMENT_ACCENT = '#3B9EFF';
 
+/** Like accent (#FF5A7A). Fixed cross-theme pink used to fill the heart when
+ *  the viewer has liked a post — the reference every other action accent is
+ *  described against. */
+export const LIKE_ACCENT = '#FF5A7A';
+
 /** Zap accent (#F7B500). Fixed cross-theme amber used to highlight the
  *  lightning icon when the viewer has zapped a post — sibling to the fixed
  *  pink "like" and blue "reply" accents. Warmer than BITCOIN_ACCENT so a

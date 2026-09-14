@@ -46,7 +46,6 @@ export function DemoHomeFeed() {
               quotedEvents={quotedEvents}
               getMetrics={getMetrics}
               variant="feed"
-              skipAnimation
               fullBleedFooterBorder
             />
           </View>

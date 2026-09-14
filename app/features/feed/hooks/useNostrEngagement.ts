@@ -5,12 +5,19 @@ import { EventDeletion, Reaction, Repost } from 'nostr-tools/kinds';
 import { useShallow } from 'zustand/shallow';
 
 import type { FeedEvent, NoteMetrics } from '@/features/feed/components/nostr/feedTypes';
+import {
+  overlayToggleCount,
+  overlayZapSats,
+  shouldSettleToggle,
+  shouldSettleZap,
+} from '@/features/feed/lib/engagementOverlay';
+import { reconcileToggle } from '@/features/feed/lib/engagementToggle';
 import { log } from '@/shared/lib/logger';
 import { publishEvent } from '@/shared/lib/nostr/publish';
+import { readNoteMetrics } from '@/shared/lib/nostr/useEntityCache';
 import { paramPopup } from '@/shared/lib/popup';
-import { useKeyedSingleFlight } from '@/shared/hooks/useSingleFlight';
-import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 
 type EngagementState = {
   liked: boolean;
@@ -24,138 +31,145 @@ type EngagementState = {
 
 export type EngagementViewState = EngagementState;
 
-const OPTIMISTIC_SETTLE_GRACE_MS = 15_000;
 const OPTIMISTIC_STALE_WARN_MS = 30_000;
 
+type Ndk = NonNullable<ReturnType<typeof useNDK>['ndk']>;
+type ToggleKind = 'like' | 'repost';
+
 // ---------------------------------------------------------------------------
-// Generic toggle-engagement helper (deduplicates toggleLike / toggleRepost)
+// Toggle machinery — module scope, so the feed, the thread on top of it and
+// the image overlay all drive ONE network loop per action.
 // ---------------------------------------------------------------------------
 
-interface ToggleEngagementOpts {
-  target: FeedEvent;
-  ndk: any;
-  kind: typeof Reaction | typeof Repost;
-  currentState: boolean;
-  isPending: boolean;
-  previousOptimistic:
-    | {
-        value: boolean;
-        pending: boolean;
-        delta: number;
-        expectedCount?: number;
-        relatedEventId?: string;
+/** `like:<id>` / `repost:<id>` actions whose network loop is running. */
+const reconcilingActions = new Set<string>();
+
+const actionKey = (kind: ToggleKind, eventId: string) => `${kind}:${eventId}`;
+
+/** The store slice for one action kind, read fresh (never a render snapshot). */
+function toggleSlice(kind: ToggleKind) {
+  const state = useNostrSocialStore.getState();
+  return kind === 'like'
+    ? {
+        overlays: state.optimisticLikesByEventId,
+        setOverlay: state.setLikeOptimistic,
+        clearOverlay: state.clearLikeOptimistic,
+        confirmedAction: (eventId: string) => state.engagementByEventId[eventId]?.liked,
       }
-    | undefined;
-  relatedEventIdFromStore: string | undefined;
-  displayedCount: number;
-  baseCount: number;
-  setOptimistic: (
-    eventId: string,
-    params: {
-      value: boolean;
-      pending: boolean;
-      delta: number;
-      expectedCount?: number;
-      relatedEventId?: string;
-    }
-  ) => void;
-  clearOptimistic: (eventId: string) => void;
-  buildContent: (target: FeedEvent) => string;
-  onActivated?: (eventId: string) => void;
-  onDeactivated?: (eventId: string) => void;
-  label: string;
+    : {
+        overlays: state.optimisticRepostsByEventId,
+        setOverlay: state.setRepostOptimistic,
+        clearOverlay: state.clearRepostOptimistic,
+        confirmedAction: (eventId: string) => state.engagementByEventId[eventId]?.reposted,
+      };
 }
 
-async function toggleEngagement(opts: ToggleEngagementOpts): Promise<void> {
-  const {
-    target,
-    ndk,
-    kind,
-    currentState,
-    isPending,
-    previousOptimistic,
-    relatedEventIdFromStore,
-    displayedCount,
-    baseCount,
-    setOptimistic,
-    clearOptimistic,
-    buildContent,
-    onActivated,
-    onDeactivated,
-    label,
-  } = opts;
-
-  const eventId = target.id;
-  if (isPending) return;
-
-  const nextActive = !currentState;
-  const expectedCount = Math.max(0, displayedCount + (nextActive ? 1 : -1));
-  const delta = expectedCount - baseCount;
-  const prevRelated = previousOptimistic?.relatedEventId || relatedEventIdFromStore;
-
-  setOptimistic(eventId, {
-    value: nextActive,
-    pending: true,
-    delta,
-    expectedCount,
-    relatedEventId: prevRelated,
+/** Update the network-side fields of an overlay without touching the intent. */
+function patchOverlay(
+  kind: ToggleKind,
+  eventId: string,
+  patch: { pending?: boolean; relatedEventId?: string | null }
+): void {
+  const { overlays, setOverlay } = toggleSlice(kind);
+  const current = overlays[eventId];
+  if (!current) return;
+  setOverlay(eventId, {
+    value: current.value,
+    pending: patch.pending ?? current.pending,
+    delta: current.delta,
+    expectedCount: current.expectedCount,
+    relatedEventId:
+      patch.relatedEventId === undefined
+        ? current.relatedEventId
+        : (patch.relatedEventId ?? undefined),
   });
+}
 
-  try {
-    if (nextActive) {
-      const ndkEvent = new NDKEvent(ndk);
-      ndkEvent.kind = kind;
-      ndkEvent.content = buildContent(target);
-      ndkEvent.tags = [
-        ['e', target.id],
-        ['p', target.pubkey],
-      ];
-      ndkEvent.created_at = Math.floor(Date.now() / 1000);
-      // Reactions are latency-sensitive: settle as soon as one relay accepts.
-      const published = await publishEvent({ ndk, event: ndkEvent, resolveOn: 'first-ok' });
-      if (published.isErr()) throw new Error(`${label} publish failed`, { cause: published.error });
-      onActivated?.(eventId);
-      setOptimistic(eventId, {
-        value: nextActive,
-        pending: false,
-        delta,
-        expectedCount,
-        relatedEventId: ndkEvent.id,
-      });
-      return;
-    }
+async function publishOwnAction(ndk: Ndk, kind: ToggleKind, target: FeedEvent): Promise<string> {
+  const event = new NDKEvent(ndk);
+  event.kind = kind === 'like' ? Reaction : Repost;
+  event.content = kind === 'like' ? '+' : JSON.stringify(target);
+  event.tags = [
+    ['e', target.id],
+    ['p', target.pubkey],
+  ];
+  event.created_at = Math.floor(Date.now() / 1000);
+  // Reactions are latency-sensitive: settle as soon as one relay accepts.
+  const published = await publishEvent({ ndk, event, resolveOn: 'first-ok' });
+  if (published.isErr()) throw new Error(`${kind} publish failed`, { cause: published.error });
+  if (kind === 'repost') useNostrSocialStore.getState().unmarkRepostDeleted(target.id);
+  return event.id;
+}
 
-    if (!prevRelated) throw new Error(`${label} event not found`);
+async function retractOwnAction(
+  ndk: Ndk,
+  kind: ToggleKind,
+  target: FeedEvent,
+  ownEventId: string
+): Promise<void> {
+  const deletion = new NDKEvent(ndk);
+  deletion.kind = EventDeletion;
+  deletion.content = 'Deleted by the author';
+  deletion.tags = [
+    ['e', ownEventId],
+    ['k', String(kind === 'like' ? Reaction : Repost)],
+  ];
+  deletion.created_at = Math.floor(Date.now() / 1000);
+  const deleted = await publishEvent({ ndk, event: deletion, resolveOn: 'first-ok' });
+  if (deleted.isErr()) throw new Error(`${kind} delete publish failed`, { cause: deleted.error });
+  if (kind === 'repost') useNostrSocialStore.getState().markRepostDeleted(target.id);
+}
 
-    const deleteEvent = new NDKEvent(ndk);
-    deleteEvent.kind = EventDeletion;
-    deleteEvent.content = 'Deleted by the author';
-    deleteEvent.tags = [
-      ['e', prevRelated],
-      ['k', String(kind)],
-    ];
-    deleteEvent.created_at = Math.floor(Date.now() / 1000);
-    const deleted = await publishEvent({ ndk, event: deleteEvent, resolveOn: 'first-ok' });
-    if (deleted.isErr())
-      throw new Error(`${label} delete publish failed`, { cause: deleted.error });
-    onDeactivated?.(eventId);
-    setOptimistic(eventId, { value: nextActive, pending: false, delta, expectedCount });
-  } catch (error) {
-    if (previousOptimistic) {
-      setOptimistic(eventId, {
-        value: previousOptimistic.value,
-        pending: previousOptimistic.pending,
-        delta: previousOptimistic.delta,
-        expectedCount: previousOptimistic.expectedCount,
-        relatedEventId: previousOptimistic.relatedEventId,
-      });
-    } else {
-      clearOptimistic(eventId);
-    }
-    paramPopup('engagement-update-failed', label as 'follow' | 'like' | 'repost', {
-      failure: { service: 'nostr', error },
-    });
+/** A network step failed: show what the network actually holds. */
+function revertToNetwork(
+  kind: ToggleKind,
+  eventId: string,
+  ownEventId: string | undefined,
+  baseCount: number
+): void {
+  const { setOverlay, clearOverlay, confirmedAction } = toggleSlice(kind);
+  const networkActive = ownEventId !== undefined;
+  if (networkActive === !!confirmedAction(eventId)) {
+    clearOverlay(eventId);
+    return;
   }
+  const expectedCount = networkActive ? baseCount + 1 : Math.max(0, baseCount - 1);
+  setOverlay(eventId, {
+    value: networkActive,
+    pending: false,
+    delta: expectedCount - baseCount,
+    expectedCount,
+    relatedEventId: ownEventId,
+  });
+}
+
+/** Start converging one action to the viewer's latest intent (no-op if already running). */
+function startReconcile(
+  ndk: Ndk,
+  kind: ToggleKind,
+  target: FeedEvent,
+  readBaseCount: () => number
+): void {
+  const key = actionKey(kind, target.id);
+  if (reconcilingActions.has(key)) return;
+  reconcilingActions.add(key);
+  void reconcileToggle({
+    initialOwnEventId: toggleSlice(kind).overlays[target.id]?.relatedEventId,
+    readIntent: () => toggleSlice(kind).overlays[target.id]?.value,
+    activate: () => publishOwnAction(ndk, kind, target),
+    deactivate: (ownEventId) => retractOwnAction(ndk, kind, target, ownEventId),
+    onProgress: (ownEventId) =>
+      patchOverlay(kind, target.id, { relatedEventId: ownEventId ?? null }),
+    onSettled: () => {
+      reconcilingActions.delete(key);
+      patchOverlay(kind, target.id, { pending: false });
+    },
+    onFailed: (ownEventId, error) => {
+      reconcilingActions.delete(key);
+      revertToNetwork(kind, target.id, ownEventId, readBaseCount());
+      paramPopup('engagement-update-failed', kind, { failure: { service: 'nostr', error } });
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -168,6 +182,7 @@ export function useNostrEngagement(
 ) {
   const { ndk } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();
+  const viewerPubkey = nostrKeys?.pubkey;
 
   // State slices — grouped with useShallow to minimise re-subscriptions. The
   // canonical maps are populated globally by useOwnEventsSync, so this hook only
@@ -190,6 +205,15 @@ export function useNostrEngagement(
 
   const lastStaleWarningRef = useRef(0);
 
+  // One base for every surface: the entity cache holds the freshest counts any
+  // read has ingested for a note, so the feed underneath and the thread on top
+  // lay the same overlay over the same numbers. The surface's own map is the
+  // fallback for notes the cache has not seen (e.g. mock mode).
+  const getSharedBaseMetrics = useCallback(
+    (eventId: string): NoteMetrics => readNoteMetrics(eventId) ?? getBaseMetrics(eventId),
+    [getBaseMetrics]
+  );
+
   // ---- derived event lookup ----
 
   const eventsById = useMemo(() => {
@@ -200,41 +224,51 @@ export function useNostrEngagement(
 
   const eventIds = useMemo(() => Array.from(eventsById.keys()), [eventsById]);
 
-  // ---- settle optimistic entries when the global sync catches up ----
+  // ---- settle overlays once the sync catches up; resume orphaned intents ----
 
   useEffect(() => {
-    const { clearLikeOptimistic, clearRepostOptimistic } = useNostrSocialStore.getState();
+    const { clearLikeOptimistic, clearRepostOptimistic, clearZapOptimistic } =
+      useNostrSocialStore.getState();
+    const now = Date.now();
 
-    for (const eventId of eventIds) {
-      settleOptimistic(
-        optimisticLikesByEventId[eventId],
-        !!engagementByEventId[eventId]?.liked,
-        getBaseMetrics(eventId).likeCount,
-        () => clearLikeOptimistic(eventId)
-      );
-      settleOptimistic(
-        optimisticRepostsByEventId[eventId],
-        !!engagementByEventId[eventId]?.reposted,
-        getBaseMetrics(eventId).repostCount,
-        () => clearRepostOptimistic(eventId)
-      );
+    for (const [eventId, target] of eventsById) {
+      const base = getSharedBaseMetrics(eventId);
+      const like = optimisticLikesByEventId[eventId];
+      const repost = optimisticRepostsByEventId[eventId];
+      if (shouldSettleToggle(like, !!engagementByEventId[eventId]?.liked, base.likeCount, now)) {
+        clearLikeOptimistic(eventId);
+      }
+      if (
+        shouldSettleToggle(repost, !!engagementByEventId[eventId]?.reposted, base.repostCount, now)
+      ) {
+        clearRepostOptimistic(eventId);
+      }
       // Zap overlay: clear only when the aggregated 9735 counts have caught
       // up to what we expect. Deliberately NO age-out — an aged-out clear
       // would visibly DECREASE satsZapped when a slow/absent LNURL server
       // never publishes the receipt; the store's recency cap bounds the map.
-      const optZap = optimisticZapsByEventId[eventId];
-      if (
-        optZap &&
-        !optZap.pending &&
-        optZap.expectedSats != null &&
-        getBaseMetrics(eventId).satsZapped >= optZap.expectedSats
-      ) {
-        useNostrSocialStore.getState().clearZapOptimistic(eventId);
+      if (shouldSettleZap(optimisticZapsByEventId[eventId], base.satsZapped)) {
+        clearZapOptimistic(eventId);
+      }
+
+      // An intent still pending with no loop running was left by an app close
+      // mid-publish (the overlay persists); pick up converging it.
+      if (!ndk || !viewerPubkey) continue;
+      if (like?.pending && !reconcilingActions.has(actionKey('like', eventId))) {
+        startReconcile(ndk, 'like', target, () => getSharedBaseMetrics(eventId).likeCount);
+      }
+      if (repost?.pending && !reconcilingActions.has(actionKey('repost', eventId))) {
+        startReconcile(ndk, 'repost', target, () => getSharedBaseMetrics(eventId).repostCount);
       }
     }
   }, [
-    eventIds,
+    eventsById,
+    ndk,
+    viewerPubkey,
+    // Not read directly: a surface's metrics map changing is the moment fresh
+    // counts may have landed in the shared cache, so re-check settlement then.
     getBaseMetrics,
+    getSharedBaseMetrics,
     engagementByEventId,
     optimisticLikesByEventId,
     optimisticRepostsByEventId,
@@ -313,18 +347,23 @@ export function useNostrEngagement(
 
   const getDisplayMetrics = useCallback(
     (eventId: string): NoteMetrics => {
-      const baseMetrics = getBaseMetrics(eventId);
-      const likeDelta = optimisticLikesByEventId[eventId]?.delta ?? 0;
-      const repostDelta = optimisticRepostsByEventId[eventId]?.delta ?? 0;
-      const zapDeltaSats = optimisticZapsByEventId[eventId]?.deltaSats ?? 0;
+      const baseMetrics = getSharedBaseMetrics(eventId);
       return {
         ...baseMetrics,
-        likeCount: Math.max(0, baseMetrics.likeCount + likeDelta),
-        repostCount: Math.max(0, baseMetrics.repostCount + repostDelta),
-        satsZapped: Math.max(0, baseMetrics.satsZapped + zapDeltaSats),
+        likeCount: overlayToggleCount(baseMetrics.likeCount, optimisticLikesByEventId[eventId]),
+        repostCount: overlayToggleCount(
+          baseMetrics.repostCount,
+          optimisticRepostsByEventId[eventId]
+        ),
+        satsZapped: overlayZapSats(baseMetrics.satsZapped, optimisticZapsByEventId[eventId]),
       };
     },
-    [getBaseMetrics, optimisticLikesByEventId, optimisticRepostsByEventId, optimisticZapsByEventId]
+    [
+      getSharedBaseMetrics,
+      optimisticLikesByEventId,
+      optimisticRepostsByEventId,
+      optimisticZapsByEventId,
+    ]
   );
 
   /**
@@ -344,89 +383,55 @@ export function useNostrEngagement(
     [optimisticZapsByEventId, zappedByEventId]
   );
 
-  // ---- toggle actions (unified via toggleEngagement) ----
+  // ---- toggle actions ----
 
-  const toggleLikeInner = useCallback(
-    async (target: FeedEvent) => {
-      if (!nostrKeys?.pubkey || !ndk) {
-        paramPopup('engagement-update-failed', 'like');
+  /**
+   * Flip the viewer's intent now; the network follows. Never blocked by a
+   * publish in flight — like then unlike straight away is the loop's job.
+   */
+  const toggle = useCallback(
+    (kind: ToggleKind, target: FeedEvent) => {
+      if (!viewerPubkey || !ndk) {
+        paramPopup('engagement-update-failed', kind);
         return;
       }
-      const state = getEngagementState(target.id);
-      const { setLikeOptimistic, clearLikeOptimistic } = useNostrSocialStore.getState();
-      await toggleEngagement({
-        target,
-        ndk,
-        kind: Reaction,
-        currentState: state.liked,
-        isPending: state.likePending,
-        previousOptimistic: optimisticLikesByEventId[target.id],
-        relatedEventIdFromStore: engagementByEventId[target.id]?.liked?.ownEventId,
-        displayedCount: getDisplayMetrics(target.id).likeCount,
-        baseCount: getBaseMetrics(target.id).likeCount,
-        setOptimistic: setLikeOptimistic,
-        clearOptimistic: clearLikeOptimistic,
-        buildContent: () => '+',
-        label: 'like',
-      });
-    },
-    [
-      getBaseMetrics,
-      getDisplayMetrics,
-      getEngagementState,
-      engagementByEventId,
-      ndk,
-      nostrKeys?.pubkey,
-      optimisticLikesByEventId,
-    ]
-  );
-
-  const toggleRepostInner = useCallback(
-    async (target: FeedEvent) => {
-      if (!nostrKeys?.pubkey || !ndk) {
-        paramPopup('engagement-update-failed', 'repost');
+      const eventId = target.id;
+      // Read the store, not this render's maps: two taps can land before a re-render.
+      const { overlays, setOverlay, confirmedAction } = toggleSlice(kind);
+      const overlay = overlays[eventId];
+      const confirmed = confirmedAction(eventId);
+      const active = overlay ? overlay.value : !!confirmed;
+      const relatedEventId = overlay ? overlay.relatedEventId : confirmed?.ownEventId;
+      const next = !active;
+      if (
+        !next &&
+        relatedEventId === undefined &&
+        !reconcilingActions.has(actionKey(kind, eventId))
+      ) {
+        // Active from another client with no event id we could retract.
+        paramPopup('engagement-update-failed', kind);
         return;
       }
-      const state = getEngagementState(target.id);
-      const { setRepostOptimistic, clearRepostOptimistic, unmarkRepostDeleted, markRepostDeleted } =
-        useNostrSocialStore.getState();
-      await toggleEngagement({
-        target,
-        ndk,
-        kind: Repost,
-        currentState: state.reposted,
-        isPending: state.repostPending,
-        previousOptimistic: optimisticRepostsByEventId[target.id],
-        relatedEventIdFromStore: engagementByEventId[target.id]?.reposted?.ownEventId,
-        displayedCount: getDisplayMetrics(target.id).repostCount,
-        baseCount: getBaseMetrics(target.id).repostCount,
-        setOptimistic: setRepostOptimistic,
-        clearOptimistic: clearRepostOptimistic,
-        buildContent: (t) => JSON.stringify(t),
-        onActivated: () => unmarkRepostDeleted(target.id),
-        onDeactivated: () => markRepostDeleted(target.id),
-        label: 'repost',
+      const readBaseCount = () => {
+        const metrics = getSharedBaseMetrics(eventId);
+        return kind === 'like' ? metrics.likeCount : metrics.repostCount;
+      };
+      const baseCount = readBaseCount();
+      const expectedCount = Math.max(0, overlayToggleCount(baseCount, overlay) + (next ? 1 : -1));
+      setOverlay(eventId, {
+        value: next,
+        pending: true,
+        delta: expectedCount - baseCount,
+        expectedCount,
+        relatedEventId,
       });
+      startReconcile(ndk, kind, target, readBaseCount);
     },
-    [
-      getBaseMetrics,
-      getDisplayMetrics,
-      getEngagementState,
-      engagementByEventId,
-      ndk,
-      nostrKeys?.pubkey,
-      optimisticRepostsByEventId,
-    ]
+    [getSharedBaseMetrics, ndk, viewerPubkey]
   );
 
-  // Per-target single-flight: tapping like on post A while post B is still
-  // publishing must not block — use the target id as the key so concurrent
-  // calls on different posts run in parallel, but a rapid double-tap on the
-  // same post drops the duplicate before the second `ndkEvent.publish()`
-  // can stomp the first call's optimistic state.
-  const targetKey = useCallback((target: FeedEvent) => target.id, []);
-  const toggleLike = useKeyedSingleFlight(toggleLikeInner, targetKey);
-  const toggleRepost = useKeyedSingleFlight(toggleRepostInner, targetKey);
+  const toggleLike = useCallback((target: FeedEvent) => toggle('like', target), [toggle]);
+  const toggleRepost = useCallback((target: FeedEvent) => toggle('repost', target), [toggle]);
 
   return {
     getDisplayMetrics,
@@ -436,20 +441,4 @@ export function useNostrEngagement(
     toggleRepost,
     engagementRevision,
   };
-}
-
-// ---------------------------------------------------------------------------
-// Optimistic settlement helper
-// ---------------------------------------------------------------------------
-
-function settleOptimistic(
-  opt: { value: boolean; pending: boolean; expectedCount?: number; updatedAt?: number } | undefined,
-  baseValue: boolean,
-  baseCount: number,
-  clear: () => void
-) {
-  if (!opt || opt.pending) return;
-  const countSettled = opt.expectedCount === undefined || baseCount === opt.expectedCount;
-  const isAgedOut = Date.now() - (opt.updatedAt || 0) >= OPTIMISTIC_SETTLE_GRACE_MS;
-  if (baseValue === opt.value && (countSettled || isAgedOut)) clear();
 }

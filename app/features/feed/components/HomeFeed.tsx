@@ -53,7 +53,13 @@ import {
   type FeedRow,
 } from '@/features/feed/lib/feedRows';
 
-import { PostCard } from './nostr/PostCard';
+import { PostCard, PostCardSkeleton } from './nostr/PostCard';
+import {
+  POST_AVATAR_SIZE,
+  POST_PADDING_H,
+  POST_PADDING_TOP,
+  postType,
+} from '@/features/feed/lib/postTypography';
 import { RepostCard } from './UserFeed';
 import {
   ImageOverlayProvider,
@@ -96,14 +102,15 @@ const FEED_PAGE_LIMIT = 10;
 
 // Stable config object — avoids re-triggering useBackgroundConfig every render
 const BG_CONFIG = { blurMode: 'full' as const };
-const FEED_AVATAR_SIZE = 36;
-const FEED_CARD_HORIZONTAL_PADDING = 16;
-const FEED_CARD_VERTICAL_PADDING = 10;
-const FEED_AVATAR_CENTER_Y = FEED_CARD_VERTICAL_PADDING + FEED_AVATAR_SIZE / 2;
+const FEED_AVATAR_SIZE = POST_AVATAR_SIZE;
+const FEED_CARD_HORIZONTAL_PADDING = POST_PADDING_H;
+const FEED_CARD_TOP_PADDING = POST_PADDING_TOP;
+const FEED_AVATAR_CENTER_Y = FEED_CARD_TOP_PADDING + FEED_AVATAR_SIZE / 2;
 const FEED_THREAD_CONNECTOR_AVATAR_GAP = 6;
 const FEED_THREAD_CONNECTOR_TOP =
-  FEED_CARD_VERTICAL_PADDING + FEED_AVATAR_SIZE + FEED_THREAD_CONNECTOR_AVATAR_GAP;
-const FEED_REPOST_HEADER_HEIGHT = 27;
+  FEED_CARD_TOP_PADDING + FEED_AVATAR_SIZE + FEED_THREAD_CONNECTOR_AVATAR_GAP;
+/** RepostCard's header: its top padding plus one meta line (see UserFeed). */
+const FEED_REPOST_HEADER_HEIGHT = POST_PADDING_TOP + postType.meta.lineHeight;
 const FEED_REPOST_ORIGINAL_AVATAR_CENTER_Y = FEED_REPOST_HEADER_HEIGHT + FEED_AVATAR_CENTER_Y;
 
 // ============================================================================
@@ -177,6 +184,18 @@ function FeedThreadPair({
     </View>
   );
 }
+
+type HomeFeedListRow = FeedRow | { key: string; skeleton: true };
+
+/** Cold-start rows: the same gutter skeleton the profile feed and thread use,
+ *  as list items with stable keys — never a spinner over an empty list. */
+const SKELETON_ROWS: HomeFeedListRow[] = Array.from({ length: 5 }, (_, i) => ({
+  key: `skeleton-${i}`,
+  skeleton: true as const,
+}));
+const getListRowKey = (row: HomeFeedListRow) => ('skeleton' in row ? row.key : getFeedRowKey(row));
+const getListRowItemType = (row: HomeFeedListRow) =>
+  'skeleton' in row ? 'skeleton' : getFeedRowItemType(row);
 
 // ============================================================================
 // Main HomeFeed Component
@@ -529,7 +548,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             row.rootMetrics ?? DEFAULT_METRICS,
             row.rootEngagement ?? DEFAULT_ENGAGEMENT_STATE
           )}
-          skipAnimation={!isFirstRender.current}
           getThreadContext={() => getThreadContextRef.current()}
           showFooterBorder={false}
           fullBleedFooterBorder
@@ -547,7 +565,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                 <PostCard
                   variant="feed"
                   {...feedPostCardProps(row, index, item.event, metrics, engagement)}
-                  skipAnimation={!isFirstRender.current}
                   getThreadContext={() => getThreadContextRef.current(replyPreviewEvents)}
                   showFooterBorder={false}
                   fullBleedFooterBorder
@@ -600,7 +617,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           <PostCard
             variant="feed"
             {...feedPostCardProps(row, index, item.event, metrics, engagement)}
-            skipAnimation={!isFirstRender.current}
             getThreadContext={() => getThreadContextRef.current()}
             fullBleedFooterBorder
           />
@@ -618,7 +634,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
               <RepostCard
                 {...repostCardProps(row, index, item)}
                 onMorePress={() => openPostActions(originalEvent)}
-                skipAnimation={!isFirstRender.current}
                 getThreadContext={() => getThreadContextRef.current()}
                 fullBleedFooterBorder
               />
@@ -629,7 +644,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       return (
         <RepostCard
           {...repostCardProps(row, index, item)}
-          skipAnimation={!isFirstRender.current}
           getThreadContext={() => getThreadContextRef.current()}
           fullBleedFooterBorder
         />
@@ -643,6 +657,17 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       getThreadContextRef,
       openPostActions,
     ]
+  );
+
+  const listRows: HomeFeedListRow[] = isLoading && feedRows.length === 0 ? SKELETON_ROWS : feedRows;
+  const renderListRow = useCallback(
+    ({ item, index }: { item: HomeFeedListRow; index: number }) =>
+      'skeleton' in item ? (
+        <PostCardSkeleton variant="thread-reply" index={index} />
+      ) : (
+        renderFeedItem({ item, index })
+      ),
+    [renderFeedItem]
   );
 
   const refreshTintColor = useMemo(() => withAlpha(foreground, 0.5), [foreground]);
@@ -672,15 +697,13 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           <List
             screen
             bottomSpacing={COMPOSE_FAB_CLEARANCE}
-            data={feedRows}
-            keyExtractor={getFeedRowKey}
-            getItemType={getFeedRowItemType}
+            data={listRows}
+            keyExtractor={getListRowKey}
+            getItemType={getListRowItemType}
             drawDistance={400}
-            renderItem={renderFeedItem}
+            renderItem={renderListRow}
             ListEmptyComponent={
-              isLoading ? (
-                <Spinner size={22} style={styles.loader} />
-              ) : pageStatus.retryAfterMs !== undefined ? null : (
+              isLoading || pageStatus.retryAfterMs !== undefined ? null : (
                 <EmptyFeed
                   mode={selectFeedEmptyMode({
                     isLoading,
@@ -1048,10 +1071,6 @@ async function loadMoreItemsImpl(
 // ============================================================================
 
 const styles = StyleSheet.create({
-  loader: {
-    alignSelf: 'center',
-    marginTop: 48,
-  },
   loadMoreSpinner: {
     alignSelf: 'center',
     paddingVertical: 24,

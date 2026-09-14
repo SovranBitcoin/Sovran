@@ -7,6 +7,7 @@
  * `ComposeConfig`; the char meter enforces the relay-sourced budget; send goes
  * through the outbox-aware publish seam.
  */
+import { POST_AVATAR_SIZE } from '@/features/feed/lib/postTypography';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { useEffect, useRef, useState } from 'react';
@@ -64,7 +65,7 @@ import {
 } from '@/features/feed/components/nostr/feedTypes';
 import { alpha, spacing } from '@/shared/styles/tokens';
 
-const AVATAR_SIZE = 36;
+const AVATAR_SIZE = POST_AVATAR_SIZE;
 const EMPTY_EVENTS = new Map<string, FeedEvent>();
 const stubMetrics = (): NoteMetrics => DEFAULT_METRICS;
 

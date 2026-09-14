@@ -357,8 +357,8 @@ Accessible names must communicate the useful full label or a clear “view/copy 
 | Function | Current style vocabulary |
 | --- | --- |
 | `formatDate` | `time`, `short-date`, `long-date`, `short-date-time`, `iso` |
-| `formatRelative` | `verbose`, `compact`, `chat-bubble`, `conversation-list` |
-| `formatRelativeUnixSeconds` | Adapter for Nostr-style seconds into compact relative display |
+| `formatRelative` | `verbose`, `compact`, `terse`, `chat-bubble`, `conversation-list` |
+| `formatRelativeUnixSeconds` | Adapter for Nostr-style seconds into `terse` relative display (`5m`, `3h`, `2d` — rows, never prose) |
 
 Use epoch milliseconds for app clock arithmetic and cache metadata; Nostr `created_at` uses seconds. Name boundary variables `...Ms`/`...Seconds` and convert once. Use a monotonic clock for elapsed-performance measurements and an absolute clock for timestamps/expiry. Store raw time, not localized labels. For actual ISO/RFC3339 serialization use an explicit UTC serialization path, not a UI date style.
 
@@ -374,7 +374,7 @@ Use existing amount/unit formatting for display; do not scatter `toFixed`, curre
 
 **Observed:** shared [Text](app/shared/ui/primitives/Text.tsx), [Button](app/shared/ui/primitives/Button.tsx), [ButtonHandler](app/shared/ui/composed/ButtonHandler.tsx), and [ScreenStates](app/shared/ui/composed/ScreenStates.tsx) provide common behavior, but do not establish full accessibility coverage.
 
-**Decision:** reuse shared controls for typography, press feedback, loading/disabled behavior, touch target, and accessible state. App text normally uses Oxygen; existing Overpass amount typography remains intentional. Keep platform/system fallback fonts for scripts the bundled fonts do not cover. Avoid assigning font families in individual screens.
+**Decision:** reuse shared controls for typography, press feedback, loading/disabled behavior, touch target, and accessible state. App text normally uses Oxygen; existing Overpass amount typography remains intentional. The feed's post surfaces (card, repost header, quoted card, action bar, tab labels) use Mona Sans through `Text family="mona"`, read from [postTypography](app/features/feed/lib/postTypography.ts) — the only bundled family with a real Medium/SemiBold, which the name/body hierarchy depends on ([ADR 0009](app/docs/adr/0009-post-card-calibration.md)). Keep platform/system fallback fonts for scripts the bundled fonts do not cover. Avoid assigning font families in individual screens.
 
 Give icon-only actions an accessible name. Expose busy/disabled/selected/expanded state, meaningful errors, and sensible focus after a sheet opens/closes. Decorative skeletons, duplicate crossfade content, and hidden layout text should not become extra screen-reader content. Platform accessibility behavior differs, so verify VoiceOver and TalkBack rather than assuming one prop has identical effects ([React Native accessibility](https://reactnative.dev/docs/accessibility)).
 

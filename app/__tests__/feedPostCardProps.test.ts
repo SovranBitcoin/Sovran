@@ -63,7 +63,6 @@ describe('feed post card props', () => {
     expect(props).toMatchObject({
       event,
       metrics,
-      index: 7,
       feedIndex: 7,
       profiles,
       quotedEvents,

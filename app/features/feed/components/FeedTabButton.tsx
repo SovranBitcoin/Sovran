@@ -5,6 +5,8 @@ import Icon from '@/assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { fontSize } from '@/shared/styles/tokens';
+import { POST_FONT_FAMILY, postInk } from '@/features/feed/lib/postTypography';
 
 /**
  * Rounded pill tab used in the Feed/Notifications header filter rows and the
@@ -27,6 +29,7 @@ export function FeedTabButton({
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
   const activeBg = useMemo(() => withAlpha(surfaceTertiary, 0.5), [surfaceTertiary]);
   const pressedBg = useMemo(() => withAlpha(surfaceTertiary, 0.65), [surfaceTertiary]);
+  const labelColor = active ? foreground : withAlpha(foreground, postInk.secondary);
   return (
     <Pressable
       testID={testID}
@@ -41,8 +44,14 @@ export function FeedTabButton({
         { backgroundColor: pressed ? pressedBg : active ? activeBg : 'transparent' },
       ]}>
       <View style={styles.tabInner}>
-        <Text style={[styles.tabLabel, { color: foreground }]}>{label}</Text>
-        {showChevron ? <Icon name="mdi:chevron-down" size={16} color={foreground} /> : null}
+        {/* Selection reads in the type too (weight + ink), not only the pill. */}
+        <Text
+          family={POST_FONT_FAMILY}
+          semibold={active}
+          style={[styles.tabLabel, { color: labelColor }]}>
+          {label}
+        </Text>
+        {showChevron ? <Icon name="mdi:chevron-down" size={16} color={labelColor} /> : null}
       </View>
     </Pressable>
   );
@@ -63,6 +72,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   tabLabel: {
-    fontSize: 17,
+    fontSize: fontSize.xl,
   },
 });

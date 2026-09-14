@@ -29,7 +29,6 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { seedThread, type ThreadSeed } from '@/features/feed/lib/threadSeedCache';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
-import { useFadeRevealProbe } from '@/shared/lib/debug/fadeRevealProbe';
 import { log, Log, feedLog } from '@/shared/lib/logger';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -43,13 +42,15 @@ import Icon from 'assets/icons';
 import { withAlpha } from '@/shared/lib/color';
 import { useCardTapGesture } from '@/features/feed/hooks/useCardTapGesture';
 import { GestureDetector } from 'react-native-gesture-handler';
-import Reanimated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withDelay,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
+import { iconSize, spacing } from '@/shared/styles/tokens';
+import {
+  POST_CONTENT_INDENT,
+  POST_FONT_FAMILY,
+  POST_PADDING_H,
+  POST_PADDING_TOP,
+  postInk,
+  postType,
+} from '@/features/feed/lib/postTypography';
 
 // ============================================================================
 // Shared module — types, constants, utils, rendering components
@@ -118,7 +119,6 @@ export const RepostCard = React.memo(function RepostCard({
   repostEvent: _repostEvent,
   originalEvent,
   originalMetrics,
-  index,
   quotedEvents,
   profiles,
   getMetrics,
@@ -141,7 +141,6 @@ export const RepostCard = React.memo(function RepostCard({
   onRepostPress,
   onZapPress,
   onMorePress,
-  skipAnimation,
   getThreadContext,
   showLineAbove = false,
   fullBleedFooterBorder = false,
@@ -149,7 +148,6 @@ export const RepostCard = React.memo(function RepostCard({
   repostEvent: FeedEvent;
   originalEvent: FeedEvent | undefined;
   originalMetrics: NoteMetrics;
-  index: number;
   quotedEvents: Map<string, FeedEvent>;
   profiles: Map<string, ProfileInfo>;
   getMetrics: (eventId: string) => NoteMetrics;
@@ -172,7 +170,6 @@ export const RepostCard = React.memo(function RepostCard({
   onRepostPress?: () => void;
   onZapPress?: () => void;
   onMorePress?: () => void;
-  skipAnimation?: boolean;
   getThreadContext?: () => ThreadSeed | null;
   showLineAbove?: boolean;
   fullBleedFooterBorder?: boolean;
@@ -182,28 +179,6 @@ export const RepostCard = React.memo(function RepostCard({
     'surface',
     'surface-tertiary',
   ] as const);
-  const progress = useSharedValue(skipAnimation ? 1 : 0);
-
-  useEffect(() => {
-    if (skipAnimation) return;
-    progress.set(
-      withDelay(
-        Math.min(index * 60, 300),
-        withTiming(1, { duration: 350, easing: Easing.out(Easing.cubic) })
-      )
-    );
-  }, [progress, index, skipAnimation]);
-  // [DEBUG-inv] catches the card entrance animation never flushing (invisible feed rows)
-  useFadeRevealProbe(`feed.card:${index}`, progress, {
-    enabled: !skipAnimation,
-    deadlineMs: 1600,
-  });
-
-  const animStyle = useAnimatedStyle(() => ({
-    opacity: progress.get(),
-    transform: [{ translateY: (1 - progress.get()) * 12 }],
-  }));
-
   const threadEventId = originalEvent?.id || _repostEvent.id;
   const primaryReposter = reposters?.[0] ?? { name: reposterName, pubkey: reposterPubkey };
   const repostHeaderText =
@@ -234,11 +209,14 @@ export const RepostCard = React.memo(function RepostCard({
     gesture: tapGesture,
     suppress: suppressThreadTapStart,
     begin: beginThreadTap,
+    probe: probeThreadTap,
   } = useCardTapGesture(navigateToThread);
 
   return (
     <GestureDetector gesture={tapGesture}>
-      <Reanimated.View style={animStyle} onStartShouldSetResponderCapture={beginThreadTap}>
+      <View
+        onStartShouldSetResponderCapture={beginThreadTap}
+        onStartShouldSetResponder={probeThreadTap}>
         {/* Repost header */}
         <Pressable
           activeOpacity={0.7}
@@ -249,16 +227,21 @@ export const RepostCard = React.memo(function RepostCard({
               params: { pubkey: primaryReposter.pubkey },
             })
           }>
-          <HStack
-            align="center"
-            gap={6}
-            style={{ paddingHorizontal: 16, paddingTop: 10, marginLeft: 36 + 12 }}>
+          <HStack align="center" gap={spacing.xs} style={styles.repostHeader}>
             <Icon
-              name="garden:arrow-retweet-fill-16"
-              size={14}
-              color={withAlpha(foreground, 0.33)}
+              name="tabler:repeat"
+              size={iconSize.sm}
+              color={withAlpha(foreground, postInk.secondary)}
             />
-            <Text size={12} semibold style={{ color: withAlpha(foreground, 0.33) }}>
+            <Text
+              family={POST_FONT_FAMILY}
+              medium
+              size={postType.meta.size}
+              numberOfLines={1}
+              style={[
+                styles.repostHeaderText,
+                { color: withAlpha(foreground, postInk.secondary) },
+              ]}>
               {repostHeaderText}
             </Text>
           </HStack>
@@ -302,15 +285,23 @@ export const RepostCard = React.memo(function RepostCard({
                 borderColor: surfaceTertiary,
               },
             ]}>
-            <HStack align="center" gap={6}>
-              <Icon name="mdi:message-text" size={14} color={withAlpha(foreground, 0.33)} />
-              <Text size={13} italic style={{ color: withAlpha(foreground, 0.33) }}>
+            <HStack align="center" gap={spacing.xs}>
+              <Icon
+                name="mdi:message-text"
+                size={iconSize.sm}
+                color={withAlpha(foreground, postInk.tertiary)}
+              />
+              <Text
+                family={POST_FONT_FAMILY}
+                size={postType.meta.size}
+                italic
+                style={{ color: withAlpha(foreground, postInk.tertiary) }}>
                 Original post unavailable
               </Text>
             </HStack>
           </View>
         )}
-      </Reanimated.View>
+      </View>
     </GestureDetector>
   );
 });
@@ -643,7 +634,6 @@ export function UserFeed({
               <PostCard
                 variant="feed"
                 {...feedPostCardProps(row, index, rootEvent, rootMetrics, rootEngagement)}
-                skipAnimation={!isFirstRender.current}
                 showLineBelow
                 getThreadContext={() => getThreadContextRef.current()}
               />
@@ -660,7 +650,6 @@ export function UserFeed({
           <PostCard
             variant="feed"
             {...feedPostCardProps(row, index, item.event, metrics, engagement)}
-            skipAnimation={!isFirstRender.current}
             getThreadContext={() => getThreadContextRef.current()}
           />
         );
@@ -676,14 +665,12 @@ export function UserFeed({
             <PostCard
               variant="feed"
               {...feedPostCardProps(row, index, rootEvent, rootMetrics, rootEngagement)}
-              skipAnimation={!isFirstRender.current}
               showLineBelow
               getThreadContext={() => getThreadContextRef.current()}
             />
             <RepostCard
               {...repostCardProps(row, index, item)}
               onMorePress={() => openPostActions(originalEvent)}
-              skipAnimation={!isFirstRender.current}
               getThreadContext={() => getThreadContextRef.current()}
               showLineAbove
             />
@@ -693,7 +680,6 @@ export function UserFeed({
       return (
         <RepostCard
           {...repostCardProps(row, index, item)}
-          skipAnimation={!isFirstRender.current}
           getThreadContext={() => getThreadContextRef.current()}
         />
       );
@@ -947,10 +933,22 @@ const styles = StyleSheet.create({
     marginLeft: 16,
   },
   missingRepost: {
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginHorizontal: 16,
-    marginVertical: 10,
+    padding: spacing.md,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: POST_PADDING_H,
+    marginVertical: spacing.sm,
+  },
+  /** Sits on the content keyline; the glyph overhangs into the avatar gutter
+   *  by the same nudge the action bar uses, so its outline lines up with the
+   *  name below (Bluesky pulls its repost line left the same way). */
+  repostHeader: {
+    paddingHorizontal: POST_PADDING_H,
+    paddingTop: POST_PADDING_TOP,
+    marginLeft: POST_CONTENT_INDENT - 4,
+  },
+  repostHeaderText: {
+    lineHeight: postType.meta.lineHeight,
+    flexShrink: 1,
   },
 });

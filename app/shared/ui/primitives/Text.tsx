@@ -108,6 +108,10 @@ interface CustomTextProps extends TextProps {
 
   /** Use the Overpass font family instead of the default Oxygen. */
   overpass?: boolean;
+  /** Font family. `oxygen` (default) has Regular/Bold only; `overpass` is the
+   *  amount face; `mona` (Mona Sans, seven weights) is the feed's face — the
+   *  only family where `medium`/`semibold` render as distinct weights. */
+  family?: 'oxygen' | 'overpass' | 'mona';
 
   italic?: boolean;
   size?: number;
@@ -177,11 +181,44 @@ function getOverpassFamily(props: CustomTextProps): string {
   return 'OverpassRegular';
 }
 
+/**
+ * Resolve weight props to Mona Sans PostScript names (keyed that way in
+ * `useFonts` so native modules can resolve them too).
+ */
+function getMonaFamily(props: CustomTextProps): string {
+  const WEIGHT_MAP: Record<string, string> = {
+    thin: 'MonaSans-Light',
+    extralight: 'MonaSans-Light',
+    light: 'MonaSans-Light',
+    regular: 'MonaSans-Regular',
+    medium: 'MonaSans-Medium',
+    semibold: 'MonaSans-SemiBold',
+    bold: 'MonaSans-Bold',
+    extrabold: 'MonaSans-ExtraBold',
+    heavy: 'MonaSans-Black',
+    black: 'MonaSans-Black',
+  };
+
+  if (props.weight && WEIGHT_MAP[props.weight]) return WEIGHT_MAP[props.weight];
+
+  for (const key of BOOLEAN_WEIGHTS) {
+    if (props[key]) return WEIGHT_MAP[key];
+  }
+  return 'MonaSans-Regular';
+}
+
+function resolveFontFamily(props: CustomTextProps): string {
+  const family = props.family ?? (props.overpass ? 'overpass' : 'oxygen');
+  if (family === 'mona') return getMonaFamily(props);
+  if (family === 'overpass') return getOverpassFamily(props);
+  return getOxygenFamily(props);
+}
+
 export function UntranslatedText({ size = 14, italic = false, ...props }: CustomTextProps) {
   const foreground = useThemeColor('foreground');
   const { style, children, ...otherProps } = props;
 
-  const fontFamily = props.overpass ? getOverpassFamily(props) : getOxygenFamily(props);
+  const fontFamily = resolveFontFamily(props);
 
   const baseStyle: TextStyle = {
     color: foreground,

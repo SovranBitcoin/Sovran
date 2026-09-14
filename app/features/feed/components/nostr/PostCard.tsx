@@ -1,6 +1,6 @@
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
 import { avatarStateFor } from '@/shared/lib/imageLoadState';
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 
@@ -18,7 +18,6 @@ import Reanimated, {
   type SharedValue,
   useSharedValue,
   useAnimatedStyle,
-  withDelay,
   withTiming,
   Easing,
 } from 'react-native-reanimated';
@@ -48,7 +47,18 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
 import { seedThread, type ThreadSeed } from '@/features/feed/lib/threadSeedCache';
 import { seedProfileFeed } from '@/features/feed/lib/profileFeedSeedCache';
-import { alpha, radius, spacing } from '@/shared/styles/tokens';
+import { radius, spacing } from '@/shared/styles/tokens';
+import {
+  POST_AVATAR_GAP,
+  POST_AVATAR_SIZE,
+  POST_CONTENT_INDENT,
+  POST_FONT_FAMILY,
+  POST_PADDING_BOTTOM,
+  POST_PADDING_H,
+  POST_PADDING_TOP,
+  postInk,
+  postType,
+} from '@/features/feed/lib/postTypography';
 import {
   REPLY_SKELETON_VARIANTS,
   TARGET_SKELETON_VARIANT,
@@ -57,7 +67,7 @@ import { THREAD_CONNECTOR_LINE_STYLE } from './threadConnectorStyle';
 
 type PostCardVariant = 'feed' | 'repost-original' | 'thread-target' | 'thread-reply';
 
-const AVATAR_SIZE = 36;
+const AVATAR_SIZE = POST_AVATAR_SIZE;
 
 const METRIC_SKELETON_ITEMS = [0, 1, 2, 3] as const;
 
@@ -72,7 +82,6 @@ function PostCardGutterHeader({
   loading = false,
   foreground,
   hasMore,
-  isThread = false,
   displayName,
   nameFallback,
   shortTime,
@@ -86,7 +95,6 @@ function PostCardGutterHeader({
   loading?: boolean;
   foreground: string;
   hasMore: boolean;
-  isThread?: boolean;
   displayName?: string;
   nameFallback?: string;
   shortTime?: string;
@@ -98,21 +106,31 @@ function PostCardGutterHeader({
   onMorePress?: () => void;
   onNestedPressIn?: () => void;
 }) {
-  const textPrimary = { color: withAlpha(foreground, 0.9) };
-  const textMuted = { color: withAlpha(foreground, 0.4) };
-  const textDimmed = { color: withAlpha(foreground, 0.3) };
+  const nameStyle = [pcStyles.nameText, { color: withAlpha(foreground, postInk.primary) }];
+  const timeStyle = [pcStyles.timeText, { color: withAlpha(foreground, postInk.secondary) }];
   return (
-    <HStack align="center" gap={6} style={sharedStyles.mb4}>
-      <HStack align="center" gap={6} style={pcStyles.headerTextRow}>
+    <HStack align="center" gap={spacing.xs} style={sharedStyles.mb4}>
+      <HStack align="flex-end" gap={spacing.xs} style={pcStyles.headerTextRow}>
         {loading ? (
-          <Text loading numberOfLines={1} placeholder={placeholderAuthor} bold size={14} />
+          <Text
+            loading
+            numberOfLines={1}
+            placeholder={placeholderAuthor}
+            family={POST_FONT_FAMILY}
+            semibold
+            size={postType.name.size}
+            style={pcStyles.nameText}
+          />
         ) : (
-          <Pressable onPressIn={onNestedPressIn} onPress={onProfilePress}>
+          // The name lane shrinks first and the time never truncates, so a long
+          // name ellipsises while `· 3h` stays whole (Bluesky's flexShrink rule).
+          <Pressable onPressIn={onNestedPressIn} onPress={onProfilePress} style={pcStyles.nameLane}>
             <Text
-              bold
-              size={14}
-              style={textPrimary}
-              numberOfLines={isThread ? 1 : undefined}
+              family={POST_FONT_FAMILY}
+              semibold
+              size={postType.name.size}
+              style={nameStyle}
+              numberOfLines={1}
               fallback={nameFallback}>
               {displayName}
             </Text>
@@ -123,18 +141,14 @@ function PostCardGutterHeader({
             loading
             numberOfLines={1}
             placeholder={placeholderTimestamp}
-            size={13}
-            style={textMuted}
+            family={POST_FONT_FAMILY}
+            size={postType.meta.size}
+            style={timeStyle}
           />
         ) : shortTime ? (
-          <>
-            <Text bold size={13} style={[textDimmed, pcStyles.dotSeparator]}>
-              {'•'}
-            </Text>
-            <Text size={13} style={textMuted}>
-              {shortTime}
-            </Text>
-          </>
+          <Text family={POST_FONT_FAMILY} size={postType.meta.size} style={timeStyle}>
+            {`· ${shortTime}`}
+          </Text>
         ) : null}
         {tierBadge}
       </HStack>
@@ -152,7 +166,7 @@ function PostCardGutterHeader({
             onPress={onMorePress}
             haptics
             style={pcStyles.moreButton}>
-            <Icon name="tabler:dots" size={18} color={withAlpha(foreground, 0.5)} />
+            <Icon name="tabler:dots" size={18} color={withAlpha(foreground, postInk.secondary)} />
           </Pressable>
         )
       ) : null}
@@ -173,8 +187,6 @@ interface PostCardProps {
   showFooterBorder?: boolean;
   fullBleedFooterBorder?: boolean;
 
-  index?: number;
-  skipAnimation?: boolean;
   /** Feed list index (when in feed); used so swipe-up can scroll to next video post. */
   feedIndex?: number;
   /** Called when overlay is opened from this post so feed can track source index. */
@@ -236,8 +248,6 @@ const PostCardBody = React.memo(function PostCardBody({
   showLineBelow = false,
   showFooterBorder = true,
   fullBleedFooterBorder = false,
-  index = 0,
-  skipAnimation = true,
   feedIndex,
   onOverlayOpenedFromIndex,
   onVideoTap,
@@ -296,48 +306,35 @@ const PostCardBody = React.memo(function PostCardBody({
   const isFeed = variant === 'feed';
 
   // Pre-compute opacity color styles to avoid inline object creation
-  const textPrimary = { color: withAlpha(foreground, 0.9) };
-  const textMuted = { color: withAlpha(foreground, 0.4) };
-
-  // Entry animation — only for feed variant on initial load
-  const shouldAnimate = isFeed && !skipAnimation;
-  const progress = useSharedValue(shouldAnimate ? 0 : 1);
-
-  useEffect(() => {
-    if (!shouldAnimate) return;
-    progress.set(
-      withDelay(
-        Math.min(index * 60, 300),
-        withTiming(1, { duration: 350, easing: Easing.out(Easing.cubic) })
-      )
-    );
-  }, [progress, index, shouldAnimate]);
-
-  const animStyle = useAnimatedStyle(() => ({
-    opacity: progress.get(),
-    transform: [{ translateY: (1 - progress.get()) * 12 }],
-  }));
+  const textPrimary = { color: withAlpha(foreground, postInk.primary) };
+  const textMuted = { color: withAlpha(foreground, postInk.secondary) };
 
   // Thread target: crossfade the in-sheet footer out as the embed sheet
   // collapses. No-op (opacity 1) when not driven.
   const footerFadeStyle = useAnimatedStyle(() => ({ opacity: footerOpacity?.get() ?? 1 }));
 
-  const navigateToThread = useCallback(() => {
-    const ctx = getThreadContext?.() ?? null;
-    const allEvents = new Map(ctx?.allEvents ?? []);
-    allEvents.set(event.id, event);
-    seedThread(event.id, {
-      allEvents,
-      profiles: ctx?.profiles ?? new Map(),
-      metrics: ctx?.metrics ?? new Map(),
-      quotedEvents: ctx?.quotedEvents ?? new Map(),
-      replyPreviewEventIds: ctx?.replyPreviewEventIds,
-    });
-    router.push({
-      pathname: '/(user-flow)/thread',
-      params: { eventId: event.id },
-    });
-  }, [event, getThreadContext]);
+  const openThread = useCallback(
+    (focusReply: boolean) => {
+      const ctx = getThreadContext?.() ?? null;
+      const allEvents = new Map(ctx?.allEvents ?? []);
+      allEvents.set(event.id, event);
+      seedThread(event.id, {
+        allEvents,
+        profiles: ctx?.profiles ?? new Map(),
+        metrics: ctx?.metrics ?? new Map(),
+        quotedEvents: ctx?.quotedEvents ?? new Map(),
+        replyPreviewEventIds: ctx?.replyPreviewEventIds,
+      });
+      router.push({
+        pathname: '/(user-flow)/thread',
+        params: focusReply ? { eventId: event.id, focusReply: '1' } : { eventId: event.id },
+      });
+    },
+    [event, getThreadContext]
+  );
+  const navigateToThread = useCallback(() => openThread(false), [openThread]);
+  // The reply button lands in the thread with the reply box focused.
+  const navigateToThreadReply = useCallback(() => openThread(true), [openThread]);
 
   const navigateToProfile = useCallback(() => {
     // Hand the author's notes this surface already has to the profile screen,
@@ -361,6 +358,7 @@ const PostCardBody = React.memo(function PostCardBody({
     suppress: suppressThreadTap,
     handleTap: handleThreadPress,
     begin: beginThreadTap,
+    probe: probeThreadTap,
   } = useCardTapGesture(navigateToThread);
 
   const handleNestedPressIn = useCallback(() => {
@@ -419,14 +417,18 @@ const PostCardBody = React.memo(function PostCardBody({
                 />
                 <VStack style={sharedStyles.flex1}>
                   <Text
-                    bold
-                    size={15}
-                    style={textPrimary}
+                    family={POST_FONT_FAMILY}
+                    semibold
+                    size={postType.name.size}
+                    style={[pcStyles.nameText, textPrimary]}
                     numberOfLines={1}
                     fallback={nameFallback}>
                     {displayName}
                   </Text>
-                  <Text semibold size={13} style={textMuted}>
+                  <Text
+                    family={POST_FONT_FAMILY}
+                    size={postType.meta.size}
+                    style={[pcStyles.timeText, textMuted]}>
                     {truncatedNpub}
                   </Text>
                 </VStack>
@@ -446,7 +448,10 @@ const PostCardBody = React.memo(function PostCardBody({
             />
 
             {fullDate ? (
-              <Text size={13} style={[textMuted, pcStyles.targetDate]}>
+              <Text
+                family={POST_FONT_FAMILY}
+                size={postType.meta.size}
+                style={[pcStyles.timeText, textMuted, pcStyles.targetDate]}>
                 {fullDate}
               </Text>
             ) : null}
@@ -456,7 +461,7 @@ const PostCardBody = React.memo(function PostCardBody({
             <MetricsFooter
               counts={countsState}
               {...metricsFooterShared}
-              onCommentPress={onCommentPress ?? navigateToThread}
+              onCommentPress={onCommentPress ?? navigateToThreadReply}
             />
           </Reanimated.View>
         </View>
@@ -505,7 +510,6 @@ const PostCardBody = React.memo(function PostCardBody({
         <PostCardGutterHeader
           foreground={foreground}
           hasMore={!!onMorePress}
-          isThread={isThread}
           displayName={displayName}
           nameFallback={nameFallback}
           shortTime={shortTime}
@@ -538,14 +542,14 @@ const PostCardBody = React.memo(function PostCardBody({
           zapPending={zapPending}
           repostPendingDirection={repostPendingDirection}
           likePendingDirection={likePendingDirection}
-          onCommentPress={onCommentPress ?? navigateToThread}
+          onCommentPress={onCommentPress ?? navigateToThreadReply}
           onRepostPress={onRepostPress}
           onLikePress={onLikePress}
           onZapPress={onZapPress}
           onActionPressIn={handleNestedPressIn}
         />
 
-        <Spacer size={8} />
+        <Spacer size={spacing.sm} />
 
         <View
           style={[
@@ -554,14 +558,17 @@ const PostCardBody = React.memo(function PostCardBody({
               : pcStyles.inlineMetricsWrap,
             fullBleedFooterBorder && showMetricsBorder && pcStyles.inlineMetricsWrapFullBleedBorder,
             fullBleedFooterBorder &&
-              showMetricsBorder && { borderBottomColor: withAlpha(foreground, 0.1) },
+              showMetricsBorder && { borderBottomColor: withAlpha(foreground, postInk.tertiary) },
           ]}>
           <MetricsFooter
             counts={countsState}
             {...metricsFooterShared}
             compact={isThread}
             showBorder={!fullBleedFooterBorder && showMetricsBorder}
-            onCommentPress={isThread ? (onCommentPress ?? navigateToThread) : undefined}
+            // Reply opens the thread (reply box focused) on every variant. It used
+            // to be disabled in the feed and rely on the tap falling through to
+            // the card, which the action bar now deliberately blocks.
+            onCommentPress={onCommentPress ?? navigateToThreadReply}
           />
         </View>
       </View>
@@ -572,9 +579,11 @@ const PostCardBody = React.memo(function PostCardBody({
     return (
       <Log name="PostCard">
         <GestureDetector gesture={tapGesture}>
-          <Reanimated.View style={animStyle} onStartShouldSetResponderCapture={beginThreadTap}>
+          <View
+            onStartShouldSetResponderCapture={beginThreadTap}
+            onStartShouldSetResponder={probeThreadTap}>
             {gutterContent}
-          </Reanimated.View>
+          </View>
         </GestureDetector>
       </Log>
     );
@@ -583,7 +592,9 @@ const PostCardBody = React.memo(function PostCardBody({
   if (isThread) {
     return (
       <Log name="PostCard">
-        <View onStartShouldSetResponderCapture={beginThreadTap}>
+        <View
+          onStartShouldSetResponderCapture={beginThreadTap}
+          onStartShouldSetResponder={probeThreadTap}>
           <Pressable onPress={handleThreadPress}>{gutterContent}</Pressable>
         </View>
       </Log>
@@ -603,8 +614,14 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
   exiting?: boolean;
 }) {
   const [foreground, loadingShimmerSurface] = useThemeColor(['foreground', 'surface'] as const);
-  const textMuted = useMemo(() => ({ color: withAlpha(foreground, alpha.muted) }), [foreground]);
-  const targetDateStyle = useMemo(() => [textMuted, pcStyles.targetDate], [textMuted]);
+  const textMuted = useMemo(
+    () => ({ color: withAlpha(foreground, postInk.secondary) }),
+    [foreground]
+  );
+  const targetDateStyle = useMemo(
+    () => [pcStyles.timeText, textMuted, pcStyles.targetDate],
+    [textMuted]
+  );
   const replyVariant = REPLY_SKELETON_VARIANTS[index % REPLY_SKELETON_VARIANTS.length];
 
   // Render invisible, then fade in once the row has laid out ("settled") so the
@@ -625,17 +642,25 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
     return (
       <Reanimated.View onLayout={revealOnSettle} style={revealStyle}>
         <View style={pcStyles.targetRow} pointerEvents="none">
-          <HStack align="center" gap={spacing.sm + 2} style={sharedStyles.mb6}>
+          <HStack align="center" gap={POST_AVATAR_GAP} style={sharedStyles.mb6}>
             <Avatar state="loading" size={AVATAR_SIZE} />
             <VStack style={sharedStyles.flex1}>
-              <Text loading numberOfLines={1} placeholder={skeletonVariant.author} bold size={15} />
+              <Text
+                loading
+                numberOfLines={1}
+                placeholder={skeletonVariant.author}
+                family={POST_FONT_FAMILY}
+                semibold
+                size={postType.name.size}
+                style={pcStyles.nameText}
+              />
               <Text
                 loading
                 numberOfLines={1}
                 placeholder={skeletonVariant.npub}
-                semibold
-                size={13}
-                style={textMuted}
+                family={POST_FONT_FAMILY}
+                size={postType.meta.size}
+                style={[pcStyles.timeText, textMuted]}
               />
             </VStack>
           </HStack>
@@ -647,6 +672,7 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
                 loading
                 numberOfLines={1}
                 placeholder={line}
+                family={POST_FONT_FAMILY}
                 size={NOTE_CONTENT_FONT_SIZE}
                 style={pcStyles.noteTextLine}
               />
@@ -657,7 +683,8 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
             loading
             numberOfLines={1}
             placeholder={skeletonVariant.date}
-            size={13}
+            family={POST_FONT_FAMILY}
+            size={postType.meta.size}
             style={targetDateStyle}
           />
         </View>
@@ -691,7 +718,6 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
               loading
               foreground={foreground}
               hasMore
-              isThread
               placeholderAuthor={skeletonVariant.author}
               placeholderTimestamp={skeletonVariant.timestamp}
             />
@@ -735,18 +761,18 @@ const MetricsFooterSkeleton = React.memo(function MetricsFooterSkeleton({
   borderColor: string;
   labelWidth: number;
 }) {
-  const glyph = compact ? POST_ACTION_ICON_SIZES.compact.base : POST_ACTION_ICON_SIZES.regular.base;
-  // The real footer's count is a `Text size={11/13}` with no lineHeight, so the
-  // footer row is as tall as that font's line box. The skeleton must use the SAME
-  // size (via a `Text loading` placeholder) — a hardcoded label rectangle was ~7px
-  // shorter, which made the reply row grow when real text replaced the skeleton.
-  const labelTextSize = compact ? 11 : 13;
+  const glyph = compact ? POST_ACTION_ICON_SIZES.compact : POST_ACTION_ICON_SIZES.regular;
+  // The real footer's count is a `postType.count` Text; the skeleton must use the
+  // SAME size and line height (via a `Text loading` placeholder) — a hardcoded
+  // label rectangle was ~7px shorter, which made the reply row grow when real
+  // text replaced the skeleton.
+  const labelTextSize = postType.count.size;
   const skeletonFill = useMemo(() => withAlpha(borderColor, 0.07), [borderColor]);
   const footerStyle = useMemo(
     () => [
       sharedStyles.noteFooter,
       sharedStyles.footerBorder,
-      { borderBottomColor: withAlpha(borderColor, alpha.faint) },
+      { borderBottomColor: withAlpha(borderColor, postInk.tertiary) },
     ],
     [borderColor]
   );
@@ -759,7 +785,10 @@ const MetricsFooterSkeleton = React.memo(function MetricsFooterSkeleton({
     }),
     [glyph, skeletonFill]
   );
-  const labelStyle = useMemo(() => ({ width: labelWidth }), [labelWidth]);
+  const labelStyle = useMemo(
+    () => ({ width: labelWidth, lineHeight: postType.count.lineHeight }),
+    [labelWidth]
+  );
 
   return (
     <View style={footerStyle} pointerEvents="none">
@@ -773,6 +802,7 @@ const MetricsFooterSkeleton = React.memo(function MetricsFooterSkeleton({
               <Text
                 loading
                 numberOfLines={1}
+                family={POST_FONT_FAMILY}
                 size={labelTextSize}
                 placeholder="0"
                 style={labelStyle}
@@ -788,30 +818,41 @@ const MetricsFooterSkeleton = React.memo(function MetricsFooterSkeleton({
 const pcStyles = StyleSheet.create({
   gutterRow: {
     flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    gap: POST_AVATAR_GAP,
+    paddingHorizontal: POST_PADDING_H,
+    paddingTop: POST_PADDING_TOP,
+    paddingBottom: POST_PADDING_BOTTOM,
   },
   gutterCol: {
     width: AVATAR_SIZE,
     alignItems: 'center',
   },
   targetRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: POST_PADDING_H,
+    paddingTop: POST_PADDING_TOP,
+    paddingBottom: POST_PADDING_BOTTOM,
   },
   targetDate: {
-    marginTop: 10,
+    marginTop: spacing.sm,
   },
   targetMetrics: {
-    paddingHorizontal: 16,
-  },
-  dotSeparator: {
-    marginRight: 4,
+    paddingHorizontal: POST_PADDING_H,
   },
   headerTextRow: {
     flex: 1,
     minWidth: 0,
+  },
+  nameLane: {
+    flexShrink: 1,
+    minWidth: 0,
+    maxWidth: '70%',
+  },
+  nameText: {
+    lineHeight: postType.name.lineHeight,
+  },
+  timeText: {
+    lineHeight: postType.meta.lineHeight,
+    flexShrink: 0,
   },
   moreButton: {
     width: 30,
@@ -823,20 +864,20 @@ const pcStyles = StyleSheet.create({
     borderRadius: 14,
   },
   inlineMetricsWrap: {
-    marginLeft: -(AVATAR_SIZE + 12),
-    marginRight: -16,
-    paddingLeft: AVATAR_SIZE + 12,
-    paddingRight: 16,
+    marginLeft: -POST_CONTENT_INDENT,
+    marginRight: -POST_PADDING_H,
+    paddingLeft: POST_CONTENT_INDENT,
+    paddingRight: POST_PADDING_H,
   },
   inlineMetricsWrapFullBleed: {
-    marginLeft: -(AVATAR_SIZE + 12 + 16),
-    marginRight: -16,
-    paddingLeft: AVATAR_SIZE + 12 + 16,
-    paddingRight: 16,
+    marginLeft: -(POST_CONTENT_INDENT + POST_PADDING_H),
+    marginRight: -POST_PADDING_H,
+    paddingLeft: POST_CONTENT_INDENT + POST_PADDING_H,
+    paddingRight: POST_PADDING_H,
   },
   inlineMetricsWrapFullBleedBorder: {
-    borderBottomWidth: 1,
-    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingBottom: spacing.sm,
   },
   noteTextLine: {
     lineHeight: NOTE_CONTENT_LINE_HEIGHT,

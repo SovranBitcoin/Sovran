@@ -47,8 +47,14 @@ import {
   MAX_REPLY_SKELETON_COUNT,
 } from '@/features/feed/lib/threadReplySkeletons';
 
+/** How long a pushed thread waits before focusing the reply box, so the
+ *  keyboard doesn't ride the push transition. */
+const THREAD_PUSH_SETTLE_MS = 350;
+
 interface ThreadViewProps {
   eventId: string;
+  /** Focus the reply box once the thread is up (opened from a reply button). */
+  focusReplyOnOpen?: boolean;
 }
 
 const REPLY_SORT_OPTIONS: {
@@ -231,7 +237,7 @@ function ReplySortPicker({
   );
 }
 
-function ThreadViewInner({ eventId }: ThreadViewProps) {
+function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps) {
   const [foreground, surface, defaultColor, surfaceTertiary] = useThemeColor([
     'foreground',
     'surface',
@@ -245,6 +251,16 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   const embedOpen = embed?.open;
   const targetFooterOpacity = embed?.targetFooterOpacity;
   const [replyBarHeight, setReplyBarHeight] = useState(0);
+  // Each bump focuses the reply bar once (it waits for the target post). The
+  // target's own reply button asks immediately; a thread opened from a reply
+  // button asks after the push settles.
+  const [replyFocusRequest, setReplyFocusRequest] = useState(0);
+  const requestReplyFocus = useCallback(() => setReplyFocusRequest((n) => n + 1), []);
+  useEffect(() => {
+    if (!focusReplyOnOpen) return;
+    const timer = setTimeout(requestReplyFocus, THREAD_PUSH_SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [focusReplyOnOpen, requestReplyFocus]);
 
   const {
     items,
@@ -484,11 +500,16 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
           onLikePress={() => toggleLike(item.event)}
           onRepostPress={() => toggleRepost(item.event)}
           onZapPress={() => openZapMenu(item.event, metrics.satsZapped)}
-          onCommentPress={() =>
-            openComposer(deriveReplyTarget(item.event), {
-              parentEvent: item.event,
-              parentProfile: profilesRef.current.get(item.event.pubkey),
-            })
+          onCommentPress={
+            // The reply bar already replies to the target, so its button focuses
+            // the bar; a reply row's button opens the composer for that reply.
+            isTarget
+              ? requestReplyFocus
+              : () =>
+                  openComposer(deriveReplyTarget(item.event), {
+                    parentEvent: item.event,
+                    parentProfile: profilesRef.current.get(item.event.pubkey),
+                  })
           }
           onMorePress={() => openPostActions(item.event)}
           getThreadContext={getThreadContext}
@@ -526,6 +547,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       toggleRepost,
       openZapMenu,
       getThreadContext,
+      requestReplyFocus,
     ]
   );
 
@@ -616,6 +638,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
                   targetItem ? profilesRef.current.get(targetItem.event.pubkey) : undefined
                 }
                 onHeightChange={setReplyBarHeight}
+                focusRequest={replyFocusRequest}
               />
             }>
             {/* FlashList v2 holds the tapped note via synchronous Fabric layout +

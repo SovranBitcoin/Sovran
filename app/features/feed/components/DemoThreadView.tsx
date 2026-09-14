@@ -27,7 +27,6 @@ export function DemoThreadView({ eventId }: { eventId: string }) {
           quotedEvents={new Map()}
           getMetrics={(id) => DEMO_METRICS.get(id) ?? DEFAULT_METRICS}
           variant="thread-target"
-          skipAnimation
         />
       </View>
       {imageReady && (

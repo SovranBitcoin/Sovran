@@ -12,6 +12,8 @@ import { DemoThreadView } from '../components/DemoThreadView';
 const ParamsSchema = z.object({
   eventId: Hex64,
   preview: z.literal('demo').optional(),
+  /** Opened from a post's reply button: focus the reply box once the thread is up. */
+  focusReply: z.literal('1').optional(),
 });
 
 export function ThreadScreen() {
@@ -35,7 +37,7 @@ export function ThreadScreen() {
       {preview ? (
         <DemoThreadView eventId={params.eventId} />
       ) : (
-        <ThreadView eventId={params.eventId} />
+        <ThreadView eventId={params.eventId} focusReplyOnOpen={params.focusReply === '1'} />
       )}
     </Screen>
   );
