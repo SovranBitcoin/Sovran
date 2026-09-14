@@ -57,6 +57,9 @@ export function createPrimalTier(config: PrimalTierConfig): NostrTierStrategy {
   return {
     tier: 'primal',
     async feedPage(request: FeedPageRequest): Promise<TierOutcome<FeedBundle>> {
+      // `cursor.createdAt` is the previous page's `FeedRange.since` (see
+      // derivePageCursor): the sort-key bound Primal pages by — a score for
+      // ranked directives, a created_at for chronological ones.
       const cacheRequest = resolveFeedSpec(request.spec, {
         until: request.cursor?.createdAt,
         limit: request.limit,
@@ -259,7 +262,9 @@ function defaultResolveFeedSpec(
   // The `spec` is a Primal `mega_feed_directive` feed spec. Valid notes-feed ids
   // (primal-server app.jl `mega_feed_directive`): global-trending / all-notes /
   // latest / most-zapped / … — NOT an arbitrary id. "for-you" is not a Primal
-  // concept, so map it to Primal's closest no-auth algo feed: global trending.
+  // concept; the product decision is that Primal-served For You IS Primal's own
+  // "Trending 24h" home feed (`get_home_feeds`: {id:'global-trending', hours:24}),
+  // so the page matches what the Primal apps show on that tab.
   switch (spec.kind) {
     case 'for-you':
       return {

@@ -166,7 +166,12 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
       const page = await pager.nextPage(request.signal);
       const parsed = emptyFeedParseResult();
       for (const source of page.pages) {
-        const result = resolvedFeedPageToParseResult(source, skimmableFeedFilters);
+        // Primal serves For You as its own "Trending 24h" feed; trending is
+        // dominated by long notes, so the skimmable cap would strip most of the
+        // page (and its top items). Render it as Primal does — uncapped.
+        const filters =
+          spec.kind === 'for-you' && source.tier === 'primal' ? {} : skimmableFeedFilters;
+        const result = resolvedFeedPageToParseResult(source, filters);
         parsed.orderedFeedItems.push(...result.orderedFeedItems);
         for (const [id, value] of result.metricsMap) parsed.metricsMap.set(id, value);
         for (const [id, value] of result.profilesMap) parsed.profilesMap.set(id, value);

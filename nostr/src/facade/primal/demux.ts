@@ -59,6 +59,13 @@ type PrimalBatch = {
   actions: NoteActionsMap;
   profiles: Record<string, NaggProfileInfo>;
   feedRange: OrderingManifest | null;
+  /**
+   * Primal's page-position lower bound from the FeedRange: the last item's sort
+   * key — a `created_at` for chronological directives, a SCORE for ranked ones
+   * (global-trending / most-zapped). Primal web pages by sending it back as
+   * `until`, so it is the only correct cursor for a ranked page.
+   */
+  feedRangeSince: number | null;
 };
 
 /** Primal inlines the reposted note as stringified JSON in the kind-6 content. */
@@ -80,6 +87,7 @@ function parsePrimalBatch(events: ReadonlyArray<RawPrimalEvent>): PrimalBatch {
   const actions: Record<string, NoteActions> = {};
   const profiles: Record<string, NaggProfileInfo> = {};
   let feedRange: OrderingManifest | null = null;
+  let feedRangeSince: number | null = null;
 
   for (const raw of events) {
     switch (raw.kind) {
@@ -153,6 +161,8 @@ function parsePrimalBatch(events: ReadonlyArray<RawPrimalEvent>): PrimalBatch {
           orderBy: parsed.order_by === 'created_at' ? 'created_at' : 'rank',
           elements: parsed.elements,
         };
+        feedRangeSince =
+          parsed.since !== undefined && Number.isInteger(parsed.since) && parsed.since >= 0 ? parsed.since : null;
         break;
       }
       default:
@@ -161,7 +171,7 @@ function parsePrimalBatch(events: ReadonlyArray<RawPrimalEvent>): PrimalBatch {
     }
   }
 
-  return { notesById, repostsByOriginalId, stats, actions, profiles, feedRange };
+  return { notesById, repostsByOriginalId, stats, actions, profiles, feedRange, feedRangeSince };
 }
 
 export function demuxPrimalFeed(events: ReadonlyArray<RawPrimalEvent>): FeedBundle {
@@ -216,8 +226,25 @@ export function demuxPrimalFeed(events: ReadonlyArray<RawPrimalEvent>): FeedBund
     ...(hasActions ? { actions: batch.actions } : {}),
     profiles: batch.profiles,
     quoted: {},
-    cursor: deriveCursorByTimestamp(manifest, timestampsById),
+    cursor: derivePageCursor(manifest, timestampsById, batch.feedRangeSince),
   };
+}
+
+/**
+ * Page cursor = Primal's own page bound when it sent one (`FeedRange.since`,
+ * echoed back as `until` — a score for ranked directives such as
+ * global-trending, so page 2 continues the ranking instead of jumping to notes
+ * whose SCORE happens to be below a unix timestamp), keyed by the last rendered
+ * item; otherwise the oldest rendered item's (created_at, id).
+ */
+function derivePageCursor(
+  manifest: OrderingManifest,
+  timestampsById: Map<string, number>,
+  since: number | null,
+): NostrCursor {
+  const lastId = manifest.elements.at(-1);
+  if (since !== null && lastId) return { createdAt: since, id: lastId };
+  return deriveCursorByTimestamp(manifest, timestampsById);
 }
 
 /** Map feedRange ids through the repost alias, drop unknowns, dedupe — so a

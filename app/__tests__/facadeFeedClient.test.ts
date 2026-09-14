@@ -58,6 +58,63 @@ it('starts fresh after a data-layer/profile replacement and seeds warm-page iden
   client.dispose?.();
 });
 
+describe('skimmable cap vs Primal-served For You', () => {
+  const longNote = (id: string) => ({
+    type: 'note' as const,
+    event: {
+      id,
+      pubkey: 'b'.repeat(64),
+      kind: 1,
+      created_at: 1_700_000_000,
+      tags: [] as string[][],
+      content: 'x'.repeat(400),
+    },
+  });
+  const pageFrom = (tier: 'nagg' | 'primal', id: string): facade.ResolvedFeedPage => ({
+    tier,
+    items: [longNote(id)],
+    stats: {},
+    profiles: {},
+    quoted: {},
+    cursor: null,
+    hasMore: false,
+    missingIds: [],
+  });
+  const clientWith = (pages: facade.ResolvedFeedPage[]) => {
+    const pager: facade.FeedPager = {
+      nextPage: jest.fn(async () => ({
+        pages,
+        cursor: null,
+        hasMore: false,
+        sources: pages.map((p) => p.tier),
+        showingRecent: false,
+      })),
+      dispose: jest.fn(),
+    };
+    const layer = facade.createNostrDataLayer({ tiers: [] });
+    jest.spyOn(layer, 'createFeedPager').mockReturnValue(pager);
+    jest.mocked(buildNostrDataLayer).mockReturnValue(layer);
+    return createFacadeFeedClient(fallback);
+  };
+
+  it('renders Primal trending uncapped (long notes dominate it) but keeps the cap elsewhere', async () => {
+    const primalForYou = await clientWith([pageFrom('primal', 'p'.repeat(64))]).getFeed({ spec });
+    expect(primalForYou.orderedFeedItems.map((i) => (i.type === 'note' ? i.event.id : ''))).toEqual(
+      ['p'.repeat(64)]
+    );
+
+    const naggForYou = await clientWith([pageFrom('nagg', 'n'.repeat(64))]).getFeed({ spec });
+    expect(naggForYou.orderedFeedItems).toEqual([]);
+
+    const followingSpec = JSON.stringify({ kind: 'notes', id: 'following-recent' });
+    const primalFollowing = await clientWith([pageFrom('primal', 'f'.repeat(64))]).getFeed({
+      spec: followingSpec,
+      userPubkey: 'a'.repeat(64),
+    });
+    expect(primalFollowing.orderedFeedItems).toEqual([]);
+  });
+});
+
 describe('read status (SYSTEM.md F06): empty vs unavailable vs disabled', () => {
   it('marks tier exhaustion as unavailable with the attempt trail, not as an empty page', async () => {
     // A layer with no tiers exhausts every read.

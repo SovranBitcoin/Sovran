@@ -101,9 +101,8 @@ describe("per-tier feed pager", () => {
     });
     expect(ids(await pager.nextPage())).toEqual(["a"]);
     expect(ids(await pager.nextPage())).toEqual(["b"]);
-    expect(primal.feedPage.mock.calls[0][0].spec).toEqual({
-      kind: "following-recent",
-    });
+    // Primal serves For You natively (its Trending 24h feed) — no degrade.
+    expect(primal.feedPage.mock.calls[0][0].spec).toEqual({ kind: "for-you" });
     now = 1_000;
     expect(ids(await pager.nextPage())).toEqual(["d"]);
     expect(nagg.feedPage).toHaveBeenCalledTimes(3);
@@ -297,6 +296,62 @@ it("uses the complete pager backoff schedule without the nagg surface cooldown",
     now += delay;
   }
   expect(fetchImpl).toHaveBeenCalledTimes(5);
+});
+
+it("serves For You from Primal as ranked content, degrading only the relay lane", async () => {
+  const primal = tier("primal", answered(bundle([note("trending")])));
+  const relay = tier("relay", answered(bundle([note("recent")])));
+  const pager = createFeedPager({
+    tiers: [tier("nagg", unsupported()), primal, relay],
+    spec: { kind: "for-you", viewerPubkey: "viewer" },
+    limit: 2,
+  });
+  const page = await pager.nextPage();
+  expect(ids(page)).toEqual(["trending", "recent"]);
+  expect(page).toMatchObject({
+    showingRecent: true,
+    sources: ["primal", "relay"],
+  });
+  expect(primal.feedPage.mock.calls[0][0].spec).toEqual({
+    kind: "for-you",
+    viewerPubkey: "viewer",
+  });
+  expect(relay.feedPage.mock.calls[0][0].spec).toEqual({
+    kind: "following-recent",
+    viewerPubkey: "viewer",
+  });
+});
+
+it("reports a Primal-only For You page as ranked, not recent", async () => {
+  const pager = createFeedPager({
+    tiers: [
+      tier("nagg", down()),
+      tier("primal", answered(bundle([note("trending")]))),
+    ],
+    spec: { kind: "for-you" },
+    limit: 1,
+  });
+  expect(await pager.nextPage()).toMatchObject({
+    showingRecent: false,
+    sources: ["primal"],
+  });
+});
+
+it("still degrades following-popular on Primal to the viewer's recent follows", async () => {
+  const primal = tier("primal", answered(bundle([note("recent")])));
+  const pager = createFeedPager({
+    tiers: [tier("nagg", unsupported()), primal],
+    spec: { kind: "following-popular", viewerPubkey: "viewer" },
+    limit: 1,
+  });
+  expect(await pager.nextPage()).toMatchObject({
+    showingRecent: true,
+    sources: ["primal"],
+  });
+  expect(primal.feedPage.mock.calls[0][0].spec).toEqual({
+    kind: "following-recent",
+    viewerPubkey: "viewer",
+  });
 });
 
 it("resolves following authors before the relay chronological fallback", async () => {

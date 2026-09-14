@@ -58,6 +58,12 @@ export function createFeedPager(options: FeedPagerOptions): FeedPager {
   const { tiers, spec, clock = Date.now, log = nostrLog, ingest } = options;
   const limit = Math.max(1, options.limit ?? 30);
   const ranked = spec.kind === "for-you" || spec.kind === "following-popular";
+  // Tiers that serve a ranked spec NATIVELY: nagg ranks everything itself; the
+  // Primal cache serves For You as its own ranked "Trending 24h" feed. Every
+  // other (tier, spec) pair degrades to the viewer's recent follows and is
+  // reported as `showingRecent`.
+  const servesRanked = (tier: NostrTier) =>
+    tier === "nagg" || (tier === "primal" && spec.kind === "for-you");
   let lanes: Lane[] = tiers.map(({ tier, feedPage }) => ({
     tier,
     cursor: null,
@@ -96,7 +102,7 @@ export function createFeedPager(options: FeedPagerOptions): FeedPager {
             continue;
           if (lane.state === "backoff" && clock() < lane.retryAtMs) continue;
           const requestSpec =
-            ranked && lane.tier !== "nagg"
+            ranked && !servesRanked(lane.tier)
               ? {
                   kind: "following-recent" as const,
                   // Without the viewer the relay tier falls back to a global
@@ -215,7 +221,7 @@ export function createFeedPager(options: FeedPagerOptions): FeedPager {
         cursor,
         hasMore,
         sources,
-        showingRecent: ranked && sources.some((tier) => tier !== "nagg"),
+        showingRecent: ranked && sources.some((tier) => !servesRanked(tier)),
         ...(count === 0 && hasMore
           ? { retryAfterMs: retries.length ? Math.min(...retries) : 1_000 }
           : {}),

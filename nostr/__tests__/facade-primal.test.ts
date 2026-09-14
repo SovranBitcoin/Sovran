@@ -53,6 +53,23 @@ describe('demuxPrimalFeed — Primal batch → contract bundle', () => {
     expect(bundle.cursor).toEqual({ createdAt: 1_700_000_100, id: ID_B });
   });
 
+  test('cursor carries the FeedRange `since` bound so a ranked page continues the ranking', () => {
+    // A trending page: Primal orders by SCORE and pages by echoing `since` back
+    // as `until`. A created_at cursor would resume at "score <= unix time",
+    // i.e. far below the current page.
+    const ranked = BATCH.map((e) =>
+      e.kind === 10_000_113
+        ? {
+            kind: 10_000_113,
+            content: JSON.stringify({ order_by: 'score', since: 13_186_813_162, until: 29_340_659_303, elements: [ID_A, ID_B] }),
+          }
+        : e,
+    );
+    const bundle = demuxPrimalFeed(ranked);
+    expect(bundle.manifest).toEqual({ orderBy: 'rank', elements: [ID_A, ID_B] });
+    expect(bundle.cursor).toEqual({ createdAt: 13_186_813_162, id: ID_B });
+  });
+
   test('synthesizes a recency manifest when Primal sends no FeedRange', () => {
     const noRange = BATCH.filter((e) => e.kind !== 10_000_113);
     const bundle = demuxPrimalFeed(noRange);
@@ -244,7 +261,16 @@ describe('Primal tier through the facade', () => {
     });
     await tier.feedPage!({ spec: { kind: 'for-you', viewerPubkey: PUB } });
     expect(captured?.verb).toBe('mega_feed_directive');
-    expect(JSON.parse(String(captured?.params.spec))).toMatchObject({ id: 'global-trending', kind: 'notes' });
+    // Exactly Primal's own "Trending 24h" home feed (get_home_feeds).
+    expect(JSON.parse(String(captured?.params.spec))).toEqual({ id: 'global-trending', kind: 'notes', hours: 24 });
+    expect(captured?.params.until).toBeUndefined();
+
+    // Page 2 echoes the previous page's FeedRange bound (a score) as `until`.
+    await tier.feedPage!({
+      spec: { kind: 'for-you', viewerPubkey: PUB },
+      cursor: { createdAt: 13_186_813_162, id: ID_B },
+    });
+    expect(captured?.params.until).toBe(13_186_813_162);
   });
 });
 
