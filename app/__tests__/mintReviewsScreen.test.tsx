@@ -240,6 +240,26 @@ it('shows a load failure when a cold request fails', async () => {
   expect(hosts('mint-reviews-empty')).toHaveLength(0);
 });
 
+it('lists only written reviews while the header still counts score-only ones', async () => {
+  const blank = { ...review, eventId: 'c'.repeat(64), comment: '  ' };
+  const empty = { ...review, eventId: 'd'.repeat(64), comment: '' };
+  jest.mocked(reviewMint).mockResolvedValue(response([blank, review, empty]));
+  await renderScreen();
+  expect(hosts(`mint-reviews-row-${review.eventId}`)).toHaveLength(1);
+  expect(hosts(`mint-reviews-row-${blank.eventId}`)).toHaveLength(0);
+  expect(hosts(`mint-reviews-row-${empty.eventId}`)).toHaveLength(0);
+  expect(textContent()).toContain('3 reviews');
+});
+
+it('shows neither the empty state nor a load failure when every review is score-only', async () => {
+  jest.mocked(reviewMint).mockResolvedValue(response([{ ...review, comment: '' }]));
+  await renderScreen();
+  expect(hosts(`mint-reviews-row-${review.eventId}`)).toHaveLength(0);
+  expect(hosts('mint-reviews-empty')).toHaveLength(0);
+  expect(textContent()).not.toContain("Couldn't load");
+  expect(textContent()).toContain('1 review');
+});
+
 it('renders scoreless endorsements without a zero-star rating', async () => {
   jest
     .mocked(reviewMint)

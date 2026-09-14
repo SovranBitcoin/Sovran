@@ -4,6 +4,13 @@ import { err, ok, type Result } from 'neverthrow';
 import { reviewMint, type MintReviewsResponse } from '@/shared/lib/apiClient';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 
+// NIP-87 content carries the `[n/5]` score inline; the score is already parsed
+// out, so `comment` is just the reviewer's prose (matches the wallet REST path).
+const SCORE_MARKER = /\[\d+(?:\.\d+)?\/5\]/;
+function stripScoreMarker(content: string): string {
+  return content.replace(SCORE_MARKER, '').trim();
+}
+
 /** Facade answer → the app's review response (the wallet's summary shape). */
 function reviewsFromFacade(resolved: facade.ResolvedMintReviews): MintReviewsResponse {
   return {
@@ -11,7 +18,7 @@ function reviewsFromFacade(resolved: facade.ResolvedMintReviews): MintReviewsRes
     score: resolved.averageScore,
     recommendations: resolved.reviews.map((review) => ({
       score: review.score,
-      comment: review.content,
+      comment: stripScoreMarker(review.content),
       pubkey: review.reviewerPubkey,
       eventId: review.eventId,
       created_at: review.createdAt,

@@ -34,13 +34,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { formatRelative } from '@/shared/lib/date';
 
-/** Commented reviews first, each group newest-first. */
-function sortReviews(rawReviews: MintRecommendation[]): MintRecommendation[] {
-  const withContent = rawReviews.filter((r) => r.comment?.trim());
-  const withoutContent = rawReviews.filter((r) => !r.comment?.trim());
-  const byDate = (a: MintRecommendation, b: MintRecommendation) =>
-    (b.created_at ?? 0) - (a.created_at ?? 0);
-  return [...withContent.sort(byDate), ...withoutContent.sort(byDate)];
+/** Only reviews with written text, newest-first; score-only ones still count in the header. */
+function writtenReviews(rawReviews: MintRecommendation[]): MintRecommendation[] {
+  return rawReviews
+    .filter((r) => r.comment?.trim())
+    .sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
 }
 
 const keyExtractor = (item: MintRecommendation) => item.eventId;
@@ -204,10 +202,11 @@ export function MintReviewsScreen() {
 
   const isLoading = !mintUrl ? false : read.status === 'loading';
   const loadFailed = !mintUrl || (!!read.error && !read.data);
-  const reviews = sortReviews(read.data?.recommendations ?? []);
+  const allReviews = read.data?.recommendations ?? [];
+  const reviews = writtenReviews(allReviews);
   // Header count prefers the durable aggregate (survives a failed row fetch),
   // falling back to the freshly-fetched rows before the first aggregate lands.
-  const totalReviews = aggregateCount ?? reviews.length;
+  const totalReviews = aggregateCount ?? allReviews.length;
 
   const renderItem = ({ item }: { item: MintRecommendation }) => <ReviewItem review={item} />;
   const aggregateLoading = isLoading && !meta?.reviewsAt;
@@ -255,25 +254,27 @@ export function MintReviewsScreen() {
     />
   ) : null;
 
-  const showEmptyState = !isLoading && !loadFailed && reviews.length === 0;
+  const showEmptyState = !isLoading && !loadFailed && allReviews.length === 0;
 
   // A failed fetch is distinct from a confirmed empty result, even on a cold open.
-  const listEmpty = !isLoading ? (
-    <VStack className="mt-6 items-center gap-3 px-8">
-      <Text size={14} className="text-foreground/50 text-center">
-        Couldn&apos;t load reviews right now.
-      </Text>
-      {mintUrl ? (
-        <Button
-          testID="mint-reviews-retry"
-          text="Try again"
-          variant="secondary"
-          size="compact"
-          onPress={read.refresh}
-        />
-      ) : null}
-    </VStack>
-  ) : null;
+  // Score-only reviews leave the list empty but the header already covers them.
+  const listEmpty =
+    loadFailed && !isLoading ? (
+      <VStack className="mt-6 items-center gap-3 px-8">
+        <Text size={14} className="text-foreground/50 text-center">
+          Couldn&apos;t load reviews right now.
+        </Text>
+        {mintUrl ? (
+          <Button
+            testID="mint-reviews-retry"
+            text="Try again"
+            variant="secondary"
+            size="compact"
+            onPress={read.refresh}
+          />
+        ) : null}
+      </VStack>
+    ) : null;
 
   return (
     <Screen
