@@ -49,6 +49,7 @@ const emojiLog = log.child({ module: 'emojiPicker' });
 
 const COLS = 6;
 const CELL_WIDTH_PCT = `${100 / COLS}%` as const;
+const EMOJI_PICKER_HANDOFF_MS = 50;
 const PREFETCH_EMOJIS = CATEGORIES.flatMap((category) => category.emojis)
   .slice(0, 24)
   .map((entry) => entry.emoji);
@@ -363,17 +364,18 @@ export function EmojiPickerContent({
 
 export function emojiPickerPopup(payload: ActionSheetPayloads['emoji-picker']): void {
   emojiLog.info('emojiPicker.invoke', { tokenLen: payload.token?.length ?? 0 });
-  // Invoked from inside another heroui sheet (e.g. the Copy split-button
-  // menu on Send Ecash). That sheet animates closed via gorhom (~200ms)
-  // when its Menu.Item's onPress runs — *before* heroui's onPress closes
-  // it. Without a delay, both sheets briefly co-exist in heroui's single
-  // `PortalHost` and gorhom can't cleanly hand off, leaving our sheet
-  // stuck closed. Same pattern as `profileSwitcherPopup` →
-  // `openProfileImportMenu` (200ms close + 100ms buffer).
+  // Invoked from inside another heroui sheet (the Copy menu on Send Ecash),
+  // whose trailing close() runs right after this onPress returns. Defer one
+  // macrotask so that close lands first: PopupHost then sees a CLOSING
+  // snapPoints follow-on and revives the same gorhom instance (its
+  // `mountedSeq` reuse path), and heroui's isOpen false→true edge snaps it
+  // straight to the picker's detent — gorhom only refuses a snap during a
+  // *forced* close, which heroui never uses. The previous 300ms wait let the
+  // menu finish its exit first, which read as lag on device.
   setTimeout(() => {
     emojiLog.info('emojiPicker.dispatch.fire', { tokenLen: payload.token?.length ?? 0 });
     showActionSheet('emoji-picker', payload);
-  }, 300);
+  }, EMOJI_PICKER_HANDOFF_MS);
 }
 
 const styles = StyleSheet.create({

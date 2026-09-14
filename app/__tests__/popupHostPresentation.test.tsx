@@ -55,10 +55,16 @@ jest.mock('@/shared/lib/popup', () => ({
   isAmountSegment: () => false,
 }));
 jest.mock('@/shared/lib/popup/E2EToastProbe', () => ({ E2EStaticToastRenderMarker: () => null }));
-jest.mock('@/shared/lib/popup/popups/actionMenuSheet', () => ({
-  ActionMenuSheetContent: () => null,
-}));
-jest.mock('@/shared/lib/popup/popups/emojiPicker', () => ({ EmojiPickerContent: () => null }));
+jest.mock('@/shared/lib/popup/popups/actionMenuSheet', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  return {
+    ActionMenuSheetContent: () => ReactActual.createElement('ActionMenuSheetContent'),
+  };
+});
+jest.mock('@/shared/lib/popup/popups/emojiPicker', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  return { EmojiPickerContent: () => ReactActual.createElement('EmojiPickerContent') };
+});
 jest.mock('@/shared/lib/popup/popups/modelPicker', () => ({ ModelPickerContent: () => null }));
 jest.mock('@/shared/lib/popup/popups/nfcTapSheet', () => ({ NfcTapContent: () => null }));
 jest.mock('@/shared/lib/popup/popups/paymentOptionsSheet', () => ({
@@ -100,10 +106,10 @@ jest.mock('react-native-reanimated', () => {
     __esModule: true,
     default: { View: component('Animated.View'), Text: component('Animated.Text') },
     Easing: { linear: 'linear' },
-    SlideInLeft: {},
-    SlideInRight: {},
-    SlideOutLeft: {},
-    SlideOutRight: {},
+    SlideInLeft: { duration: () => ({}) },
+    SlideInRight: { duration: () => ({}) },
+    SlideOutLeft: { duration: () => ({}) },
+    SlideOutRight: { duration: () => ({}) },
     cancelAnimation: jest.fn(),
     interpolateColor: () => 'transparent',
     useAnimatedStyle: (worklet: () => object) => worklet(),
@@ -146,6 +152,16 @@ const sheet = (renderer: TestRenderer.ReactTestRenderer) =>
   renderer.root.find((node) => String(node.type) === 'BottomSheet');
 const content = (renderer: TestRenderer.ReactTestRenderer) =>
   renderer.root.find((node) => String(node.type) === 'BottomSheet.Content');
+const contentGate = (renderer: TestRenderer.ReactTestRenderer) =>
+  renderer.root.find((node) => node.props.testID === 'popup-snap-content-gate');
+const bodies = (renderer: TestRenderer.ReactTestRenderer, name: string) =>
+  renderer.root.findAll((node) => String(node.type) === name);
+const layoutGate = (renderer: TestRenderer.ReactTestRenderer, height: number) =>
+  act(() => {
+    contentGate(renderer).props.onLayout({
+      nativeEvent: { layout: { x: 0, y: 0, width: 390, height } },
+    });
+  });
 
 describe('PopupHost presentation', () => {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
@@ -179,6 +195,51 @@ describe('PopupHost presentation', () => {
     act(() => usePopupStore.getState().open({ message: 'second' }));
     expect(sheet(renderer!).props.isOpen).toBe(true);
     expect(sheet(renderer!).props.instance).not.toBe(first.instance);
+  });
+
+  it('reuses the closing instance when a follow-on open() lands mid-exit', () => {
+    act(() => {
+      renderer = TestRenderer.create(<PopupHost />);
+      usePopupStore.getState().open({
+        sheetId: 'action-menu',
+        payload: { title: 'Copy token', buttons: [{ text: 'as Emoji' }] },
+      });
+    });
+    const menu = sheet(renderer!).props.instance;
+    act(() => usePopupStore.getState().close());
+    expect(sheet(renderer!).props.isOpen).toBe(false);
+    // The emoji picker dispatches 300ms after the menu's close, inside the
+    // 400ms exit window — the same gorhom instance must snap back up.
+    act(() => jest.advanceTimersByTime(300));
+    act(() =>
+      usePopupStore.getState().open({ sheetId: 'emoji-picker', payload: { token: 'cashuB' } })
+    );
+    expect(sheet(renderer!).props.instance).toBe(menu);
+    expect(sheet(renderer!).props.isOpen).toBe(true);
+    act(() => jest.advanceTimersByTime(400));
+    expect(sheet(renderer!).props.instance).toBe(menu);
+    expect(usePopupStore.getState().isOpen).toBe(true);
+  });
+
+  it('still mounts a fresh instance for a contentHeight follow-on that lands mid-exit', () => {
+    act(() => {
+      renderer = TestRenderer.create(<PopupHost />);
+      usePopupStore.getState().open({ sheetId: 'emoji-picker', payload: { token: 'cashuB' } });
+    });
+    const picker = sheet(renderer!).props.instance;
+    act(() => usePopupStore.getState().close());
+    act(() => jest.advanceTimersByTime(300));
+    // contentHeight detents wait on a fresh content measurement, so a reused
+    // closing instance could park closed (the dropped-snap case 88eb7f2f fixed).
+    act(() =>
+      usePopupStore.getState().open({
+        sheetId: 'action-menu',
+        payload: { title: 'Copy token', buttons: [{ text: 'as Text' }] },
+      })
+    );
+    expect(sheet(renderer!).props.instance).not.toBe(picker);
+    expect(sheet(renderer!).props.isOpen).toBe(true);
+    expect(content(renderer!).props.mountIndex).toBe(0);
   });
 
   it('cancels the watchdog once gorhom reports the sheet animating open', () => {
@@ -219,6 +280,40 @@ describe('PopupHost presentation', () => {
     );
     act(() => jest.advanceTimersByTime(400));
     expect(renderer!.root.findAllByType('BottomSheet' as never)).toHaveLength(0);
+  });
+
+  // gorhom's content mask has no height until the container's onLayout lands,
+  // and each open() is a fresh instance — a snapPoints body mounted in that
+  // first commit lays out unbounded, and the emoji picker's FlashList then
+  // renders every row (≈2s JS jam on device, so gorhom never animated open
+  // and the watchdog closed the sheet). The body waits for a bounded height.
+  it('holds a snapPoints body until its wrapper reports a bounded height', () => {
+    act(() => {
+      renderer = TestRenderer.create(<PopupHost />);
+      usePopupStore.getState().open({ sheetId: 'emoji-picker', payload: { token: 'cashuB' } });
+    });
+    expect(bodies(renderer!, 'EmojiPickerContent')).toHaveLength(0);
+    layoutGate(renderer!, 0);
+    expect(bodies(renderer!, 'EmojiPickerContent')).toHaveLength(0);
+    layoutGate(renderer!, 640);
+    expect(bodies(renderer!, 'EmojiPickerContent')).toHaveLength(1);
+    // A later shrink (keyboard) never unmounts a body that is already up.
+    layoutGate(renderer!, 320);
+    expect(bodies(renderer!, 'EmojiPickerContent')).toHaveLength(1);
+  });
+
+  it('mounts a contentHeight body immediately so gorhom can measure it', () => {
+    act(() => {
+      renderer = TestRenderer.create(<PopupHost />);
+      usePopupStore.getState().open({
+        sheetId: 'action-menu',
+        payload: { title: 'Copy token', buttons: [{ text: 'as Text' }] },
+      });
+    });
+    expect(bodies(renderer!, 'ActionMenuSheetContent')).toHaveLength(1);
+    expect(
+      renderer!.root.findAll((node) => node.props.testID === 'popup-snap-content-gate')
+    ).toHaveLength(0);
   });
 
   it('treats a native close reported before layout as a real dismissal', () => {

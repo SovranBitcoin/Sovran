@@ -279,6 +279,34 @@ const CUSTOM_SHEET_CONTENT: Record<keyof ActionSheetPayloads, CustomSheetRendere
   'nfc-tap': NfcTapContent as CustomSheetRenderer,
 };
 
+/**
+ * Mount snapPoints sheet bodies only once gorhom has given them a bounded
+ * height. Every open() nonce is a FRESH gorhom instance (see the `key` on
+ * `<BottomSheet>`), and gorhom's content mask carries NO height style until
+ * the container's onLayout lands — so a body mounted in the same commit as
+ * the sheet lays out unbounded, and a virtualized list inside it (the emoji
+ * picker's FlashList) sizes to its entire content and renders every row.
+ * That jammed the JS thread for ~2s on device, starving gorhom's own layout
+ * callbacks, so the sheet never animated open and `OPEN_WATCHDOG_MS` tore it
+ * down (popupHost.open_stalled ×2 → close). The previous host reused one
+ * gorhom instance across opens, so its mask was already sized and this never
+ * surfaced. contentHeight sheets are NOT gated: gorhom measures their body
+ * to derive the dynamic snap point, so it has to mount immediately.
+ */
+function SnapPointsContentGate({ children }: { children: React.ReactNode }) {
+  const [bounded, setBounded] = useState(false);
+  return (
+    <View
+      testID="popup-snap-content-gate"
+      style={{ flex: 1 }}
+      onLayout={(event) => {
+        if (!bounded && event.nativeEvent.layout.height > 0) setBounded(true);
+      }}>
+      {bounded ? children : null}
+    </View>
+  );
+}
+
 function SheetContent({
   payload,
   activeCustomPage,
@@ -335,20 +363,27 @@ function SheetContent({
       customNavDirection === 'forward' ? SlideInRight.duration(220) : SlideInLeft.duration(220);
     const exiting =
       customNavDirection === 'forward' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220);
+    const customContent = (
+      <ContentComponent
+        payload={activeCustomPage.payload}
+        close={close}
+        pushCustomPage={pushCustomPage}
+        popCustomPage={popCustomPage}
+        canPop={canPopCustomPage}
+        setFooterConfig={onCustomFooterConfigChange}
+      />
+    );
     return (
       <Animated.View
         key={`${activeCustomPage.sheetId}-${canPopCustomPage ? 'stacked' : 'root'}-${openCycle}`}
         style={isContentHeight ? undefined : { flex: 1 }}
         entering={entering}
         exiting={exiting}>
-        <ContentComponent
-          payload={activeCustomPage.payload}
-          close={close}
-          pushCustomPage={pushCustomPage}
-          popCustomPage={popCustomPage}
-          canPop={canPopCustomPage}
-          setFooterConfig={onCustomFooterConfigChange}
-        />
+        {isContentHeight ? (
+          customContent
+        ) : (
+          <SnapPointsContentGate>{customContent}</SnapPointsContentGate>
+        )}
       </Animated.View>
     );
   }
@@ -514,21 +549,53 @@ function SheetPopup() {
   // (route navigation ripping the FullWindowOverlay) leaves isOpen stuck
   // true; keying on the nonce still remounts on the next open(), so a later
   // open() is never a silent no-op (the amount screen's dead Next).
-  const [mounted, setMounted] = useState(false);
+  //
+  // `mountedSeq` is the nonce the mounted instance belongs to. Which instance
+  // serves a new open() depends on what it interrupts:
+  //  - nothing mounted → fresh instance (gorhom animate-on-mount, above);
+  //  - a sheet still OPEN (e.g. the onchain chooser launching the fee picker)
+  //    → fresh instance too, so a natively torn-down sheet that left isOpen
+  //    stuck true can never turn the next open() into a silent no-op;
+  //  - a sheet CLOSING (the emoji picker opens 300ms after the Copy menu's
+  //    close; the exit window below is 400ms) and the incoming sheet is a
+  //    snapPoints custom sheet → REUSE the closing instance and let heroui's
+  //    isOpen false→true edge snap it back up. Swapping instances here
+  //    mounted a second FullWindowOverlay while the first was being torn
+  //    down, and on iOS the new overlay came up with its JS touch responder
+  //    dead: every Pressable in the sheet ignored taps while gorhom's native
+  //    pan still dismissed it. A snapPoints sheet's detents derive from the
+  //    already-measured container, so the reused instance's snapToIndex is
+  //    never dropped and its content mask is already sized. contentHeight
+  //    sheets are NOT reused: their detents wait on a fresh content
+  //    measurement, and gorhom parks a closing sheet at the closed position
+  //    when detents change mid-exit — that is the dropped-open case the
+  //    fresh `mountIndex` mount exists for (see 88eb7f2f), so they keep it.
+  const [mountedSeq, setMountedSeq] = useState<number | null>(null);
+  const mounted = mountedSeq !== null;
   const [presentAttempt, setPresentAttempt] = useState(0);
   const [presented, setPresented] = useState(false);
+  const lastOpenRef = useRef<{ seq: number; isOpen: boolean }>({ seq: openSeq, isOpen });
   useEffect(() => {
+    const previous = lastOpenRef.current;
+    lastOpenRef.current = { seq: openSeq, isOpen };
     if (isOpen) {
-      setMounted(true);
+      const incoming = usePopupStore.getState().current;
+      const reusable =
+        isCustomSheetPayload(incoming) &&
+        SHEET_LAYOUT_CONFIG[incoming.sheetId]?.mode === 'snapPoints';
+      const reviveClosingInstance = previous.seq !== openSeq && !previous.isOpen && reusable;
+      if (mountedSeq === null || (mountedSeq !== openSeq && !reviveClosingInstance)) {
+        setMountedSeq(openSeq);
+      }
       setPresentAttempt(0);
       setPresented(false);
       return;
     }
     // Unmount after heroui's exit animation lands (~300ms) — matches the
     // lastPayload cache window above.
-    const unmountTimer = setTimeout(() => setMounted(false), 400);
+    const unmountTimer = setTimeout(() => setMountedSeq(null), 400);
     return () => clearTimeout(unmountTimer);
-  }, [isOpen, openSeq]);
+  }, [isOpen, openSeq, mountedSeq]);
 
   // Watchdog for gorhom #2690 / #2719: under JS contention at mount the
   // sheet's reanimated reactions can die, leaving it parked at -1 with no
@@ -812,7 +879,7 @@ function SheetPopup() {
 
   return (
     <BottomSheet
-      key={`${openSeq}:${presentAttempt}`}
+      key={`${mountedSeq}:${presentAttempt}`}
       isOpen={isOpen}
       onOpenChange={handleOpenChange}>
       <BottomSheet.Portal disableFullWindowOverlay={Platform.OS === 'android'}>
