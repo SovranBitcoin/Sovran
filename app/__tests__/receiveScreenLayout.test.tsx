@@ -19,6 +19,56 @@ let mockCreqExcluded = false;
 let mockTrustedMintUrls: string[] = [];
 jest.mock('@/shared/lib/version', () => ({ supportsLiquidGlass: () => true }));
 
+// The QR placeholder and the copy row's scramble readout run on Reanimated
+// worklets (frame callbacks + animated props); this node suite only needs
+// them to mount, so stub the runtime the way loadingIndicatorCascade does.
+jest.mock('react-native-reanimated', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+  const easingFn = (value: number) => value;
+  return {
+    __esModule: true,
+    default: {
+      View,
+      createAnimatedComponent: <P extends object>(Component: React.ComponentType<P>) => Component,
+    },
+    Easing: {
+      linear: easingFn,
+      quad: easingFn,
+      cubic: easingFn,
+      ease: easingFn,
+      inOut: <T,>(fn: T) => fn,
+      out: <T,>(fn: T) => fn,
+      bezier: () => easingFn,
+    },
+    ReduceMotion: { System: 'system', Always: 'always', Never: 'never' },
+    useReducedMotion: () => false,
+    runOnJS: <T extends (...args: never[]) => unknown>(fn: T) => fn,
+    cancelAnimation: jest.fn(),
+    useAnimatedProps: <T extends object>(factory: () => T) => factory(),
+    useAnimatedStyle: <T extends object>(factory: () => T) => factory(),
+    useFrameCallback: () =>
+      ReactActual.useMemo(() => ({ setActive: jest.fn(), isActive: false, callbackId: 1 }), []),
+    useSharedValue: <T,>(value: T) => {
+      const ref = ReactActual.useRef<{ get: () => T; set: (next: T) => void } | null>(null);
+      if (ref.current === null) {
+        let current = value;
+        ref.current = {
+          get: () => current,
+          set: (next: T) => {
+            current = next;
+          },
+        };
+      }
+      return ref.current;
+    },
+    withDelay: <T,>(_delayMs: number, value: T) => value,
+    withRepeat: <T,>(value: T) => value,
+    withSequence: <T,>(...values: T[]) => values[values.length - 1],
+    withTiming: <T,>(value: T) => value,
+  };
+});
+
 const mockMachine = { reset: jest.fn(), inspect: jest.fn(() => ({ isExecuting: false })) };
 let mockMachineOverride: PaymentMachine | null = null;
 const mockSelectUnit = jest.fn();
@@ -276,6 +326,20 @@ jest.mock('assets/icons', () => ({
   default: ({ name, ...props }: { name: string }) => {
     const ReactActual = jest.requireActual<typeof import('react')>('react');
     return ReactActual.createElement('Icon', { testID: `icon-${name}`, ...props });
+  },
+  CurrencyIcon: ({ currency, ...props }: { currency: string }) => {
+    const ReactActual = jest.requireActual<typeof import('react')>('react');
+    return ReactActual.createElement('CurrencyIcon', { testID: `currency-${currency}`, ...props });
+  },
+}));
+
+// The copy row's cipher readout is a native TextInput driven from a worklet;
+// under react-native-web's TextInput it reaches for `document`. Row wiring is
+// pinned by copyRequestCard.test — here it only needs to mount.
+jest.mock('@/shared/ui/primitives/ScrambleText', () => ({
+  ScrambleText: (props: Record<string, unknown>) => {
+    const ReactActual = jest.requireActual<typeof import('react')>('react');
+    return ReactActual.createElement('ScrambleText', props);
   },
 }));
 

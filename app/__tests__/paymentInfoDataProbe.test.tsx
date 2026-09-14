@@ -82,7 +82,7 @@ describe('PaymentInfo device data probe', () => {
       });
       const frame = renderer.root.findByType(QRCodeFrame);
       // First child is the placeholder's QR layer, sized to the live QR square.
-      expect(frame.props.children[0].props.style).toEqual({ width: 329, height: 329 });
+      expect(frame.props.children[0].props.style).toMatchObject({ width: 329, height: 329 });
       expect(mockQrRendered).not.toHaveBeenCalled();
       expect(renderer.root.findAllByProps({ testID: 'payment-info-token-data' })).toHaveLength(0);
       act(() =>

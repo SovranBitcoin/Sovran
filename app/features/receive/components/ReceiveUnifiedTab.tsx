@@ -18,11 +18,12 @@ import { setStringAsync } from 'expo-clipboard';
 import { buildUnifiedBip321Uri } from 'wallet';
 import { useReusableMintQuote, type UseStandingPaymentRequestResult } from 'wallet/react';
 import { paymentLog } from '@/shared/lib/logger';
+import { estimateBip321Length, expectedQrPayloadLength } from '@/shared/lib/qr';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { Bip321CustomizationCard } from '@/features/receive/components/Bip321CustomizationCard';
 import type { useBip321RailSelection } from '@/features/receive/hooks/useBip321RailSelection';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { ReceiveRailPlaceholder } from '@/features/receive/components/ReceiveRailPlaceholder';
+import { PaymentQRCodePlaceholder } from '@/shared/ui/composed/QRCodeFrame';
 import type { OnReceiveQrPayload } from '@/features/receive/lib/qrPayload';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -101,6 +102,12 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
   useEffect(() => {
     if (!anyLoading && !settled) setSettled(true);
   }, [anyLoading, settled]);
+  // Only a URI that arrives after the placeholder gets the decode-in; a tab
+  // that settles synchronously from warm caches renders its QR immediately.
+  const [revealPending, setRevealPending] = useState(!settled);
+  useEffect(() => {
+    if (!settled) setRevealPending(true);
+  }, [settled]);
 
   // The footer Copy must never hand out a half-composed URI (e.g. missing
   // the creq while the fresh rotation is in flight) — report only once the
@@ -162,14 +169,37 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
 
   if (!active) return null;
 
+  // Both branches keep the customization card as the second child so React
+  // preserves its instance (Advanced stays open, the copy row's scramble
+  // decodes in place) across the placeholder → QR swap.
   if (!settled) {
-    return <ReceiveRailPlaceholder sectionTitle="Unified" unit={unit} />;
+    return (
+      <>
+        <PaymentQRCodePlaceholder
+          unit={unit}
+          expectedLength={expectedQrPayloadLength('bip321', estimateBip321Length(selection.rails))}
+        />
+        <Bip321CustomizationCard
+          selection={selection}
+          loading
+          muted={muted}
+          onCopy={handleCopy}
+          onRailToggle={(id, enabled) => setRailExcluded(id, !enabled)}
+        />
+      </>
+    );
   }
 
   return (
     <>
       {uri ? (
-        <PaymentInfo active={active} data={uri} copyTarget="bip321" unit={unit} />
+        <PaymentInfo
+          active={active}
+          data={uri}
+          copyTarget="bip321"
+          unit={unit}
+          reveal={revealPending}
+        />
       ) : (
         <View className="mx-4 mt-8">
           <View className="bg-surface-secondary items-center rounded-xl p-6">
@@ -184,6 +214,7 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
       <Bip321CustomizationCard
         selection={selection}
         display={uri ? truncateMiddle(uri, 10) : undefined}
+        reveal={revealPending}
         muted={muted}
         onCopy={handleCopy}
         onRailToggle={(id, enabled) => setRailExcluded(id, !enabled)}

@@ -1,6 +1,11 @@
-import { memo, useEffect, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import Svg, { Path } from 'react-native-svg';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { useAnimatedQrFrames } from '@/shared/hooks/useAnimatedQrFrames';
 import { PressableFeedback } from 'heroui-native';
 import { log, Log } from '@/shared/lib/logger';
@@ -15,7 +20,7 @@ import EQRCode from 'react-native-qrcode-svg';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { withAlpha } from '@/shared/lib/color';
-import { QRCodeFrame, qrCodeGeometry } from '@/shared/ui/composed/QRCodeFrame';
+import { QRCodeFrame, QrDecodeOverlay, qrCodeGeometry } from '@/shared/ui/composed/QRCodeFrame';
 import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { IS_ANDROID_E2E } from '@/shared/lib/e2e/isAndroidE2E';
 import { ANIMATE_THRESHOLD } from '@/shared/lib/qr';
@@ -75,6 +80,10 @@ interface AnimatedQRCodeProps {
    * keeping scans reliable at default (M) error correction.
    */
   size?: number;
+  /** The value just arrived from a lazy fetch: wipe the junk placeholder away
+   * over the real code once, on mount (in lockstep with `ScrambleText`). A QR
+   * mounted with data it already had renders immediately. */
+  reveal?: boolean;
 }
 
 /**
@@ -97,6 +106,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   intervalMs,
   fragmentSize,
   size,
+  reveal = false,
 }: AnimatedQRCodeProps) {
   const { width: screenWidth } = useWindowDimensions();
 
@@ -142,6 +152,16 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   // 54 px receive-screen logo.
   const logoSize = size != null ? Math.max(20, Math.round(qrSize * 0.18)) : LOGO_SIZE;
   const circleSize = logoSize + 8;
+
+  // Cosmetic decode-in, only when the caller says the value just landed
+  // (`reveal`): the junk placeholder keeps cycling over the real code and
+  // wipes away in lockstep with the copy row's glyphs settling
+  // (`ScrambleText`). Decided once at mount — a later value change (a rail
+  // toggle, the next UR fragment) is data the screen already has. Off under
+  // reduced motion and Android e2e (a perpetual tick blinds uiautomator).
+  const reducedMotion = useReducedMotion();
+  const [decoding, setDecoding] = useState(() => reveal && !reducedMotion && !IS_ANDROID_E2E);
+  const finishDecode = useCallback(() => setDecoding(false), []);
 
   // Log render state for debugging
   const renderState = showLoading
@@ -217,7 +237,14 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
       <View style={{ alignItems: 'center' }}>
         {/* QR + centered logo overlay */}
         <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-          <QRCodeFrame>{qrContent}</QRCodeFrame>
+          <QRCodeFrame>
+            <View style={{ width: qrSize, height: qrSize }}>
+              {qrContent}
+              {canRenderQR && decoding ? (
+                <QrDecodeOverlay length={address.length} size={qrSize} onDone={finishDecode} />
+              ) : null}
+            </View>
+          </QRCodeFrame>
 
           {/* Centered logo — absolutely positioned from the container's center.
               The circle background is always white so the logo punches a

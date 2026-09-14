@@ -29,7 +29,30 @@ jest.mock('@/shared/lib/strings', () => ({ truncateMiddle: (value: string) => va
 jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: (tokens: string[]) => tokens }));
 jest.mock('uniwind', () => ({ withUniwind: (component: unknown) => component }));
 jest.mock('@/assets/icons', () => ({ __esModule: true, default: () => null }));
-jest.mock('assets/icons', () => ({ __esModule: true, default: () => null }));
+jest.mock('assets/icons', () => ({
+  __esModule: true,
+  default: () => null,
+  CurrencyIcon: () => null,
+}));
+// The unified tab keeps its customization card mounted while loading and
+// draws the junk QR placeholder above it; the placeholder's worklet layers are
+// covered by qrPlaceholderFrames.test — here it only needs to mount.
+jest.mock('@/shared/ui/composed/QRCodeFrame', () => ({
+  ...jest.requireActual<typeof import('@/shared/ui/composed/QRCodeFrame')>(
+    '@/shared/ui/composed/QRCodeFrame'
+  ),
+  PaymentQRCodePlaceholder: (props: Record<string, unknown>) =>
+    jest
+      .requireActual<typeof import('react')>('react')
+      .createElement('PaymentQRCodePlaceholder', props),
+}));
+// The copy row's cipher readout is a worklet-driven native TextInput; under
+// react-native-web's TextInput it reaches for `document`. Row wiring is
+// pinned by copyRequestCard.test — here it only needs to mount.
+jest.mock('@/shared/ui/primitives/ScrambleText', () => ({
+  ScrambleText: (props: Record<string, unknown>) =>
+    jest.requireActual<typeof import('react')>('react').createElement('ScrambleText', props),
+}));
 jest.mock('@/shared/blocks/PaymentInfo', () => ({ PaymentInfo: () => null }));
 jest.mock('@/features/receive/components/ReceiveRailPlaceholder', () => ({
   ReceiveRailPlaceholder: () => null,

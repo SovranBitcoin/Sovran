@@ -49,6 +49,7 @@ import { copyPopup } from '@/shared/lib/popup';
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 import { CopyRequestCard } from '@/shared/ui/composed/CopyRequestCard';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
+import { estimateBip321Length, expectedQrPayloadLength } from '@/shared/lib/qr';
 import { HistoryEntryRefresh } from '@/features/transactions';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -494,6 +495,16 @@ function ReceiveScreenForUnit({
               sectionTitle="RECEIVE ADDRESS"
               testID="receive-hub-placeholder"
               qrTestID="receive-hub-qr-placeholder"
+              unit={unit}
+              expectedLength={
+                selectedTab === 'Unified'
+                  ? expectedQrPayloadLength('bip321', estimateBip321Length(bip321.selection.rails))
+                  : selectedTab === 'Lightning'
+                    ? expectedQrPayloadLength(lightningMode === 'offer' ? 'bolt12Offer' : 'lud16')
+                    : selectedTab === 'Onchain'
+                      ? expectedQrPayloadLength('address')
+                      : expectedQrPayloadLength('paymentRequest')
+              }
             />
           )}
           renderContent={() => {

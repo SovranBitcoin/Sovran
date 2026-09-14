@@ -887,7 +887,7 @@
     "stylesheet-create": 1
   },
   "shared/ui/composed/QRCode.tsx": {
-    "inline-style": 14,
+    "inline-style": 15,
     "stack-layout-props": 2
   },
   "shared/ui/composed/RowStatsAccent.tsx": {
@@ -978,6 +978,9 @@
     "stylesheet-create": 1,
     "inline-style": 1,
     "stack-layout-props": 1
+  },
+  "shared/ui/primitives/ScrambleText.tsx": {
+    "stylesheet-create": 1
   },
   "shared/ui/primitives/SelectableCheck/SelectableCheck.circle.tsx": {
     "inline-style": 1

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import * as Clipboard from 'expo-clipboard';
 import {
@@ -15,7 +15,11 @@ import { copyPopup, type CopyTarget } from '@/shared/lib/popup';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Log, paymentLog } from '@/shared/lib/logger';
 
-import { ANIMATE_THRESHOLD } from '@/shared/lib/qr';
+import {
+  ANIMATE_THRESHOLD,
+  expectedQrPayloadLength,
+  rememberQrPayloadLength,
+} from '@/shared/lib/qr';
 
 /**
  * camelCase → kebab-case for testID generation. Keeps the AX testIDs
@@ -41,6 +45,11 @@ interface PaymentInfoProps {
   copyTarget: CopyTarget;
   animated?: boolean;
   variant?: 'primary' | 'secondary';
+  /** The data just arrived from a lazy fetch: play the QR decode once. The
+   * block also reveals on its own when it showed the placeholder first. */
+  reveal?: boolean;
+  /** Density hint for the placeholder; defaults to the copy target's estimate. */
+  expectedLength?: number;
 }
 
 export function PaymentInfo({
@@ -51,6 +60,8 @@ export function PaymentInfo({
   copyTarget,
   animated = false,
   variant = 'primary',
+  reveal = false,
+  expectedLength,
 }: PaymentInfoProps): React.ReactElement {
   const selectedValue = useMemo(() => {
     if (Array.isArray(data) && data.length > 0) return data[0].value;
@@ -98,6 +109,18 @@ export function PaymentInfo({
   }, [selectedValue, copyTarget]);
 
   const loading = !selectedValue;
+  // Once this block has shown the placeholder, the value that replaces it is
+  // a lazy-fetch arrival and gets the decode; a block mounted with data does
+  // not (unless the caller says so via `reveal`).
+  const [sawPlaceholder, setSawPlaceholder] = useState(loading);
+  useEffect(() => {
+    if (loading) setSawPlaceholder(true);
+  }, [loading]);
+  // Teach the placeholder the density of this target's real payload, so the
+  // next time it loads (tab revisit, unit switch) the junk QR matches.
+  useEffect(() => {
+    if (selectedValue) rememberQrPayloadLength(copyTarget, selectedValue.length);
+  }, [copyTarget, selectedValue]);
   if (loading) {
     paymentLog.debug('ui.payment_info.empty', {
       dataType: typeof data,
@@ -114,7 +137,13 @@ export function PaymentInfo({
   }
 
   if (loading || !active)
-    return <PaymentQRCodePlaceholder testID="payment-info-qr-placeholder" unit={unit} />;
+    return (
+      <PaymentQRCodePlaceholder
+        testID="payment-info-qr-placeholder"
+        unit={unit}
+        expectedLength={expectedLength ?? expectedQrPayloadLength(copyTarget)}
+      />
+    );
 
   return (
     <Log name="PaymentInfo">
@@ -156,6 +185,7 @@ export function PaymentInfo({
               variant={variant}
               intervalMs={SPEED_PRESETS[speedIndex].intervalMs}
               fragmentSize={DENSITY_PRESETS[densityIndex].fragmentSize}
+              reveal={reveal || sawPlaceholder}
             />
           </Pressable>
         </View>

@@ -12,13 +12,14 @@
  * simply "any trusted mint exists".
  */
 
-import React, { memo, useCallback, useEffect } from 'react';
+import React, { memo, useCallback, useEffect, useState } from 'react';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 import { type WalletContext } from 'wallet';
 import { type UseStandingPaymentRequestResult } from 'wallet/react';
 import { paymentLog } from '@/shared/lib/logger';
+import { expectedQrPayloadLength } from '@/shared/lib/qr';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { CreqCustomizationCard } from '@/features/receive/components/CreqCustomizationCard';
 import { ReceiveRailPlaceholder } from '@/features/receive/components/ReceiveRailPlaceholder';
@@ -97,6 +98,12 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
     );
   }, [request?.encodedRequest, onQrPayload]);
 
+  // Only a request that arrives after the placeholder gets the decode-in.
+  const [revealPending, setRevealPending] = useState(!request);
+  useEffect(() => {
+    if (!request) setRevealPending(true);
+  }, [request]);
+
   const handleNewRequest = useCallback(async () => {
     paymentLog.info('receive.creq.rotate_requested', { source: 'button' });
     await EnhancedHaptics.copyHaptic();
@@ -150,7 +157,13 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
   }
 
   if (!request) {
-    return <ReceiveRailPlaceholder sectionTitle="CASHU PAYMENT REQUEST" unit={unit} />;
+    return (
+      <ReceiveRailPlaceholder
+        sectionTitle="CASHU PAYMENT REQUEST"
+        unit={unit}
+        expectedLength={expectedQrPayloadLength('paymentRequest')}
+      />
+    );
   }
 
   return (
@@ -161,6 +174,7 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
         data={request.encodedRequest}
         copyTarget="paymentRequest"
         unit={unit}
+        reveal={revealPending}
       />
       {/* Same 12px offset the QR speed controls use; the Section below
           brings its own py-3, keeping the gaps symmetric. */}
@@ -184,6 +198,7 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
       </View>
       <CreqCustomizationCard
         encodedRequest={request.encodedRequest}
+        reveal={revealPending}
         muted={muted}
         p2pkKey={p2pkKey}
         mintSelection={mintSelection}

@@ -49,6 +49,13 @@ jest.mock('heroui-native', () => {
   return { ListGroup, PressableFeedback };
 });
 
+jest.mock('@/shared/ui/primitives/ScrambleText', () => ({
+  ScrambleText: (props: Record<string, unknown>) => {
+    const ReactActual = jest.requireActual<typeof import('react')>('react');
+    return ReactActual.createElement('ScrambleText', props);
+  },
+}));
+
 jest.mock('@/shared/ui/composed/GradientCard', () => ({
   GradientCard: ({ children }: { children?: React.ReactNode }) => {
     const ReactActual = jest.requireActual<typeof import('react')>('react');
@@ -90,9 +97,8 @@ describe('CopyRequestRow', () => {
     expect(renderer.root.findByProps({ testID: 'icon-lets-icons:copy' }).props.color).toBe(
       'muted-color'
     );
-    expect(findByType(renderer, 'ListGroup.ItemTitle').props.children).toBe('creqA…xyz');
-    expect(findByType(renderer, 'ListGroup.ItemTitle').props.numberOfLines).toBe(1);
-    expect(findByType(renderer, 'ListGroup.ItemTitle').props.ellipsizeMode).toBe('middle');
+    // The value decodes in through the UI-thread scramble readout.
+    expect(findByType(renderer, 'ScrambleText').props.text).toBe('creqA…xyz');
     expect(findByType(renderer, 'ListGroup.ItemContent').props.className).toContain('min-w-0');
     expect(findByType(renderer, 'ListGroup.ItemPrefix').props.className).toContain('shrink-0');
     expect(findByType(renderer, 'ListGroup.ItemSuffix').props.className).toContain('shrink-0');
@@ -135,6 +141,13 @@ describe('CopyRequestCard', () => {
     expect(findByType(renderer, 'Section').props.title).toBe('RECEIVE ADDRESS');
     expect(findAllByType(renderer, 'GradientCard')).toHaveLength(1);
     expect(findByType(renderer, 'ListGroup').props.variant).toBe('transparent');
-    expect(findByType(renderer, 'ListGroup.ItemTitle').props.children).toBe('npubca…ample');
+    expect(findByType(renderer, 'ScrambleText').props.text).toBe('npubca…ample');
+  });
+
+  it('keeps scrambling a value-width placeholder while loading', () => {
+    const renderer = render(
+      <CopyRequestCard title="RECEIVE ADDRESS" icon="stash:qr-code" display="" muted="m" loading />
+    );
+    expect(findByType(renderer, 'ScrambleText').props.text).toBe('');
   });
 });

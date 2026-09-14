@@ -7,13 +7,14 @@
  * attribution), so this tab never shows those.
  */
 
-import React, { memo, useCallback, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 import { getMintMethodCapability, buildBip321OnchainUri, type WalletContext } from 'wallet';
 import { useReusableMintQuote, type UseScreenActionsResult } from 'wallet/react';
 import { paymentLog } from '@/shared/lib/logger';
+import { expectedQrPayloadLength } from '@/shared/lib/qr';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { CopyRequestCard } from '@/shared/ui/composed/CopyRequestCard';
 import { ReceiveRailPlaceholder } from '@/features/receive/components/ReceiveRailPlaceholder';
@@ -135,6 +136,12 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
       request && !quoteExpired ? { value: request, copyTarget: copy.copyTarget } : null
     );
   }, [request, quoteExpired, copy.copyTarget, onQrPayload]);
+
+  // Only a request that arrives after the placeholder gets the decode-in.
+  const [revealPending, setRevealPending] = useState(!request);
+  useEffect(() => {
+    if (!request) setRevealPending(true);
+  }, [request]);
 
   // Manual address rotation (onchain only) with a short cooldown so the
   // button can't be spammed into a pile of orphan quotes at the mint.
@@ -275,7 +282,13 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   }
 
   if (!request || !qrData) {
-    return <ReceiveRailPlaceholder sectionTitle={copy.sectionTitle} unit={unit} />;
+    return (
+      <ReceiveRailPlaceholder
+        sectionTitle={copy.sectionTitle}
+        unit={unit}
+        expectedLength={expectedQrPayloadLength(copy.copyTarget)}
+      />
+    );
   }
 
   // Expired per coco's own gate → no QR (deposits wouldn't be watched); offer a
@@ -313,7 +326,13 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
 
   return (
     <>
-      <PaymentInfo active={active} data={qrData} copyTarget={copy.copyTarget} unit={unit} />
+      <PaymentInfo
+        active={active}
+        data={qrData}
+        copyTarget={copy.copyTarget}
+        unit={unit}
+        reveal={revealPending}
+      />
       {/* Same 12px offset the QR speed controls use under the QR; the Section
           below brings its own py-3, keeping the gaps symmetric. Onchain gets
           New address + View all; bolt12 reuses one standing offer per mint, so
@@ -356,6 +375,7 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
         title={copy.sectionTitle}
         icon={copy.icon}
         display={truncateMiddle(request, 10)}
+        reveal={revealPending}
         muted={muted}
         onPress={handleCopy}
       />

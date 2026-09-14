@@ -19,12 +19,19 @@ export function Bip321CustomizationCard({
   selection,
   muted,
   display,
+  loading = false,
+  reveal = false,
   onCopy,
   onRailToggle,
 }: {
   selection: Bip321RailSelection;
   muted: string;
   display?: string;
+  /** The URI is still composing: keep the card (Advanced included — it is
+   *  coming regardless) and scramble the copy row until it lands. */
+  loading?: boolean;
+  /** `display` just landed from a fetch: play the copy row's decode once. */
+  reveal?: boolean;
   onCopy: () => Promise<void>;
   onRailToggle: (id: Bip321RailId, enabled: boolean) => void;
 }) {
@@ -38,13 +45,15 @@ export function Bip321CustomizationCard({
       <Section title="Unified">
         <GradientCard>
           <ListGroup variant="transparent">
-            {display ? (
+            {display || loading ? (
               <>
                 <CopyRequestRow
                   icon="stash:qr-code"
-                  display={display}
+                  display={display ?? ''}
+                  loading={loading}
+                  reveal={reveal}
                   muted={muted}
-                  onPress={onCopy}
+                  onPress={loading ? undefined : onCopy}
                   testID="receive-unified-copy"
                   accessibilityLabel="Copy Unified request"
                 />

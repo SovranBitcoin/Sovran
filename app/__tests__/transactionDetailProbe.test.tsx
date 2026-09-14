@@ -17,7 +17,33 @@ const mockScrollTo = jest.fn();
 const mockInnerContent = {};
 let mockReducedMotion = false;
 const mockAfterInteractions: (() => void)[] = [];
-jest.mock('react-native-reanimated', () => ({ useReducedMotion: () => mockReducedMotion }));
+// The QR placeholder cycles pre-encoded junk frames from a Reanimated frame
+// callback; this node probe only needs the hooks to exist.
+jest.mock('react-native-reanimated', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    __esModule: true,
+    default: { View },
+    useReducedMotion: () => mockReducedMotion,
+    useAnimatedStyle: <T extends object>(factory: () => T) => factory(),
+    useFrameCallback: () =>
+      ReactActual.useMemo(() => ({ setActive: jest.fn(), isActive: false, callbackId: 1 }), []),
+    useSharedValue: <T,>(value: T) => {
+      const ref = ReactActual.useRef<{ get: () => T; set: (next: T) => void } | null>(null);
+      if (ref.current === null) {
+        let current = value;
+        ref.current = {
+          get: () => current,
+          set: (next: T) => {
+            current = next;
+          },
+        };
+      }
+      return ref.current;
+    },
+  };
+});
 jest.mock('wallet', () => ({ getCounterparty: () => mockCounterparty }));
 jest.mock('expo-router', () => ({ useNavigation: () => ({ setOptions: jest.fn() }) }));
 jest.mock('expo-router/react-navigation', () => ({
@@ -221,7 +247,7 @@ describe('TransactionDetailShell device probe', () => {
     expect(renderer.root.findByProps({ 'data-testid': 'known-details' })).toBeTruthy();
     const frame = renderer.root.findByType(QRCodeFrame);
     // First child is the placeholder's QR layer, sized to the live QR square.
-    expect(frame.props.children[0].props.style).toEqual({ width: 329, height: 329 });
+    expect(frame.props.children[0].props.style).toMatchObject({ width: 329, height: 329 });
     expect(renderer.root.findAllByProps({ 'data-testid': 'encoded-qr' })).toHaveLength(0);
     expect(renderer.root.findAllByProps({ 'data-testid': 'related-transactions' })).toHaveLength(0);
     expect(mockAfterInteractions).toHaveLength(1);

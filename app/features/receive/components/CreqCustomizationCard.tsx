@@ -36,6 +36,8 @@ import { ANIMATE_THRESHOLD } from '@/shared/lib/qr';
 interface CreqCustomizationCardProps {
   /** The (already re-encoded) request string shown in the copy row. */
   encodedRequest: string;
+  /** The request just landed from a fetch: play the copy row's decode once. */
+  reveal?: boolean;
   muted: string;
   /** Latest keyring P2PK pubkey (02-prefixed) — absent → lock toggle disabled. */
   p2pkKey?: string;
@@ -60,6 +62,7 @@ interface CreqCustomizationCardProps {
 
 export const CreqCustomizationCard = memo(function CreqCustomizationCard({
   encodedRequest,
+  reveal = false,
   muted,
   p2pkKey,
   mintSelection,
@@ -120,6 +123,7 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
         <CopyRequestRow
           icon="ph:coins"
           display={truncateMiddle(encodedRequest, 10)}
+          reveal={reveal}
           muted={muted}
           onPress={handleCopy}
         />
