@@ -51,6 +51,8 @@ targets/widget/generated.entitlements
 targets/widget/Assets.xcassets/AppIcon.appiconset/
 targets/widget/Assets.xcassets/$*.colorset/
 
-# Unified marketing/artwork sources, wallpapers and generated outputs are never build inputs.
-marketing/
-../marketing/
+# Website and press assets are not native build inputs. copy/ and app brand sources are.
+press/
+../press/
+site/
+../site/

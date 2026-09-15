@@ -1,0 +1,16 @@
+{
+  "name": "copy",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./onboarding": "./src/onboarding.ts",
+    "./legal": "./legal/documents.json",
+    "./site": "./src/site.ts",
+    "./claims": "./claims.json"
+  },
+  "scripts": {
+    "lint": "node scripts/lint.mjs",
+    "test": "node --test scripts/*.test.mjs"
+  }
+}

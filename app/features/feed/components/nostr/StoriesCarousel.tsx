@@ -575,12 +575,6 @@ const UserStoriesItem: FC<UserItemProps> = ({
               />
             )}
           </Animated.View>
-          {isActive && currentVideo?.videoUrl === renderedVideoUrl && (
-            <E2EAccessibilityProbe
-              testID="story-video-ready"
-              accessibilityLabel="Story video ready"
-            />
-          )}
 
           <LinearGradient
             colors={TOP_GRADIENT.colors}
@@ -588,6 +582,14 @@ const UserStoriesItem: FC<UserItemProps> = ({
             style={styles.topGradient}
           />
         </Pressable>
+        {/* Outside the accessible Pressable: iOS hides an accessibility element's
+            children, so a probe nested inside it never reaches the AX tree. */}
+        {isActive && currentVideo?.videoUrl === renderedVideoUrl && (
+          <E2EAccessibilityProbe
+            testID="story-video-ready"
+            accessibilityLabel="Story video ready"
+          />
+        )}
 
         <View style={styles.header} pointerEvents="box-none">
           <View testID="story-progress" style={styles.progressRow} pointerEvents="none">

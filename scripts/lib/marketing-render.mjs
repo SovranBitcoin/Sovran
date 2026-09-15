@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import sharp from "sharp";
 import opentype from "opentype.js";
 import { composeBrand, rasterizeBrand } from "../brand-assets.mjs";
 
@@ -51,63 +50,4 @@ export async function brandLockup(brand, height) {
   );
 
   return { ink, logoScale, logoWidth, logoHeight, logo };
-}
-
-// Caller defines #shadow and #rim once for the canvas. depth controls paint order.
-export async function phone({
-  screenshot,
-  platform,
-  x,
-  y,
-  width,
-  rotate = 0,
-  depth = 0,
-  mask = "frame",
-  index = 0,
-  dim = 0,
-  scaleX = 1,
-  frame = "#181818",
-  frameEdge = "#2e2e2e",
-  underlay = "",
-  uiMask,
-}) {
-  assert(mask === "frame", "Unknown phone mask");
-  assert(Number.isFinite(depth));
-  const meta = await sharp(screenshot).metadata();
-  assert(["ios", "android"].includes(platform), "Unknown platform");
-  // Retain the full native capture, including status bar and home indicator.
-  let screenBytes = screenshot;
-
-  if (uiMask) {
-    const maskMeta = await sharp(uiMask).metadata();
-    assert(
-      maskMeta.width === meta.width && maskMeta.height === meta.height,
-      "UI mask must match the original screenshot size",
-    );
-    const alpha = await sharp(uiMask).removeAlpha().greyscale().toBuffer();
-    const rgb = await sharp(screenBytes).removeAlpha().png().toBuffer();
-    screenBytes = await sharp(rgb).joinChannel(alpha).png().toBuffer();
-  }
-  const w = width,
-    h = (meta.height / meta.width) * w;
-  const bezel = Math.round(w * 0.03),
-    frameW = w + 2 * bezel,
-    frameH = h + 2 * bezel,
-    frameR = w * 0.135,
-    screenR = frameR - bezel;
-
-  return {
-    width: w,
-    height: h,
-    bezel,
-    frameH,
-    svg: `<g transform="translate(${x} ${y})${rotate || scaleX !== 1 ? ` rotate(${rotate} ${w / 2} ${h / 2}) scale(${scaleX} 1)` : ""}">
-  <rect x="${-bezel}" y="${-bezel}" width="${frameW}" height="${frameH}" rx="${frameR}" fill="#000" filter="url(#shadow)"/>
-  <rect x="${-bezel}" y="${-bezel}" width="${frameW}" height="${frameH}" rx="${frameR}" fill="${frame}" stroke="${frameEdge}" stroke-width="1"/>
-  <clipPath id="screen${index}"><rect width="${w}" height="${h}" rx="${screenR}"/></clipPath>
-${underlay ? `  ${underlay}\n` : ""}  <image width="${w}" height="${h}" href="data:image/png;base64,${screenBytes.toString("base64")}" clip-path="url(#screen${index})"/>
-  <rect width="${w}" height="${h}" rx="${screenR}" fill="#000" opacity="${dim}"/>
-  <rect x="${-bezel + 0.5}" y="${-bezel + 0.5}" width="${frameW - 1}" height="${frameH - 1}" rx="${frameR}" fill="none" stroke="url(#rim)" stroke-width="1"/>
-  </g>`,
-  };
 }

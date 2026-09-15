@@ -1,0 +1,64 @@
+---
+import { Image } from 'astro:assets';
+import Dev from '../layouts/Dev.astro';
+import { screenshotCatalog } from '../lib/phoneGeometry';
+const retained = screenshotCatalog.filter(capture => capture.image);
+const missing = screenshotCatalog.filter(capture => !capture.image);
+const stamped = retained.filter(capture => capture.nativeBuild);
+const outdated = retained.filter(capture => capture.freshness !== 'current');
+const freshnessText = {
+  current: 'Current: captured from the app source this page was built from.',
+  outdated: 'Outdated: app source changed since this capture. Run bun run screenshots:refresh.',
+  unverified: 'Unverified: captured before app-source stamping, so it may show an older screen. Run bun run screenshots:refresh.',
+  unknown: 'Not checked: app source is unavailable in this build.',
+  withdrawn: 'Withdrawn.',
+  missing: 'Missing.',
+} as const;
+const utc = (value?: string) => value ? `${new Date(value).toISOString().slice(0, 16).replace('T', ' ')} UTC` : undefined;
+// Run IDs embed their start time: run-2026-09-13T02-24-08-447Z-...
+const runTime = (run: string | null) => {
+  const match = /^run-(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})/.exec(run ?? '');
+  return match ? `${match[1]} ${match[2]}:${match[3]} UTC` : 'unknown time';
+};
+---
+<Dev title="Screenshot library">
+  <h1>Screenshot library</h1>
+  <p>{retained.length} retained captures with matching SHA-256 and native-run attribution. {stamped.length} of them were captured on a native build stamped against its source; the rest predate build-stamped refreshes. Presentation fixtures explain UI states, not real funds, completed payments, or service availability.</p>
+  <p>{outdated.length ? `${outdated.length} of ${retained.length} retained captures are not proven current with the app source.` : 'Every retained capture matches the current app source.'} Check with <code>bun run screenshots:status</code>; refresh every capture with <code>bun run screenshots:refresh</code>. <a href="#capture-requests">{missing.length} capture requests</a> are listed separately. Missing images are never substituted with another screen.</p>
+  <nav aria-label="Retained captures">{retained.map(capture => <a href={`#${capture.key}`}>{capture.key}</a>)}</nav>
+  {retained.map(capture => <article class="dev-capture" id={capture.key}>
+    <a href={capture.image!.src} aria-label={`Open original ${capture.key}`}><Image src={capture.image!} width={360} alt={capture.alt} loading="lazy" /></a>
+    <div>
+      <h2>{capture.context.caption}</h2><code>{capture.key}</code>
+      <dl>
+        <dt>Purpose</dt><dd>{capture.context.purpose}</dd>
+        <dt>State</dt><dd>{capture.context.state}</dd>
+        <dt>Flow</dt><dd>{capture.context.flow.id} / {capture.context.flow.position}. From: {capture.context.flow.from.join(', ') || 'entry'}. To: {capture.context.flow.to.join(', ') || 'end'}.</dd>
+        <dt>Concepts</dt><dd>{capture.context.concepts.join(', ')}</dd>
+        <dt>Related pages</dt><dd>{capture.context.relatedPages.map(page => {
+          const related = screenshotCatalog.filter(item => item.key.startsWith(capture.key.split('/')[0] + '/') && item.context?.page === page);
+          return <span>{related.length ? related.map(item => <a href={`#${item.key}`}>{item.key} </a>) : `${page} (no registered capture) `}</span>;
+        })}</dd>
+        <dt>Captured</dt><dd>{utc(capture.capturedAt) ?? runTime(capture.run)}{capture.nativeBuild
+          ? <> on native app {capture.nativeBuild.appVersion} ({capture.nativeBuild.buildNumber}), commit <code>{capture.nativeBuild.gitSha.slice(0, 7)}</code>, fingerprint <code>{capture.nativeBuild.fingerprint.slice(0, 12)}</code></>
+          : <>, before build-stamped refreshes. The native app version was not recorded.</>}</dd>
+        <dt>Freshness</dt><dd class={capture.freshness === 'current' ? undefined : 'dev-error'}>{freshnessText[capture.freshness]}</dd>
+        {capture.lastRefreshFailure && <><dt>Last refresh</dt><dd>Not replaced on {utc(capture.lastRefreshFailure.at)}: {capture.lastRefreshFailure.reason}</dd></>}
+        <dt>Source attribution</dt><dd><code>{capture.file}</code><br />Native run: <code>{capture.run}</code><br />SHA-256: <code>{capture.sha256}</code>{'wallpaperId' in capture && <><br />Wallpaper: <code>{capture.wallpaperId}</code></>}</dd>
+      </dl>
+      {capture.key.startsWith('ios/') && <p><a href={`/scenes/custom?${new URLSearchParams({ preset: 'single-front', screenshots: capture.key, format: 'native' })}`}>Compose with this capture</a></p>}
+    </div>
+  </article>)}
+  <section id="capture-requests">
+    <h2>Capture requests</h2>
+    <p>Run <code>bun run screenshots:refresh</code> to capture these on a build-stamped native app. Withdrawn captures are never displayed or used in scenes. P2PK requests cannot use the retained Unified QR as a substitute.</p>
+    {missing.map(capture => <article class="dev-missing" id={capture.key}>
+      <div>
+        <h3>{capture.context?.caption ?? capture.key}</h3><code>{capture.key}</code>
+        <p><strong>Capture requested.</strong> {capture.reason}</p>
+        {capture.lastRefreshFailure && <p>Last refresh on {utc(capture.lastRefreshFailure.at)} did not capture it: {capture.lastRefreshFailure.reason}</p>}
+        <dl><dt>Purpose</dt><dd>{capture.context?.purpose}</dd><dt>Required state</dt><dd>{capture.context?.state}</dd><dt>Expected source</dt><dd><code>{capture.file}</code></dd>{capture.run && <><dt>Withdrawn run</dt><dd><code>{capture.run}</code>, {runTime(capture.run)}</dd></>}</dl>
+      </div>
+    </article>)}
+  </section>
+</Dev>

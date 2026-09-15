@@ -338,6 +338,23 @@ export async function findInstallableApp(
   bundleId = BUNDLE_ID,
   onLifecycle: (message: string) => void = log
 ): Promise<string> {
+  const pinned = process.env.SOVRAN_E2E_APP_PATH;
+  if (pinned) {
+    // A build-stamped app from `screenshots:refresh`: never fall back to an older bundle.
+    const id = existsSync(join(pinned, 'Info.plist'))
+      ? (
+          await run(['plutil', '-extract', 'CFBundleIdentifier', 'raw', join(pinned, 'Info.plist')], {
+            allowFail: true,
+          })
+        ).trim()
+      : '';
+    if (id !== bundleId)
+      throw new Error(`SOVRAN_E2E_APP_PATH ${pinned} is ${id || 'not an app bundle'}, expected ${bundleId}`);
+    if (!(await hasBakedEntitlements(pinned)))
+      throw new Error(`SOVRAN_E2E_APP_PATH ${pinned} has no baked entitlements (SecureStore would fail)`);
+    onLifecycle(`using pinned app ${pinned}`);
+    return pinned;
+  }
   const candidates: { path: string; mtime: number }[] = [];
   const push = (app: string) => {
     if (existsSync(join(app, 'Sovran')))

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
 import {
@@ -19,8 +19,9 @@ import {
   restoreCentre,
   portalCanvas,
   main,
+  phone,
 } from "./artwork.mjs";
-import { loadFonts, hash, phone } from "./lib/marketing-render.mjs";
+import { loadFonts, hash } from "./lib/marketing-render.mjs";
 import { loadBrandInputs } from "./brand-assets.mjs";
 
 const project = await loadProject();
@@ -31,6 +32,32 @@ const context = {
 const spec = project.specs.find((s) => s.id === "ai-chat");
 const layout = project.layouts.layouts.find((l) => l.id === "spotlight");
 const inputs = await loadInputs(project, [spec]);
+
+test("contact-sheet collages cannot return through the artwork generator", async () => {
+  const source = await readFile(join(ROOT, "scripts/artwork.mjs"), "utf8");
+  assert.doesNotMatch(source, /contactSheet|contact-sheets/);
+});
+
+test("artwork inventory contains no contact-sheet records or files", async () => {
+  const manifest = await readFile(join(FOLDER, "generated/manifest.json"), "utf8");
+  assert.doesNotMatch(manifest, /contactSheet|contact-sheets/);
+  const files = await readdir(join(FOLDER, "generated"), { recursive: true });
+  assert.deepEqual(
+    files.filter((file) => /contact-sheets[\\/].+\.png$/i.test(file)),
+    [],
+  );
+});
+
+test("known-stale screenshots cannot enter poster renders even when their bytes and hashes exist", async () => {
+  for (const status of [{ availability: "unavailable" }, { freshness: "stale" }]) {
+    const marked = structuredClone(project);
+    Object.assign(marked.screenshots["ios/ai"], status, { unavailableReason: "Needs a native recapture" });
+    const result = await loadInputs(marked, [spec]);
+    assert.equal(result.shots["ios/ai"], null);
+    assert(result.missing.some(item => item.includes("ios/ai.png") && item.includes("Needs a native recapture")));
+    assert.equal(result.hashes["source/screenshots/ios/ai.png"], undefined);
+  }
+});
 
 test("19 concepts share all eight described layouts and three exact aspect ratios", () => {
   assert.equal(project.specs.length, 19);
@@ -189,20 +216,31 @@ test("tall triptychs spread across the canvas and paint lower phones above earli
   assertNoCollision({ x: 67.5, y: 67.5, width: 945, height: 282.5 }, positions);
 });
 
-test("missing sources fail strict checks, including missing masks on unselected portal variants", async () => {
+test("missing captures fail strict checks and unselected portal variants report missing masks", async () => {
+  const missingCapture = join(FOLDER, project.screenshots["ios/ai"].file);
+  const readSource = async (file) =>
+    file === missingCapture ? null : readFile(file);
+  const missingInputs = await loadInputs(project, [spec], readSource);
+  assert.deepEqual(missingInputs.missing, [project.screenshots["ios/ai"].file]);
   await assert.rejects(
-    () => main(["--check", "--only", "social-thread"]),
-    /Missing inputs/,
+    () => main(["--check", "--only", "ai-chat"], { readSource }),
+    /Missing inputs:\nsource\/screenshots\/ios\/ai\.png/,
   );
-  await assert.rejects(
-    () => main(["--check", "--only", "themes-colors"]),
-    /UI mask/,
+  const maskProject = structuredClone(project);
+  delete maskProject.screenshots["ios/wallet-navy"].uiMask;
+  const maskInputs = await loadInputs(maskProject, [
+    maskProject.specs.find((s) => s.id === "themes-colors"),
+  ]);
+  assert(
+    maskInputs.missing.includes(
+      "UI mask for ios/wallet-navy (screenshots.json uiMask)",
+    ),
   );
   const draft = await renderArtwork(
     spec,
     layout,
     "wide",
-    { ...inputs, shots: {} },
+    missingInputs,
     project,
     context,
     [512, 250],
@@ -223,6 +261,32 @@ test("missing sources fail strict checks, including missing masks on unselected 
       )
     ).record.sha256,
   );
+});
+
+test("manifest-only refresh rejects partial runs and conflicting output modes", async () => {
+  for (const args of [["--check"], ["--variants"], ["--only", "ai-chat"]]) {
+    await assert.rejects(
+      () => main(["--manifest-only", ...args]),
+      /--manifest-only requires a full run/,
+    );
+  }
+});
+
+test("manifest-only refresh refuses pixel changes without rewriting images or provenance", async () => {
+  const files = ["generated/manifest.json", "generated/ai-chat/wide.png"];
+  const before = await Promise.all(
+    files.map((file) => readFile(join(FOLDER, file))),
+  );
+  await assert.rejects(
+    () =>
+      main(["--manifest-only", "--allow-missing"], {
+        readSource: async () => null,
+      }),
+    /Stale artwork: ai-chat\/wide\.png/,
+  );
+  for (const [index, file] of files.entries()) {
+    assert((await readFile(join(FOLDER, file))).equals(before[index]), file);
+  }
 });
 
 test("source corruption is never tolerated as a missing input", async () => {
@@ -280,6 +344,18 @@ test("phone embeds the full original native capture and keeps status-bar/home-in
     assert.equal(rendered.height, (meta.height / meta.width) * 320);
     const embedded = rendered.svg.match(/base64,([^\"]+)/)[1];
     assert(Buffer.from(embedded, "base64").equals(bytes));
+    assert(
+      !rendered.svg.includes("<rect"),
+      "Frame contours are not circular rounded rectangles",
+    );
+    assert(rendered.svg.includes(`data-platform="${platform}"`));
+    assert(
+      rendered.svg.includes(
+        platform === "ios"
+          ? 'data-device="iphone-17-pro-max"'
+          : 'data-device="android-emulator"',
+      ),
+    );
   }
 });
 

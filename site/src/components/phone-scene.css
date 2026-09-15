@@ -1,0 +1,84 @@
+.phone-scene {
+  min-width: 0;
+  width: 100%;
+  margin: 0;
+}
+.phone-scene .phone-stage {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.phone-scene .phone-model {
+  filter: none;
+}
+.scene-gallery {
+  max-width: 1440px;
+  margin: auto;
+  padding: 40px 24px;
+}
+.scene-gallery h1 {
+  font-size: clamp(32px, 5vw, 56px);
+  margin-bottom: 24px;
+}
+.scene-gallery nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin: 24px 0 56px;
+}
+.scene-gallery section {
+  padding: 36px 0;
+}
+.scene-gallery h2 {
+  font-size: 24px;
+  margin-bottom: 20px;
+}
+.scene-gallery .phone-stage {
+  max-height: 780px;
+}
+.scene-editor {
+  display: grid;
+  gap: 16px;
+  max-width: 760px;
+  margin-bottom: 32px;
+}
+.scene-editor label {
+  display: grid;
+  gap: 8px;
+}
+.scene-editor input,
+.scene-editor textarea,
+.scene-editor select,
+.scene-editor button {
+  font: inherit;
+  color: inherit;
+  background: #181818;
+  border: 1px solid #737373;
+  padding: 12px;
+  border-radius: 4px;
+  max-width: 100%;
+}
+.scene-editor textarea {
+  min-height: 130px;
+}
+.scene-editor button {
+  justify-self: start;
+  cursor: pointer;
+}
+.scene-editor :focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+}
+.scene-error {
+  color: #ffb8b8;
+}
+body.scene-export-body {
+  background: transparent;
+}
+html.scene-export-root {
+  background: transparent;
+}
+.scene-export-body .scene-controls {
+  display: none;
+}

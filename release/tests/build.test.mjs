@@ -2,7 +2,7 @@ import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import childProcess from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { build } from '../build.mjs';
@@ -11,7 +11,7 @@ import { config } from '../core.mjs';
 const ids = { ios: '11111111-1111-1111-1111-111111111111', android: '22222222-2222-2222-2222-222222222222' };
 async function scenario(options, run) {
   const source = mkdtempSync(path.join(tmpdir(), 'sovran-build-test-'));
-  const legal = { publicationReady: true, operator: {}, terms: {}, privacy: {} };
+  const legal = JSON.parse(readFileSync(new URL('../../copy/legal/documents.json', import.meta.url), 'utf8'));
   const legalDirectory = path.join(source, 'app/shared/lib/legal');
   mkdirSync(legalDirectory, { recursive: true });
   writeFileSync(path.join(legalDirectory, 'documents.json'), JSON.stringify(legal));

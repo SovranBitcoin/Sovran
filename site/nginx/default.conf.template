@@ -1,0 +1,80 @@
+server {
+    listen ${PORT};
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+    server_tokens off;
+    access_log off;
+    error_log /dev/stderr crit;
+    absolute_redirect off;
+
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy no-referrer always;
+    add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
+    set $artifact_origin "${ARTIFACT_ORIGIN}";
+    resolver ${ARTIFACT_RESOLVER} valid=60s ipv6=off;
+    proxy_ssl_server_name on;
+    proxy_ssl_verify on;
+    proxy_ssl_trusted_certificate /etc/ssl/cert.pem;
+    proxy_ssl_verify_depth 3;
+    proxy_connect_timeout 10s;
+    proxy_read_timeout 60s;
+    proxy_pass_request_headers off;
+    proxy_set_header Host $proxy_host;
+    proxy_set_header Range $http_range;
+    proxy_set_header If-Range $http_if_range;
+    proxy_hide_header Set-Cookie;
+
+    # Exact pages must win over the publisher's artifact namespace.
+    location = /releases { try_files /releases/index.html =404; }
+    location = /releases/ { try_files /releases/index.html =404; }
+    location = /releases/channels.json {
+        if ($artifact_origin = "") { return 503; }
+        proxy_pass $artifact_origin$request_uri;
+        proxy_hide_header Cache-Control;
+        add_header Cache-Control "no-store" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header Referrer-Policy no-referrer always;
+    }
+    location ^~ /releases/ {
+        if ($artifact_origin = "") { return 503; }
+        proxy_pass $artifact_origin$request_uri;
+    }
+    location = /ios {
+        if ($artifact_origin = "") { return 503; }
+        proxy_pass $artifact_origin$request_uri;
+    }
+    location ^~ /ios/ {
+        if ($artifact_origin = "") { return 503; }
+        proxy_pass $artifact_origin$request_uri;
+    }
+
+    # Retired sensitive flows do not load JS, redirect, or produce access logs.
+    location ~* ^/((en|es|ja|ko|zh|fr|uk|ru|pl|de|pt)/)?(esim|esims|order|orders|blog|test-flows)(/|$) {
+        default_type text/plain;
+        return 410 "This service is no longer available on this website.\n";
+    }
+    location ~ ^/(en|es|ja|ko|zh|fr|uk|ru|pl|de|pt)/?$ { return 301 /; }
+    location ~ ^/(en|es|ja|ko|zh|fr|uk|ru|pl|de|pt)/(.+)$ { return 301 /$2; }
+
+    location = /health { default_type text/plain; return 200 "healthy\n"; }
+    location = /legal/documents.json {
+        default_type application/json;
+        add_header Cache-Control "no-cache" always;
+        add_header X-Content-Type-Options nosniff always;
+        try_files $uri =404;
+    }
+    location = /build.json { default_type application/json; try_files $uri =404; }
+    location = /.well-known/nostr.json {
+        default_type application/json;
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header X-Content-Type-Options nosniff always;
+        try_files $uri =404;
+    }
+    location ^~ /_astro/ { try_files $uri =404; }
+    location / { try_files $uri $uri/index.html =404; }
+    error_page 404 /404.html;
+    location = /404.html { internal; }
+}

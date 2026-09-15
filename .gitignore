@@ -43,5 +43,8 @@ FEEDBACK.md
 app/old_log_3.txt
 
 # Full artwork comparison variants are local; selected exports/contact sheets are committed.
-/marketing/artwork/generated/variants/
-/marketing/artwork/.staging-*/
+/press/artwork/generated/variants/
+/press/artwork/.staging-*/
+/site/dist/
+/site/.astro/
+press/exports/

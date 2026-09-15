@@ -1,0 +1,79 @@
+{
+  "renderer": "Chrome, shared continuous-corner parallel-offset extrusion with actual iOS screenshots",
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/152.0.7977.84",
+    "revision": "@4334922f44c77b1208072c4deac29db3af39bbea",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+    "jsVersion": "15.2.124.21"
+  },
+  "selection": {
+    "preset": "all",
+    "screenshots": null,
+    "poses": null,
+    "format": null,
+    "collection": null,
+    "variants": null
+  },
+  "inputs": {
+    "scripts/lib/phone-frame.mjs": "b716f3c3ad8b2167380d0584567f5c5ea84a04b044b25450bec73894705c4b5b",
+    "site/scripts/visual.mjs": "1a5f591a49831b523cd495f84abe8cf9ca0dac6908be47eaed20c690be61ca79",
+    "site/scripts/variants.mjs": "1a97ab83d5daba1aac4df35585d02bb46e0ca9cc455ae885335aa8d84d5bfda2",
+    "site/scripts/verify-inputs.mjs": "151e42dca27423bb5b7e6247e9eaf7691245f41ba8e1ea22f6d82360bee25556",
+    "site/src/components/PhoneScene.astro": "25ba9c12dbbd34a5166f67f7f74450e852b764039ecbde5c6db9b558e031fcaf",
+    "site/src/components/phone-scene.css": "8446371bc63663a1d4554e29882e4a34db0838d26b5c512e81c8221ac013a61e",
+    "site/src/lib/phoneGeometry.ts": "b50cc8bb27d4c80addbff591b8dbc64bfa3acb6fb1a03e47f866d25750aa3dd9",
+    "site/src/styles/site.css": "f78aa8f689aba4455895a206135a8312983e24c67b82b9d1b24c881cbbc9cbcc",
+    "site/src/styles/dev.css": "f571b973218f848f7e6f014af27d8c5d1f1456b32e52f9003a1f0608a7dcf354",
+    "site/src/layouts/Dev.astro": "7ace1c853e0bae06a8e2168f8d03fc9c76e3847258af995ef8bfdcfff96ba066",
+    "site/src/pages/mockups.astro": "1534f6f41df0b445aa6c953931537189c3b9f9a7f73c5faf851288b52d4cc88b",
+    "site/src/pages/screenshots.astro": "038097f6ed2852434b32b07cd3c5a4afd0b4248f258eeed5d31116c55883c301",
+    "site/src/pages/scenes/[scene].astro": "abfe02a72bfb77259c5efe2c3b15e5499b12d87e9d78512363bd7c3274b20a57",
+    "site/src/pages/scenes/index.astro": "f9d14b101e60df2c8e8bd5ef5111731886da53428e5639038f0713f4ed99bc26",
+    "site/src/pages/scenes/custom.astro": "75c71acc59a30b2da32f3ed0796e9cf25fa471cba1962461aecd1931def74409",
+    "press/artwork/source/screenshots.json": "882840c19935a68befbabb8f36dd53b1c85a3f248576c06df76b7230a9164f67",
+    "press/artwork/source/screenshot-context.json": "5f35d6409f2f4147b69a27489395030c222f11db030ca75e4897c8c9a7fc73fa",
+    "copy/src/site.ts": "91dc1cbd89a68d8bd5d1166eeeca459b2269bbdbf9dc6aeda24a32269d4d0e2a",
+    "site/public/sovran-mark.svg": "d7a4bda9fc069e991c6af6f32d5d2e38fd164af53fad3050ee871191de6404a4",
+    "site/public/fonts/MonaSans/MonaSans-Regular.ttf": "1232400c4c547ccf95fae14630cf7bcc3c02b5d3ccf9190b55fbb6b68db7f115",
+    "site/public/fonts/MonaSans/MonaSans-Bold.ttf": "37942ca1c1f743236325460d592149a39bdab8ab94a9882ac08e4b8012aa22ce",
+    "site/public/fonts/MonaSans/MonaSans-ExtraBold.ttf": "20c4d7ba5080f0ddd534f97c18b00fd29e6c2bfa3127821f926ce368dea64e0c",
+    "press/artwork/source/screenshots/ios/ai-model-picker.png": "feda19f8b8ac910b27895ba92042d4a9a8e3e87f71eb1ec706177273a5c7602b",
+    "press/artwork/source/screenshots/ios/ai.png": "84a3d4053e3e6651d0860af41bda8322b4264be2e40c1c27ed4e162edb063646",
+    "press/artwork/source/screenshots/ios/contacts.png": "aee7ee49eed1d5f5cc23a4d1e009553d5bd9d34a1f1f5c85fdd07debb5ccae8f",
+    "press/artwork/source/screenshots/ios/dm-chat.png": "b4921f9f0821d73e3a2c4fee8122b0826c43ea2a4866456ea90e46331a74af9e",
+    "press/artwork/source/screenshots/ios/feed.png": "2c9c420850c119192a0eea656d3a9661465a5d7e20c51feab3d3609dc3d7e19c",
+    "press/artwork/source/screenshots/ios/gallery.png": "83d399920956e30ac9cc4dcb4b89859afaa8b065c2c848159235d6c46fe074ef",
+    "press/artwork/source/screenshots/ios/lightning-receive.png": "1827cf058b14b5ac56a4199e2a6ee3fb2c95d59cb01001ea3875cc1d5812de84",
+    "press/artwork/source/screenshots/ios/mint-info.png": "7003028aaab9aba666943cbb8e6e156219845255ecda8da3343fe875b8c2ed3d",
+    "press/artwork/source/screenshots/ios/mint-reviews.png": "d1a8cdfaece1459f0df9c607dc3c63fbf6b9e8d8e980b9c2f205df3de09b02fd",
+    "press/artwork/source/screenshots/ios/mint-select.png": "9e5fbb323e8438ccc259762736dc7263d293ffb78e43717e13f74e000af6676f",
+    "press/artwork/source/screenshots/ios/notification-mint-changes.png": "f0bc4af6e492cc0dc3daaf224601dcc41f9f5c304bee5c4e03028649db8f3829",
+    "press/artwork/source/screenshots/ios/notifications.png": "900be6c06fbd6fe30c4888af02eb35712e178f01bfeeae559ad5a8122a097ed6",
+    "press/artwork/source/screenshots/ios/receive-qr.png": "c55582fc3cffbbab37d3dc9b2c9555f79d29fc88ff7433cc2d5ecf619f88f10c",
+    "press/artwork/source/screenshots/ios/send.png": "b4484f95d584dbbb8425e142d12d409d0e9edecf7753536f49a4e7df1990c5cc",
+    "press/artwork/source/screenshots/ios/settings.png": "c5156d98324dab947dfc590fe6cea18a4728e807c4da0f37e54d0714dc1a5abd",
+    "press/artwork/source/screenshots/ios/theme-preview.png": "6fa9b17ed2083cb9e589482107708b548930e7326f1b85dbc9d5ea0dff59d738",
+    "press/artwork/source/screenshots/ios/wallet-beige.png": "3b25848670e714455c4cbf51d8f43f4c2795b5de6aadfb35d9203b9df7be50f2",
+    "press/artwork/source/screenshots/ios/wallet-edge-of-lunar-day.png": "7a65032cff9719ae52d12363d55b7ae8fe5d33256e458153d59f0d2ab902da7a",
+    "press/artwork/source/screenshots/ios/wallet-in-eclipse.png": "7f1cf7aa9b3191266bf8bd2a8bb91892bf67a519d4e8b86793424a0d7e65d027",
+    "press/artwork/source/screenshots/ios/wallet-navy.png": "161cfdda21a2e28318a677a861d91986672c75e5a33c9cd7fbda8d703c8f2cc7",
+    "press/artwork/source/screenshots/ios/wallet-new-moon.png": "50fa4acc919526901d5f183f72abf3f1479731d9ff94917fe1223aab290c8a3f",
+    "press/artwork/source/screenshots/ios/wallet-setting-earth.png": "0c96c4c95ba58ebb97397bb854d77da69e38f8b085e82f0f55c2762aed60eada",
+    "press/artwork/source/screenshots/ios/wallet-sunset.png": "cb17a09e8e95e872086871d2668101a4c3c80f0865346f66c5ebb88df69e2e2c",
+    "press/artwork/source/screenshots/ios/wallet.png": "d0ac142d782e3c1b254ab1c195f135f92e254f126a0e5d2db304a919ce578776"
+  },
+  "exports": {
+    "og.png": {
+      "name": "og",
+      "format": "landscape",
+      "canvas": {
+        "width": 1200,
+        "height": 630
+      }
+    }
+  },
+  "images": {
+    "og.png": "134b4fd4f2de9579c72ef27c713a5eda96a565e437fd2d44dfa801f82122282b"
+  }
+}

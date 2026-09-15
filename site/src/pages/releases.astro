@@ -1,0 +1,33 @@
+---
+import Page from '../layouts/Page.astro';
+import { siteCopy } from '../../../copy/src/site';
+const copy = siteCopy.releases;
+---
+<Page title="Releases - Sovran" description={copy.text}>
+  <div class="section">
+    <div class="wrap">
+      <div class="release-log">
+        <h1>{copy.title}</h1>
+        <p class="lede">{copy.text}</p>
+        <p class="muted">{copy.note} <a href="/download">Download Sovran</a>.</p>
+        {copy.entries.map(entry => <article aria-labelledby={`v${entry.version}`}>
+          <p class="muted"><time datetime={entry.date}>{new Intl.DateTimeFormat('en', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(`${entry.date}T00:00:00Z`))}</time></p>
+          <h2 id={`v${entry.version}`}>{entry.version}: {entry.title}</h2>
+          <p>{entry.text}</p>
+          {entry.items.length > 0 && <ul>{entry.items.map(item => <li>{item}</li>)}</ul>}
+          <p><a href={entry.href} rel="noreferrer">Original {entry.version} release notes</a></p>
+        </article>)}
+        <p><a href={copy.href} rel="noreferrer">All releases on GitHub</a>. For what comes next, <a href="/roadmap">see the roadmap</a>.</p>
+      </div>
+    </div>
+  </div>
+</Page>
+
+<style>
+  .release-log { max-width: 72ch; margin-inline: auto; margin-bottom: 64px; }
+  h1 { font-size: clamp(40px, 6vw, 64px); line-height: 1.1; }
+  h2 { font-size: 28px; line-height: 1.2; margin-bottom: 16px; }
+  article { margin-block: 48px; }
+  ul { padding-inline-start: 24px; line-height: 1.65; }
+  li + li { margin-top: 12px; }
+</style>

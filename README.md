@@ -20,10 +20,20 @@ links directly.
 | **wallet** | [`wallet/`](wallet/) | Payment UX logic for Coco-based Cashu wallets — parsing, classification, routing, annotation, offline suggestions. UI- and navigation-agnostic. (Formerly the `colada` repo.) |
 | **nostr**  | [`nostr/`](nostr/)   | Typed, UI-agnostic client helpers for the Nagg GraphQL / app-view APIs and the tiered Nostr data layer. (Formerly the `nagg-ts` repo.) |
 | **docs**   | [`docs/`](docs/)     | The documentation site ([VitePress](https://vitepress.dev)). |
+| **copy**   | [`copy/`](copy/)     | Dependency-free claims policy, onboarding copy and canonical legal documents. |
+| **site**   | [`site/`](site/)     | Public website source, built separately with Astro and its own locked dependencies. Not a Bun workspace. |
+| **press**  | [`press/`](press/)   | Retained marketing captures, artwork sources and generated exports. Not bundled in the app. |
 
 `app` depends on `wallet` and `nostr` via `workspace:*`; both ship raw TypeScript
 (no build step). `@sovranbitcoin/schemas` remains an external package (shared with
 the web properties) and resolves from GitHub Packages — see [`.npmrc`](.npmrc).
+
+The public site does not need that private package or the native dependency graph.
+Use `bun run site:install`, then `bun run site:build` and `bun run site:test`.
+Its content comes from `copy/`; its confirmed download versions come from live
+per-channel metadata, not `app/app.json`. Source consolidation does not migrate
+artifact hosting: read the [migration boundaries](docs/architecture/site-consolidation.md)
+before switching delivery or retiring the old website repository.
 
 ## Getting started
 

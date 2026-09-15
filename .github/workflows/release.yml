@@ -92,7 +92,7 @@ jobs:
       - name: Verify generated artwork matches the release version
         run: bun run assets:check
       - name: Reject install-time changes to committed artwork
-        run: test -z "$(git status --porcelain --untracked-files=all -- app/assets/brand)"
+        run: test -z "$(git status --porcelain --untracked-files=all -- app/assets/brand press/artwork/generated)"
       - name: Test brand geometry and SVG rendering
         run: bun run assets:test
       - name: Validate native harness contracts
@@ -104,6 +104,9 @@ jobs:
       - run: bun run test
       - run: bun run lint
         working-directory: source/app
+      # Active releases can still pin a source SHA from before the copy workspace.
+      - name: Check claims when declared by the immutable release source
+        run: node -e 'const {scripts}=require("./package.json"); if (scripts["copy:lint"]) require("node:child_process").execFileSync("bun", ["run", "copy:lint"], {stdio:"inherit"})'
       - run: bun run pretty:check
         working-directory: source/app
       - run: bunx --no-install knip

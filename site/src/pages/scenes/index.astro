@@ -1,0 +1,23 @@
+---
+import PhoneScene from '../../components/PhoneScene.astro';
+import { SCENE_PRESETS } from '../../../../scripts/lib/phone-frame.mjs';
+import { defaultScreenshots } from '../../lib/phoneGeometry';
+import '../../styles/site.css';
+---
+<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="robots" content="noindex" /><title>Sovran phone scenes</title></head>
+  <body><main class="scene-gallery">
+    <a href="/">Sovran</a>
+    <h1>Phone scenes</h1>
+    <p>Choose a composition, then choose your screens. Every preset uses the same continuous-corner device model.</p>
+    <nav aria-label="Scene presets">
+      <a href="/scenes/custom">Custom / 1-N phones</a>
+      {Object.entries(SCENE_PRESETS).map(([key, preset]) => <a href={`#${key}`}>{preset.name}</a>)}
+    </nav>
+    {Object.entries(SCENE_PRESETS).map(([key, preset]) => <section id={key}>
+      <h2><a href={`/scenes/${key}`}>{preset.name}</a></h2>
+      <PhoneScene id={`gallery-${key}`} preset={key} screenshots={defaultScreenshots.slice(0, preset.poses.length)} />
+    </section>)}
+  </main></body>
+</html>

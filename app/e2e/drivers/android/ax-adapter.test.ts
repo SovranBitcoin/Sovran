@@ -154,3 +154,32 @@ describe('Android modal duplicate selection', () => {
     ).toBe(foreground);
   });
 });
+
+describe('merged probe content-desc', () => {
+  const xml = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" content-desc="" enabled="true" bounds="[0,0][1080,2400]">
+    <node index="0" text="" resource-id="wallet-wallpaper-image:none" class="android.view.View" content-desc="Wallpaper image none for navy, none" enabled="true" bounds="[0,0][1,1]" />
+    <node index="1" text="" resource-id="wallet-wallpaper:colors" class="android.view.View" content-desc="Active wallpaper album colors, colors" enabled="true" bounds="[0,0][1,1]" />
+    <node index="2" text="" resource-id="filter-mint-https://mint.minibits.cash/Bitcoin" class="android.view.ViewGroup" content-desc="Minibits, 1" checkable="true" checked="true" enabled="true" bounds="[40,1000][500,1080]" />
+    <node index="3" text="" resource-id="note-row:abc" class="android.view.ViewGroup" content-desc="Coffee, tea and cake" enabled="true" bounds="[40,1100][500,1180]" />
+  </node>
+</hierarchy>`;
+  const snap = parseUiautomatorXml(xml);
+
+  it('splits a probe label from the value its testID already names, matching iOS', () => {
+    const image = findElement(snap, { label: 'Wallpaper image none for navy' });
+    expect(image?.id).toBe('wallet-wallpaper-image:none');
+    expect(image?.value).toBe('none');
+    const album = findElement(snap, { id: 'wallet-wallpaper:colors' });
+    expect(album?.label).toBe('Active wallpaper album colors');
+    expect(album?.value).toBe('colors');
+  });
+
+  it('leaves labels whose trailing text is not the testID suffix untouched', () => {
+    expect(findElement(snap, { id: 'filter-mint-https://mint.minibits.cash/Bitcoin' })?.label).toBe(
+      'Minibits, 1'
+    );
+    expect(findElement(snap, { id: 'note-row:abc' })?.label).toBe('Coffee, tea and cake');
+  });
+});

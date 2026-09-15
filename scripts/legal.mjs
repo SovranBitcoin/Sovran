@@ -1,42 +1,33 @@
-import { createHash } from "node:crypto";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
+import { assertMatchingLegalDocuments } from "../release/legal.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const source = JSON.parse(
-  await readFile(resolve(root, "app/shared/lib/legal/documents.json"), "utf8"),
-);
-const revisions = Object.fromEntries(
-  ["terms", "privacy"].map((id) => [
-    id,
-    createHash("sha256")
-      .update(
-        JSON.stringify({
-          operator: source.operator,
-          document: source[id],
-          publicationReady: source.publicationReady,
-        }),
-      )
-      .digest("hex"),
-  ]),
-);
-const generated = JSON.stringify({ ...source, revisions }, null, 2) + "\n";
-const siteFile = resolve(root, "../sovran.money/public/legal/documents.json");
+const bytes = await readFile(resolve(root, "copy/legal/documents.json"));
+const source = JSON.parse(bytes.toString("utf8"));
+const site = resolve(root, "site");
 const mode = process.argv[2];
 if (mode === "--sync-site") {
-  await mkdir(resolve(root, "../sovran.money/public/legal"), {
-    recursive: true,
-  });
-  await writeFile(siteFile, generated);
-  console.log(
-    "Updated sovran.money/public/legal/documents.json from the app legal documents. Review and commit both repos.",
-  );
+  execFileSync("bun", ["run", "build"], { cwd: site, stdio: "inherit" });
+  console.log("Built site/dist from local sources. Nothing was published.");
 } else if (mode === "--check-site") {
-  if ((await readFile(siteFile, "utf8")) !== generated)
-    throw new Error("Website legal documents differ. Run bun run legal:sync.");
-  console.log("App and website legal documents match.");
+  if (!bytes.equals(await readFile(resolve(site, "dist/legal/documents.json"))))
+    throw new Error(
+      "Local website legal documents differ. Run bun run legal:sync.",
+    );
+  execFileSync(
+    "bun",
+    ["test", "tests/build.test.ts", "--test-name-pattern", "legal"],
+    {
+      cwd: site,
+      stdio: "inherit",
+    },
+  );
+  console.log("Canonical legal bytes and local website legal HTML match.");
 } else if (mode === "--publication-check") {
+  assertMatchingLegalDocuments(source, source);
   if (
     !source.publicationReady ||
     JSON.stringify(source).includes("Awaiting confirmation") ||

@@ -14,6 +14,7 @@ import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import type { MediaType } from './types';
 import { Log } from '@/shared/lib/logger';
+import { useMediaSource } from './MediaSourceContext';
 
 /**
  * Inner video page: owns the player instance. Mounted only for near-active
@@ -60,6 +61,7 @@ function MediaPageAnimated({
   expandedHeightSv,
   containerWidthSv,
   containerHeightSv,
+  onImageLoad,
 }: {
   url: string;
   mediaType: MediaType;
@@ -71,6 +73,8 @@ function MediaPageAnimated({
   pagerIndex?: number;
   expandedWidthSv: SharedValue<number>;
   expandedHeightSv: SharedValue<number>;
+  /** Reports the original URL once the full-size image has decoded. */
+  onImageLoad?: (url: string) => void;
   /** When set (e.g. single-media dismiss), size the view to the container so it shrinks with the animation instead of relying on scale transform. */
   containerWidthSv?: SharedValue<number>;
   containerHeightSv?: SharedValue<number>;
@@ -93,6 +97,10 @@ function MediaPageAnimated({
     };
   });
 
+  // Presentation-only local copy (demo content); the original URL stays the identity.
+  const mediaSource = useMediaSource();
+  const localSource = mediaSource?.sources[url];
+
   if (mediaType === 'video') {
     const isNearActive = Math.abs((pagerIndex ?? index) - activeIndex) <= 1;
     return (
@@ -108,10 +116,11 @@ function MediaPageAnimated({
     <Log name="MediaPageAnimated">
       <Animated.View style={animatedStyle} pointerEvents="none">
         <Image
-          source={{ uri: url, isAnimated: /\.(gif|webp)(\?.*)?$/i.test(url) }}
+          source={localSource ?? { uri: url, isAnimated: /\.(gif|webp)(\?.*)?$/i.test(url) }}
           style={StyleSheet.absoluteFill}
           contentFit="contain"
           cachePolicy="disk"
+          onLoad={() => onImageLoad?.(url)}
         />
       </Animated.View>
     </Log>

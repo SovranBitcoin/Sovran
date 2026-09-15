@@ -1,0 +1,35 @@
+---
+import Page from '../layouts/Page.astro';
+import Downloads from '../components/Downloads.astro';
+import PhoneScene from '../components/PhoneScene.astro';
+import { siteCopy } from '../../../copy/src/site';
+---
+<Page>
+  <section id="hero" class="hero">
+    <div class="hero-grid wrap">
+      <div class="hero-copy"><h1>{siteCopy.hero.title}</h1><div class="hero-actions"><a class="button" href="#download">{siteCopy.hero.action}</a><a class="button secondary" href="https://github.com/SovranBitcoin/Sovran" rel="noreferrer">View the code</a></div></div>
+      <PhoneScene scene="hero" />
+    </div>
+  </section>
+  <section class="manifesto wrap" aria-label="From the cypherpunk manifesto">
+    <blockquote><p>{siteCopy.manifesto.text}</p><cite><a href={siteCopy.manifesto.href} rel="noreferrer">{siteCopy.manifesto.cite}</a></cite></blockquote>
+  </section>
+  <section class="supporters" aria-label="Organizations supporting Sovran"><div class="wrap supporter-row">
+    <span class="kicker">Supported by</span><a class="supporter" href="https://opensats.org/blog/twelfth-wave-of-bitcoin-grants#sovran" rel="noreferrer"><img src="/supporters/opensats.png" width="28" height="28" alt="" /><span><strong>OpenSats</strong><small>Grant awarded July 8, 2025</small></span></a><a href="/roadmap">View our roadmap</a>
+  </div></section>
+  <section id="features" class="statement section"><div class="wrap">
+    <div class="statement-row"><p class="kicker">The problem</p><h2>{siteCopy.statement.problem}</h2></div>
+    <div class="statement-row"><p class="kicker">The solution</p><h2>{siteCopy.statement.solution}</h2></div>
+  </div></section>
+  {siteCopy.benefits.map((benefit, index) => <section id={benefit.id} class="product-section section"><div class:list={['feature-grid', 'wrap', { reverse: index % 2 === 1 }]}>
+    <article class="feature-copy"><p class="kicker">{benefit.eyebrow}</p><h2>{benefit.title}</h2><p class="lede">{benefit.text}</p><ul>{benefit.points.map(point => <li>{point}</li>)}</ul><p class="feature-note">{benefit.note}</p></article>
+    <PhoneScene scene={benefit.id} />
+  </div></section>)}
+  <section id="stack" class="stack section"><div class="stack-pattern" aria-hidden="true">{[...siteCopy.stack.items, ...siteCopy.stack.items].filter(item => item.logo).map(item => <img src={`/stack/${item.logo}-greyscale.png`} alt="" width="90" height="90" />)}</div><div class="wrap">
+    <div class="section-head"><p class="kicker">Open by design</p><h2>{siteCopy.stack.title}</h2><p class="lede">{siteCopy.stack.text}</p></div>
+    <ul class="stack-list">{siteCopy.stack.items.map(item => <li><strong>{item.name}</strong><span>{item.role}</span></li>)}</ul>
+    <a class="stack-source" href="https://github.com/SovranBitcoin/Sovran" rel="noreferrer">Explore the source and licenses</a>
+  </div></section>
+  <section id="faq" class="faq section"><div class="wrap"><p class="kicker">FAQ</p><h2>Plain answers.</h2><div class="faq-list">{siteCopy.faq.map(item => <details><summary>{item.question}</summary><p>{item.answer}</p>{'links' in item && item.links.map(link => <p><a href={link.href}>{link.label}</a></p>)}</details>)}</div></div></section>
+  <section id="download" class="download-section section"><div class="wrap"><Downloads /><aside class="download-risk"><h3>Start small.</h3><p>{siteCopy.risk}</p><a href="/terms">Understand the risks</a></aside></div></section>
+</Page>

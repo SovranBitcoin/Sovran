@@ -1,0 +1,1068 @@
+{
+  "android/ai": {
+    "context": "ai",
+    "page": "ai",
+    "file": "source/screenshots/android/ai.png",
+    "run": "run-2026-09-15T17-06-40-715Z-b6eb40f2",
+    "sha256": "2fd26499a228624c65447363afbc4b3a5be0fd9a4589572cedfe82b8b5f8fed6",
+    "capturedAt": "2026-09-15T17:06:40.716Z",
+    "nativeBuild": {
+      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "appVersion": "0.1.3",
+      "buildNumber": "2",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T15:43:24.983Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "android/contacts": {
+    "context": "contacts",
+    "page": "contacts",
+    "file": "source/screenshots/android/contacts.png",
+    "run": "run-2026-09-15T17-06-40-715Z-b6eb40f2",
+    "sha256": "1984e3750ceed7a44096c6d12fd1bed084f31573f338962915730fa04e6be910",
+    "capturedAt": "2026-09-15T17:06:40.716Z",
+    "nativeBuild": {
+      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "appVersion": "0.1.3",
+      "buildNumber": "2",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T15:43:24.983Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "android/lightning-receive": {
+    "context": "lightning-receive",
+    "page": "lightning-receive",
+    "file": "source/screenshots/android/lightning-receive.png",
+    "run": "run-2026-09-15T17-06-40-715Z-b6eb40f2",
+    "sha256": "bd83635d25bd5d51e011f434bf80552eccf27418c87d0a69577697e3125879ec",
+    "capturedAt": "2026-09-15T17:06:40.716Z",
+    "nativeBuild": {
+      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "appVersion": "0.1.3",
+      "buildNumber": "2",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T15:43:24.983Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "android/wallet": {
+    "context": "wallet",
+    "page": "wallet",
+    "file": "source/screenshots/android/wallet.png",
+    "run": "run-2026-09-15T17-06-40-715Z-b6eb40f2",
+    "sha256": "74e3610374002d09d10efce071fa900c4a1ceb6a1cdc547ee781930f2ac762a4",
+    "capturedAt": "2026-09-15T17:06:40.716Z",
+    "nativeBuild": {
+      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "appVersion": "0.1.3",
+      "buildNumber": "2",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T15:43:24.983Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/ai": {
+    "context": "ai",
+    "page": "ai",
+    "file": "source/screenshots/ios/ai.png",
+    "run": "run-2026-09-15T16-06-18-394Z-a91429d3",
+    "sha256": "9111da4191de2d6e5e2114e1e0d376ee684ee199e30813d23f4d3d8d27c660d1",
+    "capturedAt": "2026-09-15T16:06:18.395Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/contacts": {
+    "context": "contacts",
+    "page": "contacts",
+    "file": "source/screenshots/ios/contacts.png",
+    "run": "run-2026-09-15T16-06-18-394Z-a91429d3",
+    "sha256": "baa17058121cddbfcafb996d336f56bec4444fad6d1dedc0e08d882c35e84b1c",
+    "capturedAt": "2026-09-15T16:06:18.395Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/lightning-receive": {
+    "context": "lightning-receive",
+    "page": "lightning-receive",
+    "file": "source/screenshots/ios/lightning-receive.png",
+    "run": "run-2026-09-15T16-06-18-394Z-a91429d3",
+    "sha256": "090bc726ebf175631406df4a99feb7c498f89797db91b4e243ce96c7c8438f89",
+    "capturedAt": "2026-09-15T16:06:18.395Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/wallet": {
+    "context": "wallet",
+    "page": "wallet",
+    "file": "source/screenshots/ios/wallet.png",
+    "run": "run-2026-09-15T16-06-18-394Z-a91429d3",
+    "sha256": "27363210ff0839070c2c23c108d346224a837e07fd974c1b4ec263e89f6e3cf6",
+    "capturedAt": "2026-09-15T16:06:18.395Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/feed": {
+    "context": "feed",
+    "page": "feed",
+    "file": "source/screenshots/ios/feed.png",
+    "run": "run-2026-09-15T16-14-15-917Z-8d7ffd6f",
+    "sha256": "2c9c420850c119192a0eea656d3a9661465a5d7e20c51feab3d3609dc3d7e19c",
+    "capturedAt": "2026-09-15T16:14:15.918Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/thread": {
+    "context": "thread",
+    "page": "thread",
+    "file": "source/screenshots/ios/thread.png",
+    "run": "run-2026-09-15T16-34-58-978Z-41ab936b",
+    "sha256": "0211ba25e87eb4c383868b5195324e75135ee7e62791264945d9f04a541b4f8e",
+    "capturedAt": "2026-09-15T16:34:58.980Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/dm-chat": {
+    "context": "dm-chat",
+    "page": "dm-chat",
+    "file": "source/screenshots/ios/dm-chat.png",
+    "run": "run-2026-09-15T16-14-15-917Z-8d7ffd6f",
+    "sha256": "21f40f706a3cc1f412e902a5b9a630beffea15a643555c682d39326f0584873d",
+    "capturedAt": "2026-09-15T16:14:15.918Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/receive-qr": {
+    "context": "receive-qr",
+    "page": "receive-qr",
+    "file": "source/screenshots/ios/receive-qr.png",
+    "run": "run-2026-09-15T16-14-15-917Z-8d7ffd6f",
+    "sha256": "725f424cd6e80f10d787409c78ba9cd77783d5939b9652e108279a2e9745dd7c",
+    "capturedAt": "2026-09-15T16:14:15.918Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/send": {
+    "context": "send",
+    "page": "send",
+    "file": "source/screenshots/ios/send.png",
+    "run": "run-2026-09-15T16-14-15-917Z-8d7ffd6f",
+    "sha256": "4732b3e02939475eb05a82d66e4d8791633d8bd5d43f31cc9e2aad935297d648",
+    "capturedAt": "2026-09-15T16:14:15.918Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/mint-select": {
+    "context": "mint-select",
+    "page": "mint-select",
+    "file": "source/screenshots/ios/mint-select.png",
+    "run": "run-2026-09-15T16-14-15-917Z-8d7ffd6f",
+    "sha256": "e8e941e06988df8fa01c172d27848db43cf37745521d916408840aae2bbae7f6",
+    "capturedAt": "2026-09-15T16:14:15.918Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/mint-info": {
+    "context": "mint-info",
+    "page": "mint-info",
+    "file": "source/screenshots/ios/mint-info.png",
+    "run": "run-2026-09-15T16-14-15-917Z-8d7ffd6f",
+    "sha256": "e765f8d61aa70cc0e5612082d176895f5f16f82cc050c54782beeae0ac80b762",
+    "capturedAt": "2026-09-15T16:14:15.918Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/notification-mint-changes": {
+    "context": "notification-mint-changes",
+    "page": "notification-mint-changes",
+    "file": "source/screenshots/ios/notification-mint-changes.png",
+    "run": "run-2026-09-15T16-29-59-654Z-af98ae9d",
+    "sha256": "17a87d658bf18569b6e6da053e3eb5f140c53724285e627221b900e538e2f0ac",
+    "capturedAt": "2026-09-15T16:29:59.655Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/mint-reviews": {
+    "context": "mint-reviews",
+    "page": "mint-reviews",
+    "file": "source/screenshots/ios/mint-reviews.png",
+    "run": "run-2026-09-15T16-29-59-654Z-af98ae9d",
+    "sha256": "c05068d0282fb9c00a7c226f46edc9f3cbaed41a662524096ca57a43fe0f6037",
+    "capturedAt": "2026-09-15T16:29:59.655Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/notifications": {
+    "context": "notifications",
+    "page": "notifications",
+    "file": "source/screenshots/ios/notifications.png",
+    "run": "run-2026-09-15T16-14-15-917Z-8d7ffd6f",
+    "sha256": "900be6c06fbd6fe30c4888af02eb35712e178f01bfeeae559ad5a8122a097ed6",
+    "capturedAt": "2026-09-15T16:14:15.918Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/settings": {
+    "context": "settings",
+    "page": "settings",
+    "file": "source/screenshots/ios/settings.png",
+    "run": "run-2026-09-15T16-14-15-917Z-8d7ffd6f",
+    "sha256": "e8a1c48e59f950d30e46e99261263b02f1b20ac1e9da402f943b05483919aa6f",
+    "capturedAt": "2026-09-15T16:14:15.918Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/theme-preview": {
+    "context": "theme-preview",
+    "page": "theme-preview",
+    "file": "source/screenshots/ios/theme-preview.png",
+    "run": "run-2026-09-15T16-22-22-711Z-c3f3d277",
+    "sha256": "770d7813a37b9e07b0c85c096e21f14eb051299df271c5f9288ef1beb6811aa5",
+    "capturedAt": "2026-09-15T16:22:22.712Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/gallery": {
+    "context": "gallery",
+    "page": "gallery",
+    "file": "source/screenshots/ios/gallery.png",
+    "run": "run-2026-09-15T16-22-22-711Z-c3f3d277",
+    "sha256": "83d399920956e30ac9cc4dcb4b89859afaa8b065c2c848159235d6c46fe074ef",
+    "capturedAt": "2026-09-15T16:22:22.712Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/stories": {
+    "context": "stories",
+    "page": "stories",
+    "file": "source/screenshots/ios/stories.png",
+    "run": "run-2026-09-15T16-34-58-978Z-41ab936b",
+    "sha256": "b696243dcb90ce5ed803cba9e6d0135562c3b61e0b4f65c12d369a18dd17c8b0",
+    "capturedAt": "2026-09-15T16:34:58.980Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/image-viewer": {
+    "context": "image-viewer",
+    "page": "image-viewer",
+    "file": "source/screenshots/ios/image-viewer.png",
+    "run": "run-2026-09-15T16-34-58-978Z-41ab936b",
+    "sha256": "fa999da1f5c4ce888e2c6cfcad786458b613d1024eb1dde759ba4396ca541e2b",
+    "capturedAt": "2026-09-15T16:34:58.980Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/ai-model-picker": {
+    "context": "ai-model-picker",
+    "page": "ai",
+    "file": "source/screenshots/ios/ai-model-picker.png",
+    "run": "run-2026-09-15T16-14-15-917Z-8d7ffd6f",
+    "sha256": "a7310d67fa68d2935e749e9a28cfad7356bcf4e45c1d4eed0dee5884e8b8a52e",
+    "capturedAt": "2026-09-15T16:14:15.918Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/wallet-navy": {
+    "context": "wallet-appearance",
+    "page": "wallet",
+    "file": "source/screenshots/ios/wallet-navy.png",
+    "wallpaperId": "navy",
+    "run": "run-2026-09-15T16-22-22-711Z-c3f3d277",
+    "sha256": "8d97351ebc8ce0a436a7da2626a0b4dbd529f6aac0ab54d7733e776b6e41b876",
+    "capturedAt": "2026-09-15T16:22:22.712Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/wallet-sunset": {
+    "context": "wallet-appearance",
+    "page": "wallet",
+    "file": "source/screenshots/ios/wallet-sunset.png",
+    "wallpaperId": "sunset",
+    "run": "run-2026-09-15T16-22-22-711Z-c3f3d277",
+    "sha256": "e1e1d2d0d483e60c0feb6bd7df1f1af88bec0433814c9f1e922e6addf4807b6e",
+    "capturedAt": "2026-09-15T16:22:22.712Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/wallet-beige": {
+    "context": "wallet-appearance",
+    "page": "wallet",
+    "file": "source/screenshots/ios/wallet-beige.png",
+    "wallpaperId": "beige",
+    "run": "run-2026-09-15T16-22-22-711Z-c3f3d277",
+    "sha256": "d51ebaa92edfe8fcc6ae8e5d7a3a902d99ed5f6b1ce958899d7dfeaf0a5c8f35",
+    "capturedAt": "2026-09-15T16:22:22.712Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "android/feed": {
+    "context": "feed",
+    "page": "feed",
+    "file": "source/screenshots/android/feed.png",
+    "run": "run-2026-09-15T17-21-23-742Z-552fa03d",
+    "sha256": "36d422e7144766d587c21bfbfe8d0bc4c89c4e19a96cf3f448b8820390766c52",
+    "capturedAt": "2026-09-15T17:21:23.744Z",
+    "nativeBuild": {
+      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "appVersion": "0.1.3",
+      "buildNumber": "2",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T15:43:24.983Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "android/thread": {
+    "context": "thread",
+    "page": "thread",
+    "file": "source/screenshots/android/thread.png",
+    "run": null,
+    "sha256": null
+  },
+  "android/dm-chat": {
+    "context": "dm-chat",
+    "page": "dm-chat",
+    "file": "source/screenshots/android/dm-chat.png",
+    "run": "run-2026-09-15T17-21-23-742Z-552fa03d",
+    "sha256": "1a87c472f052ee8a1d760a4ff7bed11a054c38900a826a296cd260d8927cb496",
+    "capturedAt": "2026-09-15T17:21:23.744Z",
+    "nativeBuild": {
+      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "appVersion": "0.1.3",
+      "buildNumber": "2",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T15:43:24.983Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "android/receive-qr": {
+    "context": "receive-qr",
+    "page": "receive-qr",
+    "file": "source/screenshots/android/receive-qr.png",
+    "run": "run-2026-09-15T17-21-23-742Z-552fa03d",
+    "sha256": "5b69f14a14ac13891593b0ff9c9b9ae6e53101d60a02b8e22ff03eeb94343500",
+    "capturedAt": "2026-09-15T17:21:23.744Z",
+    "nativeBuild": {
+      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "appVersion": "0.1.3",
+      "buildNumber": "2",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T15:43:24.983Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "android/send": {
+    "context": "send",
+    "page": "send",
+    "file": "source/screenshots/android/send.png",
+    "run": "run-2026-09-15T17-21-23-742Z-552fa03d",
+    "sha256": "ecd5d1555daa5af678fffdd73f362505a0cee80d39cbfcf99b4c5de6202730da",
+    "capturedAt": "2026-09-15T17:21:23.744Z",
+    "nativeBuild": {
+      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "appVersion": "0.1.3",
+      "buildNumber": "2",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T15:43:24.983Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "android/mint-select": {
+    "context": "mint-select",
+    "page": "mint-select",
+    "file": "source/screenshots/android/mint-select.png",
+    "run": "run-2026-09-15T17-21-23-742Z-552fa03d",
+    "sha256": "4d02ade162596567ffd8eb81674cb69976d1d15cccd39a25784e6402d8748ed9",
+    "capturedAt": "2026-09-15T17:21:23.744Z",
+    "nativeBuild": {
+      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "appVersion": "0.1.3",
+      "buildNumber": "2",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T15:43:24.983Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "android/mint-info": {
+    "context": "mint-info",
+    "page": "mint-info",
+    "file": "source/screenshots/android/mint-info.png",
+    "run": "run-2026-09-15T17-21-23-742Z-552fa03d",
+    "sha256": "5d8569313b9babfcad2df351da90aa34a43254636e4c09332e809a72e187430b",
+    "capturedAt": "2026-09-15T17:21:23.744Z",
+    "nativeBuild": {
+      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "appVersion": "0.1.3",
+      "buildNumber": "2",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T15:43:24.983Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "android/notification-mint-changes": {
+    "context": "notification-mint-changes",
+    "page": "notification-mint-changes",
+    "file": "source/screenshots/android/notification-mint-changes.png",
+    "run": "run-2026-09-15T18-29-08-326Z-ab264017",
+    "sha256": "edb09a590e1790cb51fc973e9f36e2d38bfdc1a8356edcbab831b224f7128228",
+    "capturedAt": "2026-09-15T18:29:08.328Z",
+    "nativeBuild": {
+      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "appVersion": "0.1.3",
+      "buildNumber": "2",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T15:43:24.983Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "android/mint-reviews": {
+    "context": "mint-reviews",
+    "page": "mint-reviews",
+    "file": "source/screenshots/android/mint-reviews.png",
+    "run": "run-2026-09-15T18-29-08-326Z-ab264017",
+    "sha256": "715cb8899082543c9f1404345f83386bd984bc43024bcab80a76b153b6c6bc2c",
+    "capturedAt": "2026-09-15T18:29:08.328Z",
+    "nativeBuild": {
+      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "appVersion": "0.1.3",
+      "buildNumber": "2",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T15:43:24.983Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "android/notifications": {
+    "context": "notifications",
+    "page": "notifications",
+    "file": "source/screenshots/android/notifications.png",
+    "run": "run-2026-09-15T17-21-23-742Z-552fa03d",
+    "sha256": "e366b965b6d9c47e3c76928a077d96821d89fdc7ff473b727aead83cc50f84d3",
+    "capturedAt": "2026-09-15T17:21:23.744Z",
+    "nativeBuild": {
+      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "appVersion": "0.1.3",
+      "buildNumber": "2",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T15:43:24.983Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "android/settings": {
+    "context": "settings",
+    "page": "settings",
+    "file": "source/screenshots/android/settings.png",
+    "run": "run-2026-09-15T17-21-23-742Z-552fa03d",
+    "sha256": "e0498223d9b9edc35658941c4345d8174703b474e3c0c3b4d8db286b344ad004",
+    "capturedAt": "2026-09-15T17:21:23.744Z",
+    "nativeBuild": {
+      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "appVersion": "0.1.3",
+      "buildNumber": "2",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T15:43:24.983Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "android/theme-preview": {
+    "context": "theme-preview",
+    "page": "theme-preview",
+    "file": "source/screenshots/android/theme-preview.png",
+    "run": null,
+    "sha256": null,
+    "lastRefreshFailure": {
+      "at": "2026-09-15T16:06:13.560Z",
+      "reason": "T15 waitFor \"Wallpaper image none for navy\" failed (run-2026-09-15T18-11-05-478Z-ba466658)"
+    }
+  },
+  "android/gallery": {
+    "context": "gallery",
+    "page": "gallery",
+    "file": "source/screenshots/android/gallery.png",
+    "run": null,
+    "sha256": null,
+    "lastRefreshFailure": {
+      "at": "2026-09-15T16:06:13.560Z",
+      "reason": "T15 waitFor \"Wallpaper image none for navy\" failed (run-2026-09-15T18-11-05-478Z-ba466658)"
+    }
+  },
+  "android/stories": {
+    "context": "stories",
+    "page": "stories",
+    "file": "source/screenshots/android/stories.png",
+    "run": null,
+    "sha256": null
+  },
+  "android/image-viewer": {
+    "context": "image-viewer",
+    "page": "image-viewer",
+    "file": "source/screenshots/android/image-viewer.png",
+    "run": null,
+    "sha256": null
+  },
+  "android/ai-model-picker": {
+    "context": "ai-model-picker",
+    "page": "ai",
+    "file": "source/screenshots/android/ai-model-picker.png",
+    "run": "run-2026-09-15T17-21-23-742Z-552fa03d",
+    "sha256": "56a5010cfa001f4ce82daeb43ae103912ee0d28f2f570a5515d43426ed5d8817",
+    "capturedAt": "2026-09-15T17:21:23.744Z",
+    "nativeBuild": {
+      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "appVersion": "0.1.3",
+      "buildNumber": "2",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T15:43:24.983Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "android/wallet-navy": {
+    "context": "wallet-appearance",
+    "page": "wallet",
+    "file": "source/screenshots/android/wallet-navy.png",
+    "run": null,
+    "sha256": null,
+    "wallpaperId": "navy",
+    "lastRefreshFailure": {
+      "at": "2026-09-15T16:06:13.560Z",
+      "reason": "T15 waitFor \"Wallpaper image none for navy\" failed (run-2026-09-15T18-11-05-478Z-ba466658)"
+    }
+  },
+  "android/wallet-sunset": {
+    "context": "wallet-appearance",
+    "page": "wallet",
+    "file": "source/screenshots/android/wallet-sunset.png",
+    "run": null,
+    "sha256": null,
+    "wallpaperId": "sunset",
+    "lastRefreshFailure": {
+      "at": "2026-09-15T16:06:13.560Z",
+      "reason": "T15 waitFor \"Wallpaper image none for navy\" failed (run-2026-09-15T18-11-05-478Z-ba466658)"
+    }
+  },
+  "android/wallet-beige": {
+    "context": "wallet-appearance",
+    "page": "wallet",
+    "file": "source/screenshots/android/wallet-beige.png",
+    "run": null,
+    "sha256": null,
+    "wallpaperId": "beige",
+    "lastRefreshFailure": {
+      "at": "2026-09-15T16:06:13.560Z",
+      "reason": "T15 waitFor \"Wallpaper image none for navy\" failed (run-2026-09-15T18-11-05-478Z-ba466658)"
+    }
+  },
+  "ios/wallet-in-eclipse": {
+    "context": "wallet-appearance",
+    "page": "wallet",
+    "file": "source/screenshots/ios/wallet-in-eclipse.png",
+    "wallpaperId": "in-eclipse",
+    "run": "run-2026-09-15T16-22-22-711Z-c3f3d277",
+    "sha256": "f767d7b9a00be89a0b04a5f0b1e2122c251fd100f8cb8d603851fe4f1982fea1",
+    "capturedAt": "2026-09-15T16:22:22.712Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/wallet-looking-back-at-earth": {
+    "context": "wallet-appearance",
+    "page": "wallet",
+    "file": "source/screenshots/ios/wallet-looking-back-at-earth.png",
+    "wallpaperId": "looking-back-at-earth",
+    "run": "run-2026-09-15T16-22-22-711Z-c3f3d277",
+    "sha256": "c279419e90c248f4f8077ea01eaa8bb4db76d1d85205baef78cbdc88c594e4ed",
+    "capturedAt": "2026-09-15T16:22:22.712Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/wallet-edge-of-lunar-day": {
+    "context": "wallet-appearance",
+    "page": "wallet",
+    "file": "source/screenshots/ios/wallet-edge-of-lunar-day.png",
+    "wallpaperId": "edge-of-lunar-day",
+    "run": "run-2026-09-15T16-22-22-711Z-c3f3d277",
+    "sha256": "c47f52e6955727e933f2ba71cf6bd8b874a3dd83ea4132bda4996b74ca1648b5",
+    "capturedAt": "2026-09-15T16:22:22.712Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/wallet-setting-earth": {
+    "context": "wallet-appearance",
+    "page": "wallet",
+    "file": "source/screenshots/ios/wallet-setting-earth.png",
+    "wallpaperId": "setting-earth",
+    "run": "run-2026-09-15T16-22-22-711Z-c3f3d277",
+    "sha256": "5904f1bcde2cabdec29103cb0f52e35a8cdb399ca6dc93808b81f9fa0b8a7e93",
+    "capturedAt": "2026-09-15T16:22:22.712Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/backup-words": {
+    "context": "backup-words",
+    "page": "backup-words",
+    "file": "source/screenshots/ios/backup-words.png",
+    "run": "run-2026-09-15T16-39-39-246Z-481f11a0",
+    "sha256": "7d9bb4b4b2f758da001dfe9e1181639519c6535235cf24c8af259ade8879b2ba",
+    "capturedAt": "2026-09-15T16:39:39.248Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "android/wallet-in-eclipse": {
+    "context": "wallet-appearance",
+    "page": "wallet",
+    "file": "source/screenshots/android/wallet-in-eclipse.png",
+    "run": null,
+    "sha256": null,
+    "wallpaperId": "in-eclipse",
+    "lastRefreshFailure": {
+      "at": "2026-09-15T16:06:13.560Z",
+      "reason": "T15 waitFor \"Wallpaper image none for navy\" failed (run-2026-09-15T18-11-05-478Z-ba466658)"
+    }
+  },
+  "android/wallet-looking-back-at-earth": {
+    "context": "wallet-appearance",
+    "page": "wallet",
+    "file": "source/screenshots/android/wallet-looking-back-at-earth.png",
+    "run": null,
+    "sha256": null,
+    "wallpaperId": "looking-back-at-earth",
+    "lastRefreshFailure": {
+      "at": "2026-09-15T16:06:13.560Z",
+      "reason": "T15 waitFor \"Wallpaper image none for navy\" failed (run-2026-09-15T18-11-05-478Z-ba466658)"
+    }
+  },
+  "android/wallet-edge-of-lunar-day": {
+    "context": "wallet-appearance",
+    "page": "wallet",
+    "file": "source/screenshots/android/wallet-edge-of-lunar-day.png",
+    "run": null,
+    "sha256": null,
+    "wallpaperId": "edge-of-lunar-day",
+    "lastRefreshFailure": {
+      "at": "2026-09-15T16:06:13.560Z",
+      "reason": "T15 waitFor \"Wallpaper image none for navy\" failed (run-2026-09-15T18-11-05-478Z-ba466658)"
+    }
+  },
+  "android/wallet-setting-earth": {
+    "context": "wallet-appearance",
+    "page": "wallet",
+    "file": "source/screenshots/android/wallet-setting-earth.png",
+    "run": null,
+    "sha256": null,
+    "wallpaperId": "setting-earth",
+    "lastRefreshFailure": {
+      "at": "2026-09-15T16:06:13.560Z",
+      "reason": "T15 waitFor \"Wallpaper image none for navy\" failed (run-2026-09-15T18-11-05-478Z-ba466658)"
+    }
+  },
+  "android/backup-words": {
+    "context": "backup-words",
+    "page": "backup-words",
+    "file": "source/screenshots/android/backup-words.png",
+    "run": null,
+    "sha256": null
+  },
+  "ios/wallet-new-moon": {
+    "context": "wallet-appearance",
+    "page": "wallet",
+    "file": "source/screenshots/ios/wallet-new-moon.png",
+    "wallpaperId": "new-moon",
+    "run": "run-2026-09-15T16-22-22-711Z-c3f3d277",
+    "sha256": "373edd3e944188c520aee5497898d90bcdb8d2f4dedaf85eb723961b8396b5d6",
+    "capturedAt": "2026-09-15T16:22:22.712Z",
+    "nativeBuild": {
+      "fingerprint": "a0a685143006b95ac339368a5387c581ff76fd01",
+      "appVersion": "0.1.3",
+      "buildNumber": "1",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "builtAt": "2026-09-15T03:38:56.463Z"
+    },
+    "appSource": {
+      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
+      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "gitDirty": true
+    }
+  },
+  "ios/settings-keyring": {
+    "context": "settings-keyring",
+    "page": "settings-keyring",
+    "file": "source/screenshots/ios/settings-keyring.png",
+    "run": null,
+    "sha256": null,
+    "availability": "unavailable",
+    "unavailableReason": "Planned post-generation capture; no reviewed native image retained.",
+    "lastRefreshFailure": {
+      "at": "2026-09-15T16:06:13.560Z",
+      "reason": "T09 waitFor \"YOUR KEYS (1)\" failed (run-2026-09-15T16-46-33-355Z-1e824fa4)"
+    }
+  },
+  "android/settings-keyring": {
+    "context": "settings-keyring",
+    "page": "settings-keyring",
+    "file": "source/screenshots/android/settings-keyring.png",
+    "run": null,
+    "sha256": null,
+    "availability": "unavailable",
+    "unavailableReason": "Planned post-generation capture; no reviewed native image retained."
+  },
+  "ios/receive-qr-p2pk": {
+    "context": "receive-qr-p2pk",
+    "page": "receive-qr",
+    "file": "source/screenshots/ios/receive-qr-p2pk.png",
+    "run": null,
+    "sha256": null,
+    "availability": "unavailable",
+    "unavailableReason": "Planned Cashu tab capture with P2PK enabled; the retained Unified QR is not a substitute.",
+    "lastRefreshFailure": {
+      "at": "2026-09-15T16:06:13.560Z",
+      "reason": "T15 tapUntil #receive-onchain-find-mints (≤4) failed (run-2026-09-15T16-52-14-435Z-c5607f29)"
+    }
+  },
+  "android/receive-qr-p2pk": {
+    "context": "receive-qr-p2pk",
+    "page": "receive-qr",
+    "file": "source/screenshots/android/receive-qr-p2pk.png",
+    "run": null,
+    "sha256": null,
+    "availability": "unavailable",
+    "unavailableReason": "Planned Cashu tab capture with P2PK enabled; the retained Unified QR is not a substitute."
+  }
+}

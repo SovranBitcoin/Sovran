@@ -48,7 +48,7 @@ For a substantial new exception, record the affected decision, exact owner/files
 
 **Reviewed skills:** [codebase-design](skills/codebase-design/SKILL.md) for ownership and interface design. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
-**Observed:** the root [package.json](package.json), [wallet/package.json](wallet/package.json), and [nostr/package.json](nostr/package.json) establish four Bun workspaces. `wallet` and `nostr` are private source packages consumed through `workspace:*`. Older references to separate Colada/nagg-ts repositories describe their history, not the current code location.
+**Observed:** the root [package.json](package.json), [wallet/package.json](wallet/package.json), and [nostr/package.json](nostr/package.json) establish five Bun workspaces, including the dependency-free `copy` package. `wallet` and `nostr` are private source packages consumed through `workspace:*`. Older references to separate Colada/nagg-ts repositories describe their history, not the current code location.
 
 ```text
 sovran-app/
@@ -80,6 +80,9 @@ sovran-app/
 ├── wallet/src/              payment machine, operations, copy, React bindings
 ├── nostr/src/               transport, tier strategies, facade, entity cache
 ├── docs/                    VitePress product/developer documentation
+├── copy/                    shared wording, canonical legal text, claims rules
+├── site/                    standalone Astro website, not a Bun workspace
+├── press/                   marketing assets, outside native builds
 └── release/                 release tooling under development in this snapshot
 ```
 
@@ -271,6 +274,8 @@ Use a toast for brief nonblocking feedback, inline state for a recoverable local
 **Follow-up:** [ClaimUsernameScreen](app/features/onboarding/screens/ClaimUsernameScreen.tsx#L348) and [SettingsScreen](app/features/settings/screens/SettingsScreen.tsx#L236) still place raw exception messages in native alerts. [Colada provider](app/features/send/providers/Colada.tsx#L571) has a string-only deep-link failure popup. Trace each source and route it through the appropriate catalog; do not classify every `.message` access as a UI leak, since many are diagnostics.
 
 ## 9. Localization and text-length contracts
+
+Claim truth and qualifications belong in [CLAIMS.md](CLAIMS.md); this section owns localization mechanics.
 
 **Reviewed skills:** [sovran-app-copy](skills/sovran-app-copy/SKILL.md) for translation and truncation contracts. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
@@ -822,6 +827,13 @@ The install hook regenerates before Expo prebuild; EAS and release checks reject
 stale artwork. Commit source and generated output together so regeneration does
 not dirty the release checkout. See [the brand guide](app/assets/brand/README.md).
 
+The website mark and the logo inside its download QR are generated from the same
+`symbol.svg` by `scripts/site-brand.mjs`. `site:brand` updates them;
+`site:brand:check` runs before site builds. The QR's existing encoding is retained.
+This web-only generator is not part of native installation. The root license is
+MPL-2.0; the MIT notice for the third-party continuous-corner construction must
+remain, and does not describe the project's license.
+
 **Measured asset-budget update (2026-09-11):** the requested offline demo PNGs
 add 14,893,736 bundled bytes; standardized branding/other assets add 22,997 bytes.
 Linux release exports total 16,708,149 bytes on iOS and 17,670,455 on Android.
@@ -844,12 +856,14 @@ allowed. Recheck/remove this exception when the source, sizing recipe or rendere
 changes. Both platform checks passed with this bounded exception.
 
 **Unified marketing artwork:** [the pipeline](scripts/artwork.mjs) and
-[artwork guide](marketing/artwork/README.md) replace both former marketing trees.
-`marketing/artwork/source/layouts.json` describes eight named layouts; concepts,
+[artwork guide](press/artwork/README.md) replace both former marketing trees.
+`press/artwork/source/layouts.json` describes eight named layouts; concepts,
 copy choices, capture provenance and per-aspect selection are data alongside it.
 Every applicable concept/layout renders wide **2048×1000**, tall **1080×1920** and
-square **1080×1080**. Commit selected PNGs and labelled contact sheets (1500 px
-wide); full variants remain ignored. All six general layouts apply to every
+square **1080×1080**. Commit selected PNGs with their manifest; full variants
+remain ignored. The local site's `/dev` gallery permanently replaces contact-sheet
+collages: do not generate or retain collage PNGs or their manifest records.
+All six general layouts apply to every
 concept; repeat its retained capture when a composition needs more phone slots.
 Only portal (matched wallpaper) and pack (distinct album wallpapers) can be n/a.
 Absent captures produce labelled drafts. Keep full native capture bytes, status bar and home
@@ -871,15 +885,37 @@ wallpaper; outside is blurred/darkened. Never fabricate captures or color-key UI
 The supplied panorama size exception (two 2048×1024, eleven 3840×1920) is recorded
 in the guide and source provenance, without altering supplied bytes.
 
-`assets:generate`/`assets:check` run this single pipeline with explicit
-`--allow-missing` while captures remain incomplete; checks rerender all committed
-outputs rather than skipping the family. Strict `scripts/artwork.mjs --check`
-fails on missing sources. Both EAS ignores and the marketing import guard keep
-artwork out of builds. Follow-up: orchestrator captures for Artemis, thread,
-stories and X1 backup; reviewed portal masks; human layout/copy review; remove
-the draft allowance once complete. Screenshot scenario names remain canonical
-`wallet`; the guide maps occurrences to wallpaper-specific retained keys because
-this task does not expand the harness screenshot schema.
+`assets:generate`/`assets:check` now operate on runtime assets only. Promotional
+artwork has explicit `assets:artwork` and `assets:artwork:check` commands that fail
+on missing inputs. Only `assets:artwork:drafts` opts into labelled placeholders;
+these are not publishable images. Existing drafts remain historical artifacts.
+Both EAS ignores and the marketing import guard keep artwork out of builds.
+
+The Astro `/dev` workbench displays existing artwork as a lazy thumbnail grid,
+current by default with Needs review and All views, plus search, family and status
+filters. Native freshness is one catalog-level caveat, not a per-image status. Dev/preview-only `local-artwork.mjs`
+serves allowlisted generated PNGs through opaque IDs, never arbitrary local paths
+or raw native run directories. It verifies render hashes independently of capture
+freshness, deduplicates identical bytes, and labels historical/draft/stale images.
+It also links `/screenshots`, `/mockups`, and the orientation atlas `/scenes`.
+`screenshot-context.json` owns reviewed caption, state, purpose,
+flow, related pages and curated collections; the capture plan/importer preserves
+these alongside provenance. Missing inputs are capture requests, never substitute
+images. `press:variants` plans curated one-to-four-phone scenes using shared
+orthographic geometry; `--export` renders authentic retained pixels to exact
+canvases with source hashes. It does not prove native freshness. Front, mirrored,
+diagonal, row, stepped and grid arrangements share the landing page renderer.
+Screenshot freshness is app-source bound: promoted captures record an `appSource`
+fingerprint (`scripts/lib/app-source.mjs`); `screenshots:status --strict`, `/screenshots`
+and the `/dev` gallery flag any capture taken from different app source.
+Scenes normalize native Pro and Pro Max models to one presentation chassis height;
+native calibration is unchanged. Rows/grids use measured gaps and aligned baselines.
+Known-stale or unavailable capture registrations are excluded from both scene and
+poster generation, even when the old PNG and hash still match. A completed capture
+candidate is not a promoted asset; preserve native host/source identity and review.
+Future capture work includes P2PK key settings and the locked receive QR, thread,
+stories, backup and missing wallpapers/masks. Keep canonical E2E page names and
+use context/occurrence for state differences rather than inventing page names.
 
 **Scope and exceptions:** this is a project convention, not a platform-mandated
 folder layout. Native resource tools own their generated names. Keep upstream
@@ -943,6 +979,15 @@ The BitChat scripts intentionally patch iOS vendor input and copy selected Andro
 **Observed:** root [package.json](package.json) pins Bun 1.3.5, workspaces, singleton overrides, and patches. App [package.json](app/package.json) owns platform commands. [Metro](app/metro.config.js), [Babel](app/babel.config.js), [TypeScript](app/tsconfig.json), [Android TypeScript](app/tsconfig.android.json), [ESLint](app/eslint.config.js), [app.json](app/app.json), [app.config.js](app/app.config.js), and [eas.json](app/eas.json) have distinct responsibilities.
 
 **Decision:** install at the workspace root with Bun and one committed `bun.lock`. Declare a dependency in the package that imports it. Overrides are documented compatibility/singleton constraints, not a way to hide unsatisfied peer contracts.
+
+**Standalone site exception (2026-09-14):** `site/` uses its own frozen lock and
+isolated installer so it cannot pull the native graph or private registry into a
+public web build. Root Knip excludes that standalone project; site tests/build
+run in the dedicated website workflow. `copy/` remains an app build input; `site/`
+and `press/` do not. Brand sources stay in `app/assets/brand` because EAS install
+hooks require them. See [consolidation boundaries](docs/architecture/site-consolidation.md).
+Local native projects are disposable; `bun run prebuild` refreshes their sources,
+but a subsequent successful native build is required before claiming fresh captures.
 
 Metro/Babel/TS resolution must agree. Keep `@/` aliases, platform suffixes, workspace subpaths, singleton identities, Uniwind resolution, and worklet transforms aligned. Do not add a second explicit Reanimated/worklets transform when the Expo preset already supplies it. The separate Android type pass is required because the main config resolves iOS variants.
 
@@ -1231,6 +1276,8 @@ For changed native/config/patch/import behavior, include both Metro platform bun
 Budgets and suppression files are records of known exceptions. Changes to them require a concrete reason and evidence; increasing a threshold is not a performance fix. Add mechanical checks for new conventions when they are reliable: e.g. translation completeness/parameter parity, vendor provenance, and locked CI. Review qualitative rules such as good abstraction boundaries rather than pretending a grep can decide them.
 
 ## 27. Naming, terminology, and display derivation
+
+Use [CLAIMS.md](CLAIMS.md) for public claims and trust qualifications; naming alone does not establish a capability.
 
 **Reviewed skills:** [domain-modeling](skills/domain-modeling/SKILL.md) for domain vocabulary; [codebase-design](skills/codebase-design/SKILL.md) for interface naming. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 

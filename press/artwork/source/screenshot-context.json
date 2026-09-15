@@ -1,0 +1,711 @@
+{
+  "version": 1,
+  "contexts": {
+    "wallet": {
+      "page": "wallet",
+      "caption": "Your wallet at a glance",
+      "alt": "Sovran wallet with balance, transaction history, and Send and Receive controls.",
+      "purpose": "Introduce the wallet home and its payment entry points.",
+      "state": "Wallet overview; store captures use presentation fixtures, not proof of real funds.",
+      "flow": {
+        "id": "wallet",
+        "position": "entry",
+        "from": [],
+        "to": [
+          "send",
+          "receive",
+          "mint-select"
+        ]
+      },
+      "concepts": [
+        "cashu",
+        "balance",
+        "payments"
+      ],
+      "relatedPages": [
+        "send",
+        "receive-qr",
+        "mint-select"
+      ]
+    },
+    "contacts": {
+      "page": "contacts",
+      "caption": "People and mints in one place",
+      "alt": "Sovran contacts list with people and mint entries.",
+      "purpose": "Show where to find a contact before opening a conversation.",
+      "state": "Contacts overview with presentation data.",
+      "flow": {
+        "id": "messaging",
+        "position": "selection",
+        "from": [
+          "drawer"
+        ],
+        "to": [
+          "dm-chat"
+        ]
+      },
+      "concepts": [
+        "contacts",
+        "nostr",
+        "mints"
+      ],
+      "relatedPages": [
+        "dm-chat",
+        "feed"
+      ]
+    },
+    "ai": {
+      "page": "ai",
+      "caption": "Chat with an AI model",
+      "alt": "Sovran AI chat screen with conversation and model controls.",
+      "purpose": "Introduce AI chat without claiming a paid inference completed.",
+      "state": "Presentation conversation, not payment or service availability evidence.",
+      "flow": {
+        "id": "ai-chat",
+        "position": "conversation",
+        "from": [
+          "drawer"
+        ],
+        "to": [
+          "ai"
+        ]
+      },
+      "concepts": [
+        "ai",
+        "routstr"
+      ],
+      "relatedPages": [
+        "wallet"
+      ]
+    },
+    "ai-model-picker": {
+      "page": "ai",
+      "caption": "Choose a model for your chat",
+      "alt": "Model selection menu open over Sovran AI chat.",
+      "purpose": "Pair model choice with the chat screen.",
+      "state": "Model-picker overlay open; this is not a separate canonical page.",
+      "flow": {
+        "id": "ai-chat",
+        "position": "model-selection",
+        "from": [
+          "ai"
+        ],
+        "to": [
+          "ai"
+        ]
+      },
+      "concepts": [
+        "ai",
+        "model-selection",
+        "routstr"
+      ],
+      "relatedPages": [
+        "ai"
+      ]
+    },
+    "lightning-receive": {
+      "page": "lightning-receive",
+      "caption": "Present a Lightning invoice",
+      "alt": "Lightning receive screen displaying an invoice QR code.",
+      "purpose": "Show an amount-specific invoice, distinct from the standing receive QR.",
+      "state": "Presentation mint quote reopened from transaction history; a screenshot does not establish payment settlement.",
+      "flow": {
+        "id": "lightning-receive",
+        "position": "invoice-history",
+        "from": [
+          "transactions"
+        ],
+        "to": [
+          "wallet"
+        ]
+      },
+      "concepts": [
+        "lightning",
+        "invoice",
+        "receive"
+      ],
+      "relatedPages": [
+        "receive-qr",
+        "wallet"
+      ]
+    },
+    "receive-qr": {
+      "page": "receive-qr",
+      "caption": "Share a standing receive code",
+      "alt": "Unified tab of the Sovran receive QR screen.",
+      "purpose": "Show the Unified receive surface, not a confirmed P2PK-locked request.",
+      "state": "Unified tab selected; included methods depend on configured mints and receive settings.",
+      "flow": {
+        "id": "receive",
+        "position": "share-request",
+        "from": [
+          "wallet",
+          "receive"
+        ],
+        "to": [
+          "wallet"
+        ]
+      },
+      "concepts": [
+        "receive",
+        "qr",
+        "unified"
+      ],
+      "relatedPages": [
+        "lightning-receive",
+        "settings-keyring"
+      ]
+    },
+    "receive-qr-p2pk": {
+      "page": "receive-qr",
+      "caption": "Request ecash locked to your key",
+      "alt": "Cashu receive QR screen with the P2PK lock option enabled.",
+      "purpose": "Pair a receiving key with the Cashu payment-request lock control.",
+      "state": "Cashu tab after receive-creq-p2pk-state:1 is visible; the request asks for a P2PK lock, not proof of payment or settlement.",
+      "flow": {
+        "id": "p2pk-receive",
+        "position": "lock-request",
+        "from": [
+          "wallet",
+          "receive"
+        ],
+        "to": [
+          "wallet"
+        ]
+      },
+      "concepts": [
+        "cashu",
+        "p2pk",
+        "nut-11",
+        "nut-18",
+        "payment-request"
+      ],
+      "relatedPages": [
+        "settings-keyring",
+        "receive-qr"
+      ]
+    },
+    "settings-keyring": {
+      "page": "settings-keyring",
+      "caption": "Manage your receiving keys",
+      "alt": "P2PK Keys settings showing two keys after generating an additional key.",
+      "purpose": "Explain key management alongside a key-locked Cashu receive request.",
+      "state": "After YOUR KEYS (2); the scenario first waits for YOUR KEYS (1), then generates an additional key.",
+      "flow": {
+        "id": "p2pk-receive",
+        "position": "key-management",
+        "from": [
+          "settings"
+        ],
+        "to": [
+          "settings",
+          "wallet"
+        ]
+      },
+      "concepts": [
+        "cashu",
+        "p2pk",
+        "nut-11",
+        "receiving-keys"
+      ],
+      "relatedPages": [
+        "settings",
+        "receive-qr"
+      ]
+    },
+    "send": {
+      "page": "send",
+      "caption": "Choose how to send",
+      "alt": "Sovran Send menu with payment method choices.",
+      "purpose": "Show the entry to a payment, before an amount or confirmation.",
+      "state": "Send method hub open; no payment has been submitted.",
+      "flow": {
+        "id": "send",
+        "position": "method-selection",
+        "from": [
+          "wallet"
+        ],
+        "to": [
+          "send-amount",
+          "camera"
+        ]
+      },
+      "concepts": [
+        "send",
+        "payments",
+        "cashu",
+        "lightning"
+      ],
+      "relatedPages": [
+        "wallet",
+        "receive-qr"
+      ]
+    },
+    "mint-select": {
+      "page": "mint-select",
+      "caption": "Choose a mint",
+      "alt": "Mint selector listing the wallet's mints.",
+      "purpose": "Introduce mint choice before inspecting trust and capabilities.",
+      "state": "Mint selection list open from the wallet.",
+      "flow": {
+        "id": "mint-trust",
+        "position": "selection",
+        "from": [
+          "wallet"
+        ],
+        "to": [
+          "mint-info"
+        ]
+      },
+      "concepts": [
+        "mints",
+        "custody",
+        "trust"
+      ],
+      "relatedPages": [
+        "mint-info",
+        "mint-reviews",
+        "wallet"
+      ]
+    },
+    "mint-info": {
+      "page": "mint-info",
+      "caption": "Inspect a mint before using it",
+      "alt": "Mint information screen with details about the selected mint.",
+      "purpose": "Support an informed mint choice, not imply a safety guarantee.",
+      "state": "Selected mint details open.",
+      "flow": {
+        "id": "mint-trust",
+        "position": "inspection",
+        "from": [
+          "mint-select"
+        ],
+        "to": [
+          "mint-reviews",
+          "wallet"
+        ]
+      },
+      "concepts": [
+        "mints",
+        "custody",
+        "trust"
+      ],
+      "relatedPages": [
+        "mint-select",
+        "mint-reviews",
+        "notification-mint-changes"
+      ]
+    },
+    "mint-reviews": {
+      "page": "mint-reviews",
+      "caption": "Read community mint reviews",
+      "alt": "Community reviews for a mint in Sovran.",
+      "purpose": "Place community feedback alongside mint details.",
+      "state": "Reviews list; content depends on the selected mint and available network data.",
+      "flow": {
+        "id": "mint-trust",
+        "position": "community-review",
+        "from": [
+          "mint-info"
+        ],
+        "to": [
+          "mint-info"
+        ]
+      },
+      "concepts": [
+        "mints",
+        "reviews",
+        "nostr"
+      ],
+      "relatedPages": [
+        "mint-info",
+        "notification-mint-changes"
+      ]
+    },
+    "notification-mint-changes": {
+      "page": "notification-mint-changes",
+      "caption": "Follow changes to your mints",
+      "alt": "Mint change notifications in Sovran.",
+      "purpose": "Show ongoing mint awareness after choosing a mint.",
+      "state": "Mint updates list; not evidence that a mint is safe or solvent.",
+      "flow": {
+        "id": "mint-trust",
+        "position": "monitoring",
+        "from": [
+          "notifications"
+        ],
+        "to": [
+          "mint-info"
+        ]
+      },
+      "concepts": [
+        "mints",
+        "notifications",
+        "trust"
+      ],
+      "relatedPages": [
+        "notifications",
+        "mint-info",
+        "mint-reviews"
+      ]
+    },
+    "notifications": {
+      "page": "notifications",
+      "caption": "Catch up on activity",
+      "alt": "Sovran notifications screen with activity entries.",
+      "purpose": "Introduce the activity inbox.",
+      "state": "Notifications overview in the marketing presentation flow.",
+      "flow": {
+        "id": "social",
+        "position": "activity",
+        "from": [
+          "drawer"
+        ],
+        "to": [
+          "thread",
+          "notification-mint-changes"
+        ]
+      },
+      "concepts": [
+        "nostr",
+        "notifications"
+      ],
+      "relatedPages": [
+        "feed",
+        "thread",
+        "notification-mint-changes"
+      ]
+    },
+    "feed": {
+      "page": "feed",
+      "caption": "Explore your Nostr feed",
+      "alt": "Sovran social feed displaying Nostr posts.",
+      "purpose": "Show the social reading surface before opening a thread.",
+      "state": "Presentation feed; no publishing is performed by the capture flow.",
+      "flow": {
+        "id": "social",
+        "position": "browsing",
+        "from": [
+          "drawer"
+        ],
+        "to": [
+          "thread",
+          "stories"
+        ]
+      },
+      "concepts": [
+        "nostr",
+        "posts",
+        "social"
+      ],
+      "relatedPages": [
+        "thread",
+        "stories",
+        "notifications"
+      ]
+    },
+    "thread": {
+      "page": "thread",
+      "caption": "Follow the conversation",
+      "alt": "Nostr post thread with replies in Sovran.",
+      "purpose": "Pair the feed with a focused discussion.",
+      "state": "Thread reader; render only when a reviewed capture is available.",
+      "flow": {
+        "id": "social",
+        "position": "discussion",
+        "from": [
+          "feed"
+        ],
+        "to": [
+          "feed"
+        ]
+      },
+      "concepts": [
+        "nostr",
+        "posts",
+        "replies"
+      ],
+      "relatedPages": [
+        "feed",
+        "notifications"
+      ]
+    },
+    "dm-chat": {
+      "page": "dm-chat",
+      "caption": "Open a direct conversation",
+      "alt": "Direct-message conversation in Sovran.",
+      "purpose": "Connect the contacts list to one-to-one messaging.",
+      "state": "Presentation conversation; no message is sent by the capture flow.",
+      "flow": {
+        "id": "messaging",
+        "position": "conversation",
+        "from": [
+          "contacts"
+        ],
+        "to": [
+          "contacts",
+          "wallet"
+        ]
+      },
+      "concepts": [
+        "nostr",
+        "direct-messages",
+        "contacts"
+      ],
+      "relatedPages": [
+        "contacts",
+        "feed"
+      ]
+    },
+    "stories": {
+      "page": "stories",
+      "caption": "View a story",
+      "alt": "Story viewer in Sovran.",
+      "purpose": "Show a media-focused companion to the social feed.",
+      "state": "Story viewer; media availability is required for a usable capture.",
+      "flow": {
+        "id": "social",
+        "position": "media",
+        "from": [
+          "feed"
+        ],
+        "to": [
+          "feed"
+        ]
+      },
+      "concepts": [
+        "nostr",
+        "stories",
+        "media"
+      ],
+      "relatedPages": [
+        "feed",
+        "image-viewer"
+      ]
+    },
+    "image-viewer": {
+      "page": "image-viewer",
+      "caption": "See media in detail",
+      "alt": "Full-screen image viewer in Sovran.",
+      "purpose": "Show a post's image full screen, opened from the demo thread.",
+      "state": "Image viewer over the demo thread with the bundled local copy of the post's image; captured after the full-size image loads.",
+      "flow": {
+        "id": "social",
+        "position": "media-detail",
+        "from": [
+          "feed",
+          "thread"
+        ],
+        "to": [
+          "feed",
+          "thread"
+        ]
+      },
+      "concepts": [
+        "media",
+        "images"
+      ],
+      "relatedPages": [
+        "feed",
+        "thread",
+        "stories"
+      ]
+    },
+    "settings": {
+      "page": "settings",
+      "caption": "Make the wallet yours",
+      "alt": "Sovran settings overview.",
+      "purpose": "Introduce preferences and the entry to security key management.",
+      "state": "Settings root, not the P2PK keyring page.",
+      "flow": {
+        "id": "settings",
+        "position": "entry",
+        "from": [
+          "drawer"
+        ],
+        "to": [
+          "settings-keyring",
+          "theme-preview"
+        ]
+      },
+      "concepts": [
+        "settings",
+        "preferences",
+        "security"
+      ],
+      "relatedPages": [
+        "settings-keyring",
+        "theme-preview",
+        "wallet"
+      ]
+    },
+    "theme-preview": {
+      "page": "theme-preview",
+      "caption": "Preview your wallet's appearance",
+      "alt": "Wallpaper preview cards for wallet units in Sovran.",
+      "purpose": "Show where wallpaper customization begins.",
+      "state": "Per-unit wallpaper previews before choosing an album image.",
+      "flow": {
+        "id": "appearance",
+        "position": "preview",
+        "from": [
+          "wallet"
+        ],
+        "to": [
+          "gallery"
+        ]
+      },
+      "concepts": [
+        "themes",
+        "wallpaper",
+        "customization"
+      ],
+      "relatedPages": [
+        "gallery",
+        "wallet"
+      ]
+    },
+    "gallery": {
+      "page": "gallery",
+      "caption": "Choose a wallpaper from an album",
+      "alt": "Wallpaper album gallery in Sovran.",
+      "purpose": "Connect an album selection with the resulting wallet appearance.",
+      "state": "Wallpaper gallery open in the appearance flow.",
+      "flow": {
+        "id": "appearance",
+        "position": "selection",
+        "from": [
+          "theme-preview"
+        ],
+        "to": [
+          "wallet"
+        ]
+      },
+      "concepts": [
+        "themes",
+        "wallpaper",
+        "albums"
+      ],
+      "relatedPages": [
+        "theme-preview",
+        "wallet"
+      ]
+    },
+    "wallet-appearance": {
+      "page": "wallet",
+      "caption": "A wallet with your chosen wallpaper",
+      "alt": "Sovran wallet with a selected color or photographic wallpaper.",
+      "purpose": "Pair wallpaper choice with its applied appearance; wallpaperId identifies the variant.",
+      "state": "Wallet after a wallpaper selection; balance and controls remain wallet content.",
+      "flow": {
+        "id": "appearance",
+        "position": "applied",
+        "from": [
+          "gallery",
+          "theme-preview"
+        ],
+        "to": [
+          "theme-preview"
+        ]
+      },
+      "concepts": [
+        "themes",
+        "wallpaper",
+        "customization"
+      ],
+      "relatedPages": [
+        "theme-preview",
+        "gallery"
+      ]
+    },
+    "backup-words": {
+      "page": "backup-words",
+      "caption": "Back up your wallet carefully",
+      "alt": "Wallet recovery-word backup screen in a disposable test wallet.",
+      "purpose": "Explain the backup step; never publish a real user's recovery words.",
+      "state": "Candidate from a disposable fresh-install wallet. Manual privacy review is mandatory before retention.",
+      "flow": {
+        "id": "backup",
+        "position": "record-words",
+        "from": [
+          "backup-intro"
+        ],
+        "to": [
+          "backup-verify"
+        ]
+      },
+      "concepts": [
+        "backup",
+        "recovery",
+        "security"
+      ],
+      "relatedPages": [
+        "backup-intro",
+        "backup-verify",
+        "wallet"
+      ]
+    }
+  },
+  "collections": [
+    {
+      "id": "wallet-payments",
+      "title": "From wallet to payment",
+      "description": "The wallet overview, send choices, and standing receive code. These are entry and request screens, not settlement proof.",
+      "screenshots": [
+        "ios/wallet",
+        "ios/send",
+        "ios/receive-qr"
+      ]
+    },
+    {
+      "id": "p2pk-receive",
+      "title": "Keys and locked receive requests",
+      "description": "Pair key management with the Cashu request lock control. Both captures are unavailable until a native run is imported and reviewed; this is a conceptual pairing, not one continuous captured session.",
+      "screenshots": [
+        "ios/settings-keyring",
+        "ios/receive-qr-p2pk"
+      ]
+    },
+    {
+      "id": "mint-trust",
+      "title": "Choose and follow a mint",
+      "description": "Mint selection, details, community reviews, and updates help explain the trust decision without guaranteeing a mint's safety.",
+      "screenshots": [
+        "ios/mint-select",
+        "ios/mint-info",
+        "ios/mint-reviews",
+        "ios/notification-mint-changes"
+      ]
+    },
+    {
+      "id": "social-conversations",
+      "title": "People and conversations",
+      "description": "Move from the feed or contacts to a focused conversation. Missing captures remain unavailable.",
+      "screenshots": [
+        "ios/feed",
+        "ios/thread",
+        "ios/contacts",
+        "ios/dm-chat"
+      ]
+    },
+    {
+      "id": "ai-chat",
+      "title": "Choose a model and chat",
+      "description": "Pair the model-picker overlay with the AI conversation surface.",
+      "screenshots": [
+        "ios/ai-model-picker",
+        "ios/ai"
+      ]
+    },
+    {
+      "id": "wallet-appearance",
+      "title": "Choose a look for your wallet",
+      "description": "Preview, browse an album, then see the selected wallpaper on the wallet.",
+      "screenshots": [
+        "ios/theme-preview",
+        "ios/gallery",
+        "ios/wallet-in-eclipse"
+      ]
+    }
+  ]
+}

@@ -12,16 +12,62 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { loadBrandInputs } from "./brand-assets.mjs";
+import { loadFonts, text, brandLockup, hash } from "./lib/marketing-render.mjs";
 import {
-  loadFonts,
-  text,
-  phone,
-  brandLockup,
-  hash,
-} from "./lib/marketing-render.mjs";
+  captureDevice,
+  phoneGeometry,
+  renderPhone,
+} from "./lib/phone-frame.mjs";
+
+export async function phone({
+  screenshot,
+  platform,
+  x,
+  y,
+  width,
+  rotate = 0,
+  index = 0,
+  underlay = "",
+  uiMask,
+}) {
+  const meta = await sharp(screenshot).metadata();
+  let bytes = screenshot;
+  if (uiMask) {
+    const maskMeta = await sharp(uiMask).metadata();
+    assert(
+      maskMeta.width === meta.width && maskMeta.height === meta.height,
+      "UI mask must match the original screenshot size",
+    );
+    const alpha = await sharp(uiMask).removeAlpha().greyscale().toBuffer();
+    bytes = await sharp(await sharp(bytes).removeAlpha().png().toBuffer())
+      .joinChannel(alpha)
+      .png()
+      .toBuffer();
+  }
+  const device = captureDevice(platform, meta.width, meta.height);
+  const scale = width / device.width;
+  const geometry = phoneGeometry(meta.width, meta.height, {
+    platform,
+    x,
+    y,
+    rotateZ: rotate,
+    scale,
+  });
+  return {
+    width,
+    height: (width * meta.height) / meta.width,
+    bezel: device.bezel * scale,
+    frameH: (device.height + 2 * device.bezel) * scale,
+    svg: renderPhone(geometry, {
+      id: `artwork-${index}`,
+      href: `data:image/png;base64,${bytes.toString("base64")}`,
+      underlay,
+    }),
+  };
+}
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-export const FOLDER = join(ROOT, "marketing/artwork");
+export const FOLDER = join(ROOT, "press/artwork");
 export const ASPECTS = {
   wide: [2048, 1000],
   tall: [1080, 1920],
@@ -300,14 +346,14 @@ export async function loadProject() {
   return project;
 }
 // Authenticate originals even when a missing-input draft is requested. No network in rendering.
-export async function loadInputs(project, specs) {
+export async function loadInputs(project, specs, readSource = optional) {
   const missing = new Set(),
     shots = {},
     wallpapers = {},
     wide = {},
     hashes = {};
   const readHashed = async (entry, label) => {
-    const bytes = await optional(sourcePath(entry.file));
+    const bytes = await readSource(sourcePath(entry.file));
     if (!bytes) {
       missing.add(entry.file);
       return null;
@@ -353,6 +399,11 @@ export async function loadInputs(project, specs) {
       if (Object.hasOwn(shots, name)) continue;
       const entry = project.screenshots[name];
       assert(entry, `Missing screenshot registration: ${name}`);
+      if (entry.availability === "unavailable" || entry.freshness === "stale") {
+        missing.add(`${entry.file} (unavailable: ${entry.unavailableReason ?? entry.staleReason ?? "capture requires review"})`);
+        shots[name] = null;
+        continue;
+      }
       const bytes = await readHashed(entry, name);
       if (bytes)
         assert(
@@ -474,12 +525,12 @@ export async function portalCanvas(source, portrait, size, position) {
 }
 const defs = `<defs>
 <radialGradient id="spot"><stop stop-color="#282828"/><stop offset="1" stop-color="#0e0e0e"/></radialGradient>
-<linearGradient id="rim" x2="0" y2="1"><stop stop-color="#fff" stop-opacity=".5"/><stop offset="1" stop-color="#fff" stop-opacity=".02"/></linearGradient>
-<filter id="shadow" x="-40%" y="-30%" width="180%" height="170%"><feGaussianBlur stdDeviation="16"/><feOffset dx="-14" dy="18"/></filter>
 </defs>`;
 export function phoneBounds(p) {
+  // Conservative front/roll envelope: includes the widest supported chassis
+  // and button protrusions, rather than the old 3% circular bezel.
   const r = (p.rotate * Math.PI) / 180,
-    bezel = Math.round(p.width * 0.03);
+    bezel = p.width * 0.046;
   const w = p.width + bezel * 2,
     h = p.height + bezel * 2;
   const width = Math.abs(w * Math.cos(r)) + Math.abs(h * Math.sin(r));
@@ -548,8 +599,12 @@ export function arrange(layout, aspect, size, ratios, copyBottom) {
   } else if (layout.id === "spotlight" || layout.id === "portal") {
     // Side-copy canvases let the phone run off the bottom edge (reference
     // feature graphic); tall keeps the whole phone visible.
-    const bleed = layout.id === "portal" ? 0.92 : aspect === "tall" ? 0.92 : 1.28;
-    const w = Math.min(region.width * 0.72, (region.height / ratios[0]) * bleed);
+    const bleed =
+      layout.id === "portal" ? 0.92 : aspect === "tall" ? 0.92 : 1.28;
+    const w = Math.min(
+      region.width * 0.72,
+      (region.height / ratios[0]) * bleed,
+    );
     add(
       0,
       (region.width - w) / 2,
@@ -578,7 +633,7 @@ export function arrange(layout, aspect, size, ratios, copyBottom) {
     }
   } else if (layout.id === "pack" && aspect === "tall") {
     const rows = Math.ceil(n / 2),
-      gap = unit * 0.045,
+      gap = unit * 0.07,
       cellHeight = (region.height - gap * (rows - 1)) / rows,
       w = Math.min((region.width - gap) / 2, cellHeight / Math.max(...ratios));
     for (let i = 0; i < n; i++) {
@@ -625,7 +680,10 @@ export function arrange(layout, aspect, size, ratios, copyBottom) {
       );
   } else if (layout.id === "closeup") {
     const visible = aspect === "tall" ? 0.6 : 0.55;
-    const w = Math.min(region.width * 0.9, (H - region.y) / (ratios[0] * visible));
+    const w = Math.min(
+      region.width * 0.9,
+      (H - region.y) / (ratios[0] * visible),
+    );
     add(0, (region.width - w) / 2, 0, w);
   }
   let bounds = positions.map(phoneBounds);
@@ -796,7 +854,7 @@ export async function renderArtwork(
     screenshots = [],
     ratios = [];
   const placeholder = await sharp({
-    create: { width: 360, height: 780, channels: 3, background: "#242424" },
+    create: { width: 402, height: 874, channels: 3, background: "#242424" },
   })
     .png()
     .toBuffer();
@@ -822,7 +880,9 @@ export async function renderArtwork(
     centreStrip = null;
   // Wallpaper and palette backgrounds belong to the album layouts only; every
   // other layout keeps the brand spotlight so a concept does not go navy for no reason.
-  const id = ["pack", "portal"].includes(layout.id) ? spec.background.wallpaperId : undefined;
+  const id = ["pack", "portal"].includes(layout.id)
+    ? spec.background.wallpaperId
+    : undefined;
   if (id && inputs.wallpapers[id]) {
     let source = inputs.wallpapers[id];
     if (layout.id === "portal" && aspect !== "tall" && project.wide[id]) {
@@ -865,7 +925,7 @@ export async function renderArtwork(
         inputs.shots[`${spec.platform}/${keys[p.index]}`]?.bytes);
     const underlay =
       portal && complete
-        ? `<g clip-path="url(#screen${p.index})"><g transform="rotate(${-p.rotate} ${p.width / 2} ${p.height / 2}) translate(${-p.x} ${-p.y})"><image width="${W}" height="${H}" href="${uri(wallpaper)}"/></g></g>`
+        ? `<g clip-path="url(#artwork-${p.index}-screen)"><g transform="scale(${captureDevice(spec.platform, p.width, p.height).width / p.width}) rotate(${-p.rotate} ${p.width / 2} ${p.height / 2}) translate(${-p.x} ${-p.y})"><image width="${W}" height="${H}" href="${uri(wallpaper)}"/></g></g>`
         : "";
     stack.push(
       (
@@ -908,98 +968,6 @@ export async function renderArtwork(
     },
   };
 }
-async function contactSheet(spec, variants, statuses, project, context) {
-  const W = 1500,
-    rowHeight = 420,
-    H = 70 + project.layouts.layouts.length * rowHeight;
-  const parts = [
-    `<rect width="${W}" height="${H}" fill="#131313"/>`,
-    text(context.fonts, spec.id, 24, 42, 28, "#fff", "ExtraBold", W - 48),
-  ];
-  for (const [row, layout] of project.layouts.layouts.entries()) {
-    const y = 70 + row * rowHeight;
-    parts.push(
-      text(
-        context.fonts,
-        layout.id,
-        24,
-        y + 24,
-        20,
-        "#fff",
-        "ExtraBold",
-        W - 48,
-      ),
-    );
-    const description = fitLines(
-      context.fonts.Medium,
-      layout.description,
-      W - 48,
-      16,
-    );
-    for (const [i, line] of description.lines.entries())
-      parts.push(
-        text(
-          context.fonts,
-          line,
-          24,
-          y + 49 + i * 20,
-          description.size,
-          "#bcbcbc",
-          "Medium",
-          W - 48,
-        ),
-      );
-    for (const [col, aspect] of Object.keys(ASPECTS).entries()) {
-      const x = col * 500 + 16,
-        v = variants[`${layout.id}/${aspect}`];
-      const label = `${aspect} · ${statuses[layout.id] ? "N/A" : v.record.draft ? "DRAFT" : "rendered"}${project.selection[spec.id][aspect] === layout.id ? " · selected" : ""}`;
-      parts.push(
-        text(context.fonts, label, x + 8, y + 100, 16, "#fff", "Medium", 468),
-      );
-      if (v) {
-        const thumb = await sharp(v.png)
-          .resize(468, 294, { fit: "inside" })
-          .png()
-          .toBuffer();
-        const meta = await sharp(thumb).metadata();
-        parts.push(
-          `<image x="${x + (468 - meta.width) / 2}" y="${y + 112}" width="${meta.width}" height="${meta.height}" href="${uri(thumb)}"/>`,
-        );
-      } else {
-        parts.push(
-          `<rect x="${x}" y="${y + 112}" width="468" height="294" rx="10" fill="#242424"/>`,
-        );
-        const reason = fitLines(
-          context.fonts.Medium,
-          statuses[layout.id],
-          430,
-          18,
-        );
-        for (const [i, line] of reason.lines.entries())
-          parts.push(
-            text(
-              context.fonts,
-              line,
-              x + 18,
-              y + 240 + i * 24,
-              reason.size,
-              "#aaa",
-              "Medium",
-              430,
-            ),
-          );
-      }
-    }
-  }
-  return sharp(
-    Buffer.from(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">${parts.join("")}</svg>`,
-    ),
-  )
-    .removeAlpha()
-    .png({ compressionLevel: 9 })
-    .toBuffer();
-}
 async function outputFiles(folder, prefix = "") {
   const result = [];
   for (const entry of await readdir(folder, { withFileTypes: true })) {
@@ -1011,13 +979,18 @@ async function outputFiles(folder, prefix = "") {
   }
   return result.sort();
 }
-export async function main(args = process.argv.slice(2)) {
+export async function main(
+  args = process.argv.slice(2),
+  { readSource = optional } = {},
+) {
   let check = false,
+    manifestOnly = false,
     allowMissing = false,
     variantsFlag = false,
     only;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--check") check = true;
+    else if (args[i] === "--manifest-only") manifestOnly = true;
     else if (args[i] === "--allow-missing") allowMissing = true;
     else if (args[i] === "--variants") variantsFlag = true;
     else if (args[i] === "--only") {
@@ -1025,16 +998,21 @@ export async function main(args = process.argv.slice(2)) {
       assert(slug.test(only ?? ""), "--only needs an id");
     } else throw new Error(`Unknown argument: ${args[i]}`);
   }
+  assert(
+    !manifestOnly || (!check && !variantsFlag && !only),
+    "--manifest-only requires a full run without --check, --variants or --only",
+  );
   const project = await loadProject();
   const specs = project.specs.filter((s) => !only || s.id === only);
   assert(specs.length, `Unknown concept: ${only}`);
   const featureId = project.selection.featureGraphic;
   const feature = specs.find((s) => s.id === featureId);
   const android = feature ? { ...feature, platform: "android" } : null;
-  const allInputs = await loadInputs(project, [
-    ...specs,
-    ...(android ? [android] : []),
-  ]);
+  const allInputs = await loadInputs(
+    project,
+    [...specs, ...(android ? [android] : [])],
+    readSource,
+  );
   if (allInputs.missing.length && !allowMissing)
     throw new Error(
       `Missing inputs:\n${allInputs.missing.join("\n")}\nUse --allow-missing for labelled drafts.`,
@@ -1047,6 +1025,7 @@ export async function main(args = process.argv.slice(2)) {
   for (const file of [
     "scripts/artwork.mjs",
     "scripts/lib/marketing-render.mjs",
+    "scripts/lib/phone-frame.mjs",
     "scripts/brand-assets.mjs",
     "app/assets/fonts/MonaSans/MonaSans-ExtraBold.ttf",
     "app/assets/fonts/MonaSans/MonaSans-Medium.ttf",
@@ -1066,7 +1045,7 @@ export async function main(args = process.argv.slice(2)) {
     expected = ["manifest.json"];
   const publish = async (file, png, variant = false) => {
     if (!variant) expected.push(file);
-    if (check)
+    if (check || manifestOnly)
       assert(
         (await readFile(join(generated, file))).equals(png),
         `Stale artwork: ${file}`,
@@ -1078,7 +1057,7 @@ export async function main(args = process.argv.slice(2)) {
   };
   try {
     for (const spec of specs) {
-      const inputs = await loadInputs(project, [spec]);
+      const inputs = await loadInputs(project, [spec], readSource);
       const provenance = {
         compositionHash: project.compositions[spec.id],
         copyVersion: project.copy.version,
@@ -1118,29 +1097,12 @@ export async function main(args = process.argv.slice(2)) {
           }
         }
       }
-      const sheet = await contactSheet(
-        spec,
-        variants,
-        statuses,
-        project,
-        context,
-      );
-      const file = `contact-sheets/${spec.id}.png`;
-      await publish(file, sheet);
       manifest.concepts[spec.id] = {
         outputs,
         variants: Object.fromEntries(
           Object.entries(variants).map(([key, v]) => [key, v.record]),
         ),
         layouts: statuses,
-        contactSheet: {
-          ...provenance,
-          file,
-          sha256: hash(sheet),
-          bytes: sheet.length,
-          layouts: layoutIds,
-          copyVersion: project.copy.version,
-        },
       };
       if (check)
         assert.deepEqual(
@@ -1154,7 +1116,11 @@ export async function main(args = process.argv.slice(2)) {
         );
         for (const platform of ["ios", "android"]) {
           const platformSpec = { ...spec, platform };
-          const platformInputs = await loadInputs(project, [platformSpec]);
+          const platformInputs = await loadInputs(
+            project,
+            [platformSpec],
+            readSource,
+          );
           const v =
             platform === spec.platform
               ? variants[`${layout.id}/wide`]
@@ -1205,6 +1171,18 @@ export async function main(args = process.argv.slice(2)) {
     manifest.concepts = Object.fromEntries(
       Object.entries(manifest.concepts).sort(),
     );
+    for (const [file, expectedHash] of Object.entries(project.provenance))
+      assert.equal(
+        hash(await readFile(sourcePath(file))),
+        expectedHash,
+        `Artwork source changed during rendering: ${file}; retry after edits settle`,
+      );
+    for (const [file, expectedHash] of Object.entries(renderer))
+      assert.equal(
+        hash(await readFile(join(ROOT, file))),
+        expectedHash,
+        `Renderer changed during rendering: ${file}; format before regenerating`,
+      );
     if (check) {
       if (feature)
         assert.deepEqual(
@@ -1224,6 +1202,14 @@ export async function main(args = process.argv.slice(2)) {
           "Unexpected generated outputs",
         );
       }
+    } else if (manifestOnly) {
+      assert.deepEqual(
+        await outputFiles(generated),
+        expected.sort(),
+        "Unexpected generated outputs",
+      );
+      // Refresh provenance only after every retained image compares byte-for-byte.
+      await writeFile(manifestPath, json(manifest));
     } else {
       await mkdir(staging, { recursive: true });
       await writeFile(join(staging, "manifest.json"), json(manifest));
@@ -1248,10 +1234,11 @@ export async function main(args = process.argv.slice(2)) {
       await rename(join(staging, "manifest.json"), manifestPath);
     }
   } finally {
-    if (!check) await rm(staging, { recursive: true, force: true });
+    if (!check && !manifestOnly)
+      await rm(staging, { recursive: true, force: true });
   }
   console.log(
-    `${check ? "Verified" : "Generated"} ${specs.length} artwork concepts; ${allInputs.missing.length} missing inputs (labelled drafts${allowMissing ? " allowed" : ""}).`,
+    `${check ? "Verified" : manifestOnly ? "Refreshed manifest for" : "Generated"} ${specs.length} artwork concepts; ${allInputs.missing.length} missing inputs (labelled drafts${allowMissing ? " allowed" : ""}).`,
   );
 }
 if (

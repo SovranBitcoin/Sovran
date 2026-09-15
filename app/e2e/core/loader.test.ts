@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { onboardingCopy, backupIntroCopy } from 'copy/onboarding';
 import { loadE2E } from './loader';
 import { isValuelessTestMint } from '../funded/test-mints';
 import { effectiveRequirements, expandScenario, unsafeCocodEffects } from './plan';
@@ -1821,10 +1822,11 @@ describe('loadE2E over the real tree', () => {
   });
 
   it('retries every onboarding carousel transition until the destination slide is visible', () => {
+    const { cashu, nostr, privacy, start } = onboardingCopy.slides;
     const transitions = [
-      ['Bitcoin that feels like cash', 'Powered by Nostr'],
-      ['Powered by Nostr', 'Private by Design'],
-      ['Private by Design', 'Stay private, stay sovereign'],
+      [cashu.title, nostr.title],
+      [nostr.title, privacy.title],
+      [privacy.title, start.title],
     ] as const;
     const authoredJourneys = [
       ['flow.onboard', loaded.fixtures.get('flow.onboard')!.steps],
@@ -1838,6 +1840,11 @@ describe('loadE2E over the real tree', () => {
     ] as const;
 
     for (const [owner, steps] of authoredJourneys) {
+      expect(steps, owner).toContainEqual({
+        action: 'waitFor',
+        selector: { label: cashu.title },
+        timeoutMs: 60_000,
+      });
       for (const [from, to] of transitions) {
         expect(steps, owner).toContainEqual({
           action: 'tapUntil',
@@ -1849,6 +1856,23 @@ describe('loadE2E over the real tree', () => {
         expect(steps, owner).not.toContainEqual({ action: 'tap', selector: { label: from } });
       }
     }
+  });
+
+  it('proves practice-word mode before capturing the backup screen', () => {
+    const steps = loaded.scenarios.get('backup.flow')!.steps;
+    const disclaimer = steps.findIndex(
+      (step) =>
+        'action' in step &&
+        step.action === 'assert' &&
+        step.that === 'visible' &&
+        'label' in step.selector &&
+        step.selector.label === backupIntroCopy.demo
+    );
+    const screenshot = steps.findIndex(
+      (step) => 'action' in step && step.action === 'screenshot' && step.name === 'backup-words'
+    );
+    expect(disclaimer).toBeGreaterThanOrEqual(0);
+    expect(screenshot).toBeGreaterThan(disclaimer);
   });
 
   it('retries the empty-wallet ecash action until the product exposes its balance stop', () => {

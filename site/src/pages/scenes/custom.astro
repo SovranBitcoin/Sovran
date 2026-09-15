@@ -1,0 +1,157 @@
+---
+import { getImage } from 'astro:assets';
+import Dev from '../../layouts/Dev.astro';
+import { captures } from '../../lib/phoneGeometry';
+import { SCENE_PRESETS, CANVAS_FORMATS } from '../../../../scripts/lib/phone-frame.mjs';
+const catalog = await Promise.all(Object.values(captures).map(async capture => ({
+  key: capture.key, width: capture.width, height: capture.height, alt: capture.alt,
+  src: (await getImage({ src: capture.image, width: 900, format: 'webp' })).src,
+})));
+---
+<Dev title="Custom phone scene">
+  <div class="dev-composer" data-catalog={JSON.stringify(catalog)}>
+    <div class="scene-controls">
+      <h1>Compose a scene</h1>
+      <p>Choose a preset and the screenshot for each phone. The preview URL preserves your choices.</p>
+      <form class="dev-form scene-editor">
+        <label>Preset<select name="preset">
+          {Object.entries(SCENE_PRESETS).map(([key, preset]) => <option value={key}>{preset.name} / {preset.poses.length} phones</option>)}
+          <option value="custom">Custom placement</option>
+        </select></label>
+        <label>Phone count (custom placement)<input name="count" type="number" min="1" max="20" value="1" disabled /></label>
+        <label>Aspect ratio<select name="format">{Object.entries(CANVAS_FORMATS).map(([key, size]) => <option value={key}>{key}{size ? ` / ${size.width} x ${size.height}` : ' / scene bounds'}</option>)}</select></label>
+        <fieldset><legend>Screenshots in order</legend><div class="dev-screen-slots"></div></fieldset>
+        <input type="hidden" name="screenshots" />
+        <p>Only verified, retained iOS captures are selectable. <a href="/screenshots#capture-requests">Review capture requests</a>, including P2PK.</p>
+        <details>
+          <summary>Advanced: optional pose JSON</summary>
+          <label class="dev-field">One pose per screenshot<textarea name="poses" placeholder='[{"x":0,"y":0,"rotateY":-20,"rotateZ":8,"z":0,"scale":1}]'></textarea></label>
+          <p>Use x/y for placement, z for back-to-front order, rotateX/Y for pitch/yaw, rotateZ for whole-device roll, and scale for size. Leave blank to use the preset.</p>
+        </details>
+        <button type="submit">Update preview</button>
+      </form>
+      <p class="dev-error scene-error" role="alert" hidden></p>
+      <p data-scene-status role="status"></p>
+      <p>Orthographic illustrations, not manufacturer renders. Rotation preserves the portrait screen. Every canvas contains the full scene without cropping.</p>
+      <p><a data-share>Share this preview</a></p>
+      <h2>Export</h2>
+      <p>Run from the repository root; replace <code>NAME</code> with your output name.</p>
+      <pre><code data-export-command></code></pre>
+      <p data-export-note></p>
+      <p>Curated bulk variants: <code>bun run press:variants</code>.</p>
+      <noscript><p>Enable JavaScript to compose a scene, or <a href="/scenes">browse the static presets</a>.</p></noscript>
+    </div>
+    <div class="export-scene dev-scene" data-custom-scene data-ready="false"></div>
+  </div>
+</Dev>
+<script>
+  import { createScene, renderPhone, SCENE_PRESETS, CANVAS_FORMATS } from '../../../../scripts/lib/phone-frame.mjs';
+  type Capture = { key: string; width: number; height: number; alt: string; src: string };
+  const root = document.querySelector<HTMLElement>('[data-catalog]')!;
+  const catalog: Capture[] = JSON.parse(root.dataset.catalog!);
+  const form = root.querySelector<HTMLFormElement>('form')!;
+  const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+  const slots = root.querySelector<HTMLElement>('.dev-screen-slots')!;
+  const target = root.querySelector<HTMLElement>('[data-custom-scene]')!;
+  const error = root.querySelector<HTMLElement>('.scene-error')!;
+  const params = new URLSearchParams(location.search);
+  const isExport = params.get('export') === '1';
+  const isEmbed = !isExport && params.get('embed') === '1';
+  if (isExport || isEmbed) document.documentElement.classList.add('dev-export');
+  if (isEmbed) document.documentElement.classList.add('dev-embed');
+  const presetInput = field('preset');
+  const formatInput = field('format');
+  // Preserve invalid URL selections as explicit errors, never silently substitute.
+  for (const name of ['preset', 'format']) {
+    if (!params.has(name)) continue;
+    const select = field(name) as HTMLSelectElement;
+    const value = params.get(name)!;
+    if (![...select.options].some(option => option.value === value)) select.add(new Option(`Unknown: ${value}`, value));
+    select.value = value;
+  }
+  field('poses').value = params.get('poses') ?? '';
+  if (field('poses').value) form.querySelector('details')!.open = true;
+  const setScreens = (keys: string[]) => {
+    slots.replaceChildren();
+    keys.forEach((key, index) => {
+      const label = document.createElement('label'); label.className = 'dev-field';
+      label.append(`Phone ${index + 1}`);
+      const select = document.createElement('select'); select.name = 'screen';
+      catalog.forEach(capture => select.add(new Option(capture.key, capture.key)));
+      if (!catalog.some(capture => capture.key === key)) select.add(new Option(`Capture requested: ${key}`, key));
+      select.value = key;
+      label.append(select); slots.append(label);
+    });
+    field('count').value = String(keys.length);
+    field('count').disabled = presetInput.value !== 'custom';
+  };
+  const keys = () => [...slots.querySelectorAll('select')].map(select => select.value);
+  const resizeScreens = () => {
+    const definition = Object.hasOwn(SCENE_PRESETS, presetInput.value) ? SCENE_PRESETS[presetInput.value] : undefined;
+    const count = presetInput.value === 'custom' ? Number(field('count').value) : definition?.poses.length;
+    if (!Number.isInteger(count) || count < 1 || count > 20) return;
+    const selected = keys().slice(0, count);
+    while (selected.length < count) selected.push(catalog.find(capture => !selected.includes(capture.key))?.key ?? '');
+    setScreens(selected);
+  };
+  const render = () => {
+    target.dataset.ready = 'false';
+    delete document.documentElement.dataset.exportReady;
+    root.querySelector('[data-export-command]')!.textContent = '';
+    root.querySelector('[data-scene-status]')!.textContent = '';
+    root.querySelector('[data-share]')!.removeAttribute('href');
+    try {
+      const selectedKeys = keys();
+      if (!selectedKeys.length || selectedKeys.length > 20) throw new Error('Choose between 1 and 20 phones.');
+      if (presetInput.value === 'custom' && Number(field('count').value) !== selectedKeys.length) throw new Error('Choose a valid custom phone count between 1 and 20.');
+      const selected = selectedKeys.map(key => {
+        const capture = catalog.find(capture => capture.key === key);
+        if (!capture) throw new Error(`Capture requested: ${key}. Import and review the native image first; no substitute is rendered.`);
+        return capture;
+      });
+      const preset = presetInput.value;
+      const format = formatInput.value;
+      if (!Object.hasOwn(CANVAS_FORMATS, format)) throw new Error(`Unknown canvas format: ${format}`);
+      const poses = field('poses').value.trim();
+      const scene = createScene(selected, { preset, poses: poses ? JSON.parse(poses) : undefined });
+      const canvas = CANVAS_FORMATS[format] ?? { width: Math.ceil(scene.width), height: Math.ceil(scene.height) };
+      target.style.setProperty('--canvas-ratio', `${canvas.width} / ${canvas.height}`);
+      target.style.setProperty('--canvas-width', String(canvas.width));
+      target.style.setProperty('--canvas-height', String(canvas.height));
+      if (isExport || isEmbed) {
+        target.style.width = `${canvas.width}px`;
+        target.style.height = `${canvas.height}px`;
+      }
+      target.innerHTML = `<figure class="phone-scene" data-scene="custom"><svg class="phone-stage" xmlns="http://www.w3.org/2000/svg" viewBox="${scene.viewBox}" width="${canvas.width}" height="${canvas.height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Custom Sovran phone scene">${scene.phones.map(phone => renderPhone(phone, { id: `custom-${phone.index}`, href: phone.src, alt: phone.alt })).join('')}</svg></figure>`;
+      const query = new URLSearchParams({ preset, screenshots: selectedKeys.join(','), format });
+      if (poses) query.set('poses', poses);
+      root.querySelector<HTMLAnchorElement>('[data-share]')!.href = `${location.pathname}?${query}`;
+      // Re-serialize validated numeric poses before shell quoting; no input strings
+      // can become shell syntax, and the command reproduces the preview exactly.
+      const poseArgument = poses ? ` --poses '${JSON.stringify(JSON.parse(poses))}'` : '';
+      root.querySelector('[data-export-command]')!.textContent = `bun run --cwd site scripts/visual.mjs --export ../press/exports/NAME --preset ${preset} --screenshots ${selectedKeys.join(',')} --format ${format}${poseArgument}`;
+      root.querySelector('[data-export-note]')!.textContent = poses ? 'The export command includes your custom poses.' : '';
+      if (isExport) query.set('export', '1');
+      if (isEmbed) query.set('embed', '1');
+      history.replaceState(null, '', `${location.pathname}?${query}`);
+      field('screenshots').value = selectedKeys.join(',');
+      root.querySelector('[data-scene-status]')!.textContent = `${selected.length} phones / ${format} / ${canvas.width} x ${canvas.height}`;
+      error.hidden = true;
+      target.dataset.ready = 'true';
+      document.documentElement.dataset.exportReady = 'true';
+    } catch (cause) {
+      error.textContent = cause instanceof Error ? cause.message : String(cause);
+      error.hidden = false;
+      target.replaceChildren();
+      if (isEmbed) { const message = document.createElement('p'); message.textContent = error.textContent; target.append(message); document.documentElement.dataset.exportReady = 'true'; }
+    }
+  };
+  const initialKeys = params.has('screenshots') ? params.get('screenshots')!.split(',').map(key => key.trim()) : ['ios/wallet'];
+  setScreens(initialKeys.slice(0, 21));
+  if (!params.has('screenshots')) resizeScreens();
+  form.addEventListener('change', event => {
+    if (event.target === presetInput || event.target === field('count')) resizeScreens();
+  });
+  form.addEventListener('submit', event => { event.preventDefault(); render(); });
+  render();
+</script>

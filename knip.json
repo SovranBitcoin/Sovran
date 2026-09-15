@@ -1,5 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
+  "ignore": ["site/**"],
   "ignoreIssues": {
     "**/*.android.{ts,tsx}": ["files"],
     "**/*.ios.{ts,tsx}": ["files"],
@@ -42,6 +43,9 @@
     },
     "docs": {
       "project": [".vitepress/**/*.{ts,mts}"]
+    },
+    "copy": {
+      "project": ["src/**/*.ts", "scripts/*.mjs"]
     },
     ".": {
       "entry": ["release/check-inputs.mjs"]

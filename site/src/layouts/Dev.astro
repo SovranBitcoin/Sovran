@@ -1,0 +1,28 @@
+---
+import '../styles/site.css';
+import '../components/phone-scene.css';
+import '../styles/dev.css';
+interface Props { title: string }
+const { title } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{title} - Sovran workbench</title>
+  </head>
+  <body class="dev-body">
+    <a class="skip" href="#workbench">Skip to workbench</a>
+    <header class="dev-header">
+      <nav aria-label="Workbench">
+        {[
+          ['/dev', 'Workbench'], ['/mockups', 'Mockups'], ['/screenshots', 'Screenshots'],
+          ['/scenes/custom', 'Composer'], ['/scenes', 'Orientation atlas'], ['/', 'Public site'],
+        ].map(([href, label]) => <a href={href} aria-current={Astro.url.pathname === href ? 'page' : undefined}>{label}</a>)}
+      </nav>
+    </header>
+    <main id="workbench" class="dev-main"><slot /></main>
+  </body>
+</html>

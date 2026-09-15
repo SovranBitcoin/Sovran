@@ -122,7 +122,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
   - [x] **NIP-17 Private Direct Messages** — `kind 14` rumors sealed and gift-wrapped per NIP-59 (`kind 1059`), encrypted with NIP-44 v2
 - [x] **Relays & search**
   - [x] **NDK Mobile** — relay management via [`@nostr-dev-kit/ndk-mobile`](https://github.com/nostr-dev-kit/ndk-mobile)
-  - [x] **Nostr app-view** — Sovran-owned feed, profile, metrics, thread, notification, and DM-envelope queries served for fast app views. The default deployment is Nagg (self-hostable); the app queries it through the [`@sovranbitcoin/nagg-ts`](https://github.com/SovranBitcoin/nagg-ts) GraphQL client, with optimized REST app-view endpoints used where available (e.g. DM envelopes). nagg is zero-knowledge for DMs — it relays encrypted envelopes and never decrypts.
+  - [x] **Nostr app-view** — Sovran-owned feed, profile, metrics, thread, notification, and DM-envelope queries served for fast app views. The default deployment is Nagg (self-hostable); the app queries it through the [`@sovranbitcoin/nagg-ts`](https://github.com/SovranBitcoin/nagg-ts) GraphQL client, with optimized REST app-view endpoints used where available (e.g. DM envelopes). Nagg forwards encrypted DM envelopes without decrypting their content; routing and connection metadata remain observable.
   - [x] **Vertex** — [Vertex](https://vertexlab.io) trust-ranked Nostr search and follower-graph reputation scores
   - [x] **Vertex credibility on rows** — reputation + followers shown inline on contact search and payment-recipient confirmations
 - [x] **`nostr-tools`** — low-level signing, encoding, NIP utilities

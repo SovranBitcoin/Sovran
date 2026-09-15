@@ -43,6 +43,12 @@ type ResetMode = 'erase' | 'reinstall' | 'none';
  * under the wrong package, and the harness keeps driving whatever stale
  * com.sovranbitcoin.dev build is already on the emulator. */
 export function findInstallableApk(appDir = APP_DIR): string {
+  // A build-stamped APK from `screenshots:refresh` wins; it survives `prebuild --clean`.
+  const pinned = process.env.SOVRAN_E2E_APK_PATH;
+  if (pinned) {
+    if (!existsSync(pinned)) throw new Error(`SOVRAN_E2E_APK_PATH ${pinned} does not exist`);
+    return pinned;
+  }
   const apk = join(appDir, 'android', 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
   if (!existsSync(apk)) {
     throw new Error(

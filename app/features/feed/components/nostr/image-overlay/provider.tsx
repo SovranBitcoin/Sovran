@@ -215,6 +215,8 @@ type ImageOverlayProviderProps = {
     layouts: ImageOverlayReplaceLayout[];
     initialIndex: number;
   } | null;
+  /** Local presentation sources for this surface, carried into the overlay (Android hosts it outside this tree). */
+  mediaSource?: ImageOverlayContextValue['mediaSource'];
 };
 
 export function ImageOverlayProvider({
@@ -223,6 +225,7 @@ export function ImageOverlayProvider({
   getEngagementState,
   onSwipeUpToNextPost,
   getVideoFeedLayoutsAndIndex,
+  mediaSource = null,
 }: ImageOverlayProviderProps) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -285,6 +288,11 @@ export function ImageOverlayProvider({
       thumbnailLayoutsRef.current[key] = layout;
       if (options?.measureNow) thumbnailMeasureNowRef.current[key] = options.measureNow;
     },
+    []
+  );
+
+  const getThumbnailLayout = useCallback(
+    (key: string): ThumbnailLayout | null => thumbnailLayoutsRef.current[key] ?? null,
     []
   );
 
@@ -1083,6 +1091,8 @@ export function ImageOverlayProvider({
       close,
       openToCenter,
       registerThumbnailLayout,
+      getThumbnailLayout,
+      mediaSource,
       setPanelHeight,
       setPanelContentMinHeight,
       startOpenPanelImageAnimation,
@@ -1118,6 +1128,8 @@ export function ImageOverlayProvider({
     close,
     openToCenter,
     registerThumbnailLayout,
+    getThumbnailLayout,
+    mediaSource,
     setPanelHeight,
     setPanelContentMinHeight,
     startOpenPanelImageAnimation,

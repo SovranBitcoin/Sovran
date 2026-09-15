@@ -9,6 +9,7 @@ import { Button } from '@/shared/ui/primitives/Button';
 import { useEffect } from 'react';
 import { useNavigation } from 'expo-router';
 import { useBackupSession } from '../BackupFlowProvider';
+import { backupIntroCopy } from 'copy/onboarding';
 
 export function BackupIntroScreen() {
   const { demo, open } = useBackupSession();
@@ -21,12 +22,12 @@ export function BackupIntroScreen() {
         <BottomButtons>
           <Button
             testID="backup-show-words"
-            text="Show my words"
+            text={backupIntroCopy.showWords}
             onPress={() => router.push('/(prompt-flow)/backup-words')}
           />
           <Button
             testID="backup-not-now"
-            text="Not now"
+            text={backupIntroCopy.notNow}
             variant="secondary"
             onPress={() => {
               if (!demo) useCtaStore.getState().dismiss('backup-recovery-phrase', false);
@@ -40,14 +41,10 @@ export function BackupIntroScreen() {
         <E2EAccessibilityProbe testID="backup-intro" accessibilityLabel="Backup intro" value="1" />
         {demo && (
           <Text testID="backup-demo" size={13} className="text-muted">
-            Mock Mode — practice words only. This does not back up your wallet.
+            {backupIntroCopy.demo}
           </Text>
         )}
-        <Text size={16}>
-          Your wallet has 12 recovery words. They&apos;re the only way to get your money back if you
-          lose this phone. Write them on paper — not a screenshot, not a note. Anyone with the words
-          has your money. They can&apos;t be changed or reset.
-        </Text>
+        <Text size={16}>{backupIntroCopy.description}</Text>
       </View>
     </Screen>
   );

@@ -47,6 +47,9 @@ jobs:
       - name: Release controller and archive tests
         run: bun run test:release
 
+      - name: Claims and copy consistency
+        run: bun run copy:lint
+
       - name: Native harness contracts
         working-directory: ${{ env.APP_DIR }}
         run: |
@@ -57,7 +60,7 @@ jobs:
         run: |
           bun run assets:check
           bun run assets:test
-          test -z "$(git status --porcelain --untracked-files=all -- app/assets/brand marketing/artwork/generated)"
+          test -z "$(git status --porcelain --untracked-files=all -- app/assets/brand press/artwork/generated)"
 
   # Non-blocking signal job: runs `codereview/analyze-structure` and posts
   # the LLM-friendly summary as a sticky PR comment. The signal mirrors

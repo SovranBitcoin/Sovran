@@ -1,0 +1,18 @@
+{
+  "status": "editorially-reviewed-candidate",
+  "language": "en",
+  "publicationReady": false,
+  "note": "Not a store snapshot or publisher input. Channel locale and reviewed-source pinning remain unresolved; availability is not asserted.",
+  "apple": {
+    "name": "Sovran",
+    "subtitle": "Cashu payments and Nostr",
+    "promotionalText": "Manage Cashu ecash, make Lightning payments through supported mints, and connect on Nostr. Mint trust and recovery limits apply.",
+    "keywords": "bitcoin,cashu,ecash,lightning,nostr,wallet",
+    "description": "Sovran combines a Cashu ecash wallet with Nostr social and messaging features. Hold ecash on your device, choose mints, and send or receive using supported payment methods.\n\nThe issuing mint holds the backing funds and must honor redemption. Sovran does not verify mint reserves. Ecash is experimental; use only amounts you can afford to lose. Fees, availability, and features vary by mint, platform, and version.\n\nKeep your recovery words, mint URLs, and separate backups for imported keys. Recovery depends on supported records and reachable mints, and may not recover every balance or message.\n\nSupported Nostr DMs are encrypted for recipients. Services can observe connection and routing metadata; recipients and compromised devices can expose messages. Read the Terms and Privacy Policy before adding funds."
+  },
+  "google": {
+    "title": "Sovran",
+    "shortDescription": "Cashu ecash, Lightning payments through mints, and Nostr in one app.",
+    "fullDescription": "Manage Cashu ecash and connect on Nostr with Sovran. Send and receive through supported mints and payment methods.\n\nYour device holds keys and ecash proofs; the issuing mint holds the backing funds. Redemption depends on that mint. Reserves are not verified by the app. Ecash is experimental, and mint failures or lost data can cause loss. Use only amounts you can afford to lose.\n\nKeep recovery words, mint URLs, and separate imported-key backups. Recovery is limited by available mint records and protocol support. Supported nearby flows can hand off tokens offline, but mint access is needed for redemption and spendability checks.\n\nNostr messaging encrypts supported DMs for recipients, not all metadata or local storage. Features and availability vary by platform and version. Read the Terms and Privacy Policy before use."
+  }
+}

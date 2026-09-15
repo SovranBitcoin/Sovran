@@ -1,0 +1,27 @@
+---
+import { getImage } from 'astro:assets';
+import { renderPhone } from '../../../scripts/lib/phone-frame.mjs';
+import { resolveScene, type pageScenes } from '../lib/phoneGeometry';
+import './phone-scene.css';
+
+interface Props {
+  scene?: keyof typeof pageScenes;
+  preset?: string;
+  screenshots?: string[];
+  poses?: Record<string, number>[];
+  id?: string;
+}
+const { scene, preset, screenshots, poses, id = `scene-${scene ?? preset ?? 'custom'}` } = Astro.props;
+const model = resolveScene({ scene, preset, screenshots, poses });
+const phones = await Promise.all(model.phones.map(async phone => {
+  const image = await getImage({ src: phone.image, width: 900, format: 'webp' });
+  return renderPhone({ ...phone, imageWidth: phone.image.width, imageHeight: phone.image.height }, {
+    id: `${id}-${phone.index}`, href: image.src, alt: phone.alt,
+  });
+}));
+---
+<figure class:list={['phone-scene', `scene-${scene ?? preset ?? 'custom'}`]} data-scene={scene ?? preset ?? 'custom'}>
+  <svg class="phone-stage" viewBox={model.viewBox} width={model.width} height={model.height} xmlns="http://www.w3.org/2000/svg" aria-label="Sovran phone scene">
+    <Fragment set:html={phones.join('')} />
+  </svg>
+</figure>

@@ -1,10 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { Drawer, DrawerContentComponentProps, useDrawerStatus } from 'expo-router/drawer';
-import {
-  GestureHandlerRootView,
-  Pressable as GesturePressable,
-} from 'react-native-gesture-handler';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { useSegments } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -14,6 +11,7 @@ import { isNestedStackAtRoot } from '@/navigation/drawerGesture';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -154,7 +152,10 @@ const MenuButton = React.memo(function MenuButton({
   const foreground = useThemeColor('foreground');
 
   return (
-    <GesturePressable
+    // Core Pressable, not gesture-handler's: its iOS button (RNGH 2.32) clears
+    // testID from the element the accessibility tree exposes, hiding
+    // drawer-menu-* from e2e. The profile switcher above uses the same one.
+    <Pressable
       disabled={isActive}
       onPress={() => onNavigate(route)}
       testID={`drawer-menu-${label.toLowerCase().replace(/\s+/g, '-')}`}
@@ -172,7 +173,7 @@ const MenuButton = React.memo(function MenuButton({
         </Text>
         {RowBadge ? <RowBadge /> : null}
       </HStack>
-    </GesturePressable>
+    </Pressable>
   );
 });
 

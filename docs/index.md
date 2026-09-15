@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: Sovran
-  text: A Bitcoin wallet for Cashu, Lightning, Nostr, and offline payments
-  tagline: Coco wallet state, Nostr identity, NFC and BLE-mesh handoffs, MLS group chat, and AI payments — iOS-first, built with Expo and React Native.
+  text: A Cashu ecash wallet with Lightning and Nostr
+  tagline: Payment flows, social features, and nearby token handoffs. Ecash relies on the issuing mint for backing and redemption; features vary by platform and version.
   actions:
     - theme: brand
       text: Get started
@@ -26,13 +26,13 @@ features:
   - title: Nostr & social
     details: NIP-06 multi-account keys, NIP-17 private DMs, a Nostr feed, Vertex-ranked search, and an app-view served through the in-repo nostr package.
     link: /protocols/nostr
-  - title: Offline payments
-    details: NFC tag read/write and BitChat BLE mesh — private DMs, group chats, geohash rooms, split-bill, and Nut Drop ecash, all with no relay and no internet.
+  - title: Nearby token handoffs
+    details: Supported NFC and BitChat BLE flows can hand off ecash offline. Redemption and spendability checks need the mint; geohash Nostr rooms need network access. Device and protocol support vary.
     link: /offline/nfc-and-bitchat
   - title: AI payments
     details: Routstr fronts OpenAI-compatible LLMs and bills per request in Cashu; the wallet package mints a top-up token from your balance — no separate billing account.
     link: /reference/feature-inventory
-  - title: One repo, three packages
-    details: The app depends on the self-contained wallet and nostr packages via the bun workspace — no inter-package publishing, no version syncing.
+  - title: Source workspace
+    details: The Expo app uses local wallet, nostr, and copy packages through Bun workspaces. Repository code describes implementation, not current store availability or a guarantee of recovery.
     link: /architecture/overview
 ---

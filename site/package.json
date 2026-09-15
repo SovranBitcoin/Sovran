@@ -1,0 +1,17 @@
+{
+  "name": "sovran-site",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "packageManager": "bun@1.3.5",
+  "engines": { "node": ">=22.0.0" },
+  "scripts": {
+    "dev": "astro dev --host 127.0.0.1",
+    "build": "node ../scripts/site-brand.mjs --check && node scripts/verify-inputs.mjs && astro build",
+    "preview": "vite preview --config preview.config.mjs",
+    "test": "bun test tests && node --test scripts/local-artwork.test.mjs",
+    "test:nginx": "bun test tests/nginx.test.ts"
+  },
+  "dependencies": { "astro": "5.18.2" },
+  "devDependencies": { "vite": "6.4.3" }
+}

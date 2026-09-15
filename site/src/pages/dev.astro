@@ -1,0 +1,195 @@
+---
+import Dev from '../layouts/Dev.astro';
+import '../styles/artwork-gallery.css';
+---
+<Dev title="Artwork gallery">
+  <section class="artwork-gallery" aria-labelledby="gallery-title">
+    <div class="gallery-heading">
+      <h1 id="gallery-title">Artwork gallery</h1>
+      <nav aria-label="Public content pages">
+        <a href="/download">Download</a><a href="/releases">Releases</a>
+        <a href="/roadmap">Roadmap</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a>
+      </nav>
+    </div>
+    <form class="gallery-filters" role="search" aria-label="Filter artwork">
+      <label>Search<input id="artwork-search" type="search" placeholder="Title, path, context, diagnostic" /></label>
+      <label>View<select id="artwork-view"><option value="current">Current</option><option value="review">Needs review</option><option value="all">All</option></select></label>
+      <label>Family<select id="artwork-family"><option value="">All families</option></select></label>
+      <label>Status<select id="artwork-status"><option value="">All statuses</option></select></label>
+      <button id="artwork-refresh" type="button">Refresh files</button>
+    </form>
+    <p id="artwork-count" role="status" aria-live="polite">Reading local artwork files...</p>
+    <p id="artwork-unavailable" hidden>The local gallery is unavailable. Run <code>bun run dev</code> or <code>bun run preview</code> from <code>site/</code>, then refresh. Production static hosting does not expose the local catalog or image routes.</p>
+    <p id="artwork-old-server" hidden>This dev server loaded an older gallery module without current flags, so every image is shown. Restart <code>bun run dev</code> from <code>site/</code> to use the Current and Needs review views.</p>
+    <noscript><p>This local gallery needs JavaScript to load its catalog. The artwork files are not bundled into this page.</p></noscript>
+    <div id="artwork-grid" class="gallery-grid" aria-label="Artwork"></div>
+    <details class="gallery-notes">
+      <summary>Status notes and catalog diagnostics</summary>
+      <p>Current means at least one path for the image has a complete render record whose output and input hashes match this checkout. It does not prove a fresh native capture or production approval. No image here verifies native build freshness, so that caveat is stated once here rather than on every thumbnail.</p>
+      <p>Needs review holds images that are not current: drafts with missing inputs, stale renders whose inputs changed, known stale captures, and untracked files. The retained receive QR is a known stale capture; a replacement candidate from a passing run still needs native build verification and promotion. These images stay viewable and downloadable. A capture scope unverified chip marks browser exports without per-image screenshot keys. That is uncertainty, not proof a stale capture appears, so those images stay current.</p>
+      <p>The view is kept in the URL for sharing. Search, family and status filters apply within it. Exact-byte duplicates share one thumbnail; details retain every path and its evidence. Thumbnails load original bytes lazily, without copying or resizing files on disk. Large originals can still take time to load.</p>
+      <pre id="artwork-diagnostics">Waiting for catalog.</pre>
+    </details>
+  </section>
+</Dev>
+
+<script>
+  type Catalog = Awaited<ReturnType<typeof import('../../scripts/local-artwork.mjs').buildArtworkCatalog>>;
+  const search = document.querySelector<HTMLInputElement>('#artwork-search')!;
+  const family = document.querySelector<HTMLSelectElement>('#artwork-family')!;
+  const status = document.querySelector<HTMLSelectElement>('#artwork-status')!;
+  const view = document.querySelector<HTMLSelectElement>('#artwork-view')!;
+  const oldServer = document.querySelector<HTMLParagraphElement>('#artwork-old-server')!;
+  const refresh = document.querySelector<HTMLButtonElement>('#artwork-refresh')!;
+  const grid = document.querySelector<HTMLDivElement>('#artwork-grid')!;
+  const count = document.querySelector<HTMLParagraphElement>('#artwork-count')!;
+  const unavailable = document.querySelector<HTMLParagraphElement>('#artwork-unavailable')!;
+  const diagnostics = document.querySelector<HTMLPreElement>('#artwork-diagnostics')!;
+  let catalog: Catalog;
+  let cards: { element: HTMLElement; item: Catalog['items'][number]; text: string }[] = [];
+  // Only abnormal statuses become chips; a plain current image shows none.
+  const chipLabels: Record<string, string> = {
+    draft: 'draft', 'stale-render': 'stale render', 'stale-known-capture': 'stale capture', 'outdated-capture': 'outdated capture',
+    untracked: 'untracked', 'capture-scope-unverified': 'capture scope unverified',
+  };
+  // Mirrors isCurrentArtwork for chip colour only; item.current decides the view.
+  const reviewStatuses = new Set(['draft', 'stale-render', 'stale-known-capture', 'outdated-capture', 'untracked']);
+  const views = ['current', 'review', 'all'];
+  const requestedView = new URLSearchParams(location.search).get('view') ?? '';
+  view.value = views.includes(requestedView) ? requestedView : 'current';
+  const inView = (item: Catalog['items'][number]) =>
+    view.value === 'all' || (view.value === 'review' ? !item.current : item.current);
+
+  function element<K extends keyof HTMLElementTagNameMap>(tag: K, text?: string, className?: string) {
+    const node = document.createElement(tag);
+    if (text !== undefined) node.textContent = text;
+    if (className) node.className = className;
+    return node;
+  }
+
+  function filter() {
+    let visible = 0, files = 0;
+    const query = search.value.trim().toLowerCase();
+    for (const card of cards) {
+      const show = inView(card.item) && (!query || card.text.includes(query)) &&
+        (!family.value || card.item.families.includes(family.value)) &&
+        (!status.value || card.item.statuses.includes(status.value));
+      card.element.hidden = !show;
+      if (show) { visible++; files += card.item.aliases.length; }
+    }
+    const review = catalog.items.filter((item) => !item.current).length;
+    const label = view.value === 'all' ? '' : view.value === 'review' ? 'needing review ' : 'current ';
+    count.textContent = `${visible} ${label}images shown (of ${catalog.uniqueCount} unique; ${review} need review; ${files} of ${catalog.fileCount} file paths).${visible ? '' : ' No matching artwork.'}`;
+  }
+
+  function syncView() {
+    options(status, catalog.items.filter(inView).flatMap((item) => item.statuses), 'All statuses');
+    const query = new URLSearchParams(location.search);
+    if (view.disabled) { filter(); return; }
+    if (view.value === 'current') query.delete('view'); else query.set('view', view.value);
+    const suffix = query.toString();
+    history.replaceState(null, '', `${location.pathname}${suffix ? `?${suffix}` : ''}`);
+    filter();
+  }
+
+  function options(select: HTMLSelectElement, values: string[], label: string) {
+    const selected = select.value;
+    const all = element('option', label);
+    all.value = '';
+    select.replaceChildren(all, ...[...new Set(values)].sort().map((value) => {
+      const option = element('option', value);
+      option.value = value;
+      return option;
+    }));
+    select.value = values.includes(selected) ? selected : '';
+  }
+
+  async function load() {
+    refresh.disabled = true;
+    count.textContent = 'Reading local artwork files...';
+    unavailable.hidden = true;
+    try {
+      const response = await fetch('/__artwork/catalog', {
+        credentials: 'omit', cache: 'no-store', redirect: 'error', referrerPolicy: 'no-referrer',
+      });
+      if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw new Error('Catalog unavailable');
+      const data = await response.json();
+      if (data.schemaVersion !== 1 || !Array.isArray(data.items)) throw new Error('Unknown catalog');
+      catalog = data;
+      // A dev server started before `current` existed must not render an empty grid.
+      const legacy = catalog.items.some((item) => typeof item.current !== 'boolean');
+      oldServer.hidden = !legacy;
+      view.disabled = legacy;
+      if (legacy) view.value = 'all';
+      cards = catalog.items.map((item) => {
+        if (!/^[a-f0-9]{64}$/.test(item.id)) throw new Error('Invalid image ID');
+        // Construct links only from validated opaque IDs, never metadata URLs.
+        const url = `/__artwork/image/${item.id}`;
+        const alias = item.aliases[0];
+        const article = element('article', undefined, 'gallery-item');
+        const link = element('a', undefined, 'gallery-thumbnail');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.setAttribute('aria-label', `Open ${alias.title} original PNG`);
+        const image = element('img');
+        image.alt = alias.title;
+        image.loading = 'lazy';
+        image.decoding = 'async';
+        image.width = item.width;
+        image.height = item.height;
+        image.referrerPolicy = 'no-referrer';
+        image.src = url;
+        image.addEventListener('error', () => {
+          link.replaceChildren(element('span', 'Image unavailable. Refresh files to rescan.'));
+        }, { once: true });
+        link.append(image);
+        const title = element('h2', alias.title);
+        const dimensions = element('p', `${item.width} x ${item.height} / ${item.families.join(', ')}${alias.ratio ? ` / ${alias.ratio}` : ''}`, 'gallery-meta');
+        const chips = item.statuses.filter((value) => value in chipLabels);
+        const states = element('p', undefined, 'gallery-status');
+        for (const value of chips) {
+          const chip = element('span', chipLabels[value], 'gallery-chip');
+          if (reviewStatuses.has(value)) chip.classList.add('gallery-warning');
+          states.append(chip);
+        }
+        const details = element('details');
+        details.append(element('summary', `Files and evidence (${item.aliases.length})`));
+        details.addEventListener('toggle', () => {
+          if (!details.open || details.childElementCount > 1) return;
+          for (const file of item.aliases) {
+            details.append(element('p', file.path, 'gallery-path'), element('p', file.statuses.join(' / ')));
+            if (file.context) details.append(element('p', `Context: ${JSON.stringify(file.context)}`));
+            if (file.diagnostics.length) {
+              const list = element('ul');
+              for (const message of file.diagnostics) list.append(element('li', message));
+              details.append(list);
+            }
+            const download = element('a', 'Download original PNG');
+            download.href = url;
+            download.download = file.path.split('/').pop() || 'artwork.png';
+            details.append(download);
+            if (file.metadata.length) details.append(element('pre', JSON.stringify(file.metadata, null, 2)));
+          }
+        });
+        article.append(link, title, dimensions, ...(chips.length ? [states] : []), details);
+        return { element: article, item, text: JSON.stringify(item.aliases.map(({ metadata, ...file }) => file)).toLowerCase() };
+      });
+      grid.replaceChildren(...cards.map((card) => card.element));
+      options(family, catalog.items.flatMap((item) => item.families), 'All families');
+      diagnostics.textContent = [`Scanned: ${catalog.generatedAt}`, `Caveats: ${(catalog.caveats ?? []).join(', ')}`, ...catalog.roots, ...catalog.diagnostics].join('\n');
+      syncView();
+    } catch {
+      grid.replaceChildren();
+      cards = [];
+      count.textContent = 'Local catalog unavailable.';
+      unavailable.hidden = false;
+      diagnostics.textContent = 'No current catalog was loaded.';
+    } finally { refresh.disabled = false; }
+  }
+  document.querySelector('.gallery-filters')!.addEventListener('submit', (event) => event.preventDefault());
+  for (const control of [search, family, status]) control.addEventListener('input', () => { if (catalog && cards.length) filter(); });
+  view.addEventListener('input', () => { if (catalog && cards.length) syncView(); });
+  refresh.addEventListener('click', load);
+  load();
+</script>

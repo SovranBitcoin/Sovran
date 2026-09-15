@@ -1,0 +1,27 @@
+---
+import PhoneScene from '../../components/PhoneScene.astro';
+import '../../styles/site.css';
+import { siteCopy } from '../../../../copy/src/site';
+import { SCENE_PRESETS } from '../../../../scripts/lib/phone-frame.mjs';
+import { defaultScreenshots, pageScenes } from '../../lib/phoneGeometry';
+export function getStaticPaths() {
+  return [...Object.keys(pageScenes), 'og', ...Object.keys(SCENE_PRESETS)].map(scene => ({ params: { scene } }));
+}
+const scene = Astro.params.scene!;
+const preset = SCENE_PRESETS[scene];
+---
+<!doctype html><html lang="en" class="scene-export-root"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="robots" content="noindex" /><title>Sovran {scene} scene</title></head><body class="export-body">
+  <main class:list={['export-scene', { 'export-og': scene === 'og' }]}>
+    {scene === 'og' && <div class="export-copy"><span class="brand"><img src="/sovran-mark.svg" alt="" width="24" height="24" />SOVRAN</span><h1>{siteCopy.hero.title}</h1><p>Payments and conversations in one app.</p></div>}
+    {preset ? <PhoneScene preset={scene} screenshots={defaultScreenshots.slice(0, preset.poses.length)} /> : <PhoneScene scene={(scene === 'og' ? 'hero' : scene) as keyof typeof pageScenes} />}
+  </main>
+</body></html>
+<style>
+  .export-body { background: transparent; }
+  .export-scene { width: min(1200px, 100%); padding: 48px; }
+  .export-og { width: 1200px; height: 630px; padding: 36px 60px; background: #080808; display: grid; grid-template-columns: 1.1fr 1fr; align-items: center; gap: 24px; }
+  .export-copy h1 { font-size: 62px; line-height: .98; margin: 32px 0 24px; }
+  .export-copy p { color: #aaa; font-size: 18px; }
+  .export-og :global(.phone-scene) { width: 380px; justify-self: center; }
+  @media (max-width: 560px) { .export-scene:not(.export-og) { padding: 24px 12px; } }
+</style>

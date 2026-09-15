@@ -25,11 +25,25 @@ package (formerly `nagg-ts`).
 
 - **NIP-17 private DMs** — `kind 14` rumors sealed and gift-wrapped per NIP-59
   (`kind 1059`), encrypted with NIP-44 v2.
-- **NIP-04** — legacy encrypted DMs with a decrypt cache (kept for backwards
-  compatibility).
+- **NIP-04** — legacy encrypted DMs. Their event metadata exposes sender and
+  recipient public keys; this is not the same metadata protection as NIP-17.
 
-The app-view (nagg) is **zero-knowledge for DMs**: it relays encrypted envelopes
-and never decrypts.
+The client encrypts and decrypts supported DMs; the app-view transports encrypted
+events rather than receiving the message-decryption keys. That boundary is not a
+guarantee about server logging, metadata, device compromise, or recipient behavior.
+Relays and services can observe routing and connection information. Linked media
+can contact a separate host, and recipients can copy decrypted messages.
+
+The current `nip04Cache` and `giftWrapCache` use the app's AsyncStorage-backed
+`createPubkeyScopedCache`. Profile scoping is not encryption at rest. Do not
+describe all locally stored messages as encrypted. See the source-scoped
+[claims review](https://github.com/SovranBitcoin/Sovran/blob/main/CLAIMS.md),
+[NIP-04](https://github.com/nostr-protocol/nips/blob/master/04.md),
+[NIP-17](https://github.com/nostr-protocol/nips/blob/master/17.md), and
+[NIP-59](https://github.com/nostr-protocol/nips/blob/master/59.md).
+
+Relay acceptance does not prove that a recipient received or read a message.
+Relays can refuse or remove events, impose access rules, and become unavailable.
 
 ## Feed & social
 
@@ -79,7 +93,7 @@ those requirements.
 
 ## The data layer
 
-The app queries an app-view (the default deployment is **Nagg**, self-hostable)
+The app queries an app-view (the default deployment is **Nagg**)
 through the `nostr` package's GraphQL/REST client, falling back across a tiered
 strategy (nagg → Primal → relay). See [Provider setup](/protocols/provider-setup)
 for how the data layer is assembled, and

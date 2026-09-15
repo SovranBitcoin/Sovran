@@ -1,0 +1,176 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "ecash.bitcoin-conflation",
+      "severity": "error",
+      "phrases": [
+        "bitcoin you drop straight into the chat",
+        "bitcoin that works like cash",
+        "pay, post, and chat in bitcoin",
+        "bitcoin, ready to spend"
+      ],
+      "reason": "These artwork phrases describe mint-issued ecash as directly held bitcoin. Name digital cash and explain issuer trust (CLAIMS 1 and 11)."
+    },
+    {
+      "id": "capability.universal",
+      "severity": "error",
+      "phrases": [
+        "one code, any wallet",
+        "works with whatever wallet they use",
+        "pay anyone, any way",
+        "any model, pay per use",
+        "every reply, in order",
+        "the whole conversation loads with it"
+      ],
+      "reason": "Known artwork overclaims omit wallet, provider, mint or relay limits. Describe the supported action (CLAIMS 11)."
+    },
+    {
+      "id": "mint.unverified-trust",
+      "severity": "error",
+      "phrases": [
+        "real reviews from people who use this mint",
+        "trust, with receipts",
+        "independent checks and reviews before you put money in",
+        "guaranteed mint reserves",
+        "verified mint reserves"
+      ],
+      "reason": "Reviews and operation checks do not establish reviewer experience, independence, issuer identity or reserves (CLAIMS 2 and 11)."
+    },
+    {
+      "id": "feed.unqualified",
+      "severity": "error",
+      "phrases": ["follow people, not algorithms", "ranked by real engagement"],
+      "reason": "Ranked feeds use algorithms; engagement counts do not establish authenticity (CLAIMS 11)."
+    },
+    {
+      "id": "custody.absolute",
+      "severity": "error",
+      "phrases": ["non-custodial", "noncustodial", "self-custodial"],
+      "reason": "Local control of keys and proofs does not remove mint custody of backing funds (CLAIMS 1)."
+    },
+    {
+      "id": "privacy.absolute",
+      "severity": "error",
+      "phrases": [
+        "anonymous",
+        "untraceable",
+        "nobody's watching",
+        "zero-knowledge",
+        "mints can't link your transactions",
+        "mints cannot link your transactions"
+      ],
+      "reason": "Describe the specific blinding or encryption boundary, not anonymity or absence of metadata (CLAIMS 2 and 4)."
+    },
+    {
+      "id": "network.absolute",
+      "severity": "error",
+      "phrases": [
+        "can't be shut down",
+        "cannot be shut down",
+        "can't be censored",
+        "cannot be censored",
+        "uncensorable",
+        "censorship-proof"
+      ],
+      "reason": "Relays, mints, and other services can restrict access or become unavailable (CLAIMS 5)."
+    },
+    {
+      "id": "recovery.absolute",
+      "severity": "error",
+      "phrases": [
+        "only way to get your money back",
+        "guaranteed recovery",
+        "recover every token",
+        "restore every balance",
+        "your words are all you need"
+      ],
+      "reason": "Recovery depends on mint URLs, supported records, keys, and availability (CLAIMS 3)."
+    },
+    {
+      "id": "payment.absolute",
+      "severity": "error",
+      "phrases": [
+        "near-zero fees",
+        "zero fees",
+        "no fees",
+        "instant, final",
+        "settled before you look up"
+      ],
+      "reason": "Fees and completion depend on the operation, mint, and payment rail (CLAIMS 6)."
+    },
+    {
+      "id": "source.absolute",
+      "severity": "error",
+      "phrases": [
+        "fully open source",
+        "fully open-source",
+        "100% open source",
+        "100% open-source",
+        "completely open source"
+      ],
+      "reason": "Do not generalize repository access to the full product, services, assets, or dependencies (CLAIMS 8)."
+    },
+    {
+      "id": "privacy.review",
+      "severity": "warning",
+      "phrases": [
+        "private",
+        "privacy",
+        "anonymity",
+        "encrypted",
+        "secure",
+        "sovereign",
+        "no logs"
+      ],
+      "reason": "Review the subject, threat model, metadata, and storage qualifications. These words are not prohibited."
+    },
+    {
+      "id": "payment.review",
+      "severity": "warning",
+      "phrases": [
+        "instant",
+        "instantly",
+        "final",
+        "free",
+        "guaranteed",
+        "offline",
+        "any wallet",
+        "anyone"
+      ],
+      "reason": "Review timing, cost, compatibility, settlement, and recovery qualifications. These words are not prohibited."
+    },
+    {
+      "id": "availability.review",
+      "severity": "warning",
+      "phrases": [
+        "available now",
+        "download now",
+        "app store",
+        "google play",
+        "testflight",
+        "zapstore",
+        "freedom store",
+        "open source",
+        "open-source"
+      ],
+      "reason": "Check channel, region, version, source and licensing evidence before publishing (CLAIMS 7 and 8)."
+    }
+  ],
+  "exceptions": [
+    {
+      "id": "legal.anonymous-negation",
+      "ruleId": "privacy.absolute",
+      "paths": ["copy/legal/documents.json"],
+      "context": "Sovran is not anonymous by default.",
+      "reason": "Exact explanatory negation in the Privacy Policy, not permission for a positive claim elsewhere."
+    },
+    {
+      "id": "legal.blinding-limits",
+      "ruleId": "privacy.absolute",
+      "paths": ["copy/legal/documents.json"],
+      "context": "Ecash blinding limits certain links; it does not make every payment or network request untraceable.",
+      "reason": "Exact explanation of the limit of blinding. No other text in these files is exempt."
+    }
+  ]
+}

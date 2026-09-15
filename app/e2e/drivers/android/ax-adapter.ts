@@ -69,7 +69,23 @@ export function parseUiautomatorXml(
     // content into `text`, mirroring iOS's accessibilityValue — so it is the
     // field's VALUE, and its accessible name is the content-desc/hint. Every
     // other node keeps text as its label.
-    const label = isEditable ? contentDesc || undefined : text || contentDesc || undefined;
+    // RN appends accessibilityValue.text to content-desc (", "-joined). A probe
+    // whose testID ends in ":<value>" and whose content-desc ends in ", <value>"
+    // can be split without guessing, so its label and value match iOS
+    // (e.g. wallet-wallpaper-image:none / "Wallpaper image none for navy, none").
+    const idTail = id?.includes(':') ? id.slice(id.lastIndexOf(':') + 1) : undefined;
+    const mergedSuffix = idTail ? `, ${idTail}` : undefined;
+    const splitProbe =
+      !isEditable &&
+      !text &&
+      mergedSuffix !== undefined &&
+      contentDesc.length > mergedSuffix.length &&
+      contentDesc.endsWith(mergedSuffix);
+    const label = splitProbe
+      ? contentDesc.slice(0, -mergedSuffix!.length)
+      : isEditable
+        ? contentDesc || undefined
+        : text || contentDesc || undefined;
 
     let value: string | undefined;
     if (isEditable) {
@@ -89,6 +105,8 @@ export function parseUiautomatorXml(
           value = raw;
         }
       }
+    } else if (splitProbe) {
+      value = idTail;
     } else if (id && !text && contentDesc) {
       // Probe convention: an id-only node's content-desc IS its value payload.
       value = contentDesc;

@@ -5,6 +5,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { View, useWindowDimensions } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { PressableFeedback } from 'heroui-native';
+import { onboardingCopy } from 'copy/onboarding';
 
 import Animated, {
   Extrapolation,
@@ -84,33 +85,25 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     {
       bgColor: orange300,
       duration: SLIDE_DURATION_MS,
-      title: 'Bitcoin that feels like cash',
-      description:
-        'Send and receive instantly with near-zero fees. Ecash bearer tokens live on your device \u2014 like digital cash.',
+      ...onboardingCopy.slides.cashu,
       icon: 'mdi:bitcoin',
     },
     {
       bgColor: purple300,
       duration: SLIDE_DURATION_MS,
-      title: 'Powered by Nostr',
-      description:
-        'SOVRAN runs on Nostr, a decentralized network that can\u2019t be shut down or censored.',
+      ...onboardingCopy.slides.nostr,
       icon: 'mdi:broadcast',
     },
     {
       bgColor: blue300,
       duration: SLIDE_DURATION_MS,
-      title: 'Private by Design',
-      description:
-        'Blind signatures mean mints can\u2019t link your transactions. Choose mints you trust \u2014 spread your balance across many.',
+      ...onboardingCopy.slides.privacy,
       icon: 'mdi:key-variant',
     },
     {
       bgColor: shade300,
       duration: SLIDE_DURATION_MS,
-      title: 'Stay private, stay sovereign',
-      description:
-        'You\u2019re all set. Start sending and receiving bitcoin instantly. Welcome to freedom.',
+      ...onboardingCopy.slides.start,
       icon: 'mdi:shield-check',
     },
   ];
@@ -207,10 +200,10 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
             <Icon name="mdi:chevron-down" size={24} color={muted} />
           </Pressable>
           <Text bold size={28} style={{ color: foreground, textAlign: 'center' }}>
-            Welcome to Sovran
+            {onboardingCopy.welcome}
           </Text>
           <Text size={15} style={{ color: muted, textAlign: 'center', marginTop: 12 }}>
-            Your keys, your money, your freedom.
+            {onboardingCopy.tagline}
           </Text>
         </Animated.View>
 
@@ -230,13 +223,13 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
           }}>
           <PressableFeedback.Highlight />
           <Text bold size={16} style={{ color: background }}>
-            Get Started
+            {onboardingCopy.getStarted}
           </Text>
         </PressableFeedback>
 
         <Button
           testID="onboarding-recovery-phrase"
-          text="I have a recovery phrase"
+          text={onboardingCopy.recoveryPhrase}
           variant="underline"
           onPress={openMnemonicRecovery}
         />

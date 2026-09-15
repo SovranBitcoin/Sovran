@@ -1,0 +1,52 @@
+---
+import '../styles/site.css';
+import { siteCopy } from '../../../copy/src/site';
+import { existsSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+interface Props { title?: string; description?: string; noindex?: boolean }
+const { title = siteCopy.title, description = siteCopy.description, noindex = false } = Astro.props;
+const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+const links = [['/#features', 'Product'], ['/#faq', 'FAQ'], ['/roadmap', 'Roadmap'], ['/releases', 'Releases'], ['/download', 'Download']];
+// Never advertise an old scene export after the screenshots or composition change.
+const root = new URL('../../../', import.meta.url);
+const exportManifest = new URL('site/public/social/manifest.json', root);
+const exportImage = new URL('site/public/social/og.png', root);
+const manifest = existsSync(exportManifest) ? JSON.parse(readFileSync(exportManifest, 'utf8')) : null;
+const hash = (file: URL) => createHash('sha256').update(readFileSync(file)).digest('hex');
+const hasSocialImage = manifest && existsSync(exportImage) && hash(exportImage) === manifest.images['og.png'] && Object.entries(manifest.inputs).every(([file, revision]) => existsSync(new URL(file, root)) && hash(new URL(file, root)) === revision);
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="theme-color" content="#080808" />
+    <title>{title}</title>
+    <link rel="canonical" href={new URL(path, 'https://sovran.money')} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={new URL(path, 'https://sovran.money')} />
+    <link rel="icon" href="/sovran-mark.svg" type="image/svg+xml" />
+    {hasSocialImage && <><meta property="og:image" content="https://sovran.money/social/og.png" /><meta property="og:image:width" content="1200" /><meta property="og:image:height" content="630" /><meta property="og:image:alt" content="Sovran wallet and feed in screenshot-based phone frames" /><meta name="twitter:card" content="summary_large_image" /></>}
+    {noindex && <meta name="robots" content="noindex" />}
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <div class="header-shell"><header class="site-header wrap">
+      <a class="brand" href="/" aria-label="Sovran home"><img src="/sovran-mark.svg" alt="" width="24" height="24" />SOVRAN</a>
+      <nav aria-label="Main navigation">
+        {links.map(([href, label]) => <a href={href} class:list={{ 'nav-download': href === '/download' }} aria-current={path === href ? 'page' : undefined}>{label}</a>)}
+      </nav>
+      <details class="mobile-nav"><summary>Menu</summary><nav aria-label="Mobile navigation">{links.map(([href, label]) => <a href={href} aria-current={path === href ? 'page' : undefined}>{label}</a>)}</nav></details>
+    </header></div>
+    <main id="main"><slot /></main>
+    <footer class="site-footer wrap">
+      <div><a class="brand" href="/"><img src="/sovran-mark.svg" alt="" width="24" height="24" />SOVRAN</a><p>{siteCopy.hero.text}</p></div>
+      <nav aria-label="Footer navigation"><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/roadmap">Roadmap</a><a href="https://github.com/SovranBitcoin/Sovran" rel="noreferrer">Source code</a></nav>
+      <small>&copy; {new Date().getFullYear()} SOVRAN LTD. <a href="https://github.com/SovranBitcoin/Sovran/blob/main/LICENSE">MPL-2.0</a> · <a href="/licenses/README.txt">Third-party notices</a></small>
+    </footer>
+  </body>
+</html>

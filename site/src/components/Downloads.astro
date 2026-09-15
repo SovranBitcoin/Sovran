@@ -1,0 +1,116 @@
+---
+import { siteCopy } from '../../../copy/src/site';
+import { channelLabels } from '../lib/releases';
+// Original sovran.money badge paths, imported as static SVG without React.
+import appStore from '../../public/downloads/app-store.svg?raw';
+import freedomStore from '../../public/downloads/freedom-store.svg?raw';
+import zapstore from '../../public/downloads/zapstore.svg?raw';
+import googlePlay from '../../public/downloads/google-play.svg?raw';
+import githubApk from '../../public/downloads/github-apk.svg?raw';
+const copy = siteCopy.downloads;
+const badges = { appStore, freedomStore, zapstore, googlePlay, githubApk };
+const groups = [
+  { label: 'iOS', channels: ['appStore', 'freedomStore'] },
+  { label: 'Android', channels: ['zapstore', 'googlePlay', 'githubApk'] },
+] as const;
+---
+<section class="downloads" data-downloads data-state="loading" data-failure={copy.failure} data-ready={copy.ready} aria-labelledby="download-heading">
+  <div class="download-copy">
+    <p class="download-kicker"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>Download</p>
+    <h2 id="download-heading">{copy.title}</h2>
+    <p class="lede">{copy.text}</p>
+  </div>
+  <div class="download-options-layout">
+    <div class="download-platforms" aria-label="Download options">
+      {groups.map((group) => <section class="download-platform-row" aria-label={`${group.label} downloads`}>
+        <h3 class="download-platform-label">{group.label}</h3>
+        <ul class="official-store-badges">
+          {group.channels.map((channel) => <li class="store-card" data-channel={channel}>
+            <a class="store-badge" data-action aria-label={channel === 'githubApk' ? 'Download the APK from GitHub' : `Download from ${channelLabels[channel]}`} aria-disabled="true" tabindex="-1" aria-describedby={`${channel}-version`}>
+              <Fragment set:html={badges[channel]} />
+            </a>
+            <p class="store-card-meta" id={`${channel}-version`} data-version><span class="store-card-status">Not verified</span></p>
+            <div class="store-card-integrity" data-integrity></div>
+          </li>)}
+        </ul>
+      </section>)}
+    </div>
+    <a href="/download" class="download-qr-card" aria-label="Open the Sovran universal download link">
+      <img src="/downloads/download-qr.svg" alt="QR code for the Sovran download page" width="168" height="168" loading="lazy" />
+      <span>Scan to download</span>
+      <small>/download</small>
+    </a>
+  </div>
+  <div class="download-feedback">
+    <p class="download-status" role="status" aria-live="polite" aria-atomic="true">Checking availability...</p>
+    <button type="button" data-retry hidden disabled>{copy.retry}</button>
+  </div>
+  <noscript><p>Enable JavaScript to check download availability. Store links stay disabled until checked.</p></noscript>
+</section>
+<script>
+  import { fetchAvailability, channels } from '../lib/releases';
+  for (const root of document.querySelectorAll<HTMLElement>('[data-downloads]')) {
+    const status = root.querySelector<HTMLElement>('[role="status"]')!;
+    const retry = root.querySelector<HTMLButtonElement>('[data-retry]')!;
+    async function refresh() {
+      root.dataset.state = 'loading';
+      retry.disabled = true;
+      retry.hidden = true;
+      status.textContent = 'Checking availability...';
+      // Remove every previous link before checking again: never retain stale success.
+      for (const channel of channels) {
+        const row = root.querySelector<HTMLElement>(`[data-channel="${channel}"]`)!;
+        const meta = document.createElement('span');
+        meta.className = 'store-card-status';
+        meta.textContent = 'Not verified';
+        row.querySelector('[data-version]')!.replaceChildren(meta);
+        const action = row.querySelector<HTMLAnchorElement>('[data-action]')!;
+        action.removeAttribute('href');
+        action.removeAttribute('target');
+        action.removeAttribute('rel');
+        action.setAttribute('aria-disabled', 'true');
+        action.tabIndex = -1;
+        row.querySelector('[data-integrity]')!.replaceChildren();
+      }
+      try {
+        const available = await fetchAvailability();
+        for (const channel of channels) {
+          const row = root.querySelector<HTMLElement>(`[data-channel="${channel}"]`)!;
+          const release = available[channel];
+          const version = document.createElement('span');
+          version.className = release ? 'store-card-version' : 'store-card-status';
+          version.textContent = release ? `v${release.version}` : 'Not available yet';
+          row.querySelector('[data-version]')!.replaceChildren(version);
+          if (!release) continue;
+          const build = document.createElement('span');
+          build.className = 'store-card-build';
+          build.textContent = `build ${release.build}`;
+          row.querySelector('[data-version]')!.append(build);
+          const link = row.querySelector<HTMLAnchorElement>('[data-action]')!;
+          link.href = release.url;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.removeAttribute('aria-disabled');
+          link.removeAttribute('tabindex');
+          if (release.sha256) {
+            const details = document.createElement('details');
+            const summary = document.createElement('summary');
+            summary.textContent = 'Publisher fingerprints';
+            const text = document.createElement('p');
+            text.textContent = `SHA-256: ${release.sha256}${release.certificateSha256 ? `; signing certificate SHA-256: ${release.certificateSha256}` : ''}. Compare with a trusted source before installing. This page does not verify downloaded bytes.`;
+            details.append(summary, text);
+            row.querySelector('[data-integrity]')!.append(details);
+          }
+        }
+        status.textContent = root.dataset.ready!;
+        root.dataset.state = 'ready';
+      } catch {
+        status.textContent = root.dataset.failure!;
+        root.dataset.state = 'failure';
+        retry.hidden = false;
+      } finally { retry.disabled = false; }
+    }
+    retry.addEventListener('click', refresh);
+    void refresh();
+  }
+</script>

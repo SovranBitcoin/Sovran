@@ -1,0 +1,38 @@
+---
+import Page from '../layouts/Page.astro';
+import { siteCopy } from '../../../copy/src/site';
+const copy = siteCopy.roadmap;
+---
+<Page title="Roadmap - Sovran" description={copy.text}>
+  <div class="roadmap-copy wrap section">
+    <h1>{copy.title}</h1>
+    <p class="lede">{copy.text}</p>
+    <p class="muted">{copy.note}</p>
+    <p>{copy.glossary}</p>
+    {copy.groups.map(group => <section aria-labelledby={group.id}>
+      <h2 id={group.id}>{group.title}</h2>
+      <p><span class="status">{copy.statusLabels[group.status]}.</span> {group.text}</p>
+      <ul>{group.items.map(item => <li id={item.id} data-source-group={group.id}>
+        <span class="status">{copy.statusLabels[item.status]}.</span> {item.text}
+      </li>)}</ul>
+    </section>)}
+    <section aria-labelledby="recurring-work">
+      <h2 id="recurring-work">{copy.recurring.title}</h2>
+      <p>{copy.recurring.text}</p>
+      <ul>{copy.recurring.items.map(item => <li id={item.id}>
+        <span class="status">{item.cadence}.</span> <strong>{item.title}.</strong> {item.text}
+      </li>)}</ul>
+    </section>
+    <p>Looking for what has already changed? <a href="/releases">Read the release log</a>.</p>
+  </div>
+</Page>
+
+<style>
+  .roadmap-copy { max-width: 72ch; overflow-wrap: anywhere; }
+  h1 { font-size: clamp(40px, 6vw, 64px); line-height: 1.1; }
+  h2 { font-size: 28px; line-height: 1.2; margin-bottom: 16px; }
+  section { margin-block: 48px; }
+  ul { padding-inline-start: 24px; line-height: 1.65; }
+  li + li { margin-top: 12px; }
+  .status { font-weight: 600; }
+</style>

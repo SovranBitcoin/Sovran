@@ -1,0 +1,25 @@
+---
+import Page from '../layouts/Page.astro';
+import documents from '../../../copy/legal/documents.json';
+import { legalRevisions } from '../legal.mjs';
+export function getStaticPaths() { return ['terms', 'privacy'].map((legal) => ({ params: { legal } })); }
+const id = Astro.params.legal as 'terms' | 'privacy';
+const document = documents[id];
+const operator = documents.operator;
+const revisions = legalRevisions(documents);
+---
+<Page title={`${document.title} - Sovran`} description={document.summary} noindex={!documents.publicationReady}>
+  <article class="legal wrap section" aria-labelledby="legal-title" data-legal-revision={revisions[id]}>
+    <header class="legal-header">
+      <h1 id="legal-title">{document.title}</h1><p class="legal-revision">Updated {document.updated} / Revision <code>{revisions[id]}</code></p>
+      {!documents.publicationReady && <p class="risk">Draft for review. Operator details and operational practices must be confirmed before publication.</p>}
+      <address>{operator.name}<br />{operator.country}<br />{operator.address}<br /><a href={`mailto:${operator.email}`}>{operator.email}</a></address>
+    </header>
+    <div class="legal-layout">
+      <nav class="legal-contents" aria-label="Document contents"><ol role="list">{document.sections.map((section, index) => <li><a href={`#section-${index + 1}`}>{section.title}</a></li>)}</ol></nav>
+      <div class="legal-prose">
+        {document.sections.map((section, index) => <section id={`section-${index + 1}`} tabindex="-1"><h2>{section.title}</h2>{section.paragraphs.map((paragraph) => <p>{paragraph}</p>)}</section>)}
+      </div>
+    </div>
+  </article>
+</Page>

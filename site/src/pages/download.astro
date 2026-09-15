@@ -1,0 +1,6 @@
+---
+import Page from '../layouts/Page.astro';
+import Downloads from '../components/Downloads.astro';
+import { siteCopy } from '../../../copy/src/site';
+---
+<Page title="Download Sovran"><div class="download-section section"><div class="wrap"><h1>Get Sovran.</h1><p class="lede">Choose a store or a direct Android download. We will not redirect you based on your device.</p><Downloads /><aside class="risk"><h2>Before adding money</h2><p>{siteCopy.risk}</p><a href="/terms">Read the terms</a></aside></div></div></Page>

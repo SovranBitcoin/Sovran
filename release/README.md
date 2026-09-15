@@ -38,7 +38,28 @@ Apple/Freedom stage does not prevent the Android lane from being reconciled:
 7. Zapstore signer preview, signature/identity checks, publication and independent
    canonical relay/APK readback using the same GitHub APK bytes.
 8. Website availability changes only for confirmed channels. Pending channels keep
-   their prior version. Editorial release notes are not automatically overwritten.
+    their prior version. Editorial release notes are not automatically overwritten.
+
+## Site Consolidation Boundary
+
+The [standalone website](../site/README.md) now has source in this repository;
+artifact publication is deliberately unchanged. `config.websiteRepository`, the
+GitHub App token scope, append-only Freedom versions, immutable paths, non-force
+publishing and full-byte readback still target the existing website/artifact repo.
+Do not delete that repo or prune ADPs as part of deploying the new frontend.
+The new frontend reads the same per-channel `channels.json` at runtime through a
+configured artifact-origin proxy. A static site deploy does not declare a store live.
+
+Legal source is `copy/legal/documents.json`. Its original bytes and app acceptance
+hashes are unchanged. The controller also reads the former path for immutable
+release sources predating the move, only when the new path does not exist. The
+live legal gate still runs before EAS. Any future text edit must be published
+before releasing the app that contains it, coordinated with active old releases.
+Source-pinned claims lint runs only when that source declares the new script.
+
+See [the audit and remaining work](../docs/architecture/site-consolidation.md).
+No hosting rewrite, repository deletion, store-description overwrite, screenshot
+replacement or legal publication is authorized by these source changes.
 
 ## What the local JKS files mean
 

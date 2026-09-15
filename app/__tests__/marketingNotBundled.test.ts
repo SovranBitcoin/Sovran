@@ -20,7 +20,7 @@ function marketingImports(source: string, file: string): string[] {
   const check = (node: ts.Node | undefined) => {
     if (!node) return;
     const value = ts.isStringLiteralLike(node) ? node.text : node.getText(ast);
-    if (/(^|[/\\])marketing([/\\]|$)/.test(value)) found.push(value);
+    if (/(^|[/\\])press([/\\]|$)/.test(value)) found.push(value);
   };
   const visit = (node: ts.Node) => {
     if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) check(node.moduleSpecifier);
@@ -39,7 +39,7 @@ function marketingImports(source: string, file: string): string[] {
   return found;
 }
 
-test('marketing source and generated artwork never enter the app import graph', () => {
+test('press source and generated artwork never enter the app import graph', () => {
   const violations = sourceFiles(appRoot).flatMap((file) =>
     marketingImports(fs.readFileSync(file, 'utf8'), file).map(
       (specifier) => `${path.relative(appRoot, file)}: ${specifier}`
@@ -50,11 +50,16 @@ test('marketing source and generated artwork never enter the app import graph', 
 
 test('the guard recognizes static, dynamic, CommonJS and re-export paths', () => {
   const source = [
-    "import art from '../../marketing/artwork/generated/wallet/wide.png';",
-    "export { art } from '../marketing/art';",
-    "const art = require('../../marketing/art.png');",
-    "void import('../../marketing/art');",
+    "import art from '../../press/artwork/generated/wallet/wide.png';",
+    "export { art } from '../press/artwork';",
+    "const art = require('../../press/artwork/image.png');",
+    "void import('../../press/artwork');",
+    "const artPath = require.resolve('../../press/artwork/image.png');",
+    "const artFiles = require.context('../../press/artwork');",
+    "import art = require('../../press/artwork');",
+    'const dynamic = require(`../../press/artwork/${name}.png`);',
   ].join('\n');
-  expect(marketingImports(source, 'fixture.ts')).toHaveLength(4);
-  expect(marketingImports('// import "../marketing/ignored";', 'fixture.ts')).toEqual([]);
+  expect(marketingImports(source, 'fixture.ts')).toHaveLength(8);
+  expect(marketingImports('// import "../press/ignored";', 'fixture.ts')).toEqual([]);
+  expect(marketingImports('import Button from "./Pressable";', 'fixture.ts')).toEqual([]);
 });

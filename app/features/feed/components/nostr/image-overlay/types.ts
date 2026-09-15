@@ -117,6 +117,10 @@ export type ImageOverlayContextValue = {
       measureNow?: () => Promise<ThumbnailLayout | null>;
     }
   ) => void;
+  /** The last registered thumbnail rect for `eventId-imageIndex` (or a url), if any. */
+  getThumbnailLayout: (key: string) => ThumbnailLayout | null;
+  /** Presentation-only local media for this surface (demo content); null for live feeds. */
+  mediaSource: { sources: Readonly<Record<string, number>>; onLoad?: (url: string) => void } | null;
   /** Set panel height (drives image area); used after content measure and when panel is dragged. */
   setPanelHeight: (height: number) => void;
   /** Report measured min content height so overlay can use it for snap points. */

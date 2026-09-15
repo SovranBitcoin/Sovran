@@ -38,6 +38,8 @@ import type { ImageOverlayContextValue } from './types';
 import { IMAGE_OVERLAY_TIMING_CONFIG, useImageOverlay } from './provider';
 import { clearAndroidOverlayNode, setAndroidOverlayNode } from './AndroidImageOverlayHost';
 import { MemoizedMediaPagerPage } from './MediaPagerPage';
+import { MediaSourceContext } from './MediaSourceContext';
+import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { OverlayDot } from './PagerDots';
 import { computeDismissDecision } from './dismissDecision';
 import { duration, zIndex } from '@/shared/styles/tokens';
@@ -125,6 +127,8 @@ function AnimatedImageOverlayContent({
   /** Vertical offset for swipe-to-next transition: 0 = rest, negative = dragged up (current leaving), set to screenHeight then animate to 0 for next entering. */
   const swipeUpTranslateY = useSharedValue(0);
   const animatingToNextRef = useRef(false);
+  /** Original URL whose full-size image has decoded; drives the e2e readiness probe. */
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
 
   const {
     activeUrl,
@@ -1104,6 +1108,12 @@ function AnimatedImageOverlayContent({
     <View
       style={[StyleSheet.absoluteFill, { zIndex: zIndex.overlay }]}
       pointerEvents={activeUrl ? 'auto' : 'none'}>
+      {activeUrl != null && loadedUrl === activeUrl && (
+        <E2EAccessibilityProbe
+          testID="image-overlay-image-loaded"
+          accessibilityLabel="Image viewer image loaded"
+        />
+      )}
       <Animated.View style={[StyleSheet.absoluteFill, rSwipeUpWrapperStyle]}>
         <GestureDetector gesture={composed}>
           <AnimatedPressable
@@ -1204,6 +1214,7 @@ function AnimatedImageOverlayContent({
                       <Animated.View style={rPagerScaleStyle}>
                         <MemoizedMediaPagerPage
                           url={activeUrl}
+                          onImageLoad={setLoadedUrl}
                           mediaType="image"
                           index={0}
                           isActive={true}
@@ -1422,7 +1433,9 @@ export function AnimatedImageOverlay() {
     setAndroidOverlayNode(
       ownerKey,
       <Log name="AnimatedImageOverlay">
-        <AnimatedImageOverlayContent ctx={ctx} safeBottom={safeBottom} />
+        <MediaSourceContext.Provider value={ctx.mediaSource}>
+          <AnimatedImageOverlayContent ctx={ctx} safeBottom={safeBottom} />
+        </MediaSourceContext.Provider>
       </Log>
     );
     return () => clearAndroidOverlayNode(ownerKey);
@@ -1440,7 +1453,11 @@ export function AnimatedImageOverlay() {
 
   if (!ctx) return null;
   if (Platform.OS === 'android') return null;
-  const content = <AnimatedImageOverlayContent ctx={ctx} safeBottom={safeBottom} />;
+  const content = (
+    <MediaSourceContext.Provider value={ctx.mediaSource}>
+      <AnimatedImageOverlayContent ctx={ctx} safeBottom={safeBottom} />
+    </MediaSourceContext.Provider>
+  );
   if (Platform.OS === 'ios') {
     // Mount the extra window ONLY while media is active — activeUrl covers the
     // open AND dismiss morphs (it clears CLEAR_URL_DELAY_MS after close). An

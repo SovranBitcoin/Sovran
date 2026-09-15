@@ -1,51 +1,51 @@
 {
   "android": {
-    "run": "run-2026-09-11T18-14-26-766Z-b2d378ae",
+    "run": "run-2026-09-15T17-06-40-715Z-b6eb40f2",
     "screenshots": [
       {
         "file": "source/screenshots/android/ai-chat.png",
         "label": "AI CHAT",
-        "sha256": "afa0101acb091dffbc6496010c11e44c1841c8d09e9ac1332603ee1ce216b6ab"
+        "sha256": "2fd26499a228624c65447363afbc4b3a5be0fd9a4589572cedfe82b8b5f8fed6"
       },
       {
         "file": "source/screenshots/android/contacts.png",
         "label": "CONTACTS",
-        "sha256": "62bb7b9a48624a9d7c0bc96b0f85d05f341a3f1f7a50c0c2ea7c828946700626"
+        "sha256": "1984e3750ceed7a44096c6d12fd1bed084f31573f338962915730fa04e6be910"
       },
       {
         "file": "source/screenshots/android/lightning-receive.png",
         "label": "LIGHTNING",
-        "sha256": "f97e01d71e6b660902089014024e9eac104749268d445ac8fb4fcfe6bc003b7a"
+        "sha256": "bd83635d25bd5d51e011f434bf80552eccf27418c87d0a69577697e3125879ec"
       },
       {
         "file": "source/screenshots/android/wallet.png",
         "label": "WALLET",
-        "sha256": "a5bc1fe44ebfee0da5bdf7bc64fd2414ec2b36a06363cebd8ea11f83e9a6d865"
+        "sha256": "74e3610374002d09d10efce071fa900c4a1ceb6a1cdc547ee781930f2ac762a4"
       }
     ]
   },
   "ios": {
-    "run": "run-2026-09-11T18-03-58-075Z-813d671c",
+    "run": "run-2026-09-15T16-06-18-394Z-a91429d3",
     "screenshots": [
       {
         "file": "source/screenshots/ios/ai-chat.png",
         "label": "AI CHAT",
-        "sha256": "536fcd6a98257e3b421a9b76cb54a0f511139e9730c7c2d70fb7e1e0bf4b3d3e"
+        "sha256": "9111da4191de2d6e5e2114e1e0d376ee684ee199e30813d23f4d3d8d27c660d1"
       },
       {
         "file": "source/screenshots/ios/contacts.png",
         "label": "CONTACTS",
-        "sha256": "80a7a86d27e333fbc868c6ba038e49e0ca3ded4f807cbb8ca788c9351db98150"
+        "sha256": "baa17058121cddbfcafb996d336f56bec4444fad6d1dedc0e08d882c35e84b1c"
       },
       {
         "file": "source/screenshots/ios/lightning-receive.png",
         "label": "LIGHTNING",
-        "sha256": "29fa0e4c002974d6c7448acadfd291acbc30a992139e78d246d6358f1b6052a9"
+        "sha256": "090bc726ebf175631406df4a99feb7c498f89797db91b4e243ce96c7c8438f89"
       },
       {
         "file": "source/screenshots/ios/wallet.png",
         "label": "WALLET",
-        "sha256": "e1aacd3cb641264168ebf72297393b44ab6690bd9246223302632a37ab30ceb0"
+        "sha256": "27363210ff0839070c2c23c108d346224a837e07fd974c1b4ec263e89f6e3cf6"
       }
     ]
   }

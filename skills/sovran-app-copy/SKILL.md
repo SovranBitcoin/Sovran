@@ -10,6 +10,10 @@ and [terminology](../../SYSTEM.md#27-naming-terminology-and-display-derivation)
 where relevant. Inspect the whole interaction and actual state transition before
 rewriting an isolated label.
 
+For custody, privacy, recovery, settlement, or availability claims in app copy,
+read [CLAIMS.md](../../CLAIMS.md) for scoped evidence and wording limits. Use its
+copy owners and verification checks; a passing phrase scan does not approve a claim.
+
 For each message, identify the fact the user needs, available action, consequence,
 and supporting detail. Remove repetition between title, body, helper, and button.
 Name actions by outcome, not gestures or implementation. Keep labels persistent;

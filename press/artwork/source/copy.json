@@ -1,0 +1,285 @@
+{
+  "version": 5,
+  "concepts": {
+    "app-overview": {
+      "headlines": [
+        "Money and messages, one app.",
+        "Your wallet meets your conversations.",
+        "Send cash. Stay in the conversation."
+      ],
+      "subtitles": [
+        "Send digital cash, follow friends, and chat with AI.",
+        "Digital cash for everyday payments. You choose which mint to trust."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "wallet": {
+      "headlines": [
+        "Cash on your phone.",
+        "Your everyday cash wallet.",
+        "Spend it like cash."
+      ],
+      "subtitles": [
+        "Digital cash on your phone. Its value depends on the mint.",
+        "See your balances in sats or a supported currency."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "receive-unified": {
+      "headlines": [
+        "Show a code. Get paid.",
+        "Share a payment code.",
+        "Show it, get paid."
+      ],
+      "subtitles": [
+        "Share a payment code with a compatible wallet.",
+        "Choose a supported payment method, then share your code."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "send": {
+      "headlines": [
+        "Send from your wallet.",
+        "Paste, scan, or tap.",
+        "Send it like a message."
+      ],
+      "subtitles": [
+        "Choose a contact or scan a payment code. Check the details before sending.",
+        "Paste a supported invoice or address, then review the payment."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "mint-trust": {
+      "headlines": [
+        "Check before you add money.",
+        "Know your mint.",
+        "Read before you trust."
+      ],
+      "subtitles": [
+        "Compare mint checks and reviews. Neither guarantees your funds.",
+        "Read about the mint that issues your cash. Check its terms before adding money."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "mint-reviews": {
+      "headlines": [
+        "What others found.",
+        "Read the community's reviews.",
+        "Read before you trust."
+      ],
+      "subtitles": [
+        "Read community reviews before choosing a mint. Reviews are not guarantees.",
+        "See ratings and comments. They do not prove who runs a mint or what it holds."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "mint-updates": {
+      "headlines": [
+        "See what changed.",
+        "Follow your mint\u2019s updates.",
+        "Keep up with your mint."
+      ],
+      "subtitles": [
+        "See recorded changes to your mint, with dates and details.",
+        "Check recorded mint updates alongside community reviews."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "payments-instant": {
+      "headlines": [
+        "Pay like it's cash.",
+        "Send from your wallet.",
+        "Pay with digital cash."
+      ],
+      "subtitles": [
+        "Send digital cash. Fees and availability depend on your mint.",
+        "Your mint holds the backing funds and handles redemption."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "social-feed": {
+      "headlines": [
+        "Keep up with your people.",
+        "Your people, less noise.",
+        "A feed that stays calm."
+      ],
+      "subtitles": [
+        "Catch up with people you follow, or explore a ranked feed.",
+        "Read posts and replies, with notifications grouped together."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "social-thread": {
+      "headlines": [
+        "Follow the replies.",
+        "Make room for the conversation.",
+        "Join the conversation."
+      ],
+      "subtitles": [
+        "Open a post to explore its replies and the conversation around it.",
+        "Follow a reply back to earlier posts when they are available."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "social-dm": {
+      "headlines": [
+        "Send cash in a message.",
+        "Text them the money.",
+        "Money, mid-conversation."
+      ],
+      "subtitles": [
+        "Send digital cash in chat. You still rely on its issuer to redeem it.",
+        "Chat in encrypted messages. Redeeming cash still depends on its mint."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "contacts": {
+      "headlines": [
+        "Pay by name.",
+        "Find them, pay them.",
+        "Your people, ready to pay."
+      ],
+      "subtitles": [
+        "Find a friend, then review the payment before sending.",
+        "Start a payment from your contacts without copying an address."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "ai-chat": {
+      "headlines": [
+        "Chat with AI, pay as you go.",
+        "AI, no subscription.",
+        "Choose a model. Pay for usage."
+      ],
+      "subtitles": [
+        "Top up AI credits from your wallet. Your provider receives your prompts.",
+        "Choose a supported model. Prices and availability vary."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "ai-models": {
+      "headlines": [
+        "Choose a model. Pay for usage.",
+        "Find a model for your next question.",
+        "AI, no subscription."
+      ],
+      "subtitles": [
+        "Compare supported models. Prices and availability vary.",
+        "Top up AI credits from your wallet. Your provider receives your prompts."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "themes-colors": {
+      "headlines": [
+        "Your wallet, your colors.",
+        "Dress your wallet.",
+        "Pick a look."
+      ],
+      "subtitles": [
+        "Choose wallpapers and colors for your wallet.",
+        "Wallpapers and color themes that change with your mood."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "themes-artemis": {
+      "headlines": [
+        "A new perspective.",
+        "Your wallet, beyond Earth.",
+        "A view worth opening."
+      ],
+      "subtitles": [
+        "The Artemis II collection. A different wallpaper for each currency.",
+        "Bring views from Artemis II into your everyday wallet."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "portal-artemis": {
+      "headlines": ["A view worth opening.", "Your wallet, beyond Earth."],
+      "subtitles": [
+        "Bring the Artemis II collection into your everyday wallet."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "stories": {
+      "headlines": [
+        "Catch up in a swipe.",
+        "Moments from your people.",
+        "What they shared today."
+      ],
+      "subtitles": [
+        "Quick posts from people you follow, one tap away.",
+        "Tap through what your people shared today."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "backup": {
+      "headlines": [
+        "Keep a way back.",
+        "Start with a backup.",
+        "Write it down. Keep it safe."
+      ],
+      "subtitles": [
+        "Save your recovery words and mint URLs. Recovery has limits.",
+        "Back up imported keys too. Words alone may not restore everything."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    }
+  }
+}
