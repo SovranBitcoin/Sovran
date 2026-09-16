@@ -16,7 +16,7 @@
     {"action":"waitFor","selector":{"label":"ACCOUNT"},"timeoutMs":30000},
     {"action":"tap","selector":{"id":"settings-profile-row"}},
     {"action":"waitFor","selector":{"id":"profile-reveal-mnemonic"},"value":"0","timeoutMs":30000},
-    {"action":"screenshot","name":"settings"},
+    {"action":"screenshot","name":"settings-profile"},
     {"action":"tapUntil","sequence":[{"tap":{"id":"profile-reveal-mnemonic"}}],"until":{"id":"profile-reveal-mnemonic"},"untilValue":"1","attempts":4,"settleMs":6000},
     {"action":"waitFor","selector":{"label":"Hide"},"timeoutMs":15000},
     {"action":"tapUntil","sequence":[{"tap":{"id":"profile-reveal-mnemonic"}}],"until":{"id":"profile-reveal-mnemonic"},"untilValue":"0","attempts":4,"settleMs":6000},

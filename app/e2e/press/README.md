@@ -32,15 +32,14 @@ retain their individual `wallpaperId`.
 ## P2PK Collection
 
 Collection `p2pk-receive` pairs `ios/settings-keyring` with
-`ios/receive-qr-p2pk`. Both have `availability: "unavailable"`, an explanation,
-and null run/hash. Their file paths are reserved destinations; no image has been
-invented, copied from the Unified QR, or promoted. Android has matching unavailable
-registrations. Consumers must show unavailable slots or omit them, not silently
-substitute a different receive state.
+`ios/receive-qr-p2pk`. Read each registration's current availability, run and hash;
+historical capture requests are not a live status report. Consumers must show
+unavailable slots rather than substitute a different receive state.
 
 The keyring candidate maps to `settings.keyring.generate`, canonical
-`settings-keyring`, occurrence 2, after `YOUR KEYS (2)`. The scenario waits for
-one key before generation, not two. The locked request maps to
+`settings-keyring`, occurrence 2, after `YOUR KEYS (3)`. The full library instead
+uses the read-only keyring entry recipe and never generates keys for capture.
+The locked request maps to
 `receive.qr-display.tabs`, canonical `receive-qr`, occurrence 6, after
 `receive-creq-p2pk-state:1`. It asks the payer for P2PK-locked ecash; displaying
 the request proves neither delivery nor redemption. These are separate scenarios,
@@ -60,8 +59,10 @@ remain independent provenance. All named test and verify captures are validated;
 only mapped images are exported. Setup/cleanup captures are rejected.
 
 Importer output stays `unreviewed-candidate` and never edits the retained registry.
-`bun run screenshots:refresh` promotes a validated candidate only when it was
-captured on a build-stamped native app; see [press/README.md](../../../press/README.md).
+`bun run screenshots:refresh` first requires full-library verification on the fixed
+native profile, then updates matching curated selections; see
+[press/README.md](../../../press/README.md). It does not execute every legacy press
+recipe: effectful key generation and the live P2PK tour are excluded.
 Do not copy runtime payloads into the semantic source. Recovery-word captures use
 the display-only public practice vector in a disposable simulator wallet.
 
@@ -81,10 +82,10 @@ exact `filters.scenario`. Every selected scenario, capture, cleanup and final-st
 check must pass. An interrupted multi-scenario run cannot be imported as a completed
 single scenario. Do not edit raw manifests/events to bypass rejection.
 
-The [September 15 refresh attempt](REFRESH-2026-09-15.md) ran on an unstamped
-0.1.1 native app. `ios/receive-qr` and `ios/notification-mint-changes` stay
-withdrawn (`freshness: "stale"`) until a build-stamped refresh replaces them.
-Every promoted capture now records `nativeBuild` provenance.
+The [September 15 refresh attempt](REFRESH-2026-09-15.md) is historical evidence,
+not current capture status. Use the registry and full-library status command for
+current provenance. Every newly promoted capture records native build and app
+source identity.
 
 ## Offline Checks
 

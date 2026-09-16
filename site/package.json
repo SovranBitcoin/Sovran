@@ -8,10 +8,14 @@
   "scripts": {
     "dev": "astro dev --host 127.0.0.1",
     "build": "node ../scripts/site-brand.mjs --check && node scripts/verify-inputs.mjs && astro build",
+    "build:internal": "SOVRAN_INTERNAL_BUILD=1 astro build",
+    "assets": "node scripts/website-assets.mjs",
+    "assets:check": "node scripts/website-assets.mjs --check",
+    "assets:prune": "node scripts/prune-obsolete-assets.mjs",
     "preview": "vite preview --config preview.config.mjs",
-    "test": "bun test tests && node --test scripts/local-artwork.test.mjs",
+    "test": "bun test tests && node --test tests/export.test.mjs scripts/local-artwork.test.mjs scripts/composition.test.mjs scripts/website-assets.test.mjs",
     "test:nginx": "bun test tests/nginx.test.ts"
   },
   "dependencies": { "astro": "5.18.2" },
-  "devDependencies": { "vite": "6.4.3" }
+  "devDependencies": { "vite": "6.4.3", "sharp": "0.34.5", "opentype.js": "2.0.0" }
 }

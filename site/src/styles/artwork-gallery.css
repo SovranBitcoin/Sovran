@@ -27,6 +27,38 @@
 .gallery-path { font-family: monospace; }
 .dev-main .gallery-item pre { padding: 12px; max-height: 320px; overflow: auto; font-size: 12px; }
 .gallery-notes { padding-top: 16px; }
+.capture-group { margin-block: 42px; }
+.capture-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+.capture-source { display: grid; grid-template-rows: auto 64px 460px auto auto auto auto 1fr; align-content: start; gap: 12px; min-width: 0; }
+.capture-status-line p { margin: 0; }
+.capture-attempt-evidence, .capture-source > p { overflow-wrap: anywhere; }
+.capture-source .source-empty { overflow: auto; overflow-wrap: anywhere; }
+.capture-source > p { margin: 0; min-height: 24px; }
+.source-preview { display: flex; align-items: center; justify-content: center; min-width: 0; height: 100%; background: #2e332b; padding: 12px; }
+.source-preview img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.source-empty { display: grid; place-items: center; text-align: center; padding: 28px; background: #22251f; color: #bdbfba; }
+.capture-source .dev-action { align-self: start; }
+.capture-source details { margin: 0; }
+.logo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 24px; }
+.logo-variant { display: grid; align-content: start; gap: 16px; min-width: 0; }
+.logo-variant .source-preview { height: 240px; }
+.logo-variant h3 { min-height: 52px; }
+.logo-variant label { display: grid; gap: 8px; }
+.concept-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 12px 24px; align-items: stretch; }
+.concept-card { min-width: 0; display: grid; grid-template-rows: subgrid; grid-row: span 5; gap: 12px; padding-bottom: 24px; }
+.concept-card h3, .concept-card p { margin: 0; overflow-wrap: anywhere; }
+.concept-preview { display: grid; place-items: center; background: #22251f; width: 100%; height: 300px; }
+.concept-preview p { padding: 20px; text-align: center; color: #bdbfba; }
+.concept-preview img { width: 100%; height: 100%; object-fit: contain; }
+.concept-card .gallery-meta { font-size: 13px; }
+@media (max-width: 540px) {
+  .capture-pair { gap: 14px; }
+  .capture-source { grid-template-rows: auto 84px 280px auto auto auto auto 1fr; font-size: 13px; }
+  .capture-source h3 { font-size: 17px; }
+  .source-preview { padding: 0; }
+  .source-empty { padding: 12px; }
+  .gallery-filters .dev-check { grid-column: 1 / -1; }
+}
 @media (max-width: 540px) {
   .dev-body:has(.artwork-gallery) .dev-header { padding-block: 10px; }
   .dev-body:has(.artwork-gallery) .dev-header nav { gap: 2px 16px; font-size: 14px; }

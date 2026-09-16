@@ -34,6 +34,17 @@ describe('preparePrivateLog', () => {
 });
 
 describe('host command failures', () => {
+  it('bounds even allowFail commands and reaps a child that ignores SIGTERM', async () => {
+    const started = Date.now();
+    await expect(
+      run(
+        [process.execPath, '-e', 'process.on("SIGTERM", () => {}); setInterval(() => {}, 1000)'],
+        { timeoutMs: 80, allowFail: true }
+      )
+    ).rejects.toThrow(/timed out/);
+    expect(Date.now() - started).toBeLessThan(2_000);
+  });
+
   it('propagates nonzero exits through the simulator command boundary', async () => {
     await expect(run(['/usr/bin/false'])).rejects.toThrow(/command failed/);
   });

@@ -64,7 +64,7 @@ test('real nginx serves pages, retires sensitive paths, redirects 11 locales, an
       await Bun.sleep(40);
     }
     if (!ready) throw new Error(`nginx did not start: ${errors}`);
-    for (const path of ['/', '/download', '/releases', '/releases/', '/roadmap', '/terms', '/privacy', '/dev', '/mockups', '/screenshots', '/scenes/custom']) {
+    for (const path of ['/', '/download', '/releases', '/releases/', '/roadmap', '/terms', '/privacy']) {
       const response = await request(path);
       expect(response.status).toBe(200);
       expect(response.headers.get('content-type')).toContain('text/html');
@@ -73,6 +73,7 @@ test('real nginx serves pages, retires sensitive paths, redirects 11 locales, an
       expect(response.headers.get('content-security-policy')).toContain("frame-ancestors 'self'");
       expect(await response.text()).toContain('<h1');
     }
+    for (const path of ['/dev', '/screenshots', '/logos', '/social', '/mockups', '/scenes/custom', '/__artwork/catalog', '/social/manifest.json']) expect((await request(path)).status).toBe(404);
     for (const path of ['/releases/channels.json', '/releases/1.2.3/artwork/test.png', '/ios', '/ios/releases/test/manifest.json']) expect((await request(path)).status).toBe(503);
     for (const locale of ['en', 'es', 'ja', 'ko', 'zh', 'fr', 'uk', 'ru', 'pl', 'de', 'pt']) {
       for (const suffix of ['', '/']) {

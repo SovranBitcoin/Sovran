@@ -1,255 +1,151 @@
-# Press assets
+# Screenshots And Artwork
 
-## Marketing workbench
+Run `bun run site:dev` from the repository root and open
+<http://localhost:4321/dev>.
 
-Run `bun run site:dev` from the repository root and open `/dev`. Use `/screenshots`
-to inspect what each retained image shows, its flow/state, related pages and run
-provenance. `/mockups` pairs curated stories with one-to-four-phone compositions;
-`/scenes` displays every supported orientation. The custom composer supports
-shareable selections and fixed-ratio canvases without cropping or stretching.
+| Local page | Purpose |
+| --- | --- |
+| `/screenshots` | Native views paired by page/state and platform, with freshness, attempts and blockers |
+| `/logos` | Logo families and colorways with ordered PNG sizes and SVG downloads |
+| `/social` | Related-screen templates, editable copy/phones/poses, PNG and recipe downloads |
+| `/mockups` | Explicit website compositions and their output status |
 
-`bun run press:variants` lists the export plan without writing images. To render:
+These pages and the artwork API exist only in the local dev server. Public builds
+exclude them before compilation, so their screenshot catalogs cannot leak through
+Astro's generated asset directory. `noindex` is not the security boundary.
 
-```sh
-bun run press:variants --export ../press/exports/normalized
-```
+## Sources And Outputs
 
-The renderer verifies the retained bytes, skips missing captures and records
-source/output hashes. P2PK key management and locked receiving are a registered
-story awaiting reviewed captures; the existing Unified QR is not substituted.
-These are marketing illustrations from historical captures, not device tests.
+- `app/assets/brand/source/` owns logo masters. Keep the generated native/logo
+  variants because app installation and release tooling consume them.
+- `press/screenshots/` owns the latest verified full-page capture library. Its
+  manifest contains sanitized provenance; raw native logs and AX snapshots stay
+  in ignored E2E artifacts, never in this library.
+- `press/artwork/source/screenshots.json` retains the existing curated press
+  selections, their pixel size and metadata. Successful reviewed capture recipes
+  refresh those aliases; the store archive below is never rewritten by a capture.
+- `press/artwork/source/concepts/`, copy, layouts and screenshot context describe
+  compositions. Wallpapers and their provenance remain source inputs.
+- Social previews and PNG downloads are rendered in memory. Browsing does not
+  save a poster inventory, contact sheets or every orientation combination.
+- `press/website.json` selects named website scenes and the public OG output.
+  `site/public/social/` is the single raster destination. The homepage's remaining
+  phone scenes render directly from its selected native captures.
 
-Routine asset commands no longer generate missing-input drafts. The older poster
-pipeline remains available through `assets:artwork`; only the explicit
-`assets:artwork:drafts` command allows placeholders. Do not publish those drafts.
+The old selected-poster and duplicate full-mockup inventories are retired. The
+legacy poster renderer remains an explicit tool for its specialized wallpaper
+and store-feature-graphic contracts; normal refresh never runs its bulk writer.
 
-Promotional artwork lives in [artwork/](artwork/README.md), outside the app's
-runtime import graph. The initial move from `marketing/artwork/` preserved all
-internal source/output paths, filenames, capture pins, image bytes and file modes.
-That move was not a recapture, visual redesign or provenance upgrade. The later
-copy correction below intentionally changes the affected rendered artwork bytes.
-
-## Copy and frame corrections
-
-Copy version 4 corrected the `payments-instant` alternatives. Version 5 reviews
-all 19 concepts, including unselected alternatives, against [CLAIMS.md](../CLAIMS.md).
-Corrections distinguish digital cash from its mint-held backing, qualify recovery
-and compatibility, and explain provider visibility. Concept identities and the
-headline/subtitle selection mechanism are unchanged.
-
-This is a new render from historical source captures, not new native evidence.
-The full catalog is regenerated with the corrected copy and the shared continuous
-phone frame from `scripts/lib/phone-frame.mjs`. Copy, frame and renderer hashes
-are recorded in provenance. Source screenshots, screenshot registrations, store
-pins and brand assets are unchanged. No source capture was replaced or relabelled.
+## Refresh
 
 ```sh
-node scripts/artwork.mjs --allow-missing
+bun run screenshots:refresh:plan both
+bun run screenshots:refresh both
+bun run screenshots:refresh both --resume
+bun run screenshots:status --strict
 ```
 
-Use normal generation for copy changes. `--manifest-only` cannot apply them when
-rendered pixels differ.
-
-## Brand location correction
-
-Brand sources and generated exports remain at
-[`app/assets/brand`](../app/assets/brand/README.md). The EAS postinstall and asset
-checks require that owner today. Moving brand masters or outputs into `press/`
-would break that build contract; it is explicitly not part of this move. Fonts,
-runtime assets, e2e fixtures and scenario IDs also stay where they are.
-
-## Capture provenance
-
-### Partial iOS attempt, 2026-09-15
-
-A real disposable iPhone 17 Pro/iOS 26.2 run captured 12 core-tour PNGs, including
-a visibly updated receive QR. The run's eight-minute outer deadline interrupted
-it before verification; intake correctly rejected it. It used current Metro
-source with an existing **0.1.1 (1)** native development binary, not a fresh
-0.1.3 build. A retry stopped at the 10 GiB storage gate (8.6 GiB available).
-No canonical pixels or pins were replaced. The retained `ios/receive-qr` is now
-explicitly unavailable/stale; its historical bytes and attribution remain.
-See [the evidence and blockers](../app/e2e/press/REFRESH-2026-09-15.md).
-
-### Recapture status, 2026-09-14
-
-The existing `store-screenshots`, `marketing-screenshots`, and `backup.flow`
-journeys remain the capture path. Their obsolete onboarding/backup labels were
-repaired; the existing loader regression now derives expected titles from
-`copy/onboarding`. Validation, dry-runs and fake-driver smoke pass, but none of
-those are new native screenshot evidence.
-
-A fresh Android development APK was built for `com.sovranbitcoin.dev`, version
-0.1.3, with `ACTIVITY_RECOGNITION` absent. The real Android store-capture attempt
-stopped before emulator boot because the host had less than the runner's required
-7.3 GiB of free space. iOS still requires a fresh build. No retained screenshots
-or store pins were replaced, and the full recapture remains incomplete.
-
-The site phone scenes now use the app's continuous-corner construction for both
-screen clipping and the chassis, with an orthographic 3D extrusion. Regenerate
-their browser-rendered exports with `bun run press:mockups`; its manifest records
-input and image hashes. These scene exports do not establish screenshot freshness.
-
-The retained captures are historical. Existing run IDs and SHA-256 pins identify
-retained artifacts; they do not establish that those images show today's source
-or a newly built native app. Renderer/source fingerprints prove which local
-inputs produced an export, not native build freshness or successful device tests.
-The historical [validation record](artwork/VALIDATION.md) is not a current capture
-inventory or a new verification claim.
-
-The capture CLI below automates existing journeys and candidate export; no newly
-completed native capture or native freshness is claimed. Build-bound stamps are
-not implemented. Before claiming freshness, a successful native build and
-capture run must be verifiably bound to the reviewed source, platform/build
-identity, scenario and screenshot artifacts. A source fingerprint alone is not
-native proof. Failed builds, matching filenames and planned runs do not qualify.
-
-Never hand-copy real device captures into this tree or fill in provenance to
-make a check pass. Future capture ingestion must authenticate successful
-build-bound run artifacts and preserve their exact bytes and evidence. Until
-that mechanism exists, retain historical captures honestly and leave unavailable
-inputs as explicit drafts. Do not fabricate screenshots, masks or manifests.
-
-## Refreshing every screenshot
-
-One command captures, promotes and regenerates every screenshot on `/screenshots`:
+Refresh builds or verifies each native host, runs focused approved scenarios,
+imports passing evidence, updates the source library, then regenerates logos,
+selected website outputs and the public site. It never runs the entire functional
+suite implicitly. A simulator lane alone does not authorize publishing or spending.
 
 ```sh
-bun run screenshots:refresh:plan        # read-only: native build status, sessions, keys
-bun run screenshots:refresh             # both platforms, one after the other
-bun run screenshots:refresh ios         # or one platform
-bun run screenshots:refresh ios --scenario marketing.screenshots
+# Focused diagnosis; keep both-platform inventory visible.
+bun run screenshots:refresh android --scenario capture.local-navigation --attempts 1 --no-downstream
+
+# Regenerate derived website assets without touching a device.
+bun run screenshots:refresh --render-only
+
+# Explicit asset operations.
+bun run assets:brand
+bun run site:assets
+bun run site:assets:check
+bun run site:build
 ```
 
-For each platform it runs four stages:
+The capture profile is `library-v1`: iPhone 17 Pro Max / iOS 26.2 / 1320x2868,
+and the pinned Android emulator / 1080x2400 / 420dpi. Missing profiles fail rather
+than silently falling back.
 
-1. **Native build.** It computes the Expo fingerprint of the development client
-   (`APP_VARIANT=development`, generated `ios/` and `android/` excluded). A stamped
-   build in `app/e2e/artifacts/native-builds/<platform>/` with the same fingerprint
-   is reused. Otherwise it runs `expo prebuild` and a local build: `xcodebuild`
-   Debug for the iOS Simulator, or `gradlew assembleDebug` with JDK 17. iOS keeps
-   only the finished `Sovran.app`; its 10+ GB DerivedData is deleted afterwards.
-   `--rebuild force` or `--rebuild never` overrides the check.
-2. **Capture.** Every press session runs on that build. `SOVRAN_E2E_APP_PATH` and
-   `SOVRAN_E2E_APK_PATH` pin the drivers, so they never fall back to an older
-   installed app. A failed session retries once (`--attempts N`), and later
-   sessions still run.
-3. **Promotion.** Each passing session is imported with the full validation below,
-   then `promote.ts` copies its PNGs into `press/artwork/source/screenshots/` and
-   rewrites each registry entry with `run`, `sha256`, `capturedAt` and
-   `nativeBuild`. Unavailable and stale flags are cleared. Store pins move only
-   when the whole store set came from one run.
-4. **Failures.** A session that still fails writes `lastRefreshFailure` onto its
-   entries. The previous capture stays in use, and `/screenshots` says why it was
-   not replaced.
+Android capture also runs with animations disabled, recorded on each capture as
+`motion: reduced`. `uiautomator dump` waits for the window to go idle, and a
+looping animation — a skeleton shimmer, a marquee — never lets it, so the dump is
+reaped and the harness reads an empty screen it cannot act on. A still library
+frame wants the settled state anyway. iOS reads its accessibility hierarchy
+directly, needs no idle window, and keeps system motion; that asymmetry is why
+only the Android profile declares it. These frames are not evidence about
+animation behaviour on either platform.
 
-When anything was promoted, it then regenerates artwork and layout variants
-(`scripts/artwork.mjs --allow-missing --variants`), `press:mockups`, a fresh
-`press/exports/normalized` batch and the site build. `--no-downstream` skips this.
-A JSON report is written to `app/e2e/artifacts/screenshot-refresh-*.json`, and the
-exit code is non-zero if any build, session or downstream step failed.
+One body per platform. Every retained capture records its pixel size, and a
+capture that does not match its platform's reviewed geometry is withheld with
+that reason instead of being framed as a different phone — `/screenshots` names
+the device beside each image. Store delivery is a separate contract: Play rejects
+ratios above 2:1, so its Android images are 1080x1920. Those delivered bytes are
+archived under `press/artwork/source/store/` and pinned in
+`scripts/fixtures/artwork-store-pins.json`. Promotion never writes there, so
+recapturing the library cannot republish a differently shaped store image, and a
+new submission is a deliberate edit of that archive.
 
-Run it from a normal terminal and leave the machine alone: a full iOS pass is
-about an hour, and a simulator plus Metro needs several GB of RAM. Agent
-background jobs can be stopped under memory pressure. Each scenario runs as its
-own session, so captures promoted before an interruption are kept; rerun to
-continue.
+The campaign lock and checkpoint live in `app/e2e/artifacts/`. The checkpoint is
+`screenshot-refresh.json`; timestamped final reports are retained alongside it.
+Sessions alternate iOS/Android per recipe so one platform cannot monopolize the
+queue. Every attempt checkpoints its state. Resume skips only verified matching recipes,
+app/native fingerprints and image bytes. Inspect the recorded PID before removing
+a lock left behind by process death. Do not run overlapping native campaigns.
 
-Each capture session still needs **10 GiB free**. A cold iOS build peaks near
-11 GB before DerivedData is removed. Android also needs Gradle caches and a
-7.3 GiB emulator floor.
+## Coverage And Evidence
 
-Staleness is detected, not assumed away. Every promoted capture records
-`appSource`: a fingerprint of the files that decide rendered pixels (`app/`
-except e2e, tests and docs, plus `wallet/`, `nostr/`, `copy/`, `package.json` and
-`bun.lock`), with the commit it came from. `scripts/lib/app-source.mjs` owns the
-rule. Promotion refuses a capture without it, and a session whose app source
-changes mid-capture is not promoted. Edits to `press/`, `site/`, e2e scenarios
-or tests never make a capture look outdated.
+The inventory always contains all 101 canonical pages on both platforms: **202
+baseline slots**, plus meaningful state variants. A planned or blocked slot is
+not a captured image. Run the plan/status commands for current counts rather than
+treating this document as a capture report.
+
+Native fixtures render actual app components with controlled presentation data.
+Native navigation uses a disposable profile. Both retain
+`functionalResult: not-established`; neither proves payment settlement, hardware
+transport or recovery behavior. Import eligibility is separate from publication
+review. Real secrets and live private conversations are not approved sources.
+
+Missing views never receive substitute screenshots. A failed attempt leaves the
+last verified capture intact and visible as outdated when appropriate. Full strict
+coverage fails while any required slot is blocked, missing, corrupt or outdated.
+
+## Editing Artwork
+
+Choose a social template, change its text, screenshots, platform, compatible frame,
+arrangement or poses, and render the preview. The download rasterizes the same
+final SVG, not a separate approximation. Edits live in the URL fragment; export or
+import versioned JSON for a durable recipe. The endpoint cannot write recipes
+into the checkout or read arbitrary local paths/URLs.
+
+Every composition carries the brand lockup. `brand.placement` picks one of six
+anchors — `top-left`, `top-center`, `top-right`, `bottom-left`, `bottom-center`,
+`bottom-right` — or `none`; `brand.lockup` is the full logo and name
+(`wordmark`) or the symbol alone; `brand.scale` is 0.6-1.6. The watermark
+reserves its own band, so headline, subtitle and phones are laid out in what is
+left instead of being drawn over it, and the lockup is placed by its ink rather
+than its padded canvas. The theme follows the background automatically.
+
+Published images carry no provenance text. Capture freshness, evidence class and
+run identity live in the render's metadata and in the workbench, never in the
+pixels people see. Outdated sources still require explicit draft mode and a
+visible draft label — that label is what makes a draft unpublishable, and it sits
+in the same band, opposite the logo.
+Website output generation rejects drafts and preserves previous output on failure.
+Changing `press/website.json` and rerunning `site:assets` regenerates its selected
+deliverable with per-output source and recipe hashes.
+
+## Checks
 
 ```sh
-bun run screenshots:status           # current / outdated / unverified / withdrawn / missing
-bun run screenshots:status --strict  # exit 1 unless every capturable screenshot is current
+bun run screenshots:test
+bun test app/e2e/press app/e2e/core/loader.test.ts
+bun run site:test
+bun run site:build
+git diff --check
 ```
 
-`/screenshots` shows each capture's freshness, and the `/dev` gallery marks
-artwork built from outdated or unverified captures as `outdated capture`, so it
-leaves the Current view. Withdrawn captures are never displayed.
-
-Registry semantics:
-
-- `freshness: "stale"` with `staleReason` withdraws a capture whose content is
-  known to be wrong. Renderers and scenes exclude it, and `/screenshots` shows it
-  small beside its capture request.
-- Entries without `nativeBuild` predate build-stamped refreshes. They remain
-  usable and the page labels them as older captures.
-
-The lower-level `press:capture` (capture plus unreviewed candidates, no build or
-promotion) and `press:import RUN_DIR...` remain available.
-
-Selection is fixed to `store-screenshots`, all four `marketing-screenshots`
-scenarios, and only `backup.flow`, `settings.keyring.generate`, and
-`receive.qr-display.tabs` from `full`. `--scenario ID` narrows that allowlist to
-one exact scenario; it never expands it. The real e2e loader and planner
-check every selection and expanded fixture for simulator/no-funding operation.
-Some mint/media captures depend on external read data. Missing readiness must
-fail rather than produce an empty replacement.
-
-The read-only plan lists every scenario, all named capture steps, the 31 required
-press mappings per platform, and uncovered registrations. Mapping lives in
-`app/e2e/press/plan.ts`; no source pins are duplicated there. In particular:
-
-- `marketing.screenshots` / `ai` occurrence 2 is `ai-model-picker`.
-- Wallpaper `wallet` occurrences 1-8 are navy, sunset, beige, in-eclipse,
-  edge-of-lunar-day, setting-earth, new-moon and looking-back-at-earth. The last
-  is reached by re-applying the Artemis album and switching to EUR, because the
-  picker's first row cannot be tapped.
-- `marketing.screenshots.media` captures `thread`, `image-viewer` and `stories`.
-  The viewer opens from a separate control over the inert demo card and closes
-  with a swipe, because its close button is not in the iOS accessibility tree.
-- `backup.flow` / `backup-words` occurrence 1 is the existing display-only public
-  practice vector, not a real wallet backup.
-
-### Candidate intake
-
-Every session is validated before promotion. Intake requires a native
-`product-run` manifest, a source fingerprint, the exact selected scenarios, a
-completed passing event stream without failures, skips, deferrals or funding,
-successful cleanup and expected final states, and every named
-scenario/page/occurrence tied to its completed screenshot step. It checks PNG
-format, decoding, portrait dimensions, nonblank content and realpath containment,
-and verifies copied bytes. No resizing, re-encoding, AX/state sidecars, keys or
-logs are copied. To import existing runs without promoting them, name every
-directory explicitly:
-
-```sh
-bun app/e2e/press/import.ts app/e2e/artifacts/run-EXPLICIT_ID [OTHER_RUN_DIR ...]
-```
-
-Validation is structural. It does not prove a screen shows populated content, so
-scenarios must wait on a populated-state probe before each screenshot.
-
-```sh
-bun test app/e2e/press/*.test.ts
-```
-
-## Offline verification
-
-Run from the repository root:
-
-```sh
-node scripts/artwork.mjs --manifest-only --allow-missing
-node scripts/artwork.mjs --check --allow-missing
-bun run assets:test
-bun run assets:check
-```
-
-`--manifest-only` uses the existing renderer to recompute provenance, verifies
-every retained output byte and the output inventory, then updates only
-`artwork/generated/manifest.json`. It refuses changed pixels or missing outputs;
-it does not rewrite images. `--check` is read-only. Neither command performs
-network calls, builds or captures. `--allow-missing` labels absent inputs as
-drafts; it does not tolerate corrupt sources or certify capture freshness.
-
-`scripts/fetch-wallpapers.mjs` is a separate, explicit network maintenance command,
-not part of these checks. Do not run it as part of a path-only move.
+`site:assets:prune` previews retirement of manifest-owned, unchanged tracked
+outputs. Pass `--apply` to delete those exact files. It deliberately preserves
+edited assets, ignored/user exports, source screenshots and capture evidence.

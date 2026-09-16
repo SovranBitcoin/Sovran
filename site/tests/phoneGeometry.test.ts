@@ -53,7 +53,9 @@ test("retained Pro and Pro Max captures use their actual logical dimensions and 
     ).toBeLessThan(0.1);
     expect(device.thickness / ptPerMm).toBeCloseTo(8.75, 12);
   }
-  expect(captureDevice("android", 1080, 1920).radius).toBe(0);
+  const android = captureDevice("android", 1080, 2400);
+  expect(android.radius).toBe(0);
+  expect([android.width, android.height]).toEqual([360, 800]);
   for (const dimensions of [
     [2868, 1320],
     [1080, 1920],
@@ -61,6 +63,14 @@ test("retained Pro and Pro Max captures use their actual logical dimensions and 
     [Infinity, 2622],
   ])
     expect(() => captureDevice("ios", ...dimensions)).toThrow();
+  // Store-delivery geometry (Play rejects ratios above 2:1) is not a second
+  // framing body: it must be recaptured on library-v1, never drawn beside it.
+  for (const dimensions of [
+    [1080, 1920],
+    [2400, 1080],
+    [1320, 2868],
+  ])
+    expect(() => captureDevice("android", ...dimensions)).toThrow();
 });
 
 test("projection agrees with an independent three-axis rotation, including whole-device quarter turns", () => {
@@ -346,8 +356,8 @@ test("bounds contain every rendered depth section, including the intermediate si
       }
 });
 
-test("scene boundary rejects Android, unknown presets, corrupt poses, and hidden platform overrides", () => {
-  for (const key of ["android/wallet", "ios/../android/wallet", "wallet"])
+test("scene boundary rejects unknown platforms, presets, corrupt poses, and hidden platform overrides", () => {
+  for (const key of ["web/wallet", "ios/../android/wallet", "wallet"])
     expect(() => createScene([{ ...capture, key }])).toThrow();
   for (const preset of ["unknown", "toString", "__proto__"])
     expect(() => createScene([capture], { preset })).toThrow();
@@ -366,7 +376,22 @@ test("scene boundary rejects Android, unknown presets, corrupt poses, and hidden
   expect(() => createScene([])).toThrow();
 });
 
-test("website integrates the shared model directly, without a duplicate path or retained caption", () => {
+test('mixed iOS/Android scenes retain native ratios and enforce explicit frame identity', () => {
+  const inputs = [capture, { key: 'android/wallet', width: 1080, height: 2400, frameId: 'android-emulator' }];
+  for (const ordered of [inputs, [...inputs].reverse()]) {
+    const scene = createScene(ordered, { preset: 'duo-front' });
+    scene.phones.forEach((phone, index) => {
+      expect(phone.width / phone.height).toBeCloseTo(ordered[index].width / ordered[index].height, 12);
+      expect(phone.platform).toBe(ordered[index].key.split('/')[0]);
+    });
+    expect((scene.phones[0].height + scene.phones[0].bezel * 2) * scene.phones[0].scale).toBeCloseTo((scene.phones[1].height + scene.phones[1].bezel * 2) * scene.phones[1].scale, 10);
+  }
+  expect(() => createScene([{ ...capture, frameId: 'android-emulator' }])).toThrow();
+  expect(() => createScene([{ ...capture, frameId: 'iphone-17-pro' }])).toThrow();
+  expect(createScene([{ ...capture, frameId: 'iphone-17-pro-max' }]).phones[0].id).toBe('iphone-17-pro-max');
+});
+
+test("website integrates shared geometry, literal selected assets and a visible currentness disclosure", () => {
   const component = readFileSync(
     new URL("../src/components/PhoneScene.astro", import.meta.url),
     "utf8",
@@ -376,8 +401,10 @@ test("website integrates the shared model directly, without a duplicate path or 
     "utf8",
   );
   expect(component).toContain("scripts/lib/phone-frame.mjs");
-  expect(component).not.toContain("figcaption");
-  expect(integration).toContain("screenshots/ios/*.png");
+  expect(component).toContain("figcaption");
+  expect(component).toContain("data-capture-currentness");
+  expect(integration).not.toContain("import.meta.glob");
+  expect(integration).toContain("press/website.json");
   expect(integration).not.toContain("function continuousPath");
   const script = readFileSync(
     new URL("../scripts/visual.mjs", import.meta.url),

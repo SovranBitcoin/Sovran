@@ -17,7 +17,7 @@
     {"action":"screenshot","name":"settings"},
     {"action":"tapUntil","sequence":[{"tap":{"label":"Swap routing"}}],"until":{"label":"Max intermediaries"},"attempts":4,"settleMs":6000},
     {"action":"assert","that":"visible","selector":{"label":"Min transfer amount"}},
-    {"action":"screenshot","name":"settings"},
+    {"action":"screenshot","name":"settings-routing"},
     {"action":"goHome"},
     {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
   ],

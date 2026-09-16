@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "id": "capture.followers",
+  "name": "Empty follower notifications on a new profile",
+  "description": "Wait for follower notifications to finish loading for a disposable new profile, then capture its real empty state.",
+  "details": "Read-only network lookup, separate from local cohorts. No fixture is necessary for an empty fresh profile. Requires successful resolved data, not loading, error or a nonempty list; does not follow anyone or publish metadata.",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"openUrl","url":"sovran:///(drawer)/(tabs)/notifications/followers"},
+    {"action":"waitFor","selector":{"id":"notification-followers-empty"},"timeoutMs":90000},
+    {"action":"waitFor","selector":{"label":"No follows"},"timeoutMs":15000},
+    {"action":"screenshot","name":"notification-followers"},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

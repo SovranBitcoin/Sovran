@@ -39,7 +39,7 @@ describe('parseUiautomatorXml', () => {
     expect(send!.frame).toEqual({ x: 60, y: 2000, width: 460, height: 120 });
   });
 
-  it('prefers text over content-desc for the label and decodes entities', () => {
+  it('uses visible text when no accessibility label is authored and decodes entities', () => {
     const balance = findElement(snap, { id: 'wallet-balance' });
     expect(balance!.label).toBe('₿ 100');
   });
@@ -181,5 +181,40 @@ describe('merged probe content-desc', () => {
       'Minibits, 1'
     );
     expect(findElement(snap, { id: 'note-row:abc' })?.label).toBe('Coffee, tea and cake');
+  });
+});
+
+describe('Android authored labels and visible text', () => {
+  it('selects backup Word 1 by accessible label as well as the visible 1. text', () => {
+    const snapshot = parseUiautomatorXml(
+      `<hierarchy><node resource-id="backup-word-1" text="1." content-desc="Word 1" class="android.widget.TextView" bounds="[0,0][100,100]" /></hierarchy>`
+    );
+    const byLabel = findAndroidElement(snapshot, { label: 'Word 1' });
+    expect(byLabel?.id).toBe('backup-word-1');
+    expect(byLabel?.label).toBe('1.');
+    expect(byLabel?.accessibilityLabel).toBe('Word 1');
+    expect(findAndroidElement(snapshot, { label: '1.' })).toBe(byLabel);
+    expect(findAndroidElement(snapshot, { id: 'backup-word-1' })).toBe(byLabel);
+  });
+
+  it('decodes a merged suffix even alongside visible text, without treating editable values as labels', () => {
+    const snapshot = parseUiautomatorXml(
+      `<hierarchy><node resource-id="probe:ready" text="Visible text" content-desc="Media loaded, ready" bounds="[0,0][100,100]" /><node resource-id="field" text="private input" content-desc="Input label" class="android.widget.EditText" bounds="[0,0][100,100]" /></hierarchy>`
+    );
+    expect(findAndroidElement(snapshot, { label: 'Media loaded' })).toMatchObject({
+      value: 'ready',
+    });
+    expect(findAndroidElement(snapshot, { label: 'Visible text' })?.id).toBe('probe:ready');
+    expect(findAndroidElement(snapshot, { label: 'private input' })).toBeNull();
+    expect(findAndroidElement(snapshot, { label: 'Input label' })?.value).toBe('private input');
+  });
+
+  it('redacts noneditable secret visible-text aliases before serialization and matching', () => {
+    const snapshot = parseUiautomatorXml(
+      `<hierarchy><node resource-id="profile-secret-value-nsec" text="private-text" content-desc="private-label" bounds="[0,0][100,100]" /></hierarchy>`
+    );
+    expect(JSON.stringify(snapshot)).not.toContain('private-text');
+    expect(JSON.stringify(snapshot)).not.toContain('private-label');
+    expect(findAndroidElement(snapshot, { label: 'private-text' })).toBeNull();
   });
 });

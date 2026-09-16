@@ -50,6 +50,7 @@ import type { ProfileInfo, VideoPostRecord } from './feedTypes';
 import { Log } from '@/shared/lib/logger';
 import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import {
   remeasureVisualLayoutScope,
   useVisualListLogger,
@@ -361,6 +362,14 @@ const UserStoriesItem: FC<UserItemProps> = ({
 
   const isActive = userIndex === listCurrentIndex;
   const currentVideo = user.videoPosts[currentStoryIndex];
+  const mockMode = useSettingsStore((state) => state.mockMode);
+  // Hold only the bundled demo's decoded frame during explicit library capture.
+  // UIAutomator can otherwise arrive after playToEnd has closed the story.
+  const capturePresentation =
+    __DEV__ &&
+    process.env.EXPO_PUBLIC_E2E_CAPTURE_PROFILE === 'library-v1' &&
+    mockMode &&
+    currentVideo?.eventId === 'demo-artemis-story';
   const storyProgress = useSharedValue(0);
 
   const player = useVideoPlayer(currentVideo?.videoUrl ?? '', (p) => {
@@ -401,7 +410,7 @@ const UserStoriesItem: FC<UserItemProps> = ({
   }, [isActive, isClosing, player]);
 
   useEventListener(player, 'timeUpdate', ({ currentTime }) => {
-    if (!isActive || isClosing || captionExpandedRef.current) return;
+    if (!isActive || isClosing || captionExpandedRef.current || capturePresentation) return;
     safePlayerCall(player, (p) => {
       const dur = p.duration ?? 0;
       if (dur > 0) storyProgress.set(currentTime / dur);
@@ -423,7 +432,14 @@ const UserStoriesItem: FC<UserItemProps> = ({
   }, [currentStoryIndex, isActive, isClosing, player, storyProgress]);
 
   useEventListener(player, 'playToEnd', () => {
-    if (!isActive || isClosing || captionExpandedRef.current || !mountedRef.current) return;
+    if (
+      !isActive ||
+      isClosing ||
+      captionExpandedRef.current ||
+      !mountedRef.current ||
+      capturePresentation
+    )
+      return;
     if (currentStoryIndex < user.videoPosts.length - 1) {
       setCurrentStoryIndex(currentStoryIndex + 1);
     } else if (userIndex < totalUsers - 1) {
@@ -443,9 +459,16 @@ const UserStoriesItem: FC<UserItemProps> = ({
   }, [player]);
 
   const resumePlayer = useCallback(() => {
-    if (!isActive || isClosing || isDragging.get() || captionExpandedRef.current) return;
+    if (
+      !isActive ||
+      isClosing ||
+      isDragging.get() ||
+      captionExpandedRef.current ||
+      capturePresentation
+    )
+      return;
     safePlayerCall(player, (p) => p.play());
-  }, [isActive, isClosing, isDragging, player]);
+  }, [isActive, isClosing, isDragging, player, capturePresentation]);
 
   const changeCaptionExpanded = (expanded: boolean) => {
     captionExpandedRef.current = expanded;
@@ -568,7 +591,10 @@ const UserStoriesItem: FC<UserItemProps> = ({
             ) : (
               <VideoView
                 player={player}
-                onFirstFrameRender={() => setRenderedVideoUrl(currentVideo?.videoUrl)}
+                onFirstFrameRender={() => {
+                  if (capturePresentation) safePlayerCall(player, (p) => p.pause());
+                  setRenderedVideoUrl(currentVideo?.videoUrl);
+                }}
                 style={[StyleSheet.absoluteFill, styles.videoRadius]}
                 contentFit="contain"
                 nativeControls={false}
@@ -584,12 +610,15 @@ const UserStoriesItem: FC<UserItemProps> = ({
         </Pressable>
         {/* Outside the accessible Pressable: iOS hides an accessibility element's
             children, so a probe nested inside it never reaches the AX tree. */}
-        {isActive && currentVideo?.videoUrl === renderedVideoUrl && (
-          <E2EAccessibilityProbe
-            testID="story-video-ready"
-            accessibilityLabel="Story video ready"
-          />
-        )}
+        {isActive &&
+          !isClosing &&
+          currentVideo?.videoUrl &&
+          currentVideo.videoUrl === renderedVideoUrl && (
+            <E2EAccessibilityProbe
+              testID="story-video-ready"
+              accessibilityLabel="Story video ready"
+            />
+          )}
 
         <View style={styles.header} pointerEvents="box-none">
           <View testID="story-progress" style={styles.progressRow} pointerEvents="none">

@@ -1,6 +1,6 @@
 // Equal-radius construction from react-native-fast-squircle 1.1.5,
 // ios/SquirclePathGenerator.swift (MIT, site/public/licenses/fast-squircle.txt).
-// Smoothing .6 matches the app's SquircleView. See press/mockups/README.md
+// Smoothing .6 matches the app's SquircleView. See site/README.md
 // for capture identity evidence and the limits of this illustrative model.
 export function continuousPath(width, height, radius) {
   if (
@@ -39,7 +39,24 @@ export function continuousPath(width, height, radius) {
     c ${c} ${-d} ${b + c} ${-d} ${a + b + c} ${-d} Z`;
 }
 
-export function captureDevice(platform, width, height) {
+export const FRAME_IDS = Object.freeze({
+  ios: ['iphone-17-pro', 'iphone-17-pro-max'],
+  android: ['android-emulator'],
+});
+
+/**
+ * The library-v1 body for each platform, in device units. Draft placeholders
+ * use it so a missing capture is framed as the phone it is waiting for, and
+ * never as another platform's chassis.
+ */
+export const LIBRARY_BODY = Object.freeze({
+  ios: Object.freeze({ width: 440, height: 956 }),
+  android: Object.freeze({ width: 360, height: 800 }),
+});
+
+export function captureDevice(platform, width, height, frameId) {
+  if (frameId !== undefined && !FRAME_IDS[platform]?.includes(frameId))
+    throw new Error('Frame does not belong to the capture platform');
   if (
     ![width, height].every((v) => Number.isFinite(v) && v > 0) ||
     height <= width
@@ -47,15 +64,23 @@ export function captureDevice(platform, width, height) {
     throw new Error(
       "A full portrait capture is required; do not rotate app pixels into landscape",
     );
-  if (platform === "android")
-    return {
+  if (platform === "android") {
+    // Only the pinned library-v1 emulator (1080x2400) is a reviewed framing
+    // geometry. Store-delivery captures are 1080x1920 because Play rejects
+    // ratios above 2:1; deriving a body from whatever ratio arrived silently
+    // drew two different phones side by side. Recapture instead.
+    const device = {
       id: "android-emulator",
       width: 360,
-      height: (360 * height) / width,
+      height: 800,
       radius: 0,
       bezel: 9,
       thickness: 18,
     };
+    if (Math.abs(width / height - device.width / device.height) > 0.000001)
+      throw new Error(`Unreviewed Android capture dimensions: ${width}x${height}`);
+    return device;
+  }
   if (platform !== "ios") throw new Error("Unknown capture platform");
   // Apple's 460ppi at @3x. Average the two rounded published dimensions so
   // the continuous normal offset stays uniform (within .1mm of both axes).
@@ -83,6 +108,8 @@ export function captureDevice(platform, width, height) {
   );
   if (!device)
     throw new Error(`Unreviewed iOS capture dimensions: ${width}x${height}`);
+  if (frameId && device.id !== frameId)
+    throw new Error('Frame aspect ratio does not match the native capture');
   return device;
 }
 
@@ -94,6 +121,7 @@ export function phoneGeometry(
   imageHeight,
   {
     platform = "ios",
+    frameId,
     x = 0,
     y = 0,
     z = 0,
@@ -112,7 +140,7 @@ export function phoneGeometry(
     throw new Error(
       "Invalid pose: positive scale and front-facing pitch/yaw within +/-75 degrees required",
     );
-  const device = captureDevice(platform, imageWidth, imageHeight);
+  const device = captureDevice(platform, imageWidth, imageHeight, frameId);
   const { width, height, radius, bezel, thickness } = device;
   const rx = (rotateX * Math.PI) / 180,
     ry = (rotateY * Math.PI) / 180,
@@ -320,9 +348,9 @@ export function createScene(captures, { preset = "custom", poses } = {}) {
   let rowX = 0;
   const phones = captures
     .map((capture, index) => {
-      if (!/^ios\/[a-z0-9-]+$/.test(capture.key))
+      if (!/^(ios|android)\/[a-z0-9-]+$/.test(capture.key))
         throw new Error(
-          "Website scenes accept only reviewed ios/ screenshot references",
+          "Scenes accept only registered ios/ or android/ screenshot references",
         );
       const placement = poses
         ? poses[index]
@@ -341,7 +369,8 @@ export function createScene(captures, { preset = "custom", poses } = {}) {
         )
       )
         throw new Error("Invalid pose fields");
-      const device = captureDevice("ios", capture.width, capture.height);
+      const platform = capture.key.split('/')[0];
+      const device = captureDevice(platform, capture.width, capture.height, capture.frameId);
       const scale =
         ((placement.scale ?? 1) * chassisHeight) /
         (device.height + 2 * device.bezel);
@@ -375,7 +404,8 @@ export function createScene(captures, { preset = "custom", poses } = {}) {
           x,
           y,
           scale,
-          platform: "ios",
+          platform,
+          frameId: capture.frameId,
         }),
         index,
       };

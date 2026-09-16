@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "id": "capture.receive-rails",
+  "name": "Empty receive rail lists",
+  "description": "Read the three receive-history lists before any quote or payment request exists. No code is created, copied or paid.",
+  "details": "Direct navigation passes only the real rail enum and unit, not history objects. The success-only empty probe requires completed local reads and does not appear after a load failure. Default baseline is payment requests; subsequent occurrences are onchain and reusable Lightning offers.",
+  "lane": "simulator",
+  "tags": ["flow:receive","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"openUrl","url":"sovran:///(receive-flow)/railList?rail=paymentRequest&unit=sat"},
+    {"action":"waitFor","selector":{"id":"receive-rail-list-empty-paymentRequest"},"timeoutMs":30000},
+    {"action":"waitFor","selector":{"label":"Nothing here yet."},"timeoutMs":15000},
+    {"action":"screenshot","name":"receive-rails"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"openUrl","url":"sovran:///(receive-flow)/railList?rail=onchain&unit=sat"},
+    {"action":"waitFor","selector":{"id":"receive-rail-list-empty-onchain"},"timeoutMs":30000},
+    {"action":"screenshot","name":"receive-rails"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"openUrl","url":"sovran:///(receive-flow)/railList?rail=bolt12&unit=sat"},
+    {"action":"waitFor","selector":{"id":"receive-rail-list-empty-bolt12"},"timeoutMs":30000},
+    {"action":"screenshot","name":"receive-rails"},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

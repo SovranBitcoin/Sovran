@@ -87,52 +87,68 @@ describe('AndroidDriver Wallet navigation', () => {
   });
 });
 
+describe('unsupported Android action contracts', () => {
+  it('fails without touching app data for permission reset or GPS set/clear', async () => {
+    const { driver } = walletTabDriver();
+    await expect(driver.setPermission('location', 'reset')).rejects.toThrow(/unsupported/);
+    await expect(driver.setLocation('set', 10, 20)).rejects.toThrow(/unsupported/);
+    await expect(driver.setLocation('clear')).rejects.toThrow(/unsupported/);
+  });
+});
+
 describe('AndroidDriver screenshot safety', () => {
-  it('masks a visible mnemonic value by default without obscuring ordinary profile controls', async () => {
-    const input = await sharp({
-      create: {
-        width: 10,
-        height: 10,
-        channels: 3,
-        background: { r: 255, g: 255, b: 255 },
-      },
-    })
-      .png()
-      .toBuffer();
-    const adb = {
-      async screencapPng() {
-        return new Uint8Array(input);
-      },
-      async screenSize() {
-        return { width: 10, height: 10 };
-      },
-      async uiautomatorDumpXml() {
-        return `<?xml version="1.0" encoding="UTF-8"?>
+  it.each([undefined, 'library-v1'] as const)(
+    'masks secrets or rejects wrong dimensions for profile=%s',
+    async (captureProfile) => {
+      const input = await sharp({
+        create: {
+          width: 10,
+          height: 10,
+          channels: 3,
+          background: { r: 255, g: 255, b: 255 },
+        },
+      })
+        .png()
+        .toBuffer();
+      const adb = {
+        async screencapPng() {
+          return new Uint8Array(input);
+        },
+        async screenSize() {
+          return { width: 10, height: 10 };
+        },
+        async uiautomatorDumpXml() {
+          return `<?xml version="1.0" encoding="UTF-8"?>
           <hierarchy rotation="0">
             <node resource-id="root" class="android.view.View" bounds="[0,0][10,10]">
               <node resource-id="profile-secret-value-mnemonic" class="android.widget.EditText" bounds="[2,2][6,6]" />
               <node resource-id="profile-reveal-mnemonic" content-desc="Hide" class="android.view.View" bounds="[7,7][9,9]" />
             </node>
           </hierarchy>`;
-      },
-    };
-    const driver = new AndroidDriver(
-      adb as unknown as Adb,
-      { pollMs: 1 },
-      {
-        install: async () => undefined,
-        screenshotSettleMs: 0,
+        },
+      };
+      const driver = new AndroidDriver(
+        adb as unknown as Adb,
+        { pollMs: 1, captureProfile },
+        {
+          install: async () => undefined,
+          screenshotSettleMs: 0,
+        }
+      );
+
+      if (captureProfile) {
+        await expect(driver.screenshot()).rejects.toThrow(/requires 1080x2400/);
+        return;
       }
-    );
+      const output = await driver.screenshot();
+      const { data, info } = await sharp(output)
+        .removeAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      const pixel = (x: number, y: number): number => data[(y * info.width + x) * info.channels];
 
-    const output = await driver.screenshot();
-    const { data, info } = await sharp(output)
-      .removeAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-    const pixel = (x: number, y: number): number => data[(y * info.width + x) * info.channels];
-
-    expect(pixel(3, 3)).toBe(0);
-    expect(pixel(8, 8)).toBe(255);
-  });
+      expect(pixel(3, 3)).toBe(0);
+      expect(pixel(8, 8)).toBe(255);
+    }
+  );
 });

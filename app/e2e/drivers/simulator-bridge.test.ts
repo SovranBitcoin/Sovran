@@ -28,6 +28,46 @@ const RAW_AX = JSON.stringify([
 ]);
 
 describe('capture-free simulator bridge', () => {
+  it('keeps one polling chain when SSE reconnects during an in-flight native query', async () => {
+    let descriptions = 0;
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const native: SimulatorBridgeNative = {
+      SimHID: class {
+        touch() {}
+        key() {}
+      },
+      axDescribe: async () => {
+        descriptions++;
+        if (descriptions === 1) await pending;
+        return RAW_AX;
+      },
+    };
+    const bridge = startSimulatorBridge({ udid: UDID, port: 0, native, pollMs: 60_000 });
+    try {
+      // eslint-disable-next-line no-restricted-globals -- owned loopback boundary
+      const rejected = await fetch(new URL('/ws', bridge.axEndpoint), {
+        headers: { Origin: 'https://example.com' },
+      });
+      expect(rejected.status).toBe(403);
+      // eslint-disable-next-line no-restricted-globals -- owned loopback SSE regression
+      const first = await fetch(bridge.axEndpoint);
+      await first.body!.cancel();
+      await Bun.sleep(20);
+      // eslint-disable-next-line no-restricted-globals -- owned loopback SSE regression
+      const second = await fetch(bridge.axEndpoint);
+      release();
+      await Bun.sleep(50);
+      await second.body!.cancel();
+      expect(descriptions).toBe(1);
+    } finally {
+      release();
+      bridge.stop();
+    }
+  });
+
   it('emits a fresh SSE observation when the accessibility tree is unchanged', async () => {
     let descriptions = 0;
     const native: SimulatorBridgeNative = {

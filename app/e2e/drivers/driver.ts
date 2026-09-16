@@ -13,6 +13,7 @@ import type { Selector } from '../schema/selectors';
 export interface AxNode {
   id?: string;
   label?: string;
+  accessibilityLabel?: string;
   value?: string;
   role?: string;
   state?: Record<string, boolean>;

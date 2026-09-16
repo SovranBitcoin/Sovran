@@ -1,51 +1,59 @@
 {
   "android": {
     "run": "run-2026-09-15T17-06-40-715Z-b6eb40f2",
+    "resolution": {
+      "width": 1080,
+      "height": 1920
+    },
     "screenshots": [
       {
-        "file": "source/screenshots/android/ai-chat.png",
+        "file": "source/store/android/ai-chat.png",
         "label": "AI CHAT",
         "sha256": "2fd26499a228624c65447363afbc4b3a5be0fd9a4589572cedfe82b8b5f8fed6"
       },
       {
-        "file": "source/screenshots/android/contacts.png",
+        "file": "source/store/android/contacts.png",
         "label": "CONTACTS",
         "sha256": "1984e3750ceed7a44096c6d12fd1bed084f31573f338962915730fa04e6be910"
       },
       {
-        "file": "source/screenshots/android/lightning-receive.png",
+        "file": "source/store/android/lightning-receive.png",
         "label": "LIGHTNING",
         "sha256": "bd83635d25bd5d51e011f434bf80552eccf27418c87d0a69577697e3125879ec"
       },
       {
-        "file": "source/screenshots/android/wallet.png",
+        "file": "source/store/android/wallet.png",
         "label": "WALLET",
         "sha256": "74e3610374002d09d10efce071fa900c4a1ceb6a1cdc547ee781930f2ac762a4"
       }
     ]
   },
   "ios": {
-    "run": "run-2026-09-15T16-06-18-394Z-a91429d3",
+    "run": "run-2026-09-15T21-05-41-340Z-d7fc0cd0",
+    "resolution": {
+      "width": 1320,
+      "height": 2868
+    },
     "screenshots": [
       {
-        "file": "source/screenshots/ios/ai-chat.png",
+        "file": "source/store/ios/ai-chat.png",
         "label": "AI CHAT",
-        "sha256": "9111da4191de2d6e5e2114e1e0d376ee684ee199e30813d23f4d3d8d27c660d1"
+        "sha256": "a21e941c2395d3ad7ccfdac443f3cd6b33204a7c1368668a2845cec6c78c662c"
       },
       {
-        "file": "source/screenshots/ios/contacts.png",
+        "file": "source/store/ios/contacts.png",
         "label": "CONTACTS",
-        "sha256": "baa17058121cddbfcafb996d336f56bec4444fad6d1dedc0e08d882c35e84b1c"
+        "sha256": "379817f1d9dea42cb8911c62ca3f06337b11c0276cce638fbf517139f1532c18"
       },
       {
-        "file": "source/screenshots/ios/lightning-receive.png",
+        "file": "source/store/ios/lightning-receive.png",
         "label": "LIGHTNING",
-        "sha256": "090bc726ebf175631406df4a99feb7c498f89797db91b4e243ce96c7c8438f89"
+        "sha256": "7655da8ce830cf5cf05e1db05e53f50d748de5cd40fad715a8917c250d40b3da"
       },
       {
-        "file": "source/screenshots/ios/wallet.png",
+        "file": "source/store/ios/wallet.png",
         "label": "WALLET",
-        "sha256": "27363210ff0839070c2c23c108d346224a837e07fd974c1b4ec263e89f6e3cf6"
+        "sha256": "690d2aac6f84f3d3b87a1e927a99ee49117e72501ceeaa45b89fcb7676b3db2e"
       }
     ]
   }

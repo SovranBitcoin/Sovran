@@ -1,6 +1,6 @@
 /* eslint-disable no-console -- press CLI boundary */
 import { spawn } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, statfsSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statfsSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -61,7 +61,7 @@ async function runPress(args: string[]) {
   const options = parsePressArgs(args);
   const plan = selectPressScenario(createPressPlan(options.platforms), options.scenario);
   if (options.planOnly) {
-    console.log(JSON.stringify(plan, null, 2));
+    writeFileSync(1, JSON.stringify(plan, null, 2) + '\n');
     return;
   }
   console.log(

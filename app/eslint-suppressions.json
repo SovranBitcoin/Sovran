@@ -37,11 +37,6 @@
       "count": 1
     }
   },
-  "features/feed/hooks/useNostrEngagement.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "features/feed/screens/NotificationsScreen.tsx": {
     "no-restricted-syntax": {
       "count": 5

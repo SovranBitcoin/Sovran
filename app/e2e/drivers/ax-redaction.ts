@@ -14,6 +14,7 @@ interface ProfileSecretAxFields {
   id?: string | null;
   label?: string | null;
   value?: string | null;
+  accessibilityLabel?: string | null;
 }
 
 export const isProfileSecretAxId = (id: string | null | undefined): boolean =>
@@ -27,6 +28,9 @@ export function redactProfileSecretAxFields<T extends ProfileSecretAxFields>(nod
     ...node,
     label: PROFILE_SECRET_AX_REDACTED,
     value: PROFILE_SECRET_AX_REDACTED,
+    ...(node.accessibilityLabel !== undefined
+      ? { accessibilityLabel: PROFILE_SECRET_AX_REDACTED }
+      : {}),
   };
 }
 

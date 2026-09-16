@@ -57,6 +57,8 @@ jobs:
       - name: Build static site
         working-directory: site
         run: bun run build
+      - name: Verify selected artwork against full app source
+        run: node site/scripts/website-assets.mjs --check
       - name: Verify shared website branding
         run: node scripts/site-brand.mjs --check && node --test scripts/site-brand.test.mjs
       - name: Verify legal bytes and no-JavaScript delivery

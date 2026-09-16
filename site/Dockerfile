@@ -13,19 +13,20 @@ COPY site/src ./src
 COPY site/public ./public
 COPY site/scripts/verify-inputs.mjs ./scripts/verify-inputs.mjs
 COPY site/scripts/local-releases.mjs ./scripts/local-releases.mjs
-COPY site/scripts/local-artwork.mjs ./scripts/local-artwork.mjs
-COPY site/scripts/visual.mjs ./scripts/visual.mjs
-COPY site/scripts/variants.mjs ./scripts/variants.mjs
+COPY site/scripts/production-boundary.mjs site/scripts/website-config.mjs site/scripts/composition-recipe.mjs ./scripts/
+COPY site/scripts/website-captures.mjs site/scripts/source-catalog.mjs ./scripts/
+COPY site/scripts/website-assets.mjs site/scripts/composition.mjs ./scripts/
 COPY scripts/site-brand.mjs /build/scripts/site-brand.mjs
 COPY app/assets/brand/source/symbol.svg /build/app/assets/brand/source/symbol.svg
+COPY app/assets/fonts/MonaSans/MonaSans-ExtraBold.ttf app/assets/fonts/MonaSans/MonaSans-Medium.ttf /build/app/assets/fonts/MonaSans/
 COPY scripts/lib/phone-frame.mjs /build/scripts/lib/phone-frame.mjs
 COPY scripts/lib/app-source.mjs /build/scripts/lib/app-source.mjs
 COPY copy/src/site.ts /build/copy/src/site.ts
 COPY copy/legal/documents.json /build/copy/legal/documents.json
-COPY press/artwork/source/screenshots.json /build/press/artwork/source/screenshots.json
-COPY press/artwork/source/screenshot-context.json /build/press/artwork/source/screenshot-context.json
-COPY press/artwork/source/screenshots/ios/*.png /build/press/artwork/source/screenshots/ios/
-COPY press/artwork/source/screenshots/android/*.png /build/press/artwork/source/screenshots/android/
+# Capture sources exist only in the build stage. The recipe plugin emits imports
+# for selected public scenes; the runtime receives only the resulting dist tree.
+COPY press/ /build/press/
+COPY app/e2e/schema/pages.ts /build/app/e2e/schema/pages.ts
 RUN node ../scripts/site-brand.mjs --check && node scripts/verify-inputs.mjs && node node_modules/astro/astro.js build
 
 FROM nginx:1.28.0-alpine

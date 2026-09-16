@@ -3,15 +3,30 @@
  * run-*\/press) and the screenshot library the site and artwork read
  * (press/artwork/source). Only candidates captured on a build-stamped native
  * app are promoted; every promoted entry records its run, capture time and
- * native build so /screenshots can say exactly what it shows.
+ * native build so /screenshots can say exactly what it shows. Every entry also
+ * records its pixel size: consumers pick a phone body from it, and a capture
+ * taken on the wrong device profile has to be visible rather than reframed.
+ *
+ * Store delivery is a separate contract with its own archived bytes under
+ * press/artwork/source/store (Play rejects ratios above 2:1, so its Android
+ * images are 1080x1920 while the library is the 1080x2400 library-v1 emulator).
+ * Promotion never writes there, so recapturing the library cannot silently
+ * republish a differently shaped store image.
  */
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, renameSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, renameSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { AppSourceStamp } from '../../../scripts/lib/app-source.mjs';
 import { ROOT, type Platform } from './plan';
 
 const hash = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
+
+/** PNG IHDR width/height. A registry entry without pixels has no device. */
+function pngSize(bytes: Buffer): { width: number; height: number } {
+  if (bytes.length < 24 || bytes.readUInt32BE(12) !== 0x49484452)
+    throw new Error('Candidate is not a PNG');
+  return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+}
 
 /** The subset of a native build stamp recorded on each promoted capture. */
 export type NativeBuildSummary = {
@@ -20,15 +35,18 @@ export type NativeBuildSummary = {
   buildNumber: string;
   gitSha: string;
   builtAt: string;
+  artifactSha256?: string;
 };
 
-export type RegistryEntry = {
+type RegistryEntry = {
   context: string;
   page: string;
   file: string;
   run: string | null;
   sha256: string | null;
   capturedAt?: string;
+  /** Pixel size of the retained capture; consumers pick a device body from it. */
+  capture?: { width: number; height: number };
   nativeBuild?: NativeBuildSummary;
   /** App source the capture was taken from; see scripts/lib/app-source.mjs. */
   appSource?: AppSourceStamp;
@@ -47,11 +65,10 @@ type CandidateManifest = {
   screenshots: { file: string; key: string; context: string; page: string; sha256: string }[];
 };
 
-export type LibraryPaths = { registry: string; artwork: string; pins: string };
-export const LIBRARY: LibraryPaths = {
+export type LibraryPaths = { registry: string; artwork: string };
+const LIBRARY: LibraryPaths = {
   registry: join(ROOT, 'press/artwork/source/screenshots.json'),
   artwork: join(ROOT, 'press/artwork'),
-  pins: join(ROOT, 'scripts/fixtures/artwork-store-pins.json'),
 };
 
 function readJson<T>(path: string): { value: T; indent: number } {
@@ -69,6 +86,7 @@ function writeJsonAtomic(path: string, value: unknown, indent: number) {
 const CAPTURE_FIELDS = [
   'run',
   'sha256',
+  'capture',
   'capturedAt',
   'nativeBuild',
   'appSource',
@@ -128,6 +146,7 @@ export function promoteCandidates(
           run: `run-${manifest.runId}`,
           sha256: shot.sha256,
           capturedAt: manifest.startedAt,
+          capture: pngSize(bytes),
           nativeBuild: build,
           appSource,
         },
@@ -144,42 +163,7 @@ export function promoteCandidates(
     registry[item.key] = item.entry;
   }
   writeJsonAtomic(paths.registry, registry, indent);
-  syncStorePins(registry, paths.pins);
   return staged.map((item) => item.key);
-}
-
-/** The artwork store pins mirror the retained store captures; keep them in lockstep. */
-function syncStorePins(registry: Record<string, RegistryEntry>, pinsPath: string) {
-  if (!existsSync(pinsPath)) return;
-  const { value: pins, indent } =
-    readJson<Record<string, { run: string; screenshots: { file: string; sha256: string }[] }>>(
-      pinsPath
-    );
-  let changed = false;
-  for (const [platform, data] of Object.entries(pins)) {
-    const entries = data.screenshots.map((source) => {
-      const name = source.file.split('/').at(-1)!.replace('.png', '').replace('ai-chat', 'ai');
-      return registry[`${platform}/${name}`];
-    });
-    const runs = new Set(entries.map((entry) => entry?.run));
-    // Only move the pins when the whole store set comes from one promoted run.
-    if (
-      runs.size !== 1 ||
-      !entries[0]?.run ||
-      !entries.every((entry) => entry?.nativeBuild && entry.appSource)
-    )
-      continue;
-    const run = entries[0].run;
-    if (
-      data.run === run &&
-      data.screenshots.every((source, i) => source.sha256 === entries[i]!.sha256)
-    )
-      continue;
-    data.run = run;
-    data.screenshots.forEach((source, i) => (source.sha256 = entries[i]!.sha256!));
-    changed = true;
-  }
-  if (changed) writeJsonAtomic(pinsPath, pins, indent);
 }
 
 /**

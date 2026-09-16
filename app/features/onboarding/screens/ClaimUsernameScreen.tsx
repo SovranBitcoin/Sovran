@@ -143,6 +143,8 @@ function UsernameInput({
         },
       ]}>
       <TextInput
+        testID="claim-username-input"
+        accessibilityLabel="Username"
         value={value}
         onChangeText={handleChange}
         placeholder="username"
@@ -384,6 +386,7 @@ export function ClaimUsernameScreen() {
 
   const CloseButton = () => (
     <ScreenHeaderAction
+      testID="claim-username-close"
       icon="material-symbols:close-rounded"
       onPress={handleClose}
       accessibilityLabel="Close"
@@ -536,6 +539,7 @@ export function ClaimUsernameScreen() {
       <ButtonHandler
         buttons={[
           {
+            testID: 'claim-username-continue',
             text: isClaiming ? 'Claiming…' : 'Continue',
             variant: 'secondary' as const,
             disabled: isClaiming || !selectedDomainAvailable,

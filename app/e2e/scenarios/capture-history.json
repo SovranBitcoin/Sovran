@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "id": "capture.history",
+  "name": "Native demo transaction details",
+  "description": "Open existing demo history rows and filters without creating, paying, reclaiming or sharing anything.",
+  "details": "Actual native transaction screens select existing mockDataStore rows through normal history navigation. This is native-fixture evidence only. No fabricated route or history objects. Detail legs beyond the store screenshot invoice leg need native validation.",
+  "lane": "simulator",
+  "tags": ["flow:history","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"capture.mock"}
+  ],
+  "steps": [
+    {"action":"openUrl","url":"sovran://transactions"},
+    {"action":"waitFor","selector":{"id":"transactions-filter-open"},"timeoutMs":30000},
+    {"action":"screenshot","name":"transactions"},
+    {"action":"tap","selector":{"id":"transactions-filter-open"}},
+    {"action":"waitFor","selector":{"id":"filter-direction-incoming"},"timeoutMs":30000},
+    {"action":"screenshot","name":"transaction-filters"},
+    {"action":"tap","selector":{"id":"filters-apply"}},
+    {"action":"waitFor","selector":{"id":"transactions-filter-open"},"timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"transaction-melt-demo-melt-0"}}],"until":{"id":"melt-quote-id-demo-melt-0"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"lightning-send"},
+    {"action":"goHome"},
+    {"action":"openUrl","url":"sovran://transactions"},
+    {"action":"waitFor","selector":{"id":"transactions-filter-open"},"timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"transaction-send-demo-send-cancelled-2"}}],"until":{"id":"send-token-id-demo-send-cancelled-2"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"send-token"},
+    {"action":"goHome"},
+    {"action":"openUrl","url":"sovran://transactions"},
+    {"action":"waitFor","selector":{"id":"transactions-filter-open"},"timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"transaction-receive-demo-receive-3"},"attempts":4,"settleMs":1000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"transaction-receive-demo-receive-3"}}],"until":{"id":"receive-token-id-demo-receive-3"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"receive-token"},
+    {"action":"goHome"},
+    {"action":"openUrl","url":"sovran://transactions"},
+    {"action":"waitFor","selector":{"id":"transactions-filter-open"},"timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"swap-row-demo-swap-5"},"attempts":6,"settleMs":1000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"swap-row-demo-swap-5"}}],"until":{"id":"swap-id-demo-swap-5"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"swap"},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "finally": [
+    {"use":"capture.mock-off"}
+  ],
+  "endState": "wallet"
+}

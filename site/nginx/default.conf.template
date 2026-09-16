@@ -67,6 +67,10 @@ server {
         try_files $uri =404;
     }
     location = /build.json { default_type application/json; try_files $uri =404; }
+    # Defense in depth; these routes are excluded before Astro builds them.
+    location ~ ^/(dev|screenshots|logos|mockups|scenes[^/]*|__artwork)(/|$) { return 404; }
+    location = /social { return 404; }
+    location = /social/ { return 404; }
     location = /.well-known/nostr.json {
         default_type application/json;
         add_header Access-Control-Allow-Origin "*" always;

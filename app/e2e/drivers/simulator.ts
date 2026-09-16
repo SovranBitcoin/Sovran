@@ -8,6 +8,7 @@ import { chmodSync, closeSync, constants, mkdtempSync, openSync, rmSync } from '
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
+import { assertCaptureResolution, type CaptureProfile } from './capture-profile';
 import { redactString } from '../core/redact';
 import {
   parseE2EReadyProofAssets,
@@ -43,6 +44,7 @@ import { SimulatorInfrastructureError } from './simulator-session';
 import { isProfileSecretAxId } from './ax-redaction';
 
 interface SimConfig {
+  captureProfile?: CaptureProfile;
   udid: string;
   axEndpoint: string;
   touchEndpoint: string;
@@ -1010,6 +1012,8 @@ export class SimulatorDriver implements Driver {
       // The remaining mask/compression work is memory-only. Remove raw pixels
       // immediately instead of retaining them until that work completes.
       target.cleanup();
+      if (this.#cfg.captureProfile)
+        assertCaptureResolution('ios', await sharp(Buffer.from(bytes)).metadata());
       return await maskScreenshotBytes(bytes, before, mask, after);
     } catch (error) {
       const infrastructureError =

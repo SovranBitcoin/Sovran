@@ -24,6 +24,8 @@
         "e2e/viewer/server.ts",
         "e2e/viewer/src/main.ts",
         "e2e/audit/fresh-matrix-cli.ts",
+        "e2e/capture/refresh.ts",
+        "e2e/capture/status.ts",
         "shared/stores/runtime/mockDataStore.ts"
       ],
       "project": ["**/*.{ts,tsx,js,jsx}"],
@@ -48,7 +50,7 @@
       "project": ["src/**/*.ts", "scripts/*.mjs"]
     },
     ".": {
-      "entry": ["release/check-inputs.mjs"]
+      "entry": ["release/check-inputs.mjs", "scripts/lib/app-source.d.mts"]
     }
   },
   "ignoreBinaries": ["knip", "python3"]

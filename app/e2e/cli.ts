@@ -43,6 +43,7 @@ import { AndroidClipboardChannel } from './drivers/android/clipboard';
 import { withAndroidEmulatorSession } from './drivers/android/android-session';
 import { createSimVideoRecorder } from './drivers/video';
 import { createSimulatorAppDataCapturer } from './drivers/app-data';
+import { captureEnvironment } from './drivers/capture-profile';
 import { generateControlledP2PKKeypair } from './funded';
 import { withBoundedCashuRequests } from './funded-runtime/cashu-request-boundary';
 import {
@@ -291,6 +292,12 @@ if (options.driver === 'sim' || options.driver === 'android') {
 }
 
 const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`;
+let capture: ReturnType<typeof captureEnvironment>;
+try {
+  capture = captureEnvironment();
+} catch (error) {
+  fail((error as Error).message);
+}
 let liveCocod: LiveCocodBoundary | undefined;
 let fundedRunLock: FundedRunLock | undefined;
 if (
@@ -433,6 +440,7 @@ artifacts.write(
     version: 1,
     runId,
     suite: suite.name,
+    ...capture,
     driver: options.driver,
     proof,
     sourceFingerprint,
@@ -558,6 +566,7 @@ try {
       await withAndroidEmulatorSession(
         {
           storeScreenshots: suite.name === 'store-screenshots',
+          captureProfile: capture.captureProfile,
           runId: sessionId,
           runDir: sessionDir,
           onLifecycle: (message) => bus.emit({ type: 'lifecycle', message }),
@@ -581,6 +590,9 @@ try {
             JSON.stringify({
               version: 1,
               runId: sessionId,
+              parentRunId: runId,
+              ...capture,
+              ...(session.capture ? { capture: session.capture } : {}),
               ephemeral: true,
               seedExport: funded,
               scenarios: groupScenarios.map(({ id }) => id),
@@ -594,7 +606,7 @@ try {
           );
           const android = new AndroidDriver(
             session.adb,
-            { signal },
+            { signal, captureProfile: capture.captureProfile },
             {
               install: session.install,
               reportInfrastructureFailure: session.reportInfrastructureFailure,
@@ -670,6 +682,7 @@ try {
       await withEphemeralSimulatorSession(
         {
           ...(suite.name === 'store-screenshots' ? { preferredDevice: 'iPhone 17 Pro Max' } : {}),
+          captureProfile: capture.captureProfile,
           runId: sessionId,
           runDir: sessionDir,
           onLifecycle: (message) => bus.emit({ type: 'lifecycle', message }),
@@ -696,6 +709,9 @@ try {
             JSON.stringify({
               version: 1,
               runId: sessionId,
+              parentRunId: runId,
+              ...capture,
+              ...(session.capture ? { capture: session.capture } : {}),
               ephemeral: true,
               seedExport: funded,
               scenarios: groupScenarios.map(({ id }) => id),
@@ -719,6 +735,7 @@ try {
             {
               udid: session.udid,
               axEndpoint: session.axEndpoint,
+              captureProfile: capture.captureProfile,
               touchEndpoint: session.touchEndpoint,
               signal,
             },

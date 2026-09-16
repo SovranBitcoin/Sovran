@@ -1,0 +1,17 @@
+---
+import Dev from '../layouts/Dev.astro';
+import '../styles/artwork-gallery.css';
+---
+<Dev title="Logos">
+  <h1>Logos</h1>
+  <p>Canonical brand artwork, grouped by layout and foreground-on-background colorway. PNG sizes are sorted numerically; SVG stays vector.</p>
+  <div class="gallery-filters"><button id="catalog-refresh" type="button">Refresh sources</button></div>
+  <p id="catalog-status" role="status" aria-live="polite">Reading the brand manifest...</p>
+  <div id="logo-groups"></div>
+  <details><summary>Brand generator</summary><p>The generator remains the source of truth. From the repository root, <code>bun run assets:brand</code> regenerates approved layouts; <code>bun run assets:check</code> checks runtime assets. This workbench only reads existing files and never runs either command.</p><p>Transparent previews use a neutral display surface; downloads retain their original alpha channel. Stale source hashes are disclosed on each export.</p></details>
+  <noscript>This local catalog needs JavaScript and the site dev server.</noscript>
+</Dev>
+<script>
+  import { mountLogos } from '../../scripts/catalog-browser.mjs';
+  mountLogos();
+</script>

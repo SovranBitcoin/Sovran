@@ -38,6 +38,10 @@ export const REINSTALL_KEYCHAIN_RETENTION_CAPABILITY = 'reinstall.keychain-reten
 export const CAPABILITIES = [
   // simulator / lifecycle
   'fresh-install',
+  // Whole action contracts, including clear/reset. Android must not claim
+  // these merely because pm grant/revoke or emulator geo fix is available.
+  'device.location',
+  'device.permission-reset',
   REINSTALL_KEYCHAIN_RETENTION_CAPABILITY,
   'mock.offline',
   DEVICE_NETWORK_CAPABILITY,
@@ -77,6 +81,8 @@ export const capabilitySchema = z.enum(CAPABILITIES);
 export const DRIVER_CAPS: Record<'sim' | 'android', ReadonlySet<string>> = {
   sim: new Set([
     'fresh-install',
+    'device.location',
+    'device.permission-reset',
     REINSTALL_KEYCHAIN_RETENTION_CAPABILITY,
     'mock.offline',
     PAYMENT_REQUEST_DELIVERY_FAILURE_CAPABILITY,

@@ -209,6 +209,21 @@ export function effectiveRequirements(
     ...new Set([
       ...scenario.requires,
       ...fixtureRequires([...scenario.setup, ...scenario.finally] as PhaseItem[], fixtures),
+      ...planSteps(
+        [
+          ...scenario.setup,
+          ...scenario.steps,
+          ...scenario.verify,
+          ...scenario.finally,
+        ] as PhaseItem[],
+        fixtures
+      ).flatMap((step) =>
+        step.action === 'location'
+          ? ['device.location']
+          : step.action === 'permission' && step.mode === 'reset'
+            ? ['device.permission-reset']
+            : []
+      ),
     ]),
   ];
 }

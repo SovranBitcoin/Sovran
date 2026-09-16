@@ -7,12 +7,17 @@ import { StoriesCarousel, type StoryUser } from '@/features/feed/components/nost
 jest.mock('@/shared/ui/primitives/Text', () => ({ Text: 'Text' }));
 jest.mock('@/shared/ui/primitives/Pressable', () => ({ Pressable: 'Pressable' }));
 jest.mock('@/shared/ui/primitives/Avatar', () => ({ Avatar: 'Avatar' }));
+jest.mock('@/shared/ui/primitives/View/View', () => ({ View: 'ProbeView' }));
 jest.mock('@/assets/icons', () => 'Icon');
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
 jest.mock('uniwind', () => ({ withUniwind: (component: unknown) => component }));
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 34 }) }));
 jest.mock('@/shared/ui/composed/ScrollEdgeFade', () => ({ ScrollEdgeFade: 'ScrollEdgeFade' }));
 jest.mock('@/shared/lib/date', () => ({ formatRelative: () => '2h' }));
+let mockMode = false;
+jest.mock('@/shared/stores/global/settingsStore', () => ({
+  useSettingsStore: (selector: (state: { mockMode: boolean }) => unknown) => selector({ mockMode }),
+}));
 jest.mock('@/shared/lib/logger', () => {
   const noop = { info: jest.fn(), warn: jest.fn(), debug: jest.fn(), error: jest.fn() };
   return { Log: 'Log', log: noop, storeLog: noop, feedLog: noop, redactError: (e: unknown) => e };
@@ -121,12 +126,19 @@ beforeAll(() => {
   });
 });
 let renderer: ReactTestRenderer;
+const captureEnv = process.env.EXPO_PUBLIC_E2E_CAPTURE_PROFILE;
+const originalDev = __DEV__;
 beforeEach(() => {
   jest.clearAllMocks();
+  mockMode = false;
+  delete process.env.EXPO_PUBLIC_E2E_CAPTURE_PROFILE;
   jest.mocked(useReducedMotion).mockReturnValue(false);
 });
 afterEach(() => {
   act(() => renderer?.unmount());
+  Object.assign(globalThis, { __DEV__: originalDev });
+  if (captureEnv === undefined) delete process.env.EXPO_PUBLIC_E2E_CAPTURE_PROFILE;
+  else process.env.EXPO_PUBLIC_E2E_CAPTURE_PROFILE = captureEnv;
 });
 
 function layoutText(lineCount: number) {
@@ -278,3 +290,63 @@ it('omits media-only captions and unmounts video/caption on close', () => {
   expect(renderer.root.findAllByType(StoryCaption)).toHaveLength(0);
   expect(renderer.root.findAll((node) => String(node.type) === 'VideoView')).toHaveLength(0);
 });
+
+it('holds only the decoded bundled demo frame in an explicit mock capture and removes readiness on close', () => {
+  mockMode = true;
+  process.env.EXPO_PUBLIC_E2E_CAPTURE_PROFILE = 'library-v1';
+  const demo = { ...user, videoPosts: [{ ...user.videoPosts[0], eventId: 'demo-artemis-story' }] };
+  const close = jest.fn();
+  act(() => {
+    renderer = create(<StoriesCarousel storyUsers={[demo]} onClose={close} />);
+  });
+  expect(renderer.root.findAllByProps({ testID: 'story-video-ready' })).toHaveLength(0);
+  mockPlayer.pause.mockClear();
+  act(() => {
+    renderer.root
+      .findAll((node) => String(node.type) === 'VideoView')[0]
+      .props.onFirstFrameRender();
+  });
+  expect(mockPlayer.pause).toHaveBeenCalled();
+  expect(renderer.root.findAllByProps({ testID: 'story-video-ready' }).length).toBeGreaterThan(0);
+  mockPlayer.play.mockClear();
+  act(() => {
+    mockListeners.playToEnd({});
+    renderer.root.findByProps({ testID: 'story-video' }).props.onPressOut();
+  });
+  expect(close).not.toHaveBeenCalled();
+  expect(mockPlayer.play).not.toHaveBeenCalled();
+  expect(renderer.root.findAllByProps({ testID: 'story-video-ready' }).length).toBeGreaterThan(0);
+  act(() => renderer.update(<StoriesCarousel storyUsers={[demo]} isClosing />));
+  expect(renderer.root.findAllByProps({ testID: 'story-video-ready' })).toHaveLength(0);
+});
+
+it.each([
+  { profile: undefined, mock: true, eventId: 'demo-artemis-story' },
+  { profile: 'library-v1', mock: false, eventId: 'demo-artemis-story' },
+  { profile: 'library-v1', mock: true, eventId: 'real-story' },
+  { profile: 'library-v1', mock: true, eventId: 'demo-artemis-story', dev: false },
+])(
+  'preserves ordinary story playback outside the complete capture gate: %j',
+  ({ profile, mock, eventId, dev }) => {
+    if (dev === false) Object.assign(globalThis, { __DEV__: false });
+    mockMode = mock;
+    if (profile) process.env.EXPO_PUBLIC_E2E_CAPTURE_PROFILE = profile;
+    const stories = {
+      ...user,
+      videoPosts: [{ ...user.videoPosts[0], eventId }, user.videoPosts[1]],
+    };
+    act(() => {
+      renderer = create(<StoriesCarousel storyUsers={[stories]} />);
+    });
+    mockPlayer.pause.mockClear();
+    act(() => {
+      renderer.root
+        .findAll((node) => String(node.type) === 'VideoView')[0]
+        .props.onFirstFrameRender();
+    });
+    expect(mockPlayer.pause).not.toHaveBeenCalled();
+    act(() => mockListeners.playToEnd({}));
+    expect(renderer.root.findByType(StoryCaption).props.caption).toBe('Story 1 caption');
+    expect(renderer.root.findAllByProps({ testID: 'story-video-ready' })).toHaveLength(0);
+  }
+);

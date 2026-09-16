@@ -13,15 +13,36 @@ import { lstatSync, readFileSync, readlinkSync } from "node:fs";
 import { join } from "node:path";
 
 /** Paths whose files decide what a captured app screen looks like. */
-export const APP_SOURCE_PATHS = Object.freeze(["app", "wallet", "nostr", "copy", "package.json", "bun.lock"]);
-/** Files inside those paths that cannot change rendered pixels. */
-export const APP_SOURCE_EXCLUDE = /^app\/(?:e2e|__tests__|docs)\/|(?:^|\/)__tests__\/|\.test\.[cm]?[jt]sx?$|\.md$/;
+const APP_SOURCE_PATHS = Object.freeze([
+  "app",
+  "wallet",
+  "nostr",
+  "copy",
+  "package.json",
+  "bun.lock",
+]);
+/** Files inside those paths that cannot change rendered pixels. The lint
+ * suppression ledger is bookkeeping for `eslint`, never a rendered input. */
+const APP_SOURCE_EXCLUDE =
+  /^app\/(?:e2e|__tests__|docs)\/|^app\/eslint-suppressions\.json$|^copy\/(?:scripts\/|src\/site\.ts$|(?:store|claims)\.json$)|(?:^|\/)__tests__\/|\.test\.[cm]?[jt]sx?$|\.md$/;
 
 const git = (root, args) =>
-  execFileSync("git", args, { cwd: root, maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] });
+  execFileSync("git", args, {
+    cwd: root,
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ["ignore", "pipe", "ignore"],
+  });
 
-export function appSourceFiles(root) {
-  const listed = git(root, ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...APP_SOURCE_PATHS]);
+function appSourceFiles(root) {
+  const listed = git(root, [
+    "ls-files",
+    "-z",
+    "--cached",
+    "--others",
+    "--exclude-standard",
+    "--",
+    ...APP_SOURCE_PATHS,
+  ]);
   return [...new Set(listed.toString("utf8").split("\0").filter(Boolean))]
     .filter((file) => !APP_SOURCE_EXCLUDE.test(file))
     .sort();
@@ -43,6 +64,11 @@ export function appSourceFingerprint(root) {
       } catch {
         bytes = Buffer.from("\0deleted\0"); // tracked but removed from the working tree
       }
+      // Command aliases do not change app pixels. Dependency/config fields still do.
+      if (file.endsWith("package.json")) {
+        const { scripts, ...inputs } = JSON.parse(bytes.toString("utf8"));
+        bytes = Buffer.from(JSON.stringify(inputs));
+      }
       hash.update(`${file}\0${bytes.length}\0`);
       hash.update(bytes);
     }
@@ -60,7 +86,10 @@ export function appSourceStamp(root) {
     return {
       fingerprint,
       gitSha: git(root, ["rev-parse", "HEAD"]).toString().trim(),
-      gitDirty: git(root, ["status", "--porcelain", "--", ...APP_SOURCE_PATHS]).toString().trim().length > 0,
+      gitDirty:
+        git(root, ["status", "--porcelain", "--", ...APP_SOURCE_PATHS])
+          .toString()
+          .trim().length > 0,
     };
   } catch {
     return undefined;
@@ -87,9 +116,13 @@ export function appFilesChangedSince(root, gitSha) {
  * withdrawn / missing: not usable. unknown: current source unavailable (e.g. a Docker build).
  */
 export function classifyCapture(entry, currentFingerprint) {
-  if (!entry || entry.availability === "unavailable" || entry.freshness === "stale") return "withdrawn";
+  if (!entry) return "missing";
+  if (entry.availability === "unavailable" || entry.freshness === "stale")
+    return "withdrawn";
   if (!entry.run || !entry.sha256) return "missing";
   if (!entry.appSource?.fingerprint) return "unverified";
   if (!currentFingerprint) return "unknown";
-  return entry.appSource.fingerprint === currentFingerprint ? "current" : "outdated";
+  return entry.appSource.fingerprint === currentFingerprint
+    ? "current"
+    : "outdated";
 }

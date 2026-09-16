@@ -51,6 +51,7 @@ export function preparePrivateLog(path: string): void {
 export interface RunOptions {
   allowFail?: boolean;
   signal?: AbortSignal;
+  timeoutMs?: number;
 }
 
 function abortReason(signal: AbortSignal): Error {
@@ -58,9 +59,22 @@ function abortReason(signal: AbortSignal): Error {
 }
 
 export async function run(cmd: string[], opts: RunOptions = {}): Promise<string> {
+  if (opts.timeoutMs !== undefined && (!Number.isFinite(opts.timeoutMs) || opts.timeoutMs <= 0)) {
+    throw new Error('command timeout must be positive and finite');
+  }
   if (opts.signal?.aborted) throw abortReason(opts.signal);
   const proc = Bun.spawn(cmd, { stdout: 'pipe', stderr: 'pipe', stdin: 'ignore' });
-  const onAbort = () => proc.kill('SIGTERM');
+  // Transport children own no durable state. Kill rather than leave a hung
+  // adb client holding stdout open after cancellation or a deadline.
+  const onAbort = () => proc.kill('SIGKILL');
+  let timedOut = false;
+  const timer =
+    opts.timeoutMs === undefined
+      ? undefined
+      : setTimeout(() => {
+          timedOut = true;
+          proc.kill('SIGKILL');
+        }, opts.timeoutMs);
   opts.signal?.addEventListener('abort', onAbort, { once: true });
   try {
     const [out, err, code] = await Promise.all([
@@ -69,10 +83,12 @@ export async function run(cmd: string[], opts: RunOptions = {}): Promise<string>
       proc.exited,
     ]);
     if (opts.signal?.aborted) throw abortReason(opts.signal);
+    if (timedOut) throw new Error(`command timed out after ${opts.timeoutMs}ms`);
     if (code !== 0 && !opts.allowFail)
       throw new Error(`command failed (${code}): ${cmd.join(' ')}\n${err || out}`);
     return out.trim();
   } finally {
+    if (timer) clearTimeout(timer);
     opts.signal?.removeEventListener('abort', onAbort);
   }
 }
@@ -343,15 +359,22 @@ export async function findInstallableApp(
     // A build-stamped app from `screenshots:refresh`: never fall back to an older bundle.
     const id = existsSync(join(pinned, 'Info.plist'))
       ? (
-          await run(['plutil', '-extract', 'CFBundleIdentifier', 'raw', join(pinned, 'Info.plist')], {
-            allowFail: true,
-          })
+          await run(
+            ['plutil', '-extract', 'CFBundleIdentifier', 'raw', join(pinned, 'Info.plist')],
+            {
+              allowFail: true,
+            }
+          )
         ).trim()
       : '';
     if (id !== bundleId)
-      throw new Error(`SOVRAN_E2E_APP_PATH ${pinned} is ${id || 'not an app bundle'}, expected ${bundleId}`);
+      throw new Error(
+        `SOVRAN_E2E_APP_PATH ${pinned} is ${id || 'not an app bundle'}, expected ${bundleId}`
+      );
     if (!(await hasBakedEntitlements(pinned)))
-      throw new Error(`SOVRAN_E2E_APP_PATH ${pinned} has no baked entitlements (SecureStore would fail)`);
+      throw new Error(
+        `SOVRAN_E2E_APP_PATH ${pinned} has no baked entitlements (SecureStore would fail)`
+      );
     onLifecycle(`using pinned app ${pinned}`);
     return pinned;
   }

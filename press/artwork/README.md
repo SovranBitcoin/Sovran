@@ -1,32 +1,29 @@
 # Sovran artwork
 
-Moved intact from `marketing/artwork/` to `press/artwork/`, preserving internal
-paths and image bytes at the time of the move. Copy version 4 subsequently changes
-the payment artwork's rendered text and bytes, not its source captures. See the
-[press provenance policy](../README.md): these captures are historical, not newly
-verified against a native build.
+This guide documents the specialized poster renderer and its wallpaper/mask
+contracts. Normal social artwork uses the in-memory `/social` workbench described
+in the [press guide](../README.md). Screenshot refresh does not run this batch
+writer, and its old selected PNG inventory is retired.
 
-One pipeline combines **concept × named layout × aspect**. Edit the JSON in
-`source/`; inspect existing artwork in the local site's `/dev` gallery, then
-choose one layout per aspect in `source/selection.json`. The gallery replaces
+The specialized pipeline combines **concept × named layout × aspect**. Edit the
+JSON in `source/` and choose one layout per aspect in `source/selection.json`.
+Exports require an explicit `--out` directory. The local workbench replaces
 contact-sheet collages permanently: do not generate, retain, or add manifest
 records for them. Layout descriptions and n/a reasons remain in the source
 catalog and manifest; use `--variants` when full-size comparisons are needed.
 
 - Wide: **2048×1000** (2.048:1), tall: **1080×1920**, square: **1080×1080**.
-- Selected PNGs: `generated/<concept>/<aspect>.png`.
-- Store banners: `generated/feature-graphic/{ios,android}/1024x500.png` are plain
+- Selected PNGs: `<out>/<concept>/<aspect>.png`.
+- Store banners: `<out>/feature-graphic/{ios,android}/1024x500.png` are plain
   Lanczos downscales of the selected feature concept's platform-specific wide
   render. The iOS companion is promotional artwork, not an App Store screenshot.
 - `--variants` retains every applicable full-size render under ignored
-  `generated/variants/<concept>/<layout>/<aspect>.png` for local comparison.
+  `<out>/variants/<concept>/<layout>/<aspect>.png` for explicit local comparison.
 - Outputs are opaque sRGB PNGs, under 15 MiB each.
 
 ```sh
-node scripts/artwork.mjs --allow-missing
-node scripts/artwork.mjs --check --allow-missing
-node scripts/artwork.mjs --manifest-only --allow-missing
-node scripts/artwork.mjs --only wallet --variants
+node scripts/artwork.mjs --only wallet --out /tmp/sovran-posters --allow-missing
+node scripts/artwork.mjs --only wallet --out /tmp/sovran-posters --check --allow-missing
 bun run assets:test
 bun run assets:check
 ```
@@ -39,12 +36,11 @@ renderer provenance changes; it cannot be combined with `--check`, `--only` or
 Full checks also reject unexpected committed output files. `--only` updates or
 checks one concept and preserves other manifest entries without certifying them;
 if it selects `selection.featureGraphic`, both platform banners update too.
-All inputs and renders validate before staged outputs replace committed files.
+All inputs and renders validate before staged outputs replace owned files.
 `--allow-missing` tolerates absent inputs only: bad hashes, unreadable images,
 invalid catalog/selection and copy collisions still fail. Strict mode fails even
-when only an unselected applicable variant needs an input. Root/app asset commands
-explicitly allow labelled drafts during capture work; unlike the old skip, they
-always verify every committed output. Remove that allowance when captures finish.
+when only an unselected applicable variant needs an input. Do not commit a bulk
+comparison folder or describe draft exports as current native capture evidence.
 
 ## Layout and source contracts
 
@@ -72,11 +68,14 @@ uses canonical S/wordmark geometry. Headlines and subtitles each fit at most two
 lines; the renderer asserts that the copy box does not intersect any phone's
 rotated frame bounds. The manifest retains those bounds for review.
 
-`source/screenshots.json` retains the page/file/run/sha256 contract. Screenshot
+`source/screenshots.json` retains the page/file/run/sha256 contract plus the
+capture's pixel size, which is how a consumer picks a phone body. Screenshot
 keys describe capture variants; `page` remains the actual canonical screen.
-Retained store images are byte-identical to their original runs, pinned separately
-in `scripts/fixtures/artwork-store-pins.json`. Do not overwrite them with a newer
-capture without explicitly changing those pins. No originals or old generated
+The images delivered to the stores live in their own archive, `source/store/`,
+byte-identical to their original runs and pinned in
+`scripts/fixtures/artwork-store-pins.json` with the delivery resolution. A
+library recapture rewrites `source/screenshots/`, never that archive; changing
+what a store shows is a deliberate edit of the pins and their bytes. No originals or old generated
 aliases remain in the previous `featured` or `feature-graphic` trees.
 
 ## Copy voice
@@ -174,9 +173,10 @@ copy version/hash, source/provenance hashes, renderer/font/brand hashes,
 output hash and dimensions where applicable. Variant records remain in the
 manifest even when their full PNGs are not retained. Commit selected outputs
 with their manifest. `marketingNotBundled` guards `press/`
-against app imports. EAS exclusions and the CI unchanged-tree guard must use the
-new `press/` and `press/artwork/generated` paths. `assets:check` verifies exact
-regeneration, not native freshness.
+against app imports. EAS exclusions use the `press/` path; the CI unchanged-tree
+guard watches `app/assets/brand`, because concept renders are exported on demand
+rather than committed. `site:assets:check` verifies exact regeneration of the
+declared website outputs, not native freshness.
 
 Tests cover source corruption, missing inputs, two-render determinism, original
 store pins, full-chrome geometry, catalog/selection validation, copy collisions,

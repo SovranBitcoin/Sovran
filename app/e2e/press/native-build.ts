@@ -9,13 +9,19 @@
  * stamp is recorded on every promoted screenshot.
  */
 import { execFileSync, spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
+  closeSync,
   copyFileSync,
   createWriteStream,
   existsSync,
   mkdirSync,
+  lstatSync,
+  openSync,
+  readlinkSync,
   readdirSync,
   readFileSync,
+  readSync,
   renameSync,
   rmSync,
   writeFileSync,
@@ -23,9 +29,10 @@ import {
 import { join } from 'node:path';
 import { ROOT, type Platform } from './plan';
 import type { NativeBuildSummary } from './promote';
+import { resolveAndroidSdkRoot } from '../drivers/android/adb';
 
 const APP_DIR = join(ROOT, 'app');
-export const NATIVE_BUILDS = join(APP_DIR, 'e2e/artifacts/native-builds');
+const NATIVE_BUILDS = join(APP_DIR, 'e2e/artifacts/native-builds');
 const BUNDLE_ID = 'com.sovranbitcoin.dev';
 // Continuous Native Generation: ios/ and android/ are generated from config, so
 // they are outputs of the fingerprinted inputs, never inputs themselves.
@@ -43,21 +50,64 @@ export type NativeBuildStamp = NativeBuildSummary & {
 
 export type RebuildPolicy = 'auto' | 'force' | 'never';
 
+/** Fixed-size reads, not stream async-iteration: iterating a read stream under
+ * Bun took over five minutes on the 385 MB debug APK that `shasum` hashes in
+ * about a second, which is what stalled whole capture campaigns before the
+ * attempt deadline existed. Constant memory, so a large artifact cannot trade
+ * the stall for a spike. */
+const HASH_CHUNK = 8 * 1024 * 1024;
+export function nativeArtifactHash(artifact: string): string {
+  const hash = createHash('sha256');
+  const buffer = Buffer.allocUnsafe(HASH_CHUNK);
+  const visit = (path: string, name: string) => {
+    const stat = lstatSync(path);
+    hash.update(`${name}\0${stat.mode}\0`);
+    if (stat.isSymbolicLink()) hash.update(readlinkSync(path));
+    else if (stat.isDirectory())
+      for (const entry of readdirSync(path).sort()) visit(join(path, entry), `${name}/${entry}`);
+    else if (stat.isFile()) {
+      const file = openSync(path, 'r');
+      try {
+        for (let read = readSync(file, buffer, 0, HASH_CHUNK, null); read > 0;)
+          (hash.update(buffer.subarray(0, read)),
+            (read = readSync(file, buffer, 0, HASH_CHUNK, null)));
+      } finally {
+        closeSync(file);
+      }
+    } else throw new Error('Unsupported native artifact entry');
+  };
+  visit(artifact, 'artifact');
+  return hash.digest('hex');
+}
+
 export async function nativeFingerprint(platform: Platform): Promise<string> {
-  // app.config.js switches bundle IDs on APP_VARIANT; fingerprint the dev client.
-  process.env.APP_VARIANT = 'development';
-  const { createFingerprintAsync } = await import('@expo/fingerprint');
-  const fingerprint = await createFingerprintAsync(APP_DIR, {
-    platforms: [platform],
-    ignorePaths: GENERATED_NATIVE_DIRS,
-    silent: true,
-  });
-  return fingerprint.hash;
+  // Keep Expo's config loader outside Bun's capture/import module graph and put
+  // a hard deadline around it: a stuck config must not hang an entire campaign.
+  const output = execFileSync(
+    'node',
+    [
+      '--input-type=module',
+      '-e',
+      `import { createFingerprintAsync } from '@expo/fingerprint';
+     const result = await createFingerprintAsync(process.cwd(), { platforms: [process.argv[1]], ignorePaths: ${JSON.stringify(GENERATED_NATIVE_DIRS)}, silent: true });
+     process.stdout.write(result.hash);`,
+      platform,
+    ],
+    {
+      cwd: APP_DIR,
+      env: { ...process.env, APP_VARIANT: 'development' },
+      encoding: 'utf8',
+      timeout: 60_000,
+      maxBuffer: 1024 * 1024,
+    }
+  ).trim();
+  if (!/^[a-f0-9]{40,64}$/.test(output)) throw new Error('Invalid native fingerprint output');
+  return output;
 }
 
 const stampPath = (platform: Platform) => join(NATIVE_BUILDS, platform, 'build.json');
 
-export function readStamp(platform: Platform): NativeBuildStamp | undefined {
+function readStamp(platform: Platform): NativeBuildStamp | undefined {
   try {
     const stamp = JSON.parse(readFileSync(stampPath(platform), 'utf8')) as NativeBuildStamp;
     return stamp.version === 1 && stamp.platform === platform ? stamp : undefined;
@@ -67,8 +117,15 @@ export function readStamp(platform: Platform): NativeBuildStamp | undefined {
 }
 
 export function buildSummary(stamp: NativeBuildStamp): NativeBuildSummary {
-  const { fingerprint, appVersion, buildNumber, gitSha, builtAt } = stamp;
-  return { fingerprint, appVersion, buildNumber, gitSha, builtAt };
+  const { fingerprint, appVersion, buildNumber, gitSha, builtAt, artifactSha256 } = stamp;
+  return {
+    fingerprint,
+    appVersion,
+    buildNumber,
+    gitSha,
+    builtAt,
+    ...(artifactSha256 ? { artifactSha256 } : {}),
+  };
 }
 
 export function nativeEnv(stamp: NativeBuildStamp): Record<string, string> {
@@ -93,12 +150,20 @@ function step(
     const out = createWriteStream(log, { flags: 'a' });
     out.write(`\n== ${label}: ${command} ${args.join(' ')}\n`);
     const child = spawn(command, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const stop = () => child.kill('SIGINT');
+    process.on('SIGINT', stop);
+    process.on('SIGTERM', stop);
+    child.once('close', () => {
+      process.off('SIGINT', stop);
+      process.off('SIGTERM', stop);
+    });
     child.stdout.pipe(out, { end: false });
     child.stderr.pipe(out, { end: false });
     child.once('error', reject);
     child.once('exit', (code, signal) => {
       out.end();
-      code === 0 ? resolve() : reject(new Error(`${label} failed (${signal ?? code}); see ${log}`));
+      if (code === 0) resolve();
+      else reject(new Error(`${label} failed (${signal ?? code}); see ${log}`));
     });
   });
 }
@@ -113,13 +178,6 @@ function plistValue(app: string, key: string) {
   return execFileSync('plutil', ['-extract', key, 'raw', join(app, 'Info.plist')], {
     encoding: 'utf8',
   }).trim();
-}
-
-/** The retained app bundle; DerivedData is discarded after each build (10+ GB). */
-function iosArtifact(out: string) {
-  const retained = join(out, 'Sovran.app');
-  if (existsSync(join(retained, 'Info.plist'))) return retained;
-  throw new Error(`No retained simulator app at ${retained}`);
 }
 
 function retainIosApp(out: string) {
@@ -161,10 +219,12 @@ async function buildIos(fingerprint: string): Promise<NativeBuildStamp> {
   const log = join(out, 'build.log');
   writeFileSync(log, '');
   const env = { ...process.env, CI: '1', APP_VARIANT: 'development' };
+  if (git(['ls-files', '--', 'app/ios']).length)
+    throw new Error('Refusing to clean tracked iOS sources');
   await step(
     'expo prebuild (ios)',
-    'bunx',
-    ['expo', 'prebuild', '--platform', 'ios'],
+    'node',
+    [require.resolve('expo/bin/cli'), 'prebuild', '--platform', 'ios', '--clean'],
     APP_DIR,
     env,
     log
@@ -188,6 +248,10 @@ async function buildIos(fingerprint: string): Promise<NativeBuildStamp> {
       'generic/platform=iOS Simulator',
       '-derivedDataPath',
       join(out, 'DerivedData'),
+      '-jobs',
+      '4',
+      `ARCHS=${process.arch === 'arm64' ? 'arm64' : 'x86_64'}`,
+      'ONLY_ACTIVE_ARCH=YES',
       'build',
     ],
     APP_DIR,
@@ -198,8 +262,6 @@ async function buildIos(fingerprint: string): Promise<NativeBuildStamp> {
 }
 
 function apkBadging(apk: string) {
-  const { resolveAndroidSdkRoot } =
-    require('../drivers/android/adb') as typeof import('../drivers/android/adb');
   const buildTools = join(resolveAndroidSdkRoot(), 'build-tools');
   for (const version of readdirSync(buildTools).sort().reverse()) {
     const aapt2 = join(buildTools, version, 'aapt2');
@@ -251,7 +313,6 @@ async function buildAndroid(fingerprint: string): Promise<NativeBuildStamp> {
   writeFileSync(log, '');
   const javaHome = resolveJdk17();
   // prebuild regenerates android/ without local.properties, so gradle needs the SDK path here.
-  const { resolveAndroidSdkRoot } = await import('../drivers/android/adb');
   const sdk = resolveAndroidSdkRoot();
   const env = {
     ...process.env,
@@ -263,8 +324,8 @@ async function buildAndroid(fingerprint: string): Promise<NativeBuildStamp> {
   };
   await step(
     'expo prebuild (android)',
-    'bunx',
-    ['expo', 'prebuild', '--platform', 'android'],
+    'node',
+    [require.resolve('expo/bin/cli'), 'prebuild', '--platform', 'android'],
     APP_DIR,
     env,
     log
@@ -304,7 +365,11 @@ export async function ensureNativeBuild(
 ): Promise<NativeBuildStamp> {
   const fingerprint = await nativeFingerprint(platform);
   const stamp = readStamp(platform);
-  const current = stamp?.fingerprint === fingerprint && existsSync(stamp.artifact);
+  const current =
+    stamp?.fingerprint === fingerprint &&
+    existsSync(stamp.artifact) &&
+    Boolean(stamp.artifactSha256) &&
+    nativeArtifactHash(stamp.artifact) === stamp.artifactSha256;
   if (current && policy !== 'force') {
     console.log(
       `${platform}: reusing native build ${stamp.appVersion} (${stamp.buildNumber}) from ${stamp.builtAt}`
@@ -322,6 +387,7 @@ export async function ensureNativeBuild(
   // Source must not change under the build, or the stamp would lie.
   if ((await nativeFingerprint(platform)) !== fingerprint)
     throw new Error(`${platform}: native inputs changed during the build; rerun once edits settle`);
+  built.artifactSha256 = nativeArtifactHash(built.artifact);
   writeStamp(built);
   return built;
 }
@@ -330,21 +396,26 @@ if (import.meta.main) {
   try {
     const [platform, flag] = process.argv.slice(2);
     if (platform !== 'ios' && platform !== 'android')
-      throw new Error(
-        'Usage: bun app/e2e/press/native-build.ts ios|android [--force|--adopt|--status]'
-      );
+      throw new Error('Usage: bun app/e2e/press/native-build.ts ios|android [--force|--status]');
     if (flag === '--status') {
       const fingerprint = await nativeFingerprint(platform);
       const stamp = readStamp(platform);
       console.log(
-        JSON.stringify({ fingerprint, stamp, current: stamp?.fingerprint === fingerprint }, null, 2)
+        JSON.stringify(
+          {
+            fingerprint,
+            stamp,
+            current:
+              stamp?.fingerprint === fingerprint &&
+              Boolean(stamp?.artifactSha256) &&
+              nativeArtifactHash(stamp!.artifact) === stamp!.artifactSha256,
+          },
+          null,
+          2
+        )
       );
-    } else if (flag === '--adopt') {
-      // Stamp an app already built into the expected location from current source.
-      if (platform !== 'ios') throw new Error('--adopt supports ios only');
-      writeStamp(iosStamp(iosArtifact(join(NATIVE_BUILDS, 'ios')), await nativeFingerprint('ios')));
-      console.log(readFileSync(stampPath('ios'), 'utf8'));
     } else {
+      if (flag !== undefined && flag !== '--force') throw new Error('Choose --force or --status');
       const stamp = await ensureNativeBuild(platform, flag === '--force' ? 'force' : 'auto');
       console.log(JSON.stringify(stamp, null, 2));
     }

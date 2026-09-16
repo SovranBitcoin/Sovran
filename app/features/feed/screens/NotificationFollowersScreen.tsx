@@ -34,6 +34,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
+import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 
 const NOTIFICATION_FOLLOWERS_VISUAL_SCOPE = 'feed.notification_followers.list';
 
@@ -112,6 +113,18 @@ export function NotificationFollowersScreen() {
 
   return (
     <Screen name="NotificationFollowersScreen" scroll="custom" bgColor={surface}>
+      {__DEV__ &&
+        viewerPubkey &&
+        page.result &&
+        !isInitialLoading &&
+        !isRefreshing &&
+        !errorMessage &&
+        followers.length === 0 && (
+          <E2EAccessibilityProbe
+            testID="notification-followers-empty"
+            accessibilityLabel="Follower notifications loaded with no entries"
+          />
+        )}
       <Log name="NotificationFollowersContent" style={notificationListStyles.root}>
         <List
           screen

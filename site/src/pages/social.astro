@@ -1,0 +1,55 @@
+---
+import Dev from '../layouts/Dev.astro';
+import '../styles/artwork-gallery.css';
+---
+<Dev title="Social compositions">
+  <h1>Social compositions</h1>
+  <p>Start from a concept, not a folder of exports. Templates pair metadata-related native screens; preview and download share one final render.</p>
+  <div class="gallery-filters">
+    <label>Concept<input id="concept-search" type="search" placeholder="Wallet, social, themes..." /></label>
+    <label>Phone count<select id="concept-count"><option value="">1-4 phones</option><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+    <label>Aspect ratio<select id="concept-ratio"><option value="">All ratios</option><option value="square">Square / 1:1</option><option value="portrait">Portrait / 4:5</option><option value="story">Story / 9:16</option><option value="landscape">Landscape / 1.9:1</option></select></label>
+    <label class="dev-check"><input id="gallery-draft" type="checkbox" /> Allow clearly labelled draft previews</label>
+  </div>
+  <p id="social-status" role="status" aria-live="polite">Reading concepts and source captures...</p>
+  <details id="social-editor">
+    <summary>Composition editor</summary>
+    <div class="social-editor">
+      <form id="composition-form">
+        <div class="dev-field"><label for="recipe-title">Recipe title</label><input id="recipe-title" maxlength="120" /></div>
+        <div class="dev-field"><label for="headline">Headline</label><textarea id="headline" maxlength="180" rows="2"></textarea></div>
+        <div class="dev-field"><label for="subtitle">Subtitle</label><textarea id="subtitle" maxlength="320" rows="3"></textarea></div>
+        <div class="editor-row">
+          <label>Background<select id="background"><option value="charcoal">Charcoal</option><option value="forest">Forest</option><option value="paper">Paper</option><option value="black">Black</option></select></label>
+          <label>Canvas<select id="canvas"></select></label>
+        </div>
+        <div class="editor-row"><label>Width<input id="canvas-width" type="number" min="320" max="2560" step="1" required /></label><label>Height<input id="canvas-height" type="number" min="320" max="2560" step="1" required /></label></div>
+        <label class="dev-field">Phone arrangement<select id="preset"></select></label>
+        <div class="editor-row">
+          <label>Brand watermark<select id="brand-placement"></select></label>
+          <label>Lockup<select id="brand-lockup"></select></label>
+          <label>Logo size<input id="brand-scale" type="number" min="0.6" max="1.6" step="0.05" /></label>
+        </div>
+        <div id="phone-controls"></div>
+        <label class="dev-check"><input id="recipe-draft" type="checkbox" /> Allow outdated / unverified sources as a labelled draft</label>
+        <div class="source-actions"><button type="submit" id="render-composition">Render preview</button><button type="button" id="export-recipe">Export recipe JSON</button></div>
+        <label class="dev-field">Import recipe JSON<input type="file" id="import-recipe" accept="application/json,.json" /></label>
+        <p class="dev-note">Edits are saved in this URL's hash, not to disk. Render after editing. Imported recipes are validated before use; they cannot select arbitrary files or URLs.</p>
+      </form>
+      <section class="composition-output" aria-label="Final composition preview">
+        <p id="render-status" role="status" aria-live="polite">Choose a template below to begin.</p>
+        <div id="composition-preview" class="composition-preview"><p>No image rendered yet.</p></div>
+        <a id="download-composition" class="dev-action" hidden>Download PNG</a>
+        <details><summary>Render provenance</summary><pre id="composition-provenance">No render yet.</pre></details>
+      </section>
+    </div>
+  </details>
+  <h2>Concept gallery</h2>
+  <p>Only visible templates render. Missing sources stay visible as capture requests, never replacement images.</p>
+  <div id="concept-gallery" class="concept-gallery"></div>
+  <noscript>This local editor needs JavaScript and the site dev server. It never runs native captures or writes generated images.</noscript>
+</Dev>
+<script>
+  import { mountCompositionEditor } from '../../scripts/composition-editor.mjs';
+  mountCompositionEditor();
+</script>

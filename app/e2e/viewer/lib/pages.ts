@@ -19,8 +19,9 @@ export function groupPages(details: RunDetail[], allRuns: boolean): PagesIndex {
     if (!allRuns && detail.status !== 'complete') continue;
     for (const scenario of detail.scenarios) {
       if (!allRuns) {
-        if (scenario.ok !== true || seenScenario.has(scenario.scenarioId)) continue;
-        seenScenario.add(scenario.scenarioId);
+        const key = `${detail.driver}/${scenario.scenarioId}`;
+        if (scenario.ok !== true || seenScenario.has(key)) continue;
+        seenScenario.add(key);
       }
       for (const named of scenario.named) {
         captures.push({

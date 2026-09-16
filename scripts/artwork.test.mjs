@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile, readdir } from "node:fs/promises";
+import {
+  readFile,
+  readdir,
+  mkdtemp,
+  mkdir,
+  writeFile,
+  rm,
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
 import {
@@ -38,23 +46,24 @@ test("contact-sheet collages cannot return through the artwork generator", async
   assert.doesNotMatch(source, /contactSheet|contact-sheets/);
 });
 
-test("artwork inventory contains no contact-sheet records or files", async () => {
-  const manifest = await readFile(join(FOLDER, "generated/manifest.json"), "utf8");
-  assert.doesNotMatch(manifest, /contactSheet|contact-sheets/);
-  const files = await readdir(join(FOLDER, "generated"), { recursive: true });
-  assert.deepEqual(
-    files.filter((file) => /contact-sheets[\\/].+\.png$/i.test(file)),
-    [],
-  );
-});
-
 test("known-stale screenshots cannot enter poster renders even when their bytes and hashes exist", async () => {
-  for (const status of [{ availability: "unavailable" }, { freshness: "stale" }]) {
+  for (const status of [
+    { availability: "unavailable" },
+    { freshness: "stale" },
+  ]) {
     const marked = structuredClone(project);
-    Object.assign(marked.screenshots["ios/ai"], status, { unavailableReason: "Needs a native recapture" });
+    Object.assign(marked.screenshots["ios/ai"], status, {
+      unavailableReason: "Needs a native recapture",
+    });
     const result = await loadInputs(marked, [spec]);
     assert.equal(result.shots["ios/ai"], null);
-    assert(result.missing.some(item => item.includes("ios/ai.png") && item.includes("Needs a native recapture")));
+    assert(
+      result.missing.some(
+        (item) =>
+          item.includes("ios/ai.png") &&
+          item.includes("Needs a native recapture"),
+      ),
+    );
     assert.equal(result.hashes["source/screenshots/ios/ai.png"], undefined);
   }
 });
@@ -223,7 +232,7 @@ test("missing captures fail strict checks and unselected portal variants report 
   const missingInputs = await loadInputs(project, [spec], readSource);
   assert.deepEqual(missingInputs.missing, [project.screenshots["ios/ai"].file]);
   await assert.rejects(
-    () => main(["--check", "--only", "ai-chat"], { readSource }),
+    () => main(["--check", "--only", "ai-chat", "--out", join(tmpdir(), "artwork-check")], { readSource }),
     /Missing inputs:\nsource\/screenshots\/ios\/ai\.png/,
   );
   const maskProject = structuredClone(project);
@@ -272,20 +281,28 @@ test("manifest-only refresh rejects partial runs and conflicting output modes", 
   }
 });
 
-test("manifest-only refresh refuses pixel changes without rewriting images or provenance", async () => {
-  const files = ["generated/manifest.json", "generated/ai-chat/wide.png"];
+test("manifest-only refresh refuses pixel changes without rewriting images or provenance", async (t) => {
+  const folder = await mkdtemp(join(tmpdir(), "artwork-manifest-"));
+  t.after(() => rm(folder, { recursive: true, force: true }));
+  await mkdir(join(folder, "ai-chat"));
+  await writeFile(join(folder, "manifest.json"), "{}");
+  await writeFile(
+    join(folder, "ai-chat/wide.png"),
+    "synthetic mismatching test bytes",
+  );
+  const files = ["manifest.json", "ai-chat/wide.png"];
   const before = await Promise.all(
-    files.map((file) => readFile(join(FOLDER, file))),
+    files.map((file) => readFile(join(folder, file))),
   );
   await assert.rejects(
     () =>
-      main(["--manifest-only", "--allow-missing"], {
+      main(["--manifest-only", "--allow-missing", "--out", folder], {
         readSource: async () => null,
       }),
     /Stale artwork: ai-chat\/wide\.png/,
   );
   for (const [index, file] of files.entries()) {
-    assert((await readFile(join(FOLDER, file))).equals(before[index]), file);
+    assert((await readFile(join(folder, file))).equals(before[index]), file);
   }
 });
 
@@ -304,35 +321,34 @@ test("source corruption is never tolerated as a missing input", async () => {
   );
 });
 
-test("retained screenshots preserve the eight original native store bytes and run IDs", async () => {
+test("archived store deliveries keep their original bytes and declared device", async () => {
   const pins = JSON.parse(
     await readFile(join(ROOT, "scripts/fixtures/artwork-store-pins.json")),
   );
   let count = 0;
-  for (const [platform, data] of Object.entries(pins))
+  for (const [platform, data] of Object.entries(pins)) {
     for (const source of data.screenshots) {
-      const key = source.file
-        .split("/")
-        .at(-1)
-        .replace(".png", "")
-        .replace("ai-chat", "ai");
-      const retained = project.screenshots[`${platform}/${key}`];
-      assert.equal(retained.run, data.run);
-      assert.equal(retained.sha256, source.sha256);
-      assert.equal(
-        hash(await readFile(join(FOLDER, retained.file))),
-        source.sha256,
-      );
+      // The archive is the delivery contract: it is never rewritten by a
+      // library recapture, so the bytes must still hash to their pin.
+      assert.match(source.file, new RegExp(`^source/store/${platform}/`));
+      const bytes = await readFile(join(FOLDER, source.file));
+      assert.equal(hash(bytes), source.sha256);
+      const { width, height } = await sharp(bytes).metadata();
+      assert.deepEqual({ width, height }, data.resolution);
       count++;
     }
+  }
   assert.equal(count, 8);
 });
 
 test("phone embeds the full original native capture and keeps status-bar/home-indicator geometry", async () => {
-  for (const platform of ["ios", "android"]) {
-    const bytes = await readFile(
-      join(FOLDER, project.screenshots[`${platform}/wallet`].file),
-    );
+  // One on-profile capture per platform: Android store deliveries are a
+  // different device and are withheld from framing until recaptured.
+  for (const [platform, key] of [
+    ["ios", "ios/wallet"],
+    ["android", "android/feed"],
+  ]) {
+    const bytes = await readFile(join(FOLDER, project.screenshots[key].file));
     const meta = await sharp(bytes).metadata();
     const rendered = await phone({
       screenshot: bytes,
@@ -493,7 +509,18 @@ test("portal preserves sharp canvas alignment through the full-size UI mask", as
   assert.equal(tall.record.centreRestored, false);
 });
 
-test("feature graphic is a plain Lanczos downscale of the selected platform wide render", async () => {
+test("feature graphic is a plain Lanczos downscale of the selected platform wide render", async (t) => {
+  const folder = await mkdtemp(join(tmpdir(), "artwork-feature-"));
+  t.after(() => rm(folder, { recursive: true, force: true }));
+  await main([
+    "--only",
+    project.selection.featureGraphic,
+    "--out",
+    folder,
+    "--allow-missing",
+  ]);
+  assert.doesNotMatch(await readFile(join(folder, "manifest.json"), "utf8"), /contactSheet|contact-sheets/);
+  assert.deepEqual((await readdir(folder, { recursive: true })).filter(file => /contact-sheets[\\/].+\.png$/i.test(file)), []);
   const overview = project.specs.find(
     (s) => s.id === project.selection.featureGraphic,
   );
@@ -518,9 +545,7 @@ test("feature graphic is a plain Lanczos downscale of the selected platform wide
       .toBuffer();
     assert(
       (
-        await readFile(
-          join(FOLDER, `generated/feature-graphic/${platform}/1024x500.png`),
-        )
+        await readFile(join(folder, `feature-graphic/${platform}/1024x500.png`))
       ).equals(downscaled),
     );
   }

@@ -859,9 +859,9 @@ changes. Both platform checks passed with this bounded exception.
 [artwork guide](press/artwork/README.md) replace both former marketing trees.
 `press/artwork/source/layouts.json` describes eight named layouts; concepts,
 copy choices, capture provenance and per-aspect selection are data alongside it.
-Every applicable concept/layout renders wide **2048×1000**, tall **1080×1920** and
-square **1080×1080**. Commit selected PNGs with their manifest; full variants
-remain ignored. The local site's `/dev` gallery permanently replaces contact-sheet
+The local social workbench renders selected recipes on demand and returns PNGs
+without persisting a comparison inventory. Only explicitly declared website raster
+outputs and native/logo variants are retained. The local site's `/dev` gallery permanently replaces contact-sheet
 collages: do not generate or retain collage PNGs or their manifest records.
 All six general layouts apply to every
 concept; repeat its retained capture when a composition needs more phone slots.
@@ -885,25 +885,32 @@ wallpaper; outside is blurred/darkened. Never fabricate captures or color-key UI
 The supplied panorama size exception (two 2048×1024, eleven 3840×1920) is recorded
 in the guide and source provenance, without altering supplied bytes.
 
-`assets:generate`/`assets:check` now operate on runtime assets only. Promotional
-artwork has explicit `assets:artwork` and `assets:artwork:check` commands that fail
-on missing inputs. Only `assets:artwork:drafts` opts into labelled placeholders;
-these are not publishable images. Existing drafts remain historical artifacts.
-Both EAS ignores and the marketing import guard keep artwork out of builds.
+`assets:generate`/`assets:check` operate on runtime assets only. Promotional
+artwork is no longer a committed tree: `scripts/artwork.mjs` requires an explicit
+`--out` directory and fails on missing inputs, so bulk concept renders land in an
+ignored export folder or a scratch path. `--allow-missing` opts into labelled
+placeholders; these are not publishable images. The `/social` workbench is the
+normal path — it composes selected recipes on demand and downloads them without
+storing an inventory. Both EAS ignores and the marketing import guard keep
+artwork out of builds.
 
-The Astro `/dev` workbench displays existing artwork as a lazy thumbnail grid,
-current by default with Needs review and All views, plus search, family and status
-filters. Native freshness is one catalog-level caveat, not a per-image status. Dev/preview-only `local-artwork.mjs`
-serves allowlisted generated PNGs through opaque IDs, never arbitrary local paths
-or raw native run directories. It verifies render hashes independently of capture
-freshness, deduplicates identical bytes, and labels historical/draft/stale images.
-It also links `/screenshots`, `/mockups`, and the orientation atlas `/scenes`.
+The Astro `/dev` workbench separates paired screenshots, grouped logos, editable
+social compositions and selected website outputs. The dev-only `local-artwork.mjs`
+serves manifest-approved assets through opaque IDs and bounded in-memory renders,
+never arbitrary local paths or raw native run directories. Public builds exclude
+workbench routes before compilation. Draft previews require explicit opt-in and
+visible disclosure; website output generation rejects drafts.
 `screenshot-context.json` owns reviewed caption, state, purpose,
 flow, related pages and curated collections; the capture plan/importer preserves
 these alongside provenance. Missing inputs are capture requests, never substitute
-images. `press:variants` plans curated one-to-four-phone scenes using shared
-orthographic geometry; `--export` renders authentic retained pixels to exact
-canvases with source hashes. It does not prove native freshness. Front, mirrored,
+images. Social recipes compose one-to-four-phone scenes using shared
+orthographic geometry and one SVG for preview/PNG export. Each recipe places the
+brand lockup at one of six anchors (or opts out) in a reserved band, so copy and
+phones never sit under it, and headline/subtitle set at the poster display size
+and shrink only as far as the copy needs. A publishable render carries no
+provenance text; only a draft keeps its visible label. `press/website.json`
+declares retained website outputs; `site:assets` refreshes only those selections.
+Front, mirrored,
 diagonal, row, stepped and grid arrangements share the landing page renderer.
 Screenshot freshness is app-source bound: promoted captures record an `appSource`
 fingerprint (`scripts/lib/app-source.mjs`); `screenshots:status --strict`, `/screenshots`
@@ -913,8 +920,15 @@ native calibration is unchanged. Rows/grids use measured gaps and aligned baseli
 Known-stale or unavailable capture registrations are excluded from both scene and
 poster generation, even when the old PNG and hash still match. A completed capture
 candidate is not a promoted asset; preserve native host/source identity and review.
-Future capture work includes P2PK key settings and the locked receive QR, thread,
-stories, backup and missing wallpapers/masks. Keep canonical E2E page names and
+The full-library plan under `app/e2e/capture` accounts for all canonical pages on
+both fixed native profiles, including explicit blockers. One reviewed body per
+platform: framing rejects unreviewed capture dimensions rather than deriving a
+phone from whatever ratio arrived, every registry entry records its pixel size,
+and store-delivery images (1080x1920 on Android, where Play rejects ratios above
+2:1) keep their own archived bytes under `press/artwork/source/store/`. `screenshots:refresh`
+checkpoints each focused attempt and `--resume` revalidates successful work before
+skipping it. Native fixture/navigation captures do not establish functional proof.
+Keep canonical E2E page names and
 use context/occurrence for state differences rather than inventing page names.
 
 **Scope and exceptions:** this is a project convention, not a platform-mandated

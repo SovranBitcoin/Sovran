@@ -1,6 +1,7 @@
 // Bun + installed Chrome only. Captures the actual rendered Astro/CSS scenes.
 // Compare: bun scripts/visual.mjs
-// Export:  bun scripts/visual.mjs --export /absolute/path/to/press/mockups
+// Explicit geometry export: --export PATH --screenshots ios/wallet,ios/feed --preset duo-depth
+// Website deliverables: node site/scripts/website-assets.mjs (from the repository root).
 import { spawn, spawnSync } from "node:child_process";
 import {
   mkdir,
@@ -24,7 +25,8 @@ import {
   SCENE_PRESETS,
   createScene,
 } from "../../scripts/lib/phone-frame.mjs";
-import { loadExportCatalog, planVariants } from "./variants.mjs";
+import { buildSourceCatalog } from "./source-catalog.mjs";
+import { resolveCapture } from "./composition-recipe.mjs";
 const site = fileURLToPath(new URL("../", import.meta.url));
 const args = process.argv.slice(2);
 const options = {};
@@ -36,18 +38,14 @@ for (let i = 0; i < args.length; i++) {
       "--preset",
       "--screenshots",
       "--poses",
-      "--og-only",
       "--frames",
       "--live",
       "--format",
-      "--variants",
-      "--collection",
-      "--limit",
     ].includes(key),
     `Unknown argument: ${key}`,
   );
   assert(!Object.hasOwn(options, key), `Duplicate argument: ${key}`);
-  if (["--og-only", "--frames", "--live", "--variants"].includes(key))
+  if (["--frames", "--live"].includes(key))
     options[key] = true;
   else {
     assert(
@@ -59,23 +57,10 @@ for (let i = 0; i < args.length; i++) {
 }
 const exporting = !!options["--export"];
 assert(!options["--frames"] || !exporting, "--frames cannot export");
-assert(!options["--variants"] || exporting, "--variants requires --export");
+assert(!exporting || options["--screenshots"], "Explicit --screenshots required. Website OG: node site/scripts/website-assets.mjs");
 assert(
-  !options["--collection"] || options["--variants"],
-  "--collection requires --variants",
-);
-assert(
-  !options["--limit"] || options["--variants"],
-  "--limit requires --variants",
-);
-assert(
-  !options["--variants"] ||
-    (!options["--screenshots"] && !options["--poses"] && !options["--og-only"]),
-  "--variants cannot select screenshots, poses, or OG",
-);
-assert(
-  !options["--format"] || (exporting && !options["--og-only"]),
-  "--format requires a non-OG export",
+  !options["--format"] || exporting,
+  "--format requires an export",
 );
 assert(
   !options["--format"] || Object.hasOwn(CANVAS_FORMATS, options["--format"]),
@@ -83,12 +68,10 @@ assert(
 );
 assert(
   !options["--format"] ||
-    options["--variants"] ||
     options["--preset"] ||
     options["--screenshots"],
-  "--format requires --preset, --screenshots, or --variants",
+  "--format requires --preset or --screenshots",
 );
-assert(!options["--og-only"] || exporting, "--og-only requires --export");
 assert(!options["--preset"] || exporting, "--preset requires --export");
 assert(
   !options["--poses"] || options["--screenshots"],
@@ -98,23 +81,18 @@ assert(
   !options["--screenshots"] || exporting,
   "--screenshots requires --export",
 );
-assert(
-  !options["--og-only"] || (!options["--preset"] && !options["--screenshots"]),
-  "--og-only cannot select a custom scene",
-);
 const output = exporting
   ? resolve(options["--export"])
   : await mkdtemp(join(tmpdir(), "site-restoration-"));
 if (!output) throw new Error("Supply an export directory");
-const screenshotFiles = (
-  await readdir(`${site}/../press/artwork/source/screenshots/ios`)
-)
-  .filter((file) => file.endsWith(".png"))
-  .sort();
+const screenshotFiles = (options["--screenshots"]?.split(',') ?? []).filter(key => /^ios\/[a-z0-9-]+$/.test(key));
 const files = [
   "scripts/lib/phone-frame.mjs",
   "site/scripts/visual.mjs",
-  "site/scripts/variants.mjs",
+  "site/scripts/source-catalog.mjs",
+  "site/scripts/website-config.mjs",
+  "site/scripts/composition-recipe.mjs",
+  "press/website.json",
   "site/scripts/verify-inputs.mjs",
   "site/src/components/PhoneScene.astro",
   "site/src/components/phone-scene.css",
@@ -135,7 +113,7 @@ const files = [
     (weight) => `site/public/fonts/MonaSans/MonaSans-${weight}.ttf`,
   ),
   ...screenshotFiles.map(
-    (file) => `press/artwork/source/screenshots/ios/${file}`,
+    (file) => `press/artwork/source/screenshots/${file}.png`,
   ),
 ];
 const inputHashes = async () =>
@@ -167,31 +145,18 @@ assert(
 const selectedPreset =
   options["--preset"] ?? (selectedKeys ? "custom" : undefined);
 const selectedFormat = options["--format"] ?? "native";
-const catalog = exporting ? await loadExportCatalog() : null;
-const variants = options["--variants"]
-  ? planVariants(catalog, {
-      collection: options["--collection"],
-      format: options["--format"],
-      preset: options["--preset"],
-      limit: options["--limit"],
-    })
-  : null;
-if (variants) {
-  for (const diagnostic of variants.diagnostics) console.error(diagnostic);
-  assert(variants.jobs.length, "No exportable variants matched");
-}
-const jobs = variants?.jobs ?? [];
-if (selectedPreset && !variants) {
+const sourceCatalog = exporting ? await buildSourceCatalog(resolve(site, '..')) : null;
+const catalog = sourceCatalog ? {
+  captures: Object.fromEntries(sourceCatalog.captures.filter(capture => capture.available && capture.freshness === 'current').map(capture => [capture.id, { ...capture, key: capture.id }])),
+  missing: Object.fromEntries(sourceCatalog.captures.map(capture => [capture.id, capture.freshness])),
+} : null;
+const jobs = [];
+if (selectedPreset) {
   assert(
     selectedPreset === "custom" || Object.hasOwn(SCENE_PRESETS, selectedPreset),
     `Unknown scene preset: ${selectedPreset}`,
   );
-  const keys =
-    selectedKeys ??
-    ["ios/wallet", "ios/feed", "ios/dm-chat", "ios/send"].slice(
-      0,
-      SCENE_PRESETS[selectedPreset]?.poses.length,
-    );
+  const keys = selectedKeys;
   jobs.push({
     name: selectedKeys ? "custom" : selectedPreset,
     preset: selectedPreset,
@@ -215,9 +180,9 @@ for (const job of jobs) {
   };
   job.provenance = captures;
 }
-if (exporting) {
+if (exporting || options["--frames"]) {
   await mkdir(output, { recursive: true });
-  const build = spawnSync(process.execPath, ["run", "build"], {
+  const build = spawnSync(process.execPath, ["run", "build:internal"], {
     cwd: site,
     stdio: "inherit",
     timeout: 120000,
@@ -309,7 +274,7 @@ const serve = (root, csp = false) =>
       );
     },
   });
-const current = serve(`${site}/dist`, true);
+const current = serve(`${site}/${exporting || options["--frames"] ? '.astro/internal-dist' : 'dist'}`, true);
 const original =
   exporting || options["--frames"]
     ? null
@@ -543,20 +508,7 @@ try {
     await call("Emulation.setDefaultBackgroundColorOverride", {
       color: { r: 0, g: 0, b: 0, a: 0 },
     });
-    const exportJobs = jobs.length
-      ? jobs
-      : (options["--og-only"]
-          ? ["og"]
-          : [
-              "hero",
-              "wallet",
-              "social",
-              "ai",
-              "offline",
-              "og",
-              ...Object.keys(SCENE_PRESETS),
-            ]
-        ).map((name) => ({ name }));
+    const exportJobs = jobs;
     const records = {};
     for (const job of exportJobs) {
       const custom = !!job.screenshots;
@@ -664,19 +616,7 @@ try {
             preset: selectedPreset ?? "all",
             screenshots: selectedKeys ?? null,
             poses: selectedPoses ?? null,
-            format: variants
-              ? (options["--format"] ?? "curated")
-              : jobs.length
-                ? selectedFormat
-                : null,
-            collection: options["--collection"] ?? null,
-            variants: variants
-              ? {
-                  policy: variants.policy,
-                  count: jobs.length,
-                  diagnostics: variants.diagnostics,
-                }
-              : null,
+            format: selectedFormat,
           },
           inputs,
           exports: { ...previous?.exports, ...records },
@@ -708,7 +648,6 @@ try {
         "releases",
         "dev",
         "mockups",
-        "screenshots",
       ]) {
         await navigate(`http://127.0.0.1:${current.port}/${route}`);
         assert.equal(
@@ -717,21 +656,6 @@ try {
           `Overflow: ${route} at ${width}`,
         );
         evidence.push({ route, width, geometry: await checkPhones() });
-        if (route === "screenshots") {
-          assert.equal(
-            await evaluate(
-              'document.querySelectorAll(".dev-missing a[href*=custom]").length',
-            ),
-            0,
-            "Missing captures must not have compose links",
-          );
-          assert(
-            (await evaluate(
-              'document.querySelectorAll(".dev-capture a[href*=custom]").length',
-            )) > 0,
-            "Retained screenshots have compose links",
-          );
-        }
         if (!route.startsWith("scenes/") || route === "scenes/custom")
           await capture(
             `frames-${route.replaceAll("/", "-") || "home"}-${width}`,
@@ -739,65 +663,22 @@ try {
           );
       }
       await navigate(`http://127.0.0.1:${current.port}/mockups`);
-      await evaluate(`(() => {
-        const form = document.querySelector('[data-mockup-form]');
-        form.elements.story.value = 'mint-trust'; form.elements.count.value = '4';
-        form.elements.count.dispatchEvent(new Event('change', { bubbles: true }));
-        form.elements.preset.value = 'quartet-depth'; form.elements.format.value = 'wide';
-        form.requestSubmit();
-      })()`);
-      await evaluate(`(async () => {
-        const frame = document.querySelector('[data-preview] iframe');
-        if (!frame) throw new Error('Missing four-phone preview');
-        const deadline = Date.now() + 10000;
-        while (frame.contentDocument?.querySelector('[data-custom-scene]')?.dataset.ready !== 'true') {
-          if (Date.now() > deadline) throw new Error('Mockup preview did not become ready');
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-        const doc = frame.contentDocument;
-        await doc.fonts.ready;
-        await Promise.all([...doc.querySelectorAll('image.phone-screen')].map(async el => { const image = new Image(); image.src = el.getAttribute('href'); await image.decode(); }));
-        if (doc.querySelectorAll('.phone-model').length !== 4) throw new Error('Mockup count control failed');
-        if (new URL(frame.src).searchParams.get('format') !== 'wide') throw new Error('Mockup format control failed');
-        if (doc.documentElement.scrollWidth > frame.clientWidth) throw new Error('Embedded preview overflow');
-      })()`);
-      assert.equal(
-        await evaluate("document.documentElement.scrollWidth <= innerWidth"),
-        true,
-        `Mockup control overflow at ${width}`,
-      );
-      const mockupGeometry = await checkPhones();
-      await capture(`frames-mockups-controls-${width}`, "body");
-      const missingPreview = await evaluate(`(() => {
-        const form = document.querySelector('[data-mockup-form]');
-        form.elements.story.value = 'p2pk-receive'; form.elements.count.value = '2'; form.requestSubmit();
-        const story = JSON.parse(document.querySelector('[data-stories]').dataset.stories).find(story => story.id === 'p2pk-receive');
-        return { missing: story.missing.length, frames: document.querySelectorAll('[data-preview] iframe').length, hidden: document.querySelector('[data-compose]').hidden, diagnostic: document.querySelector('[data-missing]').textContent };
-      })()`);
-      if (missingPreview.missing) {
-        assert.equal(
-          missingPreview.frames,
-          0,
-          "P2PK must not substitute missing captures",
-        );
-        assert.equal(missingPreview.hidden, true);
-        assert.match(missingPreview.diagnostic, /Capture requested/);
-      }
-      evidence.push({
-        route: "mockups",
-        width,
-        controls: { count: 4, preset: "quartet-depth", format: "wide" },
-        geometry: mockupGeometry,
-        missingPreview,
-      });
-      await capture(`frames-mockups-p2pk-${width}`, "body");
+      const selection = await evaluate(`(() => ({
+        recipes: document.querySelectorAll('a[href^="/social#recipe="]').length,
+        status: document.querySelector('[role=status]').textContent,
+        frames: document.querySelectorAll('iframe').length,
+      }))()`);
+      assert.equal(selection.recipes, 1, 'Only the selected OG recipe is listed');
+      assert.equal(selection.frames, 0, 'Website assets do not eagerly render a batch of previews');
+      assert.match(selection.status, /Blocked:|Current:|Needs regeneration:/);
+      evidence.push({ route: 'mockups', width, selection });
       await navigate(`http://127.0.0.1:${current.port}/scenes/custom`);
       for (const format of Object.keys(CANVAS_FORMATS)) {
         await evaluate(`(() => {
           const form = document.querySelector('.scene-editor');
           form.elements.preset.value = 'duo-depth';
           form.elements.preset.dispatchEvent(new Event('change', { bubbles: true }));
-          const slots = form.querySelectorAll('[name=screen]'); slots[0].value = 'ios/wallet'; slots[1].value = 'ios/dm-chat';
+           const slots = form.querySelectorAll('[name=screen]'); slots[0].value = 'ios/wallet'; slots[1].value = 'ios/feed';
           form.elements.format.value = ${JSON.stringify(format)}; form.requestSubmit();
         })()`);
         await settleImages();
@@ -863,10 +744,10 @@ try {
       deviceScaleFactor: 1,
       mobile: false,
     });
-    const frameCatalog = await loadExportCatalog();
-    const frameScreenshots = ["ios/wallet", "ios/dm-chat"];
+    const frameCatalog = await buildSourceCatalog(resolve(site, '..'));
+    const frameScreenshots = ["ios/wallet", "ios/feed"];
     const frameScene = createScene(
-      frameScreenshots.map((key) => frameCatalog.captures[key]),
+      frameScreenshots.map((key) => ({ ...resolveCapture(frameCatalog, key), key })),
       { preset: "duo-depth" },
     );
     await call("Emulation.setDefaultBackgroundColorOverride", {
@@ -914,7 +795,7 @@ try {
       mobile: false,
     });
     await navigate(
-      `http://127.0.0.1:${current.port}/scenes/custom/?preset=single-front&screenshots=ios%2Fdm-chat`,
+      `http://127.0.0.1:${current.port}/scenes/custom/?preset=single-front&screenshots=ios%2Fwallet`,
     );
     assert.equal(
       await evaluate(
@@ -922,7 +803,7 @@ try {
       ),
       "true",
     );
-    await capture("frames-dm-front", ".phone-stage");
+    await capture("frames-wallet-front", ".phone-stage");
     const closeup = await evaluate(
       `(() => { const p = document.querySelector('.phone-screen'); const m = p.getScreenCTM(); const a = new DOMPoint(-24, -24).matrixTransform(m); const b = new DOMPoint(160, 140).matrixTransform(m); return { x: a.x + scrollX, y: a.y + scrollY, width: b.x - a.x, height: b.y - a.y, scale: 2 }; })()`,
     );
@@ -940,7 +821,6 @@ try {
       "screenshots=ios%2Fnot-registered",
       "format=not-a-format",
       ...["ios/settings-keyring", "ios/receive-qr-p2pk"]
-        .filter((key) => !Object.hasOwn(frameCatalog.captures, key))
         .map((key) => `screenshots=${encodeURIComponent(key)}`),
     ]) {
       await navigate(

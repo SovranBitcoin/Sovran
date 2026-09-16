@@ -26,8 +26,8 @@
     }
   },
   "scripts": {
-    "assets:generate": "node ../scripts/assets.mjs && node ../scripts/artwork.mjs --allow-missing",
-    "assets:check": "node ../scripts/assets.mjs --check && node ../scripts/artwork.mjs --check --allow-missing",
+    "assets:generate": "node ../scripts/assets.mjs",
+    "assets:check": "node ../scripts/assets.mjs --check",
     "eas-build-post-install": "node ../scripts/brand-assets.mjs --check",
     "assets:brand": "node ../scripts/brand-assets.mjs",
     "assets:test": "node --test ../scripts/brand-assets.test.mjs ../scripts/artwork.test.mjs",
@@ -86,9 +86,7 @@
     "test": "jest",
     "test:design-system": "jest __tests__/designSystemScenarioSnapshots.test.tsx __tests__/designSystemComponentInventory.test.ts --runInBand",
     "test:release": "node --test ../release/tests/*.test.mjs && python3 -m unittest discover -s ../release/tests -p 'test_*.py'",
-    "probe:nagg": "bun features/feed/data/__scripts__/probeNagg.ts",
-    "assets:artwork": "node ../scripts/artwork.mjs",
-    "assets:artwork:check": "node ../scripts/artwork.mjs --check"
+    "probe:nagg": "bun features/feed/data/__scripts__/probeNagg.ts"
   },
   "dependencies": {
     "@babel/runtime": "^7.28.0",

@@ -29,7 +29,7 @@ describe('loadE2E over the real tree', () => {
   });
 
   it('requires every canonical scenario to author a non-empty verify section', () => {
-    expect(loaded.scenarios.size).toBe(141);
+    expect(loaded.scenarios.size).toBe(153);
     for (const scenario of loaded.scenarios.values()) {
       expect(scenario.verify.length).toBeGreaterThan(0);
     }
@@ -1416,6 +1416,7 @@ describe('loadE2E over the real tree', () => {
       'notification-policy-relaxed',
       'notification-policy-strict',
       'profile-reveal-mnemonic',
+      'profile-reveal-nsec',
       'receive-unified-rail-switch-bolt12',
       'settings-mock-fail-melt-toggle',
       'settings-mock-fail-send-toggle',
@@ -1961,15 +1962,33 @@ describe('loadE2E over the real tree', () => {
     });
 
     const tabsSteps = loaded.scenarios.get('receive.qr-display.tabs')!.steps;
-    for (const destination of ['receive-bolt12-find-mints', 'receive-onchain-find-mints']) {
-      expect(tabsSteps, destination).toContainEqual({
+    expect(tabsSteps).toContainEqual({
+      action: 'tapUntil',
+      sequence: [{ tap: { id: 'mint-add-cancel' } }],
+      until: { id: 'receive-bolt12-find-mints' },
+      attempts: 4,
+      settleMs: 6_000,
+    });
+    // Onchain now renders the ready standing address, rather than entering Add Mints.
+    const onchainAt = tabsSteps.findIndex(
+      (step) =>
+        step.action === 'tapUntil' &&
+        'id' in step.until &&
+        step.until.id === 'payment-info-address-data'
+    );
+    expect(onchainAt).toBeGreaterThan(-1);
+    expect(tabsSteps.slice(onchainAt, onchainAt + 3)).toEqual([
+      {
         action: 'tapUntil',
-        sequence: [{ tap: { id: 'mint-add-cancel' } }],
-        until: { id: destination },
+        sequence: [{ tap: { label: 'Onchain' } }],
+        until: { id: 'payment-info-address-data' },
         attempts: 4,
         settleMs: 6_000,
-      });
-    }
+      },
+      { action: 'waitFor', selector: { id: 'payment-info-address-data' }, timeoutMs: 30_000 },
+      { action: 'screenshot', name: 'receive-qr' },
+    ]);
+    expect(JSON.stringify(tabsSteps)).not.toContain('receive-onchain-find-mints');
     expect(
       tabsSteps.filter(
         (step) =>

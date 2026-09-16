@@ -9,6 +9,7 @@ import { BUNDLE_ID, run, sleep, type RunOptions } from '../simctl';
 
 /** Same applicationId as iOS's dev-variant bundle id (app.config.js). */
 export const ANDROID_PACKAGE_ID = BUNDLE_ID;
+export const ADB_COMMAND_TIMEOUT_MS = 30_000;
 
 /** ANDROID_HOME / ANDROID_SDK_ROOT, else the macOS default install path.
  * Resolved lazily at the emulator effect boundary (offline commands must not
@@ -79,7 +80,7 @@ export class Adb {
   }
 
   #opts(extra: RunOptions = {}): RunOptions {
-    return { signal: this.#signal, ...extra };
+    return { signal: this.#signal, ...extra, timeoutMs: extra.timeoutMs ?? ADB_COMMAND_TIMEOUT_MS };
   }
 
   async raw(args: string[], opts: RunOptions = {}): Promise<string> {
@@ -91,24 +92,35 @@ export class Adb {
   }
 
   /** Binary-safe exec-out (screenshots, file pulls to stdout). */
-  async execOutBytes(args: string[]): Promise<Uint8Array> {
-    if (this.#signal?.aborted) throw new Error('operation aborted');
+  async execOutBytes(args: string[], timeoutMs = ADB_COMMAND_TIMEOUT_MS): Promise<Uint8Array> {
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0)
+      throw new Error('adb timeout must be positive and finite');
+    if (this.#signal?.aborted) throw this.#signal.reason;
     const proc = Bun.spawn([this.#bin, '-s', this.serial, 'exec-out', ...args], {
       stdout: 'pipe',
       stderr: 'pipe',
       stdin: 'ignore',
     });
-    const onAbort = () => proc.kill('SIGTERM');
+    const onAbort = () => proc.kill('SIGKILL');
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      proc.kill('SIGKILL');
+    }, timeoutMs);
     this.#signal?.addEventListener('abort', onAbort, { once: true });
     try {
-      const [bytes, err, code] = await Promise.all([
+      const [bytes, , code] = await Promise.all([
         new Response(proc.stdout).arrayBuffer(),
         new Response(proc.stderr).text(),
         proc.exited,
       ]);
-      if (code !== 0) throw new Error(`adb exec-out failed (${code}): ${args.join(' ')}\n${err}`);
+      if (this.#signal?.aborted) throw this.#signal.reason;
+      if (timedOut) throw new Error(`adb exec-out timed out after ${timeoutMs}ms`);
+      // stderr from uiautomator can contain private AX content.
+      if (code !== 0) throw new Error(`adb exec-out failed (${code})`);
       return new Uint8Array(bytes);
     } finally {
+      clearTimeout(timer);
       this.#signal?.removeEventListener('abort', onAbort);
     }
   }
@@ -172,21 +184,29 @@ export class Adb {
     return bytes;
   }
 
-  /** One uiautomator dump. Retries the transient "could not get idle state"
-   * (animations mid-flight); XML is extracted between the first `<?xml`/`<`
-   * and the last `>` so the status trailer never leaks into the parser. */
-  async uiautomatorDumpXml(attempts = 3): Promise<string> {
+  /** One uiautomator dump. Retries the transient failures that mean "the window
+   * was still moving", not "the screen is empty": the explicit idle-state error,
+   * a null root, and an empty document — a long-running animation keeps
+   * uiautomator waiting until the device-side deadline reaps it, which yields no
+   * bytes at all. Returning that as a snapshot would read as a blank screen.
+   * XML is extracted between the first `<?xml`/`<` and the last `>` so the
+   * status trailer never leaks into the parser. A busy window can starve several
+   * dumps in a row, so persistence here is what keeps a real screen from being
+   * reported as an empty one. */
+  async uiautomatorDumpXml(attempts = 6): Promise<string> {
     let lastError: Error | undefined;
     for (let attempt = 0; attempt < attempts; attempt++) {
       if (attempt > 0) await sleep(350);
       try {
         const out = new TextDecoder().decode(
-          await this.execOutBytes(['uiautomator', 'dump', '/dev/tty'])
+          // Device-side deadline also reaps the remote dumper if the host adb
+          // client is killed. Android's pinned image provides toybox timeout.
+          await this.execOutBytes(['timeout', '-k', '2', '20', 'uiautomator', 'dump', '/dev/tty'])
         );
         return extractUiautomatorXml(out);
       } catch (error) {
         lastError = error as Error;
-        if (!/idle state|null root node/i.test(lastError.message)) throw lastError;
+        if (!/idle state|null root node|produced no XML/i.test(lastError.message)) throw lastError;
       }
     }
     throw lastError ?? new Error('uiautomator dump failed');
@@ -223,7 +243,7 @@ export class Adb {
   }
 
   async install(apkPath: string): Promise<void> {
-    await this.raw(['install', '-r', apkPath]);
+    await this.raw(['install', '-r', apkPath], { timeoutMs: 120_000 });
   }
 
   async uninstall(): Promise<void> {

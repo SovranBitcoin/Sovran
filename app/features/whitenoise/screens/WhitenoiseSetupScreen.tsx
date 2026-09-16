@@ -7,6 +7,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { LoadingIndicator } from '@/shared/blocks/status';
 import { useWhitenoiseSetup } from '../hooks/useWhitenoiseSetup';
+import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 
 export function WhitenoiseSetupScreen() {
   const router = useRouter();
@@ -43,6 +44,12 @@ export function WhitenoiseSetupScreen() {
 
   return (
     <Screen name="WhitenoiseSetupScreen" contentPadding={24} footer={bottomButtons}>
+      {__DEV__ && !isLoading && !isBootstrapping && !error && keyPackageCount === 0 && (
+        <E2EAccessibilityProbe
+          testID="whitenoise-setup-uninitialized"
+          accessibilityLabel="White Noise is not set up; no key packages"
+        />
+      )}
       <View style={styles.iconCircle}>
         <Icon name="internal:whitenoise" size={64} />
       </View>

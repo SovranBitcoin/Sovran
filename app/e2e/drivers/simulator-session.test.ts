@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'bun:test';
+import { writeFileSync } from 'node:fs';
+import sharp from 'sharp';
 
 import {
   buildDevClientUrl,
@@ -54,6 +56,11 @@ const runtimes = JSON.stringify({
           identifier: 'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro',
           productFamily: 'iPhone',
         },
+        {
+          name: 'iPhone 17 Pro Max',
+          identifier: 'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max',
+          productFamily: 'iPhone',
+        },
       ],
     },
   ],
@@ -75,6 +82,31 @@ function commandFake(options: { udids?: string[]; failOn?: string } = {}) {
 }
 
 describe('ephemeral simulator target selection', () => {
+  it('pins the library target even with a different preference or newer installed runtime', () => {
+    const parsed = JSON.parse(runtimes);
+    parsed.runtimes.push({
+      ...parsed.runtimes[1],
+      version: '27.0',
+      identifier: 'com.apple.CoreSimulator.SimRuntime.iOS-27-0',
+    });
+    const target = selectSimulatorTarget(JSON.stringify(parsed), 'iPhone 16 Pro', 'library-v1');
+    expect(target.runtimeVersion).toBe('26.2');
+    expect(target.deviceTypeName).toBe('iPhone 17 Pro Max');
+  });
+
+  it('never substitutes a missing profile device or unavailable runtime', () => {
+    const parsed = JSON.parse(runtimes);
+    parsed.runtimes[1].isAvailable = false;
+    expect(() => selectSimulatorTarget(JSON.stringify(parsed), undefined, 'library-v1')).toThrow(
+      /fallback is forbidden/
+    );
+    parsed.runtimes[1].isAvailable = true;
+    parsed.runtimes[1].supportedDeviceTypes = [parsed.runtimes[1].supportedDeviceTypes[0]];
+    expect(() => selectSimulatorTarget(JSON.stringify(parsed), undefined, 'library-v1')).toThrow(
+      /fallback is forbidden/
+    );
+  });
+
   it('uses the preferred compatible device from the newest available iOS runtime', () => {
     expect(selectSimulatorTarget(runtimes)).toEqual({
       runtimeIdentifier: 'com.apple.CoreSimulator.SimRuntime.iOS-26-2',
@@ -92,6 +124,46 @@ describe('ephemeral simulator target selection', () => {
 });
 
 describe('ephemeral simulator ownership fence', () => {
+  it('validates library presentation before handing off and cleans up on settings failure', async () => {
+    const png = await sharp({
+      create: { width: 1320, height: 2868, channels: 3, background: 'black' },
+    })
+      .png()
+      .toBuffer();
+    for (const valid of [true, false]) {
+      const fake = commandFake();
+      const creating = createEphemeralSimulatorDevice(
+        { runId: 'library-test', captureProfile: 'library-v1' },
+        async (args, options) => {
+          const result = await fake.execute(args, options);
+          if (args[2] === 'io') writeFileSync(args.at(-1)!, png);
+          if (args[2] === 'ui' && args.length === 5)
+            return args[4] === 'appearance' ? (valid ? 'light' : 'dark') : 'large';
+          if (args.includes('read') && args.at(-1) === 'AppleLocale') return 'en_US';
+          return result;
+        }
+      );
+      if (valid) {
+        const device = await creating;
+        expect(device.capture).toMatchObject({
+          profile: 'library-v1',
+          model: 'iPhone 17 Pro Max',
+          runtime: '26.2',
+          resolution: { width: 1320, height: 2868 },
+          density: { scale: 3 },
+          fontScale: 1,
+          appearance: 'light',
+          locale: 'en-US',
+        });
+        expect(
+          fake.calls.find(({ command }) => command[2] === 'status_bar')?.options?.allowFail
+        ).toBe(false);
+        await device.dispose();
+      } else await expect(creating).rejects.toThrow(/did not take effect/);
+      expect(fake.calls.filter(({ command }) => command[2] === 'delete')).toHaveLength(1);
+    }
+  });
+
   it('creates, boots, and deletes only the UDID returned by create without device discovery or erase', async () => {
     const fake = commandFake();
     const device = await createEphemeralSimulatorDevice({ runId: 'test-run' }, fake.execute);
@@ -139,6 +211,15 @@ describe('ephemeral simulator ownership fence', () => {
 });
 
 describe('owned host configuration', () => {
+  it('only enables app capture presentation from the explicit host profile', () => {
+    expect(
+      buildMetroEnvironment({ EXPO_PUBLIC_E2E_CAPTURE_PROFILE: 'library-v1' })
+        .EXPO_PUBLIC_E2E_CAPTURE_PROFILE
+    ).toBeUndefined();
+    expect(
+      buildMetroEnvironment({ E2E_CAPTURE_PROFILE: 'library-v1' }).EXPO_PUBLIC_E2E_CAPTURE_PROFILE
+    ).toBe('library-v1');
+  });
   it('resolves only serve-sim native primitives for the capture-free E2E bridge', () => {
     expect(resolveServeSimNativeAddon()).toMatch(/serve-sim-native\.node$/);
   });

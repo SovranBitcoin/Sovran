@@ -40,6 +40,7 @@ import {
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { headerButtonSize, spacing } from '@/shared/styles/tokens';
+import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 
 const headerBalanceSpacerStyle = {
   height: headerButtonSize,
@@ -229,14 +230,20 @@ type NostrKeysHandle = ReturnType<typeof useNostrKeysContext>['keys'];
 
 async function loadKeypairsImpl(
   manager: CocoManagerHandle,
-  io: { setIsLoading: (value: boolean) => void; setKeypairs: (value: Keypair[]) => void }
+  io: {
+    setIsLoading: (value: boolean) => void;
+    setKeypairs: (value: Keypair[]) => void;
+    setLoadSucceeded: (value: boolean) => void;
+  }
 ): Promise<void> {
   if (!manager) return;
 
   try {
     io.setIsLoading(true);
+    io.setLoadSucceeded(false);
     const allKeys = await manager.keyring.getAllKeyPairs();
     io.setKeypairs(allKeys);
+    io.setLoadSucceeded(true);
   } catch (error) {
     log.error('settings.keyring.load_failed', { error });
     staticPopup('keys-load-failed');
@@ -384,6 +391,7 @@ export const SettingsKeyringScreen: React.FC = () => {
 
   const [keypairs, setKeypairs] = useState<Keypair[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadSucceeded, setLoadSucceeded] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isImportingCurrentNsec, setIsImportingCurrentNsec] = useState(false);
 
@@ -401,7 +409,7 @@ export const SettingsKeyringScreen: React.FC = () => {
    */
   // ast-grep-ignore: no-manual-memo-tsx
   const loadKeypairs = useCallback(
-    () => loadKeypairsImpl(manager, { setIsLoading, setKeypairs }),
+    () => loadKeypairsImpl(manager, { setIsLoading, setKeypairs, setLoadSucceeded }),
     [manager]
   );
 
@@ -490,6 +498,7 @@ export const SettingsKeyringScreen: React.FC = () => {
   const renderHeaderLeft = () => (
     <HStack gap={spacing.xs}>
       <ScreenHeaderAction
+        testID="keyring-close"
         icon={
           isFirstScreen ? 'material-symbols:close-rounded' : 'material-symbols:arrow-back-rounded'
         }
@@ -528,6 +537,12 @@ export const SettingsKeyringScreen: React.FC = () => {
   return (
     <Screen name="SettingsKeyringScreen">
       <Stack.Screen options={stackOptions} />
+      {__DEV__ && !isLoading && loadSucceeded && !isKeyringActionPending && (
+        <E2EAccessibilityProbe
+          testID="keyring-public-keys-ready"
+          accessibilityLabel="Public key list loaded"
+        />
+      )}
       {/* Quick Access Toggle */}
       <Section title="Preferences">
         <ListGroup variant="secondary">

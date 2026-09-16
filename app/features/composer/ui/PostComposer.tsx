@@ -384,10 +384,11 @@ export function PostComposer() {
           keyboardVisible,
           busy,
         }}>
-        <Button variant="ghost" size="md" onPress={handleCancel}>
+        <Button testID="composer-cancel" variant="ghost" size="md" onPress={handleCancel}>
           <Button.Label>Cancel</Button.Label>
         </Button>
         <Button
+          testID="composer-publish"
           variant="primary"
           size="sm"
           onPress={handlePost}
@@ -447,6 +448,8 @@ export function PostComposer() {
               </View>
             ) : null}
             <TextInput
+              testID="composer-input"
+              accessibilityLabel="Post text"
               value={textBlock?.kind === 'text' ? textBlock.text : ''}
               onChangeText={(text) => textBlock && setBlockText(textBlock.id, text)}
               placeholder={PLACEHOLDER[target?.mode ?? 'new']}

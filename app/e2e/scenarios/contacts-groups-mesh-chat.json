@@ -18,7 +18,7 @@
     {"action":"tapUntil","sequence":[{"tap":{"label":"Groups"}}],"until":{"id":"contact-row:geohash:mesh"},"attempts":4,"settleMs":8000},
     {"action":"screenshot","name":"contacts"},
     {"action":"tapUntil","sequence":[{"tap":{"id":"contact-row:geohash:mesh"}}],"until":{"id":"geohash-chat:mesh"},"attempts":4,"settleMs":8000},
-    {"action":"screenshot","name":"dm-chat"},
+    {"action":"screenshot","name":"geohash-chat"},
     {"action":"goHome"},
     {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
   ],

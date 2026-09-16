@@ -92,7 +92,7 @@ jobs:
       - name: Verify generated artwork matches the release version
         run: bun run assets:check
       - name: Reject install-time changes to committed artwork
-        run: test -z "$(git status --porcelain --untracked-files=all -- app/assets/brand press/artwork/generated)"
+        run: test -z "$(git status --porcelain --untracked-files=all -- app/assets/brand)"
       - name: Test brand geometry and SVG rendering
         run: bun run assets:test
       - name: Validate native harness contracts

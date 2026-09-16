@@ -4,23 +4,45 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 import { transform } from '@astrojs/compiler';
-import registry from '../../press/artwork/source/screenshots.json';
+import { dev } from 'astro';
 import { SCENE_PRESETS } from '../../scripts/lib/phone-frame.mjs';
+import { websiteCaptures } from '../scripts/website-captures.mjs';
+import { buildSourceCatalog } from '../scripts/source-catalog.mjs';
+import { resolveCapture } from '../scripts/composition-recipe.mjs';
 
 const site = new URL('../', import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, site), 'utf8');
 
-// Exercise the real Vite glob/catalog boundary without building the site or images.
+test('development retains workbench routes and the guarded source API', async () => {
+  const server = await dev({ root: site, logLevel: 'silent', server: { host: '127.0.0.1', port: 0 } });
+  try {
+    const origin = `http://127.0.0.1:${server.address.port}`;
+    for (const path of ['/dev', '/screenshots', '/logos', '/social', '/mockups', '/scenes/custom', '/scenes/hero']) {
+      const response = await fetch(`${origin}${path}`);
+      expect(response.status, path).toBe(200);
+      expect(await response.text()).toContain('noindex');
+    }
+    const response = await fetch(`${origin}/__artwork/sources`);
+    expect(response.status).toBe(200);
+    expect((await response.json()).captures.length).toBeGreaterThan(6);
+  } finally { await server.stop(); }
+}, 20000);
+
+// Exercise the real Vite selected-import boundary without building the site or images.
 // Only Astro's image metadata loader is replaced, using actual PNG headers.
-async function loadCatalog(entries = registry) {
+async function loadCatalog(tamper = false) {
   const server = await createServer({
     root: fileURLToPath(site), configFile: false, logLevel: 'silent',
     server: { middlewareMode: true, watch: null },
     optimizeDeps: { noDiscovery: true },
-    plugins: [{
+    plugins: [websiteCaptures(), {
+      name: 'tampered-hash-fixture',
+      transform(code, id) {
+        if (tamper && id === '\0virtual:sovran-website-captures') return code.replace(/sha256: "[a-f0-9]{64}"/, `sha256: "${'0'.repeat(64)}"`);
+      },
+    }, {
       name: 'workbench-image-metadata', enforce: 'pre',
       load(id) {
-        if (id.endsWith('/source/screenshots.json')) return JSON.stringify(entries);
         if (!id.endsWith('.png')) return;
         const bytes = readFileSync(id);
         return `export default ${JSON.stringify({
@@ -33,64 +55,57 @@ async function loadCatalog(entries = registry) {
   finally { await server.close(); }
 }
 
-test('the workbench catalog admits only retained, hash-matching captures with authored alt metadata', async () => {
-  const { screenshotCatalog, captures, resolveScene } = await loadCatalog();
-  const available = screenshotCatalog.filter(capture => capture.image);
-  expect(available.length).toBeGreaterThan(20);
+test('the public scene catalog admits only selected, hash-matching captures with semantic alt metadata', async () => {
+  const { captures, resolveScene } = await loadCatalog();
+  const catalog = await buildSourceCatalog(fileURLToPath(new URL('../../', import.meta.url)));
+  const available = Object.values(captures) as any[];
+  expect(available.length).toBe(6);
   for (const capture of available) {
     const bytes = readFileSync(capture.image.fsPath);
-    expect(createHash('sha256').update(bytes).digest('hex')).toBe(capture.sha256);
-    expect(capture.run).toStartWith('run-');
-    expect(capture.alt).toBe(capture.context.alt);
-    expect(capture.reason).toBe('');
+    const source = resolveCapture(catalog, capture.key);
+    expect(createHash('sha256').update(bytes).digest('hex')).toBe(source.sha256);
+    expect(capture.alt).toBe(source.context.alt ?? source.title);
   }
   expect(Object.keys(captures).every(key => key.startsWith('ios/'))).toBe(true);
   expect(captures['ios/wallet'].alt).toContain('transaction history');
   for (const key of ['ios/settings-keyring', 'ios/receive-qr-p2pk', 'ios/thread']) {
-    expect(screenshotCatalog.find(capture => capture.key === key).image).toBeUndefined();
     expect(captures[key]).toBeUndefined();
     expect(() => resolveScene({ preset: 'single-front', screenshots: [key] })).toThrow();
   }
   expect(() => resolveScene({ screenshots: ['android/wallet'] })).toThrow();
 });
 
-test('unavailable, unauthenticated, tampered, and absent collection members remain capture requests', async () => {
-  const entries = structuredClone(registry);
-  entries['ios/wallet'].sha256 = '0'.repeat(64);
-  entries['ios/feed'].run = null;
-  Object.assign(entries['ios/dm-chat'], { availability: 'unavailable', unavailableReason: 'Needs review.' });
-  delete entries['ios/settings-keyring'];
-  const { screenshotCatalog, captures } = await loadCatalog(entries);
-  for (const key of ['ios/wallet', 'ios/feed', 'ios/dm-chat', 'ios/settings-keyring']) {
-    const capture = screenshotCatalog.find(capture => capture.key === key);
-    expect(capture.image).toBeUndefined();
-    expect(capture.reason.length).toBeGreaterThan(0);
-    expect(captures[key]).toBeUndefined();
-  }
-  expect(screenshotCatalog.find(capture => capture.key === 'ios/settings-keyring').context.caption).toContain('receiving keys');
+test('retained captures declare one reviewed device, and off-profile ones are withheld', async () => {
+  const catalog = await buildSourceCatalog(fileURLToPath(new URL('../../', import.meta.url)));
+  const frames = new Map<string, Set<string>>();
+  for (const capture of catalog.captures.filter((item: any) => item.available))
+    frames.set(
+      capture.platform,
+      (frames.get(capture.platform) ?? new Set()).add(capture.frameId)
+    );
+  // Android has exactly one body. A store-delivery capture is a different
+  // device, so it is withheld with its reason instead of being reframed.
+  expect([...(frames.get('android') ?? [])]).toEqual(['android-emulator']);
+  for (const frameId of frames.get('ios') ?? [])
+    expect(['iphone-17-pro', 'iphone-17-pro-max']).toContain(frameId);
+  const wallet = catalog.captures.find((item: any) => item.id === 'android/wallet');
+  expect(wallet.available).toBeFalsy();
+  expect(wallet.reason).toContain('1080x1920');
+  // The workbench says the device beside each image, not only inside evidence.
+  expect(read('../site/scripts/catalog-browser.mjs')).toContain('off library-v1');
 });
 
-test('gallery pairings are count-correct, ordered, unique, and never padded with missing captures', async () => {
-  const { collectionPairings, collections, captures } = await loadCatalog();
-  const available = Object.keys(captures);
-  expect(collectionPairings(['a', 'b', 'c', 'd'], 2, ['a', 'b', 'c', 'd'])).toEqual([
-    ['a', 'b'], ['a', 'c'], ['a', 'd'], ['b', 'c'], ['b', 'd'], ['c', 'd'],
-  ]);
-  expect(collectionPairings(['a', 'a', 'missing'], 1, ['a'])).toEqual([['a']]);
-  expect(collectionPairings(['a', 'missing'], 2, ['a'])).toEqual([]);
-  for (const count of [0, 5, 1.5, NaN]) expect(collectionPairings(available, count, available)).toEqual([]);
-  for (const story of collections) for (const count of [1, 2, 3, 4]) {
-    const groups = collectionPairings(story.screenshots, count, available);
-    expect(new Set(groups.map(group => group.join(','))).size).toBe(groups.length);
-    for (const group of groups) {
-      expect(group.length).toBe(count);
-      expect(new Set(group).size).toBe(count);
-      expect(group.every(key => available.includes(key))).toBe(true);
-      expect(group).toEqual(story.screenshots.filter(key => group.includes(key)));
-    }
+test('the adapter rejects image metadata that changes after recipe validation', async () => {
+  await expect(loadCatalog(true)).rejects.toThrow('Website capture changed during build');
+});
+
+test('homepage scenes resolve the named declarative phone selections, not collection combinations', async () => {
+  const { pageScenes, resolveScene } = await loadCatalog();
+  const config = JSON.parse(read('../press/website.json'));
+  for (const [name, scene] of Object.entries(config.scenes) as [string, any][]) {
+    expect(pageScenes[name].screenshots).toEqual(scene.phones.map(id => config.phones[id].captureId));
+    expect(resolveScene({ scene: name }).phones.map(phone => phone.key)).toEqual(pageScenes[name].screenshots);
   }
-  const p2pk = collections.find(story => story.id === 'p2pk-receive');
-  expect(collectionPairings(p2pk.screenshots, 2, available)).toEqual([]);
 });
 
 test('owned Astro pages compile and share an explicit noindex layout', async () => {
@@ -105,16 +120,14 @@ test('owned Astro pages compile and share an explicit noindex layout', async () 
   expect(compiled.diagnostics.filter(diagnostic => diagnostic.severity === 1)).toEqual([]);
 });
 
-test('gallery renders one replaceable preview and enumerates the shared orientation atlas', () => {
+test('website artwork lists only selected recipes and links to the local composer', () => {
   const source = read('src/pages/mockups.astro');
   expect(source).not.toContain('PhoneScene');
-  expect(source.match(/document.createElement\('iframe'\)/g)).toHaveLength(1);
-  expect(source).toContain('preview.replaceChildren()');
-  expect(source).toContain('Object.entries(SCENE_PRESETS)');
-  expect(source).toContain('href={`/scenes/${key}`}');
-  expect(source).toContain('pose.rotateX');
-  expect(source).toContain('pose.rotateY');
-  expect(source).toContain('pose.rotateZ');
+  expect(source).toContain('websiteAssetStatus');
+  expect(source).toContain('press/website.json');
+  expect(source).toContain('recipeHash(recipe)');
+  expect(source).toContain('Blocked:');
+  expect(source).not.toContain('collectionPairings');
   expect(Object.values(SCENE_PRESETS).every(preset => preset.poses.length >= 1 && preset.poses.length <= 4)).toBe(true);
 });
 

@@ -14,6 +14,8 @@ import { redactProfileSecretAxFields, redactProfileSecretAxNodes } from './ax-re
 export interface AxElement {
   id?: string;
   label?: string;
+  /** Android content-desc, when different from the existing visible-text label. */
+  accessibilityLabel?: string;
   role?: string;
   enabled?: boolean;
   value?: string;
@@ -129,7 +131,11 @@ export function classifyObservedState(snap: AxSnapshot | null): ObservedState {
 export function selectorMatches(el: AxElement, sel: Selector): boolean {
   if ('id' in sel) return el.id === sel.id;
   if ('idPrefix' in sel) return !!el.id && el.id.startsWith(sel.idPrefix);
-  return normalizeWs(el.label) === normalizeWs(sel.label);
+  return (
+    normalizeWs(el.label) === normalizeWs(sel.label) ||
+    (el.accessibilityLabel !== undefined &&
+      normalizeWs(el.accessibilityLabel) === normalizeWs(sel.label))
+  );
 }
 
 /** Find the best on-screen element for a selector: exact id/label wins over a
@@ -179,6 +185,9 @@ export const toAxNode = (el: AxElement): AxNode => {
   return {
     id: safe.id,
     label: safe.label ?? undefined,
+    ...(safe.accessibilityLabel !== undefined
+      ? { accessibilityLabel: safe.accessibilityLabel }
+      : {}),
     value: normalizeCheckedControlValue(safe.value ?? undefined),
     role: safe.role,
     state: { enabled: safe.enabled ?? true },

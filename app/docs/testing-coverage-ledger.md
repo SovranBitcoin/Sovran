@@ -282,13 +282,25 @@ and the JSON plan or blocker. A cited pure test proves only its own layer.
 
 These new scenarios are authored coverage. No iOS or Android product run is
 claimed by this inventory; passing loader and planner tests prove harness
-contracts only. The full matrix now includes 141 scenarios and 245 platform pairs
-(132 iOS, 113 Android), including the explicit deferred cases.
+contracts only. The full matrix now includes 153 scenarios and 264 platform pairs
+(144 iOS, 120 Android), including the explicit deferred cases.
 
 | Scenario | Intended behavior | Status |
 | --- | --- | --- |
 | `backup.flow` | Verify all twelve recovery words | authored |
 | `cta.preview` | Call-to-action modal previews | authored |
+| `capture.onboarding` | Guarded first-run pages for the library | authored; presentation capture only, no product proof |
+| `capture.settings` | Settings pages without saving or revealing secrets | authored; presentation capture only, no product proof |
+| `capture.design-system` | Design component pages | authored; presentation capture only, no product proof |
+| `capture.history` | Native demo transaction details | authored; presentation capture only, no product proof |
+| `capture.local-navigation` | Local navigation without connecting or paying | authored; presentation capture only, no product proof |
+| `capture.account-entry` | Account forms and public keys without changing them | authored; presentation capture only, no product proof |
+| `capture.composer` | Empty post composer without publishing | authored; presentation capture only, no product proof |
+| `capture.signer-lists` | Empty signing activity and request lists | authored; presentation capture only, no product proof |
+| `capture.receive-rails` | Empty receive rail lists | authored; presentation capture only, no product proof |
+| `capture.followers` | Empty follower notifications on a new profile | authored; presentation capture only, no product proof |
+| `capture.whitenoise-entry` | White Noise setup before creating key packages | authored; presentation capture only, no product proof |
+| `capture.storage` | Storage inventory without exporting data | authored; presentation capture only, no product proof |
 | `marketing.screenshots.media` | Marketing media screenshots | deferred: Thread, stories and image-viewer have no isolated navigable Mock Mode media fixture. Capture inventory only; implement fixture entry/readiness/exit before enabling. |
 | `marketing.screenshots.mints` | Marketing mint trust screenshots | authored |
 | `marketing.screenshots.wallpapers` | Marketing wallpaper screenshots | authored |

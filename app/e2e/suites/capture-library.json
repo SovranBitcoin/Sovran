@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "name": "capture-library",
+  "defaultEndState": "wallet",
+  "scenarios": [
+    {"id":"capture.storage","file":"scenarios/capture-storage.json","order":110,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"capture.account-entry","file":"scenarios/capture-account-entry.json","order":50,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"capture.composer","file":"scenarios/capture-composer.json","order":60,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"capture.signer-lists","file":"scenarios/capture-signer-lists.json","order":70,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"capture.receive-rails","file":"scenarios/capture-receive-rails.json","order":80,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"capture.followers","file":"scenarios/capture-followers.json","order":90,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"capture.whitenoise-entry","file":"scenarios/capture-whitenoise-entry.json","order":100,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"capture.local-navigation","file":"scenarios/capture-local-navigation.json","order":40,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"capture.onboarding","file":"scenarios/capture-onboarding.json","order":5,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"capture.settings","file":"scenarios/capture-settings.json","order":10,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"capture.design-system","file":"scenarios/capture-design-system.json","order":20,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"capture.history","file":"scenarios/capture-history.json","order":30,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"}
+  ]
+}

@@ -30,6 +30,7 @@ export function ComposeFab() {
 
   return (
     <Pressable
+      testID="composer-open"
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel="New post"

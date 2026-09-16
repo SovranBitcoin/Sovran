@@ -14,6 +14,7 @@ import sharp from "sharp";
 import { loadBrandInputs } from "./brand-assets.mjs";
 import { loadFonts, text, brandLockup, hash } from "./lib/marketing-render.mjs";
 import {
+  LIBRARY_BODY,
   captureDevice,
   phoneGeometry,
   renderPhone,
@@ -400,7 +401,9 @@ export async function loadInputs(project, specs, readSource = optional) {
       const entry = project.screenshots[name];
       assert(entry, `Missing screenshot registration: ${name}`);
       if (entry.availability === "unavailable" || entry.freshness === "stale") {
-        missing.add(`${entry.file} (unavailable: ${entry.unavailableReason ?? entry.staleReason ?? "capture requires review"})`);
+        missing.add(
+          `${entry.file} (unavailable: ${entry.unavailableReason ?? entry.staleReason ?? "capture requires review"})`,
+        );
         shots[name] = null;
         continue;
       }
@@ -853,8 +856,9 @@ export async function renderArtwork(
   const missing = [],
     screenshots = [],
     ratios = [];
+  const body = LIBRARY_BODY[spec.platform];
   const placeholder = await sharp({
-    create: { width: 402, height: 874, channels: 3, background: "#242424" },
+    create: { ...body, channels: 3, background: "#242424" },
   })
     .png()
     .toBuffer();
@@ -987,13 +991,17 @@ export async function main(
     manifestOnly = false,
     allowMissing = false,
     variantsFlag = false,
+    output,
     only;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--check") check = true;
     else if (args[i] === "--manifest-only") manifestOnly = true;
     else if (args[i] === "--allow-missing") allowMissing = true;
     else if (args[i] === "--variants") variantsFlag = true;
-    else if (args[i] === "--only") {
+    else if (args[i] === "--out") {
+      output = args[++i];
+      assert(output && !output.startsWith("--"), "--out needs a directory");
+    } else if (args[i] === "--only") {
       only = args[++i];
       assert(slug.test(only ?? ""), "--only needs an id");
     } else throw new Error(`Unknown argument: ${args[i]}`);
@@ -1001,6 +1009,10 @@ export async function main(
   assert(
     !manifestOnly || (!check && !variantsFlag && !only),
     "--manifest-only requires a full run without --check, --variants or --only",
+  );
+  assert(
+    output,
+    "Choose --out DIRECTORY for explicit exports; use /social for on-demand artwork.",
   );
   const project = await loadProject();
   const specs = project.specs.filter((s) => !only || s.id === only);
@@ -1032,10 +1044,28 @@ export async function main(
   ])
     renderer[file] = hash(await readFile(join(ROOT, file)));
   const rendererHash = hash(json(renderer));
-  const generated = join(FOLDER, "generated"),
+  const generated = resolve(output),
     manifestPath = join(generated, "manifest.json");
   const savedBytes = await optional(manifestPath),
     saved = savedBytes ? JSON.parse(savedBytes) : {};
+  if (!check && !manifestOnly) {
+    const owned = new Map(
+      [
+        ...Object.values(saved.concepts ?? {}).flatMap((concept) => [
+          ...(concept.outputs ?? []),
+          ...Object.values(concept.variants ?? {}),
+        ]),
+        ...Object.values(saved.featureGraphic ?? {}),
+      ].map((record) => [record.file, record.sha256]),
+    );
+    for (const file of await outputFiles(generated)) {
+      if (file === "manifest.json" && savedBytes) continue;
+      assert(
+        owned.get(file) === hash(await readFile(join(generated, file))),
+        `Refusing to replace unowned or edited artwork: ${file}`,
+      );
+    }
+  }
   const manifest = {
     version: 1,
     concepts: only ? { ...saved.concepts } : {},

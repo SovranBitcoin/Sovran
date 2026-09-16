@@ -68,7 +68,8 @@ export function parseUiautomatorXml(
     // An editable field (RN TextInput renders as EditText) echoes its current
     // content into `text`, mirroring iOS's accessibilityValue — so it is the
     // field's VALUE, and its accessible name is the content-desc/hint. Every
-    // other node keeps text as its label.
+    // other node retains text as its label for existing text assertions, while
+    // its authored content-desc remains independently selectable.
     // RN appends accessibilityValue.text to content-desc (", "-joined). A probe
     // whose testID ends in ":<value>" and whose content-desc ends in ", <value>"
     // can be split without guessing, so its label and value match iOS
@@ -77,15 +78,13 @@ export function parseUiautomatorXml(
     const mergedSuffix = idTail ? `, ${idTail}` : undefined;
     const splitProbe =
       !isEditable &&
-      !text &&
       mergedSuffix !== undefined &&
       contentDesc.length > mergedSuffix.length &&
       contentDesc.endsWith(mergedSuffix);
-    const label = splitProbe
+    const accessibilityLabel = splitProbe
       ? contentDesc.slice(0, -mergedSuffix!.length)
-      : isEditable
-        ? contentDesc || undefined
-        : text || contentDesc || undefined;
+      : contentDesc;
+    const label = isEditable ? contentDesc || undefined : text || accessibilityLabel || undefined;
 
     let value: string | undefined;
     if (isEditable) {
@@ -116,6 +115,9 @@ export function parseUiautomatorXml(
       redactProfileSecretAxFields({
         ...(id ? { id } : {}),
         ...(label !== undefined ? { label } : {}),
+        ...(!isEditable && accessibilityLabel && accessibilityLabel !== label
+          ? { accessibilityLabel }
+          : {}),
         ...(value !== undefined ? { value } : {}),
         role: attrs.class || undefined,
         enabled: attrs.enabled !== 'false',

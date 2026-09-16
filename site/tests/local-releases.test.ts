@@ -21,12 +21,13 @@ test('the actual preview server resolves Astro directory pages without an SPA fa
     const address = server.httpServer.address();
     if (!address || typeof address === 'string') throw new Error('No preview address');
     const origin = `http://127.0.0.1:${address.port}`;
-    for (const path of ['/', '/download', '/releases', '/terms', '/privacy', '/scenes/hero']) {
+    for (const path of ['/', '/download', '/releases', '/terms', '/privacy']) {
       const response = await fetch(`${origin}${path}`);
       expect(response.status, path).toBe(200);
       expect(response.headers.get('content-type'), path).toContain('text/html');
     }
     expect((await fetch(`${origin}/missing-page`)).status).toBe(404);
+    for (const path of ['/dev', '/screenshots', '/logos', '/social', '/mockups', '/scenes/hero', '/__artwork/catalog']) expect((await fetch(`${origin}${path}`)).status).toBe(404);
   } finally { await server.close(); }
 });
 

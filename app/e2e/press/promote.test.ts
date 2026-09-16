@@ -3,9 +3,19 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import sharp from 'sharp';
 import { promoteCandidates, recordRefreshFailures, type LibraryPaths } from './promote';
 
 const sha = (bytes: Buffer | string) => createHash('sha256').update(bytes).digest('hex');
+
+/** Synthetic capture bytes: real PNG headers, deliberately not app pixels. */
+async function png(tint: number, width = 1320, height = 2868): Promise<Buffer> {
+  return sharp({
+    create: { width, height, channels: 3, background: { r: tint, g: 40, b: 60 } },
+  })
+    .png()
+    .toBuffer();
+}
 const appSource = { fingerprint: 'd'.repeat(64), gitSha: 'e'.repeat(40), gitDirty: false };
 const build = {
   fingerprint: 'a'.repeat(40),
@@ -20,7 +30,6 @@ function library() {
   const paths: LibraryPaths = {
     registry: join(root, 'screenshots.json'),
     artwork: join(root, 'artwork'),
-    pins: join(root, 'pins.json'),
   };
   const entry = (key: string, extra: Record<string, unknown> = {}) => ({
     context: key.split('/')[1],
@@ -34,7 +43,11 @@ function library() {
     paths.registry,
     `${JSON.stringify(
       {
-        'ios/wallet-navy': entry('ios/wallet-navy', { context: 'wallet-appearance', page: 'wallet', wallpaperId: 'navy' }),
+        'ios/wallet-navy': entry('ios/wallet-navy', {
+          context: 'wallet-appearance',
+          page: 'wallet',
+          wallpaperId: 'navy',
+        }),
         'ios/receive-qr': entry('ios/receive-qr', {
           availability: 'unavailable',
           freshness: 'stale',
@@ -50,7 +63,12 @@ function library() {
   return { root, paths, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
 
-function candidate(root: string, runId: string, shots: { key: string; bytes: Buffer }[], platform = 'ios') {
+function candidate(
+  root: string,
+  runId: string,
+  shots: { key: string; bytes: Buffer }[],
+  platform = 'ios'
+) {
   const dir = join(root, runId, 'press');
   mkdirSync(dir, { recursive: true });
   const screenshots = shots.map(({ key, bytes }) => {
@@ -67,17 +85,22 @@ function candidate(root: string, runId: string, shots: { key: string; bytes: Buf
 
 const read = (path: string) => JSON.parse(readFileSync(path, 'utf8'));
 
-test('promotes exact bytes and replaces capture provenance, keeping curated fields', () => {
+test('promotes exact bytes and replaces capture provenance, keeping curated fields', async () => {
   const { root, paths, cleanup } = library();
   try {
-    const qr = Buffer.from('new receive qr');
-    const navy = Buffer.from('new navy wallet');
+    const qr = await png(10);
+    const navy = await png(20);
     const dir = candidate(root, '2026-09-15T05-00-00-000Z-abcd1234', [
       { key: 'ios/receive-qr', bytes: qr },
       { key: 'ios/wallet-navy', bytes: navy },
     ]);
-    expect(promoteCandidates([dir], { builds: { ios: build }, appSource }, paths)).toEqual(['ios/receive-qr', 'ios/wallet-navy']);
-    expect(readFileSync(join(paths.artwork, 'source/screenshots/ios/receive-qr.png'))).toEqual(qr);
+    expect(promoteCandidates([dir], { builds: { ios: build }, appSource }, paths)).toEqual([
+      'ios/receive-qr',
+      'ios/wallet-navy',
+    ]);
+    expect(sha(readFileSync(join(paths.artwork, 'source/screenshots/ios/receive-qr.png')))).toBe(
+      sha(qr)
+    );
     const registry = read(paths.registry);
     expect(registry['ios/receive-qr']).toEqual({
       context: 'receive-qr',
@@ -86,10 +109,16 @@ test('promotes exact bytes and replaces capture provenance, keeping curated fiel
       run: 'run-2026-09-15T05-00-00-000Z-abcd1234',
       sha256: sha(qr),
       capturedAt: '2026-09-15T05:00:00.000Z',
+      capture: { width: 1320, height: 2868 },
       nativeBuild: build,
       appSource,
     });
-    expect(registry['ios/wallet-navy']).toMatchObject({ context: 'wallet-appearance', page: 'wallet', wallpaperId: 'navy', sha256: sha(navy) });
+    expect(registry['ios/wallet-navy']).toMatchObject({
+      context: 'wallet-appearance',
+      page: 'wallet',
+      wallpaperId: 'navy',
+      sha256: sha(navy),
+    });
     expect(registry['ios/ai'].run).toBe('run-old');
     expect(readFileSync(paths.registry, 'utf8')).toStartWith('{\n  "');
   } finally {
@@ -97,17 +126,25 @@ test('promotes exact bytes and replaces capture provenance, keeping curated fiel
   }
 });
 
-test('refuses to promote without a native build stamp or with changed bytes, writing nothing', () => {
+test('refuses to promote without a native build stamp or with changed bytes, writing nothing', async () => {
   const { root, paths, cleanup } = library();
   try {
     const before = readFileSync(paths.registry, 'utf8');
-    const dir = candidate(root, 'run-a', [{ key: 'ios/ai', bytes: Buffer.from('ai') }]);
-    expect(() => promoteCandidates([dir], { builds: {}, appSource }, paths)).toThrow('No native build stamp');
-    expect(() => promoteCandidates([dir], { builds: { ios: build }, appSource: undefined }, paths)).toThrow(
-      'No app source stamp'
+    const dir = candidate(root, 'run-a', [{ key: 'ios/ai', bytes: await png(30) }]);
+    expect(() => promoteCandidates([dir], { builds: {}, appSource }, paths)).toThrow(
+      'No native build stamp'
     );
+    expect(() =>
+      promoteCandidates([dir], { builds: { ios: build }, appSource: undefined }, paths)
+    ).toThrow('No app source stamp');
     writeFileSync(join(dir, 'ai.png'), 'tampered');
-    expect(() => promoteCandidates([dir], { builds: { ios: build }, appSource }, paths)).toThrow('Candidate hash mismatch');
+    expect(() => promoteCandidates([dir], { builds: { ios: build }, appSource }, paths)).toThrow(
+      'Candidate hash mismatch'
+    );
+    const notAnImage = candidate(root, 'run-b', [{ key: 'ios/ai', bytes: Buffer.from('ai') }]);
+    expect(() =>
+      promoteCandidates([notAnImage], { builds: { ios: build }, appSource }, paths)
+    ).toThrow('Candidate is not a PNG');
     expect(readFileSync(paths.registry, 'utf8')).toBe(before);
     expect(existsSync(join(paths.artwork, 'source/screenshots/ios/ai.png'))).toBe(false);
   } finally {
@@ -115,38 +152,31 @@ test('refuses to promote without a native build stamp or with changed bytes, wri
   }
 });
 
-test('store pins move only when the whole pinned set comes from one stamped run', () => {
+test('records the device each capture came from, so mixed geometry stays visible', async () => {
   const { root, paths, cleanup } = library();
   try {
-    writeFileSync(
-      paths.pins,
-      `${JSON.stringify(
-        {
-          ios: {
-            run: 'run-old',
-            screenshots: [
-              { file: 'source/screenshots/ios/ai-chat.png', label: 'AI', sha256: 'c'.repeat(64) },
-              { file: 'source/screenshots/ios/wallet.png', label: 'WALLET', sha256: 'c'.repeat(64) },
-            ],
-          },
-        },
-        null,
-        2
-      )}\n`
-    );
-    const ai = Buffer.from('ai v2');
-    promoteCandidates([candidate(root, 'partial', [{ key: 'ios/ai', bytes: ai }])], { builds: { ios: build }, appSource }, paths);
-    expect(read(paths.pins).ios.run).toBe('run-old');
-    const wallet = Buffer.from('wallet v2');
+    const library1080 = await png(40, 1080, 2400);
+    const store1080 = await png(50, 1080, 1920);
     promoteCandidates(
-      [candidate(root, 'store', [{ key: 'ios/ai', bytes: ai }, { key: 'ios/wallet', bytes: wallet }])],
-      { builds: { ios: build }, appSource },
+      [
+        candidate(
+          root,
+          'android-library',
+          [
+            { key: 'ios/ai', bytes: library1080 },
+            { key: 'ios/wallet', bytes: store1080 },
+          ],
+          'android'
+        ),
+      ],
+      { builds: { android: build }, appSource },
       paths
     );
-    expect(read(paths.pins).ios).toMatchObject({
-      run: 'run-store',
-      screenshots: [{ label: 'AI', sha256: sha(ai) }, { label: 'WALLET', sha256: sha(wallet) }],
-    });
+    const registry = read(paths.registry);
+    // Promotion retains both, and says which device each one is, rather than
+    // letting a consumer infer a phone body from whatever ratio arrived.
+    expect(registry['ios/ai'].capture).toEqual({ width: 1080, height: 2400 });
+    expect(registry['ios/wallet'].capture).toEqual({ width: 1080, height: 1920 });
   } finally {
     cleanup();
   }

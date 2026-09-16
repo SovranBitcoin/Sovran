@@ -80,6 +80,14 @@ describe('groupPages', () => {
     expect(wallet.captures).toHaveLength(3); // r2 ×2 + r1 ×1, never the smoke run
   });
 
+  it('keeps the newest passing scenario independently on each native platform', () => {
+    const android = run('android', '2026-07-14T01:30:00Z', older.scenarios, { driver: 'android' });
+    const index = groupPages([newest, android, older], false);
+    expect(
+      index.pages.find((page) => page.page === 'wallet')!.captures.map((c) => c.runId)
+    ).toEqual(['r2', 'r2', 'android']);
+  });
+
   it('orders groups by the canonical registry, legacy names last', () => {
     const legacy = run('r3', '2026-07-14T03:00:00Z', [
       timeline('old.scenario', true, [{ name: 'wallet-start', occurrence: 1, seq: 1 }]),

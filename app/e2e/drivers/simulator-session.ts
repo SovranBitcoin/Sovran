@@ -9,6 +9,13 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync } fro
 import { createServer as createHttpServer, type IncomingMessage } from 'node:http';
 import { createServer as createNetServer } from 'node:net';
 import { dirname, join } from 'node:path';
+import {
+  captureEnvironment,
+  LIBRARY_CAPTURE_PROFILE,
+  inspectIosCaptureResolution,
+  type CaptureProfile,
+  type NativeCaptureMetadata,
+} from './capture-profile';
 
 import {
   E2E_READY_PROOF_RECONCILIATION_ENV,
@@ -47,11 +54,13 @@ interface RuntimeRecord {
   identifier: string;
   name: string;
   version: string;
+  buildversion?: string;
   platform?: string;
   supportedDeviceTypes?: RuntimeDevice[];
 }
 
 interface SimulatorTarget {
+  runtimeBuild?: string;
   runtimeIdentifier: string;
   runtimeName: string;
   runtimeVersion: string;
@@ -61,7 +70,11 @@ interface SimulatorTarget {
 
 /** Select a device from the latest installed iOS runtime's own compatibility
  * list. This avoids guessing whether a globally listed device type can boot. */
-export function selectSimulatorTarget(raw: string, preferred = DEFAULT_DEVICE): SimulatorTarget {
+export function selectSimulatorTarget(
+  raw: string,
+  preferred = DEFAULT_DEVICE,
+  captureProfile?: CaptureProfile
+): SimulatorTarget {
   let parsed: { runtimes?: RuntimeRecord[] };
   try {
     parsed = JSON.parse(raw) as { runtimes?: RuntimeRecord[] };
@@ -72,6 +85,7 @@ export function selectSimulatorTarget(raw: string, preferred = DEFAULT_DEVICE): 
     .filter(
       (runtime) =>
         runtime.isAvailable &&
+        (!captureProfile || runtime.version === LIBRARY_CAPTURE_PROFILE.ios.runtime) &&
         (runtime.platform === 'iOS' || runtime.identifier.includes('SimRuntime.iOS'))
     )
     .sort((a, b) =>
@@ -81,12 +95,14 @@ export function selectSimulatorTarget(raw: string, preferred = DEFAULT_DEVICE): 
     const phones = (runtime.supportedDeviceTypes ?? []).filter(
       (device) => device.productFamily === 'iPhone' && device.name.startsWith('iPhone ')
     );
-    const device =
-      phones.find((candidate) => candidate.name === preferred) ??
-      phones.find((candidate) => / Pro$/.test(candidate.name)) ??
-      phones[0];
+    const device = captureProfile
+      ? phones.find((candidate) => candidate.name === LIBRARY_CAPTURE_PROFILE.ios.model)
+      : (phones.find((candidate) => candidate.name === preferred) ??
+        phones.find((candidate) => / Pro$/.test(candidate.name)) ??
+        phones[0]);
     if (!device) continue;
     return {
+      ...(runtime.buildversion ? { runtimeBuild: runtime.buildversion } : {}),
       runtimeIdentifier: runtime.identifier,
       runtimeName: runtime.name,
       runtimeVersion: runtime.version,
@@ -94,18 +110,24 @@ export function selectSimulatorTarget(raw: string, preferred = DEFAULT_DEVICE): 
       deviceTypeName: device.name,
     };
   }
-  throw new Error('no available iOS runtime with a compatible iPhone simulator');
+  throw new Error(
+    captureProfile
+      ? 'library-v1 requires available iOS 26.2 with iPhone 17 Pro Max; fallback is forbidden'
+      : 'no available iOS runtime with a compatible iPhone simulator'
+  );
 }
 
 const UDID = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
 
 interface EphemeralDevice extends SimulatorTarget {
+  readonly capture?: NativeCaptureMetadata;
   readonly udid: string;
   readonly name: string;
   dispose(): Promise<void>;
 }
 
 interface CreateDeviceOptions {
+  captureProfile?: CaptureProfile;
   runId: string;
   preferredDevice?: string;
   signal?: AbortSignal;
@@ -119,7 +141,7 @@ export async function createEphemeralSimulatorDevice(
   const runtimes = await execute(['xcrun', 'simctl', 'list', 'runtimes', '-j'], {
     signal: options.signal,
   });
-  const target = selectSimulatorTarget(runtimes, options.preferredDevice);
+  const target = selectSimulatorTarget(runtimes, options.preferredDevice, options.captureProfile);
   const safeRunId = options.runId.replace(/[^a-zA-Z0-9._-]/g, '-').slice(-48);
   const name = `Sovran E2E ${safeRunId}-${randomUUID().slice(0, 8)}`;
   const udid = (
@@ -145,6 +167,47 @@ export async function createEphemeralSimulatorDevice(
     (options.onLifecycle ?? log)(`created fresh ephemeral simulator "${name}" (${udid})`);
     await execute(['xcrun', 'simctl', 'boot', udid], { signal: options.signal });
     await execute(['xcrun', 'simctl', 'bootstatus', udid, '-b'], { signal: options.signal });
+    let capture: NativeCaptureMetadata | undefined;
+    if (options.captureProfile) {
+      const commandOptions = { signal: options.signal, timeoutMs: 30_000 };
+      for (const args of [
+        ['spawn', udid, 'defaults', 'write', 'NSGlobalDomain', 'AppleLanguages', '-array', 'en'],
+        ['spawn', udid, 'defaults', 'write', 'NSGlobalDomain', 'AppleLocale', '-string', 'en_US'],
+        ['ui', udid, 'appearance', 'light'],
+        ['ui', udid, 'content_size', 'large'],
+      ])
+        await execute(['xcrun', 'simctl', ...args], commandOptions);
+      const appearance = await execute(
+        ['xcrun', 'simctl', 'ui', udid, 'appearance'],
+        commandOptions
+      );
+      const contentSize = await execute(
+        ['xcrun', 'simctl', 'ui', udid, 'content_size'],
+        commandOptions
+      );
+      const locale = await execute(
+        ['xcrun', 'simctl', 'spawn', udid, 'defaults', 'read', 'NSGlobalDomain', 'AppleLocale'],
+        commandOptions
+      );
+      if (
+        appearance.trim() !== 'light' ||
+        contentSize.trim() !== 'large' ||
+        locale.trim() !== 'en_US'
+      ) {
+        throw new Error('library-v1 iOS presentation settings did not take effect');
+      }
+      capture = {
+        profile: options.captureProfile,
+        model: target.deviceTypeName,
+        runtime: target.runtimeVersion,
+        runtimeBuild: target.runtimeBuild,
+        resolution: await inspectIosCaptureResolution(udid, execute, options.signal),
+        density: LIBRARY_CAPTURE_PROFILE.ios.density,
+        locale: 'en-US',
+        appearance,
+        fontScale: 1,
+      };
+    }
     await execute(
       [
         'xcrun',
@@ -162,10 +225,13 @@ export async function createEphemeralSimulatorDevice(
         '4',
         '--operatorName',
         '',
+        ...(options.captureProfile
+          ? ['--wifiMode', 'active', '--wifiBars', '3', '--dataNetwork', 'wifi']
+          : []),
       ],
-      { allowFail: true, signal: options.signal }
+      { allowFail: !options.captureProfile, signal: options.signal, timeoutMs: 30_000 }
     );
-    return { ...target, udid, name, dispose };
+    return { ...target, udid, name, dispose, ...(capture ? { capture } : {}) };
   } catch (error) {
     try {
       await dispose();
@@ -206,6 +272,7 @@ export function buildMetroEnvironment(
   delete environment.EXPO_PUBLIC_E2E_TOAST_DISMISS_MS;
   delete environment.EXPO_PUBLIC_E2E_TRIPLE_TAP_WINDOW_MS;
   delete environment.EXPO_PUBLIC_E2E_STATE_MIRROR;
+  delete environment.EXPO_PUBLIC_E2E_CAPTURE_PROFILE;
   delete environment.RCT_METRO_PORT;
   // Park each onboarding slide for three minutes. Evidence capture becomes
   // much slower under concurrent iOS + Android sweeps; the old 20s window let
@@ -228,6 +295,8 @@ export function buildMetroEnvironment(
   // Every owned e2e Metro turns on the in-app zustand state mirror so each
   // evidence frame gets a .store.json sidecar (see shared/lib/e2e/stateMirror).
   environment.EXPO_PUBLIC_E2E_STATE_MIRROR = '1';
+  const { captureProfile } = captureEnvironment(source);
+  if (captureProfile) environment.EXPO_PUBLIC_E2E_CAPTURE_PROFILE = captureProfile;
   const nodeOptions = (environment.NODE_OPTIONS ?? '')
     .replace(/(?:^|\s)--dns-result-order(?:=|\s+)\S+/g, ' ')
     .trim();
@@ -897,6 +966,7 @@ const processSignals: SignalSource = {
 };
 
 interface EphemeralSimulatorSession {
+  readonly capture?: NativeCaptureMetadata;
   readonly udid: string;
   readonly name: string;
   readonly runtimeName: string;
@@ -928,6 +998,7 @@ export async function withEphemeralSimulatorSession<T>(
     runId: string;
     runDir: string;
     preferredDevice?: string;
+    captureProfile?: CaptureProfile;
     onSeedExport?: (mnemonic: string) => void;
     controlledP2PKPubkey?: string;
     fundedAssets?: readonly E2EReadyProofAsset[];
@@ -980,6 +1051,7 @@ export async function withEphemeralSimulatorSession<T>(
       {
         runId: options.runId,
         preferredDevice: options.preferredDevice,
+        captureProfile: options.captureProfile,
         signal: abort.signal,
         onLifecycle,
       },
@@ -991,6 +1063,7 @@ export async function withEphemeralSimulatorSession<T>(
     const removeUnexpectedExit = serveSim.onUnexpectedExit((error) => abort.abort(error));
     cleanups.push({ priority: 40, run: async () => void removeUnexpectedExit() });
     const session: EphemeralSimulatorSession = {
+      ...(device.capture ? { capture: device.capture } : {}),
       udid: device.udid,
       name: device.name,
       runtimeName: device.runtimeName,

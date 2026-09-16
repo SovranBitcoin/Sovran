@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "id": "capture.whitenoise-entry",
+  "name": "White Noise setup before creating key packages",
+  "description": "Read the setup screen on a fresh profile and leave without pressing Set up White Noise.",
+  "details": "Waits for the existing client to read its local zero key-package count. No bootstrap, publish, invitation acceptance or group creation. A missing client or read error fails readiness rather than counting a loading page.",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"openUrl","url":"sovran:///(user-flow)/whitenoiseSetup"},
+    {"action":"waitFor","selector":{"id":"whitenoise-setup-uninitialized"},"timeoutMs":60000},
+    {"action":"waitFor","selector":{"id":"whitenoise-setup-start"},"state":"enabled","timeoutMs":15000},
+    {"action":"screenshot","name":"whitenoise-setup"},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

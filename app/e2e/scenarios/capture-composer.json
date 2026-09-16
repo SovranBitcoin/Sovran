@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "id": "capture.composer",
+  "name": "Empty post composer without publishing",
+  "description": "Open a new post from the feed, inspect the empty form with Post disabled, and cancel without typing or uploading.",
+  "details": "Uses the real new-post entry to initialize a clean draft, not an injected store or reconstructed screen. Disposable fresh profile, Mock Mode off. No publish or media actions.",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-feed"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-feed"}}],"until":{"id":"composer-open"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"composer-open"}}],"until":{"id":"composer-input"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"composer-input"},"state":"enabled","timeoutMs":30000},
+    {"action":"assert","that":"ax","selector":{"id":"composer-publish"},"state":{"enabled":false}},
+    {"action":"screenshot","name":"composer","delayMs":1200},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"composer-cancel"}}],"until":{"id":"composer-open"},"attempts":4,"settleMs":6000},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

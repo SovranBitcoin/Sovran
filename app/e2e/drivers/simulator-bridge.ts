@@ -94,6 +94,7 @@ export function startSimulatorBridge(options: {
   let width = 0;
   let height = 0;
   let stopped = false;
+  let polling = false;
   let pollTimer: ReturnType<typeof setTimeout> | undefined;
   let axTail: Promise<void> = Promise.resolve();
 
@@ -116,8 +117,9 @@ export function startSimulatorBridge(options: {
   };
 
   const poll = async () => {
+    if (stopped || clients.size === 0 || polling) return;
     pollTimer = undefined;
-    if (stopped || clients.size === 0) return;
+    polling = true;
     try {
       const message = `data: ${JSON.stringify(normalizeAx((await describe()).roots))}\n\n`;
       // Every successful native read is a fresh observation, even when its
@@ -134,15 +136,25 @@ export function startSimulatorBridge(options: {
       const bytes = encoder.encode(message);
       for (const client of clients) client.enqueue(bytes);
     } finally {
-      if (!stopped && clients.size > 0) pollTimer = setTimeout(poll, options.pollMs ?? 500);
+      polling = false;
+      if (!stopped && clients.size > 0 && !pollTimer)
+        pollTimer = setTimeout(poll, options.pollMs ?? 500);
     }
   };
 
   const server = Bun.serve<{ udid: string }>({
     hostname: '127.0.0.1',
     port: options.port,
+    // SSE has an owned lifecycle; one-shot clients already have operation deadlines.
+    idleTimeout: 0,
     fetch: async (request, socketServer) => {
       const url = new URL(request.url);
+      if (
+        request.headers.has('origin') ||
+        !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) ||
+        url.port !== String(socketServer.port)
+      )
+        return new Response('forbidden', { status: 403 });
       if (url.pathname === '/ws') {
         return socketServer.upgrade(request, { data: { udid } })
           ? undefined
@@ -168,7 +180,7 @@ export function startSimulatorBridge(options: {
             controller = value;
             clients.add(value);
             value.enqueue(encoder.encode(':\n\n'));
-            if (!pollTimer) void poll();
+            if (!pollTimer && !polling) void poll();
           },
           cancel() {
             clients.delete(controller);

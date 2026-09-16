@@ -1,8 +1,5 @@
-export declare const APP_SOURCE_PATHS: readonly string[];
-export declare const APP_SOURCE_EXCLUDE: RegExp;
 export type AppSourceStamp = { fingerprint: string; gitSha: string; gitDirty: boolean };
 export type CaptureFreshness = 'current' | 'outdated' | 'unverified' | 'withdrawn' | 'missing' | 'unknown';
-export declare function appSourceFiles(root: string): string[];
 export declare function appSourceFingerprint(root: string): string | undefined;
 export declare function appSourceStamp(root: string): AppSourceStamp | undefined;
 export declare function appFilesChangedSince(root: string, gitSha: string): string[] | undefined;

@@ -1335,6 +1335,7 @@ export function UserProfileScreen() {
               <ScreenHeaderAction
                 icon="mdi:qrcode"
                 testID="profile-share-qr"
+                accessibilityLabel="Show public profile QR"
                 onPress={() =>
                   router.push(
                     buildProfileHref(

@@ -1,19 +1,18 @@
 ---
 import '../styles/site.css';
 import { siteCopy } from '../../../copy/src/site';
-import { existsSync, readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
+import { websiteAssetStatus } from '../../scripts/website-assets.mjs';
 interface Props { title?: string; description?: string; noindex?: boolean }
 const { title = siteCopy.title, description = siteCopy.description, noindex = false } = Astro.props;
 const path = Astro.url.pathname.replace(/\/$/, '') || '/';
 const links = [['/#features', 'Product'], ['/#faq', 'FAQ'], ['/roadmap', 'Roadmap'], ['/releases', 'Releases'], ['/download', 'Download']];
 // Never advertise an old scene export after the screenshots or composition change.
-const root = new URL('../../../', import.meta.url);
-const exportManifest = new URL('site/public/social/manifest.json', root);
-const exportImage = new URL('site/public/social/og.png', root);
-const manifest = existsSync(exportManifest) ? JSON.parse(readFileSync(exportManifest, 'utf8')) : null;
-const hash = (file: URL) => createHash('sha256').update(readFileSync(file)).digest('hex');
-const hasSocialImage = manifest && existsSync(exportImage) && hash(exportImage) === manifest.images['og.png'] && Object.entries(manifest.inputs).every(([file, revision]) => existsSync(new URL(file, root)) && hash(new URL(file, root)) === revision);
+let socialImage;
+try {
+  const status = await websiteAssetStatus(import.meta.env.SOVRAN_REPO_ROOT);
+  socialImage = status.outputs.find(output => output.output === 'social/og.png' &&
+    (output.current || (!status.fingerprint && output.renderCurrent)));
+} catch { /* Missing or invalid evidence must never advertise an old export. */ }
 ---
 <!doctype html>
 <html lang="en">
@@ -30,7 +29,7 @@ const hasSocialImage = manifest && existsSync(exportImage) && hash(exportImage) 
     <meta property="og:type" content="website" />
     <meta property="og:url" content={new URL(path, 'https://sovran.money')} />
     <link rel="icon" href="/sovran-mark.svg" type="image/svg+xml" />
-    {hasSocialImage && <><meta property="og:image" content="https://sovran.money/social/og.png" /><meta property="og:image:width" content="1200" /><meta property="og:image:height" content="630" /><meta property="og:image:alt" content="Sovran wallet and feed in screenshot-based phone frames" /><meta name="twitter:card" content="summary_large_image" /></>}
+    {socialImage && <><meta property="og:image" content="https://sovran.money/social/og.png" /><meta property="og:image:width" content={String(socialImage.recipe.width)} /><meta property="og:image:height" content={String(socialImage.recipe.height)} /><meta property="og:image:alt" content={socialImage.recipe.title} /><meta name="twitter:card" content="summary_large_image" /></>}
     {noindex && <meta name="robots" content="noindex" />}
   </head>
   <body>

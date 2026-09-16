@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "phones": {
+    "wallet": { "captureId": "ios/wallet" },
+    "feed": { "captureId": "ios/feed" },
+    "send": { "captureId": "ios/send" },
+    "notifications": { "captureId": "ios/notifications" },
+    "ai": { "captureId": "ios/ai" },
+    "contacts": { "captureId": "ios/contacts" }
+  },
+  "scenes": {
+    "hero": { "preset": "duo-depth", "phones": ["feed", "wallet"] },
+    "wallet": { "preset": "duo-overlap", "phones": ["wallet", "send"] },
+    "social": { "preset": "duo-depth", "phones": ["notifications", "feed"] },
+    "ai": { "preset": "single-tilt", "phones": ["ai"] },
+    "offline": { "preset": "duo-overlap", "phones": ["contacts", "send"] }
+  },
+  "recipes": [
+    {
+      "output": "social/og.png",
+      "scene": "hero",
+      "version": 1,
+      "id": "og",
+      "title": "Sovran wallet and feed",
+      "headline": "Sound money meets freedom of expression.",
+      "subtitle": "Payments and conversations in one app.",
+      "background": "black",
+      "width": 1200,
+      "height": 630
+    }
+  ]
+}

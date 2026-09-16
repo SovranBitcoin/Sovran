@@ -5,10 +5,11 @@
  * instead of a serve-sim SSE stream, `adb shell input` instead of the HID/WS
  * bridge, `screencap` instead of `simctl io screenshot`.
  *
- * Offline-focused subset (M4): drag, clipboard, and permission `reset` throw
- * loudly — no scenario in the android lane uses them yet, and a loud throw
- * beats a silent wrong-primitive emulation.
+ * Permission reset and the GPS set/clear contract remain unsupported and
+ * fail explicitly rather than silently approximating the native operation.
  */
+import sharp from 'sharp';
+import { assertCaptureResolution, type CaptureProfile } from '../capture-profile';
 import type { AxNode, Driver, ScreenshotOptions, StateObservation } from '../driver';
 import type { Selector } from '../../schema/selectors';
 import {
@@ -100,6 +101,7 @@ const PERMISSION_MAP: Record<'camera' | 'photos' | 'location', string[]> = {
 };
 
 interface AndroidDriverConfig {
+  captureProfile?: CaptureProfile;
   signal?: AbortSignal;
   pollMs?: number;
 }
@@ -149,8 +151,12 @@ export class AndroidDriver implements Driver {
   /** Inactive tab contents can remain present in the accessibility dump.
    * Always select the Wallet tab by id, then prove its active controls. */
   async #selectWalletTab(): Promise<void> {
-    await this.waitFor(WALLET_TAB_SELECTOR, 'enabled', 45_000);
-    await this.tap(WALLET_TAB_SELECTOR);
+    // Resolve and tap from one dump. A second UIAutomator dump can transiently
+    // omit the tab during relaunch even though the first dump proved it ready.
+    const center = await this.#waitCenter(WALLET_TAB_SELECTOR, 45_000);
+    if (!center) throw new Error('Wallet tab did not become ready after relaunch');
+    this.#ax.invalidate();
+    await this.#adb.tap(center.x, center.y);
     await this.waitFor(WALLET_READY_SELECTOR, undefined, 45_000);
   }
 
@@ -198,9 +204,13 @@ export class AndroidDriver implements Driver {
     }
   }
 
-  /** No adb-only equivalent of a simulated GPS fix (needs the emulator
-   * console) — loud throw so a scenario never believes a fix was seeded. */
-  async setLocation(): Promise<void> {
+  /** `adb emu geo fix` can seed GPS, but has no verified inverse that clears
+   * Android's cached location. Do not claim the set/clear action contract. */
+  async setLocation(
+    _mode: 'set' | 'clear',
+    _latitude?: number,
+    _longitude?: number
+  ): Promise<void> {
     this.#throwIfAborted();
     throw new Error('location simulation is unsupported on the android driver');
   }
@@ -425,6 +435,8 @@ export class AndroidDriver implements Driver {
     let bytes: Uint8Array;
     try {
       bytes = await this.#adb.screencapPng();
+      if (this.#cfg.captureProfile)
+        assertCaptureResolution('android', await sharp(Buffer.from(bytes)).metadata());
     } catch (error) {
       const infrastructureError =
         error instanceof SimulatorInfrastructureError

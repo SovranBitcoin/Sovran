@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "id": "capture.design-system",
+  "name": "Design component pages",
+  "description": "Read the existing native component previews. These are presentation fixtures, not payment or social proof.",
+  "details": "Developer entry copied from the existing showcase. Additional family legs are source-backed hypotheses using visible content, not plain View testIDs. No native run yet. No fixture state is inserted into application stores.",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"},
+    {"use":"capture.developer"}
+  ],
+  "steps": [
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-design-system-row"}}],"until":{"id":"design-system-family-foundations"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"settings-design-system"},
+    {"action":"tap","selector":{"id":"design-system-family-foundations"}},
+    {"action":"waitFor","selector":{"label":"TYPE RAMP"},"timeoutMs":30000},
+    {"action":"screenshot","name":"settings-design-system-foundations"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"flow-header-back"}}],"until":{"id":"design-system-family-loading-indicator"},"attempts":4,"settleMs":6000},
+    {"action":"tap","selector":{"id":"design-system-family-loading-indicator"}},
+    {"action":"waitFor","selector":{"label":"CURRENT STATE"},"timeoutMs":30000},
+    {"action":"screenshot","name":"settings-design-system-loading"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"flow-header-back"}}],"until":{"id":"design-system-family-segmented-progress"},"attempts":4,"settleMs":6000},
+    {"action":"tap","selector":{"id":"design-system-family-segmented-progress"}},
+    {"action":"waitFor","selector":{"label":"Pause"},"timeoutMs":30000},
+    {"action":"screenshot","name":"settings-design-system-segmented"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"flow-header-back"}}],"until":{"id":"design-system-family-empty-states"},"attempts":4,"settleMs":6000},
+    {"action":"tap","selector":{"id":"design-system-family-empty-states"}},
+    {"action":"waitFor","selector":{"label":"No posts yet"},"timeoutMs":30000},
+    {"action":"screenshot","name":"settings-design-system-empty-states"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"flow-header-back"}}],"until":{"id":"design-system-family-empty-states"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"design-system-family-skeleton-crossfade"},"attempts":4,"settleMs":1000},
+    {"action":"tap","selector":{"id":"design-system-family-skeleton-crossfade"}},
+    {"action":"waitFor","selector":{"label":"REGION WAVE + CROSSFADE"},"timeoutMs":30000},
+    {"action":"screenshot","name":"settings-design-system-skeleton-crossfade"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"flow-header-back"}}],"until":{"id":"design-system-family-skeleton-crossfade"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"design-system-family-fade-reveal-stress"},"attempts":4,"settleMs":1000},
+    {"action":"tap","selector":{"id":"design-system-family-fade-reveal-stress"}},
+    {"action":"waitFor","selector":{"label":"Jank: off"},"timeoutMs":30000},
+    {"action":"tap","selector":{"label":"Pause"}},
+    {"action":"waitFor","selector":{"label":"Run"},"timeoutMs":15000},
+    {"action":"screenshot","name":"settings-design-system-fade-stress"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"flow-header-back"}}],"until":{"id":"design-system-family-fade-reveal-stress"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"design-system-family-fake-posts"},"attempts":4,"settleMs":1000},
+    {"action":"tap","selector":{"id":"design-system-family-fake-posts"}},
+    {"action":"waitFor","selector":{"label":"PLAIN POST (BASELINE)"},"timeoutMs":30000},
+    {"action":"screenshot","name":"settings-design-system-posts"},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

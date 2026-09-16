@@ -92,9 +92,9 @@ and 0.0479 on the 0-255 scale, attributable to existing path rounding. The maste
 and all native exports were left unchanged. Website `SOVRAN` text remains live
 Mona Sans text, not a second outlined wordmark source.
 
-Existing scene PNGs and their manifests are downstream snapshots. Re-export
-`site/public/social`, `site/public/mockups` and `press/mockups` after logo input
-changes; do not merely update their source hashes. Captured app screens, store
+Selected website PNGs and their manifests are downstream snapshots. Run
+`bun run site:assets` after logo input changes; do not merely update their source
+hashes. Social compositions render on demand. Captured app screens, store
 uploads and externally published profile images require recapture/republication
 when the design changes. Third-party stack/supporter/store logos are not Sovran
 marks and must not be replaced by the Sovran generator.

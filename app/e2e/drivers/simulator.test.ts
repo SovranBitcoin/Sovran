@@ -643,58 +643,66 @@ describe('SimulatorDriver fail-closed host boundaries', () => {
     expect(data.every((channel) => channel === 255)).toBe(true);
   });
 
-  it('brackets the raw frame with AX snapshots inside private temporary storage', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'sovran-shot-driver-test-'));
-    const input = await sharp({
-      create: {
-        width: 10,
-        height: 10,
-        channels: 3,
-        background: { r: 255, g: 255, b: 255 },
-      },
-    })
-      .png()
-      .toBuffer();
-    const snapshots: AxSnapshot[] = [
-      snapshot('wallet'),
-      {
-        screen: { width: 400, height: 800 },
-        elements: [
-          {
-            id: 'payment-info-sensitive-visual',
-            frame: { x: 0, y: 0, width: 400, height: 400 },
-          },
-        ],
-      },
-    ];
-    try {
-      const driver = new SimulatorDriver(
-        { udid: 'offline-test', axEndpoint: 'unused', touchEndpoint: 'unused' },
+  it.each([undefined, 'library-v1'] as const)(
+    'brackets private raw frames and rejects wrong dimensions for profile=%s',
+    async (captureProfile) => {
+      const root = mkdtempSync(join(tmpdir(), 'sovran-shot-driver-test-'));
+      const input = await sharp({
+        create: {
+          width: 10,
+          height: 10,
+          channels: 3,
+          background: { r: 255, g: 255, b: 255 },
+        },
+      })
+        .png()
+        .toBuffer();
+      const snapshots: AxSnapshot[] = [
+        snapshot('wallet'),
         {
-          captureAxSnapshot: async () => snapshots.shift()!,
-          captureRawScreenshot: async (path) => {
-            expect(statSync(path).mode & 0o777).toBe(0o600);
-            expect(statSync(join(path, '..')).mode & 0o777).toBe(0o700);
-            writeFileSync(path, input);
-          },
-          screenshotSettleMs: 0,
-          screenshotTempRoot: root,
+          screen: { width: 400, height: 800 },
+          elements: [
+            {
+              id: 'payment-info-sensitive-visual',
+              frame: { x: 0, y: 0, width: 400, height: 400 },
+            },
+          ],
+        },
+      ];
+      try {
+        const driver = new SimulatorDriver(
+          { udid: 'offline-test', axEndpoint: 'unused', touchEndpoint: 'unused', captureProfile },
+          {
+            captureAxSnapshot: async () => snapshots.shift()!,
+            captureRawScreenshot: async (path) => {
+              expect(statSync(path).mode & 0o777).toBe(0o600);
+              expect(statSync(join(path, '..')).mode & 0o777).toBe(0o700);
+              writeFileSync(path, input);
+            },
+            screenshotSettleMs: 0,
+            screenshotTempRoot: root,
+          }
+        );
+
+        if (captureProfile) {
+          await expect(driver.screenshot()).rejects.toThrow(/requires 1320x2868/);
+          expect(readdirSync(root)).toHaveLength(0);
+          return;
         }
-      );
+        const output = await driver.screenshot();
+        const { data } = await sharp(output)
+          .removeAlpha()
+          .raw()
+          .toBuffer({ resolveWithObject: true });
 
-      const output = await driver.screenshot();
-      const { data } = await sharp(output)
-        .removeAlpha()
-        .raw()
-        .toBuffer({ resolveWithObject: true });
-
-      expect(data.every((channel) => channel === 255)).toBe(true);
-      expect(snapshots).toHaveLength(0);
-      expect(readdirSync(root)).toHaveLength(0);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
+        expect(data.every((channel) => channel === 255)).toBe(true);
+        expect(snapshots).toHaveLength(0);
+        expect(readdirSync(root)).toHaveLength(0);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
     }
-  });
+  );
 
   it('removes private raw pixels when post-capture AX fails', async () => {
     const root = mkdtempSync(join(tmpdir(), 'sovran-shot-driver-failure-test-'));

@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "id": "capture.developer",
+  "params": [],
+  "requires": [],
+  "steps": [
+    {"use":"capture.settings"},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"id":"settings-version-row"},"timeoutMs":15000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-version-row"}},{"tap":{"id":"settings-version-row"}},{"tap":{"id":"settings-version-row"}}],"until":{"id":"e2e-toast-dev-mode"},"attempts":1,"settleMs":1200},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"id":"settings-mock-mode-toggle"},"value":"0","timeoutMs":20000}
+  ]
+}

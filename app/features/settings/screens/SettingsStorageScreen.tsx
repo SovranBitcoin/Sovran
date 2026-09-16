@@ -23,6 +23,7 @@ import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
+import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 
 const KEY_FONT_SIZE = 11;
 
@@ -385,6 +386,12 @@ export const SettingsStorageScreen = () => {
 
   return (
     <ScreenWrapper name="SettingsStorageScreen" scroll="custom" safeArea>
+      {__DEV__ && !isLoading && !isRefreshing && !error && (
+        <E2EAccessibilityProbe
+          testID="settings-storage-ready"
+          accessibilityLabel="Storage key and file inventory loaded"
+        />
+      )}
       <ScrollView
         className="px-4"
         refreshControl={

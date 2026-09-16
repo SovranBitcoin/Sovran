@@ -42,9 +42,13 @@ app/old_log.txt
 FEEDBACK.md
 app/old_log_3.txt
 
-# Full artwork comparison variants are local; selected exports/contact sheets are committed.
+# Historical local exports are not source inputs. Social previews are in-memory.
 /press/artwork/generated/variants/
 /press/artwork/.staging-*/
 /site/dist/
 /site/.astro/
 press/exports/
+/press/screenshots/.import-lock/
+/press/screenshots/.staging-*/
+/press/screenshots/*.tmp
+/site/public/.website-stage-*/

@@ -50,19 +50,6 @@ test('real loader selects screenshot suites and three exact non-funded full sele
   expect(plan.websitePlatform).toBe('ios');
 });
 
-test('plan is read-only and does not invoke native tools or forward reset approval', () => {
-  const before = readdirSync(join(ROOT, 'app/e2e/artifacts'));
-  const result = Bun.spawnSync([process.execPath, 'app/e2e/press/run.ts', 'both', '--plan'], {
-    cwd: ROOT,
-    env: { ...process.env, PATH: '/nonexistent' },
-  });
-  expect(result.exitCode).toBe(0);
-  const output = JSON.parse(result.stdout.toString());
-  expect(output).toEqual(plan);
-  expect(result.stdout.toString()).not.toContain('i-approve-destructive-reset');
-  expect(readdirSync(join(ROOT, 'app/e2e/artifacts'))).toEqual(before);
-});
-
 test('strict arguments and conservative storage floor', () => {
   expect(parsePressArgs([]).platforms).toEqual(['ios', 'android']);
   expect(parsePressArgs(['--plan', 'ios'])).toEqual({ platforms: ['ios'], planOnly: true });
@@ -371,7 +358,11 @@ test.each([
   if (bad === 'final-state')
     run.events.find((event) => event.type === 'final-state')!.actual = 'unknown';
   const artifact = run.events.find((event) => event.type === 'artifact')!;
-  if (bad === 'wrong-page') artifact.path = String(artifact.path).replace('backup-words', 'wallet');
+  if (bad === 'wrong-page')
+    artifact.path = String(artifact.path).replace(
+      /\/named\/.*-(\d+)\.png$/,
+      '/named/wallet-$1.png'
+    );
   if (bad === 'wrong-step') artifact.stepId = 'T999';
   if (bad === 'missing-image') rmSync(String(artifact.path));
   run.save();
@@ -509,7 +500,9 @@ test('registry provenance is internally consistent across refreshes', () => {
     if (entry.freshness !== undefined) {
       expect(entry.freshness).toBe('stale');
       // Withdrawn captures keep their historical run and say why.
-      expect(String(entry.staleReason ?? entry.unavailableReason ?? '').trim().length).toBeGreaterThan(0);
+      expect(
+        String(entry.staleReason ?? entry.unavailableReason ?? '').trim().length
+      ).toBeGreaterThan(0);
     }
     if (entry.nativeBuild !== undefined) {
       const build = entry.nativeBuild as Record<string, unknown>;

@@ -11,7 +11,8 @@ const scratch = await mkdtemp(join(tmpdir(), 'sovran-site-install-'));
 try {
   await cp(join(site, 'package.json'), join(scratch, 'package.json'));
   const update = process.argv.includes('--update-lock');
-  if (!update) await cp(join(site, 'bun.lock'), join(scratch, 'bun.lock'));
+  try { await cp(join(site, 'bun.lock'), join(scratch, 'bun.lock')); }
+  catch (error) { if (!update || error.code !== 'ENOENT') throw error; }
   const installed = spawnSync('bun', ['install', '--ignore-scripts', ...(update ? [] : ['--frozen-lockfile'])], { cwd: scratch, stdio: 'inherit', env: { ...process.env, BUN_CONFIG_NO_CLEAR_TERMINAL: '1' } });
   if (installed.status !== 0) throw new Error('Isolated install failed');
   if (update) await cp(join(scratch, 'bun.lock'), join(site, 'bun.lock'));

@@ -1,101 +1,22 @@
 ---
 import Dev from '../layouts/Dev.astro';
-import { captures, collections, collectionPairings } from '../lib/phoneGeometry';
-import { SCENE_PRESETS, CANVAS_FORMATS } from '../../../scripts/lib/phone-frame.mjs';
-const stories = collections.map(collection => ({
-  ...collection,
-  missing: collection.screenshots.filter(key => !Object.hasOwn(captures, key)),
-  pairings: Object.fromEntries([1, 2, 3, 4].map(count => [count, collectionPairings(collection.screenshots, count, Object.keys(captures))])),
-}));
+import { websiteAssetStatus } from '../../scripts/website-assets.mjs';
+import { recipeHash } from '../../scripts/composition-recipe.mjs';
+const { outputs } = await websiteAssetStatus(import.meta.env.SOVRAN_REPO_ROOT);
 ---
-<Dev title="Mockup stories">
-  <h1>Mockup stories</h1>
-  <p>Choose a story, phone count, orientation, and canvas. One preview is rendered at a time. Pairings keep collection order: one phone per individual capture, or groups of two to four with no repeated fillers. This is not every permutation.</p>
-  <div data-stories={JSON.stringify(stories)} data-dimensions={JSON.stringify(Object.fromEntries(Object.entries(captures).map(([key, capture]) => [key, { key, width: capture.width, height: capture.height }])))}>
-    <form class="dev-form" data-mockup-form>
-      <label>Story<select name="story">{stories.map(story => <option value={story.id}>{story.title}</option>)}</select></label>
-      <label>Phone count<select name="count">{[1, 2, 3, 4].map(count => <option value={count}>{count}</option>)}</select></label>
-      <label>Preset<select name="preset">{Object.entries(SCENE_PRESETS).map(([key, preset]) => <option value={key} data-count={preset.poses.length}>{preset.name}</option>)}</select></label>
-      <label>Aspect ratio<select name="format">{Object.entries(CANVAS_FORMATS).map(([key, size]) => <option value={key}>{key}{size ? ` / ${size.width} x ${size.height}` : ' / scene bounds'}</option>)}</select></label>
-      <label>Available pairing<select name="pair"></select></label>
-      <button type="submit">Show preview</button>
-    </form>
-    <h2 data-story-title></h2><p data-story-description></p>
-    <p data-missing class="dev-error"></p>
-    <p data-pairing-status role="status"></p>
-    <div class="dev-preview" data-preview></div>
-    <p><a data-compose hidden>Open this selection in the composer</a></p>
-  </div>
-  <noscript><p>Enable JavaScript to select a bounded preview, or browse the <a href="/scenes">static orientation atlas</a> and <a href="/screenshots">screenshot library</a>.</p></noscript>
-  <h2>Orientation atlas</h2>
-  <p><a href="/scenes">View rendered examples of every preset</a>. These are orthographic illustrations, not manufacturer renders. Roll rotates the whole device while the captured screen remains portrait. Pitch, yaw, and roll below are degrees, in screenshot order.</p>
+<Dev title="Website artwork">
+  <h1>Website artwork</h1>
+  <p>Only selected public deliverables from <code>press/website.json</code>. Named phones and scenes also drive the homepage. No automatic poster or mockup batches.</p>
+  <p>Generate with <code>node site/scripts/website-assets.mjs</code>. Check without writing with <code>node site/scripts/website-assets.mjs --check</code>.</p>
   <div class="dev-atlas">
-    {Object.entries(SCENE_PRESETS).map(([key, preset]) => <article>
-      <h3><a href={`/scenes/${key}`}>{preset.name}</a></h3>
-      <p>{preset.poses.length} {preset.poses.length === 1 ? 'phone' : 'phones'}. {preset.poses.map((pose, index) => `Phone ${index + 1}: pitch ${pose.rotateX}, yaw ${pose.rotateY}, roll ${pose.rotateZ}.`).join(' ')}</p>
+    {outputs.map(({ output, recipe, scene, current, blockers }) => <article>
+      <h2>{recipe.title}</h2>
+      <p><code>{output}</code> / {recipe.width} x {recipe.height} / scene: <code>{scene}</code></p>
+      <p>{recipe.phones.map(phone => phone.captureId).join(' + ')}</p>
+      <p role="status">{blockers.length ? `Blocked: ${blockers.join('; ')}` : current ? 'Current: recipe, source and output hashes match.' : 'Needs regeneration: recipe, source or output changed.'}</p>
+      <p><a href={`/social${recipeHash(recipe)}`}>Preview this recipe in the local composer</a></p>
+      {current && <a href={`/${output}`}>View selected website PNG</a>}
     </article>)}
   </div>
+  <p>Outdated captures can be explored as explicitly labelled drafts in the composer, but never exported by the website generator. App-source freshness does not verify the native build.</p>
 </Dev>
-<script>
-  import { SCENE_PRESETS, CANVAS_FORMATS, createScene } from '../../../scripts/lib/phone-frame.mjs';
-  type Story = { id: string; title: string; description: string; missing: string[]; pairings: Record<string, string[][]> };
-  const root = document.querySelector<HTMLElement>('[data-stories]')!;
-  const stories: Story[] = JSON.parse(root.dataset.stories!);
-  const dimensions = JSON.parse(root.dataset.dimensions!);
-  const form = root.querySelector<HTMLFormElement>('form')!;
-  const field = (name: string) => form.elements.namedItem(name) as HTMLSelectElement;
-  const preview = root.querySelector<HTMLElement>('[data-preview]')!;
-  const compose = root.querySelector<HTMLAnchorElement>('[data-compose]')!;
-  const params = new URLSearchParams(location.search);
-  for (const name of ['story', 'count', 'preset', 'format']) {
-    const select = field(name);
-    if ([...select.options].some(option => option.value === params.get(name))) select.value = params.get(name)!;
-  }
-  const render = (requestedPair = field('pair').value) => {
-    const story = stories.find(story => story.id === field('story').value)!;
-    const count = Number(field('count').value);
-    const preset = field('preset');
-    const selectedPreset = preset.value;
-    preset.replaceChildren(...Object.entries(SCENE_PRESETS).filter(([, spec]) => spec.poses.length === count).map(([key, spec]) => new Option(spec.name, key)));
-    if ([...preset.options].some(option => option.value === selectedPreset)) preset.value = selectedPreset;
-    const groups = story.pairings[count];
-    const pair = field('pair');
-    pair.replaceChildren(...groups.map(keys => new Option(keys.join(' + '), keys.join(','))));
-    if (groups.some(keys => keys.join(',') === requestedPair)) pair.value = requestedPair;
-    pair.disabled = groups.length === 0;
-    root.querySelector('[data-story-title]')!.textContent = story.title;
-    root.querySelector('[data-story-description]')!.textContent = story.description;
-    const missing = root.querySelector<HTMLElement>('[data-missing]')!;
-    missing.replaceChildren();
-    if (story.missing.length) {
-      missing.append('Capture requested: ');
-      story.missing.forEach((key, index) => {
-        const link = document.createElement('a');
-        link.href = `/screenshots#${key}`; link.textContent = key;
-        if (index) missing.append(', ');
-        missing.append(link);
-      });
-    }
-    root.querySelector('[data-pairing-status]')!.textContent = groups.length
-      ? `${groups.length} count-correct pairing${groups.length === 1 ? '' : 's'} available. Showing one preview.`
-      : `No ${count}-phone pairing is available in this story. Choose fewer phones or request the missing captures.`;
-    preview.replaceChildren();
-    compose.hidden = !groups.length;
-    if (groups.length) {
-      const query = new URLSearchParams({ preset: preset.value, screenshots: pair.value, format: field('format').value });
-      compose.href = `/scenes/custom?${query}`;
-      query.set('embed', '1');
-      const frame = document.createElement('iframe');
-      const canvas = CANVAS_FORMATS[field('format').value] ?? createScene(pair.value.split(',').map(key => dimensions[key]), { preset: preset.value });
-      frame.style.aspectRatio = `${canvas.width} / ${canvas.height}`;
-      frame.title = `${story.title}: ${preset.selectedOptions[0].text}, ${field('format').value}`;
-      frame.src = `/scenes/custom?${query}`;
-      preview.append(frame);
-    }
-    const query = new URLSearchParams(['story', 'count', 'preset', 'format', 'pair'].map(name => [name, field(name).value]));
-    history.replaceState(null, '', `${location.pathname}?${query}`);
-  };
-  form.addEventListener('submit', event => { event.preventDefault(); render(); });
-  form.addEventListener('change', () => render());
-  render(params.get('pair') ?? '');
-</script>

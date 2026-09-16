@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "id": "capture.settings",
+  "name": "Settings pages without saving or revealing secrets",
+  "description": "Open profile editing, network, media, moderation and deletion information. No publish, reveal, delete, upload or recovery action is pressed.",
+  "details": "Navigation-only candidate. Entry legs copied from settings scenarios; new destinations use source-backed controls and require native validation. Profile secrets must remain hidden. No simulator run has been performed for this cohort.",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"ACCOUNT"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"settings"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-profile-row"}}],"until":{"id":"settings-profile-edit"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"profile-reveal-nsec"},"value":"0","timeoutMs":30000},
+    {"action":"screenshot","name":"settings-profile"},
+    {"action":"tap","selector":{"id":"settings-profile-edit"}},
+    {"action":"waitFor","selector":{"id":"edit-profile-name"},"state":"enabled","timeoutMs":30000},
+    {"action":"screenshot","name":"settings-edit-profile"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"ACCOUNT"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-network-row"}}],"until":{"id":"settings-vertex-credits-toggle"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"settings-network"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"ACCOUNT"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"settings-media-row"},"attempts":6,"settleMs":1000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-media-row"}}],"until":{"id":"settings-media-server-row"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"settings-media"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"ACCOUNT"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"settings-moderation-row"},"attempts":6,"settleMs":1000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-moderation-row"}}],"until":{"id":"moderation-filter-toggle"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"settings-moderation"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"ACCOUNT"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"settings-delete-row"},"attempts":8,"settleMs":1000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-delete-row"}}],"until":{"label":"Delete Account"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"Save your NIP06"},"timeoutMs":15000},
+    {"action":"screenshot","name":"settings-delete"},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

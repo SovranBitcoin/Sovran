@@ -8,6 +8,13 @@
  * cleanup — a leaked offline device would poison everything after it.
  */
 import { randomUUID } from 'node:crypto';
+import sharp from 'sharp';
+import {
+  assertCaptureResolution,
+  LIBRARY_CAPTURE_PROFILE,
+  type CaptureProfile,
+  type NativeCaptureMetadata,
+} from '../capture-profile';
 import {
   chmodSync,
   existsSync,
@@ -32,7 +39,14 @@ import {
   startOwnedMetro,
   type RunSignal,
 } from '../simulator-session';
-import { Adb, adbBin, ANDROID_PACKAGE_ID, emulatorBin, resolveAndroidSdkRoot } from './adb';
+import {
+  Adb,
+  adbBin,
+  ADB_COMMAND_TIMEOUT_MS,
+  ANDROID_PACKAGE_ID,
+  emulatorBin,
+  resolveAndroidSdkRoot,
+} from './adb';
 
 type ResetMode = 'erase' | 'reinstall' | 'none';
 
@@ -91,7 +105,7 @@ interface BootedEmulator {
 
 const OWNED_AVD_ROOT_PREFIX = 'sovran-e2e-android-avd-';
 const OWNED_AVD_NAME_PREFIX = 'Sovran_E2E_';
-const E2E_SYSTEM_IMAGE = 'system-images/android-36.1/google_apis_playstore/arm64-v8a';
+const E2E_SYSTEM_IMAGE = LIBRARY_CAPTURE_PROFILE.android.systemImage;
 /** A factory-fresh image performs Android's first-boot provisioning and can
  * exceed the old 180s persistent-image budget, especially beside an iOS run. */
 export const EMULATOR_BOOT_TIMEOUT_MS = 360_000;
@@ -390,7 +404,7 @@ export function buildOwnedAndroidEmulatorEnv(
 /** Even console ports 5554–5680; the serial is emulator-<port>. Collisions are
  * detected against `adb devices` (single-host runs; races are not a concern). */
 async function allocateConsolePort(adb: string): Promise<number> {
-  const devices = await run([adb, 'devices'], { allowFail: true });
+  const devices = await run([adb, 'devices'], { timeoutMs: ADB_COMMAND_TIMEOUT_MS });
   for (let port = 5554; port <= 5680; port += 2) {
     if (!devices.includes(`emulator-${port}`)) return port;
   }
@@ -478,7 +492,10 @@ async function bootEmulator(options: EmulatorBootOptions): Promise<BootedEmulato
   let disposePromise: Promise<void> | undefined;
   const dispose = (): Promise<void> => {
     disposePromise ??= (async () => {
-      await run([adb, '-s', serial, 'emu', 'kill'], { allowFail: true });
+      // A broken adb transport must not prevent reaping our qemu child.
+      await run([adb, '-s', serial, 'emu', 'kill'], { allowFail: true, timeoutMs: 5_000 }).catch(
+        () => undefined
+      );
       const exited = await Promise.race([
         child.exited.then(() => true),
         sleep(15_000).then(() => false),
@@ -544,14 +561,27 @@ async function bootEmulator(options: EmulatorBootOptions): Promise<BootedEmulato
  * its last slide before flow.onboard could see slide 1). The scales persist
  * in the AVD's userdata, so pin them explicitly rather than trusting
  * defaults. */
-async function prepareEmulator(adb: Adb): Promise<void> {
+export async function prepareEmulator(adb: Adb, strict = false): Promise<void> {
   await adb.setAirplaneMode(false); // known-good baseline, whatever the AVD persisted
+  // Keep the display awake for the whole session. Capture journeys go minutes
+  // between touches (a deep-link relaunch plus a few waits is over a minute),
+  // and once the emulator hits its 30s screen timeout `screencap` returns a
+  // black frame and `uiautomator dump` an empty hierarchy — which reads as "the
+  // screen is gone", not "the device is asleep". The sysui demo battery icon is
+  // cosmetic and does not change this real power state.
+  await adb.shell(['settings', 'put', 'system', 'screen_off_timeout', '2147483647']);
+  await adb.shell(['svc', 'power', 'stayon', 'true'], { allowFail: !strict });
+  // Library capture runs still: zero scales stop system transitions and put
+  // Reanimated into reduced motion, so repeating animations settle on their
+  // final value and `uiautomator dump` can reach an idle window. Ordinary runs
+  // keep the normal scale, because motion is part of what they test.
+  const animationScale = strict ? '0' : '1';
   for (const scale of [
     'window_animation_scale',
     'transition_animation_scale',
     'animator_duration_scale',
   ]) {
-    await adb.shell(['settings', 'put', 'global', scale, '1']);
+    await adb.shell(['settings', 'put', 'global', scale, animationScale]);
   }
   // Turn device location fully ON (high accuracy) so the app's location
   // request does not trigger GMS's "Location Accuracy" resolution dialog,
@@ -563,7 +593,7 @@ async function prepareEmulator(adb: Adb): Promise<void> {
   await adb.shell(
     ['am', 'broadcast', '-a', 'com.android.systemui.demo', '-e', 'command', 'enter'],
     {
-      allowFail: true,
+      allowFail: !strict,
     }
   );
   await adb.shell(
@@ -579,7 +609,7 @@ async function prepareEmulator(adb: Adb): Promise<void> {
       'hhmm',
       '0941',
     ],
-    { allowFail: true }
+    { allowFail: !strict }
   );
   await adb.shell(
     [
@@ -597,8 +627,91 @@ async function prepareEmulator(adb: Adb): Promise<void> {
       'plugged',
       'false',
     ],
-    { allowFail: true }
+    { allowFail: !strict }
   );
+}
+
+/** Only called with this session's disposable AVD. Profile dimensions take
+ * precedence over the legacy store-suite presentation, never the reverse. */
+export async function prepareAndroidCapture(
+  adb: Pick<Adb, 'shell' | 'screenSize' | 'screencapPng' | 'getprop'>,
+  options: { captureProfile?: CaptureProfile; storeScreenshots?: boolean }
+): Promise<NativeCaptureMetadata | undefined> {
+  if (!options.captureProfile) {
+    if (options.storeScreenshots) {
+      await adb.shell(['wm', 'size', '1080x1920']);
+      await adb.shell(['wm', 'density', '320']);
+    }
+    return undefined;
+  }
+  const profile = LIBRARY_CAPTURE_PROFILE;
+  await adb.shell(['wm', 'size', '1080x2400']);
+  await adb.shell(['wm', 'density', '420']);
+  // Set here as well as in prepareEmulator: this function owns the library-v1
+  // contract and verifies it below, and it runs first.
+  for (const scale of [
+    'window_animation_scale',
+    'transition_animation_scale',
+    'animator_duration_scale',
+  ])
+    await adb.shell(['settings', 'put', 'global', scale, '0']);
+  await adb.shell(['settings', 'put', 'system', 'font_scale', '1']);
+  await adb.shell(['cmd', 'uimode', 'night', 'no']);
+  await adb.shell(['settings', 'put', 'system', 'accelerometer_rotation', '0']);
+  await adb.shell(['settings', 'put', 'system', 'user_rotation', '0']);
+  const resolution = await adb.screenSize();
+  assertCaptureResolution('android', resolution);
+  assertCaptureResolution('android', await sharp(Buffer.from(await adb.screencapPng())).metadata());
+  const densityOutput = await adb.shell(['wm', 'density']);
+  const dpi = Number(
+    (densityOutput.match(/Override density:\s*(\d+)/) ??
+      densityOutput.match(/Physical density:\s*(\d+)/))?.[1]
+  );
+  const fontScale = Number(await adb.shell(['settings', 'get', 'system', 'font_scale']));
+  const appearance = await adb.shell(['cmd', 'uimode', 'night']);
+  // The factory-fresh pinned image boots in en-US. Validate the effective
+  // resource configuration rather than pretending a settings write switches
+  // Android's live locale (there is no supported shell setter on this image).
+  const configuration = await adb.shell(['cmd', 'activity', 'get-config']);
+  // `settings get` reports a float ("0.0"), can lag its own write on a
+  // freshly booted emulator, and returns "null" when unset — so compare
+  // numerically and re-apply once before calling the profile unmet.
+  const readAnimatorScale = async () =>
+    Number((await adb.shell(['settings', 'get', 'global', 'animator_duration_scale'])).trim());
+  let animatorScale = await readAnimatorScale();
+  if (animatorScale !== 0) {
+    for (const scale of [
+      'window_animation_scale',
+      'transition_animation_scale',
+      'animator_duration_scale',
+    ])
+      await adb.shell(['settings', 'put', 'global', scale, '0']);
+    animatorScale = await readAnimatorScale();
+  }
+  if (
+    dpi !== 420 ||
+    fontScale !== 1 ||
+    animatorScale !== 0 ||
+    !/night mode:\s*no\b/i.test(appearance) ||
+    !/\ben-rUS\b/.test(configuration)
+  ) {
+    throw new Error(
+      'library-v1 Android density, font scale, motion, appearance or en-US locale did not take effect'
+    );
+  }
+  return {
+    profile: options.captureProfile,
+    model: await adb.getprop('ro.product.model'),
+    runtime: await adb.getprop('ro.build.version.release'),
+    runtimeBuild: await adb.getprop('ro.build.fingerprint'),
+    systemImage: E2E_SYSTEM_IMAGE,
+    resolution,
+    density: { dpi },
+    motion: profile.android.motion,
+    locale: profile.locale,
+    appearance: profile.appearance,
+    fontScale,
+  };
 }
 
 /** The dev client's first-run "This is the developer menu… Continue" sheet
@@ -716,6 +829,7 @@ class AndroidNetworkChannel implements NetworkChannel {
 }
 
 interface AndroidEmulatorSession {
+  readonly capture?: NativeCaptureMetadata;
   readonly serial: string;
   readonly avd: string;
   readonly avdRoot: string;
@@ -752,6 +866,7 @@ export async function withAndroidEmulatorSession<T>(
     onLifecycle?: (message: string) => void;
     /** Presentation lane: 1080x1920 at 320 dpi on the disposable device. */
     storeScreenshots?: boolean;
+    captureProfile?: CaptureProfile;
     /** Funded sessions: the Metro spawns a private seed-export server (adb-
      * reversed so the emulator app can POST to the same 127.0.0.1 endpoint)
      * and declares the funded assets for in-app reconciliation. */
@@ -829,14 +944,9 @@ export async function withAndroidEmulatorSession<T>(
       },
     });
     cleanups.push({ priority: 30, run: () => cleanupAdb.reverseRemoveAll() });
-    if (options.storeScreenshots) {
-      await adb.shell(['wm', 'size', '1080x1920']);
-      // Pair pixels with density: retaining the 2400px device's 420 dpi leaves
-      // only 731dp of height and pushes the receive address under its footer.
-      await adb.shell(['wm', 'density', '320']);
-    }
-    await prepareEmulator(adb);
-    if (options.storeScreenshots) {
+    const capture = await prepareAndroidCapture(adb, options);
+    await prepareEmulator(adb, !!options.captureProfile);
+    if (options.storeScreenshots || options.captureProfile) {
       // Android 16's demo defaults include satellite icons. Normalize only the
       // presentation status bar; this broadcast does not change connectivity.
       await adb.shell([
@@ -869,6 +979,7 @@ export async function withAndroidEmulatorSession<T>(
       onLifecycle(`adb reverse seed-export port ${metro.seedExportPort}`);
     }
     const session: AndroidEmulatorSession = {
+      ...(capture ? { capture } : {}),
       serial: emulator.serial,
       avd: emulator.avd,
       avdRoot: emulator.avdRoot,

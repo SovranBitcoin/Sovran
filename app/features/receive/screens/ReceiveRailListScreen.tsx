@@ -51,6 +51,7 @@ import { copyPopup, paramPopup } from '@/shared/lib/popup';
 import { navigateToTransactionDetail } from '@/shared/lib/nav/transactionDetailRoutes';
 import { paymentLog } from '@/shared/lib/logger';
 import Icon from 'assets/icons';
+import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 
 type BadgeVariant = React.ComponentProps<typeof Badge>['variant'];
 
@@ -218,25 +219,30 @@ export function ReceiveRailListScreen() {
 
   const rail = params?.rail;
   const unit = params?.unit ?? 'sat';
-  const [state, setState] = useState<{ loading: boolean; items: ReceiveRailItem[] }>({
+  const [state, setState] = useState<{
+    loading: boolean;
+    failed: boolean;
+    items: ReceiveRailItem[];
+  }>({
     loading: true,
+    failed: false,
     items: [],
   });
 
   useEffect(() => {
     if (!rail) return;
     let cancelled = false;
-    setState({ loading: true, items: [] });
+    setState({ loading: true, failed: false, items: [] });
     void (async () => {
       try {
         const items = await loadRailItems(manager, rail, unit);
-        if (!cancelled) setState({ loading: false, items });
+        if (!cancelled) setState({ loading: false, failed: false, items });
       } catch (error) {
         paymentLog.warn('receive.rail_list.load_failed', {
           rail,
           error: error instanceof Error ? error.message : String(error),
         });
-        if (!cancelled) setState({ loading: false, items: [] });
+        if (!cancelled) setState({ loading: false, failed: true, items: [] });
       }
     })();
     return () => {
@@ -273,6 +279,12 @@ export function ReceiveRailListScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen options={{ title: RAIL_TITLE[rail] }} />
+      {__DEV__ && !state.loading && !state.failed && state.items.length === 0 && (
+        <E2EAccessibilityProbe
+          testID={`receive-rail-list-empty-${rail}`}
+          accessibilityLabel={`${RAIL_TITLE[rail]} loaded with no entries`}
+        />
+      )}
       <ScreenScrollView
         bottomSpacing={32}
         // Android form-sheet: top-edge drag dismisses, mid-scroll scrolls.

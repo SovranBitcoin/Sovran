@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import sharp from 'sharp';
 import {
   existsSync,
   lstatSync,
@@ -27,10 +28,104 @@ import {
   isOwnedAndroidAvdMetadata,
   ownedAndroidAvdName,
   ownedAndroidAvdRootPrefix,
+  prepareAndroidCapture,
+  prepareEmulator,
   removeOwnedAndroidAvd,
   runAndroidInstallAsInfrastructure,
   throwIfAndroidInfrastructureUnavailable,
 } from './android-session';
+
+describe('Android capture profile', () => {
+  async function captureAdb(overrides: Record<string, string | undefined> = {}) {
+    const calls: string[][] = [];
+    const png = await sharp({
+      create: { width: 1080, height: 2400, channels: 3, background: 'black' },
+    })
+      .png()
+      .toBuffer();
+    const responses: Record<string, string | undefined> = {
+      'wm density': 'Physical density: 320\nOverride density: 420',
+      'settings get system font_scale': '1',
+      'settings get global animator_duration_scale': '0.0',
+      'cmd uimode night': 'Night mode: no',
+      'cmd activity get-config': 'config: en-rUS-ldltr-sw411dp',
+      ...overrides,
+    };
+    return {
+      calls,
+      shell: async (args: string[]) => {
+        calls.push(args);
+        return responses[args.join(' ')] ?? '';
+      },
+      screenSize: async () => ({ width: 1080, height: 2400 }),
+      screencapPng: async () => png,
+      getprop: async (name: string) =>
+        ({
+          'ro.product.model': 'sdk_gphone64_arm64',
+          'ro.build.version.release': '16',
+          'ro.build.fingerprint': 'pinned-image-build',
+        })[name] ?? '',
+    };
+  }
+
+  it('never lets store-suite dimensions override the library profile and records effective configuration', async () => {
+    const adb = await captureAdb();
+    const metadata = await prepareAndroidCapture(adb, {
+      captureProfile: 'library-v1',
+      storeScreenshots: true,
+    });
+    expect(adb.calls).toContainEqual(['wm', 'size', '1080x2400']);
+    expect(adb.calls).not.toContainEqual(['wm', 'size', '1080x1920']);
+    expect(adb.calls).toContainEqual(['settings', 'put', 'global', 'animator_duration_scale', '0']);
+    expect(metadata).toMatchObject({
+      profile: 'library-v1',
+      model: 'sdk_gphone64_arm64',
+      runtime: '16',
+      resolution: { width: 1080, height: 2400 },
+      density: { dpi: 420 },
+      motion: 'reduced',
+      locale: 'en-US',
+      fontScale: 1,
+      appearance: 'light',
+    });
+  });
+
+  it('preserves ordinary and legacy store defaults when the profile is absent', async () => {
+    const adb = await captureAdb();
+    expect(await prepareAndroidCapture(adb, {})).toBeUndefined();
+    expect(adb.calls).toEqual([]);
+    await prepareAndroidCapture(adb, { storeScreenshots: true });
+    expect(adb.calls).toEqual([
+      ['wm', 'size', '1080x1920'],
+      ['wm', 'density', '320'],
+    ]);
+    expect(adb.calls.some((call) => call.includes('animator_duration_scale'))).toBe(false);
+  });
+
+  it('keeps the display awake, so a long wait cannot turn a capture black', async () => {
+    const adb = await captureAdb();
+    await prepareEmulator({ ...adb, setAirplaneMode: async () => {} } as unknown as Parameters<
+      typeof prepareEmulator
+    >[0]);
+    const timeout = adb.calls.find(
+      (call) => call[0] === 'settings' && call[3] === 'screen_off_timeout'
+    );
+    expect(timeout?.at(-1)).toBe('2147483647');
+    expect(adb.calls).toContainEqual(['svc', 'power', 'stayon', 'true']);
+  });
+
+  it.each([
+    { 'wm density': 'Physical density: 420\nOverride density: 320' },
+    { 'settings get system font_scale': '1.2' },
+    { 'settings get global animator_duration_scale': '1.0' },
+    { 'cmd uimode night': 'Night mode: yes' },
+    { 'cmd activity get-config': 'config: fr-rFR-ldltr-sw411dp' },
+  ])('rejects effective settings mismatch %j', async (override) => {
+    await expect(
+      prepareAndroidCapture(await captureAdb(override), { captureProfile: 'library-v1' })
+    ).rejects.toThrow(/did not take effect/);
+  });
+});
 
 describe('owned Android emulator AVD', () => {
   it('allows factory-fresh first-boot provisioning to exceed three minutes', () => {

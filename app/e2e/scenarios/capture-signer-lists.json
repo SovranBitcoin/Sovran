@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "id": "capture.signer-lists",
+  "name": "Empty signing activity and request lists",
+  "description": "Read the default signing history and pending-request pages on a fresh profile with no connected apps. No pairing or signing action occurs.",
+  "details": "Local profile-scoped lists. No fabricated requests are needed to display the legitimate empty UI. The requests route is directly navigable even though the hub hides its row when empty. Never opens pairing or signer-share.",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-remote-login"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-remote-login"}}],"until":{"id":"signer-hub-paste-row"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"No apps connected"},"timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"signer-hub-activity-row"},"attempts":4,"settleMs":1000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"signer-hub-activity-row"}}],"until":{"label":"No activity yet"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"signer-activity"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"openUrl","url":"sovran:///(signer-flow)/requests"},
+    {"action":"waitFor","selector":{"label":"All caught up"},"timeoutMs":30000},
+    {"action":"waitFor","selector":{"label":"New signing requests appear here, and as a prompt wherever you are in Sovran."},"timeoutMs":15000},
+    {"action":"screenshot","name":"signer-requests"},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}
