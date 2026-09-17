@@ -819,14 +819,29 @@ export function createDefaultOperations(
       // here), then prepare the durable mint operation against it. Onchain
       // quotes are reusable and get a FRESH address per create() — the
       // fixed-amount receive path relies on that for payment attribution.
+      // Onchain quotes are amountless and reusable; bolt11 is amount-bound.
+      // Anything else is a mint-advertised NUT-04 method with no NUT of its
+      // own (venmo, paypal, a bank rail). Those are amount-bound in practice —
+      // sortug's venmo/paypal reject an amountless quote — and run on
+      // Sovran's generic handler (app/shared/lib/cashu/genericMintMethod.ts),
+      // registered on coco's patched mint-handler registry. The method string
+      // is forwarded verbatim so the request lands on
+      // `POST /v1/mint/quote/{method}` exactly as the mint advertised it.
       const quote =
         method === "onchain"
           ? await mgr.quotes.mint.create({ mintUrl, method: "onchain", unit })
-          : await mgr.quotes.mint.create({
-              mintUrl,
-              method: "bolt11",
-              amount: { amount, unit },
-            });
+          : method === "bolt11"
+            ? await mgr.quotes.mint.create({
+                mintUrl,
+                method: "bolt11",
+                amount: { amount, unit },
+              })
+            : await mgr.quotes.mint.create({
+                mintUrl,
+                method,
+                unit,
+                amount: { amount, unit },
+              } as Parameters<typeof mgr.quotes.mint.create>[0]);
       logger.info("operations.executeMintQuote.quoteCreated", {
         ...mintUrlFields(mintUrl),
         quoteId: quote.quoteId,
@@ -862,7 +877,12 @@ export function createDefaultOperations(
         state: quote.state ?? ("UNPAID" as const),
         amount: amountToNumber(mintOp.amount),
         paymentRequest: quote.request,
-        metadata: { operationId: mintOp.id },
+        // `method` rides the metadata because coco's MintHistoryEntry has no
+        // method field, and the receive screen cannot label the request
+        // without it — a `venmo:…` payload must not be captioned "Lightning".
+        // `getOnchainMintAddress` already reads `metadata.method`, so this
+        // follows the established convention rather than inventing one.
+        metadata: { operationId: mintOp.id, method },
       };
       return { historyEntry: JSON.stringify(entry) };
     },
@@ -1602,7 +1622,8 @@ export function createDefaultOperations(
       // cache + per-mint deadline) so a warm cache opens the screen without a
       // mint round-trip; the raw manager call is the fallback.
       const readMintInfo = config.fetchMintInfo
-        ? (url: string) => config.fetchMintInfo!(url).then((info) => info ?? undefined)
+        ? (url: string) =>
+            config.fetchMintInfo!(url).then((info) => info ?? undefined)
         : (url: string) => mgr.mint.getMintInfo(url);
       const [mintInfo, balancesByMint, isTrusted] = await Promise.all([
         readMintInfo(mintUrl).catch((e) => {

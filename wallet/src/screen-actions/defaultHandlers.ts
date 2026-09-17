@@ -106,8 +106,7 @@ function readAmountEntryDisplay(entry: EntryLike): AmountEntryDisplayMetadata {
     fiatSymbol: getNullableString(entry, "fiatSymbol"),
     btcPrice: getNumber(entry, "btcPrice") ?? 0,
     displayFiat: getNullableNumber(entry, "displayFiat"),
-    displayAmount:
-      getNumber(entry, "displayAmount") ?? effective?.value ?? 0,
+    displayAmount: getNumber(entry, "displayAmount") ?? effective?.value ?? 0,
     unit: effective?.unit ?? getString(entry, "unit") ?? "sat",
     autoOptimized: entry.autoOptimized === true,
   };
@@ -248,8 +247,7 @@ export function createDefaultScreenActionHandlers(
         // lookup in the wallet's scan history store. flowCtx.rawInput is the
         // canonical string that was originally recorded by addScan().
         const flowCtx = getMachine()?.getContext?.() as
-          | { rawInput?: string; source?: string }
-          | undefined;
+          { rawInput?: string; source?: string } | undefined;
         const scannedRawInput = flowCtx?.rawInput;
 
         const tokenString = encodeToken(entry);
@@ -340,8 +338,7 @@ export function createDefaultScreenActionHandlers(
           );
 
           const setEntry = (ctx as EntryLike).setEntry as
-            | ((e: EntryLike) => void)
-            | undefined;
+            ((e: EntryLike) => void) | undefined;
           if (result.status === "pending") {
             logger.info("screenAction.receiveToken.redeem.pending", {
               id,
@@ -720,8 +717,7 @@ export function createDefaultScreenActionHandlers(
         // so audit/score travel with the navigation; falls back to a
         // cache-only build for callers that don't have a row.
         const item = (ctx as EntryLike).item as
-          | import("../types").MintListItem
-          | undefined;
+          import("../types").MintListItem | undefined;
 
         const ops = getOperations();
         let infoEntry: EntryLike = { mintUrl };
@@ -878,6 +874,26 @@ export function createDefaultScreenActionHandlers(
             // sendEcash / paymentRequest keep their destination; nothing to do.
             destination = entryDestination;
           }
+        } else if (variantId?.startsWith("method:")) {
+          // A custom NUT-04 method (venmo, paypal, a bank rail, …). The
+          // variant id carries the mint-advertised method string verbatim —
+          // colada never enumerates these, it forwards whatever the trusted
+          // mints published (see availability.ts). Receive only: custom melt
+          // is reported unavailable upstream, so a variant can only reach
+          // here on a mintQuote flow.
+          const customMethod = variantId.slice("method:".length);
+          if (entryDestination !== "mintQuote" || !customMethod) {
+            logger.warn(
+              "screenAction.amountEntry.next.customMethodNotReceive",
+              {
+                variantId,
+                destination: entryDestination,
+              },
+            );
+            return;
+          }
+          destination = "mintQuote";
+          mintQuoteMethod = customMethod;
         } else if (variantId === "onchain") {
           if (entryDestination === "mintQuote") {
             destination = "mintQuote";

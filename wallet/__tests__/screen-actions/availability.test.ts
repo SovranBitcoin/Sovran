@@ -968,3 +968,145 @@ describe("receiveHubAvailability", () => {
     expect(actions.back.available).toBe(true);
   });
 });
+
+
+// ---------------------------------------------------------------------------
+// amountEntry — custom NUT-04 methods (venmo, paypal, bank rails, …)
+// ---------------------------------------------------------------------------
+//
+// NUT-04 lets a mint advertise any `[a-z0-9_-]+` method; `mint.sortug.com`
+// serves venmo (usd) and paypal (sat). Nothing in the Next menu is hardcoded
+// per method — the rows come from whatever the TRUSTED mints advertise — so
+// these tests drive the whole thing off mint info, exactly as the app does.
+
+describe("amountEntryAvailability — custom NUT-04 receive methods", () => {
+  const customCtx = (methods: { method: string; unit: string }[]) => ({
+    trustedMintUrls: [MINT1, MINT2],
+    mintBalances: { [MINT1]: 0, [MINT2]: 0 },
+    mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+      {
+        mintUrl: MINT1,
+        mintInfo: { nuts: { "4": { methods: [{ method: "bolt11", unit: "sat" }] } } },
+      },
+      { mintUrl: MINT2, mintInfo: { nuts: { "4": { methods } } } },
+    ]),
+  });
+
+  const receiveEntry = (methodContext: unknown) => ({
+    destination: "mintQuote",
+    effectiveAmount: { value: 10000, unit: "sat" },
+    unit: "sat",
+    methodContext,
+  });
+
+  it("offers a rail for a method only one trusted mint advertises", () => {
+    const actions = getAvailableActions(
+      "amountEntry",
+      receiveEntry(customCtx([{ method: "paypal", unit: "sat" }])),
+    );
+    const paypal = actions.next.variants?.find((v) => v.id === "method:paypal");
+
+    expect(paypal?.available).toBe(true);
+    expect(paypal?.label).toBe("as PayPal");
+    expect(paypal?.icon).toBe("simple-icons:paypal");
+  });
+
+  it("shows no custom rails when every trusted mint is ordinary", () => {
+    const actions = getAvailableActions(
+      "amountEntry",
+      receiveEntry(customCtx([{ method: "onchain", unit: "sat" }])),
+    );
+
+    expect(
+      actions.next.variants?.filter((v) => v.id.startsWith("method:")),
+    ).toEqual([]);
+  });
+
+  it("ignores a method advertised for a different unit", () => {
+    // venmo is usd-only here and the flow is in sat.
+    const actions = getAvailableActions(
+      "amountEntry",
+      receiveEntry(customCtx([{ method: "venmo", unit: "usd" }])),
+    );
+
+    expect(
+      actions.next.variants?.some((v) => v.id === "method:venmo"),
+    ).toBe(false);
+  });
+
+  it("renders a method it has never seen with a legible label", () => {
+    const actions = getAvailableActions(
+      "amountEntry",
+      receiveEntry(customCtx([{ method: "bank_transfer", unit: "sat" }])),
+    );
+    const bank = actions.next.variants?.find(
+      (v) => v.id === "method:bank_transfer",
+    );
+
+    expect(bank?.available).toBe(true);
+    expect(bank?.label).toBe("as Bank transfer");
+  });
+
+  it("never offers a custom rail on a SEND flow", () => {
+    // sortug advertises paypal under NUT-05 too, and rejects the melt quote.
+    const actions = getAvailableActions("amountEntry", {
+      destination: "meltQuote",
+      effectiveAmount: { value: 10000, unit: "sat" },
+      unit: "sat",
+      meltTarget: "lnbc1someinvoice",
+      methodContext: {
+        trustedMintUrls: [MINT2],
+        mintBalances: { [MINT2]: 50000 },
+        mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+          {
+            mintUrl: MINT2,
+            mintInfo: {
+              nuts: {
+                "5": {
+                  methods: [
+                    { method: "bolt11", unit: "sat" },
+                    { method: "paypal", unit: "sat" },
+                  ],
+                },
+              },
+            },
+          },
+        ]),
+      },
+    });
+
+    expect(
+      actions.next.variants?.some((v) => v.id.startsWith("method:")),
+    ).toBe(false);
+  });
+
+  it("disables a custom rail below the mint's advertised minimum, citing it", () => {
+    const actions = getAvailableActions("amountEntry", {
+      destination: "mintQuote",
+      effectiveAmount: { value: 5, unit: "sat" },
+      unit: "sat",
+      methodContext: {
+        trustedMintUrls: [MINT2],
+        mintBalances: { [MINT2]: 0 },
+        mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+          {
+            mintUrl: MINT2,
+            mintInfo: {
+              nuts: {
+                "4": {
+                  methods: [
+                    { method: "paypal", unit: "sat", min_amount: 1000 },
+                  ],
+                },
+              },
+            },
+          },
+        ]),
+      },
+    });
+    const paypal = actions.next.variants?.find((v) => v.id === "method:paypal");
+
+    expect(paypal?.available).toBe(false);
+    expect(paypal?.reason).toContain("1,000");
+  });
+});

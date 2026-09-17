@@ -322,6 +322,10 @@ export {
   type BuildBip321OnchainUriOptions,
   type BuildUnifiedBip321UriInput,
 } from "./bip321";
+export {
+  BUILT_IN_MINT_PAYMENT_METHODS,
+  isBuiltInMintPaymentMethod,
+} from "./types";
 export { resolveIntent } from "./intent";
 export {
   describeDestination,
@@ -362,6 +366,9 @@ export {
   hasMintSupportingMethod,
   isMethodImplemented,
   isMintMethodCompatible,
+  listCustomMintMethods,
+  methodContextCustomMethods,
+  readAdvertisedMethodsFromInfo,
   methodContextHasCompatibleMint,
   methodContextHasSupportingMint,
   pickHighestBalanceUnit,
@@ -370,6 +377,17 @@ export {
   type MintMethodAmountAvailability,
   type ReceiveMethodMintResolution,
 } from "./mint-capabilities";
+// NUT-04/05 payment-method presentation, including methods with no NUT of
+// their own (venmo, paypal, bank rails). See ./payment-methods.
+export {
+  getPaymentMethodIcon,
+  getPaymentMethodLabel,
+  getPaymentMethodPresentation,
+  isCustomPaymentMethod,
+  PAYMENT_METHOD_ICONS,
+  UNKNOWN_PAYMENT_METHOD_ICON,
+  type PaymentMethodPresentation,
+} from "./payment-methods";
 export {
   validateIntent,
   checkWalletCapabilities,
@@ -540,6 +558,7 @@ export type {
   MintMethodRequirement,
   MintMethodSupport,
   MintMethodUnitCapability,
+  BuiltInMintPaymentMethod,
   MintPaymentMethod,
   MintPaymentOperation,
   PaymentOptionKind,

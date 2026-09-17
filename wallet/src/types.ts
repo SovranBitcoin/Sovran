@@ -1,4 +1,4 @@
-import type { RequestControls } from './safeFetch';
+import type { RequestControls } from "./safeFetch";
 
 // ---------------------------------------------------------------------------
 // Detectors — provided by the wallet to enable protocol-specific parsing.
@@ -76,8 +76,40 @@ export interface WalletContext {
   proofAmounts: Record<string, number[]>;
 }
 
-export type MintPaymentMethod = 'bolt11' | 'bolt12' | 'onchain';
-export type MintPaymentOperation = 'mint' | 'melt';
+/**
+ * The payment methods coco ships first-class handlers for. These are the only
+ * ones with a dedicated NUT (NUT-23 bolt11, NUT-25 bolt12, NUT-30 onchain).
+ */
+export type BuiltInMintPaymentMethod = "bolt11" | "bolt12" | "onchain";
+
+/**
+ * A NUT-04/NUT-05 payment method.
+ *
+ * The spec deliberately leaves `method` open: it is any string matching
+ * `[a-z0-9_-]+`, carried on `POST /v1/mint/quote/{method}`, and a mint
+ * advertises the ones it serves through its NUT-06 info
+ * (`nuts["4"].methods[]` / `nuts["5"].methods[]`). Mints do use that
+ * freedom — `mint.sortug.com` advertises `venmo` and `paypal` alongside the
+ * three built-ins — so the capability layer treats the method as an opaque
+ * string throughout and only special-cases the built-ins where a
+ * method-specific NUT actually changes behaviour.
+ *
+ * `string & {}` keeps editor autocomplete for the built-ins while still
+ * accepting any advertised method.
+ */
+// eslint-disable-next-line @typescript-eslint/ban-types
+export type MintPaymentMethod = BuiltInMintPaymentMethod | (string & {});
+
+/** Whether a method is one coco has a first-class handler for. */
+export const BUILT_IN_MINT_PAYMENT_METHODS: readonly BuiltInMintPaymentMethod[] =
+  ["bolt11", "bolt12", "onchain"];
+
+export function isBuiltInMintPaymentMethod(
+  method: string,
+): method is BuiltInMintPaymentMethod {
+  return (BUILT_IN_MINT_PAYMENT_METHODS as readonly string[]).includes(method);
+}
+export type MintPaymentOperation = "mint" | "melt";
 
 export interface MintMethodRequirement {
   operation: MintPaymentOperation;
@@ -128,19 +160,19 @@ export interface AmountEntryMethodContext {
 // ---------------------------------------------------------------------------
 
 export type PaymentOptionKind =
-  | 'ecashToken'
-  | 'paymentRequest'
-  | 'lightningInvoice'
-  | 'bolt12Offer'
-  | 'lightningAddress'
-  | 'lnurlp'
-  | 'onchainAddress';
+  | "ecashToken"
+  | "paymentRequest"
+  | "lightningInvoice"
+  | "bolt12Offer"
+  | "lightningAddress"
+  | "lnurlp"
+  | "onchainAddress";
 
 export interface PaymentOption {
   kind: PaymentOptionKind;
   value: string;
   amount?: number | null;
-  source: 'standalone' | 'bip321';
+  source: "standalone" | "bip321";
   paramKey?: string | null;
 }
 
@@ -154,13 +186,14 @@ export interface Bip321Container {
   unsupportedRequiredParamKeys: string[];
 }
 
-export type ParsedInputType = 'ur' | 'payment' | 'mintUrl' | 'npub' | 'bip321' | 'unknown';
+export type ParsedInputType =
+  "ur" | "payment" | "mintUrl" | "npub" | "bip321" | "unknown";
 
 export interface ParsedPaymentInput {
   raw: string;
   normalized: string;
   type: ParsedInputType;
-  container: 'standalone' | 'bip321' | null;
+  container: "standalone" | "bip321" | null;
   options: PaymentOption[];
   bip321?: Bip321Container;
   mintUrl?: string;
@@ -173,12 +206,12 @@ export interface ParsedPaymentInput {
 // Option Annotation
 // ---------------------------------------------------------------------------
 
-export type OptionStatus = 'recommended' | 'available' | 'disabled';
+export type OptionStatus = "recommended" | "available" | "disabled";
 
 export interface AnnotatedOption {
   option: PaymentOption;
   status: OptionStatus;
-  reason: import('./formatting/locales').LocalizedReason | null;
+  reason: import("./formatting/locales").LocalizedReason | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -186,17 +219,21 @@ export interface AnnotatedOption {
 // ---------------------------------------------------------------------------
 
 export type ResolvedIntent =
-  | { type: 'receiveToken'; option: PaymentOption }
-  | { type: 'sendPaymentRequest'; option: PaymentOption; info: PaymentRequestInfo }
-  | { type: 'meltLightningInvoice'; option: PaymentOption }
-  | { type: 'meltBolt12Offer'; option: PaymentOption }
-  | { type: 'meltLightningAddress'; option: PaymentOption }
-  | { type: 'meltLnurlp'; option: PaymentOption }
-  | { type: 'meltOnchainAddress'; option: PaymentOption }
-  | { type: 'openMint'; url: string }
-  | { type: 'openProfile'; npub: string }
-  | { type: 'chooseOption'; options: AnnotatedOption[] }
-  | { type: 'ignore'; reason: import('./formatting/locales').LocalizedReason };
+  | { type: "receiveToken"; option: PaymentOption }
+  | {
+      type: "sendPaymentRequest";
+      option: PaymentOption;
+      info: PaymentRequestInfo;
+    }
+  | { type: "meltLightningInvoice"; option: PaymentOption }
+  | { type: "meltBolt12Offer"; option: PaymentOption }
+  | { type: "meltLightningAddress"; option: PaymentOption }
+  | { type: "meltLnurlp"; option: PaymentOption }
+  | { type: "meltOnchainAddress"; option: PaymentOption }
+  | { type: "openMint"; url: string }
+  | { type: "openProfile"; npub: string }
+  | { type: "chooseOption"; options: AnnotatedOption[] }
+  | { type: "ignore"; reason: import("./formatting/locales").LocalizedReason };
 
 // ---------------------------------------------------------------------------
 // Destination Descriptor — render-ready model for a Send-flow destination.
@@ -209,36 +246,36 @@ export type ResolvedIntent =
 // ---------------------------------------------------------------------------
 
 export type DestinationKind =
-  | 'ecash' // cashu bearer token (redeem)
-  | 'paymentRequest' // NUT-18 creq
-  | 'lightningInvoice' // bolt11
-  | 'bolt12Offer' // BOLT-12 offer (lno1…), paid via a bolt12 melt
-  | 'lightningAddress' // lnurlp endpoint paid via Lightning (NOT an identity)
-  | 'onchain' // bitcoin address
-  | 'person' // payable Nostr identity (npub / nprofile / lightning address)
-  | 'mint' // mint URL
-  | 'unsupported'; // empty / unknown / UR fragment / parse errors
+  | "ecash" // cashu bearer token (redeem)
+  | "paymentRequest" // NUT-18 creq
+  | "lightningInvoice" // bolt11
+  | "bolt12Offer" // BOLT-12 offer (lno1…), paid via a bolt12 melt
+  | "lightningAddress" // lnurlp endpoint paid via Lightning (NOT an identity)
+  | "onchain" // bitcoin address
+  | "person" // payable Nostr identity (npub / nprofile / lightning address)
+  | "mint" // mint URL
+  | "unsupported"; // empty / unknown / UR fragment / parse errors
 
 export type DestinationIcon =
-  | 'ecash'
-  | 'paymentRequest'
-  | 'lightning'
-  | 'onchain'
-  | 'person'
-  | 'mint'
-  | 'unknown';
+  | "ecash"
+  | "paymentRequest"
+  | "lightning"
+  | "onchain"
+  | "person"
+  | "mint"
+  | "unknown";
 
 export type DestinationAction =
-  | 'receiveToken' // redeem a bearer ecash token
-  | 'sendPaymentRequest' // fulfill a creq
-  | 'meltInvoice' // pay a bolt11
-  | 'meltBolt12' // pay a bolt12 offer
-  | 'meltLnurl' // pay an lnurlp endpoint
-  | 'meltOnchain' // pay a btc address
-  | 'startContactSend' // person: app resolves profile, then contact send
-  | 'chooseOption' // multi-option: defer to the existing chooser
-  | 'openMint' // open mint info
-  | 'none'; // unsupported / empty
+  | "receiveToken" // redeem a bearer ecash token
+  | "sendPaymentRequest" // fulfill a creq
+  | "meltInvoice" // pay a bolt11
+  | "meltBolt12" // pay a bolt12 offer
+  | "meltLnurl" // pay an lnurlp endpoint
+  | "meltOnchain" // pay a btc address
+  | "startContactSend" // person: app resolves profile, then contact send
+  | "chooseOption" // multi-option: defer to the existing chooser
+  | "openMint" // open mint info
+  | "none"; // unsupported / empty
 
 export interface DestinationAmount {
   /** Integer amount in `unit`'s base unit (sats for `'sat'`). */
@@ -247,9 +284,9 @@ export interface DestinationAmount {
 }
 
 export type DestinationRecipientRef =
-  | { type: 'npub'; value: string } // bech32 npub
-  | { type: 'lightningAddress'; value: string } // user@domain (LUD-16)
-  | { type: 'pubkey'; value: string }; // 33-byte 02-prefixed P2PK lock from a creq
+  | { type: "npub"; value: string } // bech32 npub
+  | { type: "lightningAddress"; value: string } // user@domain (LUD-16)
+  | { type: "pubkey"; value: string }; // 33-byte 02-prefixed P2PK lock from a creq
 
 export interface DestinationRecipient {
   ref: DestinationRecipientRef;
@@ -302,7 +339,7 @@ export interface AmountEntryConstraints {
    * has fetched it via `operations.resolveRecipientProfile`, consumer UIs can
    * render avatar + display name without re-fetching.
    */
-  recipientProfile?: import('./machine/types').RecipientProfile;
+  recipientProfile?: import("./machine/types").RecipientProfile;
   methodContext?: AmountEntryMethodContext;
   // 'receivePaymentRequest' = receive "as Ecash": a single-use NUT-18 request.
   // It shares the mintQuote amount screen (same "receive a fixed amount" intent)
@@ -310,17 +347,17 @@ export interface AmountEntryConstraints {
   // paymentRequestReceived) so delivery rides a machine step handler, not a
   // side-channel navigation callback.
   destination:
-    | 'paymentRequest'
-    | 'meltQuote'
-    | 'sendEcash'
-    | 'mintQuote'
-    | 'receivePaymentRequest';
+    | "paymentRequest"
+    | "meltQuote"
+    | "sendEcash"
+    | "mintQuote"
+    | "receivePaymentRequest";
   /**
    * How the flow was entered (Create Ecash / scan / paste / contact) — lets
    * the amount screen render entry-appropriate chrome, e.g. a single
    * "Create ecash" action when the user explicitly chose that method.
    */
-  entrySource?: import('./machine/types').SendEntrySource;
+  entrySource?: import("./machine/types").SendEntrySource;
 }
 
 // ---------------------------------------------------------------------------
@@ -398,12 +435,12 @@ export interface MintReviewsSummary {
 export type MintContactProfileResolver = (
   pubkey: string,
   mintUrl: string,
-  controls?: RequestControls
+  controls?: RequestControls,
 ) => Promise<MintContactProfile | undefined>;
 
 export type MintReviewsFetcher = (
   mintUrl: string,
-  controls?: RequestControls
+  controls?: RequestControls,
 ) => Promise<MintReviewsSummary | undefined>;
 
 /**
@@ -431,9 +468,9 @@ export interface MintListItem {
    */
   supportedUnits?: string[];
   /** Whether this mint can be selected in the current flow. */
-  status: 'available' | 'disabled';
+  status: "available" | "disabled";
   /** Reason the mint is disabled, null when status is 'available'. */
-  reason: import('./formatting/locales').LocalizedReason | null;
+  reason: import("./formatting/locales").LocalizedReason | null;
   isPreferred: boolean;
   /** KYM (Know Your Mint) community score, cached from Nostr events. */
   kymScore?: number;
@@ -497,15 +534,18 @@ export interface MintReviewInfo {
 }
 
 export type MintSelectionResult =
-  | { type: 'selected'; mintUrl: string; balance: number }
-  | { type: 'selectionNeeded'; validMints: MintCandidate[] }
-  | { type: 'noValidMint'; reason: import('./formatting/locales').LocalizedReason };
+  | { type: "selected"; mintUrl: string; balance: number }
+  | { type: "selectionNeeded"; validMints: MintCandidate[] }
+  | {
+      type: "noValidMint";
+      reason: import("./formatting/locales").LocalizedReason;
+    };
 
 export interface MintCandidate {
   mintUrl: string;
   balance: number;
-  status?: 'available' | 'disabled';
-  reason?: import('./formatting/locales').LocalizedReason | null;
+  status?: "available" | "disabled";
+  reason?: import("./formatting/locales").LocalizedReason | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -515,7 +555,7 @@ export interface MintCandidate {
 export interface GuardResult {
   guard: string;
   passed: boolean;
-  reason?: import('./formatting/locales').LocalizedReason;
+  reason?: import("./formatting/locales").LocalizedReason;
 }
 
 // ---------------------------------------------------------------------------
@@ -525,15 +565,15 @@ export interface GuardResult {
 // ---------------------------------------------------------------------------
 
 export type WalletCapability =
-  | 'amountEntry'
-  | 'mintSelection'
-  | 'optionSelection'
-  | 'proofSelection'
-  | 'meltQuoteFetch'
-  | 'tokenReceive'
-  | 'httpTransport'
-  | 'mintInfo'
-  | 'profileView';
+  | "amountEntry"
+  | "mintSelection"
+  | "optionSelection"
+  | "proofSelection"
+  | "meltQuoteFetch"
+  | "tokenReceive"
+  | "httpTransport"
+  | "mintInfo"
+  | "profileView";
 
 export interface CapabilityCheckResult {
   covered: boolean;
@@ -560,7 +600,8 @@ export interface CompositionResult {
   target: number;
   nearestLower: number | null;
   nearestUpper: number | null;
-  strategy: 'exhaustive' | 'meet-in-the-middle' | 'bitset-dp' | 'denomination-greedy';
+  strategy:
+    "exhaustive" | "meet-in-the-middle" | "bitset-dp" | "denomination-greedy";
   elapsedMs: number;
 }
 
@@ -579,12 +620,16 @@ export interface FiatCompositionResult {
 // ---------------------------------------------------------------------------
 
 export type RecommendationRule = {
-  applies: (option: PaymentOption, ctx: WalletContext, info?: PaymentRequestInfo | null) => boolean;
+  applies: (
+    option: PaymentOption,
+    ctx: WalletContext,
+    info?: PaymentRequestInfo | null,
+  ) => boolean;
   status: OptionStatus;
   reason: (
     option: PaymentOption,
     ctx: WalletContext,
     info?: PaymentRequestInfo | null,
-    locale?: string
-  ) => import('./formatting/locales').LocalizedReason | null;
+    locale?: string,
+  ) => import("./formatting/locales").LocalizedReason | null;
 };
