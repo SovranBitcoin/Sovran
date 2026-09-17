@@ -7,6 +7,7 @@
  * - transactions: Entry point, shows transaction list with native header
  * - lightningReceive: Lightning receive details (pushes horizontally)
  * - onchainReceive: Onchain receive details (pushes horizontally)
+ * - customReceive: Receive details for a NUT-04 method with no NUT of its own
  * - lightningSend: Lightning send details (pushes horizontally)
  * - onchainSend: Onchain send details (pushes horizontally)
  * - sendToken: Ecash send details (pushes horizontally)
@@ -25,6 +26,8 @@ import { TransactionsFilterProvider } from '@/features/transactions';
 const TRANSPARENT_HEADER_STYLE = { backgroundColor: 'transparent' };
 const LIGHTNING_RECEIVE_OPTIONS = { title: 'Receive Lightning' };
 const ONCHAIN_RECEIVE_OPTIONS = { title: 'Receive onchain' };
+// Placeholder only — the route titles itself from the entry's method.
+const CUSTOM_RECEIVE_OPTIONS = { title: 'Receive' };
 const LIGHTNING_SEND_OPTIONS = {
   title: 'Send Lightning',
   headerBackButtonMenuEnabled: false,
@@ -62,6 +65,7 @@ function TransactionsFlowContent() {
       <Stack.Screen name="transactions" options={transactionsOptions} />
       <Stack.Screen name="lightningReceive" options={LIGHTNING_RECEIVE_OPTIONS} />
       <Stack.Screen name="onchainReceive" options={ONCHAIN_RECEIVE_OPTIONS} />
+      <Stack.Screen name="customReceive" options={CUSTOM_RECEIVE_OPTIONS} />
       <Stack.Screen name="lightningSend" options={LIGHTNING_SEND_OPTIONS} />
       <Stack.Screen name="onchainSend" options={ONCHAIN_SEND_OPTIONS} />
       <Stack.Screen name="sendToken" options={SEND_TOKEN_OPTIONS} />

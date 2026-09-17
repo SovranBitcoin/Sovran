@@ -9,6 +9,7 @@
  * - amount: Amount selector (pushes horizontally)
  * - lightningReceive: Lightning receive display (pushes horizontally)
  * - onchainReceive: Onchain receive display (pushes horizontally)
+ * - customReceive: Receive display for a NUT-04 method with no NUT of its own
  *
  * The first screen shows a close button, subsequent screens show a back button.
  */
@@ -22,6 +23,9 @@ const AMOUNT_OPTIONS = { title: 'Select amount' };
 const MINT_SELECT_OPTIONS = { title: 'Select mint' };
 const LIGHTNING_RECEIVE_OPTIONS = { title: 'Receive Lightning' };
 const ONCHAIN_RECEIVE_OPTIONS = { title: 'Receive onchain' };
+// Placeholder only: the route names the method once the entry is decoded
+// ("Receive PayPal") via its own Stack.Screen.
+const CUSTOM_RECEIVE_OPTIONS = { title: 'Receive' };
 const MINT_QUOTE_OPTIONS = { title: 'Receive' };
 const RECEIVE_TOKEN_OPTIONS = { title: 'Receive ecash' };
 const RAIL_LIST_OPTIONS = { title: 'View all' };
@@ -40,6 +44,7 @@ export default function ReceiveFlowLayout() {
       <Stack.Screen name="mintSelect" options={MINT_SELECT_OPTIONS} />
       <Stack.Screen name="lightningReceive" options={LIGHTNING_RECEIVE_OPTIONS} />
       <Stack.Screen name="onchainReceive" options={ONCHAIN_RECEIVE_OPTIONS} />
+      <Stack.Screen name="customReceive" options={CUSTOM_RECEIVE_OPTIONS} />
       <Stack.Screen name="paymentRequest" options={MINT_QUOTE_OPTIONS} />
       <Stack.Screen name="receiveToken" options={RECEIVE_TOKEN_OPTIONS} />
       <Stack.Screen name="railList" options={RAIL_LIST_OPTIONS} />

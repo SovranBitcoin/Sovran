@@ -54,7 +54,14 @@ export type SendEntrySource = "createEcash" | "scan" | "paste" | "contact";
 // Additive: coco supports bolt11/bolt12/onchain for both mint and melt. bolt12
 // is a first-class SEND (melt) method here; widening is safe (union values are
 // only added, never removed/renamed — no persisted-enum break).
-export type PaymentQuoteMethod = "bolt11" | "bolt12" | "onchain";
+//
+// NUT-04/05 leave `method` open to any `[a-z0-9_-]+` string the mint
+// advertises, so this stays assignable from an arbitrary advertised method
+// (see `MintPaymentMethod` in ../types). The built-in names remain listed so
+// editors still autocomplete them.
+// eslint-disable-next-line @typescript-eslint/ban-types
+export type PaymentQuoteMethod =
+  "bolt11" | "bolt12" | "onchain" | (string & {});
 export type MintQuoteMethod = PaymentQuoteMethod;
 export type MeltQuoteMethod = PaymentQuoteMethod;
 
@@ -90,8 +97,7 @@ export type ReceiveExecutePendingResult = {
 };
 
 export type ReceiveExecuteResult =
-  | ReceiveExecuteFinalizedResult
-  | ReceiveExecutePendingResult;
+  ReceiveExecuteFinalizedResult | ReceiveExecutePendingResult;
 
 // ---------------------------------------------------------------------------
 // Recipient identity — populated by `operations.resolveRecipientPubkey`
@@ -1156,10 +1162,7 @@ export interface ProcessResult {
 // ---------------------------------------------------------------------------
 
 export type ScanSourceResult =
-  | { data: string }
-  | { canceled: true }
-  | { empty: true }
-  | { error: Error };
+  { data: string } | { canceled: true } | { empty: true } | { error: Error };
 
 export interface ScanSources {
   clipboard?: () => Promise<ScanSourceResult>;

@@ -17,6 +17,12 @@ const SOURCE_ROOTS = ['app', 'features', 'shared', 'navigation', 'config', 'asse
 // the app package dir), so read its source directly rather than via node_modules.
 const RUNTIME_ICON_SOURCE_FILES = [
   path.join(ROOT, '..', 'wallet', 'src', 'screen-actions', 'availability.ts'),
+  // NUT-04/05 payment-method glyphs. A mint may advertise any method string
+  // (venmo, paypal, a bank rail), and this table is what turns one into an
+  // icon — so its names must be in the committed registry just like the
+  // app-owned ones. See also paymentMethodIcons.test.ts, which checks the
+  // same list through the runtime export rather than the AST.
+  path.join(ROOT, '..', 'wallet', 'src', 'payment-methods.ts'),
 ];
 const EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx']);
 const IGNORED_PATH_PARTS = new Set(['node_modules', 'ios', 'android']);

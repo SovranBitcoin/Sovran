@@ -162,9 +162,9 @@ async function evidence(scenarioId = 'settings.routing.navigate') {
 
 describe('capture inventory', () => {
   it('keeps every canonical native baseline, plus explicit press variants', () => {
-    expect(CANONICAL_PAGES.length).toBe(101);
-    expect(plan.baselineDenominator).toBe(202);
-    expect(plan.targets.filter((t) => t.baseline)).toHaveLength(202);
+    expect(CANONICAL_PAGES.length).toBe(102);
+    expect(plan.baselineDenominator).toBe(204);
+    expect(plan.targets.filter((t) => t.baseline)).toHaveLength(204);
     for (const platform of ['ios', 'android'])
       for (const page of CANONICAL_PAGES)
         expect(
@@ -184,7 +184,7 @@ describe('capture inventory', () => {
     expect(
       plan.targets.filter((t) => t.status === 'planned').every((t) => t.readinessStepIds.length > 0)
     ).toBe(true);
-    expect(createCapturePlan(['android']).targets.filter((t) => t.baseline)).toHaveLength(101);
+    expect(createCapturePlan(['android']).targets.filter((t) => t.baseline)).toHaveLength(102);
   });
   it('plans real default-state pages without approving their effectful controls', () => {
     const expected = [
@@ -281,8 +281,8 @@ describe('verified capture import', () => {
       hash(readFileSync(join(e.runDir, 'events.jsonl')))
     );
     const library = JSON.parse(readFileSync(result.manifest, 'utf8'));
-    expect(library.baselineDenominator).toBe(202);
-    expect(library.inventory.filter((t: { baseline: boolean }) => t.baseline)).toHaveLength(202);
+    expect(library.baselineDenominator).toBe(204);
+    expect(library.inventory.filter((t: { baseline: boolean }) => t.baseline)).toHaveLength(204);
     expect(existsSync(join(e.libraryDir, 'ios/settings-routing.png'))).toBe(true);
     expect(existsSync(join(e.libraryDir, 'ios/wallet.png'))).toBe(false);
   });

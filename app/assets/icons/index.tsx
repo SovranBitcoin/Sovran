@@ -300,6 +300,29 @@ export const icons: string[] = [
   'mdi:link-variant',
   'mdi:image-broken-variant',
   'mdi:arrow-expand',
+  // NUT-04/05 custom payment methods. A mint may advertise any method string
+  // it can settle (NUT-04 pins only the `[a-z0-9_-]+` grammar), so the receive
+  // menu can surface a rail the app has never seen — `mint.sortug.com` offers
+  // venmo and paypal. `wallet/src/payment-methods.ts` maps a method name to
+  // one of these glyphs and falls back to `mdi:bank-transfer`; the scanner
+  // cannot follow that table, so every icon it can return is listed here.
+  // Keep this list in step with PAYMENT_METHOD_ICONS (pinned by
+  // `__tests__/paymentMethodIcons.test.ts`). The simple-icons family is
+  // monochrome and paints with currentColor, so these tint in both themes.
+  'simple-icons:paypal',
+  'simple-icons:venmo',
+  'simple-icons:cashapp',
+  'simple-icons:zelle',
+  'simple-icons:revolut',
+  'simple-icons:wise',
+  'simple-icons:alipay',
+  'simple-icons:wechat',
+  'simple-icons:pix',
+  'simple-icons:stripe',
+  'simple-icons:monero',
+  'ic:baseline-account-balance',
+  'mdi:bank-transfer',
+  'mdi:cash',
 ];
 
 export function CurrencyIcon({

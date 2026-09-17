@@ -5,10 +5,10 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { getOnchainMeltAddress } from '@/shared/lib/cashu/onchainMelt';
-import { getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
+import { mintQuoteRail, type MintQuoteRail } from '@/shared/lib/cashu/mintQuoteRail';
 import { cashuLog } from '@/shared/lib/logger';
 
-type MintDetailPathname = '/lightningReceive' | '/onchainReceive';
+type MintDetailPathname = '/lightningReceive' | '/onchainReceive' | '/customReceive';
 type MeltDetailPathname = '/lightningSend' | '/onchainSend';
 
 /** coco's projected entries carry `state` untyped — narrow it for logging. */
@@ -17,13 +17,25 @@ function entryState(entry: HistoryEntry): string | null {
   return typeof state === 'string' ? state : null;
 }
 
+const MINT_DETAIL_PATHNAMES: Record<MintQuoteRail, MintDetailPathname> = {
+  lightning: '/lightningReceive',
+  onchain: '/onchainReceive',
+  custom: '/customReceive',
+};
+
+/**
+ * Reopening a mint quote from history must land on the same screen the live
+ * flow used, so both sides resolve the rail through `mintQuoteRail` rather
+ * than re-deriving it. A quote for a NUT-04 method with no NUT of its own
+ * (venmo, paypal) gets the shared custom screen.
+ */
 export function getMintDetailPathname(entry: HistoryEntry): MintDetailPathname {
-  const isOnchain = !!getOnchainMintAddress(entry);
-  const pathname = isOnchain ? '/onchainReceive' : '/lightningReceive';
+  const rail = mintQuoteRail(entry);
+  const pathname = MINT_DETAIL_PATHNAMES[rail];
   cashuLog.debug('transactions.detail_route.mint', {
     type: entry.type,
     state: entryState(entry),
-    isOnchain,
+    rail,
     pathname,
   });
   return pathname;

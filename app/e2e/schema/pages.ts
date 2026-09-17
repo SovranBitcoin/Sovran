@@ -27,7 +27,8 @@ export const CANONICAL_PAGES = [
   'receive', // receive method hub sheet (receive-method-*)
   'receive-qr', // standing receive rails QR display (ReceiveScreen: Unified/Lightning/Onchain/Cashu)
   'receive-amount', // amount entry in the receive flow
-  'lightning-receive', // lightning invoice / mint-quote QR screen (incl. tx re-entry)
+  'lightning-receive', // BOLT11 invoice mint-quote QR screen (incl. tx re-entry)
+  'custom-receive', // mint-quote QR screen for a NUT-04 method with no NUT of its own
   'receive-token', // ecash token preview/redeem screen
   // send flow
   'send', // send method hub sheet

@@ -23,10 +23,13 @@ import { useBalanceContext, useManager, useMints } from '@cashu/coco-react';
 import {
   deriveMintMethodCapabilityMapFromTrustedMints,
   deriveSupportedUnitsFromInfo,
+  isBuiltInMintPaymentMethod,
   pickHighestBalanceUnit,
+  readAdvertisedMethodsFromInfo,
   type WalletContext,
 } from 'wallet';
 import { getReadyProofs } from '@/shared/lib/cashu/managerInternals';
+import { registerGenericMintMethods } from '@/shared/lib/cashu/genericMintMethod';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 
 import { useMintStore } from '@/shared/stores/profile/mintStore';
@@ -131,6 +134,36 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
       ),
     [rawTrustedMints, activeUnit, keysetUnitsByMint]
   );
+  // Teach coco how to mint over the unusual methods these mints advertise.
+  //
+  // NUT-04 lets a mint offer any method string it can settle, and coco only
+  // ships handlers for bolt11/bolt12/onchain — an unhandled method fails at
+  // quote creation with "No mint handler registered". This is the one place
+  // that knows the full set of trusted mints, so it registers Sovran's
+  // generic handler for whatever they advertise beyond the built-ins.
+  //
+  // Registration is additive and idempotent, and deliberately NOT scoped to
+  // the active unit: a handler is per method, and the user can switch units
+  // mid-flow. Trusting a capable mint makes its methods usable immediately;
+  // untrusting one leaves a handler registered but unreachable, since the
+  // capability layer will no longer offer the rail.
+  useEffect(() => {
+    if (!manager) return;
+    const custom = new Set<string>();
+    for (const mint of rawTrustedMints) {
+      for (const method of readAdvertisedMethodsFromInfo(mint.mintInfo, 4)) {
+        if (!isBuiltInMintPaymentMethod(method)) custom.add(method);
+      }
+    }
+    if (custom.size === 0) return;
+    const methods = [...custom].sort();
+    const registered = registerGenericMintMethods(manager, methods);
+    walletLog.info('wallet.context.custom_mint_methods', {
+      advertised: methods.join(','),
+      registered: registered.join(','),
+    });
+  }, [manager, rawTrustedMints]);
+
   const stableMintUrls = useShallowMemo(trustedMintUrls);
 
   // RC4+ removed the legacy `total` injection into the per-mint map; mintBalances

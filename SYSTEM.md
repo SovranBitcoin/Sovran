@@ -610,6 +610,47 @@ curated error codes before logging or displaying them. Successful status words
 do not establish a complete read: validate the two-byte NLEN and every requested
 body/chunk length before decoding. See `nfcApduPrivacy` and `nfcReadLengths` tests.
 
+**Custom payment methods (NUT-04/05):** `method` is any `[a-z0-9_-]+` string a
+mint advertises in its NUT-06 info; only `bolt11` (NUT-23), `bolt12` (NUT-25)
+and `onchain` (NUT-30) have a spec, and only those three have a coco handler.
+Never hardcode a method name in a rail: discovery goes through
+`readAdvertisedMethodsFromInfo` / `listCustomMintMethods`
+([wallet/src/mint-capabilities.ts](wallet/src/mint-capabilities.ts)), which read
+the trusted mints' own advertisements, and presentation through
+[wallet/src/payment-methods.ts](wallet/src/payment-methods.ts), which falls back
+to a mechanical label and a generic glyph for a method nobody anticipated. The
+Next-menu variant id is `method:<advertised name>`, and the string is carried
+verbatim to `POST /v1/mint/quote/{method}` so a persisted quote always names the
+endpoint that issued it.
+
+**Mint-quote receive screens:** receiving is one Cashu operation with three
+presentations, so they share one body —
+[MintQuoteReceiveShell](app/features/receive/screens/MintQuoteReceiveShell.tsx)
+owns the paid/unpaid split, the "Receiving with" mint row, the Cancel/Copy/Share
+footer, the standard detail rows and the `mint-quote-id-…` testID. Each screen
+is then a statement of one method and nothing else:
+[LightningReceiveScreen](app/features/receive/screens/LightningReceiveScreen.tsx)
+is always BOLT11,
+[OnchainReceiveScreen](app/features/receive/screens/OnchainReceiveScreen.tsx) is
+always NUT-30 and adds the confirmation timeline, and
+[CustomReceiveScreen](app/features/receive/screens/CustomReceiveScreen.tsx)
+derives every label from the quote's own method. A screen must never be
+"sometimes Lightning": a `venmo:…` payload captioned "Lightning invoice" is a
+claim the user acts on. Which screen a quote opens is decided once, in
+[mintQuoteRail](app/shared/lib/cashu/mintQuoteRail.ts), so the live flow and a
+re-entry from the transactions list can never disagree; a quote with no recorded
+method is Lightning unless its payload is a bitcoin address.
+
+Custom methods are **receive-only**. `isMethodImplemented` reports custom melt
+unavailable, because coco's melt saga is quote-backed with method-specific
+fee-reserve and change semantics an unspecified method defines nowhere — and a
+mint advertising custom melt is not evidence it works (mint.sortug.com lists
+`paypal` under NUT-05 and answers `/v1/melt/quote/paypal` with `50000 Invalid
+payment method`). Treat an advertisement as a claim to be checked, never as a
+capability. Custom methods are also amount-bound in practice, so they belong on
+the fixed-amount receive path and not on the amountless QR Display rails that
+`bolt12`/`onchain` use.
+
 **Payment-request mint preference (W12):** `wallet` preserves NUT-18 `mp` when
 paying someone else's request and ranks preferred mints without excluding other
 funded trusted mints. Sovran's own requests are always strict (no `mp`, no UI
@@ -975,6 +1016,7 @@ For every patch record package/version, affected platform, problem/reproduction,
 | `react-native-screens@4.25.2` | Android form-sheet dimming adjustment |
 | `heroui-native@1.0.9` | Both platforms. (1) `mountIndex` on bottom-sheet content forwards to gorhom `index`: heroui consumes the public `index` as its own isOpen-edge `snapToIndex`, which gorhom silently drops before layout is calculated (menus that never open / open short under JS contention; gorhom #2690, #2719). Hosts mount sheets open with `mountIndex={0}` so gorhom's animate-on-mount waits for layout. (2) `useDirectView` / `useScrollableContainer` on `contentContainerProps` keep a nested `BottomSheetScrollView` registered as the active scrollable. (3) Toast measurement clone hidden inline (runtime `opacity-0` className can fail under the monorepo Uniwind pipeline). Guarded by `app/__tests__/herouiNativePatch.test.ts`; remove each hunk when upstream forwards `index`, adopts the container flags, or fixes the clone. The 1.0.4 `isDragging` close-reaction hunk is upstream since 1.0.5 (`isClosingOnSwipe`); 1.0.6 keyed `PortalHost` portals (invisible-open-sheet reuse bug), 1.0.9 added the portal gesture root. |
 | `expo-modules-jsi@56.0.12` | Replace unsupported `weak let` declarations for the older local Swift toolchain; review removal when Xcode 26.4+ is the minimum |
+| `@cashu/coco-core@2.0.0` | Both platforms. Reach custom NUT-04 payment methods. coco hardcodes handlers for `bolt11`/`bolt12`/`onchain` in `Manager.buildCoreServices` and throws `No mint handler registered for method …` for anything else, so a mint that advertises e.g. `venmo`/`paypal` (mint.sortug.com) is unreachable. Four JS-only hunks in `dist/index.js`: expose `mintHandlerProvider`/`meltHandlerProvider` on the Manager; let `MintQuoteApi.create` forward an `amount` for a non-built-in method (built-ins keep their existing branches, onchain still gets `{unit}` only); widen the NUT-29 batch-poll guard from a built-in allowlist to “has a registered handler”; re-export the four internals a handler needs (`assessMintQuoteClaimability`, `serializeOutputData`, `deserializeOutputData`, `mapProofToCoreProof`, `mintQuoteObservationFromBolt12Response`, `getReusableMintQuoteValidationError`). The handler itself lives in-repo at `app/shared/lib/cashu/genericMintMethod.ts`, and the patch's added type surface in `app/coco-core-patched.d.ts`, so the patch stays small and declaration-free — coco ships its `.d.ts` as a regenerated, alias-mangled bundle chunk. Guarded by `app/__tests__/genericMintMethod.test.ts` and `wallet/__tests__/unit/custom-payment-methods.test.ts`. Upstream will not fix this: coco PRD [#232 Generic Payment Methods](https://github.com/cashubtc/coco/issues/232) and #234/#235/#237/#238 were closed NOT_PLANNED on 2026-07-02. Remove if coco reopens generic payment methods or exposes handler registration. |
 
 Patch source/runtime/type declarations as required by the package's actual resolution; do not assume only `src/` is used. Install from a clean disposable checkout with the lockfile and test that all required patches apply. Do not “fix” a patch failure by ignoring it. Do not run install/update tools merely to validate this documentation.
 

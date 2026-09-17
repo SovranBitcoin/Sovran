@@ -69,6 +69,8 @@ const NOT_SWEPT: Record<string, string> = {
   'app.config.js': 'Expo config, build time',
   'babel.config.js': 'build config',
   'eslint.config.js': 'build config',
+  'coco-core-patched.d.ts':
+    'type declarations only — the module augmentation for app/patches/@cashu+coco-core+2.0.0.patch',
   'expo-env.d.ts': 'type declarations only',
   'jest.config.js': 'build config',
   'jest.staticAssets.js': 'test asset setup, never bundled',

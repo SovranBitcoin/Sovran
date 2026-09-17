@@ -6,9 +6,11 @@ import type { ActionAvailability, ScreenActionName, ScreenType } from "./types";
 import {
   evaluateMintMethodAmountAvailability,
   isMethodImplemented,
+  methodContextCustomMethods,
   methodContextHasSupportingMint,
   type MintMethodAmountAvailability,
 } from "../mint-capabilities";
+import { getPaymentMethodPresentation } from "../payment-methods";
 import { logger } from "../logger";
 import { meltMethodForTarget } from "../melt-target";
 import type { AmountEntryMethodContext, MintMethodRequirement } from "../types";
@@ -299,10 +301,10 @@ function amountEntryAvailability(
   entry: Record<string, unknown>,
 ): AvailabilityMap<"amountEntry"> {
   const effectiveRaw = entry.effectiveAmount as
-    | { value?: unknown; unit?: unknown }
-    | undefined;
+    { value?: unknown; unit?: unknown } | undefined;
   const effectiveAmount =
-    typeof effectiveRaw?.value === "number" && Number.isFinite(effectiveRaw.value)
+    typeof effectiveRaw?.value === "number" &&
+    Number.isFinite(effectiveRaw.value)
       ? effectiveRaw.value
       : 0;
   const destination = entry.destination as string | undefined;
@@ -345,8 +347,7 @@ function amountEntryAvailability(
   const nextCanFire = effectiveAmount >= 1 && Number.isFinite(effectiveAmount);
   const unit = typeof entry.unit === "string" ? entry.unit : "sat";
   const methodContext = entry.methodContext as
-    | AmountEntryMethodContext
-    | undefined;
+    AmountEntryMethodContext | undefined;
   const selectedMintUrl = getSelectedMintUrl(entry);
 
   // Whether the entered amount outstrips the spendable balance. A single
@@ -361,7 +362,9 @@ function amountEntryAvailability(
     balanceValues.length > 0 ? Math.max(...balanceValues) : 0;
   const isSpendDestination = isSendEcash || isMeltQuote || isPaymentRequest;
   const exceedsBalance =
-    isSpendDestination && effectiveAmount > 0 && effectiveAmount > spendableAmount;
+    isSpendDestination &&
+    effectiveAmount > 0 &&
+    effectiveAmount > spendableAmount;
   const receiveLightningRequirement: MintMethodRequirement = {
     operation: "mint",
     method: "bolt11",
@@ -573,6 +576,58 @@ function amountEntryAvailability(
           : undefined
       : undefined;
 
+  // ── custom NUT-04 methods ──────────────────────────────────────────
+  // NUT-04 lets a mint advertise any `[a-z0-9_-]+` method it can settle, and
+  // mints use that: `mint.sortug.com` takes `venmo` (usd) and `paypal` (sat)
+  // alongside the three built-ins. Nothing here is hardcoded per method —
+  // the list is whatever the user's TRUSTED mints advertise for this unit, so
+  // a wallet with only ordinary mints sees no extra rows at all, and a method
+  // invented tomorrow shows up without a release.
+  //
+  // Receive only: `isMethodImplemented` reports custom melt unavailable (no
+  // generic melt saga), so these variants are never built for a send flow.
+  // Like onchain receive, the rail does not care which mint is selected right
+  // now — the flow switches to a mint that advertises the method.
+  const customReceiveVariants = isMintQuote
+    ? methodContextCustomMethods(methodContext, "mint", unit).map((method) => {
+        const requirement: MintMethodRequirement = {
+          operation: "mint",
+          method,
+          unit,
+        };
+        const availability = getAmountAvailability(
+          methodContext,
+          requirement,
+          effectiveAmount,
+          selectedMintUrl,
+        );
+        const compatible = hasCompatibleCandidate(availability, false);
+        const { label, icon, noun } = getPaymentMethodPresentation(method);
+        const available = nextCanFire && compatible;
+        return {
+          id: `method:${method}`,
+          label: `as ${label}`,
+          icon,
+          available,
+          description: `Create a ${noun}`,
+          ...(compatible
+            ? {}
+            : {
+                reason: methodAmountReason(
+                  availability,
+                  `No trusted mint can create a ${noun}`,
+                ),
+              }),
+        };
+      })
+    : [];
+  logger.debug("screenActions.availability.amountEntry.customMethods", {
+    unit,
+    isMintQuote,
+    count: customReceiveVariants.length,
+    methods: customReceiveVariants.map((variant) => variant.id).join(","),
+  });
+
   // Base order — available entries bubble to the top via a stable sort below
   // so the user sees executable options first and disabled/"coming soon" rows
   // sink to the bottom.
@@ -605,6 +660,7 @@ function amountEntryAvailability(
           },
         ]
       : []),
+    ...customReceiveVariants,
   ];
   const nextVariants = baseVariants
     .map((v, i) => ({ v, i }))
@@ -724,8 +780,7 @@ function receiveHubAvailability(
     entry.id === "receive-hub";
   const unit = entry.unit as string | undefined;
   const methodContext = entry.methodContext as
-    | AmountEntryMethodContext
-    | undefined;
+    AmountEntryMethodContext | undefined;
   const canReceiveLightning = methodContextHasSupportingMint(methodContext, {
     operation: "mint",
     method: "bolt11",
@@ -764,8 +819,7 @@ function receiveAvailability(
   const unit = entry.unit as string | undefined;
   const hubLoaded = isReceiveHub;
   const methodContext = entry.methodContext as
-    | AmountEntryMethodContext
-    | undefined;
+    AmountEntryMethodContext | undefined;
   // The receive-rail pickers open whenever ANY trusted mint could serve the
   // rail — mirroring the rail tab's own visibility gate.
   const canReceiveBolt12 = methodContextHasSupportingMint(methodContext, {

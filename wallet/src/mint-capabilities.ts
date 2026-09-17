@@ -1,5 +1,7 @@
 import { localizeReason, type LocalizedReason } from "./formatting/locales";
 import { logger, mintUrlFields } from "./logger";
+import { getPaymentMethodLabel } from "./payment-methods";
+import { isBuiltInMintPaymentMethod } from "./types";
 import type {
   AmountEntryConstraints,
   AmountEntryMethodContext,
@@ -14,7 +16,21 @@ import type {
 } from "./types";
 
 const DEFAULT_UNIT = "sat";
-const METHODS: readonly MintPaymentMethod[] = ["bolt11", "bolt12", "onchain"];
+/**
+ * Rows that are always present in a capability map, whether or not the mint
+ * advertises them. Keeping the built-ins pinned means "this mint does NOT do
+ * Lightning receive" is a derived `supported: false` with a reason, not a
+ * missing key the UI has to guess about.
+ */
+const BUILT_IN_METHODS: readonly MintPaymentMethod[] = [
+  "bolt11",
+  "bolt12",
+  "onchain",
+];
+
+/** NUT-04/05 method names must match `[a-z0-9_-]+` (NUT-04, "Requesting a
+ *  Mint Quote"). Anything else in a mint's info is malformed and ignored. */
+const METHOD_NAME = /^[a-z0-9_-]+$/;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -122,6 +138,54 @@ function readNut17Support(mintInfo: unknown): boolean | undefined {
   return Array.isArray(supported) && supported.length > 0;
 }
 
+/**
+ * Every payment method one side of a mint's NUT-06 info advertises, whatever
+ * its unit.
+ *
+ * NUT-04/05 name the method but say nothing about which ones a wallet should
+ * expect, so this is pure discovery: whatever the mint lists is what the mint
+ * can be asked for. Malformed names are dropped (NUT-04 pins the grammar to
+ * `[a-z0-9_-]+`), and order follows the mint's own listing so the UI is
+ * stable across refreshes.
+ */
+export function readAdvertisedMethodsFromInfo(
+  mintInfo: unknown,
+  nut: 4 | 5,
+): string[] {
+  const settings = getNutSettings(mintInfo, nut);
+  if (settings?.disabled === true) return [];
+  const methods = settings?.methods;
+  if (!Array.isArray(methods)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const entry of methods) {
+    if (!isRecord(entry)) continue;
+    const name = methodToString(entry.method)?.trim().toLowerCase();
+    if (!name || !METHOD_NAME.test(name) || seen.has(name)) continue;
+    seen.add(name);
+    out.push(name);
+  }
+  return out;
+}
+
+/**
+ * The method rows a capability map should carry for one mint: the pinned
+ * built-ins plus anything the mint advertises on either side. Custom methods
+ * only appear for mints that actually offer them, so a wallet that has never
+ * seen `venmo` never renders a `venmo` row.
+ */
+function methodRowsFor(mintInfo: unknown): MintPaymentMethod[] {
+  const advertised = [
+    ...readAdvertisedMethodsFromInfo(mintInfo, 4),
+    ...readAdvertisedMethodsFromInfo(mintInfo, 5),
+  ];
+  const rows: MintPaymentMethod[] = [...BUILT_IN_METHODS];
+  for (const method of advertised) {
+    if (!rows.includes(method)) rows.push(method);
+  }
+  return rows;
+}
+
 export function deriveMintMethodSupportFromInfo(
   mintInfo: unknown,
   unit: string = DEFAULT_UNIT,
@@ -147,12 +211,13 @@ export function deriveMintMethodSupportFromInfo(
       reason: `Mint advertises ${normalizedUnit} but has no ${normalizedUnit} keysets`,
     };
   };
+  const methods = methodRowsFor(mintInfo);
   const support = {
     mint: Object.fromEntries(
-      METHODS.map((method) => [method, readGated(4, method)]),
+      methods.map((method) => [method, readGated(4, method)]),
     ),
     melt: Object.fromEntries(
-      METHODS.map((method) => [method, readGated(5, method)]),
+      methods.map((method) => [method, readGated(5, method)]),
     ),
     nut17: readNut17Support(mintInfo),
   };
@@ -196,7 +261,11 @@ export function compareMintDisplayOrder(
     if (aBelowMin && bBelowMin) {
       const aMin = a.reason?.params?.min;
       const bMin = b.reason?.params?.min;
-      if (typeof aMin === "number" && typeof bMin === "number" && aMin !== bMin) {
+      if (
+        typeof aMin === "number" &&
+        typeof bMin === "number" &&
+        aMin !== bMin
+      ) {
         return aMin - bMin;
       }
     }
@@ -407,19 +476,32 @@ export function getMintMethodCapability(
   return support ?? missingCapability(requirement);
 }
 
+/**
+ * Whether the wallet can actually DRIVE this method/operation pair, as opposed
+ * to merely seeing the mint advertise it.
+ *
+ * The three built-ins are fully wired in coco v2: bolt11 mint+melt, onchain
+ * mint+melt, bolt12 mint (reusable offers) + melt (paying an offer, via the
+ * bolt12 melt path in defaultOperations.executeMelt).
+ *
+ * Every other NUT-04/05 method runs on Sovran's generic mint handler
+ * (`app/shared/lib/cashu/genericMintMethod.ts`), which covers RECEIVE only.
+ * There is no generic melt: coco's melt saga is quote-backed with
+ * method-specific fee-reserve and change semantics that a custom method does
+ * not describe anywhere, and the only mint observed advertising custom melt
+ * (`mint.sortug.com`, NUT-05 `venmo`/`paypal`) rejects those melt quotes with
+ * "Invalid payment method" anyway. So a custom method is offered for receive
+ * and reported unavailable — with a reason — for send.
+ */
 export function isMethodImplemented(
-  _requirement: MintMethodRequirement,
+  requirement: MintMethodRequirement,
 ): boolean {
-  // coco v2: bolt11 mint+melt, onchain mint+melt, bolt12 mint (reusable
-  // offers) + melt (paying an offer, wired via the bolt12 melt path in
-  // defaultOperations.executeMelt). All method/operation pairs are implemented.
-  return true;
+  if (isBuiltInMintPaymentMethod(requirement.method)) return true;
+  return requirement.operation === "mint";
 }
 
 function methodLabel(method: MintPaymentMethod): string {
-  if (method === "bolt11") return "Lightning";
-  if (method === "bolt12") return "BOLT 12";
-  return "onchain";
+  return getPaymentMethodLabel(method);
 }
 
 function operationLabel(operation: MintPaymentOperation): string {
@@ -523,6 +605,68 @@ export function hasMintSupportingMethod(
     result,
   });
   return result;
+}
+
+/**
+ * Custom NUT-04/05 methods at least one trusted mint advertises for this
+ * operation and unit, in a stable order.
+ *
+ * This is the discovery step behind the receive menu's unusual rails: Sovran
+ * never hardcodes "venmo" anywhere, it asks the trusted mints what they take.
+ * Built-ins are excluded — they have their own dedicated variants — and a
+ * method is listed once even if several mints offer it, because the flow
+ * picks the mint afterwards (the same auto-switch the onchain rail uses).
+ *
+ * Only `supported && !disabled` capabilities count, so a mint that lists a
+ * method under a NUT-04 block marked `disabled` contributes nothing.
+ */
+export function listCustomMintMethods(
+  ctx: Pick<WalletContext, "trustedMintUrls" | "mintMethodCapabilities">,
+  operation: MintPaymentOperation,
+  unit: string,
+): string[] {
+  const normalizedUnit = normalizeUnit(unit);
+  const seen = new Set<string>();
+  const methods: string[] = [];
+  for (const mintUrl of ctx.trustedMintUrls) {
+    const support = ctx.mintMethodCapabilities?.[mintUrl]?.[operation];
+    if (!support) continue;
+    for (const [method, capability] of Object.entries(support)) {
+      if (isBuiltInMintPaymentMethod(method) || seen.has(method)) continue;
+      if (!capability?.supported || capability.disabled) continue;
+      if (normalizeUnit(capability.unit) !== normalizedUnit) continue;
+      seen.add(method);
+      methods.push(method);
+    }
+  }
+  methods.sort();
+  logger.debug("mintCapabilities.listCustomMethods", {
+    operation,
+    unit: normalizedUnit,
+    trustedMintCount: ctx.trustedMintUrls.length,
+    methods: methods.join(","),
+  });
+  return methods;
+}
+
+/**
+ * `listCustomMintMethods` over an amount-entry method context — the shape the
+ * screen-actions layer carries instead of a full `WalletContext`.
+ */
+export function methodContextCustomMethods(
+  ctx: AmountEntryMethodContext | undefined,
+  operation: MintPaymentOperation,
+  unit: string,
+): string[] {
+  if (!ctx) return [];
+  return listCustomMintMethods(
+    {
+      trustedMintUrls: ctx.trustedMintUrls,
+      mintMethodCapabilities: ctx.mintMethodCapabilities,
+    },
+    operation,
+    unit,
+  );
 }
 
 export function hasCompatibleMintForMethod(
@@ -706,7 +850,9 @@ export function evaluateMintMethodAmountAvailability(
     candidates.find((candidate) => candidate.reason)?.reason ??
     null;
   const amountBoundsReason =
-    availableCandidates.length === 0 ? pickAmountBoundsReason(candidates) : null;
+    availableCandidates.length === 0
+      ? pickAmountBoundsReason(candidates)
+      : null;
 
   logger.info("mintCapabilities.amountAvailability.result", {
     candidateCount: candidates.length,
@@ -763,9 +909,17 @@ function methodBounds(
     if (!capability.supported || capability.disabled) continue;
     supported = true;
     if (capability.minAmount == null) minUnbounded = true;
-    else min = min == null ? capability.minAmount : Math.min(min, capability.minAmount);
+    else
+      min =
+        min == null
+          ? capability.minAmount
+          : Math.min(min, capability.minAmount);
     if (capability.maxAmount == null) maxUnbounded = true;
-    else max = max == null ? capability.maxAmount : Math.max(max, capability.maxAmount);
+    else
+      max =
+        max == null
+          ? capability.maxAmount
+          : Math.max(max, capability.maxAmount);
   }
   if (!supported) return null;
   return { min: minUnbounded ? null : min, max: maxUnbounded ? null : max };

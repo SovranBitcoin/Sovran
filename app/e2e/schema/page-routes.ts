@@ -41,6 +41,11 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
   'whitenoise-setup': ['(profile-flow)/whitenoiseSetup.tsx', '(user-flow)/whitenoiseSetup.tsx'],
   'receive-amount': ['(receive-flow)/amount.tsx'],
   camera: ['(receive-flow)/camera.tsx', '(send-flow)/camera.tsx', 'camera.tsx'],
+  'custom-receive': [
+    '(receive-flow)/customReceive.tsx',
+    '(transactions-flow)/customReceive.tsx',
+    'customReceive.tsx',
+  ],
   'lightning-receive': [
     '(receive-flow)/lightningReceive.tsx',
     '(transactions-flow)/lightningReceive.tsx',

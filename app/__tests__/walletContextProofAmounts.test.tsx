@@ -32,9 +32,17 @@ jest.mock('wallet', () => ({
   deriveMintMethodCapabilityMapFromTrustedMints: () => ({}),
   deriveSupportedUnitsFromInfo: () => ['sat', 'usd'],
   pickHighestBalanceUnit: () => 'sat',
+  // Custom NUT-04 method discovery. These fixtures advertise nothing unusual,
+  // so the provider's registration effect is a no-op here; the behaviour
+  // itself is covered by wallet/__tests__/unit/custom-payment-methods.test.ts.
+  readAdvertisedMethodsFromInfo: () => [],
+  isBuiltInMintPaymentMethod: (method: string) => ['bolt11', 'bolt12', 'onchain'].includes(method),
 }));
 jest.mock('@/shared/lib/cashu/managerInternals', () => ({
   getReadyProofs: (...args: unknown[]) => mockGetReadyProofs(...args),
+}));
+jest.mock('@/shared/lib/cashu/genericMintMethod', () => ({
+  registerGenericMintMethods: () => [],
 }));
 jest.mock('@/shared/stores/profile/mintStore', () => ({
   useMintStore: (selector: (state: { selectedMint?: string }) => unknown) => selector({}),

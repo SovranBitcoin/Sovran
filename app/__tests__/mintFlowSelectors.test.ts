@@ -10,13 +10,23 @@ const read = (relativePath: string): string =>
   readFileSync(resolve(__dirname, '..', relativePath), 'utf8');
 
 describe('mint flow e2e selectors', () => {
-  it('pins quote-mint-selector on the lightning receive confirmation pill', () => {
-    const source = read('features/receive/screens/LightningReceiveScreen.tsx');
+  // The pill lives in the shell shared by every mint-quote rail (Lightning,
+  // onchain, custom), so pinning it once covers all three.
+  it('pins quote-mint-selector on the mint-quote confirmation pill', () => {
+    const source = read('features/receive/screens/MintQuoteReceiveShell.tsx');
     const marker = source.indexOf('testID="quote-mint-selector"');
     expect(marker).toBeGreaterThan(-1);
     const start = source.lastIndexOf('<MintSelector', marker);
     expect(start).toBeGreaterThan(-1);
     expect(source.indexOf('testID="quote-mint-selector"', start)).toBe(marker);
+  });
+
+  it.each([
+    'features/receive/screens/LightningReceiveScreen.tsx',
+    'features/receive/screens/OnchainReceiveScreen.tsx',
+    'features/receive/screens/CustomReceiveScreen.tsx',
+  ])('%s renders through the shell that owns the pill', (file) => {
+    expect(read(file)).toContain('<MintQuoteReceiveShell');
   });
 
   const MINT_SELECT_SCREEN = 'features/mint/screens/MintSelectFlowScreen.tsx';

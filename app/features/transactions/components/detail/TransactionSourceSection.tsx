@@ -90,8 +90,13 @@ export function transactionLeadDetailItems({
 }: {
   source: string | null | undefined;
   bip321: { isBip321: boolean; optionKinds: string[] | null };
-  /** Which payment category this screen actually used. */
-  usedKind: 'lightning' | 'ecash' | 'onchain';
+  /**
+   * Which payment category this screen actually used. Optional because a
+   * NUT-04 method outside the three BIP-321 categories (a custom method such
+   * as `venmo`) matches none of these icons, and highlighting one of them
+   * would be a false claim about how the payment was made.
+   */
+  usedKind?: 'lightning' | 'ecash' | 'onchain';
   /** Already-formatted datetime (`entry.createdAt.datetime`). */
   createdAt: string;
 }) {

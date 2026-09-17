@@ -1,0 +1,50 @@
+diff --git a/node_modules/@cashu/coco-core/.bun-tag-431906c982ba90af b/.bun-tag-431906c982ba90af
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/node_modules/@cashu/coco-core/.bun-tag-c69bcc74cc29fa82 b/.bun-tag-c69bcc74cc29fa82
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/dist/index.js b/dist/index.js
+index 680223d0a4201f4b29fbce8458cda9fcbf2d78e0..046f1f0066ce6aa17df90aefa3dd319c43d6fd06 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -12444,7 +12444,12 @@ var MintQuoteApi = class {
+ 			};
+ 			return this.quoteLifecycle.createMintQuote(input.mintUrl, input.method, createQuoteData);
+ 		}
+-		return this.quoteLifecycle.createMintQuote(input.mintUrl, input.method, { unit: normalizeUnit(input.unit, { defaultUnit: DEFAULT_UNIT }) });
++		const genericCreateUnit = normalizeUnit(input.unit, { defaultUnit: DEFAULT_UNIT });
++		const genericCreateAmount = input.amount !== void 0 ? parseUnitAmount(input.amount, { explicitUnit: input.unit }) : void 0;
++		return this.quoteLifecycle.createMintQuote(input.mintUrl, input.method, genericCreateAmount === void 0 ? { unit: genericCreateUnit } : {
++			unit: genericCreateAmount.unit,
++			amount: genericCreateAmount
++		});
+ 	}
+ 	get(input) {
+ 		return this.quoteLifecycle.getMintQuoteById(input);
+@@ -13131,7 +13136,7 @@ var QuoteLifecycle = class {
+ 		const uniqueMintUrls = new Set(normalizedIdentities.map((identity) => identity.mintUrl));
+ 		const uniqueQuoteIds = new Set(normalizedIdentities.map((identity) => identity.quoteId));
+ 		if (uniqueMintUrls.size !== 1 || uniqueQuoteIds.size !== normalizedIdentities.length || normalizedIdentities.some((identity) => identity.quoteId.length === 0)) return failedMintQuotePollingResult(normalizedIdentities, "validation", new MintQuoteValidationError("Mint quote polling selections require one mint and unique non-empty quote identities"));
+-		if (!BUILT_IN_MINT_METHODS.has(method)) return failedMintQuotePollingResult(normalizedIdentities, "validation", new MintQuoteValidationError(`Unsupported built-in mint quote polling method ${method}`));
++		if (!BUILT_IN_MINT_METHODS.has(method) && this.mintHandlerProvider.getAll()[method] === void 0) return failedMintQuotePollingResult(normalizedIdentities, "validation", new MintQuoteValidationError(`Unsupported built-in mint quote polling method ${method}`));
+ 		if (!await this.mintService.isTrustedMint(mintUrl)) throw new UnknownMintError(`Mint ${mintUrl} is not trusted`);
+ 		let useBatch;
+ 		try {
+@@ -14121,6 +14126,8 @@ var Manager = class {
+ 			onchain: new MintOnchainHandler(keyRingService),
+ 			bolt12: new MintBolt12Handler(keyRingService)
+ 		});
++		this.mintHandlerProvider = mintHandlerProvider;
++		this.meltHandlerProvider = meltHandlerProvider;
+ 		const quoteLifecycle = new QuoteLifecycle({
+ 			mintHandlerProvider,
+ 			meltHandlerProvider,
+@@ -15100,4 +15107,4 @@ var MemoryRepositories = class {
+ };
+ 
+ //#endregion
+-export { Amount, AuthApi, AuthSessionError, AuthSessionExpiredError, ConsoleLogger, DEFAULT_UNIT, HistoryApi, HttpResponseError, KeyRingApi, KeysetSyncError, Manager, MeltOpsApi, MeltQuoteApi, MemoryRepositories, MintApi, MintFetchError, MintOperationError, MintOpsApi, MintQuoteApi, MintQuoteKeyError, MintQuoteValidationError, NetworkError, OperationInProgressError, OpsApi, PaymentRequestError, PaymentRequestsApi, ProofOperationError, ProofValidationError, QuoteApi, QuoteIdentityConflictError, ReceiveOpsApi, SendOpsApi, TokenValidationError, UnitMismatchError, UnitValidationError, UnknownMintError, WalletApi, WalletBalancesApi, applyBolt11MintQuoteStateFallback, assertSameUnit, assertUnitAmount, compareHistoryEntries, deriveBolt11MintQuoteState, getDecodedToken, getEncodedToken, getMintQuoteAmount, getMintQuoteAvailableAmount, getMintQuoteRemoteState, getTokenMetadata, initializeCoco, isLegacyHistoryEntry, isMintQuotePending, isOperationHistoryEntry, isStatefulMintQuote, isUnitAmountLikeObject, legacyHistoryId, meltQuoteFromBolt11Response, meltQuoteFromBolt12Response, meltQuoteFromOnchainResponse, meltQuoteToMethodSnapshot, mintQuoteFromBolt11Response, mintQuoteFromBolt12Response, mintQuoteFromOnchainResponse, mintQuoteToMethodSnapshot, normalizeMintUrl, normalizeUnit, normalizeUnitAmount, normalizeUnitList, operationHistoryId, parseHistoryEntryId, parseUnitAmount, projectLegacyHistoryRow, projectMeltOperation, projectMintOperation, projectOperationToHistoryEntry, projectReceiveOperation, projectSendOperation, resolveOnchainMeltFeeOption, sameUnitAmount, sumAmounts, toAmount };
+\ No newline at end of file
++export { Amount, AuthApi, AuthSessionError, AuthSessionExpiredError, ConsoleLogger, DEFAULT_UNIT, HistoryApi, HttpResponseError, KeyRingApi, KeysetSyncError, Manager, MeltOpsApi, MeltQuoteApi, MemoryRepositories, MintApi, MintFetchError, MintOperationError, MintOpsApi, MintQuoteApi, MintQuoteKeyError, MintQuoteValidationError, NetworkError, OperationInProgressError, OpsApi, PaymentRequestError, PaymentRequestsApi, ProofOperationError, ProofValidationError, QuoteApi, QuoteIdentityConflictError, ReceiveOpsApi, SendOpsApi, TokenValidationError, UnitMismatchError, UnitValidationError, UnknownMintError, WalletApi, WalletBalancesApi, applyBolt11MintQuoteStateFallback, assertSameUnit, assertUnitAmount, compareHistoryEntries, deriveBolt11MintQuoteState, getDecodedToken, getEncodedToken, getMintQuoteAmount, getMintQuoteAvailableAmount, getMintQuoteRemoteState, getTokenMetadata, initializeCoco, isLegacyHistoryEntry, isMintQuotePending, isOperationHistoryEntry, isStatefulMintQuote, isUnitAmountLikeObject, legacyHistoryId, meltQuoteFromBolt11Response, meltQuoteFromBolt12Response, meltQuoteFromOnchainResponse, meltQuoteToMethodSnapshot, mintQuoteFromBolt11Response, mintQuoteFromBolt12Response, mintQuoteFromOnchainResponse, mintQuoteToMethodSnapshot, normalizeMintUrl, normalizeUnit, normalizeUnitAmount, normalizeUnitList, operationHistoryId, parseHistoryEntryId, parseUnitAmount, projectLegacyHistoryRow, projectMeltOperation, projectMintOperation, projectOperationToHistoryEntry, projectReceiveOperation, projectSendOperation, resolveOnchainMeltFeeOption, sameUnitAmount, sumAmounts, toAmount, assessMintQuoteClaimability, deserializeOutputData, getReusableMintQuoteValidationError, mapProofToCoreProof, mintQuoteObservationFromBolt12Response, serializeOutputData };
+\ No newline at end of file
