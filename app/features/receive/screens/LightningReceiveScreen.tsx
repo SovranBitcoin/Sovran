@@ -1,185 +1,38 @@
 /**
- * @fileoverview Shared Lightning receive screen component
+ * @fileoverview Lightning (BOLT11) receive screen.
  *
- * Display component for Lightning mint quotes (receiving). Actions (copy, share)
- * are handled by the screen-action system.
+ * Always Lightning. Everything shared with the other mint-quote rails lives in
+ * `MintQuoteReceiveShell`; what is here is only what makes a BOLT11 quote a
+ * BOLT11 quote — the invoice caption, the Lightning copy target, and the
+ * copyable Quote ID.
  */
 
-import { useEffect } from 'react';
-import { useWindowDimensions } from 'react-native';
+import { getPaymentMethodLabel } from 'wallet';
 
-import type { MintHistoryEntry } from '@cashu/coco-core';
-import { isMintQuotePaymentObserved } from 'wallet';
-import { useScreenActions } from 'wallet/react';
-import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
-
-import { MintSelector } from '@/features/wallet';
+import { mintDetailItem, quoteIdDetailItem } from '@/features/transactions';
 import { truncateMiddle } from '@/shared/lib/strings';
-import {
-  HistoryEntryRefresh,
-  TransactionDetailShell,
-  TransactionLocationSection,
-  useBip321Info,
-  transactionLeadDetailItems,
-  useIsTransactionHistoryView,
-  amountDetailItem,
-  stateDetailItem,
-  quoteIdDetailItem,
-  mintDetailItem,
-} from '@/features/transactions';
-import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
-import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
-import type { ButtonHandlerButton } from '@/shared/ui/composed/ButtonHandler';
-import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
-import { Card } from '@/shared/ui/composed/Card';
-import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
-import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
-import { useMintInfo } from '@/shared/hooks/useMintInfo';
 
-const QUOTE_CARD_HORIZONTAL_MARGIN = 16;
+import { MintQuoteReceiveShell, type MintQuoteScreenProps } from './MintQuoteReceiveShell';
 
-interface LightningReceiveScreenProps {
-  mintHistoryEntry: MintHistoryEntry | string;
-  extraButtons?: ButtonHandlerButton[];
-  onRequestMintList?: () => void;
-}
-
-export function LightningReceiveScreen({
-  mintHistoryEntry,
-  extraButtons = [],
-  onRequestMintList,
-}: LightningReceiveScreenProps) {
-  useLifecycleLogger('LightningReceiveScreen');
-  const { width: windowWidth } = useWindowDimensions();
-  const { entry, error, actions, source, mintUrl } = useScreenActions(
-    'mintQuote',
-    mintHistoryEntry
-  );
-  const mintInfo = useMintInfo(entry?.mintUrl);
-  const bip321 = useBip321Info(entry?.id);
-
-  useEffect(() => {
-    if (error) paymentLog.warn('receive.lightning.error', { error });
-  }, [error]);
-
-  const isPaid = isMintQuotePaymentObserved(entry);
-  // History view (transactions list) → fixed mint, non-clickable "Receiving with".
-  const isHistoryView = useIsTransactionHistoryView();
-  const quoteCardWidth = Math.max(0, windowWidth - QUOTE_CARD_HORIZONTAL_MARGIN * 2);
-
-  useEffect(() => {
-    if (!entry) return;
-    paymentLog.debug('receive.lightning.render', {
-      state: entry.state,
-      isPaid,
-      amount: entry.amount,
-      unit: entry.unit,
-    });
-  }, [entry, isPaid]);
-
-  if (error) {
-    return (
-      <ScreenErrorState
-        message={error}
-        onGoBack={() => {
-          void actions.back.execute();
-        }}
-      />
-    );
-  }
-
-  if (!entry) {
-    return <ScreenLoadingState message="Loading transaction..." />;
-  }
-
-  const bottomButtons = (
-    <BottomButtons>
-      <HStack justify="center" align="center">
-        <ButtonHandler
-          buttons={[
-            {
-              text: isPaid ? 'Close' : 'Cancel',
-              icon: 'ri:close-circle-line',
-              variant: 'secondary',
-              onPress: () => actions.back.execute(),
-              condition: actions.back.available,
-            },
-            {
-              text: 'Copy',
-              icon: 'lets-icons:copy',
-              variant: 'primary',
-              onPress: () => actions.copy.execute(),
-              condition: actions.copy.available,
-            },
-            {
-              text: 'Share',
-              icon: 'ri:share-fill',
-              variant: 'secondary',
-              onPress: () => actions.share.execute(),
-              condition: actions.share.available,
-            },
-            ...extraButtons.map((button) => ({ ...button, condition: !isPaid })),
-          ]}
-        />
-      </HStack>
-    </BottomButtons>
-  );
+export function LightningReceiveScreen(props: MintQuoteScreenProps) {
+  const { entry, mintUrl } = props;
 
   return (
-    <TransactionDetailShell
+    <MintQuoteReceiveShell
+      {...props}
       screenName="LightningReceiveScreen"
-      testID={`mint-quote-id-${entry.id}`}
-      entry={entry}
-      source={source}
-      footer={bottomButtons}
-      beforeStatus={
-        <>
-          {!isPaid && (
-            <PaymentInfo
-              data={[{ name: 'Lightning', value: entry.paymentRequest }]}
-              unit={entry.unit}
-              copyTarget="lightningInvoice"
-            />
-          )}
-          {isPaid && <TransactionLocationSection transactionId={entry.id} />}
-        </>
-      }
-      statusRow={
-        <>
-          {!isPaid && !isHistoryView ? (
-            <MintSelector
-              testID="quote-mint-selector"
-              width={quoteCardWidth}
-              unit={entry.unit}
-              selectedMintUrl={mintUrl}
-              onRequestMintList={onRequestMintList}
-            />
-          ) : mintInfo ? (
-            <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={entry} />
-          ) : null}
-          {entry.metadata?.memo && <Card message={entry.metadata.memo} variant="info" />}
-        </>
-      }>
-      <DetailsSection
-        items={[
-          entry.id && { title: 'ID', value: entry.id },
-          ...transactionLeadDetailItems({
-            source,
-            bip321,
-            usedKind: 'lightning',
-            createdAt: entry.createdAt.datetime,
-          }),
-          amountDetailItem({ amount: entry.amount, unit: entry.unit }),
-          stateDetailItem(entry.state),
-          quoteIdDetailItem(entry.quoteId),
-          mintDetailItem(mintUrl),
-          {
-            title: 'Invoice',
-            value: truncateMiddle(entry.paymentRequest, 10),
-          },
-        ]}
-      />
-    </TransactionDetailShell>
+      logScope="receive.lightning"
+      payment={{
+        label: getPaymentMethodLabel('bolt11'),
+        value: entry.paymentRequest,
+        copyTarget: 'lightningInvoice',
+      }}
+      usedKind="lightning"
+      detailRows={[
+        quoteIdDetailItem(entry.quoteId),
+        mintDetailItem(mintUrl),
+        { title: 'Invoice', value: truncateMiddle(entry.paymentRequest, 10) },
+      ]}
+    />
   );
 }

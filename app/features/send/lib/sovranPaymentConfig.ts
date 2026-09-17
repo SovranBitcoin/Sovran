@@ -57,6 +57,7 @@ import type {
 } from '@/shared/lib/cashu/syntheticHistory';
 import { prepareBolt11MintQuote, prepareOnchainMintQuote } from '@/shared/lib/cashu/cocoOperations';
 import { getMintQuotePaymentValue, getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
+import { mintQuoteRail, type MintQuoteRail } from '@/shared/lib/cashu/mintQuoteRail';
 import {
   getP2PKImportExtension,
   resolvePrimaryReceiveP2PKPublicKey,
@@ -1457,6 +1458,21 @@ async function deliverContactDmIfActive(
   }
 }
 
+type MintQuotePathname =
+  | '/(receive-flow)/lightningReceive'
+  | '/(receive-flow)/onchainReceive'
+  | '/(receive-flow)/customReceive';
+
+const MINT_QUOTE_PATHNAMES: Record<MintQuoteRail, MintQuotePathname> = {
+  lightning: '/(receive-flow)/lightningReceive',
+  onchain: '/(receive-flow)/onchainReceive',
+  custom: '/(receive-flow)/customReceive',
+};
+
+function mintQuoteReceivePathname(entry: HistoryEntry): MintQuotePathname {
+  return MINT_QUOTE_PATHNAMES[mintQuoteRail(entry)];
+}
+
 export function createSovranHandlers({
   machine,
   onOptionDismiss,
@@ -1722,15 +1738,18 @@ export function createSovranHandlers({
     },
 
     mintQuoteCreated: ({ historyEntry, unit }) => {
-      let pathname: '/(receive-flow)/lightningReceive' | '/(receive-flow)/onchainReceive' =
-        '/(receive-flow)/lightningReceive';
+      // Route by the quote's own method. NUT-04 lets a mint advertise any
+      // method it can settle, so the three destinations are Lightning, onchain,
+      // and one shared screen for everything else (venmo, paypal, a bank rail).
+      // The onchain address check stays as the fallback: it is what identifies
+      // an entry written before `metadata.method` existed.
+      let pathname: MintQuotePathname = '/(receive-flow)/lightningReceive';
       try {
-        pathname = getOnchainMintAddress(JSON.parse(historyEntry) as HistoryEntry)
-          ? '/(receive-flow)/onchainReceive'
-          : '/(receive-flow)/lightningReceive';
+        pathname = mintQuoteReceivePathname(JSON.parse(historyEntry) as HistoryEntry);
       } catch {
         pathname = '/(receive-flow)/lightningReceive';
       }
+      paymentLog.info('receive.mint_quote.route', { pathname });
       router.replace({
         pathname,
         params: { mintHistoryEntry: historyEntry, unit },

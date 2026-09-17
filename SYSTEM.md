@@ -623,6 +623,24 @@ Next-menu variant id is `method:<advertised name>`, and the string is carried
 verbatim to `POST /v1/mint/quote/{method}` so a persisted quote always names the
 endpoint that issued it.
 
+**Mint-quote receive screens:** receiving is one Cashu operation with three
+presentations, so they share one body —
+[MintQuoteReceiveShell](app/features/receive/screens/MintQuoteReceiveShell.tsx)
+owns the paid/unpaid split, the "Receiving with" mint row, the Cancel/Copy/Share
+footer, the standard detail rows and the `mint-quote-id-…` testID. Each screen
+is then a statement of one method and nothing else:
+[LightningReceiveScreen](app/features/receive/screens/LightningReceiveScreen.tsx)
+is always BOLT11,
+[OnchainReceiveScreen](app/features/receive/screens/OnchainReceiveScreen.tsx) is
+always NUT-30 and adds the confirmation timeline, and
+[CustomReceiveScreen](app/features/receive/screens/CustomReceiveScreen.tsx)
+derives every label from the quote's own method. A screen must never be
+"sometimes Lightning": a `venmo:…` payload captioned "Lightning invoice" is a
+claim the user acts on. Which screen a quote opens is decided once, in
+[mintQuoteRail](app/shared/lib/cashu/mintQuoteRail.ts), so the live flow and a
+re-entry from the transactions list can never disagree; a quote with no recorded
+method is Lightning unless its payload is a bitcoin address.
+
 Custom methods are **receive-only**. `isMethodImplemented` reports custom melt
 unavailable, because coco's melt saga is quote-backed with method-specific
 fee-reserve and change semantics an unspecified method defines nowhere — and a

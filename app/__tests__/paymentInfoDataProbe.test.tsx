@@ -153,14 +153,27 @@ describe('PaymentInfo device data probe', () => {
     expect(sensitiveVisual.props.collapsable).toBe(false);
   });
 
-  it('mounts the Lightning invoice probe on the fixed-amount destination screen', () => {
+  it('mounts the payment probe on every mint-quote destination screen', () => {
     const { readFileSync } = jest.requireActual<typeof import('node:fs')>('node:fs');
     const { resolve } = jest.requireActual<typeof import('node:path')>('node:path');
-    const source = readFileSync(
-      resolve(__dirname, '..', 'features/receive/screens/LightningReceiveScreen.tsx'),
-      'utf8'
-    );
+    const read = (relativePath: string) =>
+      readFileSync(resolve(__dirname, '..', relativePath), 'utf8');
 
-    expect(source).toContain('copyTarget="lightningInvoice"');
+    // The probe is mounted once, in the shell every mint-quote rail renders
+    // through; each rail supplies the copy target that names its testID. Both
+    // halves are pinned here: the mount, and Lightning still resolving to the
+    // Lightning copy target rather than a generic one.
+    expect(read('features/receive/screens/MintQuoteReceiveShell.tsx')).toContain(
+      'copyTarget={payment.copyTarget}'
+    );
+    expect(read('features/receive/screens/LightningReceiveScreen.tsx')).toContain(
+      "copyTarget: 'lightningInvoice'"
+    );
+    expect(read('features/receive/screens/OnchainReceiveScreen.tsx')).toContain(
+      "copyTarget: 'address'"
+    );
+    expect(read('features/receive/screens/CustomReceiveScreen.tsx')).toContain(
+      "copyTarget: 'paymentRequest'"
+    );
   });
 });
