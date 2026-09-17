@@ -3,6 +3,10 @@
   "name": "capture-library",
   "defaultEndState": "wallet",
   "scenarios": [
+    {"id":"capture.receive-qr-tabs","file":"scenarios/capture-receive-qr-tabs.json","order":120,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"capture.mint-details","file":"scenarios/capture-mint-details.json","order":130,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"capture.mint-updates","file":"scenarios/capture-mint-updates.json","order":140,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"capture.wallpapers","file":"scenarios/capture-wallpapers.json","order":150,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"capture.storage","file":"scenarios/capture-storage.json","order":110,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"capture.account-entry","file":"scenarios/capture-account-entry.json","order":50,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"capture.composer","file":"scenarios/capture-composer.json","order":60,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},

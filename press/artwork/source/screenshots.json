@@ -107,9 +107,9 @@
     "context": "ai",
     "page": "ai",
     "file": "source/screenshots/ios/ai.png",
-    "run": "run-2026-09-16T00-25-14-725Z-099a2535",
-    "sha256": "a5a43fa88112b27b6ab519509e042dfe0ac01390c62ec72dd1a7b488328ce188",
-    "capturedAt": "2026-09-16T00:25:14.727Z",
+    "run": "run-2026-09-16T20-47-08-002Z-17419f37",
+    "sha256": "dacab3290e1f2a31501733f77ec7fb56bf99e379dd4db464f48a219ff70f07ff",
+    "capturedAt": "2026-09-16T20:47:08.005Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -124,7 +124,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -132,9 +132,9 @@
     "context": "contacts",
     "page": "contacts",
     "file": "source/screenshots/ios/contacts.png",
-    "run": "run-2026-09-16T00-25-14-725Z-099a2535",
-    "sha256": "379817f1d9dea42cb8911c62ca3f06337b11c0276cce638fbf517139f1532c18",
-    "capturedAt": "2026-09-16T00:25:14.727Z",
+    "run": "run-2026-09-16T20-47-08-002Z-17419f37",
+    "sha256": "57946e3f4042708fa099e6120c9da0c97937660e34b2ce999262127a8de5e5ad",
+    "capturedAt": "2026-09-16T20:47:08.005Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -149,7 +149,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -157,9 +157,9 @@
     "context": "lightning-receive",
     "page": "lightning-receive",
     "file": "source/screenshots/ios/lightning-receive.png",
-    "run": "run-2026-09-16T00-25-14-725Z-099a2535",
-    "sha256": "d21f2d47ff9c918cd3394108a8edb5c693f14b175afd3cddc048aeb08784c45e",
-    "capturedAt": "2026-09-16T00:25:14.727Z",
+    "run": "run-2026-09-16T20-47-08-002Z-17419f37",
+    "sha256": "06c083db8cd6e6f51f394a4a79a056c1829633d2a339716beeac5fe9c0537aec",
+    "capturedAt": "2026-09-16T20:47:08.005Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -174,7 +174,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -182,9 +182,9 @@
     "context": "wallet",
     "page": "wallet",
     "file": "source/screenshots/ios/wallet.png",
-    "run": "run-2026-09-16T00-25-14-725Z-099a2535",
-    "sha256": "7a8d05ce839a772e2ea3087cbb8074e4e29b2ee2356689d887e022f8a8dae394",
-    "capturedAt": "2026-09-16T00:25:14.727Z",
+    "run": "run-2026-09-16T20-47-08-002Z-17419f37",
+    "sha256": "20bbb337e0287d4d630b9f31253728ddb8f11dc1fe048afc7e8ee46c41ac1049",
+    "capturedAt": "2026-09-16T20:47:08.005Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -199,7 +199,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -207,9 +207,9 @@
     "context": "feed",
     "page": "feed",
     "file": "source/screenshots/ios/feed.png",
-    "run": "run-2026-09-16T01-02-27-836Z-f8d2a983",
-    "sha256": "cf614f84ce9c3f3b23ee9c899c1ee6ce2114e0f09262952748aad096ae0f6c11",
-    "capturedAt": "2026-09-16T01:02:27.839Z",
+    "run": "run-2026-09-16T20-57-32-489Z-df256961",
+    "sha256": "717f7a43f5c6d685ec3a41529aa6b6985745c5a34286fd4bbb1d76ac91566491",
+    "capturedAt": "2026-09-16T20:57:32.494Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -224,7 +224,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -232,9 +232,9 @@
     "context": "thread",
     "page": "thread",
     "file": "source/screenshots/ios/thread.png",
-    "run": "run-2026-09-16T02-27-55-807Z-d5f25e2c",
-    "sha256": "ba309236c20773547c0a7de3a4ef035f7eab748e9ee4dae2a2b4f6bee37f1a5c",
-    "capturedAt": "2026-09-16T02:27:55.808Z",
+    "run": "run-2026-09-16T21-17-59-280Z-871711f7",
+    "sha256": "e185818c985cfd810f1dafaddf405357a42db39554e6c0f6a249ba70b5a113be",
+    "capturedAt": "2026-09-16T21:17:59.282Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -249,7 +249,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -257,9 +257,9 @@
     "context": "dm-chat",
     "page": "dm-chat",
     "file": "source/screenshots/ios/dm-chat.png",
-    "run": "run-2026-09-16T01-02-27-836Z-f8d2a983",
-    "sha256": "ead9de16dde5e1391059acedfb2698a93a22bf31dba92a9c7bb44f6108904920",
-    "capturedAt": "2026-09-16T01:02:27.839Z",
+    "run": "run-2026-09-16T20-57-32-489Z-df256961",
+    "sha256": "6b86b3d8bf8e60fc873ecde700645e0cab3cac6e7e8a32da844a41b06536de0d",
+    "capturedAt": "2026-09-16T20:57:32.494Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -274,7 +274,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -282,9 +282,9 @@
     "context": "receive-qr",
     "page": "receive-qr",
     "file": "source/screenshots/ios/receive-qr.png",
-    "run": "run-2026-09-16T01-02-27-836Z-f8d2a983",
-    "sha256": "dfccfb0f362ec15826d8b2b2287bb2e70b374812eb387da3256920c094ede1e1",
-    "capturedAt": "2026-09-16T01:02:27.839Z",
+    "run": "run-2026-09-16T20-57-32-489Z-df256961",
+    "sha256": "33b92a64720ef10dcd2414ce1b55fa5bf3d3450c86c444a4aecf50dfde4e37c4",
+    "capturedAt": "2026-09-16T20:57:32.494Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -299,7 +299,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -307,9 +307,9 @@
     "context": "send",
     "page": "send",
     "file": "source/screenshots/ios/send.png",
-    "run": "run-2026-09-16T01-02-27-836Z-f8d2a983",
-    "sha256": "554a53aa3e6ca83e307afdc0db3327f23f7e0999ead972cee46082ca139b4eeb",
-    "capturedAt": "2026-09-16T01:02:27.839Z",
+    "run": "run-2026-09-16T20-57-32-489Z-df256961",
+    "sha256": "a6d82cb973221908d24c069fa2d9988912a465001c56e3205ebb96323cc3dbc8",
+    "capturedAt": "2026-09-16T20:57:32.494Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -324,7 +324,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -332,9 +332,9 @@
     "context": "mint-select",
     "page": "mint-select",
     "file": "source/screenshots/ios/mint-select.png",
-    "run": "run-2026-09-16T01-02-27-836Z-f8d2a983",
-    "sha256": "ba570a3077746c9ee6d1d1a58e9898b76d46d6a0e10be8600e926047a8322960",
-    "capturedAt": "2026-09-16T01:02:27.839Z",
+    "run": "run-2026-09-16T20-57-32-489Z-df256961",
+    "sha256": "be71490c6a7788a9058e06ac779a8881e92759c097beaa13b224f4cb746f1ed1",
+    "capturedAt": "2026-09-16T20:57:32.494Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -349,7 +349,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -357,9 +357,9 @@
     "context": "mint-info",
     "page": "mint-info",
     "file": "source/screenshots/ios/mint-info.png",
-    "run": "run-2026-09-16T01-02-27-836Z-f8d2a983",
-    "sha256": "d321d6792ad3495ddc49215d38e8fcc5a21c8fc5a2557685ea9b71ed5e82d180",
-    "capturedAt": "2026-09-16T01:02:27.839Z",
+    "run": "run-2026-09-16T20-57-32-489Z-df256961",
+    "sha256": "33c15d5f2361e4ccdbaf999612e87e897b12257ad0a9924eaa90722cdb13872c",
+    "capturedAt": "2026-09-16T20:57:32.494Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -374,7 +374,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -382,9 +382,9 @@
     "context": "notification-mint-changes",
     "page": "notification-mint-changes",
     "file": "source/screenshots/ios/notification-mint-changes.png",
-    "run": "run-2026-09-16T03-15-24-568Z-b23676a7",
-    "sha256": "fd9c00a1cd46c0c26c7133edaf62181ab6181f8d6a70bdc1d0ac2a160a64fe19",
-    "capturedAt": "2026-09-16T03:15:24.569Z",
+    "run": "run-2026-09-16T22-00-47-270Z-f4b8cb36",
+    "sha256": "1a7e93c3e5204f3e2910a0b237656b442b37e6f4aa25005c7cde50d629776ac3",
+    "capturedAt": "2026-09-16T22:00:47.272Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -399,7 +399,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -407,9 +407,9 @@
     "context": "mint-reviews",
     "page": "mint-reviews",
     "file": "source/screenshots/ios/mint-reviews.png",
-    "run": "run-2026-09-16T03-15-24-568Z-b23676a7",
+    "run": "run-2026-09-16T22-00-47-270Z-f4b8cb36",
     "sha256": "0013667fe9ad2f52154aa4a3d04d153cefd02b518ff9c647a35ab1e98ac089af",
-    "capturedAt": "2026-09-16T03:15:24.569Z",
+    "capturedAt": "2026-09-16T22:00:47.272Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -424,7 +424,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -432,9 +432,9 @@
     "context": "notifications",
     "page": "notifications",
     "file": "source/screenshots/ios/notifications.png",
-    "run": "run-2026-09-16T01-02-27-836Z-f8d2a983",
-    "sha256": "2467b39e5be300723703ea59d9d753a9da95be2321f4f772c72fecddc3f909e0",
-    "capturedAt": "2026-09-16T01:02:27.839Z",
+    "run": "run-2026-09-16T20-57-32-489Z-df256961",
+    "sha256": "7798f2afe35a545582417bcccb5092953eb23c548f873468c1b98b2ffd63dd86",
+    "capturedAt": "2026-09-16T20:57:32.494Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -449,7 +449,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -457,9 +457,9 @@
     "context": "settings",
     "page": "settings",
     "file": "source/screenshots/ios/settings.png",
-    "run": "run-2026-09-16T01-02-27-836Z-f8d2a983",
-    "sha256": "910b2f5e940fccb1f4fb640a8a573ec75765201f989a1249536bd3f34b2e2523",
-    "capturedAt": "2026-09-16T01:02:27.839Z",
+    "run": "run-2026-09-16T20-57-32-489Z-df256961",
+    "sha256": "bf365f4857f64a62697d02b7d880bbf1a2877152df8bf351470c284451902a24",
+    "capturedAt": "2026-09-16T20:57:32.494Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -474,7 +474,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -482,9 +482,9 @@
     "context": "theme-preview",
     "page": "theme-preview",
     "file": "source/screenshots/ios/theme-preview.png",
-    "run": "run-2026-09-16T01-56-55-649Z-bcd0e946",
-    "sha256": "0ff07f0a25d027bd3addb08609ee2ca8af701e4a5a1a3c71bb0a6cd3839eee53",
-    "capturedAt": "2026-09-16T01:56:55.650Z",
+    "run": "run-2026-09-16T21-08-22-070Z-499c1265",
+    "sha256": "d32ecb2ee45d06d3a4218a48af686b5876be0490ca43e8cae72169ce8cb2d4bc",
+    "capturedAt": "2026-09-16T21:08:22.071Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -499,7 +499,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -507,9 +507,9 @@
     "context": "gallery",
     "page": "gallery",
     "file": "source/screenshots/ios/gallery.png",
-    "run": "run-2026-09-16T01-56-55-649Z-bcd0e946",
+    "run": "run-2026-09-16T21-08-22-070Z-499c1265",
     "sha256": "cd78d0b923fc2a9efe6a6b6422c63bde377dbb488c0dd00c604dca8355869a36",
-    "capturedAt": "2026-09-16T01:56:55.650Z",
+    "capturedAt": "2026-09-16T21:08:22.071Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -524,7 +524,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -532,9 +532,9 @@
     "context": "stories",
     "page": "stories",
     "file": "source/screenshots/ios/stories.png",
-    "run": "run-2026-09-16T02-27-55-807Z-d5f25e2c",
-    "sha256": "6291588d3a24b7732bc275f463a3d0b1c42e40c5d17e2646ed62ea10d89b682c",
-    "capturedAt": "2026-09-16T02:27:55.808Z",
+    "run": "run-2026-09-16T21-17-59-280Z-871711f7",
+    "sha256": "cc8dace7604e3afba86a7a82858412c0f63eb861bb88312333973b185c1defa7",
+    "capturedAt": "2026-09-16T21:17:59.282Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -549,7 +549,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -557,9 +557,9 @@
     "context": "image-viewer",
     "page": "image-viewer",
     "file": "source/screenshots/ios/image-viewer.png",
-    "run": "run-2026-09-16T02-27-55-807Z-d5f25e2c",
+    "run": "run-2026-09-16T21-17-59-280Z-871711f7",
     "sha256": "02097c63e4fb279766a774a7b5dba998c7eb81ad0ce75a7373998441d62cfac2",
-    "capturedAt": "2026-09-16T02:27:55.808Z",
+    "capturedAt": "2026-09-16T21:17:59.282Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -574,7 +574,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -582,9 +582,9 @@
     "context": "ai-model-picker",
     "page": "ai",
     "file": "source/screenshots/ios/ai-model-picker.png",
-    "run": "run-2026-09-16T01-02-27-836Z-f8d2a983",
-    "sha256": "a2673cb73270c5e3bd13482ab12432656de5b0fdbe68fbb7286dfa6b7062d6b4",
-    "capturedAt": "2026-09-16T01:02:27.839Z",
+    "run": "run-2026-09-16T20-57-32-489Z-df256961",
+    "sha256": "32e56ac883776cfde53a2d0d1e050bc0ce4be62ecd1f7331f0df37daa329c4ee",
+    "capturedAt": "2026-09-16T20:57:32.494Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -599,7 +599,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -608,9 +608,9 @@
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-navy.png",
     "wallpaperId": "navy",
-    "run": "run-2026-09-16T01-56-55-649Z-bcd0e946",
-    "sha256": "b936e000701231bf53f0a20033012dc6e260361b4498bd13c7be4dc667e41dd3",
-    "capturedAt": "2026-09-16T01:56:55.650Z",
+    "run": "run-2026-09-16T21-08-22-070Z-499c1265",
+    "sha256": "80ff639c1c3df66c9b085601a2d38317ed96d81380d4d2522d780f1f33b9a9d4",
+    "capturedAt": "2026-09-16T21:08:22.071Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -625,7 +625,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -634,9 +634,9 @@
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-sunset.png",
     "wallpaperId": "sunset",
-    "run": "run-2026-09-16T01-56-55-649Z-bcd0e946",
-    "sha256": "5de70eee987efdc42608935a648289766d8fc7a322bb1a91d77b889e6fee74ab",
-    "capturedAt": "2026-09-16T01:56:55.650Z",
+    "run": "run-2026-09-16T21-08-22-070Z-499c1265",
+    "sha256": "cf3e2f49616e7884703ff3db009590ed23b51fee61221f06916a8175a53ab032",
+    "capturedAt": "2026-09-16T21:08:22.071Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -651,7 +651,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -660,9 +660,9 @@
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-beige.png",
     "wallpaperId": "beige",
-    "run": "run-2026-09-16T01-56-55-649Z-bcd0e946",
-    "sha256": "530702f28339ae4e3d86e3fe6c35bc9b0d8847bb4d7ab06f4d7d5cff8e30debd",
-    "capturedAt": "2026-09-16T01:56:55.650Z",
+    "run": "run-2026-09-16T21-08-22-070Z-499c1265",
+    "sha256": "023e04d3f2c6f80a0984342efd9f89ad74a28d06051f5e49f14ba5e86c6cfe68",
+    "capturedAt": "2026-09-16T21:08:22.071Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -677,7 +677,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -709,9 +709,9 @@
     "context": "thread",
     "page": "thread",
     "file": "source/screenshots/android/thread.png",
-    "run": "run-2026-09-16T03-34-49-608Z-e5f6a83a",
-    "sha256": "9b046b8a2ab810679a8417da6eed2ddaaf17a0128ec13ebb74edc8252117c3f8",
-    "capturedAt": "2026-09-16T03:34:49.612Z",
+    "run": "run-2026-09-16T21-24-23-342Z-e1212146",
+    "sha256": "028c01aabf3720bc66e168b88b8dd9f140be9c875b2e081a3fb6970459c8144c",
+    "capturedAt": "2026-09-16T21:24:23.343Z",
     "capture": {
       "width": 1080,
       "height": 2400
@@ -726,7 +726,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -972,9 +972,9 @@
     "context": "stories",
     "page": "stories",
     "file": "source/screenshots/android/stories.png",
-    "run": "run-2026-09-16T03-34-49-608Z-e5f6a83a",
-    "sha256": "93050bcaab165aed2929c97b188cea13698c37c13e87c5c46d3d614e30cfcec1",
-    "capturedAt": "2026-09-16T03:34:49.612Z",
+    "run": "run-2026-09-16T21-24-23-342Z-e1212146",
+    "sha256": "79c7d3c552880b6c28325e4e82c0c9bec09c9003bacba7731dfc99af3b21923b",
+    "capturedAt": "2026-09-16T21:24:23.343Z",
     "capture": {
       "width": 1080,
       "height": 2400
@@ -989,7 +989,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -997,9 +997,9 @@
     "context": "image-viewer",
     "page": "image-viewer",
     "file": "source/screenshots/android/image-viewer.png",
-    "run": "run-2026-09-16T03-34-49-608Z-e5f6a83a",
-    "sha256": "e1326780abc20eb234cdfa1aa578cc703343179ad6cdb1c2ad399f9ba55e4135",
-    "capturedAt": "2026-09-16T03:34:49.612Z",
+    "run": "run-2026-09-16T21-24-23-342Z-e1212146",
+    "sha256": "c42244b8e8ca28353af4fcbcdd239d93d2485aa02f942c046eadcd069c81ba7f",
+    "capturedAt": "2026-09-16T21:24:23.343Z",
     "capture": {
       "width": 1080,
       "height": 2400
@@ -1014,7 +1014,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -1083,9 +1083,9 @@
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-in-eclipse.png",
     "wallpaperId": "in-eclipse",
-    "run": "run-2026-09-16T01-56-55-649Z-bcd0e946",
-    "sha256": "3c96127ce14fe0a5bc02fbbb1e1ab679fbc8c647c5c33b6ae2ec1264c977c87f",
-    "capturedAt": "2026-09-16T01:56:55.650Z",
+    "run": "run-2026-09-16T21-08-22-070Z-499c1265",
+    "sha256": "7e1e0561988246a1a00e9a6d2d4b9e47abef5ac7d1b5d345624c586a379b86c8",
+    "capturedAt": "2026-09-16T21:08:22.071Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -1100,7 +1100,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -1109,9 +1109,9 @@
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-looking-back-at-earth.png",
     "wallpaperId": "looking-back-at-earth",
-    "run": "run-2026-09-16T01-56-55-649Z-bcd0e946",
-    "sha256": "d3ec003b3b9d031c02dfa3dd59130114a752f0bc367717440795aa662de21d1f",
-    "capturedAt": "2026-09-16T01:56:55.650Z",
+    "run": "run-2026-09-16T21-08-22-070Z-499c1265",
+    "sha256": "ddbc8e21cab87ad1bd4fc78913bad1678ef2c189bedfe32b82a56e83711fca2b",
+    "capturedAt": "2026-09-16T21:08:22.071Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -1126,7 +1126,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -1135,9 +1135,9 @@
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-edge-of-lunar-day.png",
     "wallpaperId": "edge-of-lunar-day",
-    "run": "run-2026-09-16T01-56-55-649Z-bcd0e946",
-    "sha256": "083add3819d2b728beb959cf751f51a8f3244b3db833773d88bc463c6a27a505",
-    "capturedAt": "2026-09-16T01:56:55.650Z",
+    "run": "run-2026-09-16T21-08-22-070Z-499c1265",
+    "sha256": "127db9a8b4362a5904cfe7be47f595c79a1b33bb70a32e91b08b9655151f8429",
+    "capturedAt": "2026-09-16T21:08:22.071Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -1152,7 +1152,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -1161,9 +1161,9 @@
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-setting-earth.png",
     "wallpaperId": "setting-earth",
-    "run": "run-2026-09-16T01-56-55-649Z-bcd0e946",
-    "sha256": "e94e74cbebfc046e8cf18e09c4f63bdf716daa3c5dfb077a06a438122dded8f2",
-    "capturedAt": "2026-09-16T01:56:55.650Z",
+    "run": "run-2026-09-16T21-08-22-070Z-499c1265",
+    "sha256": "2b8230e36db7104f67a0160f3b7362aae16eb2e764a83cdb6bc9dc4872a9d590",
+    "capturedAt": "2026-09-16T21:08:22.071Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -1178,7 +1178,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -1186,9 +1186,9 @@
     "context": "backup-words",
     "page": "backup-words",
     "file": "source/screenshots/ios/backup-words.png",
-    "run": "run-2026-09-16T03-48-18-705Z-f416c36e",
+    "run": "run-2026-09-16T21-43-50-501Z-403974e4",
     "sha256": "8e24661fdbf1204bc303f6ca492173ada41a798acbdd45405a0dce865ed72f81",
-    "capturedAt": "2026-09-16T03:48:18.707Z",
+    "capturedAt": "2026-09-16T21:43:50.502Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -1203,7 +1203,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -1259,9 +1259,9 @@
     "context": "backup-words",
     "page": "backup-words",
     "file": "source/screenshots/android/backup-words.png",
-    "run": "run-2026-09-16T03-55-18-204Z-1457f85b",
-    "sha256": "548fceedfb8b73d4a92cb3a5fe83fd35137327fd58e72d359dbb2a5209332d57",
-    "capturedAt": "2026-09-16T03:55:18.205Z",
+    "run": "run-2026-09-16T22-08-46-240Z-1f832d03",
+    "sha256": "904d52316b1efce0134a6d579b5f1c57fc04be5486520e018bbddf1748241527",
+    "capturedAt": "2026-09-16T22:08:46.242Z",
     "capture": {
       "width": 1080,
       "height": 2400
@@ -1276,7 +1276,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },
@@ -1285,9 +1285,9 @@
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-new-moon.png",
     "wallpaperId": "new-moon",
-    "run": "run-2026-09-16T01-56-55-649Z-bcd0e946",
-    "sha256": "bf3dada10e1eb6bc6789993421380fb2912ea87698fb0c51e4cb7b474ed65b06",
-    "capturedAt": "2026-09-16T01:56:55.650Z",
+    "run": "run-2026-09-16T21-08-22-070Z-499c1265",
+    "sha256": "f9229590c5a4820ea27292763eef34166a9e943750508983d2701a02abb6b0bc",
+    "capturedAt": "2026-09-16T21:08:22.071Z",
     "capture": {
       "width": 1320,
       "height": 2868
@@ -1302,7 +1302,7 @@
     },
     "appSource": {
       "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
+      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
       "gitDirty": true
     }
   },

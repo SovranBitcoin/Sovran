@@ -20,11 +20,13 @@ export function resolveScene({
   preset,
   screenshots,
   poses,
+  shadow,
 }: {
   scene?: keyof typeof pageScenes;
   preset?: string;
   screenshots?: string[];
   poses?: Record<string, number>[];
+  shadow?: Record<string, string | number>;
 }) {
   const selection =
     scene && Object.hasOwn(pageScenes, scene) ? pageScenes[scene] : undefined;
@@ -36,6 +38,6 @@ export function resolveScene({
         throw new Error(`Unreviewed screenshot: ${key}`);
       return { ...captures[key], frameId: selection?.phones[index]?.frameId };
     }),
-    { preset: preset ?? selection?.preset ?? "custom", poses: poses ?? (selection?.phones.some(phone => phone.pose) ? selection.phones.map((phone, index) => ({ ...SCENE_PRESETS[selection.preset].poses[index], ...phone.pose })) : undefined) },
+    { preset: preset ?? selection?.preset ?? "custom", shadow, poses: poses ?? (selection?.phones.some(phone => phone.pose) ? selection.phones.map((phone, index) => ({ ...SCENE_PRESETS[selection.preset].poses[index], ...phone.pose })) : undefined) },
   );
 }

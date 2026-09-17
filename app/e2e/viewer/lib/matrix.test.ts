@@ -28,8 +28,8 @@ const crossDriverCapabilities = CAPABILITIES.filter(
 describe('real full-suite platform matrix', () => {
   test('exposes every CLI-supported scenario/platform pair exactly once', async () => {
     expect(loaded.issues).toEqual([]);
-    expect(scenarios).toHaveLength(153);
-    expect(new Set(scenarios.map(({ id }) => id)).size).toBe(153);
+    expect(scenarios).toHaveLength(157);
+    expect(new Set(scenarios.map(({ id }) => id)).size).toBe(157);
 
     const expectedById = new Map(
       scenarios.map((scenario) => [scenario.id, effectivePlatforms(scenario)])
@@ -39,12 +39,12 @@ describe('real full-suite platform matrix', () => {
     const expectedPairs = scenarios.flatMap((scenario) =>
       effectivePlatforms(scenario).map((platform) => pair(scenario.id, platform))
     );
-    expect(expectedPairs).toHaveLength(264);
-    expect(new Set(expectedPairs).size).toBe(264);
+    expect(expectedPairs).toHaveLength(272);
+    expect(new Set(expectedPairs).size).toBe(272);
 
     const catalog = (await buildCatalog()).filter((entry) => entry.suites.includes('full'));
-    expect(catalog).toHaveLength(153);
-    expect(new Set(catalog.map(({ id }) => id)).size).toBe(153);
+    expect(catalog).toHaveLength(157);
+    expect(new Set(catalog.map(({ id }) => id)).size).toBe(157);
     expect(catalog.map(({ id }) => id).sort()).toEqual(scenarios.map(({ id }) => id).sort());
 
     for (const entry of catalog) {
@@ -55,8 +55,8 @@ describe('real full-suite platform matrix', () => {
     const viewerPairs = catalog.flatMap((entry) =>
       entry.platforms.map((platform) => pair(entry.id, platform))
     );
-    expect(viewerPairs).toHaveLength(264);
-    expect(new Set(viewerPairs).size).toBe(264);
+    expect(viewerPairs).toHaveLength(272);
+    expect(new Set(viewerPairs).size).toBe(272);
     expect(viewerPairs.sort()).toEqual(expectedPairs.sort());
 
     const physicalLaneIds = scenarios
@@ -64,8 +64,8 @@ describe('real full-suite platform matrix', () => {
       .map(({ id }) => id);
 
     const platformCases = [
-      ['ios', DRIVER_CAPS.sim, 142],
-      ['android', DRIVER_CAPS.android, 118],
+      ['ios', DRIVER_CAPS.sim, 146],
+      ['android', DRIVER_CAPS.android, 122],
     ] as const;
     for (const [platform, driverCapabilities, expectedCount] of platformCases) {
       const capabilities = new Set([...driverCapabilities, ...crossDriverCapabilities]);
@@ -97,7 +97,7 @@ describe('real full-suite platform matrix', () => {
         entry.platforms.includes('ios') &&
         entry.platforms.includes('android')
     );
-    expect(both).toHaveLength(111);
+    expect(both).toHaveLength(115);
 
     for (const entry of both) {
       const plan = buildRunPlan(

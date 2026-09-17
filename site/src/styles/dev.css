@@ -34,7 +34,10 @@
 .composition-output { position: sticky; top: 20px; min-width: 0; }
 .composition-preview { display: grid; place-items: center; min-height: 260px; background: #22251f; }
 .composition-preview p { padding: 24px; }
-.composition-preview img { width: 100%; height: auto; max-height: 72svh; object-fit: contain; }
+.composition-preview img { width: 100%; height: auto; max-height: 72svh; object-fit: contain; transition: opacity 120ms linear; }
+/* The image on screen no longer matches the recipe being edited. */
+.composition-preview[data-stale='true'] img { opacity: 0.45; }
+@media (prefers-reduced-motion: reduce) { .composition-preview img { transition: none; } }
 .composition-output pre { max-height: 350px; overflow: auto; }
 @media (max-width: 800px) {
   .social-editor { grid-template-columns: 1fr; }

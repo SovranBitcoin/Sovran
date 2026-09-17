@@ -1,0 +1,24 @@
+{
+  "id": "settings",
+  "platform": "ios",
+  "screenshots": [
+    "settings",
+    "theme-preview",
+    "backup-words",
+    "settings-keyring"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "settings"
+}

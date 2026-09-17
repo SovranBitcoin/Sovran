@@ -39,6 +39,15 @@ export function continuousPath(width, height, radius) {
     c ${c} ${-d} ${b + c} ${-d} ${a + b + c} ${-d} Z`;
 }
 
+// The border between the display and the outside of the body is calibrated from
+// published dimensions, but how that border DIVIDES between the display's black
+// mask and the frame's bright chamfer is not published, so this share is an
+// illustrative choice. It is load-bearing all the same: a dark capture against
+// an all-black bezel has no visible edge, so the eye reads the bezel as part of
+// the screenshot and the app looks wider than it is. The chamfer and the glass
+// edge below are what keep the capture's own boundary legible.
+export const FRAME_RAIL_SHARE = 0.3;
+
 export const FRAME_IDS = Object.freeze({
   ios: ['iphone-17-pro', 'iphone-17-pro-max'],
   android: ['android-emulator'],
@@ -169,15 +178,33 @@ export function phoneGeometry(
     const origin = project(0, 0, pz);
     return `matrix(${a * scale} ${b * scale} ${c * scale} ${d * scale} ${origin.x} ${origin.y})`;
   };
+  // The rotation's third row, recovered as row1 x row2. A rotation is
+  // orthonormal with determinant +1, so this is the exact camera-depth row of
+  // the SAME matrix the screen and extrusion already use - not a second,
+  // independently authored depth model. Depth is 0 at the screen centre and
+  // positive toward the camera, matching the extrusion's negative thickness.
+  const depthX = c * zy - zx * d;
+  const depthY = zx * b - a * zy;
+  const depthZ = a * d - c * b;
+  const world = (px, py, pz = 0) => {
+    const point = project(px, py, pz);
+    return {
+      ...point,
+      z:
+        scale *
+        (depthX * (px - width / 2) + depthY * (py - height / 2) + depthZ * pz),
+    };
+  };
   const protrusion = bezel + 2.5;
-  const corners = [0, -thickness].flatMap((pz) =>
+  const chassis = [0, -thickness].flatMap((pz) =>
     [
       [-protrusion, -bezel - 1],
       [width + protrusion, -bezel - 1],
       [width + protrusion, height + bezel + 1],
       [-protrusion, height + bezel + 1],
-    ].map(([px, py]) => project(px, py, pz)),
+    ].map(([px, py]) => [px, py, pz]),
   );
+  const corners = chassis.map((point) => project(...point));
   return {
     ...device,
     imageWidth,
@@ -189,23 +216,49 @@ export function phoneGeometry(
     rotateY,
     rotateZ,
     project,
+    world,
     matrix,
+    chassis,
     corners,
+    worldCorners: chassis.map((point) => world(...point)),
     screenWidth: width,
     screenHeight: height,
     screen: continuousPath(width, height, radius),
   };
 }
 
-function sceneBounds(phones, padding = 28) {
+// How far a shadow may push the frame out beyond the devices themselves.
+export const SHADOW_FRAME_LIMIT = 1.3;
+
+function sceneBounds(phones, padding = 28, extra = []) {
   if (!phones.length || !Number.isFinite(padding) || padding < 0)
     throw new Error("Invalid scene bounds");
   const points = phones.flatMap((p) => p.corners);
-  const x = Math.min(...points.map((p) => p.x)) - padding;
-  const y = Math.min(...points.map((p) => p.y)) - padding;
-  const width = Math.max(...points.map((p) => p.x)) - x + padding;
-  const height = Math.max(...points.map((p) => p.y)) - y + padding;
-  return { x, y, width, height, viewBox: `${x} ${y} ${width} ${height}` };
+  // The devices are the subject. A shadow may enlarge the frame, but it must
+  // never slide the phones off its centre, so the frame grows by the same
+  // amount either side of the device centre rather than trailing the light.
+  // Growth is capped: past this the phones would be shrinking to make room for
+  // their own shadow, and a soft tail is the right thing to lose at the edge.
+  const span = (axis) => {
+    const min = Math.min(...points.map((p) => p[axis])) - padding;
+    const max = Math.max(...points.map((p) => p[axis])) + padding;
+    const centre = (min + max) / 2;
+    const devices = max - centre;
+    const reach = Math.min(
+      Math.max(devices, ...extra.map((p) => Math.abs(p[axis] - centre) + padding)),
+      devices * SHADOW_FRAME_LIMIT,
+    );
+    return { min: centre - reach, size: 2 * reach };
+  };
+  const x = span("x"),
+    y = span("y");
+  return {
+    x: x.min,
+    y: y.min,
+    width: x.size,
+    height: y.size,
+    viewBox: `${x.min} ${y.min} ${x.size} ${y.size}`,
+  };
 }
 
 const pose = (
@@ -217,6 +270,56 @@ const pose = (
   z = 0,
   scale = 1,
 ) => ({ x, y, rotateZ, rotateY, rotateX, z, scale });
+
+/**
+ * A rotated lattice. Every phone carries the same roll, and the centres sit on
+ * a grid whose basis vectors carry that same rotation, so rows and columns stay
+ * parallel to the phone edges at any angle - the repeating contact-sheet
+ * mosaic, rather than per-phone nudges that only look aligned. `stagger` shifts
+ * alternating columns by a fraction of the vertical stride for a brick lattice.
+ * Strides are lattice pitch, so a stride above the chassis footprint
+ * (471 x 987 reference units) is a gap and anything below it is an overlap.
+ * The lattice is centred on its own centroid, so the composition does not drift
+ * as columns or rows are added.
+ */
+const mosaic = (
+  angle,
+  columns,
+  rows,
+  strideX,
+  strideY,
+  { stagger = 0, rotateY = 0, rotateX = 0, scale = 1 } = {},
+) => {
+  if (
+    ![columns, rows].every((n) => Number.isInteger(n) && n > 0) ||
+    ![angle, strideX, strideY, stagger].every(Number.isFinite)
+  )
+    throw new Error("Invalid mosaic lattice");
+  const rad = (angle * Math.PI) / 180;
+  const cos = Math.cos(rad),
+    sin = Math.sin(rad);
+  const cells = Array.from({ length: columns * rows }, (_, i) => ({
+    x: (i % columns) * strideX,
+    y: (Math.floor(i / columns) + ((i % columns) % 2 ? stagger : 0)) * strideY,
+  }));
+  const centre = {
+    x: cells.reduce((sum, cell) => sum + cell.x, 0) / cells.length,
+    y: cells.reduce((sum, cell) => sum + cell.y, 0) / cells.length,
+  };
+  return cells.map(({ x, y }) => {
+    const lx = x - centre.x,
+      ly = y - centre.y;
+    return pose(
+      cos * lx - sin * ly,
+      sin * lx + cos * ly,
+      angle,
+      rotateY,
+      rotateX,
+      0,
+      scale,
+    );
+  });
+};
 // Output canvases are pixels, not camera transforms. Fit the projected scene
 // with xMidYMid meet so the screen and chassis retain one uniform scale.
 export const CANVAS_FORMATS = {
@@ -255,6 +358,28 @@ export const SCENE_PRESETS = {
   },
   "single-flatlay": { name: "Single / flat lay", poses: [pose(0, 0, -90)] },
   "single-tilt": { name: "Single / tilt", poses: [pose(0, 0, 10, -20, 8)] },
+  "single-hero": { name: "Single / hero lean", poses: [pose(0, 0, -2, -16, 6)] },
+  "single-float": { name: "Single / floating", poses: [pose(0, 0, 0, -9, 5)] },
+  "single-flatlay-angled": {
+    name: "Single / angled flat lay",
+    poses: [pose(0, 0, -30)],
+  },
+  "single-isometric-left": {
+    name: "Single / isometric left",
+    poses: [pose(0, 0, -26, -30, 16)],
+  },
+  "single-isometric-right": {
+    name: "Single / isometric right",
+    poses: [pose(0, 0, 26, 30, 16)],
+  },
+  "single-edge-left": {
+    name: "Single / left edge",
+    poses: [pose(0, 0, 0, -52)],
+  },
+  "single-edge-right": {
+    name: "Single / right edge",
+    poses: [pose(0, 0, 0, 52)],
+  },
   "duo-front": {
     name: "Duo / front comparison",
     layout: "row",
@@ -276,6 +401,23 @@ export const SCENE_PRESETS = {
     name: "Duo / depth",
     poses: [pose(0, 0, 12, -24, 10, -1, 0.9), pose(235, 205, 12, -24, 10)],
   },
+  "duo-scissor": {
+    name: "Duo / opposed roll",
+    poses: [pose(0, 0, -12), pose(500, 0, 12)],
+  },
+  "duo-parallel": {
+    name: "Duo / parallel three-quarter",
+    poses: [pose(0, 0, 0, -22, 8), pose(500, 0, 0, -22, 8)],
+  },
+  "duo-stagger": {
+    name: "Duo / staggered pair",
+    poses: [pose(0, -150, -4, -12, 6), pose(505, 150, -4, -12, 6)],
+  },
+  "duo-stack": {
+    name: "Duo / stacked column",
+    poses: [pose(0, -545), pose(0, 545)],
+  },
+  "duo-mosaic": { name: "Duo / rotated mosaic", poses: mosaic(-30, 2, 1, 520, 0) },
   "triple-fan": {
     name: "Triple / fan",
     poses: [
@@ -292,6 +434,34 @@ export const SCENE_PRESETS = {
   "triple-steps": {
     name: "Triple / ascending steps",
     poses: [pose(0, 240, 0, -12), pose(440, 120, 0, -12), pose(880, 0, 0, -12)],
+  },
+  "triple-arc": {
+    name: "Triple / symmetric arc",
+    poses: [
+      pose(-490, 170, -14, -16, 6, -1),
+      pose(0, 0, 0, 0, 6),
+      pose(490, 170, 14, 16, 6, -1),
+    ],
+  },
+  "triple-overlap": {
+    name: "Triple / overlapping deck",
+    poses: [
+      pose(0, 0, -6, -16, 8, -2, 0.92),
+      pose(285, 130, -6, -16, 8, -1, 0.96),
+      pose(570, 260, -6, -16, 8),
+    ],
+  },
+  "triple-column": {
+    name: "Triple / stacked column",
+    poses: [pose(0, -1060), pose(0, 0), pose(0, 1060)],
+  },
+  "triple-diagonal": {
+    name: "Triple / rotated diagonal",
+    poses: mosaic(-28, 3, 1, 520, 0),
+  },
+  "triple-mosaic-stagger": {
+    name: "Triple / staggered mosaic",
+    poses: mosaic(-30, 3, 1, 520, 1055, { stagger: 0.42 }),
   },
   "quartet-grid": {
     name: "Quartet / two by two",
@@ -321,9 +491,213 @@ export const SCENE_PRESETS = {
       pose(960, 300, 10, -28, 12),
     ],
   },
+  "quartet-fan": {
+    name: "Quartet / symmetric fan",
+    poses: [
+      pose(-820, 190, -19, -19, 8, -2),
+      pose(-275, 0, -7, -7, 8, -1),
+      pose(275, 0, 7, 7, 8, -1),
+      pose(820, 190, 19, 19, 8, -2),
+    ],
+  },
+  "quartet-mosaic": {
+    name: "Quartet / rotated mosaic",
+    poses: mosaic(-30, 2, 2, 520, 1055),
+  },
+  "quartet-mosaic-stagger": {
+    name: "Quartet / staggered mosaic",
+    poses: mosaic(-30, 2, 2, 520, 1055, { stagger: 0.5 }),
+  },
+  "quartet-flatlay-row": {
+    name: "Quartet / angled flat-lay row",
+    poses: mosaic(-18, 4, 1, 520, 0),
+  },
 };
 
-export function createScene(captures, { preset = "custom", poses } = {}) {
+// A ground the phones actually stand on, not a drop shadow. The camera is
+// orthographic, the ground is a flat plane and the key light is directional, so
+// the shadow of any device point is an EXACT affine image of that point: one
+// SVG matrix over the same contour the chassis is built from. Nothing here
+// offsets, scales or blurs a copy of the drawn phone.
+export const SHADOW_GROUNDS = Object.freeze({
+  // `pitch` is the plane's tilt away from the image plane. 0 is the table of a
+  // top-down flat lay; a large angle is a floor receding under standing phones.
+  table: Object.freeze({ name: "Table / flat lay", pitch: 0 }),
+  floor: Object.freeze({ name: "Floor / standing", pitch: 62 }),
+});
+export const DEFAULT_SHADOW = Object.freeze({
+  ground: "table",
+  height: 0,
+  softness: 0.6,
+  opacity: 0.38,
+  angle: 62,
+  tilt: 26,
+  samples: 14,
+});
+export const SHADOW_LIMITS = Object.freeze({
+  height: [0, 1.5],
+  softness: [0, 1],
+  opacity: [0, 0.9],
+  angle: [-180, 180],
+  tilt: [0, 70],
+  samples: [1, 24],
+});
+
+const dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+const cross = (a, b) => ({
+  x: a.y * b.z - a.z * b.y,
+  y: a.z * b.x - a.x * b.z,
+  z: a.x * b.y - a.y * b.x,
+});
+const step = (a, b, k) => ({ x: a.x + b.x * k, y: a.y + b.y * k, z: a.z + b.z * k });
+const normalize = (v) => {
+  const length = Math.hypot(v.x, v.y, v.z);
+  if (!(length > 1e-9)) throw new Error("Degenerate direction");
+  return { x: v.x / length, y: v.y / length, z: v.z / length };
+};
+
+/**
+ * Resolve the scene's ground plane and key light. The plane is placed against
+ * the scene's own lowest point, so `height` 0 means resting on it and a
+ * positive height (in chassis heights) means hovering a measured distance above
+ * it - never intersecting it, whatever the poses are.
+ */
+export function groundPlane(phones, settings = {}, chassisHeight = 1) {
+  const value = { ...DEFAULT_SHADOW, ...settings };
+  const spec = SHADOW_GROUNDS[value.ground];
+  if (!spec) throw new Error(`Unknown ground: ${value.ground}`);
+  for (const [key, [min, max]] of Object.entries(SHADOW_LIMITS))
+    if (!Number.isFinite(value[key]) || value[key] < min || value[key] > max)
+      throw new Error(`Shadow ${key} is outside ${min}-${max}`);
+  const pitch = (spec.pitch * Math.PI) / 180;
+  // The plane's normal points back toward the phones and the camera.
+  const normal = { x: 0, y: -Math.sin(pitch), z: Math.cos(pitch) };
+  // An in-plane basis: u runs along the plane's horizon, v recedes into it.
+  const u = { x: 1, y: 0, z: 0 };
+  const v = cross(normal, u);
+  const azimuth = (value.angle * Math.PI) / 180;
+  const tilt = (value.tilt * Math.PI) / 180;
+  // Direction of travel: at tilt 0 the light runs straight down the normal and
+  // the shadow sits directly under the phone.
+  const light = normalize(
+    step(step(step({ x: 0, y: 0, z: 0 }, u, Math.sin(tilt) * Math.cos(azimuth)), v, Math.sin(tilt) * Math.sin(azimuth)), normal, -Math.cos(tilt)),
+  );
+  const offset =
+    Math.min(...phones.flatMap((phone) => phone.worldCorners.map((point) => dot(normal, point)))) -
+    value.height * chassisHeight;
+  return {
+    ...value,
+    normal,
+    light,
+    offset,
+    // Angular radius of the disc source. A point one unit from the plane casts
+    // a penumbra this wide, which is why contact stays sharp and height softens.
+    radius: 2 + value.softness * 20,
+    samples: lightSamples(light, 2 + value.softness * 20, Math.round(value.samples)),
+  };
+}
+
+/**
+ * Equal-area (Vogel) samples of the light's cone. Stacking their shadows is the
+ * penumbra of a disc source, so softness follows the distance to the plane
+ * instead of being a uniform blur applied after the fact.
+ */
+export function lightSamples(light, angularRadius, count) {
+  if (!Number.isInteger(count) || count < 1 || count > 64)
+    throw new Error("Invalid light sample count");
+  const reference = Math.abs(light.z) < 0.9 ? { x: 0, y: 0, z: 1 } : { x: 1, y: 0, z: 0 };
+  const e1 = normalize(cross(light, reference));
+  const e2 = cross(light, e1);
+  const spread = Math.tan((angularRadius * Math.PI) / 180);
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  return Array.from({ length: count }, (_, i) => {
+    const radius = spread * Math.sqrt((i + 0.5) / count);
+    const theta = i * golden;
+    return normalize(step(step(light, e1, radius * Math.cos(theta)), e2, radius * Math.sin(theta)));
+  });
+}
+
+/**
+ * The affine map one light direction makes from a device plane onto the ground.
+ * Orthographic camera + flat plane + directional light is exactly affine, so
+ * this is a matrix, not an approximation. Returns undefined when the light
+ * grazes the plane and the shadow is unbounded.
+ */
+export function shadowMatrix(phone, plane, direction, pz = 0) {
+  const denominator = dot(plane.normal, direction);
+  if (denominator > -0.02) return undefined;
+  const cast = (px, py) => {
+    const point = phone.world(px, py, pz);
+    const t = (plane.offset - dot(plane.normal, point)) / denominator;
+    return { x: point.x + direction.x * t, y: point.y + direction.y * t };
+  };
+  const origin = cast(0, 0);
+  const dx = cast(1, 0);
+  const dy = cast(0, 1);
+  return [dx.x - origin.x, dx.y - origin.y, dy.x - origin.x, dy.y - origin.y, origin.x, origin.y];
+}
+
+const applyMatrix = (m, px, py) => ({ x: m[0] * px + m[2] * py + m[4], y: m[1] * px + m[3] * py + m[5] });
+
+/** Every point a phone's shadow can reach, so the scene's bounds contain it. */
+export function shadowExtent(phones, plane) {
+  const points = [];
+  for (const phone of phones)
+    for (const direction of [...plane.samples, { x: -plane.normal.x, y: -plane.normal.y, z: -plane.normal.z }]) {
+      const matrix = shadowMatrix(phone, plane, direction, -phone.thickness);
+      if (!matrix) continue;
+      for (const [px, py] of phone.chassis) points.push(applyMatrix(matrix, px, py));
+    }
+  return points;
+}
+
+/**
+ * The shadow layers for one phone, painted before ANY phone so a shadow can
+ * never land on a chassis in front of it: the plane is behind them all.
+ *
+ * Each sample is the chassis silhouette - the same contour stroked outward by
+ * the bezel that the shell uses - cast by one direction of the disc light.
+ * Layer alpha is 1-(1-opacity)^(1/n), so full occlusion lands exactly on the
+ * requested opacity while partial occlusion falls off monotonically with the
+ * fraction of the source a point can still see. A small blur only removes the
+ * banding between samples; it is not what makes the shadow soft.
+ */
+export function renderShadow(phone, { id, plane }) {
+  if (!/^[a-zA-Z][\w-]*$/.test(id)) throw new Error("Invalid shadow ID");
+  const directions = [
+    ...plane.samples.map((direction) => ({ direction, weight: 1 })),
+    // The ambient term: a hemisphere's worth of light is blocked straight down
+    // the normal, which is the tight contact darkening under the chassis.
+    { direction: { x: -plane.normal.x, y: -plane.normal.y, z: -plane.normal.z }, weight: 0.45 },
+  ];
+  const casts = directions
+    .map(({ direction, weight }) => ({ matrix: shadowMatrix(phone, plane, direction, -phone.thickness), weight }))
+    .filter((cast) => cast.matrix);
+  if (!casts.length) return "";
+  const alpha = 1 - (1 - plane.opacity) ** (1 / plane.samples.length);
+  const origins = casts.map((cast) => ({ x: cast.matrix[4], y: cast.matrix[5] }));
+  const centre = {
+    x: origins.reduce((sum, point) => sum + point.x, 0) / origins.length,
+    y: origins.reduce((sum, point) => sum + point.y, 0) / origins.length,
+  };
+  const penumbra = Math.max(...origins.map((point) => Math.hypot(point.x - centre.x, point.y - centre.y)));
+  const blur = Math.max(1.5, (penumbra / plane.samples.length) * 1.4);
+  const layers = casts
+    .map(
+      ({ matrix, weight }) =>
+        `<use href="#${id}-silhouette" transform="matrix(${matrix.join(" ")})" fill="#000" stroke="#000" stroke-width="${phone.bezel * 2}" stroke-linejoin="round" fill-opacity="${alpha * weight}" stroke-opacity="${alpha * weight}"/>`,
+    )
+    .join("");
+  return `<g class="phone-shadow" data-phone="${phone.index ?? 0}" aria-hidden="true" filter="url(#${id}-soften)">
+    <defs>
+      <path id="${id}-silhouette" d="${phone.screen}"/>
+      <filter id="${id}-soften" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="${blur}"/></filter>
+    </defs>
+    ${layers}
+  </g>`;
+}
+
+export function createScene(captures, { preset = "custom", poses, shadow } = {}) {
   if (!Array.isArray(captures) || !captures.length)
     throw new Error("Choose at least one screenshot");
   const definition = Object.hasOwn(SCENE_PRESETS, preset)
@@ -411,7 +785,10 @@ export function createScene(captures, { preset = "custom", poses } = {}) {
       };
     })
     .sort((a, b) => a.z - b.z || a.index - b.index);
-  return { phones, ...sceneBounds(phones) };
+  // Shadows widen the scene, so they are part of the bounds rather than
+  // something the viewBox clips off at the edges.
+  const ground = shadow ? groundPlane(phones, shadow, chassisHeight) : undefined;
+  return { phones, ...(ground ? { ground } : {}), ...sceneBounds(phones, 28, ground ? shadowExtent(phones, ground) : []) };
 }
 
 const escape = (value) =>
@@ -474,12 +851,14 @@ export function renderPhone(
       <path id="${id}-contour" d="${screen}"/>
       <linearGradient id="${id}-metal" x1="0" y1="0" x2="1" y2=".65"><stop stop-color="#383b37"/><stop offset=".5" stop-color="#252724"/><stop offset="1" stop-color="#40433e"/></linearGradient>
       <linearGradient id="${id}-rim" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#74786f"/><stop offset=".5" stop-color="#444840"/><stop offset="1" stop-color="#696e63"/></linearGradient>
+      <linearGradient id="${id}-edge" x1="0" y1="0" x2=".7" y2="1"><stop stop-color="#9aa093"/><stop offset=".45" stop-color="#5b6056"/><stop offset="1" stop-color="#8b9184"/></linearGradient>
       <clipPath id="${id}-screen" clipPathUnits="userSpaceOnUse"><path d="${screen}"/></clipPath>
     </defs>
     ${layers}${hardware}
     <g class="phone-front" transform="${matrix(0)}">
       ${surface(bezel, `url(#${id}-rim)`)}
-      ${surface(bezel - 1, "#050606")}
+      ${surface(bezel * (1 - FRAME_RAIL_SHARE), "#050606")}
+      ${surface(Math.min(1.1, bezel * 0.09), `url(#${id}-edge)`)}
       ${underlay}
       <image class="phone-screen" width="${width}" height="${height}" href="${escape(href)}" preserveAspectRatio="none" clip-path="url(#${id}-screen)" data-source-width="${phone.imageWidth ?? width}" data-source-height="${phone.imageHeight ?? height}" data-radius="${phone.radius}"/>
     </g>

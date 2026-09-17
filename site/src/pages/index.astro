@@ -7,7 +7,7 @@ import { siteCopy } from '../../../copy/src/site';
 <Page>
   <section id="hero" class="hero">
     <div class="hero-grid wrap">
-      <div class="hero-copy"><h1>{siteCopy.hero.title}</h1><div class="hero-actions"><a class="button" href="#download">{siteCopy.hero.action}</a><a class="button secondary" href="https://github.com/SovranBitcoin/Sovran" rel="noreferrer">View the code</a></div></div>
+      <div class="hero-copy"><h1>{siteCopy.hero.title}</h1><div class="hero-actions"><a class="button" href="#download">{siteCopy.hero.action}</a><a class="link-out" href="https://github.com/SovranBitcoin/Sovran" rel="noreferrer">Read the source<svg class="arrow-out" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.4 11.6 11.6 4.4" /><path d="M5.6 4.4h6v6" /></svg></a></div></div>
       <PhoneScene scene="hero" />
     </div>
   </section>
@@ -30,6 +30,6 @@ import { siteCopy } from '../../../copy/src/site';
     <ul class="stack-list">{siteCopy.stack.items.map(item => <li><strong>{item.name}</strong><span>{item.role}</span></li>)}</ul>
     <a class="stack-source" href="https://github.com/SovranBitcoin/Sovran" rel="noreferrer">Explore the source and licenses</a>
   </div></section>
-  <section id="faq" class="faq section"><div class="wrap"><p class="kicker">FAQ</p><h2>Plain answers.</h2><div class="faq-list">{siteCopy.faq.map(item => <details><summary>{item.question}</summary><p>{item.answer}</p>{'links' in item && item.links.map(link => <p><a href={link.href}>{link.label}</a></p>)}</details>)}</div></div></section>
+  <section id="faq" class="faq section"><div class="wrap"><p class="kicker">FAQ</p><h2>Plain answers.</h2><div class="faq-list">{siteCopy.faq.map(item => <details><summary>{item.question}<svg class="disclose" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 10h14" /><path class="disclose-v" d="M10 3v14" /></svg></summary><p>{item.answer}</p>{'links' in item && item.links.map(link => <p><a href={link.href}>{link.label}</a></p>)}</details>)}</div></div></section>
   <section id="download" class="download-section section"><div class="wrap"><Downloads /><aside class="download-risk"><h3>Start small.</h3><p>{siteCopy.risk}</p><a href="/terms">Understand the risks</a></aside></div></section>
 </Page>

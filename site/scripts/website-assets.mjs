@@ -3,7 +3,7 @@ import { lstat, mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from 
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildSourceCatalog, readSourceFile, sha256 } from './source-catalog.mjs';
-import { renderComposition } from './composition.mjs';
+import { renderComposition, rasterize } from './composition.mjs';
 import { resolveCapture } from './composition-recipe.mjs';
 import { websiteRecipes } from './website-config.mjs';
 
@@ -82,13 +82,14 @@ export async function generateWebsiteAssets({ repoRoot = root, check = false } =
       assert.equal(result.provenance.draft, false, 'Public outputs must never contain draft artwork.');
       assert.equal(result.provenance.imageLabel, null, 'Public outputs must not carry provenance text in their pixels.');
       assert(result.provenance.captures.every(capture => capture.freshness === 'current'), 'Renderer returned non-current captures.');
-      assert.equal(result.png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
-      assert.equal(result.png.readUInt32BE(16), selected.recipe.width);
-      assert.equal(result.png.readUInt32BE(20), selected.recipe.height);
-      const hash = sha256(result.png);
+      const png = await rasterize(result.svg);
+      assert.equal(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+      assert.equal(png.readUInt32BE(16), selected.recipe.width);
+      assert.equal(png.readUInt32BE(20), selected.recipe.height);
+      const hash = sha256(png);
       outputs[selected.output] = { recipeSha256: selected.recipeSha256, sourceSha256: selected.sourceSha256, sha256: hash, provenance: result.provenance };
       images['og.png'] = hash;
-      await writeFile(join(staged, 'og.png'), result.png);
+      await writeFile(join(staged, 'og.png'), png);
     }
     const manifest = { version: 1, renderer: 'composition-v1', appSourceFingerprint: status.fingerprint, outputs, images };
     await writeFile(join(staged, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');

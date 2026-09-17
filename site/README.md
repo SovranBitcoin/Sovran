@@ -42,9 +42,23 @@ for capture commands, evidence classes, retention and editing.
   attempt, freshness, blockers and downloads.
 - `/logos`: layout/colorway groups with ordered PNG sizes and SVG downloads.
 - `/social`: related-screen concept gallery and editable compositions. Text,
-  frame, screenshots, platform, placement, scale and canvas are recipe inputs.
+  frame, screenshots, platform, placement, scale, ground and canvas are recipe
+  inputs. Filters pick one subject (a named capture state, such as a single
+  mint carried across its details, reviews and updates) and one arrangement, so
+  every preset and every per-subject combination is reachable without hand
+  editing a recipe.
 - `/mockups`: the website's explicitly selected compositions and output status.
 - `/scenes`: advanced geometry reference and explicit legacy scene exports.
+
+Composition layout is measured, not assumed. The renderer tries the copy above
+the stage and beside it, and keeps whichever renders the phones larger, so a
+tall subject never sits in a wide empty band and a wide one never squeezes under
+a column of copy. Display copy is set as large as its measure allows and wrapped
+at the narrowest measure that costs the same number of lines, which is what
+keeps a lone word off the last line. Subtitles are held to a readable measure
+rather than the full width of the canvas, and a caveat belongs in the recipe's
+footnote, set quietly at the foot of the image: a disclosure set at the size and
+weight of a benefit competes with it and stops the subtitle reading as one.
 
 Social preview and download use the same final SVG and rasterization. Edits live
 in the URL fragment or exported/imported JSON. No PNG inventory or repository
@@ -78,7 +92,18 @@ manifest-owned historical outputs; it leaves user exports and source images alon
 
 `scripts/lib/phone-frame.mjs` owns calibrated capture planes and orthographic
 phone geometry. Native aspect ratios are preserved; incompatible explicit frames
-are rejected. These are screenshot-based illustrations, not manufacturer CAD or
+are rejected: the capture is mapped onto the display rect one to one, and a
+circle in a capture measures as a circle in the output. The border between
+display and body is calibrated from published dimensions, but how it divides
+between the black mask and the frame's chamfer is an illustrative choice
+(`FRAME_RAIL_SHARE`), and the hairline glass edge inside it is load-bearing: an
+all-black bezel gives a dark capture no visible boundary, so the eye reads the
+bezel as screen and the app appears about 6% wider than it is. An optional ground is a real plane placed against the scene's own
+lowest point, lit by one directional source sampled across its disc: each shadow
+is that light's exact affine projection of the chassis contour, so contact stays
+sharp, height softens it, and the throw equals the height times the tangent of
+the light's tilt. It is a projection, never a blurred copy of the drawn phone.
+These are screenshot-based illustrations, not manufacturer CAD or
 physically based renders. The continuous-corner construction derives from
 `react-native-fast-squircle@1.1.5`; its MIT notice remains in `public/licenses/`.
 Mona Sans retains its OFL notice. The repository license remains MPL-2.0, not the

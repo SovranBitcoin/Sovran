@@ -1,0 +1,24 @@
+{
+  "id": "messaging",
+  "platform": "ios",
+  "screenshots": [
+    "contacts",
+    "dm-chat",
+    "feed",
+    "thread"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "messaging"
+}

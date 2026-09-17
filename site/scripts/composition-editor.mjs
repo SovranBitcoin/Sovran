@@ -1,5 +1,6 @@
 import { element, fetchSources } from './catalog-browser.mjs';
-import { BRAND_LOCKUPS, BRAND_PLACEMENTS, DEFAULT_BRAND, POSE_LIMITS, validateRecipe, recipeHash, recipeFromHash, resolveCapture } from './composition-recipe.mjs';
+import { BRAND_LOCKUPS, BRAND_PLACEMENTS, DEFAULT_BRAND, POSE_LIMITS, SHADOW_FIELDS, validateRecipe, recipeHash, recipeFromHash, resolveCapture } from './composition-recipe.mjs';
+import { DEFAULT_SHADOW, SHADOW_GROUNDS } from '../../scripts/lib/phone-frame.mjs';
 
 export function mountCompositionEditor() {
   const get = id => document.getElementById(id);
@@ -7,10 +8,23 @@ export function mountCompositionEditor() {
   const gallery = get('concept-gallery'), form = get('composition-form');
   const download = get('download-composition'), preview = get('composition-preview');
   let catalog, recipe, revision = 0, renderBusy = false, galleryBusy = false, editorWaiting = false;
-  let outputUrl;
+  let outputUrl, renderTimer, renderedRevision = -1;
   const thumbnailUrls = new Set();
   let cards = [], observer;
-  const presetNames = ['single-tilt', 'duo-mirror', 'triple-fan', 'quartet-grid'];
+  // One signature arrangement per phone count is what the gallery shows by
+  // default; the Layout filter swaps in any single arrangement from the library
+  // so every one of them is reachable without hand-editing a recipe.
+  const signaturePresets = ['single-tilt', 'duo-mirror', 'triple-fan', 'quartet-grid'];
+  const shadowKeys = SHADOW_FIELDS.filter(field => field !== 'ground');
+  // The renderer gives the phones either the full width under the copy or about
+  // half of it beside the copy. An arrangement whose own aspect ratio matches
+  // neither shape renders phones too small to read, so the gallery does not
+  // offer that combination at all rather than showing a card of postage stamps.
+  const stageFits = (aspect, format) => {
+    const canvas = catalog.formats[format].width / catalog.formats[format].height;
+    return [canvas * 0.52, canvas * 1.8].some(stage => Math.min(aspect / stage, stage / aspect) >= 0.4);
+  };
+  const shadowDefaults = Object.fromEntries(SHADOW_FIELDS.map(key => [key, DEFAULT_SHADOW[key]]));
   const placementLabels = { none: 'No watermark', 'top-left': 'Top left', 'top-center': 'Top centre', 'top-right': 'Top right',
     'bottom-left': 'Bottom left', 'bottom-center': 'Bottom centre', 'bottom-right': 'Bottom right' };
   const lockupLabels = { wordmark: 'Logo and name', symbol: 'Symbol only' };
@@ -21,22 +35,21 @@ export function mountCompositionEditor() {
     }));
     select.value = selected;
   }
+  // The rendered image outlives the edit that superseded it: it stays on screen,
+  // marked as no longer matching the recipe, until its replacement arrives. A
+  // live preview that blanked on every keystroke would show mostly nothing.
   function invalidate() {
     revision++;
-    download.hidden = true; download.removeAttribute('href');
-    if (outputUrl) URL.revokeObjectURL(outputUrl);
-    outputUrl = undefined;
-    preview.replaceChildren(element('p', 'Recipe changed. Render to see the final image.'));
-    get('composition-provenance').textContent = 'No render for this recipe.';
+    preview.dataset.stale = 'true';
+    get('composition-provenance').textContent = 'Rendering the edited recipe.';
   }
   function persist() {
     try {
       validateRecipe(recipe);
       history.replaceState(null, '', `${location.pathname}${location.search}${recipeHash(recipe)}`);
-      renderStatus.textContent = 'Ready to render. Changes are stored in the URL.';
     } catch (error) { renderStatus.textContent = error.message; }
   }
-  const edited = () => { invalidate(); persist(); };
+  const edited = () => { invalidate(); persist(); scheduleRender(); };
   function phoneControls() {
     get('phone-controls').replaceChildren(...recipe.phones.map((phone, index) => {
       const fieldset = element('fieldset', undefined, 'phone-control');
@@ -103,23 +116,83 @@ export function mountCompositionEditor() {
     get('brand-scale').value = brand.scale;
     get('brand-scale').disabled = get('brand-lockup').disabled = brand.placement === 'none';
   }
+  // The ground is a composition choice, not a style: it is the plane the phones
+  // stand on, so it travels in the recipe beside the camera and the canvas.
+  function shadowControls() {
+    setOptions(get('shadow-ground'), [['none', 'No ground or shadow'], ...Object.entries(SHADOW_GROUNDS).map(([id, spec]) => [id, spec.name])], recipe.shadow?.ground ?? 'none');
+    for (const key of shadowKeys) {
+      const input = get(`shadow-${key}`);
+      input.value = recipe.shadow?.[key] ?? shadowDefaults[key];
+      input.disabled = !recipe.shadow;
+    }
+  }
   function selectRecipe(value, scroll = true) {
     recipe = validateRecipe(value); invalidate();
-    for (const [id, key] of [['recipe-title', 'title'], ['headline', 'headline'], ['subtitle', 'subtitle'], ['background', 'background'], ['canvas-width', 'width'], ['canvas-height', 'height']]) get(id).value = recipe[key];
+    for (const [id, key] of [['recipe-title', 'title'], ['headline', 'headline'], ['subtitle', 'subtitle'], ['footnote', 'footnote'], ['background', 'background'], ['canvas-width', 'width'], ['canvas-height', 'height']]) get(id).value = recipe[key] ?? '';
     get('recipe-draft').checked = Boolean(recipe.draft);
-    brandControls();
+    brandControls(); shadowControls();
     get('preset').value = recipe.preset;
     get('canvas').value = formats.find(format => catalog.formats[format].width === recipe.width && catalog.formats[format].height === recipe.height) ?? 'custom';
-    phoneControls(); persist(); get('social-editor').open = true;
+    phoneControls(); persist(); scheduleRender(0); get('social-editor').open = true;
     if (scroll) get('social-editor').scrollIntoView({ block: 'start', behavior: 'instant' });
   }
-  async function render(value) {
-    const response = await fetch('/__artwork/render', { method: 'POST', credentials: 'omit', redirect: 'error', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(validateRecipe(value)) });
+  // The server returns the composition SVG; only an export pays for rasterizing it.
+  // Each SVG stays in its own <img> document, because phone element ids repeat
+  // per composition and would collide if several were inlined in this page.
+  async function render(value, format = 'svg') {
+    const response = await fetch(`/__artwork/render${format === 'png' ? '?format=png' : ''}`, { method: 'POST', credentials: 'omit', redirect: 'error', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(validateRecipe(value)) });
     if (response.status === 429) throw new Error('Another render is running. Try again shortly.');
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Render failed.');
-    const bytes = Uint8Array.from(atob(result.png), char => char.charCodeAt(0));
-    return { url: URL.createObjectURL(new Blob([bytes], { type: 'image/png' })), provenance: result.provenance };
+    const blob = format === 'png'
+      ? new Blob([Uint8Array.from(atob(result.png), char => char.charCodeAt(0))], { type: 'image/png' })
+      : new Blob([result.svg], { type: 'image/svg+xml' });
+    return { url: URL.createObjectURL(blob), provenance: result.provenance };
+  }
+
+  /** Take the single local render slot, letting editor work jump the thumbnail queue. */
+  async function exclusive(run) {
+    editorWaiting = true;
+    while (galleryBusy) await new Promise(resolve => setTimeout(resolve, 100));
+    editorWaiting = false; renderBusy = true;
+    try { return await run(); } finally { renderBusy = false; queueThumbnails(); }
+  }
+
+  /** An edit schedules the preview rather than waiting for a button: a render is
+   * now the SVG alone, cheap enough to follow typing. Coalesced, so a burst of
+   * keystrokes costs one render, and only the newest recipe is ever shown. */
+  function scheduleRender(delay = 200) {
+    clearTimeout(renderTimer);
+    renderTimer = setTimeout(autoRender, delay);
+  }
+  async function autoRender() {
+    if (!recipe) return;
+    if (renderBusy) return scheduleRender(100);
+    const current = revision;
+    if (current === renderedRevision) return;
+    try {
+      // Snapshot now: the form mutates `recipe` in place, so a render taken from
+      // it later would draw one revision and be labelled with another.
+      const value = validateRecipe(recipe);
+      const result = await exclusive(() => render(value));
+      // Another edit landed while this was rendering; drop it and follow the edit.
+      if (current !== revision) { URL.revokeObjectURL(result.url); return scheduleRender(0); }
+      renderedRevision = current;
+      if (outputUrl) URL.revokeObjectURL(outputUrl); outputUrl = result.url;
+      const image = element('img'); image.src = outputUrl; image.alt = value.title;
+      image.width = value.width; image.height = value.height;
+      preview.replaceChildren(image); preview.dataset.stale = 'false';
+      download.textContent = `Download PNG (${result.provenance.draft ? 'draft' : 'native freshness unverified'})`; download.hidden = false;
+      renderStatus.textContent = `${value.width} x ${value.height}. ${result.provenance.disclosure}. The PNG export is this preview rasterized.`;
+      get('composition-provenance').textContent = JSON.stringify(result.provenance, null, 2);
+    } catch (error) {
+      if (current !== revision) return scheduleRender(0);
+      // A recipe that cannot render is not retried until it changes again; the
+      // last good image stays up, still marked stale, beside the reason.
+      renderedRevision = current;
+      renderStatus.textContent = error.message;
+      get('composition-provenance').textContent = 'No render for this recipe.';
+    }
   }
   function queueThumbnails() {
     if (galleryBusy || renderBusy || editorWaiting) return;
@@ -161,10 +234,23 @@ export function mountCompositionEditor() {
       for (const entry of entries) { const card = cards.find(card => card.element === entry.target); if (card) card.visible = entry.isIntersecting; }
       queueThumbnails();
     }, { rootMargin: '100px' });
-    for (const concept of catalog.concepts) for (let count = 1; count <= concept.captureIds.length; count++) for (const format of formats) {
-      const value = { version: 1, id: `${concept.id}-${count}-${format}`, title: `${concept.title} / ${count} ${count === 1 ? 'phone' : 'phones'} / ${format}`,
-        headline: concept.headline, subtitle: concept.subtitle, background: 'charcoal', ...catalog.formats[format], preset: presetNames[count - 1],
-        phones: concept.captureIds.slice(0, count).map(captureId => ({ captureId })), ...(get('gallery-draft').checked ? { draft: true } : {}) };
+    const chosenLayout = get('concept-layout').value;
+    const layouts = chosenLayout ? [chosenLayout] : signaturePresets;
+    // A subject is a named state - one mint, one wallpaper, one request type -
+    // carried across every screen of a concept. Showing them all at once would
+    // bury the default set, so the filter picks one subject at a time.
+    const subject = get('concept-state').value;
+    const chosen = catalog.concepts.filter(concept => !subject || concept.state === subject);
+    for (const concept of chosen) for (const preset of layouts) for (const format of formats) {
+      const count = catalog.presets[preset].poses.length;
+      // A concept only offers the arrangements its related captures can fill;
+      // a slot is never padded with an unrelated screen to reach the count.
+      if (count > concept.captureIds.length || !stageFits(catalog.presets[preset].aspect, format)) continue;
+      const value = { version: 1, id: `${concept.id}-${preset}-${format}`, title: `${concept.title} / ${count} ${count === 1 ? 'phone' : 'phones'} / ${catalog.presets[preset].name} / ${format}`,
+        headline: concept.headline, subtitle: concept.subtitle, ...(concept.footnote ? { footnote: concept.footnote } : {}),
+        background: 'charcoal', ...catalog.formats[format], preset,
+        phones: concept.captureIds.slice(0, count).map(captureId => ({ captureId })),
+        ...(get('gallery-ground').checked ? { shadow: shadowDefaults } : {}), ...(get('gallery-draft').checked ? { draft: true } : {}) };
       const sources = value.phones.map(phone => resolveCapture(catalog, phone.captureId));
       const available = sources.every(source => source?.available);
       const eligible = available && (value.draft || sources.every(source => source.freshness === 'current'));
@@ -181,30 +267,40 @@ export function mountCompositionEditor() {
     for (const card of cards) observer.observe(card.element);
     filterGallery();
   }
-  form.addEventListener('submit', async event => {
-    event.preventDefault(); if (!recipe || renderBusy) return;
-    editorWaiting = true;
-    renderStatus.textContent = galleryBusy ? 'Finishing the visible template, then rendering your composition...' : 'Rendering final image...';
-    // One shared local render slot; editor work takes priority over lazy thumbnails.
-    while (galleryBusy) await new Promise(resolve => setTimeout(resolve, 100));
-    editorWaiting = false; renderBusy = true; get('render-composition').disabled = true;
+  // Nothing to submit: Enter just skips the debounce on the render already coming.
+  form.addEventListener('submit', event => { event.preventDefault(); scheduleRender(0); });
+  // Rasterizing is deferred to the export, so the button renders on demand and
+  // hands the bytes straight to a download rather than holding a stale PNG.
+  download.addEventListener('click', async () => {
+    if (!recipe || renderBusy) return;
+    const label = download.textContent;
+    download.disabled = true; download.textContent = 'Rasterizing PNG...';
     const current = revision;
     try {
-      const result = await render(recipe);
+      const result = await exclusive(() => render(recipe, 'png'));
       if (current !== revision) { URL.revokeObjectURL(result.url); return; }
-      if (outputUrl) URL.revokeObjectURL(outputUrl); outputUrl = result.url;
-      const image = element('img'); image.src = outputUrl; image.alt = recipe.title; image.width = recipe.width; image.height = recipe.height;
-      preview.replaceChildren(image);
-      download.href = outputUrl; download.download = `${result.provenance.draft ? 'draft' : 'source-matched-native-unverified'}-${recipe.id}.png`;
-      download.textContent = `Download PNG (${result.provenance.draft ? 'draft' : 'native freshness unverified'})`; download.hidden = false;
-      renderStatus.textContent = `${recipe.width} x ${recipe.height}. ${result.provenance.disclosure}. Preview and download use identical bytes.`;
-      get('composition-provenance').textContent = JSON.stringify(result.provenance, null, 2);
+      const anchor = element('a'); anchor.href = result.url;
+      anchor.download = `${result.provenance.draft ? 'draft' : 'source-matched-native-unverified'}-${recipe.id}.png`;
+      anchor.click(); setTimeout(() => URL.revokeObjectURL(result.url), 1000);
+      renderStatus.textContent = `Exported ${recipe.width} x ${recipe.height}. ${result.provenance.disclosure}.`;
     } catch (error) { if (current === revision) renderStatus.textContent = error.message; }
-    finally { renderBusy = false; get('render-composition').disabled = false; queueThumbnails(); }
+    finally { download.disabled = false; download.textContent = label; }
   });
-  for (const [id, key] of [['recipe-title', 'title'], ['headline', 'headline'], ['subtitle', 'subtitle'], ['background', 'background'], ['canvas-width', 'width'], ['canvas-height', 'height']])
+  for (const [id, key] of [['recipe-title', 'title'], ['headline', 'headline'], ['subtitle', 'subtitle'], ['footnote', 'footnote'], ['background', 'background'], ['canvas-width', 'width'], ['canvas-height', 'height']])
     get(id).addEventListener('input', () => { if (!recipe) return; recipe[key] = ['width', 'height'].includes(key) ? get(id).valueAsNumber : get(id).value; if (['width', 'height'].includes(key)) get('canvas').value = 'custom'; edited(); });
   get('recipe-draft').addEventListener('change', () => { if (recipe) { recipe.draft = get('recipe-draft').checked; edited(); } });
+  get('shadow-ground').addEventListener('change', () => {
+    if (!recipe) return;
+    const ground = get('shadow-ground').value;
+    if (ground === 'none') delete recipe.shadow;
+    else recipe.shadow = { ...shadowDefaults, ...recipe.shadow, ground };
+    shadowControls(); edited();
+  });
+  for (const key of shadowKeys) get(`shadow-${key}`).addEventListener('input', () => {
+    if (!recipe?.shadow) return;
+    recipe.shadow = { ...recipe.shadow, [key]: get(`shadow-${key}`).valueAsNumber };
+    edited();
+  });
   for (const [id, key] of [['brand-placement', 'placement'], ['brand-lockup', 'lockup'], ['brand-scale', 'scale']])
     get(id).addEventListener('change', () => {
       if (!recipe) return;
@@ -235,12 +331,16 @@ export function mountCompositionEditor() {
     event.target.value = '';
   });
   for (const id of ['concept-search', 'concept-count', 'concept-ratio']) get(id).addEventListener('input', () => { if (catalog) filterGallery(); });
-  get('gallery-draft').addEventListener('change', () => { if (catalog) galleryCards(); });
+  for (const id of ['gallery-draft', 'gallery-ground', 'concept-layout', 'concept-state']) get(id).addEventListener('change', () => { if (catalog) galleryCards(); });
   window.addEventListener('hashchange', () => { if (catalog && location.hash) { try { selectRecipe(recipeFromHash(location.hash), false); } catch (error) { renderStatus.textContent = error.message; } } });
-  window.addEventListener('pagehide', () => { if (outputUrl) URL.revokeObjectURL(outputUrl); for (const url of thumbnailUrls) URL.revokeObjectURL(url); observer?.disconnect(); });
+  window.addEventListener('pagehide', () => { clearTimeout(renderTimer); if (outputUrl) URL.revokeObjectURL(outputUrl); for (const url of thumbnailUrls) URL.revokeObjectURL(url); observer?.disconnect(); });
   fetchSources().then(value => {
     catalog = value;
     setOptions(get('preset'), Object.entries(catalog.presets).map(([id, preset]) => [id, preset.name]), 'single-tilt');
+    setOptions(get('concept-layout'), [['', 'Signature layouts'], ...Object.entries(catalog.presets).map(([id, preset]) => [id, `${preset.name} / ${preset.poses.length}`])], '');
+    setOptions(get('concept-state'), [['default', 'Default subjects'],
+      ...[...new Set(catalog.concepts.map(concept => concept.state))].filter(state => state !== 'default').sort().map(state => [state, state]),
+      ['', 'Every subject']], 'default');
     setOptions(get('canvas'), [...formats.map(format => [format, `${format} / ${catalog.formats[format].width} x ${catalog.formats[format].height}`]), ['custom', 'Custom dimensions']], 'square');
     galleryCards();
     if (location.hash) {

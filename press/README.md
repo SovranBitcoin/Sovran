@@ -50,6 +50,11 @@ imports passing evidence, updates the source library, then regenerates logos,
 selected website outputs and the public site. It never runs the entire functional
 suite implicitly. A simulator lane alone does not authorize publishing or spending.
 
+Run the full campaign whenever a release is decided, before the version bump is
+merged: the website's phone scenes and its social/OG rasters build from this
+library, and a public `site:build` fails when a selected capture is not `current`.
+See [the release runbook](../release/README.md#day-to-day-operation).
+
 ```sh
 # Focused diagnosis; keep both-platform inventory visible.
 bun run screenshots:refresh android --scenario capture.local-navigation --attempts 1 --no-downstream
@@ -80,12 +85,10 @@ animation behaviour on either platform.
 One body per platform. Every retained capture records its pixel size, and a
 capture that does not match its platform's reviewed geometry is withheld with
 that reason instead of being framed as a different phone — `/screenshots` names
-the device beside each image. Store delivery is a separate contract: Play rejects
-ratios above 2:1, so its Android images are 1080x1920. Those delivered bytes are
-archived under `press/artwork/source/store/` and pinned in
-`scripts/fixtures/artwork-store-pins.json`. Promotion never writes there, so
-recapturing the library cannot republish a differently shaped store image, and a
-new submission is a deliberate edit of that archive.
+the device beside each image. Store delivery is a separate contract with its own
+resolution limits — Play rejects ratios above 2:1, so its images cannot be the
+1080x2400 library body. Prepare those from a current library capture at
+submission time; the library keeps no archived copy of what was last delivered.
 
 The campaign lock and checkpoint live in `app/e2e/artifacts/`. The checkpoint is
 `screenshot-refresh.json`; timestamped final reports are retained alongside it.

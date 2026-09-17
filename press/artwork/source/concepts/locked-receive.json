@@ -1,0 +1,23 @@
+{
+  "id": "locked-receive",
+  "platform": "ios",
+  "screenshots": [
+    "receive-qr-p2pk",
+    "settings-keyring",
+    "receive-qr"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "locked-receive"
+}

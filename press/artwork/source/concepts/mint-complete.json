@@ -1,0 +1,24 @@
+{
+  "id": "mint-complete",
+  "platform": "ios",
+  "screenshots": [
+    "mint-select",
+    "mint-info",
+    "mint-reviews",
+    "notification-mint-changes"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "mint-complete"
+}

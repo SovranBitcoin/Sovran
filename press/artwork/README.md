@@ -71,12 +71,10 @@ rotated frame bounds. The manifest retains those bounds for review.
 `source/screenshots.json` retains the page/file/run/sha256 contract plus the
 capture's pixel size, which is how a consumer picks a phone body. Screenshot
 keys describe capture variants; `page` remains the actual canonical screen.
-The images delivered to the stores live in their own archive, `source/store/`,
-byte-identical to their original runs and pinned in
-`scripts/fixtures/artwork-store-pins.json` with the delivery resolution. A
-library recapture rewrites `source/screenshots/`, never that archive; changing
-what a store shows is a deliberate edit of the pins and their bytes. No originals or old generated
-aliases remain in the previous `featured` or `feature-graphic` trees.
+Store delivery is a separate contract with its own resolution limits and is
+prepared from a current library capture at submission time; this tree keeps no
+archived copy of delivered bytes. No originals or old generated aliases remain in
+the previous `featured` or `feature-graphic` trees.
 
 ## Copy voice
 

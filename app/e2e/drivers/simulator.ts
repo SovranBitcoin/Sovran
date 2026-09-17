@@ -21,6 +21,7 @@ import {
 import type { Driver, AxNode, ScreenshotOptions, StateObservation } from './driver';
 import type { Selector } from '../schema/selectors';
 import {
+  centersAgree,
   classifyObservedState,
   elementTapCenter,
   parseSseData,
@@ -42,6 +43,13 @@ import {
 import { BACKSPACE_USAGE, hidKeystrokesFor, LEFT_SHIFT_USAGE } from './hid-keys';
 import { SimulatorInfrastructureError } from './simulator-session';
 import { isProfileSecretAxId } from './ax-redaction';
+
+/** How long a tap waits for its target to stop moving before committing.
+ * Sized for a rubber-band recoil after a list is swiped to its end, which is
+ * where taps were still landing one row off: the blind swipes in
+ * capture.mock-off bounce the settings list back and the press arrived
+ * mid-recoil, opening Design system instead of the mock-mode toggle. */
+const STILL_TIMEOUT_MS = 3000;
 
 interface SimConfig {
   captureProfile?: CaptureProfile;
@@ -833,8 +841,40 @@ export class SimulatorDriver implements Driver {
     return el ? toAxNode(el) : null;
   }
 
+  /** Hold a tap until the target has stopped moving: a list still gliding from
+   * the swipe that revealed the row reports a centre that is stale by the time
+   * the press lands, which opens the neighbouring row. Motion that never
+   * settles (a looping shimmer) falls through to the last reading rather than
+   * failing a tap that would otherwise land. */
+  async #settledCenter(sel: Selector): Promise<{ x: number; y: number } | null> {
+    let previous = await this.#waitCenter(sel);
+    if (!previous) return null;
+    // The centre is read from the streamed tree, so two reads of the SAME
+    // snapshot always agree and would certify a list that is still gliding.
+    // Agreement only counts across snapshots the watcher has actually
+    // replaced, which is what makes this a stability check rather than a
+    // repeat of one reading.
+    let seen = this.#ax.generation;
+    const poll = this.#cfg.pollMs ?? 200;
+    const deadline = Date.now() + STILL_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      this.#throwIfAborted();
+      await sleep(poll);
+      if (this.#ax.generation === seen) continue;
+      seen = this.#ax.generation;
+      // A confirmation read that comes back empty means the tree lagged, not
+      // that the target left the screen — a tap that was already resolvable
+      // must not be turned into a failure by the stability check itself.
+      const next = this.#center(sel) ?? (await this.#waitCenter(sel, poll * 4));
+      if (!next) return previous;
+      if (centersAgree(previous, next)) return next;
+      previous = next;
+    }
+    return previous;
+  }
+
   async tap(sel: Selector): Promise<void> {
-    const c = await this.#waitCenter(sel);
+    const c = await this.#settledCenter(sel);
     if (!c) throw new Error(`tap: selector not on screen ${JSON.stringify(sel)}`);
     await this.#interact(() => this.#press(c.x, c.y));
   }

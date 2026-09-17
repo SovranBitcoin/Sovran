@@ -296,7 +296,17 @@ export function buildMetroEnvironment(
   // evidence frame gets a .store.json sidecar (see shared/lib/e2e/stateMirror).
   environment.EXPO_PUBLIC_E2E_STATE_MIRROR = '1';
   const { captureProfile } = captureEnvironment(source);
-  if (captureProfile) environment.EXPO_PUBLIC_E2E_CAPTURE_PROFILE = captureProfile;
+  if (captureProfile) {
+    environment.EXPO_PUBLIC_E2E_CAPTURE_PROFILE = captureProfile;
+    // The dev-mode unlock is proven ONLY by its toast (loader.test.ts keeps that
+    // invariant), and the toast cannot be retried: the triple tap toggles dev
+    // mode back off. Measured over 20 library runs, successful unlocks took
+    // 7-14s and failures 13-25s: the 8s dismiss above is simply shorter than
+    // three taps plus their evidence brackets once the machine is loaded. Library pages are navigation-only captures
+    // taken many steps later, so the linger that would poison a payment
+    // scenario's stable screenshot cannot reach them; ordinary runs keep 8s.
+    environment.EXPO_PUBLIC_E2E_TOAST_DISMISS_MS = '20000';
+  }
   const nodeOptions = (environment.NODE_OPTIONS ?? '')
     .replace(/(?:^|\s)--dns-result-order(?:=|\s+)\S+/g, ' ')
     .trim();

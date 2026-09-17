@@ -656,7 +656,18 @@ export async function prepareAndroidCapture(
   ])
     await adb.shell(['settings', 'put', 'global', scale, '0']);
   await adb.shell(['settings', 'put', 'system', 'font_scale', '1']);
-  await adb.shell(['cmd', 'uimode', 'night', 'no']);
+  // `cmd uimode night no` alone loses to an active night SCHEDULE: the pinned
+  // image has reported back `Night mode: custom_bedtime` right after the write,
+  // which fails the light-appearance contract. Clear the schedule through the
+  // secure setting (1 = never) as well, then re-apply.
+  const setLightAppearance = async () => {
+    await adb.shell(['settings', 'put', 'secure', 'ui_night_mode', '1']);
+    await adb.shell(['settings', 'put', 'secure', 'ui_night_mode_custom_type', '-1'], {
+      allowFail: true,
+    });
+    await adb.shell(['cmd', 'uimode', 'night', 'no']);
+  };
+  await setLightAppearance();
   await adb.shell(['settings', 'put', 'system', 'accelerometer_rotation', '0']);
   await adb.shell(['settings', 'put', 'system', 'user_rotation', '0']);
   const resolution = await adb.screenSize();
@@ -668,7 +679,13 @@ export async function prepareAndroidCapture(
       densityOutput.match(/Physical density:\s*(\d+)/))?.[1]
   );
   const fontScale = Number(await adb.shell(['settings', 'get', 'system', 'font_scale']));
-  const appearance = await adb.shell(['cmd', 'uimode', 'night']);
+  // Same self-healing shape as the animator scale below: a schedule can reassert
+  // itself between the write and the read, so re-apply once before failing.
+  let appearance = await adb.shell(['cmd', 'uimode', 'night']);
+  if (!/night mode:\s*no\b/i.test(appearance)) {
+    await setLightAppearance();
+    appearance = await adb.shell(['cmd', 'uimode', 'night']);
+  }
   // The factory-fresh pinned image boots in en-US. Validate the effective
   // resource configuration rather than pretending a settings write switches
   // Android's live locale (there is no supported shell setter on this image).
@@ -688,16 +705,21 @@ export async function prepareAndroidCapture(
       await adb.shell(['settings', 'put', 'global', scale, '0']);
     animatorScale = await readAnimatorScale();
   }
-  if (
-    dpi !== 420 ||
-    fontScale !== 1 ||
-    animatorScale !== 0 ||
-    !/night mode:\s*no\b/i.test(appearance) ||
-    !/\ben-rUS\b/.test(configuration)
-  ) {
-    throw new Error(
-      'library-v1 Android density, font scale, motion, appearance or en-US locale did not take effect'
-    );
+  // Name the value that actually failed. A composite message hid the common
+  // case: when the emulator dies mid-preparation every `adb shell` returns
+  // nothing, so these parse to NaN and an emulator crash was reported as an
+  // unmet presentation profile.
+  const unmet = [
+    dpi !== 420 ? `density ${densityOutput.trim() || '(no output)'}` : null,
+    fontScale !== 1 ? `font scale ${fontScale}` : null,
+    animatorScale !== 0 ? `animator scale ${animatorScale}` : null,
+    !/night mode:\s*no\b/i.test(appearance)
+      ? `appearance ${appearance.trim() || '(no output)'}`
+      : null,
+    !/\ben-rUS\b/.test(configuration) ? 'locale not en-rUS' : null,
+  ].filter((entry): entry is string => entry !== null);
+  if (unmet.length) {
+    throw new Error(`library-v1 Android presentation profile unmet: ${unmet.join('; ')}`);
   }
   return {
     profile: options.captureProfile,
@@ -916,6 +938,13 @@ export async function withAndroidEmulatorSession<T>(
         // UIAutomator evidence between taps is slower than iOS. Keep the
         // dev-mode triple-tap reachable without changing production timing.
         EXPO_PUBLIC_E2E_TRIPLE_TAP_WINDOW_MS: '180000',
+        // The dev-mode unlock is proven by its toast, and that toast is the only
+        // on-screen evidence of it (see loader.test.ts). At production speed it
+        // dismisses well inside one uiautomator dump, so the gate was missing a
+        // toast that really had appeared — and it cannot be retried, because the
+        // triple tap toggles dev mode back off. iOS already slows the dismiss to
+        // 8s for the same reason; Android's dumps are slower still.
+        EXPO_PUBLIC_E2E_TOAST_DISMISS_MS: '15000',
       },
     });
     cleanups.push({ priority: 20, run: () => metro.stop() });

@@ -37,7 +37,7 @@ Each cell applies to **wide, tall and square**. R = rendered with complete input
 
 - `scripts/artwork.mjs`, `scripts/artwork.test.mjs`: single pipeline and its tests, replacing the former featured/feature-graphic scripts. The checkout had one former artwork test file; there was no separate feature-graphic test file to migrate.
 - `scripts/lib/marketing-render.mjs`: full captures in the shared phone frame; no system-chrome trimming.
-- `scripts/fetch-wallpapers.mjs`, `scripts/fixtures/artwork-store-pins.json`: explicit portrait fetch/authentication helper and immutable original store pins.
+- `scripts/fetch-wallpapers.mjs`: explicit portrait fetch/authentication helper.
 - `marketing/artwork/`: migrated screenshots and palette sources; layout/copy/concept/selection JSON; supplied portrait catalog and panorama provenance; regenerated selected outputs, manifest and documentation. Removed both superseded marketing trees.
 - Root/app `package.json`, both `.easignore` files, `.gitignore`, `.github/workflows/ci.yml`, `app/__tests__/marketingNotBundled.test.ts`, `app/assets/README.md`, `SYSTEM.md` §23: single-pipeline commands, exclusions, guard and documentation.
 - `app/e2e/scenarios/marketing-screenshots-wallpapers.json`: four explicit Artemis UI capture journeys, checking the actual loaded-image probe. No runtime app changes, dependency/lockfile/patch changes, simulator runs or publication.
@@ -130,7 +130,7 @@ Verified 19 artwork concepts; 9 missing inputs (labelled drafts allowed).
 
 ## Evidence boundaries and follow-ups
 
-- Native store pin tests authenticate all eight original PNGs and run IDs; full-chrome tests check the exact embedded bytes and native aspect ratio for both platforms.
+- Full-chrome tests check the exact embedded bytes and native aspect ratio for both platforms. The archived store-delivery PNGs and their pin test were removed once the library had moved past them; store images are prepared from a current capture at submission time.
 - All 13 portrait and panorama hashes match retained provenance. Centre-strip tests compare every restored portrait at 128 px with mean absolute error below 2/255. Portal tests verify shared canvas alignment and enforce that the phone shows the restored portrait region.
 - Visual inspection: app-overview and Colors layout variants, iOS feature banner and the explicit Artemis portal draft. Automated copy/frame bounds checks run for every applicable variant. Native screenshots and full product-claim accuracy are not newly certified.
 - Missing: thread, stories, backup-words (after X1), four Artemis wallet captures, and reviewed UI masks for wallet-navy and wallet-in-eclipse. These are seven missing screenshots plus two missing masks in the current iOS concept inventory. Keep strict checks failing until they are supplied.

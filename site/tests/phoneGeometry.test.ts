@@ -3,10 +3,15 @@ import { readFileSync, readdirSync } from "node:fs";
 import {
   captureDevice,
   continuousPath,
+  FRAME_RAIL_SHARE,
   phoneGeometry,
   createScene,
   renderPhone,
+  renderShadow,
+  shadowExtent,
+  shadowMatrix,
   SCENE_PRESETS,
+  SHADOW_FRAME_LIMIT,
 } from "../../scripts/lib/phone-frame.mjs";
 
 test("the app smoothing construction joins four identical continuous corners", () => {
@@ -121,11 +126,19 @@ test("bezel and chassis are uniform outward offsets of the exact display path, n
       /<use class="[^"]*" href="([^"]+)"[^>]*stroke-width="([^"]+)"/g,
     ),
   ];
-  expect(paths.length).toBe(67);
+  expect(paths.length).toBe(68);
   expect(paths.every((match) => match[1] === "#test-contour")).toBe(true);
   expect(svg).toContain(`<path id="test-contour" d="${phone.screen}"`);
-  expect(Number(paths.at(-2)![2])).toBe(phone.bezel * 2);
-  expect(Number(paths.at(-1)![2])).toBeCloseTo((phone.bezel - 1) * 2, 10);
+  // The three front surfaces nest strictly inward from the chassis: chamfer,
+  // then the display's black mask, then the hairline glass edge. The last one
+  // is what keeps a dark capture from reading as if it filled the whole body.
+  const front = paths.slice(-3).map((path) => Number(path[2]) / 2);
+  expect(front[0]).toBe(phone.bezel);
+  expect(front[1]).toBeCloseTo(phone.bezel * (1 - FRAME_RAIL_SHARE), 10);
+  expect(front[2]).toBeCloseTo(Math.min(1.1, phone.bezel * 0.09), 10);
+  expect(front[0]).toBeGreaterThan(front[1]);
+  expect(front[1]).toBeGreaterThan(front[2]);
+  expect(front[2]).toBeGreaterThan(0);
   // Rounded sidewalls stay inside the calibrated chassis; only the narrow rim is lighter.
   for (const path of paths.slice(0, 65))
     expect(Number(path[2])).toBeLessThanOrEqual(phone.bezel * 2);
@@ -354,6 +367,113 @@ test("bounds contain every rendered depth section, including the intermediate si
             }
         });
       }
+});
+
+test("the ground is a projection: exact contact, a throw of height x tan(tilt), and bounds that hold it", () => {
+  // The plane is placed at the scene's own lowest point, so a device resting on
+  // it casts its shadow exactly under its back face: the shadow transform IS the
+  // projection transform, with nothing to offset or tune away.
+  const resting = createScene([capture], {
+    preset: "single-front",
+    shadow: { ground: "table", height: 0 },
+  });
+  const phone = resting.phones[0];
+  const contact = shadowMatrix(
+    phone,
+    resting.ground,
+    resting.ground.light,
+    -phone.thickness,
+  );
+  const back = phone.project(0, 0, -phone.thickness);
+  expect(contact[4]).toBeCloseTo(back.x, 9);
+  expect(contact[5]).toBeCloseTo(back.y, 9);
+  expect([contact[0], contact[1], contact[2], contact[3]]).toEqual([
+    phone.scale,
+    0,
+    0,
+    phone.scale,
+  ]);
+  // Lifting it one chassis height throws the shadow by that height times the
+  // tangent of the light's tilt, along the light's azimuth and nowhere else.
+  for (const [angle, tilt] of [
+    [0, 34],
+    [90, 20],
+    [-90, 55],
+  ] as const) {
+    const lifted = createScene([capture], {
+      preset: "single-front",
+      shadow: { ground: "table", height: 1, angle, tilt },
+    });
+    const device = lifted.phones[0];
+    const cast = shadowMatrix(
+      device,
+      lifted.ground,
+      lifted.ground.light,
+      -device.thickness,
+    );
+    const origin = device.project(0, 0, -device.thickness);
+    const gap = (device.height + 2 * device.bezel) * device.scale;
+    expect(Math.hypot(cast[4] - origin.x, cast[5] - origin.y)).toBeCloseTo(
+      gap * Math.tan((tilt * Math.PI) / 180),
+      6,
+    );
+    expect(
+      (Math.atan2(cast[5] - origin.y, cast[4] - origin.x) * 180) / Math.PI,
+    ).toBeCloseTo(angle, 6);
+  }
+  // A shadow widens the scene instead of being clipped at the device edge, but
+  // it never slides the devices off centre and never pushes the frame out past
+  // the cap - beyond that the phones would shrink to make room for their shadow.
+  const bare = createScene([capture], { preset: "single-top" });
+  const lit = createScene([capture], {
+    preset: "single-top",
+    shadow: { ground: "floor", height: 0.2 },
+  });
+  expect(shadowExtent(lit.phones, lit.ground).length).toBeGreaterThan(0);
+  expect(lit.width).toBeGreaterThan(bare.width);
+  expect(lit.width).toBeLessThanOrEqual(bare.width * SHADOW_FRAME_LIMIT + 1e-9);
+  expect(lit.height).toBeLessThanOrEqual(bare.height * SHADOW_FRAME_LIMIT + 1e-9);
+  for (const point of lit.phones.flatMap((phone) => phone.corners)) {
+    expect(point.x).toBeGreaterThan(lit.x);
+    expect(point.x).toBeLessThan(lit.x + lit.width);
+  }
+  // The device centre is the frame centre, whichever way the light falls.
+  for (const angle of [0, 90, 180, -90]) {
+    const scene = createScene([capture], {
+      preset: "single-front",
+      shadow: { ground: "table", height: 0.4, angle },
+    });
+    const device = scene.phones[0];
+    const centre = device.project(device.width / 2, device.height / 2);
+    expect(centre.x).toBeCloseTo(scene.x + scene.width / 2, 6);
+    expect(centre.y).toBeCloseTo(scene.y + scene.height / 2, 6);
+  }
+  // One stroked contour per light sample plus the ambient term: a shadow is
+  // never a second drawing of the phone, and never its screenshot.
+  const svg = renderShadow(lit.phones[0], { id: "ground", plane: lit.ground });
+  expect(svg).not.toContain("<image");
+  expect((svg.match(/<use /g) ?? []).length).toBe(
+    lit.ground.samples.length + 1,
+  );
+  expect(svg).toContain('href="#ground-silhouette"');
+  expect(() =>
+    renderShadow(lit.phones[0], { id: "1bad", plane: lit.ground }),
+  ).toThrow();
+  // No ground means no plane at all, and an unapproved one is rejected.
+  expect(createScene([capture], { preset: "single-front" }).ground).toBe(
+    undefined,
+  );
+  for (const shadow of [
+    { ground: "wall" },
+    { ground: "__proto__" },
+    { height: 9 },
+    { opacity: 2 },
+    { tilt: 89 },
+    { softness: NaN },
+  ])
+    expect(() =>
+      createScene([capture], { preset: "single-front", shadow }),
+    ).toThrow();
 });
 
 test("scene boundary rejects unknown platforms, presets, corrupt poses, and hidden platform overrides", () => {

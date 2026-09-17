@@ -6,12 +6,6 @@
  * native build so /screenshots can say exactly what it shows. Every entry also
  * records its pixel size: consumers pick a phone body from it, and a capture
  * taken on the wrong device profile has to be visible rather than reframed.
- *
- * Store delivery is a separate contract with its own archived bytes under
- * press/artwork/source/store (Play rejects ratios above 2:1, so its Android
- * images are 1080x1920 while the library is the 1080x2400 library-v1 emulator).
- * Promotion never writes there, so recapturing the library cannot silently
- * republish a differently shaped store image.
  */
 import { createHash } from 'node:crypto';
 import { readFileSync, renameSync, writeFileSync, mkdirSync } from 'node:fs';

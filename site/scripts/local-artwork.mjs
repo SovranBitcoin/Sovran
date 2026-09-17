@@ -8,7 +8,7 @@ export function localArtwork({ repoRoot = repository } = {}) {
   const sourceCatalog = () => catalogPending ??= buildSourceCatalog(repoRoot)
     .then(value => (sources = value)).finally(() => { catalogPending = undefined; });
   const middleware = async (request, response, next) => {
-    const route = request.url?.split('?', 1)[0] || '';
+    const [route = '', query = ''] = (request.url || '').split('?');
     if (route !== '/__artwork' && !route.startsWith('/__artwork/')) return next();
     response.setHeader('Cache-Control', 'no-store');
     response.setHeader('X-Content-Type-Options', 'nosniff');
@@ -41,10 +41,14 @@ export function localArtwork({ repoRoot = repository } = {}) {
           request.on('error', reject);
         });
         clearTimeout(timer);
-        const { renderComposition } = await import('./composition.mjs');
-        const result = await renderComposition(JSON.parse(body), { repoRoot });
+        const { renderComposition, rasterize } = await import('./composition.mjs');
+        // The SVG is the artwork; rasterizing is the expensive half and only an
+        // export needs it, so a preview is served as the SVG a browser can draw.
+        const result = await renderComposition(JSON.parse(body), { repoRoot, catalog: sources ?? await sourceCatalog() });
         response.setHeader('Content-Type', 'application/json; charset=utf-8');
-        response.end(JSON.stringify({ png: result.png.toString('base64'), provenance: result.provenance }));
+        response.end(JSON.stringify(new URLSearchParams(query).get('format') === 'png'
+          ? { png: (await rasterize(result.svg)).toString('base64'), provenance: result.provenance }
+          : { svg: result.svg, provenance: result.provenance }));
       } catch (error) {
         response.writeHead(error.status ?? 422, { 'Content-Type': 'application/json; charset=utf-8' });
         response.end(JSON.stringify({ error: error instanceof SyntaxError ? 'Invalid recipe JSON.' : error.message }));

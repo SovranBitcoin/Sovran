@@ -41,6 +41,12 @@ const WALLET_READY_SELECTOR = { id: 'wallet-send' } as const;
 /** A dump is ~0.5–1.5s of wall clock; that duration IS the poll interval, so
  * a fresh-snapshot loop needs no extra sleep beyond a small yield. */
 const AX_FRESH_MS = 400;
+/** A relaunch on the emulator reloads the JS bundle and re-runs wallet init, so
+ * the app can still be on its splash after a minute — observed goHome legs take
+ * ~52 s, which left a 45 s budget failing on the margin. A starved uiautomator
+ * dump can also eat most of a budget on its own, so this has to leave room for
+ * several snapshot attempts, not one. */
+const RELAUNCH_READY_MS = 150_000;
 
 /** Dump-on-demand AX source with single-flight coalescing and a freshness
  * window. Every input action invalidates; a monotonic generation feeds
@@ -153,16 +159,27 @@ export class AndroidDriver implements Driver {
   async #selectWalletTab(): Promise<void> {
     // Resolve and tap from one dump. A second UIAutomator dump can transiently
     // omit the tab during relaunch even though the first dump proved it ready.
-    const center = await this.#waitCenter(WALLET_TAB_SELECTOR, 45_000);
+    const center = await this.#waitCenter(WALLET_TAB_SELECTOR, RELAUNCH_READY_MS);
     if (!center) throw new Error('Wallet tab did not become ready after relaunch');
     this.#ax.invalidate();
     await this.#adb.tap(center.x, center.y);
-    await this.waitFor(WALLET_READY_SELECTOR, undefined, 45_000);
+    await this.waitFor(WALLET_READY_SELECTOR, undefined, RELAUNCH_READY_MS);
   }
 
   async home(): Promise<void> {
-    await this.launch('none');
-    await this.#selectWalletTab();
+    // A relaunch late in a long leg can leave the device on the launcher — the
+    // process started and went away before any wallet chrome appeared. One more
+    // launch recovers that, and an emulator that is genuinely gone still fails,
+    // just after a second attempt instead of the first.
+    for (let attempt = 0; ; attempt++) {
+      await this.launch('none');
+      try {
+        await this.#selectWalletTab();
+        break;
+      } catch (error) {
+        if (attempt > 0) throw error;
+      }
+    }
     await sleep(this.#refreshClearMs); // let the post-reload "Refreshing…" overlay clear
   }
 
@@ -178,7 +195,7 @@ export class AndroidDriver implements Driver {
       this.#throwIfAborted();
       const node = await this.find({ id: E2E_READY_PROOF_STATUS_ID });
       if (node?.value && fundedSweepProbeComplete(node.value, expectedAssets)) {
-        await this.waitFor(WALLET_READY_SELECTOR, undefined, 45_000);
+        await this.waitFor(WALLET_READY_SELECTOR, undefined, RELAUNCH_READY_MS);
         await sleep(this.#refreshClearMs);
         return;
       }
@@ -310,6 +327,10 @@ export class AndroidDriver implements Driver {
   }
 
   async tap(sel: Selector): Promise<void> {
+    // No stability gate here, unlike the simulator: every #waitCenter takes a
+    // fresh uiautomator dump and the press follows it immediately, so there is
+    // no stale-tree window to guard against — and a second dump costs seconds
+    // and let the settings list shift out from under an already-resolved tap.
     const center = await this.#waitCenter(sel);
     if (!center) throw new Error(`tap: selector not on screen ${JSON.stringify(sel)}`);
     this.#ax.invalidate();

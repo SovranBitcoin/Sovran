@@ -1,0 +1,24 @@
+{
+  "id": "lightning",
+  "platform": "ios",
+  "screenshots": [
+    "lightning-receive",
+    "receive-qr",
+    "wallet",
+    "send"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "lightning"
+}

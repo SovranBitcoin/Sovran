@@ -97,7 +97,11 @@ export async function nativeFingerprint(platform: Platform): Promise<string> {
       cwd: APP_DIR,
       env: { ...process.env, APP_VARIANT: 'development' },
       encoding: 'utf8',
-      timeout: 60_000,
+      // Bounded so a stuck config cannot hang a campaign, but generous: under
+      // campaign load (emulator + Metro + simulator) this loader has exceeded
+      // 60s and thrown `spawnSync node ETIMEDOUT`, discarding a capture that
+      // had already passed — a 650s Android leg lost to a fingerprint check.
+      timeout: 240_000,
       maxBuffer: 1024 * 1024,
     }
   ).trim();

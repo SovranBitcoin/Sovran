@@ -1,0 +1,24 @@
+{
+  "id": "notifications",
+  "platform": "ios",
+  "screenshots": [
+    "notifications",
+    "notification-mint-changes",
+    "thread",
+    "feed"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "notifications"
+}

@@ -9,6 +9,29 @@ store credentials, historical signing continuity, hosting limits or live APIs wo
 After setup, change `app/app.json` → `expo.version`, run `bun run assets:generate`,
 review the brand gallery, and commit the generated artwork with the version bump
 before merging to protected `main`.
+
+Refresh the marketing material in that same pre-merge step. Once a release is
+decided, run the full native capture campaign and commit its output: the website's
+phone scenes and generated social/OG rasters build directly from
+`press/screenshots/` — selected by `press/website.json` — so there is no separate
+landing-page image job, and a public `site:build` fails when a selected capture is
+not `current`. A stale library therefore blocks the release rather than shipping
+the previous release's screens.
+
+```sh
+bun run screenshots:refresh:plan both   # read-only: what would be captured
+bun run screenshots:refresh both        # the full run
+bun run screenshots:status --strict     # coverage and freshness afterwards
+```
+
+The full run builds or verifies each native host, runs the approved capture
+scenarios on both platforms, imports passing evidence, then regenerates the logos,
+the website assets and the site build. Add `--resume` after an interruption. The
+release publishes committed bytes, so the refreshed captures and the regenerated
+`site/public/` outputs have to be in the commit that gets released. See
+[the screenshot workbench](../press/README.md) for profiles, focused reruns,
+blockers and retention.
+
 The **Production release** GitHub Action starts the release. **Run workflow →
 release** starts/resumes the same process; **plan** only reads and describes state.
 An hourly workflow resumes builds, review and deployment waits without keeping a

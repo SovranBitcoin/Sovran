@@ -1,0 +1,24 @@
+{
+  "id": "android-overview",
+  "platform": "android",
+  "screenshots": [
+    "feed",
+    "send",
+    "mint-info",
+    "settings"
+  ],
+  "background": {
+    "kind": "brand"
+  },
+  "layouts": [
+    "hero-fan",
+    "spotlight",
+    "duo",
+    "triptych",
+    "stack",
+    "closeup",
+    "portal",
+    "pack"
+  ],
+  "copy": "android-overview"
+}

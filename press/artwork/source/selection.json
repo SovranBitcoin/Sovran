@@ -94,5 +94,55 @@
     "wide": "spotlight",
     "tall": "spotlight",
     "square": "spotlight"
+  },
+  "mint-complete": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "mint-complete-android": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "notifications": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "settings": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "appearance": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "media": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "lightning": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "locked-receive": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "messaging": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
+  },
+  "android-overview": {
+    "wide": "spotlight",
+    "tall": "spotlight",
+    "square": "spotlight"
   }
 }

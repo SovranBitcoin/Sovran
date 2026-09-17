@@ -923,9 +923,9 @@ candidate is not a promoted asset; preserve native host/source identity and revi
 The full-library plan under `app/e2e/capture` accounts for all canonical pages on
 both fixed native profiles, including explicit blockers. One reviewed body per
 platform: framing rejects unreviewed capture dimensions rather than deriving a
-phone from whatever ratio arrived, every registry entry records its pixel size,
-and store-delivery images (1080x1920 on Android, where Play rejects ratios above
-2:1) keep their own archived bytes under `press/artwork/source/store/`. `screenshots:refresh`
+phone from whatever ratio arrived, and every registry entry records its pixel
+size. Store delivery is a separate contract with its own resolution limits (Play
+rejects ratios above 2:1) and is prepared at submission time. `screenshots:refresh`
 checkpoints each focused attempt and `--resume` revalidates successful work before
 skipping it. Native fixture/navigation captures do not establish functional proof.
 Keep canonical E2E page names and

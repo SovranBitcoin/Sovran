@@ -3,7 +3,7 @@ import { constants } from 'node:fs';
 import { lstat, open, readdir, realpath } from 'node:fs/promises';
 import { resolve, relative, sep } from 'node:path';
 import { appSourceFingerprint, classifyCapture } from '../../scripts/lib/app-source.mjs';
-import { captureDevice, FRAME_IDS, SCENE_PRESETS, CANVAS_FORMATS } from '../../scripts/lib/phone-frame.mjs';
+import { captureDevice, createScene, FRAME_IDS, SCENE_PRESETS, CANVAS_FORMATS } from '../../scripts/lib/phone-frame.mjs';
 
 export const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const logicalId = /^(ios|android)\/[a-z0-9-]+$/;
@@ -88,6 +88,15 @@ export async function readCaptureSource(repoRoot, source) {
   if (sha256(bytes) !== source.sha256) throw new Error('Capture bytes changed. Refresh sources.');
   return bytes;
 }
+
+// Each arrangement's own aspect ratio, measured once from the reference
+// chassis. A gallery that offers a three-phone column on a landscape card is
+// offering three postage stamps; this is what lets a caller decline to.
+const referenceCapture = Object.freeze({ key: 'ios/wallet', width: 1320, height: 2868 });
+const scenePresets = Object.fromEntries(Object.entries(SCENE_PRESETS).map(([id, preset]) => {
+  const scene = createScene(preset.poses.map(() => referenceCapture), { preset: id });
+  return [id, { ...preset, aspect: scene.width / scene.height }];
+}));
 
 export async function buildSourceCatalog(repoRoot) {
   const diagnostics = [];
@@ -253,26 +262,51 @@ export async function buildSourceCatalog(repoRoot) {
       if (!/^[a-z0-9-]+\.json$/.test(file)) continue;
       const concept = await json(`${directory}/${file}`);
       const wording = copy.concepts?.[concept.copy] ?? {};
-      const keys = list(concept.screenshots).filter(key => typeof key === 'string').map(key => key.includes('/') ? key : `${concept.platform ?? 'ios'}/${key}`).filter(key => captures.some(capture => capture.id === key || capture.aliases.includes(key)));
-      // Add only metadata-related captures; never unrelated or repeated slot fillers.
-      const related = captures.filter(capture => capture.platform === (concept.platform ?? 'ios') && keys.some(key => {
-        const source = captures.find(item => item.id === key || item.aliases.includes(key));
+      const platform = concept.platform ?? 'ios';
+      const resolve = key => captures.find(item => item.id === key || item.aliases.includes(key));
+      const keys = list(concept.screenshots).filter(key => typeof key === 'string').map(key => key.includes('/') ? key : `${platform}/${key}`).filter(key => resolve(key));
+      // Add only metadata-related captures, and only in their default state:
+      // never unrelated or repeated slot fillers, and never one mint's reviews
+      // beside another mint's details. Named states become their own
+      // compositions below instead of being mixed into this one.
+      const related = captures.filter(capture => capture.platform === platform && capture.stateId === 'default' && keys.some(key => {
+        const source = resolve(key);
         return source?.context.relatedPages?.includes(capture.page) || (source?.context.flow?.id && source.context.flow.id === capture.context.flow?.id);
       })).map(capture => capture.id);
       const seen = new Set();
       const captureIds = [...keys, ...related].filter(key => {
-        const capture = captures.find(item => item.id === key || item.aliases.includes(key));
+        const capture = resolve(key);
         if (!capture || seen.has(capture.id)) return false;
         seen.add(capture.id); return true;
       });
-      concepts.push({ id: concept.id, title: concept.id.replaceAll('-', ' '),
+      const base = { id: concept.id, title: concept.id.replaceAll('-', ' '), platform, state: 'default',
         headline: wording.headlines?.[wording.chosen?.headline ?? 0] ?? '',
         subtitle: wording.subtitles?.[wording.chosen?.subtitle ?? 0] ?? '',
-        captureIds: captureIds.slice(0, 4) });
+        footnote: wording.footnotes?.[wording.chosen?.footnote ?? 0] ?? '',
+        captureIds: captureIds.slice(0, 4) };
+      concepts.push(base);
+      // One named subject across every screen a concept covers: the same mint's
+      // details, reviews and updates together. The subject has to reach at least
+      // two of those screens, or it is a lone variant rather than a story.
+      const subjects = new Map();
+      for (const capture of captures) {
+        if (capture.platform !== platform || capture.stateId === 'default') continue;
+        if (!base.captureIds.some(id => resolve(id)?.page === capture.page)) continue;
+        subjects.set(capture.stateId, [...(subjects.get(capture.stateId) ?? []), capture]);
+      }
+      for (const [state, members] of subjects) {
+        if (members.length < 2) continue;
+        const captureIdsForState = base.captureIds.map(id => {
+          const source = resolve(id);
+          return (members.find(member => member.page === source?.page) ?? source)?.id;
+        });
+        if (captureIdsForState.every((id, index) => id === base.captureIds[index])) continue;
+        concepts.push({ ...base, id: `${concept.id}--${state}`, title: `${base.title} / ${state}`, state, captureIds: captureIdsForState });
+      }
     }
   } catch { diagnostics.push('Concept catalog unavailable.'); }
   return { version: 1, generatedAt: new Date().toISOString(), fingerprint, captures, logos, concepts,
-    frames: FRAME_IDS, presets: SCENE_PRESETS, formats: CANVAS_FORMATS, diagnostics,
+    frames: FRAME_IDS, presets: scenePresets, formats: CANVAS_FORMATS, diagnostics,
     coverage: { available: inventory.version === 1 || coverage.version === 1, entries: plans.size,
       baselineDenominator: pages.length * 2, baselineSlots: captures.filter(capture => capture.baseline).length,
       inventorySource: inventory.version === 1 ? 'press/screenshots/inventory.json' : coverage.version === 1 ? 'press/screenshots/manifest.json' : 'app/e2e/schema/pages.ts',

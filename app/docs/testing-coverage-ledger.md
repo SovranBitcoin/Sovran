@@ -301,6 +301,10 @@ contracts only. The full matrix now includes 153 scenarios and 264 platform pair
 | `capture.followers` | Empty follower notifications on a new profile | authored; presentation capture only, no product proof |
 | `capture.whitenoise-entry` | White Noise setup before creating key packages | authored; presentation capture only, no product proof |
 | `capture.storage` | Storage inventory without exporting data | authored; presentation capture only, no product proof |
+| `capture.receive-qr-tabs` | Every receive QR rail tab without sharing a payment | authored; presentation capture only, no product proof |
+| `capture.mint-details` | Mint info and reviews for every configured mint | authored; presentation capture only, no product proof |
+| `capture.mint-updates` | Mint change notifications for every configured mint | authored; presentation capture only, no product proof |
+| `capture.wallpapers` | Every built-in wallpaper applied to the wallet | authored; presentation capture only, no product proof |
 | `marketing.screenshots.media` | Marketing media screenshots | deferred: Thread, stories and image-viewer have no isolated navigable Mock Mode media fixture. Capture inventory only; implement fixture entry/readiness/exit before enabling. |
 | `marketing.screenshots.mints` | Marketing mint trust screenshots | authored |
 | `marketing.screenshots.wallpapers` | Marketing wallpaper screenshots | authored |

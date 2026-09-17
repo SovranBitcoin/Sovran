@@ -23,13 +23,17 @@
         "Spend it like cash."
       ],
       "subtitles": [
-        "Digital cash on your phone. Its value depends on the mint.",
+        "Digital cash on your phone.",
         "See your balances in sats or a supported currency."
       ],
       "chosen": {
         "headline": 0,
-        "subtitle": 0
-      }
+        "subtitle": 0,
+        "footnote": 0
+      },
+      "footnotes": [
+        "Its value depends on the mint."
+      ]
     },
     "receive-unified": {
       "headlines": [
@@ -53,13 +57,17 @@
         "Send it like a message."
       ],
       "subtitles": [
-        "Choose a contact or scan a payment code. Check the details before sending.",
+        "Choose a contact or scan a payment code.",
         "Paste a supported invoice or address, then review the payment."
       ],
       "chosen": {
         "headline": 0,
-        "subtitle": 0
-      }
+        "subtitle": 0,
+        "footnote": 0
+      },
+      "footnotes": [
+        "Check the details before sending."
+      ]
     },
     "mint-trust": {
       "headlines": [
@@ -68,13 +76,17 @@
         "Read before you trust."
       ],
       "subtitles": [
-        "Compare mint checks and reviews. Neither guarantees your funds.",
+        "Compare mint checks and reviews.",
         "Read about the mint that issues your cash. Check its terms before adding money."
       ],
       "chosen": {
         "headline": 0,
-        "subtitle": 0
-      }
+        "subtitle": 0,
+        "footnote": 0
+      },
+      "footnotes": [
+        "Neither guarantees your funds."
+      ]
     },
     "mint-reviews": {
       "headlines": [
@@ -83,13 +95,17 @@
         "Read before you trust."
       ],
       "subtitles": [
-        "Read community reviews before choosing a mint. Reviews are not guarantees.",
+        "Read community reviews before choosing a mint.",
         "See ratings and comments. They do not prove who runs a mint or what it holds."
       ],
       "chosen": {
         "headline": 0,
-        "subtitle": 0
-      }
+        "subtitle": 0,
+        "footnote": 0
+      },
+      "footnotes": [
+        "Reviews are not guarantees."
+      ]
     },
     "mint-updates": {
       "headlines": [
@@ -113,13 +129,17 @@
         "Pay with digital cash."
       ],
       "subtitles": [
-        "Send digital cash. Fees and availability depend on your mint.",
+        "Send digital cash straight from your balance.",
         "Your mint holds the backing funds and handles redemption."
       ],
       "chosen": {
         "headline": 0,
-        "subtitle": 0
-      }
+        "subtitle": 0,
+        "footnote": 0
+      },
+      "footnotes": [
+        "Fees and availability depend on your mint."
+      ]
     },
     "social-feed": {
       "headlines": [
@@ -158,13 +178,17 @@
         "Money, mid-conversation."
       ],
       "subtitles": [
-        "Send digital cash in chat. You still rely on its issuer to redeem it.",
+        "Send digital cash in chat.",
         "Chat in encrypted messages. Redeeming cash still depends on its mint."
       ],
       "chosen": {
         "headline": 0,
-        "subtitle": 0
-      }
+        "subtitle": 0,
+        "footnote": 0
+      },
+      "footnotes": [
+        "You still rely on its issuer to redeem it."
+      ]
     },
     "contacts": {
       "headlines": [
@@ -188,13 +212,17 @@
         "Choose a model. Pay for usage."
       ],
       "subtitles": [
-        "Top up AI credits from your wallet. Your provider receives your prompts.",
+        "Top up AI credits from your wallet.",
         "Choose a supported model. Prices and availability vary."
       ],
       "chosen": {
         "headline": 0,
-        "subtitle": 0
-      }
+        "subtitle": 0,
+        "footnote": 0
+      },
+      "footnotes": [
+        "Your provider receives your prompts."
+      ]
     },
     "ai-models": {
       "headlines": [
@@ -203,13 +231,17 @@
         "AI, no subscription."
       ],
       "subtitles": [
-        "Compare supported models. Prices and availability vary.",
+        "Compare the models your credits reach.",
         "Top up AI credits from your wallet. Your provider receives your prompts."
       ],
       "chosen": {
         "headline": 0,
-        "subtitle": 0
-      }
+        "subtitle": 0,
+        "footnote": 0
+      },
+      "footnotes": [
+        "Prices and availability vary."
+      ]
     },
     "themes-colors": {
       "headlines": [
@@ -242,7 +274,10 @@
       }
     },
     "portal-artemis": {
-      "headlines": ["A view worth opening.", "Your wallet, beyond Earth."],
+      "headlines": [
+        "A view worth opening.",
+        "Your wallet, beyond Earth."
+      ],
       "subtitles": [
         "Bring the Artemis II collection into your everyday wallet."
       ],
@@ -273,8 +308,151 @@
         "Write it down. Keep it safe."
       ],
       "subtitles": [
-        "Save your recovery words and mint URLs. Recovery has limits.",
+        "Save your recovery words and mint URLs.",
         "Back up imported keys too. Words alone may not restore everything."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0,
+        "footnote": 0
+      },
+      "footnotes": [
+        "Recovery has limits."
+      ]
+    },
+    "mint-complete": {
+      "headlines": [
+        "Everything about a mint, together.",
+        "Know the mint before you trust it.",
+        "One mint, the whole picture."
+      ],
+      "subtitles": [
+        "Details, reviews and updates, all for the same mint.",
+        "Details, reviews, and updates for the mint that issues your cash. Check its terms before adding money."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0,
+        "footnote": 0
+      },
+      "footnotes": [
+        "None of it guarantees your money."
+      ]
+    },
+    "notifications": {
+      "headlines": [
+        "Nothing important slips past.",
+        "Catch up in one list.",
+        "See what needs you."
+      ],
+      "subtitles": [
+        "Replies, mentions, and changes to the mints you use, in one list.",
+        "Activity from your people and updates about your mints, in one place."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "settings": {
+      "headlines": [
+        "Make it yours.",
+        "Set it up your way.",
+        "Your wallet, your rules."
+      ],
+      "subtitles": [
+        "Appearance, receiving keys, and your backup words, all in one place.",
+        "Change how it looks, manage your keys, and write down your backup."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "appearance": {
+      "headlines": [
+        "Pick a look you like.",
+        "Dress your wallet.",
+        "A wallpaper for every mood."
+      ],
+      "subtitles": [
+        "Preview a wallpaper, browse the album, then see it on your wallet.",
+        "Try a wallpaper before you keep it, from albums made for the wallet."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "media": {
+      "headlines": [
+        "Photos and stories, full screen.",
+        "See the detail.",
+        "Open anything people share."
+      ],
+      "subtitles": [
+        "Open any image from the feed, a thread, or a story.",
+        "Tap a photo to fill the screen, wherever you found it."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "lightning": {
+      "headlines": [
+        "Get paid over Lightning.",
+        "Ask for money in seconds.",
+        "One code, however they pay."
+      ],
+      "subtitles": [
+        "Show an invoice or a standing code, and the money lands in your wallet.",
+        "Present an invoice for a set amount, or a code that works any time."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "locked-receive": {
+      "headlines": [
+        "Ask for cash only you can spend.",
+        "Lock a request to your key.",
+        "Your key, your money."
+      ],
+      "subtitles": [
+        "Lock a receive request to your own key, and manage those keys in settings.",
+        "Request digital cash that only your key can unlock."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "messaging": {
+      "headlines": [
+        "Talk to the people you follow.",
+        "Conversations, not just posts.",
+        "Find them, then message them."
+      ],
+      "subtitles": [
+        "Find someone in contacts, open a private chat, or reply in the feed.",
+        "Your people and your conversations sit beside your money."
+      ],
+      "chosen": {
+        "headline": 0,
+        "subtitle": 0
+      }
+    },
+    "android-overview": {
+      "headlines": [
+        "The same app on Android.",
+        "Android, in full.",
+        "One app, both phones."
+      ],
+      "subtitles": [
+        "Feed, payments, mints, and settings, running on an Android phone.",
+        "Everything the iPhone app does, on Android."
       ],
       "chosen": {
         "headline": 0,

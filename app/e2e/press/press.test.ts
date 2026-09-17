@@ -134,10 +134,7 @@ const png = await sharp(
   .png()
   .toBuffer();
 const iosPng = await sharp(png).resize(1320, 2868).png().toBuffer();
-const canonical = [
-  'press/artwork/source/screenshots.json',
-  'scripts/fixtures/artwork-store-pins.json',
-]
+const canonical = ['press/artwork/source/screenshots.json']
   .filter((path) => existsSync(join(ROOT, path)))
   .map((path) => ({ path: join(ROOT, path), bytes: readFileSync(join(ROOT, path)) }));
 afterAll(() => {

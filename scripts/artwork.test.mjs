@@ -68,8 +68,8 @@ test("known-stale screenshots cannot enter poster renders even when their bytes 
   }
 });
 
-test("19 concepts share all eight described layouts and three exact aspect ratios", () => {
-  assert.equal(project.specs.length, 19);
+test("29 concepts share all eight described layouts and three exact aspect ratios", () => {
+  assert.equal(project.specs.length, 29);
   validateLayouts(project.layouts);
   for (const s of project.specs) assert.equal(s.layouts.length, 8);
   assert.deepEqual(ASPECTS.wide, [2048, 1000]);
@@ -321,29 +321,9 @@ test("source corruption is never tolerated as a missing input", async () => {
   );
 });
 
-test("archived store deliveries keep their original bytes and declared device", async () => {
-  const pins = JSON.parse(
-    await readFile(join(ROOT, "scripts/fixtures/artwork-store-pins.json")),
-  );
-  let count = 0;
-  for (const [platform, data] of Object.entries(pins)) {
-    for (const source of data.screenshots) {
-      // The archive is the delivery contract: it is never rewritten by a
-      // library recapture, so the bytes must still hash to their pin.
-      assert.match(source.file, new RegExp(`^source/store/${platform}/`));
-      const bytes = await readFile(join(FOLDER, source.file));
-      assert.equal(hash(bytes), source.sha256);
-      const { width, height } = await sharp(bytes).metadata();
-      assert.deepEqual({ width, height }, data.resolution);
-      count++;
-    }
-  }
-  assert.equal(count, 8);
-});
-
 test("phone embeds the full original native capture and keeps status-bar/home-indicator geometry", async () => {
-  // One on-profile capture per platform: Android store deliveries are a
-  // different device and are withheld from framing until recaptured.
+  // One on-profile capture per platform: the four 1080x1920 Android captures
+  // are a different device and are withheld from framing until recaptured.
   for (const [platform, key] of [
     ["ios", "ios/wallet"],
     ["android", "android/feed"],

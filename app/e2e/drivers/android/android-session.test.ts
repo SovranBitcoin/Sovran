@@ -123,7 +123,7 @@ describe('Android capture profile', () => {
   ])('rejects effective settings mismatch %j', async (override) => {
     await expect(
       prepareAndroidCapture(await captureAdb(override), { captureProfile: 'library-v1' })
-    ).rejects.toThrow(/did not take effect/);
+    ).rejects.toThrow(/presentation profile unmet/);
   });
 });
 

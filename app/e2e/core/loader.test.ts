@@ -29,7 +29,7 @@ describe('loadE2E over the real tree', () => {
   });
 
   it('requires every canonical scenario to author a non-empty verify section', () => {
-    expect(loaded.scenarios.size).toBe(153);
+    expect(loaded.scenarios.size).toBe(157);
     for (const scenario of loaded.scenarios.values()) {
       expect(scenario.verify.length).toBeGreaterThan(0);
     }
@@ -1416,7 +1416,6 @@ describe('loadE2E over the real tree', () => {
       'notification-policy-relaxed',
       'notification-policy-strict',
       'profile-reveal-mnemonic',
-      'profile-reveal-nsec',
       'receive-unified-rail-switch-bolt12',
       'settings-mock-fail-melt-toggle',
       'settings-mock-fail-send-toggle',

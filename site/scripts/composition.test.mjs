@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
 import { validateRecipe, recipeHash, recipeFromHash, resolveCapture } from './composition-recipe.mjs';
 import { buildSourceCatalog, readCaptureSource, sha256 } from './source-catalog.mjs';
-import { renderComposition } from './composition.mjs';
+import { renderComposition, rasterize } from './composition.mjs';
 import { localArtwork } from './local-artwork.mjs';
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
@@ -167,6 +167,16 @@ test('library image serving verifies exact bytes and revokes cached URLs after t
   const origin = `http://127.0.0.1:${server.address().port}`;
   const catalog = await (await fetch(`${origin}/__artwork/sources`)).json();
   const wallet = resolveCapture(catalog, 'ios/wallet'), url = `${origin}${wallet.imageUrl}`;
+  // Rendering serves the artwork; rasterizing is what an export asks for, and the
+  // exported pixels are that same SVG so the two can never show different images.
+  const post = (query = '') => fetch(`${origin}/__artwork/render${query}`, { method: 'POST',
+    headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(base) });
+  const drawn = await (await post()).json();
+  assert.deepEqual(Object.keys(drawn).sort(), ['provenance', 'svg']);
+  assert.match(drawn.svg, /^<svg /);
+  const exported = await (await post('?format=png')).json();
+  assert.deepEqual(Object.keys(exported).sort(), ['png', 'provenance']);
+  assert.deepEqual(Buffer.from(exported.png, 'base64'), await rasterize(drawn.svg));
   const bytes = await readCaptureSource(root, wallet);
   assert.deepEqual(Buffer.from(await (await fetch(url)).arrayBuffer()), bytes);
   assert.equal((await fetch(url, { method: 'HEAD' })).status, 200);
@@ -219,15 +229,17 @@ test('the brand watermark is placed, reserves its own band, and only drafts carr
   assert.notEqual(symbol.svg.match(/<image[^>]*data:image\/png[^>]*\/>/g).at(-1), bottomLeft.svg.match(/<image[^>]*data:image\/png[^>]*\/>/g).at(-1));
 });
 
-test('final SVG and PNG agree exactly, text is outlined/escaped, mixed platforms and 1-4 phone presets render with draft evidence', async t => {
+test('the renderer returns only SVG that rasterizes at the recipe size, text is outlined/escaped, mixed platforms and 1-4 phone presets render with draft evidence', async t => {
   const { root } = await fixture(t);
   await assert.rejects(renderComposition({ ...base, draft: false }, { repoRoot: root }), /Explicitly enable draft/);
   for (const [count, preset] of [[1, 'single-front'], [2, 'duo-mirror'], [3, 'triple-fan'], [4, 'quartet-grid']]) {
     const phones = ['ios/wallet', 'android/wallet', 'ios/feed', 'ios/send'].slice(0, count).map(captureId => ({ captureId }));
     const result = await renderComposition({ ...base, title: '<script>alert(1)</script>', preset, phones }, { repoRoot: root });
-    const metadata = await sharp(result.png).metadata();
+    // The renderer returns artwork, not pixels: a PNG only ever exists as this
+    // SVG rasterized, so a preview and an export cannot show different images.
+    assert.deepEqual(Object.keys(result).sort(), ['provenance', 'svg']);
+    const metadata = await sharp(await rasterize(result.svg)).metadata();
     assert.equal(metadata.width, 640); assert.equal(metadata.height, 640);
-    assert.deepEqual(await sharp(Buffer.from(result.svg)).png().toBuffer(), result.png);
     assert(!result.svg.includes('<script>')); assert(result.svg.includes('&lt;script&gt;'));
     assert(!result.svg.includes('<text')); assert(result.svg.includes('DRAFT'));
     assert.equal(result.provenance.captures.length, count);

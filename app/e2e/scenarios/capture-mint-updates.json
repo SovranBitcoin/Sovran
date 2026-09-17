@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "id": "capture.mint-updates",
+  "name": "Mint updates for every default mint",
+  "description": "Reach the mints tab through notifications, then read each default mint's update history. Read-only: nothing is added, trusted or dismissed.",
+  "details": "The mints tab is entered the way a person does it, from notifications, so its list is captured in its real state. Each mint's history is then opened by its own route: a mint that has published no NUT-06 change shows its own empty history rather than another mint's revisions. mint-changes-detail is the readiness because it renders whether or not revisions exist; mint-changes-populated only appears when there are some.",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"tab-notifications"}}],"until":{"id":"notifications-tab-mints"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"notifications-tab-mints"}}],"until":{"idPrefix":"mint-change-row:"},"attempts":4,"settleMs":8000},
+    {"action":"waitFor","selector":{"idPrefix":"mint-change-row:"},"timeoutMs":45000},
+    {"action":"screenshot","name":"notifications","delayMs":2500},
+    {"action":"openUrl","url":"sovran:///(drawer)/(tabs)/notifications/mint-changes?mintUrl=https%3A%2F%2Fmint.minibits.cash%2FBitcoin"},
+    {"action":"waitFor","selector":{"label":"Mint updates"},"timeoutMs":45000},
+    {"action":"waitFor","selector":{"id":"mint-changes-populated"},"timeoutMs":45000},
+    {"action":"screenshot","name":"notification-mint-changes","delayMs":3000},
+    {"action":"openUrl","url":"sovran:///(drawer)/(tabs)/notifications/mint-changes?mintUrl=https%3A%2F%2Fmint.macadamia.cash"},
+    {"action":"waitFor","selector":{"label":"Mint updates"},"timeoutMs":45000},
+    {"action":"waitFor","selector":{"id":"mint-changes-populated"},"timeoutMs":45000},
+    {"action":"screenshot","name":"notification-mint-changes","delayMs":3000},
+    {"action":"openUrl","url":"sovran:///(drawer)/(tabs)/notifications/mint-changes?mintUrl=https%3A%2F%2Fantifiat.cash"},
+    {"action":"waitFor","selector":{"label":"Mint updates"},"timeoutMs":45000},
+    {"action":"waitFor","selector":{"id":"mint-changes-populated"},"timeoutMs":45000},
+    {"action":"screenshot","name":"notification-mint-changes","delayMs":3000},
+    {"action":"openUrl","url":"sovran:///(drawer)/(tabs)/notifications/mint-changes?mintUrl=https%3A%2F%2Fmint.cubabitcoin.org"},
+    {"action":"waitFor","selector":{"label":"Mint updates"},"timeoutMs":45000},
+    {"action":"waitFor","selector":{"id":"mint-changes-populated"},"timeoutMs":45000},
+    {"action":"screenshot","name":"notification-mint-changes","delayMs":3000},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

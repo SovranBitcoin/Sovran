@@ -50,6 +50,19 @@ export function elementTapCenter(
   return { x: x / screen.width, y: y / screen.height };
 }
 
+/** A scrolling list keeps gliding after the gesture that started it, so a
+ * centre read mid-glide is already stale when the tap lands and the press
+ * arrives on the neighbouring row (a settings row tap opening Privacy instead
+ * of Media). Commit a gesture only once two consecutive reads agree. The
+ * tolerance is in normalized screen units — a hair under half a percent, which
+ * is below a row's height on either capture frame and above AX rounding. */
+export const TAP_CENTER_TOLERANCE = 0.004;
+export const centersAgree = (
+  a: { x: number; y: number } | null,
+  b: { x: number; y: number } | null,
+  tolerance: number = TAP_CENTER_TOLERANCE
+): boolean => !!a && !!b && Math.abs(a.x - b.x) <= tolerance && Math.abs(a.y - b.y) <= tolerance;
+
 export const normalizeWs = (s: string | undefined): string => (s ?? '').replace(/\s+/g, ' ').trim();
 
 const IOS_CHECKED_CONTROL_VALUE = /^(?:radio button|checkbox|switch), (?:checked, 1|unchecked, 0)$/;

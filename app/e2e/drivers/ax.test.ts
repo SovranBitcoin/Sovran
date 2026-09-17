@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  centersAgree,
   classifyObservedState,
   elementTapCenter,
   normalizeWs,
@@ -215,5 +216,17 @@ describe('classifyObservedState', () => {
     expect(
       classifyObservedState(snap([...walletElements, el({ label: 'Welcome to Sovran' })]))
     ).toBe('onboarding');
+  });
+});
+
+describe('centersAgree', () => {
+  it('accepts readings within the tolerance and rejects a row-sized drift', () => {
+    expect(centersAgree({ x: 0.5, y: 0.4 }, { x: 0.5, y: 0.4021 })).toBe(true);
+    expect(centersAgree({ x: 0.5, y: 0.4 }, { x: 0.5, y: 0.46 })).toBe(false);
+  });
+
+  it('never agrees when a reading is missing', () => {
+    expect(centersAgree(null, { x: 0.5, y: 0.4 })).toBe(false);
+    expect(centersAgree({ x: 0.5, y: 0.4 }, null)).toBe(false);
   });
 });

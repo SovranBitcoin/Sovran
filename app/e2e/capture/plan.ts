@@ -52,6 +52,10 @@ const RECIPES: Record<string, string> = {
   'capture.followers': 'capture-library',
   'capture.whitenoise-entry': 'capture-library',
   'capture.storage': 'capture-library',
+  'capture.receive-qr-tabs': 'capture-library',
+  'capture.mint-details': 'capture-library',
+  'capture.mint-updates': 'capture-library',
+  'capture.wallpapers': 'capture-library',
 };
 
 const rules: Rule[] = [];
@@ -65,7 +69,7 @@ const REVIEWED_STEPS: Record<string, string> = {
   'marketing.screenshots.media': '3dacc9199412110912142124d01882b760a7a7ad28ce157b42d5c4f62f44cdcf',
   'marketing.screenshots.mints': '45648d36d90336f529d29e8eec9f75743ce7fa732eacb0d02c49eb91678bce0a',
   'backup.flow': 'a1d6109df846af127939d86170507872a82a99cfeb259d6d76ba7f7223edabe8',
-  'cta.preview': '4145d235daea8ddd97f092d874e966d9d2e9fd4d41f4d91d71d00d6a9b9f0240',
+  'cta.preview': 'efc6208d16c153c786cb6cbccc57953e1ddf4cc0ac511626e16d173682554601',
   'profile.own.view': 'de1cd02ff2ba9c2a92f6eedc3ec8e1e27152435e47e56cba6985e0c5e82e3d96',
   'settings.routing.navigate': 'c908361b3002f4282c35d1582719ccd8dfa1c8665a29f7fcc7e9eb61a7c1dd1a',
   'settings.notification-policy':
@@ -73,21 +77,25 @@ const REVIEWED_STEPS: Record<string, string> = {
   'settings.legal.navigate': '03db104b6da7d9a1ea2afebadb9ab80bcdb0bd8acfa3823919b2d1cdeefcb244',
   'settings.design-system.showcase':
     'b42e35e1b31a6d1ac5082da96cd5545f80edc5773f07b7b791efad215d87b4f9',
-  'mint.add.cancel': 'dba338bf6d4aca7658533445e16359c7ed6593979de5c94e9031b9266b278e30',
-  'capture.settings': '41c246a2f41c505ad232cfe48fc1bebde8a57a05e144622a88e16d0c54cd0276',
-  'capture.design-system': '9aceb8f2f5d303a26f173f01e64e59475018598fe0730f70bfd448b202de1f14',
-  'capture.history': 'c1f2a17f6a2ed224cf8fbfbe0d90ce0fa51757908549d5b2315206655038388f',
+  'mint.add.cancel': 'a0c21c962af6b1e92e2765d389bf233cf59e9f8f0b6b585bb7819c60485ec759',
+  'capture.settings': '4c8d1c63037eea7b3a245d40c3659448435d9e1f18eb0ae22cb0be8ea8091f8b',
+  'capture.design-system': '463e40299eb9be49362a4a3070bd7494375d43ad507baac555475789da5dae70',
+  'capture.history': '184660bdc7b8780e1156fd9699ac3a3b0213e03aa344fd735ff7a4e1e875262c',
   'capture.onboarding': 'd1c01ff942735e67fd68c40f51441b96cb87e930f3ae4b3430bb63070113b6b1',
   'capture.local-navigation': '07fbd4bcd34445b8c49d9842fc989969c657975756b0a14daf7932f8062c0bad',
   'wallet.search.no-results': 'd13343db24654cd7ff1be2cf24a24d827b95fba5465cadf063486036dde6334a',
-  'profile.switcher': 'fa6f5a5151e0d5419ab6244e45e189d04792e426a7a79007d24a283b5404c620',
-  'capture.account-entry': '34aac00c8fc0122342921f00bf95ee936de7242b57070dc50189dee1cf230843',
-  'capture.composer': 'dd5f1765a4c7c6c67b96988f6a15ce9ad3e0869dc869449e84ab420040440888',
+  'profile.switcher': '8e368e52e4453d91befc53265f274555484e635e6561797a6013216be431ce69',
+  'capture.account-entry': '8859915a9ded9e660b7edaff587a80ad0b242e9e052527444d078d01cdda8683',
+  'capture.composer': 'cf4207b5a3f96ca70bc5a3f874e66856784a9f7e4c9107a917d2e8319d96727c',
   'capture.followers': '90e4c8e81be5825c8acbb633ee8b1ce2af72ff421a03cf38b7a2e12be6691530',
   'capture.receive-rails': '6db745b537b1aeaac47907398fe1edc33f1779bd1782daca1d8f213b493eafef',
-  'capture.signer-lists': 'be2eddd036aba70cfb6162742225b85c89af83b39429e952328edac1c62eda89',
-  'capture.storage': 'ce3fe5a6ed34f20bf4e52fea762e64c378aabe24559fbd08000c1cc8fe4c7167',
+  'capture.signer-lists': 'a35ad7b497d1c5a9e11356ae1e54b21c321fe666e0f6a8ed3e5cf7d4cf3962e6',
+  'capture.storage': 'f2a5cc448363fb2fbe629056c6dc252c5bca4e4324d2286aa772f421928f4f3e',
   'capture.whitenoise-entry': 'ec48bbdac9aa2d65669abd970ef3b2a72f8b4b0d38e7a768b0a248a894bb7544',
+  'capture.receive-qr-tabs': 'a908eaa1506be9a86dde98aeaa11f72bc1f82bf06445ad4439c5cff69a033ab6',
+  'capture.mint-details': '41fa27c452ee42048b828f021945e5c4f2c495bd67db802ed3d01cb3539286c8',
+  'capture.mint-updates': 'd9436c5a657554d4f16231175ce466e1f06daf71143887d420dc677f156195e8',
+  'capture.wallpapers': '0035c6d03b452f566743d43c95d7b42c663e3ea696cc44cd81ca2b8560fffaa1',
 };
 function recipe(
   scenario: string,
@@ -201,11 +209,10 @@ recipe('mint.add.cancel', 'native-navigation', [
   ['mint-add', 'contact-row:mint:https://testnut.cashu.space'],
 ]);
 recipe('capture.settings', 'native-navigation', [
-  ['settings-profile', 'profile-reveal-nsec'],
   ['settings-edit-profile', 'edit-profile-name'],
   ['settings-network', 'settings-vertex-credits-toggle'],
   ['settings-media', 'settings-media-server-row'],
-  ['settings-moderation', 'moderation-filter-toggle'],
+  ['settings-moderation', 'MESSAGE FILTER'],
   ['settings-delete', 'Save your NIP06'],
 ]);
 recipe('capture.design-system', 'native-fixture', [
@@ -251,8 +258,45 @@ recipe('capture.whitenoise-entry', 'native-navigation', [
   ['whitenoise-setup', 'whitenoise-setup-uninitialized'],
 ]);
 recipe('capture.storage', 'native-navigation', [['settings-storage', 'settings-storage-ready']]);
+recipe('capture.wallpapers', 'native-navigation', [
+  ['theme-background', 'wallpaper-option-navy', 1, 'colours-album'],
+  ['wallet', 'Wallpaper image none for dark', 1, 'wallpaper-dark'],
+  ['wallet', 'Wallpaper image none for light', 2, 'wallpaper-light'],
+  ['wallet', 'Wallpaper image none for navy', 3, 'wallpaper-navy'],
+  ['wallet', 'Wallpaper image none for sunset', 4, 'wallpaper-sunset'],
+  ['wallet', 'Wallpaper image none for beige', 5, 'wallpaper-beige'],
+  ['wallet', 'Wallpaper image none for crimson-night', 6, 'wallpaper-crimson-night'],
+  ['wallet', 'Wallpaper image none for twilight-amber', 7, 'wallpaper-twilight-amber'],
+  ['wallet', 'Wallpaper image none for velvet-emerald', 8, 'wallpaper-velvet-emerald'],
+]);
+recipe('capture.mint-updates', 'native-navigation', [
+  ['notifications', 'mint-change-row:', 1, 'mints'],
+  ['notification-mint-changes', 'mint-changes-populated', 1, 'minibits'],
+  ['notification-mint-changes', 'mint-changes-populated', 2, 'macadamia'],
+  ['notification-mint-changes', 'mint-changes-populated', 3, 'antifiat'],
+  ['notification-mint-changes', 'mint-changes-populated', 4, 'cubabitcoin'],
+]);
+recipe('capture.mint-details', 'native-navigation', [
+  ['mint-info', 'mint-info-reviews', 1, 'minibits'],
+  ['mint-reviews', 'mint-reviews-profile-', 1, 'minibits'],
+  ['mint-info', 'mint-info-reviews', 2, 'macadamia'],
+  ['mint-reviews', 'mint-reviews-profile-', 2, 'macadamia'],
+  ['mint-info', 'mint-info-reviews', 3, 'antifiat'],
+  ['mint-reviews', 'mint-reviews-profile-', 3, 'antifiat'],
+  ['mint-info', 'mint-info-reviews', 4, 'cubabitcoin'],
+  ['mint-reviews', 'mint-reviews-profile-', 4, 'cubabitcoin'],
+]);
+recipe('capture.receive-qr-tabs', 'native-navigation', [
+  ['receive-qr', 'receive-unified-rails-state', 1, 'unified'],
+  ['receive-qr', 'receive-lightning-mode-address', 2, 'lightning-address'],
+  ['receive-qr', 'receive-bolt12-find-mints', 3, 'bolt12-offer'],
+  ['receive-qr', 'payment-info-address-data', 4, 'onchain'],
+  ['receive-qr', 'receive-creq-p2pk-state', 5, 'cashu'],
+]);
 
 const BLOCKERS: Partial<Record<Page, string>> = {
+  'settings-profile':
+    'The profile screen renders three profile-secret inputs (nsec, NIP06, NUT13), and the screenshot mask is fail-closed on their geometry: every capture came back a whole-frame black, which the importer correctly refuses as non-evidence. Give the page an inert secret-free presentation fixture before capturing it.',
   'secure-locked':
     'recovery.secure-locked requires a manually prepared boot error on a disposable device; no automated fault fixture exists. Add that fixture and gate readiness first.',
   'profile-keys-error':

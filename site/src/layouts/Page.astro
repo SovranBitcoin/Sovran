@@ -42,10 +42,13 @@ try {
       <details class="mobile-nav"><summary>Menu</summary><nav aria-label="Mobile navigation">{links.map(([href, label]) => <a href={href} aria-current={path === href ? 'page' : undefined}>{label}</a>)}</nav></details>
     </header></div>
     <main id="main"><slot /></main>
-    <footer class="site-footer wrap">
-      <div><a class="brand" href="/"><img src="/sovran-mark.svg" alt="" width="24" height="24" />SOVRAN</a><p>{siteCopy.hero.text}</p></div>
-      <nav aria-label="Footer navigation"><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/roadmap">Roadmap</a><a href="https://github.com/SovranBitcoin/Sovran" rel="noreferrer">Source code</a></nav>
-      <small>&copy; {new Date().getFullYear()} SOVRAN LTD. <a href="https://github.com/SovranBitcoin/Sovran/blob/main/LICENSE">MPL-2.0</a> · <a href="/licenses/README.txt">Third-party notices</a></small>
+    <footer class="site-footer">
+      <div class="wrap footer-top">
+        <div><a class="brand" href="/"><img src="/sovran-mark.svg" alt="" width="24" height="24" />SOVRAN</a><p>{siteCopy.hero.text}</p></div>
+        <nav aria-label="Footer navigation"><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/roadmap">Roadmap</a><a href="https://github.com/SovranBitcoin/Sovran" rel="noreferrer">Source code</a></nav>
+        <small>&copy; {new Date().getFullYear()} SOVRAN LTD. <a href="https://github.com/SovranBitcoin/Sovran/blob/main/LICENSE">MPL-2.0</a> · <a href="/licenses/README.txt">Third-party notices</a></small>
+      </div>
+      <p class="wrap footer-mark" aria-hidden="true">SOVRAN</p>
     </footer>
   </body>
 </html>
