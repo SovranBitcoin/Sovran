@@ -43,6 +43,12 @@ interface TransferEntryRowProps {
   secondarySubtitle?: string;
   /** Optional press handler for the row */
   onPress?: () => void;
+  /** e2e selector for the pressable row, from the transfer's identity
+   *  (e.g. `transfer-entry-${type}-${mintUrl}`). */
+  testID?: string;
+  /** Screen-reader name for the pressable row. Defaults to the direction,
+   *  amount and mint. */
+  accessibilityLabel?: string;
 }
 
 export const TransferEntryRow = React.memo(
@@ -55,6 +61,8 @@ export const TransferEntryRow = React.memo(
     subtitle,
     secondarySubtitle,
     onPress,
+    testID,
+    accessibilityLabel,
   }: TransferEntryRowProps) => {
     const [foreground, surfaceSecondary, danger, success] = useThemeColor([
       'foreground',
@@ -121,7 +129,15 @@ export const TransferEntryRow = React.memo(
     if (onPress) {
       return (
         <Log name="TransferEntryRow">
-          <Pressable style={styles.entryRow} onPress={onPress}>
+          <Pressable
+            style={styles.entryRow}
+            onPress={onPress}
+            testID={testID}
+            accessibilityRole="button"
+            accessibilityLabel={
+              accessibilityLabel ??
+              `${isSend ? 'Send' : 'Receive'} ${amount} ${unit} ${isSend ? 'from' : 'to'} ${mintName}`
+            }>
             {content}
           </Pressable>
         </Log>

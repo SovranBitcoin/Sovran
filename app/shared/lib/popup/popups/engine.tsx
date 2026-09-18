@@ -24,6 +24,8 @@ type PopupButton = {
   text: string;
   page?: string;
   onPress?: () => void;
+  /** e2e selector for the sheet button, derived from the action's meaning. */
+  testID?: string;
 };
 
 interface PopupConfig {

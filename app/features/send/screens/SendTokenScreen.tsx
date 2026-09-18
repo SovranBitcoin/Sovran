@@ -28,7 +28,7 @@ import {
   stateDetailItem,
   mintDetailItem,
 } from '@/features/transactions';
-import { truncateMiddle } from '@/shared/lib/strings';
+import { MiddleEllipsisValue } from '@/shared/ui/composed/MiddleEllipsisValue';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -335,7 +335,7 @@ export function SendTokenScreen({
           paymentRequest && { title: 'Type', value: 'Payment Request' },
           paymentRequest?.requestId && {
             title: 'Request ID',
-            value: truncateMiddle(paymentRequest.requestId, 8),
+            value: <MiddleEllipsisValue value={paymentRequest.requestId} />,
           },
           ...transactionLeadDetailItems({
             source,
@@ -347,12 +347,12 @@ export function SendTokenScreen({
           stateDetailItem(entry.state),
           entry.operationId && {
             title: 'Operation ID',
-            value: truncateMiddle(entry.operationId, 7),
+            value: <MiddleEllipsisValue value={entry.operationId} />,
           },
           mintDetailItem(mintUrl),
           entry.tokenString && {
             title: 'Token',
-            value: entry.tokenString.truncate(6),
+            value: <MiddleEllipsisValue value={entry.tokenString.toString()} />,
           },
         ]}
       />

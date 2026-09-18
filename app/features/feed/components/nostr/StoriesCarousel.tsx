@@ -16,6 +16,8 @@ import {
   StyleSheet,
   useWindowDimensions,
   View,
+  type AccessibilityActionEvent,
+  type AccessibilityActionInfo,
   type GestureResponderEvent,
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -77,6 +79,11 @@ const VIEWABILITY_CONFIG = {
 };
 
 const STORIES_VISUAL_SCOPE = 'feed.stories.carousel';
+
+const STORY_ACCESSIBILITY_ACTIONS: AccessibilityActionInfo[] = [
+  { name: 'previous', label: 'Previous story' },
+  { name: 'next', label: 'Next story' },
+];
 
 const TOP_GRADIENT = easeGradient({
   colorStops: {
@@ -488,19 +495,18 @@ const UserStoriesItem: FC<UserItemProps> = ({
     }
   );
 
-  const onStoryPress = useCallback(
-    (e: GestureResponderEvent) => {
+  const stepStory = useCallback(
+    (direction: 'previous' | 'next') => {
       if (captionExpandedRef.current) {
         captionExpandedRef.current = false;
         setCaptionExpanded(false);
         resumePlayer();
         return;
       }
-      const isLeft = e.nativeEvent.pageX < screenWidth / 2;
       const isLastStory = currentStoryIndex === user.videoPosts.length - 1;
       const isFirstStory = currentStoryIndex === 0;
 
-      if (isLeft) {
+      if (direction === 'previous') {
         if (userIndex === 0 && isFirstStory) return;
         if (isFirstStory) {
           scrollRef.current?.scrollToIndex({ index: userIndex - 1, animated: true });
@@ -525,10 +531,25 @@ const UserStoriesItem: FC<UserItemProps> = ({
       userIndex,
       totalUsers,
       scrollRef,
-      screenWidth,
       user.videoPosts.length,
       onClose,
     ]
+  );
+
+  const onStoryPress = useCallback(
+    (e: GestureResponderEvent) => {
+      stepStory(e.nativeEvent.pageX < screenWidth / 2 ? 'previous' : 'next');
+    },
+    [stepStory, screenWidth]
+  );
+
+  // Screen-reader alternative to the left/right tap zones.
+  const onStoryAccessibilityAction = useCallback(
+    (e: AccessibilityActionEvent) => {
+      if (e.nativeEvent.actionName === 'previous') stepStory('previous');
+      else if (e.nativeEvent.actionName === 'next') stepStory('next');
+    },
+    [stepStory]
   );
 
   const onStoryLongPress = useCallback(() => {
@@ -574,6 +595,8 @@ const UserStoriesItem: FC<UserItemProps> = ({
           accessibilityRole="button"
           accessibilityLabel={captionExpanded ? 'Collapse caption' : 'Navigate stories'}
           accessibilityHint="Tap the left or right side to change stories. Hold to pause."
+          accessibilityActions={STORY_ACCESSIBILITY_ACTIONS}
+          onAccessibilityAction={onStoryAccessibilityAction}
           style={styles.flex1}
           onPress={onStoryPress}
           onLongPress={onStoryLongPress}

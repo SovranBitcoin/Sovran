@@ -137,7 +137,9 @@ function MenuInputField({
       ) : null}
       <BottomSheetTextInput
         testID={`action-menu-input-${input.id}`}
-        accessibilityLabel={input.label ?? input.placeholder ?? input.id}
+        accessibilityLabel={
+          input.accessibilityLabel ?? input.label ?? input.placeholder ?? input.id
+        }
         value={value}
         onChangeText={onChangeText}
         onFocus={() => setIsFocused(true)}
@@ -444,10 +446,11 @@ function ActionMenuInstance({
         : button.description;
     const item = (
       <Menu.Item
-        testID={button.testID ?? `action-menu-item-${key}`}
+        testID={button.testID}
         accessibilityLabel={button.accessibilityLabel}
         accessibilityHint={button.accessibilityHint}
         isDisabled={isDisabled}
+        isSelected={button.selected}
         variant={isDanger ? 'danger' : 'default'}
         onPress={() => handleItemPress(button)}>
         <SheetMenuRowContent
@@ -481,7 +484,7 @@ function ActionMenuInstance({
   const headerNode = payload?.header ? <View className="mb-2">{payload.header}</View> : null;
 
   const buttonsNode = payload?.buttons?.length
-    ? payload.buttons.map((b, i) => renderActionButton(b, `b-${i}`))
+    ? payload.buttons.map((b) => renderActionButton(b, `b-${b.testID}`))
     : null;
 
   const inputsNode =
@@ -503,7 +506,7 @@ function ActionMenuInstance({
     ) : null;
 
   const footerButtonsNode = payload?.footerButtons?.length
-    ? payload.footerButtons.map((b, i) => renderActionButton(b, `fb-${i}`))
+    ? payload.footerButtons.map((b) => renderActionButton(b, `fb-${b.testID}`))
     : null;
 
   const primaryActionNode = payload?.primaryAction ? (
@@ -512,6 +515,8 @@ function ActionMenuInstance({
       <Menu.Item
         testID={payload.primaryAction.testID ?? 'action-menu-submit'}
         isDisabled={primaryDisabled}
+        // Replaces heroui's own state object, so it restates `disabled`.
+        accessibilityState={{ disabled: primaryDisabled, busy: isSubmitting }}
         onPress={() => {
           void handlePrimaryPress(payload.primaryAction!);
         }}>
@@ -687,9 +692,15 @@ function ActionMenuInstance({
       {/*
        * Bottom-sheet presentation ignores Trigger position, but heroui still
        * requires a Trigger in the tree. A zero-size, offscreen Pressable
-       * satisfies the API without visually affecting anything.
+       * satisfies the API without visually affecting anything. It is never
+       * a user control (menus open imperatively), so it stays out of the
+       * accessibility tree.
        */}
-      <Menu.Trigger style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
+      <Menu.Trigger
+        style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}
+        accessible={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants">
         <View style={{ width: 1, height: 1 }} />
       </Menu.Trigger>
       {/*
@@ -811,12 +822,9 @@ function ActionMenuInstance({
               // profile list (or future >100-item picker) only mounts
               // the rows in the draw window.
               renderItem={(button, sectionId) =>
-                renderActionButton(
-                  button,
-                  `${sectionId}-${button.testID ?? sectionsForList.find((section) => section.id === sectionId)?.data.indexOf(button)}`
-                )
+                renderActionButton(button, `${sectionId}-${button.testID}`)
               }
-              keyExtractor={(button, sectionId) => `${sectionId}-${button.testID ?? button.text}`}
+              keyExtractor={(button, sectionId) => `${sectionId}-${button.testID}`}
               // The 12px horizontal inset that previously wrapped each
               // section now lives on the list contentContainer so
               // every row aligns with `Menu.Label`'s `ml-3` (24px from

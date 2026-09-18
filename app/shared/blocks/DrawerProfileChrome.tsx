@@ -262,7 +262,12 @@ export function DrawerProfileChrome({ closeDrawer }: { closeDrawer: () => void }
         paddingBottom: spacing.lg,
       }}>
       <HStack align="flex-start" justify="space-between">
-        <Pressable onPress={handleAvatarPress} hitSlop={hitSlop.default}>
+        <Pressable
+          onPress={handleAvatarPress}
+          hitSlop={hitSlop.default}
+          testID="drawer-profile-avatar"
+          accessibilityRole="button"
+          accessibilityLabel="Open your profile">
           <Avatar
             state={avatarStateFor(picture, pictureResolved)}
             seed={pubkey}
@@ -277,7 +282,9 @@ export function DrawerProfileChrome({ closeDrawer }: { closeDrawer: () => void }
       <Pressable
         onPress={handleAvatarPress}
         testID="drawer-profile-name"
-        accessibilityLabel={displayName}>
+        accessibilityRole="button"
+        accessibilityLabel={displayName}
+        accessibilityHint="Opens your profile">
         <VStack align="flex-start" gap={spacing.xs}>
           <Text bold size={20} style={{ color: foreground }}>
             {displayName}

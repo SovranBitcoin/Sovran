@@ -114,6 +114,11 @@ type SearchLayoutProps = {
   searchTestIDPrefix?: string;
 };
 
+/**
+ * The searchable-tab navigator. It is a route layout, not a screen: the Wallet,
+ * Feed and Contacts tabs' `_layout.tsx` files render it as their default
+ * export, so its `<Stack>` is the file-based stack for that tab.
+ */
 export function SearchLayout({
   title,
   placeholder,

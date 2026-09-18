@@ -6,7 +6,12 @@ import { withAlpha } from '@/shared/lib/color';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { View } from '@/shared/ui/primitives/View/View';
-import { CapsuleButtonContent, DEFAULT_HEIGHT, capsuleWidthStyle } from './CapsuleButton.content';
+import {
+  CapsuleButtonContent,
+  DEFAULT_HEIGHT,
+  capsuleAccessibilityState,
+  capsuleWidthStyle,
+} from './CapsuleButton.content';
 import type { CapsuleButtonProps } from './CapsuleButton.types';
 
 export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement {
@@ -27,6 +32,8 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
     selectedVariant = 'tint',
     height = DEFAULT_HEIGHT,
     testID,
+    disabled = false,
+    busy = false,
     roundedSide = 'all',
     fitContent = false,
     style,
@@ -64,13 +71,12 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
       <PressableFeedback
         animation={false}
         onPress={onPress}
+        isDisabled={disabled || busy}
         testID={testID}
         accessible
         accessibilityRole={accessibilityRole}
         accessibilityLabel={accessibilityLabel ?? label}
-        accessibilityState={
-          accessibilityRole === 'radio' ? { checked: isActive, selected: isActive } : undefined
-        }
+        accessibilityState={capsuleAccessibilityState(props)}
         accessibilityValue={
           accessibilityRole === 'radio' ? { text: isActive ? '1' : '0' } : undefined
         }

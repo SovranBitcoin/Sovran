@@ -35,7 +35,6 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import Icon from 'assets/icons';
-import { shortPubkey } from '@/features/nostrSigner/components/display';
 import { safeHostname } from '@/features/nostrSigner/lib/boundedDisplay';
 import {
   alwaysAllowEligible,
@@ -63,6 +62,7 @@ import {
   type Nip46Connection,
 } from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import { useNip46RequestsStore } from '@/features/nostrSigner/data/nip46RequestsStore';
+import { useShallow } from 'zustand/react/shallow';
 import type { GrantKey } from '@/features/nostrSigner/lib/nip46Types';
 import { PAIRING_PRESET_GRANT_KEYS } from '@/features/nostrSigner/lib/pairingPreset';
 import { parseGrantKey } from '@/features/nostrSigner/lib/permissionPolicy';
@@ -220,12 +220,12 @@ const PERMISSION_GROUPS = GROUP_ORDER.map(({ group, label }) => {
 
 /**
  * Avatar + resolved name for a decrypt-access peer — kind-0 cache first,
- * one-shot nagg fallback (useNostrPersonDisplay), shortPubkey last.
+ * one-shot nagg fallback (useNostrPersonDisplay), the full pubkey (middle-ellipsized) last.
  */
 function PeerAccessIdentity({ pubkey, sublabel }: { pubkey: string; sublabel: string }) {
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
   const person = useNostrPersonDisplay(pubkey);
-  const name = person.name ?? shortPubkey(pubkey);
+  const name = person.name ?? pubkey;
   return (
     <HStack gap={12} style={PEER_ROW_STYLE}>
       <Avatar
@@ -236,7 +236,11 @@ function PeerAccessIdentity({ pubkey, sublabel }: { pubkey: string; sublabel: st
         alt={name}
       />
       <View style={FLEX_ONE_STYLE}>
-        <Text size={14} color={foreground} numberOfLines={1}>
+        <Text
+          size={14}
+          color={foreground}
+          numberOfLines={1}
+          ellipsizeMode={person.name ? 'tail' : 'middle'}>
           {name}
         </Text>
         <Text size={12} color={muted}>
@@ -393,18 +397,18 @@ export function SignerAppDetailScreen(): React.ReactElement {
   const dangerTextStyle = { color: danger };
 
   // ── Per-person decrypt access (persistent + this-session grants) ──
-  const sessionGrants = useNip46RequestsStore((s) => s.sessionGrants);
-  const appSessionGrants =
-    clientPubkey === undefined ? [] : sessionGrants.filter((g) => g.clientPubkey === clientPubkey);
+  // Only this app's entries; useShallow keeps the filtered arrays stable
+  // until one of them actually changes.
+  const appSessionGrants = useNip46RequestsStore(
+    useShallow((s) => s.sessionGrants.filter((g) => g.clientPubkey === clientPubkey))
+  );
   // Session labels are suppressed in strict mode: evaluate() returns 'ask'
   // BEFORE consulting session state there (same reason the approval sheet
   // hides session affordances on strict apps), so the persisted labels are
   // the truthful ones.
-  const sessionAllows = useNip46RequestsStore((s) => s.sessionAllows);
-  const appSessionAllows =
-    clientPubkey === undefined
-      ? []
-      : sessionAllows.filter((allow) => allow.clientPubkey === clientPubkey);
+  const appSessionAllows = useNip46RequestsStore(
+    useShallow((s) => s.sessionAllows.filter((allow) => allow.clientPubkey === clientPubkey))
+  );
 
   const decryptAccessRows = buildDecryptAccessRows(app?.peerDecryptGrants ?? {}, appSessionGrants);
 
@@ -444,6 +448,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
           {
             text: 'Revoke for everyone',
             variant: 'dangerous',
+            testID: 'signer-app-revoke-decrypt-all-confirm',
             onPress: (close) => {
               close();
               for (const peer of peers) {
@@ -452,7 +457,12 @@ export function SignerAppDetailScreen(): React.ReactElement {
               }
             },
           },
-          { text: 'Cancel', variant: 'secondary', onPress: (close) => close() },
+          {
+            text: 'Cancel',
+            variant: 'secondary',
+            testID: 'signer-app-revoke-decrypt-all-cancel',
+            onPress: (close) => close(),
+          },
         ],
       });
       return;
@@ -483,6 +493,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
       buttons: [
         {
           text: 'Allow for everyone',
+          testID: 'signer-app-allow-decrypt-all-confirm',
           onPress: (close) => {
             close();
             let failed = 0;
@@ -499,7 +510,12 @@ export function SignerAppDetailScreen(): React.ReactElement {
             }
           },
         },
-        { text: 'Cancel', variant: 'secondary', onPress: (close) => close() },
+        {
+          text: 'Cancel',
+          variant: 'secondary',
+          testID: 'signer-app-allow-decrypt-all-cancel',
+          onPress: (close) => close(),
+        },
       ],
     });
   };
@@ -514,6 +530,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
         {
           text: RESTORE_DEFAULTS_LABEL,
           description: RESTORE_DEFAULTS_BODY,
+          testID: 'signer-app-restore-defaults-confirm',
           onPress: (close) => {
             close();
             for (const grantKey of Object.keys(app.grants) as GrantKey[]) {
@@ -529,7 +546,12 @@ export function SignerAppDetailScreen(): React.ReactElement {
             }
           },
         },
-        { text: 'Cancel', variant: 'secondary', onPress: (close) => close() },
+        {
+          text: 'Cancel',
+          variant: 'secondary',
+          testID: 'signer-app-restore-defaults-cancel',
+          onPress: (close) => close(),
+        },
       ],
     });
   };
@@ -553,6 +575,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
           icon: 'mdi:check-circle',
           description: STANDARD_MODE_MENU_DESCRIPTION,
           ...(!strictModeOn && { suffix: checkSuffix }),
+          testID: 'signer-app-mode-standard',
           onPress: (close) => {
             close();
             setMode(clientPubkey, 'standard');
@@ -564,6 +587,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
           description: STRICT_MODE_DESCRIPTION,
           ...(strictModeOn && { suffix: checkSuffix }),
           variant: 'secondary',
+          testID: 'signer-app-mode-strict',
           onPress: (close) => {
             close();
             setMode(clientPubkey, 'strict');
@@ -656,6 +680,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
         {
           text: 'Disconnect',
           variant: 'dangerous',
+          testID: 'signer-app-disconnect-confirm',
           onPress: (close) => {
             close();
             revokeSessionGrant(clientPubkey);
@@ -665,7 +690,12 @@ export function SignerAppDetailScreen(): React.ReactElement {
             router.back();
           },
         },
-        { text: 'Cancel', variant: 'secondary', onPress: (close) => close() },
+        {
+          text: 'Cancel',
+          variant: 'secondary',
+          testID: 'signer-app-disconnect-cancel',
+          onPress: (close) => close(),
+        },
       ],
     });
   };
@@ -705,8 +735,8 @@ export function SignerAppDetailScreen(): React.ReactElement {
               </Text>
             </View>
           </Animated.View>
-          <Text size={13} color={muted} numberOfLines={1}>
-            {appDomain ?? shortPubkey(app.clientPubkey)}
+          <Text size={13} color={muted} numberOfLines={1} ellipsizeMode="middle">
+            {appDomain ?? app.clientPubkey}
           </Text>
           <Text size={12} color={muted}>
             {`Connected ${formatDate(app.pairedAt, 'short-date')}`}
@@ -750,6 +780,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
               animation={false}
               onPress={onPressStrictRow}
               onLongPress={openStrictMenu}
+              testID="signer-app-strict-mode"
               accessibilityRole="switch"
               accessibilityLabel={STRICT_MODE_TITLE}
               accessibilityState={strictA11yState}
@@ -788,6 +819,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
                     <React.Fragment key={bundle.id}>
                       {index > 0 ? <Separator className="mx-4" /> : null}
                       <PermissionSwitchRow
+                        testID={`signer-permission-bundle-${bundle.id}`}
                         label={bundle.label}
                         state={bundleTriState((grantKey) => app.grants[grantKey]?.verdict, bundle)}
                         allowEligible
@@ -804,6 +836,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
                     <React.Fragment key={grantKey}>
                       {bundles.length > 0 || index > 0 ? <Separator className="mx-4" /> : null}
                       <PermissionSwitchRow
+                        testID={`signer-permission-${grantKey}`}
                         label={rowLabel}
                         state={triStateFor(app, grantKey)}
                         allowEligible={allowEligible}
@@ -824,8 +857,10 @@ export function SignerAppDetailScreen(): React.ReactElement {
                       <PressableFeedback
                         animation={false}
                         onPress={onToggleEveryone}
-                        accessibilityRole="button"
+                        testID="signer-app-decrypt-everyone"
+                        accessibilityRole="switch"
                         accessibilityLabel={EVERYONE_TITLE}
+                        accessibilityState={{ checked: everyoneAllowed }}
                         accessibilityValue={everyoneA11yValue}>
                         <PressableFeedback.Scale>
                           <ListGroup.Item disabled>
@@ -855,6 +890,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
                           <PressableFeedback
                             animation={false}
                             onPress={() => openPerson(row.peer)}
+                            testID={`signer-app-person-${row.peer}`}
                             accessibilityRole="button"
                             accessibilityLabel="Edit decrypt access"
                             accessibilityHint="Opens this person's access settings">
@@ -888,6 +924,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
                   haptics
                   accessibilityRole="button"
                   accessibilityLabel={FINE_GRAINED_LABEL}
+                  testID={`signer-app-fine-grained-${group}`}
                   onPress={() => openFineGrained(group)}>
                   <HStack gap={4} className="mr-1 mt-1" style={FINE_GRAINED_ROW_STYLE}>
                     <Text size={12} bold color={muted}>
@@ -906,6 +943,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
           <ListGroup variant="secondary">
             <ListRow
               paddingHorizontal={MANAGE_ROW_INSET}
+              testID="signer-app-rename"
               title="Rename App"
               subtitle={RENAME_APP_SUBTITLE}
               wrapSubtitle
@@ -914,6 +952,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
             />
             <ListRow
               paddingHorizontal={MANAGE_ROW_INSET}
+              testID="signer-app-activity"
               title="View Activity"
               subtitle={VIEW_ACTIVITY_SUBTITLE}
               wrapSubtitle
@@ -922,6 +961,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
             />
             <ListRow
               paddingHorizontal={MANAGE_ROW_INSET}
+              testID="signer-app-restore-defaults"
               title={RESTORE_DEFAULTS_LABEL}
               subtitle={RESTORE_DEFAULTS_SUBTITLE}
               wrapSubtitle
@@ -944,6 +984,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
               subtitle={DISCONNECT_SUBTITLE}
               wrapSubtitle
               accessibilityLabel="Disconnect App"
+              testID="signer-app-disconnect"
               trailing={<Icon name="mdi:chevron-right" size={18} color={muted} />}
               onPress={confirmDisconnect}
             />

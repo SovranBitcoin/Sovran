@@ -115,6 +115,7 @@ export function SettingsNetworkScreen() {
 
   const tiers = [
     {
+      id: 'nagg',
       name: 'nagg',
       description: 'App-view. Ranked, fully bundled feeds.',
       status: tierHealth.nagg,
@@ -122,6 +123,7 @@ export function SettingsNetworkScreen() {
       onToggle: setNaggTierEnabled,
     },
     {
+      id: 'primal',
       name: 'Primal cache',
       description: 'Public fallback cache.',
       status: tierHealth.primal,
@@ -129,6 +131,7 @@ export function SettingsNetworkScreen() {
       onToggle: setPrimalTierEnabled,
     },
     {
+      id: 'relay',
       name: 'Raw relays',
       description: 'Decentralized floor. Direct relay reads.',
       status: tierHealth.relay,
@@ -168,7 +171,7 @@ export function SettingsNetworkScreen() {
         <Section title="Data layer">
           <ListGroup variant="secondary">
             {tiers.map((tier, index) => (
-              <React.Fragment key={tier.name}>
+              <React.Fragment key={tier.id}>
                 {index > 0 ? <Separator className="mx-4" /> : null}
                 <ListGroup.Item className={tier.enabled ? undefined : 'opacity-40'}>
                   <ListGroup.ItemContent>
@@ -179,7 +182,12 @@ export function SettingsNetworkScreen() {
                     <ListGroup.ItemDescription>{tier.description}</ListGroup.ItemDescription>
                   </ListGroup.ItemContent>
                   <ListGroup.ItemSuffix>
-                    <Switch isSelected={tier.enabled} onSelectedChange={tier.onToggle} />
+                    <Switch
+                      testID={`settings-network-tier-${tier.id}`}
+                      accessibilityLabel={`Use ${tier.name}`}
+                      isSelected={tier.enabled}
+                      onSelectedChange={tier.onToggle}
+                    />
                   </ListGroup.ItemSuffix>
                 </ListGroup.Item>
               </React.Fragment>
@@ -248,11 +256,13 @@ export function SettingsNetworkScreen() {
                       <View className="mt-1 flex-row gap-4">
                         <RelayMarkerToggle
                           label="Read"
+                          relayUrl={entry.url}
                           value={entry.read}
                           onChange={(read) => setMarker(entry.url, { read, write: entry.write })}
                         />
                         <RelayMarkerToggle
                           label="Write"
+                          relayUrl={entry.url}
                           value={entry.write}
                           onChange={(write) => setMarker(entry.url, { read: entry.read, write })}
                         />
@@ -262,6 +272,7 @@ export function SettingsNetworkScreen() {
                       variant="ghost"
                       size="sm"
                       onPress={() => removeRelay(entry.url)}
+                      testID={`settings-network-relay-remove-${entry.url}`}
                       accessibilityLabel={`Remove ${entry.url}`}>
                       <Icon name="mdi:trash-can-outline" size={18} color={mutedColor} />
                     </Button>
@@ -277,6 +288,8 @@ export function SettingsNetworkScreen() {
             <Card.Body className="gap-2">
               <TextField>
                 <Input
+                  testID="settings-network-relay-input"
+                  accessibilityLabel="Relay URL"
                   value={draftUrl}
                   onChangeText={setDraftUrl}
                   placeholder="wss://relay.example.com"
@@ -292,7 +305,11 @@ export function SettingsNetworkScreen() {
                   {addError}
                 </Text>
               ) : null}
-              <Button variant="secondary" size="sm" onPress={handleAdd}>
+              <Button
+                variant="secondary"
+                size="sm"
+                testID="settings-network-relay-add"
+                onPress={handleAdd}>
                 <Button.Label>Add relay</Button.Label>
               </Button>
             </Card.Body>
@@ -306,10 +323,19 @@ export function SettingsNetworkScreen() {
             </Text>
           ) : null}
           <View className="gap-2">
-            <Button variant="primary" onPress={handlePublish} isDisabled={publishing}>
+            <Button
+              variant="primary"
+              testID="settings-network-publish"
+              accessibilityState={{ disabled: publishing, busy: publishing }}
+              onPress={handlePublish}
+              isDisabled={publishing}>
               <Button.Label>{publishing ? 'Publishing…' : 'Publish relay list'}</Button.Label>
             </Button>
-            <Button variant="ghost" size="sm" onPress={restoreDefaults}>
+            <Button
+              variant="ghost"
+              size="sm"
+              testID="settings-network-restore-defaults"
+              onPress={restoreDefaults}>
               <Button.Label>Restore defaults</Button.Label>
             </Button>
             {publishMsg ? (
@@ -351,16 +377,23 @@ function TierHealthBadge({ status, checkingColor }: { status: TierStatus; checki
 
 function RelayMarkerToggle({
   label,
+  relayUrl,
   value,
   onChange,
 }: {
-  label: string;
+  label: 'Read' | 'Write';
+  relayUrl: string;
   value: boolean;
   onChange: (next: boolean) => void;
 }) {
   return (
     <View className="flex-row items-center gap-1">
-      <Switch isSelected={value} onSelectedChange={onChange} />
+      <Switch
+        testID={`settings-network-relay-${label.toLowerCase()}-${relayUrl}`}
+        accessibilityLabel={`${label === 'Read' ? 'Read from' : 'Write to'} ${relayUrl}`}
+        isSelected={value}
+        onSelectedChange={onChange}
+      />
       <Text size={12} className="text-muted">
         {label}
       </Text>

@@ -88,6 +88,7 @@ export function RecentPeopleSearchStrip({
         </Text>
         {showClear ? (
           <Pressable
+            testID="recent-people-clear"
             onPress={clearRecentPeople}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
@@ -156,6 +157,7 @@ function RecentPersonCard({
   const handlePress = useCallback(() => navigateToProfile(pubkey), [pubkey]);
   return (
     <Pressable
+      testID={`recent-person-${pubkey}`}
       accessibilityRole="button"
       accessibilityLabel={`Open ${displayName}`}
       haptics

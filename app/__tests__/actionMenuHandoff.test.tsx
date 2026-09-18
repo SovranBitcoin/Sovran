@@ -11,7 +11,6 @@ import {
   E2EActionMenuProbe,
   E2EActionMenuRenderMarker,
   markE2EActionMenuPresented,
-  useE2EActionMenuRenderStore,
 } from '@/shared/lib/popup/E2EActionMenuProbe';
 import {
   actionMenuPopup,
@@ -210,11 +209,6 @@ describe('action-menu successor handoff', () => {
       jest.useRealTimers();
       dismissActionMenuPopup();
       usePopupStore.getState().close();
-      useE2EActionMenuRenderStore.setState({
-        renderedSequence: null,
-        renderedOpenSeq: null,
-        presentedOpenSeq: null,
-      });
     });
   });
 

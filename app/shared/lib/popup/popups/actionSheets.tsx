@@ -39,8 +39,13 @@ export function profileSwitcherPopup(payload: ProfileSwitcherPopupPayload): void
       overrideName: profile.cachedDisplayName,
     });
     return {
+      // `accountIndex` is the profile's derivation account — its stable
+      // identity, not a position in this list.
       testID: `profile-row-${profile.accountIndex}`,
       text: displayName,
+      // The active profile is the current choice: checked for screen readers
+      // (the check-circle suffix is its visual), and inert to re-selection.
+      selected: isActive,
       disabled: isActive,
       iconNode: (
         <Avatar
@@ -124,6 +129,7 @@ function openProfileImportMenu(payload: ProfileSwitcherPopupPayload): void {
     inputs: [
       {
         id: 'nsec',
+        accessibilityLabel: 'Nostr private key',
         placeholder: 'nsec1...',
         secureTextEntry: true,
         autoCapitalize: 'none',

@@ -32,7 +32,7 @@ import {
 import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { openExternalUrl } from '@/shared/lib/url';
-import { truncateMiddle } from '@/shared/lib/strings';
+import { MiddleEllipsisValue } from '@/shared/ui/composed/MiddleEllipsisValue';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -157,6 +157,7 @@ export function OnchainReceiveScreen({
           buttons={[
             {
               text: isPaid ? 'Close' : 'Cancel',
+              testID: isPaid ? 'receive-onchain-close' : 'receive-onchain-cancel',
               icon: 'ri:close-circle-line',
               variant: 'secondary',
               onPress: () => {
@@ -171,6 +172,7 @@ export function OnchainReceiveScreen({
             },
             {
               text: 'Copy',
+              testID: 'receive-onchain-copy',
               icon: 'lets-icons:copy',
               variant: 'primary',
               onPress: () => {
@@ -186,6 +188,7 @@ export function OnchainReceiveScreen({
             },
             {
               text: 'Share',
+              testID: 'receive-onchain-share',
               icon: 'ri:share-fill',
               variant: 'secondary',
               onPress: () => {
@@ -260,7 +263,10 @@ export function OnchainReceiveScreen({
           }),
           amountDetailItem({ amount: entry.amount, unit: entry.unit }),
           stateDetailItem(entry.state),
-          entry.quoteId && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
+          entry.quoteId && {
+            title: 'Quote ID',
+            value: <MiddleEllipsisValue value={entry.quoteId} />,
+          },
           mintDetailItem(mintUrl),
           {
             title: 'Network Fee',
@@ -268,7 +274,7 @@ export function OnchainReceiveScreen({
           },
           onchainAddress && {
             title: 'Address',
-            value: truncateMiddle(onchainAddress, 10),
+            value: <MiddleEllipsisValue value={onchainAddress} />,
           },
         ]}
       />
@@ -290,6 +296,7 @@ function OpenInExplorerLink({ url }: { url: string }) {
       haptics
       accessibilityRole="link"
       accessibilityLabel="Open in explorer"
+      testID="receive-onchain-explorer"
       onPress={handlePress}
       style={styles.explorerLink}>
       <Text size={13} color={linkColor}>

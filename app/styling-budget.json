@@ -9,10 +9,10 @@
     "content-container-style": 1
   },
   "app/(transactions-flow)/transactions.tsx": {
-    "inline-style": 2
+    "inline-style": 1
   },
   "app/_layout.tsx": {
-    "inline-style": 2
+    "inline-style": 1
   },
   "features/ai/components/AiEmptyState.tsx": {
     "inline-style": 1
@@ -22,7 +22,6 @@
     "stack-layout-props": 10
   },
   "features/ai/components/ModelChip.tsx": {
-    "inline-style": 1,
     "stack-layout-props": 1
   },
   "features/ai/screens/AiChatScreen.tsx": {
@@ -46,9 +45,6 @@
     "inline-style": 7,
     "stack-layout-props": 1
   },
-  "features/camera/screens/CameraScreen/CameraScreen.tsx": {
-    "inline-style": 1
-  },
   "features/composer/ui/ComposeFab.tsx": {
     "stylesheet-create": 1
   },
@@ -58,7 +54,7 @@
   },
   "features/composer/ui/PostComposer.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 13,
+    "inline-style": 10,
     "content-container-style": 1
   },
   "features/composer/ui/PostProgressBar.tsx": {
@@ -99,7 +95,7 @@
   },
   "features/feed/components/UserFeed.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 4,
+    "inline-style": 2,
     "stack-layout-props": 2
   },
   "features/feed/components/nostr/DeletedTombstone.tsx": {
@@ -108,10 +104,10 @@
     "stack-layout-props": 1
   },
   "features/feed/components/nostr/MetricsFooter.tsx": {
-    "stack-layout-props": 3
+    "stack-layout-props": 2
   },
   "features/feed/components/nostr/NoteContent.tsx": {
-    "inline-style": 12,
+    "inline-style": 9,
     "stack-layout-props": 6
   },
   "features/feed/components/nostr/PostCard.tsx": {
@@ -141,7 +137,7 @@
   },
   "features/feed/components/nostr/image-overlay/BottomPanel.tsx": {
     "stylesheet-create": 2,
-    "inline-style": 3
+    "inline-style": 2
   },
   "features/feed/components/nostr/image-overlay/ImageBlock.tsx": {
     "stylesheet-create": 1,
@@ -181,7 +177,7 @@
   "features/feed/screens/NotificationsScreen.tsx": {
     "stylesheet-create": 1,
     "inline-style": 6,
-    "stack-layout-props": 9,
+    "stack-layout-props": 7,
     "content-container-style": 1
   },
   "features/feed/screens/StoriesScreen.tsx": {
@@ -467,7 +463,7 @@
     "stack-layout-props": 1
   },
   "features/theme/components/AlbumPillTabs.tsx": {
-    "inline-style": 2
+    "inline-style": 1
   },
   "features/theme/components/UnitPreviewCard.tsx": {
     "inline-style": 3,
@@ -495,7 +491,7 @@
     "stack-layout-props": 2
   },
   "features/transactions/components/MonthSelector.tsx": {
-    "inline-style": 2,
+    "inline-style": 1,
     "stack-layout-props": 1
   },
   "features/transactions/components/MonthlyChart.tsx": {
@@ -645,7 +641,7 @@
     "content-container-style": 1
   },
   "shared/blocks/popup/PopupHost.tsx": {
-    "inline-style": 4
+    "inline-style": 2
   },
   "shared/blocks/status/LoadingIndicator.tsx": {
     "inline-style": 2
@@ -736,9 +732,6 @@
     "inline-style": 1
   },
   "shared/ui/composed/AndroidSheetRoot.tsx": {
-    "inline-style": 1
-  },
-  "shared/ui/composed/AnimatedCountValue.tsx": {
     "inline-style": 1
   },
   "shared/ui/composed/BackgroundView.tsx": {
@@ -880,6 +873,9 @@
     "stylesheet-create": 1,
     "content-container-style": 1
   },
+  "shared/ui/composed/ProfileTierRing.tsx": {
+    "inline-style": 4
+  },
   "shared/ui/composed/QRButton/QRButton.android.tsx": {
     "stylesheet-create": 1
   },
@@ -942,7 +938,7 @@
     "inline-style": 3
   },
   "shared/ui/composed/chat/LiquidChatComposer.tsx": {
-    "inline-style": 9,
+    "inline-style": 7,
     "stack-layout-props": 2
   },
   "shared/ui/composed/search/RecentSearches.tsx": {

@@ -223,6 +223,9 @@ export function ChatMessageBubble({
                 });
                 onRetry();
               }}
+              testID={`chat-message-retry-${message.id}`}
+              accessibilityRole="button"
+              accessibilityLabel="Retry sending message"
               hitSlop={8}
               style={{ alignSelf: 'flex-end', marginTop: 2 }}>
               <Text size={11} style={{ color: danger, fontWeight: '600' }}>

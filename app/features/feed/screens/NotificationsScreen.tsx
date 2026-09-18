@@ -186,6 +186,7 @@ function NotificationsContent({ demo }: { demo: boolean }) {
       buttons: (['DIRECT', 'THREAD'] as const).map((scope) => ({
         text: notificationReplyScopeLabel(scope),
         variant: replyScope === scope ? 'primary' : undefined,
+        testID: `notifications-reply-scope-${scope.toLowerCase()}`,
         onPress: (close) => {
           close();
           setReplyScope(scope);

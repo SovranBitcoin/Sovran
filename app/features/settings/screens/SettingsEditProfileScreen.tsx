@@ -120,7 +120,7 @@ function HistoryChips({
         </Text>
       </View>
       <View className="flex-row flex-wrap gap-2">
-        {choices.map((entry, index) => (
+        {choices.map((entry) => (
           <CapsuleButton
             key={entry.value}
             label={entry.value}
@@ -132,7 +132,8 @@ function HistoryChips({
             textSize={13}
             labelNumberOfLines={1}
             accessibilityLabel={`Previously used ${field}: ${entry.value}`}
-            testID={`edit-profile-history-${field}-${index}`}
+            testID={`edit-profile-history-${field}-${entry.value}`}
+            disabled={disabled}
             onPress={() => {
               if (!disabled) onPick(entry.value);
             }}
@@ -572,6 +573,7 @@ function ProfileEditor({
                 height={32}
                 textSize={13}
                 testID="edit-profile-lud16-npc"
+                disabled={fieldsLocked}
                 onPress={() => {
                   if (!fieldsLocked) setField('lud16', npcAddress);
                 }}

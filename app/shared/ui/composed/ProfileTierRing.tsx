@@ -306,15 +306,13 @@ export function ProfileTierRing({ tier, seed, size, background, children }: Prof
         </Animated.View>
       ) : null}
       <View
-        style={[
-          styles.frame,
-          {
-            margin: inset - GAP * scale,
-            padding: GAP * scale,
-            borderRadius: size / 2 + GAP * scale,
-            backgroundColor: background,
-          },
-        ]}>
+        className="self-start"
+        style={{
+          margin: inset - GAP * scale,
+          padding: GAP * scale,
+          borderRadius: size / 2 + GAP * scale,
+          backgroundColor: background,
+        }}>
         {children}
       </View>
     </View>
@@ -381,9 +379,3 @@ function polar(cx: number, cy: number, r: number, deg: number): { x: number; y: 
   const rad = (deg * Math.PI) / 180;
   return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
 }
-
-const styles = StyleSheet.create({
-  frame: {
-    alignSelf: 'flex-start',
-  },
-});

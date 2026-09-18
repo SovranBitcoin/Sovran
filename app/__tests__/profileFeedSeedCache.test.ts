@@ -1,12 +1,10 @@
-import {
-  clearProfileFeedSeeds,
-  peekProfileFeedSeed,
-  seedProfileFeed,
-} from '@/features/feed/lib/profileFeedSeedCache';
+import { peekProfileFeedSeed, seedProfileFeed } from '@/features/feed/lib/profileFeedSeedCache';
 import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
 
 const A = 'a'.repeat(64);
 const B = 'b'.repeat(64);
+// The cache is session-scoped with no reset; each case seeds its own author.
+const C = 'c'.repeat(64);
 const ev = (id: string, pubkey: string, kind: number, created_at: number): FeedEvent => ({
   id,
   pubkey,
@@ -15,8 +13,6 @@ const ev = (id: string, pubkey: string, kind: number, created_at: number): FeedE
   tags: [],
   created_at,
 });
-
-beforeEach(() => clearProfileFeedSeeds());
 
 it("seeds only the author's kind-1 notes, newest first, as a partial page", () => {
   seedProfileFeed(A, {
@@ -42,13 +38,13 @@ it("seeds only the author's kind-1 notes, newest first, as a partial page", () =
 });
 
 it('stores nothing when the context has no note by the author', () => {
-  seedProfileFeed(A, {
+  seedProfileFeed(C, {
     allEvents: new Map([['2', ev('2', B, 1, 20)]]),
     profiles: new Map(),
     metrics: new Map(),
     quotedEvents: new Map(),
   });
-  expect(peekProfileFeedSeed(A)).toBeUndefined();
-  seedProfileFeed(A, null);
-  expect(peekProfileFeedSeed(A)).toBeUndefined();
+  expect(peekProfileFeedSeed(C)).toBeUndefined();
+  seedProfileFeed(C, null);
+  expect(peekProfileFeedSeed(C)).toBeUndefined();
 });

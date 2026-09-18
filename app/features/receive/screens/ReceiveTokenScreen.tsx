@@ -20,7 +20,7 @@ import {
   amountDetailItem,
   mintDetailItem,
 } from '@/features/transactions';
-import { truncateMiddle } from '@/shared/lib/strings';
+import { MiddleEllipsisValue } from '@/shared/ui/composed/MiddleEllipsisValue';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
@@ -141,7 +141,7 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
           paymentRequest && { title: 'Type', value: 'Payment Request' },
           paymentRequest?.requestId && {
             title: 'Request ID',
-            value: truncateMiddle(paymentRequest.requestId, 8),
+            value: <MiddleEllipsisValue value={paymentRequest.requestId} />,
           },
           ...transactionLeadDetailItems({
             source,
@@ -151,8 +151,14 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
           }),
           amountDetailItem({ amount: entry.amount, unit: entry.unit }),
           mintDetailItem(mintUrl),
-          entry.p2pkPubkey && { title: 'P2PK', value: entry.p2pkPubkey.truncate(8) },
-          entry.tokenString && { title: 'Token', value: entry.tokenString.truncate(6) },
+          entry.p2pkPubkey && {
+            title: 'P2PK',
+            value: <MiddleEllipsisValue value={entry.p2pkPubkey.toString()} />,
+          },
+          entry.tokenString && {
+            title: 'Token',
+            value: <MiddleEllipsisValue value={entry.tokenString.toString()} />,
+          },
         ]}
       />
     </TransactionDetailShell>

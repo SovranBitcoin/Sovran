@@ -29,6 +29,8 @@ interface DetailsSectionProps {
   initialExpanded?: boolean;
   /** Camera mode for BlurView (default: false) */
   camera?: boolean;
+  /** e2e selector for the toggle (default: `details-section-toggle`). */
+  testID?: string;
 }
 
 /**
@@ -40,6 +42,7 @@ export function DetailsSection({
   label = 'Details',
   initialExpanded = false,
   camera = false,
+  testID = 'details-section-toggle',
 }: DetailsSectionProps) {
   const [expanded, setExpanded] = useState(initialExpanded);
   const foreground = useThemeColor('foreground');
@@ -55,6 +58,7 @@ export function DetailsSection({
           onPress={() => setExpanded((v) => !v)}
           style={styles.toggle}
           hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}
+          testID={testID}
           accessibilityRole="button"
           accessibilityLabel={label}
           accessibilityState={{ expanded }}>

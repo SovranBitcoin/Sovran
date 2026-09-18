@@ -30,6 +30,11 @@ interface UnitPreviewCardProps {
   height: number;
   onPress?: () => void;
   testID?: string;
+  /**
+   * Spoken name of what the card opens. Defaults to `label`, then the theme
+   * name; album cards pass the album name since they carry no visible label.
+   */
+  accessibilityLabel?: string;
 }
 
 export const UnitPreviewCard = React.memo(function UnitPreviewCard({
@@ -42,6 +47,7 @@ export const UnitPreviewCard = React.memo(function UnitPreviewCard({
   height,
   onPress,
   testID,
+  accessibilityLabel,
 }: UnitPreviewCardProps) {
   const downloaded = useWallpaperStore((s) => s.downloaded[themeName]);
   // Falls back to the remote catalog thumb so un-downloaded picks still
@@ -196,8 +202,10 @@ export const UnitPreviewCard = React.memo(function UnitPreviewCard({
       onPress={onPress}
       animation={false}
       testID={testID}
-      accessible={!!testID}
-      accessibilityLabel={label ?? themeName}>
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label ?? themeName}
+      accessibilityState={{ selected: !!selected }}>
       <PressableFeedback.Scale>{card}</PressableFeedback.Scale>
     </PressableFeedback>
   );

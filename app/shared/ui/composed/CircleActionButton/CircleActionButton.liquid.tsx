@@ -57,6 +57,8 @@ export function CircleActionButtonLiquid(props: CircleActionButtonProps): React.
   // (Expo's native GlassView may not deliver responder callbacks) blocks the
   // ancestor press while the RNGH recognizer still fires natively. Termination
   // stays allowed (default) so a drag that starts on the button still scrolls.
+  // Screen readers can't drive the RNGH Tap; the shell exposes the button's
+  // name, role, state and testID and routes the `activate` action to onPress.
   const claimResponder = useCallback(() => true, []);
 
   return (

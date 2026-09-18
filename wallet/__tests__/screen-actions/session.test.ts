@@ -152,4 +152,30 @@ describe('createScreenActionSession', () => {
     });
     session.dispose();
   });
+
+  it('parses a JSON seed string into the entry', () => {
+    const session = createScreenActionSession({
+      screenType: 'sendToken',
+      handlers: {},
+      entrySeed: JSON.stringify({ id: 'send-1', type: 'send' }),
+    });
+    expect(session.inspect().error).toBeNull();
+    expect(session.inspect().entry).toMatchObject({ id: 'send-1' });
+    session.dispose();
+  });
+
+  it.each(['not json', '"a string"', '[1,2]', 'null'])(
+    'rejects a seed that is not a JSON object (%s)',
+    (seed) => {
+      const session = createScreenActionSession({
+        screenType: 'sendToken',
+        handlers: {},
+        entrySeed: seed,
+      });
+      expect(session.inspect().error).toBe(
+        'Invalid transaction data. Please try again.',
+      );
+      session.dispose();
+    },
+  );
 });

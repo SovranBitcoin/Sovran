@@ -30,15 +30,24 @@ interface BluetoothNoticeProps {
 
 function noticeAction(
   bluetooth: UseBluetoothStateResult
-): { label: string; onPress: () => void } | null {
+): { label: string; testID: string; onPress: () => void } | null {
   switch (bluetooth.status) {
     case 'poweredOff':
       return Platform.OS === 'android'
-        ? { label: 'Turn On Bluetooth', onPress: () => void bluetooth.enableBluetooth() }
-        : { label: 'Open Settings', onPress: () => void bluetooth.openSettings() };
+        ? {
+            label: 'Turn On Bluetooth',
+            testID: 'bluetooth-notice-enable',
+            onPress: () => void bluetooth.enableBluetooth(),
+          }
+        : {
+            label: 'Open Settings',
+            testID: 'bluetooth-notice-open-settings',
+            onPress: () => void bluetooth.openSettings(),
+          };
     case 'unauthorized':
       return {
         label: 'Allow Bluetooth',
+        testID: 'bluetooth-notice-allow',
         onPress: () =>
           void bluetooth.requestPermissions().then((granted) => {
             // "Don't ask again" → the dialog never shows; settings is the only
@@ -85,7 +94,13 @@ export function BluetoothNotice({ bluetooth: bluetoothProp }: BluetoothNoticePro
       subtitle={copy.subtitle}
       action={
         action ? (
-          <Button text={action.label} onPress={handlePress} variant="primary" size="compact" />
+          <Button
+            text={action.label}
+            testID={action.testID}
+            onPress={handlePress}
+            variant="primary"
+            size="compact"
+          />
         ) : undefined
       }
     />
@@ -121,7 +136,13 @@ export function BluetoothInlineNotice({ bluetooth: bluetoothProp }: BluetoothNot
         {copy.title}
       </Text>
       {action ? (
-        <Button text={action.label} onPress={handlePress} variant="secondary" size="compact" />
+        <Button
+          text={action.label}
+          testID={`${action.testID}-inline`}
+          onPress={handlePress}
+          variant="secondary"
+          size="compact"
+        />
       ) : null}
     </HStack>
   );

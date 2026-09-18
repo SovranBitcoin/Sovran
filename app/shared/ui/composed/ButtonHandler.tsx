@@ -73,7 +73,7 @@ import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
  */
 export interface ButtonHandlerButton {
   /** Test identifier for automated testing */
-  testID?: string;
+  testID: string;
   /** Whether the button is disabled */
   disabled?: boolean;
   /** Whether the button is in loading state */
@@ -87,6 +87,10 @@ export interface ButtonHandlerButton {
    *  inline — use this to compose primitives like `AmountFormatter`
    *  alongside static text). */
   text: string | React.ReactNode;
+  /** VoiceOver/TalkBack name. Defaults to `text` when it is a string; set it
+   *  when `text` is a ReactNode, or the button renders icon-only (the third of
+   *  exactly three), since neither carries readable text. */
+  accessibilityLabel?: string;
   /** Optional secondary caption shown under the button text in the overflow
    *  Menu (has no effect on inline buttons). */
   description?: string;
@@ -100,6 +104,10 @@ export interface ButtonHandlerButton {
 }
 
 type ButtonHandlerActionButton = ButtonHandlerButton;
+
+function buttonLabel(button: ButtonHandlerActionButton): string | undefined {
+  return button.accessibilityLabel ?? (typeof button.text === 'string' ? button.text : undefined);
+}
 
 // Keep async action failures contained so overflow actions do not surface as
 // unhandled promise rejections on Android.
@@ -219,13 +227,15 @@ export function ButtonHandler({
   const openMoreMenu = () => {
     actionMenuSheet({
       title: 'Select option',
-      buttons: overflowMenuButtons.map((button, i) => ({
-        text: typeof button.text === 'string' ? button.text : 'Action',
+      buttons: overflowMenuButtons.map((button) => ({
+        text: buttonLabel(button) ?? 'Action',
         icon: button.icon,
         description: button.description,
         disabled: button.disabled,
         variant: button.variant,
-        testID: button.testID ?? (typeof button.text === 'string' ? button.text : `overflow-${i}`),
+        // Only the caller's semantic testID: a fallback built from the label or
+        // the menu position would shift whenever copy or order changes.
+        testID: button.testID,
         // Fire-and-forget: the sheet host defers its auto-close until the
         // item's onPress settles, and overflow actions can be slow async ops
         // (Check Status, Cancel transaction). Returning void keeps the sheet
@@ -249,10 +259,11 @@ export function ButtonHandler({
         style={[style]}>
         {visibleButtons.slice(0, 2).map((button, index) => (
           <View
-            key={button.testID ?? (typeof button.text === 'string' ? button.text : `btn-${index}`)}
+            key={button.testID}
             style={{ flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 }}>
             <Button
               testID={button.testID}
+              accessibilityLabel={button.accessibilityLabel}
               onPress={() => handleButtonPress(button, index)}
               text={button.text}
               variant={button.variant}
@@ -266,7 +277,8 @@ export function ButtonHandler({
         {visibleButtons.length === 3 && (
           <View>
             <Button
-              testID={visibleButtons[2].testID ?? 'more-button'}
+              testID={visibleButtons[2].testID}
+              accessibilityLabel={buttonLabel(visibleButtons[2]) ?? 'More actions'}
               icon={
                 visibleButtons[2].icon ? (
                   <Icon name={visibleButtons[2].icon} />
@@ -287,6 +299,8 @@ export function ButtonHandler({
           <View>
             <Button
               testID="more-button"
+              accessibilityLabel="More actions"
+              accessibilityHint="Opens a menu with the remaining actions"
               icon={<Icon name="tabler:dots" />}
               onPress={openMoreMenu}
               variant="secondary"

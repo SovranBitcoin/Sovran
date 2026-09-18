@@ -58,4 +58,14 @@ export interface CapsuleButtonProps {
   accessibilityLabel?: string;
   /** Radio controls expose isActive as checked/selected state. */
   accessibilityRole?: 'button' | 'radio';
+  /**
+   * The action is unavailable right now. Presses are ignored and assistive
+   * tech hears the control as dimmed. Visual dimming stays with the caller.
+   */
+  disabled?: boolean;
+  /**
+   * The control's own action is in flight (e.g. a follow publish). Presses are
+   * ignored until it settles and assistive tech hears the control as busy.
+   */
+  busy?: boolean;
 }

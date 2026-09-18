@@ -56,8 +56,3 @@ export function seedProfileFeed(pubkey: string, context: ThreadSeed | null | und
 export function peekProfileFeedSeed(pubkey: string | undefined): FeedParseResult | undefined {
   return pubkey ? cache.get(pubkey) : undefined;
 }
-
-/** Test seam. */
-export function clearProfileFeedSeeds(): void {
-  cache.clear();
-}

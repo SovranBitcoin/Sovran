@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 
-import { guardedRouter, __resetGuardForTests } from '@/shared/hooks/useGuardedRouter';
+import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 
 const mockPush = jest.fn();
 const mockNavigate = jest.fn();
@@ -27,6 +27,13 @@ jest.mock('@/shared/lib/logger', () => ({
   log: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 
+// The cooldown gate is module state with no reset: each case starts after the
+// window has elapsed, exactly as a real user's next tap would.
+const COOLDOWN_ELAPSED_MS = 1_000;
+beforeAll(() => jest.useFakeTimers());
+beforeEach(() => jest.advanceTimersByTime(COOLDOWN_ELAPSED_MS));
+afterAll(() => jest.useRealTimers());
+
 describe('guardedRouter', () => {
   beforeEach(() => {
     mockPush.mockReset();
@@ -35,7 +42,6 @@ describe('guardedRouter', () => {
     mockBack.mockReset();
     mockDismiss.mockReset();
     mockDismissTo.mockReset();
-    __resetGuardForTests();
   });
 
   it('forwards a single push to the underlying router', () => {
@@ -57,17 +63,10 @@ describe('guardedRouter', () => {
   });
 
   it('allows the same destination after the cooldown elapses', () => {
-    jest.useFakeTimers();
-    try {
-      const start = Date.now();
-      jest.setSystemTime(start);
-      guardedRouter.push('/share');
-      jest.setSystemTime(start + 700);
-      guardedRouter.push('/share');
-      expect(mockPush).toHaveBeenCalledTimes(2);
-    } finally {
-      jest.useRealTimers();
-    }
+    guardedRouter.push('/share');
+    jest.advanceTimersByTime(700);
+    guardedRouter.push('/share');
+    expect(mockPush).toHaveBeenCalledTimes(2);
   });
 
   it('treats push and navigate to the same href as distinct gates', () => {
@@ -91,7 +90,6 @@ describe('guardedRouter', () => {
 });
 
 it('suppresses the same route even if param object construction orders differ', () => {
-  __resetGuardForTests();
   mockPush.mockReset();
   guardedRouter.push({ pathname: '/profile', params: { pubkey: 'abc', tab: 'posts' } });
   guardedRouter.push({ params: { tab: 'posts', pubkey: 'abc' }, pathname: '/profile' });
@@ -99,7 +97,6 @@ it('suppresses the same route even if param object construction orders differ', 
 });
 
 it('requires the explicit raw escape hatch for intentional immediate duplicate pushes', () => {
-  __resetGuardForTests();
   mockPush.mockReset();
   guardedRouter.raw.push('/profile');
   guardedRouter.raw.push('/profile');
@@ -127,7 +124,6 @@ it('keeps one destination entry in the installed Expo stack for a rapid repeated
   ]);
 
   let state = initial;
-  __resetGuardForTests();
   mockPush.mockReset().mockImplementation(() => {
     state = stack.getStateForAction(state, action, options);
   });

@@ -217,6 +217,9 @@ export const RepostCard = React.memo(function RepostCard({
         onStartShouldSetResponder={probeThreadTap}>
         {/* Repost header */}
         <Pressable
+          testID={`repost-header-${_repostEvent.id}`}
+          accessibilityRole="button"
+          accessibilityLabel={`${repostHeaderText}. Open ${primaryReposter.name}'s profile`}
           activeOpacity={0.7}
           onPressIn={suppressThreadTapStart}
           onPress={() =>
@@ -321,7 +324,11 @@ const getListRowItemType = (row: UserFeedListRow) =>
 function EmptyFeed({ isOwnProfile }: { isOwnProfile?: boolean }) {
   const openComposer = useOpenComposer();
   const action = isOwnProfile ? (
-    <Button variant="secondary" size="sm" onPress={() => openComposer({ mode: 'new' })}>
+    <Button
+      testID="profile-feed-write-post"
+      variant="secondary"
+      size="sm"
+      onPress={() => openComposer({ mode: 'new' })}>
       <Button.Label>Write a post</Button.Label>
     </Button>
   ) : undefined;

@@ -10,6 +10,7 @@
 
 import { createSovranNotifications } from '@/features/send/lib/sovranPaymentConfig';
 import { paymentStatusPopup } from '@/shared/lib/popup';
+import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 
 jest.mock('expo-router', () => ({
   router: { navigate: jest.fn(), replace: jest.fn(), dismiss: jest.fn() },
@@ -44,6 +45,10 @@ jest.mock('@/shared/lib/nfc', () => ({
 jest.mock('wallet', () => ({
   withTimeout: jest.fn((promise: Promise<unknown>) => promise),
   rawAnnotationKey: jest.fn((raw: string) => `raw:${raw}`),
+  annotationKey: jest.fn((entry: { operationId?: string; id?: string }) =>
+    entry.operationId ? `op:${entry.operationId}` : `id:${entry.id ?? ''}`
+  ),
+  decodePaymentRequestInfo: jest.fn(() => ({ requestId: 'req-1' })),
 }));
 jest.mock('@/shared/stores/profile/transactionAnnotationStore', () => ({
   setTransactionAnnotation: jest.fn(),
@@ -208,5 +213,49 @@ describe('payment toast gating (onchain melt)', () => {
       })
     );
     expect(paymentStatusPopup).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('payment confirmation history parsing', () => {
+  beforeEach(() => {
+    mockStoreState.active = { variant: 'melt', id: 'melt-1', state: 'processing', ...BASE };
+    mockSetConfirmed.mockClear();
+    mockSetDelivered.mockClear();
+    (setTransactionAnnotation as jest.Mock).mockClear();
+  });
+
+  it('holds the melt toast while the history entry is still PENDING', () => {
+    void createSovranNotifications().onPaymentConfirmed!({
+      variant: 'melt',
+      ...BASE,
+      historyEntry: JSON.stringify({ id: 'h1', type: 'melt', state: 'PENDING' }),
+    });
+    expect(mockSetConfirmed).not.toHaveBeenCalled();
+  });
+
+  it('confirms the melt when the history entry is malformed', () => {
+    void createSovranNotifications().onPaymentConfirmed!({
+      variant: 'melt',
+      ...BASE,
+      historyEntry: 'not json',
+    });
+    expect(mockSetConfirmed).toHaveBeenCalledWith('melt-1');
+  });
+
+  it('annotates a confirmed payment-request send from its parsed metadata', () => {
+    void createSovranNotifications().onPaymentConfirmed!({
+      variant: 'paymentRequest',
+      ...BASE,
+      historyEntry: JSON.stringify({
+        id: 'h1',
+        type: 'send',
+        operationId: 'op-1',
+        metadata: { transportType: 'nostr', paymentRequest: 'creqA...' },
+      }),
+    });
+    expect(setTransactionAnnotation).toHaveBeenCalledWith('op:op-1', {
+      paymentRequest: { role: 'payer', requestId: 'req-1', transport: 'nostr' },
+    });
+    expect(mockSetDelivered).toHaveBeenCalledWith('melt-1');
   });
 });

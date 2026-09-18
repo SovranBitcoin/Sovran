@@ -64,7 +64,10 @@ export function SettingsRoutingScreen() {
                   onChangeEnd={(value) => setMinTransferThreshold(asNumber(value))}>
                   <Slider.Track>
                     <Slider.Fill />
-                    <Slider.Thumb />
+                    <Slider.Thumb
+                      testID="settings-routing-min-transfer"
+                      accessibilityLabel="Min transfer amount"
+                    />
                   </Slider.Track>
                 </Slider>
                 <Card.Description>
@@ -92,7 +95,10 @@ export function SettingsRoutingScreen() {
                   onChangeEnd={(value) => update({ maxHops: asNumber(value) })}>
                   <Slider.Track>
                     <Slider.Fill />
-                    <Slider.Thumb />
+                    <Slider.Thumb
+                      testID="settings-routing-max-hops"
+                      accessibilityLabel="Max intermediaries"
+                    />
                   </Slider.Track>
                 </Slider>
                 <Card.Description>
@@ -115,7 +121,7 @@ export function SettingsRoutingScreen() {
                   onChangeEnd={(value) => update({ maxFee: asNumber(value) })}>
                   <Slider.Track>
                     <Slider.Fill />
-                    <Slider.Thumb />
+                    <Slider.Thumb testID="settings-routing-max-fee" accessibilityLabel="Max fee" />
                   </Slider.Track>
                 </Slider>
                 <Card.Description>
@@ -138,7 +144,10 @@ export function SettingsRoutingScreen() {
                   onChangeEnd={(value) => update({ minSuccessRate: asNumber(value) / 100 })}>
                   <Slider.Track>
                     <Slider.Fill />
-                    <Slider.Thumb />
+                    <Slider.Thumb
+                      testID="settings-routing-min-success-rate"
+                      accessibilityLabel="Min success rate"
+                    />
                   </Slider.Track>
                 </Slider>
                 <Card.Description>
@@ -157,6 +166,8 @@ export function SettingsRoutingScreen() {
                 </ListGroup.ItemContent>
                 <ListGroup.ItemSuffix>
                   <HeroSwitch
+                    testID="settings-routing-require-last-ok"
+                    accessibilityLabel="Last swap must be OK"
                     isSelected={middlemanRouting.requireLastOk}
                     onSelectedChange={(v) => update({ requireLastOk: v })}
                   />
@@ -179,15 +190,24 @@ export function SettingsRoutingScreen() {
                 </VStack>
 
                 <RadioGroup
+                  accessibilityLabel="Intermediary trust policy"
                   value={middlemanRouting.trustMode}
                   onValueChange={(value) => {
                     if (value === 'trusted_only' || value === 'allow_untrusted') {
                       update({ trustMode: value });
                     }
                   }}>
-                  <RadioGroup.Item value="trusted_only">Trusted only</RadioGroup.Item>
+                  <RadioGroup.Item
+                    value="trusted_only"
+                    testID="settings-routing-trust-trusted-only">
+                    Trusted only
+                  </RadioGroup.Item>
                   <Separator className="my-1" />
-                  <RadioGroup.Item value="allow_untrusted">Allow untrusted</RadioGroup.Item>
+                  <RadioGroup.Item
+                    value="allow_untrusted"
+                    testID="settings-routing-trust-allow-untrusted">
+                    Allow untrusted
+                  </RadioGroup.Item>
                 </RadioGroup>
 
                 {middlemanRouting.trustMode === 'allow_untrusted' ? (

@@ -287,6 +287,7 @@ export function TransactionsScreen({
             icon: 'mdi:broom',
             loading: isSweeping,
             disabled: isSweeping,
+            testID: 'transactions-cancel-visible-pending',
             onPress: handleSweepVisible,
           },
         ]}

@@ -24,7 +24,12 @@ export function SettingsProfileRecoveryScreen({ onBack }: { onBack: () => void }
             Choose a profile to view its existing keys. This does not switch your wallet or accept
             the documents.
           </Text>
-          <Button variant="secondary" isDisabled={!profile} onPress={() => setProfile(null)}>
+          <Button
+            variant="secondary"
+            isDisabled={!profile}
+            testID="profile-recovery-select-root"
+            accessibilityState={{ selected: !profile, disabled: !profile }}
+            onPress={() => setProfile(null)}>
             <Button.Label>Root recovery phrase</Button.Label>
           </Button>
           {profiles.map((entry) => (
@@ -32,6 +37,11 @@ export function SettingsProfileRecoveryScreen({ onBack }: { onBack: () => void }
               key={entry.pubkey}
               variant="secondary"
               isDisabled={profile?.pubkey === entry.pubkey}
+              testID={`profile-recovery-select-${entry.pubkey}`}
+              accessibilityState={{
+                selected: profile?.pubkey === entry.pubkey,
+                disabled: profile?.pubkey === entry.pubkey,
+              }}
               onPress={() => setProfile(entry)}>
               <Button.Label>
                 {entry.cachedDisplayName || `Profile ${entry.accountIndex}`}
@@ -122,7 +132,10 @@ function RecoveryDetails({
               ? 'Could not read verified recovery information. Keep this installation and your backups.'
               : 'Recovery information was cleared when the app left the foreground.'}
           </Text>
-          <Button variant="secondary" onPress={() => setAttempt((value) => value + 1)}>
+          <Button
+            variant="secondary"
+            testID="profile-recovery-reload"
+            onPress={() => setAttempt((value) => value + 1)}>
             <Button.Label>Reload recovery information</Button.Label>
           </Button>
         </VStack>

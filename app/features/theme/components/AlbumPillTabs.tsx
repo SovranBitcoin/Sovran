@@ -43,16 +43,18 @@ export function AlbumPillTabs({ tabs, selectedTab, onSelect }: AlbumPillTabsProp
           {tabs.map((tab) => {
             const isSelected = selectedTab === tab;
             return (
-              <Pressable key={tab} onPress={() => handlePress(tab)} activeOpacity={0.7}>
+              <Pressable
+                key={tab}
+                onPress={() => handlePress(tab)}
+                activeOpacity={0.7}
+                testID={`background-album-tab-${tab}`}
+                accessibilityRole="tab"
+                accessibilityLabel={tab}
+                accessibilityState={{ selected: isSelected }}>
                 <View
                   className="rounded-2xl px-3.5 py-2"
                   style={{ backgroundColor: isSelected ? surfaceTertiary : surface }}>
-                  <Text
-                    style={{
-                      fontFamily: 'OxygenBold',
-                      fontSize: 14,
-                      color: foreground,
-                    }}>
+                  <Text bold size={14} color={foreground}>
                     {tab}
                   </Text>
                 </View>

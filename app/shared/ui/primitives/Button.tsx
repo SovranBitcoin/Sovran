@@ -437,9 +437,9 @@ export const Button = ({
             {layoutText != null &&
               (typeof layoutText === 'string' ? (
                 <Text
+                  bold
+                  color={getTextColor()}
                   style={{
-                    color: getTextColor(),
-                    fontFamily: 'OxygenBold',
                     textAlign: 'center',
                     ...(variant === 'underline'
                       ? { textDecorationLine: 'underline' as const }

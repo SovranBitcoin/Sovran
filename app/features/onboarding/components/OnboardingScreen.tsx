@@ -196,7 +196,12 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     <Log name="OnboardingScreen">
       <View style={{ flex: 1, backgroundColor: background, paddingBottom: insets.bottom + 10 }}>
         <Animated.View style={[{ marginTop: 'auto' }, welcomeBlockStyle]}>
-          <Pressable style={{ alignSelf: 'center', marginBottom: 24 }} onPress={onChevronDownPress}>
+          <Pressable
+            testID="onboarding-collapse-welcome"
+            accessibilityRole="button"
+            accessibilityLabel="Back to slides"
+            style={{ alignSelf: 'center', marginBottom: 24 }}
+            onPress={onChevronDownPress}>
             <Icon name="mdi:chevron-down" size={24} color={muted} />
           </Pressable>
           <Text bold size={28} style={{ color: foreground, textAlign: 'center' }}>

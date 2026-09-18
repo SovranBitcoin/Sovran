@@ -66,8 +66,3 @@ export function expectedQrPayloadLength(target: CopyTarget, fallback?: number): 
     DEFAULT_QR_PAYLOAD_LENGTH
   );
 }
-
-/** Test seam: forget every remembered length. */
-export function resetQrPayloadLengths(): void {
-  rememberedQrPayloadLengths.clear();
-}

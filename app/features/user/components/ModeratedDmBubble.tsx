@@ -30,6 +30,7 @@ export function ModeratedDmBubble({
       <Button
         text="Reveal censored message"
         variant="secondary"
+        testID={`dm-reveal-censored-${message.id}`}
         onPress={() => setDisclosure({ identity, revealed: true })}
       />
     );

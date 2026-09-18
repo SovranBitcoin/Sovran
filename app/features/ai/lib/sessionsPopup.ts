@@ -24,6 +24,7 @@ export function openAiSessionsMenu() {
               icon: 'mdi:message-text',
               disabled: true,
               reason: 'Start a new chat to see it here.',
+              testID: 'ai-sessions-empty',
             },
           ]
         : sessions.map((session) => {

@@ -1,29 +1,20 @@
 import { useEffect, useMemo, useRef } from 'react';
 
-import {
-  discoverMints,
-  DiscoverMintsResponse,
-  type DiscoverMint,
-  type MintSearchResult,
-} from '@/shared/lib/apiClient';
+import { discoverMints, DiscoverMintsResponse } from '@/shared/lib/apiClient';
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
-import { mintMethodsFromNuts, mintMethodUnitPairsFromNuts } from '@/shared/lib/cashu/mintNuts';
 import { useCachedRead, type ReadStatus } from '@/shared/lib/read/useCachedRead';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { extractAvailableCurrencies } from '@/features/mint/lib/availableCurrencies';
 import { MINT_DISCOVER_CACHE_KEY, mintDiscoverCache } from '@/features/mint/data/mintDiscoverCache';
+import {
+  discoverMintToSearchResult,
+  discoveryMethodMatches,
+  matchesMintCurrency,
+  matchesMintQuery,
+  type MintSearchRow,
+} from '@/features/mint/lib/mintDiscoveryRows';
 
 const DISCOVERY_UNITS = ['SAT', 'USD', 'EUR', 'GBP'];
-
-/** Discovery row + the app-local method field (the shared MintSearchResult
- *  schema predates the capability data; extend locally rather than changing
- *  the cross-repo contract). */
-type MintSearchRow = MintSearchResult & {
-  supported_methods: string[];
-  /** NUT-04 (method, unit) pairs (lowercased) — the discovery filter matches the
-   *  rail's exact pair, e.g. (bolt12, sat), not the method alone. */
-  supported_method_units: { method: string; unit: string }[];
-};
 
 interface UseMintSearchReturn {
   results: MintSearchRow[];
@@ -35,81 +26,6 @@ interface UseMintSearchReturn {
   refresh: () => void;
   availableUnits: string[];
   matchCountByUnit: Record<string, number>;
-}
-
-/**
- * Map a nagg discovery row to the screen's MintSearchResult shape. Review score
- * + count come inline (no per-mint fan-out); the operator's Nostr pubkey is
- * surfaced as a NUT-06 `contact` entry so the existing operator-profile path
- * still resolves. Exported for testing.
- */
-export function discoverMintToSearchResult(m: DiscoverMint): MintSearchRow {
-  const contact = m.operatorPubkey ? [{ method: 'nostr', info: m.operatorPubkey }] : [];
-  return {
-    url: m.mintUrl,
-    name: m.name || m.mintUrl,
-    supported_units: m.supportedUnits ?? [],
-    // Derived from the raw NUT-06 nuts map (nuts['4'].methods) — nagg ships
-    // capabilities undistilled by design.
-    supported_methods: mintMethodsFromNuts(m.nuts),
-    supported_method_units: mintMethodUnitPairsFromNuts(m.nuts, '4'),
-    state: m.state ?? 'unknown',
-    n_mints: m.nMints ?? 0,
-    n_melts: m.nMelts ?? 0,
-    n_errors: m.nErrors ?? 0,
-    review_score: m.averageScore,
-    review_count: m.reviewCount,
-    info: {
-      ...(m.iconUrl ? { icon_url: m.iconUrl } : {}),
-      ...(m.description ? { description: m.description } : {}),
-      contact,
-    },
-  };
-}
-
-function matchesQuery(result: MintSearchResult, q: string): boolean {
-  if (!q) return true;
-  const needle = q.toLowerCase();
-  return result.name.toLowerCase().includes(needle) || result.url.toLowerCase().includes(needle);
-}
-
-function matchesCurrency(result: MintSearchResult, currency: string): boolean {
-  if (!currency || currency === 'ALL') return true;
-  const units = currency
-    .split(',')
-    .map((u) => u.trim().toLowerCase())
-    .filter(Boolean);
-  if (units.length === 0) return true;
-  return result.supported_units.some((u) => units.includes(u.toLowerCase()));
-}
-
-/**
- * Method filter for receive-rail discovery CTAs. A mint matches only when nagg
- * reported it advertises the method — absence means "not known to support", so
- * rows without the field are excluded while the filter is on.
- *
- * When a concrete currency (unit) is selected, matching is on the NUT-04
- * (method, unit) PAIR: a mint that advertises `bolt12` only for `eur` must NOT
- * match a `sat` rail. `currency === 'ALL'` (or empty) falls back to method-only
- * — the user explicitly chose to browse every unit. Exported for testing.
- */
-export function discoveryMethodMatches(
-  result: MintSearchRow,
-  method: string | undefined,
-  currency: string
-): boolean {
-  if (!method) return true;
-  const wantMethod = method.toLowerCase();
-  const units = currency
-    .split(',')
-    .map((u) => u.trim().toLowerCase())
-    .filter((u) => u && u !== 'all');
-  if (units.length === 0) {
-    return result.supported_methods.some((m) => m.toLowerCase() === wantMethod);
-  }
-  return result.supported_method_units.some(
-    (p) => p.method === wantMethod && units.includes(p.unit)
-  );
 }
 
 /**
@@ -180,8 +96,8 @@ export function useMintSearch(
     const q = query.trim();
     return allMints.filter(
       (m) =>
-        matchesQuery(m, q) &&
-        matchesCurrency(m, currency) &&
+        matchesMintQuery(m, q) &&
+        matchesMintCurrency(m, currency) &&
         discoveryMethodMatches(m, method, currency)
     );
   }, [allMints, query, currency, method]);
@@ -195,9 +111,9 @@ export function useMintSearch(
     DISCOVERY_UNITS.map((unit) => [unit, 0])
   );
   for (const mint of allMints) {
-    if (!matchesQuery(mint, query.trim())) continue;
+    if (!matchesMintQuery(mint, query.trim())) continue;
     for (const unit of DISCOVERY_UNITS) {
-      if (matchesCurrency(mint, unit) && discoveryMethodMatches(mint, method, unit)) {
+      if (matchesMintCurrency(mint, unit) && discoveryMethodMatches(mint, method, unit)) {
         matchCountByUnit[unit] += 1;
       }
     }

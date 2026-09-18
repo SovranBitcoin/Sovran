@@ -24,6 +24,7 @@ import type { ActionSheetPayloads } from '../actionSheetTypes';
 import type { CustomSheetSharedProps } from '../sheets/types';
 
 interface SuggestionRowProps {
+  testID: string;
   text: string;
   icon: string;
   display: ProofSuggestionDisplay;
@@ -110,9 +111,9 @@ export function shouldShowProofSelectorMintChange(
   return showChangeMint;
 }
 
-function SuggestionRow({ text, icon, display, onPress }: SuggestionRowProps) {
+function SuggestionRow({ testID, text, icon, display, onPress }: SuggestionRowProps) {
   return (
-    <Menu.Item onPress={onPress}>
+    <Menu.Item testID={testID} onPress={onPress}>
       <SheetMenuRowContent
         icon={<Icon name={icon} size={20} />}
         title={text}
@@ -164,6 +165,7 @@ export function ProofSelectorContent({ payload, close }: ProofSelectorContentPro
       <Menu>
         {suggestions?.roundUp != null ? (
           <SuggestionRow
+            testID="proof-selector-round-up"
             text="Round up"
             icon="fluent:arrow-upload-16-filled"
             display={getProofSuggestionDisplay(suggestions.roundUp.amount, unit, payload)}
@@ -175,6 +177,7 @@ export function ProofSelectorContent({ payload, close }: ProofSelectorContentPro
         ) : null}
         {suggestions?.roundDown != null ? (
           <SuggestionRow
+            testID="proof-selector-round-down"
             text="Round down"
             icon="fluent:arrow-download-16-filled"
             display={getProofSuggestionDisplay(suggestions.roundDown.amount, unit, payload)}
@@ -188,6 +191,7 @@ export function ProofSelectorContent({ payload, close }: ProofSelectorContentPro
           <>
             <View className="bg-foreground/10 mx-3 my-1 h-px" />
             <Menu.Item
+              testID="proof-selector-change-mint"
               onPress={() => {
                 cashuLog.info('proof.selector.change_mint.choice', {
                   source: 'proof-selector',

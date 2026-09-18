@@ -282,7 +282,8 @@ const HeaderBadge = React.memo(function HeaderBadge({
       size={iconSize.xl}
       color={count > 0 ? foreground : shade400}
       onPress={onPress}
-      accessibilityLabel="Nearby peers"
+      accessibilityLabel={count > 0 ? `Nearby peers, ${count}` : 'Nearby peers'}
+      testID="near-pay-peers"
       accessory={
         count > 0 ? (
           <View style={badgeStyle}>
@@ -652,6 +653,7 @@ const PeerNode = React.memo(function PeerNode({
         haptics
         accessibilityRole="button"
         accessibilityLabel={`Pay ${target.peer.name}`}
+        testID={`near-pay-peer-${target.peer.peerID}`}
         style={peerPressableStyle}>
         <View pointerEvents="none" style={nodeStyles.peerAvatarFrame}>
           <Avatar
@@ -2108,7 +2110,14 @@ export function NearPayScreen() {
     [emptyTextStyle, emptyTitleStyle, foregroundSoft]
   );
   const renderHeaderLeft = useCallback(
-    () => <ScreenHeaderAction icon="material-symbols:arrow-back-rounded" onPress={resetToPicker} />,
+    () => (
+      <ScreenHeaderAction
+        icon="material-symbols:arrow-back-rounded"
+        onPress={resetToPicker}
+        accessibilityLabel="Back"
+        testID="near-pay-back"
+      />
+    ),
     [resetToPicker]
   );
   const renderEmptyHeader = useCallback(() => null, []);

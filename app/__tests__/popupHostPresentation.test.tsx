@@ -202,7 +202,10 @@ describe('PopupHost presentation', () => {
       renderer = TestRenderer.create(<PopupHost />);
       usePopupStore.getState().open({
         sheetId: 'action-menu',
-        payload: { title: 'Copy token', buttons: [{ text: 'as Emoji' }] },
+        payload: {
+          title: 'Copy token',
+          buttons: [{ text: 'as Emoji', testID: 'copy-token-emoji' }],
+        },
       });
     });
     const menu = sheet(renderer!).props.instance;
@@ -234,7 +237,7 @@ describe('PopupHost presentation', () => {
     act(() =>
       usePopupStore.getState().open({
         sheetId: 'action-menu',
-        payload: { title: 'Copy token', buttons: [{ text: 'as Text' }] },
+        payload: { title: 'Copy token', buttons: [{ text: 'as Text', testID: 'copy-token-text' }] },
       })
     );
     expect(sheet(renderer!).props.instance).not.toBe(picker);
@@ -307,7 +310,7 @@ describe('PopupHost presentation', () => {
       renderer = TestRenderer.create(<PopupHost />);
       usePopupStore.getState().open({
         sheetId: 'action-menu',
-        payload: { title: 'Copy token', buttons: [{ text: 'as Text' }] },
+        payload: { title: 'Copy token', buttons: [{ text: 'as Text', testID: 'copy-token-text' }] },
       });
     });
     expect(bodies(renderer!, 'ActionMenuSheetContent')).toHaveLength(1);

@@ -24,7 +24,7 @@ import { seedLowConfidenceProfiles } from '@/shared/lib/nostr/useEntityCache';
 const attempted = new Set<string>();
 
 interface NostrPersonDisplay {
-  /** displayName ?? name, trimmed; undefined when unknown (caller falls back to shortPubkey). */
+  /** displayName ?? name, trimmed; undefined when unknown (caller falls back to the full pubkey, middle-ellipsized). */
   name: string | undefined;
   picture: string | undefined;
   isLoading: boolean;

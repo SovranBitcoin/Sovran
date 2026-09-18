@@ -82,7 +82,7 @@ export function ActionMenuSheetContent({ payload, close }: ActionMenuSheetConten
           `useMenu()` — no Trigger/Portal/Content needed; Menu.Root is just a
           context Provider. Same trick as `paymentOptionsSheet` / `modelPicker`. */}
       <Menu>
-        {buttons.map((button, index) => {
+        {buttons.map((button) => {
           const disabled = button.disabled === true || button.isFailed === true;
           const description = button.disabled
             ? (button.reason ?? button.description)
@@ -90,11 +90,12 @@ export function ActionMenuSheetContent({ payload, close }: ActionMenuSheetConten
           const isDanger = button.isFailed === true || button.variant === 'dangerous';
           return (
             <Menu.Item
-              key={button.testID ?? `${button.text}-${index}`}
+              key={button.testID}
               testID={button.testID}
               accessibilityLabel={button.accessibilityLabel}
               accessibilityHint={button.accessibilityHint}
               isDisabled={disabled}
+              isSelected={button.selected}
               variant={isDanger ? 'danger' : 'default'}
               onPress={() => {
                 if (disabled) return;

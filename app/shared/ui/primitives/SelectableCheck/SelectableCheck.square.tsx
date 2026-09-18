@@ -22,6 +22,7 @@ export function SelectableCheckSquare({
   variant = 'default',
   accessibilityLabel,
   accessibilityHint,
+  testID,
 }: SelectableCheckProps) {
   const [foreground, muted, surface, danger, blue300, green400, warning] = useThemeColor([
     'foreground',
@@ -45,6 +46,7 @@ export function SelectableCheckSquare({
 
   return (
     <Pressable
+      testID={testID}
       onPress={() => onChange?.(!selected)}
       disabled={disabled}
       accessibilityRole="checkbox"

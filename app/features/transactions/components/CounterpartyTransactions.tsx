@@ -45,7 +45,6 @@ export function CounterpartyTransactions({ pubkey, excludeId }: CounterpartyTran
   const ruleFaint = withAlpha(foreground, alpha.faint);
   const leftRuleColors = useMemo(() => [ruleFaint, ruleStrong] as const, [ruleFaint, ruleStrong]);
   const rightRuleColors = useMemo(() => [ruleStrong, ruleFaint] as const, [ruleFaint, ruleStrong]);
-  const headingStyle = useMemo(() => [styles.heading, { color: ruleStrong }], [ruleStrong]);
 
   const related = useMemo(
     () => history.filter((e) => getCounterparty(e)?.pubkey === pubkey && e.id !== excludeId),
@@ -65,7 +64,7 @@ export function CounterpartyTransactions({ pubkey, excludeId }: CounterpartyTran
             style={styles.ruleFill}
           />
         </View>
-        <Text size={fontSize.sm} numberOfLines={2} style={headingStyle}>
+        <Text size={fontSize.sm} bold color={ruleStrong} numberOfLines={2} style={styles.heading}>
           Payments with {name}
         </Text>
         <View style={styles.rule}>
@@ -89,7 +88,6 @@ const styles = StyleSheet.create({
   },
   heading: {
     flexShrink: 1,
-    fontFamily: 'OxygenBold',
     textAlign: 'center',
   },
   rule: {

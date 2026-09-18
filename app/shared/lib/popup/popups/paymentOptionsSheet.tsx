@@ -85,6 +85,17 @@ function getOptionAmount(option: AnnotatedOption['option']): number | undefined 
   return undefined;
 }
 
+/**
+ * Row identity from the option's kind plus the BIP-321 param it came from
+ * (`payment-option-onchainAddress`, `payment-option-lightningInvoice-lightning`).
+ * The value itself is the invoice/address and must not surface in the AX tree.
+ */
+function paymentOptionTestID(option: AnnotatedOption['option']): string {
+  return option.paramKey
+    ? `payment-option-${option.kind}-${option.paramKey}`
+    : `payment-option-${option.kind}`;
+}
+
 interface OptionRowProps {
   annotated: AnnotatedOption;
   unit: string;
@@ -107,7 +118,11 @@ function OptionRow({ annotated, unit, isFailed, failedReason, onPress }: OptionR
         : undefined;
 
   const item = (
-    <Menu.Item isDisabled={disabled} variant={isFailed ? 'danger' : 'default'} onPress={onPress}>
+    <Menu.Item
+      testID={paymentOptionTestID(option)}
+      isDisabled={disabled}
+      variant={isFailed ? 'danger' : 'default'}
+      onPress={onPress}>
       <SheetMenuRowContent
         icon={<Icon name={getMethodIcon(option.kind)} size={20} />}
         title={getMethodLabel(option.kind)}

@@ -5,7 +5,6 @@ import { act, fireEvent, render } from '@testing-library/react-native';
 import { PostCard } from '../components/nostr/PostCard';
 import { ThreadScreen } from '../screens/ThreadScreen';
 import { DEFAULT_METRICS, type FeedEvent } from '../components/nostr/feedTypes';
-import { __resetGuardForTests } from '@/shared/hooks/useGuardedRouter';
 
 const mockPush = jest.fn();
 const mockGetThread = jest.fn();
@@ -206,7 +205,6 @@ const target: FeedEvent = {
 };
 
 beforeEach(() => {
-  __resetGuardForTests();
   mockPush.mockReset();
   mockListProps.length = 0;
   mockFooterProps.length = 0;

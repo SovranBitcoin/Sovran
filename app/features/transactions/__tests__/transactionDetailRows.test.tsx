@@ -6,6 +6,7 @@ import {
 } from '../components/detail/transactionDetailRows';
 import { formatAmount } from '@/shared/lib/currency';
 import { CopyableValue } from '@/shared/ui/composed/CopyableValue';
+import { MiddleEllipsisValue } from '@/shared/ui/composed/MiddleEllipsisValue';
 
 jest.mock('assets/icons', () => ({ __esModule: true, default: () => null }));
 jest.mock('@/shared/lib/popup', () => ({ copyPopup: jest.fn() }));
@@ -22,17 +23,13 @@ describe('transactionDetailRows', () => {
     expect(stateDetailItem('PAID')).toEqual({ title: 'State', value: 'PAID' });
   });
 
-  it('quoteIdDetailItem renders a copyable middle-truncated quote id', () => {
+  it('quoteIdDetailItem renders the full quote id as a copyable value', () => {
     const quoteId = 'melt-quote-0123456789abcdef';
     const item = quoteIdDetailItem(quoteId);
     expect(item?.title).toBe('Quote ID');
     const value = item?.value;
     expect(value?.type).toBe(CopyableValue);
-    expect(value?.props).toMatchObject({
-      value: quoteId,
-      display: 'melt-qu...9abcdef',
-      copyTarget: 'quoteId',
-    });
+    expect(value?.props).toEqual({ value: quoteId, copyTarget: 'quoteId' });
   });
 
   it('quoteIdDetailItem and mintDetailItem gate on their optional value', () => {
@@ -41,10 +38,11 @@ describe('transactionDetailRows', () => {
     expect(mintDetailItem(null)).toBeNull();
   });
 
-  it('mintDetailItem middle-truncates the mint url', () => {
-    expect(mintDetailItem('https://mint.example.sovran.money/api/v1')).toEqual({
-      title: 'Mint',
-      value: 'https://mint...money/api/v1',
-    });
+  it('mintDetailItem shows the full mint url, elided only on screen', () => {
+    const mintUrl = 'https://mint.example.sovran.money/api/v1';
+    const item = mintDetailItem(mintUrl);
+    expect(item?.title).toBe('Mint');
+    expect(item?.value.type).toBe(MiddleEllipsisValue);
+    expect(item?.value.props).toEqual({ value: mintUrl });
   });
 });

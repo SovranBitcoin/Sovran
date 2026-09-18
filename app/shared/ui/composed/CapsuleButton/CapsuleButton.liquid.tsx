@@ -8,9 +8,18 @@ import { GlassView } from 'expo-glass-effect';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
-import { CapsuleButtonContent, DEFAULT_HEIGHT, capsuleWidthStyle } from './CapsuleButton.content';
+import {
+  CapsuleButtonContent,
+  DEFAULT_HEIGHT,
+  capsuleAccessibilityState,
+  capsuleWidthStyle,
+} from './CapsuleButton.content';
 import type { CapsuleButtonProps } from './CapsuleButton.types';
 
+// iOS-only tier: only `index.ios.ts` imports this file, and `defineVariants`
+// selects it when the `liquidGlass` capability is on, so expo-glass-effect
+// never enters the Android bundle and no Platform/version check is needed here.
+//
 // Render Liquid Glass via expo-glass-effect's GlassView (a UIVisualEffectView-
 // backed React Native view) rather than an @expo/ui SwiftUI `Host`. Host views
 // are rendered by a UIHostingController that does NOT follow an RN ScrollView's
@@ -88,8 +97,6 @@ function useGlassTapFallback(onPress: () => void) {
   return { gesture, onTouchStart, onTouchMove, onTouchEnd };
 }
 
-const RADIO_SELECTED_STATE = { checked: true, selected: true };
-const RADIO_UNSELECTED_STATE = { checked: false, selected: false };
 const RADIO_SELECTED_VALUE = { text: '1' };
 const RADIO_UNSELECTED_VALUE = { text: '0' };
 
@@ -106,6 +113,8 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
     selectedVariant = 'tint',
     height = DEFAULT_HEIGHT,
     testID,
+    disabled = false,
+    busy = false,
     roundedSide = 'all',
     fitContent = false,
     style,
@@ -124,7 +133,9 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
 
   // Preserve the single-flight guard PressableFeedback's onPress used to provide
   // so a rapid double-tap can't fire Send/Receive twice.
+  // A disabled or busy capsule swallows the tap (GlassView has no `disabled`).
   const guardedPress = useSingleFlight(async () => {
+    if (disabled || busy) return;
     const result = onPress() as unknown;
     if (result instanceof Promise) await result;
   });
@@ -138,13 +149,7 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
         accessible
         accessibilityRole={accessibilityRole}
         accessibilityLabel={accessibilityLabel ?? label}
-        accessibilityState={
-          accessibilityRole === 'radio'
-            ? isActive
-              ? RADIO_SELECTED_STATE
-              : RADIO_UNSELECTED_STATE
-            : undefined
-        }
+        accessibilityState={capsuleAccessibilityState(props)}
         accessibilityValue={
           accessibilityRole === 'radio'
             ? isActive

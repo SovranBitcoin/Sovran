@@ -257,11 +257,6 @@
       "count": 1
     }
   },
-  "shared/ui/composed/chat/LiquidChatComposer.tsx": {
-    "no-restricted-syntax": {
-      "count": 4
-    }
-  },
   "shared/ui/primitives/SelectableCheck/SelectableCheck.circle.tsx": {
     "no-restricted-syntax": {
       "count": 1

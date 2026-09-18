@@ -121,11 +121,6 @@ export async function buildRelayForYouFeed(args: BuildRelayForYouArgs): Promise<
   return pageFrom(corpus, offset, limit);
 }
 
-/** Test seam — drop cached state between cases. */
-export function __clearRelayForYouCache(): void {
-  cacheByViewer.clear();
-}
-
 /** Decode the next-offset we encoded into `cursor.createdAt` (id is always ''). */
 function cursorOffset(cursor: NostrCursor | undefined): number {
   if (cursor && typeof cursor.createdAt === 'number' && cursor.createdAt > 0) {

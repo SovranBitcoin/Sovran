@@ -1,12 +1,13 @@
 // The real manifest imports every store module (heavy native transitive deps);
-// the replacer/gate under test never touch it.
-import { createSafeReplacer, isStateMirrorEnabled } from '@/shared/lib/e2e/stateMirror';
+// the serializer/gate under test never touch it.
+import { serializeStoreState } from '@/shared/lib/e2e/serializeStoreState';
+import { isStateMirrorEnabled } from '@/shared/lib/e2e/stateMirror';
 
 jest.mock('@/shared/lib/e2e/storeManifest', () => ({ E2E_STORE_MANIFEST: {} }));
 
-const roundTrip = (value: unknown) => JSON.parse(JSON.stringify(value, createSafeReplacer()));
+const roundTrip = (value: unknown) => JSON.parse(serializeStoreState(value));
 
-describe('createSafeReplacer', () => {
+describe('serializeStoreState', () => {
   it('drops functions and keeps plain data', () => {
     expect(roundTrip({ amount: 21, send: () => {}, label: 'ok' })).toEqual({
       amount: 21,
@@ -48,16 +49,23 @@ describe('isStateMirrorEnabled', () => {
   });
 });
 
-describe('serializeStoreFragment', () => {
-  const { serializeStoreFragment } = jest.requireActual('@/shared/lib/e2e/stateMirror');
-
+describe('serializeStoreState size cap', () => {
   it('passes ordinary store state through as plain JSON', () => {
-    expect(JSON.parse(serializeStoreFragment({ a: 1, b: 'x' }))).toEqual({ a: 1, b: 'x' });
+    expect(roundTrip({ a: 1, b: 'x' })).toEqual({ a: 1, b: 'x' });
+  });
+
+  it('turns a store that throws while serializing into an Error marker', () => {
+    const hostile = {
+      get boom(): never {
+        throw new Error('getter failed');
+      },
+    };
+    expect(roundTrip(hostile)).toEqual({ __type: 'Error', message: 'getter failed' });
   });
 
   it('caps giant stores with a Truncated marker keeping the key list', () => {
     const giant = { blob: 'y'.repeat(300 * 1024), other: 1 };
-    const parsed = JSON.parse(serializeStoreFragment(giant));
+    const parsed = roundTrip(giant);
     expect(parsed.__type).toBe('Truncated');
     expect(parsed.bytes).toBeGreaterThan(256 * 1024);
     expect(parsed.keys).toEqual(['blob', 'other']);

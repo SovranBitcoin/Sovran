@@ -15,6 +15,8 @@ export interface QRButtonProps {
   accentColor?: string;
   color?: string;
   size?: number;
+  /** e2e selector for the press surface. Defaults to `qr-scan-button`. */
+  testID?: string;
 }
 
 export const DEFAULT_SIZE = 64;

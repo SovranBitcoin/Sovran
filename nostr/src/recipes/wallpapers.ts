@@ -1,13 +1,24 @@
 // Wallpaper/theme recipes. Theme events (kind 1063 wallpaper files + kind 30078
 // album catalog) are published by the admin pubkey and now indexed by nagg, so
 // the read path is a plain events query instead of a bespoke relay subscription.
+import { z } from 'zod';
+
 import type { EventQueryInput } from './rank';
 
-export type NaggWallpaperColors = {
-  palette: Record<string, unknown>;
-  dominantColors: unknown[];
-  gradientColors: unknown[];
-};
+// Tag and content JSON is untrusted relay data, so it is parsed with these
+// schemas at the boundary. They check structure only: per-colour and per-URL
+// constraints belong to the consumer's `@sovranbitcoin/schemas` catalog schema,
+// which this package doesn't import as a value (see `../schemas.ts` for why).
+const PaletteSchema = z.record(z.string(), z.unknown());
+const ColorListSchema = z.array(z.unknown());
+
+const NaggWallpaperColorsSchema = z.object({
+  palette: PaletteSchema,
+  dominantColors: ColorListSchema,
+  gradientColors: ColorListSchema,
+});
+
+export type NaggWallpaperColors = z.infer<typeof NaggWallpaperColorsSchema>;
 
 export type WallpaperCatalogEntry = NaggWallpaperColors & {
   eventId: string;
@@ -22,14 +33,20 @@ export type WallpaperCatalogEntry = NaggWallpaperColors & {
   createdAt: number;
 };
 
-export type AlbumMeta = {
-  slug: string;
-  displayName: string;
-  description: string;
-  sortOrder: number;
-  topic?: string;
-  coverThemeName?: string;
-};
+// Loose so extra publisher fields (e.g. `author`) reach the consumer, which
+// filters on them.
+const AlbumMetaSchema = z.looseObject({
+  slug: z.string(),
+  displayName: z.string(),
+  description: z.string().default(''),
+  sortOrder: z.number().default(0),
+  topic: z.string().optional(),
+  coverThemeName: z.string().optional(),
+});
+
+export type AlbumMeta = z.infer<typeof AlbumMetaSchema>;
+
+const AlbumCatalogContentSchema = z.object({ albums: z.array(z.unknown()) });
 
 type RawEventNode = {
   id: string;
@@ -63,6 +80,15 @@ export function wallpaperAlbumsInput(adminPubkey: string): EventQueryInput {
   };
 }
 
+/** JSON.parse that yields `undefined` for malformed text; callers validate. */
+function parseJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+}
+
 function toUnixSeconds(value: string | number | undefined): number {
   if (typeof value === 'number') return value;
   if (value === undefined) return 0;
@@ -84,21 +110,17 @@ export function parseWallpaperEvent(
   const url = getTag('url');
   if (!themeName || !url) return null;
 
-  const colors: NaggWallpaperColors = { palette: {}, dominantColors: [], gradientColors: [] };
-  const parseJson = (raw: string | undefined): unknown => {
-    if (!raw) return undefined;
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return undefined;
-    }
+  const parseJsonTag = <T>(name: string, schema: z.ZodType<T>, fallback: T): T => {
+    const raw = getTag(name);
+    if (!raw) return fallback;
+    const parsed = schema.safeParse(parseJson(raw));
+    return parsed.success ? parsed.data : fallback;
   };
-  const palette = parseJson(getTag('palette'));
-  const dominant = parseJson(getTag('dominant_colors'));
-  const gradient = parseJson(getTag('gradient_colors'));
-  if (palette && typeof palette === 'object') colors.palette = palette as Record<string, unknown>;
-  if (Array.isArray(dominant)) colors.dominantColors = dominant;
-  if (Array.isArray(gradient)) colors.gradientColors = gradient;
+  const colors: NaggWallpaperColors = {
+    palette: parseJsonTag('palette', PaletteSchema, {}),
+    dominantColors: parseJsonTag('dominant_colors', ColorListSchema, []),
+    gradientColors: parseJsonTag('gradient_colors', ColorListSchema, []),
+  };
 
   const albumTag = tags.find((t) => t[0] === 'l' && t[2] === albumNamespace);
   const albumSlug = albumTag?.[1] || 'uncategorized';
@@ -119,17 +141,15 @@ export function parseWallpaperEvent(
 }
 
 // parseAlbumCatalog reads the album list from a kind-30078 event's content JSON.
+// Malformed content yields no albums; malformed album entries are dropped.
 export function parseAlbumCatalog(event: RawEventNode | undefined): AlbumMeta[] {
   if (!event?.content) return [];
-  try {
-    const content = JSON.parse(event.content);
-    if (content && Array.isArray(content.albums)) {
-      return content.albums as AlbumMeta[];
-    }
-  } catch {
-    // Malformed catalog JSON — fall through to empty.
-  }
-  return [];
+  const content = AlbumCatalogContentSchema.safeParse(parseJson(event.content));
+  if (!content.success) return [];
+  return content.data.albums.flatMap((album) => {
+    const parsed = AlbumMetaSchema.safeParse(album);
+    return parsed.success ? [parsed.data] : [];
+  });
 }
 
 // parseWallpaperCatalog turns the WALLPAPER_CATALOG_QUERY data into a sorted

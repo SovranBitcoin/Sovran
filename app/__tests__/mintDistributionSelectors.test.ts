@@ -45,7 +45,7 @@ describe('mint distribution e2e selectors', () => {
 
   it('keeps the ButtonHandler testID passthrough the rebalance buttons rely on', () => {
     const source = read('shared/ui/composed/ButtonHandler.tsx');
-    expect(source).toContain('testID?: string');
+    expect(source).toContain('testID: string');
     expect(source).toContain('testID={button.testID}');
   });
 

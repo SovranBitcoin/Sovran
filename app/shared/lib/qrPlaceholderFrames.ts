@@ -102,8 +102,3 @@ export function qrPlaceholderFrames(
   frameCache.set(key, frames);
   return frames;
 }
-
-/** Test seam. */
-export function resetQrPlaceholderFrameCache(): void {
-  frameCache.clear();
-}

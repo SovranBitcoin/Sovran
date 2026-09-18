@@ -209,6 +209,7 @@ export function MintListScreen({
           {
             text: closeButtonLabel,
             variant: 'secondary' as const,
+            testID: 'mint-list-close',
             onPress: async () => onClose(),
           },
         ]}

@@ -68,6 +68,10 @@ export const StatsCard = memo(function StatsCard({
           // The glass path above is a UIKit UIButton and is announced as a
           // button natively; this fallback covers Android + pre-iOS-26.
           accessibilityRole="button"
+          accessibilityLabel={`Merchant category, ${categoryLabel(category)}`}
+          accessibilityHint={`${visibleText}. Opens the category filter.`}
+          accessibilityState={{ busy: loading }}
+          testID="map-category-filter"
           style={[
             styles.fallbackCard,
             {
@@ -120,6 +124,9 @@ export const StatsCard = memo(function StatsCard({
         title: 'Merchant category',
         buttons: CATEGORY_FILTERS.map((cat) => ({
           text: categoryLabel(cat),
+          testID: `map-category-${cat}`,
+          accessibilityLabel:
+            cat === category ? `${categoryLabel(cat)}, selected` : categoryLabel(cat),
           suffix:
             cat === category ? <Icon name="mdi:check" size={20} color={success} /> : undefined,
           onPress: () => onCategoryChange(cat),
@@ -135,6 +142,7 @@ export const StatsCard = memo(function StatsCard({
   return (
     <View>
       <LiquidGlassMenu
+        testID="map-category-filter"
         style={{ width: cardWidth, height: 64 }}
         image="bitcoinsign.circle.fill"
         imageColor={BITCOIN_ACCENT}

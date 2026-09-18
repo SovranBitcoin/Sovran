@@ -116,7 +116,12 @@ function LocationPrivacyPlaceholder({ onReveal }: { onReveal: () => void }) {
   };
 
   return (
-    <Pressable onPress={onReveal} activeOpacity={0.7}>
+    <Pressable
+      onPress={onReveal}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel="Reveal location"
+      testID="transaction-location-reveal">
       <View
         className={MAP_CONTAINER_CN}
         style={

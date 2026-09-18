@@ -101,12 +101,17 @@ export interface ActionMenuItem {
    * row needs an avatar / emoji / non-iconify visual — e.g. profile rows in
    * the profile switcher menu. */
   iconNode?: React.ReactNode;
-  testID?: string;
+  /** Stable e2e selector derived from what the item does or the entity it
+   * picks (e.g. `mint-picker-${mintUrl}`) — never its position or label. */
+  testID: string;
   /** Optional stable spoken name when the visual title differs by platform
    * (for example Android's "British Pound" vs iOS's native "GBP"). */
   accessibilityLabel?: string;
   accessibilityHint?: string;
   variant?: 'primary' | 'secondary' | 'dangerous';
+  /** Marks the current choice in a pick-one-of-N menu. Exposed to screen
+   * readers as the checked state; any visual mark stays in `suffix`. */
+  selected?: boolean;
   /** Disables tap and (when `reason` is set) renders the reason as the description. */
   disabled?: boolean;
   /** Shown as the description when `disabled` is true. */
@@ -142,6 +147,9 @@ export interface ActionMenuItem {
 export interface ActionMenuInput {
   id: string;
   label?: string;
+  /** Spoken field name when there is no visible `label` (the placeholder is
+   *  an example value, not a name). */
+  accessibilityLabel?: string;
   placeholder?: string;
   initialValue?: string;
   secureTextEntry?: boolean;

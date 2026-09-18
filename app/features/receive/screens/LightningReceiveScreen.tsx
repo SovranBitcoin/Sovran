@@ -14,7 +14,7 @@ import { useScreenActions } from 'wallet/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 import { MintSelector } from '@/features/wallet';
-import { truncateMiddle } from '@/shared/lib/strings';
+import { MiddleEllipsisValue } from '@/shared/ui/composed/MiddleEllipsisValue';
 import {
   HistoryEntryRefresh,
   TransactionDetailShell,
@@ -102,6 +102,7 @@ export function LightningReceiveScreen({
               text: isPaid ? 'Close' : 'Cancel',
               icon: 'ri:close-circle-line',
               variant: 'secondary',
+              testID: 'lightning-receive-back',
               onPress: () => actions.back.execute(),
               condition: actions.back.available,
             },
@@ -109,6 +110,7 @@ export function LightningReceiveScreen({
               text: 'Copy',
               icon: 'lets-icons:copy',
               variant: 'primary',
+              testID: 'lightning-receive-copy',
               onPress: () => actions.copy.execute(),
               condition: actions.copy.available,
             },
@@ -116,6 +118,7 @@ export function LightningReceiveScreen({
               text: 'Share',
               icon: 'ri:share-fill',
               variant: 'secondary',
+              testID: 'lightning-receive-share',
               onPress: () => actions.share.execute(),
               condition: actions.share.available,
             },
@@ -176,7 +179,7 @@ export function LightningReceiveScreen({
           mintDetailItem(mintUrl),
           {
             title: 'Invoice',
-            value: truncateMiddle(entry.paymentRequest, 10),
+            value: <MiddleEllipsisValue value={entry.paymentRequest} />,
           },
         ]}
       />

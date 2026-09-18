@@ -95,7 +95,7 @@ export function GalleryScreen() {
           ) : null}
           {byTopic.map((group) => (
             <View key={group.key} className="mt-5">
-              <SectionHeader topic={group.topic} author={group.author} />
+              <SectionHeader groupKey={group.key} topic={group.topic} author={group.author} />
               <FlatList
                 horizontal
                 data={group.albums}
@@ -120,8 +120,18 @@ export function GalleryScreen() {
   );
 }
 
-function SectionHeader({ topic, author }: { topic: string; author: AlbumAuthor | null }) {
+function SectionHeader({
+  groupKey,
+  topic,
+  author,
+}: {
+  groupKey: string;
+  topic: string;
+  author: AlbumAuthor | null;
+}) {
   const foreground = useThemeColor('foreground');
+  const profileLabel = `${author?.displayName || 'Author'} profile`;
+  const profileState = { disabled: !author?.pubkey };
   const openProfile = () => {
     if (author?.pubkey) {
       router.navigate({
@@ -137,7 +147,13 @@ function SectionHeader({ topic, author }: { topic: string; author: AlbumAuthor |
       style={{ paddingHorizontal: SECTION_PADDING }}>
       <HStack style={{ alignItems: 'center', gap: 10, flex: 1 }}>
         {author?.picture ? (
-          <PressableFeedback onPress={openProfile} animation={false}>
+          <PressableFeedback
+            onPress={openProfile}
+            animation={false}
+            accessibilityRole="link"
+            accessibilityLabel={profileLabel}
+            accessibilityState={profileState}
+            testID={`gallery-author-avatar-${groupKey}`}>
             <PressableFeedback.Scale>
               <Image
                 source={{ uri: author.picture }}
@@ -152,7 +168,17 @@ function SectionHeader({ topic, author }: { topic: string; author: AlbumAuthor |
             {topic.toUpperCase()}
           </Text>
           {author?.displayName ? (
-            <PressableFeedback onPress={openProfile} animation={false}>
+            <PressableFeedback
+              onPress={openProfile}
+              animation={false}
+              accessibilityRole="link"
+              accessibilityLabel={
+                author.followers
+                  ? `${profileLabel}, ${author.followers.toLocaleString()} followers`
+                  : profileLabel
+              }
+              accessibilityState={profileState}
+              testID={`gallery-author-name-${groupKey}`}>
               <PressableFeedback.Scale>
                 <HStack style={{ alignItems: 'center', gap: 4, marginTop: 1 }}>
                   <Text size={11} bold style={{ color: STAT_COLOR_SOCIAL }}>
@@ -206,6 +232,7 @@ function AlbumCard({
         selected={isActive}
         badge={isNew ? 'New' : undefined}
         testID={`album-card-${album.slug}`}
+        accessibilityLabel={album.displayName}
       />
       <Text size={13} medium style={{ color: foreground }}>
         {album.displayName}

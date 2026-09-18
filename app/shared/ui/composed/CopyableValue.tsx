@@ -1,9 +1,9 @@
 /**
  * @fileoverview Tappable detail value that copies its full value to the clipboard.
  *
- * Drop-in `value` for a `DetailsList` / `DetailsSection` row: shows a
- * (usually truncated) display string plus a copy icon, and on press copies the
- * full `value` with the standard haptic + toast pattern (mirrors PaymentInfo).
+ * Drop-in `value` for a `DetailsList` / `DetailsSection` row: shows the value
+ * on one line, eliding its middle to fit, plus a copy icon, and on press copies
+ * the full `value` with the standard haptic + toast pattern (mirrors PaymentInfo).
  */
 
 import { useCallback } from 'react';
@@ -22,13 +22,17 @@ import { withAlpha } from '@/shared/lib/color';
 interface CopyableValueProps {
   /** Full value copied to the clipboard. */
   value: string;
-  /** Truncated/display string shown in the row (defaults to `value`). */
+  /** Display string shown in the row when it differs from `value` (a label,
+   *  not a sliced copy — the text view already elides long values). */
   display?: string;
   /** Copy popup + AX target (drives the toast message). */
   copyTarget: CopyTarget;
+  /** e2e selector; defaults to `copy-value-${copyTarget}`. Pass an
+   *  entity-scoped id when one screen shows two values of the same target. */
+  testID?: string;
 }
 
-export function CopyableValue({ value, display, copyTarget }: CopyableValueProps) {
+export function CopyableValue({ value, display, copyTarget, testID }: CopyableValueProps) {
   const foreground = useThemeColor('foreground');
 
   const handleCopyPress = useCallback(async () => {
@@ -42,10 +46,19 @@ export function CopyableValue({ value, display, copyTarget }: CopyableValueProps
     <Pressable
       onPress={handleCopyPress}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      testID={testID ?? `copy-value-${copyTarget}`}
       accessibilityRole="button"
-      accessibilityLabel={`Copy ${copyTarget}`}>
-      <HStack align="center">
-        <Text weight="bold" size={16} color={foreground} style={{ textAlign: 'right' }}>
+      accessibilityLabel={`Copy ${copyTarget}`}
+      className="shrink">
+      <HStack align="center" className="shrink">
+        <Text
+          weight="bold"
+          size={16}
+          color={foreground}
+          numberOfLines={1}
+          ellipsizeMode="middle"
+          className="shrink"
+          style={{ textAlign: 'right' }}>
           {display ?? value}
         </Text>
         <Spacer size={6} />

@@ -109,6 +109,7 @@ export function ProfileDetailsScreen({
     // secureTextEntry ignores multiline, so an obscured secret is one line and
     // only grows when the user reveals it — a shift they caused.
     const multiline = !shouldObscure && lines > 1;
+    const name = label.replace(/:$/, '');
 
     return (
       <Card variant="secondary" className="mb-3">
@@ -152,6 +153,9 @@ export function ProfileDetailsScreen({
                 size="sm"
                 className={showEyeIcon ? 'flex-1' : 'w-full'}
                 isDisabled={!value || loading || isLoading}
+                testID={`profile-copy-${copyTarget}`}
+                accessibilityLabel={`Copy ${name}`}
+                accessibilityState={{ disabled: !value || loading || isLoading }}
                 onPress={() => handleCopy(value, copyTarget)}>
                 <Icon name="lets-icons:copy" size={15} color={mutedColor} />
                 <Button.Label className="text-muted">Copy</Button.Label>
@@ -171,7 +175,7 @@ export function ProfileDetailsScreen({
       footer={
         onBack ? (
           <View className="p-4">
-            <Button variant="secondary" onPress={onBack}>
+            <Button variant="secondary" testID="settings-profile-back-to-review" onPress={onBack}>
               <Button.Label>Back to review</Button.Label>
             </Button>
           </View>

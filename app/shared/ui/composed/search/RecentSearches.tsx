@@ -60,6 +60,7 @@ export function RecentSearches({
             <Pressable
               onPress={clearQueries}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              testID="recent-searches-clear"
               accessibilityRole="button"
               accessibilityLabel="Clear recent searches">
               <Text size={13} color={accent}>
@@ -68,12 +69,15 @@ export function RecentSearches({
             </Pressable>
           </HStack>
           <View style={styles.chipWrap}>
+            {/* The query string is the recent entry's identity (the store
+                dedupes on it); entries carry no other id. */}
             {queries.map((entry) => (
               <FeedTabButton
                 key={entry.query}
                 label={entry.query}
                 active={false}
                 onPress={() => onPickQuery(entry.query)}
+                testID={`recent-search-${entry.query}`}
               />
             ))}
           </View>

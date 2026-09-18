@@ -120,12 +120,16 @@ function useOverlayZapPress(post: ImageOverlayPost, onRequestClose?: () => void)
 const PANEL_TEXT = 'rgba(255,255,255,0.95)';
 const PANEL_TEXT_MUTED = 'rgba(255,255,255,0.6)';
 
+/** Which overlay surface renders a control — keeps testIDs unique while both are mounted. */
+type OverlaySurface = 'panel' | 'bar';
+
 /**
  * Pfp + name + timestamp row that pushes the author's profile — shared by the
  * sheet panel (theme colors, 32pt pfp) and the absolute bar (fixed panel
  * colors, 28pt pfp).
  */
 function OverlayAuthorRow({
+  surface,
   event,
   profile,
   avatarSize,
@@ -134,6 +138,7 @@ function OverlayAuthorRow({
   nameColor,
   timeColor,
 }: {
+  surface: OverlaySurface;
   event: ImageOverlayPost['event'];
   profile: ImageOverlayPost['profile'];
   avatarSize: number;
@@ -146,6 +151,9 @@ function OverlayAuthorRow({
   const shortTime = formatRelativeUnixSeconds(event.created_at);
   return (
     <Pressable
+      testID={`image-overlay-${surface}-author-${event.id}`}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${displayName}'s profile`}
       onPress={() => {
         router.push({
           pathname: '/(user-flow)/profile',
@@ -351,11 +359,13 @@ function InlinePanelImage({ uri }: { uri: string }) {
  * Owns the repost-menu and zap wiring so both surfaces share one behavior.
  */
 const OverlayMetricsRow = React.memo(function OverlayMetricsRow({
+  surface,
   post,
   inactiveColor,
   onRequestClose,
   children,
 }: {
+  surface: OverlaySurface;
   post: ImageOverlayPost;
   inactiveColor: string;
   onRequestClose?: () => void;
@@ -364,11 +374,19 @@ const OverlayMetricsRow = React.memo(function OverlayMetricsRow({
   const repostedColor = useThemeColor('success');
   const handleRepostPress = useOverlayRepostMenu(post, onRequestClose);
   const handleZapPress = useOverlayZapPress(post, onRequestClose);
-  const { metrics, reposted, liked, zapped, onLikePress } = post;
+  const { event, metrics, reposted, liked, zapped, onLikePress } = post;
+  const { repostPending, likePending, zapPending } = post;
   return (
     <View style={styles.metricsRow}>
       {children}
-      <Pressable onPress={handleRepostPress} hitSlop={METRIC_HIT_SLOP} style={styles.metricBtn}>
+      <Pressable
+        testID={`image-overlay-${surface}-repost-${event.id}`}
+        accessibilityRole="button"
+        accessibilityLabel={`${reposted ? 'Reposted' : 'Repost'}, ${metrics.repostCount} reposts`}
+        accessibilityState={{ selected: !!reposted, busy: !!repostPending }}
+        onPress={handleRepostPress}
+        hitSlop={METRIC_HIT_SLOP}
+        style={styles.metricBtn}>
         <OverlayMetric
           iconName="tabler:repeat"
           iconSize={POST_ACTION_ICON_SIZES.regular}
@@ -378,7 +396,14 @@ const OverlayMetricsRow = React.memo(function OverlayMetricsRow({
           inactiveColor={inactiveColor}
         />
       </Pressable>
-      <Pressable onPress={onLikePress} hitSlop={METRIC_HIT_SLOP} style={styles.metricBtn}>
+      <Pressable
+        testID={`image-overlay-${surface}-like-${event.id}`}
+        accessibilityRole="button"
+        accessibilityLabel={`${liked ? 'Liked' : 'Like'}, ${metrics.likeCount} likes`}
+        accessibilityState={{ selected: !!liked, busy: !!likePending }}
+        onPress={onLikePress}
+        hitSlop={METRIC_HIT_SLOP}
+        style={styles.metricBtn}>
         <OverlayMetric
           iconName={liked ? 'tabler:heart-filled' : 'tabler:heart'}
           iconSize={POST_ACTION_ICON_SIZES.regular}
@@ -389,6 +414,14 @@ const OverlayMetricsRow = React.memo(function OverlayMetricsRow({
         />
       </Pressable>
       <Pressable
+        testID={`image-overlay-${surface}-zap-${event.id}`}
+        accessibilityRole="button"
+        accessibilityLabel={`Zap, ${formatSats(metrics.satsZapped)} sats zapped`}
+        accessibilityState={{
+          selected: !!zapped,
+          busy: !!zapPending,
+          disabled: !post.onZapPress,
+        }}
         onPress={handleZapPress}
         disabled={!post.onZapPress}
         hitSlop={METRIC_HIT_SLOP}
@@ -476,6 +509,7 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
       <View style={styles.wrap}>
         {/* Author row */}
         <OverlayAuthorRow
+          surface="panel"
           event={event}
           profile={profile}
           avatarSize={32}
@@ -504,6 +538,10 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
               <Text
                 size={14}
                 style={[styles.contentText, { color: muted, marginTop: 4 }]}
+                testID={`image-overlay-panel-show-more-${event.id}`}
+                accessibilityRole="button"
+                accessibilityLabel="Show more"
+                accessibilityState={{ expanded: false }}
                 onPress={() => setContentExpanded((e) => !e)}>
                 show more
               </Text>
@@ -512,6 +550,10 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
               <Text
                 size={14}
                 style={[styles.contentText, { color: muted, marginTop: 4 }]}
+                testID={`image-overlay-panel-show-less-${event.id}`}
+                accessibilityRole="button"
+                accessibilityLabel="Show less"
+                accessibilityState={{ expanded: true }}
                 onPress={() => setContentExpanded((e) => !e)}>
                 show less
               </Text>
@@ -519,7 +561,11 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
           </View>
         ) : null}
         {/* Stats / actions row */}
-        <OverlayMetricsRow post={post} inactiveColor={muted} onRequestClose={onRequestClose}>
+        <OverlayMetricsRow
+          surface="panel"
+          post={post}
+          inactiveColor={muted}
+          onRequestClose={onRequestClose}>
           {/* Reply is inert in the panel: the live composer is the ThreadReplyBar below. */}
           <View style={styles.metricBtn}>
             <OverlayMetric
@@ -571,6 +617,7 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
     <Log name="ImageOverlayAbsoluteBar">
       <View style={[styles.wrap, absoluteBarStyles.bar]}>
         <OverlayAuthorRow
+          surface="bar"
           event={event}
           profile={profile}
           avatarSize={28}
@@ -592,6 +639,10 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
               <Text
                 size={13}
                 style={[styles.contentText, absoluteBarStyles.showMore]}
+                testID={`image-overlay-bar-show-more-${event.id}`}
+                accessibilityRole="button"
+                accessibilityLabel="Show more"
+                accessibilityState={{ expanded: false }}
                 onPress={handleShowMorePress}>
                 show more
               </Text>
@@ -599,10 +650,14 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
           </View>
         ) : null}
         <OverlayMetricsRow
+          surface="bar"
           post={post}
           inactiveColor={PANEL_TEXT_MUTED}
           onRequestClose={onRequestClose}>
           <Pressable
+            testID={`image-overlay-bar-comment-${event.id}`}
+            accessibilityRole="button"
+            accessibilityLabel={`${replied ? 'Replied' : 'Reply'}, ${metrics.replyCount} replies`}
             onPress={handleCommentPress}
             hitSlop={METRIC_HIT_SLOP}
             style={styles.metricBtn}>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import type { StyleProp, ViewStyle } from 'react-native';
+import type { AccessibilityState, StyleProp, ViewStyle } from 'react-native';
 
 import Icon from 'assets/icons';
 import { controlHeight } from '@/shared/styles/tokens';
@@ -10,6 +10,26 @@ import type { CapsuleButtonProps } from './CapsuleButton.types';
 
 // controlHeight.cta (48) — every tier agrees on the same default height.
 export const DEFAULT_HEIGHT = controlHeight.cta;
+
+/**
+ * The accessibility state every tier exposes: radio selection plus the
+ * disabled/busy flags. `undefined` when there is nothing to announce.
+ */
+export function capsuleAccessibilityState({
+  accessibilityRole = 'button',
+  isActive = false,
+  disabled = false,
+  busy = false,
+}: Pick<CapsuleButtonProps, 'accessibilityRole' | 'isActive' | 'disabled' | 'busy'>):
+  AccessibilityState | undefined {
+  const radio = accessibilityRole === 'radio';
+  if (!radio && !disabled && !busy) return undefined;
+  return {
+    ...(radio ? { checked: isActive, selected: isActive } : null),
+    ...(disabled ? { disabled: true } : null),
+    ...(busy ? { busy: true } : null),
+  };
+}
 
 /** `fitContent` sizes to the label; otherwise stretch to the full parent width. */
 export function capsuleWidthStyle(fitContent: boolean | undefined): StyleProp<ViewStyle> {

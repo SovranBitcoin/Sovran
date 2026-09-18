@@ -110,14 +110,17 @@ function FilterChip({
   label,
   onPress,
   leading,
+  testID,
 }: {
   selected: boolean;
   label: string;
   onPress: () => void;
   leading?: React.ReactNode;
+  testID: string;
 }) {
   return (
     <HerouiButton
+      testID={testID}
       variant={selected ? 'primary' : 'secondary'}
       size="sm"
       onPress={onPress}
@@ -189,6 +192,7 @@ export function SignerActivityScreen(): React.ReactElement {
         }
         trailing={<Icon name="mdi:chevron-right" size={20} color={muted} />}
         onPress={() => openDetail(item.id)}
+        testID={`signer-activity-row-${item.id}`}
         accessibilityHint="Opens the request details"
       />
     );
@@ -200,6 +204,7 @@ export function SignerActivityScreen(): React.ReactElement {
       showsHorizontalScrollIndicator={false}
       contentContainerClassName="gap-2 px-4 py-2.5">
       <FilterChip
+        testID="signer-activity-filter-all"
         selected={filter.kind === 'all'}
         label="All"
         onPress={() => setFilter({ kind: 'all' })}
@@ -209,6 +214,7 @@ export function SignerActivityScreen(): React.ReactElement {
         return (
           <FilterChip
             key={clientPubkey}
+            testID={`signer-activity-filter-app-${clientPubkey}`}
             selected={filter.kind === 'app' && filter.clientPubkey === clientPubkey}
             label={appDisplayName(connection)}
             leading={
@@ -225,6 +231,7 @@ export function SignerActivityScreen(): React.ReactElement {
         );
       })}
       <FilterChip
+        testID="signer-activity-filter-denied"
         selected={filter.kind === 'denied'}
         label="Denied"
         onPress={() => setFilter({ kind: 'denied' })}

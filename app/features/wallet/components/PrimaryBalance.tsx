@@ -92,6 +92,9 @@ interface EcashStatusPillProps {
   totalAmount: number;
   unit: string;
   onPress: () => void;
+  /** Applied only while the pill is live, so hidden layout slots never
+   *  duplicate it in the AX tree. */
+  testID: string;
   /** Keep an invisible same-size slot when the amount is zero — set when
    *  ANY carousel account shows this pill, so it sits at the same position
    *  on every page. Unreserved zero pills render nothing (no dead space). */
@@ -103,6 +106,7 @@ function EcashStatusPill({
   totalAmount,
   unit,
   onPress,
+  testID,
   reserveSlot = false,
 }: EcashStatusPillProps): React.ReactElement | null {
   const foreground = useThemeColor('foreground');
@@ -122,6 +126,7 @@ function EcashStatusPill({
         label={text}
         icon="majesticons:coins"
         onPress={isPlaceholder ? () => {} : onPress}
+        testID={isPlaceholder ? undefined : testID}
         color={withAlpha(foreground, 0.85)}
         height={PILL_HEIGHT}
         fitContent
@@ -328,7 +333,14 @@ export function PrimaryBalance({
               : undefined
           }
         />
-        <Pressable onPress={toggleUnit} style={styles.balancePressable}>
+        <Pressable
+          onPress={toggleUnit}
+          testID={`wallet-balance-toggle-${account.unit}`}
+          accessibilityRole="button"
+          accessibilityLabel={`Balance, ${balance.toLocaleString()} ${account.unit.toUpperCase()}`}
+          accessibilityHint={isSatUnit ? 'Cycles the balance display format' : undefined}
+          accessibilityState={{ disabled: !isSatUnit }}
+          style={styles.balancePressable}>
           <AmountFormatter
             amount={balance}
             unit={account.unit}
@@ -374,6 +386,7 @@ export function PrimaryBalance({
         </View>
         <EcashStatusPill
           label="PENDING"
+          testID={`wallet-pending-pill-${account.unit}`}
           totalAmount={pendingTotal}
           unit={pendingUnit}
           onPress={handlePendingPress}
@@ -381,6 +394,7 @@ export function PrimaryBalance({
         />
         <EcashStatusPill
           label="RESERVED"
+          testID={`wallet-reserved-pill-${account.unit}`}
           totalAmount={reservedTotal}
           unit={account.unit}
           onPress={handleReservedPress}
@@ -388,6 +402,7 @@ export function PrimaryBalance({
         />
         <EcashStatusPill
           label="REDEEMING"
+          testID={`wallet-redeeming-pill-${account.unit}`}
           totalAmount={lockedTotal}
           unit={lockedUnit}
           onPress={handleRedeemingPress}

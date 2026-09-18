@@ -244,12 +244,17 @@ export function SignerRequestsScreen(): React.ReactElement {
       buttons: [
         {
           text: allowAllLabel(count),
+          testID: 'signer-requests-allow-all-confirm',
           onPress: (close) => {
             close();
             void resolveBatch(clientPubkey, 'approve_once');
           },
         },
-        { text: BATCH_CANCEL_LABEL, variant: 'secondary' },
+        {
+          text: BATCH_CANCEL_LABEL,
+          variant: 'secondary',
+          testID: 'signer-requests-allow-all-cancel',
+        },
       ],
     });
   };
@@ -283,6 +288,7 @@ export function SignerRequestsScreen(): React.ReactElement {
                 <HStack gap={8}>
                   <View style={{ flex: 1 }}>
                     <HerouiButton
+                      testID={`signer-requests-allow-all-${group.clientPubkey}`}
                       variant="secondary"
                       size="sm"
                       isDisabled={!allowAllEnabled}
@@ -293,6 +299,7 @@ export function SignerRequestsScreen(): React.ReactElement {
                   </View>
                   <View style={{ flex: 1 }}>
                     <HerouiButton
+                      testID={`signer-requests-deny-all-${group.clientPubkey}`}
                       variant="secondary"
                       size="sm"
                       onPress={() => void resolveBatch(group.clientPubkey, 'deny_once')}
@@ -335,6 +342,7 @@ export function SignerRequestsScreen(): React.ReactElement {
                         </Text>
                       }
                       onPress={() => reviewRequest(request.id)}
+                      testID={`signer-request-row-${request.id}`}
                       accessibilityHint="Opens the approval prompt for this request"
                     />
                   </Animated.View>

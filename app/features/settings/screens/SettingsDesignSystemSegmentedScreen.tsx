@@ -125,6 +125,9 @@ export function SettingsDesignSystemSegmentedScreen() {
                   <Button
                     variant={segmentCount === count ? 'primary' : 'secondary'}
                     size="sm"
+                    testID={`design-system-segmented-count-${count}`}
+                    accessibilityLabel={`${count} segments`}
+                    accessibilityState={{ selected: segmentCount === count }}
                     onPress={() => onSelectSegmentCount(count)}>
                     <Button.Label>{count}</Button.Label>
                   </Button>
@@ -137,17 +140,29 @@ export function SettingsDesignSystemSegmentedScreen() {
                 <Button
                   variant={segmentsAuto ? 'primary' : 'secondary'}
                   size="sm"
+                  testID="design-system-segmented-auto"
+                  accessibilityRole="switch"
+                  accessibilityLabel="Auto-play"
+                  accessibilityState={{ checked: segmentsAuto }}
                   onPress={() => setSegmentsAuto((value) => !value)}>
                   <Button.Label>{segmentsAuto ? 'Pause' : 'Play'}</Button.Label>
                 </Button>
               </View>
               <View className="flex-1">
-                <Button variant="secondary" size="sm" onPress={onStepSegment}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  testID="design-system-segmented-step"
+                  onPress={onStepSegment}>
                   <Button.Label>Step</Button.Label>
                 </Button>
               </View>
               <View className="flex-1">
-                <Button variant="secondary" size="sm" onPress={onResetSegments}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  testID="design-system-segmented-reset"
+                  onPress={onResetSegments}>
                   <Button.Label>Reset</Button.Label>
                 </Button>
               </View>

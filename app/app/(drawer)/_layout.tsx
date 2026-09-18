@@ -41,6 +41,8 @@ type MenuIconPair = {
 };
 
 type MenuItem = {
+  /** Stable row identity; drives the `drawer-menu-*` testID and list key. */
+  id: string;
   icon: MenuIconPair;
   label: string;
   route: MenuRoute;
@@ -65,36 +67,42 @@ const SignerPendingBadge = React.memo(function SignerPendingBadge() {
 
 const MENU_ITEMS: MenuItem[] = [
   {
+    id: 'feed',
     icon: { default: 'mingcute:home-4-line', selected: 'mingcute:home-4-fill' },
     label: 'Feed',
     route: '/(drawer)/(tabs)/feed',
     activeSegments: ['(drawer)', '(tabs)', 'feed'],
   },
   {
+    id: 'wallet',
     icon: { default: 'fluent:wallet-20-regular', selected: 'fluent:wallet-20-filled' },
     label: 'Wallet',
     route: '/',
     activeSegments: ['(drawer)', '(tabs)', 'index'],
   },
   {
+    id: 'contacts',
     icon: { default: 'mdi:account-group-outline', selected: 'mdi:account-group' },
     label: 'Contacts',
     route: '/(drawer)/(tabs)/contacts',
     activeSegments: ['(drawer)', '(tabs)', 'contacts'],
   },
   {
+    id: 'notifications',
     icon: { default: 'mdi:bell-outline', selected: 'mdi:bell' },
     label: 'Notifications',
     route: '/(drawer)/(tabs)/notifications',
     activeSegments: ['(drawer)', '(tabs)', 'notifications'],
   },
   {
+    id: 'ai',
     icon: { default: 'mdi:robot-outline', selected: 'mdi:robot' },
     label: 'AI',
     route: '/(drawer)/(tabs)/ai',
     activeSegments: ['(drawer)', '(tabs)', 'ai'],
   },
   {
+    id: 'remote-login',
     icon: { default: 'mdi:key-variant', selected: 'mdi:key-variant' },
     label: 'Remote Login',
     route: '/(signer-flow)',
@@ -102,6 +110,7 @@ const MENU_ITEMS: MenuItem[] = [
     Badge: SignerPendingBadge,
   },
   {
+    id: 'settings',
     icon: {
       default: 'material-symbols:settings-rounded',
       selected: 'material-symbols:settings-rounded',
@@ -135,6 +144,7 @@ function segmentsMatch(segments: string[], prefix: readonly string[]): boolean {
 // a route is pushed), so each row must bail out unless ITS active state
 // changed — otherwise 6 rows + chrome re-render while the card slide waits.
 const MenuButton = React.memo(function MenuButton({
+  id,
   icon,
   label,
   route,
@@ -142,6 +152,7 @@ const MenuButton = React.memo(function MenuButton({
   isActive,
   Badge: RowBadge,
 }: {
+  id: string;
   icon: MenuIconPair;
   label: string;
   route: MenuRoute;
@@ -158,9 +169,11 @@ const MenuButton = React.memo(function MenuButton({
     <Pressable
       disabled={isActive}
       onPress={() => onNavigate(route)}
-      testID={`drawer-menu-${label.toLowerCase().replace(/\s+/g, '-')}`}
+      testID={`drawer-menu-${id}`}
       accessible
+      accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ selected: isActive, disabled: isActive }}
       style={({ pressed }) => [styles.menuButton, pressed && { opacity: alpha.strong }]}>
       <HStack align="center" gap={spacing.md}>
         <Icon
@@ -253,9 +266,10 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
         contentContainerStyle={styles.scrollContent}>
         <DrawerProfileChrome closeDrawer={closeDrawer} />
         <VStack gap={0}>
-          {MENU_ITEMS.map((item, index) => (
+          {MENU_ITEMS.map((item) => (
             <MenuButton
-              key={index}
+              key={item.id}
+              id={item.id}
               icon={item.icon}
               label={item.label}
               route={item.route}

@@ -90,9 +90,3 @@ export function useGuardedRouter(): GuardedRouter {
   // dependency arrays and as a `router` substitute.
   return guardedRouter;
 }
-
-/** Reset the cooldown gate. Test-only. */
-export function __resetGuardForTests(): void {
-  lastNavAt = 0;
-  lastSignature = '';
-}

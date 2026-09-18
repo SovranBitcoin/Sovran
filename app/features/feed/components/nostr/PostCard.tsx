@@ -79,6 +79,7 @@ const METRIC_SKELETON_ITEMS = [0, 1, 2, 3] as const;
  * states from one component guarantees identical height/structure.
  */
 function PostCardGutterHeader({
+  eventId,
   loading = false,
   foreground,
   hasMore,
@@ -92,6 +93,8 @@ function PostCardGutterHeader({
   onMorePress,
   onNestedPressIn,
 }: {
+  /** The post's event id — keys the header controls' testIDs. */
+  eventId?: string;
   loading?: boolean;
   foreground: string;
   hasMore: boolean;
@@ -124,7 +127,13 @@ function PostCardGutterHeader({
         ) : (
           // The name lane shrinks first and the time never truncates, so a long
           // name ellipsises while `· 3h` stays whole (Bluesky's flexShrink rule).
-          <Pressable onPressIn={onNestedPressIn} onPress={onProfilePress} style={pcStyles.nameLane}>
+          <Pressable
+            testID={`post-author-name-${eventId}`}
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${displayName || nameFallback}'s profile`}
+            onPressIn={onNestedPressIn}
+            onPress={onProfilePress}
+            style={pcStyles.nameLane}>
             <Text
               family={POST_FONT_FAMILY}
               semibold
@@ -159,6 +168,7 @@ function PostCardGutterHeader({
           <View style={pcStyles.moreButton} />
         ) : (
           <Pressable
+            testID={`post-more-${eventId}`}
             accessibilityRole="button"
             accessibilityLabel="More post actions"
             hitSlop={8}
@@ -404,13 +414,18 @@ const PostCardBody = React.memo(function PostCardBody({
   // ── Thread target: stacked layout (no gutter) ──
   if (isTarget) {
     const fullDate = event.created_at ? formatDate(event.created_at * 1000, 'short-date-time') : '';
-    const truncatedNpub = `${tryNpubEncode(event.pubkey).slice(0, 16)}…`;
+    const authorNpub = tryNpubEncode(event.pubkey);
 
     return (
       <Log name="PostCard">
         <View>
           <View style={pcStyles.targetRow}>
-            <Pressable onPressIn={handleNestedPressIn} onPress={navigateToProfile}>
+            <Pressable
+              testID={`post-author-${event.id}`}
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${displayName ?? nameFallback}'s profile`}
+              onPressIn={handleNestedPressIn}
+              onPress={navigateToProfile}>
               <HStack align="center" gap={10} style={sharedStyles.mb6}>
                 <Avatar
                   state={avatarStateFor(profile?.picture, authorStatus !== 'loading')}
@@ -432,8 +447,10 @@ const PostCardBody = React.memo(function PostCardBody({
                   <Text
                     family={POST_FONT_FAMILY}
                     size={postType.meta.size}
-                    style={[pcStyles.timeText, textMuted]}>
-                    {truncatedNpub}
+                    style={[pcStyles.timeText, textMuted]}
+                    numberOfLines={1}
+                    ellipsizeMode="middle">
+                    {authorNpub}
                   </Text>
                 </VStack>
               </HStack>
@@ -492,7 +509,12 @@ const PostCardBody = React.memo(function PostCardBody({
             ]}
           />
         ) : null}
-        <Pressable onPressIn={handleNestedPressIn} onPress={navigateToProfile}>
+        <Pressable
+          testID={`post-avatar-${event.id}`}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${displayName ?? nameFallback}'s profile`}
+          onPressIn={handleNestedPressIn}
+          onPress={navigateToProfile}>
           <Avatar
             state={avatarStateFor(profile?.picture, authorStatus !== 'loading')}
             picture={profile?.picture}
@@ -514,6 +536,7 @@ const PostCardBody = React.memo(function PostCardBody({
 
       <View style={sharedStyles.flex1}>
         <PostCardGutterHeader
+          eventId={event.id}
           foreground={foreground}
           hasMore={!!onMorePress}
           displayName={displayName}
@@ -592,7 +615,13 @@ const PostCardBody = React.memo(function PostCardBody({
         <View
           onStartShouldSetResponderCapture={beginThreadTap}
           onStartShouldSetResponder={probeThreadTap}>
-          <Pressable onPress={handleThreadPress}>{gutterContent}</Pressable>
+          <Pressable
+            testID={`thread-post-${event.id}`}
+            accessibilityRole="button"
+            accessibilityHint="Opens this post's thread"
+            onPress={handleThreadPress}>
+            {gutterContent}
+          </Pressable>
         </View>
       </Log>
     );

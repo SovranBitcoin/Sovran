@@ -171,6 +171,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/blocks/InitializationGate.tsx",
     "shared/blocks/KeyRecoveryScreen.tsx",
     "shared/blocks/LegalDocumentScreen.tsx",
+    "shared/blocks/NativeSplashLayoutGate.tsx",
     "shared/blocks/NotFoundScreen.tsx",
     "shared/blocks/PaymentInfo.tsx",
     "shared/blocks/PullToAiRefreshControl.tsx",
@@ -217,6 +218,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/composed/List.tsx",
     "shared/ui/composed/ListRow.tsx",
     "shared/ui/composed/MapVignette.tsx",
+    "shared/ui/composed/MiddleEllipsisValue.tsx",
     "shared/ui/composed/ModalLayoutWrapper.tsx",
     "shared/ui/composed/PatternBackground.tsx",
     "shared/ui/composed/ProfileTierRing.tsx",
@@ -244,6 +246,8 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/composed/chat/ChatScreen.tsx",
     "shared/ui/composed/chat/DmChatHeader.tsx",
     "shared/ui/composed/chat/LiquidChatComposer.tsx",
+    "shared/ui/composed/chat/LiquidChatComposerGlass.ios.tsx",
+    "shared/ui/composed/chat/LiquidChatComposerGlass.tsx",
     "shared/ui/composed/search/RecentSearches.tsx",
     "shared/ui/composed/search/SearchOverlay.tsx",
     "shared/ui/composed/search/SearchResultRows.tsx",
@@ -259,6 +263,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 253,
+  "total": 257,
 }
 `;

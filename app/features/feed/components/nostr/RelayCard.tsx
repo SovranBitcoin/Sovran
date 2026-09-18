@@ -146,7 +146,12 @@ function RelayCardBody({
         <Text bold size={14} numberOfLines={1} style={[sharedStyles.flex1, { color: textColor }]}>
           {info?.name || domain}
         </Text>
-        <Pressable onPress={join} hitSlop={12} accessibilityRole="link">
+        <Pressable
+          testID={`relay-card-join-${url}`}
+          onPress={join}
+          hitSlop={12}
+          accessibilityRole="link"
+          accessibilityLabel={`Join ${info?.name || domain}`}>
           <Text bold size={14} style={[styles.join, { color: textColor }]}>
             Join
           </Text>

@@ -63,6 +63,7 @@ export function PermissionSwitchRow({
   allowEligible,
   sessionStatus,
   onChange,
+  testID,
 }: {
   label: string;
   /** Extra context under the status (e.g. "Event kind 1111"). */
@@ -77,6 +78,8 @@ export function PermissionSwitchRow({
    */
   sessionStatus?: string | undefined;
   onChange: (next: TriState) => void;
+  /** Stable id for the row, derived from its grant key or bundle id by the caller. */
+  testID?: string;
 }) {
   const [danger, muted] = useThemeColor(['danger', 'muted'] as const);
   const blocked = state === 'block';
@@ -93,6 +96,7 @@ export function PermissionSwitchRow({
           ...(state === 'allow' && { suffix: checkSuffix }),
           disabled: !allowEligible,
           ...(!allowEligible && { reason: ALLOW_INELIGIBLE_REASON }),
+          testID: 'signer-permission-allow',
           onPress: (close) => {
             close();
             onChange('allow');
@@ -104,6 +108,7 @@ export function PermissionSwitchRow({
           description: MENU_ASK_DESCRIPTION,
           ...(state === 'ask' && { suffix: checkSuffix }),
           variant: 'secondary',
+          testID: 'signer-permission-ask',
           onPress: (close) => {
             close();
             onChange('ask');
@@ -115,6 +120,7 @@ export function PermissionSwitchRow({
           description: MENU_BLOCK_DESCRIPTION,
           ...(state === 'block' && { suffix: checkSuffix }),
           variant: 'dangerous',
+          testID: 'signer-permission-block',
           onPress: (close) => {
             close();
             onChange('block');
@@ -147,8 +153,12 @@ export function PermissionSwitchRow({
       animation={false}
       onPress={onTap}
       onLongPress={openMenu}
-      accessibilityRole="button"
+      testID={testID}
+      accessibilityRole="switch"
       accessibilityLabel={label}
+      accessibilityState={{
+        checked: state === 'allow' ? true : state === 'mixed' ? 'mixed' : false,
+      }}
       accessibilityValue={{ text: status }}
       accessibilityHint={ROW_HINT}>
       <PressableFeedback.Scale>

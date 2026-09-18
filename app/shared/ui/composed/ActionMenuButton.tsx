@@ -115,7 +115,7 @@ const MENU_WIDTH = 260;
 
 /** Map a variant to an `actionMenuPopup` item, wrapping onPress error logging. */
 function toActionMenuItem(v: ActionMenuVariant, rootTestID: string | undefined): ActionMenuItem {
-  const itemTestID = v.testID ?? (rootTestID ? `${rootTestID}-menu-${v.id}` : undefined);
+  const itemTestID = v.testID ?? `${rootTestID ?? 'action-menu-button'}-menu-${v.id}`;
   return {
     text: v.label,
     icon: v.icon,
