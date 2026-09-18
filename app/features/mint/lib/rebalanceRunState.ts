@@ -1,4 +1,3 @@
-import { toSafeSatAmount } from '@/shared/lib/cashu/amount';
 import { cashuLog } from '@/shared/lib/logger';
 import type { TransferStep } from '@/features/mint/components/rebalance';
 import type { StepState } from '@/features/mint/components/rebalance/groupSteps';
@@ -23,22 +22,6 @@ interface MiddlemanCandidateRoute {
   pathNames: string[];
   source: 'graph' | 'local_history';
 }
-
-type TransferAmountDecision =
-  | {
-      status: 'skip';
-      minRequired: number;
-    }
-  | {
-      status: 'ready';
-      amount: number;
-      capped: false;
-    }
-  | {
-      status: 'capped';
-      amount: number;
-      capped: true;
-    };
 
 export const PENDING_STEP_STATE: StepState = Object.freeze({ status: 'pending' });
 
@@ -111,21 +94,6 @@ export function computeRebalanceStepCounts(
     ...counts,
   });
   return counts;
-}
-
-export function countRunnableSteps(
-  steps: readonly TransferStep[],
-  stepStates: Record<string, StepState>
-): number {
-  const count = steps.filter((step) => {
-    const status = stepStates[step.id]?.status;
-    return status !== 'done' && status !== 'skipped';
-  }).length;
-  cashuLog.debug('mint.rebalance.run_state.runnable_steps', {
-    stepCount: steps.length,
-    runnableCount: count,
-  });
-  return count;
 }
 
 export function resetFailedStepStates(
@@ -303,66 +271,4 @@ export function formatCandidateRoutingDetail({
     return `Trying route ${routeIndex + 1}/${routeCount}: via ${intermediaryNames}…`;
   }
   return `Routing via ${intermediaryNames}…`;
-}
-
-export function computeInitialTransferAmount({
-  requestedAmount,
-  sourceBalance,
-  minTransferThreshold,
-  feeHeadroom,
-}: {
-  requestedAmount: number;
-  sourceBalance: number;
-  minTransferThreshold: number;
-  feeHeadroom: number;
-}): TransferAmountDecision {
-  const minRequired = minTransferThreshold + feeHeadroom;
-  const requestedSatAmount = toSafeSatAmount(requestedAmount) ?? 0;
-  if (sourceBalance < minRequired || requestedSatAmount < minTransferThreshold) {
-    cashuLog.info('mint.rebalance.run_state.initial_transfer_amount', {
-      status: 'skip',
-      requestedAmount,
-      requestedSatAmount,
-      sourceBalance,
-      minTransferThreshold,
-      feeHeadroom,
-      minRequired,
-    });
-    return { status: 'skip', minRequired };
-  }
-
-  if (requestedSatAmount + feeHeadroom > sourceBalance) {
-    const amount = toSafeSatAmount(sourceBalance - feeHeadroom) ?? 0;
-    cashuLog.info('mint.rebalance.run_state.initial_transfer_amount', {
-      status: 'capped',
-      requestedAmount,
-      requestedSatAmount,
-      sourceBalance,
-      minTransferThreshold,
-      feeHeadroom,
-      minRequired,
-      amount,
-    });
-    return {
-      status: 'capped',
-      amount,
-      capped: true,
-    };
-  }
-
-  cashuLog.info('mint.rebalance.run_state.initial_transfer_amount', {
-    status: 'ready',
-    requestedAmount,
-    requestedSatAmount,
-    sourceBalance,
-    minTransferThreshold,
-    feeHeadroom,
-    minRequired,
-    amount: requestedSatAmount,
-  });
-  return {
-    status: 'ready',
-    amount: requestedSatAmount,
-    capped: false,
-  };
 }

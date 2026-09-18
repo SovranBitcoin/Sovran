@@ -9,6 +9,7 @@ const TERMINAL_STATES: ReadonlySet<ProgressState> = new Set<ProgressState>([
   'done',
   'failed',
   'cancelled',
+  'unsettled',
 ]);
 
 /**

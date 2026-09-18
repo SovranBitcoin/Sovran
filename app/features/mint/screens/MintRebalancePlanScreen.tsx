@@ -552,6 +552,9 @@ export function MintRebalancePlanScreen() {
         <View className="px-4 pb-2 pt-3">
           <Pressable
             haptics
+            accessibilityRole="button"
+            accessibilityLabel="View Swap"
+            testID="rebalance-view-swap"
             onPress={() => {
               paymentLog.info('mint.rebalance_plan.view_swap_press', {
                 swapGroupIdLength: swapGroupId.length,

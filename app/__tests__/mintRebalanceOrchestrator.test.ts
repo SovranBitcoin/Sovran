@@ -132,6 +132,7 @@ function createManager() {
           return { id: 'melt-op-1', state: 'finalized' };
         }),
         refresh: jest.fn(async () => ({ id: 'melt-op-1', state: 'finalized' })),
+        get: jest.fn(async (_id: string) => null as { id: string; state: string } | null),
       },
     },
     mint: { addMint: jest.fn().mockResolvedValue(undefined) },
@@ -362,6 +363,29 @@ test('cancelling a pending melt stops further status RPCs without retrying the p
   expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
   expect(mockStatus.setLegDone).not.toHaveBeenCalled();
   expect(mockRestore).not.toHaveBeenCalled();
+});
+
+test('a melt still unsettled after the settle window stays pending instead of failing', async () => {
+  mockManager.ops.melt.execute.mockResolvedValue({ id: 'melt-op-1', state: 'pending' });
+  mockManager.ops.melt.refresh.mockResolvedValue({ id: 'melt-op-1', state: 'pending' });
+  const { result } = mount();
+  await act(async () => result.current.handleStart());
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(21000);
+  });
+  expect(result.current.runStatus).toBe('finished');
+  expect(result.current.stepStates['step-1']).toMatchObject({
+    status: 'melting',
+    routingDetail: expect.stringContaining('Payment pending'),
+  });
+  expect(mockManager.ops.melt.execute).toHaveBeenCalledTimes(1);
+  expect(mockRestore).not.toHaveBeenCalled();
+  expect(mockStatus.setLegFailed).not.toHaveBeenCalled();
+  expect(mockTransactions.setLegStatus).not.toHaveBeenCalledWith(
+    'group-1',
+    'leg-1',
+    expect.objectContaining({ localStatus: 'failed' })
+  );
 });
 
 test('a late outgoing-manager melt error cannot invoke global recovery after manager replacement', async () => {
