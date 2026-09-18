@@ -90,7 +90,7 @@ current preflight only guards the observed emulator minimum.
 
 The gallery is a presentation check. It does not establish payment settlement,
 AI keyboard/streaming behavior, or every gesture on every route. Those remain
-separate owner/native scenarios under SYSTEM.md decision 26.
+separate owner/native scenarios under AGENTS.md's native testability contract.
 
 ## Original eight-page baseline
 
@@ -129,7 +129,7 @@ cleanup removes identifiable legacy entries without deleting genuine profiles
 that share a historical fixture's public key. DM demo messages now have separate
 local state, fixing a reproduced enable → disable leak in mounted conversations.
 Feed/notifications remount isolated instances when mode changes; AI demo replies
-stay local and never call a provider. See SYSTEM.md decision 26 for the contract.
+stay local and never call a provider. See AGENTS.md's native testability contract.
 
 Minibits is already the first of four configured defaults. On this host, curl,
 Bun and Python all failed the Minibits TLS handshake during review. Registration

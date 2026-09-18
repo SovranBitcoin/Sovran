@@ -1,5 +1,5 @@
 /**
- * SYSTEM.md F01: `createQueryCacheStore.run` is generation-guarded. An older
+ * Hunch rule async/owner-scope: `createQueryCacheStore.run` is generation-guarded. An older
  * forced read cannot overwrite a newer result on the same key; `clear()` and
  * an aborted signal reject a late completion without writing.
  */

@@ -42,8 +42,8 @@ this table.
 
 | Document | What it covers |
 |----------|----------------|
-| [`SYSTEM.md`](SYSTEM.md) | Application convention guide — which owner to use, which default to follow, which exception matters. Read before implementing. |
-| [`AGENTS.md`](AGENTS.md) · [`CLAUDE.md`](CLAUDE.md) | Contributor and agent instructions. The chain is CLAUDE.md → AGENTS.md → SYSTEM.md → the relevant reviewed skill. |
+| [`AGENTS.md`](AGENTS.md) · [`CLAUDE.md`](CLAUDE.md) | Contributor and agent entry point: layout, commands, testing and skills. CLAUDE.md imports AGENTS.md. |
+| [`hunch.config.ts`](hunch.config.ts) | Code rules that linting and type checks can't enforce, checked on each change with `npx @kelbie/hunch check`. |
 | [`CLAIMS.md`](CLAIMS.md) | What the product may claim, and the scoped source review behind each claim. |
 | [`FEEDBACK.md`](FEEDBACK.md) | Upstream feedback ledger for the coco v2 integration. |
 | [`app/README.md`](app/README.md) | The Expo / React Native application package. |

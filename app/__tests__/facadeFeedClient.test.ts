@@ -115,7 +115,7 @@ describe('skimmable cap vs Primal-served For You', () => {
   });
 });
 
-describe('read status (SYSTEM.md F06): empty vs unavailable vs disabled', () => {
+describe('read status (hunch rule ui/read-states): empty vs unavailable vs disabled', () => {
   it('marks tier exhaustion as unavailable with the attempt trail, not as an empty page', async () => {
     // A layer with no tiers exhausts every read.
     const layer = facade.createNostrDataLayer({ tiers: [] });

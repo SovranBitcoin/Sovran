@@ -217,7 +217,7 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
               attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
             });
             // Distinct from an empty thread: the screen keeps a seeded render
-            // and shows degraded/error instead of "no replies" (SYSTEM.md F06).
+            // and shows degraded/error instead of "no replies" (hunch rule ui/read-states).
             return emptyThreadResult(request, readUnavailable(error.attempts, request.readId));
           }
         );

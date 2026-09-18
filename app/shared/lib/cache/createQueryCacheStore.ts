@@ -13,7 +13,7 @@
  * Cold-start vs warm navigation is tracked here via an in-memory touched-epoch
  * map (never persisted), so the cold-start gate costs no AsyncStorage writes.
  *
- * Writes are generation-guarded (SYSTEM.md F01): every `run` for a key takes a
+ * Writes are generation-guarded (hunch rule async/owner-scope): every `run` for a key takes a
  * new generation, `clear()` bumps a store-wide scope generation, and a
  * completion whose generation is no longer current never writes — an older
  * forced read cannot overwrite a newer result, and a late completion after

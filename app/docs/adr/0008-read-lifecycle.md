@@ -1,7 +1,7 @@
 # 8. One read lifecycle: status vocabulary, cache-first paint, sequential vs aggregate tiers
 
 Date: 2026-09-13
-Status: Accepted (builds on ADR 0003's facade; closes SYSTEM.md follow-ups F01 and F06)
+Status: Accepted (builds on ADR 0003's facade; closes convention-audit follow-ups F01 and F06)
 
 ## Context
 
@@ -83,7 +83,7 @@ zero blank flashes on the touched surface.
   38000 / search reads only; feeds and threads stay single-tier. Relay note-stat
   counting runs only for ids still absent after page ingest.
 - DM snapshots (`dm-conversations-cache`, `dm-thread-cache`) are memory-only and
-  viewer-keyed; no plaintext is persisted (SYSTEM.md §19).
+  viewer-keyed; no plaintext is persisted (hunch rule nostr/private-dms).
 - Hand-rolled SWR loops that remain (`relayMetadataStore`,
   `mintMetadataStore.getCachedMintInfo`, `nostrMetadataCache`,
   `mempoolAddressCache`) are candidates for the same hook when touched.

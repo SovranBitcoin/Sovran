@@ -490,7 +490,7 @@ export function MintAddScreen() {
   // Skeleton rows are LIST ITEMS rendered through the SAME List + ContactRow
   // path as real rows — identical chrome, no content shift on the swap, and no
   // second list mounted to crossfade. Only a first paint with nothing cached
-  // shows them: a stale-cache revalidate keeps the rows it has (SYSTEM.md §7).
+  // shows them: a stale-cache revalidate keeps the rows it has (hunch rule ui/read-states).
   const isInitialLoading = searchLoading && displayMints.length === 0;
 
   const renderItem = ({ item }: { item: SearchableMint }) =>

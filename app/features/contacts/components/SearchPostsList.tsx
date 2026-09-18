@@ -7,7 +7,7 @@
  * The read is `useCachedRead` over `searchPostsCache`: returning to the Posts
  * tab for the same people paints at 0ms (fresh → no round-trip, stale →
  * silent revalidate); a tier-exhausted answer is an error with a retry, not
- * "no posts" (SYSTEM.md F06).
+ * "no posts" (hunch rule ui/read-states).
  */
 import { useCallback, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';

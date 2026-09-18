@@ -61,7 +61,7 @@ interface DmEnvelopePagesOptions {
   /**
    * Drop everything accumulated so far, before a fresh first page. Called on a
    * feed identity change only — a refresh keeps rows on screen and replaces
-   * them when its first page lands (SYSTEM.md §7: never blank a cached list).
+   * them when its first page lands (hunch rule ui/read-states: never blank a cached list).
    */
   onReset: () => void;
   /** Log event for a failed first page. */

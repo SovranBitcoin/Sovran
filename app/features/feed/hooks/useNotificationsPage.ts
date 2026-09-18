@@ -51,7 +51,7 @@ type Policy = FeedNotificationsRequest['policy'];
 type ReplyScope = FeedNotificationsRequest['replyScope'];
 type ServerTab = NonNullable<FeedNotificationsRequest['tab']>;
 
-/** An unavailable answer with nothing to show is a failed read, not an empty one (SYSTEM.md F06). */
+/** An unavailable answer with nothing to show is a failed read, not an empty one (hunch rule ui/read-states). */
 function unavailableAndEmpty(page: FeedNotificationsResult): boolean {
   return readIsUnavailable(page.read) && page.notifications.length === 0;
 }

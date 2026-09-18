@@ -34,7 +34,7 @@ export interface UserFeedLoadCtx {
  * whatever happens. Module scope: React Compiler cannot lower a `try` with a
  * `finally`, and an inline body would cost UserFeed its memoization.
  *
- * A tier-exhausted answer with nothing to show is thrown (SYSTEM.md F06) so the
+ * A tier-exhausted answer with nothing to show is thrown (hunch rule ui/read-states) so the
  * read hook reports an error instead of caching an empty page as "no posts".
  */
 export async function fetchUserFeedPage(args: {

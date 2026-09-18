@@ -2,7 +2,7 @@
  * In-memory, viewer-scoped snapshots of the two DM feeds, so re-entering the
  * Contacts tab or a conversation paints what was on screen last time while the
  * paging engine revalidates. Never persisted: decrypted previews and message
- * text stay in memory only and are dropped on profile switch (SYSTEM.md §19).
+ * text stay in memory only and are dropped on profile switch (hunch rule nostr/private-dms).
  * The paging engine owns fetching; these are read-through snapshots, not the
  * fetch cache.
  */
