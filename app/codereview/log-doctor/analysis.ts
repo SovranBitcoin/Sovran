@@ -325,7 +325,8 @@ interface ReadsAnalysis {
   blankFlashes: BlankFlash[];
 }
 
-const READ_EVENT = /^read\.([^.]+)\.(request|done|failed|superseded|partial|merged|applied|render)$/;
+const READ_EVENT =
+  /^read\.([^.]+)\.(request|done|failed|superseded|partial|merged|applied|render)$/;
 const NOSTR_READ_DONE = /^nostr\.read\.[^.]+\.done$/;
 /** A dip longer than this is a real reload, not a flash. */
 const BLANK_FLASH_MAX_MS = 2_000;
@@ -354,10 +355,14 @@ export function analyzeReads(entries: AnalyzableEntry[]): ReadsAnalysis {
           lastPhase.set(slot, { phase, dippedAt: entry._t });
         } else if (prev?.dippedAt != null && phase === 'populated') {
           const gapMs = entry._t - prev.dippedAt;
-          if (gapMs <= BLANK_FLASH_MAX_MS) blankFlashes.push({ surface, keyHash, t: prev.dippedAt, gapMs });
+          if (gapMs <= BLANK_FLASH_MAX_MS)
+            blankFlashes.push({ surface, keyHash, t: prev.dippedAt, gapMs });
           lastPhase.set(slot, { phase, dippedAt: null });
         } else {
-          lastPhase.set(slot, { phase, dippedAt: phase === 'populated' ? null : (prev?.dippedAt ?? null) });
+          lastPhase.set(slot, {
+            phase,
+            dippedAt: phase === 'populated' ? null : (prev?.dippedAt ?? null),
+          });
         }
         if (phase === 'populated' && readId) {
           const run = runs.get(readId);
@@ -392,7 +397,8 @@ export function analyzeReads(entries: AnalyzableEntry[]): ReadsAnalysis {
         run.tDone = entry._t;
         run.ok = true;
         run.degraded = params.degraded === true;
-        if (Array.isArray(params.sources)) for (const s of params.sources) run.sources.add(String(s));
+        if (Array.isArray(params.sources))
+          for (const s of params.sources) run.sources.add(String(s));
         if (typeof params.tier === 'string') run.sources.add(params.tier);
       } else if (kind === 'failed') {
         run.tDone = entry._t;
@@ -409,7 +415,10 @@ export function analyzeReads(entries: AnalyzableEntry[]): ReadsAnalysis {
     }
 
     // Facade-side fills carry the same readId.
-    if (readId && (entry.event === 'nostr.tier.aggregate.merged' || NOSTR_READ_DONE.test(entry.event))) {
+    if (
+      readId &&
+      (entry.event === 'nostr.tier.aggregate.merged' || NOSTR_READ_DONE.test(entry.event))
+    ) {
       const run = runs.get(readId);
       if (run && typeof params.tier === 'string') run.sources.add(params.tier);
     }
@@ -459,7 +468,13 @@ export function summarizeReads(runs: ReadRun[]): ReadSurfaceSummary[] {
     if (run.cached) s.cacheHit += 1;
     if (run.action === 'serve-fresh') s.serveFresh += 1;
     if (run.action === 'serve-stale-revalidate') s.staleRevalidate += 1;
-    if (run.cached && !run.stale && run.action === 'fetch' && run.trigger !== 'user' && run.trigger !== 'poll') {
+    if (
+      run.cached &&
+      !run.stale &&
+      run.action === 'fetch' &&
+      run.trigger !== 'user' &&
+      run.trigger !== 'poll'
+    ) {
       s.refetchFresh += 1;
     }
     if (run.ok === false) s.failed += 1;

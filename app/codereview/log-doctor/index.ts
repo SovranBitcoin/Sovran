@@ -4331,14 +4331,24 @@ function modeReads(entries: LogEntry[], _opts: Options): string {
     );
   }
   lines.push('');
-  lines.push(`BLANK FLASHES (populated → skeleton → populated on the same key within 2s): ${blankFlashes.length}`);
+  lines.push(
+    `BLANK FLASHES (populated → skeleton → populated on the same key within 2s): ${blankFlashes.length}`
+  );
   for (const b of blankFlashes.slice(0, 20)) {
-    lines.push(`  [${Math.round(b.t)}ms] ${b.surface} ${b.keyHash} re-populated after ${Math.round(b.gapMs)}ms`);
+    lines.push(
+      `  [${Math.round(b.t)}ms] ${b.surface} ${b.keyHash} re-populated after ${Math.round(b.gapMs)}ms`
+    );
   }
   lines.push('');
-  lines.push('RefetchFresh = a fetch issued while a fresh cached entry existed with no user/poll trigger — "refetch happens but is not necessary".');
-  lines.push('TTFUD = read.request → first read.render{phase:populated} with the same readId (cache paints count; they are the fast ones).');
-  lines.push('CacheHit = the read found an entry for its key (fresh or stale). Fresh = served with zero round-trips. StaleRV = painted, then revalidated.');
+  lines.push(
+    'RefetchFresh = a fetch issued while a fresh cached entry existed with no user/poll trigger — "refetch happens but is not necessary".'
+  );
+  lines.push(
+    'TTFUD = read.request → first read.render{phase:populated} with the same readId (cache paints count; they are the fast ones).'
+  );
+  lines.push(
+    'CacheHit = the read found an entry for its key (fresh or stale). Fresh = served with zero round-trips. StaleRV = painted, then revalidated.'
+  );
   return lines.join('\n');
 }
 

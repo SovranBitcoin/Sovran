@@ -562,7 +562,7 @@ const normalize = (v) => {
  * positive height (in chassis heights) means hovering a measured distance above
  * it - never intersecting it, whatever the poses are.
  */
-function groundPlane(phones, settings = {}, chassisHeight = 1) {
+export function groundPlane(phones, settings = {}, chassisHeight = 1) {
   const value = { ...DEFAULT_SHADOW, ...settings };
   const spec = SHADOW_GROUNDS[value.ground];
   if (!spec) throw new Error(`Unknown ground: ${value.ground}`);
@@ -602,7 +602,7 @@ function groundPlane(phones, settings = {}, chassisHeight = 1) {
  * penumbra of a disc source, so softness follows the distance to the plane
  * instead of being a uniform blur applied after the fact.
  */
-function lightSamples(light, angularRadius, count) {
+export function lightSamples(light, angularRadius, count) {
   if (!Number.isInteger(count) || count < 1 || count > 64)
     throw new Error("Invalid light sample count");
   const reference = Math.abs(light.z) < 0.9 ? { x: 0, y: 0, z: 1 } : { x: 1, y: 0, z: 0 };

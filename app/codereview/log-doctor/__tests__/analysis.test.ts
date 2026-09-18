@@ -163,19 +163,30 @@ describe('scanRedactionAudit', () => {
 });
 
 describe('analyzeReads / summarizeReads (reads mode)', () => {
-  const { analyzeReads, summarizeReads } = jest.requireActual<typeof import('../analysis')>('../analysis');
+  const { analyzeReads, summarizeReads } =
+    jest.requireActual<typeof import('../analysis')>('../analysis');
   const e = (t: number, event: string, params: Record<string, unknown>): AnalyzableEntry => ({
     level: 'info',
     event,
     _t: t,
     params,
   });
-  const id = (surface: string, keyHash: string, n: number) => ({ readId: `r${n}-${surface}`, surface, keyHash });
+  const id = (surface: string, keyHash: string, n: number) => ({
+    readId: `r${n}-${surface}`,
+    surface,
+    keyHash,
+  });
 
   it('computes TTFUD from request → first populated render with the same readId', () => {
     const r = id('feed', 'k_a', 1);
     const { runs } = analyzeReads([
-      e(0, 'read.feed.request', { ...r, action: 'fetch', trigger: 'mount', cached: false, stale: false }),
+      e(0, 'read.feed.request', {
+        ...r,
+        action: 'fetch',
+        trigger: 'mount',
+        cached: false,
+        stale: false,
+      }),
       e(2, 'read.feed.render', { ...r, phase: 'skeleton' }),
       e(150, 'read.feed.done', { ...r, tier: 'nagg', count: 3 }),
       e(160, 'read.feed.render', { ...r, phase: 'populated' }),
@@ -194,9 +205,27 @@ describe('analyzeReads / summarizeReads (reads mode)', () => {
     const user = id('profile', 'k_p', 3);
     const served = id('profile', 'k_p', 4);
     const { runs } = analyzeReads([
-      e(0, 'read.profile.request', { ...fresh, action: 'fetch', trigger: 'focus', cached: true, stale: false }),
-      e(10, 'read.profile.request', { ...user, action: 'fetch', trigger: 'user', cached: true, stale: false }),
-      e(20, 'read.profile.request', { ...served, action: 'serve-fresh', trigger: 'focus', cached: true, stale: false }),
+      e(0, 'read.profile.request', {
+        ...fresh,
+        action: 'fetch',
+        trigger: 'focus',
+        cached: true,
+        stale: false,
+      }),
+      e(10, 'read.profile.request', {
+        ...user,
+        action: 'fetch',
+        trigger: 'user',
+        cached: true,
+        stale: false,
+      }),
+      e(20, 'read.profile.request', {
+        ...served,
+        action: 'serve-fresh',
+        trigger: 'focus',
+        cached: true,
+        stale: false,
+      }),
     ]);
     const [summary] = summarizeReads(runs);
     expect(summary).toMatchObject({ reads: 3, cacheHit: 3, serveFresh: 1, refetchFresh: 1 });
@@ -206,14 +235,41 @@ describe('analyzeReads / summarizeReads (reads mode)', () => {
     const a = id('searchProfiles', 'k_s', 5);
     const b = id('searchProfiles', 'k_s', 6);
     const { runs } = analyzeReads([
-      e(0, 'read.searchProfiles.request', { ...a, action: 'fetch', trigger: 'key-change', cached: false, stale: false }),
-      e(5, 'read.searchProfiles.request', { ...b, action: 'fetch', trigger: 'key-change', cached: false, stale: false }),
+      e(0, 'read.searchProfiles.request', {
+        ...a,
+        action: 'fetch',
+        trigger: 'key-change',
+        cached: false,
+        stale: false,
+      }),
+      e(5, 'read.searchProfiles.request', {
+        ...b,
+        action: 'fetch',
+        trigger: 'key-change',
+        cached: false,
+        stale: false,
+      }),
       e(50, 'read.searchProfiles.superseded', { ...a, reason: 'newer-request' }),
       e(60, 'nostr.read.searchProfiles.done', { readId: b.readId, tier: 'nagg' }),
       e(70, 'nostr.tier.aggregate.merged', { readId: b.readId, tier: 'relay' }),
-      e(80, 'read.searchProfiles.done', { ...b, sources: ['nagg', 'relay'], degraded: false, count: 4 }),
-      e(90, 'read.searchProfiles.request', { ...id('searchProfiles', 'k_t', 7), action: 'fetch', trigger: 'key-change', cached: false, stale: false }),
-      e(95, 'read.searchProfiles.failed', { ...id('searchProfiles', 'k_t', 7), errorType: 'network', retained: false }),
+      e(80, 'read.searchProfiles.done', {
+        ...b,
+        sources: ['nagg', 'relay'],
+        degraded: false,
+        count: 4,
+      }),
+      e(90, 'read.searchProfiles.request', {
+        ...id('searchProfiles', 'k_t', 7),
+        action: 'fetch',
+        trigger: 'key-change',
+        cached: false,
+        stale: false,
+      }),
+      e(95, 'read.searchProfiles.failed', {
+        ...id('searchProfiles', 'k_t', 7),
+        errorType: 'network',
+        retained: false,
+      }),
     ]);
     const [summary] = summarizeReads(runs);
     expect(summary).toMatchObject({ reads: 3, superseded: 1, failed: 1 });
@@ -230,6 +286,8 @@ describe('analyzeReads / summarizeReads (reads mode)', () => {
       e(1000, 'read.notifications.render', { ...r, phase: 'skeleton' }),
       e(9000, 'read.notifications.render', { ...r, phase: 'populated' }), // 8s: a reload, not a flash
     ]);
-    expect(blankFlashes).toEqual([{ surface: 'notifications', keyHash: 'k_n', t: 100, gapMs: 300 }]);
+    expect(blankFlashes).toEqual([
+      { surface: 'notifications', keyHash: 'k_n', t: 100, gapMs: 300 },
+    ]);
   });
 });
