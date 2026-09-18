@@ -87,7 +87,7 @@ function PlaceholderFrameLayer({
  * this plays precisely while the JS thread is blocked composing the request,
  * which is exactly when JS timers stop firing. Purely cosmetic: the payloads
  * are throwaway noise and are never stored, copied, or exposed to AX. */
-export function QrJunkLayers({ expectedLength, size }: { expectedLength: number; size: number }) {
+function QrJunkLayers({ expectedLength, size }: { expectedLength: number; size: number }) {
   const reducedMotion = useReducedMotion();
   const frames = useMemo(() => qrPlaceholderFrames(expectedLength, size), [expectedLength, size]);
   const frameCount = frames.length;

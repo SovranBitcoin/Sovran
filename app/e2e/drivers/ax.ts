@@ -56,7 +56,7 @@ export function elementTapCenter(
  * of Media). Commit a gesture only once two consecutive reads agree. The
  * tolerance is in normalized screen units — a hair under half a percent, which
  * is below a row's height on either capture frame and above AX rounding. */
-export const TAP_CENTER_TOLERANCE = 0.004;
+const TAP_CENTER_TOLERANCE = 0.004;
 export const centersAgree = (
   a: { x: number; y: number } | null,
   b: { x: number; y: number } | null,
