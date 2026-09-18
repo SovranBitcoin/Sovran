@@ -46,7 +46,7 @@ For a substantial new exception, record the affected decision, exact owner/files
 
 ## 1. Ownership and structure
 
-**Reviewed skills:** [codebase-design](skills/codebase-design/SKILL.md) for ownership and interface design. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [codebase-design](.agents/skills/codebase-design/SKILL.md) for ownership and interface design. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** the root [package.json](package.json), [wallet/package.json](wallet/package.json), and [nostr/package.json](nostr/package.json) establish five Bun workspaces, including the dependency-free `copy` package. `wallet` and `nostr` are private source packages consumed through `workspace:*`. Older references to separate Colada/nagg-ts repositories describe their history, not the current code location.
 
@@ -54,9 +54,8 @@ For a substantial new exception, record the affected decision, exact owner/files
 sovran-app/
 ├── AGENTS.md, CLAUDE.md      contributor entrypoint and Claude import
 ├── SYSTEM.md                 this guide
-├── skills/                  vetted sources, licenses, manifest, link/check tool
-├── .agents/skills/          Codex discovery links into skills/
-├── .claude/skills/          Claude discovery links into the same skills/
+├── .agents/skills/          vetted skill sources, licenses, manifest, link/check tool
+├── .claude/skills/          Claude discovery links into .agents/skills/
 ├── package.json, bun.lock    workspace install, overrides, patch registrations
 ├── app/                     Expo application package
 │   ├── app/                 routes, route groups, layouts, special Router files
@@ -108,7 +107,7 @@ New app imports use `@/…`; within a small module, relative imports are fine. P
 
 ## 2. Navigation and route groups
 
-**Reviewed skills:** [expo-router](skills/expo-router/SKILL.md) for route mechanics. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [expo-router](.agents/skills/expo-router/SKILL.md) for route mechanics. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** [app/app](app/app) holds routes, while feature screens live outside it. [flowLayoutOptions](app/config/flowLayoutOptions.tsx), [modalScreens](app/config/modalScreens.ts), [headerItems](app/navigation/headerItems.tsx), and [routeSchemas](app/shared/lib/nav/routeSchemas.ts) centralize important behavior.
 
@@ -124,7 +123,7 @@ If a route has platform-suffixed files, keep a non-platform route entry, as requ
 
 ## 3. Page containers, insets, and keyboards
 
-**Reviewed skills:** [sovran-native-ui-review](skills/sovran-native-ui-review/SKILL.md) for native layout review; [expo-router](skills/expo-router/SKILL.md) for native navigation containers. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [sovran-native-ui-review](.agents/skills/sovran-native-ui-review/SKILL.md) for native layout review; [expo-router](.agents/skills/expo-router/SKILL.md) for native navigation containers. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** [Screen](app/shared/ui/composed/Screen.tsx), [useScreenInsets](app/shared/hooks/useScreenInsets.tsx), [List](app/shared/ui/composed/List.tsx), and [ScreenScrollView](app/shared/ui/composed/ScreenScrollView.tsx) already implement a shared geometry contract. The [page-layout audit](docs/architecture/page-layout-audit-2026-09-09.md) maps route-specific owners.
 
@@ -153,7 +152,7 @@ Floating controls use the page's remaining bottom inset plus a design gap; reser
 
 ## 4. Styling, tokens, and themes
 
-**Reviewed skills:** [sovran-native-ui-review](skills/sovran-native-ui-review/SKILL.md) for Uniwind/token consistency. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [sovran-native-ui-review](.agents/skills/sovran-native-ui-review/SKILL.md) for Uniwind/token consistency. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** [global.css](app/global.css) uses Tailwind 4/Uniwind and HeroUI styles. [tokens](app/shared/styles/tokens.ts), [themeEngine](app/shared/lib/themeEngine.ts), [ThemeProvider](app/shared/providers/ThemeProvider.tsx), and [classNames](app/shared/lib/classNames.ts) are the shared owners. [styling-budget.json](app/styling-budget.json) records existing non-class usage.
 
@@ -177,7 +176,7 @@ Theme selection is profile-scoped; wallpaper assignment is unit-scoped. Follow [
 
 ## 5. Icons and status symbols
 
-**Reviewed skills:** [sovran-native-ui-review](skills/sovran-native-ui-review/SKILL.md) for icon and accessibility consistency. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [sovran-native-ui-review](.agents/skills/sovran-native-ui-review/SKILL.md) for icon and accessibility consistency. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** [assets/icons/index.tsx](app/assets/icons/index.tsx) renders the committed [generated registry](app/assets/icons/generated.json) with `SvgXml`. [regenerate-icons.js](app/scripts/regenerate-icons.js) combines the explicit icon list and local `internal` SVGs. There is also an [IconSymbol](app/shared/ui/primitives/icon-symbol.tsx) native-symbol wrapper.
 
@@ -189,7 +188,7 @@ Native navigator symbol APIs are a valid platform seam; they do not make SF Symb
 
 ## 6. iOS, Android, and capability variants
 
-**Reviewed skills:** [expo-router](skills/expo-router/SKILL.md) for platform navigation; [sovran-native-ui-review](skills/sovran-native-ui-review/SKILL.md) for supported native variants. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [expo-router](.agents/skills/expo-router/SKILL.md) for platform navigation; [sovran-native-ui-review](.agents/skills/sovran-native-ui-review/SKILL.md) for supported native variants. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** [capability](app/shared/ui/capability) contains the reactive provider and dispatcher; [version](app/shared/lib/version.ts) provides synchronous checks. Capsule/circle buttons have capability implementations and platform entry points. Current [app.json](app/app.json) requests iOS 16.4 and Android API 26 minimums. These are configured minimums, not a claim of device coverage.
 
@@ -211,7 +210,7 @@ Glass is decorative when a Pressable owns interaction; avoid competing native/JS
 
 ## 7. Loading, empty, error, and skeleton states
 
-**Reviewed skills:** [sovran-native-ui-review](skills/sovran-native-ui-review/SKILL.md) for state coverage; [sovran-app-copy](skills/sovran-app-copy/SKILL.md) for state messaging. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [sovran-native-ui-review](.agents/skills/sovran-native-ui-review/SKILL.md) for state coverage; [sovran-app-copy](.agents/skills/sovran-app-copy/SKILL.md) for state messaging. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** [ScreenStates](app/shared/ui/composed/ScreenStates.tsx), [EmptyState](app/shared/ui/composed/EmptyState.tsx), [Skeleton](app/shared/ui/primitives/Skeleton.tsx), [Text](app/shared/ui/primitives/Text.tsx), and [SkeletonContentCrossfade](app/shared/ui/composed/SkeletonContentCrossfade.tsx) provide reusable pieces.
 
@@ -241,7 +240,7 @@ Do not blank a cached list on focus, impose arbitrary minimum skeleton delays, m
 
 ## 8. Error handling and user feedback
 
-**Reviewed skills:** [sovran-app-copy](skills/sovran-app-copy/SKILL.md) for source-aware wording; [diagnosing-bugs](skills/diagnosing-bugs/SKILL.md) for original failure investigation. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [sovran-app-copy](.agents/skills/sovran-app-copy/SKILL.md) for source-aware wording; [diagnosing-bugs](.agents/skills/diagnosing-bugs/SKILL.md) for original failure investigation. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** [shared/lib/errors](app/shared/lib/errors/README.md) is the central upstream-error presentation boundary. `describeError(error, service)` returns a stable `{ id, text }`; [popup](app/shared/lib/popup) accepts a `failure` object. This currently maps to English copy, not multilingual translations.
 
@@ -277,7 +276,7 @@ Use a toast for brief nonblocking feedback, inline state for a recoverable local
 
 Claim truth and qualifications belong in [CLAIMS.md](CLAIMS.md); this section owns localization mechanics.
 
-**Reviewed skills:** [sovran-app-copy](skills/sovran-app-copy/SKILL.md) for translation and truncation contracts. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [sovran-app-copy](.agents/skills/sovran-app-copy/SKILL.md) for translation and truncation contracts. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** the app has no installed app-wide i18n runtime in [app/package.json](app/package.json). `Text`/`UntranslatedText` are presentation primitives, not translation engines. English literals exist in shared controls and features. Errors have stable IDs. [wallet copy](wallet/src/copy/resolve.ts) has its own keyed templates and English default catalog; [wallet reason formatting](wallet/src/formatting/locales.ts) separately contains English, Arabic, and German dictionaries. This is partial infrastructure, not full multilingual app support.
 
@@ -353,7 +352,7 @@ Accessible names must communicate the useful full label or a clear “view/copy 
 
 ## 10. Dates, time, numbers, and money
 
-**Reviewed skills:** [sovran-app-copy](skills/sovran-app-copy/SKILL.md) for locale-aware display; [sovran-zod](skills/sovran-zod/SKILL.md) for input representation checks. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [sovran-app-copy](.agents/skills/sovran-app-copy/SKILL.md) for locale-aware display; [sovran-zod](.agents/skills/sovran-zod/SKILL.md) for input representation checks. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** [date.ts](app/shared/lib/date.ts) owns `formatDate`, `formatRelative`, and `formatRelativeUnixSeconds`. [displayValue](app/shared/lib/format/displayValue.ts), [cashu/amount](app/shared/lib/cashu/amount.ts), and [wallet formatting](wallet/src/formatting) contain distinct presentation/conversion responsibilities.
 
@@ -375,7 +374,7 @@ Use existing amount/unit formatting for display; do not scatter `toFixed`, curre
 
 ## 11. Accessibility, text input, and interaction
 
-**Reviewed skills:** [sovran-native-ui-review](skills/sovran-native-ui-review/SKILL.md) for native accessibility; [sovran-app-copy](skills/sovran-app-copy/SKILL.md) for labels and recovery. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [sovran-native-ui-review](.agents/skills/sovran-native-ui-review/SKILL.md) for native accessibility; [sovran-app-copy](.agents/skills/sovran-app-copy/SKILL.md) for labels and recovery. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** shared [Text](app/shared/ui/primitives/Text.tsx), [Button](app/shared/ui/primitives/Button.tsx), [ButtonHandler](app/shared/ui/composed/ButtonHandler.tsx), and [ScreenStates](app/shared/ui/composed/ScreenStates.tsx) provide common behavior, but do not establish full accessibility coverage.
 
@@ -391,7 +390,7 @@ Use one submit owner and the machine's busy/availability contract to prevent dou
 
 ## 12. React and Zustand state
 
-**Reviewed skills:** [sovran-zustand](skills/sovran-zustand/SKILL.md) for store and selector changes. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [sovran-zustand](.agents/skills/sovran-zustand/SKILL.md) for store and selector changes. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** shared stores are grouped under [global](app/shared/stores/global), [profile](app/shared/stores/profile), and [runtime](app/shared/stores/runtime). Feature-specific stores also exist. Some files in `global`, such as metadata cache infrastructure, still use profile-scoped persistence; directory names alone do not prove scope.
 
@@ -428,7 +427,7 @@ When reviewing a store, check whether timestamps/counts/flags certify other fiel
 
 ## 13. Zod, persistence, and migrations
 
-**Reviewed skills:** [sovran-zod](skills/sovran-zod/SKILL.md) for schema and migration review; [sovran-zustand](skills/sovran-zustand/SKILL.md) for hydration. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [sovran-zod](.agents/skills/sovran-zod/SKILL.md) for schema and migration review; [sovran-zustand](.agents/skills/sovran-zustand/SKILL.md) for hydration. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** [persistConfig](app/shared/lib/persist/persistConfig.ts) registers schemas/versions and installs [createMergeWithSchema](app/shared/lib/persist/createMergeWithSchema.ts). The merge returns current defaults if the persisted object fails validation. [settingsStore](app/shared/stores/global/settingsStore.ts) already uses field-level tolerance for many presentational settings. Root overrides resolve Zod 4.4.3 in this snapshot.
 
@@ -454,7 +453,7 @@ Required existing starting points: [persist round-trip](app/__tests__/persistRou
 
 ## 14. Cache ownership and freshness
 
-**Reviewed skills:** [sovran-zustand](skills/sovran-zustand/SKILL.md) for cache state and ordering; [codebase-design](skills/codebase-design/SKILL.md) for one cache owner. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [sovran-zustand](.agents/skills/sovran-zustand/SKILL.md) for cache state and ordering; [codebase-design](.agents/skills/codebase-design/SKILL.md) for one cache owner. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** [createQueryCacheStore](app/shared/lib/cache/createQueryCacheStore.ts) supplies profile-scoped persisted envelopes, freshness, entry caps, and in-flight deduplication. [buildNostrDataLayer](app/shared/lib/nostr/buildNostrDataLayer.ts) owns the shared facade and profile snapshot mirror. [NostrNDKProvider](app/shared/providers/NostrNDKProvider.tsx) separately integrates NDK's SQLite relay-event cache.
 
@@ -514,7 +513,7 @@ The inspected `run` consumer is [useMintChanges](app/features/mint/hooks/useMint
 
 ## 15. Networking, concurrency, and cancellation
 
-**Reviewed skills:** [codebase-design](skills/codebase-design/SKILL.md) for request ownership; [diagnosing-bugs](skills/diagnosing-bugs/SKILL.md) for network failure reproduction. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [codebase-design](.agents/skills/codebase-design/SKILL.md) for request ownership; [diagnosing-bugs](.agents/skills/diagnosing-bugs/SKILL.md) for network failure reproduction. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** [apiClient](app/shared/lib/apiClient.ts) wraps app/backend calls; [requestSignal](app/shared/lib/http/requestSignal.ts) composes controls for exception-style APIs; [wallet/safeFetch](wallet/src/safeFetch.ts) bounds external wallet calls; [nostr/transport](nostr/src/transport.ts) owns Nagg transport. These different boundaries are legitimate.
 
@@ -544,7 +543,7 @@ Expected background failures have a handler; `void promise` does not contain a r
 
 ## 16. Nostr reads, Nagg, Primal, and relays
 
-**Reviewed skills:** [domain-modeling](skills/domain-modeling/SKILL.md) for protocol vocabulary; [diagnosing-bugs](skills/diagnosing-bugs/SKILL.md) for fallback investigation. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [domain-modeling](.agents/skills/domain-modeling/SKILL.md) for protocol vocabulary; [diagnosing-bugs](.agents/skills/diagnosing-bugs/SKILL.md) for fallback investigation. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** [buildNostrDataLayer](app/shared/lib/nostr/buildNostrDataLayer.ts) memoizes the facade by profile and tier configuration. [data-layer](nostr/src/facade/data-layer.ts), [strategy](nostr/src/facade/strategy.ts), [tiers](nostr/src/tiers), and [facadeFeedClient](app/features/feed/data/facadeFeedClient.ts) implement the app's read path.
 
@@ -562,7 +561,7 @@ Nostr event structure, event-ID calculation, signature, and kind-specific interp
 
 ## 17. Nostr publishing, DMs, and state machines
 
-**Reviewed skills:** [domain-modeling](skills/domain-modeling/SKILL.md) for state meaning; [diagnosing-bugs](skills/diagnosing-bugs/SKILL.md) for delivery/lifecycle failures. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [domain-modeling](.agents/skills/domain-modeling/SKILL.md) for state meaning; [diagnosing-bugs](.agents/skills/diagnosing-bugs/SKILL.md) for delivery/lifecycle failures. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** [publishEvent](app/shared/lib/nostr/publish/publishEvent.ts) provides signed-event deduplication, per-relay results, and bounded fan-out/retries. [ownContentStore](app/shared/stores/profile/ownContentStore.ts) tracks local content. Nostr [notification sessions](nostr/src/facade/session) and live tier contracts own read/subscription lifecycle. There is no reason to force these into the wallet machine.
 
@@ -589,7 +588,7 @@ DM decryption stays on the client. Nagg transports ciphertext/envelopes; it must
 
 ## 18. Cashu, wallet, and payment state machines
 
-**Reviewed skills:** [codebase-design](skills/codebase-design/SKILL.md) for wallet interfaces; [domain-modeling](skills/domain-modeling/SKILL.md) for payment states; [tdd](skills/tdd/SKILL.md) for behavioral regressions. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [codebase-design](.agents/skills/codebase-design/SKILL.md) for wallet interfaces; [domain-modeling](.agents/skills/domain-modeling/SKILL.md) for payment states; [tdd](.agents/skills/tdd/SKILL.md) for behavioral regressions. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** [wallet machine](wallet/src/machine), [screen actions](wallet/src/screen-actions), [operations](wallet/src/operations), [SovranColadaProvider](app/features/send/providers/Colada.tsx), and [CocoProvider](app/shared/providers/CocoProvider.tsx) form the main seam. [STATE_MACHINE.md](wallet/docs/STATE_MACHINE.md) records flow steps and known gaps; use its source links and current code, because some introductory ownership wording predates the current package integrations.
 
@@ -642,7 +641,7 @@ not evidence for payment-request recovery. See the W12 patch handoff in
 
 ## 19. Identity, private data, and profile lifecycle
 
-**Reviewed skills:** [sovran-zod](skills/sovran-zod/SKILL.md) for durable-data boundaries; [diagnosing-bugs](skills/diagnosing-bugs/SKILL.md) for isolation failures. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [sovran-zod](.agents/skills/sovran-zod/SKILL.md) for durable-data boundaries; [diagnosing-bugs](.agents/skills/diagnosing-bugs/SKILL.md) for isolation failures. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** [profileScopedStorage](app/shared/lib/cashu/profileScopedStorage.ts) waits for migration/profile hydration and creates pubkey-scoped keys. [app root](app/app/_layout.tsx) composes account-scoped providers; [appRestart](app/shared/lib/profile/appRestart.ts) supplies restart integration. Native modules and caches have their own scope boundaries.
 
@@ -666,7 +665,7 @@ Use [openExternalUrl](app/shared/lib/url.ts) for untrusted outbound links. Enfor
 
 ## 20. Performance, efficiency, and background work
 
-**Reviewed skills:** [react-native-best-practices](skills/react-native-best-practices/SKILL.md) for measured native performance. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [react-native-best-practices](.agents/skills/react-native-best-practices/SKILL.md) for measured native performance. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** React Compiler is enabled in [app.json](app/app.json), with a [bailout baseline](app/react-compiler-bailouts.json). [useVisualActivityEffect](app/shared/hooks/useVisualActivityEffect.ts) observes screen/app activity even when a screen is frozen. [bundle budgets](app/bundle-size-budget.json) and the [thermal investigation](docs/architecture/thermal-investigation-2026-09-09.md) provide existing measurement context.
 
@@ -699,7 +698,7 @@ Keep transport delivery/reconciliation alive when its product contract requires 
 
 ## 21. Startup, preloading, prefetching, and prerendering
 
-**Reviewed skills:** [react-native-best-practices](skills/react-native-best-practices/SKILL.md) for startup measurement; [expo-router](skills/expo-router/SKILL.md) for route prefetch mechanics. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [react-native-best-practices](.agents/skills/react-native-best-practices/SKILL.md) for startup measurement; [expo-router](.agents/skills/expo-router/SKILL.md) for route prefetch mechanics. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** [index.js](app/index.js) loads [shim.js](app/shim.js) before Router; native crypto/bootstrap assertions are deliberate. [root layout](app/app/_layout.tsx), [InitializationProvider](app/shared/providers/InitializationProvider.tsx), [useDeferredMount](app/shared/hooks/useDeferredMount.ts), and the feed tab's first-focus gate separate first paint from heavier work. [imageCache](app/shared/lib/imageCache.ts) gates prefetch on boot completion and limits active requests to four with a 512-URL success set.
 
@@ -724,7 +723,7 @@ Expo Router prefetch can mount a screen and run effects, with navigation restric
 
 ## 22. Reuse and dependencies
 
-**Reviewed skills:** [codebase-design](skills/codebase-design/SKILL.md) for reuse decisions; [react-native-best-practices](skills/react-native-best-practices/SKILL.md) for dependency/bundle cost. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [codebase-design](.agents/skills/codebase-design/SKILL.md) for reuse decisions; [react-native-best-practices](.agents/skills/react-native-best-practices/SKILL.md) for dependency/bundle cost. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** [Metro configuration](app/metro.config.js) deliberately pins shared dependency identities and excludes an unused NDK wallet import surface. [requestSignal](app/shared/lib/http/requestSignal.ts) uses the `wallet/safeFetch` subpath to avoid making the whole payment engine reachable. The repo already has `neverthrow`, Zod, Zustand, Uniwind, and domain libraries.
 
@@ -755,7 +754,7 @@ Measure dependency removal by distinct resolved package/version identities as we
 
 ## 23. Assets, fonts, and user media
 
-**Reviewed skills:** [react-native-best-practices](skills/react-native-best-practices/SKILL.md) for native assets and image cost; [sovran-native-ui-review](skills/sovran-native-ui-review/SKILL.md) for font/media behavior. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [react-native-best-practices](.agents/skills/react-native-best-practices/SKILL.md) for native assets and image cost; [sovran-native-ui-review](.agents/skills/sovran-native-ui-review/SKILL.md) for font/media behavior. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** [assets](app/assets) holds bundled resources; [useFonts](app/shared/hooks/useFonts.ts) statically lists font faces; [Image](app/shared/ui/primitives/Image.tsx) defaults to cover, memory/disk caching, and a one-second transition. [imageCache](app/shared/lib/imageCache.ts) owns prefetch. [theme](app/shared/lib/theme) and [media](app/shared/lib/nostr/media) own wallpaper selection and uploads.
 
@@ -959,7 +958,7 @@ surface separately. Keep one original rather than duplicating source bytes.
 
 ## 24. npm patches and vendored code
 
-**Reviewed skills:** [code-review](skills/code-review/SKILL.md) for patch requirements versus implementation. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [code-review](.agents/skills/code-review/SKILL.md) for patch requirements versus implementation. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** root [patchedDependencies](package.json) registers six [Bun patches](app/patches). The repo also has [Marmot vendored output](app/vendor/marmot-ts), [BitChat submodules](.gitmodules), and native patch/copy scripts. These are different supply paths and need different rules.
 
@@ -988,7 +987,7 @@ The BitChat scripts intentionally patch iOS vendor input and copy selected Andro
 
 ## 25. Package scripts, configuration, and release
 
-**Reviewed skills:** [expo-router](skills/expo-router/SKILL.md) for version-specific navigation configuration; [code-review](skills/code-review/SKILL.md) for configuration changes. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [expo-router](.agents/skills/expo-router/SKILL.md) for version-specific navigation configuration; [code-review](.agents/skills/code-review/SKILL.md) for configuration changes. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** root [package.json](package.json) pins Bun 1.3.5, workspaces, singleton overrides, and patches. App [package.json](app/package.json) owns platform commands. [Metro](app/metro.config.js), [Babel](app/babel.config.js), [TypeScript](app/tsconfig.json), [Android TypeScript](app/tsconfig.android.json), [ESLint](app/eslint.config.js), [app.json](app/app.json), [app.config.js](app/app.config.js), and [eas.json](app/eas.json) have distinct responsibilities.
 
@@ -1026,7 +1025,7 @@ Scripts need a clear name, working directory, required inputs, outputs, side eff
 
 ## 26. Logging, testing, and enforcement
 
-**Reviewed skills:** [diagnosing-bugs](skills/diagnosing-bugs/SKILL.md) for reproducible diagnostics; [tdd](skills/tdd/SKILL.md) for behavior tests; [code-review](skills/code-review/SKILL.md) for independent review. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [diagnosing-bugs](.agents/skills/diagnosing-bugs/SKILL.md) for reproducible diagnostics; [tdd](.agents/skills/tdd/SKILL.md) for behavior tests; [code-review](.agents/skills/code-review/SKILL.md) for independent review. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** [logger](app/shared/lib/logger.ts) and [log-doctor](app/codereview/log-doctor/OVERVIEW.md) provide scoped diagnostics; [CI](.github/workflows/ci.yml) runs workspace tests as a blocking step, with formatting/structural signals advisory. This differs from older ADR wording saying tests are nonblocking. Other workflows cover lint, both platform type checks, styling, glass headers, Compiler, and bundle size.
 
@@ -1293,7 +1292,7 @@ Budgets and suppression files are records of known exceptions. Changes to them r
 
 Use [CLAIMS.md](CLAIMS.md) for public claims and trust qualifications; naming alone does not establish a capability.
 
-**Reviewed skills:** [domain-modeling](skills/domain-modeling/SKILL.md) for domain vocabulary; [codebase-design](skills/codebase-design/SKILL.md) for interface naming. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [domain-modeling](.agents/skills/domain-modeling/SKILL.md) for domain vocabulary; [codebase-design](.agents/skills/codebase-design/SKILL.md) for interface naming. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Observed:** [protocolIds](app/shared/lib/protocolIds.ts) already owns branded Nostr/P2PK identifiers, shared schemas, and conversions. [transactionPresentation](app/features/transactions/lib/transactionPresentation.ts) demonstrates exhaustive lookup tables; [feedEmptyStates](app/features/feed/lib/feedEmptyStates.ts), [feedRows](app/features/feed/lib/feedRows.ts), and [useFeedRows](app/features/feed/hooks/useFeedRows.ts) provide presentation owners. These are useful patterns, not claims that every existing export already follows the vocabulary below or that their English copy is localization-ready.
 
@@ -1398,7 +1397,7 @@ Rename one semantic cluster at a time: include callers, types, tests, mocks, and
 
 ## 28. Cleanup method and evidence
 
-**Reviewed skills:** [improve-codebase-architecture](skills/improve-codebase-architecture/SKILL.md) for requested architecture surveys; [codebase-design](skills/codebase-design/SKILL.md) for consolidation; [code-review](skills/code-review/SKILL.md) for change review. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
+**Reviewed skills:** [improve-codebase-architecture](.agents/skills/improve-codebase-architecture/SKILL.md) for requested architecture surveys; [codebase-design](.agents/skills/codebase-design/SKILL.md) for consolidation; [code-review](.agents/skills/code-review/SKILL.md) for change review. Apply [decision 29's scope and overrides](#29-project-skills-and-review-policy).
 
 **Decision:** a cleanup removes unnecessary implementation or competing conventions while preserving observable behavior. A lower detector count is supporting evidence, not the objective by itself. This section incorporates the deslop workflow; no separate playbook is needed. Use it for an authorized code-cleanup pass, not as a reason to turn a documentation edit or small fix into a repository-wide refactor.
 
@@ -1481,13 +1480,13 @@ This guide does not authorize committing or pushing. When a code-cleanup commit 
 
 ## 29. Project skills and review policy
 
-**Decision:** ship a small, reviewed skill library with the repository. Source folders live in [skills/](skills), and the real `.agents/skills` and `.claude/skills` directories contain per-skill relative symlinks into them. [CLAUDE.md](CLAUDE.md) imports [AGENTS.md](AGENTS.md), which routes here. Skill contents, supporting references/assets, licenses, provenance, and links are all repository files; no global install, sibling repository, or download is needed to read them after checkout.
+**Decision:** ship a small, reviewed skill library with the repository. Source folders live in [.agents/skills/](.agents/skills), the standard cross-agent location, and the real `.claude/skills` directory contains per-skill relative symlinks into it. [CLAUDE.md](CLAUDE.md) imports [AGENTS.md](AGENTS.md), which routes here. Skill contents, supporting references/assets, licenses, provenance, and links are all repository files; no global install, sibling repository, or download is needed to read them after checkout.
 
 This layout follows [Codex's repository skill discovery](https://developers.openai.com/codex/skills) and [Claude's project skills and symlink support](https://code.claude.com/docs/en/skills). Restart an existing session if its discovery cache does not see newly added directories; new sessions discover them. Personal/enterprise configuration can still override or disable skills, so prefer this guide's exact file links when similarly named global skills exist. Installation is not proof that a particular client invoked a skill.
 
 ### What was reviewed and installed
 
-Review date: **2026-09-10**. [sources.json](skills/sources.json) records immutable Git SHAs, upstream paths, source-file SHA-256 hashes, licenses, local additions/adaptations, and repository-star snapshots. Stars belong to entire repositories, not individual skills, and are a shortlist signal rather than a quality or safety rating.
+Review date: **2026-09-10**. [sources.json](.agents/skills/sources.json) records immutable Git SHAs, upstream paths, source-file SHA-256 hashes, licenses, local additions/adaptations, and repository-star snapshots. Stars belong to entire repositories, not individual skills, and are a shortlist signal rather than a quality or safety rating.
 
 | Source repository | Stars when checked | Result for Sovran |
 | --- | --- | --- |
@@ -1504,19 +1503,19 @@ One optional “Related Skills” link in Callstack's `native-platform-setup.md`
 
 | Installed skill | Useful scope | Sovran-specific application |
 | --- | --- | --- |
-| [codebase-design](skills/codebase-design/SKILL.md) | Matt's deep modules, interfaces, deletion test, alternative designs | Decisions 1/22/28 govern actual ownership and safe consolidation; its bundled design-it-twice reference replaces a separate duplicate skill |
-| [improve-codebase-architecture](skills/improve-codebase-architecture/SKILL.md) | Scoped architecture survey and comparison report | Use when an architecture review is requested; do not start a repository-wide interview during a small fix |
-| [domain-modeling](skills/domain-modeling/SKILL.md) | Resolve overloaded domain terms and meaningful ADRs | Write the domain dictionary in decision 27 and decisions here; existing ADR home is `app/docs/adr` |
-| [diagnosing-bugs](skills/diagnosing-bugs/SKILL.md) | Reproducible failure signal, minimized case, hypotheses, regression | Native/E2E/protocol fixtures and redacted logs; browser examples apply only to web surfaces |
-| [tdd](skills/tdd/SKILL.md) | Behavior-first tests and small red/green slices | Use established public contracts and correct workspace runner; no blanket test requirement for copy-only edits |
-| [code-review](skills/code-review/SKILL.md) | Independent standards-versus-requirements review | Standards source is SYSTEM.md; user task/linked issue is the requirement source; include intended working-tree changes when reviewing WIP |
-| [grilling](skills/grilling/SKILL.md) | Explore unresolved consequential design decisions | Use only for an intended interview; ask one concise decision at a time through the available question tool |
-| [expo-router](skills/expo-router/SKILL.md) | Route groups, stack/tab/sheet/link/header mechanics | Existing Expo version, route map, page containers, and platform capabilities govern implementation |
-| [react-native-best-practices](skills/react-native-best-practices/SKILL.md) | Callstack's measured React/native/bundle performance workflow | Apply the relevant reference only; retain Sovran's Compiler, cache, bootstrap, and dependency rules |
-| [sovran-zod](skills/sovran-zod/SKILL.md) | Input/output contracts, safe parsing, durable schema evolution | Owned workflow grounded in decisions 13/27 and official Zod docs; no web-form scaffolding |
-| [sovran-zustand](skills/sovran-zustand/SKILL.md) | Native store scope, selectors, hydration, async ordering | Owned workflow grounded in decisions 12–14 and official Zustand docs |
-| [sovran-app-copy](skills/sovran-app-copy/SKILL.md) | In-app actions/errors/empty states, translation and truncation | Native adaptation of Impeccable copy principles; preserve payment truth and shared catalog semantics |
-| [sovran-native-ui-review](skills/sovran-native-ui-review/SKILL.md) | Native UI consistency, task clarity, accessibility and edge cases | Native adaptation of selected Impeccable guidance through existing Sovran tokens/components |
+| [codebase-design](.agents/skills/codebase-design/SKILL.md) | Matt's deep modules, interfaces, deletion test, alternative designs | Decisions 1/22/28 govern actual ownership and safe consolidation; its bundled design-it-twice reference replaces a separate duplicate skill |
+| [improve-codebase-architecture](.agents/skills/improve-codebase-architecture/SKILL.md) | Scoped architecture survey and comparison report | Use when an architecture review is requested; do not start a repository-wide interview during a small fix |
+| [domain-modeling](.agents/skills/domain-modeling/SKILL.md) | Resolve overloaded domain terms and meaningful ADRs | Write the domain dictionary in decision 27 and decisions here; existing ADR home is `app/docs/adr` |
+| [diagnosing-bugs](.agents/skills/diagnosing-bugs/SKILL.md) | Reproducible failure signal, minimized case, hypotheses, regression | Native/E2E/protocol fixtures and redacted logs; browser examples apply only to web surfaces |
+| [tdd](.agents/skills/tdd/SKILL.md) | Behavior-first tests and small red/green slices | Use established public contracts and correct workspace runner; no blanket test requirement for copy-only edits |
+| [code-review](.agents/skills/code-review/SKILL.md) | Independent standards-versus-requirements review | Standards source is SYSTEM.md; user task/linked issue is the requirement source; include intended working-tree changes when reviewing WIP |
+| [grilling](.agents/skills/grilling/SKILL.md) | Explore unresolved consequential design decisions | Use only for an intended interview; ask one concise decision at a time through the available question tool |
+| [expo-router](.agents/skills/expo-router/SKILL.md) | Route groups, stack/tab/sheet/link/header mechanics | Existing Expo version, route map, page containers, and platform capabilities govern implementation |
+| [react-native-best-practices](.agents/skills/react-native-best-practices/SKILL.md) | Callstack's measured React/native/bundle performance workflow | Apply the relevant reference only; retain Sovran's Compiler, cache, bootstrap, and dependency rules |
+| [sovran-zod](.agents/skills/sovran-zod/SKILL.md) | Input/output contracts, safe parsing, durable schema evolution | Owned workflow grounded in decisions 13/27 and official Zod docs; no web-form scaffolding |
+| [sovran-zustand](.agents/skills/sovran-zustand/SKILL.md) | Native store scope, selectors, hydration, async ordering | Owned workflow grounded in decisions 12–14 and official Zustand docs |
+| [sovran-app-copy](.agents/skills/sovran-app-copy/SKILL.md) | In-app actions/errors/empty states, translation and truncation | Native adaptation of Impeccable copy principles; preserve payment truth and shared catalog semantics |
+| [sovran-native-ui-review](.agents/skills/sovran-native-ui-review/SKILL.md) | Native UI consistency, task clarity, accessibility and edge cases | Native adaptation of selected Impeccable guidance through existing Sovran tokens/components |
 
 ### Explicit adaptations and rejected defaults
 
@@ -1537,11 +1536,11 @@ No imported skill is the authority on Nostr signatures, Cashu settlement, key cu
 From the repository root:
 
 ```sh
-python3 skills/manage.py check
-python3 skills/manage.py link
+python3 .agents/skills/manage.py check
+python3 .agents/skills/manage.py link
 ```
 
-`check` verifies entrypoints, manifest names, pinned upstream file hashes, license presence, and both discovery link trees. `link` validates the sources first, creates missing links, and refuses to overwrite ordinary files or unexpected links; it does not delete unrelated contributor skills. Both use only the Python standard library and work without `node_modules` or network. Git must preserve symlinks for zero-setup discovery; on a checkout that materializes links as text files, enable symlink support and restore the repository links before use. The checker reports that mismatch instead of overwriting it.
+`check` verifies entrypoints, manifest names, pinned upstream file hashes, license presence, and the Claude discovery link tree. `link` validates the sources first, creates missing links, and refuses to overwrite ordinary files or unexpected links; it does not delete unrelated contributor skills. Both use only the Python standard library and work without `node_modules` or network. Git must preserve symlinks for zero-setup discovery; on a checkout that materializes links as text files, enable symlink support and restore the repository links before use. The checker reports that mismatch instead of overwriting it.
 
 To refresh an upstream skill, fetch its new immutable revision into a scratch directory, inspect the diff and referenced resources, reconsider its conflicts/permissions/license, then replace only the approved source folder. Preserve full required reference/asset closure and the upstream license, update `sources.json` hashes/provenance and this review table, and rerun the checker. Do not use a floating global `skills update`, package postinstall download, or a symlink outside this repository as the contributor installation. Do not hand-edit upstream files to hide conflicts; keep project adaptations explicit here or as clearly attributed owned skills.
 

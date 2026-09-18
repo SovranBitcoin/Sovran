@@ -23,10 +23,11 @@ errors for payment control flow, keep secrets out of logs, and retain native
 crypto/bootstrap and profile isolation. Consult the relevant SYSTEM.md decision
 before changing these boundaries.
 
-Skills are committed under `skills/`. Both `.agents/skills/` and `.claude/skills/`
-contain relative links to those same files. No global skill installation or
-parent workspace is required. Use `python3 skills/manage.py check` to verify the
-installation; `python3 skills/manage.py link` repairs missing links. Prefer the
-exact repository paths linked by SYSTEM.md if a personal skill shares a name.
-Keep upstream snapshots unchanged; record refresh provenance in
-`skills/sources.json`. Maintain app rules in SYSTEM.md, not in copied skills.
+Skills are committed under `.agents/skills/`, the standard cross-agent location.
+`.claude/skills/` contains relative links to those same files. No global skill
+installation or parent workspace is required. Use
+`python3 .agents/skills/manage.py check` to verify the installation;
+`python3 .agents/skills/manage.py link` repairs missing links. Prefer the exact
+repository paths linked by SYSTEM.md if a personal skill shares a name. Keep
+upstream snapshots unchanged; record refresh provenance in
+`.agents/skills/sources.json`. Maintain app rules in SYSTEM.md, not in copied skills.

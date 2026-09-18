@@ -9,7 +9,7 @@ documents and services need rechecking when a claim changes. No live store copy,
 mint balance, private data, or server logs were fetched for this review.
 
 Use alongside [SYSTEM.md](SYSTEM.md) for conventions, the
-[app-copy skill](skills/sovran-app-copy/SKILL.md) for microcopy,
+[app-copy skill](.agents/skills/sovran-app-copy/SKILL.md) for microcopy,
 [artwork guide](press/artwork/README.md) for rendered copy,
 [legal guide](docs/legal/README.md) for notices and [glossary](app/CONTEXT.md)
 for domain terms. Change a claim here first, update its catalog and any relevant narrow phrase rule,

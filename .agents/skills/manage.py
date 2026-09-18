@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify pinned skill content and create portable agent discovery links."""
+"""Verify pinned skill content in .agents/skills and create Claude discovery links to it."""
 
 import argparse
 import hashlib
@@ -10,8 +10,8 @@ import re
 import sys
 
 
-ROOT = Path(__file__).resolve().parent.parent
-SKILLS = ROOT / "skills"
+SKILLS = Path(__file__).resolve().parent  # .agents/skills: the real skill sources
+ROOT = SKILLS.parent.parent
 
 
 def main():
@@ -28,6 +28,9 @@ def main():
             continue
         names.add(name)
         folder = SKILLS / name
+        if folder.is_symlink():
+            errors.append(f"Skill source must be a real directory: {folder.relative_to(ROOT)}")
+            continue
         main_file = folder / "SKILL.md"
         if not main_file.is_file():
             errors.append(f"Missing {name}/SKILL.md")
@@ -59,14 +62,15 @@ def main():
 
     # Validate sources before making any links. Never overwrite a contributor's files.
     pending = []
-    for agent in (".agents", ".claude"):
+    # .agents/skills holds the sources; Claude discovers them through per-skill links.
+    for agent in (".claude",):
         parent = ROOT / agent / "skills"
         if (ROOT / agent).is_symlink() or parent.is_symlink() or (parent.exists() and not parent.is_dir()):
             errors.append(f"Expected real discovery directory: {parent.relative_to(ROOT)}")
             continue
         for name in sorted(names):
             link = parent / name
-            target = f"../../skills/{name}"
+            target = f"../../.agents/skills/{name}"
             if link.is_symlink():
                 if os.readlink(link) != target or not link.is_dir():
                     errors.append(f"Unexpected/broken link: {link.relative_to(ROOT)}")
@@ -82,7 +86,7 @@ def main():
     for link, target in pending:
         link.parent.mkdir(parents=True, exist_ok=True)
         link.symlink_to(target, target_is_directory=True)
-    print(f"Verified {len(names)} skills, pinned upstream contents, and both agent link trees."
+    print(f"Verified {len(names)} skills, pinned upstream contents, and the Claude link tree."
           + (f" Created {len(pending)} links." if pending else ""))
     return 0
 
