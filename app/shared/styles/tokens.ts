@@ -21,7 +21,7 @@
  * light/wallpaper switches take effect. These tokens are static module
  * constants baked into the bundle.
  *
- * See SYSTEM.md §4 (styling, tokens, and themes) for usage guidance.
+ * Usage rule: ui/shared-parts in hunch.config.ts.
  */
 
 import { Platform, type ViewStyle } from 'react-native';

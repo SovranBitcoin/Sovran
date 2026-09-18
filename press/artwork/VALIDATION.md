@@ -39,7 +39,7 @@ Each cell applies to **wide, tall and square**. R = rendered with complete input
 - `scripts/lib/marketing-render.mjs`: full captures in the shared phone frame; no system-chrome trimming.
 - `scripts/fetch-wallpapers.mjs`: explicit portrait fetch/authentication helper.
 - `marketing/artwork/`: migrated screenshots and palette sources; layout/copy/concept/selection JSON; supplied portrait catalog and panorama provenance; regenerated selected outputs, manifest and documentation. Removed both superseded marketing trees.
-- Root/app `package.json`, both `.easignore` files, `.gitignore`, `.github/workflows/ci.yml`, `app/__tests__/marketingNotBundled.test.ts`, `app/assets/README.md`, `SYSTEM.md` §23: single-pipeline commands, exclusions, guard and documentation.
+- Root/app `package.json`, both `.easignore` files, `.gitignore`, `.github/workflows/ci.yml`, `app/__tests__/marketingNotBundled.test.ts`, `app/assets/README.md`: single-pipeline commands, exclusions, guard and documentation.
 - `app/e2e/scenarios/marketing-screenshots-wallpapers.json`: four explicit Artemis UI capture journeys, checking the actual loaded-image probe. No runtime app changes, dependency/lockfile/patch changes, simulator runs or publication.
 
 ## Gate output
@@ -137,4 +137,4 @@ Verified 19 artwork concepts; 9 missing inputs (labelled drafts allowed).
 - The harness accepts only canonical screenshot names, so JSON uses `name: "wallet"`; the README maps occurrences to the requested `wallet-<themeName>` artwork keys. This is the explicit JSON-only workaround; distinct harness artifact names would need a separate schema change.
 - Supplied panoramas: eleven 3840×1920, two 2048×1024 (`looking-back-at-earth`, `vavilov-crater`). Original bytes and provided provenance are preserved.
 - DNS resolution prevented a live Nagg refresh. The supplied catalog/portraits were authenticated locally; `fetch-wallpapers.mjs` supports a deliberate future refresh. No fabricated image bytes or capture provenance.
-- SYSTEM.md follow-ups left open: orchestrator capture/mask handoff, human layout/copy review, removal of the temporary `--allow-missing` asset allowance, and the existing asset license/provenance review. Linux CI and native device validation were not run here.
+- Follow-ups left open: orchestrator capture/mask handoff, human layout/copy review, removal of the temporary `--allow-missing` asset allowance, and the existing asset license/provenance review. Linux CI and native device validation were not run here.

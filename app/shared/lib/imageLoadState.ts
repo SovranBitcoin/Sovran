@@ -10,7 +10,7 @@ import type { AvatarState } from '@/shared/ui/primitives/Avatar';
  * - missing  — the source is known to be absent
  * - failed   — a source existed but could not be loaded
  *
- * Placeholder policy (SYSTEM.md §7): unknown and loading show the NEUTRAL
+ * Placeholder policy (hunch rule ui/unknown-values): unknown and loading show the NEUTRAL
  * placeholder (the low-contrast skeleton fill); only missing and failed show
  * the COLOUR placeholder (clay silhouette, seeded gradient, glyph). A colour
  * placeholder therefore always means "there is no image", never "we have not

@@ -10,7 +10,7 @@
  * It is not a second cache layer: the only state it owns is "what is in flight
  * for this mount" and "the last failure"; `data` is literally the store
  * selector. Persistence, LRU, scope and cold-start policy stay in the store
- * (SYSTEM.md §14).
+ * (hunch rule state/one-authority).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
@@ -68,7 +68,7 @@ interface UseCachedReadOptions<TData> {
   seedFresh?: boolean;
   /**
    * Data present but nothing to show → `'empty'`; a result carrying an
-   * "unavailable" marker (SYSTEM.md F06) → `'error'`. Default: `'ready'`.
+   * "unavailable" marker (hunch rule ui/read-states) → `'error'`. Default: `'ready'`.
    */
   classify?: (data: TData) => 'ready' | 'empty' | 'error';
   /**
@@ -78,7 +78,7 @@ interface UseCachedReadOptions<TData> {
    */
   keepPreviousData?: (previousKey: string, nextKey: string) => boolean;
   /**
-   * First access this session: `'paint-stale'` (default, SYSTEM.md §14) shows
+   * First access this session: `'paint-stale'` (default) shows
    * a persisted entry immediately; `'skeleton'` hides it until the network
    * answers (feeds that must not show yesterday's page).
    */

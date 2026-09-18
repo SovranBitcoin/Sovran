@@ -17,7 +17,7 @@ import type { ThreadStructure } from '@/features/feed/lib/buildThreadStructure';
 export type RequestControls = WalletRequestControls & { readId?: string };
 
 /**
- * How a read resolved, distinct from what it returned (SYSTEM.md F06): an
+ * How a read resolved, distinct from what it returned (hunch rule ui/read-states): an
  * empty page from a healthy source and an empty page because every tier was
  * exhausted must render differently. Absent means `ok`.
  */

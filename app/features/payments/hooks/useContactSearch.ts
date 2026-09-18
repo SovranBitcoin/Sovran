@@ -42,7 +42,7 @@ function seedProfiles(data: SearchUsersResponse): void {
 /**
  * People search: debounced, cached by normalized query, stale-while-revalidate.
  *
- * Contract (SYSTEM.md §7/§14): rows on screen stay while a refinement loads
+ * Contract (hunch rule ui/read-states): rows on screen stay while a refinement loads
  * (`keepPreviousData`, refinements only — an unrelated query never opens on
  * the previous query's people); a query already searched this session paints at 0ms;
  * a partial answer (first tier, Vertex pre-refresh) paints immediately and is

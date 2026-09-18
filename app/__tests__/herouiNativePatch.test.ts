@@ -3,7 +3,7 @@
  */
 
 /**
- * SYSTEM.md §24: a successful install is not proof the patch landed. Metro
+ * app/patches/README.md: a successful install is not proof the patch landed. Metro
  * resolves heroui-native to `lib/module` (app/metro.config.js), so assert the
  * runtime files carry every sovran hunk; a future bump that silently drops
  * the patch fails here instead of on a device.

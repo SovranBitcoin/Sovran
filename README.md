@@ -1,13 +1,5 @@
 # Sovran
 
-## Maintenance health
-
-**Core gates:** [![Tests](https://github.com/SovranBitcoin/Sovran/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/ci.yml) [![Lint](https://github.com/SovranBitcoin/Sovran/actions/workflows/lint.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/lint.yml) [![Type Check](https://github.com/SovranBitcoin/Sovran/actions/workflows/type-check.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/type-check.yml) [![Knip](https://github.com/SovranBitcoin/Sovran/actions/workflows/knip.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/knip.yml) [![Compiler Bailout Budget](https://github.com/SovranBitcoin/Sovran/actions/workflows/react-compiler.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/react-compiler.yml) [![Styling Budget](https://github.com/SovranBitcoin/Sovran/actions/workflows/styling.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/styling.yml) [![Bundle Size Budget](https://github.com/SovranBitcoin/Sovran/actions/workflows/bundle-size.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/bundle-size.yml)
-
-**Other checks:** [![Docs](https://github.com/SovranBitcoin/Sovran/actions/workflows/docs.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/docs.yml) [![Glass Headers](https://github.com/SovranBitcoin/Sovran/actions/workflows/glass-headers.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/glass-headers.yml) [![React Doctor — advisory](https://github.com/SovranBitcoin/Sovran/actions/workflows/react-doctor.yml/badge.svg?branch=main&event=push)](https://github.com/SovranBitcoin/Sovran/actions/workflows/react-doctor.yml)
-
-Badges show the latest push to `main`. Green means the gate passed—not necessarily that historical debt is zero. React Doctor is advisory: its badge only confirms that the report was generated. Bundle Size uploads the scored iOS/Android `maintenance-health.json` artifact.
-
 Monorepo for the Sovran Bitcoin wallet and its self-contained packages. Managed
 with [Bun](https://bun.sh) workspaces — no inter-package publishing; everything
 links directly.
@@ -42,8 +34,8 @@ this table.
 
 | Document | What it covers |
 |----------|----------------|
-| [`SYSTEM.md`](SYSTEM.md) | Application convention guide — which owner to use, which default to follow, which exception matters. Read before implementing. |
-| [`AGENTS.md`](AGENTS.md) · [`CLAUDE.md`](CLAUDE.md) | Contributor and agent instructions. The chain is CLAUDE.md → AGENTS.md → SYSTEM.md → the relevant reviewed skill. |
+| [`AGENTS.md`](AGENTS.md) · [`CLAUDE.md`](CLAUDE.md) | Contributor and agent entry point: layout, commands, testing and skills. CLAUDE.md imports AGENTS.md. |
+| [`hunch.config.ts`](hunch.config.ts) | Code rules that linting and type checks can't enforce, checked on each change with `npx @kelbie/hunch check`. |
 | [`CLAIMS.md`](CLAIMS.md) | What the product may claim, and the scoped source review behind each claim. |
 | [`FEEDBACK.md`](FEEDBACK.md) | Upstream feedback ledger for the coco v2 integration. |
 | [`app/README.md`](app/README.md) | The Expo / React Native application package. |

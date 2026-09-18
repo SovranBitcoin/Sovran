@@ -143,7 +143,7 @@ export const ContactsScreen = () => {
     dmConversations
   );
 
-  // Loading gate for the idle contacts list (SYSTEM.md §7): the spinner shows
+  // Loading gate for the idle contacts list (hunch rule ui/read-states): the spinner shows
   // only while the first conversation read is in flight AND nothing is on
   // screen yet. A snapshot / last-message seed paints rows at 0ms with status
   // `revalidating`, and a refresh never blanks the list. Mint-info loading is

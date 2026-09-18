@@ -1,9 +1,15 @@
 # App assets
 
 Group assets by purpose: `brand/`, `demo/`, `fonts/`, and the existing icon and
-wallpaper owners. [SYSTEM.md, decision 23](../../SYSTEM.md#23-assets-fonts-and-user-media)
-owns the naming convention. Start with the [brand gallery](brand/index.html) or
+wallpaper owners. Start with the [brand gallery](brand/index.html) or
 [brand guide](brand/README.md).
+
+Naming: lowercase kebab-case for project-owned assets and folders; editable inputs
+in `source/`, derived exports in `generated/`, and machine inventories in
+`generated/manifest.json`. Colorways name foreground on background
+(`black-on-light`), never just `light` or `dark`. Import assets by literal paths
+Metro can enumerate, never a constructed `require()`, and delete superseded
+originals and aliases once callers are updated.
 
 ```sh
 bun run assets:generate       # brand, demo media and marketing exports

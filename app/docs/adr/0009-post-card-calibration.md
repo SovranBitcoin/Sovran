@@ -25,7 +25,7 @@ entrance, a `space-between` action bar with 11px thread counts, and a
   are a regression.
 - **Mona Sans on the feed surface** via `Text family="mona"`. It is already
   bundled for amounts and is the only family with a real SemiBold; Oxygen
-  stays the app default (SYSTEM.md §11).
+  stays the app default (hunch rule ui/shared-parts).
 - **Three-step ink ladder** — `postInk.primary` 0.9 (name, body),
   `secondary` 0.5 (time, counts, idle glyphs, repost line, dots),
   `tertiary` 0.25 (borders, unavailable cards). Links, mentions and hashtags

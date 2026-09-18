@@ -2,7 +2,7 @@
  * The mint-detail read, group by group. The screen paints whatever the
  * unified metadata cache already knows (0ms), then each group revalidates on
  * its own clock and reports its own status, so an audit outage never blanks a
- * known review score and the stats block never unmounts (SYSTEM.md §7).
+ * known review score and the stats block never unmounts (hunch rule ui/read-states).
  *
  * - identity (NUT-06): owned by the wallet bridge (`mintInfo` entry); this
  *   hook only reads its status/error and re-triggers it on Retry.

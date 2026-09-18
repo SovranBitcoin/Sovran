@@ -113,7 +113,7 @@ it('a failed refresh keeps the cached rows and reports the error', async () => {
   expect(result.current.results.map((m) => m.name)).toEqual(['Alpha']);
   expect(result.current.loading).toBe(false);
   expect(result.current.error).toBe('Failed to load mints');
-  // Rows stay on screen: a failed refresh is degraded, not an error state (SYSTEM.md §7).
+  // Rows stay on screen: a failed refresh is degraded, not an error state (hunch rule ui/read-states).
   expect(result.current.status).toBe('ready');
 });
 

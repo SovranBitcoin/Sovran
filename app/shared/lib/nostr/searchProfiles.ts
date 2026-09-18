@@ -113,7 +113,7 @@ function unionHits(
  * fresh nagg one: the current answer is delivered through `onCached` first so
  * the UI paints, then the refreshed scores are merged in. Exhaustion (every
  * tier disabled, failed or unreachable) is an ERROR, distinct from a healthy
- * empty answer (SYSTEM.md F06).
+ * empty answer (hunch rule ui/read-states).
  *
  * Every answer this emits for one call — partial, refreshed, final — is a
  * superset of the previous one in the same row order (see `PaintedOrder`):

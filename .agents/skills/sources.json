@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "reviewed_on": "2026-09-10",
-  "review_policy": "SYSTEM.md#29-project-skills-and-review-policy",
+  "review_policy": "AGENTS.md#skills",
   "repository_popularity_snapshot": [
     {
       "repository": "https://github.com/mattpocock/skills",
@@ -258,65 +258,6 @@
         "references/toolbar-and-headers.md": "14d9a71dd949bd2b28a5bd531f6b9c1b4f3fa847a86db8c5218fee67b5295769",
         "references/zoom-transitions.md": "cacc1665e9f3044762765d2cd55fd1ead9627f06478f12dfa2280c6f9ae88ede"
       }
-    },
-    {
-      "name": "sovran-zod",
-      "kind": "owned",
-      "reviewed_on": "2026-09-10",
-      "source_path": "skills/sovran-zod",
-      "guidance": "SYSTEM.md"
-    },
-    {
-      "name": "sovran-zustand",
-      "kind": "owned",
-      "reviewed_on": "2026-09-10",
-      "source_path": "skills/sovran-zustand",
-      "guidance": "SYSTEM.md"
-    },
-    {
-      "name": "sovran-app-copy",
-      "kind": "owned",
-      "reviewed_on": "2026-09-10",
-      "source_path": "skills/sovran-app-copy",
-      "guidance": "SYSTEM.md",
-      "license": "Apache-2.0",
-      "license_file": "LICENSE",
-      "adapted_from": {
-        "repository": "https://github.com/pbakaus/impeccable",
-        "revision": "67d018fe052853c104a96d441ce175dd5ec4c39d",
-        "paths": [
-          ".agents/skills/impeccable/reference/clarify.md",
-          ".agents/skills/impeccable/reference/operate.md"
-        ]
-      },
-      "local_changes": [
-        "Project-authored native workflow derived from selected playbooks.",
-        "SYSTEM.md owns conventions; no launcher, binary, hooks, extra context documents, browser CSS, or automatic handoffs."
-      ]
-    },
-    {
-      "name": "sovran-native-ui-review",
-      "kind": "owned",
-      "reviewed_on": "2026-09-10",
-      "source_path": "skills/sovran-native-ui-review",
-      "guidance": "SYSTEM.md",
-      "license": "Apache-2.0",
-      "license_file": "LICENSE",
-      "adapted_from": {
-        "repository": "https://github.com/pbakaus/impeccable",
-        "revision": "67d018fe052853c104a96d441ce175dd5ec4c39d",
-        "paths": [
-          ".agents/skills/impeccable/reference/operate.md",
-          ".agents/skills/impeccable/reference/audit.native.md",
-          ".agents/skills/impeccable/reference/harden.md",
-          ".agents/skills/impeccable/reference/ios.md",
-          ".agents/skills/impeccable/reference/android.md"
-        ]
-      },
-      "local_changes": [
-        "Project-authored native workflow derived from selected playbooks.",
-        "SYSTEM.md owns conventions; no launcher, binary, hooks, extra context documents, browser CSS, or automatic handoffs."
-      ]
     }
   ]
 }

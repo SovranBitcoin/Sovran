@@ -156,7 +156,7 @@ function AnimatedAvatar({
   );
 }
 
-/** Unknown counts render as a dash, never as a zero that reads as measured (SYSTEM.md §7). */
+/** Unknown counts render as a dash, never as a zero that reads as measured (hunch rule ui/unknown-values). */
 const UNKNOWN = '—';
 
 function StatsGrid({

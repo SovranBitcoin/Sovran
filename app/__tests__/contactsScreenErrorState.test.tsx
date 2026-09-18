@@ -1,5 +1,5 @@
 /**
- * Contacts tab read states (SYSTEM.md §7): the recent-contacts hook maps the
+ * Contacts tab read states (hunch rule ui/read-states): the recent-contacts hook maps the
  * DM conversation read into rows + a status the screen gates on, and the
  * screen's gates are pinned at source level (the screen itself pulls in far
  * too many native providers to mount in Jest).

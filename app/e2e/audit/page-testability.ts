@@ -31,7 +31,7 @@ process.stdout.write(
   [
     '# Native page testability inventory',
     '',
-    'Generated from the route catalog and authored screenshot scenarios. These are candidate journeys, **not native pass evidence**, gesture coverage, or proof that each route alias was exercised. Blank cells identify authoring gaps. Run manifests establish platform execution; review each changed interaction under SYSTEM.md decision 26.',
+    "Generated from the route catalog and authored screenshot scenarios. These are candidate journeys, **not native pass evidence**, gesture coverage, or proof that each route alias was exercised. Blank cells identify authoring gaps. Run manifests establish platform execution; review each changed interaction under AGENTS.md's native testability contract.",
     '',
     '| Page | Route aliases | iPhone scenarios | Android scenarios |',
     '| --- | --- | --- | --- |',

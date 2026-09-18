@@ -3,7 +3,7 @@
  * read. In-memory only: the row list is "junk to store forever" (the durable
  * aggregate lives in `mintMetadataStore`), but within a session a re-opened
  * reviews screen must paint at 0ms and revalidate behind the rows rather than
- * blank to skeletons (SYSTEM.md §7/§14).
+ * blank to skeletons (hunch rule ui/read-states).
  */
 import { createQueryCacheStore } from '@/shared/lib/cache/createQueryCacheStore';
 import type { MintReviewsResponse } from '@/shared/lib/apiClient';
