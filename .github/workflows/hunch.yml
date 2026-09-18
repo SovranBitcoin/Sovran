@@ -23,7 +23,7 @@ jobs:
             echo '::error::Add AI_GATEWAY_API_KEY in Settings > Secrets and variables > Actions.'
             exit 1
           fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
