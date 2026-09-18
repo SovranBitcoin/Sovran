@@ -269,7 +269,7 @@
     "certificateSha256": "b598befca67352eff6a0333e9a963c76db42bd3d1c64920ebd8b5b84751e59af",
     "size": 247607844
   },
-  "complete": false,
+  "complete": true,
   "zapstoreEventId": "c0b033cef9072e5a8388ac37e5a15cdd574ac2a3576246f9ad23dd40d10a352d",
   "adp": {
     "minOSVersion": "16.4",
