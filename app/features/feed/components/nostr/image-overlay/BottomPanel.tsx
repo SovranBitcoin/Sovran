@@ -20,7 +20,14 @@ import Icon from 'assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { formatRelativeUnixSeconds } from '@/shared/lib/date';
-import { formatCount, formatSats } from '../feedFormat';
+import {
+  formatCount,
+  formatSats,
+  likeActionLabel,
+  replyActionLabel,
+  repostActionLabel,
+  zapActionLabel,
+} from '../feedFormat';
 import { parseContent } from '../feedParse';
 import type { ContentSegment } from '../feedTypes';
 import type { ImageOverlayPost } from './types';
@@ -382,7 +389,7 @@ const OverlayMetricsRow = React.memo(function OverlayMetricsRow({
       <Pressable
         testID={`image-overlay-${surface}-repost-${event.id}`}
         accessibilityRole="button"
-        accessibilityLabel={`${reposted ? 'Reposted' : 'Repost'}, ${metrics.repostCount} reposts`}
+        accessibilityLabel={repostActionLabel(!!reposted, metrics.repostCount)}
         accessibilityState={{ selected: !!reposted, busy: !!repostPending }}
         onPress={handleRepostPress}
         hitSlop={METRIC_HIT_SLOP}
@@ -399,7 +406,7 @@ const OverlayMetricsRow = React.memo(function OverlayMetricsRow({
       <Pressable
         testID={`image-overlay-${surface}-like-${event.id}`}
         accessibilityRole="button"
-        accessibilityLabel={`${liked ? 'Liked' : 'Like'}, ${metrics.likeCount} likes`}
+        accessibilityLabel={likeActionLabel(!!liked, metrics.likeCount)}
         accessibilityState={{ selected: !!liked, busy: !!likePending }}
         onPress={onLikePress}
         hitSlop={METRIC_HIT_SLOP}
@@ -416,7 +423,7 @@ const OverlayMetricsRow = React.memo(function OverlayMetricsRow({
       <Pressable
         testID={`image-overlay-${surface}-zap-${event.id}`}
         accessibilityRole="button"
-        accessibilityLabel={`Zap, ${formatSats(metrics.satsZapped)} sats zapped`}
+        accessibilityLabel={zapActionLabel(metrics.satsZapped)}
         accessibilityState={{
           selected: !!zapped,
           busy: !!zapPending,
@@ -657,7 +664,7 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
           <Pressable
             testID={`image-overlay-bar-comment-${event.id}`}
             accessibilityRole="button"
-            accessibilityLabel={`${replied ? 'Replied' : 'Reply'}, ${metrics.replyCount} replies`}
+            accessibilityLabel={replyActionLabel(!!replied, metrics.replyCount)}
             onPress={handleCommentPress}
             hitSlop={METRIC_HIT_SLOP}
             style={styles.metricBtn}>
