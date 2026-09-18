@@ -52,3 +52,5 @@ press/exports/
 /press/screenshots/.staging-*/
 /press/screenshots/*.tmp
 /site/public/.website-stage-*/
+.vercel
+.env*
