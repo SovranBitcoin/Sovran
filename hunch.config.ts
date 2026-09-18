@@ -34,7 +34,13 @@ export default defineConfig({
   agentsMd: true,
   // Public repository; the Vercel Hobby plan can't enforce zero data retention.
   zeroDataRetention: false,
-  budget: { maxRulesPerHunk: 64 },
+  // Sized for a full `check --all` pass (about 2,500 chunks); the hosted App caps these lower.
+  budget: {
+    maxRulesPerHunk: 64,
+    maxHunks: 3000,
+    maxRequests: 3000,
+    timeoutSeconds: 3600,
+  },
 
   rules: {
     // Errors and uncertain outcomes
