@@ -17,6 +17,9 @@ const mockQuote = jest.fn<unknown, unknown[]>(() => ({
 let mockSupports = true;
 let mockRail = 'bolt12';
 const mockManager = {};
+jest.mock('@/features/receive/components/OnchainDepositLimitsCard', () => ({
+  OnchainDepositLimitsCard: () => null,
+}));
 jest.mock('expo-router', () => ({
   router: { push: (...args: unknown[]) => mockPush(...args) },
   Stack: { Screen: () => null },

@@ -129,7 +129,10 @@ function getOnchainConfirmationsFromQuoteLike(value: unknown): number | null {
   return getPositiveInteger(options?.confirmations);
 }
 
-function getPositiveSatAmount(entry: HistoryEntry | null | undefined): number | null {
+/** The sat amount an onchain mint quote requests (what its BIP-321 URI carries). */
+export function getOnchainMintRequestedAmount(
+  entry: HistoryEntry | null | undefined
+): number | null {
   const raw = entry as (EntryRecord & { amount?: AmountValue }) | null | undefined;
   if (!raw || (typeof raw.unit === 'string' && raw.unit !== 'sat')) {
     cashuLog.debug('onchain.mint.amount.result', {
@@ -167,7 +170,7 @@ function getOnchainMintBip321Uri(entry: HistoryEntry | null | undefined): string
   const metadata = getMetadata(entry);
   const memo = typeof metadata?.memo === 'string' ? metadata.memo : null;
   const uri = buildBip321OnchainUri(address, {
-    amountSats: getPositiveSatAmount(entry),
+    amountSats: getOnchainMintRequestedAmount(entry),
     message: memo,
   });
   cashuLog.debug('onchain.mint.bip321.build', {

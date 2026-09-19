@@ -7,6 +7,7 @@ import { getOnchainConfirmationProgress, isMintQuotePaymentObserved } from 'wall
 import type { DecoratedEntryFields } from 'wallet';
 import type { BoundAction } from 'wallet/react';
 
+import { OnchainDepositLimitsCard } from '@/features/receive/components/OnchainDepositLimitsCard';
 import { MintSelector } from '@/features/wallet';
 import {
   transactionLeadDetailItems,
@@ -26,6 +27,7 @@ import {
   buildOnchainRequiredConfirmationProgress,
   buildSatisfiedOnchainConfirmationProgress,
   getMintQuotePaymentValue,
+  getOnchainMintRequestedAmount,
   getOnchainMintAddress,
   getOnchainMintQuoteRequiredConfirmations,
 } from '@/shared/lib/cashu/onchainMint';
@@ -40,7 +42,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import type { ButtonHandlerButton } from '@/shared/ui/composed/ButtonHandler';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
-import { Card } from '@/shared/ui/composed/Card';
+import { Notice } from '@/shared/ui/composed/Notice';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 
@@ -225,6 +227,14 @@ export function OnchainReceiveScreen({
               copyTarget="address"
             />
           )}
+          {/* The deposit's own mint, not the selector's pick: the address belongs to it. */}
+          {!isPaid && (
+            <OnchainDepositLimitsCard
+              mintUrl={entry.mintUrl}
+              unit={entry.unit ?? 'sat'}
+              requestedAmount={getOnchainMintRequestedAmount(historyEntry)}
+            />
+          )}
           {isPaid && <TransactionLocationSection transactionId={entry.id} />}
         </>
       }
@@ -240,7 +250,15 @@ export function OnchainReceiveScreen({
           ) : mintInfo ? (
             <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={historyEntry} />
           ) : null}
-          {entry.metadata?.memo && <Card message={entry.metadata.memo} variant="info" />}
+          {entry.metadata?.memo && (
+            <Notice
+              status="info"
+              icon="ri:chat-quote-line"
+              title="Memo"
+              description={entry.metadata.memo}
+              className="mx-4"
+            />
+          )}
         </>
       }
       timeline={
