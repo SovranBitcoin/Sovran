@@ -24,7 +24,7 @@
  */
 
 import React, { useMemo, useRef, useEffect, useCallback, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { seedThread, type ThreadSeed } from '@/features/feed/lib/threadSeedCache';
@@ -108,6 +108,7 @@ interface UserFeedProps {
   authorPicture?: string;
   isOwnProfile?: boolean;
   ListHeaderComponent?: React.ReactElement | null;
+  onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   onVideoPostsReady?: (videoPosts: VideoPostRecord[]) => void;
 }
 
@@ -357,6 +358,7 @@ export function UserFeed({
   isOwnProfile,
   ListHeaderComponent,
   onVideoPostsReady,
+  onScroll,
 }: UserFeedProps) {
   const foreground = useThemeColor('foreground');
   const imageOverlay = useImageOverlay();
@@ -692,9 +694,11 @@ export function UserFeed({
   );
 
   const handleListScroll = useCallback(
-    (e: { nativeEvent: { contentOffset: { y: number } } }) =>
-      trackFeedScrollOffset(scrollOffsetRef, imageOverlay, e.nativeEvent.contentOffset.y),
-    [imageOverlay]
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      trackFeedScrollOffset(scrollOffsetRef, imageOverlay, e.nativeEvent.contentOffset.y);
+      onScroll?.(e);
+    },
+    [imageOverlay, onScroll]
   );
 
   const feedHeader = (

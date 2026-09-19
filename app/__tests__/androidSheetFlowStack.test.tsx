@@ -43,8 +43,8 @@ jest.mock('@/shared/ui/composed/ScreenHeaderAction', () => ({
   ScreenHeaderAction: () => null,
 }));
 
-jest.mock('@/shared/ui/composed/AndroidHeaderScrim', () => ({
-  AndroidHeaderScrim: () => null,
+jest.mock('@/shared/ui/composed/HeaderGradient', () => ({
+  HeaderGradient: () => null,
 }));
 
 jest.mock('@/navigation/headerItems', () => ({

@@ -298,6 +298,7 @@ export function MintListScreen({
     <Screen
       name="MintListScreen"
       headerGradient
+      headerAppearance="gradient-tabs"
       stickyContent={currencyTabs}
       stickyContentHeight={CURRENCY_TABS_HEIGHT}
       scroll="custom"

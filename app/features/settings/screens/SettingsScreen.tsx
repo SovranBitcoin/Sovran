@@ -1,6 +1,7 @@
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import React, { useRef, useCallback } from 'react';
 import { avatarStateFor } from '@/shared/lib/imageLoadState';
-import { ScrollView, Alert } from 'react-native';
+import { Alert } from 'react-native';
 import { openExternalUrl } from '@/shared/lib/url';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -251,8 +252,8 @@ export const SettingsScreen = () => {
   };
 
   return (
-    <ScreenWrapper name="SettingsScreen" scroll="custom" safeArea>
-      <ScrollView
+    <ScreenWrapper name="SettingsScreen" scroll="custom" safeArea="scroll">
+      <ScreenScrollView
         className="px-4"
         onContentSizeChange={
           VISUAL_LOGGING_ENABLED
@@ -510,7 +511,7 @@ export const SettingsScreen = () => {
             </VStack>
           </Pressable>
         </LayoutShiftProbe>
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenWrapper>
   );
 };

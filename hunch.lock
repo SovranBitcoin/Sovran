@@ -480,7 +480,7 @@
       "origin": "./docs/review/contributor-conventions.md",
       "path": "docs/review/contributor-conventions.md",
       "scope": "",
-      "hash": "fac81607856c1f4f6ee2b64e436b1400d87b31c75593a6c3b80b5a56c65ef584",
+      "hash": "aaeeb242b0aa750d2a6e96be600247a2b6fef1de1c29210bc88170cb499b253e",
       "rules": [
         {
           "id": "doc/docs/review/contributor-conventions/preserve-structured-errors",
@@ -1169,6 +1169,30 @@
             "app/app/\\(prompt-flow\\)/**"
           ],
           "message": "A security or backup prompt's primary action never dismisses it, blocking CTAs have no dismissal or back escape, and revealing the recovery phrase never marks the backup verified."
+        },
+        {
+          "id": "doc/docs/review/contributor-conventions/screen-local-header-morph",
+          "section": "ui/headers",
+          "message": "A screen-local header morph may bypass the shared identity handoff.",
+          "instructions": "Does `hunk` implement a screen-local animation that morphs page identity into the navigation header?",
+          "criteria": {
+            "true": "Screen code defines its own animated interpolation or transition for collapsing page identity into navigation.",
+            "false": "The screen delegates identity handoff to useIdentityHeader; the animation is unrelated to header identity morphing. The shared header implementation itself is allowed."
+          },
+          "appliesTo": [
+            "app/features/**/*.tsx"
+          ]
+        },
+        {
+          "id": "doc/docs/review/contributor-conventions/navigation-title-multi-row-controls",
+          "section": "ui/headers",
+          "message": "Multi-row controls may interfere with the navigation title layout.",
+          "instructions": "Does `hunk` place multi-row controls in a navigation title?",
+          "criteria": {
+            "true": "A navigation title or headerTitle renders stacked rows of controls, such as a selector above a tab bar.",
+            "false": "The title contains ordinary title content; persistent section tabs use measured stickyContent outside the navigation title."
+          },
+          "appliesTo": []
         }
       ],
       "notChecked": [
@@ -1267,6 +1291,14 @@
         {
           "section": "wallet/fresh-flow",
           "reason": "Universal reset coverage across every flow entry requires cross-file tracing; the rule checks explicit reuse of prior context."
+        },
+        {
+          "section": "ui/headers",
+          "reason": "The linked header-contract.md was not supplied. Global Screen gradient chrome, shared useIdentityHeader integration and measured stickyContent cannot be verified from arbitrary isolated chunks without surrounding composition."
+        },
+        {
+          "section": "ui/headers",
+          "reason": "Preserving header actions, scroll clearance and identity continuity on both iOS and Android requires layout and runtime evidence beyond a single chunk."
         }
       ]
     }

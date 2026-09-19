@@ -1,6 +1,7 @@
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { describeError } from '@/shared/lib/errors';
 import React, { useState, useEffect } from 'react';
-import { ScrollView } from 'react-native';
+
 import { Text } from '@/shared/ui/primitives/Text';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { clearGlassHeaderLeftItems } from '@/navigation/headerItems';
@@ -1099,8 +1100,8 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   };
 
   return (
-    <ScreenWrapper name="SettingsRecoveryScreen" scroll="custom" safeArea>
-      <ScrollView
+    <ScreenWrapper name="SettingsRecoveryScreen" scroll="custom" safeArea="scroll">
+      <ScreenScrollView
         className="flex-1"
         contentContainerClassName="grow"
         // Scrolling stays enabled throughout. Locking it during a run was
@@ -1116,7 +1117,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           phase === 'complete') &&
           renderActiveOrCompleteState()}
         {phase === 'error' && renderErrorState()}
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenWrapper>
   );
 };

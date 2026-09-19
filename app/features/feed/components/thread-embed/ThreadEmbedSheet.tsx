@@ -11,12 +11,9 @@
  *   collapse) or when the sheet is already partway collapsed (drag to re-expand);
  *   otherwise it yields and the list scrolls normally.
  *
- * The sheet rests with its top just below the navigation header (the provider's
- * `expandedOffset`) — just above the first pfp/name — not at the screen top, and
- * is laid out down to the screen bottom so the reply bar isn't clipped. The
- * grabber is hidden until an embed is active. When no embed is active the pan is
- * disabled and the sheet rests at `translateY: 0`, so the thread behaves as
- * before (just shifted to start below the header instead of padding the list).
+ * The viewport fills the screen behind navigation; the list owns its initial
+ * header clearance. The reply bar remains pinned to the sheet's bottom.
+ * The grabber and pan are enabled only while an embed is active.
  *
  * The action bar is a layout-pinned sibling (in `ThreadView`) with its own pan,
  * so dragging it moves the sheet without a counter-transform breaking its
@@ -61,7 +58,6 @@ export function ThreadEmbedSheet({
 
   const snapMiddle = embed?.snapMiddle ?? 0;
   const snapInline = embed?.snapInline ?? 0;
-  const expandedOffset = embed?.expandedOffset ?? 0;
   const sheetTranslateY = embed?.sheetTranslateY;
   const scrollY = embed?.scrollY;
   const collapseProgress = embed?.collapseProgress;
@@ -114,8 +110,7 @@ export function ThreadEmbedSheet({
 
   return (
     <GestureDetector gesture={panGesture}>
-      <Animated.View
-        style={[styles.sheet, { top: expandedOffset, backgroundColor: surface }, sheetStyle]}>
+      <Animated.View style={[styles.sheet, { backgroundColor: surface }, sheetStyle]}>
         {embedActive ? (
           <Animated.View
             entering={FadeIn.duration(duration.standard)}
@@ -135,6 +130,7 @@ export function ThreadEmbedSheet({
 const styles = StyleSheet.create({
   sheet: {
     position: 'absolute',
+    top: 0,
     left: 0,
     right: 0,
     bottom: 0,

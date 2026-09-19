@@ -1,7 +1,8 @@
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 /* eslint-disable no-restricted-syntax -- [DEBUG-inv] tile colors are fixed
  * screenshot targets for the pixel-count loop; they must NOT follow the theme. */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { StyleSheet, useWindowDimensions } from 'react-native';
 
 import { Button, Card } from 'heroui-native';
 
@@ -104,8 +105,8 @@ export function SettingsDesignSystemFadeStressScreen() {
   const tileSize = (screenWidth - GRID_PADDING * 2 - GRID_GAP * (COLUMNS - 1)) / COLUMNS;
 
   return (
-    <ScreenWrapper name="SettingsDesignSystemFadeStressScreen" scroll="custom" safeArea>
-      <ScrollView contentContainerStyle={styles.scroll}>
+    <ScreenWrapper name="SettingsDesignSystemFadeStressScreen" scroll="custom" safeArea="scroll">
+      <ScreenScrollView contentContainerStyle={styles.scroll}>
         <VStack gap={12}>
           <Card variant="secondary" style={styles.statsCard}>
             <HStack justify="space-between" align="center">
@@ -151,7 +152,7 @@ export function SettingsDesignSystemFadeStressScreen() {
             </Section>
           ))}
         </VStack>
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenWrapper>
   );
 }

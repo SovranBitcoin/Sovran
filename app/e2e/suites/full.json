@@ -159,6 +159,7 @@
     {"id":"marketing.screenshots.mints","file":"scenarios/marketing-screenshots-mints.json","order":10002,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"marketing.screenshots.media","file":"scenarios/marketing-screenshots-media.json","order":10003,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"settings.edit.profile","file":"scenarios/settings-edit-profile.json","order":595,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
-    {"id":"settings.media.server","file":"scenarios/settings-media-server.json","order":2010,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"}
+    {"id":"settings.media.server","file":"scenarios/settings-media-server.json","order":2010,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"settings.headers","file":"scenarios/settings-headers.json","order":10013,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"}
   ]
 }

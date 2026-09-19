@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "id": "settings.headers",
+  "name": "Shared headers and pinned tabs",
+  "description": "Scroll each header style and return to the gallery. Presentation only.",
+  "details": "Gradient and identity navigation headers, expanded and collapsed states, and pinned receive rail tabs.",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"ACCOUNT"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"ACCOUNT"},"timeoutMs":30000},
+    {"action":"screenshot","name":"settings"},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"settings-version-row"},"attempts":6,"settleMs":1200},
+    {"action":"waitFor","selector":{"id":"settings-version-row"},"timeoutMs":15000},
+    {"action":"screenshot","name":"settings"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-version-row"}},{"tap":{"id":"settings-version-row"}},{"tap":{"id":"settings-version-row"}}],"until":{"id":"e2e-toast-dev-mode"},"attempts":2,"settleMs":1500},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"settings-design-system-row"},"attempts":6,"settleMs":1200},
+    {"action":"waitFor","selector":{"id":"settings-design-system-row"},"timeoutMs":20000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-design-system-row"}}],"until":{"id":"design-system-family-timeline"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"settings-design-system"},
+    {"action":"tap","selector":{"id":"design-system-family-headers"}},
+    {"action":"waitFor","selector":{"id":"header-example-gradient"}},
+    {"action":"screenshot","name":"settings-design-system-headers"},
+    {"action":"tap","selector":{"label":"Identity"}},
+    {"action":"waitFor","selector":{"id":"identity-header-expanded"}},
+    {"action":"screenshot","name":"settings-design-system-headers"},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"id":"identity-header-collapsed"}},
+    {"action":"screenshot","name":"settings-design-system-headers"},
+    {"action":"swipe","dir":"down"},
+    {"action":"waitFor","selector":{"id":"identity-header-expanded"}},
+    {"action":"tap","selector":{"label":"Sticky tabs"}},
+    {"action":"waitFor","selector":{"id":"header-example-sticky-tabs"}},
+    {"action":"swipe","dir":"up"},
+    {"action":"tap","selector":{"label":"Lightning"}},
+    {"action":"screenshot","name":"settings-design-system-headers"},
+    {"action":"tap","selector":{"label":"Tab fade"}},
+    {"action":"waitFor","selector":{"id":"header-example-tab-fade"}},
+    {"action":"tap","selector":{"id":"mint-currency-tab-USD"}},
+    {"action":"swipe","dir":"up"},
+    {"action":"screenshot","name":"settings-design-system-headers"},
+    {"action":"tap","selector":{"id":"flow-header-back"}},
+    {"action":"waitFor","selector":{"id":"design-system-family-headers"}},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

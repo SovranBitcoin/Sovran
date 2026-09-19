@@ -1,5 +1,6 @@
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { useCallback } from 'react';
-import { ScrollView } from 'react-native';
+
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
@@ -26,8 +27,8 @@ export function DeleteScreen() {
   }, []);
 
   return (
-    <ScreenWrapper name="DeleteScreen" scroll="custom" safeArea>
-      <ScrollView className="flex-1" contentContainerClassName="grow">
+    <ScreenWrapper name="DeleteScreen" scroll="custom" safeArea="scroll">
+      <ScreenScrollView className="flex-1" contentContainerClassName="grow">
         <VStack gap={24} className="flex-1 px-6 pt-12">
           <VStack gap={24} className="flex-1 items-center justify-center">
             <View
@@ -104,7 +105,7 @@ export function DeleteScreen() {
             </Button>
           </VStack>
         </VStack>
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenWrapper>
   );
 }

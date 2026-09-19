@@ -24,15 +24,8 @@ import { useScreenBottomPadding } from '@/shared/hooks/useScreenInsets';
 import { useLocalSearchParams } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
-import Animated, {
-  Extrapolation,
-  interpolate,
-  useAnimatedScrollHandler,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-  type SharedValue,
-} from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
+import { useIdentityHeader } from '@/shared/ui/composed/IdentityHeader';
 
 import Icon from 'assets/icons';
 import { safeHostname } from '@/features/nostrSigner/lib/boundedDisplay';
@@ -84,26 +77,8 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 
 const IDENTITY_AVATAR_SIZE = 64;
 
-// ── Scroll-linked header handoff ────────────────────────────────
-// One FLIP POINT, not overlapping scroll bands: crossing it retargets a
-// single timed progress value (content fades fully out over the first half,
-// the header twin fades in over the second half — never both visible, and
-// parking the scroll anywhere settles on exactly one). withTiming retargets
-// from the current value on interruption, so spamming across the threshold
-// just reverses mid-fade; the two thresholds add hysteresis so resting right
-// on the boundary can't jitter.
-// The content avatar sits at y 16 (pt-4) with height 64, so its bottom slides
-// under the header bar at offset 80 — flip just before that, when the picture
-// is almost gone, and flip back once most of it has re-emerged.
-const FLIP_SHOW_HEADER_Y = 76; // scrolling down past this → header identity
-const FLIP_SHOW_CONTENT_Y = 56; // scrolling back above this → content identity
-const FLIP_FADE_MS = 200;
-const CONTENT_FADE_PHASE = [0, 0.5];
-const HEADER_FADE_PHASE = [0.5, 1];
 const SCROLL_H_PADDING = { paddingHorizontal: 16 } as const;
 const CONTENT_IDENTITY_STYLE = { alignItems: 'center' } as const;
-const HEADER_IDENTITY_ROW_STYLE = { flexDirection: 'row', alignItems: 'center', gap: 8 } as const;
-const HEADER_NAME_STYLE = { maxWidth: 190 } as const;
 
 const CENTER_ROW_STYLE = { alignItems: 'center' } as const;
 const FLEX_ONE_STYLE = { flex: 1 } as const;
@@ -251,47 +226,6 @@ function PeerAccessIdentity({ pubkey, sublabel }: { pubkey: string; sublabel: st
   );
 }
 
-/**
- * Header twin of the content identity — fades/rises in as the content
- * version scrolls under the transparent header, then stays for the rest of
- * the scroll. Lives in the navigation header's React tree, but reanimated
- * drives the style from the screen's scroll position on the UI thread.
- */
-function AppHeaderIdentity({
-  progress,
-  name,
-  image,
-  seed,
-}: {
-  /** Flip progress 0→1 (content shown → header shown). */
-  progress: SharedValue<number>;
-  name: string;
-  image?: string;
-  seed: string;
-}) {
-  const [foreground] = useThemeColor(['foreground'] as const);
-  const fadeStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, HEADER_FADE_PHASE, [0, 1], Extrapolation.CLAMP),
-    transform: [
-      { translateY: interpolate(progress.value, HEADER_FADE_PHASE, [6, 0], Extrapolation.CLAMP) },
-    ],
-  }));
-  return (
-    <Animated.View style={[HEADER_IDENTITY_ROW_STYLE, fadeStyle]}>
-      <Avatar
-        state={image ? 'image' : 'fallback'}
-        picture={image}
-        seed={seed}
-        size={28}
-        alt={name}
-      />
-      <Text size={16} bold color={foreground} numberOfLines={1} style={HEADER_NAME_STYLE}>
-        {name}
-      </Text>
-    </Animated.View>
-  );
-}
-
 function statsLine(app: Nip46Connection): string {
   const requests = app.requestCount === 1 ? '1 request' : `${app.requestCount} requests`;
   if (app.lastUsedAt === undefined) return requests;
@@ -357,42 +291,14 @@ export function SignerAppDetailScreen(): React.ReactElement {
   const scrollContentStyle = { paddingTop: headerHeight, paddingBottom: bottomPadding };
   const indicatorInsets = { top: headerHeight };
 
-  // ── Scroll-linked identity handoff (content ↔ header) ────────
-  const flipProgress = useSharedValue(0);
-  const flipped = useSharedValue(0);
-  const onScroll = useAnimatedScrollHandler((event) => {
-    const y = event.contentOffset.y;
-    // One retarget per crossing (not per frame); hysteresis between the two
-    // thresholds keeps boundary noise from re-triggering.
-    if (flipped.value === 0 && y > FLIP_SHOW_HEADER_Y) {
-      flipped.value = 1;
-      flipProgress.value = withTiming(1, { duration: FLIP_FADE_MS });
-    } else if (flipped.value === 1 && y < FLIP_SHOW_CONTENT_Y) {
-      flipped.value = 0;
-      flipProgress.value = withTiming(0, { duration: FLIP_FADE_MS });
-    }
+  const morph = useIdentityHeader({
+    identity:
+      app && clientPubkey ? { name: appName, picture: app.image, seed: clientPubkey } : undefined,
   });
-  const contentIdentityFade = useAnimatedStyle(() => ({
-    opacity: interpolate(flipProgress.value, CONTENT_FADE_PHASE, [1, 0], Extrapolation.CLAMP),
-  }));
-  const contentIdentityComposed = [CONTENT_IDENTITY_STYLE, contentIdentityFade];
-  const appImage = app?.image;
+  const contentIdentityComposed = [CONTENT_IDENTITY_STYLE, morph.contentStyle];
   useScreenOptions(
-    () =>
-      clientPubkey === undefined || app === undefined
-        ? { headerTitle: undefined, title: '' }
-        : {
-            headerTitle: () => (
-              <AppHeaderIdentity
-                progress={flipProgress}
-                name={appName}
-                {...(appImage !== undefined && { image: appImage })}
-                seed={clientPubkey}
-              />
-            ),
-          },
-    // flipProgress is a stable shared-value ref; app presence tracked via appImage/appName.
-    [appName, appImage, clientPubkey, app === undefined]
+    () => ({ headerTitle: morph.headerTitle }),
+    [appName, app?.image, clientPubkey, app === undefined]
   );
   const dangerTextStyle = { color: danger };
 
@@ -711,13 +617,14 @@ export function SignerAppDetailScreen(): React.ReactElement {
 
   return (
     <Screen name="SignerAppDetailScreen" scroll="custom">
+      {morph.probe}
       <Animated.ScrollView
         contentInsetAdjustmentBehavior="never"
         nestedScrollEnabled
         style={SCROLL_H_PADDING}
         contentContainerStyle={scrollContentStyle}
         scrollIndicatorInsets={indicatorInsets}
-        onScroll={onScroll}
+        onScroll={morph.animatedOnScroll}
         scrollEventThrottle={16}>
         {/* Identity card — logo + name fade out as their header twins fade in */}
         <VStack align="center" gap={4} className="pb-2 pt-4">

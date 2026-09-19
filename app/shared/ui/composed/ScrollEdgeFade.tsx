@@ -47,6 +47,8 @@ interface ScrollEdgeFadeProps {
    * to the edge. Defaults to `height / 2`.
    */
   fadeSize?: number;
+  /** Top color ramp endpoint as a fraction of height; 1 spans navigation and tabs. */
+  colorFadeEnd?: number;
   /**
    * Target color for the opaque end of the gradient. Defaults to the
    * theme's `background` token so content fades into the screen color.
@@ -98,6 +100,7 @@ export function ScrollEdgeFade({
   edge,
   height,
   fadeSize,
+  colorFadeEnd,
   color,
   blur = true,
   blurIntensity = 10,
@@ -114,7 +117,10 @@ export function ScrollEdgeFade({
   const resolvedFade = Math.max(0, Math.min(fadeSize ?? height / 2, height));
   // Location where the opaque band starts, expressed as a 0-1 fraction
   // measured from the top of the region regardless of edge.
-  const boundaryFromTop = edge === 'top' ? 1 - resolvedFade / height : resolvedFade / height;
+  const boundaryFromTop =
+    edge === 'top'
+      ? Math.max(0, Math.min(colorFadeEnd ?? 1 - resolvedFade / height, 1))
+      : resolvedFade / height;
 
   const isTop = edge === 'top';
   const maskColors = isTop ? TOP_MASK_COLORS : BOTTOM_MASK_COLORS;

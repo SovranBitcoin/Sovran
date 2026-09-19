@@ -3,7 +3,15 @@
  * Handles safe areas, scroll behavior, header gradient, sticky content.
  */
 
-import { type Ref, type RefObject, ReactNode, useContext, useEffect, useState } from 'react';
+import {
+  type ComponentProps,
+  type Ref,
+  type RefObject,
+  ReactNode,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
 import {
   Platform,
   ScrollView,
@@ -26,15 +34,6 @@ import { Log, log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { zIndex } from '@/shared/styles/tokens';
 import { useScreenInsets } from '@/shared/hooks/useScreenInsets';
-
-/** Measured iOS flow-modal (pageSheet) header height — a STABLE, frame-0 value
- *  used instead of the navigator header height, which react-native-screens seeds
- *  with a default (`insets.top + 44`) and corrects ~700ms after the present, so
- *  reserving JS layout from it reflows content. These modals are pageSheets, so
- *  the header does NOT include the full notch inset (the navigator default of
- *  `insets.top + 44 = 83` overshot the real measured 70) — it's ~constant across
- *  devices. Confirm via the `modal.header.tune` log if a device looks off. */
-const IOS_MODAL_HEADER_HEIGHT = 70;
 
 /**
  * Owns the Reanimated shared value + scroll handler for the animated-scroll
@@ -101,8 +100,10 @@ interface ModalLayoutWrapperProps {
   contentPadding?: number;
   /** Enable blur/gradient effect below the native header */
   headerGradient?: boolean;
+  headerAppearance?: 'gradient' | 'opaque' | 'gradient-tabs';
   /** Custom height for the header gradient area (default: uses headerHeight) */
   headerGradientHeight?: number;
+  headerGradientStyle?: ComponentProps<typeof Animated.View>['style'];
   /** Sticky content to render below the header (and gradient if enabled) */
   stickyContent?: ReactNode;
   /** Height of the sticky content for scroll padding calculation */
@@ -145,7 +146,9 @@ export function ModalLayoutWrapper({
   children,
   contentPadding = 16,
   headerGradient = false,
+  headerAppearance = 'gradient',
   headerGradientHeight,
+  headerGradientStyle,
   stickyContent,
   stickyContentHeight = 0,
   useAnimatedScroll = false,
@@ -176,18 +179,14 @@ export function ModalLayoutWrapper({
   // that absolute scrim doesn't feed HeaderHeightContext, so the reserved inset
   // would otherwise be the bar only. Add the overhang back so the first row /
   // sticky chrome clears the fade AT REST instead of sitting under it (the
-  // "looks like you need to scroll up" bug). iOS (blur + native content inset)
-  // and native-header card stacks (clipped scrim) don't overhang.
+  // "looks like you need to scroll up" bug). Screen gradients in native-header
+  // stacks do not extend past the measured header height.
   const androidSheetScrimOverhang =
-    Platform.OS === 'android' && sheetHeaderHeight != null ? FLOW_SHEET_SCRIM_OVERHANG : 0;
-  // Stable header bottom for app-owned chrome (sticky overlay, top gradient). On
-  // iOS the native automatic content inset owns the scroll content's nav-header
-  // spacing, so we only need a frame-0-stable reference for the overlay; the
-  // safe-area inset + standard nav-bar height is that, and matches the settled
-  // navigator value without the present-time settle. Android keeps the
-  // deterministic SheetHeaderHeightContext value (already shift-free).
-  const stableHeaderBottom =
-    (Platform.OS === 'ios' ? IOS_MODAL_HEADER_HEIGHT : headerHeight) + androidSheetScrimOverhang;
+    Platform.OS === 'android' && sheetHeaderHeight != null && headerAppearance === 'gradient'
+      ? FLOW_SHEET_SCRIM_OVERHANG
+      : 0;
+  // Navigator geometry owns both card and sheet clearance on every platform.
+  const stableHeaderBottom = headerHeight + androidSheetScrimOverhang;
   const themeBackground = useThemeColor('surface');
   const background = bgColor ?? themeBackground;
 
@@ -195,15 +194,24 @@ export function ModalLayoutWrapper({
   // below, so every non-animated modal (the common case) doesn't pay the
   // per-mount Reanimated worklet/shared-value registration.
 
-  const gradientHeight = headerGradientHeight ?? stableHeaderBottom;
   // The declared stickyContentHeight prop is only a first-frame estimate —
   // prefer the measured height so a wrong declaration (or wrapping content)
   // can't permanently misplace the spacer/list padding.
   const [measuredStickyHeight, setMeasuredStickyHeight] = useState<number | null>(null);
-  // iOS: reserve from the frame-0-stable header bottom, not the navigator height
-  // that settles ~700ms after present (which reflowed the list). Android keeps
-  // its deterministic value. This is the single source the spacer/overlay use.
   const totalHeaderHeight = stableHeaderBottom + (measuredStickyHeight ?? stickyContentHeight);
+  // Horizontal tab strips share the complete ramp. Other gradients end at the
+  // native header, never over resting content.
+  const fadeBoundary =
+    headerAppearance === 'gradient-tabs' ? totalHeaderHeight : stableHeaderBottom;
+  const gradientHeight = Math.min(headerGradientHeight ?? fadeBoundary, fadeBoundary);
+  const fade = (
+    <ScrollEdgeFade
+      edge="top"
+      height={gradientHeight}
+      color={background}
+      colorFadeEnd={headerAppearance === 'gradient-tabs' ? 1 : undefined}
+    />
+  );
 
   useEffect(() => {
     onHeaderHeightChange?.(totalHeaderHeight);
@@ -227,46 +235,20 @@ export function ModalLayoutWrapper({
     sheetHeaderHeight,
   ]);
 
-  const shouldRenderAndroidHeaderSpacer =
-    Platform.OS === 'android' && !disableHeaderSpacer && totalHeaderHeight > 0;
+  const shouldRenderHeaderSpacer = !disableHeaderSpacer && totalHeaderHeight > 0;
 
   const scrollContentStyle = {
     paddingHorizontal: contentPadding,
-    paddingBottom: bottomPaddingIncludesInset
-      ? Math.max(0, bottomPadding - (!useAnimatedScroll && Platform.OS === 'ios' ? bottomInset : 0))
-      : bottomPadding + (useAnimatedScroll || Platform.OS !== 'ios' ? bottomInset : 0),
+    paddingBottom: bottomPaddingIncludesInset ? bottomPadding : bottomPadding + bottomInset,
   };
 
   return (
     <Log name="ModalLayoutWrapper">
       <View className="flex-1" style={{ backgroundColor: background }}>
-        {/* Nothing may be added as the first child here: `react-native-screens`'
-            `findScrollViewInFirstDescendant` chain finder walks `subviews[0]` to
-            reach the scroll view, and iOS 26's `scrollEdgeEffects` screen option
-            only applies if it gets there. A leaf View at index 0 breaks it. */}
-        {/* Skip inside Android formSheets: FlowSheetHeader already paints the
-            header scrim there, and this fade's entire ramp lands inside the
-            header band (its lower half paints nothing) — it only doubled the
-            gradient, in the wrong color on bgColor-overriding screens. */}
-        {headerGradient && sheetHeaderHeight == null && (
-          <ScrollEdgeFade edge="top" height={gradientHeight * 2} color={background} />
-        )}
-
-        {stickyContent && (
-          <View
-            style={[styles.stickyContainer, { top: stableHeaderBottom }]}
-            onLayout={(e) => {
-              const measured = Math.round(e.nativeEvent.layout.height);
-              setMeasuredStickyHeight((prev) =>
-                prev !== null && Math.abs(prev - measured) < 2 ? prev : measured
-              );
-            }}>
-            {stickyContent}
-          </View>
-        )}
-
+        {/* Keep the page scroller first in the native view hierarchy. Header
+            overlays are siblings after it and never intercept its touches. */}
         {useCustomScrollView ? (
-          <View style={{ flex: 1 }}>{children}</View>
+          <View className="flex-1">{children}</View>
         ) : useAnimatedScroll ? (
           <AnimatedScrollContainer
             scrollViewRef={scrollViewRef}
@@ -283,16 +265,64 @@ export function ModalLayoutWrapper({
             ref={scrollViewRef}
             innerViewRef={scrollContentRef as RefObject<View> | undefined}
             className="flex-1"
-            contentInsetAdjustmentBehavior="automatic"
+            contentInsetAdjustmentBehavior="never"
             // Android: see the nested-scroll note on AnimatedScrollContainer
             // above — required so the native form-sheet scrolls the content
             // instead of dismissing when the user drags back toward the top.
             nestedScrollEnabled
             contentContainerStyle={scrollContentStyle}
             scrollIndicatorInsets={scrollIndicatorInsets}>
-            {shouldRenderAndroidHeaderSpacer && <View style={{ height: totalHeaderHeight }} />}
+            {shouldRenderHeaderSpacer && <View style={{ height: totalHeaderHeight }} />}
             {children}
           </ScrollView>
+        )}
+
+        {/* Skip inside Android formSheets: FlowSheetHeader already paints the
+            header scrim there, and this fade's entire ramp lands inside the
+            header band (its lower half paints nothing) — it only doubled the
+            gradient, in the wrong color on bgColor-overriding screens. */}
+        {headerGradient &&
+          headerHeight > 0 &&
+          (sheetHeaderHeight == null || headerAppearance === 'gradient-tabs') &&
+          (headerAppearance === 'opaque' ? (
+            <View
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: stableHeaderBottom,
+                backgroundColor: background,
+              }}
+            />
+          ) : headerGradientStyle ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.headerFadeOverlay, headerGradientStyle]}>
+              {fade}
+            </Animated.View>
+          ) : (
+            fade
+          ))}
+
+        {stickyContent && (
+          <View
+            style={[
+              styles.stickyContainer,
+              {
+                top: stableHeaderBottom,
+                backgroundColor: headerAppearance === 'gradient-tabs' ? 'transparent' : background,
+              },
+            ]}
+            onLayout={(e) => {
+              const measured = Math.round(e.nativeEvent.layout.height);
+              setMeasuredStickyHeight((prev) =>
+                prev !== null && Math.abs(prev - measured) < 2 ? prev : measured
+              );
+            }}>
+            {stickyContent}
+          </View>
         )}
 
         {bottomContent}
@@ -302,6 +332,7 @@ export function ModalLayoutWrapper({
 }
 
 const styles = StyleSheet.create({
+  headerFadeOverlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, zIndex: 50 },
   stickyContainer: {
     position: 'absolute',
     left: 0,

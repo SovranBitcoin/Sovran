@@ -299,6 +299,7 @@ export function TransactionsScreen({
     <Screen
       name="TransactionsScreen"
       headerGradient
+      headerAppearance="gradient-tabs"
       stickyContent={monthSelectorContent}
       stickyContentHeight={MONTH_SELECTOR_HEIGHT}
       scroll="custom"

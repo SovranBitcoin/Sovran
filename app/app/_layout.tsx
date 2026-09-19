@@ -30,7 +30,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { MODAL_SCREENS, ModalConfig } from '../config/modalScreens';
-import { androidHeaderScrimOptions, getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
+import { getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { CocoProvider } from '@/shared/providers/CocoProvider';
@@ -231,15 +231,13 @@ function RootLayoutContent() {
     if (Platform.OS !== 'android') return;
     void setBackgroundColorAsync(background);
   }, [background]);
-  const { keys: nostrKeys } = useNostrKeysContext();
 
   // Screen options builder. Memoized so unrelated root re-renders don't rebuild
   // every modal screen's options object on each render.
   const getScreenOptions = useCallback(
     (screen: ModalConfig) => {
       // Base header styling options from shared config
-      const backgroundColor = nostrKeys?.pubkey ? background : 'transparent';
-      const baseHeaderOptions = getBaseModalHeaderOptions(foreground, backgroundColor);
+      const baseHeaderOptions = getBaseModalHeaderOptions(foreground);
 
       // Check if this is a modal/formSheet presentation
       const isModalPresentation =
@@ -276,20 +274,16 @@ function RootLayoutContent() {
         });
       }
 
-      // Default options for screens with titles (non-modal screens).
-      // iOS gets a blurred transparent header; Android (where
-      // headerBlurEffect is a no-op) paints a near-opaque scrim instead so
-      // the title never floats unreadably over scrolling content.
+      // Page-owned gradients sit behind the native title and actions.
       if (screen.title !== undefined) {
         return {
           ...baseHeaderOptions,
           headerShown: true,
           headerTitle: screen.title,
-          ...(Platform.OS === 'ios' ? { headerBlurEffect: 'regular' as const } : {}),
+          headerBlurEffect: 'none' as const,
           headerTransparent: true,
           headerStyle: { backgroundColor: 'transparent' },
           headerLargeStyle: { backgroundColor: 'transparent' },
-          ...androidHeaderScrimOptions(background),
           headerBackTitle: 'Back',
         };
       }
@@ -297,7 +291,7 @@ function RootLayoutContent() {
       // Default: no special options
       return {};
     },
-    [foreground, background, nostrKeys?.pubkey]
+    [foreground]
   );
 
   // For iOS 26+ with Liquid Glass, use transparent background to enable glass effects

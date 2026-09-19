@@ -1,5 +1,6 @@
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, Share } from 'react-native';
+import { Alert, RefreshControl, Share } from 'react-native';
 
 import { Button, Card, Switch as HeroSwitch } from 'heroui-native';
 import * as Clipboard from 'expo-clipboard';
@@ -385,14 +386,14 @@ export const SettingsStorageScreen = () => {
   };
 
   return (
-    <ScreenWrapper name="SettingsStorageScreen" scroll="custom" safeArea>
+    <ScreenWrapper name="SettingsStorageScreen" scroll="custom" safeArea="scroll">
       {__DEV__ && !isLoading && !isRefreshing && !error && (
         <E2EAccessibilityProbe
           testID="settings-storage-ready"
           accessibilityLabel="Storage key and file inventory loaded"
         />
       )}
-      <ScrollView
+      <ScreenScrollView
         className="px-4"
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={() => loadSnapshot(true)} />
@@ -545,7 +546,7 @@ export const SettingsStorageScreen = () => {
           ]}
           emptyLabel="No coco database files currently exist."
         />
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenWrapper>
   );
 };

@@ -1,5 +1,6 @@
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import { Button, Card } from 'heroui-native';
 
@@ -114,7 +115,7 @@ export function SettingsDesignSystemTimelineScreen() {
   };
 
   return (
-    <ScreenWrapper name="SettingsDesignSystemTimelineScreen" scroll="custom" safeArea>
+    <ScreenWrapper name="SettingsDesignSystemTimelineScreen" scroll="custom" safeArea="scroll">
       {/* Receive-hub-style header: full-bleed top-level method tabs, then the
           scenario pill row — hairline separators on each band. */}
       <View style={[styles.tabBand, { borderBottomColor: separator }]}>
@@ -132,7 +133,7 @@ export function SettingsDesignSystemTimelineScreen() {
         />
       </View>
 
-      <ScrollView className="px-4">
+      <ScreenScrollView className="px-4">
         <Text size={12} className="text-foreground/60 mb-4 mt-2">
           The payment{' '}
           <Text size={12} bold className="text-foreground">
@@ -244,7 +245,7 @@ export function SettingsDesignSystemTimelineScreen() {
             </View>
           </Section>
         ))}
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenWrapper>
   );
 }

@@ -1,7 +1,7 @@
 import { choice, defineConfig } from "@kelbie/hunch";
 
 // Semantic candidates for recurring PR review; validate each flag in source.
-// Every in-scope window receives the twelve explicit concerns below.
+// Every in-scope window receives the explicit concerns below.
 // Selected skills and contributor conventions also compile into hunch.lock.
 const outcomes = {
   "preserved": "The relevant behavior visibly preserves the contract, including an explicitly allowed fallback or exception.",
@@ -25,6 +25,24 @@ export default defineConfig({
   // Whole-repository dry run: 4,460 chunks; explicit and compiled rules use separate requests.
   budget: { maxHunks: 5000, maxRulesPerHunk: 128, maxRequests: 10000, concurrency: 4, timeoutSeconds: 3600 },
   rules: {
+    "ui/header-continuity": ["warn", choice({
+      instructions: "Does this change visibly break the shared header contract: a page identity is duplicated or lost during its scroll handoff, header actions or content are obscured by incorrect inset ownership, a section selector becomes unreachable while scrolling its content, a fixed inset around a scrolling viewport prevents content from ever entering its gradient header, an opaque strip defeats the combined header/tab gradient, or identity handoff activates before the measured identity section clears navigation? Judge the visible layout and scroll ownership together, on iOS and Android; an isolated use of a header API without evidence of a broken behavior is unrelated.",
+      criteria: { concern: "The changed layout or scroll wiring visibly causes one of these continuity or reachability failures.", ...outcomes },
+      files: ["app/**/*.tsx"],
+      report: ["concern"],
+      abstain: ["insufficient-context"],
+      reference: "docs/review/header-contract.md",
+      message: "Header identity, content clearance, or pinned section navigation may lose continuity.",
+    })],
+    "ui/header-scroll-work": ["warn", choice({
+      instructions: "Does header-only visual animation visibly cause page-wide React rerenders or repeated navigator updates during scrolling or identity handoff? Follow state ownership and its consumers; identify actual state writes, not speculative memoization opportunities. A shared UI-thread animation, an isolated development probe, or necessary list/media offset bookkeeping is allowed. Native smoothness cannot be proven from code alone.",
+      criteria: { concern: "Scroll or handoff callbacks write header-only visual state into the owning page or repeatedly rebuild navigator options, rerendering content unrelated to that animation.", ...outcomes },
+      files: ["app/**/*.tsx"],
+      report: ["concern"],
+      abstain: ["insufficient-context"],
+      reference: "docs/review/header-contract.md",
+      message: "Header-only animation may force unrelated page or navigator work.",
+    })],
     "secrets/recovery-after-read-failure": ["warn", choice({
       instructions: "Does this change make a locked, failed or invalid secure-storage read lead to generating or overwriting recovery material rather than requiring confirmed absence? A write without a changed read-failure or initialization path is unrelated.",
       criteria: { concern: "The supplied change and context visibly demonstrate this concern.", ...outcomes },

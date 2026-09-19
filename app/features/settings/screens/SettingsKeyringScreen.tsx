@@ -39,14 +39,8 @@ import {
 } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { headerButtonSize, spacing } from '@/shared/styles/tokens';
+import { spacing } from '@/shared/styles/tokens';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
-
-const headerBalanceSpacerStyle = {
-  height: headerButtonSize,
-  opacity: 0,
-  width: headerButtonSize,
-};
 
 /**
  * CurrentKeyItem - Featured display for the active/most recent key
@@ -531,7 +525,6 @@ export const SettingsKeyringScreen: React.FC = () => {
         onPress={handleHeaderBack}
         accessibilityLabel={isFirstScreen ? 'Close settings' : 'Go back'}
       />
-      <View pointerEvents="none" style={headerBalanceSpacerStyle} />
     </HStack>
   );
   const renderHeaderRight = () => (

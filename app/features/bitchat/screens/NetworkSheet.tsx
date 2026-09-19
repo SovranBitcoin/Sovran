@@ -1,3 +1,4 @@
+import { Screen } from '@/shared/ui/composed/Screen';
 /**
  * @fileoverview Bluetooth mesh network / peer list
  *
@@ -13,7 +14,7 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { Log, useLifecycleLogger, bitchatLog } from '@/shared/lib/logger';
+import { useLifecycleLogger, bitchatLog } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -121,41 +122,44 @@ export default function NetworkSheet() {
   );
 
   return (
-    <Log name="BitchatNetworkSheet" style={{ flex: 1 }}>
+    <Screen name="BitchatNetworkSheet" scroll="custom" safeArea="scroll" bgColor={surfaceSecondary}>
       <Stack.Screen
         options={withGlassHeaderItems({
           headerShown: true,
-          // Parent user-flow stack defaults to headerTransparent: true, which
-          // makes the content render under the header and hides our subheader
-          // + list. Override to get automatic top-inset behaviour.
-          headerTransparent: false,
-          headerStyle: { backgroundColor: surfaceSecondary },
+          headerTransparent: true,
+          headerStyle: { backgroundColor: 'transparent' },
           headerShadowVisible: false,
           headerBackVisible: false,
           headerTintColor: foreground,
           title: 'Network',
           headerLeft: () => (
-            <ScreenHeaderAction icon="material-symbols:close-rounded" onPress={handleClose} />
+            <ScreenHeaderAction
+              icon="material-symbols:close-rounded"
+              onPress={handleClose}
+              testID="network-close"
+              accessibilityLabel="Close network"
+            />
           ),
         })}
       />
 
-      <HStack
-        align="center"
-        gap={8}
-        style={{
-          paddingHorizontal: 20,
-          paddingVertical: 10,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: withAlpha(foreground, 0.08),
-        }}>
-        <Icon name="mdi:bluetooth" size={18} color={BLUETOOTH_ACCENT} />
-        <Text size={13} style={{ color: withAlpha(foreground, 0.6) }}>
-          {subtitleText}
-        </Text>
-      </HStack>
-
       <List
+        ListHeaderComponent={
+          <HStack
+            align="center"
+            gap={8}
+            style={{
+              paddingHorizontal: 20,
+              paddingVertical: 10,
+              borderBottomWidth: StyleSheet.hairlineWidth,
+              borderBottomColor: withAlpha(foreground, 0.08),
+            }}>
+            <Icon name="mdi:bluetooth" size={18} color={BLUETOOTH_ACCENT} />
+            <Text size={13} style={{ color: withAlpha(foreground, 0.6) }}>
+              {subtitleText}
+            </Text>
+          </HStack>
+        }
         screen
         data={sortedPeers}
         keyExtractor={keyExtractor}
@@ -185,6 +189,6 @@ export default function NetworkSheet() {
           )
         }
       />
-    </Log>
+    </Screen>
   );
 }

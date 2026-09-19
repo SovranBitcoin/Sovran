@@ -67,6 +67,20 @@ for (const file of files) {
   const rel = file.replace(/\\/g, '/');
   if (ALLOWLIST.has(rel)) continue;
   const src = readFileSync(file, 'utf8');
+  if (/headerTransparent\s*:\s*false/.test(src)) {
+    violations.push(
+      `${rel}: native opaque navigation header; use Screen headerAppearance="opaque" for pinned chrome`
+    );
+  }
+  // Screen's Android-only declaration colors FlowSheetHeader's gradient;
+  // it never fills an iOS native bar. All other native header fills are transparent.
+  if (rel !== 'shared/ui/composed/Screen.tsx') {
+    for (const match of src.matchAll(/headerStyle\s*:\s*\{\s*backgroundColor\s*:\s*([^,}\n]+)/g)) {
+      if (!/^['"]transparent['"]/.test(match[1].trim())) {
+        violations.push(`${rel}: use transparent headerStyle and shared gradient chrome`);
+      }
+    }
+  }
   if (!HEADER_OPTION.test(src)) continue;
   if (!GLASS_COMPONENTS.test(src)) continue;
   if (WRAPPED.test(src)) continue;

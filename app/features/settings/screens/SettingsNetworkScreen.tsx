@@ -161,7 +161,7 @@ export function SettingsNetworkScreen() {
   const sortedEntries = [...entries].sort((a, b) => a.url.localeCompare(b.url));
 
   return (
-    <ScreenWrapper name="SettingsNetworkScreen" scroll="custom" safeArea>
+    <ScreenWrapper name="SettingsNetworkScreen" scroll="custom" safeArea="scroll">
       <ScreenScrollView
         className="px-4"
         bottomSpacing={32}

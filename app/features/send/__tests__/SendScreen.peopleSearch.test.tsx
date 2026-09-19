@@ -152,7 +152,10 @@ jest.mock('@/shared/ui/composed/ContactRow', () => ({
     ...(opts as object),
   }),
 }));
-jest.mock('@/shared/ui/composed/Screen', () => ({ useScreenOptions: () => {} }));
+jest.mock('@/shared/ui/composed/Screen', () => ({
+  Screen: stub('Screen'),
+  useScreenOptions: () => {},
+}));
 jest.mock('@/shared/ui/composed/CircleActionButton', () => ({
   CircleActionButton: stub('CircleActionButton'),
 }));

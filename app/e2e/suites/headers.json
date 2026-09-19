@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "name": "headers",
+  "scenarios": [
+    {"id":"settings.headers","file":"scenarios/settings-headers.json","order":10,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"}
+  ]
+}

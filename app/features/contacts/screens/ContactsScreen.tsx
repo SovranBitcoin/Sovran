@@ -1,3 +1,4 @@
+import { Screen } from '@/shared/ui/composed/Screen';
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
 import { shouldCensorDm } from '@/features/feed/lib/moderation';
 import { WhitenoiseSetupBanner } from '@/features/whitenoise/components/WhitenoiseSetupBanner';
@@ -20,7 +21,7 @@ import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetad
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatRelativeUnixSeconds } from '@/shared/lib/date';
 import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
-import { Log, log, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { log, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import {
   ContactRow,
   mintIdentity,
@@ -507,7 +508,12 @@ export const ContactsScreen = () => {
   );
 
   return (
-    <Log name="ContactsScreen" style={[styles.root, { backgroundColor: surface }]}>
+    <Screen
+      name="ContactsScreen"
+      scroll="custom"
+      safeArea
+      bgColor={surface}
+      headerAppearance="opaque">
       <View
         style={{
           backgroundColor: surface,
@@ -547,7 +553,7 @@ export const ContactsScreen = () => {
         <WhitenoiseSetupBanner onClearanceChange={setBannerClearance} />
       </ScreenContainer>
       <SearchOverlay recentContext="contacts" />
-    </Log>
+    </Screen>
   );
 };
 
@@ -556,9 +562,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-  },
-  root: {
-    flex: 1,
   },
   filtersRow: {
     height: SEARCH_FILTERS_HEIGHT,

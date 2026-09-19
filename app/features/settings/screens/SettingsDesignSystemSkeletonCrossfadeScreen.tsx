@@ -1,5 +1,5 @@
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView } from 'react-native';
 
 import { Button, Card } from 'heroui-native';
 
@@ -14,7 +14,6 @@ import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCr
 
 const STEP_DURATION_MS = 2200;
 const SKELETON_CROSSFADE_FAMILY = getDesignSystemFamily('skeleton-crossfade');
-const CONTENT_CONTAINER_STYLE = { paddingBottom: 32 };
 
 export function SettingsDesignSystemSkeletonCrossfadeScreen() {
   // The demo cards are `Card variant="secondary"` — the wave must match THAT
@@ -58,8 +57,11 @@ export function SettingsDesignSystemSkeletonCrossfadeScreen() {
   const pictureUrl = loading ? undefined : `https://picsum.photos/seed/sovran-${imageSeed}/88`;
 
   return (
-    <ScreenWrapper name="SettingsDesignSystemSkeletonCrossfadeScreen" scroll="custom" safeArea>
-      <ScrollView className="px-4" contentContainerStyle={CONTENT_CONTAINER_STYLE}>
+    <ScreenWrapper
+      name="SettingsDesignSystemSkeletonCrossfadeScreen"
+      scroll="custom"
+      safeArea="scroll">
+      <ScreenScrollView className="px-4" bottomSpacing={32}>
         <Text size={12} className="text-foreground/60 mb-4 mt-2">
           The canonical{' '}
           <Text size={12} bold className="text-foreground">
@@ -157,7 +159,7 @@ export function SettingsDesignSystemSkeletonCrossfadeScreen() {
             </View>
           </Section>
         ))}
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenWrapper>
   );
 }

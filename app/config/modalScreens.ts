@@ -1,3 +1,4 @@
+import { GRADIENT_HEADER_OPTIONS } from '@/navigation/headerOptions';
 import { Platform } from 'react-native';
 import type { NativeStackNavigationOptions } from 'expo-router';
 
@@ -6,12 +7,6 @@ export interface ModalConfig {
   title?: string;
   options?: NativeStackNavigationOptions;
 }
-
-const BLUR_HEADER_OPTIONS = {
-  headerBlurEffect: 'systemMaterial' as const,
-  headerTransparent: true,
-  headerBackButtonDisplayMode: 'minimal' as const,
-} satisfies Partial<NativeStackNavigationOptions>;
 
 /**
  * Android sheet presentation: a native bottom sheet (react-native-screens
@@ -94,7 +89,7 @@ const slideFromBottom = (name: string): ModalConfig => ({
  * Standalone single-screen modal. iOS: pageSheet/formSheet with material blur
  * header (unchanged). Android: native bottom sheet (see ANDROID_SHEET_OPTIONS).
  */
-const modalWithBlur = (
+const modalWithGradient = (
   name: string,
   presentation: 'modal' | 'formSheet',
   title?: string
@@ -106,7 +101,7 @@ const modalWithBlur = (
       ? ANDROID_SHEET_OPTIONS
       : {
           presentation,
-          ...BLUR_HEADER_OPTIONS,
+          ...GRADIENT_HEADER_OPTIONS,
         },
 });
 
@@ -179,14 +174,14 @@ const standaloneScreens: ModalConfig[] = [
   slideFromRight('(user-flow)'),
   fullScreenModal('(stories-flow)', { contentStyle: { backgroundColor: '#000' } }),
   modalTransparent('camera', 'Scan QR'),
-  modalWithBlur('share', 'formSheet'),
-  modalWithBlur('lightningSend', 'modal', 'Send Lightning'),
-  modalWithBlur('onchainSend', 'modal', 'Send Onchain'),
-  modalWithBlur('receiveToken', 'modal', 'Receive Ecash'),
-  modalWithBlur('lightningReceive', 'modal', 'Receive Lightning'),
-  modalWithBlur('onchainReceive', 'modal', 'Receive Onchain'),
-  modalWithBlur('paymentRequest', 'modal', 'Receive Ecash'),
-  modalWithBlur('sendToken', 'modal', 'Send Ecash'),
+  modalWithGradient('share', 'formSheet'),
+  modalWithGradient('lightningSend', 'modal', 'Send Lightning'),
+  modalWithGradient('onchainSend', 'modal', 'Send Onchain'),
+  modalWithGradient('receiveToken', 'modal', 'Receive Ecash'),
+  modalWithGradient('lightningReceive', 'modal', 'Receive Lightning'),
+  modalWithGradient('onchainReceive', 'modal', 'Receive Onchain'),
+  modalWithGradient('paymentRequest', 'modal', 'Receive Ecash'),
+  modalWithGradient('sendToken', 'modal', 'Send Ecash'),
   cardFade('claimUsername', {
     headerShadowVisible: false,
     headerTitle: '',

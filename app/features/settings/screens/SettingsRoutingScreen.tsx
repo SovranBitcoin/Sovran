@@ -46,7 +46,7 @@ export function SettingsRoutingScreen() {
   const snapSuccessRate = (rate: number) => Math.round((rate * 100) / 5) * 5;
 
   return (
-    <ScreenWrapper name="SettingsRoutingScreen" scroll="custom" safeArea>
+    <ScreenWrapper name="SettingsRoutingScreen" scroll="custom" safeArea="scroll">
       <ScreenScrollView className="px-4" bottomSpacing={32}>
         <Section title="Rebalancing">
           <VStack gap={12}>

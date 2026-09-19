@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import { spacing } from '@/shared/styles/tokens';
 
 // Scoped to the tab navigator. Root modal stacks are siblings and do not inherit it.
@@ -30,6 +31,8 @@ export function useReportTabBarHeight() {
 export const ConsumedBottomInsetContext = createContext(false);
 /** Screen publishes measured footer clearance to custom scrollers as well as its own. */
 export const ScreenBottomPaddingContext = createContext(0);
+/** Custom page scrollers consume this inside their content, never their viewport. */
+export const ScreenTopPaddingContext = createContext(0);
 
 /** Remaining inset inside this viewport, not the distance from the window bottom. */
 export function useScreenInsets() {
@@ -50,4 +53,22 @@ export function useScreenBottomPadding(extra: number = spacing.lg) {
   const { bottom } = useScreenInsets();
   const footerClearance = useContext(ScreenBottomPaddingContext);
   return Math.max(bottom + extra, footerClearance > 0 ? footerClearance - spacing.lg + extra : 0);
+}
+
+/** Page scroll content owns header clearance, local spacing and bottom safe area. */
+export function useScreenContentPadding(style?: StyleProp<ViewStyle>, bottomSpacing?: number) {
+  const headerPadding = useContext(ScreenTopPaddingContext);
+  const bottomPadding = useScreenBottomPadding(bottomSpacing);
+  const contentStyle = StyleSheet.flatten(style);
+  const existingTop =
+    contentStyle?.paddingTop ?? contentStyle?.paddingVertical ?? contentStyle?.padding ?? 0;
+  return {
+    headerPadding,
+    contentPadding: {
+      paddingBottom: bottomPadding,
+      ...(headerPadding > 0
+        ? { paddingTop: headerPadding + (typeof existingTop === 'number' ? existingTop : 0) }
+        : {}),
+    },
+  };
 }

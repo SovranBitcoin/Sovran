@@ -10,6 +10,10 @@ import { discoverMints } from '@/shared/lib/apiClient';
 import { SettingsRecoveryScreen } from '@/features/settings/screens/SettingsRecoveryScreen';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+// These isolated screen tests omit the app's SafeAreaProvider.
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 24, bottom: 34, left: 0, right: 0 }),
+}));
 
 const MINT_URL = 'https://mint.sovran.money';
 // Real NUT-02 v1 ids — the screen now skips keysets whose id is not 16 or 66

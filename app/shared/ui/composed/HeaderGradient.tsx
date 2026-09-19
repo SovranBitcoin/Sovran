@@ -1,5 +1,5 @@
 /**
- * Android stand-in for the iOS header blur: solid background behind the bar
+ * Navigation header fade: solid background behind the bar
  * easing to transparent — a pure color gradient (no blur — expo-blur on
  * Android reads as a muddy dark tint).
  *
@@ -14,14 +14,11 @@
  *   `height` taller than the bar — native-stack's custom-header wrapper has
  *   no overflow clip, so the fade tail paints below the bar over scrolling
  *   content.
- * - The NATIVE headerBackground path (androidHeaderScrimOptions — settings/
- *   user card stacks) must NOT pass height: native-stack clips that wrapper
+ * - A native headerBackground consumer must NOT pass height: native-stack clips that wrapper
  *   to the header bounds (styles.background has overflow:'hidden'), so the
  *   scrim fills it (flex:1) with a lower solid anchor instead.
  *
- * When a surface should NOT have a scrim: solid header fills (chat screens)
- * or layouts where content never underlaps the bar; immersive surfaces
- * (stories, camera). Per-screen `headerBackground: () => null` remains the
+ * Immersive surfaces (stories, camera) may omit the gradient. Per-screen `headerBackground: () => null` remains the
  * sanctioned opt-out on flow sheets.
  *
  * Lives in its own module (not config/flowLayoutOptions) so FlowSheetHeader
@@ -37,7 +34,7 @@ import { withAlpha } from '@/shared/lib/color';
  *  bottom ~45% of the taller native bar). */
 const NATIVE_BAR_ANCHOR = 0.55;
 
-export const AndroidHeaderScrim = memo(function AndroidHeaderScrim({
+export const HeaderGradient = memo(function HeaderGradient({
   backgroundColor,
   height,
   anchor,

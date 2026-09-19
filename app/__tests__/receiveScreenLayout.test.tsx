@@ -213,13 +213,15 @@ jest.mock('@/shared/ui/composed/Screen', () => ({
   Screen: ({
     children,
     footer,
+    stickyContent,
     ...props
   }: {
     children?: React.ReactNode;
     footer?: React.ReactNode;
+    stickyContent?: React.ReactNode;
   }) => {
     const ReactActual = jest.requireActual<typeof import('react')>('react');
-    return ReactActual.createElement('Screen', props, footer, children);
+    return ReactActual.createElement('Screen', props, stickyContent, footer, children);
   },
   useScreenOptions: jest.fn(),
 }));

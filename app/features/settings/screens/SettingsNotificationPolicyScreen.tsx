@@ -39,7 +39,7 @@ export function SettingsNotificationPolicyScreen() {
   );
 
   return (
-    <ScreenWrapper name="SettingsNotificationPolicyScreen" scroll="custom" safeArea>
+    <ScreenWrapper name="SettingsNotificationPolicyScreen" scroll="custom" safeArea="scroll">
       <ScreenScrollView className="px-4" bottomSpacing={32}>
         <Section title="Policy">
           <ListGroup variant="secondary">

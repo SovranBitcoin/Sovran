@@ -398,7 +398,12 @@ function NotificationsContent({ demo }: { demo: boolean }) {
   ]);
 
   return (
-    <Screen name="NotificationsScreen" scroll="custom" bgColor={surface}>
+    <Screen
+      name="NotificationsScreen"
+      scroll="custom"
+      safeArea
+      bgColor={surface}
+      headerAppearance="opaque">
       <E2EAccessibilityProbe testID="screen-notifications" accessibilityLabel="Notifications" />
       <Log name="NotificationsContent" style={notificationListStyles.root}>
         <VisualLayoutProbe

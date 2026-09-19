@@ -27,6 +27,10 @@ jest.mock('react-native-reanimated', () => {
     default: { View },
     useReducedMotion: () => mockReducedMotion,
     useAnimatedStyle: <T extends object>(factory: () => T) => factory(),
+    useAnimatedReaction: jest.fn(),
+    useAnimatedScrollHandler: (handler: unknown) => handler,
+    Extrapolation: { CLAMP: 'clamp' },
+    interpolate: (_value: number, _input: number[], output: number[]) => output[0],
     useFrameCallback: () =>
       ReactActual.useMemo(() => ({ setActive: jest.fn(), isActive: false, callbackId: 1 }), []),
     useSharedValue: <T,>(value: T) => {

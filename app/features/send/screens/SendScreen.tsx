@@ -71,7 +71,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { paymentLog } from '@/shared/lib/logger';
 import { ListRow } from '@/shared/ui/composed/ListRow';
 import { ContactRow, nostrIdentity } from '@/shared/ui/composed/ContactRow';
-import { useScreenOptions } from '@/shared/ui/composed/Screen';
+import { Screen } from '@/shared/ui/composed/Screen';
 import { DetectedActionRow } from '@/features/send/components/DetectedActionRow';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -119,14 +119,6 @@ export function SendScreen({ unit }: { unit: string }) {
     'accent',
     'overlay',
   ] as const);
-
-  // This screen paints its canvas with `overlay` (below) via a raw ScrollView
-  // rather than the `Screen` component, so it misses Screen's bgColor→header
-  // auto-sync. Declare the page color to the header so the Android sheet's
-  // scrim (FlowSheetHeader) fades from `overlay`, not the darker theme
-  // `background` — otherwise the header gradient reads as a wrong-colored slab.
-  // iOS ignores headerStyle.backgroundColor under the transparent blur header.
-  useScreenOptions(() => ({ headerStyle: { backgroundColor: overlay } }), [overlay]);
 
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState(false);
@@ -474,166 +466,172 @@ export function SendScreen({ unit }: { unit: string }) {
   ));
 
   return (
-    <ScreenScrollView
-      bottomSpacing={32}
-      style={[styles.screen, { backgroundColor: overlay }]}
-      contentContainerStyle={[styles.content, { paddingTop: headerHeight + 8 }]}
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="on-drag">
-      {/* This screen is a sheet: iOS modal AX hides the root-layout probe, so
+    <Screen name="SendScreen" scroll="custom" bgColor={overlay}>
+      <ScreenScrollView
+        bottomSpacing={32}
+        style={[styles.screen, { backgroundColor: overlay }]}
+        contentContainerStyle={[styles.content, { paddingTop: headerHeight + 8 }]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag">
+        {/* This screen is a sheet: iOS modal AX hides the root-layout probe, so
           toast evidence (e.g. balance-too-low) must be mirrored in-sheet. */}
-      <E2EToastProbe />
-      {/* Destination input + Paste/Cancel */}
-      <View style={[styles.inputWrap, { backgroundColor: surfaceSecondary }]}>
-        <Icon name="mdi:magnify" size={20} color={withAlpha(foreground, 0.5)} />
-        <TextInput
-          ref={inputRef}
-          value={query}
-          onChangeText={setQuery}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          onSubmitEditing={handleSubmitDestination}
-          placeholder="Name, address, or token"
-          placeholderTextColor={withAlpha(foreground, 0.4)}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="go"
-          style={[styles.input, { color: foreground }]}
-          testID="send-destination-input"
-        />
-        {/* Paste when the input is empty (the primary way to enter a
+        <E2EToastProbe />
+        {/* Destination input + Paste/Cancel */}
+        <View style={[styles.inputWrap, { backgroundColor: surfaceSecondary }]}>
+          <Icon name="mdi:magnify" size={20} color={withAlpha(foreground, 0.5)} />
+          <TextInput
+            ref={inputRef}
+            value={query}
+            onChangeText={setQuery}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            onSubmitEditing={handleSubmitDestination}
+            placeholder="Name, address, or token"
+            placeholderTextColor={withAlpha(foreground, 0.4)}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="go"
+            style={[styles.input, { color: foreground }]}
+            testID="send-destination-input"
+          />
+          {/* Paste when the input is empty (the primary way to enter a
             destination); once there's something to clear, it becomes Cancel to
             wipe the input + unfocus in one tap. */}
-        {query.length > 0 ? (
-          <Text
-            onPress={handleCancel}
-            color={accent}
-            bold
-            size={15}
-            style={styles.pasteBtn}
-            testID="send-cancel">
-            Cancel
-          </Text>
-        ) : (
-          <Text
-            onPress={handlePaste}
-            color={accent}
-            bold
-            size={15}
-            style={styles.pasteBtn}
-            testID="send-paste">
-            Paste
-          </Text>
-        )}
-      </View>
+          {query.length > 0 ? (
+            <Text
+              onPress={handleCancel}
+              color={accent}
+              bold
+              size={15}
+              style={styles.pasteBtn}
+              testID="send-cancel">
+              Cancel
+            </Text>
+          ) : (
+            <Text
+              onPress={handlePaste}
+              color={accent}
+              bold
+              size={15}
+              style={styles.pasteBtn}
+              testID="send-paste">
+              Paste
+            </Text>
+          )}
+        </View>
 
-      {/* Methods: four rows (expanded) ⇄ four icon buttons in one row (collapsed),
+        {/* Methods: four rows (expanded) ⇄ four icon buttons in one row (collapsed),
           cross-fading as the input gains focus. Both states use the SAME
           `CircleActionButton` (glass on supported devices, flat otherwise), so
           the icon never changes type across the fade. */}
-      <Animated.View style={[styles.methodsContainer, containerHeightStyle]}>
-        {/* Collapsed button row UNDERNEATH — revealed as the layer above fades.
+        <Animated.View style={[styles.methodsContainer, containerHeightStyle]}>
+          {/* Collapsed button row UNDERNEATH — revealed as the layer above fades.
             Mounted while focused AND through the fade-back on unfocus, so the
             cross-fade is symmetric in both directions. */}
-        {showCollapsed ? (
-          <View style={[styles.layerFill, styles.collapsedRow]}>{collapsedButtons}</View>
-        ) : null}
+          {showCollapsed ? (
+            <View style={[styles.layerFill, styles.collapsedRow]}>{collapsedButtons}</View>
+          ) : null}
 
-        {/* Opaque expanded layer ON TOP — fades its opacity out to reveal the
+          {/* Opaque expanded layer ON TOP — fades its opacity out to reveal the
             collapsed row beneath (same parent-opacity fade the wallet headerLeft
             uses over its glass). */}
-        <Animated.View
-          style={[styles.layerFill, { backgroundColor: overlay }, listFadeStyle]}
-          pointerEvents={inSearch ? 'none' : 'auto'}>
-          {expandedRows}
+          <Animated.View
+            style={[styles.layerFill, { backgroundColor: overlay }, listFadeStyle]}
+            pointerEvents={inSearch ? 'none' : 'auto'}>
+            {expandedRows}
+          </Animated.View>
         </Animated.View>
-      </Animated.View>
 
-      {/* Detected destination: colada parses the input and tells us what to
+        {/* Detected destination: colada parses the input and tells us what to
           render (Pay 100 sats / Redeem X sats / Pay <name> + pfp). Sits above
           Recent; tap reuses machine.scan (same as the Paste button/input submit)
           or startContactSend — no new routing. */}
-      {destinationDescriptor ? (
-        <DetectedActionRow
-          descriptor={destinationDescriptor}
-          onExecute={() => {
-            paymentLog.info('send.detected.execute', { kind: destinationDescriptor.kind });
-            runDestinationScan(destinationDescriptor.raw);
-          }}
-          onStartContactSend={startContactSend}
-        />
-      ) : null}
+        {destinationDescriptor ? (
+          <DetectedActionRow
+            descriptor={destinationDescriptor}
+            onExecute={() => {
+              paymentLog.info('send.detected.execute', { kind: destinationDescriptor.kind });
+              runDestinationScan(destinationDescriptor.raw);
+            }}
+            onStartContactSend={startContactSend}
+          />
+        ) : null}
 
-      {/* Nearby: live Nut Drop peers, pinned above. Shown whenever peers are in
+        {/* Nearby: live Nut Drop peers, pinned above. Shown whenever peers are in
           range — at rest, focused, or searching. */}
-      {freshPeers.length > 0 ? (
-        <VStack gap={0}>
-          <SectionLabel text="Nearby" color={withAlpha(foreground, 0.5)} />
-          {freshPeers.map((peer) => (
-            <ListRow
-              key={peer.peerID}
-              avatar={{ seed: peerIdentitySeed(peer), name: peerDisplayName(peer), size: ROW_ICON }}
-              title={peerDisplayName(peer)}
-              subtitle="Nearby · Nut Drop"
-              trailing={<Icon name="mdi:bluetooth" size={20} color={accent} />}
-              onPress={() => handleSelectPeer(peer)}
-              testID={`send-peer-${peer.peerID}`}
-            />
-          ))}
-        </VStack>
-      ) : null}
+        {freshPeers.length > 0 ? (
+          <VStack gap={0}>
+            <SectionLabel text="Nearby" color={withAlpha(foreground, 0.5)} />
+            {freshPeers.map((peer) => (
+              <ListRow
+                key={peer.peerID}
+                avatar={{
+                  seed: peerIdentitySeed(peer),
+                  name: peerDisplayName(peer),
+                  size: ROW_ICON,
+                }}
+                title={peerDisplayName(peer)}
+                subtitle="Nearby · Nut Drop"
+                trailing={<Icon name="mdi:bluetooth" size={20} color={accent} />}
+                onPress={() => handleSelectPeer(peer)}
+                testID={`send-peer-${peer.peerID}`}
+              />
+            ))}
+          </VStack>
+        ) : null}
 
-      {/* People slot (canonical ContactRow + nostrIdentity, metrics parity):
+        {/* People slot (canonical ContactRow + nostrIdentity, metrics parity):
           - typing a specific query → live search results at the top;
           - otherwise (at rest OR focused-empty) → the recent-people list
             (searched / sent / received / Nut Drop peers). */}
-      {isTyping ? (
-        <VStack gap={0}>
-          {renderedPeople.length > 0 ? (
-            <SectionLabel text="People" color={withAlpha(foreground, 0.5)} />
-          ) : null}
-          {renderedPeople.map((row) => (
-            <ContactRow
-              key={row.pubkey}
-              identity={nostrIdentity(row.pubkey, row.profile, {
-                isLoadingProfile: row.isLoadingProfile,
-              })}
-              // Placeholder rows (no profile) paint skeletons and aren't tappable.
-              onPress={
-                row.profile ? () => handleSelectContact(row.pubkey, row.profile!) : undefined
-              }
-              testID={`send-contact:${row.pubkey}`}
-            />
-          ))}
-          {!searchLoading && renderedPeople.length === 0 && freshPeers.length === 0 ? (
-            <View style={styles.emptyWrap}>
-              <Text color={withAlpha(foreground, 0.5)}>No people found</Text>
-            </View>
-          ) : null}
-        </VStack>
-      ) : quickPayPeople.length > 0 ? (
-        <VStack gap={0}>
-          <SectionLabel text="Recent" color={withAlpha(foreground, 0.5)} />
-          {quickPayPeople.map((person) => (
-            <ContactRow
-              key={person.pubkey}
-              identity={nostrIdentity(
-                person.pubkey,
-                {
-                  displayName: person.displayName,
-                  picture: person.picture ?? undefined,
-                  nip05: person.nip05 ?? undefined,
-                  lud16: person.lud16 ?? undefined,
-                },
-                { isLoadingProfile: person.isLoading }
-              )}
-              onPress={() => handleSelectQuickPay(person)}
-              testID={`send-contact:${person.pubkey}`}
-            />
-          ))}
-        </VStack>
-      ) : null}
-    </ScreenScrollView>
+        {isTyping ? (
+          <VStack gap={0}>
+            {renderedPeople.length > 0 ? (
+              <SectionLabel text="People" color={withAlpha(foreground, 0.5)} />
+            ) : null}
+            {renderedPeople.map((row) => (
+              <ContactRow
+                key={row.pubkey}
+                identity={nostrIdentity(row.pubkey, row.profile, {
+                  isLoadingProfile: row.isLoadingProfile,
+                })}
+                // Placeholder rows (no profile) paint skeletons and aren't tappable.
+                onPress={
+                  row.profile ? () => handleSelectContact(row.pubkey, row.profile!) : undefined
+                }
+                testID={`send-contact:${row.pubkey}`}
+              />
+            ))}
+            {!searchLoading && renderedPeople.length === 0 && freshPeers.length === 0 ? (
+              <View style={styles.emptyWrap}>
+                <Text color={withAlpha(foreground, 0.5)}>No people found</Text>
+              </View>
+            ) : null}
+          </VStack>
+        ) : quickPayPeople.length > 0 ? (
+          <VStack gap={0}>
+            <SectionLabel text="Recent" color={withAlpha(foreground, 0.5)} />
+            {quickPayPeople.map((person) => (
+              <ContactRow
+                key={person.pubkey}
+                identity={nostrIdentity(
+                  person.pubkey,
+                  {
+                    displayName: person.displayName,
+                    picture: person.picture ?? undefined,
+                    nip05: person.nip05 ?? undefined,
+                    lud16: person.lud16 ?? undefined,
+                  },
+                  { isLoadingProfile: person.isLoading }
+                )}
+                onPress={() => handleSelectQuickPay(person)}
+                testID={`send-contact:${person.pubkey}`}
+              />
+            ))}
+          </VStack>
+        ) : null}
+      </ScreenScrollView>
+    </Screen>
   );
 }
 

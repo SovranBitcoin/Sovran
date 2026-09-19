@@ -68,7 +68,7 @@ interface ChatScreenProps {
    * Extra inset between the chat list and the top edge of the screen, used
    * by surfaces with a transparent floating navigation header (AI tab) so
    * the topmost bubble doesn't slide *under* the header on initial paint.
-   * Surfaces that render their own in-area header (DmChatHeader) leave this 0.
+   * Defaults to the navigator height for transparent navigation headers.
    */
   topInset?: number;
   /**
@@ -156,7 +156,8 @@ export function ChatScreen({
   // above (since a real `headerHeight` already includes the status-bar
   // inset; doubling them up pushes content too far down).
   const resolvedBottomInset = bottomInset !== undefined ? bottomInset : safeAreaInsets.bottom;
-  const resolvedTopInset = topInset > 0 ? topInset : headerHeight > 0 ? 0 : safeAreaInsets.top;
+  const resolvedTopInset =
+    topInset > 0 ? topInset : headerHeight > 0 ? headerHeight : safeAreaInsets.top;
 
   const [draft, setDraft] = useState('');
 

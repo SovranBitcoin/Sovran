@@ -1,3 +1,4 @@
+import { HEADER_SCENARIOS } from './headers';
 import type { DesignSystemFamily } from './types';
 
 import { EMPTY_STATE_SCENARIOS } from './emptyStates';
@@ -11,6 +12,13 @@ import { TIMELINE_SCENARIOS } from './timeline';
 import { WALLET_CONTROL_SCENARIOS } from './walletControls';
 
 export const DESIGN_SYSTEM_CATALOG: readonly DesignSystemFamily[] = [
+  {
+    id: 'headers',
+    href: '/(settings-flow)/design-system-headers',
+    title: 'Headers',
+    description: 'Gradient, scroll-linked identity, and pinned section tabs on both platforms',
+    scenarios: HEADER_SCENARIOS,
+  },
   {
     id: 'foundations',
     href: '/(settings-flow)/design-system-foundations',

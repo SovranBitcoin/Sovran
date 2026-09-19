@@ -32,6 +32,7 @@ export function ThreadScreen() {
     <Screen
       name="ThreadScreen"
       scroll={preview ? 'auto' : 'custom'}
+      safeArea={preview ? false : 'scroll'}
       bgColor={surface}
       deferContent={false}>
       {preview ? (

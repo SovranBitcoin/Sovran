@@ -210,6 +210,7 @@ interface PostCardProps {
   /** Thread target only: fades the in-sheet footer out as the embed sheet
    *  collapses (it crossfades with the floating action bar). */
   footerOpacity?: SharedValue<number>;
+  identityStyle?: React.ComponentProps<typeof Reanimated.View>['style'];
   onCommentPress?: () => void;
   onRepostPress?: () => void;
   onLikePress?: () => void;
@@ -263,6 +264,7 @@ const PostCardBody = React.memo(function PostCardBody({
   onVideoTap,
   onLinkPress,
   footerOpacity,
+  identityStyle,
   onCommentPress,
   onRepostPress,
   onLikePress,
@@ -420,41 +422,43 @@ const PostCardBody = React.memo(function PostCardBody({
       <Log name="PostCard">
         <View>
           <View style={pcStyles.targetRow}>
-            <Pressable
-              testID={`post-author-${event.id}`}
-              accessibilityRole="button"
-              accessibilityLabel={`Open ${displayName ?? nameFallback}'s profile`}
-              onPressIn={handleNestedPressIn}
-              onPress={navigateToProfile}>
-              <HStack align="center" gap={10} style={sharedStyles.mb6}>
-                <Avatar
-                  state={avatarStateFor(profile?.picture, authorStatus !== 'loading')}
-                  picture={profile?.picture}
-                  seed={event.pubkey}
-                  size={AVATAR_SIZE}
-                  name={displayName}
-                />
-                <VStack style={sharedStyles.flex1}>
-                  <Text
-                    family={POST_FONT_FAMILY}
-                    semibold
-                    size={postType.name.size}
-                    style={[pcStyles.nameText, textPrimary]}
-                    numberOfLines={1}
-                    fallback={nameFallback}>
-                    {displayName}
-                  </Text>
-                  <Text
-                    family={POST_FONT_FAMILY}
-                    size={postType.meta.size}
-                    style={[pcStyles.timeText, textMuted]}
-                    numberOfLines={1}
-                    ellipsizeMode="middle">
-                    {authorNpub}
-                  </Text>
-                </VStack>
-              </HStack>
-            </Pressable>
+            <Reanimated.View style={identityStyle}>
+              <Pressable
+                testID={`post-author-${event.id}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${displayName ?? nameFallback}'s profile`}
+                onPressIn={handleNestedPressIn}
+                onPress={navigateToProfile}>
+                <HStack align="center" gap={10} style={sharedStyles.mb6}>
+                  <Avatar
+                    state={avatarStateFor(profile?.picture, authorStatus !== 'loading')}
+                    picture={profile?.picture}
+                    seed={event.pubkey}
+                    size={AVATAR_SIZE}
+                    name={displayName}
+                  />
+                  <VStack style={sharedStyles.flex1}>
+                    <Text
+                      family={POST_FONT_FAMILY}
+                      semibold
+                      size={postType.name.size}
+                      style={[pcStyles.nameText, textPrimary]}
+                      numberOfLines={1}
+                      fallback={nameFallback}>
+                      {displayName}
+                    </Text>
+                    <Text
+                      family={POST_FONT_FAMILY}
+                      size={postType.meta.size}
+                      style={[pcStyles.timeText, textMuted]}
+                      numberOfLines={1}
+                      ellipsizeMode="middle">
+                      {authorNpub}
+                    </Text>
+                  </VStack>
+                </HStack>
+              </Pressable>
+            </Reanimated.View>
 
             <NoteContent
               content={event.content}

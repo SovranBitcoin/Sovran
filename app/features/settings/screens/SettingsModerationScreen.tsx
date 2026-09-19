@@ -110,7 +110,7 @@ export function SettingsModerationScreen() {
     popup({ message: 'Filtered words saved', type: 'success', variant: 'toast' });
   };
   return (
-    <Screen name="SettingsModerationScreen" scroll="custom" safeArea>
+    <Screen name="SettingsModerationScreen" scroll="custom" safeArea="scroll">
       <ScreenScrollView
         className="px-4"
         bottomSpacing={32}

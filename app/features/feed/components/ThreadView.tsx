@@ -1,3 +1,6 @@
+import { useIdentityHeader } from '@/shared/ui/composed/IdentityHeader';
+import { useScreenOptions } from '@/shared/ui/composed/Screen';
+import { resolveIdentityName } from '@/shared/lib/identity';
 /**
  * @fileoverview Thread View Component
  *
@@ -8,7 +11,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { withAlpha } from '@/shared/lib/color';
 
@@ -288,6 +291,28 @@ function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps)
   const openComposer = useOpenComposer();
 
   const targetItem = useMemo(() => items.find((item) => item.type === 'target'), [items]);
+  const listRef = useRef<FlashListRef<ThreadListItem>>(null);
+  const targetEvent = targetItem?.event;
+  const targetProfile = targetEvent ? profilesRef.current.get(targetEvent.pubkey) : undefined;
+  const threadName = targetEvent
+    ? resolveIdentityName({ pubkey: targetEvent.pubkey, nostrProfile: targetProfile })
+    : '';
+  const morph = useIdentityHeader({
+    title: 'Thread',
+    collapseAt: 48,
+    identity: targetEvent
+      ? {
+          name: `${threadName}'s thread`,
+          seed: targetEvent.pubkey,
+          picture: targetProfile?.picture,
+        }
+      : undefined,
+  });
+  useScreenOptions(
+    () => ({ headerTitle: morph.headerTitle }),
+    [threadName, targetEvent?.pubkey, targetProfile?.picture]
+  );
+
   const hasParents = useMemo(() => items.some((i) => i.type === 'parent'), [items]);
 
   const displayItems = useMemo<ThreadListItem[]>(() => {
@@ -486,6 +511,7 @@ function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps)
           showFooterBorder={!suppressFooterBorder}
           onLinkPress={isTarget ? embedOpen : undefined}
           footerOpacity={isTarget ? targetFooterOpacity : undefined}
+          identityStyle={isTarget ? morph.contentStyle : undefined}
           showLineAbove={isParent ? index > 0 : isTarget ? hasParents : false}
           showLineBelow={isParent}
           liked={engagement.liked}
@@ -532,6 +558,7 @@ function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps)
       displayItems,
       embedOpen,
       targetFooterOpacity,
+      morph.contentStyle,
       getDisplayMetrics,
       getEngagementState,
       getZapState,
@@ -577,7 +604,6 @@ function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps)
   // Target-post actions for the floating embed action bar (mirrors the
   // target PostCard's MetricsFooter wiring). Hooks stay above the early
   // return below.
-  const targetEvent = targetItem?.event;
   const onTargetComment = useCallback(() => {
     if (!targetEvent) return;
     openComposer(deriveReplyTarget(targetEvent), {
@@ -615,6 +641,7 @@ function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps)
 
   return (
     <Log name="ThreadView">
+      {morph.probe}
       <ImageOverlayProvider
         getDisplayMetrics={getDisplayMetrics}
         getEngagementState={getEngagementState}>
@@ -650,6 +677,7 @@ function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps)
               anchors on the tapped note via `initialScrollIndex` and must never
               auto-pin to the bottom (so no `startRenderingFromBottom`). */}
             <FlashList
+              ref={listRef}
               data={displayItems}
               keyExtractor={threadKeyExtractor}
               getItemType={threadItemType}
@@ -671,19 +699,35 @@ function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps)
               }
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{
-                // The embed sheet starts just below the header, so the list pads no
-                // top. `replyBarHeight` already includes the bottom safe-area inset;
+                // Clearance scrolls with the list; the sheet viewport starts at zero. `replyBarHeight` already includes the bottom safe-area inset;
                 // `focusReserve` adds the room below the note (see its definition).
-                paddingTop: 0,
+                paddingTop: embed?.headerClearance ?? headerHeight,
                 paddingBottom: (replyBarHeight || 80) + 16 + focusReserve,
               }}
               onScroll={(e) => {
                 const y = e.nativeEvent.contentOffset.y;
+                const targetLayout = listRef.current?.getLayout(fullTargetIndex);
+                const firstItemOffset = listRef.current?.getFirstItemOffset() ?? 0;
+                morph.scrollY.set(
+                  targetLayout
+                    ? Math.max(
+                        0,
+                        y +
+                          (embed?.headerClearance ?? headerHeight) -
+                          targetLayout.y -
+                          firstItemOffset
+                      )
+                    : 0
+                );
                 if (imageOverlay?.scrollOffsetY != null) imageOverlay.scrollOffsetY.set(y);
                 if (embed) embed.scrollY.set(y);
               }}
               scrollEventThrottle={16}
               scrollEnabled={embed ? embed.listScrollEnabled : undefined}
+              // FlashList adds viewOffset to the item coordinate; subtract header
+              // clearance to land a targeted reply below the transparent bar.
+              initialScrollIndexParams={{ viewOffset: -(embed?.headerClearance ?? headerHeight) }}
+              contentInsetAdjustmentBehavior="never"
               initialScrollIndex={!isLoading && fullTargetIndex > 0 ? fullTargetIndex : undefined}
             />
           </ThreadEmbedSheet>
