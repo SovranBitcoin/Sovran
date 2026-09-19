@@ -139,5 +139,20 @@ export default defineConfig({
       reference: "docs/review/contracts.md",
       message: "A monetary conversion or default may change the amount actually used.",
     })],
+    // Not a lint rule: the tint and the icon are greppable, but deciding
+    // whether a given tinted row is a status notice — rather than an empty
+    // state, a badge or a field error — is a judgment about the rendered
+    // shape. `when` keeps the rule off hunks with no icon or status tint at
+    // all; every hand-built notice this rule exists to catch carries one.
+    "ui/status-notice": ["warn", choice({
+      instructions: "Require changed JSX that renders a status notice: a short warning, error, caution or informational message next to a status icon, on its own tinted or bordered surface, within a page, card or sheet. Does this change build that surface out of primitives — a View, Card, HStack, Icon and Text, or a status tint such as `bg-warning-soft`, `bg-danger-soft`, `bg-danger/[0.08]`, `withAlpha(dangerColor, …)` or a literal amber or red hex — where the shared `Notice` in `app/shared/ui/composed/Notice.tsx` would render it? Judge the rendered shape, not the vocabulary. A full-screen error or empty state, a screen-wide chrome banner, an interactive call-to-action card, a badge or pill carrying no status sentence, per-field validation text under an input, and bare tinted copy with no surface of its own are different shapes, not notices. A small named component whose body is a `Notice` at one surface's geometry is the intended pattern; so are `Notice`'s own implementation and the design-system catalogue screens under `app/features/settings`.",
+      criteria: { concern: "The changed JSX hand-builds a status notice that `Notice` — with its `status`, `tone`, `size`, `icon` and `action` props — already renders.", ...outcomes },
+      files: ["app/**/*.tsx"],
+      when: /Icon|warning|danger|caution|alert/i,
+      report: ["concern"],
+      abstain: ["insufficient-context"],
+      reference: "docs/review/contracts.md",
+      message: "A status notice may be hand-built instead of using the shared Notice component.",
+    })],
   },
 });

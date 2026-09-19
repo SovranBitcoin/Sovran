@@ -64,3 +64,23 @@ Amounts need their currency/unit and conversion meaning. `wallet/src/amount.ts` 
 semantics. Zero is a valid amount in some states; missing/unknown amounts must not silently become
 confirmed balances or executed amounts. Preserve precision across unit conversions; display
 rounding is allowed when it cannot change the executed payment.
+
+## Status notices
+
+A status notice is a short warning, error, caution or informational message shown beside a status
+icon on its own tinted surface, inside a page, card or sheet. `Notice` in
+`app/shared/ui/composed/Notice.tsx` is the only one. It carries the whole range: `status` picks
+`info`, `warning` or `danger`, `tone` picks a solid fill that interrupts or a soft tint that sits
+beside other content, `size` picks the page scale or the compact scale used in dense sheets and
+chat strips, and `icon` and `action` cover a custom glyph and a trailing recovery affordance. A
+hand-built equivalent drifts: it is how `#f59e0b` and a private 8% danger tint reached the app.
+
+Distinct shapes with their own owners are not notices and must not be folded into one: full-screen
+error and empty states (`EmptyState`), the screen-wide offline banner in `OfflineProvider`,
+interactive call-to-action cards, badges and pills carrying no status sentence, per-field
+validation text under an input, and bare tinted copy with no surface of its own.
+
+A small named component whose body is a `Notice` fixed at one surface's geometry is the intended
+way to share that geometry across call sites — `TransferErrorBanner` and `ChatStatusStrip` are the
+examples. Notice's own implementation and the design-system catalogue screens under
+`app/features/settings` are excluded by definition.

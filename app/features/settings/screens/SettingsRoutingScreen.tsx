@@ -9,7 +9,7 @@ import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { Section } from '@/shared/ui/composed/Section';
-import Icon from 'assets/icons';
+import { Notice } from '@/shared/ui/composed/Notice';
 import {
   Card,
   Label,
@@ -211,19 +211,13 @@ export function SettingsRoutingScreen() {
                 </RadioGroup>
 
                 {middlemanRouting.trustMode === 'allow_untrusted' ? (
-                  <View className="flex-row items-start gap-2">
-                    <Icon
-                      name="mdi:alert-circle-outline"
-                      size={16}
-                      color="#f59e0b"
-                      style={{ marginTop: 2 }}
-                    />
-                    <Text size={12} className="flex-1" style={{ color: '#f59e0b' }}>
-                      Untrusted mints will be temporarily trusted for the swap and untrusted
-                      afterward. Your ecash passes through mints you have not verified. Only use
-                      this with small amounts.
-                    </Text>
-                  </View>
+                  <Notice
+                    status="warning"
+                    tone="soft"
+                    size="compact"
+                    description="Untrusted mints will be temporarily trusted for the swap and untrusted afterward. Your ecash passes through mints you have not verified. Only use this with small amounts."
+                    testID="settings-routing-untrusted-warning"
+                  />
                 ) : null}
               </Card.Body>
             </Card>

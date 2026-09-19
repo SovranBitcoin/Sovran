@@ -87,11 +87,6 @@
       "count": 1
     }
   },
-  "features/settings/screens/SettingsRoutingScreen.tsx": {
-    "no-restricted-syntax": {
-      "count": 2
-    }
-  },
   "features/theme/components/UnitPreviewCard.tsx": {
     "no-restricted-syntax": {
       "count": 6

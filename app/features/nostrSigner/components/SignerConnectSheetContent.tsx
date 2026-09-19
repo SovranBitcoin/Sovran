@@ -42,6 +42,7 @@ import * as nip19 from 'nostr-tools/nip19';
 
 import Icon from 'assets/icons';
 import { SegmentedText } from '@/features/nostrSigner/components/display';
+import { Notice } from '@/shared/ui/composed/Notice';
 import { safeHostname } from '@/features/nostrSigner/lib/boundedDisplay';
 import {
   alwaysAllowEligible,
@@ -526,11 +527,10 @@ function ConnectReview({
   pushCustomPage,
   setFooterConfig,
 }: SignerConnectContentProps & { parsed: ParsedNostrConnectUri }): React.ReactElement {
-  const [foreground, muted, warning, danger, dangerSoftFg] = useThemeColor([
+  const [foreground, muted, warning, dangerSoftFg] = useThemeColor([
     'foreground',
     'muted',
     'warning',
-    'danger',
     'danger-soft-foreground',
   ] as const);
   const { keys } = useNostrKeysContext();
@@ -801,18 +801,19 @@ function ConnectReview({
 
       {/* Blocked-before notice (metadata match on a blocked record) */}
       {variant === 'blocked-fresh' ? (
-        <View className="bg-danger-soft rounded-2xl p-3">
-          <HStack gap={8} align="center">
-            <Icon name="mdi:alert-circle" size={18} color={danger} />
-            <View style={FLEX_ONE_STYLE}>
-              <SegmentedText
-                segments={blockedNoticeSegments(appName)}
-                size={13}
-                color={dangerSoftFg}
-              />
-            </View>
-          </HStack>
-        </View>
+        <Notice
+          status="danger"
+          tone="soft"
+          size="compact"
+          className="items-center p-3"
+          description={
+            <SegmentedText
+              segments={blockedNoticeSegments(appName)}
+              size={13}
+              color={dangerSoftFg}
+            />
+          }
+        />
       ) : null}
 
       {/* Reconnect: minimal restore summary + opt-in review checklist */}
@@ -1017,16 +1018,13 @@ function ConnectReview({
 
       {/* Inline failure state (relay unreachable / save failed / changed) */}
       {failure !== null ? (
-        <View className="bg-danger-soft rounded-2xl p-3">
-          <HStack gap={8} align="center">
-            <Icon name="mdi:alert-circle" size={18} color={danger} />
-            <View style={FLEX_ONE_STYLE}>
-              <Text size={13} color={dangerSoftFg}>
-                {failureMessageFor(failure)}
-              </Text>
-            </View>
-          </HStack>
-        </View>
+        <Notice
+          status="danger"
+          tone="soft"
+          size="compact"
+          className="items-center p-3"
+          description={failureMessageFor(failure)}
+        />
       ) : null}
     </VStack>
   );
@@ -1135,18 +1133,20 @@ export function SignerProfilePickerContent({
 
       {showRestartWarning ? (
         <VStack gap={10}>
-          <View className="bg-warning-soft rounded-2xl p-3">
-            <VStack gap={4}>
-              <Text size={13} bold color={warningSoftFg}>
-                {RESTART_WARNING_TITLE}
-              </Text>
+          <Notice
+            status="warning"
+            tone="soft"
+            size="compact"
+            className="p-3"
+            title={RESTART_WARNING_TITLE}
+            description={
               <SegmentedText
                 segments={restartWarningSegments(appName)}
                 size={13}
                 color={warningSoftFg}
               />
-            </VStack>
-          </View>
+            }
+          />
           <HerouiButton
             testID="signer-profile-picker-switch-connect"
             variant="primary"

@@ -28,7 +28,7 @@ import { useLifecycleLogger, bitchatLog } from '@/shared/lib/logger';
 import { useBitChat } from '../hooks/useBitChat';
 import { useBLEPeers } from '../hooks/useBLEPeers';
 import { useBluetoothState } from '../hooks/useBluetoothState';
-import { BluetoothInlineNotice } from '../components/BluetoothNotice';
+import { BluetoothInlineNotice, ChatStatusStrip } from '../components/BluetoothNotice';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import {
@@ -74,15 +74,13 @@ export function GeohashChatScreen({
 }: GeohashChatScreenProps) {
   useLifecycleLogger('GeohashChatScreen');
 
-  const [foreground, surfaceSecondary, shade400, shade500, accent, accentForeground] =
-    useThemeColor([
-      'foreground',
-      'surface-secondary',
-      'shade-400',
-      'shade-500',
-      'accent',
-      'accent-foreground',
-    ] as const);
+  const [foreground, shade400, shade500, accent, accentForeground] = useThemeColor([
+    'foreground',
+    'shade-400',
+    'shade-500',
+    'accent',
+    'accent-foreground',
+  ] as const);
 
   const { messages, isConnected, sendMessage } = useBitChat(
     geohash,
@@ -258,35 +256,17 @@ export function GeohashChatScreen({
     const isUnknownOrOffline = !dmPeerSnapshot || !dmPeerSnapshot.isConnected;
     if (isMeshOnly) {
       bleDmBanner = (
-        <HStack
-          gap={8}
-          align="center"
-          style={{
-            paddingHorizontal: 16,
-            paddingVertical: 10,
-            backgroundColor: surfaceSecondary,
-          }}>
-          <Icon name="mdi:lan-disconnect" size={16} color={shade400} />
-          <Text size={12} style={{ color: shade400, flex: 1 }} numberOfLines={2}>
-            Reachable only via mesh relay — messages may take several attempts.
-          </Text>
-        </HStack>
+        <ChatStatusStrip
+          icon="mdi:lan-disconnect"
+          text="Reachable only via mesh relay — messages may take several attempts."
+        />
       );
     } else if (isUnknownOrOffline) {
       bleDmBanner = (
-        <HStack
-          gap={8}
-          align="center"
-          style={{
-            paddingHorizontal: 16,
-            paddingVertical: 10,
-            backgroundColor: surfaceSecondary,
-          }}>
-          <Icon name="mdi:bluetooth-off" size={16} color={shade400} />
-          <Text size={12} style={{ color: shade400, flex: 1 }} numberOfLines={2}>
-            Peer is not currently nearby — your message will be queued briefly.
-          </Text>
-        </HStack>
+        <ChatStatusStrip
+          icon="mdi:bluetooth-off"
+          text="Peer is not currently nearby — your message will be queued briefly."
+        />
       );
     }
   }

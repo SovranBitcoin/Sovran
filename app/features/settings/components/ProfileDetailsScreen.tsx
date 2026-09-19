@@ -15,6 +15,7 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Button, Card, Description, Input, Label, TextField } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import type { ProfileEntry } from '@/shared/stores/global/profileStore';
+import { Notice } from '@/shared/ui/composed/Notice';
 import { log } from '@/shared/lib/logger';
 
 const DebugRow: React.FC<{ label: string; value: string }> = ({ label, value }) => {
@@ -57,7 +58,6 @@ export function ProfileDetailsScreen({
   onBack?: () => void;
 }) {
   const mutedColor = useThemeColor('muted');
-  const dangerColor = useThemeColor('danger');
   const backgroundColor = useThemeColor('background');
   const shift = useShiftLogger('SettingsProfileScreen');
   const [visibleFields, setVisibleFields] = useState({
@@ -240,21 +240,14 @@ export function ProfileDetailsScreen({
           Keys and recovery
         </Text>
 
-        <Card variant="secondary" className="border-danger bg-danger/[0.08] mb-4 border">
-          <Card.Body className="flex-row items-start gap-3 py-4">
-            <Icon name="mdi:shield" size={20} color={dangerColor} />
-            <View className="flex-1">
-              <Text bold size={14} className="text-danger">
-                Sovran will never ask for these
-              </Text>
-              <Text size={13} className="mt-1">
-                Your recovery phrase, nsec, and private keys are the keys to your money and
-                identity. Never share them with anyone — not even Sovran support. Anyone who asks
-                for them is trying to steal from you.
-              </Text>
-            </View>
-          </Card.Body>
-        </Card>
+        <Notice
+          status="danger"
+          tone="soft"
+          title="Sovran will never ask for these"
+          description="Your recovery phrase, nsec, and private keys are the keys to your money and identity. Never share them with anyone — not even Sovran support. Anyone who asks for them is trying to steal from you."
+          className="mb-4 py-4"
+          testID="settings-keys-warning"
+        />
 
         <ListRow
           testID="settings-backup-row"
