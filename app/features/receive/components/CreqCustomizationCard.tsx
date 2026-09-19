@@ -27,7 +27,6 @@ import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { View } from '@/shared/ui/primitives/View/View';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { copyPopup } from '@/shared/lib/popup';
-import { truncateMiddle } from '@/shared/lib/strings';
 import { paymentLog } from '@/shared/lib/logger';
 import Icon from '@/assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -36,8 +35,6 @@ import { ANIMATE_THRESHOLD } from '@/shared/lib/qr';
 interface CreqCustomizationCardProps {
   /** The (already re-encoded) request string shown in the copy row. */
   encodedRequest: string;
-  /** The request just landed from a fetch: play the copy row's decode once. */
-  reveal?: boolean;
   muted: string;
   /** Latest keyring P2PK pubkey (02-prefixed) — absent → lock toggle disabled. */
   p2pkKey?: string;
@@ -62,7 +59,6 @@ interface CreqCustomizationCardProps {
 
 export const CreqCustomizationCard = memo(function CreqCustomizationCard({
   encodedRequest,
-  reveal = false,
   muted,
   p2pkKey,
   mintSelection,
@@ -122,8 +118,7 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
       <ListGroup variant="transparent">
         <CopyRequestRow
           icon="ph:coins"
-          display={truncateMiddle(encodedRequest, 10)}
-          reveal={reveal}
+          parts={[{ value: encodedRequest }]}
           muted={muted}
           onPress={handleCopy}
           testID="receive-creq-copy"

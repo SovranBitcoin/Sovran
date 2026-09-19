@@ -198,7 +198,6 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
       </View>
       <CreqCustomizationCard
         encodedRequest={request.encodedRequest}
-        reveal={revealPending}
         muted={muted}
         p2pkKey={p2pkKey}
         mintSelection={mintSelection}

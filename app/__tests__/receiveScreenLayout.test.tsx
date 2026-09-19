@@ -333,16 +333,6 @@ jest.mock('assets/icons', () => ({
   },
 }));
 
-// The copy row's cipher readout is a native TextInput driven from a worklet;
-// under react-native-web's TextInput it reaches for `document`. Row wiring is
-// pinned by copyRequestCard.test — here it only needs to mount.
-jest.mock('@/shared/ui/primitives/ScrambleText', () => ({
-  ScrambleText: (props: Record<string, unknown>) => {
-    const ReactActual = jest.requireActual<typeof import('react')>('react');
-    return ReactActual.createElement('ScrambleText', props);
-  },
-}));
-
 jest.mock('heroui-native', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
 
