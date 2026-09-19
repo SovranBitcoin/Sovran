@@ -240,12 +240,7 @@ describe('persisted store round-trip', () => {
     useProfileStore.setState(original);
   });
 
-  it.each([
-    {},
-    { bolt12: true },
-    { onchain: true, creq: false },
-    { onchain: true, bolt12: true, creq: true },
-  ])('round-trips Unified exclusions %j without losing mint preferences', (bip321ExcludedRails) => {
+  it('round-trips mint preferences without persisting actions', () => {
     const { useMintStore } =
       require('@/shared/stores/profile/mintStore') as typeof import('@/shared/stores/profile/mintStore');
     const state = {
@@ -254,57 +249,44 @@ describe('persisted store round-trip', () => {
       activeUnit: 'usd' as const,
       creqP2pkLock: true,
       creqExcludedMints: { 'https://other.example': true },
-      bip321ExcludedRails,
     };
     const options = useMintStore.persist.getOptions();
     const persisted = JSON.parse(JSON.stringify(options.partialize!(state)));
-    expect(persisted.bip321ExcludedRails).toEqual(bip321ExcludedRails);
     const hydrated = options.merge!(persisted, useMintStore.getInitialState());
     expect(hydrated).toMatchObject({
       selectedMint: state.selectedMint,
       activeUnit: 'usd',
       creqP2pkLock: true,
       creqExcludedMints: state.creqExcludedMints,
-      bip321ExcludedRails,
     });
-    expect(hydrated.setBip321RailExcluded).toBe(state.setBip321RailExcluded);
-    expect(persisted.setBip321RailExcluded).toBeUndefined();
+    expect(persisted.setCreqP2pkLock).toBeUndefined();
   });
 
-  it.each([undefined, null, 'invalid', { bolt12: 'yes' }])(
-    'contains missing or malformed Unified exclusions %j to their field',
+  // The Unified per-rail switches were removed; blobs saved while they
+  // existed must still rehydrate every other preference (the persist merge
+  // discards the whole blob if any field fails to parse).
+  it.each([{}, { bolt12: true }, { onchain: true, bolt12: true, creq: true }, 'invalid', null])(
+    'rehydrates an old blob holding removed Unified exclusions %j',
     (bip321ExcludedRails) => {
       const { useMintStore } =
         require('@/shared/stores/profile/mintStore') as typeof import('@/shared/stores/profile/mintStore');
       const hydrated = useMintStore.persist.getOptions().merge!(
-        { selectedMint: 'https://mint.example', creqP2pkLock: true, bip321ExcludedRails },
+        {
+          selectedMint: 'https://mint.example',
+          creqP2pkLock: true,
+          creqExcludedMints: { 'https://other.example': true },
+          bip321ExcludedRails,
+        },
         useMintStore.getInitialState()
       );
       expect(hydrated).toMatchObject({
         selectedMint: 'https://mint.example',
         creqP2pkLock: true,
-        bip321ExcludedRails: {},
+        creqExcludedMints: { 'https://other.example': true },
       });
+      expect(hydrated).not.toHaveProperty('bip321ExcludedRails');
     }
   );
-
-  it('updates and resets Unified exclusions atomically without clearing unavailable rails', () => {
-    const { useMintStore } =
-      require('@/shared/stores/profile/mintStore') as typeof import('@/shared/stores/profile/mintStore');
-    const original = useMintStore.getState();
-    try {
-      useMintStore.setState({ bip321ExcludedRails: {} });
-      original.setBip321RailExcluded('onchain', true);
-      original.setBip321RailExcluded('bolt12', true);
-      original.setBip321RailExcluded('creq', true);
-      original.resetBip321RailExclusions(['onchain', 'creq']);
-      expect(useMintStore.getState().bip321ExcludedRails).toEqual({ bolt12: true });
-      original.setBip321RailExcluded('bolt12', false);
-      expect(useMintStore.getState().bip321ExcludedRails).toEqual({});
-    } finally {
-      useMintStore.setState(original);
-    }
-  });
 
   it('round-trips prices and server time without persisting transient state', () => {
     const { usePricelistStore } =

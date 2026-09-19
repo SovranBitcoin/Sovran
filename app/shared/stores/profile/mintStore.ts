@@ -7,7 +7,6 @@ import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStor
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 export type Bip321RailId = 'onchain' | 'bolt12' | 'creq';
-export type Bip321ExcludedRails = Partial<Record<Bip321RailId, boolean>>;
 
 const profileStorage = createProfileScopedStorage();
 
@@ -34,8 +33,6 @@ interface MintState {
    *  Advanced section (url → true). Advertisement-only — the mint stays
    *  trusted, so payments sent to an old copy of the request still claim. */
   creqExcludedMints: Record<string, boolean>;
-  /** Unified URI advertisement preferences, scoped to this profile. */
-  bip321ExcludedRails: Bip321ExcludedRails;
 }
 
 interface MintActions {
@@ -45,8 +42,6 @@ interface MintActions {
   setReceiveMintForMethod: (method: 'bolt12' | 'onchain', mintUrl: string) => void;
   setCreqP2pkLock: (enabled: boolean) => void;
   setCreqMintExcluded: (mintUrl: string, excluded: boolean) => void;
-  setBip321RailExcluded: (rail: Bip321RailId, excluded: boolean) => void;
-  resetBip321RailExclusions: (rails: Bip321RailId[]) => void;
 }
 
 type MintStore = MintState & MintActions;
@@ -69,12 +64,9 @@ const PersistedMintStore = z.object({
   // Additive tolerant field: a corrupt map degrades to {} (all mints
   // advertised again) instead of wiping the store.
   creqExcludedMints: z.record(z.string().max(2048), z.boolean()).default({}).catch({}),
-  // Zod 4 enum-keyed records are exhaustive: partialRecord preserves sparse
-  // exclusions such as { bolt12: true }. Invalid maps reset only this field.
-  bip321ExcludedRails: z
-    .partialRecord(z.enum(['onchain', 'bolt12', 'creq']), z.boolean())
-    .default({})
-    .catch({}),
+  // `bip321ExcludedRails` (Unified per-rail opt-outs) was removed with its
+  // switches: the Unified request now always carries every available rail.
+  // Old blobs still holding it parse fine — z.object strips the unknown key.
 });
 
 // v1 -> v2: the storage seam (createProfileScopedStorage) already partitions
@@ -109,7 +101,6 @@ export const useMintStore = create<MintStore>()(
       receiveMintByMethod: {},
       creqP2pkLock: false,
       creqExcludedMints: {},
-      bip321ExcludedRails: {},
 
       setSelectedMint: (mintUrl: string) => {
         storeLog.info('store.mint.set_selected', { mintUrl });
@@ -146,25 +137,6 @@ export const useMintStore = create<MintStore>()(
         });
       },
 
-      setBip321RailExcluded: (rail, excluded) => {
-        storeLog.info('store.mint.set_bip321_rail_excluded', { rail, excluded });
-        set((state) => {
-          const next = { ...state.bip321ExcludedRails };
-          if (excluded) next[rail] = true;
-          else delete next[rail];
-          return { bip321ExcludedRails: next };
-        });
-      },
-
-      resetBip321RailExclusions: (rails) => {
-        storeLog.info('store.mint.bip321_exclusions_reset', { count: rails.length });
-        set((state) => {
-          const next = { ...state.bip321ExcludedRails };
-          for (const rail of rails) delete next[rail];
-          return { bip321ExcludedRails: next };
-        });
-      },
-
       setReceiveMintForMethod: (method: 'bolt12' | 'onchain', mintUrl: string) => {
         storeLog.info('store.mint.set_receive_mint_for_method', {
           method,
@@ -188,7 +160,6 @@ export const useMintStore = create<MintStore>()(
         receiveMintByMethod: state.receiveMintByMethod,
         creqP2pkLock: state.creqP2pkLock,
         creqExcludedMints: state.creqExcludedMints,
-        bip321ExcludedRails: state.bip321ExcludedRails,
       }),
     })
   )

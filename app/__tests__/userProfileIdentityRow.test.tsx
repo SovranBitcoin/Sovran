@@ -28,7 +28,6 @@ jest.mock('@/shared/hooks/useSingleFlight', () => ({}));
 jest.mock('@/shared/lib/debug/fadeRevealProbe', () => ({}));
 jest.mock('@/shared/lib/nostr/client', () => ({}));
 jest.mock('@/shared/lib/nostr/publish', () => ({}));
-jest.mock('@/shared/ui/composed/Card', () => ({}));
 jest.mock('@/shared/ui/composed/Section', () => ({}));
 jest.mock('@/shared/ui/primitives/Avatar', () => ({}));
 jest.mock('@/shared/lib/url', () => ({}));

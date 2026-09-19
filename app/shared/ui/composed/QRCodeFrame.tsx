@@ -122,9 +122,8 @@ function QrJunkLayers({ expectedLength, size }: { expectedLength: number; size: 
   );
 }
 
-/** The junk code wiping away top → bottom over a freshly rendered real QR, in
- * lockstep with the copy row's glyphs settling left → right (`ScrambleText`,
- * same `SCRAMBLE_DECODE_MS`, same linear curve). Mount it over the live QR
+/** The junk code wiping away top → bottom over a freshly rendered real QR
+ * (`SCRAMBLE_DECODE_MS`, linear curve). Mount it over the live QR
  * when its value lands; it calls `onDone` once fully revealed so the caller
  * can unmount it. Transform-only: the clip is the outer box intersected with
  * a wrapper sliding down, whose content slides up by the same amount so the

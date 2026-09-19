@@ -1,7 +1,7 @@
 import React from 'react';
 
-import { Card } from '@/shared/ui/composed/Card';
 import { DetailsList } from '@/shared/ui/composed/DetailsList';
+import { Notice } from '@/shared/ui/composed/Notice';
 import { PillTabs } from '@/shared/ui/composed/PillTabs';
 import {
   RowStatsAccent,
@@ -27,8 +27,8 @@ import type { DesignSystemScenario } from './types';
 const SOURCES = {
   badge: 'shared/ui/primitives/Badge.tsx',
   button: 'shared/ui/primitives/Button.tsx',
-  card: 'shared/ui/composed/Card.tsx',
   detailsList: 'shared/ui/composed/DetailsList.tsx',
+  notice: 'shared/ui/composed/Notice.tsx',
   hstack: 'shared/ui/primitives/View/HStack.tsx',
   pillTabs: 'shared/ui/composed/PillTabs.tsx',
   rowStats: 'shared/ui/composed/RowStatsAccent.tsx',
@@ -185,13 +185,34 @@ export const FOUNDATION_SCENARIOS = [
     ),
   },
   {
-    id: 'notice-cards',
-    title: 'Information and warning cards',
-    covers: [SOURCES.card, SOURCES.vstack],
+    id: 'notices',
+    title: 'Notices',
+    covers: [SOURCES.notice, SOURCES.vstack],
     render: () => (
-      <VStack gap={12}>
-        <Card title="Information" message="This is a neutral supporting message." variant="info" />
-        <Card title="Check this" message="This action needs your attention." variant="warning" />
+      <VStack className="gap-3">
+        <Notice
+          status="info"
+          title="About this mint"
+          description="A quiet note that supports the page."
+        />
+        <Notice
+          status="info"
+          icon="ri:chat-quote-line"
+          title="Memo"
+          description="Info notices can carry their own icon."
+        />
+        <Notice
+          status="warning"
+          title="Onchain deposit limits"
+          description="Send between 10,000 and 5,000,000 sats. Deposits outside this range won't be credited and could be lost."
+        />
+        <Notice
+          status="danger"
+          title="This can't be undone"
+          description="Deleting the wallet erases its ecash from this device."
+        />
+        <Notice status="warning" title="Title-only notice" />
+        <Notice status="info" description="Description-only notice." />
       </VStack>
     ),
   },

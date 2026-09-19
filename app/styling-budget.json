@@ -389,7 +389,7 @@
     "stack-layout-props": 2
   },
   "features/settings/design-system/foundations.tsx": {
-    "stack-layout-props": 11
+    "stack-layout-props": 10
   },
   "features/settings/design-system/segmentedProgress.tsx": {
     "stack-layout-props": 2
@@ -777,9 +777,6 @@
   "shared/ui/composed/CapsuleButton/CapsuleButton.liquid.tsx": {
     "stylesheet-create": 1
   },
-  "shared/ui/composed/Card.tsx": {
-    "inline-style": 4
-  },
   "shared/ui/composed/CircleActionButton/CircleActionButton.flat.tsx": {
     "stylesheet-create": 1
   },
@@ -974,9 +971,6 @@
     "stylesheet-create": 1,
     "inline-style": 1,
     "stack-layout-props": 1
-  },
-  "shared/ui/primitives/ScrambleText.tsx": {
-    "stylesheet-create": 1
   },
   "shared/ui/primitives/SelectableCheck/SelectableCheck.circle.tsx": {
     "inline-style": 1

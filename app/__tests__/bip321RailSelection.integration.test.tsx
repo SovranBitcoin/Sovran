@@ -4,19 +4,16 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { ReceiveUnifiedTab } from '@/features/receive/components/ReceiveUnifiedTab';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { deriveBip321RailSelection } from '@/features/receive/lib/bip321RailSelection';
-import type { Bip321ExcludedRails } from '@/shared/stores/profile/mintStore';
 import { setStringAsync } from 'expo-clipboard';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const mockSetExcluded = jest.fn();
 const mockQuote = jest.fn();
+jest.mock('@/features/receive/components/OnchainDepositLimitsCard', () => ({
+  OnchainDepositLimitsCard: () => null,
+}));
 jest.mock('wallet/react', () => ({
   useReusableMintQuote: (...args: unknown[]) => mockQuote(...args),
-}));
-jest.mock('@/shared/stores/profile/mintStore', () => ({
-  useMintStore: (selector: (state: unknown) => unknown) =>
-    selector({ setBip321RailExcluded: mockSetExcluded }),
 }));
 jest.mock('@/features/receive/lib/standingQuoteIdentityStore', () => ({
   standingQuoteIdentityStore: {},
@@ -26,7 +23,13 @@ jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
 jest.mock('@/shared/lib/popup', () => ({ copyPopup: jest.fn(), paramPopup: jest.fn() }));
 jest.mock('@/shared/ui/primitives/Haptics', () => ({ EnhancedHaptics: { copyHaptic: jest.fn() } }));
 jest.mock('@/shared/lib/strings', () => ({ truncateMiddle: (value: string) => value }));
-jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: (tokens: string[]) => tokens }));
+jest.mock('@/shared/hooks/useThemeColor', () => ({
+  useThemeColor: (tokens: string | string[]) =>
+    Array.isArray(tokens)
+      ? tokens
+      : jest.requireActual<typeof import('@/shared/lib/brandColors')>('@/shared/lib/brandColors')
+          .INVARIANT_WHITE,
+}));
 jest.mock('uniwind', () => ({ withUniwind: (component: unknown) => component }));
 jest.mock('@/assets/icons', () => ({ __esModule: true, default: () => null }));
 jest.mock('assets/icons', () => ({
@@ -34,7 +37,7 @@ jest.mock('assets/icons', () => ({
   default: () => null,
   CurrencyIcon: () => null,
 }));
-// The unified tab keeps its customization card mounted while loading and
+// The unified tab keeps its rails card mounted while loading and
 // draws the junk QR placeholder above it; the placeholder's worklet layers are
 // covered by qrPlaceholderFrames.test — here it only needs to mount.
 jest.mock('@/shared/ui/composed/QRCodeFrame', () => ({
@@ -45,13 +48,6 @@ jest.mock('@/shared/ui/composed/QRCodeFrame', () => ({
     jest
       .requireActual<typeof import('react')>('react')
       .createElement('PaymentQRCodePlaceholder', props),
-}));
-// The copy row's cipher readout is a worklet-driven native TextInput; under
-// react-native-web's TextInput it reaches for `document`. Row wiring is
-// pinned by copyRequestCard.test — here it only needs to mount.
-jest.mock('@/shared/ui/primitives/ScrambleText', () => ({
-  ScrambleText: (props: Record<string, unknown>) =>
-    jest.requireActual<typeof import('react')>('react').createElement('ScrambleText', props),
 }));
 jest.mock('@/shared/blocks/PaymentInfo', () => ({ PaymentInfo: () => null }));
 jest.mock('@/features/receive/components/ReceiveRailPlaceholder', () => ({
@@ -87,16 +83,12 @@ jest.mock('heroui-native', () => {
 });
 
 const allAvailable = { onchain: true, bolt12: true, creq: true };
-function props(
-  excluded: Bip321ExcludedRails = {},
-  available = allAvailable
-): React.ComponentProps<typeof ReceiveUnifiedTab> {
+function props(available = allAvailable): React.ComponentProps<typeof ReceiveUnifiedTab> {
   return {
     unit: 'sat',
     muted: 'muted',
     bip321: {
-      selection: deriveBip321RailSelection({ available, excluded }),
-      excluded,
+      selection: deriveBip321RailSelection({ available }),
       onchainMint: 'https://mint.example',
       bolt12Mint: 'https://mint.example',
     },
@@ -116,7 +108,7 @@ function props(
   };
 }
 
-describe('Unified rail controls and payload', () => {
+describe('Unified rails and payload', () => {
   let renderer: TestRenderer.ReactTestRenderer;
   // The disabled hook deliberately retains a result: a real hook can keep its
   // previous quote until its null-input effect runs. The tab must mask it.
@@ -135,83 +127,47 @@ describe('Unified rail controls and payload', () => {
     renderer.root.findAllByProps({ testID: id }).find((node) => typeof node.type === 'string')!;
   const qr = () => renderer.root.findByType(PaymentInfo).props.data as string;
 
-  it('switches BOLT 12 off/on through row controls and keeps QR, copy and AX state aligned', async () => {
+  it('lists every rail with its own copy row, each copying just its value', async () => {
+    const input = props();
     act(() => {
-      renderer = TestRenderer.create(<ReceiveUnifiedTab {...props()} />);
+      renderer = TestRenderer.create(<ReceiveUnifiedTab {...input} />);
     });
     expect(qr()).toBe('bitcoin:bc1fixture?lno=lnofixture&creq=creqBfixture');
     expect(qr()).not.toContain('lightning=');
-    act(() => {
-      control('receive-unified-advanced-toggle').props.onPress();
-    });
-    const bolt12 = control('receive-unified-rail-switch-bolt12');
-    expect(bolt12.props.accessibilityRole).toBe('switch');
-    expect(bolt12.props.accessibilityState).toEqual({ checked: true, disabled: false });
-    act(() => {
-      bolt12.props.onPress();
-    });
-    expect(mockSetExcluded).toHaveBeenLastCalledWith('bolt12', true);
-    const offProps = props({ bolt12: true });
-    act(() => renderer.update(<ReceiveUnifiedTab {...offProps} />));
-    expect(mockQuote).toHaveBeenLastCalledWith(null, {});
-    expect(qr()).toBe('bitcoin:bc1fixture?creq=creqBfixture');
-    expect(offProps.onQrPayload).toHaveBeenLastCalledWith({ value: qr(), copyTarget: 'bip321' });
-    expect(control('receive-unified-rail-switch-bolt12').props.accessibilityState).toEqual({
-      checked: false,
-      disabled: false,
-    });
-    expect(control('receive-unified-rails-state').props.accessibilityValue.text).toBe(
-      'onchain:1,bolt12:0,creq:1'
-    );
-    await act(async () => control('receive-unified-copy').props.onPress());
-    expect(setStringAsync).toHaveBeenLastCalledWith(qr());
-    act(() => {
-      control('receive-unified-rail-switch-bolt12').props.onPress();
-    });
-    expect(mockSetExcluded).toHaveBeenLastCalledWith('bolt12', false);
-    act(() => renderer.update(<ReceiveUnifiedTab {...props()} />));
-    expect(qr()).toContain('lno=lnofixture');
+    expect(input.onQrPayload).toHaveBeenLastCalledWith({ value: qr(), copyTarget: 'bip321' });
     expect(control('receive-unified-rails-state').props.accessibilityValue.text).toBe(
       'onchain:1,bolt12:1,creq:1'
     );
+    // No switches or Advanced section any more.
+    expect(
+      renderer.root.findAllByProps({ testID: 'receive-unified-advanced-toggle' })
+    ).toHaveLength(0);
+    // First row: the whole bitcoin: link, the QR's own payload.
+    await act(async () => control('receive-unified-copy').props.onPress());
+    expect(setStringAsync).toHaveBeenLastCalledWith(qr());
+    await act(async () => control('receive-unified-copy-onchain').props.onPress());
+    expect(setStringAsync).toHaveBeenLastCalledWith('bc1fixture');
+    await act(async () => control('receive-unified-copy-bolt12').props.onPress());
+    expect(setStringAsync).toHaveBeenLastCalledWith('lnofixture');
+    // The Cashu row copies what the Cashu tab copies (creqA), while the URI
+    // carries the same request as creqB.
+    await act(async () => control('receive-unified-copy-creq').props.onPress());
+    expect(setStringAsync).toHaveBeenLastCalledWith('creqAfixture');
   });
 
-  it('locks the last enabled method and explains unavailable rails in Advanced', () => {
-    const input = props({ onchain: true }, { ...allAvailable, bolt12: false });
+  it('keeps an unavailable rail listed with its reason and out of the QR', () => {
+    const input = props({ ...allAvailable, bolt12: false });
     input.bip321.selection.rails[1].reason = 'No trusted mint supports BOLT 12 for sat';
     act(() => {
       renderer = TestRenderer.create(<ReceiveUnifiedTab {...input} />);
     });
-    expect(qr()).toBe('bitcoin:?creq=creqBfixture');
-    act(() => {
-      control('receive-unified-advanced-toggle').props.onPress();
-    });
-    const cashu = control('receive-unified-rail-switch-creq');
-    expect(cashu.props.accessibilityState).toEqual({ checked: true, disabled: true });
-    act(() => {
-      cashu.props.onPress();
-    });
-    expect(mockSetExcluded).not.toHaveBeenCalled();
-    const bolt12 = control('receive-unified-rail-switch-bolt12');
-    expect(bolt12.props.accessibilityState).toEqual({ checked: false, disabled: true });
-    expect(bolt12.props.accessibilityHint).toBe(input.bip321.selection.rails[1].reason);
+    expect(qr()).toBe('bitcoin:bc1fixture?creq=creqBfixture');
+    expect(mockQuote).toHaveBeenCalledWith(null, {});
+    expect(control('receive-unified-unavailable-bolt12')).toBeDefined();
+    expect(renderer.root.findAllByProps({ testID: 'receive-unified-copy-bolt12' })).toHaveLength(0);
     expect(JSON.stringify(renderer.toJSON())).toContain(input.bip321.selection.rails[1].reason);
-  });
-
-  it('waits for enabled methods only and never includes an excluded Cashu request', () => {
-    const input = props({ creq: true, bolt12: true });
-    input.creq.isLoading = true;
-    mockQuote.mockImplementation((quoteInput: unknown) => ({
-      quote: { request: 'bc1fixture' },
-      isLoading: !quoteInput,
-      error: null,
-    }));
-    act(() => {
-      renderer = TestRenderer.create(<ReceiveUnifiedTab {...input} />);
-    });
-    expect(qr()).toBe('bitcoin:bc1fixture');
     expect(control('receive-unified-rails-state').props.accessibilityValue.text).toBe(
-      'onchain:1,bolt12:0,creq:0'
+      'onchain:1,bolt12:0,creq:1'
     );
   });
 
@@ -227,14 +183,16 @@ describe('Unified rail controls and payload', () => {
     expect(qr()).toContain('creq=creqBfixture');
   });
 
-  it('does not label a failed quote as included and keeps Advanced reachable', () => {
-    const input = props({}, { onchain: true, bolt12: false, creq: false });
+  it('does not label a failed quote as included', () => {
+    const input = props({ onchain: true, bolt12: false, creq: false });
     mockQuote.mockReturnValue({ quote: null, isLoading: false, error: 'private upstream detail' });
     act(() => {
       renderer = TestRenderer.create(<ReceiveUnifiedTab {...input} />);
     });
     expect(renderer.root.findAllByType(PaymentInfo)).toHaveLength(0);
-    expect(control('receive-unified-advanced-toggle')).toBeDefined();
+    expect(control('receive-unified-rails-state').props.accessibilityValue.text).toBe(
+      'onchain:0,bolt12:0,creq:0'
+    );
     expect(JSON.stringify(renderer.toJSON())).not.toContain('private upstream detail');
   });
 });

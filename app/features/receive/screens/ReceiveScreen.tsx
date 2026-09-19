@@ -140,7 +140,7 @@ const ReceiveLightningTab = memo(function ReceiveLightningTab({
       <CopyRequestCard
         title="RECEIVE ADDRESS"
         icon="mingcute:lightning-fill"
-        display={npcAddress.truncate(6)}
+        parts={[{ value: npcAddress.toString(), kind: 'lightningAddress' }]}
         muted={muted}
         onPress={async () => {
           await EnhancedHaptics.copyHaptic();

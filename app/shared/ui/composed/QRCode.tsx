@@ -81,7 +81,7 @@ interface AnimatedQRCodeProps {
    */
   size?: number;
   /** The value just arrived from a lazy fetch: wipe the junk placeholder away
-   * over the real code once, on mount (in lockstep with `ScrambleText`). A QR
+   * over the real code once, on mount. A QR
    * mounted with data it already had renders immediately. */
   reveal?: boolean;
 }
@@ -155,8 +155,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
 
   // Cosmetic decode-in, only when the caller says the value just landed
   // (`reveal`): the junk placeholder keeps cycling over the real code and
-  // wipes away in lockstep with the copy row's glyphs settling
-  // (`ScrambleText`). Decided once at mount — a later value change (a rail
+  // wipes away. Decided once at mount — a later value change (a rail
   // toggle, the next UR fragment) is data the screen already has. Off under
   // reduced motion and Android e2e (a perpetual tick blinds uiautomator).
   const reducedMotion = useReducedMotion();

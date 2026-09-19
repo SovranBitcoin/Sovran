@@ -8,16 +8,18 @@ when a consequential decision is unresolved.
 
 ## Code rules
 
-Sovran's conventions are code-review rules in [hunch.config.ts](hunch.config.ts),
-grouped by area (errors, async, money, secrets, UI, stores, Nostr, wallet). Read
-the rules for the area you are changing before you write code, and check a change
-before handing it off:
+Read [contributor conventions](docs/review/contributor-conventions.md) for the area you are
+changing. [hunch.config.ts](hunch.config.ts) contains the smaller set of automated semantic
+concerns; [review contracts](docs/review/contracts.md) supplies their domain meaning. Hunch
+findings are candidates to verify, and insufficient context is a coverage gap. Run lint, types
+and relevant tests independently. Validate policy edits with `hunch config` using a CLI version
+that supports `review` and choice `abstain`, then check the change:
 
 ```sh
-npx @kelbie/hunch check --base origin/main
+hunch check --base origin/main
 ```
 
-Rules cover what linting and type checks can't. Record significant decisions as
+Record significant decisions as
 ADRs in [app/docs/adr](app/docs/adr); public claims and their evidence live in
 [CLAIMS.md](CLAIMS.md). Open follow-up work is in
 [docs/architecture/follow-ups.md](docs/architecture/follow-ups.md).
@@ -91,7 +93,8 @@ license and refresh command beside it.
 
 Skills are standard, upstream skills committed under `.agents/skills/`, the
 cross-agent location; `.claude/skills/` links to the same folders. Sovran-specific
-rules belong in `hunch.config.ts`, not in custom skills. Load only the skill a
+semantic checks belong in `hunch.config.ts`; broader conventions belong in
+`docs/review/contributor-conventions.md`, not in custom skills. Load only the skill a
 task needs:
 
 | Skill | Use for |

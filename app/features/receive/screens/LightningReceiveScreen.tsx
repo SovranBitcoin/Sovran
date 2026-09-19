@@ -31,7 +31,7 @@ import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import type { ButtonHandlerButton } from '@/shared/ui/composed/ButtonHandler';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
-import { Card } from '@/shared/ui/composed/Card';
+import { Notice } from '@/shared/ui/composed/Notice';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
@@ -161,7 +161,15 @@ export function LightningReceiveScreen({
           ) : mintInfo ? (
             <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={entry} />
           ) : null}
-          {entry.metadata?.memo && <Card message={entry.metadata.memo} variant="info" />}
+          {entry.metadata?.memo && (
+            <Notice
+              status="info"
+              icon="ri:chat-quote-line"
+              title="Memo"
+              description={entry.metadata.memo}
+              className="mx-4"
+            />
+          )}
         </>
       }>
       <DetailsSection

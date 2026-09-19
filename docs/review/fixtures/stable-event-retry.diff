@@ -1,0 +1,8 @@
+# expect: 
+# task: Review the changed behavior in this synthetic policy fixture.
+diff --git a/app/shared/review-fixture.ts b/app/shared/review-fixture.ts
+--- a/app/shared/review-fixture.ts
++++ b/app/shared/review-fixture.ts
+@@ -1 +1 @@
+-async function retryPublish(signedEvent) { return relay.publish(signedEvent); }
++async function retryPublish(signedEvent) { await delay(); return relay.publish(signedEvent); }
