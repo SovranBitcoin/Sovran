@@ -15,46 +15,46 @@
         {
           "id": "skill/codebase-design/inject-external-service-dependencies",
           "section": "Codebase Design > Designing for testability",
-          "message": "Constructing a service dependency inside business logic prevents tests from substituting it.",
           "instructions": "Does `hunk` introduce business logic that constructs its own external service client instead of accepting that dependency as an argument or constructor parameter?",
           "criteria": {
             "true": "A business operation directly constructs a dependency such as StripeGateway or a third-party service client for its own use.",
             "false": "The dependency is injected. Construction occurs in application wiring, an adapter implementation, or test setup. The constructed object is an ordinary data value rather than a service dependency."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "Constructing a service dependency inside business logic prevents tests from substituting it."
         },
         {
           "id": "skill/codebase-design/return-computed-results",
           "section": "Codebase Design > Designing for testability",
-          "message": "A calculation communicates its result by mutating caller-owned input, making it harder to test independently.",
           "instructions": "Does `hunk` introduce a calculation that communicates its result by mutating caller-owned input instead of returning the computed result?",
           "criteria": {
             "true": "A calculation writes its computed value into an argument, such as assigning a discount-adjusted total to cart.total, without returning the computed result.",
             "false": "The calculation returns its result without mutating caller-owned input, or only mutates local working data. The operation implements an explicit state-changing or I/O responsibility rather than a calculation."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "A calculation communicates its result by mutating caller-owned input, making it harder to test independently."
         },
         {
           "id": "skill/codebase-design/keep-test-seams-internal",
           "section": "Deepening > Seam discipline",
-          "message": "Exposing an internal seam solely for tests expands the interface callers must understand.",
           "instructions": "Does `hunk` expose an implementation detail through the module's caller-facing interface explicitly so tests can access it?",
           "criteria": {
             "true": "A change makes an internal helper, dependency hook, or implementation state public or exported, with a comment or other explicit evidence that test access is the reason.",
             "false": "The seam remains private to the implementation, including internal seams used by the module's own tests. The exposed operation serves callers as part of the module's intended interface."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "Exposing an internal seam solely for tests expands the interface callers must understand."
         },
         {
           "id": "skill/codebase-design/assert-observable-outcomes",
           "section": "Deepening > Testing strategy: replace, don't layer",
-          "message": "Assertions on private implementation state couple tests to internal refactors.",
           "instructions": "Does `hunk` add a test assertion that bypasses encapsulation to inspect private implementation state?",
           "criteria": {
             "true": "A test asserts on a private field or internal state obtained through a visibility bypass, reflection, or a cast used to circumvent private access.",
             "false": "Tests assert returned values, public observable state, or effects observed through an adapter. Tests exercise permitted internal seams through their interfaces without bypassing encapsulation."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "Assertions on private implementation state couple tests to internal refactors."
         }
       ],
       "notChecked": [
@@ -99,7 +99,6 @@
         {
           "id": "skill/expo-router/keep-support-modules-outside-app",
           "section": "Route Structure > File Conventions",
-          "message": "A support module in app may be treated as a route.",
           "instructions": "Within Sovran, app/app is the Expo Router route directory; app/shared and app/features are outside it. Does `hunk` implement a standalone reusable component, type module, or utility module in the route directory?",
           "criteria": {
             "true": "A file under app is clearly implemented as a support module rather than a route screen or layout.",
@@ -107,12 +106,12 @@
           },
           "appliesTo": [
             "app/app/**/*.{ts,tsx,js,jsx}"
-          ]
+          ],
+          "message": "A support module in app may be treated as a route."
         },
         {
           "id": "skill/expo-router/keep-tab-membership-static",
           "section": "Native Tabs > Rules",
-          "message": "Changing tab membership at runtime can remount the navigator and lose navigation state.",
           "instructions": "Does `hunk` make the set of NativeTabs.Trigger elements change after the initial render?",
           "criteria": {
             "true": "Runtime state, an event, or an asynchronous update visibly adds or removes NativeTabs.Trigger elements.",
@@ -121,12 +120,12 @@
           "appliesTo": [
             "**/*.tsx",
             "**/*.jsx"
-          ]
+          ],
+          "message": "Changing tab membership at runtime can remount the navigator and lose navigation state."
         },
         {
           "id": "skill/expo-router/keep-trigger-visibility-static",
           "section": "Native Tabs > Conditional Tabs",
-          "message": "Toggling an individual tab's visibility can remount the navigator and lose state.",
           "instructions": "Does `hunk` change a NativeTabs.Trigger hidden value after the initial render?",
           "criteria": {
             "true": "The trigger's hidden prop depends on state that is visibly updated after initialization.",
@@ -135,12 +134,12 @@
           "appliesTo": [
             "**/*.tsx",
             "**/*.jsx"
-          ]
+          ],
+          "message": "Toggling an individual tab's visibility can remount the navigator and lose state."
         },
         {
           "id": "skill/expo-router/externalize-bottom-accessory-state",
           "section": "Native Tabs > Bottom Accessory (SDK 55+)",
-          "message": "State inside a bottom accessory can diverge between its simultaneously rendered instances.",
           "instructions": "Does `hunk` store mutable UI state inside a component rendered as NativeTabs.BottomAccessory content?",
           "criteria": {
             "true": "A component visibly used as bottom accessory content owns mutable state, such as playback state managed with useState or useReducer.",
@@ -149,12 +148,12 @@
           "appliesTo": [
             "**/*.tsx",
             "**/*.jsx"
-          ]
+          ],
+          "message": "State inside a bottom accessory can diverge between its simultaneously rendered instances."
         },
         {
           "id": "skill/expo-router/avoid-nested-native-tabs",
           "section": "Native Tabs > Limitations",
-          "message": "Nested native tab navigators are unsupported.",
           "instructions": "Does `hunk` render a NativeTabs navigator inside another NativeTabs navigator?",
           "criteria": {
             "true": "The JSX or locally defined component composition nests a native tab navigator beneath another native tab navigator.",
@@ -163,12 +162,12 @@
           "appliesTo": [
             "**/*.tsx",
             "**/*.jsx"
-          ]
+          ],
+          "message": "Nested native tab navigators are unsupported."
         },
         {
           "id": "skill/expo-router/prefer-native-tab-navigator",
           "section": "Native Tabs",
-          "message": "A JavaScript tab navigator bypasses the preferred native tab experience.",
           "instructions": "Does `hunk` implement native app tabs with a JavaScript tab navigator instead of NativeTabs?",
           "criteria": {
             "true": "An iOS or Android layout uses Expo Router Tabs or a JavaScript bottom-tab navigator when SDK 54 or later support is established.",
@@ -177,12 +176,12 @@
           "appliesTo": [
             "**/*.tsx",
             "**/*.jsx"
-          ]
+          ],
+          "message": "A JavaScript tab navigator bypasses the preferred native tab experience."
         },
         {
           "id": "skill/expo-router/use-router-modal-presentation",
           "section": "Navigation > Modal",
-          "message": "A custom modal screen bypasses the preferred Stack modal presentation.",
           "instructions": "Does `hunk` implement a route screen's modal presentation with a custom modal component instead of Stack.Screen presentation=\"modal\"?",
           "criteria": {
             "true": "A route screen is visibly presented through a hand-built modal overlay or React Native Modal instead of the Stack modal presentation option.",
@@ -191,12 +190,12 @@
           "appliesTo": [
             "**/*.tsx",
             "**/*.jsx"
-          ]
+          ],
+          "message": "A custom modal screen bypasses the preferred Stack modal presentation."
         },
         {
           "id": "skill/expo-router/show-search-empty-results",
           "section": "Search > Empty States",
-          "message": "A search with no matches may leave users looking at a blank results area.",
           "instructions": "Does `hunk` render search results with no empty-state UI for a query that has no matches?",
           "criteria": {
             "true": "A complete search-results rendering branch shows that an empty filtered collection produces only a blank list or empty container.",
@@ -205,12 +204,12 @@
           "appliesTo": [
             "**/*.tsx",
             "**/*.jsx"
-          ]
+          ],
+          "message": "A search with no matches may leave users looking at a blank results area."
         },
         {
           "id": "skill/expo-router/toolbar-view-explicit-dimensions",
           "section": "Components > View",
-          "message": "A custom toolbar view may lack the explicit dimensions required for layout.",
           "instructions": "Does `hunk` add or modify custom content inside `Stack.Toolbar.View` whose root native element lacks explicit width or height?",
           "criteria": {
             "true": "The custom content's root native element has visible styling that omits width or height, including replacing either dimension with flex or aspectRatio alone.",
@@ -219,12 +218,12 @@
           "appliesTo": [
             "**/*.tsx",
             "**/*.jsx"
-          ]
+          ],
+          "message": "A custom toolbar view may lack the explicit dimensions required for layout."
         },
         {
           "id": "skill/expo-router/keep-toolbar-wrapper-with-extracted-items",
           "section": "Recommendations",
-          "message": "Toolbar items extracted without their toolbar wrapper may not render correctly.",
           "instructions": "Does `hunk` define a component that returns `Stack.Toolbar.*` items outside a `Stack.Toolbar` wrapper and render that component as a child of `Stack.Toolbar`?",
           "criteria": {
             "true": "An extracted component returns toolbar buttons or other toolbar items in a fragment or another non-toolbar root, and a shown usage places that component inside Stack.Toolbar.",
@@ -233,12 +232,12 @@
           "appliesTo": [
             "**/*.tsx",
             "**/*.jsx"
-          ]
+          ],
+          "message": "Toolbar items extracted without their toolbar wrapper may not render correctly."
         },
         {
           "id": "skill/expo-router/bottom-toolbar-only-in-screens",
           "section": "Limitations",
-          "message": "A bottom toolbar declared in a layout file is unsupported.",
           "instructions": "Does `hunk` declare a bottom `Stack.Toolbar` in an Expo Router layout file?",
           "criteria": {
             "true": "A layout file adds or changes a Stack.Toolbar with placement=\"bottom\" or omitted placement, which defaults to bottom.",
@@ -248,12 +247,12 @@
             "**/_layout.tsx",
             "**/_layout.jsx",
             "**/_layout.js"
-          ]
+          ],
+          "message": "A bottom toolbar declared in a layout file is unsupported."
         },
         {
           "id": "skill/expo-router/badge-requires-header-toolbar",
           "section": "Limitations",
-          "message": "Toolbar badges do not work in bottom toolbars.",
           "instructions": "Does `hunk` place `Stack.Toolbar.Badge` in a bottom `Stack.Toolbar`?",
           "criteria": {
             "true": "An added or modified badge is enclosed by a toolbar with placement=\"bottom\" or omitted placement.",
@@ -262,7 +261,8 @@
           "appliesTo": [
             "**/*.tsx",
             "**/*.jsx"
-          ]
+          ],
+          "message": "Toolbar badges do not work in bottom toolbars."
         }
       ],
       "notChecked": [
@@ -387,7 +387,6 @@
         {
           "id": "agents-md/root/actionable-control-accessible-label",
           "section": "Native testability",
-          "message": "An actionable control may lack an accessible name.",
           "instructions": "Does `hunk` introduce or change an actionable native control without an accessible label?",
           "criteria": {
             "true": "An actionable control has neither an explicit accessible label nor visible text that supplies its accessible name, such as an icon-only button without accessibilityLabel.",
@@ -396,12 +395,12 @@
           "appliesTo": [
             "app/**/*.tsx",
             "app/**/*.jsx"
-          ]
+          ],
+          "message": "An actionable control may lack an accessible name."
         },
         {
           "id": "agents-md/root/probe-inside-active-surface",
           "section": "Native testability",
-          "message": "A state probe outside the active surface may be unavailable to the native harness.",
           "instructions": "Does `hunk` mount `E2EAccessibilityProbe` outside the active screen or sheet whose state it exposes?",
           "criteria": {
             "true": "The probe is mounted outside the screen or sheet containing the state it represents, such as beside a modal instead of inside its content.",
@@ -410,12 +409,12 @@
           "appliesTo": [
             "app/**/*.tsx",
             "app/**/*.jsx"
-          ]
+          ],
+          "message": "A state probe outside the active surface may be unavailable to the native harness."
         },
         {
           "id": "agents-md/root/native-scenario-state-waits",
           "section": "Native testability",
-          "message": "A fixed delay may let a native scenario proceed before the required state is ready.",
           "instructions": "Does `hunk` add a fixed-duration delay as the readiness check before a native scenario proceeds?",
           "criteria": {
             "true": "A native harness scenario sleeps or waits for an elapsed duration to assume that navigation, loading, or another state transition has completed.",
@@ -423,12 +422,12 @@
           },
           "appliesTo": [
             "app/**/*.json"
-          ]
+          ],
+          "message": "A fixed delay may let a native scenario proceed before the required state is ready."
         },
         {
           "id": "agents-md/root/native-scenario-no-side-effect-retries",
           "section": "Native testability",
-          "message": "A native scenario retry may repeat a send, publish, or delete.",
           "instructions": "Does `hunk` configure a native scenario to retry a send, publish, or delete action?",
           "criteria": {
             "true": "A retry or repeated-attempt construct re-executes an action that sends, publishes, or deletes.",
@@ -436,7 +435,8 @@
           },
           "appliesTo": [
             "app/**/*.json"
-          ]
+          ],
+          "message": "A native scenario retry may repeat a send, publish, or delete."
         }
       ],
       "notChecked": [
@@ -485,216 +485,215 @@
         {
           "id": "doc/docs/review/contributor-conventions/preserve-structured-errors",
           "section": "errors/structured",
-          "message": "Failure details may be lost before non-UI code can react to them.",
           "instructions": "Does `hunk` propagate a received error to non-UI code as a string, boolean, null, undefined, or generic Error without cause?",
           "criteria": {
             "true": "A caught or received error is replaced with a lossy value in a return, store write, or call used to communicate failure.",
             "false": "Errors are rethrown, wrapped with cause, preserved in typed errors or Results, or logged as objects; strings are display-only; a documented best-effort path deliberately ignores failure and its result decides nothing."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "Failure details may be lost before non-UI code can react to them."
         },
         {
           "id": "doc/docs/review/contributor-conventions/no-payment-decisions-from-messages",
           "section": "errors/not-for-decisions",
-          "message": "Payment recovery may depend on unstable human-readable text.",
           "instructions": "Does `hunk` decide retry, refund, balance, proof state, spent status, or payment recovery by matching human-readable text outside a sanctioned error classifier?",
           "criteria": {
             "true": "Message comparisons, includes calls, or regex matches directly decide one of these outcomes.",
             "false": "Decisions use typed data; a named classifier checks codes first and falls back to messages for libraries without codes, returning typed results; matching only selects display or log text."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "Payment recovery may depend on unstable human-readable text."
         },
         {
           "id": "doc/docs/review/contributor-conventions/uncertain-outcomes-stay-uncertain",
           "section": "payments/uncertain-outcomes",
-          "message": "An uncertain outcome may be recorded as a definitive payment or delivery result.",
           "instructions": "Does `hunk` treat a timeout, abort, cancellation, lost connection, or relay or mint acceptance as proof of definite payment failure, success, or message delivery?",
           "criteria": {
             "true": "Such an event directly marks an operation failed, refunded, paid, or delivered, or releases its proofs.",
             "false": "The outcome remains pending or unknown; a definitive protocol answer determines state; relay acceptance is recorded as sent or accepted."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "An uncertain outcome may be recorded as a definitive payment or delivery result."
         },
         {
           "id": "doc/docs/review/contributor-conventions/guard-async-result-ownership",
           "section": "async/owner-scope",
-          "message": "A stale async result may update a different request or profile.",
           "instructions": "Does `hunk` write an async result into state without an ownership guard where its starting profile, request, generation, or mounted component can visibly change in flight?",
           "criteria": {
             "true": "A fetch, await chain, subscription, or timer writes mutable shared or component state despite a visible opportunity for its owner to change.",
             "false": "Writes use cancellation, generation, request, mounted, or profile guards; writes are keyed by the starting input; state is identity-independent with harmless last-writer-wins behavior; work runs once for the app lifetime."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "A stale async result may update a different request or profile."
         },
         {
           "id": "doc/docs/review/contributor-conventions/async-cleanup",
           "section": "async/cleanup",
-          "message": "Every subscription, timer, listener or background promise has an owner that handles its failure and tears it down; `void promise` and empty catch blocks must not hide errors.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` create a subscription, listener, interval, or timeout without teardown in its visible owner lifecycle? Allowed: Cleanup releases the resource; a module-level singleton intentionally lives for the app lifetime.\n2. Does `hunk` discard a promise with `void` for visible network, storage, or wallet work without rejection handling? Allowed: A catch handler or internal try/catch handles failure; the call cannot reject or handles its own errors, including sanctioned haptics, loggers, navigation, and preventAutoHideAsync calls.\n3. Does `hunk` add an empty catch without a comment explaining why ignoring its failure is expected and harmless? Allowed: The catch handles the failure or documents why it is expected and harmless.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
             "false": "No listed concern is demonstrated, or each relevant case falls within its corresponding allowed exception."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "Every subscription, timer, listener or background promise has an owner that handles its failure and tears it down; `void promise` and empty catch blocks must not hide errors."
         },
         {
           "id": "doc/docs/review/contributor-conventions/net-transport",
           "section": "net/transport",
-          "message": "Make requests through the domain transport (apiClient, wallet/safeFetch, the Nostr facade) with caller cancellation and a bounded deadline, not a screen-local fetch.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` call fetch, axios, XMLHttpRequest, or WebSocket directly from a screen, component, hook, or feature module? Allowed: The code is a service transport or client threading a signal or timeout, uses the domain transport, belongs to an e2e or test harness, or fetches a local file or bundled asset.\n2. Does `hunk` make a network request with neither caller cancellation nor a bounded timeout? Allowed: The request threads a signal or timeout, uses the sanctioned transport, is test-harness code, or reads a local file or bundled asset.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
             "false": "No listed concern is demonstrated, or each relevant case falls within its corresponding allowed exception."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "Make requests through the domain transport (apiClient, wallet/safeFetch, the Nostr facade) with caller cancellation and a bounded deadline, not a screen-local fetch."
         },
         {
           "id": "doc/docs/review/contributor-conventions/net-retries",
           "section": "net/retries",
-          "message": "Retry only idempotent reads, with bounded backoff; payments and other side effects are reconciled against persisted state, never simply repeated.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` retry a payment, melt, mint, swap, send, publish, or other potentially executed write after failure? Allowed: The code retries idempotent reads, re-prepares an unexecuted operation, reconciles against persisted or mint state, or resends the same already-signed Nostr event.\n2. Does `hunk` introduce retries without an attempt bound? Allowed: Retries have an explicit attempt bound; the code reconciles state without repeating the failed operation.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
             "false": "No listed concern is demonstrated, or each relevant case falls within its corresponding allowed exception."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "Retry only idempotent reads, with bounded backoff; payments and other side effects are reconciled against persisted state, never simply repeated."
         },
         {
           "id": "doc/docs/review/contributor-conventions/validate-untrusted-input",
           "section": "input/parse-at-boundary",
-          "message": "Untrusted input may be used as validated application data.",
           "instructions": "Does `hunk` use untrusted boundary input through a TypeScript cast or unchecked property access without validating it?",
           "criteria": {
             "true": "Network, relay, parsed JSON, storage, QR, clipboard, NFC, or native callback data is cast or read without boundary validation.",
             "false": "Zod or a dedicated protocol decoder validates it; an SDK already validated it; every accessed field is explicitly narrowed; values are trusted in-process data or typed stores; route params are plain string identifiers or narrowed before use."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "Untrusted input may be used as validated application data."
         },
         {
           "id": "doc/docs/review/contributor-conventions/shape-does-not-establish-trust",
           "section": "input/structure-not-trust",
-          "message": "Shape validation may be mistaken for verification or authorization.",
           "instructions": "Does `hunk` use successful parsing or a shape check as evidence of signature validity, authorization, or proof spendability?",
           "criteria": {
             "true": "Parse success directly grants trust that requires signature, permission, or mint-state verification.",
             "false": "Those checks occur separately, or parsed data remains explicitly unverified for storage or display."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "Shape validation may be mistaken for verification or authorization."
         },
         {
           "id": "doc/docs/review/contributor-conventions/money-exact",
           "section": "money/exact",
-          "message": "Amounts that decide a payment use exact integer or SDK values with their unit and mint: no floating-point BTC math, toFixed, rounding, or coercion of invalid, negative or fractional input.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` derive a payment-deciding amount using floating-point BTC math, parseFloat, toFixed, or rounding fractional values? Allowed: Arithmetic uses integer sats or msats; conversion is display-only or a nonbinding fiat estimate; Math.ceil reserves integer-sat fees from integer division.\n2. Does `hunk` silently coerce invalid, negative, NaN, or fractional input into a valid payment-deciding amount? Allowed: Validation rejects invalid values; conversion only affects display or a nonbinding estimate.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
             "false": "No listed concern is demonstrated, or each relevant case falls within its corresponding allowed exception."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "Amounts that decide a payment use exact integer or SDK values with their unit and mint: no floating-point BTC math, toFixed, rounding, or coercion of invalid, negative or fractional input."
         },
         {
           "id": "doc/docs/review/contributor-conventions/time-units",
           "section": "time/units",
-          "message": "Name time values with their unit (createdAtMs, timeoutSeconds), convert Nostr seconds once at the boundary, and store raw timestamps rather than formatted labels.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` mix Nostr seconds with JavaScript milliseconds without explicit conversion? Allowed: Units are explicitly converted at the boundary or remain consistently in protocol seconds.\n2. Does `hunk` persist a formatted time label instead of its raw timestamp? Allowed: Raw timestamps are stored and labels are derived for display.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
             "false": "No listed concern is demonstrated, or each relevant case falls within its corresponding allowed exception."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "Name time values with their unit (createdAtMs, timeoutSeconds), convert Nostr seconds once at the boundary, and store raw timestamps rather than formatted labels."
         },
         {
           "id": "doc/docs/review/contributor-conventions/keep-signing-secrets-in-secure-storage",
           "section": "secrets/storage",
-          "message": "Signing secrets may escape secure storage.",
           "instructions": "Does `hunk` place a mnemonic, seed, private key, nsec, or signing secret in a store, ordinary persistence, route param, URL, testID, fixture, or log?",
           "criteria": {
             "true": "Secret material enters one of these destinations instead of SecureStore or the key vault.",
             "false": "Only public keys, npubs, key IDs, secret-free pairing metadata, or opaque references are stored; secrets pass in memory to signing or secure storage."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "Signing secrets may escape secure storage."
         },
         {
           "id": "doc/docs/review/contributor-conventions/exclude-sensitive-log-payloads",
           "section": "secrets/logs",
-          "message": "Logs or telemetry may expose sensitive payloads.",
           "instructions": "Does `hunk` log seed words, private keys, Cashu proofs or tokens, invoices, DM plaintext, PINs, raw NFC bytes, or credential-bearing URLs?",
           "criteria": {
             "true": "A console, logger, analytics, or error-report payload contains one of these values.",
             "false": "Payloads contain only counts, amounts, IDs, hashes, short fingerprints, mint URLs, states, or error codes."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "Logs or telemetry may expose sensitive payloads."
         },
         {
           "id": "doc/docs/review/contributor-conventions/use-cryptographic-randomness",
           "section": "secrets/randomness",
-          "message": "Security values may be predictable.",
           "instructions": "Does `hunk` generate a security-relevant value using Math.random, time, or hand-rolled cryptography?",
           "criteria": {
             "true": "These sources produce keys, secrets, nonces, blinding factors, proof secrets, auth tokens, or pairing codes.",
             "false": "Randomness comes from expo-crypto, crypto.getRandomValues, or noble/scure libraries; Math.random serves jitter, animation, UI keys, sampling, or placeholders."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "Security values may be predictable."
         },
         {
           "id": "doc/docs/review/contributor-conventions/mock-isolation",
           "section": "mock/isolation",
-          "message": "Mock Mode data never enters Coco, transaction stores, Nostr or query caches, or persistence, and never publishes, zaps or pays.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` send Mock Mode, demo, or fake data into Coco, transaction stores, Nostr, query caches, or persistence? Allowed: Mock data stays in presentation-only memory gated by the mock flag; code is a test fixture or e2e harness.\n2. Does `hunk` allow Mock Mode, demo, or fake data to trigger a real publish, zap, or payment? Allowed: Mock flows remain presentation-only; test fixtures and e2e harness code are exempt.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
             "false": "No listed concern is demonstrated, or each relevant case falls within its corresponding allowed exception."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "Mock Mode data never enters Coco, transaction stores, Nostr or query caches, or persistence, and never publishes, zaps or pays."
         },
         {
           "id": "doc/docs/review/contributor-conventions/arch-owner",
           "section": "arch/owner",
-          "message": "Put code with the owner of its meaning (payment sequencing in wallet/, Nostr transport in nostr/, screens and device I/O in app/); no generic utils or helpers modules, and no shared helper switched by caller-specific flags.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` implement payment sequencing, proof selection, mint/melt/swap orchestration, or payment retries in app code? Allowed: UI calls wallet APIs and renders results; app code handles device I/O, native bridges, or screen glue.\n2. Does `hunk` switch a shared function's behavior using caller-specific flags or caller names? Allowed: The function has one focused purpose and its options describe domain behavior rather than caller identity.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
             "false": "No listed concern is demonstrated, or each relevant case falls within its corresponding allowed exception."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "Put code with the owner of its meaning (payment sequencing in wallet/, Nostr transport in nostr/, screens and device I/O in app/); no generic utils or helpers modules, and no shared helper switched by caller-specific flags."
         },
         {
           "id": "doc/docs/review/contributor-conventions/keep-native-tab-triggers-static",
           "section": "skill/expo-router/native-tabs-static-triggers",
-          "message": "Changing native tab triggers may remount the navigator and lose state.",
           "instructions": "Does `hunk` render a NativeTabs.Trigger set that changes with runtime conditions or data?",
           "criteria": {
             "true": "Triggers are conditional or mapped from state, props, or runtime data.",
             "false": "Triggers form a literal list, use hidden, or map a module-level constant array with a fixed set."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "Changing native tab triggers may remount the navigator and lose state."
         },
         {
           "id": "doc/docs/review/contributor-conventions/provide-android-native-tab-icons",
           "section": "skill/expo-router/native-tab-icon-md-prop",
-          "message": "A native tab icon may be missing on Android.",
           "instructions": "Does `hunk` add an Android-reachable NativeTabs icon with sf but no md, src, drawable, or xcasset alternative?",
           "criteria": {
             "true": "An SF-only icon is rendered by a NativeTabs branch that supports Android.",
             "false": "An alternative is supplied, or an iOS-only capability branch uses a different tab bar for Android."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "A native tab icon may be missing on Android."
         },
         {
           "id": "doc/docs/review/contributor-conventions/keep-stacks-in-layouts",
           "section": "skill/expo-router/stacks-defined-in-layout-files",
-          "message": "A Stack navigator may be disconnected from file-based routing.",
           "instructions": "Does `hunk` render an Expo Router Stack navigator outside a _layout file without identifying it as a shared layout used by _layout exports?",
           "criteria": {
             "true": "A non-layout file renders the Stack navigator itself.",
             "false": "The file is a _layout, is documented as a shared layout used by _layout default exports, or uses only Stack.Screen, Stack.Toolbar, Stack.SearchBar, or similar configuration subcomponents."
           },
-          "appliesTo": []
+          "appliesTo": [],
+          "message": "A Stack navigator may be disconnected from file-based routing."
         },
         {
           "id": "doc/docs/review/contributor-conventions/ui-read-states",
           "section": "ui/read-states",
-          "message": "Async screens show distinct loading, empty, failed and stale-with-data states: a failed or unavailable read is never shown as empty, and existing rows stay visible while refreshing or after a refresh fails.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` render a failed or unavailable async read using the same UI as a genuinely empty result? Allowed: Error, empty, and loading states have distinct branches; data is static or synchronous.\n2. Does `hunk` replace existing rows with a spinner, skeleton, or empty state during refresh or after refresh failure? Allowed: Cached rows remain visible during refetch and after failure; initial loading has no existing rows.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -702,12 +701,12 @@
           },
           "appliesTo": [
             "**/*.tsx"
-          ]
+          ],
+          "message": "Async screens show distinct loading, empty, failed and stale-with-data states: a failed or unavailable read is never shown as empty, and existing rows stay visible while refreshing or after a refresh fails."
         },
         {
           "id": "doc/docs/review/contributor-conventions/ui-unknown-values",
           "section": "ui/unknown-values",
-          "message": "Unknown counts stay undefined and render as a placeholder, never 0; image fallbacks appear only once the source is known to be missing or failed (avatarStateFor).",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` render an unknown or unloaded count, total, or amount as zero? Allowed: Unknown values show a placeholder; zero is used only in undisplayed arithmetic or is correct by definition, such as local list length.\n2. Does `hunk` show an image fallback before its source is known to be missing or failed? Allowed: avatarStateFor or an equivalent load-state check confirms missing or failed source before showing the fallback.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -715,12 +714,12 @@
           },
           "appliesTo": [
             "**/*.tsx"
-          ]
+          ],
+          "message": "Unknown counts stay undefined and render as a placeholder, never 0; image fallbacks appear only once the source is known to be missing or failed (avatarStateFor)."
         },
         {
           "id": "doc/docs/review/contributor-conventions/ui-honest-loading",
           "section": "ui/honest-loading",
-          "message": "No minimum skeleton durations, second list mounted just to crossfade, or loading animation that keeps running after a failure.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` keep loading UI visible for a minimum duration after data is ready? Allowed: Loading follows real pending state; features/settings catalogue or stress screens showcase loading components.\n2. Does `hunk` mount a second list solely to crossfade from a placeholder list? Allowed: A single list reflects pending state; features/settings catalogue or stress screens are exempt.\n3. Does `hunk` keep a loading animation running after its operation fails? Allowed: Animation follows real pending state and stops on failure; features/settings catalogue or stress screens are exempt.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -728,12 +727,12 @@
           },
           "appliesTo": [
             "**/*.tsx"
-          ]
+          ],
+          "message": "No minimum skeleton durations, second list mounted just to crossfade, or loading animation that keeps running after a failure."
         },
         {
           "id": "doc/docs/review/contributor-conventions/ui-insets",
           "section": "ui/insets",
-          "message": "Screen and useScreenInsets own safe-area, tab, footer and keyboard space; don't hard-code tab or footer heights or add safe-area padding twice.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` use a numeric padding, margin, or offset as a hard-coded tab-bar, footer, header, or home-indicator height? Allowed: Screen or useScreenInsets supplies spacing; the component owns the chrome and applies its inset once; numbers represent ordinary layout spacing.\n2. Does `hunk` add useSafeAreaInsets padding inside a screen already padded by Screen or useScreenInsets? Allowed: One owner applies the inset; a root overlay, tab bar, or sheet host owns its own chrome.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -741,12 +740,12 @@
           },
           "appliesTo": [
             "**/*.tsx"
-          ]
+          ],
+          "message": "Screen and useScreenInsets own safe-area, tab, footer and keyboard space; don't hard-code tab or footer heights or add safe-area padding twice."
         },
         {
           "id": "doc/docs/review/contributor-conventions/leave-block-outer-spacing-to-parent",
           "section": "ui/block-margins",
-          "message": "A reusable block may impose unexpected vertical spacing.",
           "instructions": "Does `hunk` give a stackable block component's outermost element its own top or bottom margin?",
           "criteria": {
             "true": "A reusable card, notice, banner, QR block, selector, or copy row sets root vertical margins.",
@@ -754,12 +753,12 @@
           },
           "appliesTo": [
             "**/*.tsx"
-          ]
+          ],
+          "message": "A reusable block may impose unexpected vertical spacing."
         },
         {
           "id": "doc/docs/review/contributor-conventions/ui-platform",
           "section": "ui/platform",
-          "message": "Choose glass or blur variants with the capability hook or defineVariants rather than Platform.OS or iOS version checks, and keep iOS-only native imports out of Android-reachable modules.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` select a glass or blur variant using Platform.OS, Platform.select, or an iOS version check? Allowed: Capability hooks, defineVariants, or platform file splits select the variant; platform checks handle genuine behavioral differences unrelated to glass or blur.\n2. Does `hunk` statically import an iOS-only native module into an Android-reachable module? Allowed: Platform file splits isolate the import or guarded lazy requires load it only on iOS.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -767,12 +766,12 @@
           },
           "appliesTo": [
             "**/*.tsx"
-          ]
+          ],
+          "message": "Choose glass or blur variants with the capability hook or defineVariants rather than Platform.OS or iOS version checks, and keep iOS-only native imports out of Android-reachable modules."
         },
         {
           "id": "doc/docs/review/contributor-conventions/guard-action-reentry",
           "section": "ui/single-submit",
-          "message": "Rapid taps may submit the same side effect twice.",
           "instructions": "Does `hunk` add a side-effecting pay, send, confirm, submit, or publish handler without a re-entry guard beyond a debounce or timer?",
           "criteria": {
             "true": "Repeated taps can invoke the action concurrently, or only timing-based debouncing prevents them.",
@@ -780,12 +779,12 @@
           },
           "appliesTo": [
             "**/*.tsx"
-          ]
+          ],
+          "message": "Rapid taps may submit the same side effect twice."
         },
         {
           "id": "doc/docs/review/contributor-conventions/ui-permissions",
           "section": "ui/permissions",
-          "message": "Request camera, NFC, location, clipboard and other permissions when the user starts the related action, with denied and unavailable states, never at startup.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` request a permission on mount or startup without the user choosing the related action? Allowed: A user-action handler requests it; a deliberately entered scanner, map, or nearby-payments screen requests it with denied and unavailable UI; status checks do not request permission.\n2. Does `hunk` ignore a denied or unavailable result from a permission request? Allowed: Denied and unavailable outcomes have handling or UI; the code only checks permission status.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -793,12 +792,12 @@
           },
           "appliesTo": [
             "**/*.tsx"
-          ]
+          ],
+          "message": "Request camera, NFC, location, clipboard and other permissions when the user starts the related action, with denied and unavailable states, never at startup."
         },
         {
           "id": "doc/docs/review/contributor-conventions/compose-complete-ui-sentences",
           "section": "copy/sentences",
-          "message": "Fragment-built UI text may break sentence structure or pluralization.",
           "instructions": "Does `hunk` construct user-visible sentences from separately written fragments or appended English plural endings?",
           "criteria": {
             "true": "String concatenation or adjacent text fragments assemble a sentence, including suffix-based plurals.",
@@ -806,12 +805,12 @@
           },
           "appliesTo": [
             "**/*.tsx"
-          ]
+          ],
+          "message": "Fragment-built UI text may break sentence structure or pluralization."
         },
         {
           "id": "doc/docs/review/contributor-conventions/copy-truncation",
           "section": "copy/truncation",
-          "message": "Shorten text only for display (numberOfLines or an authored short label): never slice strings or disable font scaling to fit, never cut amounts, fees, recipients, hosts or recovery steps, and always copy, sign, submit and compare the full value.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` shorten an amount, fee, recipient, public key, mint host or URL, invoice, token, or recovery step by cutting characters? Allowed: Full values use numberOfLines and ellipsizeMode; an authored short label is used; slicing affects post previews, display names, search snippets, or event-ID fingerprints for keys or logs.\n2. Does `hunk` copy, sign, submit, or compare a shortened value instead of its full value? Allowed: Shortening is display-only and operations use the full value.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -819,12 +818,12 @@
           },
           "appliesTo": [
             "**/*.tsx"
-          ]
+          ],
+          "message": "Shorten text only for display (numberOfLines or an authored short label): never slice strings or disable font scaling to fit, never cut amounts, fees, recipients, hosts or recovery steps, and always copy, sign, submit and compare the full value."
         },
         {
           "id": "doc/docs/review/contributor-conventions/copy-honest",
           "section": "copy/honest",
-          "message": "UI text never claims more security, privacy, delivery or settlement than the code establishes, and never shows raw error messages, stack traces, Zod issues or server responses.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` display a security, privacy, delivery, or settlement claim stronger than its visible state establishes? Allowed: Copy matches established state; developer and debug screens are exempt.\n2. Does `hunk` display a raw error message, stack trace, Zod issue, or server response body? Allowed: An error catalog or user-message formatter produces the text; developer and debug screens are exempt.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -832,12 +831,12 @@
           },
           "appliesTo": [
             "**/*.tsx"
-          ]
+          ],
+          "message": "UI text never claims more security, privacy, delivery or settlement than the code establishes, and never shows raw error messages, stack traces, Zod issues or server responses."
         },
         {
           "id": "doc/docs/review/contributor-conventions/a11y-controls",
           "section": "a11y/controls",
-          "message": "Interactive controls have an accessible name, expose busy, disabled, selected and expanded state, and carry a stable semantic testID based on entity identity, never an index or display text.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` render an interactive control without an accessible name? Allowed: Text buttons have visible names; shared controls receive label props; wrappers forward accessibility props; gesture-only surfaces have an accessible alternative.\n2. Does `hunk` omit accessibilityState for an interactive control's visible selected, checked, disabled, busy, or expanded state? Allowed: Relevant state is exposed, forwarded, or carried by shared-control props; gesture-only surfaces have an accessible alternative.\n3. Does `hunk` derive an interactive control's testID from a list index or display text? Allowed: The testID uses stable entity identity; a positional backup-choice slot is allowed when the only alternative identity is secret recovery material.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -845,12 +844,12 @@
           },
           "appliesTo": [
             "**/*.tsx"
-          ]
+          ],
+          "message": "Interactive controls have an accessible name, expose busy, disabled, selected and expanded state, and carry a stable semantic testID based on entity identity, never an index or display text."
         },
         {
           "id": "doc/docs/review/contributor-conventions/avoid-nested-accessible-controls",
           "section": "a11y/nested-controls",
-          "message": "An inner control may be unreachable to VoiceOver.",
           "instructions": "Does `hunk` nest an interactive control inside another accessible pressable, touchable, or accessible View?",
           "criteria": {
             "true": "An inner press handler, Pressable, PressableFeedback, Button, or Switch is merged into an accessible outer control.",
@@ -858,12 +857,12 @@
           },
           "appliesTo": [
             "**/*.tsx"
-          ]
+          ],
+          "message": "An inner control may be unreachable to VoiceOver."
         },
         {
           "id": "doc/docs/review/contributor-conventions/pause-offscreen-loops",
           "section": "perf/offscreen",
-          "message": "Offscreen work may keep consuming resources.",
           "instructions": "Does `hunk` start a repeating timer, polling loop, or infinite animation in a screen or row without a visibility-related stopping mechanism?",
           "criteria": {
             "true": "setInterval, a requestAnimationFrame loop, Animated.loop, or infinite withRepeat runs independently of screen focus, app activity, or row visibility.",
@@ -871,12 +870,12 @@
           },
           "appliesTo": [
             "**/*.tsx"
-          ]
+          ],
+          "message": "Offscreen work may keep consuming resources."
         },
         {
           "id": "doc/docs/review/contributor-conventions/state-selectors",
           "section": "state/selectors",
-          "message": "Subscribe to Zustand with the smallest selector, never the whole store or a selector returning a new object, array or function fallback; use getState() only in handlers, never during render.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` subscribe to a Zustand store without a selector? Allowed: A selector subscribes to specific state; the hook is not Zustand.\n2. Does `hunk` use a Zustand selector that creates a fresh object, array, or function without useShallow? Allowed: Selectors return primitives or existing references, use useShallow, or fall back to module-level constants; non-Zustand hooks are exempt.\n3. Does `hunk` read a Zustand store's getState directly during component or hook render? Allowed: Reads occur in handlers, effects, callbacks, async functions, or non-React modules.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -886,12 +885,12 @@
             "**/*.tsx",
             "**/hooks/**/*.ts",
             "**/use*.ts"
-          ]
+          ],
+          "message": "Subscribe to Zustand with the smallest selector, never the whole store or a selector returning a new object, array or function fallback; use getState() only in handlers, never during render."
         },
         {
           "id": "doc/docs/review/contributor-conventions/keep-heavy-work-out-of-render",
           "section": "perf/render",
-          "message": "Render may repeat data processing or network work.",
           "instructions": "Does `hunk` fetch, decrypt, parse JSON, sort, or serialize data directly during component render or per list row?",
           "criteria": {
             "true": "A render body, renderItem, or row component directly performs the listed work.",
@@ -901,12 +900,12 @@
             "**/*.tsx",
             "**/hooks/**/*.ts",
             "**/use*.ts"
-          ]
+          ],
+          "message": "Render may repeat data processing or network work."
         },
         {
           "id": "doc/docs/review/contributor-conventions/persist-data-only",
           "section": "persist/data-only",
-          "message": "Persistence may retain runtime objects or sensitive transient state.",
           "instructions": "Does `hunk` persist class instances, managers, promises, transient loading, pending, or error flags, or decrypted private messages?",
           "criteria": {
             "true": "A persist state selection, partialize result, or storage write includes one of these values.",
@@ -918,12 +917,12 @@
             "**/persist/**/*.ts",
             "**/{cache,caches}/**/*.ts",
             "**/*[Cc]ache.ts"
-          ]
+          ],
+          "message": "Persistence may retain runtime objects or sensitive transient state."
         },
         {
           "id": "doc/docs/review/contributor-conventions/use-neutral-persistence-fallbacks",
           "section": "persist/fallbacks",
-          "message": "Invalid persisted data may become valid-looking money or privileged state.",
           "instructions": "Does `hunk` default missing or invalid persisted money, credentials, consent, backup verification, trust, or enum values to a valid-looking or privileged value?",
           "criteria": {
             "true": "Schema defaults, catch fallbacks, migration defaults, ??, or || silently establish validity or privilege.",
@@ -935,12 +934,12 @@
             "**/persist/**/*.ts",
             "**/{cache,caches}/**/*.ts",
             "**/*[Cc]ache.ts"
-          ]
+          ],
+          "message": "Invalid persisted data may become valid-looking money or privileged state."
         },
         {
           "id": "doc/docs/review/contributor-conventions/persist-scope",
           "section": "persist/scope",
-          "message": "Identity-dependent data is profile-scoped, only identity-independent data is global, and cache keys include every input that changes the result (viewer, tier, filters, cursor).",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` store identity-dependent data in a global store or cache without profile scoping? Allowed: Stores are under stores/profile or instantiated or keyed per profile; global data is identity-independent, such as mint metadata, relay info, public profiles, theme, or app settings.\n2. Does `hunk` omit a visibly result-changing input from its cache key? Allowed: The key includes varying inputs or the omitted input does not change the cached result.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -952,12 +951,12 @@
             "**/persist/**/*.ts",
             "**/{cache,caches}/**/*.ts",
             "**/*[Cc]ache.ts"
-          ]
+          ],
+          "message": "Identity-dependent data is profile-scoped, only identity-independent data is global, and cache keys include every input that changes the result (viewer, tier, filters, cursor)."
         },
         {
           "id": "doc/docs/review/contributor-conventions/avoid-state-mirroring",
           "section": "state/one-authority",
-          "message": "Mirrored state may drift from its authoritative owner.",
           "instructions": "Does `hunk` mirror store, cache, or query data into another store through an effect or subscription?",
           "criteria": {
             "true": "An effect or subscription copies owner data into separately maintained state.",
@@ -969,12 +968,12 @@
             "**/persist/**/*.ts",
             "**/{cache,caches}/**/*.ts",
             "**/*[Cc]ache.ts"
-          ]
+          ],
+          "message": "Mirrored state may drift from its authoritative owner."
         },
         {
           "id": "doc/docs/review/contributor-conventions/state-shape",
           "section": "state/shape",
-          "message": "Store actions update immutably, fields that change together live in one object, and meaningful 0, false and empty values survive truthy checks and || defaults.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` mutate existing store state in place outside Immer? Allowed: Updates create new state or execute within Immer.\n2. Does `hunk` discard a meaningful 0, false, or empty string through a truthy check or || default? Allowed: The code uses nullish or explicit undefined checks; falsy values are invalid for the field, such as IDs, URLs, or keys.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -986,12 +985,12 @@
             "**/persist/**/*.ts",
             "**/{cache,caches}/**/*.ts",
             "**/*[Cc]ache.ts"
-          ]
+          ],
+          "message": "Store actions update immutably, fields that change together live in one object, and meaningful 0, false and empty values survive truthy checks and || defaults."
         },
         {
           "id": "doc/docs/review/contributor-conventions/state-clock",
           "section": "state/clock",
-          "message": "Freshness and expiry logic takes nowMs or an injected clock and reads it once per update; cache freshness never proves that a quote is valid or proofs are unspent.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` read Date.now or new Date inside a pure freshness, expiry, or TTL helper instead of accepting nowMs? Allowed: The helper accepts nowMs; an action or effect reads time and passes it down; a timestamp is recorded only for bookkeeping.\n2. Does `hunk` use cache freshness as proof that a quote is valid or proofs are unspent? Allowed: Quote or proof validity is checked against the mint; freshness only controls cache reuse.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -1003,12 +1002,12 @@
             "**/persist/**/*.ts",
             "**/{cache,caches}/**/*.ts",
             "**/*[Cc]ache.ts"
-          ]
+          ],
+          "message": "Freshness and expiry logic takes nowMs or an injected clock and reads it once per update; cache freshness never proves that a quote is valid or proofs are unspent."
         },
         {
           "id": "doc/docs/review/contributor-conventions/use-nostr-facade-for-reads",
           "section": "nostr/facade",
-          "message": "Feature code may bypass Nostr read ownership and fallback behavior.",
           "instructions": "Does `hunk` implement Nostr reads outside nostr/ by directly opening relays, calling source clients, or building a Nagg-to-Primal-to-relay fallback chain?",
           "criteria": {
             "true": "A screen, hook, or feature module directly implements reads supplied by the Nostr facade.",
@@ -1018,12 +1017,12 @@
             "nostr/**/*.{ts,tsx}",
             "**/{nostr,relay,relays,feed,threads,contacts,composer,profile,profiles,notifications,dm,dms,zap,zaps}/**/*.{ts,tsx}",
             "**/*{Nostr,Relay,Nip,Npub,Nagg,Primal,Zap,GiftWrap,Giftwrap}*.{ts,tsx}"
-          ]
+          ],
+          "message": "Feature code may bypass Nostr read ownership and fallback behavior."
         },
         {
           "id": "doc/docs/review/contributor-conventions/nostr-signed-events",
           "section": "nostr/signed-events",
-          "message": "Never alter a signed event and still treat it as verified; keep the raw event, derive display data separately, and retry a publish by resending the same signed event.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` change a signed event's content, tags, created_at, pubkey or id while retaining its status as a verified signed event? Allowed: Raw signed events remain unchanged while separate objects hold display data, or the code signs a brand-new event.\n2. Does `hunk` rebuild or re-sign a Nostr event for a publish retry instead of resending the same signed event? Allowed: Retries resend the stored signed event, or signing creates a brand-new event rather than retrying publication.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -1033,12 +1032,12 @@
             "nostr/**/*.{ts,tsx}",
             "**/{nostr,relay,relays,feed,threads,contacts,composer,profile,profiles,notifications,dm,dms,zap,zaps}/**/*.{ts,tsx}",
             "**/*{Nostr,Relay,Nip,Npub,Nagg,Primal,Zap,GiftWrap,Giftwrap}*.{ts,tsx}"
-          ]
+          ],
+          "message": "Never alter a signed event and still treat it as verified; keep the raw event, derive display data separately, and retry a publish by resending the same signed event."
         },
         {
           "id": "doc/docs/review/contributor-conventions/nostr-delivery",
           "section": "nostr/delivery",
-          "message": "A message state may misrepresent signing, relay acceptance or recipient delivery.",
           "instructions": "Does this change confuse local optimistic, signed, relay-accepted and recipient-delivered states? Flag a visible claim of recipient receipt or guaranteed delivery based only on queueing, signing or relay acknowledgment; marking an unsigned event as signed; marking a merely signed event as relay-accepted; or declaring failure solely because some relays timed out after another accepted the event. Local sent or publication-success state after the first relay OK is explicitly allowed and does not mean recipient delivery.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -1048,12 +1047,12 @@
             "nostr/**/*.{ts,tsx}",
             "**/{nostr,relay,relays,feed,threads,contacts,composer,profile,profiles,notifications,dm,dms,zap,zaps}/**/*.{ts,tsx}",
             "**/*{Nostr,Relay,Nip,Npub,Nagg,Primal,Zap,GiftWrap,Giftwrap}*.{ts,tsx}"
-          ]
+          ],
+          "message": "A message state may misrepresent signing, relay acceptance or recipient delivery."
         },
         {
           "id": "doc/docs/review/contributor-conventions/nostr-private-dms",
           "section": "nostr/private-dms",
-          "message": "Decrypt DMs on the device only; never send private keys or plaintext to Nagg, or persist decrypted messages unencrypted.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` send a private key or decrypted DM plaintext to Nagg or another server? Allowed: Only encrypted payloads and metadata leave the device; decrypted content remains in memory or encrypted storage.\n2. Does `hunk` perform DM decryption outside the user's device? Allowed: The device decrypts DMs locally; servers handle encrypted payloads and metadata only.\n3. Does `hunk` persist decrypted DM content without encryption? Allowed: Decrypted content stays in memory or is persisted using encrypted storage; encrypted payloads may be persisted.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -1063,12 +1062,12 @@
             "nostr/**/*.{ts,tsx}",
             "**/{nostr,relay,relays,feed,threads,contacts,composer,profile,profiles,notifications,dm,dms,zap,zaps}/**/*.{ts,tsx}",
             "**/*{Nostr,Relay,Nip,Npub,Nagg,Primal,Zap,GiftWrap,Giftwrap}*.{ts,tsx}"
-          ]
+          ],
+          "message": "Decrypt DMs on the device only; never send private keys or plaintext to Nagg, or persist decrypted messages unencrypted."
         },
         {
           "id": "doc/docs/review/contributor-conventions/app-implements-wallet-engine",
           "section": "wallet/engine-owns",
-          "message": "App code may take ownership of wallet engine operations.",
           "instructions": "Does `hunk` implement proof selection, mint/melt/swap sequencing, payment retry logic or history reconciliation directly in app code?",
           "criteria": {
             "true": "App code contains the algorithm or orchestration for a wallet engine responsibility instead of delegating to a wallet action or machine event.",
@@ -1076,12 +1075,12 @@
           },
           "appliesTo": [
             "app/**"
-          ]
+          ],
+          "message": "App code may take ownership of wallet engine operations."
         },
         {
           "id": "doc/docs/review/contributor-conventions/screen-cancellation-assumes-payment-rollback",
           "section": "wallet/cancel",
-          "message": "Closing a payment screen may incorrectly cancel or refund an active payment.",
           "instructions": "Does `hunk` treat screen exit or UI cancellation as a payment rollback without confirmation from a wallet API?",
           "criteria": {
             "true": "Unmount, back navigation, a cancel button or an AbortSignal marks the payment cancelled/refunded, releases its proofs or clears its pending record without confirmed wallet rollback.",
@@ -1091,12 +1090,12 @@
             "wallet/**/*.{ts,tsx}",
             "**/{cashu,wallet,payment,payments,mint,mints,send,receive,transactions,nfc,nearPay,melt,swap,balance,proofs}/**/*.{ts,tsx}",
             "**/*{Wallet,Payment,Mint,Melt,Send,Receive,Proof,Token,Invoice,Amount,Balance,Cashu,Lightning,Onchain}*.{ts,tsx}"
-          ]
+          ],
+          "message": "Closing a payment screen may incorrectly cancel or refund an active payment."
         },
         {
           "id": "doc/docs/review/contributor-conventions/wallet-locks",
           "section": "wallet/locks",
-          "message": "A recipient-locked (P2PK/NUT-10) transfer never falls back to an unlocked bearer token, and a payment request's lock, mint list and unit constraints are never dropped.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` send an unlocked bearer token when a P2PK or NUT-10 recipient lock was requested? Allowed: Lock failures abort the send and successful sends honor the requested lock; no recipient lock was requested.\n2. Does `hunk` discard a payment request's lock, allowed-mint list or unit when building the payment? Allowed: Payment construction honors the request's constraints, or the request does not supply the relevant constraint.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -1106,12 +1105,12 @@
             "wallet/**/*.{ts,tsx}",
             "**/{cashu,wallet,payment,payments,mint,mints,send,receive,transactions,nfc,nearPay,melt,swap,balance,proofs}/**/*.{ts,tsx}",
             "**/*{Wallet,Payment,Mint,Melt,Send,Receive,Proof,Token,Invoice,Amount,Balance,Cashu,Lightning,Onchain}*.{ts,tsx}"
-          ]
+          ],
+          "message": "A recipient-locked (P2PK/NUT-10) transfer never falls back to an unlocked bearer token, and a payment request's lock, mint list and unit constraints are never dropped."
         },
         {
           "id": "doc/docs/review/contributor-conventions/wallet-mint-trust",
           "section": "wallet/mint-trust",
-          "message": "Never bypass TLS checks or add a fake trusted mint record to hide a network failure.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` disable or bypass TLS certificate verification for a mint connection? Allowed: TLS verification remains enabled and connection failures surface as errors or unknown state.\n2. Does `hunk` mark a mint trusted or added using fabricated state after a network or mint-info failure? Allowed: Mint-info failures surface as errors or unknown state.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -1121,12 +1120,12 @@
             "wallet/**/*.{ts,tsx}",
             "**/{cashu,wallet,payment,payments,mint,mints,send,receive,transactions,nfc,nearPay,melt,swap,balance,proofs}/**/*.{ts,tsx}",
             "**/*{Wallet,Payment,Mint,Melt,Send,Receive,Proof,Token,Invoice,Amount,Balance,Cashu,Lightning,Onchain}*.{ts,tsx}"
-          ]
+          ],
+          "message": "Never bypass TLS checks or add a fake trusted mint record to hide a network failure."
         },
         {
           "id": "doc/docs/review/contributor-conventions/wallet-fresh-flow",
           "section": "wallet/fresh-flow",
-          "message": "A new Send, Receive, scan or NFC flow starts from cleared payment context without a previous recipient, amount, unit or mint, and offline sends never wait on network fetches.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` initialize a new Send, Receive, scan or NFC flow with a previous flow's recipient, amount, unit or mint from shared or persisted state? Allowed: Entry resets payment context, or prefill comes from explicit new input such as a scanned request, deep link or newly selected contact.\n2. Does `hunk` make an offline send wait for a network fetch before proceeding? Allowed: Offline sends proceed without waiting for network requests; the network-dependent path is explicitly online-only.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -1136,12 +1135,12 @@
             "wallet/**/*.{ts,tsx}",
             "**/{cashu,wallet,payment,payments,mint,mints,send,receive,transactions,nfc,nearPay,melt,swap,balance,proofs}/**/*.{ts,tsx}",
             "**/*{Wallet,Payment,Mint,Melt,Send,Receive,Proof,Token,Invoice,Amount,Balance,Cashu,Lightning,Onchain}*.{ts,tsx}"
-          ]
+          ],
+          "message": "A new Send, Receive, scan or NFC flow starts from cleared payment context without a previous recipient, amount, unit or mint, and offline sends never wait on network fetches."
         },
         {
           "id": "doc/docs/review/contributor-conventions/cta-pure-eligibility",
           "section": "cta/pure-eligibility",
-          "message": "A CTA's shouldShow is pure and synchronous over its injected context and clock; it never waits on the network.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` make a CTA's shouldShow or eligibility function return a promise instead of a synchronous result? Allowed: Eligibility returns a synchronous result derived from injected context and clock.\n2. Does `hunk` perform a network request while evaluating a CTA's shouldShow or eligibility function? Allowed: Eligibility reads injected context, including previously fetched data, without initiating network activity.\n3. Does `hunk` use Date.now() to determine CTA eligibility instead of the injected clock? Allowed: Eligibility uses the injected clock; Date.now() appears outside eligibility evaluation.\n4. Does `hunk` cause a non-network side effect while evaluating a CTA's shouldShow or eligibility function? Allowed: Eligibility performs pure calculations over injected context and clock; local temporary calculations do not mutate external state.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -1152,12 +1151,12 @@
             "app/shared/blocks/Cta*",
             "app/features/backup/**",
             "app/app/\\(prompt-flow\\)/**"
-          ]
+          ],
+          "message": "A CTA's shouldShow is pure and synchronous over its injected context and clock; it never waits on the network."
         },
         {
           "id": "doc/docs/review/contributor-conventions/cta-security-nags",
           "section": "cta/security-nags",
-          "message": "A security or backup prompt's primary action never dismisses it, blocking CTAs have no dismissal or back escape, and revealing the recovery phrase never marks the backup verified.",
           "instructions": "Does the supplied change visibly violate any of these requirements? Evaluate each case with its own allowed exceptions; one visible violation is enough.\n1. Does `hunk` make a security or backup prompt's primary action dismiss or snooze the prompt before its task is completed? Allowed: The primary action performs backup or verification, a finished-backup screen closes the completed flow, or a non-blocking CTA is dismissed through a secondary action.\n2. Does `hunk` give an unfinished blocking CTA a dismiss, close or back escape? Allowed: Blocking CTAs have no escape, a finished-backup screen closes the completed flow, or a non-blocking CTA offers secondary dismissal.\n3. Does `hunk` mark a backup verified solely because the recovery phrase was revealed or viewed? Allowed: Verification requires the user to confirm words; revealing or viewing the phrase does not mark the backup verified.",
           "criteria": {
             "true": "At least one listed concern is visibly demonstrated and its corresponding allowed exception does not apply.",
@@ -1168,7 +1167,8 @@
             "app/shared/blocks/Cta*",
             "app/features/backup/**",
             "app/app/\\(prompt-flow\\)/**"
-          ]
+          ],
+          "message": "A security or backup prompt's primary action never dismisses it, blocking CTAs have no dismissal or back escape, and revealing the recovery phrase never marks the backup verified."
         }
       ],
       "notChecked": [
