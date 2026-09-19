@@ -1,3 +1,4 @@
+import { GRADIENT_HEADER_OPTIONS } from './headerOptions';
 /**
  * Native tab bar and header components for Expo Router.
  * Uses expo-router/unstable-native-tabs and liquid glass on supported iOS devices.
@@ -134,6 +135,7 @@ export function buildExpoRouterHeaderOptions({
   headerRightTestID,
 }: ExpoRouterHeaderOptionsInput): NativeStackNavigationOptions {
   const nextOptions: NativeStackNavigationOptions = {
+    ...GRADIENT_HEADER_OPTIONS,
     ...(options || {}),
   };
   const resolvedIconColor = iconColor ?? '#FFFFFF';

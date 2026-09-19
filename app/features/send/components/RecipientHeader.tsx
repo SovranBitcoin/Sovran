@@ -1,15 +1,4 @@
-/**
- * Stack.Screen `headerTitle` content used by AmountFlowScreen when the
- * melt target resolves to a known Nostr identity. Avatar on top, "Pay
- * <name>" centered below — the alternative to the MintSelector pill that
- * the screen renders by default.
- */
-
-import { HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { Text } from '@/shared/ui/primitives/Text';
-import { VStack } from '@/shared/ui/primitives/View/VStack';
+import { IdentityHeader } from '@/shared/ui/composed/IdentityHeader';
 
 interface RecipientHeaderProps {
   pubkey?: string;
@@ -19,21 +8,11 @@ interface RecipientHeaderProps {
 }
 
 export function RecipientHeader({ pubkey, seed, displayName, avatarUrl }: RecipientHeaderProps) {
-  const foreground = useThemeColor('foreground');
-  const avatarSeed = seed ?? pubkey ?? displayName;
   return (
-    <VStack align="center" gap={4} style={{ paddingTop: 20 }}>
-      <Avatar
-        state={avatarUrl ? 'image' : 'fallback'}
-        picture={avatarUrl ?? undefined}
-        size={HEADER_LAYOUT.TOOLBAR_BUTTON_WIDTH}
-        name={displayName}
-        seed={avatarSeed}
-        alt={`${displayName} avatar`}
-      />
-      <Text size={14} weight="bold" style={{ color: foreground }}>
-        Pay {displayName}
-      </Text>
-    </VStack>
+    <IdentityHeader
+      name={`Pay ${displayName}`}
+      seed={seed ?? pubkey ?? displayName}
+      picture={avatarUrl}
+    />
   );
 }

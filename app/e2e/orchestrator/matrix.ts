@@ -60,8 +60,8 @@ interface ChunkPlanOptions {
 
 /** Matches the fresh-matrix invariant guard — bump both together when the
  * full suite grows. */
-const EXPECTED_SCENARIOS = 157;
-const EXPECTED_PAIRS = 272;
+const EXPECTED_SCENARIOS = 158;
+const EXPECTED_PAIRS = 274;
 
 export function buildChunkPlan(options: ChunkPlanOptions): Result<ChunkPlan, string> {
   if (options.platforms.length === 0) return err('no platforms selected');

@@ -276,6 +276,7 @@ export function MintDistributionScreen() {
     <Screen
       name="MintDistributionScreen"
       headerGradient
+      headerAppearance="gradient-tabs"
       stickyContent={currencyTabs}
       stickyContentHeight={MINT_CURRENCY_TABS_HEIGHT}
       scroll="custom"

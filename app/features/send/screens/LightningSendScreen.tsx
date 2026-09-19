@@ -14,8 +14,6 @@
 import { useEffect } from 'react';
 import { useWindowDimensions } from 'react-native';
 
-import { Stack } from 'expo-router';
-
 import type { MeltHistoryEntry } from '@cashu/coco-core';
 import { isMeltQuotePaid, isMeltQuoteReadyToPay } from 'wallet';
 import { useScreenActions } from 'wallet/react';
@@ -48,7 +46,6 @@ import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnn
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { consumePendingZap, peekPendingZap } from '@/shared/stores/runtime/pendingZapStore';
 import { ZappedPostSection } from '@/features/transactions/components/detail/ZappedPostSection';
-import { RecipientHeader } from '../components/RecipientHeader';
 import { MeltDestinationFingerprintProbe } from '../components/MeltDestinationFingerprintProbe';
 import { MeltSelectedMintProbe } from '../components/MeltSelectedMintProbe';
 
@@ -268,25 +265,15 @@ export function LightningSendScreen({
       entry={entry}
       source={source}
       footer={bottomButtons}
-      headerOverride={
-        recipientPubkey && headerDisplayName ? (
-          // Override the layout's static "Send Lightning" title with the
-          // resolved recipient identity. Expo Router lets a screen body
-          // render `<Stack.Screen options={...} />` to update its own
-          // active-route options without re-declaring at the layout level.
-          // See `AmountFlowScreen.tsx` for the same pattern.
-          <Stack.Screen
-            options={{
-              headerTitle: () => (
-                <RecipientHeader
-                  pubkey={recipientPubkey}
-                  displayName={headerDisplayName}
-                  avatarUrl={headerAvatarUrl}
-                />
-              ),
-            }}
-          />
-        ) : null
+      headerTitle="Send Lightning"
+      headerIdentity={
+        recipientPubkey && headerDisplayName
+          ? {
+              name: `Pay ${headerDisplayName}`,
+              seed: recipientPubkey,
+              picture: headerAvatarUrl,
+            }
+          : undefined
       }
       beforeStatus={
         <>

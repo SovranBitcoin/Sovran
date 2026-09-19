@@ -8,7 +8,7 @@
  * untouched (the blurred native header is already there).
  *
  * Layout mirrors FlowSheetHeader: the chrome is an absolute OVERLAY with the
- * eased AndroidHeaderScrim behind it (solid through the title row, fade tail
+ * eased HeaderGradient behind it (solid through the title row, fade tail
  * below the bar), and children fill the sheet from the very top.
  * AndroidSheetRoot publishes FLOW_SHEET_HEADER_HEIGHT through
  * SheetHeaderHeightContext, so composed Screen/ModalLayoutWrapper children
@@ -30,7 +30,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { SheetGrabber } from '@/shared/ui/composed/SheetGrabber';
 import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
-import { AndroidHeaderScrim } from '@/shared/ui/composed/AndroidHeaderScrim';
+import { HeaderGradient } from '@/shared/ui/composed/HeaderGradient';
 import { FLOW_SHEET_HEADER_HEIGHT, SCRIM_TOTAL_HEIGHT } from '@/shared/ui/composed/FlowSheetHeader';
 
 interface FormSheetChromeProps {
@@ -52,7 +52,7 @@ function AndroidFormSheetChrome({ title, children, scrimColor }: FormSheetChrome
         {children}
         <View style={styles.chrome} pointerEvents="box-none">
           <View style={styles.scrimLayer} pointerEvents="none">
-            <AndroidHeaderScrim
+            <HeaderGradient
               backgroundColor={scrimColor ?? background}
               height={SCRIM_TOTAL_HEIGHT}
               anchor={FLOW_SHEET_HEADER_HEIGHT / SCRIM_TOTAL_HEIGHT - 0.1}

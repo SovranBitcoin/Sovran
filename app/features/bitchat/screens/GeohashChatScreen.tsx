@@ -171,8 +171,8 @@ export function GeohashChatScreen({
     <Stack.Screen
       options={withGlassHeaderItems({
         headerShown: true,
-        headerTransparent: false,
-        headerStyle: { backgroundColor: surfaceSecondary },
+        headerTransparent: true,
+        headerStyle: { backgroundColor: 'transparent' },
         headerShadowVisible: false,
         headerBackVisible: false,
         headerTintColor: foreground,

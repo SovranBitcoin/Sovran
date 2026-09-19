@@ -1,3 +1,5 @@
+import { Screen } from '@/shared/ui/composed/Screen';
+import { useHeaderHeight } from 'expo-router/react-navigation';
 import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 /**
  * Merchant detail screen: displays info about a Bitcoin-accepting merchant.
@@ -7,7 +9,6 @@ import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { useNavigation } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShallow } from 'zustand/react/shallow';
 import { z } from 'zod';
 
@@ -23,7 +24,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useBTCMapStore, BTCMapPlaceDetails } from '@/shared/stores/global/btcMapStore';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { withAlpha } from '@/shared/lib/color';
-import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { getMarkerColor } from '@/shared/lib/map/categories';
 import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
@@ -130,7 +131,7 @@ export function MerchantDetailScreen() {
     'default',
     'surface',
   ] as const);
-  const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
   const params = useRouteParams(ParamsSchema, { where: 'map-flow.detail' });
   const placeId = params?.placeId;
   const { fetchPlaceDetails, getCachedPlaceDetails } = useBTCMapStore(
@@ -226,39 +227,39 @@ export function MerchantDetailScreen() {
 
   if (isLoading) {
     return (
-      <Log name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
+      <Screen name="MerchantDetailScreen" scroll="custom" bgColor={background}>
         <View style={styles.loadingContainer}>
           <Spinner size={32} color={BITCOIN_ACCENT} />
           <Text size={14} style={{ color: withAlpha(foreground, 0.5), marginTop: 12 }}>
             Loading merchant details...
           </Text>
         </View>
-      </Log>
+      </Screen>
     );
   }
 
   if (!place) {
     return (
-      <Log name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
+      <Screen name="MerchantDetailScreen" scroll="custom" bgColor={background}>
         <View style={styles.loadingContainer}>
           <Icon name="mdi:alert-circle" size={48} color={withAlpha(foreground, 0.4)} />
           <Text size={14} style={{ color: withAlpha(foreground, 0.5), marginTop: 12 }}>
             No merchant data available
           </Text>
         </View>
-      </Log>
+      </Screen>
     );
   }
 
   return (
-    <Log name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
+    <Screen name="MerchantDetailScreen" scroll="custom" bgColor={background}>
       <ScreenScrollView
         bottomSpacing={32}
         style={styles.scrollView}
         // Android form-sheet: top-edge drag dismisses, mid-scroll scrolls.
         nestedScrollEnabled
         contentContainerStyle={{
-          paddingTop: insets.top + 56,
+          paddingTop: headerHeight + 16,
           paddingHorizontal: 16,
         }}
         showsVerticalScrollIndicator={false}>
@@ -348,7 +349,7 @@ export function MerchantDetailScreen() {
           </Text>
         </View>
       </ScreenScrollView>
-    </Log>
+    </Screen>
   );
 }
 

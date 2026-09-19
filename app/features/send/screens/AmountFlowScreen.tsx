@@ -1,5 +1,6 @@
+import { Screen } from '@/shared/ui/composed/Screen';
 /**
- * Shared send/receive amount route shell: mint header, amount entry screen actions, AmountSelector.
+ * Shared amount route shell: compact title, amount actions and mint selection below the keypad.
  *
  * Follows the same pattern as LightningSendScreen, SendTokenScreen, etc:
  * receives a single serialized entry from the machine's step handler,
@@ -12,7 +13,6 @@ import { Stack } from 'expo-router';
 import { useExecutionState, useScreenActions, usePaymentFlowMachine } from 'wallet/react';
 import { fetchNip05Pubkey, type RecipientProfile } from 'wallet';
 
-import { MintSelector } from '@/features/wallet';
 import { useWalletContextWithOverride } from '@/shared/providers/WalletContextProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
@@ -44,7 +44,11 @@ interface AmountFlowContentProps {
 const AMOUNT_FLOW_DIAGNOSTIC_LOGS_ENABLED = false;
 
 export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
-  return <AmountFlowContent amountEntry={amountEntry} headerMode="native" />;
+  return (
+    <Screen name="AmountFlowScreen" scroll="none">
+      <AmountFlowContent amountEntry={amountEntry} headerMode="native" />
+    </Screen>
+  );
 }
 
 export function AmountFlowContent({ amountEntry, headerMode = 'native' }: AmountFlowContentProps) {
@@ -248,21 +252,9 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
           avatarUrl={headerAvatarUrl}
         />
       ) : (
-        <MintSelector
-          testID="amount-mint-selector"
-          selectedMintUrl={mintUrl}
-          onRequestMintList={handleRequestMintList}
-        />
+        'Select amount'
       ),
-    [
-      handleRequestMintList,
-      headerAvatarUrl,
-      headerDisplayName,
-      headerSeed,
-      mintUrl,
-      recipientPubkey,
-      recipientReady,
-    ]
+    [headerAvatarUrl, headerDisplayName, headerSeed, recipientPubkey, recipientReady]
   );
   const renderHeaderRight = useCallback(
     () => (
@@ -306,7 +298,7 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
   }
 
   return (
-    <Log name="AmountFlowScreen">
+    <Log name="AmountFlowContent">
       {headerMode === 'native' ? <Stack.Screen options={stackOptions} /> : null}
       <View style={amountBodyStyle}>
         <E2EActionMenuProbe />
@@ -317,7 +309,7 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
           suggestions={suggestions}
           transactionType={isSendOperation ? 'send' : 'receive'}
           machineBusy={isExecuting}
-          showMintBottomButton={recipientReady}
+          showMintBottomButton
           mintUrl={mintUrl}
           onRequestMintList={handleRequestMintList}
           recipientPubkey={recipientPubkey}

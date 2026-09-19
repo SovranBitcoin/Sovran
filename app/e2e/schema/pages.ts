@@ -11,6 +11,7 @@
  * would be ambiguous to strip.
  */
 export const CANONICAL_PAGES = [
+  'settings-design-system-headers',
   // launch + onboarding
   'secure-locked', // unreadable SecureStore boot gate
   'profile-keys-error', // saved identity requires re-import

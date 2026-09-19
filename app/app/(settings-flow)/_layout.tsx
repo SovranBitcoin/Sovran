@@ -53,6 +53,7 @@ export default function SettingsFlowLayout() {
       <Stack.Screen name="privacy" options={{ title: 'Privacy Policy' }} />
       <Stack.Screen name="moderation" options={MODERATION_OPTIONS} />
       <Stack.Screen name="media" options={MEDIA_OPTIONS} />
+      <Stack.Screen name="design-system-headers" options={{ title: 'Headers' }} />
       <Stack.Screen name="design-system" options={DESIGN_SYSTEM_OPTIONS} />
       <Stack.Screen name="design-system-foundations" options={DESIGN_SYSTEM_FOUNDATIONS_OPTIONS} />
       <Stack.Screen

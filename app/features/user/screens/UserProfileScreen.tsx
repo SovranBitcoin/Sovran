@@ -1,3 +1,7 @@
+import { Screen } from '@/shared/ui/composed/Screen';
+import { useIdentityHeader } from '@/shared/ui/composed/IdentityHeader';
+import { useHeaderHeight } from 'expo-router/react-navigation';
+import type { LayoutChangeEvent } from 'react-native';
 /**
  * @fileoverview User Profile Screen
  *
@@ -11,7 +15,7 @@
 
 import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import React, { useEffect, useState } from 'react';
-import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
+import { StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
@@ -89,13 +93,7 @@ import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useVisualStateLogger } from '@/shared/lib/contentShiftLog';
-import {
-  Log,
-  nostrLog,
-  paymentLog,
-  useLifecycleLogger,
-  mintUrlLogFields,
-} from '@/shared/lib/logger';
+import { nostrLog, paymentLog, useLifecycleLogger, mintUrlLogFields } from '@/shared/lib/logger';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { fontSize, iconSize } from '@/shared/styles/tokens';
 import { resolveProfileTier, type ProfileTier } from '@/shared/lib/profile/profileTier';
@@ -559,6 +557,8 @@ function BannerWithAvatar({
   onAvatarPress,
   tier,
   visualScope,
+  identityStyle,
+  onIdentityLayout,
 }: {
   bannerUrl?: string;
   pictureUrl?: string;
@@ -582,6 +582,8 @@ function BannerWithAvatar({
   hasStories?: boolean;
   onAvatarPress?: () => void;
   visualScope: string;
+  identityStyle?: React.ComponentProps<typeof Animated.View>['style'];
+  onIdentityLayout?: (event: LayoutChangeEvent) => void;
 }) {
   const [foreground, surfaceSecondary, background] = useThemeColor([
     'foreground',
@@ -689,6 +691,7 @@ function BannerWithAvatar({
     <VisualLayoutProbe
       scope={visualScope}
       surface="profile"
+      onLayout={onIdentityLayout}
       component="ProfileBannerHeader"
       itemKey="profile-banner-header"
       itemType={bannerState}
@@ -791,7 +794,11 @@ function BannerWithAvatar({
 
       {/* Avatar - positioned to overlap banner */}
       <Animated.View
-        style={[styles.avatarContainer, avatarSettled ? styles.settledReveal : avatarStyle]}>
+        style={[
+          styles.avatarContainer,
+          avatarSettled ? styles.settledReveal : avatarStyle,
+          identityStyle,
+        ]}>
         {hasStories && onAvatarPress ? (
           <Pressable
             activeOpacity={0.8}
@@ -812,21 +819,23 @@ function BannerWithAvatar({
             ambient shimmer sweep while loading (the thread skeleton treatment)
             instead of independently pulsing. */}
         <View style={styles.identityBlock}>
-          <View style={{ alignSelf: 'center' }}>
-            <Text
-              loading={isLoading}
-              placeholder="Display Name"
-              bold
-              size={22}
-              style={{
-                color: foreground,
-                includeFontPadding: false,
-                lineHeight: Math.round(22 * 1.25),
-              }}>
-              {displayName}
-            </Text>
-          </View>
-          <UserProfileIdentityRow nip05={nip05} isLoading={isLoading} foreground={foreground} />
+          <Animated.View style={identityStyle}>
+            <View style={{ alignSelf: 'center' }}>
+              <Text
+                loading={isLoading}
+                placeholder="Display Name"
+                bold
+                size={22}
+                style={{
+                  color: foreground,
+                  includeFontPadding: false,
+                  lineHeight: Math.round(22 * 1.25),
+                }}>
+                {displayName}
+              </Text>
+            </View>
+            <UserProfileIdentityRow nip05={nip05} isLoading={isLoading} foreground={foreground} />
+          </Animated.View>
           {showFollowButton &&
             (isLoading ? (
               <View
@@ -1081,6 +1090,17 @@ export function UserProfileScreen() {
   // longer used as a name; the npub still appears as a copy-row in the
   // profile body.
   const displayName = resolveIdentityName({ pubkey, nostrProfile: cachedProfile });
+  const headerHeight = useHeaderHeight();
+  const [identityBottom, setIdentityBottom] = useState<number | null>(null);
+  const morph = useIdentityHeader({
+    identity: pubkey
+      ? { name: displayName, seed: pubkey, picture: cachedProfile?.picture }
+      : undefined,
+    collapseAt:
+      identityBottom === null
+        ? Number.POSITIVE_INFINITY
+        : Math.max(0, identityBottom - headerHeight),
+  });
 
   // Send Money enters through colada's normal Send entrypoint so no-balance
   // and multi-mint selection behavior stays identical to the wallet Send
@@ -1299,7 +1319,11 @@ export function UserProfileScreen() {
   });
 
   return (
-    <Log name="UserProfileScreen" style={{ flex: 1, backgroundColor: background }}>
+    <Screen
+      name="UserProfileScreen"
+      scroll="custom"
+      bgColor={background}
+      headerGradientStyle={morph.headerGradientStyle}>
       {/* The Send-Message/Send-Money menus present in a FullWindowOverlay whose
           rows never reach iOS AX — this dev-only marker is the waitable
           evidence e2e uses before a coordinate row selection. */}
@@ -1322,14 +1346,7 @@ export function UserProfileScreen() {
           title: '',
           // The banner already displays the name below the avatar. A second
           // transparent header title overlaps the avatar on both platforms.
-          headerTitle: '',
-          // The profile renders its own full-bleed banner at the top — the
-          // default Android header scrim painted a theme-background band
-          // over it. A null headerBackground is the sanctioned scrim opt-out
-          // (renders nothing in both the native-header and sheet-header
-          // paths); only NON-null per-screen backgrounds are forbidden on
-          // sheet flows.
-          ...(Platform.OS === 'android' ? { headerBackground: () => null } : {}),
+          headerTitle: morph.headerTitle,
           headerRight: () => (
             <HStack gap={4}>
               {!isOwnProfile && (
@@ -1371,8 +1388,10 @@ export function UserProfileScreen() {
         })}
       />
 
+      {morph.probe}
       {pubkey ? (
         <UserFeed
+          onScroll={morph.onScroll}
           pubkey={pubkey}
           authorName={displayName}
           authorPicture={cachedProfile?.picture}
@@ -1381,6 +1400,14 @@ export function UserProfileScreen() {
           ListHeaderComponent={
             <View>
               <BannerWithAvatar
+                identityStyle={morph.contentStyle}
+                onIdentityLayout={(event) => {
+                  const { y, height } = event.nativeEvent.layout;
+                  const bottom = Math.round(y + height);
+                  setIdentityBottom((previous) =>
+                    previous !== null && Math.abs(previous - bottom) < 2 ? previous : bottom
+                  );
+                }}
                 bannerUrl={cachedProfile?.banner}
                 pictureUrl={cachedProfile?.picture}
                 pubkey={pubkey}
@@ -1477,7 +1504,7 @@ export function UserProfileScreen() {
           }
         />
       ) : null}
-    </Log>
+    </Screen>
   );
 }
 

@@ -1,5 +1,6 @@
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, RefreshControl, StyleSheet } from 'react-native';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Image } from 'expo-image';
 import { Button, Card } from 'heroui-native';
@@ -299,8 +300,8 @@ export const SettingsMediaScreen = () => {
   const handleRefresh = () => refreshOwnedBlobs(setRefreshing);
 
   return (
-    <ScreenWrapper name="SettingsMediaScreen" scroll="custom" safeArea>
-      <ScrollView
+    <ScreenWrapper name="SettingsMediaScreen" scroll="custom" safeArea="scroll">
+      <ScreenScrollView
         className="px-4"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}>
         <Section title="Upload server">
@@ -356,7 +357,7 @@ export const SettingsMediaScreen = () => {
           onDelete={confirmDelete}
         />
         <E2EHerouiMenuProbe />
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenWrapper>
   );
 };

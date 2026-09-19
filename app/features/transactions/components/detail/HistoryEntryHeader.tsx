@@ -1,3 +1,6 @@
+import Animated from 'react-native-reanimated';
+import type { ComponentProps } from 'react';
+import type { HeaderIdentity } from '@/shared/ui/composed/IdentityHeader';
 import { useEffect } from 'react';
 
 import { avatarStateFor } from '@/shared/lib/imageLoadState';
@@ -43,6 +46,8 @@ interface HistoryEntryHeaderProps {
   showRecipientAvatar?: boolean;
   /** Show loading state on the icon */
   isLoading?: boolean;
+  identity?: HeaderIdentity;
+  identityStyle?: ComponentProps<typeof Animated.View>['style'];
 }
 
 export function HistoryEntryHeader({
@@ -51,6 +56,8 @@ export function HistoryEntryHeader({
   recipientPubkey,
   showRecipientAvatar = true,
   isLoading,
+  identity,
+  identityStyle,
 }: HistoryEntryHeaderProps) {
   // Counterparty from the persisted annotation (Nut Drop send/receive) is the
   // fallback when the caller didn't thread a transient recipientPubkey.
@@ -110,6 +117,17 @@ export function HistoryEntryHeader({
   const iconOverlaySize = 24;
 
   const renderIcon = () => {
+    if (identity) {
+      return (
+        <Avatar
+          state={identity.picture ? 'image' : 'fallback'}
+          picture={identity.picture ?? undefined}
+          seed={identity.seed}
+          size={avatarSize}
+          name={identity.name}
+        />
+      );
+    }
     if (avatarRecipientPubkey) {
       const recipientName =
         recipientMetadata?.displayName ?? recipientMetadata?.name ?? counterparty?.displayName;
@@ -201,7 +219,7 @@ export function HistoryEntryHeader({
             )}
           </Text>
         </VStack>
-        {renderIcon()}
+        <Animated.View style={identity ? identityStyle : undefined}>{renderIcon()}</Animated.View>
       </HStack>
     </Log>
   );

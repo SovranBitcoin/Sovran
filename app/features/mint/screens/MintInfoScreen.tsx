@@ -1,4 +1,4 @@
-import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
+import { useIdentityHeader } from '@/shared/ui/composed/IdentityHeader';
 import { Screen } from '@/shared/ui/composed/Screen';
 import React, { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
@@ -30,7 +30,6 @@ import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCr
 import { Avatar, AvatarStatusDot } from '@/shared/ui/primitives/Avatar';
 import * as Clipboard from 'expo-clipboard';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import { useScreenActions } from 'wallet/react';
 import { withAlpha } from '@/shared/lib/color';
@@ -331,12 +330,16 @@ export function MintInfoScreen() {
     'green-300',
     'yellow-300',
   ] as const);
-  const insets = useSafeAreaInsets();
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.info' });
   const { entry, actions } = useScreenActions('mintInfo', params?.mintInfoEntry);
 
   const mintUrl = (entry?.mintUrl as string) ?? '';
   const displayName = (entry?.displayName as string) ?? mintUrl;
+  const morph = useIdentityHeader({
+    identity: { name: displayName, seed: mintUrl, picture: entry?.iconUrl as string | undefined },
+    title: entry?.fromAccepter ? 'Verify Mint' : 'Mint Details',
+    collapseAt: 110,
+  });
   // The inspect paths seed mintInfoEntry with only { mintUrl }, so KYM review
   // data never arrives via the entry on that route. Fall back to the same
   // review cache the mint list rows read,
@@ -406,7 +409,8 @@ export function MintInfoScreen() {
   return (
     <Screen
       name="MintInfoScreen"
-      scroll="custom"
+      scroll="animated"
+      scrollY={morph.scrollY}
       bgColor={background}
       footer={
         <BottomButtons>
@@ -464,7 +468,8 @@ export function MintInfoScreen() {
       }>
       <Stack.Screen
         options={withGlassHeaderItems({
-          title: entry?.fromAccepter ? 'Verify Mint' : displayName || 'Mint Details',
+          title: entry?.fromAccepter ? 'Verify Mint' : 'Mint Details',
+          headerTitle: morph.headerTitle,
           headerRight:
             entry?.fromAccepter || !(typeof kymScore === 'number' && kymScore >= 0)
               ? undefined
@@ -480,31 +485,28 @@ export function MintInfoScreen() {
         })}
       />
 
-      <ScreenScrollView
-        className="flex-1"
-        // Android form-sheet: opt into nested-scroll so a top-edge drag dismisses
-        // the sheet while mid-scroll drags scroll (matches Receive / shared List).
-        nestedScrollEnabled
-        contentContainerStyle={{
-          paddingTop: insets.top + 16,
-          paddingHorizontal: 16,
-        }}
-        showsVerticalScrollIndicator={false}>
+      {morph.probe}
+      <View className="pt-4">
         <VStack align="center" className="w-full pb-8 pt-6">
-          <ProgressRing
-            size={84}
-            progress={ringProgress}
-            successColor={success}
-            errorColor={danger}>
-            <AnimatedAvatar
-              picture={entry?.iconUrl as string | undefined}
-              name={displayName}
-              alt={`${displayName} icon`}
-              status={(entry?.auditState as string | undefined) ?? detail.meta.auditState}
-              size={70}
-              isLoading={detail.identity === 'loading'}
-            />
-          </ProgressRing>
+          <Animated.View className="items-center" style={morph.contentStyle}>
+            <ProgressRing
+              size={84}
+              progress={ringProgress}
+              successColor={success}
+              errorColor={danger}>
+              <AnimatedAvatar
+                picture={entry?.iconUrl as string | undefined}
+                name={displayName}
+                alt={`${displayName} icon`}
+                status={(entry?.auditState as string | undefined) ?? detail.meta.auditState}
+                size={70}
+                isLoading={detail.identity === 'loading'}
+              />
+            </ProgressRing>
+            <Text bold size={22} numberOfLines={2} className="mt-3 text-center">
+              {displayName}
+            </Text>
+          </Animated.View>
 
           <Spacer size={16} />
 
@@ -705,7 +707,7 @@ export function MintInfoScreen() {
             </ListGroup>
           </Section>
         )}
-      </ScreenScrollView>
+      </View>
     </Screen>
   );
 }

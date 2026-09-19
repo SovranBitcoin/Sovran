@@ -112,7 +112,7 @@ export function NotificationFollowersScreen() {
     });
 
   return (
-    <Screen name="NotificationFollowersScreen" scroll="custom" bgColor={surface}>
+    <Screen name="NotificationFollowersScreen" scroll="custom" safeArea="scroll" bgColor={surface}>
       {__DEV__ &&
         viewerPubkey &&
         page.result &&

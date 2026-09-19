@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import { StyleSheet, type ScrollView, type View as NativeView } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
+import { useIdentityHeader, type HeaderIdentity } from '@/shared/ui/composed/IdentityHeader';
 import { getCounterparty } from 'wallet';
 
 import { useDeferredMount } from '@/shared/hooks/useDeferredMount';
-import { Screen } from '@/shared/ui/composed/Screen';
+import { Screen, useScreenOptions } from '@/shared/ui/composed/Screen';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HistoryEntryHeader } from '@/features/transactions/components/detail/HistoryEntryHeader';
@@ -42,10 +43,11 @@ interface TransactionDetailShellProps {
   /** Footer (bottom buttons). */
   footer: React.ReactNode;
   /**
-   * Screen-level sibling rendered before the body — e.g. a `<Stack.Screen
-   * options>` route-header override. Renders nothing visually.
+   * Optional counterparty identity that hands off from the body avatar to the
+   * compact navigation title while scrolling.
    */
-  headerOverride?: React.ReactNode;
+  headerIdentity?: HeaderIdentity;
+  headerTitle?: string;
   /**
    * Screen-specific content rendered between the header and the status/refresh
    * row — warnings, the bearer-token PaymentInfo, memo cards, the redeemed
@@ -99,12 +101,18 @@ export function TransactionDetailShell({
   source,
   showRecipientAvatar = false,
   footer,
-  headerOverride,
+  headerIdentity,
+  headerTitle = '',
   beforeStatus,
   statusRow,
   timeline,
   children,
 }: TransactionDetailShellProps): React.ReactElement {
+  const morph = useIdentityHeader({ identity: headerIdentity, title: headerTitle, collapseAt: 48 });
+  useScreenOptions(
+    () => (headerTitle ? { headerTitle: morph.headerTitle } : {}),
+    [headerTitle, headerIdentity?.name, headerIdentity?.picture, headerIdentity?.seed]
+  );
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollContentRef = useRef<NativeView>(null);
   const timelineRef = useRef<NativeView>(null);
@@ -141,13 +149,15 @@ export function TransactionDetailShell({
   return (
     <Screen
       name={screenName}
+      scroll={headerIdentity ? 'animated' : 'auto'}
+      scrollY={morph.scrollY}
       contentPadding={0}
       footer={footer}
       deferContent={false}
       scrollViewRef={scrollViewRef}
       scrollContentRef={scrollContentRef}
       onHeaderHeightChange={recordHeaderHeight}>
-      {headerOverride}
+      {headerIdentity ? morph.probe : null}
       <E2EToastProbe />
       <E2EActionMenuProbe />
       <View
@@ -165,7 +175,12 @@ export function TransactionDetailShell({
           {entry ? (
             <>
               <TransactionProbe entry={entry} source={source} transactionId={entry.id} />
-              <HistoryEntryHeader historyEntry={entry} showRecipientAvatar={showRecipientAvatar} />
+              <HistoryEntryHeader
+                historyEntry={entry}
+                showRecipientAvatar={showRecipientAvatar}
+                identity={headerIdentity}
+                identityStyle={morph.contentStyle}
+              />
             </>
           ) : null}
           {beforeStatus}

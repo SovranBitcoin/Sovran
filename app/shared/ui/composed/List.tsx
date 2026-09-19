@@ -13,7 +13,7 @@
  * transaction timeline — render FlashList directly rather than through `<List>`.
  */
 import type { Ref } from 'react';
-import { useScreenBottomPadding } from '@/shared/hooks/useScreenInsets';
+import { useScreenContentPadding } from '@/shared/hooks/useScreenInsets';
 import {
   FlashList as BaseFlashList,
   type FlashListProps,
@@ -69,7 +69,10 @@ export function List<T>({
     /** Content gap above the screen bottom or footer. */
     bottomSpacing?: number;
   }) {
-  const bottomPadding = useScreenBottomPadding(bottomSpacing);
+  const { headerPadding, contentPadding } = useScreenContentPadding(
+    contentContainerStyle,
+    bottomSpacing
+  );
   return (
     <FlashList
       showsVerticalScrollIndicator={showsVerticalScrollIndicator}
@@ -77,11 +80,13 @@ export function List<T>({
       nestedScrollEnabled={nestedScrollEnabled}
       {...props}
       contentContainerStyle={
-        screen ? [contentContainerStyle, { paddingBottom: bottomPadding }] : contentContainerStyle
+        screen ? [contentContainerStyle, contentPadding] : contentContainerStyle
       }
       contentInsetAdjustmentBehavior={screen ? 'never' : contentInsetAdjustmentBehavior}
       scrollIndicatorInsets={
-        screen ? { ...scrollIndicatorInsets, bottom: bottomPadding } : scrollIndicatorInsets
+        screen
+          ? { top: headerPadding, ...scrollIndicatorInsets, bottom: contentPadding.paddingBottom }
+          : scrollIndicatorInsets
       }
     />
   );

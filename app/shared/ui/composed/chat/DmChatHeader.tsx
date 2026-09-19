@@ -74,11 +74,7 @@ export function DmChatHeader({
   const { width: screenWidth } = useWindowDimensions();
   const headerTitleWidth = screenWidth - 124 - 24;
 
-  const [foreground, surfaceSecondary, shade400] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-    'shade-400',
-  ] as const);
+  const [foreground, shade400] = useThemeColor(['foreground', 'shade-400'] as const);
 
   const { metadata, isLoading } = useNostrProfileMetadata(pubkey);
 
@@ -129,8 +125,8 @@ export function DmChatHeader({
     <Stack.Screen
       options={withGlassHeaderItems({
         headerShown: true,
-        headerTransparent: false,
-        headerStyle: { backgroundColor: surfaceSecondary },
+        headerTransparent: true,
+        headerStyle: { backgroundColor: 'transparent' },
         headerShadowVisible: false,
         headerBackVisible: false,
         headerTintColor: foreground,

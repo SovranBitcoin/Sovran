@@ -6,6 +6,10 @@ import { ListGroup } from 'heroui-native';
 import { Section } from '@/shared/ui/composed/Section';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+// These isolated screen tests omit the app's SafeAreaProvider.
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 24, bottom: 34, left: 0, right: 0 }),
+}));
 let mockDisplayName = '';
 let mockKeys: { pubkey: string; npub: string } | undefined;
 let mockDevMode = false;

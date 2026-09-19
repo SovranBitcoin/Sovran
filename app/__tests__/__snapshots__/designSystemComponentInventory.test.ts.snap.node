@@ -22,6 +22,8 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/composed/DetailsSection.tsx",
     "shared/ui/composed/EmptyState.tsx",
     "shared/ui/composed/GradientCard.tsx",
+    "shared/ui/composed/HeaderGradient.tsx",
+    "shared/ui/composed/IdentityHeader.tsx",
     "shared/ui/composed/MintIcon.tsx",
     "shared/ui/composed/Notice.tsx",
     "shared/ui/composed/PillTabs.tsx",
@@ -187,7 +189,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/capability/index.tsx",
     "shared/ui/composed/ActionMenuButton.tsx",
     "shared/ui/composed/AmountEntryView.tsx",
-    "shared/ui/composed/AndroidHeaderScrim.tsx",
     "shared/ui/composed/AndroidSheetRoot.tsx",
     "shared/ui/composed/AnimatedCountValue.tsx",
     "shared/ui/composed/BackgroundView.tsx",
@@ -263,6 +264,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 257,
+  "total": 258,
 }
 `;

@@ -1,3 +1,4 @@
+import { Screen } from '@/shared/ui/composed/Screen';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { DemoHomeFeed } from '../components/DemoHomeFeed';
 import { useState, useCallback, useMemo } from 'react';
@@ -144,7 +145,7 @@ export function FeedScreen() {
   }, []);
 
   return (
-    <Log name="FeedScreen" style={[styles.root, { backgroundColor: surface }]}>
+    <Screen name="FeedScreen" scroll="custom" safeArea bgColor={surface} headerAppearance="opaque">
       <View
         style={[
           styles.filtersRow,
@@ -172,14 +173,11 @@ export function FeedScreen() {
           whose rows are AX-invisible under FullWindowOverlay — mirror its open
           state so e2e can wait before a coordinate tap (same as WalletScreen). */}
       <E2EHerouiMenuProbe />
-    </Log>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
   filtersRow: {
     height: SEARCH_FILTERS_HEIGHT,
   },

@@ -1,3 +1,4 @@
+import { Screen } from '@/shared/ui/composed/Screen';
 /**
  * @fileoverview Receive hub — the method-first front door for receiving.
  *
@@ -141,15 +142,17 @@ export function ReceiveHubScreen({ receiveHubEntry, unit }: ReceiveHubScreenProp
   }
 
   return (
-    <ScreenScrollView
-      bottomSpacing={24}
-      style={[styles.screen, { backgroundColor: overlay }]}
-      contentContainerStyle={[styles.content, { paddingTop: headerHeight + 8 }]}>
-      {/* This screen is a sheet: iOS modal AX hides the root-layout probe, so
+    <Screen name="ReceiveHubScreen" scroll="custom">
+      <ScreenScrollView
+        bottomSpacing={24}
+        style={[styles.screen, { backgroundColor: overlay }]}
+        contentContainerStyle={[styles.content, { paddingTop: headerHeight + 8 }]}>
+        {/* This screen is a sheet: iOS modal AX hides the root-layout probe, so
           toast evidence (e.g. no-clipboard-address) must be mirrored in-sheet. */}
-      <E2EToastProbe />
-      {rows}
-    </ScreenScrollView>
+        <E2EToastProbe />
+        {rows}
+      </ScreenScrollView>
+    </Screen>
   );
 }
 

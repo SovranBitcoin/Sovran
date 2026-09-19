@@ -1,3 +1,4 @@
+import { GRADIENT_HEADER_OPTIONS } from '@/navigation/headerOptions';
 /**
  * @fileoverview Shared modal configuration for flow layouts
  *
@@ -15,28 +16,12 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { FLOW_SHEET_HEADER_HEIGHT, FlowSheetHeader } from '@/shared/ui/composed/FlowSheetHeader';
-import { AndroidHeaderScrim } from '@/shared/ui/composed/AndroidHeaderScrim';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 
 interface FlowColors {
   foreground: string;
   background: string;
 }
-
-/**
- * Spread into header options on Android only; empty on iOS (blur handles it).
- * NATIVE-header stacks only ((settings-flow)/(user-flow), root default-title
- * modals): react-navigation renders this as a content-level layer beneath the
- * natively-later toolbar, which is exactly where the fade belongs. The sheet
- * flows must NOT let this option reach native-stack — see
- * createFlowLayoutScreenOptions below.
- */
-export const androidHeaderScrimOptions = (
-  backgroundColor: string
-): Partial<NativeStackNavigationOptions> =>
-  Platform.OS === 'android'
-    ? { headerBackground: () => <AndroidHeaderScrim backgroundColor={backgroundColor} /> }
-    : {};
 
 /**
  * Shared header button component for flow layouts.
@@ -70,11 +55,8 @@ const FlowHeaderButton = memo(function FlowHeaderButton({
  */
 const getBaseFlowScreenOptions = (colors: FlowColors): NativeStackNavigationOptions => ({
   headerShown: true,
-  headerTransparent: true,
+  ...GRADIENT_HEADER_OPTIONS,
   headerTitleAlign: 'center',
-  headerStyle: {
-    backgroundColor: 'transparent',
-  },
   headerTitleStyle: {
     color: colors.foreground,
   },
@@ -82,7 +64,7 @@ const getBaseFlowScreenOptions = (colors: FlowColors): NativeStackNavigationOpti
   // Hide any back title that might show parent route names
   headerBackButtonDisplayMode: 'minimal',
   headerBackVisible: false,
-  ...androidHeaderScrimOptions(colors.background),
+  headerBackground: () => null,
   // Horizontal slide animation within the modal
   animation: 'slide_from_right',
   gestureEnabled: true,
@@ -156,10 +138,7 @@ export function AndroidSheetFlowStack({ children }: { children: ReactNode }) {
  * Base header options shared across root modal screens.
  * Used by _layout.tsx for consistent header styling.
  */
-export const getBaseModalHeaderOptions = (
-  foreground: string,
-  backgroundColor: string
-): NativeStackNavigationOptions => ({
+export const getBaseModalHeaderOptions = (foreground: string): NativeStackNavigationOptions => ({
   headerTitleAlign: 'center',
   headerTitleStyle: {
     color: foreground,
@@ -168,12 +147,7 @@ export const getBaseModalHeaderOptions = (
   headerBackTitleStyle: {
     fontSize: 16,
   },
-  headerStyle: {
-    backgroundColor,
-  },
-  headerLargeStyle: {
-    backgroundColor,
-  },
+  ...GRADIENT_HEADER_OPTIONS,
 });
 
 /**

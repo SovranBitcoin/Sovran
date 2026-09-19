@@ -1,5 +1,5 @@
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView } from 'react-native';
 
 import { Button, Card } from 'heroui-native';
 
@@ -17,7 +17,6 @@ import { LoadingIndicator, type Phase } from '@/shared/blocks/status';
 const SEGMENT_STEP_DURATION_MS = 850;
 const SEGMENT_COMPLETE_HOLD_STEPS = 2;
 const SEGMENTED_PROGRESS_FAMILY = getDesignSystemFamily('segmented-progress');
-const CONTENT_CONTAINER_STYLE = { paddingBottom: 32 };
 
 export function SettingsDesignSystemSegmentedScreen() {
   const surfaceSecondary = useThemeColor('surface-secondary');
@@ -77,8 +76,8 @@ export function SettingsDesignSystemSegmentedScreen() {
   const segmentedPhase: Phase = visibleCompletedSegments >= segmentCount ? 'done' : 'loading';
 
   return (
-    <ScreenWrapper name="SettingsDesignSystemSegmentedScreen" scroll="custom" safeArea>
-      <ScrollView className="px-4" contentContainerStyle={CONTENT_CONTAINER_STYLE}>
+    <ScreenWrapper name="SettingsDesignSystemSegmentedScreen" scroll="custom" safeArea="scroll">
+      <ScreenScrollView className="px-4" bottomSpacing={32}>
         <Text size={12} className="text-foreground/60 mb-4 mt-2">
           The{' '}
           <Text size={12} bold className="text-foreground">
@@ -177,7 +176,7 @@ export function SettingsDesignSystemSegmentedScreen() {
             </View>
           </Section>
         ))}
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenWrapper>
   );
 }

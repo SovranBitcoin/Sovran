@@ -1,5 +1,5 @@
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import React, { useCallback } from 'react';
-import { ScrollView } from 'react-native';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { ListGroup, PressableFeedback, Separator } from 'heroui-native';
@@ -37,8 +37,8 @@ const DesignSystemLinkItem: React.FC<DesignSystemFamily> = ({ id, href, title, d
 
 export function SettingsDesignSystemScreen() {
   return (
-    <ScreenWrapper name="SettingsDesignSystemScreen" scroll="custom" safeArea>
-      <ScrollView className="px-4">
+    <ScreenWrapper name="SettingsDesignSystemScreen" scroll="custom" safeArea="scroll">
+      <ScreenScrollView className="px-4">
         <Text size={12} className="text-foreground/60 mb-4 mt-2">
           Live previews of shared UI components. Open one to see it in isolation — only the selected
           component animates, so the previews stay smooth.
@@ -53,7 +53,7 @@ export function SettingsDesignSystemScreen() {
             ))}
           </ListGroup>
         </Section>
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenWrapper>
   );
 }

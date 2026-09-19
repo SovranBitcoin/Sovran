@@ -2,6 +2,7 @@
  * coverage claim. The audit gate rejects unregistered new routes. */
 import type { CANONICAL_PAGES } from './pages';
 export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], readonly string[]>> = {
+  'settings-design-system-headers': ['(settings-flow)/design-system-headers.tsx'],
   'image-viewer': [], // overlay opened from post media, not a route
   cta: ['(prompt-flow)/cta.tsx'],
   'backup-intro': ['(prompt-flow)/backup-intro.tsx'],

@@ -1,5 +1,5 @@
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView } from 'react-native';
 
 import { Button, Card } from 'heroui-native';
 
@@ -89,8 +89,8 @@ export function SettingsDesignSystemLoadingScreen() {
   const displayKey = phase === 'done' ? result : phase;
 
   return (
-    <ScreenWrapper name="SettingsDesignSystemLoadingScreen" scroll="custom" safeArea>
-      <ScrollView className="px-4">
+    <ScreenWrapper name="SettingsDesignSystemLoadingScreen" scroll="custom" safeArea="scroll">
+      <ScreenScrollView className="px-4">
         <Text size={12} className="text-foreground/60 mb-4 mt-2">
           The canonical{' '}
           <Text size={12} bold className="text-foreground">
@@ -222,7 +222,7 @@ export function SettingsDesignSystemLoadingScreen() {
             </HStack>
           </Card.Body>
         </Card>
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenWrapper>
   );
 }

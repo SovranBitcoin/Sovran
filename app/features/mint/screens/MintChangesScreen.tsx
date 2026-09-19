@@ -155,7 +155,7 @@ export function MintChangesScreen() {
   const renderSeparator = () => <View style={[styles.separator, { backgroundColor: separator }]} />;
 
   return (
-    <Screen name="MintChangesScreen" scroll="custom" bgColor={surface}>
+    <Screen name="MintChangesScreen" scroll="custom" safeArea="scroll" bgColor={surface}>
       {revisions.length > 0 && (
         <E2EAccessibilityProbe
           testID="mint-changes-populated"

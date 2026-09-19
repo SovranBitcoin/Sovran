@@ -584,7 +584,6 @@ export function MintAddScreen() {
     // sheet header's scrim fades from the page's color, not the darker
     // theme background. FlowSheetHeader reads this; iOS ignores it under a
     // transparent header.
-    headerStyle: { backgroundColor: surface },
     headerTitle: renderHeaderTitle,
     headerRight: renderHeaderRight,
   });
@@ -777,6 +776,7 @@ export function MintAddScreen() {
     <Screen
       name="MintAddScreen"
       headerGradient
+      headerAppearance="gradient-tabs"
       stickyContent={currencyTabs}
       stickyContentHeight={CURRENCY_TABS_HEIGHT}
       scroll="custom"

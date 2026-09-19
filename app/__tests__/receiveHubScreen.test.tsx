@@ -175,3 +175,8 @@ describe('ReceiveHubScreen', () => {
     }
   });
 });
+
+// Layout ownership is exercised in screenLayout; these tests check receive actions.
+jest.mock('@/shared/ui/composed/Screen', () => ({
+  Screen: ({ children }: { children: React.ReactNode }) => children,
+}));

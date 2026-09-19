@@ -103,8 +103,8 @@ type SearchLayoutProps = {
   renderIdleTitle?: () => ReactNode;
   /**
    * Transparent header + content, for a tab that paints its own background
-   * (the Wallet's wallpaper). Default `false` keeps the opaque `surface`
-   * behavior used by Feed/Contacts.
+   * (the Wallet's wallpaper). Feed/Contacts paint their surface and gradient
+   * through Screen.
    */
   transparent?: boolean;
   /**
@@ -159,9 +159,11 @@ export function SearchLayout({
       // the light theme's `surface` background.
       headerTitleStyle: { color: iconColor },
       headerTintColor: iconColor,
-      ...(transparent
-        ? { headerTransparent: true, headerStyle: { backgroundColor: 'transparent' } }
-        : { headerStyle: { backgroundColor: surface } }),
+      headerTransparent: true,
+      headerShadowVisible: false,
+      headerBlurEffect: 'none',
+      headerStyle: { backgroundColor: 'transparent' },
+      headerBackground: () => null,
       // GlassSearchBar wins while searching; otherwise an optional custom
       // idle title (Wallet's MintSelector), else the native `title`.
       ...(search.isSearching

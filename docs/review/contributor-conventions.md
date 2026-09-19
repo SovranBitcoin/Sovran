@@ -611,3 +611,11 @@ A security or backup prompt's primary action never dismisses it, blocking CTAs h
 Does `hunk` make a security or backup prompt's primary action dismiss or snooze it, give a blocking CTA a dismiss, close or back escape, or mark the backup verified just because the recovery phrase was revealed or viewed?
 
 Allowed cases: The primary action performs the backup or verification; verification requires the user to confirm words; a finished-backup screen whose button closes the completed flow; non-blocking CTAs dismissible through a secondary action.
+
+## ui/headers
+
+Use the [header contract](header-contract.md): `Screen` gradient chrome, shared
+`useIdentityHeader` handoff where a page identity can collapse into navigation, and
+measured `stickyContent` for persistent section tabs. Preserve header actions,
+scroll clearance and identity continuity on iOS and Android. Do not build screen-local
+morph animations or place multi-row controls in a navigation title.

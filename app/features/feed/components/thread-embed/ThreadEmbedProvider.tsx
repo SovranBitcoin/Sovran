@@ -1,3 +1,4 @@
+import { useScreenContentPadding } from '@/shared/hooks/useScreenInsets';
 /**
  * Provider for the in-thread link embed.
  *
@@ -68,7 +69,7 @@ interface ThreadEmbedContextValue {
   /** Live thread-list scroll offset, fed by `ThreadView`'s onScroll. */
   scrollY: SharedValue<number>;
   /** Resting top of the sheet (px from screen top) — just above the first pfp/name. */
-  expandedOffset: number;
+  headerClearance: number;
   /** Slide distance to the MIDDLE snap. */
   snapMiddle: number;
   /** Slide distance to the INLINE snap (only the action bar remains). */
@@ -83,44 +84,31 @@ const ThreadEmbedContext = createContext<ThreadEmbedContextValue | null>(null);
 export function ThreadEmbedProvider({ children }: { children: React.ReactNode }) {
   const { height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  // The sheet rests with its top just below the navigation header (i.e. just
-  // above the first pfp/name), not at the very top of the screen.
-  //
-  // The sheet is absolutely positioned at `top: expandedOffset`, so any change
-  // to this value after the first render drops the ENTIRE thread down a frame
-  // later (the "whole page jumps down" shift). `useHeaderHeight()` is unsafe for
-  // this: it can report 0 — or a non-final value — on the first render(s) and
-  // then settle. Derive the offset from the safe-area top + the standard nav bar
-  // height instead; both are available synchronously and never settle, so the
-  // sheet's resting position is identical on the very first frame. (Standard
-  // `title` header, `app/(user-flow)/thread.tsx`.) `navHeaderHeight` is logged
-  // only to verify it matches.
+  // The viewport starts at zero so content can scroll behind navigation.
+  // Reserve stable header geometry inside the list instead of shifting the sheet.
   const navHeaderHeight = useHeaderHeight();
-  const expandedOffset = insets.top + DEFAULT_NAV_BAR_HEIGHT;
+  const { headerPadding } = useScreenContentPadding();
+  const headerClearance = headerPadding || navHeaderHeight || insets.top + DEFAULT_NAV_BAR_HEIGHT;
 
   useEffect(() => {
     feedLog.info('thread.offset.header', {
       navHeaderHeight,
       insetTop: insets.top,
-      expandedOffset,
+      headerClearance,
     });
-  }, [navHeaderHeight, insets.top, expandedOffset]);
+  }, [navHeaderHeight, insets.top, headerClearance]);
   const [actionBarHeight, setActionBarHeightState] = useState(INLINE_ACTION_BAR_FALLBACK);
 
   // Middle snap: most of the page revealed, thread as a bottom strip.
   const snapMiddle = useMemo(
-    () => Math.max(160, Math.round(screenHeight * MIDDLE_REVEAL_FRACTION) - expandedOffset),
-    [screenHeight, expandedOffset]
+    () => Math.max(160, Math.round(screenHeight * MIDDLE_REVEAL_FRACTION)),
+    [screenHeight]
   );
   // Inline snap: slid down until only the floating action bar plus the drag
   // handle peeking just above it remain.
   const snapInline = useMemo(
-    () =>
-      Math.max(
-        snapMiddle + 80,
-        screenHeight - actionBarHeight - INLINE_HANDLE_PEEK - expandedOffset
-      ),
-    [screenHeight, actionBarHeight, expandedOffset, snapMiddle]
+    () => Math.max(snapMiddle + 80, screenHeight - actionBarHeight - INLINE_HANDLE_PEEK),
+    [screenHeight, actionBarHeight, snapMiddle]
   );
 
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
@@ -226,7 +214,7 @@ export function ThreadEmbedProvider({ children }: { children: React.ReactNode })
       actionBarOpacity,
       targetFooterOpacity,
       scrollY,
-      expandedOffset,
+      headerClearance,
       snapMiddle,
       snapInline,
       listScrollEnabled,
@@ -242,7 +230,7 @@ export function ThreadEmbedProvider({ children }: { children: React.ReactNode })
       actionBarOpacity,
       targetFooterOpacity,
       scrollY,
-      expandedOffset,
+      headerClearance,
       snapMiddle,
       snapInline,
       listScrollEnabled,

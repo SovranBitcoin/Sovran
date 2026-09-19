@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 /**
  * JS header for nested flow stacks presented as Android formSheets.
  *
@@ -14,7 +15,7 @@
  * changes. Visuals match FormSheetChrome (grabber + centered bold title +
  * 44pt side slots).
  *
- * The header OWNS the Android scrim (AndroidHeaderScrim) rather than reading
+ * The header OWNS the Android scrim (HeaderGradient) rather than reading
  * it from options.headerBackground: createFlowLayoutScreenOptions strips that
  * option on sheet flows because native-stack renders it ITSELF in a wrapper
  * with elevation:1 when headerTransparent — on Android that composites the
@@ -30,6 +31,7 @@
  * back/close affordance is the flows' own headerLeft (FlowHeaderButton).
  * No top safe-area inset — the sheet already sits below the status bar.
  */
+import Animated from 'react-native-reanimated';
 import { StyleSheet, View } from 'react-native';
 import type { NativeStackHeaderProps } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -37,7 +39,7 @@ import { headerButtonSize, spacing, fontSize } from '@/shared/styles/tokens';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { SheetGrabber } from '@/shared/ui/composed/SheetGrabber';
-import { AndroidHeaderScrim } from '@/shared/ui/composed/AndroidHeaderScrim';
+import { HeaderGradient } from '@/shared/ui/composed/HeaderGradient';
 
 /**
  * Fixed total height: SheetGrabber (8 marginTop + 4) + title row
@@ -59,7 +61,16 @@ export const SCRIM_TOTAL_HEIGHT = FLOW_SHEET_HEADER_HEIGHT + 32;
  *  formSheets only). */
 export const FLOW_SHEET_SCRIM_OVERHANG = SCRIM_TOTAL_HEIGHT - FLOW_SHEET_HEADER_HEIGHT;
 
-export function FlowSheetHeader({ back, options, route }: NativeStackHeaderProps) {
+export function FlowSheetHeader({
+  back,
+  options,
+  route,
+  appearance = 'gradient',
+  gradientStyle,
+}: NativeStackHeaderProps & {
+  appearance?: 'gradient' | 'opaque' | 'gradient-tabs';
+  gradientStyle?: ComponentProps<typeof Animated.View>['style'];
+}) {
   const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
 
   const tintColor = options.headerTintColor ?? foreground;
@@ -82,47 +93,42 @@ export function FlowSheetHeader({ back, options, route }: NativeStackHeaderProps
   const left = options.headerLeft?.({ tintColor, canGoBack: !!back });
   const right = options.headerRight?.({ tintColor, canGoBack: !!back });
 
-  // headerStyle.backgroundColor plays two roles: with headerTransparent off
-  // it is a SOLID header fill (NetworkSheet/GeohashChat/DmChatHeader set
-  // surfaceSecondary); with headerTransparent ON it declares the page's
-  // actual background so the scrim fades from the right color — screens that
-  // override their page color (e.g. MintListScreen bgColor={surface}) must
-  // declare it here too, or the scrim fades from the (darker) theme
-  // background and reads as a wrong-colored slab.
+  // Screen declares its page color here on Android sheets. Native iOS bars
+  // stay transparent; this custom header owns the Android gradient.
   const headerStyleBackground = (
     StyleSheet.flatten(options.headerStyle) as { backgroundColor?: string } | undefined
   )?.backgroundColor;
-  const transparentHeader = options.headerTransparent === true;
   const declaredBackground =
     headerStyleBackground && headerStyleBackground !== 'transparent'
       ? headerStyleBackground
       : undefined;
-  const backgroundColor = !transparentHeader ? declaredBackground : undefined;
 
-  // Background layer: a screen-provided headerBackground wins; solid-header
-  // screens (backgroundColor set) need no scrim; transparent headers get the
-  // Android color-fade scrim in the page's declared color (theme fallback).
+  // A screen-provided null background opts out for immersive media.
+  // All ordinary sheets get the gradient in their declared page color.
   // The scrim is TALLER than the bar: solid through the title row, then an
   // eased fade whose tail paints ~32dp below the bar over scrolling content.
   // Safe because native-stack's custom-header wrapper has no overflow clip
   // and absolute children don't contribute to the onLayout that feeds
   // HeaderHeightContext (the measured height stays FLOW_SHEET_HEADER_HEIGHT).
-  const backgroundLayer = options.headerBackground ? (
-    options.headerBackground()
-  ) : backgroundColor ? null : (
-    <AndroidHeaderScrim
-      backgroundColor={declaredBackground ?? background}
-      height={SCRIM_TOTAL_HEIGHT}
-      anchor={FLOW_SHEET_HEADER_HEIGHT / SCRIM_TOTAL_HEIGHT - 0.1}
-    />
-  );
+  const backgroundLayer =
+    appearance === 'gradient-tabs' ? null : appearance === 'opaque' ? (
+      <View style={[styles.container, { backgroundColor: declaredBackground ?? background }]} />
+    ) : options.headerBackground ? (
+      options.headerBackground()
+    ) : (
+      <HeaderGradient
+        backgroundColor={declaredBackground ?? background}
+        height={SCRIM_TOTAL_HEIGHT}
+        anchor={FLOW_SHEET_HEADER_HEIGHT / SCRIM_TOTAL_HEIGHT - 0.1}
+      />
+    );
 
   return (
-    <View style={[styles.container, backgroundColor ? { backgroundColor } : null]}>
+    <View style={styles.container}>
       {backgroundLayer ? (
-        <View style={styles.backgroundLayer} pointerEvents="none">
+        <Animated.View style={[styles.backgroundLayer, gradientStyle]} pointerEvents="none">
           {backgroundLayer}
-        </View>
+        </Animated.View>
       ) : null}
       <SheetGrabber />
       <HStack align="center" style={styles.titleRow}>

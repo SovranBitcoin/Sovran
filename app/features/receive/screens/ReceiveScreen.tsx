@@ -351,7 +351,6 @@ function ReceiveScreenForUnit({
   useScreenOptions(
     () =>
       withGlassHeaderItems({
-        headerStyle: { backgroundColor: overlay },
         headerRight: () =>
           hasReceiveEntryData ? (
             <UnitSwitcherPillFallback
@@ -441,6 +440,34 @@ function ReceiveScreenForUnit({
       contentPadding={0}
       deferContent={false}
       bgColor={overlay}
+      headerAppearance="opaque"
+      stickyContent={
+        <>
+          {tabs.length > 1 && (
+            <View style={[styles.tabBand, { borderBottomColor: separator }]}>
+              <UnderlineTabs
+                tabs={tabs}
+                selectedTab={selectedTab}
+                handleTabPress={setSelectedTab}
+              />
+            </View>
+          )}
+          {selectedTab === 'Lightning' && (
+            <View style={[styles.pillBand, { borderBottomColor: separator }]}>
+              <PillTabs
+                tabs={LIGHTNING_MODE_PILLS}
+                activeTab={PILL_BY_LIGHTNING_MODE[lightningMode]}
+                onTabChange={(pill) => setLightningMode(LIGHTNING_MODE_BY_PILL[pill])}
+                testIDFor={(pill) =>
+                  pill === 'Address'
+                    ? 'receive-lightning-mode-address'
+                    : 'receive-lightning-mode-offer'
+                }
+              />
+            </View>
+          )}
+        </>
+      }
       footer={
         <BottomButtons>
           {/* Paste / Fixed Amount / Scan QR moved to the receive hub — here
@@ -464,26 +491,6 @@ function ReceiveScreenForUnit({
           toast evidence (mint-updated, payment-status) must be mirrored
           in-sheet for the npc receive scenarios. */}
       <E2EToastProbe />
-      {/* Contacts-style header: full-bleed top-level tabs, then (Lightning
-          only) the pill sub-tab row — hairline separators on each band. */}
-      {tabs.length > 1 && (
-        <View style={[styles.tabBand, { borderBottomColor: separator }]}>
-          <UnderlineTabs tabs={tabs} selectedTab={selectedTab} handleTabPress={setSelectedTab} />
-        </View>
-      )}
-      {selectedTab === 'Lightning' && (
-        <View style={[styles.pillBand, { borderBottomColor: separator }]}>
-          <PillTabs
-            tabs={LIGHTNING_MODE_PILLS}
-            activeTab={PILL_BY_LIGHTNING_MODE[lightningMode]}
-            onTabChange={(pill) => setLightningMode(LIGHTNING_MODE_BY_PILL[pill])}
-            testIDFor={(pill) =>
-              pill === 'Address' ? 'receive-lightning-mode-address' : 'receive-lightning-mode-offer'
-            }
-          />
-        </View>
-      )}
-
       <View style={styles.content}>
         <SkeletonContentCrossfade
           loading={!receiveEntryData}

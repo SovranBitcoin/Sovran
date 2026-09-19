@@ -1,4 +1,4 @@
-import { ScrollView } from 'react-native';
+import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
 
 import { getDesignSystemFamily } from '@/features/settings/design-system/catalog';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
@@ -7,12 +7,11 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 
 const FAKE_POSTS_FAMILY = getDesignSystemFamily('fake-posts');
-const CONTENT_CONTAINER_STYLE = { paddingBottom: 32 };
 
 export function SettingsDesignSystemPostsScreen() {
   return (
-    <ScreenWrapper name="SettingsDesignSystemPostsScreen" scroll="custom" safeArea>
-      <ScrollView className="px-4" contentContainerStyle={CONTENT_CONTAINER_STYLE}>
+    <ScreenWrapper name="SettingsDesignSystemPostsScreen" scroll="custom" safeArea="scroll">
+      <ScreenScrollView className="px-4" bottomSpacing={32}>
         <Text size={12} className="text-foreground/60 mb-4 mt-2">
           Fixture posts rendered through the real `PostCard` — relay cards in every state, seeded
           into `relayMetadataStore` so nothing here depends on live content.
@@ -24,7 +23,7 @@ export function SettingsDesignSystemPostsScreen() {
             </View>
           </Section>
         ))}
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenWrapper>
   );
 }

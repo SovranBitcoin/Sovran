@@ -14,10 +14,7 @@
 import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import {
-  androidHeaderScrimOptions,
-  createFlowLayoutScreenOptions,
-} from '../../config/flowLayoutOptions';
+import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
 const PROFILE_OPTIONS = { title: 'Profile' };
 // Statically shown: DmChatHeader swaps header content only. A false→true
@@ -37,7 +34,6 @@ export default function UserFlowLayout() {
     () => ({
       title: 'Thread',
       contentStyle: { backgroundColor: surface },
-      ...androidHeaderScrimOptions(surface),
     }),
     [surface]
   );
