@@ -529,6 +529,28 @@ export default defineConfig({
             when: /#[0-9a-fA-F]{3,8}\b|rgba?\(|ActivityIndicator|fontFamily|<Svg|<Path|Ionicons|MaterialIcons|Feather/,
           }),
         ],
+        // Stacked page sections (QR, notices, mint selector, copy rows, timeline, history) must sit
+        // the same distance apart on every page. That holds only when the parent owns the vertical
+        // gap. A block that sets its own top margin doubles a stack's gap: 24 above the onchain
+        // deposit notice inside TransactionDetailShell's 12-point stack, 12 everywhere else. (A
+        // question about margins inside a gap stack was tried and dropped: the stack is usually
+        // outside the diff's context, so it could not be judged.)
+        'ui/block-margins': [
+          'warn',
+          noul({
+            ...STRICT,
+            message:
+              "A stackable block sets its own top or bottom margin, so its distance from neighbours changes with every parent. Leave vertical spacing to the parent stack's gap or to the call site.",
+            instructions:
+              'Does `hunk` define a component that renders one self-contained block for screens to stack (a card, notice, banner, QR block, selector or copy row), whose outermost element sets its own top or bottom margin (`mt-*`, `mb-*`, `my-*`, `marginTop`, `marginBottom`, `marginVertical`)?',
+            criteria: {
+              true: 'A deposit-limits component returning `<Notice className="mx-4 mt-3" … />`; a card whose root style is `{ marginHorizontal: 16, marginBottom: 16 }`.',
+              false:
+                'The root sets only horizontal insets (`mx-4`) or takes its outer spacing from a `className` or `style` prop; margins on inner elements of the block; a screen or page component laying out its own sections; design-system catalogue screens under `features/settings`.',
+            },
+            when: /\bm[tby]-|\bmargin(Top|Bottom|Vertical)/,
+          }),
+        ],
         'ui/platform': [
           'warn',
           noul({
