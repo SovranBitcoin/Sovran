@@ -17,6 +17,7 @@ import { paymentLog } from '@/shared/lib/logger';
 import { expectedQrPayloadLength } from '@/shared/lib/qr';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { CopyRequestCard } from '@/shared/ui/composed/CopyRequestCard';
+import { OnchainDepositLimitsCard } from '@/features/receive/components/OnchainDepositLimitsCard';
 import { ReceiveRailPlaceholder } from '@/features/receive/components/ReceiveRailPlaceholder';
 import { HistoryEntryRefresh } from '@/features/transactions';
 import { ActionSegmentsCard } from '@/shared/ui/composed/ActionSegmentsCard';
@@ -29,7 +30,6 @@ import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
-import { truncateMiddle } from '@/shared/lib/strings';
 import { setStringAsync } from 'expo-clipboard';
 import { copyPopup, staticPopup } from '@/shared/lib/popup';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
@@ -333,6 +333,9 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
         unit={unit}
         reveal={revealPending}
       />
+      {method === 'onchain' && (
+        <OnchainDepositLimitsCard mintUrl={methodMint} unit={unit} className="mt-3" />
+      )}
       {/* Same 12px offset the QR speed controls use under the QR; the Section
           below brings its own py-3, keeping the gaps symmetric. Onchain gets
           New address + View all; bolt12 reuses one standing offer per mint, so
@@ -374,8 +377,7 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
       <CopyRequestCard
         title={copy.sectionTitle}
         icon={copy.icon}
-        display={truncateMiddle(request, 10)}
-        reveal={revealPending}
+        parts={[{ value: request }]}
         muted={muted}
         onPress={handleCopy}
       />

@@ -12,7 +12,6 @@ import Icon, { CurrencyIcon } from 'assets/icons';
 import { View } from '@/shared/ui/primitives/View/View';
 import * as Clipboard from 'expo-clipboard';
 import { copyPopup } from '@/shared/lib/popup';
-import { truncateMiddle } from '@/shared/lib/strings';
 import { withAlpha } from '@/shared/lib/color';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
@@ -175,7 +174,12 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
                   <Icon name={config.iconName} size={20} color={withAlpha(foreground, 0.4)} />
                 ) : undefined
               }
-              display={truncateMiddle(activeData, 10)}
+              parts={[
+                {
+                  value: activeData,
+                  kind: config.copyTarget === 'lud16' ? 'lightningAddress' : 'code',
+                },
+              ]}
               muted={withAlpha(foreground, 0.4)}
               onPress={handleCopy}
               testID={`share-copy-${config.copyTarget}`}

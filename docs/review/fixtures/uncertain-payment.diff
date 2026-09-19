@@ -1,0 +1,8 @@
+# expect: payments/uncertain-outcome
+# task: Review the changed behavior in this synthetic policy fixture.
+diff --git a/app/shared/review-fixture.ts b/app/shared/review-fixture.ts
+--- a/app/shared/review-fixture.ts
++++ b/app/shared/review-fixture.ts
+@@ -1 +1 @@
+-try { await mint.pay(invoice); } catch (error) { return { status: "unknown", error }; }
++try { await mint.pay(invoice); } catch (error) { return { status: "paid" }; }

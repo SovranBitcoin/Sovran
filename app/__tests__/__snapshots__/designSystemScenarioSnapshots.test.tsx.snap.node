@@ -2603,7 +2603,7 @@ exports[`Design System exact structural snapshots renders foundations/detail-row
 }
 `;
 
-exports[`Design System exact structural snapshots renders foundations/notice-cards: notice-cards 1`] = `
+exports[`Design System exact structural snapshots renders foundations/notices: notices 1`] = `
 {
   "children": [
     {
@@ -2611,51 +2611,50 @@ exports[`Design System exact structural snapshots renders foundations/notice-car
         {
           "children": [
             {
+              "children": null,
+              "props": {
+                "color": "rgb(96, 96, 96)",
+                "height": 20,
+                "width": 20,
+                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10s-4.477 10-10 10m-1-11v6h2v-6zm0-4v2h2V7z"/></svg>",
+              },
+              "type": "SvgXml",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
               "children": [
-                "Information",
+                "About this mint",
               ],
               "props": {
                 "className": "css-text-146c3p1",
                 "dir": "auto",
                 "style": {
-                  "color": "rgba(16,16,16,0.50)",
+                  "color": "rgba(16,16,16,1.00)",
                   "fontFamily": "OxygenBold",
-                  "fontSize": "14px",
-                  "paddingLeft": "16px",
-                  "paddingRight": "4px",
-                  "paddingTop": "16px",
+                  "fontSize": "15px",
                 },
               },
               "type": "div",
             },
             {
               "children": [
-                {
-                  "children": [
-                    "This is a neutral supporting message.",
-                  ],
-                  "props": {
-                    "className": "css-text-146c3p1",
-                    "dir": "auto",
-                    "style": {
-                      "color": "rgba(16,16,16,0.80)",
-                      "fontFamily": "OxygenRegular",
-                      "fontSize": "14px",
-                      "paddingBottom": "16px",
-                      "paddingLeft": "16px",
-                      "paddingRight": "4px",
-                      "paddingTop": "16px",
-                    },
-                  },
-                  "type": "div",
-                },
+                "A quiet note that supports the page.",
               ],
               "props": {
-                "className": "css-view-g5y9jx",
-                "dir": null,
+                "className": "css-text-146c3p1",
+                "dir": "auto",
                 "style": {
-                  "alignItems": "center",
-                  "flexDirection": "row",
+                  "color": "rgba(96,96,96,1.00)",
+                  "fontFamily": "OxygenRegular",
+                  "fontSize": "14px",
                 },
               },
               "type": "div",
@@ -2664,20 +2663,14 @@ exports[`Design System exact structural snapshots renders foundations/notice-car
           "props": {
             "className": "css-view-g5y9jx",
             "dir": null,
-            "style": {
-              "flexDirection": "column",
-            },
           },
           "type": "div",
         },
       ],
       "props": {
+        "aria-label": "About this mint. A quiet note that supports the page.",
         "className": "css-view-g5y9jx",
         "dir": null,
-        "style": {
-          "backgroundColor": "rgba(224,224,224,1.00)",
-          "borderLeftColor": "rgba(16,16,16,0.80)",
-        },
       },
       "type": "div",
     },
@@ -2686,51 +2679,50 @@ exports[`Design System exact structural snapshots renders foundations/notice-car
         {
           "children": [
             {
+              "children": null,
+              "props": {
+                "color": "rgb(96, 96, 96)",
+                "height": 20,
+                "width": 20,
+                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" d="M21 3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6.455L2 22.5V4a1 1 0 0 1 1-1zm-1 2H4v13.385L5.763 17H20zm-9.485 2.412l.447.688c-1.668.903-1.639 2.352-1.639 2.665c.155-.022.318-.025.48-.01a1.76 1.76 0 0 1 1.613 1.745a1.75 1.75 0 0 1-1.75 1.75c-.537 0-1.05-.245-1.374-.59c-.515-.546-.792-1.16-.792-2.155c0-1.75 1.228-3.318 3.015-4.093m5 0l.447.688c-1.668.903-1.639 2.352-1.639 2.665c.155-.022.318-.025.48-.01a1.76 1.76 0 0 1 1.613 1.745a1.75 1.75 0 0 1-1.75 1.75c-.537 0-1.05-.245-1.374-.59c-.515-.546-.792-1.16-.792-2.155c0-1.75 1.228-3.318 3.015-4.093"/></svg>",
+              },
+              "type": "SvgXml",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
               "children": [
-                "Check this",
+                "Memo",
               ],
               "props": {
                 "className": "css-text-146c3p1",
                 "dir": "auto",
                 "style": {
-                  "color": "rgba(16,16,16,0.50)",
+                  "color": "rgba(16,16,16,1.00)",
                   "fontFamily": "OxygenBold",
-                  "fontSize": "14px",
-                  "paddingLeft": "16px",
-                  "paddingRight": "4px",
-                  "paddingTop": "16px",
+                  "fontSize": "15px",
                 },
               },
               "type": "div",
             },
             {
               "children": [
-                {
-                  "children": [
-                    "This action needs your attention.",
-                  ],
-                  "props": {
-                    "className": "css-text-146c3p1",
-                    "dir": "auto",
-                    "style": {
-                      "color": "rgba(192,48,48,1.00)",
-                      "fontFamily": "OxygenRegular",
-                      "fontSize": "14px",
-                      "paddingBottom": "16px",
-                      "paddingLeft": "16px",
-                      "paddingRight": "4px",
-                      "paddingTop": "16px",
-                    },
-                  },
-                  "type": "div",
-                },
+                "Info notices can carry their own icon.",
               ],
               "props": {
-                "className": "css-view-g5y9jx",
-                "dir": null,
+                "className": "css-text-146c3p1",
+                "dir": "auto",
                 "style": {
-                  "alignItems": "center",
-                  "flexDirection": "row",
+                  "color": "rgba(96,96,96,1.00)",
+                  "fontFamily": "OxygenRegular",
+                  "fontSize": "14px",
                 },
               },
               "type": "div",
@@ -2739,20 +2731,259 @@ exports[`Design System exact structural snapshots renders foundations/notice-car
           "props": {
             "className": "css-view-g5y9jx",
             "dir": null,
-            "style": {
-              "flexDirection": "column",
-            },
           },
           "type": "div",
         },
       ],
       "props": {
+        "aria-label": "Memo. Info notices can carry their own icon.",
         "className": "css-view-g5y9jx",
         "dir": null,
-        "style": {
-          "backgroundColor": "rgba(224,224,224,1.00)",
-          "borderLeftColor": "rgba(192,48,48,1.00)",
+      },
+      "type": "div",
+    },
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "color": "#000000",
+                "height": 20,
+                "width": 20,
+                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" d="m12.866 3l9.526 16.5a1 1 0 0 1-.866 1.5H2.474a1 1 0 0 1-.866-1.5L11.134 3a1 1 0 0 1 1.732 0M11 16v2h2v-2zm0-7v5h2V9z"/></svg>",
+              },
+              "type": "SvgXml",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
         },
+        {
+          "children": [
+            {
+              "children": [
+                "Onchain deposit limits",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(0,0,0,1.00)",
+                  "fontFamily": "OxygenBold",
+                  "fontSize": "15px",
+                },
+              },
+              "type": "div",
+            },
+            {
+              "children": [
+                "Send between 10,000 and 5,000,000 sats. Deposits outside this range won't be credited and could be lost.",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,0.82)",
+                  "fontFamily": "OxygenRegular",
+                  "fontSize": "14px",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+      ],
+      "props": {
+        "aria-label": "Onchain deposit limits. Send between 10,000 and 5,000,000 sats. Deposits outside this range won't be credited and could be lost.",
+        "className": "css-view-g5y9jx",
+        "dir": null,
+        "role": "alert",
+      },
+      "type": "div",
+    },
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "color": "#FFFFFF",
+                "height": 20,
+                "width": 20,
+                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10s-4.477 10-10 10m-1-7v2h2v-2zm0-8v6h2V7z"/></svg>",
+              },
+              "type": "SvgXml",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
+              "children": [
+                "This can't be undone",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(255,255,255,1.00)",
+                  "fontFamily": "OxygenBold",
+                  "fontSize": "15px",
+                },
+              },
+              "type": "div",
+            },
+            {
+              "children": [
+                "Deleting the wallet erases its ecash from this device.",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,0.82)",
+                  "fontFamily": "OxygenRegular",
+                  "fontSize": "14px",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+      ],
+      "props": {
+        "aria-label": "This can't be undone. Deleting the wallet erases its ecash from this device.",
+        "className": "css-view-g5y9jx",
+        "dir": null,
+        "role": "alert",
+      },
+      "type": "div",
+    },
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "color": "#000000",
+                "height": 20,
+                "width": 20,
+                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" d="m12.866 3l9.526 16.5a1 1 0 0 1-.866 1.5H2.474a1 1 0 0 1-.866-1.5L11.134 3a1 1 0 0 1 1.732 0M11 16v2h2v-2zm0-7v5h2V9z"/></svg>",
+              },
+              "type": "SvgXml",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
+              "children": [
+                "Title-only notice",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(0,0,0,1.00)",
+                  "fontFamily": "OxygenBold",
+                  "fontSize": "15px",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+      ],
+      "props": {
+        "aria-label": "Title-only notice",
+        "className": "css-view-g5y9jx",
+        "dir": null,
+        "role": "alert",
+      },
+      "type": "div",
+    },
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "color": "rgb(96, 96, 96)",
+                "height": 20,
+                "width": 20,
+                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10s-4.477 10-10 10m-1-11v6h2v-6zm0-4v2h2V7z"/></svg>",
+              },
+              "type": "SvgXml",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
+              "children": [
+                "Description-only notice.",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,1.00)",
+                  "fontFamily": "OxygenRegular",
+                  "fontSize": "14px",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+      ],
+      "props": {
+        "aria-label": "Description-only notice.",
+        "className": "css-view-g5y9jx",
+        "dir": null,
       },
       "type": "div",
     },
@@ -2762,7 +2993,6 @@ exports[`Design System exact structural snapshots renders foundations/notice-car
     "dir": null,
     "style": {
       "flexDirection": "column",
-      "gap": "12px",
     },
   },
   "type": "div",

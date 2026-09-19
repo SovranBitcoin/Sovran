@@ -3,6 +3,7 @@ import {
   Text as DefaultText,
   TextStyle,
   ColorValue,
+  Platform,
   View,
   type StyleProp,
   type ViewStyle,
@@ -110,8 +111,10 @@ interface CustomTextProps extends TextProps {
   overpass?: boolean;
   /** Font family. `oxygen` (default) has Regular/Bold only; `overpass` is the
    *  amount face; `mona` (Mona Sans, seven weights) is the feed's face — the
-   *  only family where `medium`/`semibold` render as distinct weights. */
-  family?: 'oxygen' | 'overpass' | 'mona';
+   *  only family where `medium`/`semibold` render as distinct weights;
+   *  `mono` is the platform monospace face, for values a user must read
+   *  character by character (addresses, invoices, keys). */
+  family?: 'oxygen' | 'overpass' | 'mona' | 'mono';
 
   italic?: boolean;
   size?: number;
@@ -207,8 +210,13 @@ function getMonaFamily(props: CustomTextProps): string {
   return 'MonaSans-Regular';
 }
 
+/** System monospace: Menlo ships on every iOS; Android maps `monospace` to
+ *  its bundled mono face. No weights — verification text stays regular. */
+const MONO_FAMILY = Platform.select({ ios: 'Menlo', default: 'monospace' });
+
 function resolveFontFamily(props: CustomTextProps): string {
   const family = props.family ?? (props.overpass ? 'overpass' : 'oxygen');
+  if (family === 'mono') return MONO_FAMILY;
   if (family === 'mona') return getMonaFamily(props);
   if (family === 'overpass') return getOverpassFamily(props);
   return getOxygenFamily(props);

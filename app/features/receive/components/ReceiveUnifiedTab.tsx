@@ -20,18 +20,24 @@ import { useReusableMintQuote, type UseStandingPaymentRequestResult } from 'wall
 import { paymentLog } from '@/shared/lib/logger';
 import { estimateBip321Length, expectedQrPayloadLength } from '@/shared/lib/qr';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
-import { Bip321CustomizationCard } from '@/features/receive/components/Bip321CustomizationCard';
+import { OnchainDepositLimitsCard } from '@/features/receive/components/OnchainDepositLimitsCard';
+import { UnifiedRailsCard } from '@/features/receive/components/UnifiedRailsCard';
 import type { useBip321RailSelection } from '@/features/receive/hooks/useBip321RailSelection';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
+import type { Bip321RailId } from '@/shared/stores/profile/mintStore';
 import { PaymentQRCodePlaceholder } from '@/shared/ui/composed/QRCodeFrame';
 import type { OnReceiveQrPayload } from '@/features/receive/lib/qrPayload';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
-import { truncateMiddle } from '@/shared/lib/strings';
-import { copyPopup } from '@/shared/lib/popup';
+import { copyPopup, type CopyTarget } from '@/shared/lib/popup';
 import { standingQuoteIdentityStore } from '@/features/receive/lib/standingQuoteIdentityStore';
 import Icon from 'assets/icons';
+
+const RAIL_COPY_TARGET: Record<Bip321RailId, CopyTarget> = {
+  onchain: 'address',
+  bolt12: 'bolt12Offer',
+  creq: 'paymentRequest',
+};
 
 interface ReceiveUnifiedTabProps {
   unit: string;
@@ -57,8 +63,7 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
 }: ReceiveUnifiedTabProps) {
   const identityStore = standingQuoteIdentityStore;
 
-  const { selection, onchainMint, bolt12Mint, excluded } = bip321;
-  const setRailExcluded = useMintStore((s) => s.setBip321RailExcluded);
+  const { selection, onchainMint, bolt12Mint } = bip321;
   const onchainEnabled = selection.rails.some(
     (rail) => rail.id === 'onchain' && rail.state === 'included'
   );
@@ -85,6 +90,17 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
     () => buildUnifiedBip321Uri({ address, lno: offer, creq: request }),
     [address, offer, request]
   );
+  // Each rail row copies exactly what that rail's own tab copies — the bare
+  // address, the bare offer, the creqA request (the Cashu tab's copy; the URI
+  // itself carries the same request as NUT-26 creqB). Bare values, not
+  // deeplinks: that is what payer wallets and exchange fields paste, and what
+  // cashu.me and cashubtc/wallet copy. Trimmed as buildUnifiedBip321Uri trims.
+  const railValues = {
+    onchain: address?.trim() || null,
+    bolt12: offer?.trim() || null,
+    creq: (creqEnabled ? creq.request?.encodedRequest?.trim() : null) || null,
+  };
+
   const anyLoading =
     (onchainEnabled && onchain.isLoading) ||
     (bolt12Enabled && bolt12.isLoading) ||
@@ -148,30 +164,30 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
     });
   }, [settled, uriRef]);
 
-  const handleCopy = useCallback(async () => {
-    if (!uri) return;
+  const handleCopyUri = useCallback(async (value: string) => {
     await EnhancedHaptics.copyHaptic();
-    await setStringAsync(uri);
+    await setStringAsync(value);
     copyPopup('bip321');
-    paymentLog.info('receive.bip321.copied', {
-      uriLength: uri.length,
-      included: [
-        ...(address ? ['Onchain'] : []),
-        ...(offer ? ['BOLT 12'] : []),
-        ...(request ? ['Cashu'] : []),
-      ].join(','),
-      excluded: selection.rails
-        .filter((rail) => excluded[rail.id])
-        .map((rail) => rail.id)
-        .join(','),
-    });
-  }, [uri, address, offer, request, excluded, selection.rails]);
+    paymentLog.info('receive.bip321.copied', { uriLength: value.length });
+  }, []);
+
+  const handleCopyRail = useCallback(async (id: Bip321RailId, value: string) => {
+    await EnhancedHaptics.copyHaptic();
+    await setStringAsync(value);
+    copyPopup(RAIL_COPY_TARGET[id]);
+    paymentLog.info('receive.unified.rail_copied', { rail: id, valueLength: value.length });
+  }, []);
 
   if (!active) return null;
 
-  // Both branches keep the customization card as the second child so React
-  // preserves its instance (Advanced stays open, the copy row's scramble
-  // decodes in place) across the placeholder → QR swap.
+  // The URI's onchain body takes any amount, so while the onchain rail is
+  // included, state the mint's deposit bounds under the QR.
+  const depositLimits = onchainEnabled ? (
+    <OnchainDepositLimitsCard mintUrl={onchainMint} unit={unit} className="mt-3" />
+  ) : null;
+
+  // Both branches keep the deposit limits second and the rails card third so
+  // React preserves their instances across the placeholder → QR swap.
   if (!settled) {
     return (
       <>
@@ -179,12 +195,15 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
           unit={unit}
           expectedLength={expectedQrPayloadLength('bip321', estimateBip321Length(selection.rails))}
         />
-        <Bip321CustomizationCard
+        {depositLimits}
+        <UnifiedRailsCard
           selection={selection}
+          uri={null}
+          values={railValues}
           loading
           muted={muted}
-          onCopy={handleCopy}
-          onRailToggle={(id, enabled) => setRailExcluded(id, !enabled)}
+          onCopyUri={handleCopyUri}
+          onCopyRail={handleCopyRail}
         />
       </>
     );
@@ -211,13 +230,15 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
           </View>
         </View>
       )}
-      <Bip321CustomizationCard
+      {depositLimits}
+      <UnifiedRailsCard
         selection={selection}
-        display={uri ? truncateMiddle(uri, 10) : undefined}
-        reveal={revealPending}
+        uri={uri}
+        values={railValues}
+        loading={false}
         muted={muted}
-        onCopy={handleCopy}
-        onRailToggle={(id, enabled) => setRailExcluded(id, !enabled)}
+        onCopyUri={handleCopyUri}
+        onCopyRail={handleCopyRail}
       />
     </>
   );

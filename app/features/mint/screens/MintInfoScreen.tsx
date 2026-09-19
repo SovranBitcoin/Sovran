@@ -19,7 +19,7 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
-import { Card } from '@/shared/ui/composed/Card';
+import { Notice } from '@/shared/ui/composed/Notice';
 import { Section } from '@/shared/ui/composed/Section';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
@@ -293,10 +293,14 @@ function StatsGrid({
       testID="mint-info-audit-status"
       accessibilityLabel={`Audit ${status}`}>
       {status === 'empty' ? (
-        <Card variant="info" message="No audit data for this mint yet." />
+        <Notice status="info" description="No audit data for this mint yet." />
       ) : status === 'error' ? (
         <VStack className="w-full items-center gap-3">
-          <Card variant="warning" message="Couldn't load audit data right now." />
+          <Notice
+            status="warning"
+            description="Couldn't load audit data right now."
+            className="w-full"
+          />
           <Button
             testID="mint-info-audit-retry"
             text="Try again"
@@ -525,7 +529,7 @@ export function MintInfoScreen() {
 
         {identityError && (
           <>
-            <Card variant="warning" message={identityError} />
+            <Notice status="warning" description={identityError} />
             <VStack className="w-full items-center pb-3">
               <Button
                 testID="mint-info-retry"
@@ -541,21 +545,26 @@ export function MintInfoScreen() {
 
         {typeof entry?.description === 'string' && (
           <>
-            <Card variant="info" message={entry.description} />
+            <Notice status="info" title="About this mint" description={entry.description} />
             <Spacer size={12} />
           </>
         )}
 
         {typeof entry?.longDescription === 'string' && (
           <>
-            <Card variant="warning" message={entry.longDescription} />
+            <Notice
+              status="info"
+              icon="ri:file-text-line"
+              title="Details"
+              description={entry.longDescription}
+            />
             <Spacer size={12} />
           </>
         )}
 
         {typeof entry?.motd === 'string' && (
           <>
-            <Card variant="warning" message={`Message: ${entry.motd}`} />
+            <Notice status="warning" title="Message from the mint" description={entry.motd} />
             <Spacer size={12} />
           </>
         )}

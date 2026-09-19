@@ -3,6 +3,7 @@ import { isMintQuotePaymentObserved } from 'wallet';
 
 import {
   getMintQuotePaymentValue,
+  getOnchainMintRequestedAmount,
   getOnchainMintQuoteRequiredConfirmations,
   getOnchainRequiredConfirmations,
 } from '@/shared/lib/cashu/onchainMint';
@@ -109,5 +110,20 @@ describe('mint quote screen presentation', () => {
         mintInfo
       )
     ).toBe(6);
+  });
+});
+
+describe('getOnchainMintRequestedAmount', () => {
+  it('reads the requested amount an onchain quote carries in its BIP-321 URI', () => {
+    const address = 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080';
+    expect(
+      getOnchainMintRequestedAmount({
+        type: 'mint',
+        paymentRequest: address,
+        amount: 0,
+        unit: 'sat',
+        metadata: { method: 'onchain', onchainAddress: address, requestedAmount: '1234' },
+      } as unknown as HistoryEntry)
+    ).toBe(1234);
   });
 });

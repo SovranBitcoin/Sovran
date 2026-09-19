@@ -1,0 +1,138 @@
+{
+  "capturedAt": "2026-09-19",
+  "hunchVersion": "0.13.0 development",
+  "provider": "gateway",
+  "requestedModel": "typesafe-ai/jev (unpinned)",
+  "zeroDataRetention": false,
+  "annotation": "Agent-authored synthetic development fixtures, tuned against these results; not held-out quality evidence.",
+  "policySha256": "fc031277f7efd767443521af00578c14a6571792a615bdda96e0c43fd5682afd",
+  "contractsSha256": "1d7994392d059b957917f1261d6b56d24fb04808c0720623a12f9c3fa583fa9b",
+  "fixtures": [
+    {
+      "path": "docs/review/fixtures/encrypted-secret.diff",
+      "sha256": "19ab2fb8bfc55c7d6068b40ee20ec4c79e4c3e344dc61a097b35ff3f78590114"
+    },
+    {
+      "path": "docs/review/fixtures/plaintext-secret.diff",
+      "sha256": "0c8ba0c9975d80a974220189c1a2a667cbaeafaf90fcdd64e1d2233a6bdf540b"
+    },
+    {
+      "path": "docs/review/fixtures/preserved-uncertainty.diff",
+      "sha256": "820c99deb0ae06b83383e4d4edbde0f9ede9ce33427d2bceafaf89f9b7dc4d29"
+    },
+    {
+      "path": "docs/review/fixtures/relay-delivery.diff",
+      "sha256": "95a1571a39314308225a44ab1855a0a0e6c591d9065bfbf205dc8b354be34a85"
+    },
+    {
+      "path": "docs/review/fixtures/relay-published.diff",
+      "sha256": "b7a1a9301253786866b8f3dfd053b1f721e48ba22bfc9f736c770dc3772e3497"
+    },
+    {
+      "path": "docs/review/fixtures/resigned-retry.diff",
+      "sha256": "76f321b62b34dfd9e0413ffd591a18497102f6de6b5caf9e1cd593a45683fe8e"
+    },
+    {
+      "path": "docs/review/fixtures/stable-event-retry.diff",
+      "sha256": "131d06ae4b2a5b6a54a86287d5da7ba40cd6400805be0433d1df1a72fe44696f"
+    },
+    {
+      "path": "docs/review/fixtures/uncertain-payment.diff",
+      "sha256": "56983a641a76883c4a1ac1a9cc1c1429c5b8dc55a3790b75c83f9e5e151c7df6"
+    }
+  ],
+  "result": {
+    "fixtures": [
+      {
+        "file": "encrypted-secret.diff",
+        "expected": [],
+        "fired": []
+      },
+      {
+        "file": "plaintext-secret.diff",
+        "expected": [
+          "secrets/disclosure"
+        ],
+        "fired": [
+          "secrets/disclosure"
+        ]
+      },
+      {
+        "file": "preserved-uncertainty.diff",
+        "expected": [],
+        "fired": []
+      },
+      {
+        "file": "relay-delivery.diff",
+        "expected": [
+          "nostr/delivery-claim"
+        ],
+        "fired": [
+          "nostr/delivery-claim"
+        ]
+      },
+      {
+        "file": "relay-published.diff",
+        "expected": [],
+        "fired": []
+      },
+      {
+        "file": "resigned-retry.diff",
+        "expected": [
+          "nostr/retry-identity"
+        ],
+        "fired": [
+          "nostr/retry-identity"
+        ]
+      },
+      {
+        "file": "stable-event-retry.diff",
+        "expected": [],
+        "fired": []
+      },
+      {
+        "file": "uncertain-payment.diff",
+        "expected": [
+          "payments/uncertain-outcome"
+        ],
+        "fired": [
+          "payments/uncertain-outcome"
+        ]
+      }
+    ],
+    "rules": [
+      {
+        "rule": "nostr/delivery-claim",
+        "precision": 1,
+        "recall": 1,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "rule": "nostr/retry-identity",
+        "precision": 1,
+        "recall": 1,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "rule": "payments/uncertain-outcome",
+        "precision": 1,
+        "recall": 1,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "rule": "secrets/disclosure",
+        "precision": 1,
+        "recall": 1,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      }
+    ]
+  }
+}

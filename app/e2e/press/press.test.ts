@@ -579,7 +579,7 @@ test('P2PK mappings follow asserted states and never alias a retained Unified QR
   }
 });
 
-test('receive tour uses current Unified controls, not the removed method pills', () => {
+test('receive tour uses current Unified copy rows, not the removed pills or switches', () => {
   const scenario = JSON.parse(
     readFileSync(join(ROOT, 'app/e2e/scenarios/receive-qr-display-tabs.json'), 'utf8')
   );
@@ -588,6 +588,8 @@ test('receive tour uses current Unified controls, not the removed method pills',
     'receive-unified-rail-onchain',
     'receive-unified-rail-bolt12',
     'receive-unified-rail-creq',
+    'receive-unified-rail-switch',
+    'receive-unified-advanced-toggle',
     'BOLT 12, included',
   ])
     expect(steps).not.toContain(removed);
@@ -598,9 +600,7 @@ test('receive tour uses current Unified controls, not the removed method pills',
   });
   expect(scenario.steps).toContainEqual({
     action: 'waitFor',
-    selector: { id: 'receive-unified-rail-switch-bolt12' },
-    state: 'enabled',
-    value: '1',
+    selector: { id: 'receive-unified-copy-bolt12' },
     timeoutMs: 45000,
   });
 });

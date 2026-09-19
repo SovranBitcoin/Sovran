@@ -302,7 +302,7 @@ describe('Design System exact structural snapshots', () => {
       'badge-statuses',
       'skeleton-shapes',
       'spinner-sizes',
-      'notice-cards',
+      'notices',
       'detail-rows',
       'row-stats-loading',
       'row-stats',

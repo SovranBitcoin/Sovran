@@ -28,7 +28,7 @@ export function ReceiveRailPlaceholder({
   return (
     <View testID={testID}>
       <PaymentQRCodePlaceholder testID={qrTestID} unit={unit} expectedLength={expectedLength} />
-      <CopyRequestCard title={sectionTitle} icon="stash:qr-code" display="" muted={muted} loading />
+      <CopyRequestCard title={sectionTitle} icon="stash:qr-code" parts={[]} muted={muted} loading />
     </View>
   );
 }

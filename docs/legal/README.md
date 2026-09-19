@@ -73,7 +73,7 @@ Before activation, inspect actual requests and configuration for page paths, cam
 ## Claims Follow-Up Review
 
 Reviewed on **14 September 2026** against `copy/legal/documents.json`, the
-implementation evidence in [CLAIMS.md](../../CLAIMS.md#11-evidence-and-artwork-review),
+implementation evidence in [CLAIMS.md](https://github.com/SovranBitcoin/Sovran/blob/main/CLAIMS.md#11-evidence-and-artwork-review),
 and the public sources below. No canonical policy text, approval flag, operator
 field, date or acceptance hash was changed. No provider accounts, secrets,
 server logs, wallet contents or live settings were inspected. This is a specific
@@ -192,7 +192,7 @@ Additional primary sources fetched for this follow-up on **14 September 2026**:
 - [ICO privacy-information requirements](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/individual-rights/the-right-to-be-informed/what-privacy-information-should-we-provide/): purpose, lawful basis, recipients, retention periods or criteria, transfers, public-data sources and rights. The page flags ongoing review following the Data (Use and Access) Act; do not present the general checklist as a complete current legal opinion.
 - [ICO complaint preparation](https://ico.org.uk/for-organisations/how-to-deal-with-data-protection-complaints/how-do-we-prepare-to-handle-data-protection-complaints/): direct complaint route, accepting complaints through other channels, informing people, acknowledgment and investigation processes, and processor assistance without transferring controller responsibility.
 - Consumer Rights Act 2015 [section 47](https://www.legislation.gov.uk/ukpga/2015/15/section/47), [section 57](https://www.legislation.gov.uk/ukpga/2015/15/section/57), [section 62](https://www.legislation.gov.uk/ukpga/2015/15/section/62), [section 65](https://www.legislation.gov.uk/ukpga/2015/15/section/65): relevant digital-content/services exclusions, unfair terms and negligence limits. The applicable contract and facts still need assessment; experimental branding is not an exemption.
-- Cashu NUT-00/02/07/09/11/13, custody explainer, Cashu documentation, and Nostr NIP-44/17/59 are individually attributed in the [claims evidence table](../../CLAIMS.md#protocol-evidence). Protocol authors' marketing headings and cited protocol audits are not legal or security approval of Sovran.
+- Cashu NUT-00/02/07/09/11/13, custody explainer, Cashu documentation, and Nostr NIP-44/17/59 are individually attributed in the [claims evidence table](https://github.com/SovranBitcoin/Sovran/blob/main/CLAIMS.md#protocol-evidence). Protocol authors' marketing headings and cited protocol audits are not legal or security approval of Sovran.
 
 ## Verification
 
