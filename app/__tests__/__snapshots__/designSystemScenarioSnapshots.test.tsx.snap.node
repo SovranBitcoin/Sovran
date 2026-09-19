@@ -2987,6 +2987,198 @@ exports[`Design System exact structural snapshots renders foundations/notices: n
       },
       "type": "div",
     },
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "color": "rgb(192, 128, 32)",
+                "height": 20,
+                "width": 20,
+                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" d="m12.866 3l9.526 16.5a1 1 0 0 1-.866 1.5H2.474a1 1 0 0 1-.866-1.5L11.134 3a1 1 0 0 1 1.732 0M11 16v2h2v-2zm0-7v5h2V9z"/></svg>",
+              },
+              "type": "SvgXml",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
+              "children": [
+                "Soft warning",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,1.00)",
+                  "fontFamily": "OxygenBold",
+                  "fontSize": "15px",
+                },
+              },
+              "type": "div",
+            },
+            {
+              "children": [
+                "Sits inside a sheet or card beside other content. The glyph keeps full amber; only the copy steps down.",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,1.00)",
+                  "fontFamily": "OxygenRegular",
+                  "fontSize": "14px",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+      ],
+      "props": {
+        "aria-label": "Soft warning. Sits inside a sheet or card beside other content. The glyph keeps full amber; only the copy steps down.",
+        "className": "css-view-g5y9jx",
+        "dir": null,
+        "role": "alert",
+      },
+      "type": "div",
+    },
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "color": "rgb(192, 48, 48)",
+                "height": 20,
+                "width": 20,
+                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10s-4.477 10-10 10m-1-7v2h2v-2zm0-8v6h2V7z"/></svg>",
+              },
+              "type": "SvgXml",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
+              "children": [
+                "Soft danger",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,1.00)",
+                  "fontFamily": "OxygenBold",
+                  "fontSize": "15px",
+                },
+              },
+              "type": "div",
+            },
+            {
+              "children": [
+                "Same shape as the solid red, at a volume that doesn't shout over the page around it.",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,1.00)",
+                  "fontFamily": "OxygenRegular",
+                  "fontSize": "14px",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+      ],
+      "props": {
+        "aria-label": "Soft danger. Same shape as the solid red, at a volume that doesn't shout over the page around it.",
+        "className": "css-view-g5y9jx",
+        "dir": null,
+        "role": "alert",
+      },
+      "type": "div",
+    },
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": null,
+              "props": {
+                "color": "rgb(192, 128, 32)",
+                "height": 16,
+                "width": 16,
+                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" d="m12.866 3l9.526 16.5a1 1 0 0 1-.866 1.5H2.474a1 1 0 0 1-.866-1.5L11.134 3a1 1 0 0 1 1.732 0M11 16v2h2v-2zm0-7v5h2V9z"/></svg>",
+              },
+              "type": "SvgXml",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+        {
+          "children": [
+            {
+              "children": [
+                "Compact: the smaller icon and type used inside dense sheets and above a chat composer.",
+              ],
+              "props": {
+                "className": "css-text-146c3p1",
+                "dir": "auto",
+                "style": {
+                  "color": "rgba(16,16,16,1.00)",
+                  "fontFamily": "OxygenRegular",
+                  "fontSize": "12px",
+                },
+              },
+              "type": "div",
+            },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+      ],
+      "props": {
+        "aria-label": "Compact: the smaller icon and type used inside dense sheets and above a chat composer.",
+        "className": "css-view-g5y9jx",
+        "dir": null,
+        "role": "alert",
+      },
+      "type": "div",
+    },
   ],
   "props": {
     "className": "css-view-g5y9jx",
@@ -34468,35 +34660,35 @@ exports[`Design System exact structural snapshots renders wallet-controls/transf
         {
           "children": [
             {
-              "children": [
-                {
-                  "children": null,
-                  "props": {
-                    "color": "rgb(192, 48, 48)",
-                    "height": 16,
-                    "width": 16,
-                    "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" d="M13 13h-2V7h2m0 10h-2v-2h2M12 2A10 10 0 0 0 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2"/></svg>",
-                  },
-                  "type": "SvgXml",
-                },
-              ],
+              "children": null,
               "props": {
-                "className": "css-view-g5y9jx",
-                "dir": null,
+                "color": "rgb(192, 48, 48)",
+                "height": 16,
+                "width": 16,
+                "xml": "<svg viewBox="0 0 24 24" width="1em" height="1em" ><path fill="currentColor" d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10s-4.477 10-10 10m-1-7v2h2v-2zm0-8v6h2V7z"/></svg>",
               },
-              "type": "div",
+              "type": "SvgXml",
             },
+          ],
+          "props": {
+            "className": "css-view-g5y9jx",
+            "dir": null,
+          },
+          "type": "div",
+        },
+        {
+          "children": [
             {
               "children": [
                 "The mint rejected these proofs. Nothing was spent.",
               ],
               "props": {
-                "className": "css-text-146c3p1 r-flex-13awgt0",
+                "className": "css-text-146c3p1",
                 "dir": "auto",
                 "style": {
-                  "color": "rgba(192,48,48,1.00)",
-                  "fontFamily": "OxygenBold",
-                  "fontSize": "11px",
+                  "color": "rgba(16,16,16,1.00)",
+                  "fontFamily": "OxygenRegular",
+                  "fontSize": "12px",
                 },
               },
               "type": "div",
@@ -34505,21 +34697,15 @@ exports[`Design System exact structural snapshots renders wallet-controls/transf
           "props": {
             "className": "css-view-g5y9jx",
             "dir": null,
-            "style": {
-              "alignItems": "center",
-              "flexDirection": "row",
-              "gap": "8px",
-            },
           },
           "type": "div",
         },
       ],
       "props": {
-        "className": "css-view-g5y9jx r-alignItems-1awozwy r-borderRadius-kdyh1x r-justifyContent-1777fci r-marginBottom-5oul0u r-marginInline-1xpp3t0 r-paddingBlock-11f147o r-paddingInline-3pj75a",
+        "aria-label": "The mint rejected these proofs. Nothing was spent.",
+        "className": "css-view-g5y9jx",
         "dir": null,
-        "style": {
-          "backgroundColor": "rgba(16,16,16,0.15)",
-        },
+        "role": "alert",
       },
       "type": "div",
     },

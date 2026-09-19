@@ -28,16 +28,12 @@
     "inline-style": 8,
     "content-container-style": 3
   },
-  "features/bitchat/components/BluetoothNotice.tsx": {
-    "inline-style": 2,
-    "stack-layout-props": 1
-  },
   "features/bitchat/screens/GeohashChatScreen.tsx": {
-    "inline-style": 11,
-    "stack-layout-props": 4
+    "inline-style": 7,
+    "stack-layout-props": 2
   },
   "features/bitchat/screens/NetworkSheet.tsx": {
-    "inline-style": 7,
+    "inline-style": 6,
     "stack-layout-props": 2,
     "content-container-style": 1
   },
@@ -193,7 +189,7 @@
   },
   "features/map/screens/MerchantDetailScreen.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 12,
+    "inline-style": 9,
     "stack-layout-props": 1,
     "content-container-style": 1
   },
@@ -237,8 +233,7 @@
   "features/mint/screens/MintInfoScreen.tsx": {
     "stylesheet-create": 1,
     "inline-style": 5,
-    "stack-layout-props": 1,
-    "content-container-style": 1
+    "stack-layout-props": 1
   },
   "features/mint/screens/MintListScreen.tsx": {
     "inline-style": 3
@@ -266,10 +261,10 @@
     "inline-style": 2
   },
   "features/nostrSigner/components/SignerApprovalSheetContent.tsx": {
-    "stack-layout-props": 8
+    "stack-layout-props": 6
   },
   "features/nostrSigner/components/SignerConnectSheetContent.tsx": {
-    "stack-layout-props": 23
+    "stack-layout-props": 20
   },
   "features/nostrSigner/components/SummaryPreviewCards.tsx": {
     "stack-layout-props": 9
@@ -290,7 +285,7 @@
     "content-container-style": 1
   },
   "features/nostrSigner/screens/SignerAppDetailScreen.tsx": {
-    "stack-layout-props": 5,
+    "stack-layout-props": 4,
     "content-container-style": 1
   },
   "features/nostrSigner/screens/SignerAppPermissionsScreen.tsx": {
@@ -357,10 +352,6 @@
     "stylesheet-create": 1,
     "stack-layout-props": 1
   },
-  "features/send/components/RecipientHeader.tsx": {
-    "inline-style": 2,
-    "stack-layout-props": 1
-  },
   "features/send/screens/AmountSelector.tsx": {
     "stylesheet-create": 1
   },
@@ -404,39 +395,23 @@
     "inline-style": 2,
     "stack-layout-props": 4
   },
-  "features/settings/screens/SettingsDesignSystemEmptyStatesScreen.tsx": {
-    "content-container-style": 1
-  },
   "features/settings/screens/SettingsDesignSystemFadeStressScreen.tsx": {
     "stylesheet-create": 1,
     "stack-layout-props": 4,
-    "content-container-style": 1
-  },
-  "features/settings/screens/SettingsDesignSystemFoundationsScreen.tsx": {
     "content-container-style": 1
   },
   "features/settings/screens/SettingsDesignSystemLoadingScreen.tsx": {
     "inline-style": 1,
     "stack-layout-props": 5
   },
-  "features/settings/screens/SettingsDesignSystemPostsScreen.tsx": {
-    "content-container-style": 1
-  },
   "features/settings/screens/SettingsDesignSystemSegmentedScreen.tsx": {
     "inline-style": 2,
-    "stack-layout-props": 3,
-    "content-container-style": 1
-  },
-  "features/settings/screens/SettingsDesignSystemSkeletonCrossfadeScreen.tsx": {
-    "content-container-style": 1
+    "stack-layout-props": 3
   },
   "features/settings/screens/SettingsDesignSystemTimelineScreen.tsx": {
     "stylesheet-create": 1,
     "inline-style": 2,
     "stack-layout-props": 4
-  },
-  "features/settings/screens/SettingsDesignSystemWalletControlsScreen.tsx": {
-    "content-container-style": 1
   },
   "features/settings/screens/SettingsKeyringScreen.tsx": {
     "inline-style": 7,
@@ -455,7 +430,6 @@
     "stack-layout-props": 22
   },
   "features/settings/screens/SettingsRoutingScreen.tsx": {
-    "inline-style": 2,
     "stack-layout-props": 3
   },
   "features/settings/screens/SettingsScreen.tsx": {
@@ -569,7 +543,7 @@
   },
   "features/user/screens/UserProfileScreen.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 18,
+    "inline-style": 17,
     "stack-layout-props": 4
   },
   "features/wallet/components/Account.tsx": {
@@ -652,10 +626,6 @@
   "shared/blocks/transfer/TransferEntryRow.tsx": {
     "stylesheet-create": 1,
     "stack-layout-props": 5
-  },
-  "shared/blocks/transfer/TransferErrorBanner.tsx": {
-    "stylesheet-create": 1,
-    "stack-layout-props": 1
   },
   "shared/blocks/transfer/TransferSeparator.tsx": {
     "stylesheet-create": 1
@@ -888,7 +858,7 @@
     "stack-layout-props": 4
   },
   "shared/ui/composed/Screen.tsx": {
-    "inline-style": 2
+    "inline-style": 1
   },
   "shared/ui/composed/ScreenHeaderAction.tsx": {
     "stylesheet-create": 1

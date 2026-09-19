@@ -28,6 +28,7 @@ import Animated from 'react-native-reanimated';
 import { useIdentityHeader } from '@/shared/ui/composed/IdentityHeader';
 
 import Icon from 'assets/icons';
+import { Notice } from '@/shared/ui/composed/Notice';
 import { safeHostname } from '@/features/nostrSigner/lib/boundedDisplay';
 import {
   alwaysAllowEligible,
@@ -80,7 +81,6 @@ const IDENTITY_AVATAR_SIZE = 64;
 const SCROLL_H_PADDING = { paddingHorizontal: 16 } as const;
 const CONTENT_IDENTITY_STYLE = { alignItems: 'center' } as const;
 
-const CENTER_ROW_STYLE = { alignItems: 'center' } as const;
 const FLEX_ONE_STYLE = { flex: 1 } as const;
 const PEER_ROW_STYLE = { flex: 1, alignItems: 'center' } as const;
 const CONFIRM_BODY_TEXT_STYLE = { lineHeight: 20 } as const;
@@ -272,13 +272,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
   }, [throttledUntil]);
   const throttled = throttledUntil > throttleNow;
 
-  const [foreground, muted, warning, warningSoftFg, danger] = useThemeColor([
-    'foreground',
-    'muted',
-    'warning',
-    'warning-soft-foreground',
-    'danger',
-  ] as const);
+  const [foreground, muted, danger] = useThemeColor(['foreground', 'muted', 'danger'] as const);
 
   const appName = appDisplayName(app);
   const appDomain = app?.url !== undefined ? safeHostname(app.url).unwrapOr(null) : null;
@@ -658,21 +652,16 @@ export function SignerAppDetailScreen(): React.ReactElement {
 
         {/* Throttle flag */}
         {throttled ? (
-          <View className="bg-warning-soft mt-2 rounded-2xl p-3">
-            <HStack gap={8} style={CENTER_ROW_STYLE}>
-              <Icon name="mdi:alert-circle-outline" size={18} color={warning} />
-              <View style={FLEX_ONE_STYLE}>
-                <Text size={13} bold color={warningSoftFg}>
-                  {THROTTLED_BANNER}
-                </Text>
-                <Text size={12} color={warningSoftFg}>
-                  {`Requests are being declined automatically — asking resumes ${throttleResumeLabel(
-                    throttledUntil - throttleNow
-                  )}.`}
-                </Text>
-              </View>
-            </HStack>
-          </View>
+          <Notice
+            status="warning"
+            tone="soft"
+            size="compact"
+            className="mt-2 p-3"
+            title={THROTTLED_BANNER}
+            description={`Requests are being declined automatically — asking resumes ${throttleResumeLabel(
+              throttledUntil - throttleNow
+            )}.`}
+          />
         ) : null}
 
         {/* Gesture demo — teaches tap / long-press on the permission rows below */}

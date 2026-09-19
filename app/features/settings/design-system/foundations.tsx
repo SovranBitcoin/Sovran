@@ -213,6 +213,25 @@ export const FOUNDATION_SCENARIOS = [
         />
         <Notice status="warning" title="Title-only notice" />
         <Notice status="info" description="Description-only notice." />
+        <Notice
+          status="warning"
+          tone="soft"
+          title="Soft warning"
+          description="Sits inside a sheet or card beside other content. The glyph keeps full amber; only the copy steps down."
+        />
+        <Notice
+          status="danger"
+          tone="soft"
+          title="Soft danger"
+          description="Same shape as the solid red, at a volume that doesn't shout over the page around it."
+        />
+        <Notice
+          status="warning"
+          tone="soft"
+          size="compact"
+          description="Compact: the smaller icon and type used inside dense sheets and above a chat composer."
+          className="items-center"
+        />
       </VStack>
     ),
   },

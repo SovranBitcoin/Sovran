@@ -34,6 +34,7 @@ import Animated, { SlideInRight } from 'react-native-reanimated';
 
 import Icon from 'assets/icons';
 import { SegmentedText } from '@/features/nostrSigner/components/display';
+import { Notice } from '@/shared/ui/composed/Notice';
 import { boundDisplay, safeHostname } from '@/features/nostrSigner/lib/boundedDisplay';
 import { useNip46ConnectionsStore } from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import {
@@ -192,10 +193,9 @@ export function SignerApprovalSheetContent({
 }: SignerApprovalContentProps): React.ReactElement {
   const pending = useNip46RequestsStore((s) => s.pending);
   const { keys } = useNostrKeysContext();
-  const [foreground, muted, danger, warning, warningSoftFg, dangerSoftFg] = useThemeColor([
+  const [foreground, muted, warning, warningSoftFg, dangerSoftFg] = useThemeColor([
     'foreground',
     'muted',
-    'danger',
     'warning',
     'warning-soft-foreground',
     'danger-soft-foreground',
@@ -578,27 +578,19 @@ export function SignerApprovalSheetContent({
 
         {/* Tier banner */}
         {banner !== null ? (
-          <View
-            className={
-              banner.tone === 'danger'
-                ? 'bg-danger-soft rounded-2xl p-3'
-                : 'bg-warning-soft rounded-2xl p-3'
-            }>
-            <HStack gap={8} style={CENTER_ROW_STYLE}>
-              <Icon
-                name={banner.tone === 'danger' ? 'mdi:alert-circle' : 'mdi:alert-circle-outline'}
-                size={18}
-                color={banner.tone === 'danger' ? danger : warning}
+          <Notice
+            status={banner.tone === 'danger' ? 'danger' : 'warning'}
+            tone="soft"
+            size="compact"
+            className="items-center p-3"
+            description={
+              <SegmentedText
+                segments={banner.segments}
+                size={13}
+                color={banner.tone === 'danger' ? dangerSoftFg : warningSoftFg}
               />
-              <View style={FLEX_ONE_STYLE}>
-                <SegmentedText
-                  segments={banner.segments}
-                  size={13}
-                  color={banner.tone === 'danger' ? dangerSoftFg : warningSoftFg}
-                />
-              </View>
-            </HStack>
-          </View>
+            }
+          />
         ) : null}
 
         {/* Risk-flag banners (summary-derived, on top of the tier banner) */}
@@ -606,28 +598,14 @@ export function SignerApprovalSheetContent({
           const riskBanner = RISK_BANNERS[flag];
           if (riskBanner === undefined) return null;
           return (
-            <View
+            <Notice
               key={flag}
-              className={
-                riskBanner.tone === 'danger'
-                  ? 'bg-danger-soft rounded-2xl p-3'
-                  : 'bg-warning-soft rounded-2xl p-3'
-              }>
-              <HStack gap={8} style={CENTER_ROW_STYLE}>
-                <Icon
-                  name="mdi:alert-circle"
-                  size={18}
-                  color={riskBanner.tone === 'danger' ? danger : warning}
-                />
-                <View style={FLEX_ONE_STYLE}>
-                  <Text
-                    size={13}
-                    color={riskBanner.tone === 'danger' ? dangerSoftFg : warningSoftFg}>
-                    {riskBanner.text}
-                  </Text>
-                </View>
-              </HStack>
-            </View>
+              status={riskBanner.tone === 'danger' ? 'danger' : 'warning'}
+              tone="soft"
+              size="compact"
+              description={riskBanner.text}
+              className="items-center p-3"
+            />
           );
         })}
 

@@ -11,17 +11,12 @@
  *                  ("don't ask again").
  * - unsupported  → text only (emulators / BLE-less hardware).
  */
-import { useCallback } from 'react';
+import { useCallback, type ReactNode } from 'react';
 import { Platform } from 'react-native';
-import { withAlpha } from '@/shared/lib/color';
-import Icon from 'assets/icons';
 import { useBluetoothState, type UseBluetoothStateResult } from '../hooks/useBluetoothState';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { alpha } from '@/shared/styles/tokens';
 import { Button } from '@/shared/ui/primitives/Button';
-import { Text } from '@/shared/ui/primitives/Text';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
+import { Notice } from '@/shared/ui/composed/Notice';
 
 interface BluetoothNoticeProps {
   /** Pass the surrounding screen's hook result to share one subscription. */
@@ -109,41 +104,60 @@ export function BluetoothNotice({ bluetooth: bluetoothProp }: BluetoothNoticePro
 
 /**
  * One-line banner variant for surfaces that keep their content visible while
- * Bluetooth is unavailable (e.g. a BLE DM thread with history). Matches the
- * peer-reachability banner styling in GeohashChatScreen.
+ * Bluetooth is unavailable (e.g. a BLE DM thread with history). Shares
+ * `ChatStatusStrip` with GeohashChatScreen's peer-reachability banners.
  */
 export function BluetoothInlineNotice({ bluetooth: bluetoothProp }: BluetoothNoticeProps) {
   const ownBluetooth = useBluetoothState();
   const bluetooth = bluetoothProp ?? ownBluetooth;
-  const [foreground, surfaceSecondary] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-  ] as const);
   const copy = COPY[bluetooth.status];
   const action = noticeAction(bluetooth);
   const handlePress = useCallback(() => action?.onPress(), [action]);
 
   if (!copy) return null;
 
-  const muted = withAlpha(foreground, alpha.muted);
   return (
-    <HStack
-      gap={8}
-      align="center"
-      style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: surfaceSecondary }}>
-      <Icon name="mdi:bluetooth-off" size={16} color={muted} />
-      <Text size={12} style={{ color: muted, flex: 1 }} numberOfLines={2}>
-        {copy.title}
-      </Text>
-      {action ? (
-        <Button
-          text={action.label}
-          testID={`${action.testID}-inline`}
-          onPress={handlePress}
-          variant="secondary"
-          size="compact"
-        />
-      ) : null}
-    </HStack>
+    <ChatStatusStrip
+      icon="mdi:bluetooth-off"
+      text={copy.title}
+      action={
+        action ? (
+          <Button
+            text={action.label}
+            testID={`${action.testID}-inline`}
+            onPress={handlePress}
+            variant="secondary"
+            size="compact"
+          />
+        ) : undefined
+      }
+    />
+  );
+}
+
+/**
+ * The full-bleed status strip above a chat composer: an `info` Notice squared
+ * off and pinned to the screen's edges, since it sits against the thread
+ * rather than inside a padded card. GeohashChatScreen's reachability banners
+ * use it too — they and the Bluetooth strip must stay identical.
+ */
+export function ChatStatusStrip({
+  icon,
+  text,
+  action,
+}: {
+  icon: string;
+  text: string;
+  action?: ReactNode;
+}) {
+  return (
+    <Notice
+      status="info"
+      size="compact"
+      icon={icon}
+      description={text}
+      action={action}
+      className="items-center rounded-none px-4 py-2.5"
+    />
   );
 }
