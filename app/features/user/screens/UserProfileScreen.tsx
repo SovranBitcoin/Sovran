@@ -37,7 +37,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { publishEvent } from '@/shared/lib/nostr/publish';
-import { Card } from '@/shared/ui/composed/Card';
+import { Notice } from '@/shared/ui/composed/Notice';
 import { Section } from '@/shared/ui/composed/Section';
 import Icon, { CurrencyIcon } from '@/assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
@@ -1437,7 +1437,7 @@ export function UserProfileScreen() {
 
               {cachedProfile?.about && (
                 <View style={{ paddingHorizontal: 16 }}>
-                  <Card variant="info" message={cachedProfile.about} />
+                  <Notice status="info" icon="ri:user-3-line" description={cachedProfile.about} />
                   <Spacer size={16} />
                 </View>
               )}
