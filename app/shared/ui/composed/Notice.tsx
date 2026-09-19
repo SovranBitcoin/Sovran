@@ -120,9 +120,17 @@ export function Notice({
   const iconColor = status === 'info' ? muted : soft ? (isWarning ? warning : danger) : ink;
   const scale = SIZE[size];
   const root = soft ? SOFT_ROOT[status] : SOLID_ROOT[status];
-  const label = [title, typeof description === 'string' ? description : undefined]
-    .filter(Boolean)
-    .join('. ');
+  // The title and the description are two complete phrases the caller wrote
+  // separately, not fragments of one sentence. A screen reader needs a
+  // sentence break between them, and a title that already ends in one must not
+  // get a second — `RESTART_WARNING_TITLE` ends in a full stop today.
+  const named = title !== undefined && title.length > 0 ? title : undefined;
+  const spoken =
+    typeof description === 'string' && description.length > 0 ? description : undefined;
+  const label =
+    named !== undefined && spoken !== undefined
+      ? `${named}${/[.!?]$/.test(named) ? '' : '.'} ${spoken}`
+      : (named ?? spoken ?? '');
   // Collapsing to one accessible node needs a label to read. A rich
   // `description` (SegmentedText, a custom row) contributes nothing to `label`,
   // so the notice stays uncollapsed and the screen reader walks the children —
