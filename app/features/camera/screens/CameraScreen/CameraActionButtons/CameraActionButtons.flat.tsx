@@ -14,7 +14,9 @@ export function CameraActionButtonsFlat({
   flashlightOn,
 }: CameraActionButtonsProps): React.ReactElement {
   const foreground = useThemeColor('foreground');
-  const flashlightLabel = `${CAMERA_ACTIONS.flashlight.label}, ${flashlightOn ? 'on' : 'off'}`;
+  const flashlightLabel = flashlightOn
+    ? CAMERA_ACTIONS.flashlight.labelOn
+    : CAMERA_ACTIONS.flashlight.labelOff;
   return (
     <>
       <Button

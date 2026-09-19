@@ -12,5 +12,10 @@ export interface CameraActionButtonsProps {
 export const CAMERA_ACTIONS = {
   paste: { testID: 'camera-paste', label: 'Paste from clipboard' },
   gallery: { testID: 'camera-gallery', label: 'Scan from photo library' },
-  flashlight: { testID: 'camera-flashlight', label: 'Flashlight' },
+  flashlight: {
+    testID: 'camera-flashlight',
+    label: 'Flashlight',
+    labelOn: 'Flashlight, on',
+    labelOff: 'Flashlight, off',
+  },
 } as const;
