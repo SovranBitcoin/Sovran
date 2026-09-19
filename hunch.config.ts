@@ -1,8 +1,8 @@
 import { choice, defineConfig } from "@kelbie/hunch";
 
 // Semantic candidates for recurring PR review; validate each flag in source.
-// No lexical gates: every in-scope window receives every concern.
-// Human conventions live in docs/review/contributor-conventions.md.
+// Every in-scope window receives the twelve explicit concerns below.
+// Selected skills and contributor conventions also compile into hunch.lock.
 const outcomes = {
   "preserved": "The relevant behavior visibly preserves the contract, including an explicitly allowed fallback or exception.",
   "unrelated": "The changed lines do not add, remove or alter the mechanism this question asks about. Mere shared vocabulary or possible unseen callers do not make a change relevant. Tests constructing the bad case are not violations.",
@@ -15,13 +15,15 @@ export default defineConfig({
   zeroDataRetention: false,
   include: ["**/*.{ts,tsx,js,jsx,mjs,cjs,swift,kt,java,cpp,h,mm,rs}"],
   ignore: ["hunch.config.ts", "**/dist/**", "**/build/**", "**/vendor/**", "**/BitChatVendor/**", "**/generated/**"],
-  skills: [],
-  agentsMd: false,
+  skills: ["./.agents/skills/codebase-design", "./.agents/skills/expo-router"],
+  agentsMd: true,
+  docs: ["docs/review/contributor-conventions.md"],
   failOnError: false,
   task: "pr",
   // Experimental attribution remains off until independently labeled evaluation supports it.
   review: { contextLines: 40, chunkLines: 150, overlapLines: 0, localize: false },
-  budget: { maxHunks: 3000, maxRulesPerHunk: 24, maxRequests: 3000, concurrency: 4, timeoutSeconds: 3600 },
+  // Whole-repository dry run: 4,460 chunks; explicit and compiled rules use separate requests.
+  budget: { maxHunks: 5000, maxRulesPerHunk: 128, maxRequests: 10000, concurrency: 4, timeoutSeconds: 3600 },
   rules: {
     "secrets/recovery-after-read-failure": ["warn", choice({
       instructions: "Does this change make a locked, failed or invalid secure-storage read lead to generating or overwriting recovery material rather than requiring confirmed absence? A write without a changed read-failure or initialization path is unrelated.",

@@ -1,0 +1,55 @@
+{
+  "kind": "offline structural check; synthetic answers, not model quality",
+  "skipped": [
+    "app/codereview/analyze-structure/index.mjs"
+  ],
+  "maxBytes": 75487,
+  "stats": {
+    "hunks": 4460,
+    "skippedHunks": 0,
+    "requests": 8919,
+    "questions": 204917,
+    "inputTokens": 0,
+    "modelIds": [
+      "OFFLINE-STRUCTURAL-AUDIT"
+    ]
+  },
+  "notices": [
+    "app/assets/icons/index.tsx:451: request exceeds conservative context budget; rules skipped."
+  ],
+  "complete": false,
+  "date": "2026-09-19",
+  "hunchVersion": "0.13.1",
+  "sources": [
+    {
+      "id": "skill/codebase-design",
+      "rules": 4,
+      "lexicalGates": 0,
+      "notChecked": 7
+    },
+    {
+      "id": "skill/expo-router",
+      "rules": 12,
+      "lexicalGates": 0,
+      "notChecked": 27
+    },
+    {
+      "id": "agents-md/root",
+      "rules": 4,
+      "lexicalGates": 0,
+      "notChecked": 8
+    },
+    {
+      "id": "doc/docs/review/contributor-conventions",
+      "rules": 52,
+      "lexicalGates": 0,
+      "notChecked": 24
+    }
+  ],
+  "maxRules": {
+    "file": "app/features/transactions/components/detail/ZappedPostSection.tsx",
+    "count": 72,
+    "questionBytes": 52951
+  },
+  "filesOverRuleBudget": 0
+}
