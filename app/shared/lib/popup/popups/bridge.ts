@@ -85,7 +85,7 @@ export type SheetConfig = {
   icon?: PopupIcon;
   dismissable?: boolean;
   duration?: number;
-  buttons?: { text: string; page?: string; onPress?: () => void }[];
+  buttons?: { text: string; page?: string; onPress?: () => void; testID?: string }[];
   buttonLayout?: 'row' | 'stack';
   onClose?: (event: SheetCloseEvent) => void;
   live?: LiveSheetConfig;

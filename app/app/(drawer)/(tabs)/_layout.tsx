@@ -8,7 +8,7 @@ import { Expo55NativeTabs, isExpo55NativeTabsSupported } from '@/navigation/nati
 import { TabBarInsetsProvider } from '@/shared/hooks/useScreenInsets';
 
 export const unstable_settings = {
-  initialRouteName: 'index',
+  anchor: 'index',
 };
 
 type TabName = 'feed' | 'index' | 'contacts' | 'notifications' | 'ai';

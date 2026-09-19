@@ -1,4 +1,5 @@
 import React, { useCallback } from 'react';
+import type { AccessibilityActionEvent } from 'react-native';
 import Animated, { Easing, LinearTransition } from 'react-native-reanimated';
 
 import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
@@ -140,6 +141,11 @@ interface TransactionProps {
   onCancel?: (historyEntry: SendHistoryEntry) => void;
 }
 
+const CANCEL_PENDING_SEND_ACTION = 'cancelPendingSend';
+const CANCEL_PENDING_SEND_ACTIONS = [
+  { name: CANCEL_PENDING_SEND_ACTION, label: 'Cancel pending send' },
+];
+
 export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: TransactionProps) => {
   const [foreground, danger, success] = useThemeColor(['foreground', 'danger', 'success'] as const);
 
@@ -184,13 +190,24 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
   // the FlashList sections below reflow as the list re-measures.
   const collapsedStyle = isCollapsing ? { height: 0, opacity: 0 } : null;
 
+  // Swipe-to-cancel has no screen-reader equivalent, so the same commit is
+  // offered as a custom accessibility action while the swipe is enabled.
+  const cancelActionEnabled = swipeable && !isReclaiming && !isCollapsing;
+  const handleAccessibilityAction = (event: AccessibilityActionEvent) => {
+    if (event.nativeEvent.actionName === CANCEL_PENDING_SEND_ACTION && cancellable && onCancel) {
+      onCancel(historyEntry);
+    }
+  };
+
   const row = (
     <Pressable
       key={historyEntry?.id}
       testID={testID}
       className="flex-row items-center justify-between px-4 py-5"
       style={isRolledBack ? { opacity: 0.33 } : undefined}
-      onPress={handlePress}>
+      onPress={handlePress}
+      accessibilityActions={cancelActionEnabled ? CANCEL_PENDING_SEND_ACTIONS : undefined}
+      onAccessibilityAction={cancelActionEnabled ? handleAccessibilityAction : undefined}>
       <HStack gap={12} flex={1}>
         <TransactionIcon historyEntry={historyEntry} isLoading={isReclaiming} />
 
@@ -274,7 +291,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
         {swipeable && cancellable && onCancel ? (
           <SwipeableRow
             testID={`${testID}-swipeable`}
-            enabled={!isReclaiming && !isCollapsing}
+            enabled={cancelActionEnabled}
             onCommit={() => onCancel(historyEntry)}>
             {row}
           </SwipeableRow>

@@ -33,7 +33,7 @@ import { BottomSheet, Button as HerouiButton } from 'heroui-native';
 import Animated, { SlideInRight } from 'react-native-reanimated';
 
 import Icon from 'assets/icons';
-import { SegmentedText, shortPubkey } from '@/features/nostrSigner/components/display';
+import { SegmentedText } from '@/features/nostrSigner/components/display';
 import { boundDisplay, safeHostname } from '@/features/nostrSigner/lib/boundedDisplay';
 import { useNip46ConnectionsStore } from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import {
@@ -365,21 +365,21 @@ export function SignerApprovalSheetContent({
   const appDomain =
     connection?.url !== undefined ? safeHostname(connection.url).unwrapOr(null) : null;
 
-  // Decrypt/encrypt peer label: resolved display name, shortPubkey fallback.
+  // Decrypt/encrypt peer label: resolved display name (untrusted, so bounded),
+  // else the full pubkey — never a sliced one.
   const peerPubkey =
     preview.type === 'decrypt' || preview.type === 'encrypt' ? preview.peerPubkey : undefined;
   const { metadata: peerMetadata } = useNostrProfileMetadata(peerPubkey);
+  const peerName = peerMetadata?.displayName?.trim() || peerMetadata?.name?.trim();
   const peerLabel =
-    peerPubkey !== undefined
-      ? peerMetadata?.displayName?.trim() || peerMetadata?.name?.trim() || shortPubkey(peerPubkey)
-      : undefined;
+    peerPubkey !== undefined ? (peerName ? boundDisplay(peerName, 48) : peerPubkey) : undefined;
 
   const bodyContext =
     head === null
       ? { appName }
       : {
           appName,
-          ...(peerLabel !== undefined && { peerLabel: boundDisplay(peerLabel, 48) }),
+          ...(peerLabel !== undefined && { peerLabel }),
           ...(signEvent !== null &&
             (head.kind === 22242 || head.kind === 27235) && {
               relayLabel: loginTargetFor(signEvent),
@@ -425,12 +425,18 @@ export function SignerApprovalSheetContent({
         {
           text: 'Block',
           variant: 'dangerous',
+          testID: 'signer-approval-block-confirm',
           onPress: (menuClose) => {
             menuClose();
             void submitVerdict('block');
           },
         },
-        { text: 'Cancel', variant: 'secondary', onPress: (menuClose) => menuClose() },
+        {
+          text: 'Cancel',
+          variant: 'secondary',
+          testID: 'signer-approval-block-cancel',
+          onPress: (menuClose) => menuClose(),
+        },
       ],
     });
   };
@@ -488,6 +494,7 @@ export function SignerApprovalSheetContent({
             </Text>
             <Pressable
               haptics
+              testID="signer-approval-view-all"
               accessibilityRole="button"
               accessibilityLabel={VIEW_ALL_LABEL}
               onPress={viewAll}
@@ -512,8 +519,8 @@ export function SignerApprovalSheetContent({
             <Text size={16} bold color={foreground} numberOfLines={1}>
               {appName}
             </Text>
-            <Text size={12} color={muted} numberOfLines={1}>
-              {appDomain ?? shortPubkey(head.clientPubkey)}
+            <Text size={12} color={muted} numberOfLines={1} ellipsizeMode="middle">
+              {appDomain ?? head.clientPubkey}
             </Text>
           </VStack>
         </HStack>
@@ -628,7 +635,11 @@ export function SignerApprovalSheetContent({
             escalating severity. Self-decrypt keeps maximum friction:
             Approve (once) / Deny / Block only. */}
         <VStack gap={10}>
-          <HerouiButton variant="primary" className="bg-foreground" onPress={approvePrimary}>
+          <HerouiButton
+            testID="signer-approval-approve"
+            variant="primary"
+            className="bg-foreground"
+            onPress={approvePrimary}>
             <HerouiButton.Label className="text-background">
               {approveOnceOnly
                 ? APPROVAL_BUTTON_LABELS.approveOnce
@@ -636,14 +647,18 @@ export function SignerApprovalSheetContent({
             </HerouiButton.Label>
           </HerouiButton>
           {offerAlways ? (
-            <HerouiButton variant="tertiary" onPress={approveAlways}>
+            <HerouiButton
+              testID="signer-approval-always-allow"
+              variant="tertiary"
+              onPress={approveAlways}>
               <HerouiButton.Label>{APPROVAL_BUTTON_LABELS.alwaysAllow}</HerouiButton.Label>
             </HerouiButton>
           ) : null}
-          <HerouiButton variant="danger-soft" onPress={denyOnce}>
+          <HerouiButton testID="signer-approval-deny" variant="danger-soft" onPress={denyOnce}>
             <HerouiButton.Label>{APPROVAL_BUTTON_LABELS.deny}</HerouiButton.Label>
           </HerouiButton>
           <HerouiButton
+            testID="signer-approval-block"
             variant="danger"
             accessibilityLabel={BLOCK_APP_LABEL}
             onPress={confirmBlock}>

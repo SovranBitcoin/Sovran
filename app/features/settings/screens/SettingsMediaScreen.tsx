@@ -130,7 +130,7 @@ function BlobRow({
       {canDelete ? (
         <Pressable
           haptics
-          testID="settings-media-delete"
+          testID={`settings-media-delete-${blob.host}-${blob.sha256}`}
           hitSlop={10}
           onPress={() => onDelete?.(blob)}
           style={styles.deleteButton}
@@ -333,6 +333,7 @@ export const SettingsMediaScreen = () => {
                 variant="secondary"
                 size="sm"
                 isDisabled={refreshing || total === 0}
+                accessibilityState={{ disabled: refreshing || total === 0, busy: refreshing }}
                 onPress={handleRefresh}>
                 <Button.Label>{refreshing ? 'Checking…' : 'Refresh status'}</Button.Label>
               </Button>

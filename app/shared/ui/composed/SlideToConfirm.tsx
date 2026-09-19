@@ -1,5 +1,5 @@
-import React, { useCallback } from 'react';
-import { useWindowDimensions } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { useWindowDimensions, type AccessibilityActionEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Extrapolation,
@@ -19,6 +19,7 @@ const TRACK_PADDING = 4;
 const SCREEN_PADDING_X = 48;
 const COMPLETE_THRESHOLD = 0.9;
 const SPRING = { damping: 20, stiffness: 200 } as const;
+const ACTIVATE_ACTIONS = [{ name: 'activate' }] as const;
 
 interface SlideToConfirmProps {
   onConfirm: () => void;
@@ -47,10 +48,22 @@ export const SlideToConfirm: React.FC<SlideToConfirmProps> = ({
   const maxTranslate = sliderWidth - THUMB_SIZE - TRACK_PADDING * 2;
   const translateX = useSharedValue(0);
   const isComplete = useSharedValue(false);
+  // Mirrors `isComplete` for the accessibility tree, which reads JS state.
+  const [confirmed, setConfirmed] = useState(false);
 
   const handleComplete = useCallback(() => {
+    setConfirmed(true);
     onConfirm();
   }, [onConfirm]);
+
+  // The drag is unreachable for VoiceOver/TalkBack users, so the track's
+  // `activate` action (double-tap) completes the same confirmation.
+  const handleAccessibilityAction = (event: AccessibilityActionEvent) => {
+    if (event.nativeEvent.actionName !== 'activate' || isComplete.get()) return;
+    isComplete.set(true);
+    translateX.set(withSpring(maxTranslate, SPRING));
+    handleComplete();
+  };
 
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
@@ -83,6 +96,10 @@ export const SlideToConfirm: React.FC<SlideToConfirmProps> = ({
       accessible
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityHint="Double-tap to confirm"
+      accessibilityState={{ disabled: confirmed }}
+      accessibilityActions={confirmed ? undefined : ACTIVATE_ACTIONS}
+      onAccessibilityAction={handleAccessibilityAction}
       testID="slide-to-confirm">
       <Animated.View
         className="absolute inset-x-0 items-center justify-center"

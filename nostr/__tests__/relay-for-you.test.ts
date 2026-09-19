@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from 'vitest';
+import { describe, test, expect, beforeEach, vi } from 'vitest';
 import { ok, type Result } from 'neverthrow';
 import type { NaggError } from '../src/errors';
 import type { RawRelayEvent, RelayConnection, NostrFilter } from '../src/facade/relay/protocol';
@@ -11,10 +11,6 @@ import {
   rankNotes,
   type CandidateAuthor,
 } from '../src/facade/relay/for-you/discovery';
-import {
-  buildRelayForYouFeed,
-  __clearRelayForYouCache,
-} from '../src/facade/relay/for-you/build';
 
 // --- event builders --------------------------------------------------------
 
@@ -86,7 +82,13 @@ function rankedAuthors(bundle: { manifest: { elements: string[] }; itemsById: Ma
   });
 }
 
-beforeEach(() => __clearRelayForYouCache());
+// The per-viewer corpus cache is module state with no reset; each case loads a
+// fresh copy of the orchestrator so one case's corpus never serves another.
+let buildRelayForYouFeed: typeof import('../src/facade/relay/for-you/build').buildRelayForYouFeed;
+beforeEach(async () => {
+  vi.resetModules();
+  ({ buildRelayForYouFeed } = await import('../src/facade/relay/for-you/build'));
+});
 
 // --- pure: targetAuthorFromReaction ----------------------------------------
 

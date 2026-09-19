@@ -110,6 +110,7 @@ export function useModerationActions() {
           description: blocked
             ? 'Show their posts and messages again.'
             : 'Hide their posts and messages. They can still see your public posts.',
+          testID: blocked ? 'person-menu-unblock' : 'person-menu-block',
           onPress: (close) => {
             close();
             void block(pubkey, !blocked);
@@ -119,6 +120,7 @@ export function useModerationActions() {
           text: 'Report person',
           icon: 'material-symbols:report-rounded',
           keepOpen: true,
+          testID: 'person-menu-report',
           onPress: () => report(pubkey),
         },
       ],

@@ -23,6 +23,7 @@ export function SelectableCheckCircle({
   size = 20,
   accessibilityLabel,
   accessibilityHint,
+  testID,
 }: SelectableCheckProps) {
   const [foreground, accent] = useThemeColor(['foreground', 'accent'] as const);
 
@@ -43,10 +44,12 @@ export function SelectableCheckCircle({
     </View>
   );
 
+  // Visual-only: the parent row is the control and carries the checked state.
   if (!onChange) return visual;
 
   return (
     <Pressable
+      testID={testID}
       onPress={() => !disabled && onChange(!selected)}
       disabled={disabled}
       accessibilityRole="checkbox"

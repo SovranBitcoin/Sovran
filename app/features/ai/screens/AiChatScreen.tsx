@@ -319,14 +319,19 @@ export function AiChatScreen() {
     }
     void pickChatImage().then((picked) => {
       if (!picked) return;
+      // The local URI is the attachment's identity (row key, remove target and
+      // testID), so re-picking the same file doesn't add a second copy.
       setPendingAttachments((prev) =>
-        prev.length >= MAX_INLINE_IMAGES ? prev : [...prev, picked]
+        prev.length >= MAX_INLINE_IMAGES ||
+        prev.some((attachment) => attachment.localUri === picked.localUri)
+          ? prev
+          : [...prev, picked]
       );
     });
   };
 
-  const handleRemoveAttachment = (index: number) => {
-    setPendingAttachments((prev) => prev.filter((_, i) => i !== index));
+  const handleRemoveAttachment = (localUri: string) => {
+    setPendingAttachments((prev) => prev.filter((attachment) => attachment.localUri !== localUri));
   };
 
   // Perf loggers — same canonical emits the shared ChatScreen produces, so
@@ -421,8 +426,8 @@ export function AiChatScreen() {
                 paddingBottom: 8,
               }}
               style={{ flexGrow: 0 }}>
-              {pendingAttachments.map((attachment, index) => (
-                <RNView key={`${attachment.localUri}-${index}`}>
+              {pendingAttachments.map((attachment) => (
+                <RNView key={attachment.localUri}>
                   <Image
                     source={{ uri: attachment.localUri }}
                     style={{ width: 56, height: 56, borderRadius: 10 }}
@@ -430,11 +435,11 @@ export function AiChatScreen() {
                     accessibilityLabel="Pending image attachment"
                   />
                   <Pressable
-                    onPress={() => handleRemoveAttachment(index)}
+                    onPress={() => handleRemoveAttachment(attachment.localUri)}
                     hitSlop={8}
                     accessibilityLabel="Remove attachment"
                     accessibilityRole="button"
-                    testID={`ai-attachment-remove-${index}`}
+                    testID={`ai-attachment-remove-${attachment.localUri}`}
                     style={{
                       position: 'absolute',
                       top: -6,

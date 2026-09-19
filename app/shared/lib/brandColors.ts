@@ -42,6 +42,10 @@ export const BITCOIN_ACCENT = '#F7931A';
  *  symbol cutouts, and iOS glass wash layers that must not invert by theme. */
 export const INVARIANT_WHITE = '#FFFFFF';
 
+/** Near-black base (#0F0F12) under the boot splash's QR-button look-alike
+ *  layers; kept exact so the splash-to-QR-button handoff is pixel-identical. */
+export const SPLASH_QR_BASE = '#0F0F12';
+
 /** Fixed black for theme-invariant QR foregrounds. Scanners expect dark modules
  *  on a light background, so this intentionally does not follow app theme. */
 export const INVARIANT_BLACK = '#000000';

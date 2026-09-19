@@ -198,13 +198,15 @@ export function ModelChip() {
   return (
     <Button
       testID="ai-model-chip"
+      accessibilityLabel={`Model: ${chipLabel}`}
+      accessibilityHint="Opens the model picker"
       variant="primary"
       size="compact"
       onPress={onPress}
       icon={<Icon name={currentProvider.icon} size={16} color={background} />}
       text={
         <HStack align="center" gap={4}>
-          <Text size={13} style={{ color: background, fontFamily: 'OxygenBold' }}>
+          <Text size={13} bold color={background}>
             {chipLabel}
           </Text>
           <Icon name="mdi:chevron-down" size={12} color={withAlpha(background, 0.7)} />

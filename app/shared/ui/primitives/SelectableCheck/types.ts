@@ -22,4 +22,7 @@ export interface SelectableCheckProps {
   accessibilityLabel?: string;
   /** Optional VoiceOver hint describing the toggle outcome. */
   accessibilityHint?: string;
+  /** Stable e2e selector derived from the option's identity (e.g.
+   *  `split-participant-check-${pubkey}`). Applied to the tap target. */
+  testID?: string;
 }

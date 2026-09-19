@@ -196,7 +196,8 @@ export function CashuTokenBubble({
         onPress={handlePress}
         testID={isOwn ? 'cashu-bubble-own' : 'cashu-bubble-incoming'}
         accessibilityRole="button"
-        accessibilityLabel={isOwn ? 'Sent ecash token' : 'Received ecash token'}>
+        accessibilityLabel={isOwn ? 'Sent ecash token' : 'Received ecash token'}
+        accessibilityHint={isOwn ? 'Opens the token to cancel it' : 'Opens the token to redeem it'}>
         <VStack
           gap={spacing.sm}
           className="min-w-0 self-stretch p-3"
@@ -239,11 +240,11 @@ export function CashuTokenBubble({
             ) : null}
           </VStack>
 
-          <Pressable
-            onPress={handlePress}
+          {/* The whole bubble is the one control; this pill only shows what a
+              tap does. A second pressable here would be unreachable inside the
+              bubble for VoiceOver and the harness. */}
+          <View
             testID={isOwn ? 'cashu-bubble-cancel' : 'cashu-bubble-redeem'}
-            accessibilityRole="button"
-            accessibilityLabel={isOwn ? 'Cancel' : 'Redeem'}
             style={{
               marginTop: spacing.xs,
               paddingVertical: spacing.sm,
@@ -260,7 +261,7 @@ export function CashuTokenBubble({
                 {isOwn ? 'Cancel' : 'Redeem'}
               </Text>
             </HStack>
-          </Pressable>
+          </View>
         </VStack>
       </Pressable>
     </View>

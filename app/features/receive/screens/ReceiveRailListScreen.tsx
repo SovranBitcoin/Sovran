@@ -152,8 +152,19 @@ const ReceiveRailRow = memo(function ReceiveRailRow({
     formatRelative(item.createdAt, 'compact'),
   ].filter((part): part is string => !!part);
 
+  const action = copyable ? 'Copy' : item.linkEntry ? 'Open' : 'Unavailable';
   return (
-    <PressableFeedback animation={false} onPress={() => onPress(item)}>
+    <PressableFeedback
+      animation={false}
+      testID={`receive-rail-item-${item.key}`}
+      accessibilityRole="button"
+      accessibilityLabel={[
+        `${action} ${truncateMiddle(item.request, 12)}`,
+        item.listening === true && item.status !== 'paid' ? 'Listening' : badge.label,
+        ...descriptionParts,
+      ].join(', ')}
+      accessibilityState={{ selected: item.isCurrent }}
+      onPress={() => onPress(item)}>
       <PressableFeedback.Scale>
         <ListGroup.Item disabled>
           <ListGroup.ItemPrefix>

@@ -865,13 +865,7 @@ function EmptyStateCard({
       <BlurCardFrame accentColor={muted}>
         <View style={styles.emptyState}>
           <Icon name="fluent:clock-12-filled" size={36} color={withAlpha(foreground, 0.33)} />
-          <Text
-            size={16}
-            style={{
-              color: withAlpha(foreground, 0.66),
-              fontFamily: 'OxygenBold',
-              textAlign: 'center',
-            }}>
+          <Text size={16} bold color={withAlpha(foreground, 0.66)} style={{ textAlign: 'center' }}>
             {title}
           </Text>
           <Text

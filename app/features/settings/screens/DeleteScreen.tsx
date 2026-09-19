@@ -93,8 +93,13 @@ export function DeleteScreen() {
               thumbColor={foreground}
               textColor={foreground}
               iconColor={danger}
+              testID="settings-delete-slider"
             />
-            <Button variant="secondary" className="w-full" onPress={() => router.back()}>
+            <Button
+              variant="secondary"
+              className="w-full"
+              testID="settings-delete-cancel"
+              onPress={() => router.back()}>
               <Button.Label>Cancel</Button.Label>
             </Button>
           </VStack>

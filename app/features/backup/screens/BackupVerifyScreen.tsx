@@ -132,10 +132,19 @@ export function BackupVerifyScreen() {
                   {question.choices.map((word, index) => (
                     <Fragment key={index}>
                       {index > 0 ? <Separator className="mx-4" /> : null}
+                      {/* A choice slot's only identity besides its position is its
+                          recovery word, which must never reach a testID or E2E artifact,
+                          so the slot number is the testID. While an accepted answer
+                          advances, every slot is disabled and busy. */}
                       <PressableFeedback
                         testID={`backup-choice-${index}`}
                         accessibilityRole="button"
                         accessibilityLabel={`Option ${index + 1}, ${word}`}
+                        accessibilityState={{
+                          disabled: accepted,
+                          busy: accepted,
+                          selected: accepted && index === question.answerIndex,
+                        }}
                         isDisabled={accepted}
                         onPress={() => pick(index)}>
                         <PressableFeedback.Scale>

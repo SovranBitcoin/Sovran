@@ -19,7 +19,14 @@ import { COMMENT_ACCENT, LIKE_ACCENT, ZAP_ACCENT } from '@/shared/lib/brandColor
 import { openRepostMenu } from '@/features/feed/lib/repostMenu';
 import { POST_FONT_FAMILY, postInk, postType } from '@/features/feed/lib/postTypography';
 import type { NoteMetrics } from './feedTypes';
-import { formatCount, formatSats } from './feedFormat';
+import {
+  formatCount,
+  formatSats,
+  likeActionLabel,
+  replyActionLabel,
+  repostActionLabel,
+  zapActionLabel,
+} from './feedFormat';
 
 /** Glyph sizes: 20 in the feed / thread target, 18 on compact thread replies. */
 export const POST_ACTION_ICON_SIZES = {
@@ -313,7 +320,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
             onPress={onCommentPress}
             onPressIn={onActionPressIn}
             onPressOut={onActionPressOut}
-            accessibilityLabel={`${replied ? 'Replied' : 'Reply'}, ${metrics.replyCount} replies`}
+            accessibilityLabel={replyActionLabel(!!replied, metrics.replyCount)}
             testID="post-comment"
           />
           <ActionColumn
@@ -328,7 +335,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
             onPress={handleRepostPress}
             onPressIn={onActionPressIn}
             onPressOut={onActionPressOut}
-            accessibilityLabel={`${reposted ? 'Reposted' : 'Repost'}, ${metrics.repostCount} reposts`}
+            accessibilityLabel={repostActionLabel(!!reposted, metrics.repostCount)}
           />
           <ActionColumn
             action="like"
@@ -342,7 +349,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
             onPress={handleLikePress}
             onPressIn={onActionPressIn}
             onPressOut={onActionPressOut}
-            accessibilityLabel={`${liked ? 'Liked' : 'Like'}, ${metrics.likeCount} likes`}
+            accessibilityLabel={likeActionLabel(!!liked, metrics.likeCount)}
             burstSeq={likeBurstSeq}
           />
           <ActionColumn
@@ -360,7 +367,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
             onPress={onZapPress}
             onPressIn={onActionPressIn}
             onPressOut={onActionPressOut}
-            accessibilityLabel={`Zap, ${formatSats(metrics.satsZapped)} sats zapped`}
+            accessibilityLabel={zapActionLabel(metrics.satsZapped)}
             testID="post-zap"
           />
         </HStack>

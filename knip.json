@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "ignore": ["site/**"],
+  "ignore": ["site/**", "hunch.config.ts"],
   "ignoreIssues": {
     "**/*.android.{ts,tsx}": ["files"],
     "**/*.ios.{ts,tsx}": ["files"],
@@ -10,7 +10,8 @@
     "app/codereview/log-doctor/test-dsl/cashu-decode.ts": ["exports"],
     "app/features/feed/data/recentPeopleProfiles.ts": ["exports"],
     "app/shared/lib/e2e/stateMirror.ts": ["exports"],
-    "app/shared/lib/popup/popups/sendMemoSheet.tsx": ["exports"]
+    "app/shared/lib/popup/popups/sendMemoSheet.tsx": ["exports"],
+    "scripts/lib/phone-frame.mjs": ["exports"]
   },
   "workspaces": {
     "app": {
@@ -50,7 +51,7 @@
       "project": ["src/**/*.ts", "scripts/*.mjs"]
     },
     ".": {
-      "entry": ["release/check-inputs.mjs", "scripts/lib/app-source.d.mts"]
+      "entry": ["release/check-inputs.mjs", "scripts/lib/app-source.mjs", "scripts/lib/app-source.d.mts"]
     }
   },
   "ignoreBinaries": ["knip", "python3"]

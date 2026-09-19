@@ -97,7 +97,8 @@ const requiredBadges = [
   'docs.yml',
   'glass-headers.yml',
 ];
-const readmes = [resolve(REPO_DIR, 'README.md'), resolve(APP_DIR, 'README.md')];
+// The badges live in the app README; the root README stays a short monorepo intro.
+const readmes = [resolve(APP_DIR, 'README.md')];
 const missingBadges = readmes.flatMap((readme) => {
   const contents = readFileSync(readme, 'utf8');
   return requiredBadges
@@ -160,7 +161,7 @@ const summary = [
       `| ${platform} | ${mib(metrics.bundleBytes)} | ${signedKib(metrics.deltaFromReferenceBytes.bundle)} | ${mib(metrics.assetBytes)} | ${signedKib(metrics.deltaFromReferenceBytes.assets)} | ${metrics.withinBudget ? 'pass' : 'FAIL'} |`
   ),
   '',
-  'React Doctor is advisory and intentionally excluded from the score. The workflow badges in both READMEs are enforced by this job; full numbers are in the `maintenance-health` artifact.',
+  'React Doctor is advisory and intentionally excluded from the score. The workflow badges in the app README are enforced by this job; full numbers are in the `maintenance-health` artifact.',
   '',
 ].join('\n');
 

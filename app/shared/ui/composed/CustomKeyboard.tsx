@@ -50,26 +50,40 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
   );
 
   const renderButton = useCallback(
-    (value: KeyboardValue) => (
-      <Pressable
-        key={String(value)}
-        className="mx-0.5 w-1/3 items-center justify-center overflow-hidden"
-        style={{ opacity: loading ? 0.5 : 1 }}
-        disabled={loading}
-        onPress={() => handlePress(value)}>
-        {value === '<' ? (
-          <Icon name="lucide:delete" size={compact ? 22 : 24} color={foreground} />
-        ) : (
-          <Text
-            size={compact ? 22 : 24}
-            bold
-            color={foreground}
-            style={{ padding: compact ? 14 : 16, paddingHorizontal: compact ? 22 : 24 }}>
-            {value}
-          </Text>
-        )}
-      </Pressable>
-    ),
+    (value: KeyboardValue) => {
+      const key = String(value);
+      // The sat keypad has no decimal key; keep its slot as an inert spacer so
+      // the grid stays aligned without an unnamed, do-nothing button.
+      if (key === '') {
+        return <View key="spacer" className="mx-0.5 w-1/3" />;
+      }
+      const isBackspace = key === '<';
+      const isDecimal = key === '.';
+      return (
+        <Pressable
+          key={key}
+          testID={`keypad-key-${isBackspace ? 'backspace' : isDecimal ? 'decimal' : key}`}
+          accessibilityRole="button"
+          accessibilityLabel={isBackspace ? 'Delete' : isDecimal ? 'Decimal point' : key}
+          accessibilityState={{ disabled: loading, busy: loading }}
+          className="mx-0.5 w-1/3 items-center justify-center overflow-hidden"
+          style={{ opacity: loading ? 0.5 : 1 }}
+          disabled={loading}
+          onPress={() => handlePress(value)}>
+          {isBackspace ? (
+            <Icon name="lucide:delete" size={compact ? 22 : 24} color={foreground} />
+          ) : (
+            <Text
+              size={compact ? 22 : 24}
+              bold
+              color={foreground}
+              style={{ padding: compact ? 14 : 16, paddingHorizontal: compact ? 22 : 24 }}>
+              {value}
+            </Text>
+          )}
+        </Pressable>
+      );
+    },
     [compact, foreground, handlePress, loading]
   );
 

@@ -13,7 +13,10 @@ interface UnderlineTabsProps {
   tabs: readonly string[];
   selectedTab: string;
   handleTabPress: (tab: string, index: number) => void;
-  /** Optional per-tab testID (e2e selectors). */
+  /** Per-tab testID (e2e selectors). Defaults to `underline-tab-${tab}`:
+   *  each tab value is the selection key `selectedTab` and `handleTabPress`
+   *  carry, so it is the tab's identity. Pass this when the values are
+   *  translated or otherwise unstable display strings. */
   testIDFor?: (tab: string) => string;
   /** Override the active underline color. Defaults to the theme `accent` token. */
   accentColor?: string;
@@ -22,6 +25,8 @@ interface UnderlineTabsProps {
 /** Slightly under body size — keeps 4–5 short tabs on-bar on phone widths
  *  before the (…) overflow has to engage. */
 const LABEL_SIZE = 15;
+
+const defaultTestIDFor = (tab: string) => `underline-tab-${tab}`;
 
 /**
  * Flat underline tab bar — each tab is `flex: 1`, the active tab gets a
@@ -38,7 +43,7 @@ const LABEL_SIZE = 15;
 export function UnderlineTabs({
   tabs,
   selectedTab,
-  testIDFor,
+  testIDFor = defaultTestIDFor,
   handleTabPress,
   accentColor,
 }: UnderlineTabsProps) {
@@ -82,6 +87,7 @@ export function UnderlineTabs({
       buttons: overflow.map((tab) => ({
         text: tab,
         testID: `underline-tabs-menu-${tab}`,
+        selected: tab === selectedTab,
         suffix:
           tab === selectedTab ? <Icon name="mdi:check" size={20} color={success} /> : undefined,
         onPress: () => handleTabPress(tab, tabs.indexOf(tab)),
@@ -111,8 +117,9 @@ export function UnderlineTabs({
           return (
             <Pressable
               key={tab}
-              testID={testIDFor?.(tab)}
+              testID={testIDFor(tab)}
               accessibilityRole="tab"
+              accessibilityLabel={tab}
               accessibilityState={{ selected: isActive }}
               onPress={() => handleTabPress(tab, tabs.indexOf(tab))}
               style={[
@@ -132,7 +139,12 @@ export function UnderlineTabs({
         {overflow.length > 0 && (
           <Pressable
             testID="underline-tabs-more"
+            accessibilityRole="button"
             accessibilityLabel="More tabs"
+            // The (…) button carries the selection whenever the active tab is
+            // one of the tabs collapsed behind it; name which one.
+            accessibilityState={{ selected: selectedInOverflow }}
+            accessibilityValue={selectedInOverflow ? { text: selectedTab } : undefined}
             onPress={openOverflowMenu}
             style={[
               styles.moreButton,

@@ -1,8 +1,8 @@
 import {
   discoverMintToSearchResult,
   discoveryMethodMatches,
-  useMintSearch,
-} from '@/features/mint/hooks/useMintSearch';
+} from '@/features/mint/lib/mintDiscoveryRows';
+import { useMintSearch } from '@/features/mint/hooks/useMintSearch';
 import { renderHook, waitFor } from '@testing-library/react-native';
 import { ok } from 'neverthrow';
 import { discoverMints } from '@/shared/lib/apiClient';

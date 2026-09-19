@@ -12,7 +12,7 @@ const E2E_HEROUI_MENU_OPEN_ID = 'e2e-heroui-menu-open';
 /** State belongs in the id on Android: RN merges a labeled non-editable
  * node's accessibilityValue into content-desc, which cannot be separated
  * reliably by uiautomator. */
-export const e2eMenuStateId = (baseId: string, state: string): string =>
+const e2eMenuStateId = (baseId: string, state: string): string =>
   `${baseId}:${encodeURIComponent(state || 'untitled')}`;
 
 type E2EActionMenuRenderState = {
@@ -25,10 +25,9 @@ type E2EActionMenuRenderState = {
   clear: (sequence: number) => void;
 };
 
-/** Exported for the e2e state-mirror so a run's sidecar exposes the render/
- * present gate state — the only way to diagnose why the FWO action-menu probe
- * fails to light for a given sheet (dev-only; never read in product paths). */
-export const useE2EActionMenuRenderStore = create<E2EActionMenuRenderState>((set, get) => ({
+/** Render/present gate for the FWO action-menu probe, driven only by the
+ * render marker and `markE2EActionMenuPresented` (dev-only). */
+const useE2EActionMenuRenderStore = create<E2EActionMenuRenderState>((set, get) => ({
   sequence: 0,
   renderedSequence: null,
   renderedOpenSeq: null,
@@ -65,10 +64,10 @@ type E2EActionMenuTargetState = {
   clearTarget: (actionId: string, registration: number) => void;
 };
 
-/** Exported for focused tests and state diagnosis. Coordinates are transient,
- * non-secret screen geometry; the store is populated only by an owned e2e
- * Metro on iOS. */
-export const useE2EActionMenuTargetStore = create<E2EActionMenuTargetState>((set) => ({
+/** Measured menu-row centres, written only by `E2EActionMenuTargetMarker`.
+ * Coordinates are transient, non-secret screen geometry; the store is
+ * populated only by an owned e2e Metro on iOS. */
+const useE2EActionMenuTargetStore = create<E2EActionMenuTargetState>((set) => ({
   targets: {},
   setTarget: (target) =>
     set((state) => ({ targets: { ...state.targets, [target.actionId]: target } })),

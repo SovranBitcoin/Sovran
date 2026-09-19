@@ -140,6 +140,7 @@ function buildSwapEntryRowProps(
       : 'Unconfirmed',
     secondarySubtitle: fiatAmount,
     onPress: handlePress,
+    testID: `swap-leg-${historyEntry.type}-${historyEntry.id}`,
   };
 }
 
@@ -395,7 +396,13 @@ export function SwapTransactionScreen({ groupId }: Props) {
         </HStack>
 
         {/* ── Disclosure toggle (animated chevron, like SwiftUI DisclosureGroup) ── */}
-        <Pressable onPress={toggleExpanded} style={{ marginHorizontal: 16 }}>
+        <Pressable
+          onPress={toggleExpanded}
+          accessibilityRole="button"
+          accessibilityLabel="Transactions"
+          accessibilityState={{ expanded }}
+          testID="swap-legs-toggle"
+          style={{ marginHorizontal: 16 }}>
           <HStack align="center" justify="space-between" style={styles.toggleHeader}>
             <UntranslatedText bold size={13} color={withAlpha(foreground, 0.66)}>
               Transactions

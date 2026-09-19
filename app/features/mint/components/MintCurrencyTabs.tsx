@@ -14,14 +14,16 @@ import Animated, {
   SharedValue,
 } from 'react-native-reanimated';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { Text } from '@/shared/ui/primitives/Text';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { cashuLog, Log } from '@/shared/lib/logger';
 // Size constants
 const LARGE_ICON_SIZE = 28;
 const SMALL_ICON_SIZE = 22;
-const LARGE_FONT_SIZE = 14;
-const SMALL_FONT_SIZE = 14;
+// The label stays one size in both states; only the icon, padding and gap
+// animate with the collapse.
+const FONT_SIZE = 14;
 const LARGE_PADDING_H = 14;
 const SMALL_PADDING_H = 12;
 const LARGE_PADDING_V = 10;
@@ -132,26 +134,6 @@ function AnimatedCurrencyTab({
     };
   });
 
-  // Animated text style
-  const animatedTextStyle = useAnimatedStyle(() => {
-    if (!scrollY) {
-      return {
-        fontSize: SMALL_FONT_SIZE,
-      };
-    }
-
-    const fontSize = interpolate(
-      scrollY.value,
-      [0, COLLAPSE_THRESHOLD],
-      [LARGE_FONT_SIZE, SMALL_FONT_SIZE],
-      Extrapolation.CLAMP
-    );
-
-    return {
-      fontSize,
-    };
-  });
-
   // Animated gap style for the HStack
   const animatedGapStyle = useAnimatedStyle(() => {
     if (!scrollY) {
@@ -212,10 +194,9 @@ function AnimatedCurrencyTab({
           <Animated.View className="items-center justify-center" style={animatedIconStyle}>
             {renderIcon()}
           </Animated.View>
-          <Animated.Text
-            style={[{ fontFamily: 'OxygenBold', color: primaryColor0 }, animatedTextStyle]}>
+          <Text size={FONT_SIZE} bold color={primaryColor0}>
             {label}
-          </Animated.Text>
+          </Text>
         </Animated.View>
       </Animated.View>
     </Pressable>

@@ -53,7 +53,7 @@ describe('wallet surface e2e selectors', () => {
 
   it('pins the mint-info Nostr contact row', () => {
     const source = read('features/mint/screens/MintInfoScreen.tsx');
-    expect(source).toContain("testID={c.isNostr ? 'mint-info-contact-nostr' : undefined}");
+    expect(source).toMatch(/c\.isNostr\s*\?\s*'mint-info-contact-nostr'/);
   });
 
   it('pins the own/other profile screen probe', () => {
@@ -238,9 +238,21 @@ describe('wallet surface e2e selectors', () => {
   });
 
   it('pins the drawer menu row ids', () => {
-    expect(read('app/(drawer)/_layout.tsx')).toContain(
-      "testID={`drawer-menu-${label.toLowerCase().replace(/\\s+/g, '-')}`}"
-    );
+    const drawer = read('app/(drawer)/_layout.tsx');
+    expect(drawer).toContain('testID={`drawer-menu-${id}`}');
+    // Row ids are the e2e selector suffixes (drawer-menu-feed, …); renaming
+    // one breaks every scenario that opens that route from the drawer.
+    for (const id of [
+      'feed',
+      'wallet',
+      'contacts',
+      'notifications',
+      'ai',
+      'remote-login',
+      'settings',
+    ]) {
+      expect(drawer).toContain(`id: '${id}',`);
+    }
   });
 
   it('pins the wallet wallpaper probe and gallery card AX identity', () => {
@@ -256,9 +268,14 @@ describe('wallet surface e2e selectors', () => {
     expect(sprite).toContain('markWallpaperLoaded(activeTheme)');
     expect(sprite).toContain('markWallpaperFailed(activeTheme)');
     // Gallery album cards are addressable only via the pressable wrapper —
-    // the inner card View's testID never becomes an AX element.
+    // the inner card View's testID never becomes an AX element — and are
+    // announced by the album name with their selected state.
     const card = read('features/theme/components/UnitPreviewCard.tsx');
-    expect(card).toContain('accessible={!!testID}');
+    expect(card).toContain('accessibilityLabel={accessibilityLabel ?? label ?? themeName}');
+    expect(card).toContain('accessibilityState={{ selected: !!selected }}');
+    expect(read('features/theme/screens/GalleryScreen.tsx')).toContain(
+      'accessibilityLabel={album.displayName}'
+    );
   });
 
   it('pins the mint-info KYM cache fallback', () => {

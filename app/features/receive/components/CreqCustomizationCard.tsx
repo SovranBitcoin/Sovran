@@ -126,6 +126,8 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
           reveal={reveal}
           muted={muted}
           onPress={handleCopy}
+          testID="receive-creq-copy"
+          accessibilityLabel="Copy payment request"
         />
         <Separator className="mx-4" />
         {/* The whole row is the toggle target: a HeroSwitch inside a
@@ -197,7 +199,7 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
           <PressableFeedback.Ripple />
         </PressableFeedback>
         {advancedOpen
-          ? mintSelection.options.map((option, index) => (
+          ? mintSelection.options.map((option) => (
               <React.Fragment key={option.mintUrl}>
                 <Separator className="mx-4" />
                 <ListGroup.Item>
@@ -217,7 +219,7 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
                   </ListGroup.ItemContent>
                   <ListGroup.ItemSuffix>
                     <HeroSwitch
-                      testID={`receive-creq-mint-${index}`}
+                      testID={`receive-creq-mint-${option.mintUrl}`}
                       accessibilityLabel={`Include ${option.displayName}`}
                       isSelected={option.enabled}
                       isDisabled={option.switchDisabled}

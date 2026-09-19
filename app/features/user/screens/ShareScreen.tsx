@@ -149,7 +149,12 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
       {/* Tab bar - only show if npub is available for p2pk type */}
       {showTabs && (
         <View className="mb-4">
-          <UnderlineTabs tabs={tabs} selectedTab={selectedTab} handleTabPress={handleTabPress} />
+          <UnderlineTabs
+            tabs={tabs}
+            selectedTab={selectedTab}
+            handleTabPress={handleTabPress}
+            testIDFor={(tab) => `share-tab-${tab.toLowerCase()}`}
+          />
         </View>
       )}
 
@@ -173,6 +178,8 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
               display={truncateMiddle(activeData, 10)}
               muted={withAlpha(foreground, 0.4)}
               onPress={handleCopy}
+              testID={`share-copy-${config.copyTarget}`}
+              accessibilityLabel={`Copy ${config.sectionTitle.toLowerCase()}`}
             />
           </ListGroup>
         </GradientCard>

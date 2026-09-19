@@ -71,6 +71,7 @@ export function usePostActions(options?: {
             {
               text: 'Share',
               icon: 'mdi:share-variant-outline',
+              testID: 'post-share',
               onPress: (close) => {
                 close();
                 void Share.share({ message: links.njumpUrl });
@@ -79,6 +80,7 @@ export function usePostActions(options?: {
             {
               text: 'Copy link',
               icon: 'mdi:link-variant',
+              testID: 'post-copy-link',
               onPress: (close) => {
                 close();
                 void Clipboard.setStringAsync(links.njumpUrl);

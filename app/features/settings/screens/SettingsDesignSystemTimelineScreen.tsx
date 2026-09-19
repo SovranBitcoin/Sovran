@@ -207,17 +207,29 @@ export function SettingsDesignSystemTimelineScreen() {
                 <Button
                   variant={timelineAuto ? 'primary' : 'secondary'}
                   size="sm"
+                  testID="design-system-timeline-auto"
+                  accessibilityRole="switch"
+                  accessibilityLabel="Auto-play"
+                  accessibilityState={{ checked: timelineAuto }}
                   onPress={() => setTimelineAuto((value) => !value)}>
                   <Button.Label>{timelineAuto ? 'Pause' : 'Play'}</Button.Label>
                 </Button>
               </View>
               <View className="flex-1">
-                <Button variant="secondary" size="sm" onPress={onStepFrame}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  testID="design-system-timeline-step"
+                  onPress={onStepFrame}>
                   <Button.Label>Step</Button.Label>
                 </Button>
               </View>
               <View className="flex-1">
-                <Button variant="secondary" size="sm" onPress={onResetFrames}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  testID="design-system-timeline-reset"
+                  onPress={onResetFrames}>
                   <Button.Label>Reset</Button.Label>
                 </Button>
               </View>

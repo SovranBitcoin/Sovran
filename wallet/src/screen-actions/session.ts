@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import type {
   CreateAmountActionManagerConfig,
   QuickSendSuggestion,
@@ -71,6 +73,27 @@ export interface CreateScreenActionSessionConfig<S extends ScreenType> {
   decorateEntry?: ScreenActionsBridge['decorateEntry'];
 }
 
+/**
+ * A screen entry seed arrives as a JSON string from a route param. It must be
+ * a JSON object; the handlers narrow individual fields as they read them.
+ */
+const EntrySeedSchema = z.record(z.string(), z.unknown());
+
+function parseEntrySeedString(
+  seed: string,
+): { ok: true; entry: Record<string, unknown> } | { ok: false; error: unknown } {
+  let json: unknown;
+  try {
+    json = JSON.parse(seed);
+  } catch (error) {
+    return { ok: false, error };
+  }
+  const result = EntrySeedSchema.safeParse(json);
+  return result.success
+    ? { ok: true, entry: result.data }
+    : { ok: false, error: result.error };
+}
+
 function parseEntrySeed(
   screenType: ScreenType,
   seed: ScreenActionEntrySeed,
@@ -82,14 +105,14 @@ function parseEntrySeed(
     if (seed == null) return { parsed: {}, error: null };
     if (typeof seed === 'string') {
       if (!seed.trim()) return { parsed: {}, error: null };
-      try {
-        return {
-          parsed: JSON.parse(seed) as Record<string, unknown>,
-          error: null,
-        };
-      } catch {
-        return { parsed: null, error: 'Invalid amount screen data.' };
-      }
+      const result = parseEntrySeedString(seed);
+      if (result.ok) return { parsed: result.entry, error: null };
+      logger.warn('screenActionSession.entrySeed.invalid', {
+        screenType,
+        seedLength: seed.length,
+        error: errField(result.error),
+      });
+      return { parsed: null, error: 'Invalid amount screen data.' };
     }
     return { parsed: seed, error: null };
   }
@@ -101,17 +124,17 @@ function parseEntrySeed(
     };
   }
   if (typeof seed === 'string') {
-    try {
-      return {
-        parsed: JSON.parse(seed) as Record<string, unknown>,
-        error: null,
-      };
-    } catch {
-      return {
-        parsed: null,
-        error: 'Invalid transaction data. Please try again.',
-      };
-    }
+    const result = parseEntrySeedString(seed);
+    if (result.ok) return { parsed: result.entry, error: null };
+    logger.warn('screenActionSession.entrySeed.invalid', {
+      screenType,
+      seedLength: seed.length,
+      error: errField(result.error),
+    });
+    return {
+      parsed: null,
+      error: 'Invalid transaction data. Please try again.',
+    };
   }
   return { parsed: seed, error: null };
 }
@@ -122,6 +145,9 @@ function getMintUrl(entry: Record<string, unknown> | null): string | undefined {
   return typeof url === 'string' && url.length > 0 ? url : undefined;
 }
 
+// `suggestions` is written onto the entry by the amount action manager
+// (`createManager` → `resolution.suggestions`), never read from the seed, so
+// it is a trusted in-process value.
 function getSuggestions(
   entry: Record<string, unknown> | null,
 ): QuickSendSuggestion[] {

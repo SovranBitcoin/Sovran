@@ -15,7 +15,7 @@ import type { QRButtonProps } from './QRButton.shared';
 import { QRButtonFace, QRButtonGlyph } from './QRButtonFace';
 
 export function QRButton(props: QRButtonProps): React.ReactElement {
-  const { onPress, size = DEFAULT_SIZE } = props;
+  const { onPress, size = DEFAULT_SIZE, testID = 'qr-scan-button' } = props;
   const {
     foreground,
     background,
@@ -43,6 +43,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
         style={[{ width: size, height: size }, visibilityStyle]}>
         <Animated.View style={[{ width: size, height: size }, pressFeedback.animatedStyle]}>
           <Pressable
+            testID={testID}
             accessibilityLabel="Scan QR code"
             accessibilityRole="button"
             style={[styles.touchable, pressableStyle]}

@@ -58,12 +58,7 @@ function FilterButton() {
           <View
             className="absolute right-1 top-1 h-4 min-w-4 items-center justify-center rounded-[10px]"
             style={{ backgroundColor: accent }}>
-            <Text
-              size={10}
-              style={{
-                color: accentForeground,
-                fontFamily: 'OxygenBold',
-              }}>
+            <Text size={10} bold color={accentForeground}>
               {activeFilterCount}
             </Text>
           </View>

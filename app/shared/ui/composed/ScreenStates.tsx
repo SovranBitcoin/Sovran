@@ -19,43 +19,47 @@ export function ScreenErrorState({ message, title, onGoBack }: ScreenErrorStateP
 
   return (
     <Screen name="ScreenErrorState" scroll="none">
-      <View
-        accessible
-        accessibilityRole="alert"
-        accessibilityLiveRegion="polite"
-        accessibilityLabel={title ? `${title}. ${message}` : message}
-        style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
-        {title ? (
-          <>
-            <Text
-              size={18}
-              bold
-              style={{
-                color: withAlpha(foreground, 0.9),
-                marginBottom: 16,
-                textAlign: 'center',
-              }}>
-              {title}
-            </Text>
-            <Text
-              size={14}
-              style={{
-                color: withAlpha(foreground, 0.5),
-                marginBottom: 24,
-                textAlign: 'center',
-              }}>
-              {message}
-            </Text>
-          </>
-        ) : (
-          <Text color={withAlpha(foreground, 0.66)}>{message}</Text>
-        )}
+      <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
+        {/* The alert groups only the text: an `accessible` container would
+            swallow the Go Back button below into one non-actionable element. */}
+        <View
+          accessible
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          accessibilityLabel={title ? `${title}. ${message}` : message}>
+          {title ? (
+            <>
+              <Text
+                size={18}
+                bold
+                style={{
+                  color: withAlpha(foreground, 0.9),
+                  marginBottom: 16,
+                  textAlign: 'center',
+                }}>
+                {title}
+              </Text>
+              <Text
+                size={14}
+                style={{
+                  color: withAlpha(foreground, 0.5),
+                  marginBottom: 24,
+                  textAlign: 'center',
+                }}>
+                {message}
+              </Text>
+            </>
+          ) : (
+            <Text color={withAlpha(foreground, 0.66)}>{message}</Text>
+          )}
+        </View>
         <ButtonHandler
           buttons={[
             {
               text: 'Go Back',
               icon: 'ri:arrow-left-line',
               variant: 'primary',
+              testID: 'screen-error-go-back',
               onPress: async () => onGoBack(),
             },
           ]}

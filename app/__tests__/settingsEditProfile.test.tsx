@@ -321,11 +321,11 @@ it('offers previous values as one-tap chips and hides the current one', async ()
   });
   const control = (testID: string) => renderer.root.findByProps({ testID });
   // 'Old' is the current name, so only 'Older' is offered.
-  expect(renderer.root.findAllByProps({ testID: 'edit-profile-history-name-1' })).toHaveLength(0);
-  expect(control('edit-profile-history-name-0').props.label).toBe('Older');
+  expect(renderer.root.findAllByProps({ testID: 'edit-profile-history-name-Old' })).toHaveLength(0);
+  expect(control('edit-profile-history-name-Older').props.label).toBe('Older');
   act(() => {
-    control('edit-profile-history-name-0').props.onPress();
-    control('edit-profile-history-lud16-0').props.onPress();
+    control('edit-profile-history-name-Older').props.onPress();
+    control('edit-profile-history-lud16-prev@ln.example').props.onPress();
   });
   expect(control('edit-profile-name').props.value).toBe('Older');
   expect(control('edit-profile-lud16').props.value).toBe('prev@ln.example');

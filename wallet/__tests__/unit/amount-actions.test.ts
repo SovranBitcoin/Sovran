@@ -137,6 +137,31 @@ describe('createAmountActionManager — unit awareness', () => {
   });
 });
 
+describe('createAmountActionManager — raw input validation', () => {
+  it.each(['1.5', '-5', '1e3', 'abc', '.', '1.2.3', ' 5'])(
+    'rejects %j on a sat account instead of coercing it',
+    (input) => {
+      const { manager } = makeManager({ unitRef: { current: 'sat' } });
+      manager.setInput(input);
+      expect(manager.inspect().effectiveAmount).toEqual({ value: 0, unit: 'sat' });
+    },
+  );
+
+  it('rejects more fraction digits than a fiat unit allows', () => {
+    const { manager } = makeManager({ unitRef: { current: 'usd' } });
+    manager.setInput('1.005');
+    expect(manager.inspect().effectiveAmount).toEqual({ value: 0, unit: 'usd' });
+  });
+
+  it('accepts a trailing decimal point while typing', () => {
+    const { manager } = makeManager({ unitRef: { current: 'usd' } });
+    manager.setInput('12.');
+    expect(manager.inspect().effectiveAmount).toEqual({ value: 1200, unit: 'usd' });
+    manager.setInput('.5');
+    expect(manager.inspect().effectiveAmount).toEqual({ value: 50, unit: 'usd' });
+  });
+});
+
 describe('createAmountActionManager — suggestions gate', () => {
   const PROOFS = [64, 32, 4];
 

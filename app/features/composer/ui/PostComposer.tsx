@@ -12,7 +12,6 @@ import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -32,6 +31,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'assets/icons';
 import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useUploadAbortMap } from '@/shared/hooks/useUploadAbortMap';
 import { uploadMediaBlocks } from '@/shared/lib/nostr/media/uploadMediaBlocks';
@@ -393,6 +393,7 @@ export function PostComposer() {
           size="sm"
           onPress={handlePost}
           isDisabled={!canPost}
+          accessibilityState={{ disabled: !canPost, busy }}
           style={!canPost ? styles.disabledPostButton : undefined}>
           <Button.Label>{busy ? 'Posting…' : 'Post'}</Button.Label>
         </Button>
@@ -515,7 +516,7 @@ export function PostComposer() {
                             mediaKind: block.mediaKind,
                             uploadProgress: block.uploadProgress ?? null,
                           }}>
-                          <ActivityIndicator color={INVARIANT_WHITE} />
+                          <Spinner size={20} color={INVARIANT_WHITE} />
                         </VisualLayoutProbe>
                         {block.uploadProgress > 0 ? (
                           <Text
@@ -533,12 +534,14 @@ export function PostComposer() {
                     {config.allowAltText && block.uploadProgress === undefined ? (
                       <Pressable
                         onPress={() => setAltEdit({ id: block.id, value: block.alt ?? '' })}
+                        testID={`composer-media-alt-${block.id}`}
+                        accessibilityRole="button"
                         accessibilityLabel={block.alt ? 'Edit alt text' : 'Add alt text'}
                         style={[
                           styles.altBadge,
                           block.alt ? { backgroundColor: accentColor } : null,
                         ]}>
-                        <Text size={10} style={{ color: INVARIANT_WHITE, fontWeight: '700' }}>
+                        <Text size={10} bold color={INVARIANT_WHITE}>
                           {block.alt ? 'ALT ✓' : 'ALT'}
                         </Text>
                       </Pressable>
@@ -547,6 +550,7 @@ export function PostComposer() {
                       variant="ghost"
                       size="sm"
                       onPress={() => handleRemoveMedia(block.id)}
+                      testID={`composer-media-remove-${block.id}`}
                       accessibilityLabel="Remove media">
                       <Icon name="mdi:close-circle" size={18} color={mutedColor} />
                     </Button>
@@ -593,8 +597,10 @@ export function PostComposer() {
           onPress={handleAddMedia}
           disabled={!!poll || mediaBlocks.length >= config.maxMedia}
           hitSlop={10}
+          testID="composer-add-media"
           accessibilityRole="button"
-          accessibilityLabel="Add photo or video">
+          accessibilityLabel="Add photo or video"
+          accessibilityState={{ disabled: !!poll || mediaBlocks.length >= config.maxMedia }}>
           <Icon
             name="mdi:image-plus"
             size={24}
@@ -605,8 +611,13 @@ export function PostComposer() {
           onPress={() => setPoll(poll ? undefined : emptyPollDraft())}
           disabled={!config.allowPoll || mediaBlocks.length > 0}
           hitSlop={10}
+          testID="composer-toggle-poll"
           accessibilityRole="button"
-          accessibilityLabel={poll ? 'Remove poll' : 'Add poll'}>
+          accessibilityLabel={poll ? 'Remove poll' : 'Add poll'}
+          accessibilityState={{
+            disabled: !config.allowPoll || mediaBlocks.length > 0,
+            selected: !!poll,
+          }}>
           <Icon
             name="mdi:poll"
             size={24}
@@ -630,15 +641,26 @@ export function PostComposer() {
         transparent
         animationType="fade"
         onRequestClose={() => setAltEdit(null)}>
-        <Pressable style={styles.altBackdrop} onPress={() => setAltEdit(null)}>
-          <Pressable style={[styles.altCard, { backgroundColor: surface }]}>
-            <Text size={15} style={{ color: foreground, fontWeight: '600', marginBottom: 6 }}>
+        {/* Tapping outside dismisses; screen readers use Cancel instead, so
+            the backdrop stays out of the accessibility tree. */}
+        <Pressable
+          style={styles.altBackdrop}
+          onPress={() => setAltEdit(null)}
+          accessible={false}
+          importantForAccessibility="no">
+          <Pressable
+            style={[styles.altCard, { backgroundColor: surface }]}
+            accessibilityViewIsModal
+            importantForAccessibility="yes">
+            <Text size={15} bold color={foreground} style={{ marginBottom: 6 }}>
               Describe this image
             </Text>
             <Text size={12} style={{ color: mutedColor, marginBottom: 12 }}>
               Alt text helps people using screen readers understand the image.
             </Text>
             <TextInput
+              testID="composer-alt-input"
+              accessibilityLabel="Alt text"
               value={altEdit?.value ?? ''}
               onChangeText={(text) =>
                 setAltEdit((prev) => (prev ? { ...prev, value: text } : prev))
@@ -650,8 +672,12 @@ export function PostComposer() {
               style={[styles.altInput, { color: foreground, borderColor: lineColor }]}
             />
             <View style={styles.altActions}>
-              <Pressable onPress={() => setAltEdit(null)} accessibilityLabel="Cancel alt text">
-                <Text size={14} style={{ color: mutedColor, fontWeight: '600' }}>
+              <Pressable
+                onPress={() => setAltEdit(null)}
+                testID="composer-alt-cancel"
+                accessibilityRole="button"
+                accessibilityLabel="Cancel alt text">
+                <Text size={14} bold color={mutedColor}>
                   Cancel
                 </Text>
               </Pressable>
@@ -662,8 +688,10 @@ export function PostComposer() {
                   updateBlock(altEdit.id, { alt: trimmed.length > 0 ? trimmed : undefined });
                   setAltEdit(null);
                 }}
+                testID="composer-alt-save"
+                accessibilityRole="button"
                 accessibilityLabel="Save alt text">
-                <Text size={14} style={{ color: accentColor, fontWeight: '700' }}>
+                <Text size={14} bold color={accentColor}>
                   Save
                 </Text>
               </Pressable>

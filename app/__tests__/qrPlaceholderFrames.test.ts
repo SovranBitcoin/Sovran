@@ -13,15 +13,9 @@ import {
   qrJunkPayload,
   qrMatrixPath,
   qrPlaceholderFrames,
-  resetQrPlaceholderFrameCache,
   QR_PLACEHOLDER_FRAME_COUNT,
 } from '@/shared/lib/qrPlaceholderFrames';
-import {
-  estimateBip321Length,
-  expectedQrPayloadLength,
-  rememberQrPayloadLength,
-  resetQrPayloadLengths,
-} from '@/shared/lib/qr';
+import { estimateBip321Length } from '@/shared/lib/qr';
 
 const SAMPLE_UNIFIED_URI =
   'bitcoin:bc1pxyzabc0defghijklmnopqrstuvwxyz0123456789abcdefghijklmnop?lno=' +
@@ -42,8 +36,6 @@ describe('qrJunkPayload', () => {
 });
 
 describe('qrPlaceholderFrames', () => {
-  beforeEach(() => resetQrPlaceholderFrameCache());
-
   it('matches the module density of a real payload of the same length', () => {
     const real = createQrCode(SAMPLE_UNIFIED_URI, { errorCorrectionLevel: 'M' });
     const frames = qrPlaceholderFrames(SAMPLE_UNIFIED_URI.length, 300);
@@ -81,9 +73,13 @@ describe('qrMatrixPath', () => {
 });
 
 describe('expectedQrPayloadLength', () => {
-  beforeEach(() => resetQrPayloadLengths());
-
   it('prefers the last rendered length, then the caller fallback, then the estimate', () => {
+    // A fresh module copy: remembered lengths live for the session.
+    let qr!: typeof import('@/shared/lib/qr');
+    jest.isolateModules(() => {
+      qr = require('@/shared/lib/qr');
+    });
+    const { expectedQrPayloadLength, rememberQrPayloadLength } = qr;
     expect(expectedQrPayloadLength('address')).toBe(62);
     expect(expectedQrPayloadLength('address', 70)).toBe(70);
     rememberQrPayloadLength('address', 55);

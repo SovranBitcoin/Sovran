@@ -441,36 +441,39 @@ function resolveName(ids: Identity[]): string | undefined {
   return resolved;
 }
 
+/** The full identifier shown when a row has no name. Never sliced: the title
+ *  shortens it on screen with a middle ellipsis, so both ends stay readable. */
 function resolveTitleFallback(ids: Identity[]): string | undefined {
   const nostr = find(ids, 'nostr');
-  if (nostr?.pubkey) return nostr.pubkey.slice(0, 12) + '...';
+  if (nostr?.pubkey) return nostr.pubkey;
   const self = find(ids, 'self');
-  if (self?.pubkey) return self.pubkey.slice(0, 12) + '...';
+  if (self?.pubkey) return self.pubkey;
   const ble = find(ids, 'ble');
-  if (ble?.peerID) return ble.peerID.slice(0, 12);
+  if (ble?.peerID) return ble.peerID;
   const geohash = find(ids, 'geohash');
   if (geohash?.geohash) return `#${geohash.geohash}`;
   return undefined;
 }
 
+/** BLE reachability caption. Three states the user actually cares about for
+ *  DM reachability:
+ *   - direct link → DM goes straight over BLE
+ *   - mesh-only  → reachable but DMs may stall / drop in spool window
+ *   - offline    → last-seen timestamp
+ *  Returns undefined when the caller supplies no reachability. */
+function resolveBleReachability(ble: BleIdentity): string | undefined {
+  if (ble.isConnected === undefined) return undefined;
+  if (!ble.isConnected) {
+    return `seen ${typeof ble.lastSeen === 'number' ? formatRelative(ble.lastSeen, 'verbose') : 'recently'}`;
+  }
+  return ble.hasDirectLink ? 'connected' : 'mesh-only';
+}
+
 /** Default subtitle per kind. Nostr identities leave it empty — their
  *  second line is the NIP-05 pill on the accent row. Mint identities
- *  render balance via AmountFormatter in the component body. */
+ *  render balance via AmountFormatter in the component body, and BLE peers
+ *  their id plus reachability in the component body. */
 function resolveSubtitle(ids: Identity[]): string | undefined {
-  const ble = find(ids, 'ble');
-  if (ble) {
-    if (ble.isConnected === undefined) return undefined;
-    // Three states the user actually cares about for DM reachability:
-    //  - direct link → DM goes straight over BLE
-    //  - mesh-only  → reachable but DMs may stall / drop in spool window
-    //  - offline    → last-seen timestamp
-    const suffix = !ble.isConnected
-      ? `seen ${typeof ble.lastSeen === 'number' ? formatRelative(ble.lastSeen, 'verbose') : 'recently'}`
-      : ble.hasDirectLink
-        ? 'connected'
-        : 'mesh-only';
-    return `#${ble.peerID.slice(0, 8)} · ${suffix}`;
-  }
   const geohash = find(ids, 'geohash');
   if (geohash) {
     if (geohash.transport === 'ble') return 'Nearby via Bluetooth mesh';
@@ -726,6 +729,13 @@ export function ContactRow({
   let titleNode: string | ReactNode | undefined = titleBase;
   if (resolvedLoading) {
     titleNode = titleBase;
+  } else if (!titleBase && titleFallback) {
+    // A nameless row shows its full identifier, shortened only on screen.
+    titleNode = (
+      <Text size={16} bold numberOfLines={1} ellipsizeMode="middle" color={foreground}>
+        {titleFallback}
+      </Text>
+    );
   } else if (isCurrentSelf && titleBase) {
     titleNode = (
       <HStack align="center" gap={8}>
@@ -775,6 +785,24 @@ export function ContactRow({
         color={foreground}
       />
     );
+  } else if (ble) {
+    const reachability = resolveBleReachability(ble);
+    subtitleNode =
+      reachability === undefined ? undefined : (
+        <HStack className="items-center">
+          <Text
+            size={14}
+            numberOfLines={1}
+            ellipsizeMode="middle"
+            color={withAlpha(foreground, 0.5)}
+            className="shrink">
+            #{ble.peerID}
+          </Text>
+          <Text size={14} numberOfLines={1} color={withAlpha(foreground, 0.5)}>
+            {` · ${reachability}`}
+          </Text>
+        </HStack>
+      );
   } else {
     subtitleNode = resolveSubtitle(identities);
   }
@@ -1049,7 +1077,6 @@ export function ContactRow({
       iconCircle={leadingNode ? undefined : iconCircleProp}
       title={titleNode}
       titlePlaceholder={titlePlaceholder}
-      titleFallback={titleFallback}
       subtitle={subtitleNode}
       subtitlePlaceholder={subtitlePlaceholder}
       accent={accentNode}

@@ -194,4 +194,32 @@ describe('ContactRow BLE avatars', () => {
       renderer.unmount();
     });
   });
+
+  it('shows the full BLE peer id (never sliced) beside its reachability', () => {
+    const peerID = '0123456789abcdef';
+    let renderer: TestRenderer.ReactTestRenderer;
+
+    act(() => {
+      renderer = TestRenderer.create(
+        <ContactRow
+          identity={bleIdentity({ peerID, nickname: 'Nearby Alice', isConnected: true })}
+        />
+      );
+    });
+
+    // Inspect the subtitle element tree directly: ListRow is mocked, so the
+    // node is never mounted.
+    const subtitle = jest.mocked(ListRow).mock.calls[0]?.[0]?.subtitle as React.ReactElement<{
+      children: React.ReactElement<{ children?: unknown; ellipsizeMode?: string }>[];
+    }>;
+    const [idText, reachabilityText] = subtitle.props.children;
+
+    expect(idText?.props.children).toEqual(['#', peerID]);
+    expect(idText?.props.ellipsizeMode).toBe('middle');
+    expect(reachabilityText?.props.children).toBe(' · mesh-only');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
 });

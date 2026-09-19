@@ -63,7 +63,7 @@ import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { formatAmount } from '@/shared/lib/currency';
 import { openExternalUrl } from '@/shared/lib/url';
 import { log, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
-import { truncateMiddle } from '@/shared/lib/strings';
+import { MiddleEllipsisValue } from '@/shared/ui/composed/MiddleEllipsisValue';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -321,12 +321,18 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
             title: 'Accelerated',
             value: 'mempool.space',
           },
-          entry.quoteId && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
+          entry.quoteId && {
+            title: 'Quote ID',
+            value: <MiddleEllipsisValue value={entry.quoteId} />,
+          },
           onchainAddress && {
             title: 'Destination',
-            value: truncateMiddle(onchainAddress, 12),
+            value: <MiddleEllipsisValue value={onchainAddress} />,
           },
-          outpoint && { title: 'Transaction', value: truncateMiddle(outpoint.txid, 10) },
+          outpoint && {
+            title: 'Transaction',
+            value: <MiddleEllipsisValue value={outpoint.txid} />,
+          },
           mintDetailItem(mintUrl),
         ]}
       />

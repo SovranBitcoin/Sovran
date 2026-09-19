@@ -194,6 +194,7 @@ export function SignerHubScreen(): React.ReactElement {
         {
           text: 'Reset',
           variant: 'dangerous',
+          testID: 'signer-reset-confirm',
           onPress: (close) => {
             close();
             void clearAllSignerData(activePubkey).match(
@@ -202,7 +203,12 @@ export function SignerHubScreen(): React.ReactElement {
             );
           },
         },
-        { text: 'Cancel', variant: 'secondary', onPress: (close) => close() },
+        {
+          text: 'Cancel',
+          variant: 'secondary',
+          testID: 'signer-reset-cancel',
+          onPress: (close) => close(),
+        },
       ],
     });
   };

@@ -79,6 +79,9 @@ const InlineMention = React.memo(function InlineMention({
       family={POST_FONT_FAMILY}
       size={NOTE_CONTENT_FONT_SIZE}
       style={{ color: accent }}
+      testID={`note-mention-${pubkey}`}
+      accessibilityRole="link"
+      accessibilityLabel={`Open ${label}'s profile`}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={() => {
@@ -117,6 +120,9 @@ const InlineLink = React.memo(function InlineLink({
       family={POST_FONT_FAMILY}
       size={NOTE_CONTENT_FONT_SIZE}
       style={{ color: accent }}
+      testID={`note-link-${url}`}
+      accessibilityRole="link"
+      accessibilityLabel={prettifyUrl(url)}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={async () => {
@@ -182,8 +188,15 @@ const VideoBlockInner = React.memo(function VideoBlockInner({
   const hasTap = !!(openOverlay && overlayLayout) || !!onTap;
   const aspectRatio = overlayLayout?.aspectRatio ?? aspectRatioProp ?? 16 / 9;
 
+  // The tap is a gesture-handler gesture, so the outer view carries the
+  // accessible name/role; activation falls through to the tap gesture.
   const content = (
-    <View style={[sharedStyles.videoBlockOuter, { backgroundColor: surface }]}>
+    <View
+      testID={`note-video-${url}`}
+      accessible={hasTap}
+      accessibilityRole={hasTap ? 'button' : undefined}
+      accessibilityLabel={hasTap ? 'Play video' : undefined}
+      style={[sharedStyles.videoBlockOuter, { backgroundColor: surface }]}>
       <View
         ref={containerRef}
         collapsable={false}
@@ -262,6 +275,9 @@ const LightningBlock = React.memo(function LightningBlock({ meltTarget }: { melt
 
   return (
     <Pressable
+      testID={`note-lightning-invoice-${decoded.paymentHash ?? meltTarget}`}
+      accessibilityRole="button"
+      accessibilityLabel={`Pay Lightning invoice, ${subtitle}`}
       onPress={() => {
         clearPaymentContext('feed.lightning_invoice');
         void machine.execute(meltTarget, { reset: true });
@@ -346,6 +362,9 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
 
   return (
     <Pressable
+      testID={`quoted-post-${event.id}`}
+      accessibilityRole="button"
+      accessibilityLabel={`Open quoted post by ${displayName}`}
       onPressIn={suppressQuotedTapStart}
       onPressOut={suppressQuotedTapEnd}
       onPress={handleOpenQuotedThread}>
@@ -782,6 +801,10 @@ export const NoteContent = React.memo(function NoteContent({
               family={POST_FONT_FAMILY}
               size={NOTE_CONTENT_FONT_SIZE}
               style={accentColor}
+              testID={`note-show-more-${noteKey}`}
+              accessibilityRole="button"
+              accessibilityLabel="Show more"
+              accessibilityState={{ expanded: false }}
               onPressIn={onInlineActionPressIn}
               onPressOut={onInlineActionPressOut}
               onPress={() => toggleExpanded(true)}>
@@ -793,6 +816,10 @@ export const NoteContent = React.memo(function NoteContent({
               family={POST_FONT_FAMILY}
               size={NOTE_CONTENT_FONT_SIZE}
               style={accentColor}
+              testID={`note-show-less-${noteKey}`}
+              accessibilityRole="button"
+              accessibilityLabel="Show less"
+              accessibilityState={{ expanded: true }}
               onPressIn={onInlineActionPressIn}
               onPressOut={onInlineActionPressOut}
               onPress={() => toggleExpanded(false)}>

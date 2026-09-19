@@ -88,6 +88,8 @@ export function AccelerateSection({ offer, accelerating, onAccelerate }: Acceler
         haptics
         accessibilityRole="button"
         accessibilityLabel={accelerating ? 'Accelerating transaction' : 'Accelerate transaction'}
+        accessibilityState={{ disabled: accelerating || busy, busy }}
+        testID="transaction-accelerate"
         disabled={accelerating || busy}
         onPress={() => void handlePress()}
         style={styles.row}>

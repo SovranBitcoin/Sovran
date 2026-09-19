@@ -446,16 +446,18 @@ function refreshInBackground(
 }
 
 /**
- * Subscribe a coco `Manager` so `mint:added` / `mint:updated` events write the
- * NUT-06 blob back into the identity group. Wire once per manager in `CocoProvider`.
+ * Subscribe a coco `Manager` so `mint:added` / `mint:updated` events revalidate
+ * the identity group. The event is only a trigger: the entry is refilled
+ * through this cache's own fetcher (`manager.mint.getMintInfo`, the same one
+ * `getCachedMintInfo` callers pass), never by copying the event payload.
+ * Wire once per manager in `CocoProvider`.
  */
 export function attachMintMetadataToManager(manager: Manager): () => void {
+  const fetcher = (mintUrl: string) => manager.mint.getMintInfo(mintUrl);
   const makeHandler =
     (_eventName: 'mint:added' | 'mint:updated') =>
-    ({ mint }: { mint: { mintUrl: string; mintInfo?: GetInfoResponse } }) => {
-      if (mint?.mintInfo && mint.mintUrl) {
-        useMintMetadataStore.getState().setIdentity(mint.mintUrl, mint.mintInfo);
-      }
+    ({ mint }: { mint: { mintUrl: string } }) => {
+      if (mint?.mintUrl) refreshInBackground(fetcher, mint.mintUrl);
     };
 
   const addedHandler = makeHandler('mint:added');
@@ -484,19 +486,87 @@ const LEGACY_KEYS = [
   'kym-mint-store',
 ] as const;
 
-interface LegacyEnvelope {
-  state?: { byMintUrl?: Record<string, unknown>; cache?: Record<string, unknown> };
-}
+// Legacy blobs are storage reads: every shape below is parsed, never cast.
+// Field-level `.catch(undefined)` keeps the rest of an entry when one field is
+// malformed; an entry that isn't an object at all is skipped.
+const LegacyRecord = z.record(z.string(), z.unknown()).optional().catch(undefined);
+
+const LegacyEnvelope = z.object({
+  state: z.object({ byMintUrl: LegacyRecord, cache: LegacyRecord }).optional().catch(undefined),
+});
+
+const legacyTimestamp = z.number().optional().catch(undefined);
+
+/**
+ * The NUT-06 fields the import projects. The full `GetInfoResponse` shape is
+ * owned by cashu-ts; like `apiClient`'s `MintInfoSpine`, only the fields read
+ * here are validated and the rest passes through verbatim.
+ */
+const LegacyMintInfo = z.looseObject({
+  name: z.string().optional().catch(undefined),
+  icon_url: z.string().optional().catch(undefined),
+  description: z.string().optional().catch(undefined),
+});
+
+/** Auditor fields `auditScalarsFrom` / `transformAuditData` read. */
+const LegacyAuditData = z.looseObject({
+  url: z.string(),
+  name: z.string(),
+  state: z.string(),
+  n_mints: z.number(),
+  n_melts: z.number(),
+  n_errors: z.number(),
+  swaps: z.array(z.looseObject({ state: z.string() })),
+});
+
+const LegacyInfoCacheEntry = z.object({
+  info: LegacyMintInfo.optional().catch(undefined),
+  fetchedAt: legacyTimestamp,
+});
+
+const LegacyAuditCacheEntry = z.object({
+  auditData: LegacyAuditData.optional().catch(undefined),
+  mintInfo: LegacyMintInfo.optional().catch(undefined),
+  timestamp: legacyTimestamp,
+});
+
+const LegacyProfileCacheEntry = z.object({
+  followers: z.number().optional().catch(undefined),
+  reputation: z.number().nullable().optional().catch(undefined),
+  timestamp: legacyTimestamp,
+});
+
+const LegacyKymCacheEntry = z.object({
+  score: z.number().nullable().optional().catch(undefined),
+  recommendations: z.array(z.unknown()).optional().catch(undefined),
+  timestamp: legacyTimestamp,
+});
 
 function parseEnvelope(raw: string | null): Record<string, unknown> {
   if (!raw) return {};
+  let json: unknown;
   try {
-    const parsed = JSON.parse(raw) as LegacyEnvelope;
-    return parsed.state?.byMintUrl ?? parsed.state?.cache ?? {};
+    json = JSON.parse(raw);
   } catch {
+    // Unreadable legacy blob: nothing to import from it.
     return {};
   }
+  const parsed = LegacyEnvelope.safeParse(json);
+  if (!parsed.success) return {};
+  return parsed.data.state?.byMintUrl ?? parsed.data.state?.cache ?? {};
 }
+
+/** Parse each legacy entry with `schema`, skipping entries that aren't objects. */
+function legacyEntries<T>(source: Record<string, unknown>, schema: z.ZodType<T>): [string, T][] {
+  return Object.entries(source).flatMap(([k, v]) => {
+    const parsed = schema.safeParse(v);
+    return parsed.success ? [[k, parsed.data] as [string, T]] : [];
+  });
+}
+
+// Spine-validated above; the full NUT-06 / auditor types are owned upstream.
+const asMintInfo = (info: z.infer<typeof LegacyMintInfo>) => info as GetInfoResponse;
+const asAuditData = (audit: z.infer<typeof LegacyAuditData>) => audit as LegacyMintAudit;
 
 export async function migrateLegacyMintCaches(): Promise<void> {
   if (useMintMetadataStore.getState().legacyMigrated) return;
@@ -524,35 +594,29 @@ export async function migrateLegacyMintCaches(): Promise<void> {
   const merged: Record<string, MintMetadataEntry> = {};
   const ensure = (k: string): MintMetadataEntry => (merged[k] ??= {});
 
-  for (const [k, v] of Object.entries(info)) {
-    const e = v as { info?: GetInfoResponse; fetchedAt?: number };
+  for (const [k, e] of legacyEntries(info, LegacyInfoCacheEntry)) {
     const entry = ensure(k);
-    if (e.info) Object.assign(entry, identityFromInfo(e.info));
+    if (e.info) Object.assign(entry, identityFromInfo(asMintInfo(e.info)));
     entry.identityAt = e.fetchedAt;
   }
-  for (const [k, v] of Object.entries(audit)) {
-    const e = v as {
-      auditData?: LegacyMintAudit;
-      mintInfo?: GetInfoResponse;
-      timestamp?: number;
-    };
+  for (const [k, e] of legacyEntries(audit, LegacyAuditCacheEntry)) {
     const entry = ensure(k);
-    if (e.auditData) Object.assign(entry, auditScalarsFrom(e.auditData));
-    if (e.mintInfo && entry.info === undefined) Object.assign(entry, identityFromInfo(e.mintInfo));
+    if (e.auditData) Object.assign(entry, auditScalarsFrom(asAuditData(e.auditData)));
+    if (e.mintInfo && entry.info === undefined) {
+      Object.assign(entry, identityFromInfo(asMintInfo(e.mintInfo)));
+    }
     entry.auditAt = e.timestamp;
   }
-  for (const [k, v] of Object.entries(profile)) {
-    const e = v as { followers?: number; reputation?: number | null; timestamp?: number };
+  for (const [k, e] of legacyEntries(profile, LegacyProfileCacheEntry)) {
     const entry = ensure(k);
     if (e.followers !== undefined) entry.contactFollowers = e.followers;
     if (e.reputation !== undefined) entry.contactReputation = e.reputation;
     entry.socialAt = e.timestamp;
   }
-  for (const [k, v] of Object.entries(kym)) {
-    const e = v as { score?: number | null; recommendations?: unknown[]; timestamp?: number };
+  for (const [k, e] of legacyEntries(kym, LegacyKymCacheEntry)) {
     const entry = ensure(k);
     entry.averageScore = e.score ?? null;
-    entry.reviewCount = Array.isArray(e.recommendations) ? e.recommendations.length : 0;
+    entry.reviewCount = e.recommendations?.length ?? 0;
     entry.reviewsAt = e.timestamp;
     // recommendations (raw review rows) are intentionally dropped.
   }

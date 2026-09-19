@@ -160,10 +160,18 @@ describe.each([true, false])('cashu token geometry (isOwn: %s)', (isOwn) => {
       return node.props.children === (isOwn ? 'Cancel' : 'Redeem');
     });
     expect(action).toBeDefined();
-    expect(
-      token.findAllByProps({ testID: isOwn ? 'cashu-bubble-cancel' : 'cashu-bubble-redeem' })[0]
-        .props.accessibilityLabel
-    ).toBe(isOwn ? 'Cancel' : 'Redeem');
+    // The pill is visual only: the bubble itself is the single control and
+    // names the action in its hint.
+    const pill = token.findAllByProps({
+      testID: isOwn ? 'cashu-bubble-cancel' : 'cashu-bubble-redeem',
+    })[0];
+    expect(pill.props.onPress).toBeUndefined();
+    const bubble = token.findAllByProps({
+      testID: isOwn ? 'cashu-bubble-own' : 'cashu-bubble-incoming',
+    })[0];
+    expect(bubble.props.accessibilityHint).toBe(
+      isOwn ? 'Opens the token to cancel it' : 'Opens the token to redeem it'
+    );
 
     await act(async () => renderer.unmount());
   });

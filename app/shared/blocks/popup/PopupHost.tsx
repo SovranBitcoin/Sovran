@@ -216,7 +216,7 @@ function SubmessageRenderer({
 
   if (Array.isArray(submessage)) {
     return (
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+      <View className="flex-row items-center justify-center">
         {(submessage as PopupTextSegment[]).map((segment, i) =>
           isAmountSegment(segment) ? (
             <AmountFormatter
@@ -436,7 +436,7 @@ function SheetContent({
 // run `button.onPress` twice and `close()` twice (or run the navigation twice
 // before close lands), which double-stacks the destination on the back stack.
 type SheetActionButtonProps = {
-  button: { text: string; page?: string; onPress?: () => void | Promise<void> };
+  button: { text: string; page?: string; onPress?: () => void | Promise<void>; testID?: string };
   variant: 'primary' | 'tertiary';
   feedbackVariant: 'scale' | undefined;
   /** In a row layout each button takes an equal share of the width. */
@@ -465,6 +465,7 @@ function SheetActionButton({
 
   return (
     <Button
+      testID={button.testID ?? (button.page ? `popup-sheet-action-${button.page}` : undefined)}
       variant={variant}
       className={className}
       feedbackVariant={feedbackVariant}
@@ -842,9 +843,7 @@ function SheetPopup() {
                 ? (event) => setPinnedFooterHeight(event.nativeEvent.layout.height)
                 : undefined
             }>
-            <View
-              className={customFooterConfig.layout === 'row' ? 'flex-row' : undefined}
-              style={{ gap: 10 }}>
+            <View className={customFooterConfig.layout === 'row' ? 'flex-row gap-2.5' : 'gap-2.5'}>
               {customFooterConfig.buttons.map((button, index) => {
                 const variant = button.variant ?? (index === 0 ? 'primary' : 'tertiary');
                 const buttonClassName = getSheetButtonClassName(variant);
@@ -886,6 +885,10 @@ function SheetPopup() {
         <NostrKeysContextBridge value={nostrKeysContextValue}>
           <BottomSheet.Overlay
             isCloseOnPress={standardPayload?.dismissable ?? true}
+            testID="popup-sheet-overlay"
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss"
+            accessibilityState={{ disabled: !(standardPayload?.dismissable ?? true) }}
             onPress={() => Keyboard.dismiss()}
             style={{ backgroundColor: `rgba(0,0,0,${alpha.strong})` }}
           />
@@ -998,7 +1001,7 @@ function SheetPopup() {
               customFooterConfig &&
               customFooterConfig.buttons.length > 0 && (
                 <View className={getStickyFooterClass(layoutConfig?.mode)}>
-                  <View style={{ gap: 10 }}>
+                  <View className="gap-2.5">
                     {customFooterConfig.buttons.map((button, index) => {
                       const variant = button.variant ?? (index === 0 ? 'primary' : 'tertiary');
 

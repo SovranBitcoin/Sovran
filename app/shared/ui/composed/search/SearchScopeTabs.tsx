@@ -32,7 +32,12 @@ export function SearchScopeTabs({ scopes, selected, onSelect }: SearchScopeTabsP
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.content}
       renderItem={({ item }) => (
-        <FeedTabButton label={item} active={item === selected} onPress={() => onSelect(item)} />
+        <FeedTabButton
+          label={item}
+          active={item === selected}
+          onPress={() => onSelect(item)}
+          testID={`search-scope-${item.toLowerCase()}`}
+        />
       )}
     />
   );

@@ -36,6 +36,9 @@ export const ActionSegmentsCard = memo(function ActionSegmentsCard({
   segments: ActionSegment[];
 }) {
   const foreground = useThemeColor('foreground');
+  // A row where any segment sets `active` is a mode switcher, so every
+  // segment reports its selected state; one-shot action rows report none.
+  const isSwitcher = segments.some((segment) => segment.active !== undefined);
   const tint = (segment: ActionSegment) =>
     segment.active ? foreground : withAlpha(foreground, segment.dimmed ? 0.25 : 0.5);
 
@@ -43,7 +46,7 @@ export const ActionSegmentsCard = memo(function ActionSegmentsCard({
     <GradientCard style={{ marginHorizontal: 16 }}>
       <HStack style={{ minHeight: 44 }}>
         {segments.map((segment, index) => (
-          <React.Fragment key={segment.label}>
+          <React.Fragment key={segment.testID ?? segment.label}>
             {index > 0 && (
               <View
                 style={{
@@ -55,6 +58,10 @@ export const ActionSegmentsCard = memo(function ActionSegmentsCard({
             )}
             <PressableFeedback
               testID={segment.testID}
+              accessibilityRole="button"
+              accessibilityLabel={segment.label}
+              // `dimmed` stays pressable by design, so it is not `disabled`.
+              accessibilityState={isSwitcher ? { selected: !!segment.active } : undefined}
               animation={false}
               onPress={segment.onPress}
               style={{ flex: 1 }}>

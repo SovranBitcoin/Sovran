@@ -3,20 +3,17 @@
  *
  * Identity-row primitives reused by the approval sheet, the connect sheet, and
  * the app-detail screen so the same app-identity slot renders identically
- * everywhere (one truncation format, one hostname parser, one segmented-copy
- * renderer). App-supplied strings reaching these are untrusted — bound them at
- * the catalog choke point before passing them in, and never log the value.
+ * everywhere (one hostname parser, one segmented-copy renderer). A pubkey
+ * shown in place of a name is always the full value in a one-line text with
+ * `ellipsizeMode="middle"` — never a sliced copy. App-supplied strings
+ * reaching these are untrusted — bound them at the catalog choke point before
+ * passing them in, and never log the value.
  */
 
 import React from 'react';
 
 import type { CopySegment } from '@/features/nostrSigner/components/permissionCatalog';
 import { Text } from '@/shared/ui/primitives/Text';
-
-/** First-8 … last-4 pubkey fallback for the app-identity subtitle. */
-export function shortPubkey(pubkey: string): string {
-  return `${pubkey.slice(0, 8)}…${pubkey.slice(-4)}`;
-}
 
 /** Renders catalog `CopySegment[]` runs, bolding `bold` segments (app names). */
 export function SegmentedText({

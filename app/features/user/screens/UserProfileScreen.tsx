@@ -192,6 +192,7 @@ interface ProfileInfoItem {
   prefix: React.ReactNode;
   title: string;
   suffixIcon: string;
+  accessibilityLabel: string;
   onPress: () => void;
 }
 
@@ -209,6 +210,7 @@ function buildProfileInfoItems(
       prefix: <CurrencyIcon colors={[iconColor]} width={20} currency="nostr" />,
       title: truncateMiddle(npub, 10),
       suffixIcon: 'lets-icons:copy',
+      accessibilityLabel: 'Copy npub',
       onPress: () => {
         void handleCopy(npub, 'npub');
       },
@@ -222,6 +224,7 @@ function buildProfileInfoItems(
       prefix: <Icon name="mdi:check-decagram" size={20} color={iconColor} />,
       title: nip05,
       suffixIcon: 'lets-icons:copy',
+      accessibilityLabel: `Copy Nostr address, ${nip05}`,
       onPress: () => {
         void handleCopy(nip05, 'nip05');
       },
@@ -235,6 +238,7 @@ function buildProfileInfoItems(
       prefix: <Icon name="mdi:lightning-bolt" size={20} color={iconColor} />,
       title: lud16,
       suffixIcon: 'lets-icons:copy',
+      accessibilityLabel: `Copy Lightning address, ${lud16}`,
       onPress: () => {
         void handleCopy(lud16, 'lud16');
       },
@@ -248,6 +252,7 @@ function buildProfileInfoItems(
       prefix: <Icon name="mdi:web" size={20} color={iconColor} />,
       title: website,
       suffixIcon: 'mdi:open-in-new',
+      accessibilityLabel: `Open website, ${website}`,
       onPress: () => {
         void handleOpenLink(website);
       },
@@ -461,6 +466,9 @@ function TopFollowers({
       key={follower.pubkey}
       style={[styles.topFollowerGridItem, { width: itemWidth }]}
       onPress={() => handleFollowerPress(follower)}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${getFollowerDisplayName(follower)} profile`}
+      testID={`profile-top-follower-${follower.pubkey}`}
       activeOpacity={0.7}>
       <Avatar
         state={getFollowerPicture(follower) ? 'image' : 'fallback'}
@@ -785,7 +793,12 @@ function BannerWithAvatar({
       <Animated.View
         style={[styles.avatarContainer, avatarSettled ? styles.settledReveal : avatarStyle]}>
         {hasStories && onAvatarPress ? (
-          <Pressable activeOpacity={0.8} onPress={onAvatarPress}>
+          <Pressable
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="View stories"
+            testID="profile-avatar-stories"
+            onPress={onAvatarPress}>
             {avatarContent}
           </Pressable>
         ) : (
@@ -836,7 +849,8 @@ function BannerWithAvatar({
                 systemIcon={isFollowing ? 'checkmark' : 'person.badge.plus'}
                 isActive={isFollowing}
                 filled={!isFollowing}
-                onPress={isFollowLoading ? () => {} : onToggleFollow}
+                onPress={onToggleFollow}
+                busy={isFollowLoading}
                 fitContent
                 height={34}
                 iconSize={15}
@@ -1322,6 +1336,7 @@ export function UserProfileScreen() {
                 <ScreenHeaderAction
                   icon="material-symbols:report-rounded"
                   accessibilityLabel="Block or report person"
+                  testID="profile-person-menu"
                   onPress={() => personMenu(pubkey)}
                 />
               )}
@@ -1330,6 +1345,7 @@ export function UserProfileScreen() {
                   icon="mingcute:bank-fill"
                   onPress={handleMintInfoPress}
                   testID="profile-mint-info"
+                  accessibilityLabel="Mint info"
                 />
               )}
               <ScreenHeaderAction
@@ -1431,7 +1447,13 @@ export function UserProfileScreen() {
                 <Section title="Profile Info">
                   <ListGroup variant="secondary">
                     {profileInfoItems.map((item) => (
-                      <PressableFeedback key={item.key} animation={false} onPress={item.onPress}>
+                      <PressableFeedback
+                        key={item.key}
+                        animation={false}
+                        accessibilityRole={item.key === 'website' ? 'link' : 'button'}
+                        accessibilityLabel={item.accessibilityLabel}
+                        testID={`profile-info-${item.key}`}
+                        onPress={item.onPress}>
                         <PressableFeedback.Scale>
                           <ListGroup.Item disabled>
                             <ListGroup.ItemPrefix>{item.prefix}</ListGroup.ItemPrefix>

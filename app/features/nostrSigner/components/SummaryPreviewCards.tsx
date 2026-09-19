@@ -20,7 +20,6 @@ import { Button as HerouiButton } from 'heroui-native';
 import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 
 import Icon from 'assets/icons';
-import { shortPubkey } from '@/features/nostrSigner/components/display';
 import { encryptedPayloadLabel } from '@/features/nostrSigner/components/permissionCatalog';
 import { useReferencedEventPreview } from '@/features/nostrSigner/hooks/useReferencedEventPreview';
 import { boundDisplay } from '@/features/nostrSigner/lib/boundedDisplay';
@@ -62,9 +61,10 @@ const SKELETON_NAME_STYLE = { width: 120, height: 14 } as const;
 const SKELETON_LINE_FULL_STYLE = { width: '100%', height: 12 } as const;
 const SKELETON_LINE_SHORT_STYLE = { width: '70%', height: 12 } as const;
 
-function boundedName(name: string | undefined, pubkey: string): string {
+/** The bounded display name, or `undefined` when the pubkey stands in for it. */
+function boundedName(name: string | undefined): string | undefined {
   const trimmed = name?.trim();
-  return trimmed ? boundDisplay(trimmed, NAME_MAX_CHARS) : shortPubkey(pubkey);
+  return trimmed ? boundDisplay(trimmed, NAME_MAX_CHARS) : undefined;
 }
 
 /** Avatar + resolved display name for a pubkey (kind-0 cache + NDK). */
@@ -88,7 +88,7 @@ function PeerIdentityRow({
   const person = useNostrPersonDisplay(
     nameOverride === undefined || pictureOverride === undefined ? pubkey : undefined
   );
-  const name = boundedName(nameOverride ?? person.name, pubkey);
+  const name = boundedName(nameOverride ?? person.name);
   const picture = pictureOverride ?? person.picture;
 
   return (
@@ -103,10 +103,16 @@ function PeerIdentityRow({
         picture={picture}
         seed={pubkey}
         size={size}
-        alt={name}
+        alt={name ?? pubkey}
       />
-      <Text size={14} bold color={foreground} numberOfLines={1} style={NAME_SHRINK_STYLE}>
-        {name}
+      <Text
+        size={14}
+        bold
+        color={foreground}
+        numberOfLines={1}
+        ellipsizeMode={name ? 'tail' : 'middle'}
+        style={NAME_SHRINK_STYLE}>
+        {name ?? pubkey}
       </Text>
     </HStack>
   );
@@ -146,7 +152,10 @@ export function ReferencedNoteCard({
     return (
       <View className="bg-surface rounded-2xl p-3">
         <Text size={13} color={muted}>
-          {`Couldn't load the referenced post · ${shortPubkey(eventId)}`}
+          {"Couldn't load the referenced post."}
+        </Text>
+        <Text size={12} color={muted} numberOfLines={1} ellipsizeMode="middle">
+          {eventId}
         </Text>
       </View>
     );
@@ -274,7 +283,7 @@ export function DecryptPeerCard({
 }) {
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
   const person = useNostrPersonDisplay(peerPubkey);
-  const name = boundedName(person.name, peerPubkey);
+  const name = boundedName(person.name);
   return (
     <View className="bg-surface rounded-2xl p-3">
       <HStack gap={10} style={CENTER_ROW_STYLE}>
@@ -283,11 +292,16 @@ export function DecryptPeerCard({
           picture={person.picture}
           seed={peerPubkey}
           size={36}
-          alt={name}
+          alt={name ?? peerPubkey}
         />
         <View style={PEER_NAME_BLOCK_STYLE}>
-          <Text size={15} bold color={foreground} numberOfLines={1}>
-            {name}
+          <Text
+            size={15}
+            bold
+            color={foreground}
+            numberOfLines={1}
+            ellipsizeMode={name ? 'tail' : 'middle'}>
+            {name ?? peerPubkey}
           </Text>
           {ciphertextLength !== undefined ? (
             <HStack gap={4} style={CENTER_ROW_STYLE}>
@@ -297,8 +311,8 @@ export function DecryptPeerCard({
               </Text>
             </HStack>
           ) : (
-            <Text size={12} color={muted} numberOfLines={1}>
-              {shortPubkey(peerPubkey)}
+            <Text size={12} color={muted} numberOfLines={1} ellipsizeMode="middle">
+              {peerPubkey}
             </Text>
           )}
         </View>
@@ -382,8 +396,10 @@ export function ExpandableEventJson({
     <VStack gap={8}>
       <Pressable
         haptics
+        testID="signer-event-json-toggle"
         accessibilityRole="button"
         accessibilityLabel={expanded ? hideLabel : showLabel}
+        accessibilityState={{ expanded }}
         onPress={toggle}>
         <HStack gap={4} style={CENTER_ROW_STYLE}>
           <Text size={13} bold color={muted}>
@@ -403,6 +419,7 @@ export function ExpandableEventJson({
             </Text>
           </GestureScrollView>
           <HerouiButton
+            testID="signer-event-json-copy"
             variant="ghost"
             size="sm"
             isIconOnly

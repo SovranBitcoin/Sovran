@@ -4,7 +4,6 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { ReceiveReusableQuoteTab } from '@/features/receive/components/ReceiveReusableQuoteTab';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { ReceiveRailListScreen } from '@/features/receive/screens/ReceiveRailListScreen';
-import { __resetGuardForTests } from '@/shared/hooks/useGuardedRouter';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const mockPush = jest.fn();
@@ -166,7 +165,6 @@ describe('receive rail presentation', () => {
     mockPaymentInfo.mockClear();
     mockQuote.mockClear();
     mockPush.mockClear();
-    __resetGuardForTests();
   });
   it('keeps the standing quote subscribed while its hidden QR is unmounted', () => {
     let renderer!: TestRenderer.ReactTestRenderer;

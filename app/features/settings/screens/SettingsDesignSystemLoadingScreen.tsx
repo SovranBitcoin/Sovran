@@ -136,6 +136,8 @@ export function SettingsDesignSystemLoadingScreen() {
                 <Button
                   variant={!auto && phase === 'idle' ? 'primary' : 'secondary'}
                   size="sm"
+                  testID="design-system-loading-phase-idle"
+                  accessibilityState={{ selected: !auto && phase === 'idle' }}
                   onPress={() => onLockPhase('idle')}>
                   <Button.Label>Idle</Button.Label>
                 </Button>
@@ -144,6 +146,8 @@ export function SettingsDesignSystemLoadingScreen() {
                 <Button
                   variant={!auto && phase === 'loading' ? 'primary' : 'secondary'}
                   size="sm"
+                  testID="design-system-loading-phase-loading"
+                  accessibilityState={{ selected: !auto && phase === 'loading' }}
                   onPress={() => onLockPhase('loading')}>
                   <Button.Label>Loading</Button.Label>
                 </Button>
@@ -159,12 +163,16 @@ export function SettingsDesignSystemLoadingScreen() {
                   !auto && phase === 'done' && result === 'success' ? 'primary' : 'secondary'
                 }
                 size="sm"
+                testID="design-system-loading-result-success"
+                accessibilityState={{ selected: !auto && phase === 'done' && result === 'success' }}
                 onPress={() => onLockResult('success')}>
                 <Button.Label>Success</Button.Label>
               </Button>
               <Button
                 variant={!auto && phase === 'done' && result === 'error' ? 'primary' : 'secondary'}
                 size="sm"
+                testID="design-system-loading-result-error"
+                accessibilityState={{ selected: !auto && phase === 'done' && result === 'error' }}
                 onPress={() => onLockResult('error')}>
                 <Button.Label>Error</Button.Label>
               </Button>
@@ -173,6 +181,10 @@ export function SettingsDesignSystemLoadingScreen() {
                   !auto && phase === 'done' && result === 'reverted' ? 'primary' : 'secondary'
                 }
                 size="sm"
+                testID="design-system-loading-result-reverted"
+                accessibilityState={{
+                  selected: !auto && phase === 'done' && result === 'reverted',
+                }}
                 onPress={() => onLockResult('reverted')}>
                 <Button.Label>Reverted</Button.Label>
               </Button>
@@ -181,6 +193,9 @@ export function SettingsDesignSystemLoadingScreen() {
             <Button
               variant={auto ? 'primary' : 'secondary'}
               size="sm"
+              testID="design-system-loading-auto"
+              accessibilityRole="switch"
+              accessibilityState={{ checked: auto }}
               onPress={() => setAuto((v) => !v)}>
               <Button.Label>{auto ? 'Stop auto-cycle' : 'Start auto-cycle'}</Button.Label>
             </Button>

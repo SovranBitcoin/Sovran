@@ -37,16 +37,3 @@ export function amountToNumber(value: AmountValue): number {
   }
   return amount;
 }
-
-export function toSafeSatAmount(value: AmountValue): number | null {
-  const amount = amountToNumber(value);
-  if (!Number.isFinite(amount) || amount < 0) {
-    cashuLog.warn('cashu.amount.safe_sat.rejected', {
-      amount,
-      finite: Number.isFinite(amount),
-      negative: amount < 0,
-    });
-    return null;
-  }
-  return Math.trunc(amount);
-}

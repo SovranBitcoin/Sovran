@@ -31,6 +31,7 @@ import {
 import { BASE_EDITOR_GRANT_KEYS } from '@/features/nostrSigner/components/editorGrantKeys';
 import { useNip46ConnectionsStore } from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import { useNip46RequestsStore } from '@/features/nostrSigner/data/nip46RequestsStore';
+import { useShallow } from 'zustand/react/shallow';
 import type { GrantKey } from '@/features/nostrSigner/lib/nip46Types';
 import {
   bundleForGrantKey,
@@ -110,16 +111,14 @@ export function SignerAppPermissionsScreen(): React.ReactElement {
   // suppresses these labels — evaluate() asks before session checks there,
   // so the persisted labels are the truthful ones.
   const strictModeOn = app?.mode === 'strict';
-  const sessionGrants = useNip46RequestsStore((s) => s.sessionGrants);
-  const sessionAllows = useNip46RequestsStore((s) => s.sessionAllows);
-  const appSessionGrants =
-    clientPubkey === undefined
-      ? []
-      : sessionGrants.filter((grant) => grant.clientPubkey === clientPubkey);
-  const appSessionAllows =
-    clientPubkey === undefined
-      ? []
-      : sessionAllows.filter((allow) => allow.clientPubkey === clientPubkey);
+  // Only this app's entries; useShallow keeps the filtered arrays stable
+  // until one of them actually changes.
+  const appSessionGrants = useNip46RequestsStore(
+    useShallow((s) => s.sessionGrants.filter((grant) => grant.clientPubkey === clientPubkey))
+  );
+  const appSessionAllows = useNip46RequestsStore(
+    useShallow((s) => s.sessionAllows.filter((allow) => allow.clientPubkey === clientPubkey))
+  );
 
   const sections: RowSection[] = buildRowSections(app, group);
 
@@ -156,6 +155,7 @@ export function SignerAppPermissionsScreen(): React.ReactElement {
                 <React.Fragment key={row.grantKey}>
                   {index > 0 ? <Separator className="mx-4" /> : null}
                   <PermissionSwitchRow
+                    testID={`signer-permission-${row.grantKey}`}
                     label={row.displayLabel}
                     {...(row.subtitle !== undefined && { subtitle: row.subtitle })}
                     state={triStateFor(app, row.grantKey)}

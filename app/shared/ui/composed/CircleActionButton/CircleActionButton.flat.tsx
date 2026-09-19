@@ -19,7 +19,10 @@ export function CircleActionButtonFlat(props: CircleActionButtonProps): React.Re
   const interactive = !disabled && !!(onPress || onPressIn || onPressOut);
   return (
     <CircleActionButtonShell {...props}>
+      {/* The shell is the accessible button (name, role, state, testID and
+          the screen-reader activate action); this surface only takes touches. */}
       <Pressable
+        accessible={false}
         onPress={interactive ? onPress : undefined}
         onPressIn={interactive ? onPressIn : undefined}
         onPressOut={interactive ? onPressOut : undefined}

@@ -7,8 +7,8 @@
  * pixel-aligned regardless of which variant renders.
  */
 
-import React from 'react';
-import { StyleSheet } from 'react-native';
+import React, { useCallback } from 'react';
+import { StyleSheet, type AccessibilityActionEvent } from 'react-native';
 import { withAlpha } from '@/shared/lib/color';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -39,6 +39,17 @@ export function CircleActionButtonShell({
   const [foreground] = useThemeColor(['foreground'] as const);
   const interactive = !disabled && !!(onPress || onPressIn || onPressOut);
   const a11yLabel = accessibilityLabel ?? label;
+  // The shell is the single accessible element, but the tap handler lives on
+  // the variant's inner surface (an RN Pressable, or a gesture-handler Tap
+  // that screen readers cannot reach). Route VoiceOver/TalkBack activation
+  // here so every variant is operable without a touch at the glyph.
+  const canActivate = interactive && !!onPress;
+  const handleAccessibilityAction = useCallback(
+    (event: AccessibilityActionEvent) => {
+      if (event.nativeEvent.actionName === 'activate') onPress?.();
+    },
+    [onPress]
+  );
 
   return (
     <View
@@ -49,6 +60,8 @@ export function CircleActionButtonShell({
       accessibilityLabel={a11yLabel}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: !interactive }}
+      accessibilityActions={canActivate ? ACTIVATE_ACTIONS : undefined}
+      onAccessibilityAction={canActivate ? handleAccessibilityAction : undefined}
       style={[
         styles.wrapper,
         label ? styles.labeledWrapper : null,
@@ -66,6 +79,8 @@ export function CircleActionButtonShell({
     </View>
   );
 }
+
+const ACTIVATE_ACTIONS = [{ name: 'activate' }] as const;
 
 const styles = StyleSheet.create({
   wrapper: {

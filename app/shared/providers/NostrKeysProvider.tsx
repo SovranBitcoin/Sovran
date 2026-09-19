@@ -166,9 +166,8 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
           cachedKeys.current.set(accountIndex, derivedKeys);
           return derivedKeys;
         } catch (err) {
-          const errorMessage = err instanceof Error ? err.message : 'Failed to derive Nostr keys';
           log.error('nostr.keys.derive_failed', { error: redactError(err) });
-          throw new Error(errorMessage);
+          throw err;
         } finally {
           inFlightKeys.current.delete(accountIndex);
         }
@@ -203,10 +202,8 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
           cachedCashuMnemonics.current.set(accountIndex, derivedCashuMnemonic);
           return derivedCashuMnemonic;
         } catch (err) {
-          const errorMessage =
-            err instanceof Error ? err.message : 'Failed to derive cashu mnemonic';
           log.error('nostr.keys.cashu_mnemonic_failed', { error: redactError(err) });
-          throw new Error(errorMessage);
+          throw err;
         } finally {
           inFlightCashu.current.delete(accountIndex);
         }
@@ -217,14 +214,16 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     [getMnemonicForDerivation]
   );
 
+  // `null` means no root mnemonic exists yet; a derivation failure rejects with
+  // the original error so callers (the profile orchestrator) can tell the two
+  // apart. `error` state only carries display text for KeyRecoveryScreen.
   const getKeysForAccount = useCallback(
     async (accountIndex: number): Promise<NostrKeys | null> => {
       try {
         return await deriveKeys(accountIndex);
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to get keys for account';
-        setError(errorMessage);
-        return null;
+        setError(err instanceof Error ? err.message : 'Failed to get keys for account');
+        throw err;
       }
     },
     [deriveKeys]
@@ -235,10 +234,8 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
       try {
         return await deriveCashuMnemonic(accountIndex);
       } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : 'Failed to get cashu mnemonic for account';
-        setError(errorMessage);
-        return null;
+        setError(err instanceof Error ? err.message : 'Failed to get cashu mnemonic for account');
+        throw err;
       }
     },
     [deriveCashuMnemonic]
@@ -470,10 +467,11 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         stage.complete();
         initLog('NostrKeys', 'stage complete');
       } catch (err) {
+        log.error('nostr.keys.init_failed', { error: redactError(err) });
+        // Display text for the init screen and KeyRecoveryScreen.
         const errorMessage = err instanceof Error ? err.message : 'Failed to initialize keys';
         setError(errorMessage);
         stage.error(errorMessage);
-        initLog('NostrKeys', `ERROR: ${err}`);
       } finally {
         setIsLoading(false);
       }

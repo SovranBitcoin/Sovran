@@ -54,7 +54,9 @@ export function CopyRequestRow({
       isDisabled={!onPress}
       onPress={onPress}
       testID={testID}
-      accessibilityLabel={accessibilityLabel}>
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled: !onPress, busy: loading }}>
       <PressableFeedback.Scale>
         <ListGroup.Item disabled>
           <ListGroup.ItemPrefix className="shrink-0">

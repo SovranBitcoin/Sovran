@@ -23,6 +23,7 @@ export function openRepostMenu({
       {
         text: reposted ? 'Undo repost' : 'Repost',
         icon: 'garden:arrow-retweet-fill-16',
+        testID: reposted ? 'repost-menu-undo' : 'repost-menu-repost',
         onPress: (close) => {
           close();
           onRepost();
@@ -33,6 +34,7 @@ export function openRepostMenu({
         icon: 'mdi:format-quote-close',
         disabled: !onQuote,
         reason: onQuote ? undefined : 'Coming soon',
+        testID: 'repost-menu-quote',
         onPress: (close) => {
           close();
           onQuote?.();

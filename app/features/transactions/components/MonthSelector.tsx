@@ -28,17 +28,20 @@ function MonthTab({ item, isSelected, onPress, showYear }: MonthTabProps) {
   }, [item.key, item.label, onPress]);
 
   return (
-    <Pressable onPress={handlePress}>
+    <Pressable
+      onPress={handlePress}
+      testID={`transactions-month-${item.key}`}
+      accessibilityRole="tab"
+      accessibilityLabel={item.fullLabel}
+      accessibilityState={{ selected: isSelected }}>
       <View
         className="mr-2 shrink-0 flex-row items-center justify-center rounded-2xl px-4 py-2"
         style={{ backgroundColor: isSelected ? surfaceSecondary : 'transparent' }}>
         <Text
           className="text-center"
-          style={{
-            color: isSelected ? foreground : withAlpha(foreground, 0.4),
-            fontFamily: 'OxygenBold',
-            fontSize: 15,
-          }}>
+          size={15}
+          bold
+          color={isSelected ? foreground : withAlpha(foreground, 0.4)}>
           {showYear ? item.fullLabel : item.label}
         </Text>
       </View>
@@ -94,7 +97,7 @@ export function MonthSelector({
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerClassName="pr-4">
-          <HStack align="center">
+          <HStack align="center" accessibilityRole="tablist">
             {months.map((item) => (
               <View key={item.key} onLayout={handleItemLayout(item.key)}>
                 <MonthTab

@@ -3,7 +3,9 @@
  *
  * A long-running action is modelled as a sequence of N legs, each flipping
  * pending → active → done | failed | skipped, with a terminal action state of
- * running → done | failed | cancelled. The unified Swap toast and the post
+ * running → done | failed | cancelled | unsettled. `unsettled` means the run
+ * stopped with an outcome that is not yet known (a payment still in flight):
+ * it is never reported as a failure. The unified Swap toast and the post
  * Delete toast both drive their progress through a store built from this
  * factory — the leg state machine lives here once, the domain-specific toast
  * surfaces (text vs. segmented ring) stay separate.
@@ -24,7 +26,7 @@ type LegLogger = {
 
 export type LegStatus = 'pending' | 'active' | 'done' | 'failed' | 'skipped';
 
-export type ProgressState = 'running' | 'done' | 'failed' | 'cancelled';
+export type ProgressState = 'running' | 'done' | 'failed' | 'cancelled' | 'unsettled';
 
 export interface ProgressLeg {
   id: string;
@@ -40,7 +42,7 @@ interface ActiveProgress<Meta> {
   startedAt: number;
   state: ProgressState;
   legs: ProgressLeg[];
-  /** Last failure text, set when state flips to 'failed'. */
+  /** Last failure text when state flips to 'failed', or the pending detail for 'unsettled'. */
   errorMessage?: string;
   /** Domain payload (swap: unit/totalAmount/groupId; delete: noteId). */
   meta: Meta;
@@ -56,6 +58,9 @@ interface LegProgressStore<Meta> {
   complete: () => void;
   fail: (errorMessage?: string) => void;
   cancel: (errorMessage?: string) => void;
+  /** End the run with an outcome that is still unknown (e.g. a melt that has
+   *  not settled); `detail` says what is still pending. */
+  settleUnknown: (detail?: string) => void;
   /** Clear without firing terminal logs — used when the toast auto-dismisses. */
   clear: () => void;
 }
@@ -137,6 +142,17 @@ export function createLegProgressStore<Meta extends object>(opts: {
         if (!cur) return;
         logSettled('cancel', cur);
         set({ active: { ...cur, state: 'cancelled', errorMessage } });
+      },
+      settleUnknown: (detail) => {
+        const cur = get().active;
+        if (!cur) return;
+        log.info(`${name}.status.unsettled`, {
+          id: cur.id,
+          durationMs: Date.now() - cur.startedAt,
+          doneLegs: cur.legs.filter((l) => l.status === 'done').length,
+          totalLegs: cur.legs.length,
+        });
+        set({ active: { ...cur, state: 'unsettled', errorMessage: detail } });
       },
       clear: () => {
         if (get().active) log.debug(`${name}.status.clear`);

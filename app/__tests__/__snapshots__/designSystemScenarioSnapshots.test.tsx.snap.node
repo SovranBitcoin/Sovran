@@ -31718,6 +31718,11 @@ exports[`Design System exact structural snapshots renders wallet-controls/action
                 },
               ],
               "props": {
+                "accessibilityLabel": "Send",
+                "accessibilityRole": "button",
+                "accessibilityState": {
+                  "selected": true,
+                },
                 "style": {
                   "flex": 1,
                 },
@@ -31809,6 +31814,11 @@ exports[`Design System exact structural snapshots renders wallet-controls/action
                 },
               ],
               "props": {
+                "accessibilityLabel": "Receive",
+                "accessibilityRole": "button",
+                "accessibilityState": {
+                  "selected": false,
+                },
                 "style": {
                   "flex": 1,
                 },
@@ -31900,6 +31910,11 @@ exports[`Design System exact structural snapshots renders wallet-controls/action
                 },
               ],
               "props": {
+                "accessibilityLabel": "Offline",
+                "accessibilityRole": "button",
+                "accessibilityState": {
+                  "selected": false,
+                },
                 "style": {
                   "flex": 1,
                 },
@@ -32382,7 +32397,7 @@ exports[`Design System exact structural snapshots renders wallet-controls/copyab
             "mint.sovran…/bitcoin",
           ],
           "props": {
-            "className": "css-text-146c3p1",
+            "className": "css-text-146c3p1 r-maxWidth-dnmrzs r-overflow-1udh08x r-textOverflow-1udbk01 r-whiteSpace-3s2u2q r-wordWrap-1iln25a",
             "dir": "auto",
             "style": {
               "color": "rgba(16,16,16,1.00)",
@@ -32438,6 +32453,7 @@ exports[`Design System exact structural snapshots renders wallet-controls/copyab
   "props": {
     "aria-label": "Copy mintUrl",
     "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+    "data-testid": "copy-value-mintUrl",
     "dir": null,
     "role": "button",
     "style": {
@@ -32507,6 +32523,7 @@ exports[`Design System exact structural snapshots renders wallet-controls/detail
       "props": {
         "aria-label": "Payment details",
         "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-paddingBlock-11f147o r-paddingInline-n7gxbd",
+        "data-testid": "details-section-toggle",
         "dir": null,
         "role": "button",
         "style": {
@@ -32583,6 +32600,7 @@ exports[`Design System exact structural snapshots renders wallet-controls/detail
       "props": {
         "aria-label": "Payment details",
         "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-paddingBlock-11f147o r-paddingInline-n7gxbd",
+        "data-testid": "details-section-toggle",
         "dir": null,
         "role": "button",
         "style": {
@@ -32902,14 +32920,19 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
           ],
           "props": {
             "aria-disabled": true,
+            "aria-label": "1",
             "className": "css-view-g5y9jx r-pointerEvents-12vffkv",
+            "data-testid": "keypad-key-1",
             "dir": null,
+            "disabled": true,
+            "role": "button",
             "style": {
               "opacity": 0.5,
             },
             "tabIndex": -1,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
         {
           "children": [
@@ -32935,14 +32958,19 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
           ],
           "props": {
             "aria-disabled": true,
+            "aria-label": "2",
             "className": "css-view-g5y9jx r-pointerEvents-12vffkv",
+            "data-testid": "keypad-key-2",
             "dir": null,
+            "disabled": true,
+            "role": "button",
             "style": {
               "opacity": 0.5,
             },
             "tabIndex": -1,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
         {
           "children": [
@@ -32968,14 +32996,19 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
           ],
           "props": {
             "aria-disabled": true,
+            "aria-label": "3",
             "className": "css-view-g5y9jx r-pointerEvents-12vffkv",
+            "data-testid": "keypad-key-3",
             "dir": null,
+            "disabled": true,
+            "role": "button",
             "style": {
               "opacity": 0.5,
             },
             "tabIndex": -1,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
       ],
       "props": {
@@ -33010,14 +33043,19 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
           ],
           "props": {
             "aria-disabled": true,
+            "aria-label": "4",
             "className": "css-view-g5y9jx r-pointerEvents-12vffkv",
+            "data-testid": "keypad-key-4",
             "dir": null,
+            "disabled": true,
+            "role": "button",
             "style": {
               "opacity": 0.5,
             },
             "tabIndex": -1,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
         {
           "children": [
@@ -33043,14 +33081,19 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
           ],
           "props": {
             "aria-disabled": true,
+            "aria-label": "5",
             "className": "css-view-g5y9jx r-pointerEvents-12vffkv",
+            "data-testid": "keypad-key-5",
             "dir": null,
+            "disabled": true,
+            "role": "button",
             "style": {
               "opacity": 0.5,
             },
             "tabIndex": -1,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
         {
           "children": [
@@ -33076,14 +33119,19 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
           ],
           "props": {
             "aria-disabled": true,
+            "aria-label": "6",
             "className": "css-view-g5y9jx r-pointerEvents-12vffkv",
+            "data-testid": "keypad-key-6",
             "dir": null,
+            "disabled": true,
+            "role": "button",
             "style": {
               "opacity": 0.5,
             },
             "tabIndex": -1,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
       ],
       "props": {
@@ -33118,14 +33166,19 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
           ],
           "props": {
             "aria-disabled": true,
+            "aria-label": "7",
             "className": "css-view-g5y9jx r-pointerEvents-12vffkv",
+            "data-testid": "keypad-key-7",
             "dir": null,
+            "disabled": true,
+            "role": "button",
             "style": {
               "opacity": 0.5,
             },
             "tabIndex": -1,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
         {
           "children": [
@@ -33151,14 +33204,19 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
           ],
           "props": {
             "aria-disabled": true,
+            "aria-label": "8",
             "className": "css-view-g5y9jx r-pointerEvents-12vffkv",
+            "data-testid": "keypad-key-8",
             "dir": null,
+            "disabled": true,
+            "role": "button",
             "style": {
               "opacity": 0.5,
             },
             "tabIndex": -1,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
         {
           "children": [
@@ -33184,14 +33242,19 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
           ],
           "props": {
             "aria-disabled": true,
+            "aria-label": "9",
             "className": "css-view-g5y9jx r-pointerEvents-12vffkv",
+            "data-testid": "keypad-key-9",
             "dir": null,
+            "disabled": true,
+            "role": "button",
             "style": {
               "opacity": 0.5,
             },
             "tabIndex": -1,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
       ],
       "props": {
@@ -33226,14 +33289,19 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
           ],
           "props": {
             "aria-disabled": true,
+            "aria-label": "Decimal point",
             "className": "css-view-g5y9jx r-pointerEvents-12vffkv",
+            "data-testid": "keypad-key-decimal",
             "dir": null,
+            "disabled": true,
+            "role": "button",
             "style": {
               "opacity": 0.5,
             },
             "tabIndex": -1,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
         {
           "children": [
@@ -33259,14 +33327,19 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
           ],
           "props": {
             "aria-disabled": true,
+            "aria-label": "0",
             "className": "css-view-g5y9jx r-pointerEvents-12vffkv",
+            "data-testid": "keypad-key-0",
             "dir": null,
+            "disabled": true,
+            "role": "button",
             "style": {
               "opacity": 0.5,
             },
             "tabIndex": -1,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
         {
           "children": [
@@ -33292,14 +33365,19 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
           ],
           "props": {
             "aria-disabled": true,
+            "aria-label": "Delete",
             "className": "css-view-g5y9jx r-pointerEvents-12vffkv",
+            "data-testid": "keypad-key-backspace",
             "dir": null,
+            "disabled": true,
+            "role": "button",
             "style": {
               "opacity": 0.5,
             },
             "tabIndex": -1,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
       ],
       "props": {
@@ -33348,14 +33426,18 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
             },
           ],
           "props": {
+            "aria-label": "1",
             "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+            "data-testid": "keypad-key-1",
             "dir": null,
+            "role": "button",
             "style": {
               "opacity": 1,
             },
             "tabIndex": 0,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
         {
           "children": [
@@ -33380,14 +33462,18 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
             },
           ],
           "props": {
+            "aria-label": "2",
             "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+            "data-testid": "keypad-key-2",
             "dir": null,
+            "role": "button",
             "style": {
               "opacity": 1,
             },
             "tabIndex": 0,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
         {
           "children": [
@@ -33412,14 +33498,18 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
             },
           ],
           "props": {
+            "aria-label": "3",
             "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+            "data-testid": "keypad-key-3",
             "dir": null,
+            "role": "button",
             "style": {
               "opacity": 1,
             },
             "tabIndex": 0,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
       ],
       "props": {
@@ -33453,14 +33543,18 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
             },
           ],
           "props": {
+            "aria-label": "4",
             "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+            "data-testid": "keypad-key-4",
             "dir": null,
+            "role": "button",
             "style": {
               "opacity": 1,
             },
             "tabIndex": 0,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
         {
           "children": [
@@ -33485,14 +33579,18 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
             },
           ],
           "props": {
+            "aria-label": "5",
             "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+            "data-testid": "keypad-key-5",
             "dir": null,
+            "role": "button",
             "style": {
               "opacity": 1,
             },
             "tabIndex": 0,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
         {
           "children": [
@@ -33517,14 +33615,18 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
             },
           ],
           "props": {
+            "aria-label": "6",
             "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+            "data-testid": "keypad-key-6",
             "dir": null,
+            "role": "button",
             "style": {
               "opacity": 1,
             },
             "tabIndex": 0,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
       ],
       "props": {
@@ -33558,14 +33660,18 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
             },
           ],
           "props": {
+            "aria-label": "7",
             "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+            "data-testid": "keypad-key-7",
             "dir": null,
+            "role": "button",
             "style": {
               "opacity": 1,
             },
             "tabIndex": 0,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
         {
           "children": [
@@ -33590,14 +33696,18 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
             },
           ],
           "props": {
+            "aria-label": "8",
             "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+            "data-testid": "keypad-key-8",
             "dir": null,
+            "role": "button",
             "style": {
               "opacity": 1,
             },
             "tabIndex": 0,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
         {
           "children": [
@@ -33622,14 +33732,18 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
             },
           ],
           "props": {
+            "aria-label": "9",
             "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+            "data-testid": "keypad-key-9",
             "dir": null,
+            "role": "button",
             "style": {
               "opacity": 1,
             },
             "tabIndex": 0,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
       ],
       "props": {
@@ -33641,32 +33755,10 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
     {
       "children": [
         {
-          "children": [
-            {
-              "children": null,
-              "props": {
-                "className": "css-text-146c3p1",
-                "dir": "auto",
-                "style": {
-                  "color": "rgba(16,16,16,1.00)",
-                  "fontFamily": "OxygenBold",
-                  "fontSize": "22px",
-                  "paddingBottom": "14px",
-                  "paddingLeft": "22px",
-                  "paddingRight": "22px",
-                  "paddingTop": "14px",
-                },
-              },
-              "type": "div",
-            },
-          ],
+          "children": null,
           "props": {
-            "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+            "className": "css-view-g5y9jx",
             "dir": null,
-            "style": {
-              "opacity": 1,
-            },
-            "tabIndex": 0,
           },
           "type": "div",
         },
@@ -33693,14 +33785,18 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
             },
           ],
           "props": {
+            "aria-label": "0",
             "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+            "data-testid": "keypad-key-0",
             "dir": null,
+            "role": "button",
             "style": {
               "opacity": 1,
             },
             "tabIndex": 0,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
         {
           "children": [
@@ -33725,14 +33821,18 @@ exports[`Design System exact structural snapshots renders wallet-controls/keypad
             },
           ],
           "props": {
+            "aria-label": "Delete",
             "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+            "data-testid": "keypad-key-backspace",
             "dir": null,
+            "role": "button",
             "style": {
               "opacity": 1,
             },
             "tabIndex": 0,
+            "type": "button",
           },
-          "type": "div",
+          "type": "button",
         },
       ],
       "props": {

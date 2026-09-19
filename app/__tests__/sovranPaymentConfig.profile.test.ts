@@ -294,7 +294,7 @@ describe('createSovranHandlers profile routing', () => {
         id: 'send-p2pk-e2e',
         type: 'send',
         mintUrl: 'https://mint.example',
-        token: { proofs: [] },
+        token: { mint: 'https://mint.example', proofs: [] },
       }),
       p2pkLockPubkey,
     });
@@ -456,7 +456,7 @@ describe('createSovranHandlers profile routing', () => {
       id: 'send-no-creq',
       type: 'send',
       mintUrl: 'https://mint.example',
-      token: { proofs: [] },
+      token: { mint: 'https://mint.example', proofs: [] },
     });
 
     await handlers.sendComplete?.({
@@ -499,7 +499,7 @@ describe('createSovranHandlers profile routing', () => {
       id: 'send-3',
       type: 'send',
       mintUrl: 'https://mint.example',
-      token: { proofs: [] },
+      token: { mint: 'https://mint.example', proofs: [] },
     });
 
     // Bearer drops take the local-proof shortcut when offline, but only after a
@@ -546,7 +546,7 @@ describe('createSovranHandlers profile routing', () => {
       id: 'send-4',
       type: 'send',
       mintUrl: 'https://mint.example',
-      token: { proofs: [] },
+      token: { mint: 'https://mint.example', proofs: [] },
     });
 
     // A locked token is delivered as a private Noise DM addressed to the

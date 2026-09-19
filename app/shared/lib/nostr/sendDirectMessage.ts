@@ -14,6 +14,9 @@
  * relay set leaves the caller's await hanging until TCP eventually fails. We
  * bound the publish with `withTimeout` so the caller always gets a definite
  * answer.
+ *
+ * The relay pool is injected through `createDirectMessageSender`, so tests can
+ * supply a fake; `sendDirectMessageToRelays` is the app's `SimplePool` wiring.
  */
 
 import { SimplePool } from 'nostr-tools/pool';
@@ -41,48 +44,66 @@ export const PAYMENT_RELAYS = [DEFAULT_PAYMENT_RELAY, ...FALLBACK_PAYMENT_RELAYS
 /** How long to wait for the first relay OK before failing the publish. */
 const DEFAULT_PUBLISH_TIMEOUT_MS = 15_000;
 
-export async function sendDirectMessageToRelays(params: {
+/** The slice of nostr-tools' `SimplePool` this publisher needs. */
+export type DirectMessageRelayPool = Pick<SimplePool, 'publish' | 'close'>;
+
+interface SendDirectMessageParams {
   senderPrivateKey: Uint8Array;
   nprofile: string;
   message: string;
   timeoutMs?: number;
-}): Promise<void> {
-  const decoded = nip19.decode(params.nprofile);
-  if (decoded.type !== 'nprofile') {
-    nostrLog.warn('nostr.sendDirectMessage.invalidNprofile', {
-      decodedType: decoded.type,
-      inputPreview: params.nprofile.slice(0, 30),
-    });
-    throw new Error('Invalid nprofile format');
-  }
-
-  const { pubkey, relays } = decoded.data;
-  nostrLog.info('nostr.sendDirectMessage.publish', {
-    pubkeyPreview: pubkey.slice(0, 12) + '…',
-    relayCount: relays?.length ?? 0,
-    usingDefaults: !relays?.length,
-  });
-  const relayUrls =
-    relays?.length && relays.length > 0
-      ? relays
-      : [DEFAULT_PAYMENT_RELAY, ...FALLBACK_PAYMENT_RELAYS];
-  const uniqueRelays = [...new Set(relayUrls)];
-
-  const { recipientWrap } = buildRecipientGiftWrap({
-    content: params.message,
-    senderPrivateKey: params.senderPrivateKey,
-    recipientPublicKey: pubkey,
-  });
-
-  const pool = new SimplePool();
-  try {
-    await withTimeout(
-      Promise.any(pool.publish(uniqueRelays, recipientWrap)),
-      params.timeoutMs ?? DEFAULT_PUBLISH_TIMEOUT_MS,
-      'sendDirectMessage publish'
-    );
-    nostrLog.info('nostr.sendDirectMessage.published');
-  } finally {
-    pool.close(uniqueRelays);
-  }
 }
+
+/**
+ * Build a DM publisher over an injected relay-pool factory. Each publish opens
+ * a pool, publishes, and closes the relays it used.
+ */
+export function createDirectMessageSender(deps: {
+  openPool: () => DirectMessageRelayPool;
+}): (params: SendDirectMessageParams) => Promise<void> {
+  return async function sendDirectMessage(params) {
+    const decoded = nip19.decode(params.nprofile);
+    if (decoded.type !== 'nprofile') {
+      nostrLog.warn('nostr.sendDirectMessage.invalidNprofile', {
+        decodedType: decoded.type,
+        inputPreview: params.nprofile.slice(0, 30),
+      });
+      throw new Error('Invalid nprofile format');
+    }
+
+    const { pubkey, relays } = decoded.data;
+    nostrLog.info('nostr.sendDirectMessage.publish', {
+      pubkeyPreview: pubkey.slice(0, 12) + '…',
+      relayCount: relays?.length ?? 0,
+      usingDefaults: !relays?.length,
+    });
+    const relayUrls =
+      relays?.length && relays.length > 0
+        ? relays
+        : [DEFAULT_PAYMENT_RELAY, ...FALLBACK_PAYMENT_RELAYS];
+    const uniqueRelays = [...new Set(relayUrls)];
+
+    const { recipientWrap } = buildRecipientGiftWrap({
+      content: params.message,
+      senderPrivateKey: params.senderPrivateKey,
+      recipientPublicKey: pubkey,
+    });
+
+    const pool = deps.openPool();
+    try {
+      await withTimeout(
+        Promise.any(pool.publish(uniqueRelays, recipientWrap)),
+        params.timeoutMs ?? DEFAULT_PUBLISH_TIMEOUT_MS,
+        'sendDirectMessage publish'
+      );
+      nostrLog.info('nostr.sendDirectMessage.published');
+    } finally {
+      pool.close(uniqueRelays);
+    }
+  };
+}
+
+/** App wiring: a short-lived nostr-tools `SimplePool` per publish. */
+export const sendDirectMessageToRelays = createDirectMessageSender({
+  openPool: () => new SimplePool(),
+});

@@ -11,8 +11,8 @@
 
 import { logger } from '../logger';
 import {
-  majorToMinor,
   minorToRawInput,
+  unitMinorDecimals,
   unitSymbol as symbolForUnit,
 } from '../formatting/units';
 import { resolveAmount, resolutionEqual } from './resolve';
@@ -27,6 +27,33 @@ import type {
 } from './types';
 
 const SATS_PER_BTC = 100_000_000;
+/** The display-currency keypad (fiat mode on the sat account) takes cents. */
+const FIAT_INPUT_DECIMALS = 2;
+
+const RAW_AMOUNT_INPUT = /^(\d*)(?:\.(\d*))?$/;
+
+/**
+ * Parse a keypad string into a non-negative major-denomination value with at
+ * most `maxDecimals` fraction digits. `''` is "no amount yet" (0); anything
+ * else that isn't plain digits with an optional decimal point — or that has
+ * too many fraction digits or exceeds the safe-integer range in minor units —
+ * returns `null` so callers reject it instead of rounding it into an amount.
+ */
+function parseRawAmountInput(
+  input: string,
+  maxDecimals: number,
+): number | null {
+  if (input === '') return 0;
+  const match = RAW_AMOUNT_INPUT.exec(input);
+  if (!match) return null;
+  const whole = match[1] ?? '';
+  const fraction = match[2] ?? '';
+  if (whole === '' && fraction === '') return null;
+  if (fraction.length > maxDecimals) return null;
+  const minor = Number(`${whole}${fraction.padEnd(maxDecimals, '0')}` || '0');
+  if (!Number.isSafeInteger(minor)) return null;
+  return minor / 10 ** maxDecimals;
+}
 
 /**
  * Convert a fiat number to the most natural raw input string.
@@ -231,10 +258,30 @@ export function createAmountActionManager(
     for (const fn of listeners) fn();
   }
 
+  /** Fraction digits the keypad may produce in the current mode. */
+  function inputDecimals(): number {
+    return inputMode === 'fiat'
+      ? FIAT_INPUT_DECIMALS
+      : unitMinorDecimals(getUnit());
+  }
+
+  /**
+   * Major-denomination value of a raw keypad string. Malformed input (more
+   * fraction digits than the mode allows, signs, exponents, stray text) is
+   * rejected and resolves to no amount rather than being coerced into one.
+   */
   function parseNumericValue(input: string): number {
-    if (!input) return 0;
-    const parsed = parseFloat(input);
-    return isNaN(parsed) ? 0 : parsed;
+    const parsed = parseRawAmountInput(input, inputDecimals());
+    if (parsed === null) {
+      logger.warn('amountActions.input.rejected', {
+        inputMode,
+        unit: getUnit(),
+        rawInputLength: input.length,
+        maxDecimals: inputDecimals(),
+      });
+      return 0;
+    }
+    return parsed;
   }
 
   /** The envelope max for the active unit, or null when uncapped. */
@@ -246,16 +293,21 @@ export function createAmountActionManager(
     return envelope.maxAmount > 0 ? envelope.maxAmount : null;
   }
 
-  /** Minor-unit value the given raw string resolves to in the current mode. */
+  /**
+   * Minor-unit value the given raw string resolves to in the current mode.
+   * Delegates to `resolveAmount` (without offline optimization) so the cap
+   * check uses the same fiat → sat conversion as the amount that is paid.
+   */
   function rawToMinor(input: string): number {
-    const numericValue = parseNumericValue(input);
-    if (numericValue <= 0) return 0;
-    if (inputMode === 'fiat') {
-      const btcPrice = getBtcPrice();
-      if (btcPrice <= 0) return 0;
-      return Math.round(numericValue * (SATS_PER_BTC / btcPrice));
-    }
-    return majorToMinor(numericValue, getUnit());
+    return resolveAmount({
+      inputMode,
+      rawInput: input,
+      numericValue: parseNumericValue(input),
+      unit: getUnit(),
+      proofAmounts: [],
+      btcPrice: getBtcPrice(),
+      offlineOptimization: false,
+    }).effectiveAmount.value;
   }
 
   /** Render a minor-unit cap as a raw-input string for the current mode. */

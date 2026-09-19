@@ -105,6 +105,15 @@ export function PollCard({ event }: { event: FeedEvent }) {
         return (
           <Pressable
             key={option.id}
+            testID={`poll-option-${poll.id}-${option.id}`}
+            accessibilityRole={isMulti ? 'checkbox' : 'radio'}
+            accessibilityLabel={
+              showResults ? `${option.label}, ${pct}%${mine ? ', your vote' : ''}` : option.label
+            }
+            accessibilityState={{
+              checked: showResults ? mine : isSelected,
+              disabled: showResults,
+            }}
             onPress={() => toggleSelect(option.id)}
             disabled={showResults}
             style={[styles.option, { borderColor: withAlpha(foreground, 0.12) }]}>
@@ -153,6 +162,10 @@ export function PollCard({ event }: { event: FeedEvent }) {
         </Text>
         {!showResults ? (
           <Pressable
+            testID={`poll-vote-${poll.id}`}
+            accessibilityRole="button"
+            accessibilityLabel="Vote"
+            accessibilityState={{ disabled: voting || selected.length === 0, busy: voting }}
             onPress={submitVote}
             disabled={voting || selected.length === 0}
             style={[

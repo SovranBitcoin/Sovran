@@ -8,11 +8,10 @@ import TestRenderer, { act } from 'react-test-renderer';
 import {
   E2EActionMenuProbe,
   E2EActionMenuRenderMarker,
+  E2EActionMenuTargetMarker,
   E2EHerouiMenuProbe,
-  e2eMenuStateId,
   markE2EActionMenuPresented,
   markE2EHerouiMenu,
-  useE2EActionMenuTargetStore,
 } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 
@@ -36,7 +35,6 @@ describe('DEV action-menu render probe', () => {
   afterEach(() => {
     act(() => usePopupStore.getState().close());
     act(() => markE2EHerouiMenu(null));
-    act(() => useE2EActionMenuTargetStore.setState({ targets: {} }));
     if (originalE2EStateMirror === undefined) {
       delete process.env.EXPO_PUBLIC_E2E_STATE_MIRROR;
     } else {
@@ -116,8 +114,7 @@ describe('DEV action-menu render probe', () => {
       markE2EHerouiMenu('Conversations & history');
     });
 
-    const stateId = e2eMenuStateId('e2e-heroui-menu-open', 'Conversations & history');
-    expect(stateId).toBe('e2e-heroui-menu-open:Conversations%20%26%20history');
+    const stateId = 'e2e-heroui-menu-open:Conversations%20%26%20history';
     const stateProbe = renderer!.root.findByProps({ testID: stateId });
     expect(stateProbe.props.accessibilityLabel).toBe('Heroui menu state');
     expect(stateProbe.props.accessibilityValue).toBeUndefined();
@@ -125,41 +122,52 @@ describe('DEV action-menu render probe', () => {
     act(() => renderer!.unmount());
   });
 
-  it('mirrors a measured iOS menu row under its stable action id only in e2e', () => {
+  it('mirrors a measured iOS menu row under its stable action id only in e2e', async () => {
     process.env.EXPO_PUBLIC_E2E_STATE_MIRROR = '1';
+    // The production row reports this window frame; the probe mirrors its centre.
+    // (Jest renders react-native through react-native-web, whose measureInWindow
+    // reads the host element's getBoundingClientRect.)
+    const createNodeMock = () => ({
+      nodeType: 1,
+      getBoundingClientRect: () => ({ left: 180, top: 700, width: 32.5, height: 27.75 }),
+    });
+    const tree = ({ rendered = false, row = false } = {}) => (
+      <>
+        {rendered ? <E2EActionMenuRenderMarker presentationKey="semantic-action" /> : null}
+        {row ? <E2EActionMenuTargetMarker actionId="send-token-cancel-transaction" /> : null}
+        <E2EActionMenuProbe />
+      </>
+    );
     let renderer: TestRenderer.ReactTestRenderer;
     act(() => {
-      renderer = TestRenderer.create(<E2EActionMenuProbe />);
+      renderer = TestRenderer.create(tree(), { createNodeMock });
       usePopupStore.getState().open({
         sheetId: 'action-menu',
         payload: { buttons: [] },
       });
     });
-    act(() => {
-      renderer!.update(
-        <>
-          <E2EActionMenuRenderMarker presentationKey="semantic-action" />
-          <E2EActionMenuProbe />
-        </>
-      );
-    });
-    const openSeq = usePopupStore.getState().openSeq;
-    act(() => markE2EActionMenuPresented(openSeq));
-    act(() =>
-      useE2EActionMenuTargetStore.getState().setTarget({
-        actionId: 'send-token-cancel-transaction',
-        openSeq,
-        registration: 1,
-        x: 196.25,
-        y: 713.875,
-      })
+    act(() => renderer!.update(tree({ rendered: true, row: true })));
+    act(() => markE2EActionMenuPresented(usePopupStore.getState().openSeq));
+    const [measuredRow] = renderer!.root.findAll(
+      (node) => typeof node.props?.onLayout === 'function' && node.props.collapsable === false
     );
+    await act(async () => {
+      measuredRow.props.onLayout();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
 
     const action = renderer!.root.findByProps({ testID: 'send-token-cancel-transaction' });
     expect(action.props.accessibilityRole).toBe('button');
     expect(action.props.accessibilityValue).toEqual({
       text: 'e2e-action-menu-target:196.250:713.875',
     });
+
+    // Unmounting the row withdraws its measured target; the menu probe stays.
+    act(() => renderer!.update(tree({ rendered: true })));
+    expect(renderer!.root.findAllByProps({ testID: 'send-token-cancel-transaction' })).toHaveLength(
+      0
+    );
+    expect(renderer!.root.findByProps({ testID: 'e2e-action-menu-open' })).toBeDefined();
 
     act(() => renderer!.unmount());
   });

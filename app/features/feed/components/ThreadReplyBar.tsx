@@ -380,9 +380,11 @@ export function ThreadReplyBar({
                 </View>
               ) : null}
               <Pressable
+                testID={`thread-reply-remove-media-${block.id}`}
                 onPress={() => handleRemoveMedia(block.id)}
                 hitSlop={8}
                 style={styles.thumbRemove}
+                accessibilityRole="button"
                 accessibilityLabel="Remove media">
                 <Icon name="mdi:close-circle" size={18} color={INVARIANT_WHITE} />
               </Pressable>
@@ -401,6 +403,8 @@ export function ThreadReplyBar({
         />
         <TextInput
           ref={inputRef}
+          testID="thread-reply-input"
+          accessibilityLabel="Post your reply"
           value={text}
           onChangeText={setText}
           onFocus={() => setFocused(true)}
@@ -411,11 +415,13 @@ export function ThreadReplyBar({
           style={[styles.input, { color: foreground, backgroundColor: fieldBg }]}
         />
         <Pressable
+          testID="thread-reply-expand"
           onPress={() => expandToFull(false)}
           disabled={!replyTarget}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel="Expand composer">
+          accessibilityLabel="Expand composer"
+          accessibilityState={{ disabled: !replyTarget }}>
           <Icon name="mdi:arrow-expand" size={20} color={muted} />
         </Pressable>
       </HStack>
@@ -424,6 +430,7 @@ export function ThreadReplyBar({
         <Animated.View entering={SECTION_FADE_IN} exiting={SECTION_FADE_OUT}>
           <HStack gap={20} align="center" style={{ marginTop: 10 }}>
             <Pressable
+              testID="thread-reply-add-media"
               onPress={handleAddMedia}
               hitSlop={8}
               accessibilityRole="button"
@@ -431,15 +438,23 @@ export function ThreadReplyBar({
               <Icon name="mdi:image-plus" size={24} color={accent} />
             </Pressable>
             <Pressable
+              testID="thread-reply-add-poll"
               onPress={() => expandToFull(true)}
               disabled={!replyTarget}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="Add poll">
+              accessibilityLabel="Add poll"
+              accessibilityState={{ disabled: !replyTarget }}>
               <Icon name="mdi:poll" size={24} color={accent} />
             </Pressable>
             <View style={{ flex: 1 }} />
-            <Button variant="primary" size="sm" isDisabled={!canPost} onPress={handlePost}>
+            <Button
+              testID="thread-reply-post"
+              variant="primary"
+              size="sm"
+              isDisabled={!canPost}
+              onPress={handlePost}
+              accessibilityState={{ disabled: !canPost, busy: posting }}>
               <Button.Label>{posting ? 'Posting…' : 'Reply'}</Button.Label>
             </Button>
           </HStack>
@@ -453,6 +468,7 @@ export function ThreadReplyBar({
   // keyboard. Rendered before the bar so the bar stays on top and tappable.
   const backdrop = focused ? (
     <Pressable
+      testID="thread-reply-dismiss-backdrop"
       style={StyleSheet.absoluteFill}
       onPress={dismissKeyboard}
       accessibilityRole="button"

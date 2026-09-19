@@ -36,46 +36,44 @@ function apply(result: StepResult, ctx: FlowContext): TransitionResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Seed a scanned fixed amount into the flow context. Scanned amounts are
+ * The flow-context amount for a scanned fixed amount. Scanned amounts are
  * ALWAYS sat-denominated (BIP-321 `amount=`, fixed bolt11/bolt12 decodes),
  * but `ctx.amount` must stay denominated in `ctx.unit` — every downstream
  * consumer (preview display, balance/capability gates, `executeMelt`'s
  * fiat→sat conversion) assumes that invariant. On a fiat-unit account the
  * sats are therefore re-denominated to the active unit ONCE here. Without a
- * live rate (or when the amount is below one minor unit) the amount is left
- * unseeded so the flow bounces to amount entry — never book sats into a
- * fiat context, which would double-convert at execution (BTC-02).
+ * live rate (or when the amount is below one minor unit) it returns
+ * `undefined` so the amount stays unseeded and the flow bounces to amount
+ * entry — never book sats into a fiat context, which would double-convert at
+ * execution (BTC-02).
  */
-function seedScannedSatAmount(
-  ctx: FlowContext,
+function scannedAmountInUnit(
+  unit: string,
   sats: number,
   source: string,
   getSatsPerUnitMinor?: (unit: string) => number | null,
-): void {
-  if (ctx.unit.toLowerCase() === "sat") {
-    ctx.amount = sats;
-    return;
-  }
-  const rate = getSatsPerUnitMinor?.(ctx.unit) ?? null;
+): number | undefined {
+  if (unit.toLowerCase() === "sat") return sats;
+  const rate = getSatsPerUnitMinor?.(unit) ?? null;
   if (rate == null || rate <= 0) {
     logger.warn("transitions.seedScannedAmount.noRate", {
       source,
-      unit: ctx.unit,
+      unit,
       sats,
     });
-    return;
+    return undefined;
   }
   const minor = Math.round(sats / rate);
   if (!Number.isSafeInteger(minor) || minor <= 0) {
     logger.warn("transitions.seedScannedAmount.belowMinorUnit", {
       source,
-      unit: ctx.unit,
+      unit,
       sats,
       rate,
     });
-    return;
+    return undefined;
   }
-  ctx.amount = minor;
+  return minor;
 }
 
 function handleExecute(
@@ -161,12 +159,13 @@ function handleExecute(
     case "meltLightningInvoice":
       ctx.meltTarget = intent.option.value;
       if (isValidSatAmount(intent.option.amount)) {
-        seedScannedSatAmount(
-          ctx,
+        const scannedAmount = scannedAmountInUnit(
+          ctx.unit,
           intent.option.amount,
           "meltLightningInvoice",
           getSatsPerUnitMinor,
         );
+        if (scannedAmount !== undefined) ctx.amount = scannedAmount;
       } else if (intent.option.amount != null) {
         logger.warn("transitions.execute.invalidAmount", {
           source: "meltLightningInvoice",
@@ -185,12 +184,13 @@ function handleExecute(
       // Null today (amountless / quote-first → user enters it). A decoded fixed
       // offer seeds it here, exactly like the fixed bolt11 invoice arm above.
       if (isValidSatAmount(intent.option.amount)) {
-        seedScannedSatAmount(
-          ctx,
+        const scannedAmount = scannedAmountInUnit(
+          ctx.unit,
           intent.option.amount,
           "meltBolt12Offer",
           getSatsPerUnitMinor,
         );
+        if (scannedAmount !== undefined) ctx.amount = scannedAmount;
       }
       break;
     case "meltOnchainAddress":
@@ -198,12 +198,13 @@ function handleExecute(
       ctx.meltQuoteMethod = "onchain";
       ctx.meltTarget = intent.option.value;
       if (isValidSatAmount(intent.option.amount)) {
-        seedScannedSatAmount(
-          ctx,
+        const scannedAmount = scannedAmountInUnit(
+          ctx.unit,
           intent.option.amount,
           "meltOnchainAddress",
           getSatsPerUnitMinor,
         );
+        if (scannedAmount !== undefined) ctx.amount = scannedAmount;
       }
       break;
   }
@@ -292,12 +293,13 @@ function handleOptionChosen(
     case "meltLightningInvoice":
       ctx.meltTarget = intent.option.value;
       if (isValidSatAmount(intent.option.amount)) {
-        seedScannedSatAmount(
-          ctx,
+        const scannedAmount = scannedAmountInUnit(
+          ctx.unit,
           intent.option.amount,
           "meltLightningInvoice",
           getSatsPerUnitMinor,
         );
+        if (scannedAmount !== undefined) ctx.amount = scannedAmount;
       } else if (intent.option.amount != null) {
         logger.warn("transitions.optionChosen.invalidAmount", {
           source: "meltLightningInvoice",
@@ -314,12 +316,13 @@ function handleOptionChosen(
       ctx.meltQuoteMethod = "bolt12";
       ctx.meltTarget = intent.option.value;
       if (isValidSatAmount(intent.option.amount)) {
-        seedScannedSatAmount(
-          ctx,
+        const scannedAmount = scannedAmountInUnit(
+          ctx.unit,
           intent.option.amount,
           "meltBolt12Offer",
           getSatsPerUnitMinor,
         );
+        if (scannedAmount !== undefined) ctx.amount = scannedAmount;
       }
       break;
     case "meltOnchainAddress":
@@ -327,12 +330,13 @@ function handleOptionChosen(
       ctx.meltQuoteMethod = "onchain";
       ctx.meltTarget = intent.option.value;
       if (isValidSatAmount(intent.option.amount)) {
-        seedScannedSatAmount(
-          ctx,
+        const scannedAmount = scannedAmountInUnit(
+          ctx.unit,
           intent.option.amount,
           "meltOnchainAddress",
           getSatsPerUnitMinor,
         );
+        if (scannedAmount !== undefined) ctx.amount = scannedAmount;
       }
       break;
   }

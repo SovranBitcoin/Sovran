@@ -114,6 +114,14 @@ function MerchantTextSection({ title, body }: { title: string; body: string }) {
   );
 }
 
+const CONTACT_METHOD_LABELS: Record<string, string> = {
+  phone: 'Call',
+  website: 'Open',
+  email: 'Email',
+  instagram: 'Instagram',
+  twitter: 'X',
+};
+
 export function MerchantDetailScreen() {
   useLifecycleLogger('MerchantDetailScreen');
   const navigation = useNavigation();
@@ -304,6 +312,9 @@ export function MerchantDetailScreen() {
                 <PressableFeedback
                   key={contact.method}
                   animation={false}
+                  accessibilityRole="link"
+                  accessibilityLabel={`${CONTACT_METHOD_LABELS[contact.method] ?? contact.method}, ${contact.info}`}
+                  testID={`merchant-contact-${contact.method}`}
                   onPress={() =>
                     handleContactPress(contact.method, contact.info, contact.fullInfo)
                   }>

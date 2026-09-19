@@ -77,6 +77,8 @@ interface CurrencySwapperPillProps {
   /** Override pill height. Defaults to 36 (smaller than the header pill
    *  so the amount-entry layout stays balanced). */
   height?: number;
+  /** Defaults to `amount-currency-swapper`. */
+  testID?: string;
 }
 
 export function CurrencySwapperPill({
@@ -84,6 +86,7 @@ export function CurrencySwapperPill({
   onPress,
   width,
   height = 36,
+  testID = 'amount-currency-swapper',
 }: CurrencySwapperPillProps) {
   const displayCurrency = useSettingsStore((s) => s.displayCurrency);
   const activeCurrency: SwapperCurrency = inputMode === 'unit' ? 'sat' : displayCurrency;
@@ -102,6 +105,7 @@ export function CurrencySwapperPill({
       ctaLabel={label}
       balance={0}
       onPress={onPress}
+      testID={testID}
       width={resolvedWidth}
       height={height}
       // Let BalanceDisplay span the full pill height so its inner

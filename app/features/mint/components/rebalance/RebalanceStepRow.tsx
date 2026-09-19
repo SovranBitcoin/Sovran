@@ -141,7 +141,6 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
       unit,
       status,
       errorMessageLength: errorMessage?.length ?? 0,
-      errorIsNoRoute: String(errorMessage ?? '').includes('no_route'),
       routeSuggestionStatus: routeSuggestion?.status ?? null,
       routePathCount: routeSuggestion?.path?.length ?? 0,
       routePathNameCount: routeSuggestion?.pathNames?.length ?? 0,
@@ -256,16 +255,15 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
             <VStack gap={8} className="pb-3">
               <TransferErrorBanner message={errorMessage} />
 
-              {String(errorMessage).includes('no_route') &&
-                routeSuggestion?.status === 'searching' && (
-                  <HStack align="center" gap={8} className="px-4">
-                    <LoadingIndicator size={14} phase="loading" color={primaryColor300} />
-                    <Text size={12} style={{ color: primaryColor300 }}>
-                      Finding a middleman…
-                    </Text>
-                  </HStack>
-                )}
-              {String(errorMessage).includes('no_route') && routeSuggestion?.status === 'none' && (
+              {routeSuggestion?.status === 'searching' && (
+                <HStack align="center" gap={8} className="px-4">
+                  <LoadingIndicator size={14} phase="loading" color={primaryColor300} />
+                  <Text size={12} style={{ color: primaryColor300 }}>
+                    Finding a middleman…
+                  </Text>
+                </HStack>
+              )}
+              {routeSuggestion?.status === 'none' && (
                 <Text size={12} className="px-4" style={{ color: primaryColor300 }}>
                   No middleman routes available right now.
                 </Text>
@@ -284,6 +282,13 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                       onRouteThrough();
                     }}
                     haptics
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      routeViaLabel
+                        ? `Retry through middleman via ${routeViaLabel}`
+                        : 'Retry through middleman'
+                    }
+                    testID={`rebalance-step-route-through-${id}`}
                     style={{
                       backgroundColor: primaryColor700,
                       paddingHorizontal: 12,
@@ -308,13 +313,14 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                   <RebalanceActionPill
                     icon="mdi:refresh"
                     label="Retry"
+                    testID={`rebalance-step-retry-${id}`}
                     onPress={() => {
                       paymentLog.info('mint.rebalance.step_row.press', {
                         action: 'retry',
                         status,
                         amount,
                         unit,
-                        errorIsNoRoute: String(errorMessage ?? '').includes('no_route'),
+                        routeSuggestionStatus: routeSuggestion?.status ?? null,
                       });
                       onRetry();
                     }}
@@ -324,6 +330,7 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                   <RebalanceActionPill
                     icon="mdi:skip-next"
                     label="Skip"
+                    testID={`rebalance-step-skip-${id}`}
                     onPress={() => {
                       paymentLog.info('mint.rebalance.step_row.press', {
                         action: 'skip',

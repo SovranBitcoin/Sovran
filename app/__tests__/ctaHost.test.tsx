@@ -5,7 +5,6 @@ import { err, ok } from 'neverthrow';
 import { CtaScreen } from '@/shared/blocks/CtaScreen';
 import { getLatestVersion } from '@/shared/lib/apiClient';
 import { CtaHost } from '@/shared/blocks/CtaHost';
-import { __resetGuardForTests } from '@/shared/hooks/useGuardedRouter';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { useSettingsHydration, useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -45,6 +44,14 @@ jest.mock('expo-router', () => ({
   useNavigation: () => mockScreenNavigation,
   useRootNavigationState: () => mockNavigation,
 }));
+jest.mock('@/shared/hooks/useGuardedRouter', () => {
+  // The double-tap cooldown is session state with its own suite
+  // (useGuardedRouter.test); these cases navigate back to the same routes, so
+  // here navigation passes straight through to the mocked expo-router.
+  const { router } = jest.requireMock('expo-router');
+  const guardedRouter = { ...router, raw: router };
+  return { guardedRouter, useGuardedRouter: () => guardedRouter };
+});
 jest.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.0' }));
 jest.mock('wallet/react', () => ({ useColadaBalance: () => ({ total: mockBalance }) }), {
   virtual: true,
@@ -92,7 +99,6 @@ function HostWithScreen({ id }: { id?: 'update-required' | 'backup-recovery-phra
   );
 }
 beforeEach(async () => {
-  __resetGuardForTests();
   jest.spyOn(BackHandler, 'addEventListener').mockReturnValue({ remove: jest.fn() });
   jest.clearAllMocks();
   jest.mocked(getLatestVersion).mockResolvedValue(err(new Error('offline')));

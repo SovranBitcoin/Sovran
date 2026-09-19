@@ -563,7 +563,12 @@ export function MintInfoScreen() {
         {mintUrl && (
           <Section title="Mint address">
             <ListGroup variant="secondary">
-              <PressableFeedback animation={false} onPress={handleMintUrlPress}>
+              <PressableFeedback
+                animation={false}
+                accessibilityRole="button"
+                accessibilityLabel={`Copy mint address, ${mintUrl}`}
+                testID="mint-info-url-copy"
+                onPress={handleMintUrlPress}>
                 <PressableFeedback.Scale>
                   <ListGroup.Item disabled>
                     <ListGroup.ItemPrefix>
@@ -611,8 +616,15 @@ export function MintInfoScreen() {
                     animation={false}
                     // Stable id for device tests: the row's visible label is a
                     // resolved display name (data-bearing, flaky to select on).
-                    testID={c.isNostr ? 'mint-info-contact-nostr' : undefined}
-                    accessibilityLabel={c.isNostr ? 'Open Nostr contact profile' : undefined}
+                    testID={
+                      c.isNostr
+                        ? 'mint-info-contact-nostr'
+                        : `mint-info-contact-${c.method.toLowerCase()}`
+                    }
+                    accessibilityRole={c.isNostr ? 'button' : 'link'}
+                    accessibilityLabel={
+                      c.isNostr ? 'Open Nostr contact profile' : `${c.method}, ${c.info}`
+                    }
                     onPress={() => handleContactPress(c.method, c.info, rowNostrPubkey)}>
                     <PressableFeedback.Scale>
                       <ListGroup.Item disabled>
@@ -658,7 +670,12 @@ export function MintInfoScreen() {
         {entry?.isTrusted === true && !entry?.fromAccepter && (
           <Section title="Settings">
             <ListGroup variant="secondary">
-              <PressableFeedback animation={false} onPress={() => router.navigate('/distribution')}>
+              <PressableFeedback
+                animation={false}
+                accessibilityRole="button"
+                accessibilityLabel="Balance split"
+                testID="mint-info-balance-split"
+                onPress={() => router.navigate('/distribution')}>
                 <PressableFeedback.Scale>
                   <ListGroup.Item disabled>
                     <ListGroup.ItemPrefix>

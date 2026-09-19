@@ -410,13 +410,21 @@ export const SettingsStorageScreen = () => {
               profile/account data and reports which currently exist.
             </Text>
             <View className="flex-row gap-2">
-              <Button variant="secondary" size="sm" onPress={() => loadSnapshot(true)}>
+              <Button
+                variant="secondary"
+                size="sm"
+                testID="settings-storage-refresh"
+                accessibilityState={{ busy: isRefreshing }}
+                onPress={() => loadSnapshot(true)}>
                 <Button.Label>Refresh</Button.Label>
               </Button>
               <Button
                 variant="secondary"
                 size="sm"
                 isDisabled={isSharing}
+                testID="settings-storage-share-dump"
+                accessibilityLabel="Share Full Dump"
+                accessibilityState={{ disabled: isSharing, busy: isSharing }}
                 onPress={handleShareDump}>
                 <Button.Label>{isSharing ? 'Exporting...' : 'Share Full Dump'}</Button.Label>
               </Button>
@@ -424,10 +432,17 @@ export const SettingsStorageScreen = () => {
                 variant="secondary"
                 size="sm"
                 isDisabled={isCopyingLogs}
+                testID="settings-storage-copy-debug-logs"
+                accessibilityLabel="Copy Debug Logs"
+                accessibilityState={{ disabled: isCopyingLogs, busy: isCopyingLogs }}
                 onPress={handleCopyDebugLogs}>
                 <Button.Label>{isCopyingLogs ? 'Copying...' : 'Copy Debug Logs'}</Button.Label>
               </Button>
-              <Button variant="secondary" size="sm" onPress={handleCopyCocoReport}>
+              <Button
+                variant="secondary"
+                size="sm"
+                testID="settings-storage-copy-coco-report"
+                onPress={handleCopyCocoReport}>
                 <Button.Label>Copy coco v2 Report</Button.Label>
               </Button>
             </View>
@@ -446,6 +461,8 @@ export const SettingsStorageScreen = () => {
                 On-Device Log File
               </Text>
               <HeroSwitch
+                testID="settings-storage-file-logging-toggle"
+                accessibilityLabel="On-device log file"
                 isSelected={fileLoggingEnabled}
                 onSelectedChange={handleToggleFileLogging}
               />
@@ -463,6 +480,12 @@ export const SettingsStorageScreen = () => {
                 variant="secondary"
                 size="sm"
                 isDisabled={isExportingLogs || !logFileInfo.exists}
+                testID="settings-storage-export-log-file"
+                accessibilityLabel="Export Log File"
+                accessibilityState={{
+                  disabled: isExportingLogs || !logFileInfo.exists,
+                  busy: isExportingLogs,
+                }}
                 onPress={handleExportLogFile}>
                 <Button.Label>{isExportingLogs ? 'Exporting...' : 'Export Log File'}</Button.Label>
               </Button>
@@ -470,6 +493,7 @@ export const SettingsStorageScreen = () => {
                 variant="secondary"
                 size="sm"
                 isDisabled={!logFileInfo.exists}
+                testID="settings-storage-clear-log-file"
                 onPress={handleClearLogFile}>
                 <Button.Label>Clear Log File</Button.Label>
               </Button>

@@ -19,13 +19,13 @@ import type { PollDraft } from '@/features/composer/config/types';
 const MIN_OPTIONS = 2;
 const MAX_OPTIONS = 5;
 
-const DURATIONS: { label: string; secs: number }[] = [
-  { label: 'No limit', secs: 0 },
-  { label: '1h', secs: 3600 },
-  { label: '6h', secs: 21600 },
-  { label: '1d', secs: 86400 },
-  { label: '3d', secs: 259200 },
-  { label: '1w', secs: 604800 },
+const DURATIONS: { label: string; spoken: string; secs: number }[] = [
+  { label: 'No limit', spoken: 'No time limit', secs: 0 },
+  { label: '1h', spoken: '1 hour', secs: 3600 },
+  { label: '6h', spoken: '6 hours', secs: 21600 },
+  { label: '1d', spoken: '1 day', secs: 86400 },
+  { label: '3d', spoken: '3 days', secs: 259200 },
+  { label: '1w', spoken: '1 week', secs: 604800 },
 ];
 
 let optionSeq = 0;
@@ -60,7 +60,11 @@ export function PollComposeForm() {
         <Text size={13} bold style={{ color: muted }}>
           POLL
         </Text>
-        <Pressable onPress={() => setPoll(undefined)} accessibilityLabel="Remove poll">
+        <Pressable
+          onPress={() => setPoll(undefined)}
+          testID="composer-poll-remove"
+          accessibilityRole="button"
+          accessibilityLabel="Remove poll">
           <Icon name="mdi:close" size={18} color={muted} />
         </Pressable>
       </View>
@@ -68,6 +72,8 @@ export function PollComposeForm() {
       {poll.options.map((option, index) => (
         <View key={option.id} style={styles.optionRow}>
           <TextInput
+            testID={`composer-poll-option-${option.id}`}
+            accessibilityLabel={`Option ${index + 1}`}
             value={option.label}
             onChangeText={(label) =>
               update({
@@ -84,6 +90,8 @@ export function PollComposeForm() {
               onPress={() =>
                 update({ ...poll, options: poll.options.filter((o) => o.id !== option.id) })
               }
+              testID={`composer-poll-option-remove-${option.id}`}
+              accessibilityRole="button"
               accessibilityLabel={`Remove option ${index + 1}`}>
               <Icon name="mdi:minus-circle-outline" size={20} color={muted} />
             </Pressable>
@@ -96,6 +104,9 @@ export function PollComposeForm() {
           onPress={() =>
             update({ ...poll, options: [...poll.options, { id: newOptionId(), label: '' }] })
           }
+          testID="composer-poll-option-add"
+          accessibilityRole="button"
+          accessibilityLabel="Add option"
           style={styles.addRow}>
           <Icon name="mdi:plus" size={18} color={accent} />
           <Text size={14} style={{ color: accent }}>
@@ -108,6 +119,7 @@ export function PollComposeForm() {
         {(['singlechoice', 'multiplechoice'] as const).map((type) => (
           <Chip
             key={type}
+            testID={`composer-poll-type-${type}`}
             label={type === 'singlechoice' ? 'Single choice' : 'Multiple choice'}
             active={poll.type === type}
             onPress={() => update({ ...poll, type })}
@@ -124,8 +136,10 @@ export function PollComposeForm() {
       <View style={styles.chipRow}>
         {DURATIONS.map((d) => (
           <Chip
-            key={d.label}
+            key={d.secs}
+            testID={`composer-poll-duration-${d.secs}`}
             label={d.label}
+            accessibilityLabel={`Duration: ${d.spoken}`}
             active={
               d.secs === 0 ? poll.endsAt === undefined : Math.abs(selectedDuration - d.secs) < 60
             }
@@ -146,14 +160,18 @@ export function PollComposeForm() {
 }
 
 function Chip({
+  testID,
   label,
+  accessibilityLabel,
   active,
   onPress,
   accent,
   foreground,
   muted,
 }: {
+  testID: string;
   label: string;
+  accessibilityLabel?: string;
   active: boolean;
   onPress: () => void;
   accent: string;
@@ -163,6 +181,10 @@ function Chip({
   return (
     <Pressable
       onPress={onPress}
+      testID={testID}
+      accessibilityRole="radio"
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityState={{ selected: active, checked: active }}
       style={[
         styles.chip,
         {

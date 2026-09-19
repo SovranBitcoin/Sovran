@@ -28,7 +28,7 @@ export interface CircleRowAction {
   menuText?: string;
   /** Secondary caption on the overflow menu row. Not shown on the circle. */
   description?: string;
-  testID?: string;
+  testID: string;
   disabled?: boolean;
   onPress: () => void;
 }
@@ -66,7 +66,7 @@ export function CircleActionRow({
     <HStack justify="space-around" style={style}>
       {direct.map((action) => (
         <CircleActionButton
-          key={action.testID ?? action.label}
+          key={action.testID}
           icon={action.icon}
           systemIcon={action.systemIcon}
           label={action.label}

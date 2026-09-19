@@ -3,21 +3,12 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Platform } from 'react-native';
+import { AppState } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
-import {
-  Host,
-  Button as SwiftUIButton,
-  HStack as SwiftUIHStack,
-  Image as SwiftUIImage,
-} from '@expo/ui/swift-ui';
-import { buttonStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
-
-import Icon from 'assets/icons';
 import { usePaymentFlowMachine } from 'wallet/react';
 import { useHandleCameraPermission } from '../../hooks/useHandleCameraPermission';
 import {
@@ -30,12 +21,11 @@ import {
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useWalletContextWithOverride } from '@/shared/providers/WalletContextProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useCapabilities } from '@/shared/ui/capability';
-import { Button } from '@/shared/ui/primitives/Button';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { popup } from '@/shared/lib/popup';
 
+import { CameraActionButtons } from './CameraActionButtons';
 import { CameraLayout } from './CameraLayout';
 import type { ScanningData } from './types';
 
@@ -72,43 +62,6 @@ interface CameraScreenProps {
    * Non-matching scans show the pairing error toast — never the payment flow.
    */
   signerPairOnly?: boolean;
-}
-
-const GLASS_BUTTON_SIZE = 52;
-
-/** SF Symbol names accepted by `@expo/ui`, without pinning its symbol-set version. */
-type SFSymbolName = NonNullable<React.ComponentProps<typeof SwiftUIImage>['systemName']>;
-
-/**
- * One circular Liquid Glass control in the camera overlay's action row. The
- * three iOS buttons differ only by SF Symbol and handler; the Host sizing,
- * glass modifiers, and centring stack must stay identical or the row's
- * spacing drifts.
- */
-function GlassCircleButton({
-  systemName,
-  onPress,
-}: {
-  systemName: SFSymbolName;
-  onPress: () => void;
-}) {
-  return (
-    <Host style={{ height: GLASS_BUTTON_SIZE, width: GLASS_BUTTON_SIZE }} matchContents={false}>
-      <SwiftUIButton
-        modifiers={[
-          buttonStyle('glass'),
-          frame({ height: GLASS_BUTTON_SIZE, width: GLASS_BUTTON_SIZE }),
-          glassEffect({ shape: 'circle', glass: { variant: 'regular', interactive: true } }),
-        ]}
-        onPress={onPress}>
-        <SwiftUIHStack
-          alignment="center"
-          modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' })]}>
-          <SwiftUIImage systemName={systemName} size={22} color="white" />
-        </SwiftUIHStack>
-      </SwiftUIButton>
-    </Host>
-  );
 }
 
 interface ScanOutcome {
@@ -170,7 +123,6 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
   const selectedMint = useMintStore((state) => state.selectedMint);
   const walletContext = useWalletContextWithOverride(selectedMint);
   const foreground = useThemeColor('foreground');
-  const { liquidGlass } = useCapabilities();
   const insets = useSafeAreaInsets();
   const [progress, setProgress] = useState(0);
   const [flashlightOn, setFlashlightOn] = useState<boolean | null>(null);
@@ -344,54 +296,17 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
     toggleFlashlight,
   };
 
-  const iosButtons = (
-    <>
-      <GlassCircleButton systemName="doc.on.clipboard" onPress={handleClipboardPress} />
-      {/* Gallery decodes inside the payment machine — no pre-machine hook
-          exists, so signer-pair mode hides it instead of half-supporting it. */}
-      {!signerPairOnly ? (
-        <GlassCircleButton systemName="photo" onPress={handleGalleryPress} />
-      ) : null}
-      <GlassCircleButton
-        systemName={flashlightOn ? 'flashlight.on.fill' : 'flashlight.off.fill'}
-        onPress={toggleFlashlight}
-      />
-    </>
-  );
-
-  const androidButtons = (
-    <>
-      <Button
-        onPress={handleClipboardPress}
-        icon={<Icon name="lets-icons:copy" color={foreground} />}
-        blur
-      />
-      {/* Same gallery rationale as iOS above. */}
-      {!signerPairOnly ? (
-        <Button
-          onPress={handleGalleryPress}
-          icon={<Icon name="proicons:photo" color={foreground} />}
-          blur
-        />
-      ) : null}
-      <Button
-        onPress={toggleFlashlight}
-        icon={
-          !flashlightOn ? (
-            <Icon name="mdi:lightbulb-on-outline" color={foreground} />
-          ) : (
-            <Icon name="mdi:lightbulb-on" color={foreground} />
-          )
-        }
-        blur
-      />
-    </>
-  );
-
   return (
     <Log name="CameraScreen">
       <CameraLayout {...shared}>
-        {Platform.OS === 'ios' && liquidGlass ? iosButtons : androidButtons}
+        {/* Gallery decodes inside the payment machine — no pre-machine hook
+            exists, so signer-pair mode hides it instead of half-supporting it. */}
+        <CameraActionButtons
+          onPaste={handleClipboardPress}
+          onGallery={signerPairOnly ? undefined : handleGalleryPress}
+          onToggleFlashlight={toggleFlashlight}
+          flashlightOn={flashlightOn}
+        />
       </CameraLayout>
     </Log>
   );

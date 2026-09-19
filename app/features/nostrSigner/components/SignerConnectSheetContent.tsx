@@ -41,7 +41,7 @@ import { Result } from 'neverthrow';
 import * as nip19 from 'nostr-tools/nip19';
 
 import Icon from 'assets/icons';
-import { SegmentedText, shortPubkey } from '@/features/nostrSigner/components/display';
+import { SegmentedText } from '@/features/nostrSigner/components/display';
 import { safeHostname } from '@/features/nostrSigner/lib/boundedDisplay';
 import {
   alwaysAllowEligible,
@@ -278,17 +278,20 @@ function ReviewSwitchRow({
   description,
   selected,
   onToggle,
+  testID,
 }: {
   label: string;
   description?: string;
   selected: boolean;
   onToggle: () => void;
+  testID: string;
 }) {
   const switchA11yState = { checked: selected };
   return (
     <PressableFeedback
       animation={false}
       onPress={onToggle}
+      testID={testID}
       accessibilityRole="switch"
       accessibilityState={switchA11yState}
       accessibilityLabel={label}>
@@ -504,6 +507,7 @@ function InvalidLinkBody({ close }: { close: () => void }): React.ReactElement {
         </View>
       </HStack>
       <Button
+        testID="signer-connect-invalid-cancel"
         text={CANCEL_BUTTON_LABEL}
         variant="underline"
         size="compact"
@@ -636,6 +640,7 @@ function ConnectReview({
 
   const presetAllChecked = presetRows.every((row) => checked[row.grantKey] === true);
   const presetA11yState = { checked: presetAllChecked };
+  const presetExpandA11yState = { expanded: presetExpanded };
   const togglePresetAll = () => {
     setChecked((current) => {
       const allOn = presetRows.every((row) => current[row.grantKey] === true);
@@ -753,8 +758,8 @@ function ConnectReview({
           <Text size={16} bold color={foreground} numberOfLines={1}>
             {appName}
           </Text>
-          <Text size={12} color={muted} numberOfLines={1}>
-            {appDomain ?? shortPubkey(parsed.clientPubkey)}
+          <Text size={12} color={muted} numberOfLines={1} ellipsizeMode="middle">
+            {appDomain ?? parsed.clientPubkey}
           </Text>
         </VStack>
       </HStack>
@@ -784,6 +789,7 @@ function ConnectReview({
             ) : null}
           </VStack>
           <HerouiButton
+            testID="signer-connect-change-profile"
             variant="secondary"
             size="sm"
             onPress={openProfilePicker}
@@ -823,6 +829,7 @@ function ConnectReview({
           </Text>
           <Pressable
             haptics
+            testID="signer-connect-review-toggle"
             accessibilityRole="button"
             accessibilityState={reviewToggleA11yState}
             accessibilityLabel={REVIEW_PERMISSIONS_LABEL}
@@ -847,6 +854,7 @@ function ConnectReview({
                   <React.Fragment key={bundle.id}>
                     {index > 0 ? <Separator className="mx-4" /> : null}
                     <ReviewSwitchRow
+                      testID={`signer-connect-review-bundle-${bundle.id}`}
                       label={bundle.label}
                       description={anyOn && !allOn ? MIXED_REVIEW_CAPTION : undefined}
                       selected={allOn}
@@ -861,6 +869,7 @@ function ConnectReview({
                     <Separator className="mx-4" />
                   ) : null}
                   <ReviewSwitchRow
+                    testID={`signer-connect-review-perm-${row.grantKey}`}
                     label={row.entry.permissionEditorLabel}
                     selected={checked[row.grantKey] === true}
                     onToggle={() => toggleRow(row)}
@@ -887,6 +896,7 @@ function ConnectReview({
             <Pressable
               key={row.grantKey}
               haptics
+              testID={`signer-connect-perm-${row.grantKey}`}
               disabled={!row.eligible}
               accessibilityRole="checkbox"
               accessibilityState={{
@@ -930,41 +940,51 @@ function ConnectReview({
       {/* Common social actions preset (bundle minus URI-covered keys) */}
       {presetRows.length > 0 ? (
         <VStack gap={10}>
-          <Pressable
-            haptics
-            accessibilityRole="checkbox"
-            accessibilityState={presetA11yState}
-            accessibilityLabel={PRESET_TITLE}
-            onPress={togglePresetAll}>
-            <HStack gap={10} align="center">
-              <SelectableCheck selected={presetAllChecked} style="square" />
-              <View style={FLEX_ONE_STYLE}>
-                <Text size={14} bold color={foreground}>
-                  {PRESET_TITLE}
-                </Text>
-                <Text size={12} color={muted}>
-                  {PRESET_DESCRIPTION}
-                </Text>
-              </View>
-              <Pressable
-                haptics
-                accessibilityRole="button"
-                accessibilityLabel={presetExpanded ? 'Collapse list' : 'Expand list'}
-                onPress={togglePresetExpanded}
-                style={EXPAND_PRESSABLE_STYLE}>
-                <Icon
-                  name={presetExpanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
-                  size={20}
-                  color={muted}
-                />
-              </Pressable>
-            </HStack>
-          </Pressable>
+          {/* Siblings, not nested: an accessible pressable hides its
+              children from screen readers, so the expander would be
+              unreachable inside the checkbox. */}
+          <View className="flex-row items-center gap-2.5">
+            <Pressable
+              haptics
+              testID="signer-connect-preset-all"
+              accessibilityRole="checkbox"
+              accessibilityState={presetA11yState}
+              accessibilityLabel={PRESET_TITLE}
+              onPress={togglePresetAll}
+              style={FLEX_ONE_STYLE}>
+              <HStack gap={10} align="center">
+                <SelectableCheck selected={presetAllChecked} style="square" />
+                <View style={FLEX_ONE_STYLE}>
+                  <Text size={14} bold color={foreground}>
+                    {PRESET_TITLE}
+                  </Text>
+                  <Text size={12} color={muted}>
+                    {PRESET_DESCRIPTION}
+                  </Text>
+                </View>
+              </HStack>
+            </Pressable>
+            <Pressable
+              haptics
+              testID="signer-connect-preset-expand"
+              accessibilityRole="button"
+              accessibilityLabel={presetExpanded ? 'Collapse list' : 'Expand list'}
+              accessibilityState={presetExpandA11yState}
+              onPress={togglePresetExpanded}
+              style={EXPAND_PRESSABLE_STYLE}>
+              <Icon
+                name={presetExpanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
+                size={20}
+                color={muted}
+              />
+            </Pressable>
+          </View>
           {presetExpanded
             ? presetRows.map((row) => (
                 <Pressable
                   key={row.grantKey}
                   haptics
+                  testID={`signer-connect-preset-perm-${row.grantKey}`}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: checked[row.grantKey] === true }}
                   accessibilityLabel={row.entry.permissionEditorLabel}
@@ -1085,6 +1105,7 @@ export function SignerProfilePickerContent({
             <Pressable
               key={profile.accountIndex}
               haptics
+              testID={`signer-profile-picker-${profile.pubkey}`}
               accessibilityRole="button"
               accessibilityState={{ selected: isSelected }}
               accessibilityLabel={displayName}
@@ -1126,7 +1147,11 @@ export function SignerProfilePickerContent({
               />
             </VStack>
           </View>
-          <HerouiButton variant="primary" className="bg-foreground" onPress={onSwitchAndConnect}>
+          <HerouiButton
+            testID="signer-profile-picker-switch-connect"
+            variant="primary"
+            className="bg-foreground"
+            onPress={onSwitchAndConnect}>
             <HerouiButton.Label className="text-background">
               {SWITCH_AND_CONNECT_LABEL}
             </HerouiButton.Label>

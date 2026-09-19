@@ -91,6 +91,7 @@ function CopyableEventId({ eventId }: { eventId: string }) {
   return (
     <Pressable
       haptics
+      testID={`signer-activity-copy-event-id-${eventId}`}
       onPress={copy}
       accessibilityRole="button"
       accessibilityLabel="Copy event ID"
@@ -229,6 +230,7 @@ export function SignerActivityDetailScreen(): React.ReactElement {
         {/* Protocol jargon, collapsed by default */}
         <Pressable
           haptics
+          testID="signer-activity-technical-details"
           accessibilityRole="button"
           accessibilityState={{ expanded: techExpanded }}
           accessibilityLabel={TECHNICAL_DETAILS_LABEL}

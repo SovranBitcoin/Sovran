@@ -67,7 +67,7 @@ it('keeps a like that is still publishing pressable, so it can be undone at once
   const view = render(
     <MetricsFooter metrics={metrics} borderColor="black" onLikePress={onLikePress} likePending />
   );
-  fireEvent.press(view.getByLabelText(/^Like,/));
+  fireEvent.press(view.getByLabelText(/^Like\./));
   expect(onLikePress).toHaveBeenCalledTimes(1);
 });
 

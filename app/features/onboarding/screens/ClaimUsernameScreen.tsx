@@ -228,6 +228,14 @@ function DomainOption({
     <Pressable
       activeOpacity={0.7}
       onPress={onSelect}
+      testID={`claim-username-domain-${domain.id}`}
+      accessibilityRole="radio"
+      accessibilityLabel={status ? `@${domain.label}, ${status.text}` : `@${domain.label}`}
+      accessibilityState={{
+        selected: isSelected,
+        checked: isSelected,
+        busy: availabilityResult?.loading ?? false,
+      }}
       style={[
         styles.domainOption,
         {

@@ -178,6 +178,7 @@ export function ShareSignerScreen(): React.ReactElement {
             {MINT_FAILED_MESSAGE}
           </Text>
           <HerouiButton
+            testID="share-signer-retry"
             variant="secondary"
             size="sm"
             onPress={() => regenerate(false)}
@@ -189,10 +190,15 @@ export function ShareSignerScreen(): React.ReactElement {
       ) : (
         <View className="px-5 pt-4">
           <HerouiButton
+            testID="share-signer-copy-link"
             variant="secondary"
             isDisabled={state.status !== 'ready'}
             onPress={() => void copyLink()}
-            accessibilityLabel={COPY_LINK_LABEL}>
+            accessibilityLabel={COPY_LINK_LABEL}
+            accessibilityState={{
+              disabled: state.status !== 'ready',
+              busy: state.status === 'loading',
+            }}>
             <Icon name="lets-icons:copy" size={16} color={muted} />
             <HerouiButton.Label style={{ color: muted }}>{COPY_LINK_LABEL}</HerouiButton.Label>
           </HerouiButton>
@@ -221,11 +227,16 @@ export function ShareSignerScreen(): React.ReactElement {
               {SECRET_BODY}
             </Text>
             <HerouiButton
+              testID="share-signer-rotate-secret"
               variant="secondary"
               size="sm"
               isDisabled={state.status === 'loading'}
               onPress={confirmRotate}
-              accessibilityLabel={ROTATE_SECRET_LABEL}>
+              accessibilityLabel={ROTATE_SECRET_LABEL}
+              accessibilityState={{
+                disabled: state.status === 'loading',
+                busy: state.status === 'loading',
+              }}>
               <Icon name="mdi:shield-refresh" size={16} color={foreground} />
               <HerouiButton.Label>{ROTATE_SECRET_LABEL}</HerouiButton.Label>
             </HerouiButton>

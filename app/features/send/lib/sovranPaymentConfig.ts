@@ -17,10 +17,12 @@ import { scanFromURLAsync } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
+import { parseHistoryEntryOnce, type ParsedHistoryEntry } from 'wallet/operations';
+import { z } from 'zod';
 import { runAfterInteractions } from '@/shared/lib/interactions';
 import { mintLocalId } from '@/shared/lib/id';
 
-import { getEncodedToken, getTokenMetadata } from '@cashu/cashu-ts';
+import { getEncodedToken, getTokenMetadata, type Token } from '@cashu/cashu-ts';
 import type {
   HistoryEntry,
   Manager,
@@ -744,19 +746,25 @@ export function createSovranNotifications(
       // so the history detail needs this annotation to present the send as a
       // payment-request payment instead of plain bearer ecash. Written before
       // the toast guard: the linkage must land even without an active toast.
-      if (data.variant === 'paymentRequest' && data.historyEntry) {
+      // `parseHistoryEntryOnce` schema-validates the entry (and logs a
+      // malformed one); fields beyond its schema are narrowed with typeof.
+      const confirmedEntry =
+        data.variant === 'paymentRequest' || data.variant === 'melt'
+          ? parseHistoryEntryOnce(data.historyEntry)
+          : null;
+      if (data.variant === 'paymentRequest' && confirmedEntry) {
         try {
-          const parsed = JSON.parse(data.historyEntry) as {
-            id?: string;
-            operationId?: string;
-            metadata?: Record<string, string>;
-          };
-          const transportType = parsed.metadata?.transportType;
-          const requestId = parsed.metadata?.paymentRequest
-            ? decodePaymentRequestInfo(parsed.metadata.paymentRequest)?.requestId
+          const metadata = confirmedEntry.metadata ?? {};
+          const transportType = metadata.transportType;
+          const paymentRequest =
+            typeof metadata.paymentRequest === 'string' ? metadata.paymentRequest : undefined;
+          const requestId = paymentRequest
+            ? decodePaymentRequestInfo(paymentRequest)?.requestId
             : undefined;
+          const operationId =
+            typeof confirmedEntry.operationId === 'string' ? confirmedEntry.operationId : undefined;
           setTransactionAnnotation(
-            annotationKey({ type: 'send', id: parsed.id, operationId: parsed.operationId }),
+            annotationKey({ type: 'send', id: confirmedEntry.id, operationId }),
             {
               paymentRequest: {
                 role: 'payer',
@@ -792,23 +800,14 @@ export function createSovranNotifications(
         });
         store.setDelivered(store.active.id);
       } else if (data.variant === 'melt' && data.historyEntry) {
-        try {
-          const parsed = JSON.parse(data.historyEntry);
-          if (parsed.state === 'PENDING') {
-            paymentLog.info('payment.confirmed.skipped', {
-              variant: data.variant,
-              reason: 'melt_history_pending',
-              activeId: store.active.id,
-              activeState: store.active.state,
-            });
-            return;
-          }
-        } catch (error) {
-          paymentLog.warn('payment.confirmed.history_parse_failed', {
+        if (confirmedEntry?.state === 'PENDING') {
+          paymentLog.info('payment.confirmed.skipped', {
             variant: data.variant,
-            historyEntryLength: data.historyEntry.length,
-            error: error instanceof Error ? error.message : String(error),
+            reason: 'melt_history_pending',
+            activeId: store.active.id,
+            activeState: store.active.state,
           });
+          return;
         }
         paymentLog.info('payment.confirmed.route', {
           variant: data.variant,
@@ -1079,13 +1078,13 @@ export function createSovranNotifications(
       if (store.active?.id === id) {
         store.setConfirmed(id);
       }
-      try {
-        const entry = JSON.parse(historyEntry);
-        if (entry.id) {
+      const entry = parseHistoryEntryOnce(historyEntry);
+      if (entry?.id) {
+        try {
           await captureAndStoreLocation(entry.id);
+        } catch {
+          // Non-critical — skip location capture
         }
-      } catch {
-        // Non-critical — skip location capture
       }
     },
 
@@ -1325,22 +1324,32 @@ interface CreateSovranHandlersConfig {
   deliverContactEcashDm?: (params: { recipientPubkey: string; token: string }) => Promise<void>;
 }
 
+/**
+ * The spine of the cashu-ts `Token` a send history entry carries. Only the
+ * fields that make it a token are checked here; the proofs pass through to
+ * `getEncodedToken`, which owns their shape.
+ */
+const SendEntryTokenSchema = z.looseObject({ mint: z.string(), proofs: z.array(z.unknown()) });
+
+function sendEntryToken(entry: ParsedHistoryEntry): Token | null {
+  const parsed = SendEntryTokenSchema.safeParse(entry.token);
+  return parsed.success ? (parsed.data as Token) : null;
+}
+
 function getEncodedEcashTokenFromSendHistoryEntry(historyEntry: string): string | null {
+  const parsed = parseHistoryEntryOnce(historyEntry);
+  if (!parsed) return null;
+  if (typeof parsed.tokenString === 'string' && parsed.tokenString.length > 0) {
+    return parsed.tokenString;
+  }
+  const rawToken = parsed.metadata?.rawToken;
+  if (typeof rawToken === 'string' && rawToken.length > 0) {
+    return rawToken;
+  }
+  const token = sendEntryToken(parsed);
+  if (!token) return null;
   try {
-    const parsed = JSON.parse(historyEntry) as {
-      token?: Parameters<typeof getEncodedToken>[0];
-      tokenString?: unknown;
-      metadata?: { rawToken?: unknown };
-    };
-    if (typeof parsed.tokenString === 'string' && parsed.tokenString.length > 0) {
-      return parsed.tokenString;
-    }
-    if (typeof parsed.metadata?.rawToken === 'string' && parsed.metadata.rawToken.length > 0) {
-      return parsed.metadata.rawToken;
-    }
-    if (parsed.token) {
-      return getEncodedToken(parsed.token);
-    }
+    return getEncodedToken(token);
   } catch (err) {
     paymentLog.warn('near_pay.token.extract_failed', {
       error: err instanceof Error ? err.message : String(err),
@@ -1393,15 +1402,15 @@ async function deliverNearPayIfActive(
 
     // Delivered over the BLE/bitchat mesh — stamp a bluetooth source badge on
     // the resulting send transaction.
-    try {
-      const entry = JSON.parse(historyEntry) as { id?: unknown };
-      if (typeof entry.id === 'string') {
+    const entry = parseHistoryEntryOnce(historyEntry);
+    if (entry?.id) {
+      try {
         setTransactionAnnotation(`id:${entry.id}`, { scan: { method: 'ble' } });
+      } catch (e) {
+        paymentLog.warn('near_pay.delivery.ble_source_annotation_failed', {
+          error: e instanceof Error ? e.message : String(e),
+        });
       }
-    } catch (e) {
-      paymentLog.warn('near_pay.delivery.ble_source_annotation_failed', {
-        error: e instanceof Error ? e.message : String(e),
-      });
     }
   } catch (err) {
     paymentLog.error('near_pay.delivery.failed', {
@@ -1500,8 +1509,10 @@ export function createSovranHandlers({
       const topUpState = useRoutstrTopUpStore.getState();
       if (topUpState.active) {
         try {
-          const entry = JSON.parse(historyEntry);
-          const encodedToken = getEncodedToken(entry.token);
+          const entry = parseHistoryEntryOnce(historyEntry);
+          const token = entry ? sendEntryToken(entry) : null;
+          if (!token) throw new Error('Send history entry carries no token');
+          const encodedToken = getEncodedToken(token);
           const result = await executeRoutstrTopUp(encodedToken);
 
           if (result.success) {
@@ -1542,8 +1553,8 @@ export function createSovranHandlers({
       // metadata injection above only survives this navigation).
       if (recipientPubkey) {
         try {
-          const entry = JSON.parse(enrichedHistoryEntry) as { id?: unknown };
-          if (typeof entry.id === 'string') {
+          const entry = parseHistoryEntryOnce(enrichedHistoryEntry);
+          if (entry?.id) {
             setTransactionAnnotation(`id:${entry.id}`, {
               counterparty: {
                 pubkey: recipientPubkey,
@@ -1565,8 +1576,8 @@ export function createSovranHandlers({
 
       if (createdOffline) {
         try {
-          const entry = JSON.parse(enrichedHistoryEntry) as { id?: unknown; mintUrl?: unknown };
-          if (typeof entry.id === 'string' && typeof entry.mintUrl === 'string') {
+          const entry = parseHistoryEntryOnce(enrichedHistoryEntry);
+          if (entry?.id && typeof entry.mintUrl === 'string') {
             useSendReachabilityStore.getState().markChecking(entry.id, entry.mintUrl);
             useSendReachabilityStore.getState().pruneOld();
           }
@@ -1722,15 +1733,11 @@ export function createSovranHandlers({
     },
 
     mintQuoteCreated: ({ historyEntry, unit }) => {
-      let pathname: '/(receive-flow)/lightningReceive' | '/(receive-flow)/onchainReceive' =
-        '/(receive-flow)/lightningReceive';
-      try {
-        pathname = getOnchainMintAddress(JSON.parse(historyEntry) as HistoryEntry)
-          ? '/(receive-flow)/onchainReceive'
-          : '/(receive-flow)/lightningReceive';
-      } catch {
-        pathname = '/(receive-flow)/lightningReceive';
-      }
+      // Schema-checked spine; `getOnchainMintAddress` re-checks every field it reads.
+      const entry = parseHistoryEntryOnce(historyEntry) as HistoryEntry | null;
+      const pathname = getOnchainMintAddress(entry)
+        ? '/(receive-flow)/onchainReceive'
+        : '/(receive-flow)/lightningReceive';
       router.replace({
         pathname,
         params: { mintHistoryEntry: historyEntry, unit },
@@ -1947,18 +1954,19 @@ function injectSendMetadata(
   historyEntry: string,
   values: { recipientPubkey?: string; p2pkLockPubkey?: string }
 ): string {
-  try {
-    const parsed = JSON.parse(historyEntry) as { metadata?: Record<string, unknown> };
-    parsed.metadata = {
-      ...(parsed.metadata ?? {}),
-      ...(values.recipientPubkey ? { recipientPubkey: values.recipientPubkey } : {}),
-      ...(values.p2pkLockPubkey ? { p2pkLockPubkey: values.p2pkLockPubkey } : {}),
-    };
-    return JSON.stringify(parsed);
-  } catch {
+  const parsed = parseHistoryEntryOnce(historyEntry);
+  if (!parsed) {
     paymentLog.warn('payment.send_metadata.inject_failed');
     return historyEntry;
   }
+  return JSON.stringify({
+    ...parsed,
+    metadata: {
+      ...(parsed.metadata ?? {}),
+      ...(values.recipientPubkey ? { recipientPubkey: values.recipientPubkey } : {}),
+      ...(values.p2pkLockPubkey ? { p2pkLockPubkey: values.p2pkLockPubkey } : {}),
+    },
+  });
 }
 
 function sendCtx(ctx: ScreenActionContext): Ctx<SendHistoryEntry> {

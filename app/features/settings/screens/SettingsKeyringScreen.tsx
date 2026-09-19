@@ -95,12 +95,16 @@ const CurrentKeyItem: React.FC<{
             tabs={['P2PK', 'NPUB']}
             selectedTab={selectedTab}
             handleTabPress={handleTabPress}
+            testIDFor={(tab) => `keyring-active-tab-${tab.toLowerCase()}`}
           />
         </View>
       )}
 
       <PressableFeedback
         onPress={handleShowQR}
+        accessibilityRole="button"
+        accessibilityLabel="Show QR code"
+        testID="keyring-active-qr"
         className="mb-4 self-center overflow-hidden rounded-xl">
         <PressableFeedback.Highlight />
         <View
@@ -144,11 +148,19 @@ const CurrentKeyItem: React.FC<{
       </View>
 
       <HStack gap={10} className="mt-3.5">
-        <Button variant="secondary" className="flex-1" onPress={handleCopy}>
+        <Button
+          variant="secondary"
+          className="flex-1"
+          testID="keyring-active-copy"
+          onPress={handleCopy}>
           <Icon name="lets-icons:copy" size={16} color={muted} />
           <Button.Label style={{ color: muted }}>Copy</Button.Label>
         </Button>
-        <Button variant="secondary" className="flex-1" onPress={handleShowQR}>
+        <Button
+          variant="secondary"
+          className="flex-1"
+          testID="keyring-active-show-qr"
+          onPress={handleShowQR}>
           <Icon name="stash:qr-code" size={16} color={muted} />
           <Button.Label style={{ color: muted }}>Show QR</Button.Label>
         </Button>
@@ -188,7 +200,9 @@ const KeyItem: React.FC<{
   };
 
   return (
-    <PressableFeedback onPress={() => onCopy(keypair.publicKeyHex)}>
+    // The whole-row tap is a shortcut for the Copy button inside it; the row
+    // stays out of the AX tree so VoiceOver and the harness reach both buttons.
+    <PressableFeedback onPress={() => onCopy(keypair.publicKeyHex)} accessible={false}>
       <PressableFeedback.Highlight />
       <View className="flex-row items-center gap-3 p-4">
         <View className="bg-default items-center justify-center rounded-lg p-2">
@@ -207,10 +221,22 @@ const KeyItem: React.FC<{
           </Text>
         </ListGroup.ItemContent>
         <HStack gap={4}>
-          <Button variant="ghost" size="sm" isIconOnly onPress={() => onCopy(keypair.publicKeyHex)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            isIconOnly
+            accessibilityLabel="Copy key"
+            testID={`keyring-key-copy-${keypair.publicKeyHex}`}
+            onPress={() => onCopy(keypair.publicKeyHex)}>
             <Icon name="lets-icons:copy" size={16} />
           </Button>
-          <Button variant="ghost" size="sm" isIconOnly onPress={handleShowQR}>
+          <Button
+            variant="ghost"
+            size="sm"
+            isIconOnly
+            accessibilityLabel="Show key QR code"
+            testID={`keyring-key-qr-${keypair.publicKeyHex}`}
+            onPress={handleShowQR}>
             <Icon name="stash:qr-code" size={16} />
           </Button>
         </HStack>
@@ -521,6 +547,7 @@ export const SettingsKeyringScreen: React.FC = () => {
         icon="mdi:key-plus"
         onPress={isGenerating ? undefined : handleGenerateKey}
         disabled={isKeyringActionPending && !isGenerating}
+        testID="keyring-generate"
         accessibilityLabel={isGenerating ? 'Generating P2PK key' : 'Generate P2PK key'}>
         {isGenerating ? (
           <LoadingIndicator size={22} phase="loading" color={foreground} />
@@ -556,6 +583,8 @@ export const SettingsKeyringScreen: React.FC = () => {
             </ListGroup.ItemContent>
             <ListGroup.ItemSuffix>
               <HeroSwitch
+                testID="keyring-regenerate-on-receive"
+                accessibilityLabel="Regenerate key on receive"
                 isSelected={regenerateP2PKOnReceive ?? true}
                 onSelectedChange={setRegenerateP2PKOnReceive}
               />
@@ -575,6 +604,11 @@ export const SettingsKeyringScreen: React.FC = () => {
                 size="sm"
                 isDisabled={!canImportCurrentNsec || isImportingCurrentNsec}
                 onPress={handleImportCurrentNsec}
+                accessibilityLabel="Add current Nostr key"
+                accessibilityState={{
+                  disabled: !canImportCurrentNsec || isImportingCurrentNsec,
+                  busy: isImportingCurrentNsec,
+                }}
                 testID="keyring-import-current-nsec">
                 {isImportingCurrentNsec ? (
                   <LoadingIndicator size={16} phase="loading" color={foreground} />

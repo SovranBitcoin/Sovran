@@ -130,12 +130,20 @@ export function SettingsDesignSystemSkeletonCrossfadeScreen() {
             <Text size={11} bold className="text-foreground/50 tracking-widest">
               STATE: {loading ? 'LOADING' : 'LOADED'}
             </Text>
-            <Button variant="secondary" size="sm" onPress={toggle}>
+            <Button
+              variant="secondary"
+              size="sm"
+              testID="design-system-skeleton-crossfade-toggle"
+              onPress={toggle}>
               <Button.Label>{loading ? 'Show content' : 'Show skeleton'}</Button.Label>
             </Button>
             <Button
               variant={auto ? 'primary' : 'secondary'}
               size="sm"
+              testID="design-system-skeleton-crossfade-auto"
+              accessibilityRole="switch"
+              accessibilityLabel="Auto-cycle"
+              accessibilityState={{ checked: auto }}
               onPress={() => setAuto((v) => !v)}>
               <Button.Label>{auto ? 'Stop auto-cycle' : 'Start auto-cycle'}</Button.Label>
             </Button>

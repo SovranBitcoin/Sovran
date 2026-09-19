@@ -17,7 +17,6 @@ import { ListGroup, PressableFeedback, Switch as HeroSwitch } from 'heroui-nativ
 import { z } from 'zod';
 
 import Icon from 'assets/icons';
-import { shortPubkey } from '@/features/nostrSigner/components/display';
 import { useNip46ConnectionsStore } from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import { useNip46RequestsStore } from '@/features/nostrSigner/data/nip46RequestsStore';
 import { useNostrPersonDisplay } from '@/shared/hooks/useNostrPersonDisplay';
@@ -105,7 +104,7 @@ export function SignerAppPersonScreen(): React.ReactElement {
     );
   }
 
-  const name = person.name ?? shortPubkey(peer);
+  const name = person.name ?? peer;
 
   return (
     <Screen name="SignerAppPersonScreen">
@@ -120,11 +119,16 @@ export function SignerAppPersonScreen(): React.ReactElement {
             alt={name}
           />
           <VStack gap={2} style={{ flex: 1 }}>
-            <Text size={18} bold color={foreground} numberOfLines={1}>
+            <Text
+              size={18}
+              bold
+              color={foreground}
+              numberOfLines={1}
+              ellipsizeMode={person.name ? 'tail' : 'middle'}>
               {name}
             </Text>
-            <Text size={12} color={muted} numberOfLines={1}>
-              {shortPubkey(peer)}
+            <Text size={12} color={muted} numberOfLines={1} ellipsizeMode="middle">
+              {peer}
             </Text>
           </VStack>
         </HStack>
@@ -143,7 +147,12 @@ export function SignerAppPersonScreen(): React.ReactElement {
                 {!hasPersistentGrant && hasSessionAccess ? (
                   <Icon name="mdi:clock-outline" size={18} color={muted} />
                 ) : null}
-                <HeroSwitch isSelected={hasPersistentGrant} onSelectedChange={onToggleAllow} />
+                <HeroSwitch
+                  testID={`signer-app-person-allow-${peer}`}
+                  accessibilityLabel={ALLOW_TITLE}
+                  isSelected={hasPersistentGrant}
+                  onSelectedChange={onToggleAllow}
+                />
               </HStack>
             </ListGroup.ItemSuffix>
           </ListGroup.Item>
@@ -152,7 +161,12 @@ export function SignerAppPersonScreen(): React.ReactElement {
         {/* Danger zone */}
         <Section title="Danger Zone" isDanger>
           <ListGroup variant="secondary">
-            <PressableFeedback animation={false} onPress={revokeAll}>
+            <PressableFeedback
+              animation={false}
+              testID={`signer-app-person-revoke-${peer}`}
+              accessibilityRole="button"
+              accessibilityLabel={REVOKE_TITLE}
+              onPress={revokeAll}>
               <PressableFeedback.Scale>
                 <ListGroup.Item disabled>
                   <ListGroup.ItemContent>
