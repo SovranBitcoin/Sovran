@@ -28,7 +28,14 @@ export default defineConfig({
     "./.agents/skills/react-native-testing",
   ],
   agentsMd: true,
-  docs: ["docs/review/contributor-conventions.md"],
+  docs: [
+    "docs/review/contributor-conventions.md",
+    "docs/review/conventions-zod.md",
+    "docs/review/conventions-react-native.md",
+    "docs/review/conventions-state.md",
+    "docs/review/conventions-typescript.md",
+    "docs/review/conventions-async-tests.md",
+  ],
   failOnError: false,
   task: "pr",
   // Experimental attribution remains off until independently labeled evaluation supports it.
@@ -94,6 +101,13 @@ export default defineConfig({
     // The shared Pressable wraps onPress in a single-flight guard; userEvent's
     // timing against it is unverified, so fireEvent is not a finding yet.
     "skill/react-native-testing/prefer-userevent-over-fireevent": "off",
+    // Its `**/app/**` glob matches this workspace's `app/` package, not just
+    // the `app/app/` route tree, so it flags every shared module; routes/thin
+    // already keeps non-route code out of the route tree.
+    "skill/expo-router/no-colocation-in-app-dir": "off",
+    // Fires on `react-test-renderer` tree walking (`root.findAll`, `findByProps`),
+    // which 83 test files use by design and which is not RNTL's `UNSAFE_*`.
+    "skill/react-native-testing/no-unsafe-apis": "off",
     // No branded types exist yet; a naming convention for them is premature.
     "skill/typescript-best-practices/brand-shape-convention": "off",
     "skill/typescript-best-practices/type-guard-naming": "off",

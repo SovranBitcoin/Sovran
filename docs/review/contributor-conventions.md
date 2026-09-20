@@ -622,7 +622,7 @@ morph animations or place multi-row controls in a navigation title.
 
 ## units/registry
 
-Scope: `repository-wide`
+Scope: `app/features/**/*.{ts,tsx}`, `app/shared/**/*.{ts,tsx}`, `app/app/**/*.{ts,tsx}`, `wallet/src/**/*.ts`, `nostr/src/**/*.ts`
 
 Which units the wallet offers, and each unit's label, name, symbol and decimals, are declared once in the unit registry (`wallet/src/units/registry.ts`, importable as `wallet/units`); everything else derives from it.
 
@@ -656,7 +656,7 @@ Scope: `repository-wide`
 
 Zod 4 does not catch a throw inside a refinement or transform: it escapes `safeParse`, `parseWith` and the persist merge.
 
-Does `hunk` contain a `throw` inside a `.refine`, `.superRefine`, `.check`, `.transform` or `z.preprocess` callback, or call something there that visibly throws on bad input (`JSON.parse`, `new URL`, `BigInt(…)`, a decoder) without catching it and reporting an issue instead?
+Does `hunk` contain a `throw` inside a `.refine`, `.superRefine`, `.check`, `.transform` or `z.preprocess` callback, or call something there that visibly throws on bad input (`JSON.parse`, `new URL`, `BigInt(…)`, a decoder) without catching it and reporting an issue instead This includes a callback that seems protected by an earlier check on the same schema (`z.url().refine((v) => new URL(v)…)`): Zod 4 still runs refinements after a failed non-aborting check, so the callback sees the invalid input?
 
 Allowed cases: The callback returns `false`, adds an issue through `ctx`, or returns `z.NEVER`; the throwing call is wrapped in a try/catch that reports an issue.
 
@@ -666,7 +666,7 @@ Scope: `repository-wide`
 
 Zod 3 parameters and shapes that Zod 4 silently ignores or changes are bugs, not style.
 
-Does `hunk` pass `required_error`, `invalid_type_error` or `errorMap` to a zod schema (Zod 4 silently ignores them; use `error`), spread a `z.looseObject` or `z.strictObject` shape into a new `z.object({ ...X.shape })` (the result silently strips unknown keys; use `.extend`), call `.pick`, `.omit` or `.partial` on a refined object (throws), use `z.record(EnumSchema, …)` where some keys may be absent (exhaustive in Zod 4; use `z.partialRecord`), or add an async refinement or transform to a schema parsed with synchronous `safeParse` or `parse` (throws)?
+Does `hunk` pass `required_error`, `invalid_type_error` or `errorMap` to a zod schema (Zod 4 silently ignores them; use `error`), spread a `z.looseObject` or `z.strictObject` shape into a new `z.object({ ...X.shape })` (the result silently strips unknown keys; use `.extend`), call `.pick`, `.omit` or `.partial` on a refined object (throws), intersect (`z.intersection`, `.and`) schemas whose overlapping keys are transformed (throws a plain `Error` out of `safeParse`), use `z.record(EnumSchema, …)` where some keys may be absent (exhaustive in Zod 4; use `z.partialRecord`), or add an async refinement or transform to a schema parsed with synchronous `safeParse` or `parse` (throws)?
 
 Allowed cases: `message` (deprecated, still works); `.extend` on a loose or strict object; a spread whose strip-mode result is intended and commented; schemas parsed with `safeParseAsync`.
 
@@ -696,7 +696,7 @@ Scope: `repository-wide`
 
 Zod issue messages embed the offending values; logs and UI carry issue paths and codes only.
 
-Does `hunk` log, persist, send or display zod issue text — `error.message`, `z.prettifyError`, `z.flattenError`, `z.treeifyError`, `issue.message`, `issue.input`, or a schema built with `reportInput` — for data that can hold secrets, tokens, invoices, mint URLs or private message content?
+Does `hunk` log, persist, send or display zod issue text — `error.message`, `z.prettifyError`, `z.flattenError`, `z.treeifyError`, `issue.message`, `issue.input`, or a schema built with `reportInput` — for data that can hold secrets, tokens, invoices, mint URLs or private message content, or log issue `path`s for a record keyed by a secret (a token, quote secret or invoice), since the path carries the key and `unrecognized_keys` carries key names?
 
 Allowed cases: `loggableIssues(error)` or an equivalent that keeps only `path` and `code`; messages the schema author wrote as fixed strings with no interpolated input; development-only assertions in tests.
 
@@ -816,6 +816,6 @@ Scope: `**/__tests__/**/*.{ts,tsx}`, `**/*.test.{ts,tsx}`
 
 A test states the expected outcome as a literal and reaches the code through its public interface.
 
-Does a new or changed test in `hunk` assert only that something was called, defined or truthy (`toHaveBeenCalled*`, `toBeDefined`, `toBeTruthy`) with no assertion on an observable result, compute its expected value the same way the code under test does, or `jest.mock` / `vi.mock` a module this repository owns (`@/…`, `wallet`, `nostr`) when the module under test could be exercised through its public interface with only system boundaries mocked?
+Does a new or changed test in `hunk` assert only that something was called, defined or truthy (`toHaveBeenCalled*`, `toBeDefined`, `toBeTruthy`) with no assertion on an observable result, compute its expected value the same way the code under test does, or `jest.mock` / `vi.mock` a module this repository owns (`@/…`, `wallet`, `nostr`) that holds plain logic — a pure function, parser, mapper, formatter or state machine — when the module under test could run it for real?
 
-Allowed cases: Mocks of system boundaries (network, native modules, SecureStore, AsyncStorage, time, randomness, the logger); a call assertion that IS the contract (an adapter must call the native module once, a guard must not call the network); mocks of heavy UI primitives in a render test of something else; existing mocks the hunk does not add.
+Allowed cases: Mocks of system boundaries (network and the repo's network clients such as `apiClient`, native modules, SecureStore, AsyncStorage, time, randomness, the logger); a store, hook or provider mocked to keep a component render test off the wallet, coco or native runtime; a call assertion that IS the contract (an adapter must call the native module once, a guard must not call the network); mocks of heavy UI primitives in a render test of something else; existing mocks the hunk does not add.

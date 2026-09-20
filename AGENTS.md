@@ -9,7 +9,8 @@ when a consequential decision is unresolved.
 ## Code rules
 
 Read [contributor conventions](docs/review/contributor-conventions.md) for the area you are
-changing. [hunch.config.ts](hunch.config.ts) contains the smaller set of automated semantic
+changing, and its per-domain companions in `docs/review/conventions-*.md` (zod,
+React Native, state, TypeScript, async and tests) when the change touches one. [hunch.config.ts](hunch.config.ts) contains the smaller set of automated semantic
 concerns; [review contracts](docs/review/contracts.md) supplies their domain meaning. Hunch
 findings are candidates to verify, and insufficient context is a coverage gap. Run lint, types
 and relevant tests independently. Validate policy edits with `hunch config` using a CLI version
