@@ -24,7 +24,7 @@ import {
 } from 'wallet/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
-import { toAccountUnit, toRealUnit, type FormattedString } from 'wallet';
+import { isAccountUnit, toAccountUnit, toRealUnit, type FormattedString } from 'wallet';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ReceiveReusableQuoteTab } from '@/features/receive/components/ReceiveReusableQuoteTab';
 import { ReceivePaymentRequestTab } from '@/features/receive/components/ReceivePaymentRequestTab';
@@ -40,7 +40,6 @@ import {
 } from '@/features/receive/lib/standingQuoteIdentityStore';
 import { useMintStore, type ActiveUnit } from '@/shared/stores/profile/mintStore';
 import { UnitSwitcherPillFallback } from '@/features/wallet/components/UnitSwitcherPill/UnitSwitcherPill.fallback';
-import { PILL_LABELS } from '@/features/wallet/components/UnitSwitcherPill/useUnitSwitcherPill';
 import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -366,9 +365,7 @@ function ReceiveScreenForUnit({
           hasReceiveEntryData ? (
             <UnitSwitcherPillFallback
               header
-              displayUnit={
-                Object.hasOwn(PILL_LABELS, accountUnit) ? (accountUnit as ActiveUnit) : undefined
-              }
+              displayUnit={isAccountUnit(accountUnit) ? accountUnit : undefined}
               onSelectUnit={selectReceiveUnit}
             />
           ) : null,

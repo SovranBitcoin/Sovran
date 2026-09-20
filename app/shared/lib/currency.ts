@@ -6,6 +6,8 @@
  * Conversions route through BTC as the base unit.
  */
 
+import { FIAT_UNITS, isFiatUnit, unitMinorDecimals, unitSymbol, type FiatUnit } from 'wallet/units';
+
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
@@ -29,15 +31,12 @@ interface FormatAmountOptions {
   displayPreference?: number;
 }
 
-const SYMBOLS: Record<string, string> = {
-  usd: '$',
-  eur: '€',
-  gbp: '£',
-  btc: '₿',
-  sats: 'ṩ',
-};
+// Bitcoin's two display denominations. Fiat symbols, decimals and the fiat
+// unit list itself come from the wallet's unit registry.
+const BITCOIN_SYMBOLS: Record<string, string> = { btc: '₿', sats: 'ṩ' };
 
-const FIAT_UNITS = ['usd', 'eur', 'gbp'];
+/** Offline fallback BTC prices, used only until the pricelist first loads. */
+const FALLBACK_BTC_PRICE: Record<FiatUnit, number> = { usd: 63_900, eur: 53_500, gbp: 47_800 };
 
 const satsFormatter = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 0,
@@ -66,9 +65,9 @@ function getRate(unit: string): number {
   const rates: Record<string, number> = {
     btc: 1,
     sats: 100_000_000,
-    usd: pricelist?.usd?.btc ?? 63_900,
-    eur: pricelist?.eur?.btc ?? 53_500,
-    gbp: pricelist?.gbp?.btc ?? 47_800,
+    ...Object.fromEntries(
+      FIAT_UNITS.map((fiat) => [fiat, pricelist?.[fiat]?.btc ?? FALLBACK_BTC_PRICE[fiat]])
+    ),
   };
   // Render-hot path (every displayed amount) — log only the anomalous case.
   if (rates[unit] == null) {
@@ -91,16 +90,17 @@ export function formatAmount(input: AmountWithUnit, options: FormatAmountOptions
     return displayBtc === 2 ? `${formatted} sats` : formatted;
   }
 
-  const adjustedInput = FIAT_UNITS.includes(inputUnit) ? amount / 100 : amount;
+  const adjustedInput = amount / 10 ** unitMinorDecimals(inputUnit);
   const inBtc = adjustedInput / getRate(inputUnit);
   const outputValue = inBtc * getRate(outputUnit);
 
   const formatted = getFormatter(outputUnit).format(outputValue);
 
-  const display = options.currencyDisplay ?? (FIAT_UNITS.includes(outputUnit) ? 'symbol' : 'none');
+  const display = options.currencyDisplay ?? (isFiatUnit(outputUnit) ? 'symbol' : 'none');
 
-  if (display === 'symbol' && SYMBOLS[outputUnit]) {
-    return `${SYMBOLS[outputUnit]}${formatted}`;
+  const symbol = unitSymbol(outputUnit) || BITCOIN_SYMBOLS[outputUnit];
+  if (display === 'symbol' && symbol) {
+    return `${symbol}${formatted}`;
   }
   if (display === 'name') {
     return `${formatted} ${outputUnit}`;

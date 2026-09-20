@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   ACCOUNT_UNITS,
   accountUnitLabel,
+  accountUnitName,
+  isAccountUnit,
   isTestnutUnit,
   toAccountUnit,
   toRealUnit,
-} from "../../src/account-units";
+} from "../../src/units/accounts";
 import {
   isFiatUnit,
   majorToMinor,
@@ -17,8 +19,12 @@ import {
   deriveMintMethodCapabilityMapFromTrustedMints,
   hasMintSupportingMethod,
   resolveReceiveMethodMint,
-  SWITCHABLE_UNITS,
 } from "../../src/mint-capabilities";
+import {
+  FIAT_UNITS,
+  SWITCHABLE_UNITS,
+  unitDefinition,
+} from "../../src/units/registry";
 
 describe("account units", () => {
   it("splits a testnut mint's unit into its own account and back", () => {
@@ -58,6 +64,25 @@ describe("account units", () => {
     expect(isFiatUnit("tgbp")).toBe(true);
     expect(isFiatUnit("tsat")).toBe(false);
     expect(majorToMinor(1.5, "tusd")).toBe(150);
+  });
+});
+
+describe("unit registry", () => {
+  it("derives the fiat units and every unit's facts from one table", () => {
+    expect(FIAT_UNITS).toEqual(["usd", "eur", "gbp"]);
+    expect(unitDefinition("USD")).toMatchObject({ symbol: "$", minorDecimals: 2 });
+    expect(unitDefinition("sat")).toMatchObject({ label: "BTC", minorDecimals: 0 });
+    expect(unitDefinition("chf")).toBeUndefined();
+  });
+
+  it("names accounts and recognises exactly the account units", () => {
+    expect(accountUnitName("sat")).toBe("Bitcoin account");
+    expect(accountUnitName("usd")).toBe("USD account");
+    expect(accountUnitName("tsat")).toBe("Test Bitcoin account");
+    expect(accountUnitName("teur")).toBe("Test EUR account");
+    expect(ACCOUNT_UNITS.every(isAccountUnit)).toBe(true);
+    expect(isAccountUnit("chf")).toBe(false);
+    expect(isAccountUnit("tchf")).toBe(false);
   });
 });
 

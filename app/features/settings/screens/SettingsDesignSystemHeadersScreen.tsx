@@ -1,3 +1,4 @@
+import { SWITCHABLE_UNITS } from 'wallet';
 import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
 import { HEADER_SCENARIOS } from '@/features/settings/design-system/headers';
 import { useState } from 'react';
@@ -12,7 +13,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 
 const OPTIONS = ['Gradient', 'Identity', 'Sticky tabs', 'Tab fade'];
-const CURRENCIES = ['SAT', 'USD', 'EUR', 'GBP'];
+const CURRENCIES = SWITCHABLE_UNITS.map((unit) => unit.toUpperCase());
 const RAILS = ['Unified', 'Lightning', 'Onchain', 'Cashu'];
 const EXAMPLES = [
   'Gradient headers fade into the page on iOS and Android.',

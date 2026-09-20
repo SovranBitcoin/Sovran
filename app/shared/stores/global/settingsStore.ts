@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
+import { FIAT_UNITS, type FiatUnit } from 'wallet/units';
 import { storeLog, applyFileLogging } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { legalRevisions, type LegalAcceptance } from '@/shared/lib/legal/legalDocuments';
@@ -16,7 +17,8 @@ interface TermsAccepted {
   date: string;
 }
 
-export type DisplayCurrency = 'usd' | 'eur' | 'gbp';
+/** The fiat currency balances are re-priced in — a fiat unit of the wallet registry. */
+export type DisplayCurrency = FiatUnit;
 
 type MiddlemanTrustMode = 'trusted_only' | 'allow_untrusted';
 
@@ -160,7 +162,7 @@ const PersistedSettings = z.object({
   lastKnownAppVersion: PersistedLastKnownAppVersion,
   language: z.string().max(16).default('en').catch('en'),
   displayBtc: z.number().int().min(0).max(8).default(3).catch(3),
-  displayCurrency: z.enum(['usd', 'eur', 'gbp']).default('usd').catch('usd'),
+  displayCurrency: z.enum(FIAT_UNITS).default('usd').catch('usd'),
   experimental: z.boolean().default(false).catch(false),
   mockMode: z.boolean().default(false).catch(false),
   mockOffline: z.boolean().default(false).catch(false),

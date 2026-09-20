@@ -12,6 +12,7 @@
  * Onchain sending & receiving" — matching how the rest of Notifications reads
  * ("Alice liked your post").
  */
+import { isFiatUnit, unitMinorDecimals, unitSymbol } from 'wallet';
 import { railName, type Direction, type MintChangeFact } from './interpret';
 
 /**
@@ -83,8 +84,6 @@ const RAIL_ICONS: Record<string, string> = {
 
 /* ── amounts ─────────────────────────────────────────────────────────── */
 
-const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' };
-
 /**
  * Amounts are shown in the mint's OWN unit, verbatim. Deliberately not
  * `shared/lib/currency`'s `formatAmount`: that converts through live exchange
@@ -94,10 +93,11 @@ const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' }
 function formatMintAmount(amount: number, unit?: string): string {
   const u = unit?.toLowerCase();
   if (u === 'sat') return `${amount.toLocaleString('en-US')} sats`;
-  if (u && FIAT_SYMBOLS[u]) {
-    return `${FIAT_SYMBOLS[u]}${(amount / 100).toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+  if (u && isFiatUnit(u)) {
+    const decimals = unitMinorDecimals(u);
+    return `${unitSymbol(u)}${(amount / 10 ** decimals).toLocaleString('en-US', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
     })}`;
   }
   const value = amount.toLocaleString('en-US');

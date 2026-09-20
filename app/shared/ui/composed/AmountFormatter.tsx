@@ -21,7 +21,6 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { View } from '@/shared/ui/primitives/View/View';
 
-type CurrencyUnit = 'sat' | 'usd' | 'eur' | string;
 type FontWeight = 'light' | 'regular' | 'medium' | 'heavy';
 
 // MonaSans ships ₿ (U+20BF) as a proper glyph, so we can render the Bitcoin
@@ -43,7 +42,7 @@ export const AMOUNT_FONT_FAMILY: Record<FontWeight, string> = {
 
 interface AmountFormatterProps {
   amount: AmountValue;
-  unit: CurrencyUnit;
+  unit: string;
   /**
    * Explicit BTC/sats display preference. Defaults to the persisted setting;
    * pass a value when the same component must render reproducibly in an
@@ -178,7 +177,7 @@ export function AmountFormatter({
 // U+2009 thin space sits ~\u00BD the width of a regular space and reads as the
 // natural gap between a currency glyph and the digits it labels. Mirrored in
 // FiatAmountDisplay so toggling fiat \u2194 sat keeps the symbol cadence identical.
-function decorate(formatted: string, unit: CurrencyUnit, displayBtc: number): string {
+function decorate(formatted: string, unit: string, displayBtc: number): string {
   if (unit !== 'sat') return formatted;
   if (displayBtc === 0 || displayBtc === 3) return `\u20BF\u2009${formatted}`;
   if (displayBtc === 1) return `${formatted}\u2009\u26A1\uFE0E`;

@@ -84,7 +84,7 @@ async function readBreakdown(
  *
  * All figures are scoped to `unit` (coco v2 multi-unit; defaults to sat so
  * existing callers keep today's behavior). `includeMint` narrows them to one
- * side of the testnut split (see account-units) — pass a referentially stable
+ * side of the testnut split (see units/accounts) — pass a referentially stable
  * predicate, it re-scopes the read.
  */
 export function useColadaBalance(

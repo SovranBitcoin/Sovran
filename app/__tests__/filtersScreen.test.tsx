@@ -10,6 +10,9 @@ const mockDismissTo = jest.fn();
 let mockParams: Record<string, string> = {};
 
 // Expo's node preset rewrites FlatList to this web host. Layout is outside this test.
+jest.mock('@/features/wallet/hooks/useActiveUnit', () => ({
+  useActiveUnit: () => ({ availableUnits: ['sat', 'usd'] }),
+}));
 jest.mock('react-native-web/dist/exports/FlatList', () => {
   const React = jest.requireActual('react');
   return {

@@ -1,12 +1,13 @@
 import React, { useCallback } from 'react';
 import { ActionSheetIOS } from 'react-native';
+import { accountUnitLabel, FIAT_UNITS } from 'wallet';
 
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
 import { FiatPillShell } from './FiatCurrencyPill.shell';
 
-const CURRENCY_SHEET_OPTIONS = ['USD', 'EUR', 'GBP', 'Cancel'];
-const CANCEL_BUTTON_INDEX = 3;
+const CURRENCY_SHEET_OPTIONS = [...FIAT_UNITS.map((unit) => accountUnitLabel(unit)), 'Cancel'];
+const CANCEL_BUTTON_INDEX = FIAT_UNITS.length;
 
 export function FiatCurrencyPillFlat(props: FiatCurrencyPillProps): React.ReactElement {
   const {
@@ -28,9 +29,8 @@ export function FiatCurrencyPillFlat(props: FiatCurrencyPillProps): React.ReactE
         userInterfaceStyle: colorScheme,
       },
       (buttonIndex) => {
-        if (buttonIndex === 0) handleSelectCurrency('usd');
-        if (buttonIndex === 1) handleSelectCurrency('eur');
-        if (buttonIndex === 2) handleSelectCurrency('gbp');
+        const picked = FIAT_UNITS[buttonIndex];
+        if (picked) handleSelectCurrency(picked);
       }
     );
   }, [handleSelectCurrency, colorScheme]);

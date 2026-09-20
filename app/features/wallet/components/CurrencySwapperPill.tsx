@@ -13,6 +13,7 @@
  * component only reads it.
  */
 
+import { unitFlagIcon, unitName } from '@/shared/lib/cashu/unitPresentation';
 import Icon, { CurrencyIcon } from '@/assets/icons';
 import BalancePill from '@/shared/ui/composed/BalancePill';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
@@ -26,19 +27,6 @@ const ICON_SIZE = 20;
 // chrome used elsewhere in the app. Bitcoin uses the branded orange
 // gradient disc from `CurrencyIcon` — the same component that renders
 // the BTC tile on the Select Mint screen — sized to match the flags.
-const CURRENCY_LABELS: Record<SwapperCurrency, string> = {
-  sat: 'Bitcoin',
-  usd: 'US Dollar',
-  eur: 'Euro',
-  gbp: 'British Pound',
-};
-
-const FIAT_FLAG_NAMES: Record<DisplayCurrency, string> = {
-  usd: 'circle-flags:us',
-  eur: 'circle-flags:eu',
-  gbp: 'circle-flags:gb',
-};
-
 // Pill width is sized to fit just the *active* label so "Euro" doesn't carry
 // the same footprint as "British Pound". The pill reflows when the user
 // toggles sat ↔ fiat or picks a different `displayCurrency`.
@@ -60,7 +48,7 @@ function CurrencyGlyph({ currency }: { currency: SwapperCurrency }) {
   if (currency === 'sat') {
     return <CurrencyIcon currency="sat" width={ICON_SIZE} />;
   }
-  return <Icon name={FIAT_FLAG_NAMES[currency]} size={ICON_SIZE} />;
+  return <Icon name={unitFlagIcon(currency) ?? ''} size={ICON_SIZE} />;
 }
 
 interface CurrencySwapperPillProps {
@@ -90,7 +78,7 @@ export function CurrencySwapperPill({
 }: CurrencySwapperPillProps) {
   const displayCurrency = useSettingsStore((s) => s.displayCurrency);
   const activeCurrency: SwapperCurrency = inputMode === 'unit' ? 'sat' : displayCurrency;
-  const label = CURRENCY_LABELS[activeCurrency];
+  const label = unitName(activeCurrency);
   const resolvedWidth = width ?? widthForLabel(label);
 
   return (

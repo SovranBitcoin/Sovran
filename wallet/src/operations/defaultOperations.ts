@@ -51,7 +51,7 @@ import { parsePaymentInput } from "../parse";
 import { MeltUserCancelledError, UnitRateUnavailableError } from "../errors";
 import { normalizeNostrPubkey, resolveRecipientPubkey } from "../recipient";
 import { amountToNumber, type AmountLike } from "../amount";
-import { toAccountUnit } from "../account-units";
+import { toAccountUnit } from "../units/accounts";
 import {
   buildMethodAwareMintCandidates,
   compareMintDisplayOrder,
@@ -554,7 +554,7 @@ export interface DefaultOperationsConfig {
     mintUrls: string[],
   ) => Promise<Record<string, MintCatalogEntry>>;
   /**
-   * The testnut split (see account-units): which mints are testnuts, and
+   * The testnut split (see units/accounts): which mints are testnuts, and
    * whether the active account is a testnut one. `buildMintListItems` reports
    * each row's units as account units and, outside the wallet's own mint
    * picker, disables mints on the other side of the split. Absent = no mint

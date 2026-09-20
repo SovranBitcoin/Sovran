@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
-import type { AccountUnit } from 'wallet';
+import { ACCOUNT_UNITS, type AccountUnit } from 'wallet/units';
 import { storeLog } from '@/shared/lib/logger';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
@@ -16,7 +16,7 @@ const profileStorage = createProfileScopedStorage();
  *  in (coco v2 multi-unit balances/quotes/proofs are per mint+unit), with
  *  testnut mints' units split out as `tsat`/`tusd`/… so test funds never
  *  share an account with real ones. Coco and the payment machine only ever
- *  see `toRealUnit(activeUnit)` — see wallet `account-units`. */
+ *  see `toRealUnit(activeUnit)` — see wallet `units/accounts`. */
 export type ActiveUnit = AccountUnit;
 
 interface MintState {
@@ -58,11 +58,8 @@ const PersistedMintStore = z.object({
   // Additive tolerant field (no version bump needed): old blobs rehydrate to
   // 'sat'; an unknown persisted value degrades to 'sat' instead of wiping the
   // store (sovran-data persisted-schema invariant).
-  // Widened (additive) with the testnut account units.
-  activeUnit: z
-    .enum(['sat', 'usd', 'eur', 'gbp', 'tsat', 'tusd', 'teur', 'tgbp'])
-    .default('sat')
-    .catch('sat'),
+  // The wallet's account units (registry-derived); growing it is additive.
+  activeUnit: z.enum(ACCOUNT_UNITS).default('sat').catch('sat'),
   // Additive tolerant field: a corrupt map degrades to {} (new standing
   // quotes get created and re-recorded) instead of wiping the store.
   standingQuotes: z.record(z.string(), z.string().max(256)).default({}).catch({}),

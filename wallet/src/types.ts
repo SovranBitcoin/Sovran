@@ -427,7 +427,7 @@ export interface MintListItem {
   /**
    * ACCOUNT units the mint can actually issue: advertised NUT-04 units gated
    * on the mint's real keysets, as `tsat`/`tusd`/… for a testnut mint (see
-   * account-units). Absent on synchronous fallback rows (unknown) —
+   * units/accounts). Absent on synchronous fallback rows (unknown) —
    * consumers treat absent as unrestricted.
    */
   supportedUnits?: string[];

@@ -3,7 +3,7 @@
  * backend (nagg's unpaid-quote probe saw them mark a never-paid quote paid).
  *
  * The verdict decides which ACCOUNT a mint's units belong to (`usd` vs `tusd`,
- * see wallet `account-units`), so test funds never share a balance, a mint
+ * see wallet `units/accounts`), so test funds never share a balance, a mint
  * picker tab, a receive rail or a Balance split with real ones. That makes it
  * money-routing state, not presentation: it lives here rather than as a group
  * on `mintMetadataStore`, whose LRU a single 200-row discover seed can turn

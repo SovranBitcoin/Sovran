@@ -2,7 +2,7 @@
 import { ResultAsync } from 'neverthrow';
 import { ApiHttpError, fetchBtcRates } from '@/shared/lib/apiClient';
 import { log } from '@/shared/lib/logger';
-import type { BitcoinPrices } from '@/shared/stores/global/pricelistStore';
+import { RATE_CODES, type BitcoinPrices } from '@/shared/stores/global/pricelistStore';
 
 export const POLL_MS = 10 * 60 * 1000;
 const RESUME_FRESH_MS = 60 * 1000;
@@ -67,7 +67,7 @@ export function createPricelistFeed({
     if (result.isOk()) {
       const { rates, updatedAt, degraded } = result.value;
       const prices: Partial<BitcoinPrices> = {};
-      for (const currency of ['USD', 'EUR', 'GBP'] as const) {
+      for (const currency of RATE_CODES) {
         if (rates[currency]) prices[currency] = rates[currency].price;
       }
       onPrices(prices, updatedAt);

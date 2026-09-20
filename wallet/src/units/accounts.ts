@@ -10,38 +10,46 @@
 // Account units are a wallet-view concept only. Coco, the payment machine,
 // tokens, quotes and payment requests all speak the mint's REAL unit — convert
 // with `toRealUnit` before any of them sees a unit.
+//
+// Derived from the unit registry (`registry.ts`): every switchable unit has
+// exactly one testnut counterpart, `t` + the unit.
 // ---------------------------------------------------------------------------
 
-const TESTNUT_UNIT_BY_REAL = {
-  sat: "tsat",
-  usd: "tusd",
-  eur: "teur",
-  gbp: "tgbp",
-} as const;
+import {
+  isSwitchableUnit,
+  SWITCHABLE_UNITS,
+  unitDefinition,
+  type SwitchableUnit,
+} from "./registry";
 
-type RealAccountUnit = keyof typeof TESTNUT_UNIT_BY_REAL;
-export type TestnutUnit = (typeof TESTNUT_UNIT_BY_REAL)[RealAccountUnit];
-export type AccountUnit = RealAccountUnit | TestnutUnit;
+export type TestnutUnit = `t${SwitchableUnit}`;
+export type AccountUnit = SwitchableUnit | TestnutUnit;
 
-const REAL_UNIT_BY_TESTNUT: Record<string, RealAccountUnit> = Object.fromEntries(
-  Object.entries(TESTNUT_UNIT_BY_REAL).map(([real, testnut]) => [testnut, real]),
-) as Record<string, RealAccountUnit>;
+const testnutUnitOf = (unit: SwitchableUnit): TestnutUnit => `t${unit}`;
+
+const REAL_UNIT_BY_TESTNUT = new Map<string, SwitchableUnit>(
+  SWITCHABLE_UNITS.map((unit) => [testnutUnitOf(unit), unit]),
+);
 
 /** Every account the unit switcher may offer, in display order: real, then testnut. */
 export const ACCOUNT_UNITS: readonly AccountUnit[] = [
-  ...(Object.keys(TESTNUT_UNIT_BY_REAL) as RealAccountUnit[]),
-  ...Object.values(TESTNUT_UNIT_BY_REAL),
+  ...SWITCHABLE_UNITS,
+  ...SWITCHABLE_UNITS.map(testnutUnitOf),
 ];
+
+export function isAccountUnit(unit: string): unit is AccountUnit {
+  return isSwitchableUnit(unit) || REAL_UNIT_BY_TESTNUT.has(unit);
+}
 
 /** True for a testnut account unit (`tsat`, `tusd`, …). */
 export function isTestnutUnit(unit: string): boolean {
-  return unit.toLowerCase() in REAL_UNIT_BY_TESTNUT;
+  return REAL_UNIT_BY_TESTNUT.has(unit.toLowerCase());
 }
 
 /** The mint unit behind an account unit: `tusd` → `usd`; real units pass through. */
 export function toRealUnit(unit: string): string {
   const normalized = unit.toLowerCase();
-  return REAL_UNIT_BY_TESTNUT[normalized] ?? normalized;
+  return REAL_UNIT_BY_TESTNUT.get(normalized) ?? normalized;
 }
 
 /**
@@ -50,15 +58,25 @@ export function toRealUnit(unit: string): string {
  */
 export function toAccountUnit(unit: string, testnut: boolean): string {
   const normalized = unit.toLowerCase();
-  if (!testnut) return normalized;
-  return (
-    (TESTNUT_UNIT_BY_REAL as Record<string, string>)[normalized] ?? normalized
-  );
+  return testnut && isSwitchableUnit(normalized)
+    ? testnutUnitOf(normalized)
+    : normalized;
 }
 
 /** Short tab / badge label: `sat` → BTC, `tsat` → tBTC, `tusd` → tUSD. */
 export function accountUnitLabel(unit: string): string {
   const real = toRealUnit(unit);
-  const label = real === "sat" ? "BTC" : real.toUpperCase();
+  const label = unitDefinition(real)?.label ?? real.toUpperCase();
   return isTestnutUnit(unit) ? `t${label}` : label;
+}
+
+/** Menu / accessibility name: `usd` → "USD account", `tsat` → "Test Bitcoin account". */
+export function accountUnitName(unit: string): string {
+  const real = toRealUnit(unit);
+  // Bitcoin reads by name; fiat accounts by their code, as the app always has.
+  const base =
+    real === "sat"
+      ? (unitDefinition(real)?.name ?? "Bitcoin")
+      : (unitDefinition(real)?.label ?? real.toUpperCase());
+  return `${isTestnutUnit(unit) ? "Test " : ""}${base} account`;
 }

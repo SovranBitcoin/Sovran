@@ -6,6 +6,8 @@
  */
 
 import { accountUnitLabel, toRealUnit } from 'wallet';
+
+import { unitFlagIcon } from '@/shared/lib/cashu/unitPresentation';
 import { useCallback } from 'react';
 import { ScrollView } from 'react-native';
 import Animated, {
@@ -76,7 +78,7 @@ function AnimatedCurrencyTab({
   // Get label for currency
   // Testnut account units read tBTC / tUSD …; their icon is the real unit's.
   const label = currency === 'ALL' ? 'ALL' : accountUnitLabel(currency);
-  const iconCurrency = toRealUnit(currency).toUpperCase();
+  const flagIcon = unitFlagIcon(currency.toLowerCase());
 
   // Animated container style
   const animatedContainerStyle = useAnimatedStyle(() => {
@@ -159,14 +161,7 @@ function AnimatedCurrencyTab({
 
   // Render icon based on currency type - always render at LARGE size, scaling handles the rest
   const renderIcon = () => {
-    if (iconCurrency === 'USD' || iconCurrency === 'EUR' || iconCurrency === 'GBP') {
-      return (
-        <Icon
-          name={`circle-flags:${iconCurrency === 'USD' ? 'us' : iconCurrency === 'EUR' ? 'eu' : 'gb'}`}
-          size={LARGE_ICON_SIZE}
-        />
-      );
-    }
+    if (flagIcon) return <Icon name={flagIcon} size={LARGE_ICON_SIZE} />;
     if (currency === 'ALL') {
       return (
         <Icon
@@ -176,7 +171,7 @@ function AnimatedCurrencyTab({
         />
       );
     }
-    return <CurrencyIcon width={LARGE_ICON_SIZE} currency={iconCurrency.toLowerCase()} />;
+    return <CurrencyIcon width={LARGE_ICON_SIZE} currency={toRealUnit(currency)} />;
   };
 
   return (

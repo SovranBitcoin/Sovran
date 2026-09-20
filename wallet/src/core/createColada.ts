@@ -104,7 +104,7 @@ export interface ColadaConfig {
     mintUrls: string[],
   ) => Promise<Record<string, MintCatalogEntry>>;
   /**
-   * The testnut split (see account-units): which mints are testnuts, and
+   * The testnut split (see units/accounts): which mints are testnuts, and
    * whether the active account is a testnut one. Absent = no mint is.
    */
   isTestnutMint?: (mintUrl: string) => boolean;

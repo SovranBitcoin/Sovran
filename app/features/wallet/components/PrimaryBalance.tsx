@@ -4,9 +4,7 @@ import type { GlassVariant } from 'liquid-glass-text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { UnitSwitcherPill } from '@/features/wallet/components/UnitSwitcherPill';
-import { PILL_LABELS } from '@/features/wallet/components/UnitSwitcherPill/useUnitSwitcherPill';
 import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
-import type { ActiveUnit } from '@/shared/stores/profile/mintStore';
 import { useSettingsStore, DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
@@ -14,22 +12,22 @@ import { useBtcPrice } from '@/shared/stores/global/pricelistStore';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { FiatCurrencyPill } from '@/features/wallet/components/FiatCurrencyPill';
 import { withAlpha } from '@/shared/lib/color';
-import { MOCK_FIAT_BALANCES, useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
+import { getMockFiatBalance, useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { actionMenuPopup, staticPopup } from '@/shared/lib/popup';
-import { accountUnitLabel, isTestnutUnit, toRealUnit } from 'wallet';
+import { accountUnitLabel, isAccountUnit, isTestnutUnit, toRealUnit } from 'wallet';
 import { useColadaBalance } from 'wallet/react';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { walletLog, Log } from '@/shared/lib/logger';
 
 interface Account {
-  unit: CurrencyUnit;
+  /** The ACCOUNT unit this page shows (`usd`, `tusd`, …). */
+  unit: string;
 }
 
-type CurrencyUnit = 'sat' | 'usd' | 'eur' | string;
 type DisplayBtcMode = 0 | 1 | 2 | 3;
 
 export interface PillVisibility {
@@ -243,10 +241,7 @@ export function PrimaryBalance({
     setDisplayBtc(((displayBtc + 1) % 4) as DisplayBtcMode);
   };
 
-  const demoBalance =
-    realUnit === 'usd' || realUnit === 'eur' || realUnit === 'gbp'
-      ? MOCK_FIAT_BALANCES[realUnit]
-      : mockBalance;
+  const demoBalance = getMockFiatBalance(realUnit) ?? mockBalance;
   const balance = mockMode ? demoBalance : breakdown.total;
   const reservedTotal = mockMode ? 0 : breakdown.reserved;
   const pendingTotal = mockMode ? (isSatUnit ? mockPendingAmount : 0) : breakdown.pending;
@@ -338,9 +333,7 @@ export function PrimaryBalance({
         <UnitSwitcherPill
           presentation
           textSize={12}
-          displayUnit={
-            Object.hasOwn(PILL_LABELS, account.unit) ? (account.unit as ActiveUnit) : undefined
-          }
+          displayUnit={isAccountUnit(account.unit) ? account.unit : undefined}
         />
         <Pressable
           onPress={toggleUnit}

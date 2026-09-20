@@ -7,6 +7,7 @@
  * the subscription pattern of WallpaperBrowseScreen.
  */
 
+import { SWITCHABLE_UNITS } from 'wallet';
 import { useCallback, useEffect } from 'react';
 // Tolerated seam exception: short horizontal album shelves nested inside the
 // page ScrollView — FlashList can't virtualize inside an unbounded parent.
@@ -38,7 +39,7 @@ import {
   type AlbumAuthor,
 } from '@/features/theme/lib/useAlbumList';
 
-const PREVIEW_UNIT_IDS = ['sat', 'usd', 'eur', 'gbp'];
+const PREVIEW_UNIT_IDS: string[] = [...SWITCHABLE_UNITS];
 const CARD_RATIO = 2.05;
 const CARD_SPACING = 16;
 const SECTION_PADDING = 20;

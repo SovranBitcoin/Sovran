@@ -1,3 +1,4 @@
+import { FIAT_UNITS, SWITCHABLE_UNITS, type FiatUnit } from 'wallet/units';
 import { Asset } from 'expo-asset';
 import { PUBLIC_DEMO_METADATA } from './mockPublicProfile';
 import { isLegacyMockProfile } from './legacyMockProfiles';
@@ -340,9 +341,16 @@ interface MockDataState {
   mockPendingAmount: number;
 }
 
-export const MOCK_WALLET_UNITS: ActiveUnit[] = ['sat', 'usd', 'eur', 'gbp'];
+/** Mock Mode previews every real account; testnut accounts have nothing to show. */
+export const MOCK_WALLET_UNITS: ActiveUnit[] = [...SWITCHABLE_UNITS];
 /** Fiat figures are minor units, matching AmountFormatter and real wallet balances. */
-export const MOCK_FIAT_BALANCES = { usd: 18_450, eur: 16_925, gbp: 14_280 } as const;
+const MOCK_FIAT_BALANCES: Record<FiatUnit, number> = { usd: 18_450, eur: 16_925, gbp: 14_280 };
+
+/** The mock balance for a fiat unit; undefined for sat, which uses `mockBalance`. */
+export function getMockFiatBalance(unit: string): number | undefined {
+  const fiat = FIAT_UNITS.find((candidate) => candidate === unit);
+  return fiat && MOCK_FIAT_BALANCES[fiat];
+}
 
 const MOCK = buildMockData();
 const MOCK_DM = buildMockContactsAndThreads(Date.now());

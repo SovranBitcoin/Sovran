@@ -26,7 +26,7 @@ export type MintSearchRow = MintSearchResult & {
  * still resolves.
  *
  * A testnut row's units become ACCOUNT units (`tsat`, `tusd`, … — wallet
- * `account-units`), so every unit filter downstream — the currency tabs, the
+ * `units/accounts`), so every unit filter downstream — the currency tabs, the
  * per-tab counts, the (method, unit) rail match — files test mints under their
  * own tBTC / tUSD tabs instead of among the real ones.
  */

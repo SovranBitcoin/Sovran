@@ -1,5 +1,6 @@
 import { localizeReason, type LocalizedReason } from "./formatting/locales";
 import { logger, mintUrlFields } from "./logger";
+import { isSwitchableUnit, SWITCHABLE_UNITS } from "./units/registry";
 import type {
   AmountEntryConstraints,
   AmountEntryMethodContext,
@@ -204,9 +205,6 @@ export function compareMintDisplayOrder(
   return b.balance - a.balance;
 }
 
-/** Units the wallet's unit switcher may offer, in display order. */
-export const SWITCHABLE_UNITS = ["sat", "usd", "eur", "gbp"] as const;
-export type SwitchableUnit = (typeof SWITCHABLE_UNITS)[number];
 
 /**
  * Units a mint advertises for minting (NUT-04 method-unit entries),
@@ -234,7 +232,7 @@ export function deriveSupportedUnitsFromInfo(
       typeof entry.unit === "string" ? normalizeUnit(entry.unit) : null;
     if (
       unit &&
-      (SWITCHABLE_UNITS as readonly string[]).includes(unit) &&
+      isSwitchableUnit(unit) &&
       (issued == null || issued.has(unit))
     ) {
       units.add(unit);
@@ -362,7 +360,7 @@ export function deriveMintMethodCapabilityMapFromTrustedMints(
      * The mint belongs to the other side of the testnut split (a testnut mint
      * while a real account is active, or the reverse). Every method reads as
      * unsupported, so no rail, candidate list or auto-pick can route the
-     * active account's funds through it. See account-units.
+     * active account's funds through it. See units/accounts.
      */
     outsideAccount?: boolean;
   }[],

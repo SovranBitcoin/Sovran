@@ -27,11 +27,12 @@ import {
   createMempoolSpaceChainAdapter,
   decodeUrlOrAddress,
   ACCOUNT_UNITS,
-  isFiatUnit,
+  FIAT_UNITS,
   isTestnutUnit,
   toAccountUnit,
   toRealUnit,
   unitMinorDecimals,
+  unitSymbol,
   withTimeout,
 } from 'wallet';
 import {
@@ -81,8 +82,6 @@ import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/s
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { useDmEchoStore } from '@/shared/stores/runtime/dmEchoStore';
 import { isPaymentRequestFailureMockEnabled } from '@/features/send/lib/paymentRequestFailureMock';
-
-const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' };
 
 // Per-mint NUT-06 deadline used by `fetchMintInfo` below. Only matters on a
 // true cache miss; SWR hits resolve synchronously. Kept well under coco's
@@ -295,14 +294,15 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   // express fiat-unit melt amounts in sats (LNURL invoices, onchain
   // amountSats). Keyed by the unit itself, not the display currency.
   const getSatsPerUnitMinor = useCallback((unit: string) => {
-    if (!isFiatUnit(unit)) return null;
-    const price = usePricelistStore.getState().getBtcPrice(unit as 'usd' | 'eur' | 'gbp');
+    const fiat = FIAT_UNITS.find((candidate) => candidate === toRealUnit(unit));
+    if (!fiat) return null;
+    const price = usePricelistStore.getState().getBtcPrice(fiat);
     if (!price || price <= 0) return null;
     return 100_000_000 / (price * 10 ** unitMinorDecimals(unit));
   }, []);
   const getDisplayCurrency = useCallback(() => {
     const currency = useSettingsStore.getState().displayCurrency as DisplayCurrency;
-    const symbol = FIAT_SYMBOLS[currency];
+    const symbol = unitSymbol(currency);
     return symbol ? { code: currency, symbol } : null;
   }, []);
 
@@ -343,7 +343,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         getDisplayCurrency,
         getPreferredMintUrl: () => useMintStore.getState().selectedMint,
         getActiveUnit,
-        // The testnut split for the machine's own mint lists (account-units).
+        // The testnut split for the machine's own mint lists (units/accounts).
         isTestnutMint,
         isTestnutAccount: () => isTestnutUnit(useMintStore.getState().activeUnit),
         // NIP-57: when the melt target was registered as a zap (pendingZapStore),

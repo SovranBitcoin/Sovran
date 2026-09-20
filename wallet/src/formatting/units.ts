@@ -8,27 +8,22 @@
 // denominates exactly like the mint unit behind it.
 // ---------------------------------------------------------------------------
 
-import { toRealUnit } from '../account-units';
-
-const FIAT_UNIT_SYMBOLS: Record<string, string> = {
-  usd: '$',
-  eur: '€',
-  gbp: '£',
-};
+import { toRealUnit } from '../units/accounts';
+import { unitDefinition } from '../units/registry';
 
 /** Currency symbol for a fiat unit; '' for sat and unknown units. */
 export function unitSymbol(unit: string): string {
-  return FIAT_UNIT_SYMBOLS[toRealUnit(unit)] ?? '';
+  return unitDefinition(toRealUnit(unit))?.symbol ?? '';
 }
 
 /** Decimal places between a unit's minor amounts and its major display. */
 export function unitMinorDecimals(unit: string): number {
-  return toRealUnit(unit) in FIAT_UNIT_SYMBOLS ? 2 : 0;
+  return unitDefinition(toRealUnit(unit))?.minorDecimals ?? 0;
 }
 
 /** True for units entered as major-denomination decimals (usd/eur/gbp). */
 export function isFiatUnit(unit: string): boolean {
-  return toRealUnit(unit) in FIAT_UNIT_SYMBOLS;
+  return unitMinorDecimals(unit) > 0;
 }
 
 /**

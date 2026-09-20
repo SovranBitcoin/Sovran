@@ -33,15 +33,17 @@ import {
   type ScanMethod,
   type TransactionDirection,
   type TransactionPaymentType,
+  accountUnitLabel,
+  isTestnutUnit,
+  SWITCHABLE_UNITS,
 } from 'wallet';
+import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
 
 type Status = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 type SourceFilter = 'all' | ScanMethod;
 type LockFilter = 'all' | 'locked' | 'unlocked';
 type CounterpartyFilter = 'all' | 'with';
 type ZapFilter = 'all' | 'zaps';
-
-const SUPPORTED_CURRENCIES = ['ALL', 'SAT', 'USD', 'EUR', 'GBP'];
 
 const PAYMENT_TYPE_OPTIONS = {
   all: { label: 'All', icon: 'fluent:apps-16-filled' },
@@ -104,6 +106,14 @@ export function FiltersScreen() {
   useLifecycleLogger('FiltersScreen');
   const { trustedMints } = useMints();
   const { history } = useHistoryWithMelts();
+  // Every real account, plus the testnut accounts this wallet actually has.
+  const { availableUnits } = useActiveUnit();
+  const currencyTabs = [
+    'ALL',
+    ...[...SWITCHABLE_UNITS, ...availableUnits.filter(isTestnutUnit)].map((unit) =>
+      unit.toUpperCase()
+    ),
+  ];
 
   const params = useRouteParams(ParamsSchema, { where: 'filter-flow.filters' });
 
@@ -280,7 +290,8 @@ export function FiltersScreen() {
         <Section title="Currency">
           <PillTabs
             selectedVariant="contrast"
-            tabs={SUPPORTED_CURRENCIES}
+            tabs={currencyTabs}
+            labelFor={(value) => (isTestnutUnit(value) ? accountUnitLabel(value) : value)}
             activeTab={currency.toUpperCase()}
             onTabChange={(value) => setCurrency(value.toLowerCase())}
             accessibilityRole="radio"

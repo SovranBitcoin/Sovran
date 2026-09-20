@@ -43,7 +43,7 @@ interface ActiveUnitState {
  * the transaction list. NOT the fiat display currency.
  *
  * A testnut mint's units are separate accounts (`tsat`, `tusd`, … — wallet
- * `account-units`), classified from the locally cached nagg verdicts in
+ * `units/accounts`), classified from the locally cached nagg verdicts in
  * `mintTestnutStore`, never a network call.
  *
  * Availability derives synchronously from trusted mints' cached NUT-04

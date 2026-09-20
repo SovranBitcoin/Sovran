@@ -1,21 +1,20 @@
+import { FIAT_UNITS } from 'wallet';
+
+import { unitFlagIcon, unitName } from '@/shared/lib/cashu/unitPresentation';
 import React, { useCallback } from 'react';
 
 import Icon from 'assets/icons';
 import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
-import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
 import { FiatPillShell } from './FiatCurrencyPill.shell';
 
-const CURRENCY_OPTIONS: {
-  currency: DisplayCurrency;
-  label: string;
-  icon: string;
-}[] = [
-  { currency: 'usd', label: 'US Dollar', icon: 'circle-flags:us' },
-  { currency: 'eur', label: 'Euro', icon: 'circle-flags:eu' },
-  { currency: 'gbp', label: 'British Pound', icon: 'circle-flags:gb' },
-];
+const CURRENCY_OPTIONS = FIAT_UNITS.map((currency) => ({
+  currency,
+  label: unitName(currency),
+  icon: unitFlagIcon(currency) ?? '',
+}));
 
 export function FiatCurrencyPillAndroidMenu(props: FiatCurrencyPillProps): React.ReactElement {
   const {
