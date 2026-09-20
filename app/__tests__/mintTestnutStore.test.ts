@@ -34,9 +34,16 @@ import { isTestnutMint, useMintTestnutStore } from '@/shared/stores/global/mintT
 const REAL = 'https://mint.minibits.cash/Bitcoin';
 const TESTNUT = 'https://testnut.cashu.space';
 
+// Each case starts a minute after the last, clear of the refresher's failure backoff.
+let now = 1_800_000_000_000;
 beforeEach(() => {
+  now += 5 * 60 * 1000;
+  jest.spyOn(Date, 'now').mockImplementation(() => now);
   mockFetchMintInfos.mockReset();
   useMintTestnutStore.setState({ byMintUrl: {} });
+});
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 describe('applyMintInfos', () => {
@@ -99,6 +106,36 @@ describe('refreshMintTestnutVerdicts', () => {
 
     // A newly added mint has no entry, so the pass runs again.
     await refreshMintTestnutVerdicts([TESTNUT, REAL, 'https://new.example']);
+    expect(mockFetchMintInfos).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives a mint added while a pass is running its own check', async () => {
+    let finishFirst!: (rows: unknown) => void;
+    mockFetchMintInfos
+      .mockReturnValueOnce(new Promise((resolve) => (finishFirst = resolve)))
+      .mockResolvedValueOnce(
+        ok([
+          { mintUrl: REAL, testnut: false },
+          { mintUrl: TESTNUT, testnut: true, probedAt: 1_790_000_000 },
+        ])
+      );
+    const first = refreshMintTestnutVerdicts([REAL]);
+    // Added mid-pass: the running request does not include it.
+    const second = refreshMintTestnutVerdicts([REAL, TESTNUT]);
+    finishFirst(ok([{ mintUrl: REAL, testnut: false }]));
+    await Promise.all([first, second]);
+    expect(mockFetchMintInfos).toHaveBeenCalledTimes(2);
+    expect(mockFetchMintInfos.mock.calls[1][0]).toEqual([REAL, TESTNUT]);
+    expect(isTestnutMint(TESTNUT)).toBe(true);
+  });
+
+  it('backs off for a minute after nagg fails, then tries again', async () => {
+    mockFetchMintInfos.mockResolvedValue(err(new Error('offline')));
+    await refreshMintTestnutVerdicts([REAL]);
+    await refreshMintTestnutVerdicts([REAL]);
+    expect(mockFetchMintInfos).toHaveBeenCalledTimes(1);
+    now += 61 * 1000;
+    await refreshMintTestnutVerdicts([REAL]);
     expect(mockFetchMintInfos).toHaveBeenCalledTimes(2);
   });
 

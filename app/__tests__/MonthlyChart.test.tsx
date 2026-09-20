@@ -26,7 +26,7 @@ jest.mock('@/shared/stores/profile/swapTransactionsStore', () => ({
 }));
 jest.mock('wallet', () => ({
   ...jest.requireActual('../../wallet/src/history/filters'),
-  ...jest.requireActual('../../wallet/src/units/index'),
+  ...jest.requireActual('wallet/units'),
 }));
 jest.mock('@/shared/stores/global/mintTestnutStore', () => ({
   useIsTestnutMint: () => (mintUrl: string) => mintUrl.includes('testnut'),
