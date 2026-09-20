@@ -24,7 +24,13 @@ jest.mock('@/shared/stores/profile/swapTransactionsStore', () => ({
   useSwapTransactionsStore: (selector: (state: { quoteIdToGroup: object }) => unknown) =>
     selector({ quoteIdToGroup: {} }),
 }));
-jest.mock('wallet', () => jest.requireActual('../../wallet/src/history/filters'));
+jest.mock('wallet', () => ({
+  ...jest.requireActual('../../wallet/src/history/filters'),
+  ...jest.requireActual('../../wallet/src/account-units'),
+}));
+jest.mock('@/shared/stores/global/mintTestnutStore', () => ({
+  useIsTestnutMint: () => (mintUrl: string) => mintUrl.includes('testnut'),
+}));
 jest.mock('@/shared/lib/logger', () => ({
   Log: ({ children }: { children: React.ReactNode }) => children,
   paymentLog: { debug: jest.fn() },

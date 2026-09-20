@@ -52,6 +52,7 @@ const STORE_MODULES = [
   '@/shared/stores/global/nostrMetadataCache',
   '@/shared/stores/global/pricelistStore',
   '@/shared/stores/global/profileStore',
+  '@/shared/stores/global/mintTestnutStore',
   '@/shared/stores/global/relayMetadataStore',
   '@/shared/stores/global/settingsStore',
   '@/shared/stores/global/walletLifecycleStore',

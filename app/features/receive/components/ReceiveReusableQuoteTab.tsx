@@ -11,7 +11,14 @@ import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
-import { getMintMethodCapability, buildBip321OnchainUri, type WalletContext } from 'wallet';
+import {
+  buildBip321OnchainUri,
+  getMintMethodCapability,
+  isTestnutUnit,
+  toAccountUnit,
+  type WalletContext,
+} from 'wallet';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useReusableMintQuote, type UseScreenActionsResult } from 'wallet/react';
 import { paymentLog } from '@/shared/lib/logger';
 import { expectedQrPayloadLength } from '@/shared/lib/qr';
@@ -232,7 +239,12 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
     paymentLog.info(`receive.${method}.discovery_opened`, { unit });
     // Thread the rail's unit so discovery filters to the (method, unit) pair
     // (e.g. bolt12+sat), not just the method — see MintAddScreen / useMintSearch.
-    router.push({ pathname: '/(mint-flow)/add', params: { method, unit } });
+    // Discovery tabs are ACCOUNT units: a testnut account looks for test mints.
+    const testnut = isTestnutUnit(useMintStore.getState().activeUnit);
+    router.push({
+      pathname: '/(mint-flow)/add',
+      params: { method, unit: toAccountUnit(unit, testnut) },
+    });
   }, [method, unit]);
 
   const renderEmptyState = (message: string, cta?: React.ReactNode) => (

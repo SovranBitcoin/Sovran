@@ -6,6 +6,8 @@
  * activeUnit) and a corrupt value must both rehydrate — never wipe the store.
  */
 
+import { ACCOUNT_UNITS } from 'wallet';
+
 import { persistRegistry } from '@/shared/lib/persist/persistConfig';
 // Importing the store registers its schema in the persistRegistry.
 import '@/shared/stores/profile/mintStore';
@@ -38,5 +40,12 @@ describe('mintStore activeUnit persistence', () => {
   it('keeps a valid persisted unit', () => {
     const parsed = mintStoreSchema().parse({ activeUnit: 'usd' }) as { activeUnit?: string };
     expect(parsed.activeUnit).toBe('usd');
+  });
+
+  it('keeps a testnut account unit, and accepts exactly the wallet account units', () => {
+    for (const unit of ACCOUNT_UNITS) {
+      const parsed = mintStoreSchema().parse({ activeUnit: unit }) as { activeUnit?: string };
+      expect(parsed.activeUnit).toBe(unit);
+    }
   });
 });

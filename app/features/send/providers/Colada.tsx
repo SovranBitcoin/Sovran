@@ -26,7 +26,11 @@ import {
   createColada,
   createMempoolSpaceChainAdapter,
   decodeUrlOrAddress,
+  ACCOUNT_UNITS,
   isFiatUnit,
+  isTestnutUnit,
+  toAccountUnit,
+  toRealUnit,
   unitMinorDecimals,
   withTimeout,
 } from 'wallet';
@@ -65,7 +69,8 @@ import { createNfcAdapter } from '@/shared/lib/nfc';
 import { staticPopup } from '@/shared/lib/popup';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { isTestnutMint } from '@/shared/stores/global/mintTestnutStore';
+import { useMintStore, type ActiveUnit } from '@/shared/stores/profile/mintStore';
 import { transactionAnnotationAdapter } from '@/shared/stores/profile/transactionAnnotationStore';
 import { runDataMigrations } from '@/shared/lib/migrations/dataMigrations';
 import { getMintCatalog } from '@/shared/lib/getMintCatalog';
@@ -84,8 +89,9 @@ const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' }
 // 10s `updateMint` timeout so one dead mint can't visibly gate the list.
 const FIRST_OPEN_DEADLINE_MS = 3000;
 
-/** Authoritative active unit for flow resets, read straight off the store. */
-const getActiveUnit = () => useMintStore.getState().activeUnit;
+/** Authoritative active unit for flow resets, read straight off the store.
+ *  The machine speaks the mint's REAL unit — never the testnut account unit. */
+const getActiveUnit = () => toRealUnit(useMintStore.getState().activeUnit);
 
 /**
  * Stage 2 of recipient resolution: hex pubkey → Nostr kind-0 profile.
@@ -336,7 +342,10 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         getSatsPerUnitMinor,
         getDisplayCurrency,
         getPreferredMintUrl: () => useMintStore.getState().selectedMint,
-        getActiveUnit: () => useMintStore.getState().activeUnit,
+        getActiveUnit,
+        // The testnut split for the machine's own mint lists (account-units).
+        isTestnutMint,
+        isTestnutAccount: () => isTestnutUnit(useMintStore.getState().activeUnit),
         // NIP-57: when the melt target was registered as a zap (pendingZapStore),
         // attach a signed kind-9734 zap request to the LNURL invoice callback.
         // The 9734 is never published to relays — the recipient's LNURL server
@@ -512,9 +521,13 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     () =>
       ({
         ...instance.operations,
+        // The machine asks for a REAL unit; stay on the active account's side
+        // of the testnut split.
         switchUnit: (unit: string) => {
-          if (unit === 'sat' || unit === 'usd' || unit === 'eur' || unit === 'gbp') {
-            useMintStore.getState().setActiveUnit(unit);
+          const store = useMintStore.getState();
+          const next = toAccountUnit(unit, isTestnutUnit(store.activeUnit));
+          if ((ACCOUNT_UNITS as readonly string[]).includes(next)) {
+            store.setActiveUnit(next as ActiveUnit);
           }
         },
         executeReceive: createSovranExecuteReceive(getManager, getOffline),

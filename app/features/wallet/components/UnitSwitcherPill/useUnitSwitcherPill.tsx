@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 
 import Icon, { CurrencyIcon } from 'assets/icons';
+import { toRealUnit } from 'wallet';
 import { useWalletPresentationUnit } from '@/features/wallet/hooks/useWalletPresentationUnit';
 import type { ActiveUnit } from '@/shared/stores/profile/mintStore';
 import { walletLog } from '@/shared/lib/logger';
@@ -29,6 +30,12 @@ const UNIT_OPTIONS: UnitOption[] = [
   { unit: 'usd', label: 'USD account', flagIcon: 'circle-flags:us' },
   { unit: 'eur', label: 'EUR account', flagIcon: 'circle-flags:eu' },
   { unit: 'gbp', label: 'GBP account', flagIcon: 'circle-flags:gb' },
+  // Testnut accounts: the same unit at a mint with a fake payment backend,
+  // kept apart so test funds never mix with real ones.
+  { unit: 'tsat', label: 'Test Bitcoin account' },
+  { unit: 'tusd', label: 'Test USD account', flagIcon: 'circle-flags:us' },
+  { unit: 'teur', label: 'Test EUR account', flagIcon: 'circle-flags:eu' },
+  { unit: 'tgbp', label: 'Test GBP account', flagIcon: 'circle-flags:gb' },
 ];
 
 /** SF Symbols for the native menu rows (LiquidGlassMenu / MenuView) — the
@@ -38,13 +45,17 @@ export const UNIT_SF_SYMBOLS: Record<ActiveUnit, string> = {
   usd: 'dollarsign',
   eur: 'eurosign',
   gbp: 'sterlingsign',
+  tsat: 'bitcoinsign',
+  tusd: 'dollarsign',
+  teur: 'eurosign',
+  tgbp: 'sterlingsign',
 };
 
 export function unitIconNode(option: UnitOption, size: number): React.ReactNode {
   return option.flagIcon ? (
     <Icon name={option.flagIcon} size={size} />
   ) : (
-    <CurrencyIcon width={size} currency={option.unit} />
+    <CurrencyIcon width={size} currency={toRealUnit(option.unit)} />
   );
 }
 
@@ -53,6 +64,10 @@ export const PILL_LABELS: Record<ActiveUnit, string> = {
   usd: 'USD',
   eur: 'EUR',
   gbp: 'GBP',
+  tsat: 'tBTC',
+  tusd: 'tUSD',
+  teur: 'tEUR',
+  tgbp: 'tGBP',
 };
 
 // Matches FiatCurrencyPill's height — they stack in the same balance column.

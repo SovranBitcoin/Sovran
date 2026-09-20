@@ -1,9 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import type { GlassVariant } from 'liquid-glass-text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { UnitSwitcherPill } from '@/features/wallet/components/UnitSwitcherPill';
+import { PILL_LABELS } from '@/features/wallet/components/UnitSwitcherPill/useUnitSwitcherPill';
+import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
+import type { ActiveUnit } from '@/shared/stores/profile/mintStore';
 import { useSettingsStore, DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
@@ -17,6 +20,7 @@ import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { actionMenuPopup, staticPopup } from '@/shared/lib/popup';
+import { accountUnitLabel, isTestnutUnit, toRealUnit } from 'wallet';
 import { useColadaBalance } from 'wallet/react';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { walletLog, Log } from '@/shared/lib/logger';
@@ -217,9 +221,19 @@ export function PrimaryBalance({
   // unit: total (spendable + reserved), reserved, pending (cancellable ecash
   // sends), and redeeming (received-but-unredeemed ecash — e.g. P2PK tokens
   // accepted offline, invisible otherwise).
-  const breakdown = useColadaBalance(account.unit);
+  // `account.unit` is an ACCOUNT unit: a testnut account (`tusd`) reads the
+  // mint unit behind it (`usd`), narrowed to the testnut mints — and a real
+  // account to the real ones — so the two never sum into one balance.
+  const realUnit = toRealUnit(account.unit);
+  const isTestnutMint = useIsTestnutMint();
+  const testnutAccount = isTestnutUnit(account.unit);
+  const inAccount = useCallback(
+    (mintUrl: string) => isTestnutMint(mintUrl) === testnutAccount,
+    [isTestnutMint, testnutAccount]
+  );
+  const breakdown = useColadaBalance(realUnit, inAccount);
   const btcPrice = useBtcPrice(displayCurrency);
-  const isSatUnit = account.unit === 'sat';
+  const isSatUnit = realUnit === 'sat';
 
   const toggleUnit = async () => {
     // displayBtc cycling re-formats a SAT balance (sat/BTC/⚡ modes); it has
@@ -230,16 +244,16 @@ export function PrimaryBalance({
   };
 
   const demoBalance =
-    account.unit === 'usd' || account.unit === 'eur' || account.unit === 'gbp'
-      ? MOCK_FIAT_BALANCES[account.unit]
+    realUnit === 'usd' || realUnit === 'eur' || realUnit === 'gbp'
+      ? MOCK_FIAT_BALANCES[realUnit]
       : mockBalance;
   const balance = mockMode ? demoBalance : breakdown.total;
   const reservedTotal = mockMode ? 0 : breakdown.reserved;
   const pendingTotal = mockMode ? (isSatUnit ? mockPendingAmount : 0) : breakdown.pending;
   const lockedTotal = mockMode ? 0 : breakdown.redeeming;
   // Pills sum amounts in the active unit (matches the balance above).
-  const pendingUnit = account.unit;
-  const lockedUnit = account.unit;
+  const pendingUnit = realUnit;
+  const lockedUnit = realUnit;
 
   useEffect(() => {
     onPillVisibilityChange?.(account.unit, {
@@ -325,25 +339,20 @@ export function PrimaryBalance({
           presentation
           textSize={12}
           displayUnit={
-            account.unit === 'sat' ||
-            account.unit === 'usd' ||
-            account.unit === 'eur' ||
-            account.unit === 'gbp'
-              ? account.unit
-              : undefined
+            Object.hasOwn(PILL_LABELS, account.unit) ? (account.unit as ActiveUnit) : undefined
           }
         />
         <Pressable
           onPress={toggleUnit}
           testID={`wallet-balance-toggle-${account.unit}`}
           accessibilityRole="button"
-          accessibilityLabel={`Balance, ${balance.toLocaleString()} ${account.unit.toUpperCase()}`}
+          accessibilityLabel={`Balance, ${balance.toLocaleString()} ${accountUnitLabel(account.unit)}`}
           accessibilityHint={isSatUnit ? 'Cycles the balance display format' : undefined}
           accessibilityState={{ disabled: !isSatUnit }}
           style={styles.balancePressable}>
           <AmountFormatter
             amount={balance}
-            unit={account.unit}
+            unit={realUnit}
             size={BALANCE_TEXT_SIZE}
             lineHeight={BALANCE_TEXT_LINE_HEIGHT}
             weight="heavy"
@@ -396,7 +405,7 @@ export function PrimaryBalance({
           label="RESERVED"
           testID={`wallet-reserved-pill-${account.unit}`}
           totalAmount={reservedTotal}
-          unit={account.unit}
+          unit={realUnit}
           onPress={handleReservedPress}
           reserveSlot={reservePillSlots?.reserved}
         />

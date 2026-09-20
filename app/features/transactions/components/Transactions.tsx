@@ -50,11 +50,14 @@ import {
   type ScanMethod,
   type TransactionDirection,
   type TransactionPaymentType,
+  toRealUnit,
 } from 'wallet';
 import { log, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { spacing, zIndex } from '@/shared/styles/tokens';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
+import { belongsToAccount } from '@/shared/lib/cashu/accountScope';
+import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import {
   useSwapTransactionsStore,
   type SwapGroup,
@@ -238,13 +241,14 @@ export const Transactions = React.memo(
 
     const swapGroups = useMemo(() => {
       if (account.unit === 'all') return Object.values(swapGroupsById);
-      return Object.values(swapGroupsById).filter((g) => g.unit === account.unit);
+      return Object.values(swapGroupsById).filter((g) => g.unit === toRealUnit(account.unit));
     }, [swapGroupsById, account.unit]);
+    const isTestnutMint = useIsTestnutMint();
 
     const filteredHistory = useMemo(() => {
       const t0 = performance.now();
       const result = history.filter((historyEntry: HistoryEntry) => {
-        if (account.unit !== 'all' && historyEntry.unit !== account.unit) return false;
+        if (!belongsToAccount(account.unit, historyEntry, isTestnutMint)) return false;
         if (mintUrlFilter !== 'all' && historyEntry.mintUrl !== mintUrlFilter) return false;
 
         // Hide legs that belong to a swap group — colada surfaces the group as a
@@ -290,6 +294,7 @@ export const Transactions = React.memo(
     }, [
       history,
       account.unit,
+      isTestnutMint,
       mintUrlFilter,
       filter,
       type,

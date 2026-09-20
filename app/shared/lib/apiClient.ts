@@ -106,8 +106,22 @@ const DiscoverMint = z.looseObject({
   follows: z.number().int().optional(),
   vertexRank: z.number().optional(),
   vertexScore: z.number().nullable().optional(),
+  // nagg's unpaid-quote probe saw the mint mark a never-paid quote as paid: a
+  // fake payment backend. The row's units are then testnut account units.
+  testnut: z.boolean().optional().catch(undefined),
 });
 export type DiscoverMint = z.infer<typeof DiscoverMint>;
+// nagg's per-mint info for the wallet's OWN mints (which discovery's roster
+// may not list). `testnut` is a verdict only when `probedAt` is present:
+// false without it means "not probed yet", not "real mint".
+const MintInfoRow = z.looseObject({
+  mintUrl: z.string().max(2048),
+  known: z.boolean().optional().catch(undefined),
+  testnut: z.boolean(),
+  probedAt: z.number().int().nonnegative().optional().catch(undefined),
+});
+const MintInfoResponse = z.looseObject({ mints: z.array(MintInfoRow).max(64) });
+export type MintInfoRow = z.infer<typeof MintInfoRow>;
 // nagg's mint-info changelog: every tracked mint's NUT-06 revisions, newest
 // first, each carrying the RFC-6902 patch that produced it. Lenient like
 // `DiscoverMint` — the `patch` ops are a wire shape we only ever read, and the
@@ -426,6 +440,7 @@ export const fetchBtcRates = (controls: RequestControls = {}) =>
 const parseAiLineup = parseWith(NaggAiLineupSchema, 'app/ai-lineup');
 const parseDiscoverMints = parseWith(DiscoverMintsResponse, 'nostr/mint/discover');
 const parseMintChanges = parseWith(MintChangesResponse, 'nostr/mint/changes');
+const parseMintInfos = parseWith(MintInfoResponse, 'nostr/mint/info');
 const parseCatalog = parseWith(CatalogResponse, 'app/wallpapers');
 
 /**
@@ -490,6 +505,26 @@ export const fetchMintChanges = ({
     undefined,
     { signal }
   );
+
+/** nagg caps one `/nostr/mint/info` request at this many mints. */
+export const MINT_INFO_MAX_URLS = 50;
+
+/**
+ * nagg's stored info + testnut verdict for up to `MINT_INFO_MAX_URLS` of the
+ * wallet's own mints, one row per mint echoing the requested URL. Nagg fails
+ * the whole request rather than answer without verdicts, so an Ok result is
+ * safe to cache.
+ */
+export const fetchMintInfos = (mintUrls: readonly string[], controls?: RequestControls) =>
+  fetchJson(
+    `${SCORE_API_BASE_URL}/nostr/mint/info?${mintUrls
+      .map((url) => `u=${encodeURIComponent(url)}`)
+      .join('&')}`,
+    parseMintInfos,
+    'nostr/mint/info',
+    undefined,
+    controls
+  ).then((result) => result.map(({ mints }) => mints));
 
 /** A normalized single-mint lookup; unknown mints return no row. */
 export const discoverMint = async (mintUrl: string, controls?: RequestControls) =>

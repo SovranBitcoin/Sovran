@@ -2,6 +2,7 @@ import type { RequestControls } from 'wallet';
 
 import { discoverMint } from '@/shared/lib/apiClient';
 import { newReadId, readErrorType, readEvents, readKeyHash } from '@/shared/lib/read/readLog';
+import { useMintTestnutStore } from '@/shared/stores/global/mintTestnutStore';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 
@@ -63,6 +64,7 @@ export async function getDiscoveredMintMetadata(
   }
   if (result.isOk() && result.value) {
     useMintMetadataStore.getState().upsertFromDiscover([result.value]);
+    useMintTestnutStore.getState().applyDiscover([result.value]);
     const next = useMintMetadataStore.getState().getCached(mintUrl);
     readEvents.done({
       readId,

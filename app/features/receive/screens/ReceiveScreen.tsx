@@ -24,7 +24,7 @@ import {
 } from 'wallet/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
-import type { FormattedString } from 'wallet';
+import { toAccountUnit, toRealUnit, type FormattedString } from 'wallet';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ReceiveReusableQuoteTab } from '@/features/receive/components/ReceiveReusableQuoteTab';
 import { ReceivePaymentRequestTab } from '@/features/receive/components/ReceivePaymentRequestTab';
@@ -219,12 +219,18 @@ interface ReceiveScreenProps {
 export function ReceiveScreen(props: ReceiveScreenProps) {
   const [selectedTab, setSelectedTab] = useState<string>('Unified');
   const [lightningMode, setLightningMode] = useState<'address' | 'offer'>('address');
+  // `props.unit` is the mint's REAL unit; the account adds the active side of
+  // the testnut split, so `usd` → `tusd` (same unit, different mints) is a
+  // different account too.
+  const { testnut } = useActiveUnit();
+  const accountUnit = toAccountUnit(props.unit, testnut);
   // Keep the selected tab, but reset every quote/copy cache across accounts so
   // an old-unit payment request cannot paint or copy during the new load.
   return (
     <ReceiveScreenForUnit
-      key={props.unit}
+      key={accountUnit}
       {...props}
+      accountUnit={accountUnit}
       selectedTab={selectedTab}
       setSelectedTab={setSelectedTab}
       lightningMode={lightningMode}
@@ -236,11 +242,13 @@ export function ReceiveScreen(props: ReceiveScreenProps) {
 function ReceiveScreenForUnit({
   receiveEntry,
   unit,
+  accountUnit,
   selectedTab,
   setSelectedTab,
   lightningMode,
   setLightningMode,
 }: ReceiveScreenProps & {
+  accountUnit: string;
   selectedTab: string;
   setSelectedTab: (tab: string) => void;
   lightningMode: 'address' | 'offer';
@@ -333,20 +341,23 @@ function ReceiveScreenForUnit({
   const selectReceiveUnit = useCallback(
     (next: ActiveUnit) => {
       if (
-        next === unit ||
+        next === accountUnit ||
         machine.inspect().isExecuting ||
         [actions.changeNpcMint, actions.changeBolt12Mint, actions.changeOnchainMint].some(
           (action) => action.loading
         )
       )
         return;
-      const nextEntry = receiveEntryInUnit(receiveEntry, next);
+      // The route and the entry carry the REAL unit; the account (which side
+      // of the testnut split) lives in the active unit `selectUnit` sets.
+      const nextUnit = toRealUnit(next);
+      const nextEntry = receiveEntryInUnit(receiveEntry, nextUnit);
       if (!nextEntry) return;
       selectUnit(next);
       machine.reset();
-      router.setParams({ unit: next, receiveEntry: nextEntry });
+      router.setParams({ unit: nextUnit, receiveEntry: nextEntry });
     },
-    [actions, machine, receiveEntry, selectUnit, unit]
+    [actions, machine, receiveEntry, selectUnit, accountUnit]
   );
   useScreenOptions(
     () =>
@@ -355,7 +366,9 @@ function ReceiveScreenForUnit({
           hasReceiveEntryData ? (
             <UnitSwitcherPillFallback
               header
-              displayUnit={Object.hasOwn(PILL_LABELS, unit) ? (unit as ActiveUnit) : undefined}
+              displayUnit={
+                Object.hasOwn(PILL_LABELS, accountUnit) ? (accountUnit as ActiveUnit) : undefined
+              }
               onSelectUnit={selectReceiveUnit}
             />
           ) : null,

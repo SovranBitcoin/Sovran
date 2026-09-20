@@ -31,6 +31,7 @@ import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
+import { toRealUnit } from 'wallet';
 import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
 import { E2EHerouiMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
@@ -119,7 +120,8 @@ export function WalletScreen() {
     clearPaymentContext('wallet.scan_qr');
     router.navigate({
       pathname: '/camera',
-      params: { to: 'sendToken', unit: account.unit },
+      // Payment routes carry the mint's REAL unit, never the account unit.
+      params: { to: 'sendToken', unit: toRealUnit(account.unit) },
     });
   };
 

@@ -5,6 +5,7 @@
  * large (expanded) and small (compact) sizes based on scroll position.
  */
 
+import { accountUnitLabel, toRealUnit } from 'wallet';
 import { useCallback } from 'react';
 import { ScrollView } from 'react-native';
 import Animated, {
@@ -73,7 +74,9 @@ function AnimatedCurrencyTab({
   primaryColor900: string;
 }) {
   // Get label for currency
-  const label = currency === 'SAT' ? 'BTC' : currency === 'ALL' ? 'ALL' : currency;
+  // Testnut account units read tBTC / tUSD …; their icon is the real unit's.
+  const label = currency === 'ALL' ? 'ALL' : accountUnitLabel(currency);
+  const iconCurrency = toRealUnit(currency).toUpperCase();
 
   // Animated container style
   const animatedContainerStyle = useAnimatedStyle(() => {
@@ -156,10 +159,10 @@ function AnimatedCurrencyTab({
 
   // Render icon based on currency type - always render at LARGE size, scaling handles the rest
   const renderIcon = () => {
-    if (currency === 'USD' || currency === 'EUR' || currency === 'GBP') {
+    if (iconCurrency === 'USD' || iconCurrency === 'EUR' || iconCurrency === 'GBP') {
       return (
         <Icon
-          name={`circle-flags:${currency === 'USD' ? 'us' : currency === 'EUR' ? 'eu' : 'gb'}`}
+          name={`circle-flags:${iconCurrency === 'USD' ? 'us' : iconCurrency === 'EUR' ? 'eu' : 'gb'}`}
           size={LARGE_ICON_SIZE}
         />
       );
@@ -173,7 +176,7 @@ function AnimatedCurrencyTab({
         />
       );
     }
-    return <CurrencyIcon width={LARGE_ICON_SIZE} currency={currency.toLowerCase()} />;
+    return <CurrencyIcon width={LARGE_ICON_SIZE} currency={iconCurrency.toLowerCase()} />;
   };
 
   return (

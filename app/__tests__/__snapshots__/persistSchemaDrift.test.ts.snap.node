@@ -1187,6 +1187,10 @@ exports[`persisted schema drift mint-store schema matches the golden snapshot fo
             "usd",
             "eur",
             "gbp",
+            "tsat",
+            "tusd",
+            "teur",
+            "tgbp",
           ],
           "type": "string",
         },
@@ -1245,6 +1249,10 @@ exports[`persisted schema drift mint-store schema matches the golden snapshot fo
             "usd",
             "eur",
             "gbp",
+            "tsat",
+            "tusd",
+            "teur",
+            "tgbp",
           ],
           "type": "string",
         },
@@ -1301,6 +1309,93 @@ exports[`persisted schema drift mint-store schema matches the golden snapshot fo
     },
   },
   "version": 2,
+}
+`;
+
+exports[`persisted schema drift mint-testnut-store schema matches the golden snapshot for its version: mint-testnut-store 1`] = `
+{
+  "name": "mint-testnut-store",
+  "shape": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "byMintUrl": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "properties": {
+              "checkedAt": {
+                "default": 0,
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "probedAt": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "testnut": {
+                "default": false,
+                "type": "boolean",
+              },
+            },
+            "type": "object",
+          },
+          "default": {},
+          "propertyNames": {
+            "maxLength": 2048,
+            "type": "string",
+          },
+          "type": "object",
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "byMintUrl": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "properties": {
+              "checkedAt": {
+                "default": 0,
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "probedAt": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "testnut": {
+                "default": false,
+                "type": "boolean",
+              },
+            },
+            "required": [
+              "testnut",
+              "checkedAt",
+            ],
+            "type": "object",
+          },
+          "default": {},
+          "propertyNames": {
+            "maxLength": 2048,
+            "type": "string",
+          },
+          "type": "object",
+        },
+      },
+      "required": [
+        "byMintUrl",
+      ],
+      "type": "object",
+    },
+  },
+  "version": 1,
 }
 `;
 

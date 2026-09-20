@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
+import type { AccountUnit } from 'wallet';
 import { storeLog } from '@/shared/lib/logger';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
@@ -10,10 +11,13 @@ export type Bip321RailId = 'onchain' | 'bolt12' | 'creq';
 
 const profileStorage = createProfileScopedStorage();
 
-/** The wallet's active mint unit — NOT the fiat display currency
+/** The wallet's active ACCOUNT unit — NOT the fiat display currency
  *  (settingsStore.displayCurrency); this is the unit ecash is denominated
- *  in (coco v2 multi-unit balances/quotes/proofs are per mint+unit). */
-export type ActiveUnit = 'sat' | 'usd' | 'eur' | 'gbp';
+ *  in (coco v2 multi-unit balances/quotes/proofs are per mint+unit), with
+ *  testnut mints' units split out as `tsat`/`tusd`/… so test funds never
+ *  share an account with real ones. Coco and the payment machine only ever
+ *  see `toRealUnit(activeUnit)` — see wallet `account-units`. */
+export type ActiveUnit = AccountUnit;
 
 interface MintState {
   selectedMint: string | undefined;
@@ -54,7 +58,11 @@ const PersistedMintStore = z.object({
   // Additive tolerant field (no version bump needed): old blobs rehydrate to
   // 'sat'; an unknown persisted value degrades to 'sat' instead of wiping the
   // store (sovran-data persisted-schema invariant).
-  activeUnit: z.enum(['sat', 'usd', 'eur', 'gbp']).default('sat').catch('sat'),
+  // Widened (additive) with the testnut account units.
+  activeUnit: z
+    .enum(['sat', 'usd', 'eur', 'gbp', 'tsat', 'tusd', 'teur', 'tgbp'])
+    .default('sat')
+    .catch('sat'),
   // Additive tolerant field: a corrupt map degrades to {} (new standing
   // quotes get created and re-recorded) instead of wiping the store.
   standingQuotes: z.record(z.string(), z.string().max(256)).default({}).catch({}),

@@ -19,6 +19,9 @@ import { useMints, useBalanceContext } from '@cashu/coco-react';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { useMintKeysetUnits } from '@/features/wallet/hooks/useMintKeysetUnits';
+import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
+import { deriveSupportedUnitsFromInfo, isTestnutUnit, toRealUnit } from 'wallet';
 
 import {
   EMPTY_DISTRIBUTION,
@@ -84,11 +87,16 @@ export function MintRebalancePlanScreen() {
   const fgDim = withAlpha(foreground, 0.4);
 
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.rebalancePlan' });
-  const unit = params?.unit?.toLowerCase() || 'sat';
+  // The route carries the ACCOUNT unit (`tusd` for a testnut split): it keys
+  // the distribution and picks the mint set, while coco moves the real unit.
+  const accountUnit = params?.unit?.toLowerCase() || 'sat';
+  const unit = toRealUnit(accountUnit);
 
   const { trustedMints } = useMints();
   const { balances: liveBalanceCtx } = useBalanceContext();
-  const liveBalances = liveBalanceCtx.byMint;
+  const liveBalances = liveBalanceCtx.byMintAndUnit;
+  const keysetUnitsByMint = useMintKeysetUnits();
+  const isTestnutMint = useIsTestnutMint();
   const { getMintInfo } = useMintManagement();
   const middlemanRouting = useSettingsStore((state) => state.middlemanRouting);
   const minTransferThreshold = useSettingsStore((state) => state.minTransferThreshold);
@@ -99,21 +107,19 @@ export function MintRebalancePlanScreen() {
   // active unit's slice is read. Falling back to a shared frozen empty object keeps
   // the reference stable when the unit has no entry yet.
   const distribution = useMintDistributionStore(
-    (state) => state.distributions[unit] ?? EMPTY_DISTRIBUTION
+    (state) => state.distributions[accountUnit] ?? EMPTY_DISTRIBUTION
   );
 
+  // Same mint set the Balance split screen edits: keyset-backed units, and
+  // only mints on the account's side of the testnut split — a plan never
+  // moves funds between a testnut and a real mint.
   const mintsForUnit = useMemo(() => {
-    return trustedMints.filter((mint) => {
-      if (unit === 'sat') {
-        if (!mint.mintInfo?.nuts?.['4']?.methods) return true;
-        return mint.mintInfo.nuts['4'].methods.some(
-          (method) => method.unit?.toLowerCase() === 'sat'
-        );
-      }
-      if (!mint.mintInfo?.nuts?.['4']?.methods) return false;
-      return mint.mintInfo.nuts['4'].methods.some((method) => method.unit?.toLowerCase() === unit);
-    });
-  }, [trustedMints, unit]);
+    return trustedMints.filter(
+      (mint) =>
+        isTestnutMint(mint.mintUrl) === isTestnutUnit(accountUnit) &&
+        deriveSupportedUnitsFromInfo(mint.mintInfo, keysetUnitsByMint[mint.mintUrl]).includes(unit)
+    );
+  }, [trustedMints, unit, accountUnit, keysetUnitsByMint, isTestnutMint]);
 
   const mintUrls = useMemo(() => mintsForUnit.map((m) => m.mintUrl), [mintsForUnit]);
 
@@ -163,10 +169,10 @@ export function MintRebalancePlanScreen() {
   const computedPlan = useMemo(() => {
     const mintBalances = mintUrls.map((mintUrl) => ({
       mintUrl,
-      balance: amountToNumber(liveBalances[mintUrl]?.total),
+      balance: amountToNumber(liveBalances?.[mintUrl]?.[unit]?.total),
     }));
     return computeRebalancePlan(mintBalances, distribution, minTransferThreshold);
-  }, [mintUrls, liveBalances, distribution, minTransferThreshold]);
+  }, [mintUrls, liveBalances, unit, distribution, minTransferThreshold]);
 
   const {
     plan,
