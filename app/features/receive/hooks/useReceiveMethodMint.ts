@@ -2,7 +2,9 @@ import { useMemo } from 'react';
 
 import { hasMintSupportingMethod, resolveReceiveMethodMint } from 'wallet';
 
+import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { paymentLog } from '@/shared/lib/logger';
 
@@ -22,13 +24,21 @@ interface ReceiveMethodMintState {
  * `mintStore.receiveMintByMethod`; the auto default (first trusted mint
  * supporting the method) is derived per render, so trusting a capable mint
  * populates the rail immediately and untrusting one self-heals.
+ *
+ * One pick per method is shared by every account, so a pick on the other side
+ * of the testnut split (a testnut mint while a real account is active, or the
+ * reverse) is set aside for the auto default instead of backing the rail —
+ * `walletContext` already limits the auto default to the active account.
  */
 export function useReceiveMethodMint(
   method: 'bolt12' | 'onchain',
   unit: string
 ): ReceiveMethodMintState {
-  const explicit = useMintStore((s) => s.receiveMintByMethod[method]);
+  const picked = useMintStore((s) => s.receiveMintByMethod[method]);
   const walletContext = useWalletContext();
+  const { testnut } = useActiveUnit();
+  const isTestnutMint = useIsTestnutMint();
+  const explicit = picked && isTestnutMint(picked) === testnut ? picked : undefined;
 
   return useMemo(() => {
     const requirement = { operation: 'mint' as const, method, unit };

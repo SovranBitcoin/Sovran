@@ -2,20 +2,12 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
+import { FIAT_UNITS, type FiatUnit } from 'wallet/units';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
-interface PricelistData {
-  usd?: {
-    btc: number;
-  };
-  eur?: {
-    btc: number;
-  };
-  gbp?: {
-    btc: number;
-  };
-}
+/** BTC price per fiat unit of the wallet's unit registry. */
+type PricelistData = Partial<Record<FiatUnit, { btc: number }>>;
 
 interface PricelistState {
   pricelist: PricelistData | null;
@@ -25,13 +17,14 @@ interface PricelistState {
   error: string | null;
 }
 
-export interface BitcoinPrices {
-  USD: number;
-  GBP: number;
-  EUR: number;
-}
+/** nagg's `/app/rates` wire shape: upper-case currency codes. */
+export type BitcoinPrices = Record<Uppercase<FiatUnit>, number>;
 
-type SupportedCurrency = keyof PricelistData;
+type SupportedCurrency = FiatUnit;
+
+const wireCode = (unit: FiatUnit) => unit.toUpperCase() as Uppercase<FiatUnit>;
+/** The rate codes nagg is asked about: one per fiat unit of the registry. */
+export const RATE_CODES = FIAT_UNITS.map(wireCode);
 
 // Nagg refreshes upstream prices hourly; allow two refresh windows before stale.
 export const PRICE_STALE_MINUTES = 120;
@@ -48,11 +41,11 @@ type PricelistStore = PricelistState & PricelistActions;
 
 const PersistedPricelistStore = z.object({
   pricelist: z
-    .looseObject({
-      usd: z.looseObject({ btc: z.number() }).optional(),
-      eur: z.looseObject({ btc: z.number() }).optional(),
-      gbp: z.looseObject({ btc: z.number() }).optional(),
-    })
+    .looseObject(
+      Object.fromEntries(
+        FIAT_UNITS.map((unit) => [unit, z.looseObject({ btc: z.number() }).optional()])
+      )
+    )
     .nullable()
     .default(null),
   lastUpdated: z.number().int().nonnegative().nullable().default(null),
@@ -69,20 +62,17 @@ export const usePricelistStore = create<PricelistStore>()(
       error: null,
 
       setBtcPrices: (prices, serverUpdatedAtSeconds) => {
-        if (prices.USD === undefined && prices.EUR === undefined && prices.GBP === undefined)
-          return;
+        const received: PricelistData = {};
+        for (const unit of FIAT_UNITS) {
+          const price = prices[wireCode(unit)];
+          if (price !== undefined) received[unit] = { btc: price };
+        }
+        if (Object.keys(received).length === 0) return;
         storeLog.debug('store.pricelist.set_btc_prices', {
-          usd: prices.USD,
-          eur: prices.EUR,
-          gbp: prices.GBP,
+          ...Object.fromEntries(FIAT_UNITS.map((unit) => [unit, received[unit]?.btc])),
         });
         set((state) => ({
-          pricelist: {
-            ...state.pricelist,
-            ...(prices.USD !== undefined ? { usd: { btc: prices.USD } } : {}),
-            ...(prices.EUR !== undefined ? { eur: { btc: prices.EUR } } : {}),
-            ...(prices.GBP !== undefined ? { gbp: { btc: prices.GBP } } : {}),
-          },
+          pricelist: { ...state.pricelist, ...received },
           lastUpdated: Date.now(),
           serverUpdatedAt: serverUpdatedAtSeconds ?? null,
           error: null,

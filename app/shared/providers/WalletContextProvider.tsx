@@ -24,12 +24,14 @@ import {
   deriveMintMethodCapabilityMapFromTrustedMints,
   deriveSupportedUnitsFromInfo,
   pickHighestBalanceUnit,
+  toAccountUnit,
   type WalletContext,
 } from 'wallet';
 import { getReadyProofs } from '@/shared/lib/cashu/managerInternals';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 
-import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
+import { useMintStore, type ActiveUnit } from '@/shared/stores/profile/mintStore';
 import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
 import { useMintKeysetUnits } from '@/features/wallet/hooks/useMintKeysetUnits';
 import { useShallowMemo } from '@/shared/hooks/useShallowMemo';
@@ -83,10 +85,22 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
   // The whole wallet view is scoped to the active mint unit (coco v2
   // multi-unit): balances, method capabilities, and proof amounts below all
   // read the active unit's slice.
-  const { unit: activeUnit, setUnit: setActiveUnit } = useActiveUnit();
+  //
+  // The testnut split is enforced HERE for the payment machine: it works in
+  // the account's real mint unit (`activeUnit`), and a mint on the other side
+  // of the split (a testnut mint while a real account is active, or the
+  // reverse) contributes no balance and no method capability. So no send,
+  // melt, receive rail or auto-pick can mix test funds with real ones.
+  const { realUnit: activeUnit, testnut: testnutAccount, setUnit: setActiveUnit } = useActiveUnit();
+  const isTestnutMint = useIsTestnutMint();
+  const inActiveAccount = useCallback(
+    (mintUrl: string) => isTestnutMint(mintUrl) === testnutAccount,
+    [isTestnutMint, testnutAccount]
+  );
   const { mintBalances: rawMintBalances, unitBalances } = useMemo(() => {
     const unitBalances: Record<string, Record<string, number>> = {};
     for (const [mintUrl, byUnit] of Object.entries(rawBalanceCtx.byMintAndUnit ?? {})) {
+      if (!inActiveAccount(mintUrl)) continue;
       for (const [unit, snapshot] of Object.entries(byUnit)) {
         const unitEntry = unitBalances[unit] ?? (unitBalances[unit] = {});
         unitEntry[mintUrl] = snapshot ? amountToNumber(snapshot.total) : 0;
@@ -96,12 +110,12 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
       mintBalances: Object.fromEntries(
         Object.entries(rawBalanceCtx.byMintAndUnit ?? {}).map(([url, byUnit]) => [
           url,
-          byUnit[activeUnit] ? amountToNumber(byUnit[activeUnit].total) : 0,
+          inActiveAccount(url) && byUnit[activeUnit] ? amountToNumber(byUnit[activeUnit].total) : 0,
         ])
       ),
       unitBalances,
     };
-  }, [rawBalanceCtx, activeUnit]);
+  }, [rawBalanceCtx, activeUnit, inActiveAccount]);
   const manager = useManager();
   const preferredMintUrl = useMintStore((state) => state.selectedMint);
 
@@ -126,10 +140,11 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
           mintUrl: mint.mintUrl,
           mintInfo: mint.mintInfo,
           keysetUnits: keysetUnitsByMint[mint.mintUrl],
+          outsideAccount: !inActiveAccount(mint.mintUrl),
         })),
         activeUnit
       ),
-    [rawTrustedMints, activeUnit, keysetUnitsByMint]
+    [rawTrustedMints, activeUnit, keysetUnitsByMint, inActiveAccount]
   );
   const stableMintUrls = useShallowMemo(trustedMintUrls);
 
@@ -160,30 +175,38 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     proofSnapshot?.scope === proofScope ? proofSnapshot.amounts : EMPTY_PROOF_AMOUNTS;
 
   // Follow the preferred mint with the active unit: when the user switches
-  // mints and the new mint doesn't support the current unit, snap to the
+  // mints and the new mint doesn't support the current ACCOUNT unit (a testnut
+  // mint never supports a real account, and vice versa), snap to the
   // unit holding the highest balance AT THAT MINT (not blindly sat) —
   // colada's pickHighestBalanceUnit, tie-broken sat-first. Derived from
   // CACHED NUT-04 mintInfo in coco's DB, so this works offline — no
   // info-endpoint call. Keyed on the mint URL (a ref, not an effect dep on
   // activeUnit) so a manual unit switch is never fought by this rule; the
   // switcher's own mint-follow (selectUnit) always lands on a supporting
-  // mint, so the two rules cannot ping-pong.
+  // mint, so the two rules cannot ping-pong. The key includes the mint's
+  // testnut verdict, so a verdict arriving for the preferred mint moves the
+  // wallet to that mint's account instead of leaving it stranded.
   const lastUnitSyncMintRef = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (!preferredMintUrl || lastUnitSyncMintRef.current === preferredMintUrl) return;
-    lastUnitSyncMintRef.current = preferredMintUrl;
+    if (!preferredMintUrl) return;
+    const preferredTestnut = isTestnutMint(preferredMintUrl);
+    const syncKey = `${preferredMintUrl}|${preferredTestnut}`;
+    if (lastUnitSyncMintRef.current === syncKey) return;
+    lastUnitSyncMintRef.current = syncKey;
     const mint = rawTrustedMints.find((m) => m.mintUrl === preferredMintUrl);
     if (!mint) return;
     const supported = deriveSupportedUnitsFromInfo(mint.mintInfo, keysetUnitsByMint[mint.mintUrl]);
     const currentUnit = useMintStore.getState().activeUnit;
-    if (supported.includes(currentUnit)) return;
+    if (supported.some((unit) => toAccountUnit(unit, preferredTestnut) === currentUnit)) return;
     const balanceByUnit = Object.fromEntries(
       Object.entries(rawBalanceCtx.byMintAndUnit?.[preferredMintUrl] ?? {}).map(
         ([unitKey, snapshot]) => [unitKey, snapshot ? amountToNumber(snapshot.total) : 0]
       )
     );
-    const next = pickHighestBalanceUnit(supported, balanceByUnit);
-    if (next !== 'sat' && next !== 'usd' && next !== 'eur' && next !== 'gbp') return;
+    const next = toAccountUnit(
+      pickHighestBalanceUnit(supported, balanceByUnit),
+      preferredTestnut
+    ) as ActiveUnit;
     walletLog.info('wallet.unit.synced_to_mint', {
       ...preferredMintLogFields(preferredMintUrl),
       from: currentUnit,
@@ -191,7 +214,14 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
       source: 'highest_balance_at_mint',
     });
     setActiveUnit(next);
-  }, [preferredMintUrl, rawTrustedMints, rawBalanceCtx, setActiveUnit, keysetUnitsByMint]);
+  }, [
+    preferredMintUrl,
+    rawTrustedMints,
+    rawBalanceCtx,
+    setActiveUnit,
+    keysetUnitsByMint,
+    isTestnutMint,
+  ]);
 
   const fetchProofAmounts = useCallback(async () => {
     walletLog.debug('provider.wallet_context.fetch_proof_amounts_start', {

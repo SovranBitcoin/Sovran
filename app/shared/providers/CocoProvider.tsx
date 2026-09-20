@@ -6,6 +6,7 @@ import { reportCocoApiFailure } from '@/shared/lib/cashu/cocoFeedback';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { attachMintTestnutToManager } from '@/shared/lib/mintTestnutRefresh';
 import { attachMintMetadataToManager } from '@/shared/stores/global/mintMetadataStore';
 import { log, initLog, initPhase, useInitMount, deferWork } from '@/shared/lib/logger';
 import { getBootMorphCompleted, subscribeBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
@@ -323,6 +324,13 @@ export function CocoProvider({ children }: CocoProviderProps) {
     if (!manager) return;
     log.info('coco.mint_info_cache.attach');
     return attachMintMetadataToManager(manager);
+  }, [manager]);
+
+  // Testnut verdicts for the trusted mints, refreshed in the background so the
+  // account split (tBTC / tUSD …) never waits on the network.
+  useEffect(() => {
+    if (!manager) return;
+    return attachMintTestnutToManager(manager);
   }, [manager]);
 
   const contextValue: CocoContextValue = {

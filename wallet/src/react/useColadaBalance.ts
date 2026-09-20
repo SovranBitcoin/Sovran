@@ -23,6 +23,7 @@ const PENDING_PAGE_SIZE = 100;
 async function readBreakdown(
   mgr: Manager,
   unit: string,
+  includeMint: ((mintUrl: string) => boolean) | undefined,
 ): Promise<WalletBalanceBreakdown | null> {
   try {
     const [perMint, historyPage, inFlight] = await Promise.all([
@@ -35,7 +36,13 @@ async function readBreakdown(
     let spendable = Amount.zero();
     let reserved = Amount.zero();
     let total = Amount.zero();
-    for (const balance of Object.values(perMint)) {
+    const included = (mintUrl: unknown) =>
+      !includeMint || typeof mintUrl !== "string" || includeMint(mintUrl);
+    // Coco owns the object it returned; the narrowed view is a copy.
+    const byMint: typeof perMint = {};
+    for (const [mintUrl, balance] of Object.entries(perMint)) {
+      if (!included(mintUrl)) continue;
+      byMint[mintUrl] = balance;
       spendable = spendable.add(balance.spendable);
       reserved = reserved.add(balance.reserved);
       total = total.add(balance.total);
@@ -44,12 +51,20 @@ async function readBreakdown(
       spendable: amountToNumber(spendable),
       reserved: amountToNumber(reserved),
       total: amountToNumber(total),
-      byMint: perMint,
+      byMint,
       pending: sumReservedSends(
-        (historyPage ?? []).filter((entry) => (entry.unit ?? "sat") === unit),
+        (historyPage ?? []).filter(
+          (entry) =>
+            (entry.unit ?? "sat") === unit &&
+            included((entry as { mintUrl?: unknown }).mintUrl),
+        ),
       ),
       redeeming: inFlight
-        .filter((op) => (op.unit ?? "sat") === unit)
+        .filter(
+          (op) =>
+            (op.unit ?? "sat") === unit &&
+            included((op as { mintUrl?: unknown }).mintUrl),
+        )
         .reduce((sum, op) => sum + amountToNumber(op.amount), 0),
     };
   } catch (err) {
@@ -68,21 +83,30 @@ async function readBreakdown(
  * helpers in `balance/breakdown`, reaching coco via the `useColadaManager` seam.
  *
  * All figures are scoped to `unit` (coco v2 multi-unit; defaults to sat so
- * existing callers keep today's behavior).
+ * existing callers keep today's behavior). `includeMint` narrows them to one
+ * side of the testnut split (see units/accounts) — pass a referentially stable
+ * predicate, it re-scopes the read.
  */
-export function useColadaBalance(unit = "sat"): WalletBalanceBreakdown {
+export function useColadaBalance(
+  unit = "sat",
+  includeMint?: (mintUrl: string) => boolean,
+): WalletBalanceBreakdown {
   const manager = useColadaManager();
 
   const [snapshot, setSnapshot] = useState(() => ({
     manager,
     unit,
+    includeMint,
     balance: emptyBalanceBreakdown(),
   }));
   const balance = useMemo(
-    () => snapshot.manager === manager && snapshot.unit === unit
-      ? snapshot.balance
-      : emptyBalanceBreakdown(),
-    [snapshot, manager, unit],
+    () =>
+      snapshot.manager === manager &&
+      snapshot.unit === unit &&
+      snapshot.includeMint === includeMint
+        ? snapshot.balance
+        : emptyBalanceBreakdown(),
+    [snapshot, manager, unit, includeMint],
   );
 
   useEffect(() => {
@@ -97,11 +121,11 @@ export function useColadaBalance(unit = "sat"): WalletBalanceBreakdown {
       running = true;
       while (requested && !cancelled) {
         requested = false;
-        const next = await readBreakdown(manager, unit);
+        const next = await readBreakdown(manager, unit, includeMint);
         // Events received during a read invalidate it. Collapse their work
         // into one trailing read, and never paint the outdated snapshot.
         if (next && !requested && !cancelled) {
-          setSnapshot({ manager, unit, balance: next });
+          setSnapshot({ manager, unit, includeMint, balance: next });
           logger.debug("balance.breakdown.reload", {
             unit,
             mintCount: Object.keys(next.byMint).length,
@@ -128,7 +152,7 @@ export function useColadaBalance(unit = "sat"): WalletBalanceBreakdown {
       cancelled = true;
       for (const event of events) manager.off(event, onChange);
     };
-  }, [manager, unit]);
+  }, [manager, unit, includeMint]);
 
   return balance;
 }

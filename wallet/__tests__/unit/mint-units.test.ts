@@ -6,8 +6,8 @@ import {
   pickHighestBalanceUnit,
   pickMintForUnit,
   resolveReceiveMethodMint,
-  SWITCHABLE_UNITS,
 } from "../../src/mint-capabilities";
+import { SWITCHABLE_UNITS } from "../../src/units/registry";
 
 function mintInfo(methods: { method: string; unit: string }[]) {
   return { nuts: { "4": { methods } } };

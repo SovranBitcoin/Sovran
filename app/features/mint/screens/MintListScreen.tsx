@@ -15,6 +15,7 @@ import { useEffect, useRef, useState } from 'react';
 import { List } from '@/shared/ui/composed/List';
 
 import type { MintListItem } from 'wallet';
+import { accountUnitLabel } from 'wallet';
 import type { MintRow } from '@/features/mint/hooks/useMintRowsWithCache';
 
 import { Text } from '@/shared/ui/primitives/Text';
@@ -198,7 +199,7 @@ export function MintListScreen({
     <Text style={{ color: withAlpha(foreground, 0.66), textAlign: 'center', marginTop: 20 }}>
       {selectedCurrency === 'ALL'
         ? 'No mints available'
-        : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}
+        : `No mints available for ${accountUnitLabel(selectedCurrency)}`}
     </Text>
   );
 

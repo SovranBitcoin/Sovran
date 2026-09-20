@@ -379,8 +379,6 @@ export {
   deriveMintMethodCapabilityMapFromTrustedMints,
   deriveMintMethodSupportFromInfo,
   deriveSupportedUnitsFromInfo,
-  SWITCHABLE_UNITS,
-  type SwitchableUnit,
   evaluateMintMethodAmountAvailability,
   getCapabilityUnavailableReason,
   getUnitAmountEnvelope,
@@ -398,6 +396,25 @@ export {
   type MintMethodAmountAvailability,
   type ReceiveMethodMintResolution,
 } from "./mint-capabilities";
+export {
+  FIAT_UNITS,
+  isSwitchableUnit,
+  SWITCHABLE_UNITS,
+  unitDefinition,
+  type FiatUnit,
+  type SwitchableUnit,
+} from "./units/registry";
+export {
+  ACCOUNT_UNITS,
+  accountUnitLabel,
+  accountUnitName,
+  isAccountUnit,
+  isTestnutUnit,
+  toAccountUnit,
+  toRealUnit,
+  type AccountUnit,
+  type TestnutUnit,
+} from "./units/accounts";
 export {
   validateIntent,
   checkWalletCapabilities,

@@ -30,11 +30,11 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { unitSfSymbol } from '@/shared/lib/cashu/unitPresentation';
 import type { ActiveUnit } from '@/shared/stores/profile/mintStore';
 import {
   PILL_HEIGHT,
-  PILL_LABELS,
-  UNIT_SF_SYMBOLS,
+  pillLabel,
   useUnitSwitcherPill,
   type UnitSwitcherPillProps,
 } from './useUnitSwitcherPill';
@@ -47,7 +47,7 @@ export function UnitSwitcherPillLiquid(props: UnitSwitcherPillProps): React.Reac
   const colorScheme = useColorScheme();
   const textColor = useThemeColor('foreground');
 
-  const label = PILL_LABELS[shownUnit];
+  const label = pillLabel(shownUnit);
 
   // iOS 26: native glass button that morphs into its UIMenu and scrolls.
   if (LiquidGlassMenu.isSupported) {
@@ -72,7 +72,7 @@ export function UnitSwitcherPillLiquid(props: UnitSwitcherPillProps): React.Reac
           actions={availableOptions.map((option) => ({
             id: option.unit,
             title: option.label,
-            image: UNIT_SF_SYMBOLS[option.unit],
+            image: unitSfSymbol(option.unit),
             selected: option.unit === unit,
           }))}
           onSelectAction={({ nativeEvent }) => handleSelectUnit(nativeEvent.id as ActiveUnit)}
@@ -85,7 +85,7 @@ export function UnitSwitcherPillLiquid(props: UnitSwitcherPillProps): React.Reac
   const actions: MenuAction[] = availableOptions.map((option) => ({
     id: option.unit,
     title: option.label,
-    image: UNIT_SF_SYMBOLS[option.unit],
+    image: unitSfSymbol(option.unit),
     state: option.unit === unit ? ('on' as const) : ('off' as const),
   }));
 

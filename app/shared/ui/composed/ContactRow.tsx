@@ -22,6 +22,7 @@ import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { ReactNode, useEffect } from 'react';
 import { withAlpha } from '@/shared/lib/color';
 import type { MintListItem } from 'wallet';
+import { accountUnitLabel } from 'wallet';
 
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
@@ -516,9 +517,7 @@ function buildStats(
         // unit (chorus usd) never shows here.
         const units = mintStats?.supportedUnits;
         if (units && units.length > 1) {
-          const label = units
-            .map((unit) => (unit.toLowerCase() === 'sat' ? 'BTC' : unit.toUpperCase()))
-            .join('·');
+          const label = units.map((unit) => accountUnitLabel(unit)).join('·');
           out.push({
             icon: 'ph:coins',
             value: label,

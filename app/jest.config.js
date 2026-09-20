@@ -19,6 +19,7 @@ module.exports = {
     '^nostr/schemas$': '<rootDir>/../nostr/src/schemas.ts',
     '^wallet$': '<rootDir>/../wallet/src/index.ts',
     '^wallet/react$': '<rootDir>/../wallet/src/react/index.ts',
+    '^wallet/units$': '<rootDir>/../wallet/src/units/index.ts',
     '^wallet/safeFetch$': '<rootDir>/../wallet/src/safeFetch.ts',
     '^wallet/operations$': '<rootDir>/../wallet/src/operations/index.ts',
     // A hoisted install and an isolated install must use the renderer's React.

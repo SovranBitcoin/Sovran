@@ -126,6 +126,25 @@ describe('apiClient backend config routing', () => {
     if (result.isOk()) expect(result.value).toEqual(row);
   });
 
+  it('asks nagg for the wallet mints in one mint-info request', async () => {
+    process.env.EXPO_PUBLIC_SCORE_API_BASE_URL = 'https://score.example.test/';
+    const { fetchMintInfos } =
+      jest.requireActual<typeof import('@/shared/lib/apiClient')>('@/shared/lib/apiClient');
+    const mints = ['https://mint.example.test/Bitcoin', 'https://testnut.example.test'];
+    const rows = [
+      { mintUrl: mints[0], known: true, testnut: false },
+      { mintUrl: mints[1], known: true, testnut: true, probedAt: 1_790_000_000, name: 'Testnut' },
+    ];
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ mints: rows }) });
+    const result = await fetchMintInfos(mints);
+    expect(mockFetch).toHaveBeenCalledWith(
+      `https://score.example.test/nostr/mint/info?u=${encodeURIComponent(mints[0])}&u=${encodeURIComponent(mints[1])}`,
+      expect.anything()
+    );
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) expect(result.value).toEqual(rows);
+  });
+
   it('returns no discovery row for an unknown mint', async () => {
     const { discoverMint } =
       jest.requireActual<typeof import('@/shared/lib/apiClient')>('@/shared/lib/apiClient');

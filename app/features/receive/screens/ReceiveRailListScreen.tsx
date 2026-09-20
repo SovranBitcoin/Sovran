@@ -22,7 +22,7 @@ import { z } from 'zod';
 import { withAlpha } from '@/shared/lib/color';
 
 import type { Manager } from '@cashu/coco-core';
-import { standingPaymentRequestKey } from 'wallet';
+import { isTestnutUnit, standingPaymentRequestKey } from 'wallet';
 import { useColadaManager } from 'wallet/react';
 import {
   buildBolt12Items,
@@ -41,6 +41,7 @@ import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { isTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
@@ -98,9 +99,13 @@ async function loadRailItems(
     });
   }
   const standingIds = new Set(Object.values(standingQuotes));
-  return rail === 'onchain'
+  const items = await (rail === 'onchain'
     ? buildOnchainItems(manager, { standingIds })
-    : buildBolt12Items(manager, { standingIds });
+    : buildBolt12Items(manager, { standingIds }));
+  // Coco lists every mint's quotes; keep the active account's side of the
+  // testnut split so a test mint's addresses never sit among real ones.
+  const testnutAccount = isTestnutUnit(useMintStore.getState().activeUnit);
+  return items.filter((item) => !item.mintUrl || isTestnutMint(item.mintUrl) === testnutAccount);
 }
 
 // Live "coco is watching this for a payment" indicator for the reusable rails

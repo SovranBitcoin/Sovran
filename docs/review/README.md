@@ -36,6 +36,13 @@ Native bridge code is included; upstream BitChatVendor trees, other declared
 generated/build/vendor paths and Hunch's built-in exclusions are outside scope. All former
 contributor conventions remain in [contributor-conventions.md](contributor-conventions.md).
 
+Per-domain conventions sit beside it, each rule reproduced against the installed
+package versions before it was accepted: [zod](conventions-zod.md),
+[React Native and Expo](conventions-react-native.md), [state, persistence and
+React](conventions-state.md), [TypeScript, errors and data handling](conventions-typescript.md)
+and [async, errors, network and tests](conventions-async-tests.md). Re-check a rule
+that names a dependency's behaviour when that dependency is upgraded.
+
 [contracts.md](contracts.md) defines domain meanings and allowed cases. Its source links are for
 human investigation, not automatic source expansion. Head-source context is bounded at 40 lines;
 callers, schemas and distant guards may still be absent. An `insufficient-context` response makes

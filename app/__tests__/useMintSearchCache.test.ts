@@ -14,6 +14,9 @@ const mockUpsert = jest.fn();
 jest.mock('@/shared/stores/global/mintMetadataStore', () => ({
   useMintMetadataStore: { getState: () => ({ upsertFromDiscover: mockUpsert }) },
 }));
+jest.mock('@/shared/stores/global/mintTestnutStore', () => ({
+  useMintTestnutStore: { getState: () => ({ applyDiscover: jest.fn() }) },
+}));
 jest.mock('@/shared/lib/logger', () => {
   const sink = { info: jest.fn(), warn: jest.fn(), debug: jest.fn(), error: jest.fn() };
   return {

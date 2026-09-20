@@ -16,7 +16,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import {
   PILL_HEIGHT,
-  PILL_LABELS,
+  pillLabel,
   unitIconNode,
   useUnitSwitcherPill,
   type UnitSwitcherPillProps,
@@ -51,7 +51,7 @@ export function UnitSwitcherPillFallback(
       <ScreenHeaderAction
         onPress={openUnitMenu}
         testID="wallet-unit-switcher"
-        accessibilityLabel={`Switch wallet account, ${PILL_LABELS[shownUnit]}`}>
+        accessibilityLabel={`Switch wallet account, ${pillLabel(shownUnit)}`}>
         {unitIconNode(shownOption, 24)}
       </ScreenHeaderAction>
     );
@@ -63,7 +63,7 @@ export function UnitSwitcherPillFallback(
       style={canSwitch ? undefined : styles.disabledSlot}
       pointerEvents={canSwitch ? 'auto' : 'none'}>
       <CapsuleButton
-        label={PILL_LABELS[shownUnit]}
+        label={pillLabel(shownUnit)}
         // Matches the liquid tier's spoken name — the visible "SATS"/"USD"
         // abbreviation does not stand alone.
         accessibilityLabel="Switch wallet account"

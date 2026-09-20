@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef } from 'react';
+import { ACCOUNT_UNITS } from 'wallet';
 
 import { discoverMints, DiscoverMintsResponse } from '@/shared/lib/apiClient';
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import { useCachedRead, type ReadStatus } from '@/shared/lib/read/useCachedRead';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
+import { useMintTestnutStore } from '@/shared/stores/global/mintTestnutStore';
 import { extractAvailableCurrencies } from '@/features/mint/lib/availableCurrencies';
 import { MINT_DISCOVER_CACHE_KEY, mintDiscoverCache } from '@/features/mint/data/mintDiscoverCache';
 import {
@@ -14,7 +16,7 @@ import {
   type MintSearchRow,
 } from '@/features/mint/lib/mintDiscoveryRows';
 
-const DISCOVERY_UNITS = ['SAT', 'USD', 'EUR', 'GBP'];
+const DISCOVERY_UNITS = ACCOUNT_UNITS.map((unit) => unit.toUpperCase());
 
 interface UseMintSearchReturn {
   results: MintSearchRow[];
@@ -67,6 +69,9 @@ export function useMintSearch(
       // Seed the unified cache from the discovery rows so the selector, audit
       // and operator-profile lookups all become cache hits (not round-trips).
       useMintMetadataStore.getState().upsertFromDiscover(res.value.mints);
+      // Testnut rows classify a mint the moment it is added, ahead of the
+      // background verdict refresh.
+      useMintTestnutStore.getState().applyDiscover(res.value.mints);
       return { data: res.value };
     },
   });

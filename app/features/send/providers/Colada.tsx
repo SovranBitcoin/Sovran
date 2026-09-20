@@ -26,8 +26,13 @@ import {
   createColada,
   createMempoolSpaceChainAdapter,
   decodeUrlOrAddress,
-  isFiatUnit,
+  ACCOUNT_UNITS,
+  FIAT_UNITS,
+  isTestnutUnit,
+  toAccountUnit,
+  toRealUnit,
   unitMinorDecimals,
+  unitSymbol,
   withTimeout,
 } from 'wallet';
 import {
@@ -65,7 +70,8 @@ import { createNfcAdapter } from '@/shared/lib/nfc';
 import { staticPopup } from '@/shared/lib/popup';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { isTestnutMint } from '@/shared/stores/global/mintTestnutStore';
+import { useMintStore, type ActiveUnit } from '@/shared/stores/profile/mintStore';
 import { transactionAnnotationAdapter } from '@/shared/stores/profile/transactionAnnotationStore';
 import { runDataMigrations } from '@/shared/lib/migrations/dataMigrations';
 import { getMintCatalog } from '@/shared/lib/getMintCatalog';
@@ -77,15 +83,14 @@ import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext
 import { useDmEchoStore } from '@/shared/stores/runtime/dmEchoStore';
 import { isPaymentRequestFailureMockEnabled } from '@/features/send/lib/paymentRequestFailureMock';
 
-const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' };
-
 // Per-mint NUT-06 deadline used by `fetchMintInfo` below. Only matters on a
 // true cache miss; SWR hits resolve synchronously. Kept well under coco's
 // 10s `updateMint` timeout so one dead mint can't visibly gate the list.
 const FIRST_OPEN_DEADLINE_MS = 3000;
 
-/** Authoritative active unit for flow resets, read straight off the store. */
-const getActiveUnit = () => useMintStore.getState().activeUnit;
+/** Authoritative active unit for flow resets, read straight off the store.
+ *  The machine speaks the mint's REAL unit — never the testnut account unit. */
+const getActiveUnit = () => toRealUnit(useMintStore.getState().activeUnit);
 
 /**
  * Stage 2 of recipient resolution: hex pubkey → Nostr kind-0 profile.
@@ -289,14 +294,15 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   // express fiat-unit melt amounts in sats (LNURL invoices, onchain
   // amountSats). Keyed by the unit itself, not the display currency.
   const getSatsPerUnitMinor = useCallback((unit: string) => {
-    if (!isFiatUnit(unit)) return null;
-    const price = usePricelistStore.getState().getBtcPrice(unit as 'usd' | 'eur' | 'gbp');
+    const fiat = FIAT_UNITS.find((candidate) => candidate === toRealUnit(unit));
+    if (!fiat) return null;
+    const price = usePricelistStore.getState().getBtcPrice(fiat);
     if (!price || price <= 0) return null;
     return 100_000_000 / (price * 10 ** unitMinorDecimals(unit));
   }, []);
   const getDisplayCurrency = useCallback(() => {
     const currency = useSettingsStore.getState().displayCurrency as DisplayCurrency;
-    const symbol = FIAT_SYMBOLS[currency];
+    const symbol = unitSymbol(currency);
     return symbol ? { code: currency, symbol } : null;
   }, []);
 
@@ -336,7 +342,10 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         getSatsPerUnitMinor,
         getDisplayCurrency,
         getPreferredMintUrl: () => useMintStore.getState().selectedMint,
-        getActiveUnit: () => useMintStore.getState().activeUnit,
+        getActiveUnit,
+        // The testnut split for the machine's own mint lists (units/accounts).
+        isTestnutMint,
+        isTestnutAccount: () => isTestnutUnit(useMintStore.getState().activeUnit),
         // NIP-57: when the melt target was registered as a zap (pendingZapStore),
         // attach a signed kind-9734 zap request to the LNURL invoice callback.
         // The 9734 is never published to relays — the recipient's LNURL server
@@ -512,9 +521,13 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     () =>
       ({
         ...instance.operations,
+        // The machine asks for a REAL unit; stay on the active account's side
+        // of the testnut split.
         switchUnit: (unit: string) => {
-          if (unit === 'sat' || unit === 'usd' || unit === 'eur' || unit === 'gbp') {
-            useMintStore.getState().setActiveUnit(unit);
+          const store = useMintStore.getState();
+          const next = toAccountUnit(unit, isTestnutUnit(store.activeUnit));
+          if ((ACCOUNT_UNITS as readonly string[]).includes(next)) {
+            store.setActiveUnit(next as ActiveUnit);
           }
         },
         executeReceive: createSovranExecuteReceive(getManager, getOffline),

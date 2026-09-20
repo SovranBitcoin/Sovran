@@ -1,6 +1,8 @@
 import React, { useCallback } from 'react';
 
 import Icon, { CurrencyIcon } from 'assets/icons';
+import { ACCOUNT_UNITS, accountUnitLabel, accountUnitName, toRealUnit } from 'wallet';
+import { unitFlagIcon, unitName } from '@/shared/lib/cashu/unitPresentation';
 import { useWalletPresentationUnit } from '@/features/wallet/hooks/useWalletPresentationUnit';
 import type { ActiveUnit } from '@/shared/stores/profile/mintStore';
 import { walletLog } from '@/shared/lib/logger';
@@ -22,38 +24,28 @@ interface UnitOption {
   flagIcon?: string;
 }
 
-// Same icon language as the mint switcher's currency tabs: circle flags for
-// fiat accounts, the branded bitcoin disc for sats.
-const UNIT_OPTIONS: UnitOption[] = [
-  { unit: 'sat', label: 'Bitcoin account' },
-  { unit: 'usd', label: 'USD account', flagIcon: 'circle-flags:us' },
-  { unit: 'eur', label: 'EUR account', flagIcon: 'circle-flags:eu' },
-  { unit: 'gbp', label: 'GBP account', flagIcon: 'circle-flags:gb' },
-];
-
-/** SF Symbols for the native menu rows (LiquidGlassMenu / MenuView) — the
- *  same sign glyphs FiatCurrencyPill's native menu uses, plus bitcoin. */
-export const UNIT_SF_SYMBOLS: Record<ActiveUnit, string> = {
-  sat: 'bitcoinsign',
-  usd: 'dollarsign',
-  eur: 'eurosign',
-  gbp: 'sterlingsign',
-};
+// Every account the wallet knows, in registry order (real, then testnut —
+// the same unit at a mint with a fake payment backend, kept apart so test funds
+// never mix with real ones). Same icon language as the mint switcher's currency
+// tabs: circle flags for fiat accounts, the branded bitcoin disc for sats.
+const UNIT_OPTIONS: UnitOption[] = ACCOUNT_UNITS.map((unit) => ({
+  unit,
+  label: accountUnitName(unit),
+  flagIcon: unitFlagIcon(unit),
+}));
 
 export function unitIconNode(option: UnitOption, size: number): React.ReactNode {
   return option.flagIcon ? (
     <Icon name={option.flagIcon} size={size} />
   ) : (
-    <CurrencyIcon width={size} currency={option.unit} />
+    <CurrencyIcon width={size} currency={toRealUnit(option.unit)} />
   );
 }
 
-export const PILL_LABELS: Record<ActiveUnit, string> = {
-  sat: 'Bitcoin',
-  usd: 'USD',
-  eur: 'EUR',
-  gbp: 'GBP',
-};
+/** Pill face: the Bitcoin account reads by name, every other by its code. */
+export function pillLabel(unit: ActiveUnit): string {
+  return unit === 'sat' ? unitName(unit) : accountUnitLabel(unit);
+}
 
 // Matches FiatCurrencyPill's height — they stack in the same balance column.
 export const PILL_HEIGHT = 34;

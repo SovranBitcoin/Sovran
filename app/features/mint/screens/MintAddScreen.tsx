@@ -1,3 +1,4 @@
+import { accountUnitLabel } from 'wallet';
 import { useState, useMemo, useEffect } from 'react';
 import { Platform, TextInput, useWindowDimensions } from 'react-native';
 import { usePreventRemove } from 'expo-router/react-navigation';
@@ -624,7 +625,7 @@ export function MintAddScreen() {
   );
 
   const hasUnitMatches = Object.values(matchCountByUnit).some((count) => count > 0);
-  const unitLabel = selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency;
+  const unitLabel = accountUnitLabel(selectedCurrency);
   const showBtcMints =
     methodFilter &&
     selectedCurrency !== 'ALL' &&
@@ -648,7 +649,7 @@ export function MintAddScreen() {
               : `No known mints support ${methodLabel} yet`
             : selectedCurrency === 'ALL'
               ? 'No mints available'
-              : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}
+              : `No mints available for ${accountUnitLabel(selectedCurrency)}`}
       </Text>
       {showBtcMints && (
         <CapsuleButton

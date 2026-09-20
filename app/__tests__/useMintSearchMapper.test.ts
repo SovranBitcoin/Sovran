@@ -1,6 +1,7 @@
 import {
   discoverMintToSearchResult,
   discoveryMethodMatches,
+  matchesMintCurrency,
 } from '@/features/mint/lib/mintDiscoveryRows';
 import { useMintSearch } from '@/features/mint/hooks/useMintSearch';
 import { renderHook, waitFor } from '@testing-library/react-native';
@@ -17,6 +18,9 @@ jest.mock('@/shared/lib/apiClient', () => {
 jest.mock('@/shared/stores/runtime/debugTierStore', () => ({ recordDebugTiers: jest.fn() }));
 jest.mock('@/shared/stores/global/mintMetadataStore', () => ({
   useMintMetadataStore: { getState: () => ({ upsertFromDiscover: jest.fn() }) },
+}));
+jest.mock('@/shared/stores/global/mintTestnutStore', () => ({
+  useMintTestnutStore: { getState: () => ({ applyDiscover: jest.fn() }) },
 }));
 jest.mock('@/shared/lib/logger', () => {
   const sink = { info: jest.fn(), warn: jest.fn(), debug: jest.fn(), error: jest.fn() };
@@ -114,6 +118,22 @@ describe('discoverMintToSearchResult', () => {
     expect((r.info as { icon_url: string }).icon_url).toBe('https://i/x.png');
   });
 
+  it("files a testnut row's units under testnut account units", () => {
+    const row = discoverMintToSearchResult({ ...base, testnut: true });
+    expect(row.supported_units).toEqual(['tsat', 'tusd']);
+    expect(row.supported_method_units).toContainEqual({ method: 'bolt12', unit: 'tsat' });
+    // A real SAT / USD tab never lists it; its own tBTC tab does.
+    expect(matchesMintCurrency(row, 'USD')).toBe(false);
+    expect(matchesMintCurrency(row, 'TUSD')).toBe(true);
+    expect(discoveryMethodMatches(row, 'bolt12', 'SAT')).toBe(false);
+    expect(discoveryMethodMatches(row, 'bolt12', 'TSAT')).toBe(true);
+    // A row nagg has not flagged is untouched.
+    expect(discoverMintToSearchResult({ ...base, testnut: false }).supported_units).toEqual([
+      'sat',
+      'usd',
+    ]);
+  });
+
   it('tolerates a Nostr-only row (no audit / operator)', () => {
     const r = discoverMintToSearchResult({
       mintUrl: 'https://m2',
@@ -166,6 +186,9 @@ describe('discoveryMethodMatches — unit-aware (method, unit) pair filter', () 
   });
 });
 
+// Every discovery tab is counted, the testnut account tabs included.
+const NO_TESTNUT_MATCHES = { TSAT: 0, TUSD: 0, TEUR: 0, TGBP: 0 };
+
 describe('useMintSearch unit availability and counts', () => {
   const rows: DiscoverMint[] = [
     {
@@ -209,7 +232,13 @@ describe('useMintSearch unit availability and counts', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.results).toEqual([]);
     expect(result.current.availableUnits).toEqual(['SAT', 'EUR', 'GBP', 'USD']);
-    expect(result.current.matchCountByUnit).toEqual({ SAT: 1, USD: 0, EUR: 0, GBP: 0 });
+    expect(result.current.matchCountByUnit).toEqual({
+      SAT: 1,
+      USD: 0,
+      EUR: 0,
+      GBP: 0,
+      ...NO_TESTNUT_MATCHES,
+    });
   });
 
   it('counts each matching mint once per exact method/unit pair and switches to SAT', async () => {
@@ -218,7 +247,13 @@ describe('useMintSearch unit availability and counts', () => {
       { initialProps: { currency: 'USD' } }
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.matchCountByUnit).toEqual({ SAT: 2, USD: 0, EUR: 0, GBP: 1 });
+    expect(result.current.matchCountByUnit).toEqual({
+      SAT: 2,
+      USD: 0,
+      EUR: 0,
+      GBP: 1,
+      ...NO_TESTNUT_MATCHES,
+    });
     rerender({ currency: 'SAT' });
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.results.map((mint) => mint.name)).toEqual(['Alpha', 'Beta']);
@@ -228,7 +263,13 @@ describe('useMintSearch unit availability and counts', () => {
   it('counts supported units without a method filter and matches a trimmed URL query', async () => {
     const { result } = renderHook(() => useMintSearch('  ALPHA.EXAMPLE  ', 'ALL'));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.matchCountByUnit).toEqual({ SAT: 1, USD: 0, EUR: 1, GBP: 0 });
+    expect(result.current.matchCountByUnit).toEqual({
+      SAT: 1,
+      USD: 0,
+      EUR: 1,
+      GBP: 0,
+      ...NO_TESTNUT_MATCHES,
+    });
     expect(result.current.availableUnits).toEqual(['SAT', 'EUR', 'GBP']);
   });
 
@@ -237,6 +278,12 @@ describe('useMintSearch unit availability and counts', () => {
     const { result } = renderHook(() => useMintSearch('', 'USD', { method: 'onchain' }));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.availableUnits).toEqual(['SAT', 'USD']);
-    expect(result.current.matchCountByUnit).toEqual({ SAT: 0, USD: 0, EUR: 0, GBP: 0 });
+    expect(result.current.matchCountByUnit).toEqual({
+      SAT: 0,
+      USD: 0,
+      EUR: 0,
+      GBP: 0,
+      ...NO_TESTNUT_MATCHES,
+    });
   });
 });

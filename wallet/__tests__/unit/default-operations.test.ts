@@ -1481,3 +1481,70 @@ it("retains receiver preference order and reason after mint-list enrichment", as
     reason: { code: "MINT_NOT_PREFERRED" },
   });
 });
+
+describe("buildMintListItems testnut split", () => {
+  const TESTNUT = "https://testnut.example";
+  const info = {
+    name: "mint",
+    nuts: { "4": { methods: [{ method: "bolt11", unit: "sat" }] } },
+  };
+  const build = (data: Record<string, unknown>, testnutAccount: boolean) => {
+    const manager = createMockManager({
+      mint: {
+        getAllTrustedMints: vi.fn().mockResolvedValue([
+          { mintUrl: MINT1, mintInfo: info },
+          { mintUrl: TESTNUT, mintInfo: info },
+        ]),
+        getMintInfo: vi.fn().mockResolvedValue(info),
+      },
+      wallet: {
+        balances: {
+          byMintAndUnit: vi.fn().mockResolvedValue({
+            [MINT1]: { sat: { total: 1000 } },
+            [TESTNUT]: { sat: { total: 5000 } },
+          }),
+        },
+      },
+    });
+    const ops = createDefaultOperations({
+      getManager: () => manager as unknown as Manager,
+      isTestnutMint: (mintUrl) => mintUrl === TESTNUT,
+      isTestnutAccount: () => testnutAccount,
+    });
+    return ops.buildMintListItems!({
+      unit: "sat",
+      candidates: [],
+      ...data,
+    } as never);
+  };
+  const byUrl = (items: Awaited<ReturnType<typeof build>>) =>
+    Object.fromEntries(items.map((item) => [item.mintUrl, item]));
+
+  it("files a testnut mint's units under testnut account units", async () => {
+    const items = byUrl(await build({ scope: "selected" }, false));
+    expect(items[MINT1].supportedUnits).toEqual(["sat"]);
+    expect(items[TESTNUT].supportedUnits).toEqual(["tsat"]);
+  });
+
+  it("keeps both sides pickable in the wallet's own mint picker", async () => {
+    const items = byUrl(await build({ scope: "selected" }, false));
+    expect(items[MINT1].status).toBe("available");
+    expect(items[TESTNUT].status).toBe("available");
+  });
+
+  it("disables the other side of the split in a payment flow", async () => {
+    const real = byUrl(await build({ destination: "sendEcash", amount: 100 }, false));
+    expect(real[MINT1].status).toBe("available");
+    expect(real[TESTNUT]).toMatchObject({
+      status: "disabled",
+      reason: { code: "TESTNUT_ACCOUNT_MISMATCH" },
+    });
+
+    const test = byUrl(await build({ scope: "onchain" }, true));
+    expect(test[TESTNUT].status).toBe("available");
+    expect(test[MINT1]).toMatchObject({
+      status: "disabled",
+      reason: { code: "TESTNUT_ACCOUNT_MISMATCH" },
+    });
+  });
+});

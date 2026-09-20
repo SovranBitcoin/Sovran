@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react-native';
 import { WalletContextProvider, useWalletContext } from '@/shared/providers/WalletContextProvider';
 
 let mockUnit = 'sat';
+let mockTestnutAccount = false;
 function createManager() {
   const listeners = new Map<string, Set<(event: { mintUrl: string }) => void>>();
   return {
@@ -20,7 +21,9 @@ function createManager() {
   };
 }
 let mockManager = createManager();
-let mockBalances = { byMintAndUnit: { mint: { sat: { total: 16 }, usd: { total: 3 } } } };
+let mockBalances: { byMintAndUnit: Record<string, Record<string, { total: number }>> } = {
+  byMintAndUnit: { mint: { sat: { total: 16 }, usd: { total: 3 } } },
+};
 let mockMints = [{ mintUrl: 'mint' }];
 const mockGetReadyProofs = jest.fn();
 jest.mock('@cashu/coco-react', () => ({
@@ -32,6 +35,10 @@ jest.mock('wallet', () => ({
   deriveMintMethodCapabilityMapFromTrustedMints: () => ({}),
   deriveSupportedUnitsFromInfo: () => ['sat', 'usd'],
   pickHighestBalanceUnit: () => 'sat',
+  toAccountUnit: (unit: string, testnut: boolean) => (testnut ? `t${unit}` : unit),
+}));
+jest.mock('@/shared/stores/global/mintTestnutStore', () => ({
+  useIsTestnutMint: () => (mintUrl: string) => mintUrl.includes('testnut'),
 }));
 jest.mock('@/shared/lib/cashu/managerInternals', () => ({
   getReadyProofs: (...args: unknown[]) => mockGetReadyProofs(...args),
@@ -40,7 +47,12 @@ jest.mock('@/shared/stores/profile/mintStore', () => ({
   useMintStore: (selector: (state: { selectedMint?: string }) => unknown) => selector({}),
 }));
 jest.mock('@/features/wallet/hooks/useActiveUnit', () => ({
-  useActiveUnit: () => ({ unit: mockUnit, setUnit: jest.fn() }),
+  useActiveUnit: () => ({
+    unit: mockUnit,
+    realUnit: mockUnit,
+    testnut: mockTestnutAccount,
+    setUnit: jest.fn(),
+  }),
 }));
 jest.mock('@/features/wallet/hooks/useMintKeysetUnits', () => ({ useMintKeysetUnits: () => ({}) }));
 jest.mock('@/shared/lib/logger', () => ({
@@ -57,6 +69,7 @@ type ProofAmount = { amount: number; unit?: string; usedByOperationId?: string }
 
 beforeEach(() => {
   mockUnit = 'sat';
+  mockTestnutAccount = false;
   mockManager = createManager();
   mockMints = [{ mintUrl: 'mint' }];
   mockBalances = { byMintAndUnit: { mint: { sat: { total: 16 }, usd: { total: 3 } } } };
@@ -227,3 +240,26 @@ it('exposes all unit balances independently of the active-unit view', async () =
   expect(result.current.unitBalances).toEqual({ sat: { mint: 16 }, usd: { mint: 3 } });
   expect(result.current.mintBalances).toEqual({ mint: 3 });
 });
+
+// The testnut split: same unit, but a testnut mint's funds are another account.
+it.each([
+  [false, { mint: 16, 'https://testnut.example': 0 }, { sat: { mint: 16 }, usd: { mint: 3 } }],
+  [true, { mint: 0, 'https://testnut.example': 900 }, { sat: { 'https://testnut.example': 900 } }],
+])(
+  'exposes only the active account side of the split (testnut account: %s)',
+  async (testnutAccount, mintBalances, unitBalances) => {
+    mockTestnutAccount = testnutAccount;
+    mockMints = [{ mintUrl: 'mint' }, { mintUrl: 'https://testnut.example' }];
+    mockBalances = {
+      byMintAndUnit: {
+        mint: { sat: { total: 16 }, usd: { total: 3 } },
+        'https://testnut.example': { sat: { total: 900 } },
+      },
+    };
+    mockGetReadyProofs.mockResolvedValue([]);
+    const { result } = renderHook(useWalletContext, { wrapper });
+    await act(async () => {});
+    expect(result.current.mintBalances).toEqual(mintBalances);
+    expect(result.current.unitBalances).toEqual(unitBalances);
+  }
+);

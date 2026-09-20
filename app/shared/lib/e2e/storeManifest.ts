@@ -14,6 +14,7 @@
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 import { useMempoolAddressCache } from '@/shared/stores/global/mempoolAddressCache';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
+import { useMintTestnutStore } from '@/shared/stores/global/mintTestnutStore';
 import { useRelayMetadataStore } from '@/shared/stores/global/relayMetadataStore';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
 import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
@@ -68,6 +69,7 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'global/btcMapStore': useBTCMapStore,
   'global/mempoolAddressCache': useMempoolAddressCache,
   'global/mintMetadataStore': useMintMetadataStore,
+  'global/mintTestnutStore': useMintTestnutStore,
   'global/relayMetadataStore': useRelayMetadataStore,
   'global/nostrMetadataCache': useNostrMetadataCache,
   'global/pricelistStore': usePricelistStore,

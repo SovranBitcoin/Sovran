@@ -17,6 +17,9 @@
  * `onPress`, a tap opens the menu.
  */
 
+import { accountUnitLabel, FIAT_UNITS } from 'wallet';
+
+import { unitSfSymbol } from '@/shared/lib/cashu/unitPresentation';
 import React from 'react';
 import { MenuView, type MenuAction } from '@react-native-menu/menu';
 import { GlassView } from 'expo-glass-effect';
@@ -63,11 +66,12 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
         colorScheme={colorScheme}
         menuTitle="Display currency"
         hasPrimaryAction={menuOpensOnLongPress}
-        actions={[
-          { id: 'usd', title: 'USD', image: 'dollarsign', selected: displayCurrency === 'usd' },
-          { id: 'eur', title: 'EUR', image: 'eurosign', selected: displayCurrency === 'eur' },
-          { id: 'gbp', title: 'GBP', image: 'sterlingsign', selected: displayCurrency === 'gbp' },
-        ]}
+        actions={FIAT_UNITS.map((unit) => ({
+          id: unit,
+          title: accountUnitLabel(unit),
+          image: unitSfSymbol(unit),
+          selected: displayCurrency === unit,
+        }))}
         onSelectAction={({ nativeEvent }) =>
           handleSelectCurrency(nativeEvent.id as DisplayCurrency)
         }
@@ -77,21 +81,12 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
   }
 
   // Fallback: GlassView pill + native UIMenu via MenuView (scrolls, no morph).
-  const actions: MenuAction[] = [
-    {
-      id: 'usd',
-      title: 'USD',
-      image: 'dollarsign',
-      state: displayCurrency === 'usd' ? 'on' : 'off',
-    },
-    { id: 'eur', title: 'EUR', image: 'eurosign', state: displayCurrency === 'eur' ? 'on' : 'off' },
-    {
-      id: 'gbp',
-      title: 'GBP',
-      image: 'sterlingsign',
-      state: displayCurrency === 'gbp' ? 'on' : 'off',
-    },
-  ];
+  const actions: MenuAction[] = FIAT_UNITS.map((unit) => ({
+    id: unit,
+    title: accountUnitLabel(unit),
+    image: unitSfSymbol(unit),
+    state: displayCurrency === unit ? ('on' as const) : ('off' as const),
+  }));
 
   const pill = (
     <GlassView

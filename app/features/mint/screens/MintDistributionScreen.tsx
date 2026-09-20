@@ -14,7 +14,13 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { MINT_CURRENCY_TABS_HEIGHT } from '@/features/mint/components/MintCurrencyTabs';
 import { useStickyCurrencyTabs } from '@/features/mint/hooks/useStickyCurrencyTabs';
 import { useMintKeysetUnits } from '@/features/wallet/hooks/useMintKeysetUnits';
-import { deriveSupportedUnitsFromInfo } from 'wallet';
+import {
+  ACCOUNT_UNITS,
+  accountUnitLabel,
+  deriveSupportedUnitsFromInfo,
+  toAccountUnit,
+} from 'wallet';
+import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { MintDistributionCards } from '@/features/mint/components/distribution/MintDistributionCards';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
@@ -97,13 +103,17 @@ export function MintDistributionScreen() {
 
   // Keyset-backed: an advertised NUT-04 unit the mint holds no keys for
   // (chorus lists usd/eur with sat-only keysets) is not distributable.
+  // ACCOUNT units: a testnut mint's `usd` is `tusd`, so a split is only ever
+  // defined among testnut mints or among real mints — never across the two.
   const keysetUnitsByMint = useMintKeysetUnits();
+  const isTestnutMint = useIsTestnutMint();
   const supportedUnitsByMint = Object.fromEntries(
     trustedMints.map((mint) => [
       mint.mintUrl,
-      mint.mintInfo
+      (mint.mintInfo
         ? deriveSupportedUnitsFromInfo(mint.mintInfo, keysetUnitsByMint[mint.mintUrl])
-        : ['sat'],
+        : ['sat']
+      ).map((unit) => toAccountUnit(unit, isTestnutMint(mint.mintUrl))),
     ])
   ) as Record<string, string[]>;
 
@@ -111,8 +121,8 @@ export function MintDistributionScreen() {
   for (const supported of Object.values(supportedUnitsByMint)) {
     for (const unit of supported) units.add(unit.toUpperCase());
   }
-  // Filter to common currencies and ensure at least SAT
-  const commonUnits = [...units].filter((c) => ['SAT', 'USD', 'EUR', 'GBP'].includes(c));
+  // Filter to the wallet's accounts (display order) and ensure at least SAT
+  const commonUnits = ACCOUNT_UNITS.map((unit) => unit.toUpperCase()).filter((c) => units.has(c));
   const availableCurrencies = commonUnits.length > 0 ? commonUnits : ['SAT'];
 
   useEffect(() => {
@@ -298,7 +308,7 @@ export function MintDistributionScreen() {
         {mintsForCurrency.length === 0 ? (
           <View className="items-center p-10">
             <Text style={{ color: foreground, textAlign: 'center' }}>
-              No mints available for {selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}
+              No mints available for {accountUnitLabel(selectedCurrency)}
             </Text>
           </View>
         ) : (

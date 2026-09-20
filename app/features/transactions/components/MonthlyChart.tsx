@@ -12,7 +12,9 @@ import { withAlpha } from '@/shared/lib/color';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
 import type { HistoryEntry } from '@cashu/coco-core';
-import { isSettledReceiveHistoryEntry, isSettledSpendHistoryEntry } from 'wallet';
+import { isSettledReceiveHistoryEntry, isSettledSpendHistoryEntry, toRealUnit } from 'wallet';
+import { belongsToAccount } from '@/shared/lib/cashu/accountScope';
+import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { zIndex } from '@/shared/styles/tokens';
 import { Log, paymentLog } from '@/shared/lib/logger';
@@ -118,7 +120,7 @@ const MODE_CONFIG: Record<
 
 function computeMonthlySeries({
   history,
-  unit,
+  inAccount,
   mockMode,
   config,
   quoteIdToGroup,
@@ -126,7 +128,8 @@ function computeMonthlySeries({
   drawableHeight,
 }: {
   history: HistoryEntry[];
-  unit: string;
+  /** Entry belongs to the charted account (unit + side of the testnut split). */
+  inAccount: (entry: HistoryEntry) => boolean;
   mockMode: boolean;
   config: (typeof MODE_CONFIG)[ChartMode];
   quoteIdToGroup: Record<string, unknown>;
@@ -152,7 +155,7 @@ function computeMonthlySeries({
     const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999).getTime();
 
     const matching = history.filter((entry) => {
-      if (entry.unit !== unit) return false;
+      if (!inAccount(entry)) return false;
       if (entry.createdAt < monthStart || entry.createdAt > monthEnd) return false;
       if (entry.type === 'mint' || entry.type === 'melt') {
         const quoteId = (entry as any).quoteId as string | undefined;
@@ -228,7 +231,10 @@ function buildXTickPositions(daysInMonth: number, drawableWidth: number) {
 // Component
 // ---------------------------------------------------------------------------
 
-function MonthlyChart({ history, unit = 'sat', mode }: MonthlyChartProps) {
+function MonthlyChart({ history, unit: accountUnit = 'sat', mode }: MonthlyChartProps) {
+  // `unit` arrives as the ACCOUNT unit; amounts render in the mint unit behind it.
+  const unit = toRealUnit(accountUnit);
+  const isTestnutMint = useIsTestnutMint();
   const [muted, foreground, dangerColor, successColor] = useThemeColor([
     'muted',
     'foreground',
@@ -271,7 +277,7 @@ function MonthlyChart({ history, unit = 'sat', mode }: MonthlyChartProps) {
     todayDay,
   } = computeMonthlySeries({
     history,
-    unit,
+    inAccount: (entry) => belongsToAccount(accountUnit, entry, isTestnutMint),
     mockMode,
     config,
     quoteIdToGroup,

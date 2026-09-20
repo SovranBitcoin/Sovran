@@ -4,6 +4,8 @@
  * and the client-side query / currency / receive-method filters applied to the
  * discovered set (discovery is one call, so filtering never hits the network).
  */
+import { toAccountUnit } from 'wallet';
+
 import type { DiscoverMint, MintSearchResult } from '@/shared/lib/apiClient';
 import { mintMethodsFromNuts, mintMethodUnitPairsFromNuts } from '@/shared/lib/cashu/mintNuts';
 
@@ -22,17 +24,26 @@ export type MintSearchRow = MintSearchResult & {
  * + count come inline (no per-mint fan-out); the operator's Nostr pubkey is
  * surfaced as a NUT-06 `contact` entry so the existing operator-profile path
  * still resolves.
+ *
+ * A testnut row's units become ACCOUNT units (`tsat`, `tusd`, … — wallet
+ * `units/accounts`), so every unit filter downstream — the currency tabs, the
+ * per-tab counts, the (method, unit) rail match — files test mints under their
+ * own tBTC / tUSD tabs instead of among the real ones.
  */
 export function discoverMintToSearchResult(m: DiscoverMint): MintSearchRow {
   const contact = m.operatorPubkey ? [{ method: 'nostr', info: m.operatorPubkey }] : [];
+  const testnut = m.testnut === true;
   return {
     url: m.mintUrl,
     name: m.name || m.mintUrl,
-    supported_units: m.supportedUnits ?? [],
+    supported_units: (m.supportedUnits ?? []).map((unit) => toAccountUnit(unit, testnut)),
     // Derived from the raw NUT-06 nuts map (nuts['4'].methods) — nagg ships
     // capabilities undistilled by design.
     supported_methods: mintMethodsFromNuts(m.nuts),
-    supported_method_units: mintMethodUnitPairsFromNuts(m.nuts, '4'),
+    supported_method_units: mintMethodUnitPairsFromNuts(m.nuts, '4').map((pair) => ({
+      ...pair,
+      unit: toAccountUnit(pair.unit, testnut),
+    })),
     state: m.state ?? 'unknown',
     n_mints: m.nMints ?? 0,
     n_melts: m.nMelts ?? 0,

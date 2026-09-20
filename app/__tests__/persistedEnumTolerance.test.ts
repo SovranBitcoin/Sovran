@@ -49,6 +49,7 @@ import '@/shared/stores/global/mempoolAddressCache';
 import '@/shared/stores/global/nostrMetadataCache';
 import '@/shared/stores/global/pricelistStore';
 import '@/shared/stores/global/profileStore';
+import '@/shared/stores/global/mintTestnutStore';
 import '@/shared/stores/global/relayMetadataStore';
 import '@/shared/stores/global/settingsStore';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';

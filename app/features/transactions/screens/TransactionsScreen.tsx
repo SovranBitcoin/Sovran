@@ -37,6 +37,8 @@ import { useManager } from '@cashu/coco-react';
 import { attemptRollback } from '@/shared/lib/cashu/utils';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { belongsToAccount } from '@/shared/lib/cashu/accountScope';
+import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import {
   matchesTransactionFilters,
   type TransactionDirection,
@@ -108,6 +110,7 @@ export function TransactionsScreen({
   const { isOffline } = useOfflineStatus();
 
   const selectedCurrency = filterCurrency || 'sat';
+  const isTestnutMint = useIsTestnutMint();
   const paymentType = filterPaymentType;
   const direction = filterDirection;
   const tab = initialTab;
@@ -217,7 +220,7 @@ export function TransactionsScreen({
   const listKey = `${paymentType}-${direction}-${tab}-${selectedCurrency}-${filterMintUrl}`;
 
   const filteredByTypeHistory = history.filter((historyEntry) => {
-    if (selectedCurrency !== 'all' && historyEntry.unit !== selectedCurrency) return false;
+    if (!belongsToAccount(selectedCurrency, historyEntry, isTestnutMint)) return false;
     if (!matchesTransactionFilters(historyEntry, { paymentType, direction })) return false;
     return true;
   });

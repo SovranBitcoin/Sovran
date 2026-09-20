@@ -15,9 +15,27 @@ export default defineConfig({
   zeroDataRetention: false,
   include: ["**/*.{ts,tsx,js,jsx,mjs,cjs,swift,kt,java,cpp,h,mm,rs}"],
   ignore: ["hunch.config.ts", "**/dist/**", "**/build/**", "**/vendor/**", "**/BitChatVendor/**", "**/generated/**"],
-  skills: ["./.agents/skills/codebase-design", "./.agents/skills/expo-router"],
+  // Vetted against the installed library versions and the contributor
+  // conventions before selection (.agents/skills/sources.json). Compiled rules
+  // that contradict a house convention are switched off by id below.
+  skills: [
+    "./.agents/skills/codebase-design",
+    "./.agents/skills/expo-router",
+    "./.agents/skills/expo-animation",
+    "./.agents/skills/typescript-best-practices",
+    "./.agents/skills/principle-type-system-discipline",
+    "./.agents/skills/principle-model-the-domain",
+    "./.agents/skills/react-native-testing",
+  ],
   agentsMd: true,
-  docs: ["docs/review/contributor-conventions.md"],
+  docs: [
+    "docs/review/contributor-conventions.md",
+    "docs/review/conventions-zod.md",
+    "docs/review/conventions-react-native.md",
+    "docs/review/conventions-state.md",
+    "docs/review/conventions-typescript.md",
+    "docs/review/conventions-async-tests.md",
+  ],
   failOnError: false,
   task: "pr",
   // Experimental attribution remains off until independently labeled evaluation supports it.
@@ -25,6 +43,75 @@ export default defineConfig({
   // Whole-repository dry run: 4,460 chunks; explicit and compiled rules use separate requests.
   budget: { maxHunks: 5000, maxRulesPerHunk: 128, maxRequests: 10000, concurrency: 4, timeoutSeconds: 3600 },
   rules: {
+    // ── Compiled skill rules switched off ─────────────────────────────────
+    // Each skill was vetted before selection; these compiled rules either
+    // duplicate something a tool or a house convention already decides, or
+    // contradict a deliberate practice. The skills stay available to agents.
+    //
+    // Decided by lint (`no-explicit-any`, `no-console`,
+    // `consistent-type-assertions`, the legacy-Animated ban) or better decided
+    // by one (`switch-exhaustiveness-check`, `no-non-null-assertion`,
+    // `testing-library/*`): not semantic questions.
+    "skill/typescript-best-practices/unknown-over-any": "off",
+    "skill/typescript-best-practices/no-console-log": "off",
+    "skill/typescript-best-practices/satisfies-over-as": "off",
+    "skill/typescript-best-practices/exhaustive-switch-never": "off",
+    "skill/typescript-best-practices/no-non-null-assertion": "off",
+    "skill/principle-type-system-discipline/exhaustive-variant-match": "off",
+    "skill/expo-animation/no-core-animated": "off",
+    "skill/expo-animation/no-panresponder": "off",
+    "skill/react-native-testing/no-destructuring-render": "off",
+    // Same question as a house convention, which is corrected for the
+    // installed versions and carries this codebase's allowed cases
+    // (motion/*, ui/keyboard-tracking, types/illegal-states,
+    // input/parse-at-boundary, skill/expo-router/* in the conventions).
+    "skill/expo-animation/no-runonjs": "off",
+    "skill/expo-animation/no-setstate-in-gesture-or-scroll": "off",
+    "skill/expo-animation/no-schedule-on-rn-per-frame": "off",
+    "skill/expo-animation/shared-value-get-set": "off",
+    "skill/expo-animation/no-shared-value-in-render": "off",
+    "skill/expo-animation/no-entering-on-virtualized-row": "off",
+    "skill/expo-animation/no-cubic-bezier-string": "off",
+    "skill/expo-animation/spring-velocity-handoff": "off",
+    "skill/expo-animation/gesture-start-context": "off",
+    "skill/expo-animation/dismissal-uses-velocity": "off",
+    "skill/expo-animation/keyboard-controller-not-listeners": "off",
+    "skill/typescript-best-practices/discriminated-union-over-optional-bag": "off",
+    "skill/principle-type-system-discipline/boolean-flag-with-optional-companion": "off",
+    "skill/principle-model-the-domain/second-boolean-for-same-state": "off",
+    "skill/principle-type-system-discipline/no-type-checker-escape-hatch": "off",
+    "skill/principle-type-system-discipline/parse-external-data-at-boundary": "off",
+    "skill/expo-router/prefer-native-tabs": "off",
+    "skill/expo-router/native-tab-icon-missing-md": "off",
+    "skill/expo-router/stack-navigator-outside-layout": "off",
+    "skill/expo-router/dynamic-native-tab-triggers": "off",
+    "skill/expo-router/prefer-modal-route-over-custom-modal": "off",
+    // Contradicts a deliberate practice here.
+    // perf/memo: React Compiler memoizes; a gesture `useMemo` is allowed, not required.
+    "skill/expo-animation/gesture-memoized": "off",
+    "skill/expo-animation/layout-builder-not-inline": "off",
+    // Duration tokens, `PressScale` and the 90-140ms decorative exits are deliberate.
+    "skill/expo-animation/no-ease-in-on-ui": "off",
+    "skill/expo-animation/no-scale-zero-entrance": "off",
+    "skill/expo-animation/spring-designer-params": "off",
+    // ui/shared-parts: colours come from `useThemeColor`, not expo-router's `Color`.
+    "skill/expo-router/prefer-color-over-platformcolor": "off",
+    // a11y/controls requires accessibilityLabel / Role / State.
+    "skill/react-native-testing/prefer-aria-props": "off",
+    // The shared Pressable wraps onPress in a single-flight guard; userEvent's
+    // timing against it is unverified, so fireEvent is not a finding yet.
+    "skill/react-native-testing/prefer-userevent-over-fireevent": "off",
+    // Its `**/app/**` glob matches this workspace's `app/` package, not just
+    // the `app/app/` route tree, so it flags every shared module; routes/thin
+    // already keeps non-route code out of the route tree.
+    "skill/expo-router/no-colocation-in-app-dir": "off",
+    // Fires on `react-test-renderer` tree walking (`root.findAll`, `findByProps`),
+    // which 83 test files use by design and which is not RNTL's `UNSAFE_*`.
+    "skill/react-native-testing/no-unsafe-apis": "off",
+    // No branded types exist yet; a naming convention for them is premature.
+    "skill/typescript-best-practices/brand-shape-convention": "off",
+    "skill/typescript-best-practices/type-guard-naming": "off",
+
     "ui/header-continuity": ["warn", choice({
       instructions: "Does this change visibly break the shared header contract: a page identity is duplicated or lost during its scroll handoff, header actions or content are obscured by incorrect inset ownership, a section selector becomes unreachable while scrolling its content, a fixed inset around a scrolling viewport prevents content from ever entering its gradient header, an opaque strip defeats the combined header/tab gradient, or identity handoff activates before the measured identity section clears navigation? Judge the visible layout and scroll ownership together, on iOS and Android; an isolated use of a header API without evidence of a broken behavior is unrelated.",
       criteria: { concern: "The changed layout or scroll wiring visibly causes one of these continuity or reachability failures.", ...outcomes },

@@ -16,6 +16,7 @@ const mockQuote = jest.fn<unknown, unknown[]>(() => ({
 }));
 let mockSupports = true;
 let mockRail = 'bolt12';
+let mockActiveUnit = 'sat';
 const mockManager = {};
 jest.mock('@/features/receive/components/OnchainDepositLimitsCard', () => ({
   OnchainDepositLimitsCard: () => null,
@@ -32,6 +33,11 @@ jest.mock('wallet', () => ({
   getMintMethodCapability: () => ({ supported: true }),
   buildBip321OnchainUri: (value: string) => value,
   standingPaymentRequestKey: (unit: string) => unit,
+  isTestnutUnit: (unit: string) => unit.startsWith('t'),
+  toAccountUnit: (unit: string, testnut: boolean) => (testnut ? `t${unit}` : unit),
+}));
+jest.mock('@/shared/stores/global/mintTestnutStore', () => ({
+  isTestnutMint: (mintUrl: string) => mintUrl.includes('testnut'),
 }));
 jest.mock('@/features/receive/hooks/useReceiveMethodMint', () => ({
   useReceiveMethodMint: () => ({ mintUrl: 'https://mint.example', anyMintSupports: mockSupports }),
@@ -71,7 +77,7 @@ jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (tokens: string[]) => tokens.map(() => '#ffffff'),
 }));
 jest.mock('@/shared/stores/profile/mintStore', () => ({
-  useMintStore: { getState: () => ({ standingQuotes: {} }) },
+  useMintStore: { getState: () => ({ standingQuotes: {}, activeUnit: mockActiveUnit }) },
 }));
 jest.mock('@/features/receive/lib/receiveRailItems', () => ({
   isExpiryElapsed: () => false,
@@ -260,4 +266,37 @@ describe('receive rail presentation', () => {
       act(() => renderer.unmount());
     }
   );
+  it.each([
+    ['sat', 'real-offer'],
+    ['tsat', 'testnut-offer'],
+  ])('lists only the %s account side of the testnut split', async (activeUnit, shown) => {
+    mockRail = 'bolt12';
+    mockActiveUnit = activeUnit;
+    const item = (key: string, mintUrl: string) => ({
+      key,
+      rail: 'bolt12',
+      request: key,
+      status: 'reusable',
+      createdAt: 1,
+      copyTarget: 'bolt12Offer',
+      mintUrl,
+    });
+    mockLoadItems.mockResolvedValue([
+      item('real-offer', 'https://mint.example'),
+      item('testnut-offer', 'https://testnut.example'),
+    ]);
+    let renderer!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(<ReceiveRailListScreen />);
+    });
+    const rows = renderer.root.findAll(
+      (node) =>
+        typeof node.props.testID === 'string' && node.props.testID.startsWith('receive-rail-item-')
+    );
+    expect([...new Set(rows.map((row) => row.props.testID))]).toEqual([
+      `receive-rail-item-${shown}`,
+    ]);
+    mockActiveUnit = 'sat';
+    act(() => renderer.unmount());
+  });
 });

@@ -30,6 +30,7 @@ import '@/shared/stores/profile/nostrSocialStore';
 import '@/shared/stores/profile/dataMigrationStore';
 import '@/shared/stores/profile/dmLastMessageStore';
 import '@/shared/stores/global/mintMetadataStore';
+import '@/shared/stores/global/mintTestnutStore';
 import '@/shared/stores/global/relayMetadataStore';
 import '@/shared/stores/profile/mintStore';
 // AI chat: apiKey + sessions (now incl. message attachments) + the
