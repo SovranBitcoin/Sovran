@@ -38,11 +38,11 @@ async function readBreakdown(
     let total = Amount.zero();
     const included = (mintUrl: unknown) =>
       !includeMint || typeof mintUrl !== "string" || includeMint(mintUrl);
+    // Coco owns the object it returned; the narrowed view is a copy.
+    const byMint: typeof perMint = {};
     for (const [mintUrl, balance] of Object.entries(perMint)) {
-      if (!included(mintUrl)) {
-        delete perMint[mintUrl];
-        continue;
-      }
+      if (!included(mintUrl)) continue;
+      byMint[mintUrl] = balance;
       spendable = spendable.add(balance.spendable);
       reserved = reserved.add(balance.reserved);
       total = total.add(balance.total);
@@ -51,7 +51,7 @@ async function readBreakdown(
       spendable: amountToNumber(spendable),
       reserved: amountToNumber(reserved),
       total: amountToNumber(total),
-      byMint: perMint,
+      byMint,
       pending: sumReservedSends(
         (historyPage ?? []).filter(
           (entry) =>

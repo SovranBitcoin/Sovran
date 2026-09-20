@@ -70,7 +70,9 @@ function getRate(unit: string): number {
     ),
   };
   // Render-hot path (every displayed amount) — log only the anomalous case.
-  if (rates[unit] == null) {
+  // `unit` can be a mint-supplied string: own keys only, so `constructor`
+  // cannot resolve to an inherited function.
+  if (!Object.hasOwn(rates, unit)) {
     cashuLog.warn('currency.rate.unknown_unit', { unit, hasPricelist: !!pricelist });
     return 1;
   }

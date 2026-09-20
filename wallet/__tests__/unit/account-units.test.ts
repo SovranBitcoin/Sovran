@@ -37,12 +37,17 @@ describe("account units", () => {
   });
 
   it("covers every switchable unit, real accounts first", () => {
-    expect(ACCOUNT_UNITS.slice(0, SWITCHABLE_UNITS.length)).toEqual([
-      ...SWITCHABLE_UNITS,
+    expect(SWITCHABLE_UNITS).toEqual(["sat", "usd", "eur", "gbp"]);
+    expect(ACCOUNT_UNITS).toEqual([
+      "sat",
+      "usd",
+      "eur",
+      "gbp",
+      "tsat",
+      "tusd",
+      "teur",
+      "tgbp",
     ]);
-    expect(ACCOUNT_UNITS.slice(SWITCHABLE_UNITS.length)).toEqual(
-      SWITCHABLE_UNITS.map((unit) => toAccountUnit(unit, true)),
-    );
   });
 
   it("passes an unswitchable unit through rather than inventing an account", () => {
