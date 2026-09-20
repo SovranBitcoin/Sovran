@@ -108,6 +108,11 @@ task needs:
 | grilling | Resolving an open design decision, one question at a time |
 | expo-router | Route, stack, tab and sheet mechanics |
 | react-native-best-practices | Measured native performance work |
+| expo-animation | Motion decisions, Reanimated 4, gestures, haptics |
+| typescript-best-practices | Type modelling in `.ts` / `.tsx` |
+| principle-type-system-discipline | Illegal states, derived types, exhaustive matching |
+| principle-model-the-domain | Replacing scattered branching with one structure |
+| react-native-testing | React Native Testing Library 13 queries and async tests |
 
 `python3 .agents/skills/manage.py check` verifies the installation and
 `python3 .agents/skills/manage.py link` repairs missing links. Keep upstream

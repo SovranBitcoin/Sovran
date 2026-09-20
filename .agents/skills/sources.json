@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "reviewed_on": "2026-09-10",
+  "reviewed_on": "2026-09-20",
   "review_policy": "AGENTS.md#skills",
   "repository_popularity_snapshot": [
     {
@@ -20,6 +20,18 @@
       "revision": "063bee94c3f4df8453406c830b0a7df0f2860278",
       "repository_stars": 31032,
       "checked_on": "2026-09-10"
+    },
+    {
+      "repository": "https://github.com/cursor/plugins",
+      "revision": "032be146865d973682535de75f2287da438550bf",
+      "repository_stars": 8193,
+      "checked_on": "2026-09-20"
+    },
+    {
+      "repository": "https://github.com/callstack/react-native-testing-library",
+      "revision": "fc59e55769307befbd103c17131d6f78f38033b7",
+      "repository_stars": 3420,
+      "checked_on": "2026-09-20"
     },
     {
       "repository": "https://github.com/expo/skills",
@@ -241,15 +253,16 @@
       "repository": "https://github.com/expo/skills",
       "revision": "85c7236254db761c3905f9078ce17393f3544ff8",
       "source_path": "plugins/expo/skills/expo-router",
-      "reviewed_on": "2026-09-10",
+      "reviewed_on": "2026-09-20",
       "license": "MIT",
       "license_file": "LICENSE",
       "local_changes": [
-        "Added repository license; upstream skill files unchanged."
+        "Added repository license.",
+        "Removed the 'Submitting Feedback' section: it tells agents to run `npx --yes submit-expo-feedback@latest`, which downloads and executes a remote package and sends data out."
       ],
       "files_sha256": {
         "LICENSE": "49c5f9c7097c9a940ff663a54c27a4c60e379df6cc2b3052df0d37a09a85df93",
-        "SKILL.md": "93ff75501eb74e4982a93119ad3145499d400bb613260d2eb39be8008651f500",
+        "SKILL.md": "1aec82ed5122e9ec69a762115e3e0b725687573f5ebcd7cf43e612453acf794e",
         "agents/openai.yaml": "7b76d9331a33e06e61504db9af069bccc8ab4a02e2f8be92727e8e0f9ad7941d",
         "references/form-sheet.md": "947de9cf35a15aacf3f02e96e45942b5e4826e536e529570886e5ddbb7ec8591",
         "references/route-structure.md": "4c3d70edeb7e36d965c4d96fa150f23ee57e01be5f6c57dd3e34c6309aab7e87",
@@ -257,6 +270,100 @@
         "references/tabs.md": "c49081529a200bfc62c95d41229e5dd7368f2e35cd5775ccaaab3289ed1fd7eb",
         "references/toolbar-and-headers.md": "14d9a71dd949bd2b28a5bd531f6b9c1b4f3fa847a86db8c5218fee67b5295769",
         "references/zoom-transitions.md": "cacc1665e9f3044762765d2cd55fd1ead9627f06478f12dfa2280c6f9ae88ede"
+      }
+    },
+    {
+      "name": "expo-animation",
+      "kind": "upstream",
+      "repository": "https://github.com/expo/skills",
+      "revision": "39708666ce7014def1f8e34f3d8c93e8d3f588bb",
+      "source_path": "plugins/expo/skills/expo-animation",
+      "reviewed_on": "2026-09-20",
+      "license": "MIT",
+      "license_file": "LICENSE",
+      "local_changes": [
+        "Removed the 'Submitting Feedback' section: it tells agents to run `npx --yes submit-expo-feedback@latest`, which downloads and executes a remote package and sends data out."
+      ],
+      "files_sha256": {
+        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
+        "RECIPES.md": "4db141cb346d49231c94a95aaa50844b85a71c47ec543e9f9f5a1f453abc9883",
+        "SKILL.md": "262dd8b5887a02d049602f03349af16e955a594c73904f82cfcac348e4b59220",
+        "agents/openai.yaml": "7667e1a159300ee640ffb6ed4f81281dfdc0e3a789d4f3e5179c32ab3565795a"
+      }
+    },
+    {
+      "name": "typescript-best-practices",
+      "kind": "upstream",
+      "repository": "https://github.com/cursor/plugins",
+      "revision": "032be146865d973682535de75f2287da438550bf",
+      "source_path": "pstack/skills/typescript-best-practices",
+      "reviewed_on": "2026-09-20",
+      "license": "MIT",
+      "license_file": "LICENSE",
+      "local_changes": [
+        "Added repository license.",
+        "Upstream skill files unchanged."
+      ],
+      "files_sha256": {
+        "LICENSE": "bc957ca6bee02792566a1a028d105e02e247c6e77cf057061674273da77b200e",
+        "SKILL.md": "28f9e61710e205f6f3c5476f333483cff0e988f6a5b639e2faad536344b40c5e",
+        "references/patterns.md": "62e9cd32d2fa066a35d0d1349aac22dce31a48ad7d5eaf142570770cfe707384"
+      }
+    },
+    {
+      "name": "principle-type-system-discipline",
+      "kind": "upstream",
+      "repository": "https://github.com/cursor/plugins",
+      "revision": "032be146865d973682535de75f2287da438550bf",
+      "source_path": "pstack/skills/principle-type-system-discipline",
+      "reviewed_on": "2026-09-20",
+      "license": "MIT",
+      "license_file": "LICENSE",
+      "local_changes": [
+        "Added repository license.",
+        "Upstream skill files unchanged."
+      ],
+      "files_sha256": {
+        "LICENSE": "bc957ca6bee02792566a1a028d105e02e247c6e77cf057061674273da77b200e",
+        "SKILL.md": "c83da8031ffb4c86410030d3e261f659598fca2b7d8158fd9dc269d70a3a025e"
+      }
+    },
+    {
+      "name": "principle-model-the-domain",
+      "kind": "upstream",
+      "repository": "https://github.com/cursor/plugins",
+      "revision": "032be146865d973682535de75f2287da438550bf",
+      "source_path": "pstack/skills/principle-model-the-domain",
+      "reviewed_on": "2026-09-20",
+      "license": "MIT",
+      "license_file": "LICENSE",
+      "local_changes": [
+        "Added repository license.",
+        "Upstream skill files unchanged."
+      ],
+      "files_sha256": {
+        "LICENSE": "bc957ca6bee02792566a1a028d105e02e247c6e77cf057061674273da77b200e",
+        "SKILL.md": "bbadbb9a723fac3f76e782ae45665eb94058ec10993e4bae36d4dc6b0e4eac07"
+      }
+    },
+    {
+      "name": "react-native-testing",
+      "kind": "upstream",
+      "repository": "https://github.com/callstack/react-native-testing-library",
+      "revision": "fc59e55769307befbd103c17131d6f78f38033b7",
+      "source_path": "skills/react-native-testing",
+      "reviewed_on": "2026-09-20",
+      "license": "MIT",
+      "license_file": "LICENSE",
+      "local_changes": [
+        "Added repository license.",
+        "Omitted references/api-reference-v14.md: the app runs @testing-library/react-native 13.x, and the v14 'always await render' guidance is wrong for it."
+      ],
+      "files_sha256": {
+        "LICENSE": "7252e9bc5eba33ff2b205f12c581fde208fa92c94ae8dac36d8167b648ad622c",
+        "SKILL.md": "dea54d1d397cbd271a9ee7f6c09e841bb1aa546d9f2a3ee46fd466275061e6e1",
+        "references/anti-patterns.md": "1ae7fcef36164093ca259a4192556b6356ba70ec2ac000b08307ffebd89da823",
+        "references/api-reference-v13.md": "f9a47fcbee4c54871b2fc337e7ba035d9f9753c2f0cadef459e40b11932e77a7"
       }
     }
   ]

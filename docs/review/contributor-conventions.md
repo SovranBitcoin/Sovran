@@ -619,3 +619,203 @@ Use the [header contract](header-contract.md): `Screen` gradient chrome, shared
 measured `stickyContent` for persistent section tabs. Preserve header actions,
 scroll clearance and identity continuity on iOS and Android. Do not build screen-local
 morph animations or place multi-row controls in a navigation title.
+
+## units/registry
+
+Scope: `repository-wide`
+
+Which units the wallet offers, and each unit's label, name, symbol and decimals, are declared once in the unit registry (`wallet/src/units/registry.ts`, importable as `wallet/units`); everything else derives from it.
+
+Does `hunk` hand-write a currency or unit vocabulary instead of importing or deriving it from the unit registry (`SWITCHABLE_UNITS`, `FIAT_UNITS`, `ACCOUNT_UNITS`, `SwitchableUnit`, `FiatUnit`, `AccountUnit`, `unitDefinition`, `unitSymbol`, `unitMinorDecimals`, `isFiatUnit`, `accountUnitLabel`)? A vocabulary is a `'sat' | 'usd' | …` union, a `['SAT', 'USD', …]` list, a `{ usd: '$', … }` symbol, label, name, flag or decimals map keyed by unit, a run of `unit === 'usd' || unit === 'eur' || …` comparisons, a cast to such a union, or an inline `unit === 'sat' ? 'BTC' : unit.toUpperCase()` label.
+
+Allowed cases: The registry itself and `app/shared/lib/cashu/unitPresentation.ts`, whose icon tables are typed `Record<SwitchableUnit | FiatUnit, …>` so a new unit fails to compile without an entry; a comparison against ONE specific unit for behaviour that genuinely belongs to that unit (`unit === 'sat'` for the Lightning address, sat display modes); protocol unit strings passed through untouched; test fixtures and e2e scenarios; nagg's upper-case rate codes derived from `FIAT_UNITS`.
+
+## types/derive
+
+Scope: `repository-wide`
+
+A type, list or lookup that restates values another declaration owns is derived from that owner, so the two cannot drift.
+
+Does `hunk` declare a literal union, interface, array or lookup table that restates values already owned by an `as const` object or array, a zod schema, or a library type, instead of deriving it (`typeof X[number]`, `keyof typeof X`, `z.infer`, `Pick`, `Omit`, `Parameters`, `ReturnType`)? Or does it key a lookup table by a known union but type it `Record<string, …>`, or cast the key (`unit as 'usd' | 'eur'`), so that a new union member compiles with no entry?
+
+Allowed cases: The declaration is the owner; the table is typed `Record<Union, …>` or `satisfies Record<Union, …>`; a deliberately partial table typed `Partial<Record<Union, …>>` with a handled miss; wire types generated from or validated by a schema; test fixtures.
+
+## types/illegal-states
+
+Scope: `repository-wide`
+
+Mutually exclusive states are a discriminated union, not a boolean plus optional fields that admit contradictory combinations.
+
+Does `hunk` add or extend a type that models mutually exclusive states as a boolean plus optional fields, or as several booleans that must stay in sync (`{ loading; data?; error? }`, `completed` plus `completedAt?`, `isPaid` and `isFailed`), where a discriminated union would make the contradictory combinations unrepresentable?
+
+Allowed cases: Independent flags that can each be true or false in any combination; props of a presentational component; wire or persisted shapes owned by another system; a boolean derived from the single source rather than stored beside it.
+
+## zod/callbacks-dont-throw
+
+Scope: `repository-wide`
+
+Zod 4 does not catch a throw inside a refinement or transform: it escapes `safeParse`, `parseWith` and the persist merge.
+
+Does `hunk` contain a `throw` inside a `.refine`, `.superRefine`, `.check`, `.transform` or `z.preprocess` callback, or call something there that visibly throws on bad input (`JSON.parse`, `new URL`, `BigInt(…)`, a decoder) without catching it and reporting an issue instead?
+
+Allowed cases: The callback returns `false`, adds an issue through `ctx`, or returns `z.NEVER`; the throwing call is wrapped in a try/catch that reports an issue.
+
+## zod/v4-api
+
+Scope: `repository-wide`
+
+Zod 3 parameters and shapes that Zod 4 silently ignores or changes are bugs, not style.
+
+Does `hunk` pass `required_error`, `invalid_type_error` or `errorMap` to a zod schema (Zod 4 silently ignores them; use `error`), spread a `z.looseObject` or `z.strictObject` shape into a new `z.object({ ...X.shape })` (the result silently strips unknown keys; use `.extend`), call `.pick`, `.omit` or `.partial` on a refined object (throws), use `z.record(EnumSchema, …)` where some keys may be absent (exhaustive in Zod 4; use `z.partialRecord`), or add an async refinement or transform to a schema parsed with synchronous `safeParse` or `parse` (throws)?
+
+Allowed cases: `message` (deprecated, still works); `.extend` on a loose or strict object; a spread whose strip-mode result is intended and commented; schemas parsed with `safeParseAsync`.
+
+## zod/defaults-and-coercion
+
+Scope: `repository-wide`
+
+A default or a coercion never manufactures a valid-looking value from missing or malformed input.
+
+Does `hunk` add `z.coerce.number()` or `z.coerce.boolean()` to input that can be a string (`''` becomes `0`, `'false'` becomes `true`), or add `.default(v)` to a schema with a `.transform`, `.pipe` or checks where `v` is an input-side value (`.default` short-circuits: it must be of the OUTPUT type and skips validation; `.prefault` runs the value through the schema)?
+
+Allowed cases: `z.stringbool()` or an explicit string-to-boolean mapping; a coercion preceded by a non-empty check or applied to a value that is already numeric; `.default` whose value is of the output type; `.prefault` for input-side defaults.
+
+## zod/boundary-parse
+
+Scope: `repository-wide`
+
+Schemas are built once at module scope and untrusted data is parsed with a non-throwing parser.
+
+Does `hunk` construct a `z.*` schema inside a component, hook, store action, request handler or loop rather than at module scope, or call a throwing `.parse(` on network, storage, relay, deep-link or native-module data instead of `safeParse` or a hoisted `parseWith(Schema, where)`?
+
+Allowed cases: A schema that genuinely depends on a runtime value and is memoized or built once per call site by design; `.parse` on a constant the module itself owns; tests.
+
+## zod/issue-values
+
+Scope: `repository-wide`
+
+Zod issue messages embed the offending values; logs and UI carry issue paths and codes only.
+
+Does `hunk` log, persist, send or display zod issue text — `error.message`, `z.prettifyError`, `z.flattenError`, `z.treeifyError`, `issue.message`, `issue.input`, or a schema built with `reportInput` — for data that can hold secrets, tokens, invoices, mint URLs or private message content?
+
+Allowed cases: `loggableIssues(error)` or an equivalent that keeps only `path` and `code`; messages the schema author wrote as fixed strings with no interpolated input; development-only assertions in tests.
+
+## persist/config-seam
+
+Scope: `**/stores/**/*.{ts,tsx}`, `**/*[Ss]tore.{ts,tsx}`, `**/persist/**/*.ts`, `**/{cache,caches}/**/*.ts`, `**/*[Cc]ache.ts`
+
+Every persisted store goes through `persistConfig`, and every persisted enum is tolerant, because the merge discards the whole blob when one field fails to parse.
+
+Does `hunk` call zustand's `persist(` without building its options with `persistConfig(...)`, or add an enum, union or literal field to a schema passed to `persistConfig({ schema })` without `.default(X).catch(X)` (or, for collections, the tolerant helpers in `app/shared/lib/persist/tolerant.ts`)?
+
+Allowed cases: `createQueryCacheStore`, which owns its own envelope; the e2e runtime; a field whose invalid value must reject the blob and is covered by a `version` bump and `migrate`; enums derived from the unit registry that keep `.default().catch()`.
+
+## state/zustand-v5
+
+Scope: `repository-wide`
+
+Zustand 4 APIs that version 5 removed fail at runtime here, not just in review.
+
+Does `hunk` pass a second (equality) argument to a hook made by `create`, import `zustand/traditional`, `createWithEqualityFn` or a default export from `zustand` (none can work here: `use-sync-external-store` is not installed), or call `store.subscribe(selector, listener)` on a store that is not wrapped in `subscribeWithSelector` (the listener never runs)?
+
+Allowed cases: `useShallow` around the selector; `subscribe(listener)` with a single argument; stores created with `subscribeWithSelector`.
+
+## motion/thread-hop
+
+Scope: `**/*.tsx`, `**/hooks/**/*.ts`, `**/use*.ts`
+
+Work crosses between the UI and JS threads explicitly, with the current worklets API.
+
+Does a worklet in `hunk` — a gesture callback, `useAnimatedStyle`, `useDerivedValue`, `useAnimatedReaction`, `useAnimatedScrollHandler`, `useFrameCallback` or an animation completion callback — call a plain JS function directly (a state setter, `router.*`, a store action, haptics, an imported helper with no `'worklet'` directive), pass `scheduleOnRN` a function created inside the worklet, or ADD a new `runOnJS(fn)(…)` / `runOnUI(fn)(…)` call (deprecated in Reanimated 4; use `scheduleOnRN(fn, …args)` / `scheduleOnUI`)?
+
+Allowed cases: `scheduleOnRN` / `scheduleOnUI` with a function defined at component or module scope; functions marked `'worklet'`; the Gesture Handler builder option `.runOnJS(true)`, which is a different API; existing `runOnJS` calls the hunk does not add.
+
+## motion/per-frame-js
+
+Scope: `**/*.tsx`, `**/hooks/**/*.ts`, `**/use*.ts`
+
+Nothing re-renders React or crosses to the JS thread once per frame.
+
+Does `hunk` call `scheduleOnRN`, `runOnJS` or a React state setter on every frame — inside `.onUpdate`, `.onChange`, `useAnimatedScrollHandler`, `useFrameCallback` or `useAnimatedStyle` — with no threshold or change guard, or keep a per-frame value (scroll offset, drag translation) in `useState` instead of a shared value?
+
+Allowed cases: The hop happens in `.onEnd` / `.onFinalize`; a `useAnimatedReaction` whose prepare returns a boolean or bucket and whose react runs only when `current !== previous`; a guard that fires once per threshold crossing; list or media offset bookkeeping that the header contract names.
+
+## motion/shared-value-access
+
+Scope: `**/*.tsx`, `**/hooks/**/*.ts`, `**/use*.ts`
+
+Shared values are read and written with `.get()` / `.set()`, and never during render.
+
+Does `hunk` add a read or write of a Reanimated shared value through `.value` (including `+=`) rather than `.get()` / `.set()`, which the React Compiler requires, or read or write a shared value in a component or hook body during render instead of inside a worklet, effect, handler or animation callback?
+
+Allowed cases: `.value` on things that are not shared values (events, refs, form state, query results); `.get()` / `.set()` inside worklets, effects, handlers and callbacks; files listed in `react-compiler-bailouts.json`; existing `.value` access the hunk does not add.
+
+## motion/reanimated-4-config
+
+Scope: `**/*.tsx`, `**/hooks/**/*.ts`, `**/use*.ts`
+
+Reanimated 4 rejects or ignores configuration shapes that version 3 accepted.
+
+Does `hunk` pass a raw `'cubic-bezier(…)'` or `'steps(…)'` string or an `Easing.*` value to `transitionTimingFunction` / `animationTimingFunction` (throws; use `cubicBezier()`, `steps()`, `linear()` from Reanimated), give `withSpring` both the physics form (`stiffness`, `damping`, `mass`) and the duration form (`duration`, `dampingRatio`), use `restDisplacementThreshold` / `restSpeedThreshold` (removed; `energyThreshold`), or use `useAnimatedGestureHandler`, `useWorkletCallback`, the `Layout` transition, `useAnimatedKeyboard`, `useScrollViewOffset` or `sharedTransitionTag`?
+
+Allowed cases: Named timing-function strings (`'ease-in-out'`); one spring form at a time; `LinearTransition` and the other named layout transitions; `react-native-keyboard-controller` for keyboard tracking.
+
+## motion/gesture-handoff
+
+Scope: `**/*.tsx`, `**/hooks/**/*.ts`, `**/use*.ts`
+
+A gesture hands its velocity to the animation that follows it and does not fight the scroller it sits in.
+
+Does `hunk` add a `Gesture.Pan()` inside a scrollable or list with no `activeOffsetX` / `activeOffsetY`, `failOffset*` or relation to the scroll gesture, write `translationX` / `translationY` without adding the offset captured at `.onStart` / `.onBegin`, decide dismiss or commit on distance alone when the event's velocity is available, or start the release `withSpring` without `velocity`?
+
+Allowed cases: A pan that owns the whole screen with no scroller beneath it; a release that snaps with `withTiming` by design and says so; gestures whose end state does not depend on the fling (sliders that stop where released).
+
+## motion/list-rows
+
+Scope: `**/*.tsx`
+
+Recycled list rows do not replay entering animations or lose their layout type.
+
+Does `hunk` put `entering=` or `exiting=` on a row rendered by FlashList, FlatList or the shared `List` (recycling replays it while scrolling), or render visibly different row layouts from one `renderItem` without `getItemType`?
+
+Allowed cases: An entering animation gated to the first mount of a newly inserted item; rows of a small non-virtualized list; lists whose rows share one layout.
+
+## rn/numeric-and
+
+Scope: `**/*.tsx`
+
+`{count && <View/>}` renders the number when it is zero, and a bare number outside `<Text>` crashes on native.
+
+Does `hunk` add JSX of the form `{x && <Component … />}` where `x` is or can be a number (`count`, `length`, `amount`, `balance`, `index`, a `?.length`), so that `0` or `NaN` is rendered as a text node?
+
+Allowed cases: `x` is a boolean, a string, an object or `null`/`undefined`; the condition is a comparison (`count > 0 && …`), `!!x`, `Boolean(x)` or a ternary.
+
+## ui/glass-surfaces
+
+Scope: `**/*.tsx`
+
+Glass effects have rendering constraints that fail silently.
+
+Does `hunk` set `overflow: 'hidden'` on a `GlassView` or an ancestor that clips it, animate the opacity of a glass view, set `isInteractive` on glass that is not itself a control, or render glass without an availability check and a Reduce Transparency fallback?
+
+Allowed cases: The capability hook or `defineVariants` chose the glass variant and supplies the fallback; opacity animated on a sibling or child rather than the glass view; clipping applied to content inside the glass.
+
+## ui/keyboard-tracking
+
+Scope: `**/*.tsx`, `**/hooks/**/*.ts`, `**/use*.ts`
+
+Keyboard movement comes from `react-native-keyboard-controller`, and taps reach controls while the keyboard is open.
+
+Does `hunk` track keyboard position with `Keyboard.addListener` plus a timing animation or `LayoutAnimation`, or add a scrollable form or search-results list whose rows are tappable while an input is focused without `keyboardShouldPersistTaps="handled"`?
+
+Allowed cases: `react-native-keyboard-controller` hooks and views; `Keyboard.dismiss()`; listeners used for non-layout behaviour (analytics, focus bookkeeping); scrollers with no focusable input above them.
+
+## tests/assert-outcomes
+
+Scope: `**/__tests__/**/*.{ts,tsx}`, `**/*.test.{ts,tsx}`
+
+A test states the expected outcome as a literal and reaches the code through its public interface.
+
+Does a new or changed test in `hunk` assert only that something was called, defined or truthy (`toHaveBeenCalled*`, `toBeDefined`, `toBeTruthy`) with no assertion on an observable result, compute its expected value the same way the code under test does, or `jest.mock` / `vi.mock` a module this repository owns (`@/…`, `wallet`, `nostr`) when the module under test could be exercised through its public interface with only system boundaries mocked?
+
+Allowed cases: Mocks of system boundaries (network, native modules, SecureStore, AsyncStorage, time, randomness, the logger); a call assertion that IS the contract (an adapter must call the native module once, a guard must not call the network); mocks of heavy UI primitives in a render test of something else; existing mocks the hunk does not add.
