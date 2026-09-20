@@ -17,6 +17,7 @@ import { useWalletContextWithOverride } from '@/shared/providers/WalletContextPr
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
+import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
@@ -242,6 +243,16 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
     () => ({ opacity: canSendOffline === null ? 0.3 : 1 }),
     [canSendOffline]
   );
+  // A `headerTitle` function replaces the native title outright: the navigator
+  // renders whatever this returns and ignores the `title` option entirely. So
+  // both branches must return an ELEMENT — the fallback used to return the bare
+  // string 'Select amount', which is not renderable in a native header view,
+  // and left every amount page with no title at all.
+  //
+  // It also has to stay a function in both states. `recipientReady` flips
+  // false → true as the kind-0 resolves, and React Navigation caches the header
+  // title's form; swapping between the `title` string and a render function
+  // mid-screen leaves the old form on screen (see MintAddScreen).
   const renderHeaderTitle = useCallback(
     () =>
       recipientReady ? (
@@ -252,7 +263,9 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
           avatarUrl={headerAvatarUrl}
         />
       ) : (
-        'Select amount'
+        <Text className="text-foreground" size={17} bold>
+          Select amount
+        </Text>
       ),
     [headerAvatarUrl, headerDisplayName, headerSeed, recipientPubkey, recipientReady]
   );
@@ -277,6 +290,8 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
   const stackOptions = useMemo(
     () =>
       withGlassHeaderItems({
+        // Unused while `headerTitle` is set, but it is what the back button on
+        // the next screen and the accessibility page title read.
         title: 'Select amount',
         headerTitleAlign: 'center' as const,
         headerTitle: renderHeaderTitle,
