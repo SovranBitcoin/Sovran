@@ -399,6 +399,15 @@ export {
   type ReceiveMethodMintResolution,
 } from "./mint-capabilities";
 export {
+  ACCOUNT_UNITS,
+  accountUnitLabel,
+  isTestnutUnit,
+  toAccountUnit,
+  toRealUnit,
+  type AccountUnit,
+  type TestnutUnit,
+} from "./account-units";
+export {
   validateIntent,
   checkWalletCapabilities,
   checkAllCapabilities,

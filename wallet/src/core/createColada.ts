@@ -104,6 +104,12 @@ export interface ColadaConfig {
     mintUrls: string[],
   ) => Promise<Record<string, MintCatalogEntry>>;
   /**
+   * The testnut split (see account-units): which mints are testnuts, and
+   * whether the active account is a testnut one. Absent = no mint is.
+   */
+  isTestnutMint?: (mintUrl: string) => boolean;
+  isTestnutAccount?: () => boolean;
+  /**
    * Per-mint NUT-06 fetcher used by `buildMintListItems`. Lets the wallet route
    * through its own SWR cache + per-mint deadline so one slow/dead mint can't
    * gate the Select Mint screen. Defaults to coco's `manager.mint.getMintInfo`.
@@ -219,6 +225,8 @@ export function createColada(config: ColadaConfig): ColadaInstance {
     sendNostrDM,
     enrichMintReviewInfo,
     fetchMintCatalog: config.fetchMintCatalog,
+    isTestnutMint: config.isTestnutMint,
+    isTestnutAccount: config.isTestnutAccount,
     fetchMintInfo: config.fetchMintInfo,
     resolveMintContactProfile:
       config.resolveMintContactProfile ??

@@ -4,8 +4,11 @@
 // Cashu fiat units are minor-denominated (usd = cents). These helpers are the
 // single colada-side source for how a unit's minor amounts map to the
 // major-denomination strings users type and read. 'sat' (and unknown units)
-// have no minor scaling and no symbol.
+// have no minor scaling and no symbol. A testnut account unit (`tusd`)
+// denominates exactly like the mint unit behind it.
 // ---------------------------------------------------------------------------
+
+import { toRealUnit } from '../account-units';
 
 const FIAT_UNIT_SYMBOLS: Record<string, string> = {
   usd: '$',
@@ -15,17 +18,17 @@ const FIAT_UNIT_SYMBOLS: Record<string, string> = {
 
 /** Currency symbol for a fiat unit; '' for sat and unknown units. */
 export function unitSymbol(unit: string): string {
-  return FIAT_UNIT_SYMBOLS[unit.toLowerCase()] ?? '';
+  return FIAT_UNIT_SYMBOLS[toRealUnit(unit)] ?? '';
 }
 
 /** Decimal places between a unit's minor amounts and its major display. */
 export function unitMinorDecimals(unit: string): number {
-  return unit.toLowerCase() in FIAT_UNIT_SYMBOLS ? 2 : 0;
+  return toRealUnit(unit) in FIAT_UNIT_SYMBOLS ? 2 : 0;
 }
 
 /** True for units entered as major-denomination decimals (usd/eur/gbp). */
 export function isFiatUnit(unit: string): boolean {
-  return unit.toLowerCase() in FIAT_UNIT_SYMBOLS;
+  return toRealUnit(unit) in FIAT_UNIT_SYMBOLS;
 }
 
 /**

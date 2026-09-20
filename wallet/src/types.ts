@@ -425,8 +425,9 @@ export interface MintListItem {
   /** Unit the flow (and `balance`) is denominated in — NOT the mint's full unit set. */
   unit: string;
   /**
-   * Units the mint can actually issue: advertised NUT-04 units gated on the
-   * mint's real keysets. Absent on synchronous fallback rows (unknown) —
+   * ACCOUNT units the mint can actually issue: advertised NUT-04 units gated
+   * on the mint's real keysets, as `tsat`/`tusd`/… for a testnut mint (see
+   * account-units). Absent on synchronous fallback rows (unknown) —
    * consumers treat absent as unrestricted.
    */
   supportedUnits?: string[];

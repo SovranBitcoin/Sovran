@@ -51,6 +51,7 @@ import { parsePaymentInput } from "../parse";
 import { MeltUserCancelledError, UnitRateUnavailableError } from "../errors";
 import { normalizeNostrPubkey, resolveRecipientPubkey } from "../recipient";
 import { amountToNumber, type AmountLike } from "../amount";
+import { toAccountUnit } from "../account-units";
 import {
   buildMethodAwareMintCandidates,
   compareMintDisplayOrder,
@@ -553,6 +554,15 @@ export interface DefaultOperationsConfig {
     mintUrls: string[],
   ) => Promise<Record<string, MintCatalogEntry>>;
   /**
+   * The testnut split (see account-units): which mints are testnuts, and
+   * whether the active account is a testnut one. `buildMintListItems` reports
+   * each row's units as account units and, outside the wallet's own mint
+   * picker, disables mints on the other side of the split. Absent = no mint
+   * is a testnut.
+   */
+  isTestnutMint?: (mintUrl: string) => boolean;
+  isTestnutAccount?: () => boolean;
+  /**
    * Per-mint NUT-06 fetcher used by `buildMintListItems` to resolve name/icon.
    *
    * Defaults to `mgr.mint.getMintInfo`, which always hits coco's 5-min TTL and
@@ -997,6 +1007,14 @@ export function createDefaultOperations(
       const supportedSet = data.supportedMintUrls
         ? new Set(data.supportedMintUrls)
         : null;
+      const testnutAccount = config.isTestnutAccount?.() ?? false;
+      const isTestnut = (mintUrl: string) =>
+        config.isTestnutMint?.(mintUrl) ?? false;
+      // The wallet's own picker lists both sides: picking a mint there moves
+      // the wallet to that mint's account. Every flow picker is pinned to the
+      // active account, so test and real funds never meet in one payment.
+      const crossesAccounts = (mintUrl: string) =>
+        data.scope !== "selected" && isTestnut(mintUrl) !== testnutAccount;
       const capabilityCtx = {
         trustedMintUrls: mintUrls,
         mintBalances: balances,
@@ -1005,6 +1023,7 @@ export function createDefaultOperations(
             mintUrl: mint.mintUrl,
             mintInfo: mintInfoMap.get(mint.mintUrl) ?? mint.mintInfo,
             keysetUnits: keysetUnitsByMint[mint.mintUrl],
+            outsideAccount: crossesAccounts(mint.mintUrl),
           })),
           data.unit,
         ),
@@ -1057,7 +1076,10 @@ export function createDefaultOperations(
         // disabled so the user can't pick one that won't auto-receive.
         const supportsWebsocket =
           (info?.nuts?.["17"]?.supported?.length ?? 0) > 0;
-        if (data.scope === "npc" && !supportsWebsocket) {
+        if (crossesAccounts(mintUrl)) {
+          status = "disabled";
+          reason = localizeReason("TESTNUT_ACCOUNT_MISMATCH");
+        } else if (data.scope === "npc" && !supportsWebsocket) {
           status = "disabled";
           reason = {
             code: "NO_WEBSOCKET",
@@ -1104,7 +1126,10 @@ export function createDefaultOperations(
           // fallback for missing info would wrongly hide the mint from
           // non-sat currency filters.
           supportedUnits: info
-            ? deriveSupportedUnitsFromInfo(info, keysetUnitsByMint[mintUrl])
+            ? deriveSupportedUnitsFromInfo(
+                info,
+                keysetUnitsByMint[mintUrl],
+              ).map((unit) => toAccountUnit(unit, isTestnut(mintUrl)))
             : undefined,
           status,
           reason,
