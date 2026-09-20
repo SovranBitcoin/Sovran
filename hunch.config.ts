@@ -39,9 +39,12 @@ export default defineConfig({
   failOnError: false,
   task: "pr",
   // Experimental attribution remains off until independently labeled evaluation supports it.
-  review: { contextLines: 40, chunkLines: 150, overlapLines: 0, localize: false },
-  // Whole-repository dry run: 4,460 chunks; explicit and compiled rules use separate requests.
-  budget: { maxHunks: 5000, maxRulesPerHunk: 128, maxRequests: 10000, concurrency: 4, timeoutSeconds: 3600 },
+  // `everywhere`: every compiled rule is asked of every chunk. The compiler's `appliesTo` globs and
+  // `when` regexes in hunch.lock are guesses, and a wrong one silences a rule without a trace.
+  review: { contextLines: 40, chunkLines: 150, overlapLines: 0, localize: false, compiledScope: "everywhere" },
+  // Sized from `check --all --dry-run`: 4,526 chunks, 1.43M questions in 25,980 requests. The hosted
+  // App applies its own caps to a PR (3,000 requests, 8 in flight, 240 seconds).
+  budget: { maxHunks: 10000, maxRulesPerHunk: 1024, maxRequests: 40000, concurrency: 16, timeoutSeconds: 43200 },
   rules: {
     // ── Compiled skill rules switched off ─────────────────────────────────
     // Each skill was vetted before selection; these compiled rules either
@@ -229,13 +232,12 @@ export default defineConfig({
     // Not a lint rule: the tint and the icon are greppable, but deciding
     // whether a given tinted row is a status notice — rather than an empty
     // state, a badge or a field error — is a judgment about the rendered
-    // shape. `when` keeps the rule off hunks with no icon or status tint at
-    // all; every hand-built notice this rule exists to catch carries one.
+    // shape. It is asked of every `.tsx` chunk under `app/`, with no regex
+    // prefilter, so a notice built from an unforeseen tint is still seen.
     "ui/status-notice": ["warn", choice({
       instructions: "Require changed JSX that renders a status notice: a short warning, error, caution or informational message next to a status icon, on its own tinted or bordered surface, within a page, card or sheet. Does this change build that surface out of primitives — a View, Card, HStack, Icon and Text, or a status tint such as `bg-warning-soft`, `bg-danger-soft`, `bg-danger/[0.08]`, `withAlpha(dangerColor, …)` or a literal amber or red hex — where the shared `Notice` in `app/shared/ui/composed/Notice.tsx` would render it? Judge the rendered shape, not the vocabulary. A full-screen error or empty state, a screen-wide chrome banner, an interactive call-to-action card, a badge or pill carrying no status sentence, per-field validation text under an input, and bare tinted copy with no surface of its own are different shapes, not notices. A small named component whose body is a `Notice` at one surface's geometry is the intended pattern; so are `Notice`'s own implementation and the design-system catalogue screens under `app/features/settings`.",
       criteria: { concern: "The changed JSX hand-builds a status notice that `Notice` — with its `status`, `tone`, `size`, `icon` and `action` props — already renders.", ...outcomes },
       files: ["app/**/*.tsx"],
-      when: /Icon|warning|danger|caution|alert/i,
       report: ["concern"],
       abstain: ["insufficient-context"],
       reference: "docs/review/contracts.md",

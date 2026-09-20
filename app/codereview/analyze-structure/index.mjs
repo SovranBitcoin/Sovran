@@ -1295,7 +1295,7 @@ function propagatePlatformSiblings({ allFiles, faninMap, fanoutMap, importedName
   // `.native`/`.web`/`.types`/`.styles`/`.constants` and the file extension).
   const groups = new Map();
   for (const f of allFiles) {
-    const key = `${dirname(f.fullPath)} ${strippedBase(f.name)}`;
+    const key = `${dirname(f.fullPath)}\0${strippedBase(f.name)}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(f.fullPath);
   }
