@@ -85,8 +85,8 @@ export function LightningSendScreen({
   // fallback for the race-loss case where the entry has `recipientPubkey`
   // but `recipientDisplayName` wasn't populated yet at the moment of
   // navigation. On a warm cache it returns synchronously on first render
-  // — no flicker; on a cold cache the layout default "Send Lightning"
-  // stays visible until kind-0 lands (documented trade-off).
+  // — no flicker; on a cold cache the rail wording ("Send Lightning",
+  // "Sent Lightning") stays visible until kind-0 lands (documented trade-off).
   const recipientPubkey =
     typeof entry?.metadata?.recipientPubkey === 'string'
       ? entry.metadata.recipientPubkey
@@ -265,11 +265,12 @@ export function LightningSendScreen({
       entry={entry}
       source={source}
       footer={bottomButtons}
-      headerTitle="Send Lightning"
       headerIdentity={
         recipientPubkey && headerDisplayName
           ? {
-              name: `Pay ${headerDisplayName}`,
+              // The bare name: the shell puts it in the transaction's own
+              // tense ("Pay Alex" while unpaid, "Paid Alex" afterwards).
+              name: headerDisplayName,
               seed: recipientPubkey,
               picture: headerAvatarUrl,
             }

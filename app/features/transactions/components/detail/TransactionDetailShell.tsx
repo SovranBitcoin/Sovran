@@ -3,7 +3,7 @@ import { StyleSheet, type ScrollView, type View as NativeView } from 'react-nati
 import { useReducedMotion } from 'react-native-reanimated';
 
 import { useIdentityHeader, type HeaderIdentity } from '@/shared/ui/composed/IdentityHeader';
-import { getCounterparty } from 'wallet';
+import { getCounterparty, transactionHeaderTitle } from 'wallet';
 
 import { useDeferredMount } from '@/shared/hooks/useDeferredMount';
 import { Screen, useScreenOptions } from '@/shared/ui/composed/Screen';
@@ -55,6 +55,12 @@ interface TransactionDetailShellProps {
    * cannot — the melt preview's "Pay <name>".
    */
   headerIdentity?: HeaderIdentity;
+  /**
+   * Overrides the derived title. Leave it unset: the shell names the screen
+   * from the entry's rail and state (`transactionHeaderTitle`), so a settled
+   * payment reads "Sent Lightning" / "Paid Alex" instead of instructing the
+   * user to send something the wallet already sent.
+   */
   headerTitle?: string;
   /**
    * Screen-specific content rendered between the header and the status/refresh
@@ -110,18 +116,24 @@ export function TransactionDetailShell({
   showRecipientAvatar = false,
   footer,
   headerIdentity,
-  headerTitle = '',
+  headerTitle,
   beforeStatus,
   statusRow,
   timeline,
   children,
 }: TransactionDetailShellProps): React.ReactElement {
   const entryIdentity = useTransactionIdentity(entry);
-  const identity = headerIdentity ?? entryIdentity;
-  const morph = useIdentityHeader({ identity, title: headerTitle, collapseAt: 48 });
+  const namedIdentity = headerIdentity ?? entryIdentity;
+  // One phrase names the screen and the person: the collapsed bar shows the
+  // icon and this title beneath it, so "Paid Alex" must not become "Alex" on
+  // the way into the header.
+  const title =
+    headerTitle ?? transactionHeaderTitle(entry, { counterpartyName: namedIdentity?.name });
+  const identity = namedIdentity ? { ...namedIdentity, name: title } : undefined;
+  const morph = useIdentityHeader({ identity, title, collapseAt: 48 });
   useScreenOptions(
-    () => (headerTitle ? { headerTitle: morph.headerTitle } : {}),
-    [headerTitle, identity?.name, identity?.picture, identity?.seed]
+    () => (title ? { headerTitle: morph.headerTitle } : {}),
+    [title, identity?.picture, identity?.seed]
   );
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollContentRef = useRef<NativeView>(null);

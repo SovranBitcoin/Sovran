@@ -7,11 +7,12 @@
  */
 
 import { SendTokenRoute } from '@/features/send';
+import { railHeaderTitle } from 'wallet';
 import { FormSheetChrome } from '@/shared/ui/composed/FormSheetChrome';
 
 export default function ModalScreen() {
   return (
-    <FormSheetChrome title="Send Ecash">
+    <FormSheetChrome title={railHeaderTitle('ecashSend')}>
       <SendTokenRoute where="app.sendToken" />
     </FormSheetChrome>
   );

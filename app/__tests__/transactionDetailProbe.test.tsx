@@ -48,7 +48,12 @@ jest.mock('react-native-reanimated', () => {
     },
   };
 });
-jest.mock('wallet', () => ({ getCounterparty: () => mockCounterparty }));
+jest.mock('wallet', () => ({
+  getCounterparty: () => mockCounterparty,
+  // The title resolver is covered by wallet's own unit tests; this probe only
+  // needs the shell to get A title so the header renders.
+  transactionHeaderTitle: () => 'Sent Lightning',
+}));
 // The shared identity resolver reaches the whole nostr data layer; this probe
 // only cares about the scroll/timeline spine, so it stands in for the answer.
 jest.mock('@/features/transactions/lib/transactionIdentity', () => ({

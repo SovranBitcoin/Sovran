@@ -18,6 +18,16 @@ export {
   matchesTransactionPaymentType,
 } from "./filters";
 export type { TransactionBucket } from "./filters";
+export {
+  railHeaderTitle,
+  transactionHeaderPhase,
+  transactionHeaderRail,
+  transactionHeaderTitle,
+} from "./header-title";
+export type {
+  TransactionHeaderPhase,
+  TransactionHeaderRail,
+} from "./header-title";
 export { inFlightReceiveToHistoryEntry } from "./inFlightReceives";
 export {
   isPendingPaymentRequestEntry,

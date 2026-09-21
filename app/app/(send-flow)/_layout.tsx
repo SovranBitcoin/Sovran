@@ -20,6 +20,7 @@
  */
 
 import { Stack } from 'expo-router';
+import { railHeaderTitle } from 'wallet';
 import { AndroidSheetFlowStack } from '../../config/flowLayoutOptions';
 
 const SEND_OPTIONS = { title: 'Send' };
@@ -37,13 +38,13 @@ const NEAR_PAY_PEERS_OPTIONS = {
   ...NEAR_PAY_HEADER_OPTIONS,
 };
 const AMOUNT_OPTIONS = { title: 'Select amount' };
-const SEND_TOKEN_OPTIONS = { title: 'Send ecash' };
+const SEND_TOKEN_OPTIONS = { title: railHeaderTitle('ecashSend') };
 const LIGHTNING_SEND_OPTIONS = {
-  title: 'Send Lightning',
+  title: railHeaderTitle('lightningSend'),
   headerBackButtonMenuEnabled: false,
 };
 const ONCHAIN_SEND_OPTIONS = {
-  title: 'Send onchain',
+  title: railHeaderTitle('onchainSend'),
   headerBackButtonMenuEnabled: false,
 };
 const PAYMENT_REQUEST_OPTIONS = {

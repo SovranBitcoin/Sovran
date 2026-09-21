@@ -1,3 +1,5 @@
+import { railHeaderTitle } from 'wallet';
+
 import { GRADIENT_HEADER_OPTIONS } from '@/navigation/headerOptions';
 import { Platform } from 'react-native';
 import type { NativeStackNavigationOptions } from 'expo-router';
@@ -175,13 +177,13 @@ const standaloneScreens: ModalConfig[] = [
   fullScreenModal('(stories-flow)', { contentStyle: { backgroundColor: '#000' } }),
   modalTransparent('camera', 'Scan QR'),
   modalWithGradient('share', 'formSheet'),
-  modalWithGradient('lightningSend', 'modal', 'Send Lightning'),
-  modalWithGradient('onchainSend', 'modal', 'Send Onchain'),
-  modalWithGradient('receiveToken', 'modal', 'Receive Ecash'),
-  modalWithGradient('lightningReceive', 'modal', 'Receive Lightning'),
-  modalWithGradient('onchainReceive', 'modal', 'Receive Onchain'),
-  modalWithGradient('paymentRequest', 'modal', 'Receive Ecash'),
-  modalWithGradient('sendToken', 'modal', 'Send Ecash'),
+  modalWithGradient('lightningSend', 'modal', railHeaderTitle('lightningSend')),
+  modalWithGradient('onchainSend', 'modal', railHeaderTitle('onchainSend')),
+  modalWithGradient('receiveToken', 'modal', railHeaderTitle('ecashReceive')),
+  modalWithGradient('lightningReceive', 'modal', railHeaderTitle('lightningReceive')),
+  modalWithGradient('onchainReceive', 'modal', railHeaderTitle('onchainReceive')),
+  modalWithGradient('paymentRequest', 'modal', railHeaderTitle('ecashReceive')),
+  modalWithGradient('sendToken', 'modal', railHeaderTitle('ecashSend')),
   cardFade('claimUsername', {
     headerShadowVisible: false,
     headerTitle: '',
