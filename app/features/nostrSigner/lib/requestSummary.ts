@@ -392,7 +392,9 @@ function summarizeAppData(event: UnsignedEvent): RequestSummary {
 
 function summarizeZapRequest(event: UnsignedEvent): RequestSummary {
   const rawAmount = firstTagValue(event.tags, 'amount');
-  const msats = rawAmount !== undefined ? Number(rawAmount) : NaN;
+  // Canonical decimal digits only: `Number` would also read '1e6', '0x3e8' and ' 1000 '.
+  const msats =
+    rawAmount !== undefined && /^[1-9]\d{0,15}$/.test(rawAmount) ? Number(rawAmount) : NaN;
   const amountSats =
     Number.isInteger(msats) && msats > 0 && msats <= MAX_ZAP_AMOUNT_MSATS
       ? Math.floor(msats / 1000)
