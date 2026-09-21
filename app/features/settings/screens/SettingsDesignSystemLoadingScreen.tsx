@@ -31,12 +31,13 @@ const CYCLE: CycleStep[] = [
 
 const STEP_DURATION_MS = 1700;
 
-const STATE_LABEL: Record<string, string> = {
+const STATE_LABEL: Record<Exclude<Phase, 'done'> | Result, string> = {
   idle: 'Idle',
   loading: 'Loading',
   success: 'Resolved · Success',
   error: 'Resolved · Error',
   reverted: 'Resolved · Reverted',
+  warning: 'Resolved · Warning',
 };
 
 export function SettingsDesignSystemLoadingScreen() {
@@ -120,7 +121,7 @@ export function SettingsDesignSystemLoadingScreen() {
                 CURRENT STATE
               </Text>
               <Text size={18} bold className="text-foreground">
-                {STATE_LABEL[displayKey] ?? displayKey}
+                {STATE_LABEL[displayKey]}
               </Text>
             </VStack>
           </Card.Body>

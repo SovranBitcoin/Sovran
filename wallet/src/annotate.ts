@@ -268,7 +268,9 @@ const BOLT12_RULES: RecommendationRule[] = [
   },
 ];
 
-const RULES_BY_KIND: Partial<Record<string, RecommendationRule[]>> = {
+const RULES_BY_KIND: Partial<
+  Record<PaymentOption["kind"], RecommendationRule[]>
+> = {
   paymentRequest: PAYMENT_REQUEST_RULES,
   lightningInvoice: LIGHTNING_RULES,
   bolt12Offer: BOLT12_RULES,

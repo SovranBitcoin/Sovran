@@ -298,7 +298,10 @@ export function validateIntent(
 // all necessary flows.
 // ---------------------------------------------------------------------------
 
-const CAPABILITIES_BY_INTENT: Record<string, WalletCapability[]> = {
+const CAPABILITIES_BY_INTENT: Record<
+  ResolvedIntent["type"],
+  WalletCapability[]
+> = {
   receiveToken: ["tokenReceive"],
   sendPaymentRequest: [
     "amountEntry",
@@ -307,6 +310,12 @@ const CAPABILITIES_BY_INTENT: Record<string, WalletCapability[]> = {
     "httpTransport",
   ],
   meltLightningInvoice: ["mintSelection", "proofSelection", "meltQuoteFetch"],
+  meltBolt12Offer: [
+    "amountEntry",
+    "mintSelection",
+    "proofSelection",
+    "meltQuoteFetch",
+  ],
   meltLightningAddress: [
     "amountEntry",
     "mintSelection",
@@ -319,16 +328,23 @@ const CAPABILITIES_BY_INTENT: Record<string, WalletCapability[]> = {
     "proofSelection",
     "meltQuoteFetch",
   ],
+  meltOnchainAddress: [
+    "amountEntry",
+    "mintSelection",
+    "proofSelection",
+    "meltQuoteFetch",
+  ],
   openMint: ["mintInfo"],
   openProfile: ["profileView"],
   chooseOption: ["optionSelection"],
+  ignore: [],
 };
 
 export function checkWalletCapabilities(
   walletCapabilities: Set<WalletCapability>,
   intent: ResolvedIntent,
 ): CapabilityCheckResult {
-  const required = CAPABILITIES_BY_INTENT[intent.type] ?? [];
+  const required = CAPABILITIES_BY_INTENT[intent.type];
   const missing = required.filter((c) => !walletCapabilities.has(c));
   const result = { covered: missing.length === 0, missing };
   logger.info("guards.capabilities.intent", {

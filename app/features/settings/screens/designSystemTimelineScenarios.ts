@@ -422,7 +422,7 @@ function isOnchainEntry(entry: HistoryEntry): boolean {
 // The real normalizers from colada's one state owner — the debug readout can
 // never drift from what buildTimeline actually renders.
 const normalizeMintState = (raw: string): string => normalizeTimelineMintState(raw);
-const normalizeMeltState = (raw: string): string => normalizeTimelineMeltState(raw);
+const normalizeMeltState = (raw: string) => normalizeTimelineMeltState(raw);
 
 const BOLT11_MINT_MEANING: Record<string, string> = {
   [MintQuoteState.UNPAID]: 'Mint quote issued — the Lightning invoice has not been paid yet.',
@@ -436,7 +436,7 @@ const ONCHAIN_MINT_MEANING: Record<string, string> = {
   [MintQuoteState.ISSUED]: 'Proofs minted and stored — the receive is complete.',
 };
 
-const MELT_MEANING: Record<string, string> = {
+const MELT_MEANING: Record<ReturnType<typeof normalizeTimelineMeltState>, string> = {
   [MeltQuoteState.UNPAID]: 'Melt quote accepted — the wallet has not started paying yet.',
   [MeltQuoteState.PENDING]: 'Mint is paying the Lightning invoice — settlement in flight.',
   [MeltQuoteState.PAID]: 'Lightning invoice settled — the send is complete.',
@@ -514,7 +514,7 @@ export function describeFrameState(frame: TimelineFrame): FrameStateInsight {
         code: `MeltQuoteState.${state}`,
         meaning: expired
           ? 'Quote expiry timestamp passed — still UNPAID at the mint, surfaced to the user as expired.'
-          : (MELT_MEANING[state] ?? ''),
+          : MELT_MEANING[state],
         detail: frame.meltQuote
           ? [{ label: 'quote expiry', value: expired ? 'elapsed → expired' : 'valid' }]
           : undefined,

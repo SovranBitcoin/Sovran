@@ -98,6 +98,18 @@ export const StyledText = ({
 
 type TextProps = DefaultText['props'] & { id?: string };
 
+type FontWeight =
+  | 'thin'
+  | 'extralight'
+  | 'light'
+  | 'regular'
+  | 'medium'
+  | 'semibold'
+  | 'bold'
+  | 'extrabold'
+  | 'heavy'
+  | 'black';
+
 interface CustomTextProps extends TextProps {
   medium?: boolean;
   semibold?: boolean;
@@ -105,7 +117,7 @@ interface CustomTextProps extends TextProps {
   heavy?: boolean;
   /** Any key of the family weight maps, including the lighter faces the
    *  boolean props above do not cover. */
-  weight?: string;
+  weight?: FontWeight;
 
   /** Use the Overpass font family instead of the default Oxygen. */
   overpass?: boolean;
@@ -163,7 +175,7 @@ function getOxygenFamily(props: CustomTextProps): string {
  * Used for balance / amount / monetary value displays.
  */
 function getOverpassFamily(props: CustomTextProps): string {
-  const WEIGHT_MAP: Record<string, string> = {
+  const WEIGHT_MAP: Record<FontWeight, string> = {
     thin: 'OverpassLight',
     extralight: 'OverpassLight',
     light: 'OverpassLight',
@@ -176,7 +188,7 @@ function getOverpassFamily(props: CustomTextProps): string {
     black: 'OverpassHeavy',
   };
 
-  if (props.weight && WEIGHT_MAP[props.weight]) return WEIGHT_MAP[props.weight];
+  if (props.weight) return WEIGHT_MAP[props.weight];
 
   for (const key of BOOLEAN_WEIGHTS) {
     if (props[key]) return WEIGHT_MAP[key];
@@ -189,7 +201,7 @@ function getOverpassFamily(props: CustomTextProps): string {
  * `useFonts` so native modules can resolve them too).
  */
 function getMonaFamily(props: CustomTextProps): string {
-  const WEIGHT_MAP: Record<string, string> = {
+  const WEIGHT_MAP: Record<FontWeight, string> = {
     thin: 'MonaSans-Light',
     extralight: 'MonaSans-Light',
     light: 'MonaSans-Light',
@@ -202,7 +214,7 @@ function getMonaFamily(props: CustomTextProps): string {
     black: 'MonaSans-Black',
   };
 
-  if (props.weight && WEIGHT_MAP[props.weight]) return WEIGHT_MAP[props.weight];
+  if (props.weight) return WEIGHT_MAP[props.weight];
 
   for (const key of BOOLEAN_WEIGHTS) {
     if (props[key]) return WEIGHT_MAP[key];
