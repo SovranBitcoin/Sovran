@@ -49,6 +49,12 @@ jest.mock('react-native-reanimated', () => {
   };
 });
 jest.mock('wallet', () => ({ getCounterparty: () => mockCounterparty }));
+// The shared identity resolver reaches the whole nostr data layer; this probe
+// only cares about the scroll/timeline spine, so it stands in for the answer.
+jest.mock('@/features/transactions/lib/transactionIdentity', () => ({
+  transactionIdentitySnapshot: () => undefined,
+  useTransactionIdentity: () => undefined,
+}));
 jest.mock('expo-router', () => ({ useNavigation: () => ({ setOptions: jest.fn() }) }));
 jest.mock('expo-router/react-navigation', () => ({
   HeaderHeightContext: jest.requireActual<typeof import('react')>('react').createContext(80),
