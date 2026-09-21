@@ -752,6 +752,8 @@ export function buildMethodAwareMintCandidates(
 }
 
 export interface MintMethodAmountAvailability {
+  /** Every trusted mint with its verdict, so a caller can explain the result. */
+  candidates: MintCandidate[];
   selectedCandidate: MintCandidate | null;
   availableCandidates: MintCandidate[];
   selectedUnavailableReason: LocalizedReason | null;
@@ -853,6 +855,7 @@ export function evaluateMintMethodAmountAvailability(
   });
 
   return {
+    candidates,
     selectedCandidate,
     availableCandidates,
     selectedUnavailableReason,

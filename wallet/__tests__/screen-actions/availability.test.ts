@@ -13,12 +13,13 @@
  * delivered (i.e. operationId is present or phase is 'delivered').
  */
 
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
 import {
   getAvailableActions,
   isPaymentRequestPreview,
 } from "../../src/screen-actions/availability";
 import { deriveMintMethodCapabilityMapFromTrustedMints } from "../../src/mint-capabilities";
+import { setLogger } from "../../src/logger";
 import { INPUTS, MINT1, MINT2 } from "../_harness/fixtures";
 
 describe("screen action availability — back", () => {
@@ -1122,5 +1123,81 @@ describe("receiveHubAvailability", () => {
     expect(actions.paste.available).toBe(false);
     expect(actions.fixedAmount.available).toBe(false);
     expect(actions.back.available).toBe(true);
+  });
+});
+
+describe("amountEntry — the log explains each Next method", () => {
+  afterEach(() => setLogger(null));
+
+  const methodLogs = (entry: Record<string, unknown>) => {
+    const logs: Record<string, unknown>[] = [];
+    const record = (event: string, fields?: Record<string, unknown>) => {
+      if (event.startsWith("screenActions.availability.amountEntry.method.")) {
+        logs.push(fields ?? {});
+      }
+    };
+    setLogger({ debug: record, info: record, warn: record, error: record });
+    getAvailableActions("amountEntry", entry);
+    return Object.fromEntries(logs.map((log) => [log.id, log]));
+  };
+
+  it("names the rule, its operands and each mint's verdict for a disabled method", () => {
+    const logs = methodLogs({
+      destination: "mintQuote",
+      effectiveAmount: { value: 500, unit: "sat" },
+      unit: "sat",
+      methodContext: {
+        trustedMintUrls: [MINT1, MINT2],
+        mintBalances: { [MINT1]: 0, [MINT2]: 0 },
+        mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+          {
+            mintUrl: MINT1,
+            mintInfo: {
+              nuts: { "4": { methods: [{ method: "bolt11", unit: "sat", min_amount: 1_000 }] } },
+            },
+          },
+          { mintUrl: MINT2, mintInfo: { nuts: { "4": { methods: [] } } } },
+        ]),
+      },
+    });
+
+    expect(logs.lightning).toMatchObject({
+      flow: "mintQuote",
+      shown: true,
+      available: false,
+      rule: "nextCanFire && receiveLightningCompatible",
+      conditions: { nextCanFire: true, receiveLightningCompatible: false },
+    });
+    const mints = logs.lightning?.mints as Record<string, string>;
+    // The mint that merely lacks the method sorts after the one the amount rules out.
+    expect(Object.keys(mints)).toEqual([MINT1, MINT2]);
+    expect(mints[MINT1]).toMatch(/^AMOUNT_BELOW_MINT_MIN: .*1,000/);
+    expect(mints[MINT2]).toMatch(/^MINT_METHOD_UNSUPPORTED/);
+    expect(logs.ecash).toMatchObject({
+      available: true,
+      rule: "nextCanFire && hasAccountMint",
+      conditions: { hasAccountMint: true },
+    });
+    expect(logs.onchain).toMatchObject({ shown: false, available: false });
+    expect(String(logs.onchain?.rule)).toMatch(/^hidden:/);
+  });
+
+  it("says why Lightning is never offered for a bitcoin address", () => {
+    const logs = methodLogs({
+      destination: "meltQuote",
+      meltTarget: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080",
+      effectiveAmount: { value: 5_000, unit: "sat" },
+      unit: "sat",
+    });
+
+    expect(logs.lightning).toMatchObject({
+      available: false,
+      rule: "never: the melt target is a bitcoin address",
+      mints: null,
+    });
+    expect(logs.onchain).toMatchObject({
+      shown: true,
+      rule: "nextCanFire && sendOnchainSupported && sendOnchainCompatible",
+    });
   });
 });

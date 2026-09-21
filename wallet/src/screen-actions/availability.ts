@@ -173,6 +173,32 @@ function methodAmountReason(
   return boundsMessage ?? fallback;
 }
 
+/**
+ * Each trusted mint's verdict for one rail, for the per-method availability
+ * log. Keyed by mint with one short string each, the mints that enable the
+ * method first and the ones that merely lack it last: the app logger keeps
+ * only the first few items of an array and the first keys of an object.
+ */
+function describeMints(availability: MintMethodAmountAvailability | null) {
+  if (!availability) return null;
+  const rank = (candidate: MintMethodAmountAvailability["candidates"][number]) =>
+    candidate.status !== "disabled"
+      ? 0
+      : candidate.reason?.code === "MINT_METHOD_UNSUPPORTED"
+        ? 2
+        : 1;
+  return Object.fromEntries(
+    [...availability.candidates]
+      .sort((a, b) => rank(a) - rank(b))
+      .map((candidate) => [
+        candidate.mintUrl,
+        candidate.status !== "disabled"
+          ? `ENABLES IT (balance ${candidate.balance})`
+          : `${candidate.reason?.code ?? "DISABLED"}: ${candidate.reason?.message ?? ""} (balance ${candidate.balance})`,
+      ]),
+  );
+}
+
 function summarizeAvailabilityMap(
   availability: Record<string, ActionAvailability>,
 ) {
@@ -490,13 +516,13 @@ function amountEntryAvailability(
   let ecashDescription: string | undefined;
   let ecashReason: string | undefined;
   let ecashLabel = "as Ecash";
+  const hasAccountMint =
+    methodContext != null && accountMintUrls(methodContext).length > 0;
   if (isMintQuote) {
     // Receive "as Ecash" = a single-use NUT-18 payment request. Mints never
     // advertise NUT-18 (wallet-to-wallet), so any of the ACCOUNT's mints
     // qualifies — never one across the testnut split, whose ecash would land
     // in the other account under the same real unit.
-    const hasAccountMint =
-      methodContext != null && accountMintUrls(methodContext).length > 0;
     ecashAvailable = nextCanFire && hasAccountMint;
     ecashDescription = "Request as a Cashu payment request";
     if (!hasAccountMint) ecashReason = "No trusted mints";
@@ -682,6 +708,118 @@ function amountEntryAvailability(
       (availability) =>
         availability?.amountBoundsReason?.code === "AMOUNT_BELOW_MINT_MIN",
     );
+  // One line per Next-menu method carrying every input to its verdict, so an
+  // enabled or disabled row can be explained from the log alone. `rule` is the
+  // expression that decided `available` in this flow; `conditions` are its
+  // operands; `mints` is each trusted mint's verdict for the rail behind it.
+  // The method id is part of the event name because the app logger drops a
+  // repeat of the same event name inside its dedup window.
+  const flow = isMintQuote
+    ? "mintQuote"
+    : isMeltQuote
+      ? "meltQuote"
+      : isPaymentRequest
+        ? "paymentRequest"
+        : isSendEcash
+          ? "sendEcash"
+          : "unknown";
+  const sharedConditions = {
+    effectiveAmount,
+    unit,
+    nextCanFire,
+    methodContextPresent: methodContext != null,
+    trustedMintCount: methodContext?.trustedMintUrls.length ?? null,
+    selectedMintUrl: selectedMintUrl ?? null,
+    hasMeltTarget,
+    meltTargetMethod,
+  };
+  logger.info("screenActions.availability.amountEntry.method.ecash", {
+    id: "ecash",
+    flow,
+    shown: true,
+    available: ecashAvailable,
+    reason: ecashReason ?? null,
+    rule: isMintQuote
+      ? "nextCanFire && hasAccountMint"
+      : isPaymentRequest || isSendEcash
+        ? "nextCanFire"
+        : isMeltQuote
+          ? "never: a melt target is paid over its own rail, not as ecash"
+          : "never: unknown destination",
+    conditions: { ...sharedConditions, hasAccountMint },
+    mints: null,
+  });
+  const lightningUsesReceiveRail = isMintQuote;
+  const lightningUsesSendRail =
+    (isMeltQuote && !meltTargetIsOnchain) || (isSendEcash && hasMeltTarget);
+  logger.info("screenActions.availability.amountEntry.method.lightning", {
+    id: "lightning",
+    flow,
+    shown: true,
+    available: lightningAvailable,
+    reason: lightningReason ?? null,
+    rule: lightningUsesReceiveRail
+      ? "nextCanFire && receiveLightningCompatible"
+      : lightningUsesSendRail
+        ? "nextCanFire && sendLightningCompatible"
+        : isMeltQuote
+          ? "never: the melt target is a bitcoin address"
+          : isPaymentRequest
+            ? "never: payment requests are ecash only"
+            : isSendEcash
+              ? "never: no Lightning target on this send"
+              : "never: unknown destination",
+    conditions: {
+      ...sharedConditions,
+      // With no method context the Lightning rails assume a compatible mint.
+      receiveLightningCompatible,
+      sendLightningCompatible,
+      sendRequiresBalance: true,
+      amountBoundsReasonCode:
+        (lightningUsesReceiveRail
+          ? receiveLightningAvailability
+          : sendLightningAvailability
+        )?.amountBoundsReason?.code ?? null,
+    },
+    mints: lightningUsesReceiveRail
+      ? describeMints(receiveLightningAvailability)
+      : lightningUsesSendRail
+        ? describeMints(sendLightningAvailability)
+        : null,
+  });
+  logger.info("screenActions.availability.amountEntry.method.onchain", {
+    id: "onchain",
+    flow,
+    shown: showOnchainReceive || showOnchainSend,
+    available: onchainAvailable,
+    reason: onchainReason ?? null,
+    rule: showOnchainReceive
+      ? "nextCanFire && receiveOnchainCompatible"
+      : showOnchainSend
+        ? "nextCanFire && sendOnchainSupported && sendOnchainCompatible"
+        : isMintQuote
+          ? "hidden: shown on receive only when receiveOnchainImplemented && receiveOnchainSupported"
+          : "hidden: shown on send only when the melt target is a bitcoin address",
+    conditions: {
+      ...sharedConditions,
+      receiveOnchainImplemented,
+      receiveOnchainSupported,
+      // With no method context onchain receive assumes NO compatible mint.
+      receiveOnchainCompatible,
+      meltTargetIsOnchain,
+      sendOnchainSupported,
+      sendOnchainCompatible,
+      sendRequiresBalance: true,
+      amountBoundsReasonCode:
+        (showOnchainSend ? sendOnchainAvailability : receiveOnchainAvailability)
+          ?.amountBoundsReason?.code ?? null,
+    },
+    mints: showOnchainSend
+      ? describeMints(sendOnchainAvailability)
+      : isMintQuote
+        ? describeMints(receiveOnchainAvailability)
+        : null,
+  });
   logger.info("screenActions.availability.amountEntry.result", {
     destination: destination ?? null,
     effectiveAmount,
