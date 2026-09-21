@@ -123,7 +123,7 @@ async function mediaFiles(state, apple) {
   }
   return files;
 }
-export async function hostApple(ledger) {
+export async function hostApple(ledger, { apple = () => new Apple(), site = () => new GitHub(required('WEBSITE_TOKEN'), config.websiteRepository) } = {}) {
   const state = ledger.state;
   if (!state.adpId || !state.appleVersionId || state.steps.assetsHosted) return;
   if (state.inventory) {
@@ -145,15 +145,14 @@ export async function hostApple(ledger) {
     const manifest = JSON.parse(readFileSync(path.join(destination, 'manifest.json')));
     validateManifest(manifest, state);
     const files = inventory.map((file) => ({ path: `public/ios/releases/${state.adpId}/${file.path}`, bytes: readFileSync(path.join(destination, file.path)), immutable: true }));
-    const media = await mediaFiles(state, new Apple()); files.push(...media);
+    const media = await mediaFiles(state, apple()); files.push(...media);
     state.screenshots = media.map((file) => `${config.website}/${file.path.slice(7)}`);
     // Inventory is outside the signed Apple package. Never pretty-print manifest.json.
     state.inventory = files.map((file) => ({ path: file.path.slice(7), size: file.bytes.length, sha256: sha256(file.bytes) }));
     state.adp = { minOSVersion: manifest.minimumSystemVersions.ios, size: inventory.reduce((n, f) => n + f.size, 0), url: `${config.website}/ios/releases/${state.adpId}/` };
     files.push({ path: `public/releases/${state.version}-ios.json`, bytes: Buffer.from(JSON.stringify(state.inventory, null, 2) + '\n'), immutable: true });
     files.push({ path: 'src/releaseMedia.json', bytes: Buffer.from(JSON.stringify({ version: state.version, primary: state.screenshots.map((url) => new URL(url).pathname) }, null, 2) + '\n') });
-    const site = new GitHub(required('WEBSITE_TOKEN'), config.websiteRepository);
-    await commitFiles(site, files, `chore: publish Sovran ${state.version} iOS assets`);
+    await commitFiles(site(), files, `chore: publish Sovran ${state.version} iOS assets`);
     await ledger.save(); // On lost acknowledgement, immutable identical bytes are reused.
     state.steps.assetsHosted = await verifyHosted(state.inventory); await ledger.save();
   });

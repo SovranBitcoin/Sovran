@@ -36,7 +36,7 @@ export async function githubRelease(ledger) {
   state.channels.githubApk = published(state, 'githubApk', state.builds.android.number, url, state.apk); await ledger.save();
 }
 
-export async function zapstoreRelease(ledger) {
+export async function zapstoreRelease(ledger, { pool: createPool = (SimplePool) => new SimplePool() } = {}) {
   const state = ledger.state;
   if (state.channels.githubApk?.version !== state.version || state.channels.zapstore?.version === state.version) return;
   // Reuse the app's frozen nostr-tools dependency; never implement signature
@@ -45,7 +45,7 @@ export async function zapstoreRelease(ledger) {
   const npub = required('ZAPSTORE_NPUB'), decoded = nip19.decode(npub);
   check(decoded.type === 'npub', 'Invalid Zapstore public identity');
   const pubkey = decoded.data;
-  const pool = new SimplePool();
+  const pool = createPool(SimplePool);
   const relays = ['wss://relay.zapstore.dev'];
   const tag = (event, name) => { const values = event.tags.filter((t) => t[0] === name); check(values.length <= 1, 'Duplicate Zapstore scalar tag'); return values[0]?.[1]; };
   const query = async (filter) => {

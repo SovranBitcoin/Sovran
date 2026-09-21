@@ -54,9 +54,9 @@ export async function publishVersionArtwork(ledger, site) {
   return state.steps.artworkHosted;
 }
 
-export async function websiteRelease(ledger) {
+export async function websiteRelease(ledger, { site: createSite = () => new GitHub(required('WEBSITE_TOKEN'), config.websiteRepository) } = {}) {
   const state = ledger.state;
-  const site = new GitHub(required('WEBSITE_TOKEN'), config.websiteRepository);
+  const site = createSite();
   if (!Object.values(state.channels).some((channel) => channel?.version === state.version)) return;
   const artworkReady = await publishVersionArtwork(ledger, site);
   const previous = await site.file('public/releases/channels.json');
