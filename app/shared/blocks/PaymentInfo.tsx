@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import type { AccessibilityActionEvent } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import * as Clipboard from 'expo-clipboard';
 import {
@@ -34,6 +35,8 @@ function kebabCase(s: string): string {
     .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
     .toLowerCase();
 }
+
+const ACTIVATE_ACTIONS = [{ name: 'activate' }] as const;
 
 interface PaymentInfoProps {
   unit: string;
@@ -107,6 +110,12 @@ export function PaymentInfo({
     await Clipboard.setStringAsync(selectedValue);
     copyPopup(copyTarget);
   }, [selectedValue, copyTarget]);
+  const handleAccessibilityAction = useCallback(
+    (event: AccessibilityActionEvent) => {
+      if (event.nativeEvent.actionName === 'activate') void handleCopyPress();
+    },
+    [handleCopyPress]
+  );
 
   const loading = !selectedValue;
   // Once this block has shown the placeholder, the value that replaces it is
@@ -168,15 +177,21 @@ export function PaymentInfo({
             height: 1,
           }}
         />
-        {/* QR code — tap to copy */}
+        {/* QR code — tap to copy. The wrapper is the single accessible element
+            (its id drives screenshot redaction), so screen-reader activation is
+            routed here to the copy handler on the inner surface. */}
         <View
           testID="payment-info-sensitive-visual"
           accessible
-          accessibilityRole="image"
+          accessibilityRole="imagebutton"
           accessibilityLabel="Sensitive payment visual"
+          accessibilityHint={copyDisabled ? undefined : 'Copies the payment details'}
+          accessibilityState={{ disabled: copyDisabled }}
+          accessibilityActions={copyDisabled ? undefined : ACTIVATE_ACTIONS}
+          onAccessibilityAction={copyDisabled ? undefined : handleAccessibilityAction}
           importantForAccessibility="yes"
           collapsable={false}>
-          <Pressable disabled={copyDisabled} onPress={handleCopyPress}>
+          <Pressable accessible={false} disabled={copyDisabled} onPress={handleCopyPress}>
             <AnimatedQRCode
               padding={PAYMENT_QR_PADDING}
               unit={unit}
