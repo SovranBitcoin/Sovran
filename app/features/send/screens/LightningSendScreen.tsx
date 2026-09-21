@@ -38,7 +38,7 @@ import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/Scree
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { formatAmount } from '@/shared/lib/currency';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
-import { truncateMiddle } from '@/shared/lib/strings';
+import { MiddleEllipsisValue } from '@/shared/ui/composed/MiddleEllipsisValue';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
@@ -326,7 +326,7 @@ export function LightningSendScreen({
           quoteIdDetailItem(entry.quoteId),
           entry.metadata?.meltTarget && {
             title: 'Destination',
-            value: truncateMiddle(entry.metadata.meltTarget, 12),
+            value: <MiddleEllipsisValue value={entry.metadata.meltTarget} />,
           },
           mintDetailItem(mintUrl),
         ]}

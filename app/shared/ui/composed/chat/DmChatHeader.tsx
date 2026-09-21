@@ -15,7 +15,6 @@ import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
-import { truncateMiddle } from '@/shared/lib/strings';
 
 interface DmChatHeaderProps {
   /**
@@ -166,8 +165,9 @@ export function DmChatHeader({
                 <Text
                   size={12}
                   style={{ color: shade400, marginTop: 2, textAlign: 'left' }}
-                  numberOfLines={1}>
-                  {truncateMiddle(npub, 8)}
+                  numberOfLines={1}
+                  ellipsizeMode="middle">
+                  {npub}
                 </Text>
               ) : null}
             </VStack>
