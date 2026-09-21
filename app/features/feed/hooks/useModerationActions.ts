@@ -8,6 +8,7 @@ import {
   setPersonBlocked,
   syncMuteList,
 } from '@/shared/lib/nostr/moderation';
+import { NostrEventIdSchema, NostrPubkeyHexSchema } from '@/shared/lib/protocolIds';
 import { REPORT_REASONS, type ReportReason } from '../lib/moderation';
 import { useFeedIgnoreStore } from '../stores/ignoreStore';
 
@@ -75,12 +76,18 @@ export function useModerationActions() {
                     popup({ message: 'Account is still loading', type: 'error' });
                     return;
                   }
+                  const target = NostrPubkeyHexSchema.safeParse(pubkey);
+                  const eventId = NostrEventIdSchema.optional().safeParse(publicEventId);
+                  if (!target.success || !eventId.success) {
+                    popup({ message: 'Report could not be published', type: 'error' });
+                    return;
+                  }
                   void publishReport(
                     ndk,
                     ownPubkey,
-                    pubkey,
+                    target.data,
                     reason as ReportReason,
-                    publicEventId
+                    eventId.data
                   ).then(
                     () => popup({ message: 'Report published to Nostr', type: 'success' }),
                     () =>

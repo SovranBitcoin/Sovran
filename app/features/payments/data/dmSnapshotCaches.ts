@@ -9,7 +9,7 @@
 import { createQueryCacheStore } from '@/shared/lib/cache/createQueryCacheStore';
 import type { DmConversation } from '@/features/payments/hooks/useDmConversations';
 import type { DmThreadMessage } from '@/features/payments/hooks/useDmThread';
-import type { DmProtocol } from './dmEnvelopeTypes';
+import type { DmThreadRef } from '@/shared/stores/runtime/dmEchoStore';
 
 export const dmConversationsCache = createQueryCacheStore<DmConversation[]>({
   name: 'dm-conversations-cache',
@@ -31,6 +31,6 @@ export const dmThreadCache = createQueryCacheStore<DmThreadMessage[]>({
   persist: false,
 });
 
-export function dmThreadKey(viewer: string, protocol: DmProtocol, counterparty: string): string {
+export function dmThreadKey({ viewer, protocol, counterparty }: DmThreadRef): string {
   return `dmthread:${viewer}:${protocol}:${counterparty}`;
 }

@@ -249,13 +249,16 @@ describe('UserMessagesScreen optimistic DM echoes', () => {
   });
 
   it('keeps the sent Cashu bubble rendered while server history moves from loading to error', async () => {
-    useDmEchoStore.getState().append('nip17', mockOwnPubkey, PEER_PUBKEY, {
-      id: SELF_WRAP_ID,
-      content: TOKEN,
-      isOwn: true,
-      created_at: 1_700_000_000,
-      pubkey: mockOwnPubkey,
-    });
+    useDmEchoStore.getState().append(
+      { viewer: mockOwnPubkey, protocol: 'nip17', counterparty: PEER_PUBKEY },
+      {
+        id: SELF_WRAP_ID,
+        content: TOKEN,
+        isOwn: true,
+        created_at: 1_700_000_000,
+        pubkey: mockOwnPubkey,
+      }
+    );
     mockThreadState = threadState({ loading: true });
 
     let renderer: TestRenderer.ReactTestRenderer;
@@ -278,13 +281,16 @@ describe('UserMessagesScreen optimistic DM echoes', () => {
   });
 
   it('reconciles the matching server self-copy without rendering a duplicate bubble', async () => {
-    useDmEchoStore.getState().append('nip17', mockOwnPubkey, PEER_PUBKEY, {
-      id: SELF_WRAP_ID,
-      content: TOKEN,
-      isOwn: true,
-      created_at: 1_700_000_000,
-      pubkey: mockOwnPubkey,
-    });
+    useDmEchoStore.getState().append(
+      { viewer: mockOwnPubkey, protocol: 'nip17', counterparty: PEER_PUBKEY },
+      {
+        id: SELF_WRAP_ID,
+        content: TOKEN,
+        isOwn: true,
+        created_at: 1_700_000_000,
+        pubkey: mockOwnPubkey,
+      }
+    );
     mockThreadState = threadState({
       messages: [
         {
@@ -307,13 +313,16 @@ describe('UserMessagesScreen optimistic DM echoes', () => {
   });
 
   it("does not seed a NIP-17 Cashu echo into the same peer's NIP-04 thread", async () => {
-    useDmEchoStore.getState().append('nip17', mockOwnPubkey, PEER_PUBKEY, {
-      id: SELF_WRAP_ID,
-      content: TOKEN,
-      isOwn: true,
-      created_at: 1_700_000_000,
-      pubkey: mockOwnPubkey,
-    });
+    useDmEchoStore.getState().append(
+      { viewer: mockOwnPubkey, protocol: 'nip17', counterparty: PEER_PUBKEY },
+      {
+        id: SELF_WRAP_ID,
+        content: TOKEN,
+        isOwn: true,
+        created_at: 1_700_000_000,
+        pubkey: mockOwnPubkey,
+      }
+    );
     mockThreadState = threadState();
 
     let renderer: TestRenderer.ReactTestRenderer;
@@ -326,13 +335,16 @@ describe('UserMessagesScreen optimistic DM echoes', () => {
   });
 
   it("does not seed another profile's bearer-token echo after an in-process switch", async () => {
-    useDmEchoStore.getState().append('nip17', mockOwnPubkey, PEER_PUBKEY, {
-      id: SELF_WRAP_ID,
-      content: TOKEN,
-      isOwn: true,
-      created_at: 1_700_000_000,
-      pubkey: mockOwnPubkey,
-    });
+    useDmEchoStore.getState().append(
+      { viewer: mockOwnPubkey, protocol: 'nip17', counterparty: PEER_PUBKEY },
+      {
+        id: SELF_WRAP_ID,
+        content: TOKEN,
+        isOwn: true,
+        created_at: 1_700_000_000,
+        pubkey: mockOwnPubkey,
+      }
+    );
     mockActiveOwnPubkey = '33'.repeat(32);
     mockThreadState = threadState();
 

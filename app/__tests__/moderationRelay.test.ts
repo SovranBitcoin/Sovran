@@ -6,9 +6,10 @@ import {
   syncMuteList,
 } from '../shared/lib/nostr/moderation';
 import { useFeedIgnoreStore } from '../features/feed/stores/ignoreStore';
+import { asNostrPubkeyHex } from '../shared/lib/protocolIds';
 
 const own = 'a'.repeat(64);
-const target = 'b'.repeat(64);
+const target = asNostrPubkeyHex('b'.repeat(64));
 const mockRelay = { url: 'wss://relay.example' };
 const mockRelays = [mockRelay];
 const mockProfile = {

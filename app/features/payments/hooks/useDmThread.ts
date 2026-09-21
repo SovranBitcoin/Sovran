@@ -29,14 +29,21 @@ export interface DmThreadMessage {
   isOwn: boolean;
 }
 
-export function useDmThread(
-  counterparty: string,
-  viewerPubkey?: string,
-  viewerPrivateKey?: Uint8Array,
-  protocol: DmProtocol = 'nip17'
-) {
+export function useDmThread({
+  counterparty,
+  viewerPubkey,
+  viewerPrivateKey,
+  protocol = 'nip17',
+}: {
+  counterparty: string;
+  viewerPubkey?: string;
+  viewerPrivateKey?: Uint8Array;
+  protocol?: DmProtocol;
+}) {
   const cacheKey =
-    viewerPubkey && counterparty ? dmThreadKey(viewerPubkey, protocol, counterparty) : null;
+    viewerPubkey && counterparty
+      ? dmThreadKey({ viewer: viewerPubkey, protocol, counterparty })
+      : null;
   // This session's snapshot of the conversation paints on the first frame; the
   // page walk revalidates behind it and merges by message id.
   const [initial] = useState<{ key: string | null; rows: DmThreadMessage[] }>(() => {

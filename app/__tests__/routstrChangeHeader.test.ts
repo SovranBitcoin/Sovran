@@ -29,7 +29,7 @@ const completion = (key: string) =>
 const operations = [
   ['completion', completion],
   ['balance', (key: string) => checkBalance(key)],
-  ['topup', (key: string) => topUpBalance(key, 'cashuA-test-topup')],
+  ['topup', (key: string) => topUpBalance({ apiKey: key, cashuToken: 'cashuA-test-topup' })],
 ] as const;
 const response = (status = 200, message = 'upstream unavailable', change = 'cashuB-test-change') =>
   new Response(JSON.stringify(status === 200 ? { balance: 10, msats: 10 } : { detail: message }), {

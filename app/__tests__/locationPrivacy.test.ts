@@ -50,8 +50,8 @@ describe('location privacy offset', () => {
     const getRandomValues = installRandomValues(0, 0);
 
     const { applySafetyOffset } = loadApplySafetyOffset();
-    const first = applySafetyOffset(51, -1);
-    const second = applySafetyOffset(52, -2);
+    const first = applySafetyOffset({ latitude: 51, longitude: -1 });
+    const second = applySafetyOffset({ latitude: 52, longitude: -2 });
 
     expect(getRandomValues).toHaveBeenCalledTimes(1);
     expect(getRandomValues.mock.calls[0][0]).toBeInstanceOf(Uint32Array);
@@ -65,7 +65,7 @@ describe('location privacy offset', () => {
     const { applySafetyOffset } = loadApplySafetyOffset();
 
     const from = { latitude: 80, longitude: 10 };
-    const safe = applySafetyOffset(from.latitude, from.longitude);
+    const safe = applySafetyOffset(from);
 
     expect(distanceMeters(from, safe)).toBeCloseTo(750, 5);
   });
@@ -74,7 +74,7 @@ describe('location privacy offset', () => {
     installRandomValues(2 ** 30, 0);
     const { applySafetyOffset } = loadApplySafetyOffset();
 
-    const safe = applySafetyOffset(0, 179.999);
+    const safe = applySafetyOffset({ latitude: 0, longitude: 179.999 });
 
     expect(safe.longitude).toBeGreaterThanOrEqual(-180);
     expect(safe.longitude).toBeLessThan(180);
@@ -88,7 +88,7 @@ describe('location privacy offset', () => {
     });
 
     const { applySafetyOffset } = loadApplySafetyOffset();
-    expect(() => applySafetyOffset(51, -1)).toThrow();
+    expect(() => applySafetyOffset({ latitude: 51, longitude: -1 })).toThrow();
   });
 
   it('fails closed when the native CSPRNG throws', () => {
@@ -102,6 +102,8 @@ describe('location privacy offset', () => {
     });
 
     const { applySafetyOffset } = loadApplySafetyOffset();
-    expect(() => applySafetyOffset(51, -1)).toThrow('native rng unavailable');
+    expect(() => applySafetyOffset({ latitude: 51, longitude: -1 })).toThrow(
+      'native rng unavailable'
+    );
   });
 });

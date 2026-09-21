@@ -27,32 +27,30 @@ export interface DmEchoMessage {
 
 type DmEchoProtocol = 'nip04' | 'nip17';
 
+/** One DM thread: the active profile's pubkey, the protocol and the peer, all hex. */
+export interface DmThreadRef {
+  viewer: string;
+  protocol: DmEchoProtocol;
+  counterparty: string;
+}
+
 interface DmEchoStore {
   byThread: Record<string, DmEchoMessage[]>;
   /** Record a sent echo for one profile- and protocol-specific peer thread. */
-  append: (
-    protocol: DmEchoProtocol,
-    ownPubkey: string,
-    peerPubkey: string,
-    message: DmEchoMessage
-  ) => void;
+  append: (thread: DmThreadRef, message: DmEchoMessage) => void;
   /** Read echoes for exactly one profile- and protocol-specific peer thread. */
-  getForThread: (
-    protocol: DmEchoProtocol,
-    ownPubkey: string,
-    peerPubkey: string
-  ) => DmEchoMessage[];
+  getForThread: (thread: DmThreadRef) => DmEchoMessage[];
 }
 
 const MAX_ECHOES_PER_THREAD = 20;
-const threadKey = (protocol: DmEchoProtocol, ownPubkey: string, peerPubkey: string) =>
-  `${protocol}:${ownPubkey}:${peerPubkey}`;
+const threadKey = ({ protocol, viewer, counterparty }: DmThreadRef) =>
+  `${protocol}:${viewer}:${counterparty}`;
 
 export const useDmEchoStore = create<DmEchoStore>((set, get) => ({
   byThread: {},
-  append: (protocol, ownPubkey, peerPubkey, message) =>
+  append: (thread, message) =>
     set((state) => {
-      const key = threadKey(protocol, ownPubkey, peerPubkey);
+      const key = threadKey(thread);
       const existing = state.byThread[key] ?? [];
       if (existing.some((m) => m.id === message.id)) return state;
       return {
@@ -62,6 +60,5 @@ export const useDmEchoStore = create<DmEchoStore>((set, get) => ({
         },
       };
     }),
-  getForThread: (protocol, ownPubkey, peerPubkey) =>
-    get().byThread[threadKey(protocol, ownPubkey, peerPubkey)] ?? [],
+  getForThread: (thread) => get().byThread[threadKey(thread)] ?? [],
 }));

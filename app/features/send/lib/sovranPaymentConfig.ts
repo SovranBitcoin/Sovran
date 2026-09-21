@@ -939,9 +939,14 @@ export function createSovranNotifications(
         deeplink: 'deeplink',
       };
       const scanSource = sourceMap[source ?? ''] ?? 'qr';
-      useScanHistoryStore
-        .getState()
-        .addScan(rawInput, scanType, scanSource, parsedType, container, optionKinds);
+      useScanHistoryStore.getState().addScan({
+        raw: rawInput,
+        type: scanType,
+        source: scanSource,
+        inputType: parsedType,
+        container,
+        optionKinds,
+      });
       // Annotation: stash the scan under a raw key now; bridged onto the final
       // transaction id in onTransactionCreated (colada owns the read model).
       setTransactionAnnotation(rawAnnotationKey(rawInput), {

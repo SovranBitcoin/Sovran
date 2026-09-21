@@ -399,7 +399,11 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
                 // `proofTally` is written through, not returned: this call
                 // throws on the already-recovered path, which is precisely
                 // where the interesting counts are.
-                await restoreKeysetForMint(manager, mintUrl, keyset.id, unit, proofTally);
+                await restoreKeysetForMint(
+                  manager,
+                  { mintUrl, keysetId: keyset.id, unit },
+                  proofTally
+                );
               } catch (error) {
                 if (isAlreadyRecoveredError(error)) {
                   // Every proof was already in the database — a second run

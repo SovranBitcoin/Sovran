@@ -135,7 +135,11 @@ describe('restoreKeysetForMint proof-state tally', () => {
       await wallet.checkProofsStates();
     });
 
-    await restoreKeysetForMint(manager, 'https://mint.example', '009a1f293253e41e', 'sat', tally);
+    await restoreKeysetForMint(
+      manager,
+      { mintUrl: 'https://mint.example', keysetId: '009a1f293253e41e', unit: 'sat' },
+      tally
+    );
 
     expect(tally).toEqual({ ready: 1, spent: 3 });
   });
@@ -152,7 +156,11 @@ describe('restoreKeysetForMint proof-state tally', () => {
     });
 
     await expect(
-      restoreKeysetForMint(manager, 'https://mint.example', '009a1f293253e41e', 'sat', tally)
+      restoreKeysetForMint(
+        manager,
+        { mintUrl: 'https://mint.example', keysetId: '009a1f293253e41e', unit: 'sat' },
+        tally
+      )
     ).rejects.toThrow('already exists');
 
     expect(tally).toEqual({ ready: 1, spent: 3 });
@@ -164,8 +172,16 @@ describe('restoreKeysetForMint proof-state tally', () => {
       await wallet.checkProofsStates();
     });
 
-    await restoreKeysetForMint(manager, 'https://mint.example', '009a1f293253e41e', 'sat', tally);
-    await restoreKeysetForMint(manager, 'https://mint.example', '00107937db0cc865', 'sat', tally);
+    await restoreKeysetForMint(
+      manager,
+      { mintUrl: 'https://mint.example', keysetId: '009a1f293253e41e', unit: 'sat' },
+      tally
+    );
+    await restoreKeysetForMint(
+      manager,
+      { mintUrl: 'https://mint.example', keysetId: '00107937db0cc865', unit: 'sat' },
+      tally
+    );
 
     expect(tally).toEqual({ ready: 2, spent: 6 });
     // WalletService caches per (mintUrl, unit), so the instrumented method must

@@ -85,7 +85,9 @@ beforeEach(async () => {
 });
 it('uses the same inbox as Contacts when its message came from a fallback relay', async () => {
   mockInbox.mockResolvedValue(page('peer', 1, 1000));
-  const { result } = renderHook(() => useDmThread('peer', 'viewer', key));
+  const { result } = renderHook(() =>
+    useDmThread({ counterparty: 'peer', viewerPubkey: 'viewer', viewerPrivateKey: key })
+  );
   await waitFor(() => expect(result.current.messages).toHaveLength(1));
   expect(mockDirect).not.toHaveBeenCalled();
 });
@@ -93,14 +95,18 @@ it('finds a conversation beyond an unrelated first page without needing a scroll
   mockInbox
     .mockResolvedValueOnce(page('other', 50, 1000))
     .mockResolvedValueOnce(page('peer', 1, 900));
-  const { result } = renderHook(() => useDmThread('peer', 'viewer', key));
+  const { result } = renderHook(() =>
+    useDmThread({ counterparty: 'peer', viewerPubkey: 'viewer', viewerPrivateKey: key })
+  );
   await waitFor(() => expect(result.current.messages).toHaveLength(1));
   expect(mockInbox).toHaveBeenCalledTimes(2);
   expect(mockInbox.mock.calls[1][0].until).toBeLessThan(1000);
 });
 it('stops searching when a source repeats its page', async () => {
   mockInbox.mockResolvedValue(page('other', 50, 1000));
-  const { result } = renderHook(() => useDmThread('peer', 'viewer', key));
+  const { result } = renderHook(() =>
+    useDmThread({ counterparty: 'peer', viewerPubkey: 'viewer', viewerPrivateKey: key })
+  );
   await waitFor(() => expect(mockInbox).toHaveBeenCalledTimes(2));
   await waitFor(() => expect(result.current.loading).toBe(false));
   expect(result.current.hasMore).toBe(false);
@@ -111,11 +117,11 @@ describe.each(['thread', 'conversations'] as const)('%s last-message recording',
   const peer = 'a'.repeat(64);
   function useHistory(viewer = mockViewer) {
     // Each parameterized suite always calls the same hook.
-    const thread = useDmThread(
-      source === 'thread' ? peer : '',
-      source === 'thread' ? viewer : undefined,
-      key
-    );
+    const thread = useDmThread({
+      counterparty: source === 'thread' ? peer : '',
+      viewerPubkey: source === 'thread' ? viewer : undefined,
+      viewerPrivateKey: key,
+    });
     const conversations = useDmConversations(source === 'conversations' ? viewer : undefined, key);
     return source === 'thread' ? thread : conversations;
   }
@@ -165,7 +171,9 @@ it('settles the first empty page while later inbox pages are still pending', asy
         finishSecond = resolve;
       })
   );
-  const { result } = renderHook(() => useDmThread('peer', 'viewer', key));
+  const { result } = renderHook(() =>
+    useDmThread({ counterparty: 'peer', viewerPubkey: 'viewer', viewerPrivateKey: key })
+  );
   await waitFor(() => expect(mockInbox).toHaveBeenCalledTimes(2));
   expect(result.current.hasLoadedOnce).toBe(true);
   expect(result.current.loading).toBe(true);
@@ -183,7 +191,8 @@ it('settles the first empty page while later inbox pages are still pending', asy
 it('settles failed first loads and resets readiness when the conversation changes', async () => {
   mockInbox.mockRejectedValueOnce(new Error('Unavailable'));
   const { result, rerender } = renderHook(
-    ({ peer }: { peer: string }) => useDmThread(peer, 'viewer', key),
+    ({ peer }: { peer: string }) =>
+      useDmThread({ counterparty: peer, viewerPubkey: 'viewer', viewerPrivateKey: key }),
     {
       initialProps: { peer: 'peer' },
     }
@@ -203,7 +212,9 @@ it('keeps the thread on screen across a refresh and merges the replacement page'
   mockInbox
     .mockResolvedValueOnce(page('peer', 1, 900))
     .mockImplementationOnce(() => new Promise<DmEnvelopePage>((r) => (finish = r)));
-  const { result } = renderHook(() => useDmThread('peer', 'viewer', key));
+  const { result } = renderHook(() =>
+    useDmThread({ counterparty: 'peer', viewerPubkey: 'viewer', viewerPrivateKey: key })
+  );
   await waitFor(() => expect(result.current.status).toBe('ready'));
   expect(result.current.messages).toHaveLength(1);
 
@@ -219,12 +230,16 @@ it('keeps the thread on screen across a refresh and merges the replacement page'
 
 it("seeds a re-opened thread from this session's snapshot and revalidates behind it", async () => {
   mockInbox.mockResolvedValueOnce(page('peer', 1, 900));
-  const first = renderHook(() => useDmThread('peer', 'viewer', key));
+  const first = renderHook(() =>
+    useDmThread({ counterparty: 'peer', viewerPubkey: 'viewer', viewerPrivateKey: key })
+  );
   await waitFor(() => expect(first.result.current.status).toBe('ready'));
   first.unmount();
 
   mockInbox.mockImplementationOnce(() => new Promise(() => {}));
-  const second = renderHook(() => useDmThread('peer', 'viewer', key));
+  const second = renderHook(() =>
+    useDmThread({ counterparty: 'peer', viewerPubkey: 'viewer', viewerPrivateKey: key })
+  );
   expect(second.result.current.messages).toHaveLength(1);
   expect(second.result.current.status).toBe('revalidating');
   expect(second.result.current.loading).toBe(false);
@@ -232,11 +247,15 @@ it("seeds a re-opened thread from this session's snapshot and revalidates behind
 
 it('never seeds a thread snapshot across viewers', async () => {
   mockInbox.mockResolvedValueOnce(page('peer', 1, 900));
-  const first = renderHook(() => useDmThread('peer', 'viewer', key));
+  const first = renderHook(() =>
+    useDmThread({ counterparty: 'peer', viewerPubkey: 'viewer', viewerPrivateKey: key })
+  );
   await waitFor(() => expect(first.result.current.status).toBe('ready'));
   first.unmount();
   mockInbox.mockImplementationOnce(() => new Promise(() => {}));
-  const other = renderHook(() => useDmThread('peer', 'other-viewer', key));
+  const other = renderHook(() =>
+    useDmThread({ counterparty: 'peer', viewerPubkey: 'other-viewer', viewerPrivateKey: key })
+  );
   expect(other.result.current.messages).toEqual([]);
   expect(other.result.current.status).toBe('loading');
 });

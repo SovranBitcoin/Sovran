@@ -500,7 +500,9 @@ test.each([0, 1])(
     expect(receipts.get(replacement)?.amount.toNumber()).toBe(
       receipts.get(abandoned)!.amount.toNumber() - 2
     );
-    expect(mockTransactions.tagMintQuote).toHaveBeenCalledWith('group-1', 'leg-1', replacement);
+    expect(mockTransactions.tagMintQuote).toHaveBeenCalledWith('group-1', 'leg-1', {
+      quoteId: replacement,
+    });
     expect(setTransactionAnnotation).toHaveBeenCalledWith(
       `quote:${replacement}`,
       expect.objectContaining({

@@ -185,7 +185,7 @@ async function resolveNearbyCoords(ctx: {
       });
     }
     if (loc && !isCancelled()) {
-      const safe = applySafetyOffset(loc.coords.latitude, loc.coords.longitude);
+      const safe = applySafetyOffset(loc.coords);
       setCoords(safe);
     }
   } catch {

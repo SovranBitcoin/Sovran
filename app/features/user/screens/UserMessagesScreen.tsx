@@ -118,12 +118,12 @@ export function UserMessagesScreen({
     loadMore,
     refresh,
     error: threadError,
-  } = useDmThread(
-    isFictionalContact || blocked ? '' : pubkey,
-    nostrKeys?.pubkey,
-    nostrKeys?.privateKey,
-    protocol
-  );
+  } = useDmThread({
+    counterparty: isFictionalContact || blocked ? '' : pubkey,
+    viewerPubkey: nostrKeys?.pubkey,
+    viewerPrivateKey: nostrKeys?.privateKey,
+    protocol,
+  });
 
   // Local messages contain only real optimistic sent echoes. Demo messages
   // have a separate lifetime and can never merge into the live conversation. Echoes are keyed on the self-copy wrap id so they dedup against the
@@ -139,7 +139,9 @@ export function UserMessagesScreen({
   // another profile's plaintext DM (which may be bearer ecash).
   useEffect(() => {
     const seeded = nostrKeys?.pubkey
-      ? useDmEchoStore.getState().getForThread(protocol, nostrKeys.pubkey, pubkey)
+      ? useDmEchoStore
+          .getState()
+          .getForThread({ viewer: nostrKeys.pubkey, protocol, counterparty: pubkey })
       : [];
     chatLog.info('dm.echo.seed', { count: seeded.length });
     setLocalMessages(seeded);
