@@ -1796,7 +1796,7 @@
       "origin": "./docs/review/contributor-conventions.md",
       "path": "docs/review/contributor-conventions.md",
       "scope": "",
-      "hash": "e41441896a8663e285c0a2df23a5242e7fa2c7977dd9c31e45aab342df3187c3",
+      "hash": "42f715bdedde7247a047a1f39ede88031ec52625d1e8b05e16ff4e64939c7d24",
       "rules": [
         {
           "id": "doc/docs/review/contributor-conventions/error-passed-on-lossily",
@@ -1945,11 +1945,11 @@
         {
           "id": "doc/docs/review/contributor-conventions/time-value-without-unit",
           "section": "time/units",
-          "message": "A duration or timestamp without a unit in its name invites seconds/milliseconds mix-ups.",
-          "instructions": "Does `hunk` declare a variable, constant, field or parameter holding a numeric duration or timestamp whose name omits its unit (e.g. `timeout`, `createdAt`, `expiry`, `delay`, `ttl`, `staleTime`)?",
+          "message": "A duration without a unit in its name, or a seconds timestamp under a millisecond-style name, invites seconds/milliseconds mix-ups.",
+          "instructions": "Does `hunk` declare a variable, constant, field or parameter that holds a numeric duration under a name that does not state its unit (`timeout`, `delay`, `ttl`, `interval`), or that holds a timestamp counted in seconds under a name that does not say so (`createdAt = event.created_at`, `expiresAt = Math.floor(Date.now() / 1000) + ttl`)?",
           "criteria": {
-            "true": "A new numeric time-valued identifier is introduced whose name carries no unit suffix such as `Ms`, `Sec`, `Seconds` or `Minutes`.",
-            "false": "Names carry the unit (`timeoutMs`, `createdAtSec`, `ttlSeconds`, `STALE_MS`); Nostr protocol field names (`created_at`, `since`, `until`); `Date` objects; option names fixed by a library or wire format (`setTimeout(fn, delay)` argument, `{ timeout }` passed to an external API, React Query `staleTime`)."
+            "true": "A numeric duration is declared under a name with no unit such as `Ms`, `Sec`, `Seconds` or `Minutes`, or `hunk` visibly assigns a seconds-valued timestamp to a name that carries no `Sec` or `Seconds`.",
+            "false": "Names carry the unit (`timeoutMs`, `createdAtSec`, `ttlSeconds`, `STALE_MS`); a timestamp named `…At` or `timestamp` that holds epoch milliseconds or whose unit `hunk` does not show (`createdAt: number`, `createdAt: Date.now()`, `updatedAt`, `expiresAt`) — milliseconds is the default for those names; Nostr protocol field names (`created_at`, `since`, `until`); a field that keeps the name its mint, Coco or wire-format owner gave it (`expiry` on a quote); `Date` objects; option names fixed by a library (`setTimeout(fn, delay)` argument, `{ timeout }` or `{ duration }` passed to an external API, React Query `staleTime`); a test or fixture that only fills in such fields."
           },
           "appliesTo": [],
           "when": "(timeout|createdAt|expiry|expires|delay|ttl|TTL|staleTime|interval|duration|elapsed)"

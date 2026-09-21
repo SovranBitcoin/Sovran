@@ -108,11 +108,11 @@ Allowed cases: Integer arithmetic on sat or msat integers; conversions for displ
 
 Scope: `repository-wide`
 
-Name time values with their unit (createdAtMs, timeoutSeconds), convert Nostr seconds once at the boundary, and store raw timestamps rather than formatted labels.
+Name durations with their unit (timeoutMs, ttlSeconds). A timestamp named `…At` or `timestamp` is epoch milliseconds, as `Date.now()` returns, and needs no suffix; a timestamp in any other unit states it (createdAtSec). Convert Nostr seconds once at the boundary, and store raw timestamps rather than formatted labels.
 
-Does `hunk` declare a variable, constant, field or parameter holding a numeric duration or timestamp whose name does not state its unit (`timeout`, `createdAt`, `expiry`, `delay`, `ttl`, `staleTime`), mix Nostr seconds with JavaScript milliseconds without an explicit conversion, or persist a formatted time label instead of the raw timestamp?
+Does `hunk` declare a variable, constant, field or parameter holding a numeric duration whose name does not state its unit (`timeout`, `delay`, `ttl`, `interval`), hold a timestamp counted in seconds under a name that does not say so (`createdAt = event.created_at`, `expiresAt = Math.floor(Date.now() / 1000) + ttl`), mix Nostr seconds with JavaScript milliseconds without an explicit conversion, or persist a formatted time label instead of the raw timestamp?
 
-Allowed cases: Names carry the unit (`timeoutMs`, `createdAtSec`, `ttlSeconds`, `STALE_MS`); Nostr fields named by the protocol (`created_at`, `since`, `until`) used at the boundary; `Date` objects; option names fixed by a library or wire format the code doesn't control (`setTimeout(fn, delayMs)`, `{ timeout }` passed to an external API, `staleTime` in React Query options).
+Allowed cases: Names carry the unit (`timeoutMs`, `createdAtSec`, `ttlSeconds`, `STALE_MS`); an epoch-millisecond timestamp named `…At` or `timestamp` (`createdAt: Date.now()`, `updatedAt`, `expiresAt`); Nostr fields named by the protocol (`created_at`, `since`, `until`) used at the boundary; a field that keeps the name its mint, Coco or wire-format owner gave it (`expiry` on a quote); `Date` objects; option names fixed by a library or wire format the code doesn't control (`setTimeout(fn, delayMs)`, `{ timeout }` passed to an external API, `staleTime` in React Query options).
 
 ## secrets/storage
 
