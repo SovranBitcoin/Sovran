@@ -3,10 +3,7 @@
     "inline-style": 2
   },
   "app/(drawer)/_layout.tsx": {
-    "stylesheet-create": 1,
-    "inline-style": 3,
-    "stack-layout-props": 2,
-    "content-container-style": 1
+    "stylesheet-create": 1
   },
   "app/(transactions-flow)/transactions.tsx": {
     "inline-style": 1
@@ -593,6 +590,12 @@
   "features/whitenoise/screens/WhitenoiseSetupScreen.tsx": {
     "stylesheet-create": 1
   },
+  "navigation/DrawerContent.tsx": {
+    "stylesheet-create": 1,
+    "inline-style": 3,
+    "stack-layout-props": 2,
+    "content-container-style": 1
+  },
   "shared/blocks/DrawerProfileChrome.tsx": {
     "inline-style": 8,
     "stack-layout-props": 6
@@ -814,7 +817,7 @@
   "shared/ui/composed/GradientCardFrame.tsx": {
     "inline-style": 2
   },
-  "shared/ui/composed/HeaderGlassCircle.tsx": {
+  "shared/ui/composed/HeaderGlassCircle.ios.tsx": {
     "stylesheet-create": 1
   },
   "shared/ui/composed/LayoutDebugWrapper.tsx": {
@@ -890,7 +893,7 @@
     "stylesheet-create": 1
   },
   "shared/ui/composed/chat/CashuTokenBubble.tsx": {
-    "inline-style": 6,
+    "inline-style": 5,
     "stack-layout-props": 4
   },
   "shared/ui/composed/chat/ChatMessageBubble.tsx": {

@@ -59,7 +59,7 @@ export const RebalanceChainCard: React.FC<RebalanceChainCardProps> = ({
 
   return (
     <Log name="RebalanceChainCard">
-      <View className="mx-4 my-1.5" style={allDone ? { opacity: 0.85 } : undefined}>
+      <View className="mx-4" style={allDone ? { opacity: 0.85 } : undefined}>
         <TransferCard>
           {/* ── Hop rows — each hop shows send → progress → receive ── */}
           {steps.map((step) => {

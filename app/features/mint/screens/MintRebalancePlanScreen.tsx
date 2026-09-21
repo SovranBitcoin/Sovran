@@ -461,7 +461,7 @@ export function MintRebalancePlanScreen() {
 
       {plan.steps.length > 0 && (
         <Animated.View layout={LinearTransition.duration(280)}>
-          <VStack gap={0} className="pt-2">
+          <VStack gap={12} className="pb-1.5 pt-3.5">
             {groupStepsForDisplay(plan.steps, runPlan ? stepStates : {}).map((group) => {
               if (group.chainId && group.steps.length > 1) {
                 return (

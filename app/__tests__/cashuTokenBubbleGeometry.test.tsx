@@ -8,7 +8,7 @@ import { CashuTokenBubble } from '@/shared/ui/composed/chat/CashuTokenBubble';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { log } from '@/shared/lib/logger';
 import { withAlpha } from '@/shared/lib/color';
-import { alpha, spacing } from '@/shared/styles/tokens';
+import { alpha } from '@/shared/styles/tokens';
 
 // eslint-disable-next-line no-restricted-syntax -- distinct parseable theme fixtures, not UI colors
 const mockColors = ['#EEEEEE', '#444444', '#222222', '#888888'] as const;
@@ -138,9 +138,13 @@ describe.each([true, false])('cashu token geometry (isOwn: %s)', (isOwn) => {
 
     const wrapper = token.findAllByType(BubbleView)[0];
     expect(wrapper.props.className).toContain('self-stretch');
-    expect(wrapper.props.className).toContain('mb-0');
-    expect(StyleSheet.flatten(wrapper.props.style).marginTop).toBe(spacing.sm);
-    expect(StyleSheet.flatten(wrapper.props.style).maxWidth).toBeUndefined();
+    // The message stack owns the text-to-token distance; the card sets no margin.
+    expect(StyleSheet.flatten(wrapper.props.style)?.marginTop).toBeUndefined();
+    const messageStack = renderer.root.findAllByProps({
+      className: 'min-w-0 gap-2.5 self-stretch',
+    })[0];
+    expect(messageStack.findByType(CashuTokenBubble)).toBe(token);
+    expect(StyleSheet.flatten(wrapper.props.style)?.maxWidth).toBeUndefined();
     const boundedViews = renderer.root.findAllByType(BubbleView).filter((node) => {
       return StyleSheet.flatten(node.props.style)?.maxWidth === '85%';
     });
@@ -198,10 +202,9 @@ describe.each([true, false])('cashu token geometry (isOwn: %s)', (isOwn) => {
     });
     expect(jest.mocked(log.warn).mock.calls).toEqual([]);
     const token = renderer.root.findByType(CashuTokenBubble);
-    expect(token.props.hasText).toBe(false);
     const wrapper = token.findAllByType(BubbleView)[0];
-    expect(StyleSheet.flatten(wrapper.props.style).marginTop).toBe(0);
-    expect(wrapper.props.className).toContain('mb-0');
+    expect(StyleSheet.flatten(wrapper.props.style)?.marginTop).toBeUndefined();
+    expect(wrapper.props.className).not.toMatch(/\bm[tby]-/);
     await act(async () => renderer.unmount());
   });
 });
