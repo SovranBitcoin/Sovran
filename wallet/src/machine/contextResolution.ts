@@ -619,7 +619,12 @@ export function requestMintSelector(
           ctx.destination!,
         )
       : null;
-  const candidates = getValidMintCandidates(walletCtx, { minAmount: amount });
+  const candidates = getValidMintCandidates(walletCtx, {
+    minAmount: amount,
+    ...(ctx.supportedMintUrls?.length
+      ? { allowedMints: ctx.supportedMintUrls }
+      : {}),
+  });
 
   const allTrustedCandidates = walletCtx.trustedMintUrls.map((mintUrl) => ({
     mintUrl,

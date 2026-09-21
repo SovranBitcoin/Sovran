@@ -115,6 +115,13 @@ export function startSendEcashFlow(
       ? { p2pkLockPubkey: opts.p2pkLockPubkey.toLowerCase() }
       : {}),
     ...(opts.entrySource ? { entrySource: opts.entrySource } : {}),
+    // The recipient's accepted mints bind the WHOLE flow, not just the first
+    // auto-pick: a later mint change (the amount screen's mint pill) must not
+    // land on a mint they cannot redeem from — a P2PK-locked token from one is
+    // unredeemable by them and unreclaimable by us.
+    ...(opts.allowedMints?.length
+      ? { supportedMintUrls: opts.allowedMints }
+      : {}),
   };
   // A malformed lock key must abort the flow — silently dropping it would
   // downgrade the send to a bearer token on whatever surface requested a lock.
@@ -188,6 +195,9 @@ export function startSendEcashFlow(
         context,
         data: {
           candidates: selection.validMints,
+          ...(context.supportedMintUrls
+            ? { supportedMintUrls: context.supportedMintUrls }
+            : {}),
           unit,
           destination: 'sendEcash',
           ...(opts.meltTarget ? { meltTarget: opts.meltTarget } : {}),
