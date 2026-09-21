@@ -63,11 +63,14 @@ export function registerPendingZap(zap: PendingZap): void {
 }
 
 /** TTL-checked lookup; expired entries are dropped on read. */
-export function peekPendingZap(meltTarget: string): PendingZap | undefined {
+export function peekPendingZap(
+  meltTarget: string,
+  nowMs: number = Date.now()
+): PendingZap | undefined {
   const key = normalizeTarget(meltTarget);
   const pending = pendingByTarget.get(key);
   if (!pending) return undefined;
-  if (Date.now() - pending.createdAt > TTL_MS) {
+  if (nowMs - pending.createdAt > TTL_MS) {
     pendingByTarget.delete(key);
     storeLog.info('zap.pending.expired', {
       eventIdPrefix: pending.eventId.slice(0, 8),

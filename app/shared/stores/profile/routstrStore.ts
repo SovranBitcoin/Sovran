@@ -237,7 +237,7 @@ interface RoutstrActions {
     nodeBaseUrl: string | null;
     authMode?: 'bearer' | 'x-cashu';
   }) => void;
-  isCacheStale: () => boolean;
+  isCacheStale: (nowMs?: number) => boolean;
 
   createSession: () => string;
   switchSession: (sessionId: string) => void;
@@ -593,11 +593,12 @@ export const useRoutstrStore = create<RoutstrStore>()(
           ),
           allProvidersEmpty: !lineupHasEntries(derived),
         });
+        const now = Date.now();
         set({
-          modelsCache: { data: models, timestamp: Date.now() },
+          modelsCache: { data: models, timestamp: now },
           lineup: merged,
           lastKnownLineup: lineupHasEntries(merged)
-            ? { derivedAt: Date.now(), lineup: merged, nodeBaseUrl: get().nodeBaseUrl }
+            ? { derivedAt: now, lineup: merged, nodeBaseUrl: get().nodeBaseUrl }
             : previous,
         });
       },
@@ -623,10 +624,10 @@ export const useRoutstrStore = create<RoutstrStore>()(
         });
       },
 
-      isCacheStale: () => {
+      isCacheStale: (nowMs: number = Date.now()) => {
         const cache = get().modelsCache;
         if (!cache) return true;
-        return Date.now() - cache.timestamp > MODELS_CACHE_TTL;
+        return nowMs - cache.timestamp > MODELS_CACHE_TTL;
       },
 
       createSession: () => {

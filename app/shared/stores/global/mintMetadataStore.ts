@@ -72,7 +72,12 @@ interface MintMetadataState {
     partial: Partial<MintMetadataEntry>,
     groups: MintMetaGroup[]
   ) => void;
-  isStale: (mintUrl: string, group: MintMetaGroup, maxAgeMinutes?: number) => boolean;
+  isStale: (
+    mintUrl: string,
+    group: MintMetaGroup,
+    maxAgeMinutes?: number,
+    nowMs?: number
+  ) => boolean;
 
   // Thin group setters — 1:1 replacements for the old stores' `setCached`.
   setIdentity: (mintUrl: string, info: GetInfoResponse) => void;
@@ -140,6 +145,18 @@ const PersistedMintMetadataStore = z.object({
   legacyMigrated: z.boolean().default(false),
 });
 
+/** True when the entry is missing, the group was never stamped, or its stamp is older than the window. */
+export function isMintMetaGroupStale(
+  entry: MintMetadataEntry | undefined,
+  group: MintMetaGroup,
+  nowMs: number,
+  maxAgeMinutes: number = MINT_META_TTL_MIN[group]
+): boolean {
+  const stampedAt = entry?.[GROUP_STAMP[group]];
+  if (!entry || typeof stampedAt !== 'number') return true;
+  return (nowMs - stampedAt) / (1000 * 60) > maxAgeMinutes;
+}
+
 /** Most-recent touch across all groups — drives LRU eviction. */
 function lastTouched(entry: MintMetadataEntry): number {
   return Math.max(
@@ -204,12 +221,13 @@ export const useMintMetadataStore = create<MintMetadataState>()(
           });
         },
 
-        isStale: (mintUrl, group, maxAgeMinutes = MINT_META_TTL_MIN[group]) => {
-          const entry = get().byMintUrl[normalizeMintUrlKey(mintUrl)];
-          const stampedAt = entry?.[GROUP_STAMP[group]];
-          if (!entry || typeof stampedAt !== 'number') return true;
-          return (Date.now() - stampedAt) / (1000 * 60) > maxAgeMinutes;
-        },
+        isStale: (mintUrl, group, maxAgeMinutes, nowMs = Date.now()) =>
+          isMintMetaGroupStale(
+            get().byMintUrl[normalizeMintUrlKey(mintUrl)],
+            group,
+            nowMs,
+            maxAgeMinutes
+          ),
 
         setIdentity: (mintUrl, info) => {
           get().mergeCached(mintUrl, identityFromInfo(info), ['identity']);
@@ -377,23 +395,28 @@ export async function getCachedMintInfo(
   const key = normalizeMintUrlKey(mintUrl);
   const entry = useMintMetadataStore.getState().byMintUrl[key];
   const now = Date.now();
+  // `info` rehydrates as `unknown`; anything that is not an object is a miss.
+  const cachedInfo =
+    typeof entry?.info === 'object' && entry.info !== null && !Array.isArray(entry.info)
+      ? entry.info
+      : undefined;
   const isFresh =
-    !!entry?.info &&
-    typeof entry.identityAt === 'number' &&
+    !!cachedInfo &&
+    typeof entry?.identityAt === 'number' &&
     now - entry.identityAt <= IDENTITY_STALE_TTL_MS;
 
-  if (isFresh) {
+  if (cachedInfo && isFresh) {
     storeLog.debug('store.mint_metadata.info.hit_fresh', {
       key,
-      ageMs: now - (entry.identityAt ?? 0),
+      ageMs: now - (entry?.identityAt ?? 0),
     });
-    return entry.info as GetInfoResponse;
+    return cachedInfo;
   }
 
-  if (entry?.info) {
+  if (cachedInfo) {
     storeLog.info('store.mint_metadata.info.hit_stale', { key });
     refreshInBackground(fetcher, mintUrl);
-    return entry.info as GetInfoResponse;
+    return cachedInfo;
   }
 
   storeLog.info('store.mint_metadata.info.miss', { key });

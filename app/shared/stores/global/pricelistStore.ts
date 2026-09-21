@@ -34,7 +34,7 @@ interface PricelistActions {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   getBtcPrice: (currency?: SupportedCurrency) => number | null;
-  isStale: (maxAgeMinutes?: number) => boolean;
+  isStale: (maxAgeMinutes?: number, nowMs?: number) => boolean;
 }
 
 type PricelistStore = PricelistState & PricelistActions;
@@ -93,11 +93,11 @@ export const usePricelistStore = create<PricelistStore>()(
         return pricelist?.[currency]?.btc ?? null;
       },
 
-      isStale: (maxAgeMinutes: number = PRICE_STALE_MINUTES) => {
+      isStale: (maxAgeMinutes: number = PRICE_STALE_MINUTES, nowMs: number = Date.now()) => {
         const { lastUpdated, serverUpdatedAt } = get();
         const updatedAtMs = serverUpdatedAt === null ? lastUpdated : serverUpdatedAt * 1000;
         if (updatedAtMs === null) return true;
-        return (Date.now() - updatedAtMs) / (1000 * 60) > maxAgeMinutes;
+        return (nowMs - updatedAtMs) / (1000 * 60) > maxAgeMinutes;
       },
     }),
     persistConfig({

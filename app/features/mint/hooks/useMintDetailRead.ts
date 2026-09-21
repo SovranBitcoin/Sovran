@@ -23,6 +23,7 @@ import { fetchMintReviews } from '@/shared/lib/nostr/fetchMintReviews';
 import { extractMintNostrPubkey } from '@/shared/lib/nostr/extractMintNostrPubkey';
 import { newReadId, readErrorType, readEvents, readKeyHash } from '@/shared/lib/read/readLog';
 import {
+  isMintMetaGroupStale,
   useCachedMintMetadata,
   useMintMetadataStore,
 } from '@/shared/stores/global/mintMetadataStore';
@@ -139,6 +140,7 @@ export function useMintDetailRead(
   const cached = useCachedMintMetadata(mintUrl || null);
   const meta = useMemo(() => projectMintMeta(cached), [cached]);
   const [attempt, setAttempt] = useState(0);
+  const [openedAtMs] = useState(() => Date.now());
   const [audit, setAudit] = useState<GroupState>(IDLE);
   const [reviews, setReviews] = useState<GroupState>(IDLE);
 
@@ -146,14 +148,15 @@ export function useMintDetailRead(
   useEffect(() => {
     if (!mintUrl) return;
     const store = useMintMetadataStore.getState();
+    const nowMs = Date.now();
     const controller = new AbortController();
     const groups: [
       boolean,
       (mintUrl: string, signal: AbortSignal) => Promise<boolean>,
       (next: GroupState) => void,
     ][] = [
-      [store.isStale(mintUrl, 'audit'), runAuditRead, setAudit],
-      [store.isStale(mintUrl, 'reviews'), runReviewsRead, setReviews],
+      [store.isStale(mintUrl, 'audit', undefined, nowMs), runAuditRead, setAudit],
+      [store.isStale(mintUrl, 'reviews', undefined, nowMs), runReviewsRead, setReviews],
     ];
     for (const [stale, run, set] of groups) {
       if (!stale) {
@@ -197,7 +200,7 @@ export function useMintDetailRead(
   const hasAudit = meta.auditState !== undefined || meta.auditScore !== undefined;
   const hasReviews = meta.kymScore !== undefined || meta.reviewCount !== undefined;
   const hasSocial = meta.contactFollowers !== undefined || meta.contactReputation !== undefined;
-  const socialStale = useMintMetadataStore((s) => (mintUrl ? s.isStale(mintUrl, 'social') : false));
+  const socialStale = mintUrl ? isMintMetaGroupStale(cached, 'social', openedAtMs) : false;
   const social: MintDetailGroupStatus = hasSocial
     ? 'ready'
     : identity === 'loading'
