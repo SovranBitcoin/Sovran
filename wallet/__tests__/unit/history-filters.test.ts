@@ -4,6 +4,7 @@ import type { HistoryEntry, ReceiveOperation } from '@cashu/coco-core';
 import {
   bucketTransaction,
   inFlightReceiveToHistoryEntry,
+  isCancellablePendingEcash,
   isMeltQuotePaid,
   isMeltQuoteReadyToPay,
   isMintExpired,
@@ -11,7 +12,6 @@ import {
   isPendingTransaction,
   isReceiveTokenPending,
   isReceiveTokenRedeemed,
-  isReservedSendHistoryEntry,
   isSendTokenCancelled,
   isSendTokenComplete,
   isOnchainHistoryEntry,
@@ -58,8 +58,8 @@ describe('history state filters', () => {
   });
 
   it('classifies chart and balance state predicates', () => {
-    expect(isReservedSendHistoryEntry({ type: 'send', state: 'prepared' } as never)).toBe(true);
-    expect(isReservedSendHistoryEntry({ type: 'send', state: 'finalized' } as never)).toBe(false);
+    expect(isCancellablePendingEcash({ type: 'send', state: 'prepared' } as never)).toBe(true);
+    expect(isCancellablePendingEcash({ type: 'send', state: 'finalized' } as never)).toBe(false);
 
     expect(isSettledSpendHistoryEntry({ type: 'send', state: 'finalized' } as never)).toBe(true);
     expect(isSettledSpendHistoryEntry({ type: 'melt', state: 'PAID' } as never)).toBe(true);

@@ -16,7 +16,7 @@
 
 import type { BalancesByMint, HistoryEntry } from "@cashu/coco-core";
 
-import { isReservedSendHistoryEntry } from "../history/filters";
+import { isCancellablePendingEcash } from "../history/filters";
 
 export interface WalletBalanceBreakdown {
   spendable: number;
@@ -43,7 +43,7 @@ export function amountToNumber(value: AmountLike): number {
 export function sumReservedSends(history: readonly HistoryEntry[]): number {
   return history.reduce(
     (sum, entry) =>
-      isReservedSendHistoryEntry(entry)
+      isCancellablePendingEcash(entry)
         ? sum + amountToNumber((entry as { amount?: AmountLike }).amount)
         : sum,
     0,

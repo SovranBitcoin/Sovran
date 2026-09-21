@@ -9,7 +9,6 @@ export {
   isPendingTransaction,
   isReceiveTokenPending,
   isReceiveTokenRedeemed,
-  isReservedSendHistoryEntry,
   isSendTokenCancelled,
   isSendTokenComplete,
   isSettledReceiveHistoryEntry,

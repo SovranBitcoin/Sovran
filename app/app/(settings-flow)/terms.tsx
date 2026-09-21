@@ -1,5 +1,5 @@
-import { SettingsLegalScreen } from '@/features/settings/screens/SettingsLegalScreen';
+import { LegalDocumentScreen } from '@/shared/blocks/LegalDocumentScreen';
 
 export default function TermsRoute() {
-  return <SettingsLegalScreen documentId="terms" />;
+  return <LegalDocumentScreen documentId="terms" />;
 }

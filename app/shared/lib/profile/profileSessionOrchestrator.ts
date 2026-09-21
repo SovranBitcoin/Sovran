@@ -323,14 +323,6 @@ export async function createAndSwitchProfile(opts?: {
   }
 }
 
-export async function switchToImportedProfile(opts: {
-  accountIndex: number;
-  resetStages?: TransitionControls['resetStages'];
-  cancelResetStages?: TransitionControls['cancelResetStages'];
-}): Promise<boolean> {
-  return switchToExistingProfile(opts);
-}
-
 /** Replace an inaccessible root, or the unused onboarding root, then boot new caches. */
 export async function recoverMnemonicSession(mnemonic: string): Promise<boolean> {
   if (!bip39.validateMnemonic(mnemonic, wordlist) || mnemonic.split(' ').length !== 12)
