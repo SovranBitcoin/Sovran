@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 import { View } from 'react-native';
 import { Gesture } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import type { ImageOverlayLayout } from './image-overlay/types';
 
@@ -49,7 +49,7 @@ export function useVideoTapGesture({
     if (!isAndroid && !handleTap) return undefined;
     return Gesture.Tap().onEnd(() => {
       'worklet';
-      runOnJS(handleTap)();
+      scheduleOnRN(handleTap);
     });
   }, [isAndroid, handleTap]);
 

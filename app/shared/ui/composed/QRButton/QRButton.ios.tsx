@@ -1,7 +1,8 @@
 import React, { useCallback } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { PressableFeedback } from 'heroui-native';
-import Animated, { measure, runOnJS, runOnUI } from 'react-native-reanimated';
+import Animated, { measure } from 'react-native-reanimated';
+import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 
 import { Log, initLog } from '@/shared/lib/logger';
 import { setQRButtonAnchor } from '@/shared/lib/qrButtonAnchor';
@@ -34,22 +35,23 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
 
   const publishAnchor = useCallback(() => {
     // Try the worklet path first — UI-thread measurement, syncs with frame.
-    runOnUI(() => {
+    scheduleOnUI(() => {
       'worklet';
       const m = measure(animatedRef);
       if (m === null || !m.width || !m.height) return;
-      runOnJS(setQRButtonAnchor)({
+      scheduleOnRN(setQRButtonAnchor, {
         x: m.pageX,
         y: m.pageY,
         width: m.width,
         height: m.height,
         borderRadius,
       });
-      runOnJS(initLog)(
+      scheduleOnRN(
+        initLog,
         'QRButtonAnchor',
         `measure(UI) — pageX=${m.pageX} pageY=${m.pageY} width=${m.width} height=${m.height}`
       );
-    })();
+    });
     publishInWindow();
   }, [animatedRef, borderRadius, publishInWindow]);
 

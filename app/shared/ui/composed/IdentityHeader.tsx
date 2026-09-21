@@ -4,7 +4,6 @@ import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
-  runOnJS,
   useAnimatedReaction,
   useAnimatedScrollHandler,
   useAnimatedStyle,
@@ -12,6 +11,7 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
@@ -139,7 +139,7 @@ function IdentityHeaderProbe({ flipped }: { flipped: SharedValue<boolean> }) {
   useAnimatedReaction(
     () => flipped.get(),
     (next, previous) => {
-      if (next !== previous) runOnJS(setCollapsed)(next);
+      if (next !== previous) scheduleOnRN(setCollapsed, next);
     }
   );
   return (

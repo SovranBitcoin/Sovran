@@ -30,11 +30,11 @@ import Animated, {
   useAnimatedReaction,
   useAnimatedScrollHandler,
   useAnimatedStyle,
-  runOnJS,
   FadeIn,
   FadeOut,
   type SharedValue,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEventListener } from 'expo';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -201,7 +201,7 @@ export const StoriesCarousel: FC<CarouselProps> = ({
       const contentLength = event.contentSize.width || storyUsers.length * width;
       if (Math.abs(scroll - lastReportedScrollX.get()) >= Math.max(32, width / 2)) {
         lastReportedScrollX.set(scroll);
-        runOnJS(reportCarouselScrollFromUI)(scroll, size, contentLength);
+        scheduleOnRN(reportCarouselScrollFromUI, scroll, size, contentLength);
       }
     },
     onMomentumEnd: () => {
@@ -488,9 +488,9 @@ const UserStoriesItem: FC<UserItemProps> = ({
     () => isDragging.get(),
     (current) => {
       if (current) {
-        runOnJS(pausePlayer)();
+        scheduleOnRN(pausePlayer);
       } else if (userIndex === listCurrentIndex) {
-        runOnJS(resumePlayer)();
+        scheduleOnRN(resumePlayer);
       }
     }
   );

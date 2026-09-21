@@ -84,10 +84,7 @@
     "shared/ui/composed/CapsuleButton/CapsuleButton.liquid.tsx": [
       "Cannot access refs during render"
     ],
-    "shared/ui/composed/chat/useChatSurfacePerfLogger.ts": [
-      "Cannot access refs during render",
-      "This value cannot be modified"
-    ],
+    "shared/ui/composed/chat/useChatSurfacePerfLogger.ts": ["Cannot access refs during render"],
     "shared/ui/composed/Screen.tsx": [
       "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
     ]
