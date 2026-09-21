@@ -4,6 +4,7 @@
 
 import type { ActionAvailability, ScreenActionName, ScreenType } from "./types";
 import {
+  accountMintUrls,
   evaluateMintMethodAmountAvailability,
   isMethodImplemented,
   methodContextHasSupportingMint,
@@ -491,11 +492,14 @@ function amountEntryAvailability(
   let ecashLabel = "as Ecash";
   if (isMintQuote) {
     // Receive "as Ecash" = a single-use NUT-18 payment request. Mints never
-    // advertise NUT-18 (wallet-to-wallet), so any trusted mint qualifies.
-    const hasTrustedMint = (methodContext?.trustedMintUrls.length ?? 0) > 0;
-    ecashAvailable = nextCanFire && hasTrustedMint;
+    // advertise NUT-18 (wallet-to-wallet), so any of the ACCOUNT's mints
+    // qualifies — never one across the testnut split, whose ecash would land
+    // in the other account under the same real unit.
+    const hasAccountMint =
+      methodContext != null && accountMintUrls(methodContext).length > 0;
+    ecashAvailable = nextCanFire && hasAccountMint;
     ecashDescription = "Request as a Cashu payment request";
-    if (!hasTrustedMint) ecashReason = "No trusted mints";
+    if (!hasAccountMint) ecashReason = "No trusted mints";
   } else if (isMeltQuote) {
     ecashReason = meltTargetIsOnchain
       ? "Onchain destination"

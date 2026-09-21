@@ -1,4 +1,5 @@
 import {
+  accountMintCandidates,
   buildMethodAwareMintCandidates,
   createAmountEntryMethodContext,
   getCapabilityUnavailableReason,
@@ -661,7 +662,7 @@ export function requestMintSelector(
   // Receive-rail picks list every trusted mint with unsupported ones DISABLED
   // (with the capability reason) rather than hidden — the user should see
   // which mints could serve the rail, mirroring the NPC NUT-17 treatment.
-  const finalCandidates =
+  const scopedCandidates =
     methodScope && requirement
       ? buildMethodAwareMintCandidates(walletCtx, requirement, {})
       : (npcCandidates ??
@@ -670,6 +671,13 @@ export function requestMintSelector(
           : skipBalanceFilter
             ? allTrustedCandidates
             : candidates));
+  // Every flow picker is pinned to the active account. Only the wallet's own
+  // picker (`selected`) lists both sides, because picking there moves the
+  // wallet to that mint's account.
+  const finalCandidates =
+    event.scope === "selected"
+      ? scopedCandidates
+      : accountMintCandidates(walletCtx, scopedCandidates);
 
   return logContextResult("request_mint_selector", {
     step: "selectMint",

@@ -11,6 +11,7 @@ import {
 } from 'bitchat-module';
 import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
 import { useMints } from '@cashu/coco-react';
+import { isTestnutUnit } from 'wallet';
 import { areBLEPeerSnapshotsEquivalent } from '@/features/bitchat/lib/blePeerSnapshots';
 import { useBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
 import { useBitchatBLEIdentityMaterial } from '@/features/bitchat/hooks/useBitchatBLEIdentityMaterial';
@@ -18,6 +19,8 @@ import { useBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
 import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
 import { bitchatLog } from '@/shared/lib/logger';
 import { buildStandingCreq } from '@/shared/lib/nutCreq';
+import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
 
 interface UseBLEPeersResult {
   peers: BLEPeer[];
@@ -51,14 +54,22 @@ export function useBLEPeers(): UseBLEPeersResult {
   // so the favorite advertises it (`[FAVORITED]:<npub>:<creq>`). Keyed on the
   // mint-URL set so it only rebuilds when trusted mints change; startBLE updates
   // the native creq without restarting the mesh.
+  //
+  // The request names the REAL unit `sat`, which a testnut mint shares with a
+  // real one, so it lists only the active account's side of the testnut split:
+  // a real account never invites test ecash, and testnut mints never crowd
+  // real ones out of the capped list.
   const { trustedMints } = useMints();
+  const isTestnutMint = useIsTestnutMint();
+  const testnutAccount = useMintStore((state) => isTestnutUnit(state.activeUnit));
   const mintUrlsKey = useMemo(
     () =>
       trustedMints
         .map((m) => m.mintUrl)
+        .filter((mintUrl) => isTestnutMint(mintUrl) === testnutAccount)
         .sort()
         .join(','),
-    [trustedMints]
+    [trustedMints, isTestnutMint, testnutAccount]
   );
   const creq = useMemo(() => {
     if (!identityMaterial || !mintUrlsKey) return null;

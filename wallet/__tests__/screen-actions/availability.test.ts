@@ -832,6 +832,37 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     expect(onchain?.available ?? false).toBe(false);
   });
 
+  it("never offers onchain receive through a mint across the testnut split", () => {
+    // MINT2 is a testnut with no onchain minimum; the real account's only
+    // onchain mint (MINT1) wants 1 000 sat. 100 sat must stay unavailable.
+    const onchainInfo = (min_amount?: number) => ({
+      nuts: {
+        "4": {
+          methods: [
+            { method: "bolt11", unit: "sat" },
+            { method: "onchain", unit: "sat", ...(min_amount ? { min_amount } : {}) },
+          ],
+        },
+      },
+    });
+    const actions = getAvailableActions("amountEntry", {
+      destination: "mintQuote",
+      effectiveAmount: { value: 100, unit: "sat" },
+      unit: "sat",
+      methodContext: {
+        trustedMintUrls: [MINT1, MINT2],
+        mintBalances: { [MINT1]: 0, [MINT2]: 0 },
+        mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+          { mintUrl: MINT1, mintInfo: onchainInfo(1_000) },
+          { mintUrl: MINT2, mintInfo: onchainInfo(), outsideAccount: true },
+        ]),
+      },
+    });
+    expect(
+      actions.next.variants?.find((variant) => variant.id === "onchain"),
+    ).toMatchObject({ available: false, reason: "Minimum 1,000 sat" });
+  });
+
   it("disables Lightning send when no trusted mint advertises NUT-05 bolt11", () => {
     const entry = {
       destination: "meltQuote",
@@ -935,6 +966,21 @@ describe("amountEntryAvailability — receive as Ecash (NUT-18 payment request)"
       (variant) => variant.id === "ecash",
     );
     expect(ecash?.available).toBe(true);
+  });
+
+  it("disables the ecash variant when every trusted mint is across the testnut split", () => {
+    // A real `sat` request must not be served by a testnut mint: both speak
+    // the real unit `sat`, so only the account scope keeps them apart.
+    const entry = mintQuoteEntry([MINT1]);
+    entry.methodContext.mintMethodCapabilities =
+      deriveMintMethodCapabilityMapFromTrustedMints([
+        { mintUrl: MINT1, outsideAccount: true },
+      ]);
+    const actions = getAvailableActions("amountEntry", entry);
+    const ecash = actions.next.variants?.find(
+      (variant) => variant.id === "ecash",
+    );
+    expect(ecash).toMatchObject({ available: false, reason: "No trusted mints" });
   });
 
   it("disables the ecash variant on receive when no trusted mints exist", () => {

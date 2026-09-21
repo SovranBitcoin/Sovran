@@ -407,9 +407,24 @@ export function deriveMintMethodCapabilityMapFromTrustedMints(
         : deriveMintMethodSupportFromInfo(mint.mintInfo, unit, mint.keysetUnits),
     ]),
   );
+  // Which mints this map says can MINT onchain, and on what bounds. Logged here
+  // as one line because the per-mint `deriveSupport` debug lines are emitted
+  // back-to-back and the logger dedupes by event name inside 50 ms, so only the
+  // first survives. This is the map the amount screen's rail menu is gated on;
+  // the mint picker derives its own from freshly fetched mint info, so naming
+  // the mint is what tells the two sources apart.
+  const onchainCapable = trustedMints
+    .filter((mint) => map[mint.mintUrl]?.mint?.onchain?.supported)
+    .map((mint) => {
+      const capability = map[mint.mintUrl].mint.onchain;
+      return `${mint.mintUrl}=${capability?.minAmount ?? "_"}..${capability?.maxAmount ?? "_"}`;
+    });
   logger.info("mintCapabilities.deriveMap", {
     mintCount: trustedMints.length,
     unit: normalizeUnit(unit),
+    onchainCapableCount: onchainCapable.length,
+    onchainCapable,
+    outsideAccountCount: trustedMints.filter((mint) => mint.outsideAccount).length,
   });
   return map;
 }
@@ -426,7 +441,51 @@ function outsideAccountSupport(unit: string): MintMethodSupport {
     mint: Object.fromEntries(METHODS.map((m) => [m, unsupported(m)])),
     melt: Object.fromEntries(METHODS.map((m) => [m, unsupported(m)])),
     nut17: undefined,
+    outsideAccount: true,
   };
+}
+
+/**
+ * The trusted mints that belong to the active account. `trustedMintUrls` keeps
+ * its trust meaning (a testnut token is still from a trusted mint while a real
+ * account is active), so anything asking "which mints can serve this account?"
+ * — a picker's rows, a payment request's mint list, the receive-as-ecash gate —
+ * reads this instead.
+ */
+export function accountMintUrls(
+  ctx: Pick<WalletContext, "trustedMintUrls" | "mintMethodCapabilities">,
+): string[] {
+  return ctx.trustedMintUrls.filter(
+    (mintUrl) => !ctx.mintMethodCapabilities?.[mintUrl]?.outsideAccount,
+  );
+}
+
+/**
+ * The rows a FLOW picker may offer: the active account's mints only. A mint
+ * across the testnut split is not a disabled option, it is not an option — the
+ * unit switcher is how the user reaches it.
+ *
+ * Every `selectMint` step builds its rows through this, so the synchronous
+ * fallback rows and the async enriched rows (`buildMintListItems`, which
+ * applies the same rule) agree on the FIRST frame. They used to disagree, and
+ * the picker visibly dropped rows a moment after opening.
+ *
+ * The wallet's own picker (`scope: 'selected'`) is the one caller that must NOT
+ * use this: picking there moves the wallet to that mint's account.
+ */
+export function accountMintCandidates<T extends { mintUrl: string }>(
+  ctx: Pick<WalletContext, "trustedMintUrls" | "mintMethodCapabilities">,
+  candidates: readonly T[],
+): T[] {
+  const allowed = new Set(accountMintUrls(ctx));
+  const scoped = candidates.filter((candidate) => allowed.has(candidate.mintUrl));
+  if (scoped.length !== candidates.length) {
+    logger.debug("mintCapabilities.accountMintCandidates", {
+      before: candidates.length,
+      after: scoped.length,
+    });
+  }
+  return scoped;
 }
 
 function missingCapability(

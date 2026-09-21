@@ -112,6 +112,12 @@ export type MintMethodSupport = Record<
    * quote settlement over the mint's websocket).
    */
   nut17?: boolean;
+  /**
+   * The mint sits on the other side of the testnut split from the active
+   * account (units/accounts): every method reads unsupported, and the mint is
+   * not one of the account's mints at all — see `accountMintUrls`.
+   */
+  outsideAccount?: true;
 };
 
 export type MintMethodCapabilityMap = Record<string, MintMethodSupport>;

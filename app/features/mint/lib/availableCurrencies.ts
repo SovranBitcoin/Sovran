@@ -13,3 +13,25 @@ export function extractAvailableCurrencies(unitLists: string[][]): string[] {
       Number(isTestnutUnit(a)) - Number(isTestnutUnit(b)) || rank(a) - rank(b) || a.localeCompare(b)
   );
 }
+
+/**
+ * The rows a currency tab lists. A unit tab lists the mints that can issue that
+ * account unit. `ALL` spans the active ACCOUNT's units only: a mint across the
+ * testnut split already has its own tabs (TSAT, TUSD, …), so listing it under
+ * `ALL` as well would sit test mints among real ones. Rows with unknown
+ * `supportedUnits` (fallback rows, before enrichment) always pass — never hide
+ * a mint on missing data.
+ */
+export function filterMintsForCurrencyTab<T extends { supportedUnits?: string[] }>(
+  items: readonly T[],
+  selectedCurrency: string,
+  testnutAccount: boolean
+): T[] {
+  return items.filter((item) => {
+    if (!item.supportedUnits) return true;
+    return selectedCurrency === 'ALL'
+      ? item.supportedUnits.length === 0 ||
+          item.supportedUnits.some((unit) => isTestnutUnit(unit) === testnutAccount)
+      : item.supportedUnits.some((unit) => unit.toUpperCase() === selectedCurrency);
+  });
+}

@@ -1532,19 +1532,13 @@ describe("buildMintListItems testnut split", () => {
     expect(items[TESTNUT].status).toBe("available");
   });
 
-  it("disables the other side of the split in a payment flow", async () => {
+  it("leaves the other side of the split out of a flow picker", async () => {
     const real = byUrl(await build({ destination: "sendEcash", amount: 100 }, false));
     expect(real[MINT1].status).toBe("available");
-    expect(real[TESTNUT]).toMatchObject({
-      status: "disabled",
-      reason: { code: "TESTNUT_ACCOUNT_MISMATCH" },
-    });
+    expect(real[TESTNUT]).toBeUndefined();
 
     const test = byUrl(await build({ scope: "onchain" }, true));
     expect(test[TESTNUT].status).toBe("available");
-    expect(test[MINT1]).toMatchObject({
-      status: "disabled",
-      reason: { code: "TESTNUT_ACCOUNT_MISMATCH" },
-    });
+    expect(test[MINT1]).toBeUndefined();
   });
 });

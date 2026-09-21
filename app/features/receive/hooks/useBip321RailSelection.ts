@@ -1,4 +1,4 @@
-import { getMintMethodCapability, type WalletContext } from 'wallet';
+import { accountMintUrls, getMintMethodCapability, type WalletContext } from 'wallet';
 
 import { useReceiveMethodMint } from '@/features/receive/hooks/useReceiveMethodMint';
 import { deriveBip321RailSelection } from '@/features/receive/lib/bip321RailSelection';
@@ -26,7 +26,7 @@ export function useBip321RailSelection(
   const available = {
     onchain: !!onchainCapability?.supported && !onchainCapability.disabled,
     bolt12: !!bolt12Capability?.supported && !bolt12Capability.disabled,
-    creq: walletContext.trustedMintUrls.length > 0,
+    creq: accountMintUrls(walletContext).length > 0,
   };
   const selection = deriveBip321RailSelection({ available });
   selection.rails = selection.rails.map((rail) => {

@@ -1012,9 +1012,14 @@ export function createDefaultOperations(
         config.isTestnutMint?.(mintUrl) ?? false;
       // The wallet's own picker lists both sides: picking a mint there moves
       // the wallet to that mint's account. Every flow picker is pinned to the
-      // active account, so test and real funds never meet in one payment.
+      // active account, so test and real funds never meet in one payment — a
+      // mint on the other side is left out of the rows, not listed disabled
+      // (the unit switcher is how the user reaches it).
       const crossesAccounts = (mintUrl: string) =>
         data.scope !== "selected" && isTestnut(mintUrl) !== testnutAccount;
+      const listedMints = allTrustedMints.filter(
+        (mint) => !crossesAccounts(mint.mintUrl),
+      );
       const capabilityCtx = {
         trustedMintUrls: mintUrls,
         mintBalances: balances,
@@ -1046,7 +1051,7 @@ export function createDefaultOperations(
         methodCandidates.map((candidate) => [candidate.mintUrl, candidate]),
       );
 
-      const items = allTrustedMints.map((mint: Mint): MintListItem => {
+      const items = listedMints.map((mint: Mint): MintListItem => {
         const mintUrl = mint.mintUrl;
         const info = mintInfoMap.get(mintUrl);
         const balance = balances[mintUrl] ?? 0;
@@ -1076,10 +1081,7 @@ export function createDefaultOperations(
         // disabled so the user can't pick one that won't auto-receive.
         const supportsWebsocket =
           (info?.nuts?.["17"]?.supported?.length ?? 0) > 0;
-        if (crossesAccounts(mintUrl)) {
-          status = "disabled";
-          reason = localizeReason("TESTNUT_ACCOUNT_MISMATCH");
-        } else if (data.scope === "npc" && !supportsWebsocket) {
+        if (data.scope === "npc" && !supportsWebsocket) {
           status = "disabled";
           reason = {
             code: "NO_WEBSOCKET",
@@ -1166,13 +1168,22 @@ export function createDefaultOperations(
     },
 
     // Receive "as Ecash": single-use NUT-18 request over the registered
-    // transport. Every trusted mint qualifies (mints never advertise NUT-18
-    // — wallet-to-wallet), so the allow-list is simply the trusted set,
-    // capped to keep the QR sane.
+    // transport. Mints never advertise NUT-18 (wallet-to-wallet), so the
+    // allow-list is the active account's trusted mints, capped to keep the QR
+    // sane. The request names the REAL unit, which a testnut mint shares with
+    // its real counterpart — listing both sides would let a payer settle a
+    // real `sat` request in worthless test ecash.
     createPaymentRequestReceive: async ({ amount, unit }) => {
       const mgr = requireManager();
       const trusted = await mgr.mint.getAllTrustedMints();
-      const mints = trusted.map((mint) => mint.mintUrl).slice(0, 5);
+      const testnutAccount = config.isTestnutAccount?.() ?? false;
+      const mints = trusted
+        .map((mint) => mint.mintUrl)
+        .filter(
+          (mintUrl) =>
+            (config.isTestnutMint?.(mintUrl) ?? false) === testnutAccount,
+        )
+        .slice(0, 5);
       logger.info("operations.createPaymentRequestReceive.start", {
         amount,
         unit,
