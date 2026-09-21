@@ -12,7 +12,7 @@
  * - Meta objects are flattened into params and Cashu-specific secrets are compacted before emission.
  */
 
-import { cashuLog } from '../logger';
+import { cashuLog, redactKnownSecretSubstrings, secretStringKind } from '../logger';
 
 type LogLevel = 'error' | 'warn' | 'info' | 'debug';
 type SanitizedRecord = Record<string, unknown>;
@@ -42,21 +42,6 @@ function flattenMeta(meta: unknown[]): SanitizedRecord | undefined {
 
 function normalizeFieldName(fieldName: string): string {
   return fieldName.replace(/[^a-z0-9]/gi, '').toLowerCase();
-}
-
-function secretStringKind(value: string): string | null {
-  if (value.startsWith('cashuA') || value.startsWith('cashuB')) return 'cashu_token';
-  if (/^ln(bc|tb|tbs)[0-9a-z]{50,}/i.test(value)) return 'lightning_invoice';
-  if (/^nsec1[023456789acdefghjklmnpqrstuvwxyz]{58}$/.test(value)) return 'nsec';
-  if (/^(0x)?[0-9a-fA-F]{64}$/.test(value)) return 'hex32';
-  return null;
-}
-
-function redactEmbeddedSecrets(value: string): string {
-  return value
-    .replace(/\bcashu[AB][A-Za-z0-9_-]{20,}/g, '<REDACTED:cashu-token>')
-    .replace(/\bln(bc|tb|tbs)[0-9a-z]{50,}/gi, '<REDACTED:lightning-invoice>')
-    .replace(/\bnsec1[023456789acdefghjklmnpqrstuvwxyz]{58}\b/g, '<REDACTED:nsec>');
 }
 
 function isSensitiveField(fieldName: string | undefined): boolean {
@@ -134,7 +119,7 @@ function sanitizeValue(value: unknown, fieldName?: string, depth: number = 0): u
     if (secretKind || isSensitiveField(fieldName)) {
       return { _kind: secretKind ?? 'secret', len: value.length };
     }
-    const redacted = redactEmbeddedSecrets(value);
+    const redacted = redactKnownSecretSubstrings(value);
     if (redacted !== value) return redacted;
     if (value.length > 120)
       return { _kind: 'string', len: value.length, preview: value.slice(0, 32) };
@@ -144,7 +129,7 @@ function sanitizeValue(value: unknown, fieldName?: string, depth: number = 0): u
     return {
       _kind: 'error',
       name: value.name,
-      message: redactEmbeddedSecrets(value.message),
+      message: redactKnownSecretSubstrings(value.message),
     };
   }
   if (value instanceof Uint8Array) {
@@ -189,7 +174,7 @@ function sanitizeRecord(
 function eventKey(message: string): string {
   const secretKind = secretStringKind(message);
   if (secretKind) return `redacted_${secretKind}`;
-  const key = redactEmbeddedSecrets(message)
+  const key = redactKnownSecretSubstrings(message)
     .toLowerCase()
     .replace(/[^a-z0-9 ]/g, '')
     .trim()

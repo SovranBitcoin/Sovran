@@ -58,7 +58,7 @@ export function nostrPubkeyHexFromCashuP2pk(value: string): NostrPubkeyHex {
 
 /** NIP-01 event id: sha256 of the serialized event — 64 hex, shape-identical
  * to a pubkey but a DIFFERENT thing; never validate one as the other's type. */
-type NostrEventId = Brand<string, 'nostr.event.id'>;
+export type NostrEventId = Brand<string, 'nostr.event.id'>;
 
 // Shared case-tolerant 64-hex runtime check (reads must stay byte-compatible
 // with historically-accepted persisted data — sovran-data; NIP-01 says
@@ -72,6 +72,11 @@ const isHex64 = (value: unknown): value is string =>
  * path fails the parse and wipes persisted blobs.
  */
 export function isNostrPubkeyHex(value: unknown): value is NostrPubkeyHex {
+  return isHex64(value);
+}
+
+/** Same tolerant read guard, for event ids. */
+export function isNostrEventId(value: unknown): value is NostrEventId {
   return isHex64(value);
 }
 

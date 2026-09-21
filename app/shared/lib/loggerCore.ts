@@ -268,6 +268,13 @@ function getEntryDeviceInfo(): Record<string, unknown> {
 // Detect known verbose patterns and replace with a compact summary:
 //   { _kind: "jwt", len: 512, preview: "eyJhbGciOi…" }
 
+// BOLT11 invoice across every network hrp (mainnet, testnet, signet `tbs`/`sb`,
+// regtest). Two body shapes: a long opaque run, or the amount/separator digits
+// followed by the data part — so a short invoice is caught as well as a long one.
+const LIGHTNING_INVOICE_SOURCE =
+  'ln(?:bc|tb|tbs|bcrt|sb)(?:[0-9a-z]{50,}|[0-9]{1,12}[0-9a-z]{20,})';
+const LIGHTNING_INVOICE_PREFIX_RE = new RegExp(`^${LIGHTNING_INVOICE_SOURCE}`, 'i');
+
 // Secret patterns: a previewed prefix is itself sensitive — emit `_kind, len`
 // only. Order: secret patterns run before LONG_STRING_PATTERNS so a string
 // matching both is classified as the secret it actually is.
@@ -283,7 +290,7 @@ const SECRET_STRING_PATTERNS: { name: string; test: (s: string) => boolean }[] =
   // Runs before the long-string patterns so it's classified as the secret it is.
   { name: 'mnemonic', test: (s) => /^([a-z]{3,8}\s+){11,23}[a-z]{3,8}$/.test(s.trim()) },
   { name: 'cashu_token', test: (s) => s.startsWith('cashuA') || s.startsWith('cashuB') },
-  { name: 'lightning_invoice', test: (s) => /^ln(bc|tb|tbs)[0-9a-z]{50,}/i.test(s) },
+  { name: 'lightning_invoice', test: (s) => LIGHTNING_INVOICE_PREFIX_RE.test(s) },
   // A bare 32-byte hex string is the secp256k1 private-key length. A private
   // key and a public key / event id are indistinguishable by value (both are
   // 64 hex chars), so we cannot safely preview *any* of them: a 32-char preview
@@ -326,7 +333,7 @@ const EMBEDDED_SECRET_PATTERNS: { replacement: string; pattern: RegExp }[] = [
   },
   {
     replacement: '<REDACTED:lightning-invoice>',
-    pattern: /\bln(bc|tb|tbs)[0-9a-z]{50,}/gi,
+    pattern: new RegExp(`\\b${LIGHTNING_INVOICE_SOURCE}`, 'gi'),
   },
   {
     replacement: '<REDACTED:jwt>',
@@ -368,8 +375,19 @@ const LONG_STRING_PATTERNS: { name: string; noPreview?: boolean; test: (s: strin
 type StringClass =
   { kind: 'secret'; name: string } | { kind: 'long'; name: string; noPreview?: boolean };
 
+/**
+ * The secret kind a whole string is (`nsec`, `cashu_token`, `lightning_invoice`,
+ * `hex32`, …), or null. The one value-shape classifier: the coco logger and any
+ * other sanitizer reuse it instead of re-declaring the patterns.
+ */
+export function secretStringKind(s: string): string | null {
+  for (const p of SECRET_STRING_PATTERNS) if (p.test(s)) return p.name;
+  return null;
+}
+
 function classifyString(s: string): StringClass {
-  for (const p of SECRET_STRING_PATTERNS) if (p.test(s)) return { kind: 'secret', name: p.name };
+  const secretKind = secretStringKind(s);
+  if (secretKind) return { kind: 'secret', name: secretKind };
   for (const p of LONG_STRING_PATTERNS)
     if (p.test(s)) return { kind: 'long', name: p.name, noPreview: p.noPreview };
   return { kind: 'long', name: 'long_string' };
@@ -377,7 +395,8 @@ function classifyString(s: string): StringClass {
 
 type Compact = string | { _kind: string; len: number; preview?: string };
 
-function redactKnownSecretSubstrings(s: string): string {
+/** Replace every secret embedded in a larger string with its `<REDACTED:kind>` marker. */
+export function redactKnownSecretSubstrings(s: string): string {
   let out = s;
   for (const { pattern, replacement } of EMBEDDED_SECRET_PATTERNS) {
     out = out.replace(pattern, replacement);

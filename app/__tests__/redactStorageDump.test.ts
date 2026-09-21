@@ -82,8 +82,8 @@ describe('redactStorageDump', () => {
       cashuMnemonic: string;
       keys: { privateKeyHex: string; secretKey: string; publicKeyHex: string };
     };
-    expect(legacy.mnemonic).toBe('<REDACTED:secret>');
-    expect(legacy.cashuMnemonic).toBe('<REDACTED:secret>');
+    expect(legacy.mnemonic).toBe('<REDACTED:mnemonic>');
+    expect(legacy.cashuMnemonic).toBe('<REDACTED:mnemonic>');
     expect(legacy.keys.privateKeyHex).toBe('<REDACTED:private-key>');
     expect(legacy.keys.secretKey).toBe('<REDACTED:private-key>');
     expect(legacy.keys.publicKeyHex).toBe('a'.repeat(64));

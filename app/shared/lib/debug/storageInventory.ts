@@ -3,7 +3,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as SecureStore from 'expo-secure-store';
 
 import type { ProfileEntry } from '@/shared/stores/global/profileStore';
-import { redactError, storeLog } from '@/shared/lib/logger';
+import { redactError, redactKnownSecretSubstrings, storeLog } from '@/shared/lib/logger';
 import { sensitiveFieldKind } from '@/shared/lib/sensitiveFieldNames';
 
 const GLOBAL_ZUSTAND_STORE_KEYS = [
@@ -232,10 +232,6 @@ export async function getFullAsyncStorageDump(): Promise<Record<string, unknown>
 
 const REDACTED_GEOLOCATION_KEY_PATTERN = /^transaction-location-store(:|$)/;
 
-const NSEC_PATTERN = /\bnsec1[023456789acdefghjklmnpqrstuvwxyz]{58}\b/g;
-const CASHU_TOKEN_PATTERN = /\bcashu[AB][A-Za-z0-9_-]{20,}/g;
-const LIGHTNING_INVOICE_PATTERN = /\bln(bc|tb|bcrt|sb)[0-9]{1,12}[a-z0-9]{20,}/gi;
-
 /**
  * Strip bearer instruments and precise location data from a parsed
  * AsyncStorage dump.
@@ -245,9 +241,11 @@ const LIGHTNING_INVOICE_PATTERN = /\bln(bc|tb|bcrt|sb)[0-9]{1,12}[a-z0-9]{20,}/g
  * outright — there is no triage value in a redacted lat/lon.
  *
  * Bearer instruments: cashu token strings (`cashuA…` / `cashuB…`) and
- * lightning invoices (`lnbc…` / `lntb…` / `lnbcrt…` / `lnsb…`) are
- * recursively replaced inside any string value, since they leak
- * spendable funds or in-flight payment metadata if shared verbatim.
+ * lightning invoices (`lnbc…` / `lntb…` / `lntbs…` / `lnbcrt…` / `lnsb…`)
+ * are recursively replaced inside any string value, since they leak
+ * spendable funds or in-flight payment metadata if shared verbatim. The
+ * embedded-secret patterns are the logger's (`redactKnownSecretSubstrings`),
+ * so a log line and a support dump redact the same set.
  *
  * Wallet secrets: legacy stores or future debugging mistakes may include
  * `nsec`, mnemonic, seed, or private-key fields. Those are redacted by key
@@ -270,7 +268,7 @@ export function redactStorageDump(dump: Record<string, unknown>): Record<string,
 }
 
 function redactValue(value: unknown): unknown {
-  if (typeof value === 'string') return redactString(value);
+  if (typeof value === 'string') return redactKnownSecretSubstrings(value);
   if (Array.isArray(value)) return value.map(redactValue);
   if (value !== null && typeof value === 'object') {
     const out: Record<string, unknown> = {};
@@ -282,13 +280,6 @@ function redactValue(value: unknown): unknown {
   return value;
 }
 
-function redactString(s: string): string {
-  return s
-    .replace(NSEC_PATTERN, '<REDACTED:nsec>')
-    .replace(CASHU_TOKEN_PATTERN, '<REDACTED:cashu-token>')
-    .replace(LIGHTNING_INVOICE_PATTERN, '<REDACTED:lightning-invoice>');
-}
-
 function isSensitiveStorageField(fieldName: string): boolean {
   return sensitiveFieldKind(fieldName) !== null;
 }
@@ -296,7 +287,7 @@ function isSensitiveStorageField(fieldName: string): boolean {
 function redactSensitiveStorageValue(value: unknown, fieldName: string): string {
   const kind = sensitiveFieldKind(fieldName) ?? 'secret';
   if (typeof value === 'string') {
-    const redacted = redactString(value);
+    const redacted = redactKnownSecretSubstrings(value);
     if (redacted !== value && redacted.startsWith('<REDACTED:')) {
       return redacted;
     }
