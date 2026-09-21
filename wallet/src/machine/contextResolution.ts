@@ -5,6 +5,7 @@ import {
   getMintMethodCapability,
 } from "../mint-capabilities";
 import { localizeReason } from "../formatting/locales";
+import { isValidSatAmount } from "../guards";
 import { logger, mintUrlFields } from "../logger";
 import {
   getValidMintCandidates,
@@ -691,7 +692,9 @@ export function resolveFromContext(
 ): ContextResolutionResult {
   const destination = ctx.destination ?? "sendEcash";
   const unit = ctx.unit;
-  const amount = ctx.amount;
+  // NaN, Infinity, fractional and non-positive amounts resolve like a missing
+  // amount: back to amount entry, never on to a quote or send step.
+  const amount = isValidSatAmount(ctx.amount) ? ctx.amount : undefined;
   const mintUrl = ctx.mintUrl;
   logger.debug("contextResolution.resolve.start", {
     enableEcashSendMemo,
@@ -700,7 +703,7 @@ export function resolveFromContext(
   });
 
   if (destination === "mintQuote") {
-    if (amount == null || amount <= 0) {
+    if (amount == null) {
       return logContextResult("mint_quote_enter_amount", {
         step: "enterAmount",
         context: { ...ctx, destination },
@@ -782,7 +785,7 @@ export function resolveFromContext(
     // operation embeds the trusted allow-list itself — so once we have an
     // amount we go straight to the auto-execution step. Mirrors the mintQuote
     // "enter amount first" guard.
-    if (amount == null || amount <= 0) {
+    if (amount == null) {
       return logContextResult("receive_payment_request_enter_amount", {
         step: "enterAmount",
         context: { ...ctx, destination },
@@ -814,7 +817,7 @@ export function resolveFromContext(
         },
       });
     }
-    if (amount == null || amount <= 0) {
+    if (amount == null) {
       return logContextResult("melt_quote_enter_amount", {
         step: "enterAmount",
         context: { ...ctx, destination },
@@ -857,7 +860,7 @@ export function resolveFromContext(
     });
   }
 
-  if (amount == null || amount <= 0) {
+  if (amount == null) {
     return logContextResult("send_or_payment_enter_amount", {
       step: "enterAmount",
       context: { ...ctx, destination },
