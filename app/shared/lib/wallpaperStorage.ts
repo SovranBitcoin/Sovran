@@ -154,7 +154,7 @@ export async function downloadWallpaper(
     } else {
       await removeDownloadFile(stagingUri);
     }
-    throw new Error(`Download failed for "${themeName}": ${message}`);
+    throw new Error(`Download failed for "${themeName}": ${message}`, { cause: error });
   } finally {
     acceptingProgress = false;
     // Also removes DownloadResumable's JS progress subscription on success.

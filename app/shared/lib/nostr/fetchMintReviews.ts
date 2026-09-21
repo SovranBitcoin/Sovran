@@ -55,7 +55,7 @@ export async function fetchMintReviews(args: {
     });
     return resolved.match(
       (value) => ok(reviewsFromFacade(value)),
-      (error) => err(new Error(`mint reviews: ${error.type}`))
+      (error) => err(new Error(`mint reviews: ${error.type}`, { cause: error }))
     );
   } catch (error) {
     return err(error instanceof Error ? error : new Error(String(error)));

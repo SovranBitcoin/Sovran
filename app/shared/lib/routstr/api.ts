@@ -565,8 +565,7 @@ export async function checkBalance(
 }
 
 export async function topUpBalance(
-  apiKey: string,
-  cashuToken: string,
+  { apiKey, cashuToken }: { apiKey: string; cashuToken: string },
   controls: RequestControls = {}
 ): Promise<TopUpResponse> {
   apiLog.info('api.routstr.wallet.topup.start', { tokenLength: cashuToken?.length });
@@ -709,9 +708,7 @@ async function* parseSSEFromReadableStream(
       duration_ms: Math.round(performance.now() - streamStart),
       status: error && typeof error === 'object' && 'status' in error ? error.status : 0,
     });
-    throw new Error(
-      'Failed to stream response: ' + (error instanceof Error ? error.message : String(error))
-    );
+    throw error;
   } finally {
     reader.releaseLock();
   }

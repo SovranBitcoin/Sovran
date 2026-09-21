@@ -115,7 +115,11 @@ function publishToRelay(
     try {
       socket = new WebSocket(relayUrl);
     } catch (error) {
-      reject(new Error(`relay ${relayUrl}: ${error instanceof Error ? error.message : error}`));
+      reject(
+        new Error(`relay ${relayUrl}: ${error instanceof Error ? error.message : error}`, {
+          cause: error,
+        })
+      );
       return;
     }
     const timer = setTimeout(() => {
@@ -174,6 +178,7 @@ export async function deliverPaymentRequestPayload(params: {
   // contract (one such failure quarantined a whole funded chunk).
   const maxAttempts = 3;
   let lastReasons: string[] = [];
+  let lastError: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const attempts = params.relays.map((relay) =>
       publishToRelay(relay, frame, wrap.id, params.timeoutMs)
@@ -182,6 +187,7 @@ export async function deliverPaymentRequestPayload(params: {
       const acceptedBy = await Promise.any(attempts);
       return { wrapEventId: wrap.id, acceptedBy };
     } catch (error) {
+      lastError = error;
       lastReasons =
         error instanceof AggregateError
           ? error.errors.map((entry) => (entry instanceof Error ? entry.message : String(entry)))
@@ -192,6 +198,7 @@ export async function deliverPaymentRequestPayload(params: {
     }
   }
   throw new Error(
-    `payment request delivery failed on every relay (${maxAttempts} rounds): ${lastReasons.join('; ')}`
+    `payment request delivery failed on every relay (${maxAttempts} rounds): ${lastReasons.join('; ')}`,
+    { cause: lastError }
   );
 }

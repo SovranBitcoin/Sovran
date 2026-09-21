@@ -189,12 +189,24 @@ export class ApiHttpError extends Error {
   }
 }
 
+/**
+ * A response that arrived but failed its schema. Carries the redacted
+ * paths+codes only — the raw ParseError can hold the offending input.
+ */
+export class ApiParseError extends Error {
+  readonly where: string;
+  readonly issues: ReturnType<typeof loggableIssues>;
+
+  constructor(e: ParseError) {
+    super(`${e.where}: ${e.issues.length} schema issue(s)`);
+    this.where = e.where;
+    this.issues = loggableIssues(e);
+  }
+}
+
 function toError(e: FetchOrParseError): Error {
   if (e instanceof Error) return e;
-  if ((e as ParseError).type === 'schema/zod') {
-    const issues = (e as ParseError).issues.length;
-    return new Error(`${(e as ParseError).where}: ${issues} schema issue(s)`);
-  }
+  if ((e as ParseError).type === 'schema/zod') return new ApiParseError(e as ParseError);
   return new Error('unknown error');
 }
 
@@ -228,7 +240,7 @@ function normalizeMintReviewsSummary(
 /**
  * Core fetch-parse helper. Network or HTTP errors surface as `Error`;
  * shape validation failures are logged with paths+codes (never raw input)
- * and collapsed into `Error` to preserve the existing caller signature.
+ * and surface as `ApiParseError`, keeping the `Result<T, Error>` signature.
  *
  * `controls.signal` is the caller's abort source (e.g. effect cleanup);
  * `controls.timeoutMs` defaults to `DEFAULT_TIMEOUT_MS`. The two are
