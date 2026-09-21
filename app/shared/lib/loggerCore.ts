@@ -616,6 +616,20 @@ class RingBuffer<T> {
 
 // ─── Built-in Transports ─────────────────────────────────────────────────────
 
+/**
+ * Whether the console transport pretty-prints. Indented JSON is easier to read
+ * in a live Metro window, but it spreads one entry over many lines, so a
+ * captured session is no longer JSON-lines and log-doctor cannot parse it.
+ * `EXPO_PUBLIC_LOG_PRETTY=0` gives one entry per line — what `bun run dev`
+ * sets while teeing the session to LOG.txt.
+ */
+const DEFAULT_PRETTY =
+  process.env.EXPO_PUBLIC_LOG_PRETTY === '0'
+    ? false
+    : process.env.EXPO_PUBLIC_LOG_PRETTY === '1'
+      ? true
+      : IS_DEV;
+
 function consoleTransport(pretty: boolean) {
   return (entry: LogEntry): void => {
     const method = LEVEL_CONSOLE_METHOD[entry.level];
@@ -688,7 +702,7 @@ export function createLogger(options: LoggerOptions = {}): Logger {
     maxArrayItems = 5,
     maxDepth = 4,
     maxObjectKeys = 15,
-    transports = [consoleTransport(options.pretty ?? IS_DEV)],
+    transports = [consoleTransport(options.pretty ?? DEFAULT_PRETTY)],
     async = true,
     enabled = true,
     ringBufferSize = 100,
