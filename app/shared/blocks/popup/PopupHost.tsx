@@ -90,18 +90,18 @@ function ToastRegistrar() {
   return null;
 }
 
-function DurationBar({ duration }: { duration: number }) {
+function DurationBar({ durationMs }: { durationMs: number }) {
   const progress = useSharedValue(0);
 
   useEffect(() => {
     progress.value = 0;
     progress.value = withTiming(1, {
-      duration,
+      duration: durationMs,
       easing: Easing.linear,
     });
 
     return () => cancelAnimation(progress);
-  }, [duration, progress]);
+  }, [durationMs, progress]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     width: `${progress.value * 100}%`,
@@ -109,7 +109,10 @@ function DurationBar({ duration }: { duration: number }) {
 
   return (
     <View className="bg-foreground/10 mt-3 h-1 w-8 self-center overflow-hidden rounded-full">
-      <Animated.View className="bg-foreground/40 h-full rounded-full" style={animatedStyle} />
+      <Animated.View
+        className="bg-foreground/40 absolute bottom-0 left-0 top-0 rounded-full"
+        style={animatedStyle}
+      />
     </View>
   );
 }
@@ -337,7 +340,7 @@ function SheetContent({
 }) {
   const isCustom = isCustomSheetPayload(payload);
   const standardPayload = !isCustom ? (payload as StandardSheetPayload | null) : null;
-  const showDuration = standardPayload?.duration != null && standardPayload.duration > 0;
+  const showDuration = standardPayload?.durationMs != null && standardPayload.durationMs > 0;
   const hasLiveStatus = standardPayload?.status != null;
 
   const titleAnimatedStyle = useAnimatedStyle(() =>
@@ -425,7 +428,7 @@ function SheetContent({
         </View>
       ) : null}
 
-      {showDuration ? <DurationBar duration={standardPayload!.duration!} /> : null}
+      {showDuration ? <DurationBar durationMs={standardPayload!.durationMs!} /> : null}
     </View>
   );
 }
@@ -779,13 +782,13 @@ function SheetPopup() {
 
   useEffect(() => {
     const standard = !isCustom ? (current as StandardSheetPayload) : null;
-    if (!standard?.duration || !isOpen) {
+    if (!standard?.durationMs || !isOpen) {
       return;
     }
 
     const timer = setTimeout(() => {
       usePopupStore.getState().close();
-    }, standard.duration);
+    }, standard.durationMs);
 
     return () => clearTimeout(timer);
   }, [current, isOpen, isCustom]);
