@@ -91,8 +91,11 @@ describe('Android portal flags', () => {
   it('keeps Android bottom footers out of the masked blur native path', () => {
     const source = readFileSync(resolve(ROOT, 'shared/ui/composed/BottomButtons.tsx'), 'utf8');
 
-    expect(source).toContain("blur && Platform.OS !== 'android'");
+    const capabilities = readFileSync(resolve(ROOT, 'shared/ui/capability/detect.ts'), 'utf8');
+
+    expect(source).toContain('blur && frostedSurface');
     expect(source).toContain('shouldRenderBlur');
+    expect(capabilities).toContain('frostedSurface: isIOS && blur');
   });
 
   it('keeps button text wrappers mounted before Android loading transitions', () => {

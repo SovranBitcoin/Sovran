@@ -26,6 +26,7 @@ import Icon from 'assets/icons';
 import { withAlpha } from '@/shared/lib/color';
 import { MapVignette } from '@/shared/ui/composed/MapVignette';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useCapabilities } from '@/shared/ui/capability';
 import { Log } from '@/shared/lib/logger';
 
 interface TransactionLocationSectionProps {
@@ -52,6 +53,7 @@ const MAP_CONTAINER_CN = 'mx-4 rounded-xl overflow-hidden h-[150px]';
  */
 function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
   const surfaceSecondary = useThemeColor('surface-secondary');
+  const { frostedSurface } = useCapabilities();
 
   return (
     <>
@@ -73,7 +75,7 @@ function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
       />
 
       {/* Blur stays iOS-only — Android keeps flat surfaces by design. */}
-      {withBlur && Platform.OS === 'ios' && (
+      {withBlur && frostedSurface && (
         <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
       )}
 

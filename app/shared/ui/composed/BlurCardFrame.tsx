@@ -1,9 +1,10 @@
 import React from 'react';
-import { Platform, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { withAlpha } from '@/shared/lib/color';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useCapabilities } from '@/shared/ui/capability';
 import { View } from '@/shared/ui/primitives/View/View';
 
 /** Size of the gradient container box (pixels) */
@@ -51,12 +52,13 @@ interface BlurCardFrameProps {
  * Children are rendered alongside to establish the container's height.
  */
 export function BlurCardFrame({ accentColor, children, variant = 'diagonal' }: BlurCardFrameProps) {
-  const androidSurface = useThemeColor('surface-secondary');
+  const flatSurface = useThemeColor('surface-secondary');
+  const { frostedSurface } = useCapabilities();
 
-  if (Platform.OS === 'android') {
+  if (!frostedSurface) {
     return (
       <Log name="BlurCardFrame">
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: androidSurface }]} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: flatSurface }]} />
         {children}
       </Log>
     );

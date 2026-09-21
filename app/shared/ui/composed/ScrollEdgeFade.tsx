@@ -23,7 +23,7 @@
  */
 
 import { useMemo } from 'react';
-import { Platform, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { BlurView, type BlurTint } from 'expo-blur';
 
 import { chromeBlurTint } from '@/shared/styles/tokens';
@@ -34,6 +34,7 @@ import { withAlpha } from '@/shared/lib/color';
 
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useCapabilities } from '@/shared/ui/capability';
 import { useScreenBackground } from '@/shared/ui/composed/ScreenFooterContext';
 
 interface ScrollEdgeFadeProps {
@@ -110,6 +111,7 @@ export function ScrollEdgeFade({
 }: ScrollEdgeFadeProps) {
   const themeBackground = useThemeColor('surface');
   const pageBackground = useScreenBackground();
+  const { frostedSurface } = useCapabilities();
   const fillColor = color === null ? null : (color ?? pageBackground ?? themeBackground);
 
   // Resolve fade band. Clamp so we always have a well-formed mask even
@@ -162,7 +164,7 @@ export function ScrollEdgeFade({
       {/* Blur layer is iOS-only by design: expo-blur on Android renders as a
           muddy dark tint rather than frosted glass, which made header fades
           look broken. Android keeps the pure eased color gradient below. */}
-      {blur && Platform.OS === 'ios' && (
+      {blur && frostedSurface && (
         <MaskedView
           style={StyleSheet.absoluteFill}
           maskElement={
