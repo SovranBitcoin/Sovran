@@ -296,6 +296,18 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
     });
   }
 
+  /** Fire-and-forget `respond`: the engine moves on, but a failed send is still logged. */
+  function respondDetached(
+    toPubkey: string,
+    response: RpcResponse,
+    encryption: Nip46Encryption
+  ): void {
+    void respond(toPubkey, response, encryption).mapErr((error) => {
+      nostrLog.warn('nostr.signer.engine_respond_failed', { type: error.type });
+      return error;
+    });
+  }
+
   /** Skips `ping` — liveness chatter would churn the 500-entry capped log. */
   function logActivity(input: {
     clientPubkey: string;
@@ -334,7 +346,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
       // wire response, only the activity row below.
       const connection = connections().apps[expired.clientPubkey] ?? null;
       if (connection !== null && connection.status === 'active') {
-        void respond(
+        respondDetached(
           expired.clientPubkey,
           { id: expired.id, error: NIP46_ERRORS.requestExpired },
           context?.encryption ?? connection.encryption
@@ -396,7 +408,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
     });
     if (isStale(capturedGeneration)) return; // stopped/restarted mid-execution — never respond
     if (outcome.isErr()) {
-      void respond(
+      respondDetached(
         clientPubkey,
         { id: request.id, error: NIP46_ERRORS.malformedRequest },
         encryption
@@ -410,7 +422,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
       connections().touchUsage(clientPubkey, { denied: true });
       return;
     }
-    void respond(clientPubkey, { id: request.id, result: outcome.value }, encryption);
+    respondDetached(clientPubkey, { id: request.id, result: outcome.value }, encryption);
     const isNormalSign = args.contentPreview !== undefined;
     const eventId =
       request.method === 'sign_event' && isNormalSign
@@ -454,13 +466,17 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
         return;
       }
       if (!args.rateAllowed) {
-        void respond(clientPubkey, { id: request.id, error: NIP46_ERRORS.rateLimited }, encryption);
+        respondDetached(
+          clientPubkey,
+          { id: request.id, error: NIP46_ERRORS.rateLimited },
+          encryption
+        );
         logActivity({ clientPubkey, method: 'connect', verdict: 'auto_denied_rate_limited' });
         connections().touchUsage(clientPubkey, { denied: true });
         return;
       }
       // Known client re-connect: ack + usage touch, no new record, no prompt.
-      void respond(clientPubkey, { id: request.id, result: 'ack' }, encryption);
+      respondDetached(clientPubkey, { id: request.id, result: 'ack' }, encryption);
       connections().touchUsage(clientPubkey);
       logActivity({ clientPubkey, method: 'connect', verdict: 'auto_approved_method' });
       return;
@@ -473,7 +489,11 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
 
     const secret = request.params[1]?.trim() ?? '';
     if (secret === '') {
-      void respond(clientPubkey, { id: request.id, error: NIP46_ERRORS.invalidSecret }, encryption);
+      respondDetached(
+        clientPubkey,
+        { id: request.id, error: NIP46_ERRORS.invalidSecret },
+        encryption
+      );
       return;
     }
     const consumed = await deps.consumeSecret(engine.userPubkey, secret);
@@ -487,7 +507,11 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
       return;
     }
     if (!consumed.value) {
-      void respond(clientPubkey, { id: request.id, error: NIP46_ERRORS.invalidSecret }, encryption);
+      respondDetached(
+        clientPubkey,
+        { id: request.id, error: NIP46_ERRORS.invalidSecret },
+        encryption
+      );
       return;
     }
 
@@ -501,10 +525,17 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
     });
     if (upserted.isErr()) {
       nostrLog.warn('nostr.signer.engine_bunker_upsert_failed', { cause: upserted.error });
-      void respond(clientPubkey, { id: request.id, error: NIP46_ERRORS.notAuthorized }, encryption);
+      respondDetached(
+        clientPubkey,
+        { id: request.id, error: NIP46_ERRORS.notAuthorized },
+        encryption
+      );
       return;
     }
-    await respond(clientPubkey, { id: request.id, result: 'ack' }, encryption);
+    const acked = await respond(clientPubkey, { id: request.id, result: 'ack' }, encryption);
+    if (acked.isErr()) {
+      nostrLog.warn('nostr.signer.engine_respond_failed', { type: acked.error.type });
+    }
     if (isStale(capturedGeneration)) return; // stopped/restarted during the ack await
     logActivity({ clientPubkey, method: 'connect', verdict: 'approved_pairing' });
     const rebuilt = rebuildRelays();
@@ -671,7 +702,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
           verdict: 'auto_denied_blocked',
         });
       } else {
-        void respond(sender, { id: request.id, error: NIP46_ERRORS.malformedRequest }, used);
+        respondDetached(sender, { id: request.id, error: NIP46_ERRORS.malformedRequest }, used);
         logActivity({
           clientPubkey: sender,
           method: request.method,
@@ -701,7 +732,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
     if (decision.verdict === 'deny') {
       // Blocked apps are a silent tier: activity row, no response.
       if (decision.reason !== 'blocked') {
-        void respond(
+        respondDetached(
           sender,
           { id: request.id, error: DENY_ERROR_BY_REASON[decision.reason] },
           used
@@ -750,7 +781,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
     };
     const enqueued = requests().enqueue(pending);
     if (enqueued.isErr()) {
-      void respond(sender, { id: request.id, error: NIP46_ERRORS.rateLimited }, used);
+      respondDetached(sender, { id: request.id, error: NIP46_ERRORS.rateLimited }, used);
       logActivity({
         clientPubkey: sender,
         method: request.method,
@@ -835,7 +866,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
       typeof method === 'string' && !isKnownMethod(method)
         ? NIP46_ERRORS.unsupportedMethod
         : NIP46_ERRORS.malformedRequest;
-    void respond(sender, { id, error }, encryption);
+    respondDetached(sender, { id, error }, encryption);
   }
 
   function isKnownMethod(method: string): boolean {
@@ -1039,7 +1070,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
     stopSweepIfIdle: () => {
       if (requests().pending.length === 0) stopSweep();
     },
-    respond,
+    respond: respondDetached,
     logActivity,
     executeApproved: (context, encryption) => {
       const engine = state;

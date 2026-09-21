@@ -24,10 +24,7 @@ import { errAsync, ResultAsync } from 'neverthrow';
 import type { Nip46ActivitySummary } from '@/features/nostrSigner/data/nip46ActivityStore';
 import { useNip46ConnectionsStore } from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import { useNip46RequestsStore } from '@/features/nostrSigner/data/nip46RequestsStore';
-import type {
-  Nip46Encryption,
-  Nip46TransportError,
-} from '@/features/nostrSigner/lib/nip46Transport';
+import type { Nip46Encryption } from '@/features/nostrSigner/lib/nip46Transport';
 import {
   NIP46_ERRORS,
   type ActivityVerdict,
@@ -77,11 +74,8 @@ export interface VerdictResolverSeam {
   deleteContext(requestId: string): void;
   /** Stops the expiry sweep when the pending queue just emptied. */
   stopSweepIfIdle(): void;
-  respond(
-    toPubkey: string,
-    response: RpcResponse,
-    encryption: Nip46Encryption
-  ): ResultAsync<void, Nip46TransportError>;
+  /** Detached send: the engine logs a failed response, the resolver never waits on it. */
+  respond(toPubkey: string, response: RpcResponse, encryption: Nip46Encryption): void;
   logActivity(input: {
     clientPubkey: string;
     method: Nip46Method;
@@ -125,11 +119,7 @@ export function resolveVerdict(
     // prompted request still gets its documented final "Not authorized"
     // while everything the app sends afterwards is silent.
     if (connection !== null && connection.status === 'active') {
-      void seam.respond(
-        clientPubkey,
-        { id: request.id, error: NIP46_ERRORS.notAuthorized },
-        encryption
-      );
+      seam.respond(clientPubkey, { id: request.id, error: NIP46_ERRORS.notAuthorized }, encryption);
     }
     seam.logActivity({
       clientPubkey,
