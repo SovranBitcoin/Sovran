@@ -213,6 +213,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/composed/GlassSearchBar/GlassSearchBar.android.tsx",
     "shared/ui/composed/GlassSearchBar/GlassSearchBar.ios.tsx",
     "shared/ui/composed/GradientCardFrame.tsx",
+    "shared/ui/composed/HeaderGlassCircle.ios.tsx",
     "shared/ui/composed/HeaderGlassCircle.tsx",
     "shared/ui/composed/LayoutDebugWrapper.tsx",
     "shared/ui/composed/LayoutShiftProbe.tsx",
@@ -264,6 +265,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 258,
+  "total": 259,
 }
 `;
