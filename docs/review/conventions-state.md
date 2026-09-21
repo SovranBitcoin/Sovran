@@ -128,9 +128,9 @@ Scope: `**/*.tsx`, `**/hooks/**/*.ts`, `**/use*.ts`
 
 `useShallow` compares one level with `Object.is`; if any member of the selected object or array is itself created inside the selector, every comparison fails and the component crashes at mount with "Maximum update depth exceeded".
 
-Does `hunk` wrap in `useShallow` a selector whose result contains a value created inside the selector — a nested object or array literal (`s => ({ user: { name: s.name } })`), an inline function (`{ onX: () => … }`), a `.map` that builds new objects (`s.items.map(i => ({ ...i }))`), `Object.entries`/`Object.values` of nested records, or a `?? []` / `?? {}` fallback inside the literal?
+Does `hunk` wrap in `useShallow` a selector whose result, once any spreads are applied, has at least one own member that is itself created inside the selector — a nested object or array literal (`s => ({ user: { name: s.name } })`), an inline function (`{ onX: () => … }`), a `.map` that builds new objects (`s.items.map(i => ({ ...i }))`), `Object.entries`/`Object.values` of nested records, or a `?? []` / `?? {}` fallback inside the literal?
 
-Allowed cases: Members that are primitives or existing references from state (`{ a: s.a, list: s.list }`); `.map` to primitives (`s.items.map(i => i.id)`); `.filter` over existing element references; `new Map(s.map)` / `new Set(…)` of primitives; module-level constant fallbacks; `useShallow` around a primitive selector is a harmless no-op and needs no comment.
+Allowed cases: Members that are primitives or existing references from state (`{ a: s.a, list: s.list }`); `.map` to primitives (`s.items.map(i => i.id)`); `.filter` over existing element references; `new Map(s.map)` / `new Set(…)` of primitives; module-level constant fallbacks; a helper result spread into the returned object when the fields it contributes are primitives (`...counts(s.legs)` contributing `settled` and `total` numbers); `useShallow` around a primitive selector is a harmless no-op and needs no comment.
 
 ## state/pure-selectors
 

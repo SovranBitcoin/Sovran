@@ -138,9 +138,9 @@ Scope: `repository-wide`
 
 This codebase and its libraries throw plain objects and strings; a `catch` that only understands `Error` loses them.
 
-Does `hunk` handle a caught value or a rejected promise so that a non-`Error` throwable is dropped or flattened — `if (e instanceof Error) { … }` with no `else`, `(e as Error).message`, `e.message` on `unknown`, or `e instanceof Error ? e.message : String(e)` feeding a value that code (not just display) relies on, which yields `"[object Object]"` for a thrown `{ code, detail }` or `{ type: 'no-ndk' }`?
+Does `hunk` handle a caught value or a rejected promise so that a non-`Error` throwable is dropped or flattened by accident — `if (e instanceof Error) { … }` with no `else`, `(e as Error).message`, `e.message` on `unknown`, or `e instanceof Error ? e.message : String(e)` feeding a value that code (not just display) relies on, which yields `"[object Object]"` for a thrown `{ code, detail }` or `{ type: 'no-ndk' }`?
 
-Allowed cases: The value goes through a house normaliser that keeps object fields (`errField`, `redactError`, `toError`, a named `classify*` function that reads `code`/`status`/`type`); the non-Error branch is handled explicitly (`typeof e === 'object' && e !== null && 'type' in e`); the string is produced only for display or as the message of a log call that also receives the error object; abort detection through `isAbortError`.
+Allowed cases: The value goes through a house normaliser that keeps object fields (`errField`, `redactError`, `toError`, a named `classify*` function that reads `code`/`status`/`type`); the non-Error branch is handled explicitly (`typeof e === 'object' && e !== null && 'type' in e`); the string is produced only for display or as the message of a log call that also receives the error object; abort detection through `isAbortError`; a catch that discards detail on purpose for secrecy (a provider error may disclose credentials) and sends every value it does not recognise to a fixed, safe output.
 
 ## errors/serialized-error
 
@@ -198,9 +198,9 @@ Scope: `repository-wide`
 
 JavaScript's number parsers accept far more than digits: `Number('')` is `0`, `Number('1e3')` is `1000`, `parseInt('12abc')` is `12`, and anything above 2^53 silently changes value.
 
-Does `hunk` convert an untrusted string or bigint — typed text, a route param, a relay tag, a mint or LNURL response field, a BOLT11 section, a token amount — into an amount, count, timestamp or index with `Number(`, unary `+`, `parseInt(` or `parseFloat(`, without first checking a digits-only pattern (or `typeof` for non-strings) and `Number.isSafeInteger` on the result?
+Does `hunk` convert an untrusted string or bigint from an app user or a remote party — text typed in the app, a route param, a relay tag, a mint or LNURL response field, a BOLT11 section, a token amount — into an amount, count, timestamp or index with `Number(`, unary `+`, `parseInt(` or `parseFloat(`, without first checking a digits-only pattern (or `typeof` for non-strings) and `Number.isSafeInteger` on the result?
 
-Allowed cases: The value passes a Zod schema that already enforces `int()`, bounds and safe range (`z.number().int().nonnegative()`, `z.coerce` behind a non-empty digits check); `amountToNumber` in `wallet/src/amount.ts` and `wallet/src/amount-actions`, which own amount parsing; `parseInt(x, 10)` of values that are digits by construction (a regex capture of `\d+`, `Platform.Version`); display-only numbers; BigInt arithmetic that never narrows to `number`.
+Allowed cases: The value passes a Zod schema that already enforces `int()`, bounds and safe range (`z.number().int().nonnegative()`, `z.coerce` behind a non-empty digits check); `amountToNumber` in `wallet/src/amount.ts` and `wallet/src/amount-actions`, which own amount parsing; `parseInt(x, 10)` of values that are digits by construction (a regex capture of `\d+`, `Platform.Version`); command-line flags or environment values an operator passes to a developer-run tool, where a bad number only degrades that operator's own output; display-only numbers; BigInt arithmetic that never narrows to `number`.
 
 ## tests/async-assertion-settled
 
@@ -248,9 +248,9 @@ Scope: `**/__tests__/**/*.{ts,tsx}`, `**/*.test.{ts,tsx}`
 
 Neither the Jest nor the Vitest config restores mocks, so fake timers, a mocked `Date.now`, `Math.random` or `global.fetch` leak into the following tests of the file unless restored on every path; `clearAllMocks` keeps mock implementations.
 
-Does a test in `hunk` install fake timers, `setSystemTime`, `spyOn(Date | Math | console | global, …)` or assign `global.fetch` / `Date.now`, and restore it only with statements at the end of the test body (skipped when an assertion fails), only with `clearAllMocks()`, or not at all in the visible file section?
+Does a test in `hunk` install fake timers, `setSystemTime`, `spyOn(Date | Math | console | global, …)` or assign `global.fetch` / `Date.now`, and restore it only with statements at the end of the test body (skipped when an assertion fails), only with `clearAllMocks()`, or — when the hunk shows the file's setup and teardown hooks — not at all?
 
-Allowed cases: Restoration in `afterEach` / `afterAll` / a `try … finally`: `useRealTimers()`, `restoreAllMocks()`, `mockRestore()`, reassigning the saved original; a file-level `beforeEach(useFakeTimers)` paired with `afterEach(useRealTimers)`; spies created by a helper that registers its own cleanup.
+Allowed cases: Restoration in `afterEach` / `afterAll` / a `try … finally`: `useRealTimers()`, `restoreAllMocks()`, `mockRestore()`, reassigning the saved original; a file-level `beforeEach(useFakeTimers)` paired with `afterEach(useRealTimers)`; spies created by a helper that registers its own cleanup; a hunk that is a window into a longer test file and simply shows no restore — file-level hooks may sit outside it, so their absence is not evidence.
 
 ## tests/singleton-state-reset
 
@@ -258,9 +258,9 @@ Scope: `**/__tests__/**/*.{ts,tsx}`, `**/*.test.{ts,tsx}`
 
 Stores, caches and in-flight maps are module singletons, so state written by one test is still there in the next and the file only passes in its current order.
 
-Does a test in `hunk` write to a module-level singleton — `useXStore.setState(…)`, a store action, a module cache, an in-flight map, a registered Coco/Nostr listener — without a `beforeEach` / `afterEach` in the file that resets it, or assert a starting value that only holds when an earlier test ran (or did not run) first?
+Does a test in `hunk` write to a module-level singleton — `useXStore.setState(…)`, a store action, a module cache, an in-flight map, a registered Coco/Nostr listener — in a way another test in the file can observe (the same key, an asserted initial value, a size or eviction assertion), without a `beforeEach` / `afterEach` in the file that resets it, or assert a starting value that only holds when an earlier test ran (or did not run) first?
 
-Allowed cases: `beforeEach(() => useXStore.setState(initial, true))`, a store `reset()` action or `getInitialState()`; state created inside the test (a fresh manager, a store factory, a new `Map`); `jest.isolateModules` / `vi.resetModules` with the module re-imported afterwards.
+Allowed cases: `beforeEach(() => useXStore.setState(initial, true))`, a store `reset()` action or `getInitialState()`; state created inside the test (a fresh manager, a store factory, a new `Map`); `jest.isolateModules` / `vi.resetModules` with the module re-imported afterwards; each test writing under its own key that no other test reads or writes, so no test can observe another's write.
 
 ## tests/reset-modules-reimport
 

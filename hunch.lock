@@ -15,10 +15,10 @@
         {
           "id": "skill/codebase-design/accept-dependencies-dont-create-them",
           "section": "Designing for testability > Accept dependencies, don't create them",
-          "instructions": "Does `hunk` add a function, method, or class body that constructs a concrete I/O or service dependency inside itself (e.g. `new StripeGateway()`, `new SomeHttpClient()`, `createPool()`) instead of receiving it as a parameter or injected field?",
+          "instructions": "Does `hunk` add a function or method that holds decision or domain logic and, inside that same body, constructs a new concrete client, gateway, connection or repository for an external service (e.g. `new StripeGateway()`, `new SomeHttpClient(token)`), which the logic then uses, with no parameter, option or overridable default through which a caller or test could pass a substitute?",
           "criteria": {
-            "true": "Added code instantiates a concrete gateway, client, connection, repository, or other external-service dependency inside the body of the function or method that uses it, with no way for a caller or test to supply a substitute.",
-            "false": "The dependency is passed in as a parameter or constructor argument; it is supplied as an overridable default value; the added code is a composition root, factory, or wiring/bootstrap code whose job is to build dependencies; or the constructed value is a plain in-memory value object, error, or data structure rather than an external dependency."
+            "true": "Added code mixes branching or domain logic with constructing a new external-service dependency in the same body, so a test must patch a module, prototype or global to exercise the logic.",
+            "false": "The dependency is passed in as a parameter or constructor argument, or supplied as an overridable default; the code is itself the adapter, driver or transport that implements a port or wraps a platform primitive (`fetch`, `fs`, a socket, a spawned process) and is what callers inject; the instance comes from an accessor returning a shared or memoised app-scoped instance rather than a new one, whatever the accessor is called (`buildX()`, `createX()`, `getX()`); the function's returned product is the constructed object (a factory, a server starter); the body is a composition root — app bootstrap, a React provider, a CLI or script `main`; or the constructed value is a plain in-memory value object, error or data structure."
           },
           "appliesTo": [],
           "when": "new\\s+[A-Z]\\w*\\s*\\(|createClient|createPool|\\.connect\\(",
@@ -27,10 +27,10 @@
         {
           "id": "skill/codebase-design/return-results-dont-mutate-inputs",
           "section": "Designing for testability > Return results, don't produce side effects",
-          "instructions": "Does `hunk` add a function or method that returns nothing (void/undefined) and instead computes its outcome by mutating an object, array, or field it was passed?",
+          "instructions": "Does `hunk` add an exported function or public method that returns nothing and reports a computed value by assigning to, or deleting from, an object, array or map that its caller owns and will keep using, so callers must copy the argument first or read the answer back out of it?",
           "criteria": {
-            "true": "The added function has no return value and its observable effect is assigning to a property of a parameter or to shared external state (e.g. `cart.total -= discount`), where a computed result could have been returned instead.",
-            "false": "The added function returns the computed result; the mutation is the module's intended side effect at an I/O seam (persisting, writing, emitting, rendering); the function is a setter, reducer applied to a draft/builder, or event handler whose contract is mutation; or no new function is added."
+            "true": "The added exported function has no return value and its result is a change to a caller-owned argument (e.g. `cart.total -= discount`, evicting entries from a map the caller passed in), where the computed result could have been returned instead.",
+            "false": "The added function returns the computed result; it is not exported and the structure it edits is a local accumulator, working buffer or builder that its caller created and then returns; the mutation is the module's intended side effect at an I/O seam (persisting, writing, emitting, rendering); the object is a draft handed over by a framework, store or transaction callback (a rehydrate or migrate hook, `update(record => …)`, an immer-style producer); it is a setter, reducer, event handler, interpreter scope or stack, or an in-memory cache the module owns; or no new function is added."
           },
           "appliesTo": [],
           "message": "A function that mutates its argument instead of returning a result is harder to test through its interface."
@@ -38,10 +38,10 @@
         {
           "id": "skill/codebase-design/no-pass-through-wrapper",
           "section": "Principles > The deletion test",
-          "instructions": "Does `hunk` add an exported function or public method whose body only forwards its arguments to a single other function or method, adding no logic of its own?",
+          "instructions": "Does `hunk` add an exported function, component or public method that callers could replace by calling another function or component of this codebase they can already import, with exactly the same arguments — nothing bound, fixed, reordered, projected or parsed, no closure or instance state supplied, and the result returned unchanged?",
           "criteria": {
-            "true": "A newly added public/exported function or method consists solely of a one-line delegation such as `return other.doThing(a, b)` with the same parameters and no added validation, defaulting, error handling, transformation, or composition.",
-            "false": "The delegation adds behaviour (mapping, defaults, validation, error translation, retries, composition of several calls); the added code is an adapter implementing a port at a seam; it is a re-export or deprecation shim for backwards compatibility; or it is a type-level declaration rather than an implementation."
+            "true": "A newly added public/exported function, method or component is a same-signature alias of another exported one in this codebase, such as `export function b(x) { return a(x) }` or a component that renders one other component with identical props.",
+            "false": "The delegation adds behaviour (mapping, defaults, validation, error translation, retries); an argument is bound, fixed or derived, or transformed before the call (`f(x.field)`, `f(g(x))`); two or more calls are composed; the target is private to the module, class or closure, or is a store or singleton the wrapper resolves; the target is a third-party, framework or platform API, so the wrapper is the single point of dependency or a test seam; the name or signature is dictated by a framework, plugin or native-binding registration; it is an adapter implementing a port at a seam; it is a re-export or deprecation shim; or it is a type-level declaration rather than an implementation."
           },
           "appliesTo": [],
           "message": "A pass-through wrapper adds interface without adding behaviour, making the module shallower."
@@ -49,10 +49,10 @@
         {
           "id": "skill/codebase-design/tests-assert-through-interface",
           "section": "Deepening > Testing strategy: replace, don't layer",
-          "instructions": "Does `hunk` add a test assertion that reads a module's internal state rather than an observable outcome of its interface — e.g. asserting on a private/underscore-prefixed field, casting to `any` to reach internals, or importing an internal/private path to inspect it?",
+          "instructions": "Does `hunk` add a test assertion that reaches state which is not part of the subject's exported or declared type — it needs a cast to `any`/`unknown`, bracket access to a private, `#` or underscore-prefixed member of the subject, or an import from a file the package does not export — rather than an observable outcome of its interface?",
           "criteria": {
             "true": "An added test asserts on internals, such as `expect((svc as any)._cache)`, reaching into `instance['privateField']`, or asserting on a value imported from a module's internal implementation file, rather than on a return value, thrown error, or effect visible at the interface.",
-            "false": "Added tests assert on return values, thrown errors, or effects observable through the module's interface (including through a test adapter or in-memory stand-in at a declared seam), or the hunk adds no assertions."
+            "false": "Added tests assert on return values, thrown errors, or effects observable through the module's interface (including through a test adapter or in-memory stand-in at a declared seam); they read a property declared on the subject's public return type or exported interface, whatever it is named (`cache`, `pending`, `ref.current`); they read another module's state through that module's exported API; they inspect the arguments a mock or fake received at a declared seam; they use a library's own test helper (neverthrow `_unsafeUnwrap`); or the hunk adds no assertions."
           },
           "appliesTo": [
             "**/*.test.*",
@@ -656,10 +656,10 @@
         {
           "id": "skill/expo-animation/no-blur-intensity-or-elevation",
           "section": "Pick the properties",
-          "instructions": "Does `hunk` animate a `BlurView`'s `intensity` or a view's `elevation`, instead of crossfading the opacity of a static pre-blurred or pre-shadowed layer?",
+          "instructions": "Does `hunk` bind an animated value to a `BlurView`'s `intensity` prop (through `animatedProps`, `useAnimatedProps`, an animated style or a transition) or to a view's `elevation`, on a code path that renders on Android, instead of crossfading the opacity of a static pre-blurred or pre-shadowed layer?",
           "criteria": {
-            "true": "`intensity` or `elevation` is driven by a shared value, animated style, transition, or keyframe.",
-            "false": "`intensity`/`elevation` are static constants, or the effect is achieved by animating the `opacity` of a static layer."
+            "true": "`intensity` or `elevation` of a rendered view is driven by a shared value, animated props, animated style, transition or keyframe, and nothing in `hunk` keeps that path off Android.",
+            "false": "`intensity`/`elevation` are static constants, or the effect is achieved by animating the `opacity` of a static layer; the animated `BlurView` is rendered only when a platform or capability check excludes Android, and Android gets an opacity-animated static layer instead; a shared value that is animated but that `hunk` does not bind to an `intensity` or `elevation` prop, whatever it is named."
           },
           "appliesTo": [
             "**/*.js",
@@ -807,10 +807,10 @@
         {
           "id": "skill/expo-animation/interpolate-clamp",
           "section": "Recipes > Collapsing header",
-          "instructions": "Does `hunk` call `interpolate(...)` on a scroll- or gesture-driven value without passing `Extrapolation.CLAMP` (or an explicit extrapolation config)?",
+          "instructions": "Does `hunk` call `interpolate(...)` on a value driven by a scroll offset, a gesture translation, a navigator or drawer progress, or a spring or decay animation, without passing `Extrapolation.CLAMP` (or an explicit extrapolation config)?",
           "criteria": {
-            "true": "An `interpolate(value, input, output)` call driven by scroll offset or a drag position omits the extrapolation argument.",
-            "false": "`Extrapolation.CLAMP` (or an explicit extrapolate config) is passed, or `interpolateColor`/a non-positional input is used."
+            "true": "An `interpolate(value, input, output)` call whose input can leave the input range — a scroll offset, drag position, drawer or navigator progress, spring or decay value — omits the extrapolation argument.",
+            "false": "`Extrapolation.CLAMP` (or an explicit extrapolate config) is passed, or `interpolateColor`/a non-positional input is used; the input shared value is, as `hunk` shows, only ever assigned `withTiming` towards the endpoints of the input range with a non-overshooting easing, so it cannot leave that range."
           },
           "appliesTo": [
             "**/*.js",
@@ -873,10 +873,10 @@
         {
           "id": "skill/expo-animation/animation-matches-gesture",
           "section": "Recipes > Screen transitions",
-          "instructions": "Does `hunk` set a custom native-stack `animation` (e.g. `slide_from_right`, `slide_from_bottom`, `flip`) on a screen without also setting `animationMatchesGesture: true`?",
+          "instructions": "Does `hunk` set a native-stack `animation` that differs from the iOS default push (e.g. `slide_from_bottom`, `fade_from_bottom`, `flip`, `simple_push`, `ios_from_left`) on a screen that can be swiped back, without also setting `animationMatchesGesture: true`?",
           "criteria": {
-            "true": "Screen or stack options set a non-default `animation` value and no `animationMatchesGesture` is present.",
-            "false": "`animationMatchesGesture: true` is set alongside, or the animation is `'default'`, `'none'`, or `'fade'`."
+            "true": "Screen or stack options set such an `animation` on a card or default presentation with gestures enabled (or with `fullScreenGestureEnabled`), and no `animationMatchesGesture` is present.",
+            "false": "`animationMatchesGesture: true` is set alongside, or the animation is `'default'`, `'none'` or `'fade'`; `'slide_from_right'`, which is the iOS default push, so the native back-swipe already matches it; a `modal`, `fullScreenModal` or `formSheet` presentation whose dismissal is not an interactive stack pop and that does not enable a back gesture."
           },
           "appliesTo": [
             "**/*.js",
@@ -998,10 +998,10 @@
         {
           "id": "skill/typescript-best-practices/no-unearned-as-cast",
           "section": "No `as` casts",
-          "instructions": "Does `hunk` add an `as SomeType` cast on a value whose shape is not verified in the visible code (e.g. casting a fetch/JSON.parse/IPC/postMessage/`unknown` value straight to a domain type)?",
+          "instructions": "In code that runs outside a test, does `hunk` take a value that enters the program untyped — the result of `JSON.parse`, `res.json()`, a storage read, a route or deep-link param, a native-module, websocket or IPC payload, a caught error, or a parameter declared `unknown`/`any` — and use `as T` (or a generic `parse<T>()` helper that does so) to claim concrete required fields that no visible code checked, or cast a library's return value to a type that contradicts the one the library declares?",
           "criteria": {
-            "true": "An added line asserts a type onto unchecked data, e.g. `const user = data as User`, `JSON.parse(raw) as Config`, `(await res.json()) as ApiResponse`, `event.data as Message`.",
-            "false": "The cast is `as const`; the cast is the final step of a visible validation/parse function that already checked the fields; the cast applies a brand right after a validation check (`return input as AgentId` following an `isUUID` check); or the visible code narrows with a discriminant, `in`, `typeof`/`instanceof`, or a schema `parse` instead of casting."
+            "true": "An added line asserts a domain type with required, non-`unknown` fields onto unchecked outside data, e.g. `const user = data as User`, `JSON.parse(raw) as Config`, `(await res.json()) as ApiResponse`, `event.data as Message`, `(err as Error).message`; or it re-types a library value against its declared type so that a field reads as a different primitive.",
+            "false": "The cast is `as const`; the cast is the final step of a visible validation/parse function that already checked the fields; the cast applies a brand right after a validation check (`return input as AgentId` following an `isUUID` check); the visible code narrows with a discriminant, `in`, `typeof`/`instanceof`, or a schema `parse` instead of casting; the cast only widens, or targets `Record<string, unknown>` or an all-optional/all-`unknown` shape whose fields are each narrowed before use; the cast is to the raw input type of a decoder that is called on it next; the operand already has a static type from a library or this codebase and the cast bridges two such typings, re-parameterises a generic, indexes with `keyof typeof`, or views a `require()` or constructor result through an interface; the value is a literal or object built in the same file; or the cast builds a test double, a partial or deliberately invalid fixture, a mock (`as jest.Mock`, `mock.calls`), or a value the surrounding test then asserts on."
           },
           "appliesTo": [
             "**/*.ts",
@@ -1197,10 +1197,10 @@
         {
           "id": "skill/principle-type-system-discipline/brand-semantic-primitives",
           "section": "The patterns > Brand semantic primitives",
-          "instructions": "Does `hunk` add a function, method, or constructor signature with two or more parameters of the same raw primitive type (`string`, `number`, `int`, etc.) that denote different domain identities (e.g. `(userId: string, orderId: string)` or `(fromAccount: string, toAccount: string)`), rather than branded/newtype/opaque types?",
+          "instructions": "Does `hunk` declare (not call, and not re-implement a signature fixed by an interface, an override or an external declaration) a positional parameter list in which two or more parameters of the same raw primitive type are identifiers, keys, secrets or measured quantities of different kinds that look alike at a call site (e.g. a pubkey and an event id that are both 64-hex strings, two different private keys, latitude and longitude, an API key and a bearer token), or three or more adjacent same-primitive parameters of different meaning, so a transposed call would compile and not fail at first use?",
           "criteria": {
-            "true": "An added signature takes two or more adjacent parameters of the same unbranded primitive type that stand for distinct domain concepts or distinct entity ids, so callers can transpose them silently.",
-            "false": "The same-typed parameters are interchangeable values of one concept (e.g. `x, y` of a size, items of a list, a numeric pair with no identity), the parameters use branded intersections, newtypes, value classes, or opaque types, the parameters have distinct types, or an options object with named fields is used."
+            "true": "An added signature is called positionally and takes look-alike parameters of the same unbranded primitive type that stand for distinct domain concepts or distinct entity ids, so callers can transpose them silently; a named-field object parameter or a branded type would make the swap a compile error.",
+            "false": "The same-typed parameters are interchangeable values of one concept (e.g. `x, y` of a size, items of a list, a numeric pair with no identity); they are two values of the same kind in different roles (from/to, source/destination, own/peer, previous/next), which a brand cannot separate; they are a (key, value), (identifier, payload) or (recipient, message) pair in which at most one is an identity; the values look nothing alike at a call site (a URL and a hex id) or a swap fails at first use; a single object, props or record parameter with named fields is used, destructured or not, or the language requires argument labels; the parameters use branded intersections, newtypes, value classes or opaque types, or have distinct types; the function is the validating constructor that turns raw primitives into the typed value; the signature implements or overrides an interface member declared elsewhere; or it is a test fixture builder."
           },
           "appliesTo": [],
           "message": "Two same-typed primitive parameters meaning different identifiers can be swapped at a call site without the compiler noticing."
@@ -1469,10 +1469,10 @@
         {
           "id": "skill/react-native-testing/no-act-around-rntl-calls",
           "section": "Rules > Don't wrap in act()",
-          "instructions": "Does `hunk` wrap a `render`, `rerender`, `fireEvent`, or `userEvent` call inside an `act(...)` callback?",
+          "instructions": "Does `hunk` call `render`, `rerender`, `fireEvent.*` or a `userEvent` method imported from `@testing-library/react-native` inside an `act(...)` callback?",
           "criteria": {
-            "true": "`act(() => { render(<Component />); })`, `act(() => { fireEvent.press(button); })`, or `await act(async () => { await user.press(button); })`.",
-            "false": "`act()` used around a function returned by a hook from `renderHook` that triggers a state update (e.g. `act(() => { result.current.increment(); })`); `render`/`fireEvent`/`userEvent` called directly without `act`."
+            "true": "`act(() => { render(<Component />); })`, `act(() => { fireEvent.press(button); })`, or `await act(async () => { await user.press(button); })`, where `render`, `fireEvent` or the user come from `@testing-library/react-native`.",
+            "false": "`act()` used around a function returned by a hook from `renderHook` that triggers a state update (e.g. `act(() => { result.current.increment(); })`); `render`/`fireEvent`/`userEvent` called directly without `act`; `act` around `react-test-renderer` APIs (`TestRenderer.create`, `renderer.update`, `renderer.unmount`), which do not wrap themselves; `act` around a directly invoked prop callback (`node.props.onPress()`), a store update, a timer advance or a captured listener; or a file-local helper that happens to be named `render` but is not the RNTL import."
           },
           "appliesTo": [
             "**/*.test.*",
@@ -1517,10 +1517,10 @@
         {
           "id": "skill/react-native-testing/no-raw-prop-assertions",
           "section": "Anti-Patterns > Wrong assertions",
-          "instructions": "Does `hunk` assert directly on an element's `.props` (e.g. `expect(button.props['aria-disabled']).toBe(true)` or `expect(el.props.style.backgroundColor)...`) instead of using an RNTL matcher?",
+          "instructions": "In a test that renders with `@testing-library/react-native`, does `hunk` take a host element returned by an RNTL query (`getBy*`, `queryBy*`, `findBy*`) and assert on its raw `.props` (e.g. `expect(button.props['aria-disabled']).toBe(true)` or `expect(el.props.style.backgroundColor)...`) where an RNTL matcher could express the same check?",
           "criteria": {
-            "true": "An `expect(...)` whose subject is `<element>.props.<something>` or `<element>.props['<something>']`.",
-            "false": "Assertions using matchers such as `toBeDisabled()`, `toHaveStyle()`, `toHaveTextContent()`, `toHaveDisplayValue()`, or `toHaveProp(name, value)`; `.props` read on a mock/component object that is not a queried element."
+            "true": "An `expect(...)` whose subject is `<element>.props.<something>` or `<element>.props['<something>']` for an element returned by an RNTL query, where a matcher such as `toBeDisabled()`, `toHaveStyle()`, `toHaveTextContent()`, `toHaveDisplayValue()`, `toHaveAccessibilityValue()` or `toHaveProp(name, value)` exists.",
+            "false": "Assertions using those matchers; a tree from `react-test-renderer` (`TestRenderer.create`, `root.find*`, `toJSON()`), where RNTL matchers are not registered; `.props` read on a mocked component or a composite component instance whose received props are the contract under test; a prop with no matcher (class names, object identity, SVG or graphics attributes, animated props); an assertion on a value derived from a prop (flattened, parsed, a method called on it) or a scan of the whole props object (a leak check, a JSON payload); a test whose purpose is the raw accessibility-prop payload a native harness reads; or `.props` used only to find a node or to invoke a callback."
           },
           "appliesTo": [
             "**/*.test.*",
@@ -1674,10 +1674,10 @@
           "id": "agents-md/root/e2e-wait-for-state-not-time",
           "section": "Native testability > Scenarios",
           "message": "A time-based wait in a scenario makes it flaky; scenarios must wait for state.",
-          "instructions": "Does `hunk` add a time-based wait to an E2E scenario (e.g. a `sleep`/`delay`/`wait` step expressed in milliseconds or seconds) rather than a wait on observable state?",
+          "instructions": "Does `hunk` add, to a declarative E2E scenario (a list of steps the harness executes), a step whose only effect is to let a fixed duration pass (a `sleep`/`delay`/`pause`/`wait` step expressed in milliseconds or seconds) before the next step, where an observable state could be awaited instead?",
           "criteria": {
-            "true": "An added scenario step waits for a duration — a `sleep`, `delay`, `pause`, `waitMs`/`timeout`-as-wait step or a bare timer — instead of asserting/awaiting a state condition.",
-            "false": "Added steps wait for a state condition (element visible, probe value, text present), or the added lines contain no wait at all."
+            "true": "An added scenario step waits for a duration — a `sleep`, `delay`, `pause` or `waitMs` step — instead of asserting or awaiting a state condition.",
+            "false": "Added steps wait for a state condition (element visible, probe value, text present); the code implements the harness, a driver or a step interpreter, including the interpreter of a delay step; a sleep is the polling interval inside a loop that exits on a condition or deadline; a timer enforces a timeout (`setTimeout` plus reject or abort, a `Promise.race` deadline); the code injects latency as the behaviour under test; it is a unit test of harness code; or the added lines contain no wait at all."
           },
           "appliesTo": [
             "**/e2e/**",
@@ -1688,10 +1688,10 @@
           "id": "agents-md/root/e2e-no-retry-mutations",
           "section": "Native testability > Scenarios",
           "message": "Retrying a send, publish or delete in a scenario can duplicate an irreversible action.",
-          "instructions": "Does `hunk` add a retry, repeat or re-attempt around a send, publish or delete action in an E2E scenario?",
+          "instructions": "Does `hunk` repeat, on failure or until a condition holds, an E2E action that creates a new irreversible effect each time it runs — tapping a send, pay, publish or delete control, or building and submitting a new payment, event or deletion per attempt?",
           "criteria": {
-            "true": "An added scenario step or helper wraps a send/publish/delete action in a retry, `retries`/`attempts` count, or loop that repeats the action on failure.",
-            "false": "Retries are applied only to reads, waits or navigation, or no retry construct is added."
+            "true": "An added scenario step or helper wraps a send/publish/delete action in a retry, `retries`/`attempts` count, or loop that performs the action again on failure.",
+            "false": "The repeated action only navigates, opens a menu, row or tab, reads or polls; the repeat is gated on a value proving the previous attempt did not land; the loop re-delivers one artifact built once outside the loop whose identity (event id, token, revision) makes re-delivery idempotent; it is host-side transport plumbing; it is a test asserting a scenario's shape; the words send, publish, delete or retries appear only in an identifier, selector id, title or comment; or no retry construct is added."
           },
           "appliesTo": [
             "**/e2e/**",
@@ -1796,16 +1796,16 @@
       "origin": "./docs/review/contributor-conventions.md",
       "path": "docs/review/contributor-conventions.md",
       "scope": "",
-      "hash": "42f715bdedde7247a047a1f39ede88031ec52625d1e8b05e16ff4e64939c7d24",
+      "hash": "dd89f9b61b907c666763c3bc464db173bd3b6498b4b3ee01f782b85d93e73b15",
       "rules": [
         {
           "id": "doc/docs/review/contributor-conventions/error-passed-on-lossily",
           "section": "errors/structured",
           "message": "A caught error may reach non-UI code as a string, boolean or bare Error, losing its cause, code and status.",
-          "instructions": "Does `hunk` catch or receive an error and pass it on in a lossy form — `String(err)`, `err.message`, a template string, a boolean, `null`/`undefined`, or a `new Error(...)` without `{ cause }` — to a caller, store, return value or thrown value that non-UI code uses to understand the failure?",
+          "instructions": "Does `hunk` catch or receive an error that carries information a program could act on — a status or code, an error subclass or `name` such as `AbortError`, a typed `kind`, or an upstream cause — and hand it to other code only as something that information cannot be recovered from (`String(err)`, `err.message`, a template string, a boolean, `null`/`undefined`, or a `new Error(...)` without `{ cause }`), where that code or a later caller branches, retries, classifies or reports on the failure?",
           "criteria": {
-            "true": "A catch block (or error callback) that returns, stores, resolves or throws a stringified/boolean/null stand-in for the error, or constructs a new generic Error without passing `{ cause }`, and that value is consumed by non-UI logic.",
-            "false": "The error is rethrown as-is, wrapped with `{ cause }`, returned as a typed error / Result / discriminated union, or logged with the error object; the string is built at the UI edge purely for display (screen error text, toast, status label); the catch is a documented best-effort path (optional enrichment, cache read, feature detection, cleanup, telemetry) whose result decides nothing."
+            "true": "A caught Error value is in scope, and a catch block (or error callback) returns, stores, resolves or throws only a stringified/boolean/null stand-in for it, or constructs a new generic Error without passing `{ cause }`, and that value is consumed by non-UI logic.",
+            "false": "The error is rethrown as-is, wrapped with `{ cause }`, returned as a typed error / Result / discriminated union, or logged with the error object; an unknown thrown value is normalised while keeping the original when it already is an Error (`err instanceof Error ? err : new Error(String(err))`); no caught Error exists to preserve (a socket or DOM `error` event, a timer, a rejected payload, an invariant `throw new Error` outside any catch); a typed status, `kind` or Result derived from the live error travels alongside the string; the string is the program's final human-readable output — screen error text, toast, status label, CLI output, a test or run report; the original is withheld on purpose because it may contain secret material (tokens, invoices, seeds, keys) and a fixed or redacted message is thrown instead; the catch only detects that a pure parser or validator rejected its input (`new URL`, `JSON.parse`, a key decode); the error is being serialised onto a wire, IPC or file format, or into a failure shape a third party defines; the catch is a documented best-effort path (optional enrichment, cache read, feature detection, cleanup, telemetry) whose result decides nothing."
           },
           "appliesTo": [],
           "when": "catch\\s*[({]|\\.message|String\\(|new Error\\("
@@ -1850,10 +1850,10 @@
           "id": "doc/docs/review/contributor-conventions/subscription-without-teardown",
           "section": "async/cleanup",
           "message": "A subscription, listener or timer may keep running with no owner to tear it down.",
-          "instructions": "Does `hunk` start a subscription, event listener, `setInterval` or `setTimeout` inside a component, hook or effect without a matching teardown (cleanup return, `unsubscribe`, `clearInterval`/`clearTimeout`, `removeEventListener`)?",
+          "instructions": "Does `hunk` attach a listener or subscription to something that outlives the attaching code (`window`, `document`, `AppState`, a store, an emitter, a native module, a socket), or start a `setInterval`, inside a component, hook, effect or other owner with a shorter life, with no matching teardown (cleanup return, `unsubscribe`, `clearInterval`, `removeEventListener`) when that owner goes away — or start a one-shot `setTimeout` whose callback sets state, navigates or performs I/O after the owner may be gone?",
           "criteria": {
-            "true": "An effect or component body calls `subscribe`, `addEventListener`, `setInterval` or `setTimeout` and the hunk shows no cleanup function or disposal for it.",
-            "false": "The effect returns cleanup that unsubscribes/clears/removes the listener; the handle is stored and disposed elsewhere in the visible code; module-level singletons meant to live for the app lifetime."
+            "true": "An effect or component body calls `subscribe`, `addEventListener`, `setInterval` or such a `setTimeout` on a longer-lived target and the hunk shows no cleanup function or disposal for it.",
+            "false": "The effect returns cleanup that unsubscribes/clears/removes the listener; the handle is stored and disposed elsewhere in the visible code; the listener is added to an element the same code just created and that is discarded with it, so their lifetimes are equal; a one-shot timer that only writes a ref, a local flag or a label; module-level singletons meant to live for the app lifetime."
           },
           "appliesTo": [],
           "when": "setInterval|setTimeout|addEventListener|\\.subscribe\\(|useEffect"
@@ -1862,10 +1862,10 @@
           "id": "doc/docs/review/contributor-conventions/swallowed-async-failure",
           "section": "async/cleanup",
           "message": "A background promise or empty catch may hide a real network, storage or wallet failure.",
-          "instructions": "Does `hunk` add a `void`-ed promise that visibly performs network, storage or wallet work with no `.catch`, or an empty `catch {}` with no comment explaining why ignoring the failure is safe?",
+          "instructions": "Does `hunk` discard (`void`, or leave un-awaited) a promise that can reject — the called function, as far as `hunk` shows, neither catches internally nor returns a Result or status — while it performs network, storage or wallet work, with no `.catch`; or add an empty `catch {}` with no comment explaining why ignoring the failure is safe?",
           "criteria": {
-            "true": "`void somePromise()` where the called work is a fetch, persistence or wallet operation and no `.catch` or internal try/catch is visible; or `catch {}` / `catch (e) {}` with no explanatory comment.",
-            "false": "The promise has `.catch(...)` or a try/catch inside its async body; `void` on calls that cannot reject or handle their own errors (haptics, loggers, navigation, `preventAutoHideAsync`, functions the hunk shows catching internally); an empty catch carrying a comment explaining why the failure is expected and harmless."
+            "true": "`void somePromise()` where the called work is a fetch, persistence or wallet operation and `hunk` shows the callee can reject — for example it re-throws after logging — and no `.catch` is attached; or `catch {}` / `catch (e) {}` with no explanatory comment.",
+            "false": "The promise has `.catch(...)`, `.then(onOk, onErr)` or a try/catch inside its async body; the callee returns a `Result`, `ResultAsync` or a tagged status object and so cannot reject; the callee is defined outside `hunk` and nothing visible shows it can reject; `void` on calls that cannot reject or handle their own errors (haptics, loggers, navigation, share sheet, clipboard, `preventAutoHideAsync`, functions the hunk shows catching internally); a catch that returns the function's documented failure value (`catch { return null }` in a parser); an empty catch carrying a comment explaining why the failure is expected and harmless."
           },
           "appliesTo": [],
           "when": "void \\w|catch\\s*\\{\\s*\\}|catch\\s*\\([^)]*\\)\\s*\\{\\s*\\}"
@@ -1874,10 +1874,10 @@
           "id": "doc/docs/review/contributor-conventions/direct-network-call-outside-transport",
           "section": "net/transport",
           "message": "A screen-local network call bypasses the domain transport that owns cancellation and deadlines.",
-          "instructions": "Does `hunk` call `fetch(`, `axios`, `XMLHttpRequest` or `new WebSocket(` directly from a screen, component, hook or feature module rather than going through a transport module (apiClient, safeFetch, the Nostr facade)?",
+          "instructions": "In code that has a domain transport module available to it (the app and its feature modules), does `hunk` call `fetch(`, `axios`, `XMLHttpRequest` or `new WebSocket(` directly from a screen, component, hook or feature module rather than going through that transport (apiClient, safeFetch, the Nostr facade)?",
           "criteria": {
-            "true": "A raw `fetch`/`axios`/`XMLHttpRequest`/`new WebSocket` call appears in a UI screen, component, hook or feature module.",
-            "false": "The file is itself the transport or client module for one service (apiClient, safeFetch, a `*Client.ts` or `api.ts` owning one external API); the request goes through such a module; e2e or test-harness code; `fetch` of a local `file://` or bundled asset."
+            "true": "A raw `fetch`/`axios`/`XMLHttpRequest`/`new WebSocket` call appears in an app UI screen, component, hook or feature module.",
+            "false": "The file is itself the transport or client module for one service (apiClient, safeFetch, a `*Client.ts` or `api.ts` owning one external API), or a small function that is the single client for one endpoint; the request goes through such a module; code outside the app runtime — a build or command-line script, a standalone website or developer tool page — where no such transport exists; e2e or test-harness code; `fetch` of a local `file://` or bundled asset."
           },
           "appliesTo": [],
           "when": "fetch\\(|axios|XMLHttpRequest|new WebSocket"
@@ -1886,10 +1886,10 @@
           "id": "doc/docs/review/contributor-conventions/request-without-deadline",
           "section": "net/transport",
           "message": "A request with no AbortSignal or timeout can hang indefinitely.",
-          "instructions": "Does `hunk` make a network request (`fetch`, `axios`, a client call) that has neither caller cancellation (an AbortSignal) nor a bounded timeout?",
+          "instructions": "In code that ships to users or runs unattended (the app, its packages, release or CI automation), does `hunk` start a request to a remote service (`fetch`, `axios`, a client call) that has neither caller cancellation (an AbortSignal) nor a bounded timeout?",
           "criteria": {
-            "true": "A request call site passes no `signal`, no `AbortController`, and no timeout/deadline option.",
-            "false": "A `signal` or `AbortController` is threaded through, or a timeout/deadline option is set; the call delegates to a transport module that the hunk shows threading a signal or timeout; e2e or test-harness code; local asset reads."
+            "true": "A request call site to a remote service passes no `signal`, no `AbortController`, and no timeout/deadline option, and `hunk` is the place that could set one.",
+            "false": "A `signal` or `AbortController` is threaded through, or a timeout/deadline option is set; the call delegates to a transport module that the hunk shows threading a signal or timeout; the call goes through an interface that cannot take a signal and `hunk` is not that interface's implementation; the peer is a loopback or same-origin server that the same test or developer tool started, so the runner's own timeout is the deadline; the code only ever runs under a test runner or a developer-run tool (tests, e2e harness, a local tooling page); `fetch` is mocked; local asset reads."
           },
           "appliesTo": [],
           "when": "fetch\\(|axios|\\.request\\("
@@ -1898,10 +1898,10 @@
           "id": "doc/docs/review/contributor-conventions/retry-side-effecting-operation",
           "section": "net/retries",
           "message": "Retrying a payment or other write may repeat an operation that already happened.",
-          "instructions": "Does `hunk` retry — via a loop, backoff helper or re-invocation after failure — an operation with side effects (payment, melt, mint, swap, send, publish or other write), or retry anything with no bound on attempts?",
+          "instructions": "Does `hunk` retry — via a loop, backoff helper or re-invocation after failure — an operation whose repeat could duplicate an effect (payment, melt, mint, swap, send, publish or other non-idempotent write), or retry anything with no bound on attempts in either the loop header or its body?",
           "criteria": {
-            "true": "A retry loop, `while (true)`, recursive re-invocation or backoff wrapper around a call that spends, melts, mints, swaps, sends or publishes; or any retry construct without a maximum attempt count.",
-            "false": "Bounded retries of idempotent reads (GETs, quote or proof-state checks, metadata fetches) with backoff; bounded re-preparation of an operation that has not yet executed; reconciling a failed side effect by checking persisted or mint state; resending the same already-signed Nostr event."
+            "true": "A retry loop, recursive re-invocation or backoff wrapper around a call that spends, melts, mints, swaps, sends or publishes and may already have happened; or any retry construct with no maximum attempt count anywhere in its header or body.",
+            "false": "Bounded retries of idempotent reads (GETs, quote or proof-state checks, metadata fetches) with backoff; bounded re-preparation of an operation that has not yet executed; reconciling a failed side effect by checking persisted or mint state; a bounded new attempt — a new quote or a smaller amount — made only after persisted or mint state shows the previous attempt did not execute; resending the same already-signed Nostr event; a bounded retry of an idempotent write whose repeat cannot duplicate anything (a content-addressed upload, a PUT of the same resource); a `for (;;)` or `while (true)` whose body enforces a maximum attempt count."
           },
           "appliesTo": [],
           "when": "retry|Retry|backoff|Backoff|attempt|maxAttempts"
@@ -1910,10 +1910,10 @@
           "id": "doc/docs/review/contributor-conventions/untrusted-input-cast-not-parsed",
           "section": "input/parse-at-boundary",
           "message": "Untrusted input may be cast to a type instead of validated at the boundary.",
-          "instructions": "Does `hunk` take untrusted input — a network or relay response, `JSON.parse` output, storage read, QR, clipboard or NFC data, or a native callback payload — and use it via a TypeScript cast (`as T`, `as unknown as T`) or unchecked property access instead of validating it with a Zod schema or a protocol decoder?",
+          "instructions": "Does `hunk` contain the point where data an outside party controls — a network, relay or mint response, `JSON.parse` of such text, a storage read an older app version may have written, QR, clipboard, NFC or deep-link data, another app, or a native callback payload — first becomes a typed value, and give it a type that asserts unverified facts (`as T`, `as unknown as T`, a declared type with concrete required fields, or a generic `JSON.parse(x) as T` helper), and then rely on a field whose runtime type was never checked, instead of validating it with a Zod schema, a protocol decoder or a per-field guard?",
           "criteria": {
-            "true": "A value coming from the network, `JSON.parse`, storage, QR/clipboard/NFC or a native callback is cast with `as` or has its fields read directly, with no `.parse`/`.safeParse` or decoder in the hunk.",
-            "false": "Validated by a Zod schema (`.parse`/`.safeParse`) or a protocol decoder with typed output (`getDecodedToken`, `nip19.decode`, a bolt11 decoder); the value comes from an SDK that already validated it; casts of trusted in-process values or this app's own typed stores; route params used as plain string identifiers; `unknown` narrowed with explicit `typeof` checks on every field read."
+            "true": "A value coming from the network, `JSON.parse`, storage, QR/clipboard/NFC or a native callback is cast with `as` to a type with concrete required fields, or has such fields read directly, and the code then dereferences, persists, builds a filesystem path or storage key from, or passes to native code a field that no `.parse`/`.safeParse`, decoder or guard in the hunk checked. A raw wire type that declares a field as a concrete primitive (`kind: number`) counts as trusting that field.",
+            "false": "Validated by a Zod schema (`.parse`/`.safeParse`) or a protocol decoder with typed output (`getDecodedToken`, `nip19.decode`, a bolt11 decoder), in `hunk` or in a helper or injected validator it calls; the value comes from an SDK that already decoded it, and the cast only bridges two typings; casts of trusted in-process values or this app's own typed stores; data this project itself produced in the same process or tool run (its own committed files, its own dev server, output of a tool the code just invoked, a value it serialised a moment earlier); a widening cast to `unknown`, `Record<string, unknown>` or an all-optional/all-`unknown` shape where every field read is then checked — by `typeof`, `Array.isArray`, strict equality with a literal, a regex, a numeric range check, a fail-closed assertion or coercion; a cast that follows a narrowing of the same value; route params used as plain string identifiers; `as` on something that is not data (`require(addon) as T`); a test parsing its subject's own output or a fixture in order to assert on it."
           },
           "appliesTo": [],
           "when": "JSON\\.parse|as unknown as| as [A-Z]\\w+|getItem\\(|Clipboard|response|\\.json\\(\\)"
@@ -1934,10 +1934,10 @@
           "id": "doc/docs/review/contributor-conventions/float-math-for-payment-amount",
           "section": "money/exact",
           "message": "An amount that decides a payment may be computed with floating-point math or coerced from invalid input.",
-          "instructions": "Does `hunk` compute an amount that decides what is paid, sent, minted or received (sats, msats, proof amounts, fees, invoice amounts) using floating-point BTC math, `toFixed`, `parseFloat`, or `Math.round`/`floor`/`ceil` on fractional values, or silently coerce invalid, negative, NaN or fractional input into a valid amount?",
+          "instructions": "Does `hunk` compute an amount that decides what is paid, sent, minted or received (sats, msats, proof amounts, fees, invoice amounts) using floating-point BTC math, a fractional fee or percentage factor applied to integer sats, `toFixed`, `parseFloat`, or `Math.round`/`floor`/`ceil` on fractional values, or silently coerce invalid, negative, NaN or fractional input into a valid amount?",
           "criteria": {
-            "true": "A value passed to a pay/send/mint/melt/proof-selection path is produced by float arithmetic, `toFixed`, `parseFloat`, rounding of a fractional value, or a fallback that turns NaN/negative/fractional input into a usable amount.",
-            "false": "Integer arithmetic on sat or msat integers; conversions used only for display (fiat labels, formatted strings, charts); rounding inside a fiat estimate that never decides what is paid; input validation that rejects invalid values; `Math.ceil` of an integer division for fee reserves in integer sats."
+            "true": "A value passed to a pay/send/mint/melt/proof-selection path is produced by float arithmetic (`amount * 0.02`, `balance / 1.02`, BTC decimals), `toFixed`, `parseFloat`, rounding of a fractional value, or a fallback that turns NaN/negative/fractional input into a usable amount.",
+            "false": "Integer arithmetic on sat or msat integers, including fees in basis points with integer division; conversions used only for display (fiat labels, formatted strings, charts); rounding inside a fiat estimate that never decides what is paid; a single explicit rounding where an amount crosses currencies through an exchange rate (a fiat entry or fiat minor units converted to sats), provided a missing or invalid rate is rejected and the integer result is the amount then shown and confirmed; input validation that rejects invalid values; `Math.ceil` of an integer division for fee reserves in integer sats."
           },
           "appliesTo": [],
           "when": "toFixed|parseFloat|Math\\.round|Math\\.floor|Math\\.ceil|1e8|100000000|100_000_000"
@@ -1948,8 +1948,8 @@
           "message": "A duration without a unit in its name, or a seconds timestamp under a millisecond-style name, invites seconds/milliseconds mix-ups.",
           "instructions": "Does `hunk` declare a variable, constant, field or parameter that holds a numeric duration under a name that does not state its unit (`timeout`, `delay`, `ttl`, `interval`), or that holds a timestamp counted in seconds under a name that does not say so (`createdAt = event.created_at`, `expiresAt = Math.floor(Date.now() / 1000) + ttl`)?",
           "criteria": {
-            "true": "A numeric duration is declared under a name with no unit such as `Ms`, `Sec`, `Seconds` or `Minutes`, or `hunk` visibly assigns a seconds-valued timestamp to a name that carries no `Sec` or `Seconds`.",
-            "false": "Names carry the unit (`timeoutMs`, `createdAtSec`, `ttlSeconds`, `STALE_MS`); a timestamp named `…At` or `timestamp` that holds epoch milliseconds or whose unit `hunk` does not show (`createdAt: number`, `createdAt: Date.now()`, `updatedAt`, `expiresAt`) — milliseconds is the default for those names; Nostr protocol field names (`created_at`, `since`, `until`); a field that keeps the name its mint, Coco or wire-format owner gave it (`expiry` on a quote); `Date` objects; option names fixed by a library (`setTimeout(fn, delay)` argument, `{ timeout }` or `{ duration }` passed to an external API, React Query `staleTime`); a test or fixture that only fills in such fields."
+            "true": "A numeric duration is declared under a name with no unit such as `Ms`, `Sec`, `Seconds` or `Minutes`, or `hunk` visibly assigns a seconds-valued timestamp to a name that carries no `Sec` or `Seconds`, or documents an in-memory field as seconds (`/** unix seconds */`) under an `…At` name.",
+            "false": "Names carry the unit (`timeoutMs`, `createdAtSec`, `ttlSeconds`, `STALE_MS`); a timestamp named `…At` or `timestamp` that holds epoch milliseconds or whose unit `hunk` does not show (`createdAt: number`, `createdAt: Date.now()`, `updatedAt`, `expiresAt`) — milliseconds is the default for those names; Nostr protocol field names (`created_at`, `since`, `until`); a field that keeps the name its mint, Coco or wire-format owner gave it (`expiry` on a quote); a field of a persisted schema (a zod schema or type behind a store's `persist`) that holds seconds and says so in a comment on its declaration — renaming stored data needs a migration, so there the comment carries the unit; `Date` objects; option names fixed by a library (the delay argument of `setTimeout`, `{ timeout }` or `{ duration }` passed to an external API, React Query `staleTime`); a timer handle or a function that is merely named `timeout`, `interval` or `delay` and holds no number; a fixture or call that only fills a field whose name is declared elsewhere (an imported type, a wire or library option); a test or fixture that only fills in such fields."
           },
           "appliesTo": [],
           "when": "(timeout|createdAt|expiry|expires|delay|ttl|TTL|staleTime|interval|duration|elapsed)"
@@ -1958,10 +1958,10 @@
           "id": "doc/docs/review/contributor-conventions/secret-outside-secure-storage",
           "section": "secrets/storage",
           "message": "A mnemonic, private key or nsec may be stored outside secure storage.",
-          "instructions": "Does `hunk` put a mnemonic, seed, private key, nsec or other signing secret anywhere other than secure storage — a Zustand store, AsyncStorage or MMKV, route params, a URL, a `testID`, a fixture or a log?",
+          "instructions": "Does `hunk` put a mnemonic, seed, private key, nsec or other signing secret that a real user or deployment could hold anywhere other than secure storage — a Zustand store, AsyncStorage or MMKV, route params, a URL, a `testID`, a fixture or a log?",
           "criteria": {
-            "true": "A secret value is assigned into store state, written via AsyncStorage/MMKV, embedded in a route param, URL or testID, or committed as fixture data.",
-            "false": "Only public keys, npubs, key ids, pairing metadata without secrets or opaque references are stored; the secret stays in memory and is passed to signing or into expo-secure-store / the key vault module."
+            "true": "A secret value is assigned into store state, written via AsyncStorage/MMKV, embedded in a route param, URL or testID, or a real or realistic private secret (not a published specification vector) is committed as fixture data.",
+            "false": "Only public keys, npubs, key ids, pairing metadata without secrets or opaque references are stored; the secret stays in memory and is passed to signing or into expo-secure-store / the key vault module; a deliberately public test vector (a published BIP-39 or NIP-06 mnemonic and the keys derived from it) or an obviously synthetic placeholder (`'fixture-nsec'`, a zeroed byte array) used as test, mock or known-answer input, which no wallet holds; a value held only in a local variable or constant, with no storage, route, URL or log involved."
           },
           "appliesTo": [],
           "when": "mnemonic|Mnemonic|seed|privateKey|privkey|nsec|secretKey|signingKey"
@@ -1970,10 +1970,10 @@
           "id": "doc/docs/review/contributor-conventions/sensitive-value-logged",
           "section": "secrets/logs",
           "message": "A log may leak seed words, keys, proofs, tokens, invoices, DM contents or credentials.",
-          "instructions": "Does `hunk` log (via `log.*`, `console.*`, a logger, analytics or an error report) a value that is or contains seed words, a private key, Cashu proofs or an encoded token, a Lightning invoice, DM plaintext, a PIN, raw NFC bytes, or a URL carrying credentials?",
+          "instructions": "Does application or library code in `hunk` emit a diagnostic log, analytics event or error report (via `log.*`, `console.*`, a logger, analytics or an error reporter) with a value that is or contains seed words, a private key, Cashu proofs or an encoded token, a Lightning invoice, DM plaintext, a PIN, raw NFC bytes, or a URL carrying credentials?",
           "criteria": {
             "true": "A logging or telemetry call passes such a value, or an object/whole payload that visibly contains one.",
-            "false": "Logs record only counts, amounts, ids, hashes, short fingerprints, mint URLs, states or error codes."
+            "false": "Logs record only counts, amounts, ids, hashes, short fingerprints, mint URLs, states or error codes; a test passing a synthetic secret-shaped value to the logger under test in order to assert that it is redacted; a command-line tool writing the result its operator asked for (a generated key, derived test vectors) to its own stdout, which is the program's output rather than diagnostic logging or telemetry; published test vectors that are not secrets."
           },
           "appliesTo": [],
           "when": "console\\.|log\\.(debug|info|warn|error)|logger|captureException|analytics"
@@ -2006,10 +2006,10 @@
           "id": "doc/docs/review/contributor-conventions/payment-logic-in-app-layer",
           "section": "arch/owner",
           "message": "Payment sequencing or proof handling may be living in the app layer instead of wallet/.",
-          "instructions": "Does `hunk` implement payment sequencing, proof selection, mint/melt/swap orchestration or payment retries inside a file under `app/`?",
+          "instructions": "Does a file under `app/` in `hunk` itself perform the computation of a payment — decide the order of mint, melt, swap or receive operations (prepare, verify, execute, recover), choose proofs or amounts to spend, poll wallet history to reconcile an operation, expand a route into executed legs, or loop or retry a payment call automatically — rather than calling a wallet API?",
           "criteria": {
-            "true": "An `app/` file contains proof selection, melt/mint/swap ordering, change handling or payment retry logic rather than calling a wallet API.",
-            "false": "The `app/` code only calls a wallet API and renders or navigates on the result; device I/O, native bridges and screen glue; the file lives under `wallet/`."
+            "true": "An `app/` file contains proof selection, melt/mint/swap/receive ordering, change handling, history reconciliation or automatic payment retry logic written out in its own code rather than calling a wallet API.",
+            "false": "The `app/` code only calls a wallet API and renders or navigates on the result; constructing a wallet-package engine or machine with injected ports or callbacks and mirroring its outcome into UI state; a user-tapped retry that calls the same wallet API again; busy or re-entrancy guards; a sheet or menu that displays wallet-computed options and forwards the choice; payment vocabulary that appears only in names (a proof selector sheet, an orchestrator hook) while the work is delegated; device I/O, native bridges and screen glue; the file lives under `wallet/`."
           },
           "appliesTo": [
             "app/**/*.ts",
@@ -2038,10 +2038,10 @@
           "id": "doc/docs/review/contributor-conventions/verb-contradicts-body",
           "section": "naming/verbs",
           "message": "A function's leading verb may not match what its body does (e.g. `get*` doing network I/O).",
-          "instructions": "Does `hunk` define a function whose leading verb contradicts its visible body: `get*` that is async or does network/storage I/O, `fetch*` that performs no network read, `load*` that reads the network instead of local persistence, `build*`/`compute*` with side effects, `format*` returning something other than display text, or `parse*` that decodes nothing?",
+          "instructions": "Does `hunk` define a function whose leading verb contradicts its visible body: `get*` that is async or does network/storage I/O, `fetch*` that performs no network read, `load*` that reads the network instead of local persistence, `build*`/`compute*` with side effects its caller can observe (state or store mutation, persistence, network, navigation, mutating an argument), `format*` returning something other than display text, or `parse*` that decodes nothing?",
           "criteria": {
             "true": "A function definition in the hunk has a leading verb whose body visibly does something else, as listed above.",
-            "false": "The body matches the verb; `get*` returning a cached or in-memory value synchronously; React hooks (`use*`); names imposed by an interface, library or protocol; the function body is not visible in the hunk."
+            "false": "The body matches the verb; `get*` returning a cached or in-memory value synchronously; a diagnostic log or metric call inside an otherwise pure `build*`/`compute*`; React hooks (`use*`); names imposed by an interface, library or protocol; the function body is not visible in the hunk."
           },
           "appliesTo": [],
           "when": "\\b(get|fetch|load|build|compute|format|parse)[A-Z]\\w*\\s*[=(]"
@@ -2050,10 +2050,10 @@
           "id": "doc/docs/review/contributor-conventions/bare-protocol-name",
           "section": "naming/protocol",
           "message": "A protocol value named `token`, `secret`, `pubkey`, `quote` or `invoice` hides its kind and encoding.",
-          "instructions": "Does `hunk` declare a new variable, field, parameter or prop holding a protocol value under a bare generic name — `token`, `secret`, `pubkey`, `quote`, `invoice` — where nothing nearby (enclosing type, function or module name) makes its kind and encoding clear?",
+          "instructions": "Does `hunk` declare a new variable, field, parameter or prop holding a protocol value under a bare generic name — `token`, `secret`, `pubkey`, `quote`, `invoice` — where nothing nearby (enclosing type, function or module name, or the value's own initialiser) makes its kind and encoding clear?",
           "criteria": {
-            "true": "A new declaration uses one of those bare names for a Cashu, Nostr or Lightning value with no disambiguating container or type name visible.",
-            "false": "Names state meaning (`cashuTokenEncoded`, `nostrPubkeyHex`, `mintQuoteId`, `lnInvoiceBolt11`); the name is scoped by its container (`quote.id` on a `MintQuote`, `event.pubkey`, `pubkey` inside `NostrProfile`); field names fixed by a protocol, SDK or wire format; destructured SDK fields."
+            "true": "A new declaration uses one of those bare names for a Cashu, Nostr or Lightning value with no disambiguating container, type name or initialiser visible.",
+            "false": "Names state meaning (`cashuTokenEncoded`, `nostrPubkeyHex`, `mintQuoteId`, `lnInvoiceBolt11`); the name is scoped by its container (`quote.id` on a `MintQuote`, `event.pubkey`, `pubkey` inside `NostrProfile`); field names fixed by a protocol, SDK or wire format; destructured SDK fields; a short-lived local whose initialiser on the same line shows its kind and encoding (a `cashuB…` or `lnbc…` literal), or that is named to match the shorthand property of an existing API (`{ token, amount }`)."
           },
           "appliesTo": [],
           "when": "\\b(token|secret|pubkey|quote|invoice)\\b"
@@ -2062,10 +2062,10 @@
           "id": "doc/docs/review/contributor-conventions/new-identifier-regex",
           "section": "naming/protocol",
           "message": "A new regex for Nostr, Cashu or Lightning identifiers duplicates the shared protocolIds patterns.",
-          "instructions": "Does `hunk` add a new regular expression matching Nostr, Cashu or Lightning identifiers (npub, nsec, note, nevent, cashu token, lnbc invoice, hex event id) instead of reusing `protocolIds`?",
+          "instructions": "Does `hunk` introduce a regular expression that validates or classifies a value as a Nostr, Cashu or Lightning identifier (npub, nsec, note, nevent, cashu token, lnbc invoice, hex pubkey or event id), or redacts one, when an equivalent shared matcher already exists in this codebase — `protocolIds` for 64-hex ids and Cashu P2PK keys, the logger's secret patterns for redaction — instead of reusing it?",
           "criteria": {
-            "true": "A regex literal or `new RegExp` targeting one of those identifier formats is introduced in the hunk.",
-            "false": "The code reuses `protocolIds` or an existing shared matcher; the regex matches something unrelated to protocol identifiers; the hunk is the `protocolIds` module itself."
+            "true": "A regex literal or `new RegExp` targeting one of those identifier formats is introduced in the hunk and duplicates a matcher the codebase already shares, so the two copies can drift.",
+            "false": "The code reuses `protocolIds` or an existing shared matcher; no equivalent shared matcher exists for that format; the regex matches something unrelated to protocol identifiers, or classifies only a family (is this string lower-case bech32?); the hunk is the `protocolIds` module itself or the module that owns the shared redaction patterns."
           },
           "appliesTo": [],
           "when": "npub|nsec|note1|nevent|lnbc|cashu|new RegExp|/\\^"
@@ -2116,10 +2116,10 @@
           "id": "doc/docs/review/contributor-conventions/stack-outside-layout",
           "section": "skill/expo-router/stacks-defined-in-layout-files",
           "message": "A Stack navigator outside a `_layout` file won't be wired into file-based routing correctly.",
-          "instructions": "Does `hunk` render a `<Stack>` navigator (with children, `screenOptions`, or bare) in a file that is not a `_layout` file?",
+          "instructions": "Does `hunk` show a route or screen component — one rendered as a page — mounting its own `<Stack>` navigator element (with children, `screenOptions`, or bare) in a file that is not a `_layout` file?",
           "criteria": {
-            "true": "A `<Stack>` navigator element is rendered in a non-`_layout` file and nothing in the hunk shows the component is a shared layout used by `_layout` files.",
-            "false": "The file is a `_layout` file; the component is documented as a shared layout rendered by `_layout` files as their default export; the file only uses `Stack.Screen`, `Stack.Toolbar`, `Stack.SearchBar` or similar sub-components to configure itself."
+            "true": "A `<Stack>` navigator element itself (not `<Stack.Screen>` or another `Stack.` sub-component) is rendered by a page component in a non-`_layout` file, and nothing in the hunk shows the component is a shared layout used by `_layout` files.",
+            "false": "The file is a `_layout` file; the component is documented as a shared layout rendered by `_layout` files; a reusable navigator wrapper that takes `children` (the `Stack.Screen` declarations its importers supply) and is not itself a route; the file only uses `Stack.Screen`, `Stack.Toolbar`, `Stack.SearchBar` or similar sub-components to configure itself — `<Stack.` followed by a sub-component name is never a navigator."
           },
           "appliesTo": [
             "**/*.tsx"
@@ -2144,10 +2144,10 @@
           "id": "doc/docs/review/contributor-conventions/failed-read-rendered-as-empty",
           "section": "ui/read-states",
           "message": "A failed or unavailable read may be shown as a genuinely empty result.",
-          "instructions": "Does `hunk` render an async-loaded list or value so that an error or unavailable read shows the same UI as an empty result (no distinct error branch)?",
+          "instructions": "Does `hunk` render an async-loaded list or value so that, when the read fails or is unavailable, the user is shown the same explicit empty state (`Nothing here yet`, `No results`, an empty list) as for a successful empty result, with no distinct error branch?",
           "criteria": {
-            "true": "The render branches only on emptiness/loading and shows an empty state when the query errored, with no separate error branch.",
-            "false": "Separate error, empty and loading branches exist; the data is static or synchronous."
+            "true": "The render branches only on emptiness/loading, so a failed read ends in the empty or none state — a catch that only logs, or a recorded `failed` flag the render never consults — with no separate error branch.",
+            "false": "Separate error, empty and loading branches exist; the data is static or synchronous; a failed background refresh that keeps showing last-known or derived data, with no empty state involved; optional enrichment (a name, avatar or metadata lookup) that falls back to the un-enriched value while the primary content and action still work."
           },
           "appliesTo": [
             "**/*.tsx"
@@ -2158,10 +2158,10 @@
           "id": "doc/docs/review/contributor-conventions/rows-replaced-while-refreshing",
           "section": "ui/read-states",
           "message": "Rows already on screen may be replaced by a spinner or empty state while refreshing.",
-          "instructions": "Does `hunk` replace already-rendered rows with a spinner, skeleton or empty state while a refresh is in flight or after a refresh fails?",
+          "instructions": "Does `hunk` replace already-rendered rows with a spinner, skeleton or empty state while a refresh of the same query is in flight or after that refresh fails?",
           "criteria": {
-            "true": "A refetch/refresh flag (`isFetching`, `isRefetching`, a local `refreshing`) gates the whole list so existing rows unmount during refresh, or an error after a successful load clears the rows.",
-            "false": "Cached rows stay visible during refetch with an inline refresh indicator; only the first load shows a skeleton; static or synchronous data."
+            "true": "A refetch/refresh flag (`isFetching`, `isRefetching`, a local `refreshing`) gates the whole list so existing rows unmount while the same data is re-fetched, or an error after a successful load clears the rows.",
+            "false": "Cached rows stay visible during refetch with an inline refresh indicator; only the first load shows a skeleton; rows cleared because the query's inputs changed (a different account, unit, filter or profile), so the old rows would be wrong data; static or synchronous data."
           },
           "appliesTo": [
             "**/*.tsx"
@@ -2172,10 +2172,10 @@
           "id": "doc/docs/review/contributor-conventions/unknown-count-rendered-as-zero",
           "section": "ui/unknown-values",
           "message": "A not-yet-loaded count may be displayed as 0 instead of a placeholder.",
-          "instructions": "Does `hunk` display an unknown or not-yet-loaded count, total or amount as `0` — a `?? 0` or `|| 0` whose result feeds rendered text?",
+          "instructions": "Does `hunk` display a count, total or amount whose source can be unknown or not yet loaded (a pending query, a remote count, a store still hydrating) as `0` — a `?? 0` or `|| 0` whose result feeds rendered text?",
           "criteria": {
-            "true": "A possibly-undefined count/total/amount is defaulted to 0 and that value is rendered in the UI.",
-            "false": "Unknown values stay `undefined` and render a placeholder, skeleton or dash; `?? 0` used in arithmetic that is not displayed, or for values that are zero by definition when absent (length of a local list)."
+            "true": "A possibly-undefined count/total/amount from a source that can still be loading or unknown is defaulted to 0 and that value is rendered in the UI.",
+            "false": "Unknown values stay `undefined` and render a placeholder, skeleton or dash; `?? 0` used in arithmetic that is not displayed, or for values that are zero by definition when absent (length of a local list, a missing key in a locally computed tally, histogram or per-item balance map); a default that cannot be reached because the enclosing render branch is already guarded on the value being defined."
           },
           "appliesTo": [
             "**/*.tsx"
@@ -2186,10 +2186,10 @@
           "id": "doc/docs/review/contributor-conventions/premature-image-fallback",
           "section": "ui/unknown-values",
           "message": "An avatar or image fallback may show before the source is known to be missing or failed.",
-          "instructions": "Does `hunk` show an image fallback (initials, placeholder avatar) whenever the source is merely not loaded yet, rather than once it is known to be missing or to have failed?",
+          "instructions": "Does `hunk` show an image fallback that asserts there is no image (initials, a silhouette, a generic or seeded avatar) whenever the source is merely not loaded yet, rather than once it is known to be missing or to have failed?",
           "criteria": {
-            "true": "The fallback renders on a falsy/undefined source or during loading, without an error or resolved-missing state check.",
-            "false": "The fallback is driven by `avatarStateFor` or an equivalent load-state check (`onError`, resolved-missing), or a neutral placeholder is shown while loading."
+            "true": "The fallback renders on a falsy/undefined source or during loading, without an error, loading-flag or resolved-missing state check.",
+            "false": "The fallback is driven by `avatarStateFor` or an equivalent load-state check (`onError`, resolved-missing, a ternary that tests a loading flag before choosing the fallback: `isLoading ? 'loading' : url ? 'image' : 'fallback'`), or a neutral placeholder is shown while loading; progressive enhancement where the interim visual is the same content at lower fidelity (a static glyph before its animated version, a blurhash or thumbnail before the full image)."
           },
           "appliesTo": [
             "**/*.tsx"
@@ -2258,8 +2258,8 @@
           "message": "A stackable block setting its own top/bottom margin fixes its spacing regardless of parent.",
           "instructions": "Does `hunk` define a self-contained block component for screens to stack (card, notice, banner, QR block, selector, copy row) whose outermost element sets its own top or bottom margin (`mt-*`, `mb-*`, `my-*`, `marginTop`, `marginBottom`, `marginVertical`)?",
           "criteria": {
-            "true": "The root element of such a block component carries a vertical margin class or style.",
-            "false": "The root sets only horizontal insets (`mx-4`) or takes outer spacing from a `className`/`style` prop; margins only on inner elements; a screen or page component laying out its own sections; design-system catalogue screens under `features/settings`."
+            "true": "The root element of such a block component carries a vertical margin class or style, including a margin computed from a prop that exists only to describe its neighbour (`hasText`, `isFirst`).",
+            "false": "The root sets only horizontal insets (`mx-4`) or takes outer spacing from a `className`/`style` prop; margins only on inner elements; a component that is the row of a virtualized list (rendered from `renderItem`), since the list cannot supply a gap between rows; a screen or page component laying out its own sections; design-system catalogue screens under `features/settings`."
           },
           "appliesTo": [
             "**/*.tsx"
@@ -2270,10 +2270,10 @@
           "id": "doc/docs/review/contributor-conventions/platform-check-for-glass",
           "section": "ui/platform",
           "message": "Glass or blur variants chosen by Platform.OS bypass the capability hook.",
-          "instructions": "Does `hunk` choose a glass, blur or liquid-glass variant using `Platform.OS`, `Platform.select` or an iOS version check instead of the capability hook or `defineVariants`?",
+          "instructions": "Does `hunk` decide whether to render a glass, blur, frosted or liquid-glass layer, style or component rather than a flat fallback by comparing `Platform.OS`, `Platform.select` or an iOS version, instead of using the capability hook or `defineVariants`?",
           "criteria": {
-            "true": "A `Platform.OS`/`Platform.select`/version comparison selects a glass, blur or liquid-glass style or component.",
-            "false": "A capability hook or `defineVariants` chooses the variant; `.ios.tsx`/`.android.tsx` splits; `Platform` checks for genuine non-glass behaviour differences (keyboard, haptics, permissions, map providers, native APIs, font metrics, shadow vs elevation, status bar)."
+            "true": "A `Platform.OS`/`Platform.select`/version comparison selects a glass, blur or liquid-glass style or component in code that consumes it.",
+            "false": "A capability hook or `defineVariants` chooses the variant; `.ios.tsx`/`.android.tsx` splits; code that itself defines or exports an availability or capability check, or guards the `require` of a platform-only native module (`isSupported` derived from the platform and OS version); `Platform` checks for genuine non-glass behaviour differences (keyboard, haptics, permissions, map providers, native APIs, font metrics, shadow vs elevation, status bar)."
           },
           "appliesTo": [
             "**/*.tsx"
@@ -2284,10 +2284,10 @@
           "id": "doc/docs/review/contributor-conventions/ios-only-static-import",
           "section": "ui/platform",
           "message": "An iOS-only native import at module top level can crash Android loads of that module.",
-          "instructions": "Does `hunk` statically import an iOS-only native module (liquid glass, `@expo/ui/swift-ui`, SwiftUI views) at the top of a module that Android also loads?",
+          "instructions": "Does `hunk` add a top-level value import (not `import type`) of a package whose JavaScript entry unconditionally requires an iOS-only native module or SwiftUI view (`@expo/ui/swift-ui`, `@expo/ui/swift-ui/modifiers`, `expo-glass-effect`) in a cross-platform module that Android also loads?",
           "criteria": {
-            "true": "A top-level `import` of an iOS-only native module appears in a file with no `.ios` extension and no guarded lazy require.",
-            "false": "The file is `.ios.tsx`; the module is loaded through a guarded lazy `require`; the import is cross-platform."
+            "true": "A top-level value `import` of an iOS-only native package appears in a file that exports cross-platform code — no `.ios` extension, no platform or capability variant suffix, and no guarded lazy require.",
+            "false": "The file is `.ios.tsx`, or is itself a platform or capability variant that only an `.ios` entry registers (`X.liquid.tsx` reached from `index.ios.ts`); the import is `import type`; the imported module is a wrapper that guards its native require with a platform check and provides a fallback; the module is loaded through a guarded lazy `require`; `hunk` shows usage of such a component but no import statement; the import is cross-platform."
           },
           "appliesTo": [
             "**/*.tsx"
@@ -2298,10 +2298,10 @@
           "id": "doc/docs/review/contributor-conventions/action-can-double-submit",
           "section": "ui/single-submit",
           "message": "A pay, send or submit handler may run twice on a fast double tap.",
-          "instructions": "Does `hunk` add a pay, send, confirm, submit or publish action whose handler has no re-entry protection — no single-flight guard, no busy/disabled state from the owner, no state-machine phase check — or relies only on a debounce or timer?",
+          "instructions": "Does `hunk` add a pay, send, confirm, submit or publish action whose handler commits the side effect and has no re-entry protection — no single-flight guard, no busy/disabled state from the owner, no state-machine phase check — or relies only on a debounce or timer?",
           "criteria": {
-            "true": "A side-effecting action handler is attached with nothing in the hunk preventing a second invocation while the first is in flight, or only a debounce/throttle guards it.",
-            "false": "The shared `Pressable` or `Button` with an async handler (their single-flight guard drops re-entry); `disabled={busy}` driven by the owning state; a state-machine guard; `useSingleFlight`; actions without side effects (navigation, toggles, opening sheets, copying)."
+            "true": "A handler that itself pays, sends, publishes or submits is attached with nothing in the hunk preventing a second invocation while the first is in flight, or only a debounce/throttle guards it.",
+            "false": "The shared `Pressable` or `Button` with an async handler (their single-flight guard drops re-entry); `disabled={busy}` driven by the owning state; a state-machine guard, including a dispatch into a machine that ignores or supersedes a repeated event; `useSingleFlight`; a handler that only opens or seeds a flow that still requires confirmation before anything is paid or sent, whatever its label says; actions without side effects (navigation, toggles, opening sheets, copying)."
           },
           "appliesTo": [
             "**/*.tsx"
@@ -2396,10 +2396,10 @@
           "id": "doc/docs/review/contributor-conventions/testid-from-index-or-text",
           "section": "a11y/controls",
           "message": "A testID built from a list index or display text is not stable across data or copy changes.",
-          "instructions": "Does `hunk` build a `testID` from a list index or from display text rather than from entity identity?",
+          "instructions": "Does `hunk` pass to a component's `testID` prop a value that interpolates the index of a data-driven list whose items have their own id, or free or remote display copy — a title, display name, translated label or a slugified label — rather than entity identity?",
           "criteria": {
-            "true": "A `testID` interpolates a map index, array position or a user-visible label/title string.",
-            "false": "The testID derives from entity identity (`mint-row-${mintUrl}`); a positional slot testID (`backup-choice-${index}`) where the only other identity is secret material such as recovery-phrase words; the testID is a fixed literal."
+            "true": "A `testID` being assigned interpolates a map index or array position of items that carry an id, or a user-visible label/title string, when a stable id exists or could be declared.",
+            "false": "The testID derives from entity identity (`mint-row-${mintUrl}`); the interpolated value is the item's own key — a member of a closed literal union, `as const` list or enum that the code compares against for selection, even if it is also rendered; the ordinal of a fixed-geometry part (segment, slot, step, page, keypad digit), or a positional slot (`backup-choice-${index}`) where the only other identity is secret material such as recovery-phrase words; a testID forwarded from props; a React `key`; test code that looks a testID up rather than assigning one; the testID is a fixed literal."
           },
           "appliesTo": [
             "**/*.tsx"
@@ -2410,10 +2410,10 @@
           "id": "doc/docs/review/contributor-conventions/nested-interactive-control",
           "section": "a11y/nested-controls",
           "message": "An interactive control nested inside another accessible control becomes unreachable on iOS.",
-          "instructions": "Does `hunk` place an element with `onPress`/`onLongPress` (or a nested `Pressable`, `PressableFeedback`, `Button`, `Switch`) inside another accessible `Pressable`/touchable, or inside a container `View` marked `accessible`?",
+          "instructions": "Does `hunk` place an element with `onPress`/`onLongPress` (or a nested `Pressable`, `PressableFeedback`, `Button`, `Switch`) inside another accessible `Pressable`/touchable, or inside a container `View` marked `accessible`, so that one of the two controls cannot be activated?",
           "criteria": {
-            "true": "The JSX shows a pressable or switch rendered as a descendant of another pressable or of an `accessible` container.",
-            "false": "The controls are siblings; the outer element sets `accessible={false}`; the inner element is purely visual with no press handler; the outer element is a plain `View` without `accessible` or a gesture detector; an `accessible` container wrapping only static text; a container that is itself the single control and forwards `onAccessibilityAction` inward."
+            "true": "The JSX shows a pressable or switch rendered as a descendant of another pressable or of an `accessible` container — including an `accessible` wrapper with a button or image role around a native or hosted button when nothing forwards activation to its handler.",
+            "false": "The controls are siblings; the outer element sets `accessible={false}`; the inner element is purely visual with no press handler; the outer element is a plain `View` without `accessible` or a gesture detector; an `accessible` container wrapping only static text; a container that is itself the single control and forwards activation inward to the same handler (`onAccessibilityTap`, `onAccessibilityAction` or its own `onPress`)."
           },
           "appliesTo": [
             "**/*.tsx"
@@ -2424,10 +2424,10 @@
           "id": "doc/docs/review/contributor-conventions/timer-runs-offscreen",
           "section": "perf/offscreen",
           "message": "A repeating timer, poll or infinite animation may keep running when the screen or row is not visible.",
-          "instructions": "Does `hunk` start a repeating timer, polling loop or infinite animation (`withRepeat(…, -1)`, `Animated.loop`, `setInterval`, a `requestAnimationFrame` loop) in a screen or list row without pausing it when the screen loses focus, the app is backgrounded or the row leaves view?",
+          "instructions": "Does `hunk` start a repeating timer, polling loop or infinite animation (`withRepeat(…, -1)`, `Animated.loop`, `setInterval`, a `requestAnimationFrame` loop) in a screen or list row that can keep firing indefinitely — it has no deadline, or its stop condition may never occur — because nothing pauses it when the screen loses focus, the app is backgrounded or the row leaves view?",
           "criteria": {
-            "true": "Such a loop is started with no `useIsFocused`, `useFocusEffect`, `useVisualActivityEffect`, AppState or visibility-prop gating visible.",
-            "false": "Focus, visibility or AppState gating is present; animations have a finite repeat count; loops run only while an operation is pending and stop on completion or failure; design-system catalogue screens that exist to run animations."
+            "true": "Such a loop is started with no `useIsFocused`, `useFocusEffect`, `useVisualActivityEffect`, AppState or visibility-prop gating visible, and it runs for as long as the component stays mounted or a remote state stays unchanged (a countdown on a quote that may never be paid).",
+            "false": "Focus, visibility or AppState gating is present; animations have a finite repeat count; loops run only while an operation is pending and stop on completion or failure; a loop that clears itself at a known, finite deadline a short time ahead (a cooldown or rate-limit countdown); design-system catalogue or demo screens that exist to cycle or animate examples, whatever kind of loop they use (`setInterval` included)."
           },
           "appliesTo": [
             "**/*.tsx"
@@ -2438,10 +2438,10 @@
           "id": "doc/docs/review/contributor-conventions/unstable-zustand-selector",
           "section": "state/selectors",
           "message": "Subscribing to the whole store or a newly-built object re-renders on every store change.",
-          "instructions": "Does `hunk` subscribe to a Zustand store with no selector (`useStore()`) or with a selector that builds a new object, array or function on every call (`s => ({ a: s.a })`, `s => s.items.filter(...)`, `s => s.list ?? []`) without `useShallow`?",
+          "instructions": "Does `hunk` subscribe to a Zustand store with no selector (`useStore()`) or with a selector whose RETURN value is a new object, array or function on every call (`s => ({ a: s.a })`, `s => s.items.filter(...)`, `s => s.list ?? []`) without `useShallow`?",
           "criteria": {
-            "true": "A store hook is called with no argument, or with a selector whose return value is constructed inline and is not wrapped in `useShallow`.",
-            "false": "Selectors return a primitive or an existing reference (`s => s.items`); `useShallow` wraps multi-field picks; fallbacks go to a module-level constant (`s => s.list ?? EMPTY`); the hook is not a Zustand store."
+            "true": "A store hook is called with no argument, or with a selector that returns a value constructed inline and is not wrapped in `useShallow`.",
+            "false": "Selectors return a primitive or an existing reference (`s => s.items`), including one that builds intermediate arrays but returns a primitive (`.filter(…).map(…).join(',')`, `.length`, `.some(…)`) or an existing element (`.find(…)`); `useShallow` wraps multi-field picks; fallbacks go to a module-level constant (`s => s.list ?? EMPTY`); the hook is not a Zustand store."
           },
           "appliesTo": [
             "**/*.tsx",
@@ -2454,10 +2454,10 @@
           "id": "doc/docs/review/contributor-conventions/getstate-during-render",
           "section": "state/selectors",
           "message": "Reading `getState()` during render skips the subscription and renders stale data.",
-          "instructions": "Does `hunk` read `useStore.getState()` in a component or hook body during render rather than inside a handler, effect or callback?",
+          "instructions": "Is a `useStore.getState()` call in `hunk` evaluated every time a component or hook body runs — as a top-level statement of that body or an expression in its JSX or props — rather than inside a function that runs later?",
           "criteria": {
-            "true": "A `getState()` call appears at the top level of a component or hook body, outside any handler, effect or callback.",
-            "false": "`getState()` inside event handlers, effects, callbacks, async functions, or non-React modules."
+            "true": "A `getState()` call executes at the top level of a component or hook body on each render, outside any function declared in that body.",
+            "false": "`getState()` inside event handlers, effects, callbacks, async functions, or non-React modules; inside any function declared in the body that runs later (a menu builder, a helper called from a handler) — lexical position inside the hook is not render time; a `useState(() => …)` or `useRef` initialiser that deliberately snapshots the store once at mount (seeding a form draft that must not reset)."
           },
           "appliesTo": [
             "**/*.tsx",
@@ -2486,10 +2486,10 @@
           "id": "doc/docs/review/contributor-conventions/unbounded-scrollview-list",
           "section": "perf/render",
           "message": "An unbounded list rendered with ScrollView and .map mounts every row at once.",
-          "instructions": "Does `hunk` render an unbounded, data-driven list with a `ScrollView` plus `.map` instead of the shared virtualized `List`?",
+          "instructions": "Does `hunk` render with a `ScrollView` plus `.map`, instead of the shared virtualized `List`, a data-driven list whose length can grow without a cap — a feed, a history, transaction or message log, a full contact or follow list, search results with no limit?",
           "criteria": {
-            "true": "A `ScrollView` maps over an array whose length comes from fetched or store data.",
-            "false": "The shared virtualized `List`/FlashList is used; the list is small and bounded (a few fixed items, a settings section, tabs, a handful of mints)."
+            "true": "A `ScrollView` (or a screen scroll wrapper) maps over an array that grows with use or with remote data and that nothing caps.",
+            "false": "The shared virtualized `List`/FlashList is used; the list is small and bounded (a few fixed items, a settings section, tabs, a handful of mints); a top-N or recents list capped by its source (a `limit`, `slice` or maximum); a user-curated configuration list (relays, mints, accounts); a scroll container with no `.map` over data in `hunk`."
           },
           "appliesTo": [
             "**/*.tsx",
@@ -2533,10 +2533,10 @@
           "id": "doc/docs/review/contributor-conventions/route-file-does-work",
           "section": "routes/thin",
           "message": "A route file may hold data fetching or business logic that belongs in a feature screen.",
-          "instructions": "Does this route file contain work beyond reading/validating params, choosing a feature screen, redirecting or guarding, and configuring navigation — data fetching, business logic, a state machine or a sizeable JSX layout?",
+          "instructions": "Does this route file itself define work beyond reading/validating params, choosing a feature screen, redirecting or guarding, composing providers and gates, and configuring navigation — data fetching, a store subscription or effect with its logic written inline, business logic, a state machine, or visual UI of its own such as rows, menus, custom drawer or tab content or a screen layout?",
           "criteria": {
-            "true": "The route file declares queries, mutations, wallet/Nostr logic, a reducer/state machine, or a multi-element screen layout.",
-            "false": "A `_layout` file configuring navigators, providers and screen options; a route that reads params, validates them and renders one feature screen with those identifiers."
+            "true": "The route file declares queries, mutations, wallet/Nostr logic, a reducer/state machine, an effect or store subscription whose logic is written inline, a payment or wallet machine instantiated with callbacks built around it, or visual components and a multi-element screen layout of its own (not a provider or navigator tree).",
+            "false": "A `_layout` file configuring navigators, providers, gates and screen options, including a font or splash gate and theme, dimension or single `useState` reads that only feed `screenOptions`; mounting headless components or calling one feature hook whose body lives elsewhere, for instance to obtain a handler for navigation chrome; a route that reads params, validates them and renders one feature screen with those identifiers."
           },
           "appliesTo": [
             "app/app/**",
@@ -2589,10 +2589,10 @@
           "id": "doc/docs/review/contributor-conventions/default-fabricates-trust",
           "section": "persist/fallbacks",
           "message": "A default or .catch may turn missing or invalid money, consent or trust into valid-looking state.",
-          "instructions": "Does `hunk` use a schema `.default()`/`.catch()`, a migration fallback, or a `??`/`||` default that turns missing or invalid money amounts, credentials, consent or terms acceptance, backup-verified status, or trust (trusted mints, allowed signers, granted permissions) into a valid-looking value, or make an unknown enum value fall back to a privileged member?",
+          "instructions": "Does `hunk` use a schema `.default()`/`.catch()`, a migration fallback, or a `??`/`||` default that turns missing or invalid money amounts, credentials, consent or terms acceptance, backup-verified status, or trust (trusted mints, allowed signers, granted permissions) into a value that grants something — funds, access, identity, consent or trust — or make an unknown enum value fall back to a privileged member?",
           "criteria": {
             "true": "A fallback supplies a balance/amount, `true` for consent, verified or trusted status, a populated allow-list, or a privileged enum member when the stored value is missing or invalid.",
-            "false": "Fallbacks go to neutral or least-privileged values (`false`, `\"ask\"`, empty lists, `undefined`, not-accepted); fallbacks for presentational preferences (theme, sort order, UI toggles, display units)."
+            "false": "Fallbacks go to neutral or least-privileged values (`false`, `\"ask\"`, empty lists, `undefined`, not-accepted), including the enum member that fails closed — the one that demands a credential or errors visibly rather than deriving or granting anything; fallbacks for presentational preferences (theme, sort order, UI toggles, display units)."
           },
           "appliesTo": [
             "**/stores/**/*.ts",
@@ -2694,10 +2694,10 @@
           "id": "doc/docs/review/contributor-conventions/clock-read-inside-freshness-helper",
           "section": "state/clock",
           "message": "Reading Date.now() inside freshness logic makes expiry untestable and lets checks disagree.",
-          "instructions": "Does `hunk` decide freshness, expiry or TTL by reading `Date.now()` or `new Date()` inside the freshness helper instead of taking a `nowMs` parameter, or read the clock more than once within a single update?",
+          "instructions": "Does `hunk` contain a reusable freshness predicate — a helper that returns whether something is stale, expired or still valid (`isStale`, `isExpired`, `peekX`) — that reads `Date.now()` or `new Date()` itself instead of taking a `nowMs` parameter, or does one action read the clock two or more times for values that are then compared with each other?",
           "criteria": {
             "true": "A helper that compares timestamps or TTLs calls `Date.now()` itself, or one action calls `Date.now()` several times for comparisons that must agree.",
-            "false": "Freshness helpers take `nowMs`; the clock is read once at the top of an action or effect and passed down; timestamps recorded for bookkeeping (`updatedAtMs: Date.now()`)."
+            "false": "Freshness helpers take `nowMs`; the clock is read once at the top of an entry-point action or effect (prune, fetch, set) into a local and reused or passed down; separate actions in the same file each read the clock once; timestamps recorded for bookkeeping and not compared in the same action (`updatedAt: Date.now()`)."
           },
           "appliesTo": [
             "**/stores/**/*.ts",
@@ -2810,10 +2810,10 @@
           "id": "doc/docs/review/contributor-conventions/wallet-logic-in-app",
           "section": "wallet/engine-owns",
           "message": "Wallet engine logic is implemented in app code instead of behind a wallet/ action.",
-          "instructions": "Does this `app/` file implement wallet engine logic itself — selecting proofs, sequencing mint/melt/swap steps, retrying payments, or reconciling history — rather than triggering a `wallet/` action or machine event?",
+          "instructions": "Does this shipped app runtime file under `app/` (a screen, hook, store or feature lib bundled into the app) implement wallet engine logic itself — selecting proofs, sequencing mint/melt/swap steps, overriding or re-implementing a `wallet/` machine operation, retrying payments, or reconciling history — rather than triggering a `wallet/` action or machine event?",
           "criteria": {
-            "true": "App-layer code picks or splits proofs, chains multiple mint/melt/swap calls, loops or re-invokes a payment on failure, or recomputes/reconciles transaction history locally.",
-            "false": "App code dispatches one wallet or Coco API call or machine event per user action and renders the resulting state; the file only displays wallet state."
+            "true": "App-layer runtime code picks or splits proofs, chains multiple mint/melt/swap calls, loops or re-invokes a payment on failure, or recomputes/reconciles transaction history locally.",
+            "false": "App code dispatches one wallet or Coco API call or machine event per user action and renders the resulting state; the file only displays wallet state; the code is a test harness, fixture or tool that drives or audits the wallet from outside the app runtime (an E2E custody, recovery or accounting script), even though it lives under `app/`; the wallet vocabulary appears only in names (a proof selector sheet, an orchestrator hook) while the work is delegated."
           },
           "appliesTo": [
             "app/**"
@@ -2888,10 +2888,10 @@
           "id": "doc/docs/review/contributor-conventions/fake-trusted-mint-record",
           "section": "wallet/mint-trust",
           "message": "A placeholder trusted-mint record hides a network or mint-info failure.",
-          "instructions": "Does `hunk` create a fake or placeholder mint record, or mark a mint trusted/added, when the mint-info or network call failed?",
+          "instructions": "Does a failure branch in `hunk` write to the wallet's mint or trust state — create a fake or placeholder mint record, or mark a mint trusted/added — when the mint-info or network call failed?",
           "criteria": {
-            "true": "A catch or failure branch inserts a mint entry with stub values or sets a trusted/added flag despite the failed fetch.",
-            "false": "Mint-info failures surface as an error or leave the mint in an unknown/unverified state."
+            "true": "A catch or failure branch inserts a mint entry with stub values into wallet or persisted state, or sets a trusted/added flag, despite the failed fetch.",
+            "false": "Mint-info failures surface as an error or leave the mint in an unknown/unverified state; a transient display row or view-model (the URL shown as the name, a zero balance) for a mint the wallet already holds; a trust lookup that fails closed (`.catch(() => false)`)."
           },
           "appliesTo": [
             "wallet/**/*.{ts,tsx}",
@@ -3034,10 +3034,10 @@
           "id": "doc/docs/review/contributor-conventions/record-string-key-for-union",
           "section": "types/derive",
           "message": "A lookup keyed by a known union is typed loosely, so a new member compiles with no entry.",
-          "instructions": "Does `hunk` type a lookup table keyed by a known union as `Record<string, …>`, or cast its key to a union (`unit as 'usd' | 'eur'`), instead of `Record<Union, …>`?",
+          "instructions": "Does `hunk` index a fixed literal lookup table (`TABLE[expr]`) with an expression whose static type is a declared literal union or enum, while the table is typed `Record<string, …>` or with an index signature, or cast the key to a union (`unit as 'usd' | 'eur'`) without handling a miss — so that adding a union member compiles with no entry?",
           "criteria": {
             "true": "A table whose keys are members of a known union is declared `Record<string, …>` or indexed with a cast key, so a missing entry does not fail to compile.",
-            "false": "The table is typed `Record<Union, …>` or `satisfies Record<Union, …>`; a deliberately partial table typed `Partial<Record<Union, …>>` with a handled miss; keys genuinely arbitrary strings; test fixtures."
+            "false": "The table is typed `Record<Union, …>` or `satisfies Record<Union, …>`; an `as const satisfies Record<string, V>` object whose literal keys are themselves the owner of the union (`keyof typeof TABLE`); a deliberately partial table typed `Partial<Record<Union, …>>` with a handled miss; keys genuinely arbitrary strings (parsed input, a wire or third-party value, user text) with the miss handled; an object added to or deleted from at runtime, or a data map or accumulator rather than a fixed table; `Record<string, unknown>` used as the generic JSON-object type; `Object.keys(x) as (keyof typeof x)[]`; test or test-harness code."
           },
           "appliesTo": [],
           "when": "Record<string|\\sas\\s+'"
@@ -3142,10 +3142,10 @@
           "id": "doc/docs/review/contributor-conventions/zod-schema-built-in-function",
           "section": "zod/boundary-parse",
           "message": "A zod schema is rebuilt on every call instead of at module scope.",
-          "instructions": "Does `hunk` construct a `z.*` schema inside a component, hook, store action, request handler or loop rather than at module scope?",
+          "instructions": "Does `hunk` construct a `z.*` schema inside the body of a React component, hook, store action, request handler or loop, so that it is rebuilt on every render, call or iteration, rather than at module scope?",
           "criteria": {
-            "true": "A `z.object`/`z.string`/etc. schema literal is created inside a function, component body, hook, handler or loop.",
-            "false": "The schema is declared at module scope; it genuinely depends on a runtime value and is memoized or built once per call site by design; tests."
+            "true": "A `z.object`/`z.string`/etc. schema literal is created inside a component body, hook, store action, handler or loop.",
+            "false": "The schema is declared at module scope; it genuinely depends on a runtime value and is memoized or built once per call site by design; a named factory function that returns a schema from its arguments — it is judged where it is called, not where it is defined; tests."
           },
           "appliesTo": [],
           "when": "z\\.(object|string|number|boolean|array|union|enum|record|discriminatedUnion|tuple)\\("
@@ -3250,10 +3250,10 @@
           "id": "doc/docs/review/contributor-conventions/worklet-calls-js-directly",
           "section": "motion/thread-hop",
           "message": "A worklet calls a JS-thread function directly, which crashes or silently does nothing.",
-          "instructions": "Does a worklet in `hunk` (gesture callback, `useAnimatedStyle`, `useDerivedValue`, `useAnimatedReaction`, `useAnimatedScrollHandler`, `useFrameCallback`, animation completion callback) call a plain JS function directly — a state setter, `router.*`, a store action, haptics, an imported helper with no `'worklet'` directive — or pass `scheduleOnRN` a function created inside the worklet?",
+          "instructions": "Does a worklet in `hunk` (gesture callback, `useAnimatedStyle`, `useDerivedValue`, `useAnimatedReaction`, `useAnimatedScrollHandler`, `useFrameCallback`, animation completion callback) call a plain JS function directly — a state setter, `router.*`, a store action, haptics, an imported helper with no `'worklet'` directive — or pass `scheduleOnRN` a function literal created inside the worklet?",
           "criteria": {
-            "true": "Inside a worklet body, a non-worklet JS function is invoked directly, or `scheduleOnRN` receives a closure defined within the worklet.",
-            "false": "`scheduleOnRN`/`scheduleOnUI` with a function defined at component or module scope; the called function is marked `'worklet'`."
+            "true": "Inside a worklet body, a function the hunk shows to be non-worklet JS is invoked directly, or `scheduleOnRN` receives a closure visibly defined within the worklet.",
+            "false": "`scheduleOnRN`/`scheduleOnUI` with a function defined at component or module scope, or with an identifier whose definition is not visible inside the worklet; the called function is marked `'worklet'` — its body begins with the directive, even when it is wrapped in `useCallback` or `useMemo`."
           },
           "appliesTo": [
             "**/*.tsx",
@@ -3314,10 +3314,10 @@
           "id": "doc/docs/review/contributor-conventions/shared-value-dot-value",
           "section": "motion/shared-value-access",
           "message": "Shared values must be read and written with `.get()`/`.set()` for the React Compiler.",
-          "instructions": "Does `hunk` add a read or write of a Reanimated shared value through `.value` (including `+=`) rather than `.get()`/`.set()`?",
+          "instructions": "Does component, hook or worklet source code in `hunk` add a read or write of a Reanimated shared value through `.value` (including `+=`) rather than `.get()`/`.set()`?",
           "criteria": {
-            "true": "Added code accesses `.value` on something created by `useSharedValue`/`makeMutable` or an animated value passed in as a shared value.",
-            "false": "`.value` on things that are not shared values (events, refs, form state, query results); `.get()`/`.set()` is used; files listed in `react-compiler-bailouts.json`; existing `.value` access the hunk does not add."
+            "true": "Added component, hook or worklet code accesses `.value` on something created by `useSharedValue`/`makeMutable` or an animated value passed in as a shared value.",
+            "false": "`.value` on things that are not shared values (events, refs, form state, query results); `.get()`/`.set()` is used; a test that reads `.value` only to assert on it, since test code is not compiled by the React Compiler; files listed in `react-compiler-bailouts.json`; existing `.value` access the hunk does not add."
           },
           "appliesTo": [
             "**/*.tsx",
@@ -3330,10 +3330,10 @@
           "id": "doc/docs/review/contributor-conventions/shared-value-during-render",
           "section": "motion/shared-value-access",
           "message": "A shared value is read or written during render.",
-          "instructions": "Does `hunk` read or write a shared value in a component or hook body during render, rather than inside a worklet, effect, handler or animation callback?",
+          "instructions": "Does `hunk` read or write a Reanimated shared value — something returned by `useSharedValue`, `useDerivedValue` or `makeMutable`, or typed `SharedValue<…>` — in a component or hook body during render, rather than inside a worklet, effect, handler or animation callback?",
           "criteria": {
-            "true": "A `.get()`/`.set()`/`.value` access on a shared value appears directly in the component or hook body, or its result is used in JSX or to compute render output.",
-            "false": "The access happens inside a worklet, `useEffect`, event handler or animation callback."
+            "true": "A `.get()`/`.set()`/`.value` access on a Reanimated shared value appears directly in the component or hook body, or its result is used in JSX or to compute render output.",
+            "false": "The access happens inside a worklet, `useEffect`, event handler or animation callback; the object is not a Reanimated shared value — `.current` on a React ref, `.get()`/`.set()` on a `Map`, store or storage adapter."
           },
           "appliesTo": [
             "**/*.tsx",
@@ -3378,10 +3378,10 @@
           "id": "doc/docs/review/contributor-conventions/reanimated-removed-apis",
           "section": "motion/reanimated-4-config",
           "message": "An API removed in Reanimated 4 is used and will not work.",
-          "instructions": "Does `hunk` use `restDisplacementThreshold`, `restSpeedThreshold`, `useAnimatedGestureHandler`, `useWorkletCallback`, the bare `Layout` transition, `useAnimatedKeyboard`, `useScrollViewOffset` or `sharedTransitionTag`?",
+          "instructions": "Does `hunk` use one of these APIs removed in Reanimated 4 — imported from or accessed on `react-native-reanimated`, or passed as an option to one of its functions: `restDisplacementThreshold`, `restSpeedThreshold`, `useAnimatedGestureHandler`, `useWorkletCallback`, the bare `Layout` transition, `useAnimatedKeyboard`, `useScrollViewOffset` or `sharedTransitionTag`?",
           "criteria": {
-            "true": "Any of those identifiers appears in added code.",
-            "false": "`energyThreshold`; `LinearTransition` and other named layout transitions; `react-native-keyboard-controller` for keyboard tracking; `Gesture.*` builders."
+            "true": "Added code imports one of those from Reanimated, calls it, or passes it as an animation option or prop.",
+            "false": "`energyThreshold`; `LinearTransition` and other named layout transitions; `react-native-keyboard-controller` for keyboard tracking; `Gesture.*` builders; a function or hook this codebase declares itself that merely shares a removed export's name and is built on current APIs."
           },
           "appliesTo": [
             "**/*.tsx",
@@ -3540,10 +3540,10 @@
           "id": "doc/docs/review/contributor-conventions/test-weak-assertions",
           "section": "tests/assert-outcomes",
           "message": "The test only checks that something was called or defined, not the observable outcome.",
-          "instructions": "Does a new or changed test in `hunk` assert only with `toHaveBeenCalled*`, `toBeDefined` or `toBeTruthy` and make no assertion on an observable result value?",
+          "instructions": "Is every expectation in a new or changed test in `hunk` one that carries no expected value — a bare `toHaveBeenCalled()` on a collaborator this codebase owns, `toBeDefined()`, or `toBeTruthy()` on a plain value — with nothing comparing a returned value, a rendered element, exact call arguments, an exact call count, or a deliberate not-called?",
           "criteria": {
-            "true": "The test body's only expectations are call/defined/truthy checks with no comparison against a concrete expected value.",
-            "false": "There is at least one assertion on a returned or rendered value; the call assertion IS the contract (an adapter must call the native module once, a guard must not call the network)."
+            "true": "The test body's only expectations are bare called/defined/truthy checks with no comparison against a concrete expected value.",
+            "false": "There is at least one assertion on a returned or rendered value; `toHaveBeenCalledWith(exact arguments)`, `toHaveBeenCalledTimes(n)` and `.not.toHaveBeenCalled()` are concrete expectations; a Testing Library `getBy*` query inside `expect(...).toBeTruthy()` is a rendered-output assertion, because `getBy*` throws when the element is missing; the unit has no return value and its call to a mocked external boundary (native module, sensor, logger, callback prop) IS the contract (an adapter must call the native module once, a guard must not call the network)."
           },
           "appliesTo": [
             "**/__tests__/**/*.{ts,tsx}",
@@ -3555,10 +3555,10 @@
           "id": "doc/docs/review/contributor-conventions/test-mirrors-implementation",
           "section": "tests/assert-outcomes",
           "message": "The expected value is computed the same way as the code under test, so the test cannot fail.",
-          "instructions": "Does a test in `hunk` compute its expected value by calling or re-implementing the same logic as the code under test instead of stating a literal?",
+          "instructions": "Is the expected side of an assertion in `hunk` produced by the code under test itself on the same input, by a helper the implementation calls, by a constant imported from the implementation, or by a line-for-line copy of its formula — so that a bug in the implementation would change both sides equally — instead of stating a literal?",
           "criteria": {
             "true": "The expectation is built from the function under test, a helper it uses, or a copy of its formula, rather than a literal.",
-            "false": "Expected values are literals or fixtures independent of the implementation."
+            "false": "Expected values are literals or fixtures independent of the implementation; an independent oracle that could disagree (a naive reference model in a property test, a different library, a differently structured derivation); invariance, round-trip or metamorphic assertions comparing two runs or two inputs; a relation between several outputs stated as a law; the function under test used only to build a later step's input; a generated artifact compared to its canonical source file."
           },
           "appliesTo": [
             "**/__tests__/**/*.{ts,tsx}",
@@ -3570,10 +3570,10 @@
           "id": "doc/docs/review/contributor-conventions/test-mocks-owned-logic",
           "section": "tests/assert-outcomes",
           "message": "A repo-owned module holding plain logic is mocked, so the test no longer exercises it.",
-          "instructions": "Does a test in `hunk` add a `jest.mock`/`vi.mock` for a module this repository owns (`@/…`, `wallet`, `nostr`) that holds plain logic — a pure function, parser, mapper, formatter or state machine?",
+          "instructions": "Does a test in `hunk` add a `jest.mock`/`vi.mock` for a module this repository owns (`@/…`, `wallet`, `nostr`) that holds deterministic plain logic — a pure function, parser, mapper, formatter or state machine — whose real output would otherwise flow into the behaviour under test?",
           "criteria": {
-            "true": "A new mock replaces an owned pure-logic module that the module under test could run for real.",
-            "false": "Mocks of system boundaries (network and network clients such as `apiClient`, native modules, SecureStore, AsyncStorage, time, randomness, the logger); a store, hook or provider mocked to keep a component render test off the wallet, coco or native runtime; mocks of heavy UI primitives in a render test of something else; existing mocks the hunk does not add."
+            "true": "A new mock replaces an owned pure-logic module that the module under test could run for real — most clearly when the fake re-implements the real function, or an assertion expects the fake's return value or call arguments.",
+            "false": "Mocks of system boundaries (network and network clients such as `apiClient`, native modules, SecureStore, AsyncStorage, time, randomness, the logger); an owned module whose only job is to produce a non-deterministic value (an id, clock or random helper), which is the time and randomness boundary; a store, hook or provider mocked to keep a component render test off the wallet, coco or native runtime; mocks of heavy UI primitives in a render test of something else; a stub that only cuts an import graph, where `hunk` shows the mocked function is never reached by the tested paths and no assertion depends on it; existing mocks the hunk does not add."
           },
           "appliesTo": [
             "**/__tests__/**/*.{ts,tsx}",
@@ -3663,16 +3663,16 @@
       "origin": "./docs/review/conventions-zod.md",
       "path": "docs/review/conventions-zod.md",
       "scope": "",
-      "hash": "5c2caf37c2967a88cac6643e806bf1cc8a088788cb453f1ce82bfe704e286919",
+      "hash": "bc37b6eb2e9ed1d288c49cb9e6e01ec51f9feeecf3cd208f7ad03274be8e3529",
       "rules": [
         {
           "id": "doc/docs/review/conventions-zod/money-integer-schema",
           "section": "money/integer-schema",
           "message": "A payable amount typed as `z.number()` accepts fractions, negatives and unsafe integers.",
-          "instructions": "Does `hunk` declare a schema field for a payable amount (`amount`, `sats`, `msat`, `fee`, `reserve`, `balance`, `total`, a proof or quote amount) as `z.number()` — alone or with only `.positive()`, `.nonnegative()`, `.min(…)` or `.max(…)` — without `.int()`, `z.int()` or the shared `Sats` primitive, or as `z.union([z.number(), z.string()])` used as a number with no integer check?",
+          "instructions": "Does `hunk` declare a schema field for a payable amount (`amount`, `sats`, `msat`, `fee`, `reserve`, `balance`, `total`, a proof or quote amount) as `z.number()` — alone or with only `.positive()`, `.nonnegative()`, `.min(…)` or `.max(…)` — without `.int()`, `z.int()` or the shared `Sats` primitive, or as `z.union([z.number(), z.string()])` that the hunk or the schema's consumer then compares, adds or sends as an amount with no integer check?",
           "criteria": {
-            "true": "An amount-bearing schema field is `z.number()` (optionally with range refinements only), or a number|string union for an amount with no integer check.",
-            "false": "Uses `Sats`, `CountInt`, `z.number().int()` or `z.int()`; the field is a fiat rate, price, score, percentage, latency or other display-only float; a loose read of a third-party history row only displayed or logged and re-validated before deciding a payment; bigint or decimal-string amounts validated by a digit regex."
+            "true": "An amount-bearing schema field is `z.number()` (optionally with range refinements only), or a number|string union whose value is then used arithmetically or to decide a payment with no integer check.",
+            "false": "Uses `Sats`, `CountInt`, `z.number().int()` or `z.int()`; the field is a fiat rate, price, score, percentage, latency or other display-only float; a loose read of a third-party history row only displayed or logged and re-validated before deciding a payment; a serialised SDK amount kept as `number | string` on a row that is only logged or forwarded; bigint or decimal-string amounts validated by a digit regex."
           },
           "appliesTo": [],
           "when": "z\\.number\\("
@@ -3729,10 +3729,10 @@
           "id": "doc/docs/review/conventions-zod/hex-ids",
           "section": "zod/hex-ids",
           "message": "A Nostr id, pubkey, signature or digest validated without a hex charset accepts arbitrary strings.",
-          "instructions": "Does `hunk` declare a schema field for a Nostr event id, pubkey, signature, P2PK key or hash (`id`, `eventId`, `pubkey`, `peer`, `author`, `sig`, `sha256`, `x`) on relay, network, route, QR or persisted input as `z.string()`, `z.string().max(…)`, `z.string().length(64)` or another length-only check with no charset constraint, or as `z.hex()` with no length?",
+          "instructions": "Does `hunk` declare a schema field for a Nostr event id, pubkey, signature, P2PK key or hash (`id`, `eventId`, `pubkey`, `peer`, `author`, `sig`, `sha256`, `x`) on relay, network, route, QR or persisted input as `z.string()`, `z.string().max(…)`, `z.string().length(64)` or another length-only check with no charset constraint, or as `z.hex()` with no length, so that the value is used without its hex format ever being checked?",
           "criteria": {
-            "true": "An id/pubkey/sig/hash field is a bare or length-only string, or `z.hex()` without a length.",
-            "false": "Uses `Hex64`, `Hex128`, `Sha256Hex`, `HexOrNpub`, `NostrPubkeyHexSchema`/`NostrEventIdSchema`, `z.string().refine(isNostrPubkeyHex)`, `z.hash('sha256')` or `z.hex().length(64)`; the field is an opaque non-Nostr id (operation id, quote id, UUID) bounded with `.max(…)`; a loose upstream envelope whose events are signature-verified before use."
+            "true": "An id/pubkey/sig/hash field is a bare or length-only string, or `z.hex()` without a length, and nothing in `hunk` checks its hex format before it is used.",
+            "false": "Uses `Hex64`, `Hex128`, `Sha256Hex`, `HexOrNpub`, `NostrPubkeyHexSchema`/`NostrEventIdSchema`, `z.string().refine(isNostrPubkeyHex)`, `z.hash('sha256')` or `z.hex().length(64)`; the field is an opaque non-Nostr id (operation id, quote id, UUID) bounded with `.max(…)`; a loose upstream envelope whose events are signature-verified before use; the same function passes the parsed field through a hex predicate (`isNostrPubkeyHex`, a 64-hex regex) before any use, dropping or nulling it on failure."
           },
           "appliesTo": [],
           "when": "z\\.string\\(|z\\.hex\\("
@@ -3821,10 +3821,10 @@
           "id": "doc/docs/review/conventions-zod/catch-shared-mutable-fallback",
           "section": "zod/shared-fallback-reference",
           "message": "`.catch([])` returns the same array or object on every fallback, making it shared mutable state.",
-          "instructions": "Does `hunk` pass an array or object to `.catch(` by value — `.catch([])`, `.catch({})`, `.catch({ … })`, `.catch(SOME_CONSTANT)`?",
+          "instructions": "Does `hunk` pass an array or object to `.catch(` by value — `.catch([])`, `.catch({})`, `.catch({ … })`, or `.catch(SOME_CONSTANT)` where the constant holds an array or object?",
           "criteria": {
-            "true": "`.catch(` receives a literal array/object or a constant reference rather than a factory.",
-            "false": "A factory (`.catch(() => [])`, `.catch(() => ({}))`); primitives, `undefined` or `null`; a frozen (`Object.freeze`) or provably never-mutated fallback."
+            "true": "`.catch(` receives a literal array/object, or a constant whose declaration or type shows it is an array or object, rather than a factory.",
+            "false": "A factory (`.catch(() => [])`, `.catch(() => ({}))`); primitives, `undefined` or `null`; a constant that is a string, number, boolean or enum member (`.catch(DEFAULT_MODE)` where `DEFAULT_MODE = 'relaxed'`); a frozen (`Object.freeze`) or provably never-mutated fallback."
           },
           "appliesTo": [],
           "when": "\\.catch\\("
@@ -4044,7 +4044,7 @@
       "origin": "./docs/review/conventions-react-native.md",
       "path": "docs/review/conventions-react-native.md",
       "scope": "",
-      "hash": "841a1ed3245073b2460368887127eb4630b8389c03829de46de099e854809850",
+      "hash": "c7e74137f7e59645f1ce38e656f4d38f3c71e0ce60a2d21a682077aafb43b327",
       "rules": [
         {
           "id": "doc/docs/review/conventions-react-native/row-local-state-recycling",
@@ -4108,10 +4108,10 @@
           "id": "doc/docs/review/conventions-react-native/nested-same-axis-list",
           "section": "lists/nested-same-axis",
           "message": "A virtualized list inside a same-axis scroll container renders every row and loses virtualization.",
-          "instructions": "Does `hunk` render `List`, `FlashList`, `FlatList` or `SectionList` inside a `ScrollView`, `ScreenScrollView`, `BottomSheetScrollView` or another list's header/row that scrolls on the same axis, or give a vertical list a parent with no bounded height?",
+          "instructions": "Does `hunk` render a virtualized list — a component that takes `data` and `renderItem`, such as `FlashList`, `FlatList`, `SectionList` or the shared `List` wrapper around them — inside a `ScrollView`, `ScreenScrollView`, `BottomSheetScrollView` or another list's header/row that scrolls on the same axis, or give a vertical virtualized list a parent with no bounded height?",
           "criteria": {
-            "true": "The hunk shows a vertical list nested inside a vertical scroll container (or a same-axis nesting), or a vertical list whose visible parent has no height bound and sizes to content.",
-            "false": "A horizontal list inside a vertical scroller or the reverse; outer content moved into `ListHeaderComponent`/`ListFooterComponent`; a list with `scrollEnabled={false}` over a small bounded data set the hunk shows; the sheet-scroll injection used by `SectionAnchorList`."
+            "true": "The hunk shows a vertical virtualized list nested inside a vertical scroll container (or a same-axis nesting), or a vertical virtualized list whose visible parent has no height bound and sizes to content.",
+            "false": "A horizontal list inside a vertical scroller or the reverse; outer content moved into `ListHeaderComponent`/`ListFooterComponent`; a list with `scrollEnabled={false}` over a small bounded data set the hunk shows; the sheet-scroll injection used by `SectionAnchorList`; a component with `List` in its name that lays out static JSX children (a grouped-row container and its rows) rather than taking `data` and `renderItem` — it is not a virtualized list."
           },
           "appliesTo": [
             "**/*.tsx"
@@ -4298,10 +4298,10 @@
           "id": "doc/docs/review/conventions-react-native/route-params-seam",
           "section": "routes/params-seam",
           "message": "Route params can arrive as arrays or strings, so the generic on `useLocalSearchParams` is an unchecked cast.",
-          "instructions": "Does `hunk` read params via `useLocalSearchParams<{…}>()` or `useGlobalSearchParams<{…}>()` and then use a value as a single string, number, boolean or enum (`Number(id)`, `parseInt`, `=== 'true'`, a template string, a store key, `as SomeUnion`) instead of `useRouteParams(ParamsSchema, { where })`?",
+          "instructions": "Does `hunk` read params via `useLocalSearchParams<{…}>()` or `useGlobalSearchParams<{…}>()` and then let an unchecked value flow onward as a single string, number, boolean or enum (`Number(id)`, `parseInt`, a template string, a store key, a prop, `as SomeUnion`) instead of `useRouteParams(ParamsSchema, { where })`?",
           "criteria": {
-            "true": "A typed `useLocalSearchParams`/`useGlobalSearchParams` result is coerced or used as a scalar without narrowing.",
-            "false": "`useRouteParams` with a module-level Zod schema; the param is narrowed in the hunk (`typeof x === 'string'`, `Array.isArray`) before use; params only forwarded untouched to another route."
+            "true": "A typed `useLocalSearchParams`/`useGlobalSearchParams` result is coerced, cast, interpolated or passed on as a scalar without narrowing.",
+            "false": "`useRouteParams` with a module-level Zod schema; the param is narrowed in the hunk (`typeof x === 'string'`, `Array.isArray`) before use; a strict `===` comparison against one literal whose false branch is the same default state as the param being absent (`flag === '1'`), since an array or any other string simply compares false; params only forwarded untouched to another route."
           },
           "appliesTo": [
             "app/app/**",
@@ -4384,10 +4384,10 @@
           "id": "doc/docs/review/conventions-react-native/hitslop-clipped-parent",
           "section": "a11y/touch-target",
           "message": "`hitSlop` has no effect when the parent is the same size as the control or clips it.",
-          "instructions": "Does `hunk` add `hitSlop` to a control whose visible parent is the same size as the control or clips it (`overflow: 'hidden'`, a tight row), so the slop cannot extend past the parent's bounds?",
+          "instructions": "Does `hunk` add `hitSlop` to a control smaller than the 44pt target whose visible parent is the same size as the control or clips it (`overflow: 'hidden'`, a tight row), so the slop the control relies on cannot extend past the parent's bounds?",
           "criteria": {
-            "true": "A `hitSlop` is added inside a wrapper the hunk shows to be exactly the control's size or to clip overflow.",
-            "false": "`hitSlop` on a control whose parent has room around it; no clipping or tight-fitting parent visible; the control already meets the 44pt target."
+            "true": "A `hitSlop` is added to a control the hunk shows to be under 44pt, inside a wrapper the hunk shows to be exactly the control's size or to clip overflow.",
+            "false": "`hitSlop` on a control whose parent has room around it; no clipping or tight-fitting parent visible; the control already meets the 44pt target, so the inert slop does no harm; the control's size is not visible in `hunk` (it comes from a prop or an imported constant), which is insufficient evidence."
           },
           "appliesTo": [
             "**/*.tsx"
@@ -4491,7 +4491,7 @@
       "origin": "./docs/review/conventions-state.md",
       "path": "docs/review/conventions-state.md",
       "scope": "",
-      "hash": "8dac2a29a518ec62b3ff456e7441140f2345c72d910922509deafc6083586340",
+      "hash": "95948500406701f2fedeb312a2346f230a5738fbd14e2d7befc3af36208817ef",
       "rules": [
         {
           "id": "doc/docs/review/conventions-state/persist-hydration-gate",
@@ -4830,10 +4830,10 @@
           "id": "doc/docs/review/conventions-state/useshallow-new-member",
           "section": "state/useshallow-depth",
           "message": "A `useShallow` selector whose members are created inside it can loop until \"Maximum update depth exceeded\".",
-          "instructions": "Does `hunk` wrap in `useShallow` a selector whose result contains a value created inside the selector — a nested object or array literal, an inline function, a `.map` that builds new objects, `Object.entries`/`Object.values` of nested records, or a `?? []` / `?? {}` fallback inside the literal?",
+          "instructions": "Does `hunk` wrap in `useShallow` a selector whose result, once any spreads are applied, has at least one own member that is itself created inside the selector — a nested object or array literal, an inline function, a `.map` that builds new objects, `Object.entries`/`Object.values` of nested records, or a `?? []` / `?? {}` fallback inside the literal?",
           "criteria": {
             "true": "Inside `useShallow(s => …)` at least one member of the returned object/array is a freshly constructed object, array or function.",
-            "false": "Members are primitives or existing references from state; `.map` to primitives; `.filter` over existing element references; `new Map`/`new Set` of primitives; module-level constant fallbacks; `useShallow` around a primitive selector."
+            "false": "Members are primitives or existing references from state; `.map` to primitives; `.filter` over existing element references; `new Map`/`new Set` of primitives; module-level constant fallbacks; a helper result spread into the returned object when the fields it contributes are primitives (`...counts(s.legs)` contributing `settled` and `total` numbers); `useShallow` around a primitive selector."
           },
           "appliesTo": [
             "**/*.tsx",
@@ -5138,7 +5138,7 @@
       "origin": "./docs/review/conventions-typescript.md",
       "path": "docs/review/conventions-typescript.md",
       "scope": "",
-      "hash": "9105de6462429ffe5a2813b4e8979d283bd4eba46e203fdb75d35624aef14b02",
+      "hash": "9a127a19da3c4ef16f1c78bfebaa66646e6ccad9224b8a3cf3e72b4ae4036236",
       "rules": [
         {
           "id": "doc/docs/review/conventions-typescript/unused-result",
@@ -5219,10 +5219,10 @@
           "id": "doc/docs/review/conventions-typescript/prototype-key-lookup",
           "section": "input/prototype-key-lookup",
           "message": "Indexing a plain-object table with an external string can return an inherited member like `constructor` or `toString`.",
-          "instructions": "Does `hunk` index a plain-object lookup table (object literal or `Record<string, …>` constant) with a string that comes from outside the app — a mint-supplied unit, method, NUT number or state, a relay or event field, a route param, parsed JSON, user text — and trust the result through `TABLE[key] ?? fallback`, `TABLE[key] || fallback`, `if (TABLE[key])`, `key in TABLE`, or by rendering or calling it?",
+          "instructions": "Does `hunk` index a plain-object lookup table (object literal or `Record<string, …>` constant) with a string authored by someone outside this project — a mint-supplied unit, method, NUT number or state, a relay or event field, a route or deep-link param, a field of a remote JSON document, user text — and trust the result through `TABLE[key] ?? fallback`, `TABLE[key] || fallback`, `if (TABLE[key])`, `key in TABLE`, or by rendering or calling it?",
           "criteria": {
-            "true": "An externally-sourced string indexes a plain object table and the result is used via `??`, `||`, truthiness, `in`, rendering or invocation, with no own-property or type check.",
-            "false": "Membership checked with `Object.hasOwn(TABLE, key)` or `Object.prototype.hasOwnProperty.call` before the read; the table is a `Map`, `Set`, or null-prototype object (`Object.create(null)`); the key was already validated against a closed union (zod enum, a registry guard such as `isFiatUnit`, a `switch` over literals); the key is produced by this app's own code (enum-like constant, `Object.keys` of the same table); a `typeof value === 'string'` or other exact type check on the result before use."
+            "true": "A string that a user, mint, relay, other app or remote document controls indexes a plain object table and the result is used via `??`, `||`, truthiness, `in`, rendering or invocation, with no own-property or type check.",
+            "false": "Membership checked with `Object.hasOwn(TABLE, key)` or `Object.prototype.hasOwnProperty.call` before the read; the table is a `Map`, `Set`, or null-prototype object (`Object.create(null)`); the key was already validated against a closed union (zod enum, a registry guard such as `isFiatUnit`, a `switch` over literals); the key is a protocol identifier whose format cannot equal an inherited member name — a hex pubkey or event id, a digits-only string, a URL, a single character — validated or produced as such; the key is produced by this app's own code (enum-like constant, `Object.keys` of the same table), or read from a file or artefact this project's own tooling wrote — origin is judged by who authors the value, not by whether it travelled as JSON; a `typeof value === 'string'` or other exact type check on the result before use."
           },
           "appliesTo": [
             "**/*.ts",
@@ -5248,10 +5248,10 @@
           "id": "doc/docs/review/conventions-typescript/shared-in-place",
           "section": "mutation/shared-in-place",
           "message": "An in-place mutation on a value the function does not own changes the caller's, store's or cache's data.",
-          "instructions": "Does `hunk` call `.sort(`, `.reverse(`, `.splice(`, `.fill(`, `.copyWithin(`, `.push(`, `.pop(`, `.shift(` or `.unshift(` on — or assign to or `delete` a property of — a value the enclosing function did not create: a function parameter, a component prop, a hook, selector, query or `getState()` result, an imported or module-level constant, or a property of one of those?",
+          "instructions": "Does `hunk` call `.sort(`, `.reverse(`, `.splice(`, `.fill(`, `.copyWithin(`, `.push(`, `.pop(`, `.shift(` or `.unshift(` on — or assign to or `delete` a property of — a value the enclosing function did not create and was not handed in order to mutate: a function parameter, a component prop, a hook, selector, query or `getState()` result, an imported or module-level constant, or a property of one of those?",
           "criteria": {
-            "true": "A mutating array method, property assignment or `delete` targets a parameter, prop, hook/selector/store result, or imported/module-level value that the enclosing function did not construct.",
-            "false": "The receiver is a fresh copy or freshly built value in the same function (`[...items].sort(…)`, `items.slice().reverse()`, `items.map(…).sort(…)`, `.filter(…)`, `Array.from(…)`, `Object.keys(…)`, a local `const out = []` pushed to); `toSorted`/`toReversed`/`toSpliced`/`with`; an Immer draft or a parameter documented or named as an accumulator or output (`out`, `acc`, `draft`, `result`); a class mutating its own private field; store files; mutation during render."
+            "true": "A mutating array method, property assignment or `delete` targets a parameter, prop, hook/selector/store result, or imported/module-level value that the enclosing function did not construct — most clearly an imported constant, or one mutated through an `as` cast that widens its literal or readonly type.",
+            "false": "The receiver is a fresh copy or freshly built value in the same function (`[...items].sort(…)`, `items.slice().reverse()`, `items.map(…).sort(…)`, `.filter(…)`, `Array.from(…)`, `Object.keys(…)`, a local `const out = []` pushed to); `toSorted`/`toReversed`/`toSpliced`/`with`; an Immer draft, or the argument of an updater or producer callback passed to the owning store's `update`/`set`/`produce`, whatever it is named; a parameter whose documented purpose — in its name (`out`, `acc`, `draft`, `result`), its JSDoc or the file header — is to be mutated in place; a module's own mutable context, session or cursor object threaded through its private helpers so that they can maintain it (`ctx.stack.push(…)`); a class mutating its own private field; store files; mutation during render."
           },
           "appliesTo": [
             "**/*.ts",
@@ -5263,10 +5263,10 @@
           "id": "doc/docs/review/conventions-typescript/empty-aggregate",
           "section": "math/empty-aggregate",
           "message": "An aggregate over a possibly-empty list yields `Infinity` or throws at runtime.",
-          "instructions": "Does `hunk` call `Math.max(...list)` or `Math.min(...list)` with only a spread argument, or `.reduce(fn)` with no initial value, on an array that can be empty at runtime — a filtered or mapped list, a store or query result, wire data, a function parameter — with no length check shown before it?",
+          "instructions": "Does `hunk` call `Math.max(...list)` or `Math.min(...list)` with only a spread argument, or `.reduce(fn)` with no initial value, on an array that can be empty at runtime when the call executes — a filtered or mapped list, a store or query result, wire data, a function parameter — with no length check shown before it?",
           "criteria": {
             "true": "A spread-only `Math.max`/`Math.min`, or a `reduce` without an initial value, runs on a list the hunk does not show to be non-empty and does not guard for emptiness.",
-            "false": "A preceding `if (list.length === 0) return …` or `list.length ? … : …` ternary in the same function; a literal non-spread operand that bounds the result (`Math.max(0, ...list)`, `Math.min(cap, ...list)`); `reduce` with an initial value; a non-empty tuple type (`[T, ...T[]]`); a list the hunk shows being built with at least one element."
+            "false": "A preceding `if (list.length === 0) return …` or `list.length ? … : …` ternary in the same function; a literal non-spread operand that bounds the result (`Math.max(0, ...list)`, `Math.min(cap, ...list)`); `reduce` with an initial value; a non-empty tuple type (`[T, ...T[]]`); a list the hunk shows being built with at least one element; a call that sits inside a `for…of`, `.map` or `.forEach` body iterating that same list, so it cannot run when the list is empty."
           },
           "appliesTo": [
             "**/*.ts",
@@ -5293,10 +5293,10 @@
           "id": "doc/docs/review/conventions-typescript/nan-passes-guard",
           "section": "money/nan-passes-guard",
           "message": "An amount guard written only as rejecting comparisons lets `NaN`, `Infinity` or fractions through as valid.",
-          "instructions": "Does `hunk` validate an amount, fee, limit or balance that decides a payment using only `typeof x === 'number'` or only rejecting comparisons (`if (amount <= 0) return …`, `if (amount > max) return …`, `amount < min || amount > max`), with no `Number.isSafeInteger`, `Number.isInteger`, `Number.isFinite` or schema check (`z.number().int().positive()`, `z.int()`) on that value anywhere in the hunk?",
+          "instructions": "Does `hunk` take an amount, fee, limit or balance that arrives from outside the function's own arithmetic — an event or machine-context field, a route or deep-link param, a parsed payload, user input, a store field — and let it continue into a quote, send, melt, mint or other payment step when the only checks on it are a bare `typeof x === 'number'` or comparisons written in the rejecting direction (`if (amount <= 0) return …`, `if (amount > max) return …`, `amount < min || amount > max`), which are all false for `NaN`, with no `Number.isSafeInteger`, `Number.isInteger`, `Number.isFinite` or schema check (`z.number().int().positive()`, `z.int()`) on that value anywhere in the hunk?",
           "criteria": {
-            "true": "A money-deciding value is admitted by rejecting comparisons or a bare `typeof === 'number'` check, and no finite/integer/schema validation of that value appears in the hunk.",
-            "false": "The value was already parsed by a zod number schema or came from an SDK amount type (cashu-ts amounts, `amountToNumber` of a validated amount); the guard is an acceptance test that `NaN` fails (`if (!(amount > 0 && amount <= max)) return …`) or is preceded by `Number.isSafeInteger`/`Number.isFinite`; range checks on non-money values that cannot be `NaN` (array indices, lengths, enum ordinals); display-only code."
+            "true": "A money-deciding value that enters from outside is admitted into a payment step by rejecting comparisons or a bare `typeof === 'number'` check, and no finite/integer/schema validation of that value appears in the hunk.",
+            "false": "The value was already parsed by a zod number schema or came from an SDK amount type (cashu-ts amounts, `amountToNumber` of a validated amount); the guard is an acceptance test that `NaN` fails (`if (!(amount > 0 && amount <= max)) return …`, `if (amount != null && amount > 0) { … }`), including rejecting range checks nested inside such a test, or is preceded by `Number.isSafeInteger`/`Number.isFinite`; a later exact-match or set-membership acceptance that `NaN` and fractions fail; values the function computed itself from validated inputs or module constants (deltas, remainders, suggestion targets) and loop or bookkeeping conditions on them; a helper that only labels, filters or ranks candidates for display and sends nothing; a `typeof` check on a value that is only displayed; range checks on non-money values that cannot be `NaN` (array indices, lengths, enum ordinals); display-only code."
           },
           "appliesTo": [
             "wallet/**/*.ts",
@@ -5311,10 +5311,10 @@
           "id": "doc/docs/review/conventions-typescript/exhaustive-else",
           "section": "types/exhaustive-else",
           "message": "A final `else` standing for one union member will silently absorb members added later.",
-          "instructions": "Does `hunk` branch over a closed set of literal values (a `kind`, `type`, `status`, `state`, `phase`, `mode` or unit compared with `===` against string literals) using an `if`/`else if` chain or nested ternary whose final `else` or last arm produces a member-specific result — a label, a state, a verdict such as `'finalized'` or `'deny'`, `true` for refund — rather than a genuinely neutral fallback?",
+          "instructions": "Does `hunk` map ONE variable that ranges over a closed set of three or more literal values (a `kind`, `type`, `status`, `state`, `phase`, `mode` or unit compared with `===` against string literals) to results arm by arm — with an `if`/`else if` chain, a run of early returns or a nested ternary — so that the final `else`, fall-through or last arm produces the result that belongs to one specific unnamed member (a label, a colour, a state, a verdict such as `'finalized'` or `'deny'`, `true` for refund) rather than a genuinely neutral fallback?",
           "criteria": {
-            "true": "An if/else-if chain or nested ternary over string-literal members ends in a branch that returns a result specific to one remaining member instead of a neutral value.",
-            "false": "A `switch`, or a lookup table typed `Record<Union, …>` / `satisfies Record<Union, …>`, over the union; a final branch that assigns to `never`, calls `assertNever`, throws, or returns a neutral value correct for future members (`null`, `undefined`, the input unchanged, \"unknown\"); a two-member union or boolean; a comparison against ONE literal whose `else` really means \"everything else\" (`unit === 'sat' ? … : …`); values that are open strings from the wire rather than a closed union."
+            "true": "An if/else-if chain, run of early returns or nested ternary over the string-literal members of one variable ends in a branch whose result is specific to one remaining member (the colour for success, the text for the last status) instead of a neutral value, so a member added later silently receives it.",
+            "false": "A `switch`, or a lookup table typed `Record<Union, …>` / `satisfies Record<Union, …>`, over the union; a final branch that assigns to `never`, calls `assertNever`, throws, or returns a neutral value correct for future members (`null`, `undefined`, the input unchanged or echoed, \"unknown\"); a two-member union or boolean; a comparison against ONE literal whose `else` really means \"everything else\" (`unit === 'sat' ? … : …`); values that are open strings from the wire rather than a closed union; a ladder of guards over several different variables or conditions whose fall-through is the default or least-privileged outcome (`'ask'`, deny, not allowed); guards that skip an action for certain states and otherwise perform the same generic action for every remaining state; a final arm that handles absence (`undefined` or `null`) rather than a literal member; a discriminator the same function computes a few lines earlier with its own ternary or if-chain, so the set of values and the mapping are edited together."
           },
           "appliesTo": [
             "**/*.ts",
@@ -5404,7 +5404,7 @@
       "origin": "./docs/review/conventions-async-tests.md",
       "path": "docs/review/conventions-async-tests.md",
       "scope": "",
-      "hash": "624d8b14bfd9cc7219c9258b212047bef4feaeecbd99b9ec539a046482768948",
+      "hash": "a002fbced5c1c442db22ae9538b921ae04e90e62e3f147d2e41e8c1ab4837d0b",
       "rules": [
         {
           "id": "doc/docs/review/conventions-async-tests/race-loser-unhandled",
@@ -5594,10 +5594,10 @@
           "id": "doc/docs/review/conventions-async-tests/non-error-throwables",
           "section": "errors/non-error-throwables",
           "message": "A caught value that is not an `Error` is dropped or flattened to `\"[object Object]\"`, losing its fields.",
-          "instructions": "Does `hunk` handle a caught value or rejected promise so that a non-`Error` throwable is dropped or flattened — `if (e instanceof Error) { … }` with no `else`, `(e as Error).message`, `e.message` on `unknown`, or `e instanceof Error ? e.message : String(e)` feeding a value that code (not just display) relies on?",
+          "instructions": "Does `hunk` handle a caught value or rejected promise so that a non-`Error` throwable is dropped or flattened by accident — `if (e instanceof Error) { … }` with no `else`, `(e as Error).message`, `e.message` on `unknown`, or `e instanceof Error ? e.message : String(e)` feeding a value that code (not just display) relies on?",
           "criteria": {
             "true": "The catch path narrows to `Error` with no non-Error branch, casts the caught value to `Error` to read `.message`, or `String(e)`s it into a value used for logic, classification or storage.",
-            "false": "The value goes through a house normaliser that keeps object fields (`errField`, `redactError`, `toError`, a named `classify*` reading `code`/`status`/`type`); the non-Error branch is handled explicitly (`typeof e === 'object' && e !== null && 'type' in e`); the string is only for display or as a log message alongside the error object; abort detection through `isAbortError`."
+            "false": "The value goes through a house normaliser that keeps object fields (`errField`, `redactError`, `toError`, a named `classify*` reading `code`/`status`/`type`); the non-Error branch is handled explicitly (`typeof e === 'object' && e !== null && 'type' in e`); the string is only for display or as a log message alongside the error object; abort detection through `isAbortError`; a catch that discards detail on purpose for secrecy (a provider error may disclose credentials) and sends every value it does not recognise to a fixed, safe output."
           },
           "appliesTo": [],
           "when": "catch\\s*\\(|instanceof Error|unknown"
@@ -5690,10 +5690,10 @@
           "id": "doc/docs/review/conventions-async-tests/numeric-strings",
           "section": "input/numeric-strings",
           "message": "Untrusted text converted with `Number`/`parseInt` can yield a silently wrong amount, count or index.",
-          "instructions": "Does `hunk` convert an untrusted string or bigint — typed text, a route param, a relay tag, a mint or LNURL response field, a BOLT11 section, a token amount — into an amount, count, timestamp or index with `Number(`, unary `+`, `parseInt(` or `parseFloat(`, without first checking a digits-only pattern (or `typeof` for non-strings) and `Number.isSafeInteger` on the result?",
+          "instructions": "Does `hunk` convert an untrusted string or bigint from an app user or a remote party — text typed in the app, a route param, a relay tag, a mint or LNURL response field, a BOLT11 section, a token amount — into an amount, count, timestamp or index with `Number(`, unary `+`, `parseInt(` or `parseFloat(`, without first checking a digits-only pattern (or `typeof` for non-strings) and `Number.isSafeInteger` on the result?",
           "criteria": {
-            "true": "A value from input, a route param or a network/protocol field is coerced with `Number(`/`+x`/`parseInt(`/`parseFloat(` and used as an amount, count, timestamp or index with no digits-only validation and no `Number.isSafeInteger` check.",
-            "false": "The value passes a Zod schema enforcing `int()`, bounds and safe range; `amountToNumber` in `wallet/src/amount.ts` or `amount-actions`; `parseInt(x, 10)` of values that are digits by construction (a `\\d+` regex capture, `Platform.Version`); display-only numbers; BigInt arithmetic that never narrows to `number`."
+            "true": "A value from app input, a route param or a network/protocol field is coerced with `Number(`/`+x`/`parseInt(`/`parseFloat(` and used as an amount, count, timestamp or index with no digits-only validation and no `Number.isSafeInteger` check.",
+            "false": "The value passes a Zod schema enforcing `int()`, bounds and safe range; `amountToNumber` in `wallet/src/amount.ts` or `amount-actions`; `parseInt(x, 10)` of values that are digits by construction (a `\\d+` regex capture, `Platform.Version`); command-line flags or environment values an operator passes to a developer-run tool, where a bad number only degrades that operator's own output; display-only numbers; BigInt arithmetic that never narrows to `number`."
           },
           "appliesTo": [],
           "when": "Number\\(|parseInt\\(|parseFloat\\("
@@ -5770,10 +5770,10 @@
           "id": "doc/docs/review/conventions-async-tests/restore-global-fakes",
           "section": "tests/restore-global-fakes",
           "message": "Fake timers or a patched global left unrestored leak into the following tests in the file.",
-          "instructions": "Does a test in `hunk` install fake timers, `setSystemTime`, `spyOn(Date | Math | console | global, …)` or assign `global.fetch` / `Date.now`, and restore it only with statements at the end of the test body, only with `clearAllMocks()`, or not at all in the visible section?",
+          "instructions": "Does a test in `hunk` install fake timers, `setSystemTime`, `spyOn(Date | Math | console | global, …)` or assign `global.fetch` / `Date.now`, and restore it only with statements at the end of the test body, only with `clearAllMocks()`, or — when `hunk` shows the file's setup and teardown hooks — not at all?",
           "criteria": {
-            "true": "The fake or spy is installed inside a test body and the restore is a trailing statement (skipped if an assertion throws), is only `clearAllMocks()`, or is absent from the visible code.",
-            "false": "Restoration in `afterEach` / `afterAll` / a `try … finally` (`useRealTimers()`, `restoreAllMocks()`, `mockRestore()`, reassigning the saved original); a file-level `beforeEach(useFakeTimers)` paired with `afterEach(useRealTimers)`; spies created by a helper that registers its own cleanup."
+            "true": "The fake or spy is installed inside a test body and the restore is a trailing statement (skipped if an assertion throws), is only `clearAllMocks()`, or `hunk` shows the enclosing `describe` with its hooks and none of them restores it.",
+            "false": "Restoration in `afterEach` / `afterAll` / a `try … finally` (`useRealTimers()`, `restoreAllMocks()`, `mockRestore()`, reassigning the saved original); a file-level `beforeEach(useFakeTimers)` paired with `afterEach(useRealTimers)`; spies created by a helper that registers its own cleanup; `hunk` is a window into a longer test file and simply shows no restore — file-level hooks may sit outside it, so their absence is not evidence."
           },
           "appliesTo": [
             "**/__tests__/**/*.ts",
@@ -5787,10 +5787,10 @@
           "id": "doc/docs/review/conventions-async-tests/singleton-state-reset",
           "section": "tests/singleton-state-reset",
           "message": "Module-singleton state written by one test survives into the next, so the file only passes in its current order.",
-          "instructions": "Does a test in `hunk` write to a module-level singleton — `useXStore.setState(…)`, a store action, a module cache, an in-flight map, a registered Coco/Nostr listener — without a `beforeEach` / `afterEach` in the visible file that resets it, or assert a starting value that only holds when an earlier test ran (or did not run) first?",
+          "instructions": "Does a test in `hunk` write to a module-level singleton — `useXStore.setState(…)`, a store action, a module cache, an in-flight map, a registered Coco/Nostr listener — in a way another test in the file can observe (the same key, an asserted initial value, a size or eviction assertion), without a `beforeEach` / `afterEach` in the visible file that resets it, or assert a starting value that only holds when an earlier test ran (or did not run) first?",
           "criteria": {
-            "true": "A test mutates a shared store, module cache, in-flight map or global listener registry and no reset hook for it is visible, or it asserts an initial value that depends on a previous test.",
-            "false": "`beforeEach(() => useXStore.setState(initial, true))`, a store `reset()` action or `getInitialState()`; state created inside the test (a fresh manager, a store factory, a new `Map`); `jest.isolateModules` / `vi.resetModules` with the module re-imported afterwards."
+            "true": "A test mutates a shared store, module cache, in-flight map or global listener registry that other tests also read and no reset hook for it is visible, or it asserts an initial value that depends on a previous test.",
+            "false": "`beforeEach(() => useXStore.setState(initial, true))`, a store `reset()` action or `getInitialState()`; state created inside the test (a fresh manager, a store factory, a new `Map`); `jest.isolateModules` / `vi.resetModules` with the module re-imported afterwards; each test writes under its own key that no other test reads or writes, so no test can observe another's write."
           },
           "appliesTo": [
             "**/__tests__/**/*.ts",

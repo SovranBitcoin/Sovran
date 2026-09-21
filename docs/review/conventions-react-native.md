@@ -48,9 +48,9 @@ Scope: `**/*.tsx`
 
 A virtualized list inside a scroll container of the same axis has unbounded length, so it renders every row at once and the virtualization is lost.
 
-Does `hunk` render `List`, `FlashList`, `FlatList` or `SectionList` inside a `ScrollView`, `ScreenScrollView`, `BottomSheetScrollView` or another list's header/row that scrolls along the same axis, or give a vertical list a parent with no bounded height so that it sizes to its content?
+Does `hunk` render a virtualized list — a component that takes `data` and `renderItem`, such as `FlashList`, `FlatList`, `SectionList` or the shared `List` wrapper around them — inside a `ScrollView`, `ScreenScrollView`, `BottomSheetScrollView` or another list's header/row that scrolls along the same axis, or give a vertical virtualized list a parent with no bounded height so that it sizes to its content?
 
-Allowed cases: A horizontal list inside a vertical scroller (or the reverse); the outer content moved into the list's `ListHeaderComponent`/`ListFooterComponent`; a list with `scrollEnabled={false}` over a small bounded data set where the hunk shows the bound; the sheet-scroll injection used by `SectionAnchorList`.
+Allowed cases: A horizontal list inside a vertical scroller (or the reverse); the outer content moved into the list's `ListHeaderComponent`/`ListFooterComponent`; a list with `scrollEnabled={false}` over a small bounded data set where the hunk shows the bound; the sheet-scroll injection used by `SectionAnchorList`; a component with `List` in its name that lays out static JSX children (a grouped-row container and its rows) rather than taking `data` and `renderItem`, which is not a virtualized list.
 
 ## lists/mvcp-top-anchored
 
@@ -158,9 +158,9 @@ Scope: `app/app/**`, `app/features/**/*.tsx`
 
 A query param repeated in a URL arrives as an array and every param arrives as a string; the generic on `useLocalSearchParams<T>()` is a cast, not a check.
 
-Does `hunk` read route params through `useLocalSearchParams<{…}>()` or `useGlobalSearchParams<{…}>()` and then use a value as a single string, number, boolean or enum — `Number(id)`, `parseInt`, `=== 'true'`, a template string, a store key, `as SomeUnion` — instead of `useRouteParams(ParamsSchema, { where })` from `@/shared/lib/nav/useRouteParams`?
+Does `hunk` read route params through `useLocalSearchParams<{…}>()` or `useGlobalSearchParams<{…}>()` and then let an unchecked value flow onward as a single string, number, boolean or enum — `Number(id)`, `parseInt`, a template string, a store key, a prop, `as SomeUnion` — instead of `useRouteParams(ParamsSchema, { where })` from `@/shared/lib/nav/useRouteParams`?
 
-Allowed cases: `useRouteParams` with a module-level Zod schema; a param that is narrowed in the hunk (`typeof x === 'string'`, `Array.isArray`) before use; params only forwarded untouched to another route.
+Allowed cases: `useRouteParams` with a module-level Zod schema; a param that is narrowed in the hunk (`typeof x === 'string'`, `Array.isArray`) before use; a strict `===` comparison against one literal whose false branch is the same default state as the param being absent (`flag === '1'`), since an array or any other string simply compares false; params only forwarded untouched to another route.
 
 ## sheets/dynamic-detent
 
@@ -208,9 +208,9 @@ Scope: `**/*.tsx`
 
 `hitSlop` cannot extend a touch area past the parent's bounds, and a target under 44pt (iOS) / 48dp (Android) is hard to hit.
 
-Does `hunk` add an icon-only or otherwise small pressable whose laid-out size is visibly under 44×44 (`size-6`, `w-8 h-8`, `width: 28`, an `Icon` with no padding) with no `hitSlop`, or add `hitSlop` to a control whose parent is the same size as the control or clips it (`overflow: 'hidden'`, a tight row), where the slop has no effect?
+Does `hunk` add an icon-only or otherwise small pressable whose laid-out size is visibly under 44×44 (`size-6`, `w-8 h-8`, `width: 28`, an `Icon` with no padding) with no `hitSlop`, or add `hitSlop` to a control smaller than the 44pt target whose parent is the same size as the control or clips it (`overflow: 'hidden'`, a tight row), where the slop the control relies on has no effect?
 
-Allowed cases: Controls at least 44pt in both dimensions through size, padding or `min-h`/`min-w`; `hitSlop` on a control whose parent has room around it; shared components that own their target size (`Button`, `CircleActionButton`, `HeaderGlassCircle`, `ScreenHeaderAction`, `ListItem`); dense inline text links inside a paragraph.
+Allowed cases: Controls at least 44pt in both dimensions through size, padding or `min-h`/`min-w`, where an inert `hitSlop` does no harm; `hitSlop` on a control whose parent has room around it; a control whose size the hunk does not show (it comes from a prop or an imported constant), which is insufficient evidence; shared components that own their target size (`Button`, `CircleActionButton`, `HeaderGlassCircle`, `ScreenHeaderAction`, `ListItem`); dense inline text links inside a paragraph.
 
 ## native/secure-store-key-charset
 
