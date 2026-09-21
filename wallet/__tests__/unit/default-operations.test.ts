@@ -1532,13 +1532,20 @@ describe("buildMintListItems testnut split", () => {
     expect(items[TESTNUT].status).toBe("available");
   });
 
-  it("leaves the other side of the split out of a flow picker", async () => {
+  // Every trusted mint is listed in every picker, so its unit tab (TSAT, TUSD)
+  // exists everywhere. Inside a flow the other side cannot be PICKED: the
+  // testnut mint holds 5000 here, more than the send needs, and is still
+  // disabled, because test and real funds never meet in one payment.
+  it("lists the other side of the split in a flow picker, but never pickable", async () => {
+    const outside = { status: "disabled", reason: { code: "MINT_OUTSIDE_ACCOUNT" } };
+
     const real = byUrl(await build({ destination: "sendEcash", amount: 100 }, false));
     expect(real[MINT1].status).toBe("available");
-    expect(real[TESTNUT]).toBeUndefined();
+    expect(real[TESTNUT]).toMatchObject(outside);
+    expect(real[TESTNUT].supportedUnits).toEqual(["tsat"]);
 
     const test = byUrl(await build({ scope: "onchain" }, true));
     expect(test[TESTNUT].status).toBe("available");
-    expect(test[MINT1]).toBeUndefined();
+    expect(test[MINT1]).toMatchObject(outside);
   });
 });

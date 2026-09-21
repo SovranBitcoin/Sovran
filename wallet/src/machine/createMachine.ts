@@ -3,12 +3,10 @@ import { parsePaymentInput } from "../parse";
 import { rankMintCandidates } from "../mint-selection";
 import { isValidSatAmount } from "../guards";
 import { defaultDetectors } from "../detectors";
+import { createMintRowRules } from "../mint-list-rows";
 import { isMeltUserCancelledError, isMintOfflineError } from "../errors";
 import { t } from "../formatting/locales";
-import {
-  accountMintUrls,
-  compareMintDisplayOrder,
-} from "../mint-capabilities";
+import { compareMintDisplayOrder } from "../mint-capabilities";
 import { errField, logger, mintUrlFields } from "../logger";
 import { buildProofSuggestions } from "./amountFallback";
 import {
@@ -590,43 +588,36 @@ export function createPaymentMachine(
     data: StepDataMap["selectMint"],
   ): MintListItem[] {
     const walletCtx = getContext();
-    const byMintUrl = new Map(
-      data.candidates.map((candidate) => [candidate.mintUrl, candidate]),
+    const balanceByCandidate = new Map(
+      data.candidates.map((candidate) => [candidate.mintUrl, candidate.balance]),
     );
-    // The same MINTS the enrichment will list, not just the ones that passed
-    // the flow's filters. `data.candidates` is already filtered (a send drops
-    // every unfunded mint), while `buildMintListItems` lists the whole account
-    // and explains each exclusion — so painting the candidates alone made the
-    // row COUNT jump the moment enrichment landed, which reads as the picker
-    // briefly showing the wrong mints. Only the metadata may fill in now.
-    const mintUrls =
-      data.scope === "selected"
-        ? walletCtx.trustedMintUrls
-        : accountMintUrls(walletCtx);
+    // The same MINTS and the same VERDICTS the enrichment will give. Every
+    // trusted mint is listed (`data.candidates` is only what the flow may
+    // pick), and each row's status and reason come from the rules the
+    // enrichment uses, read against the wallet context instead of freshly
+    // fetched mint info. Guessing here (an unfunded mint "has no balance", even
+    // on a receive) made every row change a moment after the picker opened.
+    const rowVerdict = createMintRowRules({
+      data,
+      capabilityCtx: walletCtx,
+      crossesAccounts: (mintUrl) =>
+        walletCtx.mintMethodCapabilities?.[mintUrl]?.outsideAccount === true,
+      supportsWebsocket: (mintUrl) =>
+        walletCtx.mintMethodCapabilities?.[mintUrl]?.nut17,
+    });
     // Sorted with the SAME comparator the async enrichment uses, so the
     // first painted frame is already in the final order and the enriched
     // rows land without re-shuffling the list.
-    const items = mintUrls
+    const items = walletCtx.trustedMintUrls
       .map((mintUrl): MintListItem => {
-        const candidate = byMintUrl.get(mintUrl);
-        const balance = candidate?.balance ?? walletCtx.mintBalances[mintUrl] ?? 0;
-        // A mint the flow filtered out is disabled here too. Its reason is
-        // named only where the rule is the enrichment's own — an unfunded mint
-        // on a spend — and otherwise left to the enrichment rather than guessed.
-        const excluded = !candidate;
+        const balance =
+          balanceByCandidate.get(mintUrl) ?? walletCtx.mintBalances[mintUrl] ?? 0;
         return {
           mintUrl,
           displayName: mintUrl,
           balance,
           unit: data.unit,
-          status: excluded
-            ? ("disabled" as const)
-            : (candidate.status ?? ("available" as const)),
-          reason: excluded
-            ? balance <= 0
-              ? { code: "NO_BALANCE", message: "No balance" }
-              : null
-            : (candidate.reason ?? null),
+          ...rowVerdict(mintUrl, balance),
           isPreferred: false,
         };
       })

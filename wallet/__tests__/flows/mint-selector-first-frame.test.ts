@@ -76,6 +76,52 @@ describe('mint selector — first frame', () => {
     expect(byUrl[FUNDED].status).toBe('available');
   });
 
+  it('opens an onchain receive picker with the reasons the enriched rows will give', async () => {
+    // From a real session: the first frame disabled every mint without onchain
+    // for NO_BALANCE (a receive needs none), and the enrichment then corrected
+    // all of them. Both frames now ask the same rules.
+    const ONCHAIN = 'https://onchain.example.com';
+    const TESTNUT = 'https://testnut.example.com';
+    const onchainInfo = {
+      nuts: { '4': { methods: [{ method: 'onchain', unit: 'sat' }] } },
+    };
+    const tm = createTestMachine({
+      wallet: {
+        trustedMintUrls: [FUNDED, EMPTY_A, ONCHAIN, TESTNUT],
+        mintBalances: { [FUNDED]: 5_000, [EMPTY_A]: 0, [ONCHAIN]: 0, [TESTNUT]: 0 },
+        mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+          { mintUrl: FUNDED, mintInfo: info },
+          { mintUrl: EMPTY_A, mintInfo: info },
+          { mintUrl: ONCHAIN, mintInfo: onchainInfo },
+          { mintUrl: TESTNUT, mintInfo: onchainInfo, outsideAccount: true },
+        ]),
+      },
+    });
+    await tm.machine.requestMintSelector({ reset: true });
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, FUNDED, {
+      destination: 'mintQuote',
+      mintQuoteMethod: 'onchain',
+    });
+    tm.assertStep('selectMint');
+
+    const byUrl = Object.fromEntries(fallbackItems(tm).map((item) => [item.mintUrl, item]));
+    expect(byUrl[ONCHAIN]).toMatchObject({ status: 'available', reason: null });
+    expect(byUrl[FUNDED]).toMatchObject({
+      status: 'disabled',
+      reason: { code: 'MINT_METHOD_UNSUPPORTED' },
+    });
+    expect(byUrl[EMPTY_A]).toMatchObject({
+      status: 'disabled',
+      reason: { code: 'MINT_METHOD_UNSUPPORTED' },
+    });
+    // The test mint is listed (its TSAT tab needs the row) but cannot be picked
+    // from inside a real-account flow.
+    expect(byUrl[TESTNUT]).toMatchObject({
+      status: 'disabled',
+      reason: { code: 'MINT_OUTSIDE_ACCOUNT' },
+    });
+  });
+
   it('keeps a receive picker on the account too', async () => {
     const tm = createTestMachine({ wallet });
     await tm.machine.startReceiveLightning({ reset: true });
