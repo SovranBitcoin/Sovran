@@ -9,7 +9,7 @@ import { classifyMeshToken, meshTokenDedupeKey } from 'wallet';
 
 import { drainNutDropRedeemQueue } from '@/features/nearPay/lib/nutDropAutoRedeem';
 import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
-import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
+import { paymentLog, mintUrlLogFields, redactError } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
@@ -41,13 +41,32 @@ async function drainWithBackgroundBudget(): Promise<void> {
     return drainNutDropRedeemQueue();
   }
   paymentLog.info('near_pay.redeem.background_budget.start', { appState: AppState.currentState });
-  const handle = await beginBLEBackgroundTask('nutdrop-redeem');
+  // Android's no-op handle doubles as the fallback: a failed assertion only
+  // shortens the budget, it must not stop the drain.
+  const handle = await beginBLEBackgroundTask('nutdrop-redeem').catch((error: unknown) => {
+    paymentLog.warn('near_pay.redeem.background_budget.begin_failed', {
+      error: redactError(error),
+    });
+    return -1;
+  });
   try {
     await drainNutDropRedeemQueue();
   } finally {
     paymentLog.info('near_pay.redeem.background_budget.end', { handle });
-    void endBLEBackgroundTask(handle);
+    void endBLEBackgroundTask(handle).catch((error: unknown) => {
+      paymentLog.warn('near_pay.redeem.background_budget.end_failed', {
+        error: redactError(error),
+      });
+    });
   }
+}
+
+/** Fire-and-forget drain for event handlers and effects. */
+function drainInBackground(run: () => Promise<void>): void {
+  void run().catch(() => {
+    // Already logged as near_pay.redeem.drain.failed; the entries stay queued
+    // for the next trigger.
+  });
 }
 
 export function useNutDropAutoRedeem(): void {
@@ -101,18 +120,18 @@ export function useNutDropAutoRedeem(): void {
         enqueued,
         senderPeerID: event.peerID,
       });
-      void drainWithBackgroundBudget();
+      drainInBackground(drainWithBackgroundBudget);
     });
 
     // Mount-time drain: catches entries persisted while the app was dead or
     // the previous drain was interrupted mid-flight.
     paymentLog.info('near_pay.redeem.drain_trigger', { trigger: 'mount' });
-    void drainNutDropRedeemQueue();
+    drainInBackground(drainNutDropRedeemQueue);
 
     const appStateSub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         paymentLog.info('near_pay.redeem.drain_trigger', { trigger: 'app_active' });
-        void drainNutDropRedeemQueue();
+        drainInBackground(drainNutDropRedeemQueue);
       }
     });
 
@@ -126,7 +145,7 @@ export function useNutDropAutoRedeem(): void {
   useEffect(() => {
     if (wasOffline.current && !isOffline) {
       paymentLog.info('near_pay.redeem.drain_trigger', { trigger: 'offline_to_online' });
-      void drainNutDropRedeemQueue();
+      drainInBackground(drainNutDropRedeemQueue);
     }
     wasOffline.current = isOffline;
   }, [isOffline]);
