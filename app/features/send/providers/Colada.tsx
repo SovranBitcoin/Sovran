@@ -586,7 +586,8 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
       customSchemes: ['sovran'],
       ignoredHosts: ['camera', 'expo-development-client'],
       onBeforeScan: () => clearPaymentContext('send.deeplink'),
-      onError: (err) => staticPopup('deeplink-failed', { text: err.message }),
+      // ColadaProvider logs the failure; the popup keeps to its catalog copy.
+      onError: () => staticPopup('deeplink-failed'),
     }),
     [deepLinkUrl, keys?.pubkey]
   );
@@ -624,13 +625,16 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
       // via the dmEchoStore state-mirror: byPeer stayed empty through delivery).
       const ownPubkey = getPublicKey(pk);
       paymentLog.info('contact_send.echo.seeded', { selfWrapId });
-      useDmEchoStore.getState().append('nip17', ownPubkey, recipientPubkey, {
-        id: selfWrapId,
-        content: token,
-        isOwn: true,
-        created_at: Math.floor(Date.now() / 1000),
-        pubkey: ownPubkey,
-      });
+      useDmEchoStore.getState().append(
+        { viewer: ownPubkey, protocol: 'nip17', counterparty: recipientPubkey },
+        {
+          id: selfWrapId,
+          content: token,
+          isOwn: true,
+          created_at: Math.floor(Date.now() / 1000),
+          pubkey: ownPubkey,
+        }
+      );
     },
     [identity]
   );
