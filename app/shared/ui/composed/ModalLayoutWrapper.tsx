@@ -108,6 +108,14 @@ interface ModalLayoutWrapperProps {
   stickyContent?: ReactNode;
   /** Height of the sticky content for scroll padding calculation */
   stickyContentHeight?: number;
+  /**
+   * Header chrome that hangs one line below the bar (the collapsed identity's
+   * name). Unlike `stickyContent` it is never measured and never widens the
+   * scroll padding: it only appears once the page is scrolled, where content
+   * already passes under the header, so reserving space for it would shift
+   * every resting page for chrome that is not there yet.
+   */
+  headerBand?: ReactNode;
   /** Use Animated.ScrollView for scroll position tracking */
   useAnimatedScroll?: boolean;
   /** Shared value for scroll position (used with useAnimatedScroll) */
@@ -151,6 +159,7 @@ export function ModalLayoutWrapper({
   headerGradientStyle,
   stickyContent,
   stickyContentHeight = 0,
+  headerBand,
   useAnimatedScroll = false,
   scrollY: externalScrollY,
   bottomContent,
@@ -306,6 +315,12 @@ export function ModalLayoutWrapper({
             fade
           ))}
 
+        {headerBand && (
+          <View pointerEvents="none" style={[styles.headerBand, { top: stableHeaderBottom }]}>
+            {headerBand}
+          </View>
+        )}
+
         {stickyContent && (
           <View
             style={[
@@ -338,5 +353,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: zIndex.dropdown,
+  },
+  // Above the header fade, below any sticky strip — a screen with both keeps
+  // its tabs on top of the band's taper.
+  headerBand: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: zIndex.dropdown - 1,
   },
 });

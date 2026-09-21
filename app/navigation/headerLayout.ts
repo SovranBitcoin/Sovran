@@ -3,7 +3,7 @@ import { useWindowDimensions } from 'react-native';
 import { headerButtonSize } from '@/shared/styles/tokens';
 
 /** Bar edge margin: UIKit's layout margin and the Toolbar content inset are both 16. */
-const HEADER_EDGE_INSET = 16;
+export const HEADER_EDGE_INSET = 16;
 /** Space a bar keeps between neighbouring items, and between an item and the title. */
 const HEADER_ITEM_GAP = 8;
 /** Beyond this a title reads as a sentence; it also bounds titles in narrow iPad sheets. */

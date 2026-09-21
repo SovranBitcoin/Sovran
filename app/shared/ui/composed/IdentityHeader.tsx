@@ -13,7 +13,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
-import { useCenteredTitleMaxWidth } from '@/navigation/headerLayout';
+import { HEADER_EDGE_INSET, useCenteredTitleMaxWidth } from '@/navigation/headerLayout';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { headerIdentity } from '@/shared/styles/tokens';
@@ -43,6 +43,28 @@ const NAME_STYLE = { lineHeight: headerIdentity.nameLineHeight };
 // row with the header buttons. The accessibility label carries the full name.
 const NAME_MAX_FONT_SCALE = 1.2;
 
+/** The identity's picture at whatever diameter its header shape allows. */
+function IdentityIcon({
+  name,
+  seed,
+  picture,
+  kind = 'person',
+  isLoading = false,
+  size,
+}: HeaderIdentity & { size: number }) {
+  return kind === 'mint' ? (
+    <MintIcon iconUrl={picture} name={name} size={size} isLoading={isLoading} />
+  ) : (
+    <Avatar
+      state={isLoading ? 'loading' : picture ? 'image' : 'fallback'}
+      picture={picture ?? undefined}
+      seed={seed}
+      size={size}
+      alt={name}
+    />
+  );
+}
+
 /** Icon above name, inside the header-button box, so every identity page centres alike. */
 export function IdentityHeader({
   name,
@@ -57,22 +79,14 @@ export function IdentityHeader({
   const boxStyle = { maxWidth, height: headerIdentity.height, gap: headerIdentity.gap };
   return (
     <View className="items-center justify-center" style={boxStyle}>
-      {kind === 'mint' ? (
-        <MintIcon
-          iconUrl={picture}
-          name={name}
-          size={headerIdentity.iconSize}
-          isLoading={isLoading}
-        />
-      ) : (
-        <Avatar
-          state={isLoading ? 'loading' : picture ? 'image' : 'fallback'}
-          picture={picture ?? undefined}
-          seed={seed}
-          size={headerIdentity.iconSize}
-          alt={name}
-        />
-      )}
+      <IdentityIcon
+        name={name}
+        seed={seed}
+        picture={picture}
+        kind={kind}
+        isLoading={isLoading}
+        size={headerIdentity.iconSize}
+      />
       <Text
         bold
         size={headerIdentity.nameSize}
@@ -128,7 +142,7 @@ function MorphTitle({
       </Animated.View>
       <Animated.View className="max-w-full" style={identityStyle}>
         {identity ? (
-          <IdentityHeader {...identity} sideActions={sideActions} />
+          <IdentityIcon {...identity} size={headerIdentity.barIconSize} />
         ) : (
           <Text size={16} bold numberOfLines={1}>
             {title}
@@ -139,10 +153,52 @@ function MorphTitle({
   );
 }
 
+const BAND_STYLE = { height: headerIdentity.bandHeight, marginTop: -headerIdentity.bandPullUp };
+const BAND_NAME_STYLE = {
+  lineHeight: headerIdentity.bandNameLineHeight,
+  paddingHorizontal: HEADER_EDGE_INSET,
+};
+
+/**
+ * The collapsed identity's name, pinned directly under the bar.
+ *
+ * The bar itself has no room for it — the icon now fills the row at button
+ * size, and neither platform exposes a native header subtitle — so the name
+ * becomes header chrome one line lower. It draws no scrim of its own: the
+ * screen's existing header gradient is the only chrome here, and a second ramp
+ * under it only ever read as a misplaced slab. `Screen` overlays the band
+ * without reserving layout, so an unscrolled page is unchanged. The bar's title
+ * view already announces the name, so this copy stays out of the accessibility
+ * tree.
+ */
+function IdentityNameBand({ name, progress }: { name: string; progress: SharedValue<number> }) {
+  const style = useAnimatedStyle(() => ({ opacity: progress.get() }));
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[BAND_STYLE, style]}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants">
+      <Text
+        bold
+        size={headerIdentity.bandNameSize}
+        numberOfLines={1}
+        maxFontSizeMultiplier={NAME_MAX_FONT_SCALE}
+        className="text-center"
+        style={BAND_NAME_STYLE}>
+        {name}
+      </Text>
+    </Animated.View>
+  );
+}
+
 /** Connected Apps' two-phase handoff, shared by every identity screen.
  * Hysteresis prevents threshold jitter; withTiming honors system reduced motion.
  * Supply a measured identity bottom relative to the unobscured scroll viewport
  * when the identity is not the first 64pt avatar in the page.
+ *
+ * The collapsed bar shows the icon alone at header-button size, so pass
+ * `headerBand` to the page's `Screen` — that is where the name lands.
  */
 export function useIdentityHeader({
   identity,
@@ -189,6 +245,8 @@ export function useIdentityHeader({
     headerTitle: () => (
       <MorphTitle identity={identity} title={title} sideActions={sideActions} progress={progress} />
     ),
+    /** Pass to `Screen`'s `headerBand`: the name the collapsed bar hands down a line. */
+    headerBand: identity ? <IdentityNameBand name={identity.name} progress={progress} /> : null,
     probe: __DEV__ ? <IdentityHeaderProbe flipped={flipped} /> : null,
   };
 }

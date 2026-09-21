@@ -610,7 +610,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
   }
 
   return (
-    <Screen name="SignerAppDetailScreen" scroll="custom">
+    <Screen name="SignerAppDetailScreen" scroll="custom" headerBand={morph.headerBand}>
       {morph.probe}
       <Animated.ScrollView
         contentInsetAdjustmentBehavior="never"

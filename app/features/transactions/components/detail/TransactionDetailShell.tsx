@@ -165,6 +165,7 @@ export function TransactionDetailShell({
       name={screenName}
       scroll={canMorph ? 'animated' : 'auto'}
       scrollY={morph.scrollY}
+      headerBand={morph.headerBand}
       contentPadding={0}
       footer={footer}
       deferContent={false}

@@ -750,6 +750,15 @@ function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps)
               }
             />
           ) : null}
+          {/* The collapsed identity's name, under the navigation bar. This view
+              owns its own header geometry (the list and the embed both inset
+              off `headerHeight`), so it places the band the way `Screen` does
+              for the other identity pages. */}
+          {morph.headerBand ? (
+            <View pointerEvents="none" style={[styles.identityBand, { top: headerHeight }]}>
+              {morph.headerBand}
+            </View>
+          ) : null}
           <AnimatedImageOverlay />
         </View>
       </ImageOverlayProvider>
@@ -770,6 +779,11 @@ export const ThreadView = React.memo(ThreadViewWithEmbed);
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  identityBand: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
   },
   centerContent: {
     justifyContent: 'center',

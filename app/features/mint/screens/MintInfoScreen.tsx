@@ -395,6 +395,7 @@ export function MintInfoScreen() {
       name="MintInfoScreen"
       scroll="animated"
       scrollY={morph.scrollY}
+      headerBand={morph.headerBand}
       bgColor={background}
       footer={
         <BottomButtons>

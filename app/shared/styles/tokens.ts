@@ -243,11 +243,17 @@ const headerIdentityNameLineHeight = 14;
 const headerIdentityGap = 2;
 
 /**
- * Header identity (icon above name). The whole stack occupies the header-button
- * box, so it sits on the same row as headerLeft/headerRight and cannot outgrow
- * the bar: UIKit fixes the navigation row at 44pt, react-native-screens' Android
- * header subview clips its content to its own bounds, and Screen's fade ends at
- * the bar. The icon takes whatever the name line leaves.
+ * Header identity, in two shapes. A static title (DM chat, the send recipient)
+ * stacks the icon above the name inside the header-button box, so it sits on
+ * the same row as headerLeft/headerRight and cannot outgrow the bar: UIKit
+ * fixes the navigation row at 44pt, react-native-screens' Android header
+ * subview clips its content to its own bounds, and Screen's fade ends at the
+ * bar. There the icon takes whatever the name line leaves.
+ *
+ * The scroll handoff (`useIdentityHeader`) instead gives the icon the full
+ * button diameter and moves the name into `Screen`'s `headerBand`, directly
+ * below the bar — the only place a second line fits, since neither platform
+ * offers a native header subtitle.
  */
 export const headerIdentity = {
   height: headerButtonSize,
@@ -255,6 +261,22 @@ export const headerIdentity = {
   nameSize: 11,
   nameLineHeight: headerIdentityNameLineHeight,
   iconSize: headerButtonSize - headerIdentityNameLineHeight - headerIdentityGap,
+  /**
+   * The scroll handoff draws the icon ALONE, at the same diameter as every
+   * headerLeft/headerRight control, so the collapsed bar reads as one row of
+   * equal circles. The name it displaces rides in the band below the bar.
+   */
+  barIconSize: headerButtonSize,
+  /**
+   * Name band under the bar: the second line the navigation row has no room
+   * for. Just the name — the screen's own header gradient is the chrome here.
+   * The bar leaves slack under a title view, so `bandPullUp` lifts the row back
+   * toward the icon; the two read as one identity rather than two rows.
+   */
+  bandNameSize: 13,
+  bandNameLineHeight: 18,
+  bandHeight: 18,
+  bandPullUp: 8,
 } as const;
 
 /**

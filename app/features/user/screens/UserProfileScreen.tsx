@@ -1364,6 +1364,7 @@ export function UserProfileScreen() {
       name="UserProfileScreen"
       scroll="custom"
       bgColor={background}
+      headerBand={morph.headerBand}
       headerGradientStyle={morph.headerGradientStyle}>
       {/* The Send-Message/Send-Money menus present in a FullWindowOverlay whose
           rows never reach iOS AX — this dev-only marker is the waitable

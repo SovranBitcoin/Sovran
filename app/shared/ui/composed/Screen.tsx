@@ -66,6 +66,12 @@ interface ScreenProps {
   /** Sticky content rendered below the native header. */
   stickyContent?: ReactNode;
   stickyContentHeight?: number;
+  /**
+   * Header chrome hanging one line under the bar — `useIdentityHeader`'s
+   * `headerBand`, the name its collapsed icon has no room for. Overlays the
+   * page without reserving scroll padding, so a resting page is unchanged.
+   */
+  headerBand?: ReactNode;
   contentPadding?: number;
   headerGradient?: boolean;
   /** Pinned selectors use solid chrome; scrolling identity pages keep the fade. */
@@ -121,6 +127,7 @@ export function Screen({
   footer,
   stickyContent,
   stickyContentHeight,
+  headerBand,
   contentPadding,
   headerGradient = true,
   headerAppearance = 'gradient',
@@ -251,6 +258,7 @@ export function Screen({
                 headerGradientStyle={headerGradientStyle}
                 stickyContent={stickyContent}
                 stickyContentHeight={stickyContentHeight}
+                headerBand={headerBand}
                 useAnimatedScroll={scroll === 'animated'}
                 scrollY={scrollY}
                 useCustomScrollView={useCustomScrollView}

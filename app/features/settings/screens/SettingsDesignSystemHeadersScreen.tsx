@@ -52,27 +52,33 @@ export function SettingsDesignSystemHeadersScreen() {
         variant === 'Sticky tabs' ? 'opaque' : variant === 'Tab fade' ? 'gradient-tabs' : 'gradient'
       }
       stickyContent={
-        <View className="px-4 pb-2">
-          <UnderlineTabs
-            tabs={OPTIONS}
-            selectedTab={variant}
-            handleTabPress={(tab) => {
-              const next = OPTIONS.find((option) => option === tab);
-              if (next) setVariant(next);
-            }}
-          />
-          {variant === 'Tab fade' ? (
-            <MintCurrencyTabs
-              currencies={CURRENCIES}
-              selectedCurrency={currency}
-              onCurrencyChange={setCurrency}
-              scrollY={morph.scrollY}
+        // The tabs already hold the row under the bar, so the identity band
+        // stacks above them here rather than overlaying them as it does on a
+        // real identity page.
+        <>
+          {morph.headerBand}
+          <View className="px-4 pb-2">
+            <UnderlineTabs
+              tabs={OPTIONS}
+              selectedTab={variant}
+              handleTabPress={(tab) => {
+                const next = OPTIONS.find((option) => option === tab);
+                if (next) setVariant(next);
+              }}
             />
-          ) : null}
-          {variant === 'Sticky tabs' ? (
-            <UnderlineTabs tabs={RAILS} selectedTab={rail} handleTabPress={setRail} />
-          ) : null}
-        </View>
+            {variant === 'Tab fade' ? (
+              <MintCurrencyTabs
+                currencies={CURRENCIES}
+                selectedCurrency={currency}
+                onCurrencyChange={setCurrency}
+                scrollY={morph.scrollY}
+              />
+            ) : null}
+            {variant === 'Sticky tabs' ? (
+              <UnderlineTabs tabs={RAILS} selectedTab={rail} handleTabPress={setRail} />
+            ) : null}
+          </View>
+        </>
       }>
       {morph.probe}
       <E2EAccessibilityProbe
