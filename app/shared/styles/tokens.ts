@@ -239,6 +239,24 @@ export const controlHeight = {
  */
 export const headerButtonSize = Platform.select({ android: 54, default: minTouchTarget });
 
+const headerIdentityNameLineHeight = 14;
+const headerIdentityGap = 2;
+
+/**
+ * Header identity (icon above name). The whole stack occupies the header-button
+ * box, so it sits on the same row as headerLeft/headerRight and cannot outgrow
+ * the bar: UIKit fixes the navigation row at 44pt, react-native-screens' Android
+ * header subview clips its content to its own bounds, and Screen's fade ends at
+ * the bar. The icon takes whatever the name line leaves.
+ */
+export const headerIdentity = {
+  height: headerButtonSize,
+  gap: headerIdentityGap,
+  nameSize: 11,
+  nameLineHeight: headerIdentityNameLineHeight,
+  iconSize: headerButtonSize - headerIdentityNameLineHeight - headerIdentityGap,
+} as const;
+
 /**
  * The tint every chrome surface (bottom button bars, scroll edge fades) blurs
  * with. iOS's system material renders true frosted glass that composes

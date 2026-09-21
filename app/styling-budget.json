@@ -904,9 +904,6 @@
     "inline-style": 5,
     "content-container-style": 2
   },
-  "shared/ui/composed/chat/DmChatHeader.tsx": {
-    "inline-style": 3
-  },
   "shared/ui/composed/chat/LiquidChatComposer.tsx": {
     "inline-style": 7,
     "stack-layout-props": 2

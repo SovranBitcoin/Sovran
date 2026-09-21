@@ -9,9 +9,17 @@ Android form sheets use `FlowSheetHeader`, which owns their gradient and grabber
 Never add a second header background over that custom header.
 
 An identity page uses `useIdentityHeader` and `IdentityHeader`. The page avatar
-hands off to the compact avatar/title row as it crosses the header. Connected Apps,
-mint details, profiles, recipient payments and threads share this transition.
-Long names truncate; title content fits in one navigation row. Amount entry puts
+hands off to the compact header identity as it crosses the header: icon above name,
+the whole stack inside the header-button box (`headerIdentity` tokens), so it shares
+the actions' row and never outgrows the bar. A mint identity (`kind: 'mint'`) draws
+`MintIcon` and its placeholder. Connected Apps, mint details, profiles, recipient
+payments, direct messages and threads share this identity.
+Long names truncate; title content fits in one navigation row.
+
+A title stays on the screen's centre line only while it clears the busier side
+mirrored onto both. Native bars slide a wider title toward the emptier side, so a
+custom title bounds itself with `useCenteredTitleMaxWidth(sideActions)`, and
+`FlowSheetHeader` gives both side slots the wider side's measured width. Amount entry puts
 mint selection in its existing bottom action slot, with its payment constraints intact.
 A plain title remains appropriate when no identity is known or the page does not scroll.
 

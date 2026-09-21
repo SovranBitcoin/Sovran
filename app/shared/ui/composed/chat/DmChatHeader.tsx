@@ -1,15 +1,10 @@
 import { useModerationActions } from '@/features/feed/hooks/useModerationActions';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import React, { useCallback, useMemo } from 'react';
-import { useWindowDimensions } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import * as nip19 from 'nostr-tools/nip19';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { MarqueeText } from '@/shared/ui/primitives/MarqueeText';
-import { Text } from '@/shared/ui/primitives/Text';
-import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { View } from '@/shared/ui/primitives/View/View';
+import { IdentityHeader } from '@/shared/ui/composed/IdentityHeader';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -18,10 +13,10 @@ import { resolveIdentityName } from '@/shared/lib/identity';
 
 interface DmChatHeaderProps {
   /**
-   * Counterparty Nostr pubkey (hex). When provided, the header shows the
-   * truncated npub subtitle and a QR-share button on the right. Set
-   * `null`/omit for transports without a Nostr identity (e.g. BitChat BLE
-   * peers) — the npub line and QR button are hidden.
+   * Counterparty Nostr pubkey (hex). When provided, the header shows a
+   * QR-share button (which carries the full npub) and the moderation menu on
+   * the right. Omit for transports without a Nostr identity (e.g. BitChat BLE
+   * peers) — both are hidden.
    */
   pubkey?: string;
   /**
@@ -42,8 +37,6 @@ interface DmChatHeaderProps {
    * so the header avatar matches in-thread message avatars.
    */
   seed?: string;
-  /** Optional custom subtitle. Overrides the default npub-truncated line. */
-  subtitle?: string;
   onBack: () => void;
   /**
    * Replaces the right-hand QR-share button. Use when a transport needs a
@@ -53,8 +46,8 @@ interface DmChatHeaderProps {
 }
 
 /**
- * Header for 1:1 DM chat screens — avatar + display name + truncated npub +
- * QR-share button. Lifted from `features/user/screens/UserMessagesScreen.tsx`
+ * Header for 1:1 DM chat screens — the shared `IdentityHeader` (avatar above
+ * display name) + QR-share button. Lifted from `features/user/screens/UserMessagesScreen.tsx`
  * (the non-Routstr DM path) so White Noise, BitChat-DM, and Nostr DMs all
  * present the same identity affordance. Internally renders a `<Stack.Screen>`
  * options block, so consumers just mount this component anywhere inside their
@@ -65,15 +58,11 @@ export function DmChatHeader({
   displayName: displayNameOverride,
   nickname,
   seed,
-  subtitle,
   onBack,
   trailing,
 }: DmChatHeaderProps) {
   const { personMenu } = useModerationActions();
-  const { width: screenWidth } = useWindowDimensions();
-  const headerTitleWidth = screenWidth - 124 - 24;
-
-  const [foreground, shade400] = useThemeColor(['foreground', 'shade-400'] as const);
+  const foreground = useThemeColor('foreground');
 
   const { metadata, isLoading } = useNostrProfileMetadata(pubkey);
 
@@ -119,6 +108,8 @@ export function DmChatHeader({
         accessibilityLabel="Share profile QR"
       />
     ) : null);
+  // The busier side of the bar: the trailing action plus the moderation menu.
+  const sideActions = Math.max(1, (trailingNode ? 1 : 0) + (pubkey ? 1 : 0));
 
   return (
     <Stack.Screen
@@ -137,41 +128,16 @@ export function DmChatHeader({
             accessibilityLabel="Go back"
           />
         ),
+        headerTitleAlign: 'center',
         headerTitle: () => (
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              width: headerTitleWidth,
-              height: 48,
-            }}>
-            <Avatar
-              state={shouldShowAvatarLoading ? 'loading' : userPicture ? 'image' : 'fallback'}
-              size={40}
-              picture={userPicture}
-              seed={seed ?? pubkey ?? nickname ?? displayName}
-              name={displayName}
-            />
-            <VStack className="ml-2 min-w-0 flex-1 items-start justify-start gap-0.5">
-              <MarqueeText text={displayName} size={16} weight="bold" testID="dm-header-title" />
-              {subtitle ? (
-                <Text
-                  size={12}
-                  style={{ color: shade400, marginTop: 2, textAlign: 'left' }}
-                  numberOfLines={1}>
-                  {subtitle}
-                </Text>
-              ) : npub ? (
-                <Text
-                  size={12}
-                  style={{ color: shade400, marginTop: 2, textAlign: 'left' }}
-                  numberOfLines={1}
-                  ellipsizeMode="middle">
-                  {npub}
-                </Text>
-              ) : null}
-            </VStack>
-          </View>
+          <IdentityHeader
+            name={displayName}
+            seed={seed ?? pubkey ?? nickname ?? displayName}
+            picture={userPicture}
+            isLoading={shouldShowAvatarLoading}
+            sideActions={sideActions}
+            nameTestID="dm-header-title"
+          />
         ),
         headerRight: () => (
           <HStack className="gap-1">

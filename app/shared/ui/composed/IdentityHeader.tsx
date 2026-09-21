@@ -13,8 +13,11 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { useCenteredTitleMaxWidth } from '@/navigation/headerLayout';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
+import { headerIdentity } from '@/shared/styles/tokens';
+import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -23,20 +26,61 @@ export interface HeaderIdentity {
   name: string;
   seed: string;
   picture?: string | null;
+  /** A mint draws `MintIcon`, so a missing or failed icon is the mint placeholder, not a seeded avatar. */
+  kind?: 'person' | 'mint';
+  /** The picture is still resolving; draws the loading placeholder instead of a fallback. */
+  isLoading?: boolean;
 }
 
-/** A single compact row fits native iOS bars and the Android sheet title slot. */
-export function IdentityHeader({ name, seed, picture }: HeaderIdentity) {
+interface IdentityHeaderProps extends HeaderIdentity {
+  /** The larger number of header actions on either side of the title (see `useCenteredTitleMaxWidth`). */
+  sideActions?: number;
+  nameTestID?: string;
+}
+
+const NAME_STYLE = { lineHeight: headerIdentity.nameLineHeight };
+// Native navigation titles do not follow Dynamic Type, and this one shares a fixed
+// row with the header buttons. The accessibility label carries the full name.
+const NAME_MAX_FONT_SCALE = 1.2;
+
+/** Icon above name, inside the header-button box, so every identity page centres alike. */
+export function IdentityHeader({
+  name,
+  seed,
+  picture,
+  kind = 'person',
+  isLoading = false,
+  sideActions,
+  nameTestID,
+}: IdentityHeaderProps) {
+  const maxWidth = useCenteredTitleMaxWidth(sideActions);
+  const boxStyle = { maxWidth, height: headerIdentity.height, gap: headerIdentity.gap };
   return (
-    <View className="max-w-[220px] flex-row items-center gap-2">
-      <Avatar
-        state={picture ? 'image' : 'fallback'}
-        picture={picture ?? undefined}
-        seed={seed}
-        size={28}
-        alt={name}
-      />
-      <Text bold size={16} numberOfLines={1} className="shrink">
+    <View className="items-center justify-center" style={boxStyle}>
+      {kind === 'mint' ? (
+        <MintIcon
+          iconUrl={picture}
+          name={name}
+          size={headerIdentity.iconSize}
+          isLoading={isLoading}
+        />
+      ) : (
+        <Avatar
+          state={isLoading ? 'loading' : picture ? 'image' : 'fallback'}
+          picture={picture ?? undefined}
+          seed={seed}
+          size={headerIdentity.iconSize}
+          alt={name}
+        />
+      )}
+      <Text
+        bold
+        size={headerIdentity.nameSize}
+        numberOfLines={1}
+        maxFontSizeMultiplier={NAME_MAX_FONT_SCALE}
+        className="max-w-full text-center"
+        style={NAME_STYLE}
+        testID={nameTestID}>
         {name}
       </Text>
     </View>
@@ -46,13 +90,17 @@ export function IdentityHeader({ name, seed, picture }: HeaderIdentity) {
 function MorphTitle({
   identity,
   title,
+  sideActions,
   progress,
 }: {
   identity?: HeaderIdentity;
   title: string;
+  sideActions?: number;
   progress: SharedValue<number>;
 }) {
   const foreground = useThemeColor('foreground');
+  const maxWidth = useCenteredTitleMaxWidth(sideActions);
+  const boxStyle = { maxWidth, height: headerIdentity.height };
   const identityStyle = useAnimatedStyle(() => ({
     opacity: interpolate(progress.get(), [0.5, 1], [0, 1], Extrapolation.CLAMP),
     transform: [{ translateY: interpolate(progress.get(), [0.5, 1], [6, 0], Extrapolation.CLAMP) }],
@@ -62,20 +110,27 @@ function MorphTitle({
   }));
   return (
     <View
-      className="min-h-8 max-w-[220px] items-center justify-center"
+      className="items-center justify-center"
+      style={boxStyle}
       accessible
       accessibilityRole="header"
       accessibilityLabel={identity?.name ?? title}>
-      <Animated.View className="absolute" style={titleStyle}>
+      {/* The title is an overlay, so this zero-height copy is what gives the box
+          the title's width: Android's native header subview clips content to the
+          box, and the identity stack alone is narrower than most titles. */}
+      <Text size={16} bold numberOfLines={1} aria-hidden className="h-0 opacity-0">
+        {title}
+      </Text>
+      <Animated.View className="absolute max-w-full" style={titleStyle}>
         <Text size={16} bold color={foreground} numberOfLines={1}>
           {title}
         </Text>
       </Animated.View>
-      <Animated.View style={identityStyle}>
+      <Animated.View className="max-w-full" style={identityStyle}>
         {identity ? (
-          <IdentityHeader {...identity} />
+          <IdentityHeader {...identity} sideActions={sideActions} />
         ) : (
-          <Text size={16} bold>
+          <Text size={16} bold numberOfLines={1}>
             {title}
           </Text>
         )}
@@ -93,10 +148,13 @@ export function useIdentityHeader({
   identity,
   title = '',
   collapseAt = 76,
+  sideActions,
 }: {
   identity?: HeaderIdentity;
   title?: string;
   collapseAt?: number;
+  /** The larger number of header actions on either side; bounds the title so it stays centred. */
+  sideActions?: number;
 }) {
   const scrollY = useSharedValue(0);
   const progress = useSharedValue(0);
@@ -128,7 +186,9 @@ export function useIdentityHeader({
     animatedOnScroll,
     contentStyle,
     headerGradientStyle,
-    headerTitle: () => <MorphTitle identity={identity} title={title} progress={progress} />,
+    headerTitle: () => (
+      <MorphTitle identity={identity} title={title} sideActions={sideActions} progress={progress} />
+    ),
     probe: __DEV__ ? <IdentityHeaderProbe flipped={flipped} /> : null,
   };
 }
