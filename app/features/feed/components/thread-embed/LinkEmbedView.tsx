@@ -26,7 +26,7 @@ export const LinkEmbedView = React.memo(function LinkEmbedView({
   /** Inset so the page clears the navigation header. */
   topInset: number;
 }) {
-  const fadeStyle = useAnimatedStyle(() => ({ opacity: embedOpacity.value }));
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: embedOpacity.get() }));
 
   const handleScroll = useCallback<NonNullable<WebViewProps['onScroll']>>(
     (e) => {

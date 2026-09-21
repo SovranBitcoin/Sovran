@@ -31,7 +31,7 @@ export function useStickyCurrencyTabs({
   const [totalHeaderHeight, setTotalHeaderHeight] = useState(0);
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    scrollY.value = Math.max(0, event.nativeEvent.contentOffset.y);
+    scrollY.set(Math.max(0, event.nativeEvent.contentOffset.y));
   };
 
   const currencyTabs = (

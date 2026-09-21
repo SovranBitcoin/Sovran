@@ -25,13 +25,18 @@ export function useCountRollIn(value: string) {
       firstRender.current = false;
       return;
     }
-    progress.value = withSequence(
-      withTiming(0, { duration: 0 }),
-      withTiming(1, { duration: 280, easing: Easing.out(Easing.cubic) })
+    progress.set(
+      withSequence(
+        withTiming(0, { duration: 0 }),
+        withTiming(1, { duration: 280, easing: Easing.out(Easing.cubic) })
+      )
     );
   }, [value, progress]);
-  return useAnimatedStyle(() => ({
-    opacity: 0.25 + 0.75 * progress.value,
-    transform: [{ translateY: (1 - progress.value) * 6 }],
-  }));
+  return useAnimatedStyle(() => {
+    const p = progress.get();
+    return {
+      opacity: 0.25 + 0.75 * p,
+      transform: [{ translateY: (1 - p) * 6 }],
+    };
+  });
 }

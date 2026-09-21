@@ -28,7 +28,7 @@ export function OverlayDot({
   activeColor: string;
 }) {
   const animatedDotStyle = useAnimatedStyle(() => {
-    const position = index - pagerOffsetSv.value;
+    const position = index - pagerOffsetSv.get();
     const scale = interpolate(
       position,
       [...DOTS_SCALE_INPUT],
