@@ -13,7 +13,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useHeaderSearch } from '@/shared/hooks/useHeaderSearch';
 import { useDebouncedMintValidation } from '@/features/mint/hooks/useDebouncedMintValidation';
 import { useMintSearch } from '@/features/mint/hooks/useMintSearch';
-import { auditScoreFromOps } from '@/features/mint/lib/auditScore';
+import { selectMintAudit, type MintAuditSummary } from '@/features/mint/lib/auditInfo';
 import { extractAvailableCurrencies } from '@/features/mint/lib/availableCurrencies';
 import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import type { MintSearchResult } from '@/shared/lib/apiClient';
@@ -90,10 +90,8 @@ interface DisplayMint {
   } | null;
   contactFollowers?: number;
   contactReputation?: number;
-  /** Server-provided audit state for sorting badge color */
-  auditState?: string;
-  /** Server-provided total operations for stats display */
-  serverStats?: { n_mints: number; n_melts: number; n_errors: number };
+  /** The audit pill's numbers, read the same way the mint info page reads them. */
+  audit?: MintAuditSummary;
   /** KYM review score (0-5) */
   reviewScore?: number | null;
   /** Number of KYM reviews */
@@ -124,12 +122,17 @@ function adaptSearchResult(result: MintSearchResult): DisplayMint {
       profile && typeof profile.contactReputation === 'number'
         ? Math.round(profile.contactReputation)
         : undefined,
-    auditState: result.state,
-    serverStats: {
-      n_mints: result.n_mints,
-      n_melts: result.n_melts,
-      n_errors: result.n_errors,
-    },
+    // The metadata store is seeded from this same discover response and is
+    // what the mint info page reads, so it wins; the row's own counts cover a
+    // mint the store has evicted.
+    audit:
+      selectMintAudit(profile) ??
+      selectMintAudit({
+        auditState: result.state,
+        nMints: result.n_mints,
+        nMelts: result.n_melts,
+        nErrors: result.n_errors,
+      }),
     reviewScore: result.review_score,
     reviewCount: result.review_count,
   };
@@ -218,26 +221,6 @@ function FallbackSearchHeader({
   );
 }
 
-// Search-result preview: discovery rows carry operation counts (no per-swap
-// array), so the pill uses the ops-based score from the single owner — the
-// same number the store writes for the same row, so search and detail agree.
-function computeAuditStats(mint: SearchableMint): {
-  auditScore: number | undefined;
-  auditTotalOps: number | undefined;
-} {
-  if (!('serverStats' in mint) || !mint.serverStats)
-    return { auditScore: undefined, auditTotalOps: undefined };
-  const { n_mints, n_melts, n_errors } = mint.serverStats;
-  const { score, totalOps } = auditScoreFromOps({
-    nMints: n_mints,
-    nMelts: n_melts,
-    nErrors: n_errors,
-  });
-  return score === null
-    ? { auditScore: undefined, auditTotalOps: undefined }
-    : { auditScore: score, auditTotalOps: totalOps };
-}
-
 // Pre-baked mint row — deferred to the shared `ContactRow` so search results
 // here visually match the mint list, contacts tab, and split-bill picker.
 //
@@ -261,7 +244,7 @@ function MintItem({
 }) {
   const mintInfo = 'mintInfo' in mint ? mint.mintInfo : undefined;
   const displayName = getMintDisplayName(mint.url, mintInfo);
-  const { auditScore, auditTotalOps } = computeAuditStats(mint);
+  const audit = 'audit' in mint ? mint.audit : undefined;
 
   return (
     <ContactRow
@@ -279,9 +262,9 @@ function MintItem({
             'reviewCount' in mint && typeof mint.reviewCount === 'number'
               ? mint.reviewCount
               : undefined,
-          auditScore,
-          auditState: 'auditState' in mint ? mint.auditState : undefined,
-          auditTotalOps,
+          auditScore: audit?.score,
+          auditState: audit?.state,
+          auditTotalOps: audit?.totalOps,
           contactReputation: 'contactReputation' in mint ? mint.contactReputation : undefined,
           contactFollowers: 'contactFollowers' in mint ? mint.contactFollowers : undefined,
         },

@@ -209,24 +209,14 @@ export function getSovranMintEnrichment(mintUrl: string): Partial<MintReviewInfo
   if (p.contactReputation !== undefined) enrichment.contactReputation = p.contactReputation;
 
   if (p.audit) {
-    // Raw auditor blob present — assign the swap-derived fields explicitly (not
-    // guarded): the result is spread over the existing entry, so a now-scoreless
-    // mint (zero recent swaps → `auditScore` undefined) must CLEAR a stale score
-    // rather than silently preserve it.
-    enrichment.auditScore = p.auditScore;
-    enrichment.auditState = p.auditState;
-    enrichment.totalMints = p.auditMints;
-    enrichment.totalMelts = p.auditMelts;
-    enrichment.successRate = p.audit.successRate;
-    enrichment.swapSuccess = p.audit.swapSuccess;
-    enrichment.swapTotal = p.audit.swapTotal;
-    enrichment.avgTimeMs = p.audit.avgTimeMs;
-  } else {
-    // Discover-seeded scalars (no raw swaps) — surface what's present, omit holes.
-    if (p.auditScore !== undefined) enrichment.auditScore = p.auditScore;
-    if (p.auditState !== undefined) enrichment.auditState = p.auditState;
-    if (p.auditMints != null) enrichment.totalMints = p.auditMints;
-    if (p.auditMelts != null) enrichment.totalMelts = p.auditMelts;
+    // Assigned explicitly (not guarded): the result is spread over the existing
+    // entry, so a now-scoreless mint (no recorded operations → `score`
+    // undefined) must CLEAR a stale score rather than silently preserve it.
+    enrichment.auditScore = p.audit.score;
+    enrichment.auditState = p.audit.state;
+    enrichment.totalMints = p.audit.mints;
+    enrichment.totalMelts = p.audit.melts;
+    enrichment.avgTimeMs = p.audit.avgLatencyMs;
   }
 
   return enrichment;

@@ -174,8 +174,10 @@ describe('getMintCatalog cache-first behavior', () => {
       networkMode: 'cache-only',
     });
 
+    // 15 successes and no errors: the rate comes from the operation counts,
+    // never from the blob's swap list (one of its two swaps failed).
     expect(catalog[MINT_URL]).toMatchObject({
-      auditScore: 2.5,
+      auditScore: 5,
       auditState: 'OK',
       auditTotalOps: 15,
       kymScore: 4.2,

@@ -16,8 +16,9 @@
  * `getMintCatalog`, the discover seed (`upsertFromDiscover`) and the manager
  * attach below — screens read, they do not write ad-hoc derived fields.
  *
- * Raw `info` (NUT-06) and `auditData` blobs are retained verbatim because the
- * mint-info screen derives swap success-rate / latency from `auditData.swaps`
+ * Raw `info` (NUT-06) and `auditData` blobs are retained verbatim because
+ * rebalance routing builds its swap graph from `auditData.swaps` (and
+ * `selectMintAudit` falls back to the blob for a mint nagg has no audit for),
  * and operator-pubkey extraction needs the full NUT-06 contact array. "Cache
  * the aggregate, not the rows" applies strictly to KYM review rows, which are
  * never persisted here — only their `averageScore` / `reviewCount`.
@@ -32,7 +33,7 @@ import { z } from 'zod';
 import { create } from 'zustand';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 
-import { transformAuditData } from '@/features/mint/lib/auditInfo';
+import { auditGroupFromDiscover } from '@/features/mint/lib/auditInfo';
 import { auditScoreFromOps } from '@/features/mint/lib/auditScore';
 import type { LegacyMintAudit, MintMetadataEntry } from './mintMetadataTypes';
 import type { DiscoverMint } from '@/shared/lib/apiClient';
@@ -186,14 +187,16 @@ function identityFromInfo(info: GetInfoResponse): Partial<MintMetadataEntry> {
 
 /** Audit scalars projected from a raw auditor response. */
 function auditScalarsFrom(auditData: LegacyMintAudit): Partial<MintMetadataEntry> {
-  const { score } = transformAuditData(auditData);
-  return {
-    auditData,
-    auditScore: typeof score === 'number' ? score : null,
-    auditState: auditData.state,
+  const counts = {
     nMints: auditData.n_mints,
     nMelts: auditData.n_melts,
     nErrors: auditData.n_errors,
+  };
+  return {
+    auditData,
+    auditScore: auditScoreFromOps(counts).score,
+    auditState: auditData.state,
+    ...counts,
   };
 }
 
@@ -279,16 +282,7 @@ export const useMintMetadataStore = create<MintMetadataState>()(
               // Stamp a group's `*At` ONLY when this row actually carried that
               // group's data — otherwise `isStale` lies and a consumer skips a
               // needed refetch.
-              const hasAudit =
-                m.state !== undefined ||
-                m.nMints !== undefined ||
-                m.nMelts !== undefined ||
-                m.nErrors !== undefined ||
-                m.uptime24h !== undefined ||
-                m.avgLatencyMs !== undefined;
-              // Discovery's operation score (successes vs errors) — one owner
-              // for the formula so search, store and detail can never disagree.
-              const auditScore = auditScoreFromOps(m).score;
+              const auditGroup = auditGroupFromDiscover(m);
               // A follower COUNT alone is not "social resolved": `resolveNostrProfile`
               // reads the `social` group to decide whether the operator-profile
               // fetch (which yields reputation) can be skipped. A discover row that
@@ -318,18 +312,10 @@ export const useMintMetadataStore = create<MintMetadataState>()(
                 ...(m.reviewCount !== undefined ? { reviewCount: m.reviewCount } : {}),
                 ...(m.favouriteCount !== undefined ? { favouriteCount: m.favouriteCount } : {}),
                 reviewsAt: now,
-                // audit scalars (no raw swaps) — stamp only when present.
-                // Use `!== undefined` (not truthiness) to match `hasAudit`, so a
-                // falsy-but-present state can't stamp `auditAt` without storing it.
-                ...(m.state !== undefined ? { auditState: m.state } : {}),
-                ...(m.nMints !== undefined ? { nMints: m.nMints } : {}),
-                ...(m.nMelts !== undefined ? { nMelts: m.nMelts } : {}),
-                ...(m.nErrors !== undefined ? { nErrors: m.nErrors } : {}),
-                ...(hasAudit ? { auditScore, auditAt: now } : {}),
-                ...(m.uptime24h !== undefined ? { uptime24h: m.uptime24h } : {}),
-                ...(m.avgLatencyMs !== undefined ? { avgLatencyMs: m.avgLatencyMs } : {}),
-                ...(m.auditSource !== undefined ? { auditSource: m.auditSource } : {}),
-                ...(m.auditUpdatedAt !== undefined ? { auditUpdatedAt: m.auditUpdatedAt } : {}),
+                // audit — the whole group at once. Its `undefined` keys are
+                // deliberate: they drop what the previous auditor's row left
+                // behind (a mint moving from ucash to 8333 loses its latency).
+                ...(auditGroup ? { ...auditGroup, auditAt: now } : {}),
                 // social — guard reputation on a real number so a `null`
                 // ("unknown") row can't clobber a previously-resolved reputation.
                 ...(m.followers !== undefined ? { contactFollowers: m.followers } : {}),
@@ -531,7 +517,7 @@ const LegacyMintInfo = z.looseObject({
   description: z.string().optional().catch(undefined),
 });
 
-/** Auditor fields `auditScalarsFrom` / `transformAuditData` read. */
+/** Auditor fields `auditScalarsFrom` / `selectMintAudit` read. */
 const LegacyAuditData = z.looseObject({
   url: z.string(),
   name: z.string(),

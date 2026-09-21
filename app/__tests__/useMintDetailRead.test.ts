@@ -36,7 +36,7 @@ const MINT = 'https://mint.example.com';
 const store = () => useMintMetadataStore.getState();
 
 function stampAudit(state = 'OK') {
-  store().mergeCached(MINT, { auditState: state, auditScore: 4, nMints: 10, nMelts: 5 }, ['audit']);
+  store().mergeCached(MINT, { auditState: state, nMints: 10, nMelts: 6, nErrors: 4 }, ['audit']);
 }
 
 beforeEach(() => {
@@ -58,7 +58,7 @@ it('serves fresh audit + review groups from the store with no round-trips', asyn
   await waitFor(() => expect(result.current.reviews).toBe('ready'));
   expect(result.current.audit).toBe('ready');
   expect(result.current.identity).toBe('ready');
-  expect(result.current.meta.auditScore).toBe(4);
+  expect(result.current.meta.audit).toMatchObject({ state: 'OK', score: 4, totalOps: 20 });
   expect(getDiscoveredMintMetadata).not.toHaveBeenCalled();
   expect(fetchMintReviews).not.toHaveBeenCalled();
 });

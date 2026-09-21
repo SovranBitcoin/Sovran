@@ -64,11 +64,9 @@ function readCachedEntry(mintUrl: string): { entry: MintCatalogEntry; info: unkn
   const p = projectMintMeta(meta);
 
   const entry: MintCatalogEntry = {};
-  if (p.auditScore !== undefined) entry.auditScore = p.auditScore;
-  if (p.auditState !== undefined) entry.auditState = p.auditState;
-  if (p.auditMints != null && p.auditMelts != null) {
-    entry.auditTotalOps = p.auditMints + p.auditMelts;
-  }
+  if (p.audit?.score !== undefined) entry.auditScore = p.audit.score;
+  if (p.audit?.state !== undefined) entry.auditState = p.audit.state;
+  if (p.audit?.totalOps !== undefined) entry.auditTotalOps = p.audit.totalOps;
   if (p.kymScore !== undefined) entry.kymScore = p.kymScore;
   if (p.reviewCount !== undefined) entry.reviewCount = p.reviewCount;
   if (p.contactFollowers !== undefined) entry.contactFollowers = p.contactFollowers;

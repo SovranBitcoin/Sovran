@@ -1,67 +1,143 @@
+import type { DiscoverMint } from '@/shared/lib/apiClient';
 import type { LegacyMintAudit, MintMetadataEntry } from '@/shared/stores/global/mintMetadataTypes';
-import { auditScoreFromSwaps } from './auditScore';
+import { auditScoreFromOps } from './auditScore';
 
-interface AuditInfo {
-  url: string;
-  name: string;
-  state: string;
-  /** 0-5 score derived from successRate (swap-based), used by some UI */
-  score?: number;
-  /** Swap success rate in range [0..1], computed from recent swaps (typically last 100) */
-  successRate?: number;
-  /** Recent swap window size used for successRate (e.g. 100) */
-  swapTotal?: number;
-  /** Successful swaps (state === 'OK') in the recent window */
-  swapSuccess?: number;
-  /** Average time_taken (ms) for successful swaps with time_taken > 0 */
-  avgTimeMs?: number;
-  auditorData: {
-    name: string;
-    state: string;
-    mints: number;
-    melts: number;
-    errors: number;
+/**
+ * The cached fields one auditor row owns. They are written and cleared
+ * together so an entry never holds one auditor's counts beside another's
+ * latency.
+ */
+type MintAuditGroup = Pick<
+  MintMetadataEntry,
+  | 'auditState'
+  | 'nMints'
+  | 'nMelts'
+  | 'nErrors'
+  | 'auditScore'
+  | 'uptime24h'
+  | 'avgLatencyMs'
+  | 'auditSource'
+  | 'auditUpdatedAt'
+>;
+
+const NO_AUDIT: MintAuditGroup = {
+  auditState: undefined,
+  nMints: undefined,
+  nMelts: undefined,
+  nErrors: undefined,
+  auditScore: undefined,
+  uptime24h: undefined,
+  avgLatencyMs: undefined,
+  auditSource: undefined,
+  auditUpdatedAt: undefined,
+};
+
+/**
+ * Normalize the audit half of a nagg `/nostr/mint/discover` row. Nagg has
+ * already chosen the auditor for the mint: a ucash row (the newer auditor) wins,
+ * and the 8333 row (the older one) fills the mints ucash does not track.
+ *
+ * Every key is returned, absent ones as `undefined`, so spreading the result
+ * over a cached entry REPLACES the previous auditor's row instead of leaving
+ * its fields behind. `hasAudit: false` is nagg's answer that no auditor tracks
+ * the mint (it still sends zero counts), which clears the group. `undefined`
+ * means the row said nothing about audit, so the cached group is left alone.
+ */
+export function auditGroupFromDiscover(m: DiscoverMint): MintAuditGroup | undefined {
+  const hasAuditFields =
+    m.state !== undefined ||
+    m.nMints !== undefined ||
+    m.nMelts !== undefined ||
+    m.nErrors !== undefined ||
+    m.uptime24h !== undefined ||
+    m.avgLatencyMs !== undefined;
+  if (m.hasAudit === false) return NO_AUDIT;
+  if (m.hasAudit === undefined && !hasAuditFields) return undefined;
+  return {
+    auditState: m.state,
+    nMints: m.nMints,
+    nMelts: m.nMelts,
+    nErrors: m.nErrors,
+    auditScore: auditScoreFromOps(m).score,
+    uptime24h: m.uptime24h,
+    avgLatencyMs: m.avgLatencyMs,
+    auditSource: m.auditSource,
+    auditUpdatedAt: m.auditUpdatedAt,
   };
 }
 
-/**
- * Reduce the auditor's per-mint response to the swap-based metrics the
- * mint UI surfaces ("100 of 100 swaps", score chips, latency chips).
- * Identical results were hand-coded twice in `useAuditedMint` and
- * `useAuditedMints`; this is the single canonical implementation.
- */
-export function transformAuditData(auditData: LegacyMintAudit): AuditInfo {
-  const swaps = auditData.swaps || [];
-  const swapTotal = swaps.length;
-  const swapSuccess = swaps.reduce((acc, s) => acc + (s.state === 'OK' ? 1 : 0), 0);
-  const successRate = swapTotal > 0 ? swapSuccess / swapTotal : undefined;
-  const score = auditScoreFromSwaps(successRate);
+/** One auditor's view of a mint, as every mint surface displays it. */
+export interface MintAuditSummary {
+  /** The auditor that measured this; `undefined` when the cached row names none. */
+  source: MintMetadataEntry['auditSource'];
+  state?: string;
+  /** successes / (successes + errors), 0..1; `undefined` until an operation was recorded. */
+  successRate?: number;
+  /** `successRate` on the 0..5 scale the row pills use. */
+  score?: number;
+  /** The operations behind `successRate`: successes plus errors. */
+  totalOps?: number;
+  mints?: number;
+  melts?: number;
+  avgLatencyMs?: number;
+}
 
-  const successfulTimes = swaps
+function summarize(
+  source: MintAuditSummary['source'],
+  state: string | undefined,
+  counts: { nMints?: number; nMelts?: number; nErrors?: number },
+  avgLatencyMs: number | undefined
+): MintAuditSummary | undefined {
+  const { score, totalOps } = auditScoreFromOps(counts);
+  // Zero counts with no state is what an unaudited mint looks like in cache.
+  if (state === undefined && score === null && avgLatencyMs === undefined) return undefined;
+  const summary: MintAuditSummary = { source };
+  if (state !== undefined) summary.state = state;
+  if (score !== null) {
+    summary.successRate = score / 5;
+    summary.score = score;
+    summary.totalOps = totalOps;
+  }
+  if (counts.nMints !== undefined) summary.mints = counts.nMints;
+  if (counts.nMelts !== undefined) summary.melts = counts.nMelts;
+  if (avgLatencyMs !== undefined) summary.avgLatencyMs = avgLatencyMs;
+  return summary;
+}
+
+/** Mean `time_taken` of the successful swaps in a retired-API blob. */
+function legacyAvgLatencyMs(auditData: LegacyMintAudit): number | undefined {
+  const times = (auditData.swaps || [])
     .filter((s) => s.state === 'OK' && typeof s.time_taken === 'number' && s.time_taken > 0)
     .map((s) => s.time_taken);
-  const avgTimeMs =
-    successfulTimes.length > 0
-      ? successfulTimes.reduce((sum, t) => sum + t, 0) / successfulTimes.length
-      : undefined;
+  if (times.length === 0) return undefined;
+  return times.reduce((sum, t) => sum + t, 0) / times.length;
+}
 
-  return {
-    url: auditData.url,
-    name: auditData.name,
-    state: auditData.state,
-    score,
-    successRate,
-    swapTotal,
-    swapSuccess,
-    avgTimeMs,
-    auditorData: {
-      name: auditData.name,
-      state: auditData.state,
-      mints: auditData.n_mints,
-      melts: auditData.n_melts,
-      errors: auditData.n_errors,
-    },
-  };
+/**
+ * The ONE reading of a cached entry's audit. The mint list rows, the Add Mints
+ * rows and the mint info page all display this, so they agree by construction.
+ *
+ * One source per summary, never a blend:
+ *   1. the nagg discovery group (ucash preferred, 8333 as nagg's fallback);
+ *   2. only when that group is empty, the 8333 blob kept from the retired audit
+ *      API (`auditData`), read whole.
+ * The rate always comes from the chosen source's operation counts, so a number
+ * means the same thing whichever auditor supplied it.
+ */
+export function selectMintAudit(
+  entry: MintMetadataEntry | undefined
+): MintAuditSummary | undefined {
+  if (!entry) return undefined;
+  const discovered = summarize(entry.auditSource, entry.auditState, entry, entry.avgLatencyMs);
+  if (discovered) return discovered;
+  const legacy = entry.auditData;
+  if (!legacy) return undefined;
+  return summarize(
+    '8333',
+    legacy.state,
+    { nMints: legacy.n_mints, nMelts: legacy.n_melts, nErrors: legacy.n_errors },
+    legacyAvgLatencyMs(legacy)
+  );
 }
 
 /** Normalized presentation scalars projected from a cached metadata entry. */
@@ -71,23 +147,15 @@ interface MintMetaProjection {
   contactFollowers?: number;
   /** rounded to a whole number */
   contactReputation?: number;
-  auditScore?: number;
-  auditState?: string;
-  /** n_mints */
-  auditMints?: number;
-  /** n_melts */
-  auditMelts?: number;
-  /** full swap breakdown — present only when the raw auditor blob is cached */
-  audit?: AuditInfo;
+  audit?: MintAuditSummary;
 }
 
 /**
  * Single owner for "given a cached mint metadata entry, here are the
- * presentation scalars." Both the catalog reader (`getMintCatalog`) and the
- * send-flow enrichment bridge project the same audit/review/social fields;
- * centralizing the raw-blob-vs-discover-scalars fallback and the reputation
- * rounding here keeps them from drifting. Legacy swap scores live in
- * `transformAuditData`; discovery operation scores are written by the store. Lives next to that transform — a runtime leaf — so
+ * presentation scalars." The catalog reader (`getMintCatalog`), the send-flow
+ * enrichment bridge and the mint detail read project the same
+ * audit/review/social fields; centralizing the audit selection and the
+ * reputation rounding here keeps them from drifting. A runtime leaf, so
  * importing it never drags the network layer into a consumer.
  */
 export function projectMintMeta(meta: MintMetadataEntry | undefined): MintMetaProjection {
@@ -100,17 +168,7 @@ export function projectMintMeta(meta: MintMetadataEntry | undefined): MintMetaPr
   if (typeof meta.contactReputation === 'number') {
     p.contactReputation = Math.round(meta.contactReputation);
   }
-
-  // Legacy swap detail remains available, but fresh discovery scalars win.
-  const audit = meta.auditData ? transformAuditData(meta.auditData) : undefined;
+  const audit = selectMintAudit(meta);
   if (audit) p.audit = audit;
-  const score = meta.auditScore !== undefined ? meta.auditScore : audit?.score;
-  if (score != null) p.auditScore = score;
-  const state = meta.auditState ?? audit?.state;
-  if (state !== undefined) p.auditState = state;
-  const mints = meta.nMints ?? audit?.auditorData.mints;
-  const melts = meta.nMelts ?? audit?.auditorData.melts;
-  if (mints != null) p.auditMints = mints;
-  if (melts != null) p.auditMelts = melts;
   return p;
 }

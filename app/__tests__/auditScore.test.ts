@@ -1,4 +1,4 @@
-import { auditScoreFromOps, auditScoreFromSwaps } from '@/features/mint/lib/auditScore';
+import { auditScoreFromOps } from '@/features/mint/lib/auditScore';
 
 describe('auditScoreFromOps', () => {
   it('rates successes against successes plus errors, on a 0..5 scale', () => {
@@ -19,17 +19,5 @@ describe('auditScoreFromOps', () => {
     });
     expect(auditScoreFromOps({ nMints: 5, nMelts: 5 })).toEqual({ score: null, totalOps: 0 });
     expect(auditScoreFromOps({})).toEqual({ score: null, totalOps: 0 });
-  });
-});
-
-describe('auditScoreFromSwaps', () => {
-  it('scales a swap success rate to 0..5 and stays bounded', () => {
-    expect(auditScoreFromSwaps(0.8)).toBe(4);
-    expect(auditScoreFromSwaps(1.4)).toBe(5);
-    expect(auditScoreFromSwaps(-1)).toBe(0);
-  });
-  it('is undefined without a rate', () => {
-    expect(auditScoreFromSwaps(undefined)).toBeUndefined();
-    expect(auditScoreFromSwaps(Number.NaN)).toBeUndefined();
   });
 });

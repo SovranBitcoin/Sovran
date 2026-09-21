@@ -37,7 +37,7 @@ interface MintDetailRead {
   audit: MintDetailGroupStatus;
   reviews: MintDetailGroupStatus;
   social: MintDetailGroupStatus;
-  /** Cached scalars projected for display (audit score/state/counts, review aggregate, operator). */
+  /** Cached scalars projected for display (the audit summary, review aggregate, operator). */
   meta: ReturnType<typeof projectMintMeta>;
   /** Re-run every failed group (identity via the bridge, audit + reviews here). */
   retry: () => void;
@@ -197,7 +197,7 @@ export function useMintDetailRead(
   const identity: MintDetailGroupStatus =
     !mintUrl || !entry ? 'loading' : identityError ? 'error' : 'ready';
 
-  const hasAudit = meta.auditState !== undefined || meta.auditScore !== undefined;
+  const hasAudit = meta.audit !== undefined;
   const hasReviews = meta.kymScore !== undefined || meta.reviewCount !== undefined;
   const hasSocial = meta.contactFollowers !== undefined || meta.contactReputation !== undefined;
   const socialStale = mintUrl ? isMintMetaGroupStale(cached, 'social', openedAtMs) : false;
