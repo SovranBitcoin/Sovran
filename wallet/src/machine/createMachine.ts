@@ -5,7 +5,10 @@ import { isValidSatAmount } from "../guards";
 import { defaultDetectors } from "../detectors";
 import { isMeltUserCancelledError, isMintOfflineError } from "../errors";
 import { t } from "../formatting/locales";
-import { compareMintDisplayOrder } from "../mint-capabilities";
+import {
+  accountMintUrls,
+  compareMintDisplayOrder,
+} from "../mint-capabilities";
 import { errField, logger, mintUrlFields } from "../logger";
 import { buildProofSuggestions } from "./amountFallback";
 import {
@@ -586,20 +589,54 @@ export function createPaymentMachine(
   function buildFallbackMintListItems(
     data: StepDataMap["selectMint"],
   ): MintListItem[] {
+    const walletCtx = getContext();
+    const byMintUrl = new Map(
+      data.candidates.map((candidate) => [candidate.mintUrl, candidate]),
+    );
+    // The same MINTS the enrichment will list, not just the ones that passed
+    // the flow's filters. `data.candidates` is already filtered (a send drops
+    // every unfunded mint), while `buildMintListItems` lists the whole account
+    // and explains each exclusion — so painting the candidates alone made the
+    // row COUNT jump the moment enrichment landed, which reads as the picker
+    // briefly showing the wrong mints. Only the metadata may fill in now.
+    const mintUrls =
+      data.scope === "selected"
+        ? walletCtx.trustedMintUrls
+        : accountMintUrls(walletCtx);
     // Sorted with the SAME comparator the async enrichment uses, so the
     // first painted frame is already in the final order and the enriched
     // rows land without re-shuffling the list.
-    return data.candidates
-      .map((candidate) => ({
-        mintUrl: candidate.mintUrl,
-        displayName: candidate.mintUrl,
-        balance: candidate.balance,
-        unit: data.unit,
-        status: candidate.status ?? ("available" as const),
-        reason: candidate.reason ?? null,
-        isPreferred: false,
-      }))
+    const items = mintUrls
+      .map((mintUrl): MintListItem => {
+        const candidate = byMintUrl.get(mintUrl);
+        const balance = candidate?.balance ?? walletCtx.mintBalances[mintUrl] ?? 0;
+        // A mint the flow filtered out is disabled here too. Its reason is
+        // named only where the rule is the enrichment's own — an unfunded mint
+        // on a spend — and otherwise left to the enrichment rather than guessed.
+        const excluded = !candidate;
+        return {
+          mintUrl,
+          displayName: mintUrl,
+          balance,
+          unit: data.unit,
+          status: excluded
+            ? ("disabled" as const)
+            : (candidate.status ?? ("available" as const)),
+          reason: excluded
+            ? balance <= 0
+              ? { code: "NO_BALANCE", message: "No balance" }
+              : null
+            : (candidate.reason ?? null),
+          isPreferred: false,
+        };
+      })
       .sort(compareMintDisplayOrder);
+    logger.debug("machine.selectMint.fallbackItems", {
+      candidateCount: data.candidates.length,
+      itemCount: items.length,
+      scope: data.scope ?? null,
+    });
+    return items;
   }
 
   function startMintListEnrichment(
