@@ -498,7 +498,7 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
           hasMetadata: !!r.metadata,
           followers: r.followersCount ?? null,
           following: r.followingCount ?? null,
-          joinedAt: r.joinedAt ?? null,
+          joinedAtSec: r.joinedAtSec ?? null,
           ...describeProvenance(r.provenance),
         }),
       );
@@ -714,7 +714,7 @@ function mergeProfileStats(acc: ProfileStats | undefined, next: ProfileStats): P
     followersCount: acc.followersCount ?? next.followersCount,
     followingCount: acc.followingCount ?? next.followingCount,
     noteCount: acc.noteCount ?? next.noteCount,
-    joinedAt: acc.joinedAt ?? next.joinedAt,
+    joinedAtSec: acc.joinedAtSec ?? next.joinedAtSec,
   };
 }
 
@@ -858,14 +858,18 @@ function auditThread(
   memo: ThreadAuditMemo,
   request: ThreadAuditRequest,
 ): Promise<ResolvedThreadAudit> {
-  const cached = memo.get(request.noteId);
+  // A caller-owned abort must never settle the entry other callers join.
+  if (request.signal) return runThreadAudit(tiers, cache, request);
+  // The consulted tiers are the ones below `primaryTier`, so it is part of the key.
+  const key = `${request.primaryTier}|${request.noteId}`;
+  const cached = memo.get(key);
   const now = Date.now();
   if (cached && now - cached.at < THREAD_AUDIT_TTL_MS) {
     nostrLog.debug('nostr.read.threadAudit.memo', { noteId: short(request.noteId) });
     return cached.promise;
   }
   const promise = runThreadAudit(tiers, cache, request);
-  memo.set(request.noteId, { at: now, promise });
+  memo.set(key, { at: now, promise });
   if (memo.size > THREAD_AUDIT_MEMO_MAX) {
     const oldest = memo.keys().next().value;
     if (oldest !== undefined) memo.delete(oldest);

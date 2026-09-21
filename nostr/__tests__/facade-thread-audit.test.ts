@@ -126,4 +126,39 @@ describe('NostrDataLayer.auditThreadReplies — the "Might be spam" second opini
       first.extras.map((i) => (i.type === 'note' ? i.event.id : '')),
     );
   });
+
+  test('a different primary tier does not join the memoized audit', async () => {
+    const primal = countingPrimal(AUDIT_BATCH);
+    const relay = countingRelay(AUDIT_BATCH);
+    const layer = createNostrDataLayer({
+      tiers: [
+        pendingFeedTier('nagg'),
+        createPrimalTier({ connection: primal.connection }),
+        createRelayTier({ connection: relay.connection }),
+      ],
+    });
+    const base = { noteId: ROOT, opPubkey: OP, knownReplyIds: [KNOWN] };
+
+    // Relay is the lowest tier: nothing below it, so this audit is the skipped empty one.
+    const fromRelay = await layer.auditThreadReplies({ ...base, primaryTier: 'relay' });
+    expect(fromRelay.tier).toBeNull();
+
+    const fromNagg = await layer.auditThreadReplies({ ...base, primaryTier: 'nagg' });
+    expect(fromNagg.tier).not.toBeNull();
+    expect(fromNagg.extras.map((i) => (i.type === 'note' ? i.event.id : ''))).toEqual([EXTRA]);
+  });
+
+  test('a signalled audit bypasses the memo so its abort is not shared', async () => {
+    const primal = countingPrimal(AUDIT_BATCH);
+    const layer = createNostrDataLayer({
+      tiers: [pendingFeedTier('nagg'), createPrimalTier({ connection: primal.connection })],
+    });
+    const request = { noteId: ROOT, opPubkey: OP, primaryTier: 'nagg' as const, knownReplyIds: [KNOWN] };
+
+    await layer.auditThreadReplies({ ...request, signal: new AbortController().signal });
+    const callsAfterSignalled = primal.calls();
+    await layer.auditThreadReplies(request);
+
+    expect(primal.calls()).toBeGreaterThan(callsAfterSignalled);
+  });
 });
