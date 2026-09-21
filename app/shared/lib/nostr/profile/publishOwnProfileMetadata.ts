@@ -37,10 +37,10 @@ export const PROFILE_CREATED_AT_MAX_SKEW_SECONDS = 300;
 // by every relay, so the new event must always be newer than its base. A base
 // beyond the skew window is logged (clock_skew) but still superseded by +1;
 // capping below it would make every later edit unpublishable.
-export const nextProfileCreatedAt = (
-  baseCreatedAt = 0,
+export const nextProfileCreatedAtSec = (
+  baseCreatedAtSec = 0,
   nowSeconds = Math.floor(Date.now() / 1000)
-) => Math.max(nowSeconds, baseCreatedAt + 1);
+) => Math.max(nowSeconds, baseCreatedAtSec + 1);
 
 export function parseOwnProfileSnapshot(event: {
   content: string;
@@ -223,7 +223,7 @@ export function publishOwnProfileMetadata({
     event.kind = 0;
     event.pubkey = pubkey;
     const nowSeconds = Math.floor(Date.now() / 1000);
-    event.created_at = nextProfileCreatedAt(base?.createdAt, nowSeconds);
+    event.created_at = nextProfileCreatedAtSec(base?.createdAt, nowSeconds);
     if (base && base.createdAt > nowSeconds + PROFILE_CREATED_AT_MAX_SKEW_SECONDS)
       nostrLog.warn('nostr.profile.publish.clock_skew', {
         deltaSeconds: base.createdAt - nowSeconds,

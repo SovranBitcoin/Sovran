@@ -33,17 +33,17 @@ export interface OwnSyncEvent {
 interface OwnLikeRow {
   targetEventId: string;
   reactionEventId: string;
-  createdAt: number;
+  createdAtSec: number;
 }
 interface OwnRepostRow {
   targetEventId: string;
   repostEventId: string;
-  createdAt: number;
+  createdAtSec: number;
 }
 interface OwnReplyRow {
   targetEventId: string;
   replyEventId: string;
-  createdAt: number;
+  createdAtSec: number;
 }
 
 interface OwnEventsPartition {
@@ -115,7 +115,7 @@ export function partitionOwnEvents(events: readonly OwnSyncEvent[]): OwnEventsPa
           out.likes.push({
             targetEventId: target,
             reactionEventId: event.id,
-            createdAt: event.created_at,
+            createdAtSec: event.created_at,
           });
         }
         break;
@@ -126,7 +126,7 @@ export function partitionOwnEvents(events: readonly OwnSyncEvent[]): OwnEventsPa
           out.reposts.push({
             targetEventId: target,
             repostEventId: event.id,
-            createdAt: event.created_at,
+            createdAtSec: event.created_at,
           });
         }
         break;
@@ -138,7 +138,7 @@ export function partitionOwnEvents(events: readonly OwnSyncEvent[]): OwnEventsPa
           out.replies.push({
             targetEventId: target,
             replyEventId: event.id,
-            createdAt: event.created_at,
+            createdAtSec: event.created_at,
           });
         }
         break;

@@ -30,7 +30,7 @@ export interface DmConversation {
   lastMessagePreview: string;
   lastMessageIsOwn?: boolean;
   /** unix seconds */
-  lastMessageAt: number;
+  lastMessageAtSec: number;
   /** Protocol of the most recent message with this counterparty. */
   protocol: DmProtocol;
   /** Event id of the newest message (gift-wrap id for NIP-17, kind-4 id for
@@ -53,17 +53,17 @@ function seedFromLastMessages(): DmConversation[] {
       counterparty,
       lastMessagePreview: '',
       lastMessageIsOwn: entry.isOwn,
-      lastMessageAt: entry.atSeconds,
+      lastMessageAtSec: entry.atSeconds,
       protocol: entry.protocol,
       newestMessageId: '',
       previewPending: true,
     });
   }
-  return out.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+  return out.sort((a, b) => b.lastMessageAtSec - a.lastMessageAtSec);
 }
 
 function sorted(bucket: Map<string, DmConversation>): DmConversation[] {
-  return [...bucket.values()].sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+  return [...bucket.values()].sort((a, b) => b.lastMessageAtSec - a.lastMessageAtSec);
 }
 
 export function useDmConversations(
@@ -110,7 +110,7 @@ export function useDmConversations(
         if (isCurrentProfile && !isMockContactPubkey(dm.counterparty)) {
           useDmLastMessageStore.getState().recordLastMessage(dm.counterparty, {
             protocol: dm.protocol,
-            atSeconds: dm.createdAt,
+            atSeconds: dm.createdAtSec,
             isOwn: dm.isOwn,
           });
         }
@@ -118,12 +118,12 @@ export function useDmConversations(
         // message wins (and sets the displayed protocol). Per-protocol threads
         // are opened from the profile's send-message picker.
         const existing = bucketRef.current.get(dm.counterparty);
-        if (!existing || dm.createdAt > existing.lastMessageAt) {
+        if (!existing || dm.createdAtSec > existing.lastMessageAtSec) {
           bucketRef.current.set(dm.counterparty, {
             counterparty: dm.counterparty,
             lastMessagePreview: dm.content,
             lastMessageIsOwn: dm.isOwn,
-            lastMessageAt: dm.createdAt,
+            lastMessageAtSec: dm.createdAtSec,
             protocol: dm.protocol,
             newestMessageId: dm.id,
           });

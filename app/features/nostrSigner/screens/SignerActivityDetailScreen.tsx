@@ -85,7 +85,7 @@ function CopyableEventId({ eventId }: { eventId: string }) {
 
   const copy = useCallback(() => {
     void Clipboard.setStringAsync(eventId);
-    popup({ message: 'Copied', type: 'success', variant: 'toast', duration: 1500 });
+    popup({ message: 'Copied', type: 'success', variant: 'toast', durationMs: 1500 });
   }, [eventId]);
 
   return (

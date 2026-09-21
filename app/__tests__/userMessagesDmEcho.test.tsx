@@ -38,7 +38,7 @@ let mockThreadState: {
     id: string;
     content: string;
     senderPubkey: string;
-    createdAt: number;
+    createdAtSec: number;
     isOwn: boolean;
   }[];
   loading: boolean;
@@ -297,7 +297,7 @@ describe('UserMessagesScreen optimistic DM echoes', () => {
           id: SELF_WRAP_ID,
           content: TOKEN,
           senderPubkey: mockOwnPubkey,
-          createdAt: 1_700_000_000,
+          createdAtSec: 1_700_000_000,
           isOwn: true,
         },
       ],

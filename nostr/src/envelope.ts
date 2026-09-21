@@ -767,7 +767,7 @@ export type NaggOwnProfileRow = ProfileMetadata & {
   pubkey: string;
   followers: number;
   follows: number;
-  createdAt?: number;
+  createdAtSec?: number;
 };
 
 /** v1's own-profiles rows: kind-0 metadata + follower/following aggregates. */
@@ -788,7 +788,7 @@ export function ownProfilesFromEnvelope(envelope: NaggProfilesEnvelope): NaggOwn
       ...(metadata ?? {}),
       followers: counts.followers,
       follows: counts.following,
-      ...(event ? { createdAt: event.created_at } : {}),
+      ...(event ? { createdAtSec: event.created_at } : {}),
     });
   }
   return rows;

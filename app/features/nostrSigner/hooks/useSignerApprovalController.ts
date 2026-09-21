@@ -147,7 +147,7 @@ export function useSignerApprovalController(): void {
         ...(newest.kind !== undefined && { kind: newest.kind }),
       });
       const copy = autoSignedToastCopy(appDisplayName(connection), headline);
-      popup({ message: copy.label, text: copy.description, duration: AUTO_SIGNED_TOAST_MS });
+      popup({ message: copy.label, text: copy.description, durationMs: AUTO_SIGNED_TOAST_MS });
     });
     const unsubHydrate = useNip46ActivityStore.persist.onFinishHydration(seed);
     if (useNip46ActivityStore.persist.hasHydrated()) seed();

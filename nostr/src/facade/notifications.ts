@@ -20,7 +20,7 @@ import { statsFromMetrics } from './feed';
 // ---------------------------------------------------------------------------
 
 /** Stable notification order: timestamp, then event id descending. */
-export type NotificationSortKey = { createdAt: number; id: string };
+export type NotificationSortKey = { createdAtSec: number; id: string };
 
 export type NotificationTab = 'ALL' | 'MENTIONS';
 export type NotificationPolicy = 'RELAXED' | 'MODERATE' | 'STRICT' | 'FOLLOWS';

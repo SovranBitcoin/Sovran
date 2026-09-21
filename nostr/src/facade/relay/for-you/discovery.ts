@@ -31,7 +31,7 @@ export type CandidateAuthor = {
   /** Distinct seed authors who liked this author (popularity within a melting pot). */
   likedBy: string[];
   /** Most recent reaction timestamp toward this author — recency tiebreak. */
-  latestLikeAt: number;
+  latestLikeAtSec: number;
   source: CandidateSource;
 };
 
@@ -65,16 +65,16 @@ export function tallyLikedAuthors(
 ): CandidateAuthor[] {
   const byAuthor = new Map<
     string,
-    { likeCount: number; likedBy: Set<string>; latestLikeAt: number }
+    { likeCount: number; likedBy: Set<string>; latestLikeAtSec: number }
   >();
 
   for (const reaction of reactions) {
     const author = targetAuthorFromReaction(reaction);
     if (!author || author === options.excludePubkey) continue;
-    const entry = byAuthor.get(author) ?? { likeCount: 0, likedBy: new Set<string>(), latestLikeAt: 0 };
+    const entry = byAuthor.get(author) ?? { likeCount: 0, likedBy: new Set<string>(), latestLikeAtSec: 0 };
     entry.likeCount += 1;
     if (reaction.pubkey) entry.likedBy.add(reaction.pubkey);
-    if (reaction.created_at > entry.latestLikeAt) entry.latestLikeAt = reaction.created_at;
+    if (reaction.created_at > entry.latestLikeAtSec) entry.latestLikeAtSec = reaction.created_at;
     byAuthor.set(author, entry);
   }
 
@@ -86,7 +86,7 @@ export function tallyLikedAuthors(
       score: options.source === 'viewer' ? entry.likeCount : likedBy.length,
       likeCount: entry.likeCount,
       likedBy,
-      latestLikeAt: entry.latestLikeAt,
+      latestLikeAtSec: entry.latestLikeAtSec,
       source: options.source,
     });
   }
@@ -167,7 +167,7 @@ export function rankNotes(args: {
 function sortCandidates(candidates: CandidateAuthor[]): CandidateAuthor[] {
   return candidates.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
-    if (b.latestLikeAt !== a.latestLikeAt) return b.latestLikeAt - a.latestLikeAt;
+    if (b.latestLikeAtSec !== a.latestLikeAtSec) return b.latestLikeAtSec - a.latestLikeAtSec;
     return a.pubkey < b.pubkey ? -1 : a.pubkey > b.pubkey ? 1 : 0;
   });
 }

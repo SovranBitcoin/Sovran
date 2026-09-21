@@ -173,7 +173,7 @@ export function createNotificationsSession(
     const newest = merger.snapshot().notifications[0]?.event;
     unsubscribeLive = options.liveSubscribe(
       options.request,
-      newest ? { createdAt: newest.created_at, id: newest.id } : undefined,
+      newest ? { createdAtSec: newest.created_at, id: newest.id } : undefined,
       (items) => {
         pendingLive.push(...items);
         if (!cancelSettle) {

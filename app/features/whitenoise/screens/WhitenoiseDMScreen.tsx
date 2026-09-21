@@ -133,7 +133,7 @@ function toBubble(m: WhitenoiseDmMessage): ChatBubbleMessage {
     id: m.id,
     content: m.content,
     senderId: m.authorPubkey,
-    timestamp: m.createdAt * 1000,
+    timestamp: m.createdAtSec * 1000,
     isOwn: m.isSelf,
     deliveryStatus: m.isSelf ? (m.isPending ? 'sending' : 'sent') : undefined,
     cashuToken: extractCashuToken(m.content) ?? undefined,

@@ -5,7 +5,7 @@ import type { SheetCloseEvent } from '@/shared/stores/runtime/popupStore';
 import type { ServiceFailure } from '@/shared/lib/errors';
 
 export type BaseOverrides = {
-  duration?: number;
+  durationMs?: number;
   onOpen?: () => void;
   onClose?: (event: SheetCloseEvent) => void;
 };

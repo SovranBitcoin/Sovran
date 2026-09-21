@@ -459,7 +459,7 @@ describe('DM envelopes', () => {
       id: '8'.repeat(64),
       kind: 1059,
       content: 'ciphertext',
-      createdAt: 1_700_000_000,
+      createdAtSec: 1_700_000_000,
     });
     expect(bundle.cursor).toEqual({ createdAt: 1_700_000_000, id: '8'.repeat(64) });
   });

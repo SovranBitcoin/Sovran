@@ -161,9 +161,9 @@ export function mountCompositionEditor() {
   /** An edit schedules the preview rather than waiting for a button: a render is
    * now the SVG alone, cheap enough to follow typing. Coalesced, so a burst of
    * keystrokes costs one render, and only the newest recipe is ever shown. */
-  function scheduleRender(delay = 200) {
+  function scheduleRender(delayMs = 200) {
     clearTimeout(renderTimer);
-    renderTimer = setTimeout(autoRender, delay);
+    renderTimer = setTimeout(autoRender, delayMs);
   }
   async function autoRender() {
     if (!recipe) return;

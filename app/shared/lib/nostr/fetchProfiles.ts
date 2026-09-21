@@ -101,7 +101,7 @@ export function readCachedProfileStats(pubkey: string): facade.CachedProfileStat
  */
 export function cacheProfileStats(
   pubkey: string,
-  stats: { followers?: number; follows?: number; joinedAt?: number | null }
+  stats: { followers?: number; follows?: number; joinedAtSec?: number | null }
 ): void {
   const cache = buildNostrDataLayer()?.cache;
   if (!cache) return;
@@ -112,6 +112,6 @@ export function cacheProfileStats(
     followersCount: stats.followers ?? existing?.followersCount,
     followingCount: stats.follows ?? existing?.followingCount,
     noteCount: existing?.noteCount,
-    joinedAt: stats.joinedAt ?? existing?.joinedAt,
+    joinedAtSec: stats.joinedAtSec ?? existing?.joinedAtSec,
   });
 }

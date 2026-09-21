@@ -38,7 +38,7 @@ function compareNewestFirst(
   a: NotificationSortKey,
   b: NotificationSortKey,
 ): number {
-  if (a.createdAt !== b.createdAt) return b.createdAt - a.createdAt;
+  if (a.createdAtSec !== b.createdAtSec) return b.createdAtSec - a.createdAtSec;
   if (a.id === b.id) return 0;
   return a.id < b.id ? 1 : -1;
 }
@@ -245,13 +245,13 @@ export function createNotificationsMerger(): NotificationsMerger {
       const pooled = [...rows.values()].filter((row) => row.sortAt === null);
       pooled.sort((a, b) =>
         compareNewestFirst(
-          { createdAt: a.item.event.created_at, id: a.item.event.id },
-          { createdAt: b.item.event.created_at, id: b.item.event.id },
+          { createdAtSec: a.item.event.created_at, id: a.item.event.id },
+          { createdAtSec: b.item.event.created_at, id: b.item.event.id },
         ),
       );
       const revealedKeys: string[] = [];
       for (const row of pooled.slice(0, Math.max(0, limit))) {
-        row.sortAt = { createdAt: row.item.event.created_at, id: row.item.event.id };
+        row.sortAt = { createdAtSec: row.item.event.created_at, id: row.item.event.id };
         revealed.push(row);
         revealedKeys.push(row.key);
       }

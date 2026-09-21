@@ -7,10 +7,10 @@ function note(
   id: string,
   pubkey: string,
   tags: string[][] = [],
-  createdAt = 1700000000,
+  createdAtSec = 1700000000,
   kind = ShortTextNote
 ): FeedEvent {
-  return { id, kind, pubkey, content: '', tags, created_at: createdAt };
+  return { id, kind, pubkey, content: '', tags, created_at: createdAtSec };
 }
 
 function makeMap(events: FeedEvent[]): Map<string, FeedEvent> {

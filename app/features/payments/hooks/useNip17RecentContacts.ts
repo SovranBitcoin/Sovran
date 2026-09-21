@@ -42,7 +42,7 @@ export function useNip17RecentContacts(
         ? null
         : { content: c.lastMessagePreview, isOwn: c.lastMessageIsOwn },
       nip17Content: c.previewPending ? undefined : c.lastMessagePreview,
-      timestamp: c.lastMessageAt,
+      timestamp: c.lastMessageAtSec,
       protocol: c.protocol,
       ...(c.newestMessageId ? { newestMessageId: c.newestMessageId } : {}),
       ...(c.previewPending ? { previewLoading: true } : {}),

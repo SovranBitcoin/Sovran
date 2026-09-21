@@ -49,14 +49,14 @@ const MORPH_TIMING = 'ease-out';
 // button will ever publish. Sized to comfortably cover cold-start init on a
 // first launch (legacy migration + global migration + nostr + coco) plus
 // WalletScreen mount.
-const MORPH_FALLBACK_TIMEOUT = 8000;
+const MORPH_FALLBACK_TIMEOUT_MS = 8000;
 // Stability window for the QR-button anchor before kicking off the morph.
 // The morph effect re-arms this timer every time the anchor changes, so
 // the morph only fires once the position has been STABLE for this long.
 // Combined with the polling interval below, the morph will track late
 // layout shifts (iOS `contentInsetAdjustmentBehavior`, safe-area updates,
 // wallpaper image load) instead of locking to an early/wrong position.
-const LAYOUT_SETTLE_DELAY = 500;
+const LAYOUT_SETTLE_DELAY_MS = 500;
 // Hard wall-clock cap on the overlay's life, measured from `await_anchor`
 // entry (native splash hidden). Anchor republishes restart the morph
 // tween/timer by design; the cap guarantees restarts can only ever SHORTEN
@@ -64,7 +64,7 @@ const LAYOUT_SETTLE_DELAY = 500;
 const OVERLAY_LIFETIME_CAP_MS = 10_000;
 // Poll cadence for `measureInWindow` during the settle window. Cheap call —
 // the store dedupes redundant anchor publishes via field-level equality.
-const LAYOUT_POLL_INTERVAL = 100;
+const LAYOUT_POLL_INTERVAL_MS = 100;
 // UI-thread self-fade of the overlay's content after the tween docks. The JS
 // completion timer that unmounts the overlay routinely fires 0.3–1.3s late on
 // a congested boot thread, so the overlay must make itself invisible on the
@@ -99,7 +99,7 @@ function useSplashGeometry() {
 // Linear phase machine for the boot splash → QR-button handoff.
 //   await_init    — splash visible; waiting for our root view to lay out
 //   await_anchor  — native splash hidden; waiting for the QR-button anchor
-//                   (or MORPH_FALLBACK_TIMEOUT, whichever comes first)
+//                   (or MORPH_FALLBACK_TIMEOUT_MS, whichever comes first)
 //   morphing      — animating the overlay to the QR-button position
 //   fading        — animating the overlay to opacity 0 (no anchor available)
 //   unmounted     — overlay fully gone; real QR button takes over
@@ -186,10 +186,10 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
   }, [phase, hasRootLaidOut]);
 
   // Phase 2 — await_anchor: wait for the QR button to publish a stable
-  // anchor. We poll `measureInWindow` for `LAYOUT_SETTLE_DELAY` ms because
+  // anchor. We poll `measureInWindow` for `LAYOUT_SETTLE_DELAY_MS` ms because
   // ancestor layout (safe-area, wallpaper image load) can shift the button's
   // window position without firing a fresh `onLayout` on the button itself.
-  // If we still have no anchor after `MORPH_FALLBACK_TIMEOUT`, fall back to
+  // If we still have no anchor after `MORPH_FALLBACK_TIMEOUT_MS`, fall back to
   // a plain fade so we never strand the user on the splash.
   useEffect(() => {
     if (phase !== 'await_anchor') return;
@@ -206,7 +206,10 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
     const startAnchorSettle = (reason: 'initial' | 'polled') => {
       if (cancelled || settleTimer) return;
       requestQRButtonRemeasure();
-      initLog('SplashMorph', `anchor ${reason} — settling ${LAYOUT_SETTLE_DELAY}ms before morph`);
+      initLog(
+        'SplashMorph',
+        `anchor ${reason} — settling ${LAYOUT_SETTLE_DELAY_MS}ms before morph`
+      );
 
       settleTimer = setTimeout(() => {
         if (cancelled) return;
@@ -222,7 +225,7 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
         }
         initLog('SplashMorph', 'anchor disappeared during settle — fading out');
         setPhase('fading');
-      }, LAYOUT_SETTLE_DELAY);
+      }, LAYOUT_SETTLE_DELAY_MS);
     };
 
     const initialAnchor = getQRButtonAnchor();
@@ -232,14 +235,14 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
     } else {
       initLog(
         'SplashMorph',
-        `init done but no anchor yet — waiting up to ${MORPH_FALLBACK_TIMEOUT}ms`
+        `init done but no anchor yet — waiting up to ${MORPH_FALLBACK_TIMEOUT_MS}ms`
       );
     }
 
     const poll = setInterval(() => {
       requestQRButtonRemeasure();
       if (getQRButtonAnchor()) startAnchorSettle('polled');
-    }, LAYOUT_POLL_INTERVAL);
+    }, LAYOUT_POLL_INTERVAL_MS);
 
     const fallback = setTimeout(() => {
       if (cancelled || settleTimer) return;
@@ -255,7 +258,7 @@ export function NativeSplashLayoutGate({ children }: { children: React.ReactNode
         clearInterval(poll);
         setPhase('fading');
       }
-    }, MORPH_FALLBACK_TIMEOUT);
+    }, MORPH_FALLBACK_TIMEOUT_MS);
 
     return () => {
       cancelled = true;

@@ -153,9 +153,9 @@ if (isMainThread) {
   const ticker = setInterval(() => {
     const sec = Number(process.hrtime.bigint() - start) / 1e9;
     const rate = tried / sec;
-    const eta = rate > 0 ? (expected - tried) / rate : Infinity;
+    const etaSec = rate > 0 ? (expected - tried) / rate : Infinity;
     process.stderr.write(
-      `\r  tried ${(tried / 1e6).toFixed(1)}M  ·  ${(rate / 1000).toFixed(0)}k/s  ·  ETA ~${fmt(eta)}   `
+      `\r  tried ${(tried / 1e6).toFixed(1)}M  ·  ${(rate / 1000).toFixed(0)}k/s  ·  ETA ~${fmt(etaSec)}   `
     );
   }, 1000);
 
@@ -176,11 +176,11 @@ if (isMainThread) {
       process.exit(1);
     }
 
-    const elapsed = Number(process.hrtime.bigint() - start) / 1e9;
+    const elapsedSec = Number(process.hrtime.bigint() - start) / 1e9;
     process.stdout.write(
       [
         '',
-        `\n  Found npub1${prefix} in ${fmt(elapsed)} (~${(tried / 1e6).toFixed(1)}M tries).`,
+        `\n  Found npub1${prefix} in ${fmt(elapsedSec)} (~${(tried / 1e6).toFixed(1)}M tries).`,
         '',
         '  SECRET — add to .env (gitignored) and EAS, never commit:',
         '',

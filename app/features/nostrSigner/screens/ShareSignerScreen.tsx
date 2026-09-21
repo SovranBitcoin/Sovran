@@ -122,7 +122,7 @@ export function ShareSignerScreen(): React.ReactElement {
   const copyLink = useSingleFlight(async () => {
     if (state.status !== 'ready') return;
     await Clipboard.setStringAsync(state.uri);
-    popup({ message: 'Copied', type: 'success', variant: 'toast', duration: 1500 });
+    popup({ message: 'Copied', type: 'success', variant: 'toast', durationMs: 1500 });
   });
 
   const confirmRotate = () => {

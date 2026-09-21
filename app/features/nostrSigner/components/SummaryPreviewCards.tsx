@@ -389,7 +389,7 @@ export function ExpandableEventJson({
   const toggle = () => setExpanded((value) => !value);
   const copyJson = () => {
     void Clipboard.setStringAsync(fullJson);
-    popup({ message: 'Copied', type: 'success', variant: 'toast', duration: 1500 });
+    popup({ message: 'Copied', type: 'success', variant: 'toast', durationMs: 1500 });
   };
 
   return (

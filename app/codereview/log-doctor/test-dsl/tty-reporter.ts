@@ -144,7 +144,7 @@ interface ReporterState {
   failed: number;
 
   /** Rolling window of recent unit durations for ETA. */
-  recentDurations: number[];
+  recentDurationsMs: number[];
 
   /** The single currently-running leaf step — drawn in the live tail. */
   currentLeaf: LiveStep | null;
@@ -229,7 +229,7 @@ export function createTtyReporter(opts: TtyReporterOptions = {}): TtyReporter {
     totalUnits: 0,
     passed: 0,
     failed: 0,
-    recentDurations: [],
+    recentDurationsMs: [],
     currentLeaf: null,
     blockStack: [],
     completedSteps: 0,
@@ -407,8 +407,8 @@ export function createTtyReporter(opts: TtyReporterOptions = {}): TtyReporter {
       const errSuffix = event.error ? `\n    ${c.red('╰ ' + truncatePlain(event.error, 140))}` : '';
       commit([`  ${c.red('✗')} ${c.red(event.name)}  ${c.dim(`${steps}  ${dur}`)}${errSuffix}`]);
     }
-    state.recentDurations.push(event.durationMs);
-    if (state.recentDurations.length > 8) state.recentDurations.shift();
+    state.recentDurationsMs.push(event.durationMs);
+    if (state.recentDurationsMs.length > 8) state.recentDurationsMs.shift();
   }
 
   function handleStepBegin(event: StepBeginEvent): void {
@@ -530,8 +530,8 @@ export function createTtyReporter(opts: TtyReporterOptions = {}): TtyReporter {
   function handleMatrixCellEnd(event: MatrixCellEndEvent): void {
     if (event.ok) state.passed++;
     else state.failed++;
-    state.recentDurations.push(event.durationMs);
-    if (state.recentDurations.length > 8) state.recentDurations.shift();
+    state.recentDurationsMs.push(event.durationMs);
+    if (state.recentDurationsMs.length > 8) state.recentDurationsMs.shift();
 
     const dur = formatDuration(event.durationMs);
     if (event.ok) {
@@ -592,9 +592,9 @@ export function createTtyReporter(opts: TtyReporterOptions = {}): TtyReporter {
       // If a step has been running a while, add a "waiting Ns" note
       // directly beneath it so the user knows progress is actually
       // stalled vs. "just short-running at this spinner frame".
-      const waited = Date.now() - state.currentLeaf.startedAt;
-      if (waited > 2000) {
-        lines.push(c.dim(`      waiting ${formatDuration(waited)}`));
+      const waitedMs = Date.now() - state.currentLeaf.startedAt;
+      if (waitedMs > 2000) {
+        lines.push(c.dim(`      waiting ${formatDuration(waitedMs)}`));
       }
     }
 
@@ -625,10 +625,11 @@ export function createTtyReporter(opts: TtyReporterOptions = {}): TtyReporter {
     const bar = '█'.repeat(filled) + c.dim('░'.repeat(progressBarWidth - filled));
 
     let etaStr = '';
-    if (total > 0 && done > 0 && done < total && state.recentDurations.length > 0) {
-      const avg = state.recentDurations.reduce((s, v) => s + v, 0) / state.recentDurations.length;
-      const remainingMs = (total - done) * avg;
-      const prefix = state.recentDurations.length < 3 ? '~' : '';
+    if (total > 0 && done > 0 && done < total && state.recentDurationsMs.length > 0) {
+      const avgMs =
+        state.recentDurationsMs.reduce((s, v) => s + v, 0) / state.recentDurationsMs.length;
+      const remainingMs = (total - done) * avgMs;
+      const prefix = state.recentDurationsMs.length < 3 ? '~' : '';
       etaStr = `  ETA ${prefix}${formatDuration(remainingMs)}`;
     }
 

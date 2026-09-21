@@ -29,7 +29,7 @@ export type ProfileStats = {
   followingCount?: number;
   noteCount?: number;
   /** Unix seconds of the profile's earliest known event (Primal `time_joined`). */
-  joinedAt?: number;
+  joinedAtSec?: number;
 };
 
 export type ProfileStatsBundle = ProfileStats;
@@ -49,6 +49,6 @@ export function profileStatsIsEmpty(bundle: ProfileStats): boolean {
     bundle.followersCount === undefined &&
     bundle.followingCount === undefined &&
     bundle.noteCount === undefined &&
-    bundle.joinedAt === undefined
+    bundle.joinedAtSec === undefined
   );
 }

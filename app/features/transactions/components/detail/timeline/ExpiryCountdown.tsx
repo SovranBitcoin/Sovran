@@ -70,13 +70,13 @@ export function ExpiryCountdown({
 }: ExpiryCountdownProps) {
   const [currentTime, setCurrentTime] = useState(() => Date.now());
 
-  const meltExpiry = meltQuote?.expiry;
+  const meltExpirySec = meltQuote?.expiry;
   const mintState = historyEntry.type === 'mint' ? historyEntry.state : null;
 
   const expiryBadge = getExpiryBadgeText(historyEntry, meltQuote, isOnchainMint, currentTime);
 
   const shouldUpdate =
-    (historyEntry.type === 'melt' && !!meltExpiry) ||
+    (historyEntry.type === 'melt' && !!meltExpirySec) ||
     (historyEntry.type === 'mint' && !isOnchainMint && mintState === MintQuoteState.UNPAID);
 
   // The 1s tick keeps uiautomator from ever reaching idle, blinding every AX

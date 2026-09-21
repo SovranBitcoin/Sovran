@@ -994,20 +994,20 @@ async function toggleFollowContacts(ctx: {
     pubkey,
     shouldFollow
   );
-  const createdAt = Math.floor(Date.now() / 1000);
+  const createdAtSec = Math.floor(Date.now() / 1000);
 
   try {
     const contactEvent = new NDKEvent(ndk);
     contactEvent.kind = Contacts;
     contactEvent.tags = nextTags;
     contactEvent.content = contactsContent;
-    contactEvent.created_at = createdAt;
+    contactEvent.created_at = createdAtSec;
     // Contact list is replaceable + important: land it on as many write relays
     // as possible via the central seam (outbox-aware, with retry).
     const published = await publishEvent({ ndk, event: contactEvent, resolveOn: 'all-settled' });
     if (published.isErr()) throw new Error('contacts publish failed');
     nostrLog.info('user.profile.follow.published', { pubkey, shouldFollow });
-    setContactsFromRelay({ tags: nextTags, content: contactsContent, createdAt });
+    setContactsFromRelay({ tags: nextTags, content: contactsContent, createdAtSec });
     clearFollowOptimistic(pubkey);
   } catch (e) {
     nostrLog.error('user.profile.follow.failed', {

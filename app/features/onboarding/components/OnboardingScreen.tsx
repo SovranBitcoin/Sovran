@@ -84,25 +84,25 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const slides: OnboardingSlide[] = [
     {
       bgColor: orange300,
-      duration: SLIDE_DURATION_MS,
+      durationMs: SLIDE_DURATION_MS,
       ...onboardingCopy.slides.cashu,
       icon: 'mdi:bitcoin',
     },
     {
       bgColor: purple300,
-      duration: SLIDE_DURATION_MS,
+      durationMs: SLIDE_DURATION_MS,
       ...onboardingCopy.slides.nostr,
       icon: 'mdi:broadcast',
     },
     {
       bgColor: blue300,
-      duration: SLIDE_DURATION_MS,
+      durationMs: SLIDE_DURATION_MS,
       ...onboardingCopy.slides.privacy,
       icon: 'mdi:key-variant',
     },
     {
       bgColor: shade300,
-      duration: SLIDE_DURATION_MS,
+      durationMs: SLIDE_DURATION_MS,
       ...onboardingCopy.slides.start,
       icon: 'mdi:shield-check',
     },

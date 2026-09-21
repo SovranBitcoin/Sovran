@@ -68,11 +68,11 @@ export function mintHistoryEntryExpired(historyEntry: AnyMintHistoryEntry): bool
     log.error('utils.decode_payment_request_failed', {});
     return false;
   }
-  const expiry = info.expirySec ?? 3600;
-  const timestamp = info.timestampSec ?? 0;
-  const expiryTime = (timestamp + expiry) * 1000;
+  const expirySec = info.expirySec ?? 3600;
+  const timestampSec = info.timestampSec ?? 0;
+  const expiresAt = (timestampSec + expirySec) * 1000;
 
-  return Date.now() > expiryTime;
+  return Date.now() > expiresAt;
 }
 
 /**
@@ -92,11 +92,11 @@ export function getMintHistoryEntryTimeUntilExpiry(
     log.error('utils.expiry_calc_failed', {});
     return null;
   }
-  const expiry = info.expirySec ?? 3600;
-  const timestamp = info.timestampSec ?? 0;
-  const expiryTime = (timestamp + expiry) * 1000;
+  const expirySec = info.expirySec ?? 3600;
+  const timestampSec = info.timestampSec ?? 0;
+  const expiresAt = (timestampSec + expirySec) * 1000;
 
-  return formatExpiryCountdown(Math.floor((expiryTime - Date.now()) / 1000));
+  return formatExpiryCountdown(Math.floor((expiresAt - Date.now()) / 1000));
 }
 
 /**

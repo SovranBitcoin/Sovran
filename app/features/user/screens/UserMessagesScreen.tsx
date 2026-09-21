@@ -178,7 +178,7 @@ export function UserMessagesScreen({
       id: m.id,
       content: m.content,
       isOwn: m.isOwn,
-      created_at: m.createdAt,
+      created_at: m.createdAtSec,
       pubkey: m.senderPubkey,
     }));
     const pending = localMessages.filter((m) => !serverIds.has(m.id));
@@ -251,14 +251,14 @@ export function UserMessagesScreen({
       // Mock thread: append locally and stop. Publishing here would broadcast
       // demo messages outside the isolated conversation.
       if (isMockThread) {
-        const timestamp = Math.floor(Date.now() / 1000);
+        const createdAtSec = Math.floor(Date.now() / 1000);
         setDemoMessages((prev) => [
           ...prev,
           {
-            id: `demo-dm-local-${timestamp}`,
+            id: `demo-dm-local-${createdAtSec}`,
             content: text,
             isOwn: true,
-            created_at: timestamp,
+            created_at: createdAtSec,
             pubkey: '',
           },
         ]);
@@ -283,7 +283,7 @@ export function UserMessagesScreen({
         return;
       }
 
-      const timestamp = Math.floor(Date.now() / 1000);
+      const createdAtSec = Math.floor(Date.now() / 1000);
 
       // NIP-04 (legacy): a single signed kind-4 event authored by us and
       // addressed to the recipient via a `p` tag. No gift wrap / self-copy —
@@ -305,7 +305,7 @@ export function UserMessagesScreen({
               content: text,
               isOwn: true,
               isSending: true,
-              created_at: timestamp,
+              created_at: createdAtSec,
               pubkey: myPubkey,
             },
           ]);
@@ -360,7 +360,7 @@ export function UserMessagesScreen({
             content: text,
             isOwn: true,
             isSending: true,
-            created_at: timestamp,
+            created_at: createdAtSec,
             pubkey: myPubkey,
           },
         ]);

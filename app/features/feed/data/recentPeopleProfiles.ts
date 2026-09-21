@@ -98,7 +98,7 @@ export function mapRecentPeopleProfileEvents(
 ): Record<string, RecentPeopleProfileMetadata> {
   const newestByPubkey = new Map<
     string,
-    { createdAt: number; metadata: RecentPeopleProfileMetadata }
+    { createdAtSec: number; metadata: RecentPeopleProfileMetadata }
   >();
 
   for (const node of nodes) {
@@ -107,10 +107,10 @@ export function mapRecentPeopleProfileEvents(
     if (!pubkey) continue;
     const metadata = parseProfileMetadata(node.content);
     if (!metadata) continue;
-    const createdAt = createdAtSeconds(node.createdAt);
+    const createdAtSec = createdAtSeconds(node.createdAt);
     const existing = newestByPubkey.get(pubkey);
-    if (!existing || createdAt >= existing.createdAt) {
-      newestByPubkey.set(pubkey, { createdAt, metadata });
+    if (!existing || createdAtSec >= existing.createdAtSec) {
+      newestByPubkey.set(pubkey, { createdAtSec, metadata });
     }
   }
 

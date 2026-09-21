@@ -108,7 +108,7 @@ interface RoutstrSession {
 }
 
 // Cache TTL: 5 minutes
-const MODELS_CACHE_TTL = 5 * 60 * 1000; // 300000ms
+const MODELS_CACHE_TTL_MS = 5 * 60 * 1000; // 300000ms
 
 interface ModelsCache {
   data: RoutstrModel[];
@@ -627,7 +627,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
       isCacheStale: (nowMs: number = Date.now()) => {
         const cache = get().modelsCache;
         if (!cache) return true;
-        return nowMs - cache.timestamp > MODELS_CACHE_TTL;
+        return nowMs - cache.timestamp > MODELS_CACHE_TTL_MS;
       },
 
       createSession: () => {

@@ -55,7 +55,7 @@ export function useWhitenoiseInbox() {
     // Track the highest created_at seen this session so listener-side
     // ingest events can update the persisted cursor without racing each
     // other on the AsyncStorage write.
-    let cursorHigh = 0;
+    let cursorHighSec = 0;
 
     void (async () => {
       // Prefer the user's published kind-10051 inbox relays if any; fall
@@ -66,10 +66,11 @@ export function useWhitenoiseInbox() {
       // No cursor on first cold start: full backfill once so users with
       // pre-cursor history don't silently drop unread invites. Subsequent
       // starts bound the relay-to-device fetch to events we haven't seen.
-      const persistedCursor = await cursorStore.getItem(CURSOR_KEY);
+      const persistedCursorSec = await cursorStore.getItem(CURSOR_KEY);
       if (cancelled) return;
-      cursorHigh = persistedCursor ?? 0;
-      const since = persistedCursor !== null ? persistedCursor - CURSOR_SLACK_SECONDS : undefined;
+      cursorHighSec = persistedCursorSec ?? 0;
+      const since =
+        persistedCursorSec !== null ? persistedCursorSec - CURSOR_SLACK_SECONDS : undefined;
 
       wnLog.info('whitenoise.inbox.start', {
         relayCount: inboxRelays.length,
@@ -117,10 +118,10 @@ export function useWhitenoiseInbox() {
       // Advance the persisted cursor monotonically. created_at is seconds.
       // Skipping the write on stale events bounds AsyncStorage churn to the
       // narrow tail of newer gift wraps once we've caught up.
-      const createdAt = typeof ev.created_at === 'number' ? ev.created_at : 0;
-      if (createdAt > cursorHigh) {
-        cursorHigh = createdAt;
-        cursorStore.setItem(CURSOR_KEY, cursorHigh).catch((err) => {
+      const createdAtSec = typeof ev.created_at === 'number' ? ev.created_at : 0;
+      if (createdAtSec > cursorHighSec) {
+        cursorHighSec = createdAtSec;
+        cursorStore.setItem(CURSOR_KEY, cursorHighSec).catch((err) => {
           wnLog.debug('whitenoise.inbox.cursor_persist_failed', {
             error: err instanceof Error ? err.message : String(err),
           });

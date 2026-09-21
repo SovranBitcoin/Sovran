@@ -187,7 +187,7 @@ const mockPrivateConversations = [
     counterparty: 'ab'.repeat(32),
     lastMessagePreview: 'Private live message',
     lastMessageIsOwn: false,
-    lastMessageAt: 123,
+    lastMessageAtSec: 123,
   },
 ];
 const mockDmReader = jest.fn((..._args: unknown[]) => ({

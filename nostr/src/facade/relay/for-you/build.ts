@@ -75,7 +75,7 @@ type ForYouCorpus = {
   candidates: CandidateAuthor[];
   authors: string[];
   /** Exclusive upper bound (unix sec) for the next older backfill query. */
-  oldestFetchedAt: number;
+  oldestFetchedAtSec: number;
   /** No more older notes to fetch (or corpus cap hit). */
   exhausted: boolean;
   generatedAt: number;
@@ -227,7 +227,7 @@ async function computeHead(
     profiles,
     candidates,
     authors,
-    oldestFetchedAt: oldestCreatedAt(notes, nowSec - DEFAULTS.notesWindowSec),
+    oldestFetchedAtSec: oldestCreatedAt(notes, nowSec - DEFAULTS.notesWindowSec),
     exhausted: false,
     generatedAt: now,
   };
@@ -241,7 +241,7 @@ async function backfillOlder(
 ): Promise<void> {
   const raw = await requestEvents(
     connection,
-    [{ kinds: [1], authors: corpus.authors, until: corpus.oldestFetchedAt, limit: DEFAULTS.notesLimit }],
+    [{ kinds: [1], authors: corpus.authors, until: corpus.oldestFetchedAtSec, limit: DEFAULTS.notesLimit }],
     { signal: request.signal, timeoutMs: DEFAULTS.notesTimeoutMs },
   );
   const { notesById, profiles } = parseRelayBatch(raw);
@@ -273,7 +273,7 @@ async function backfillOlder(
   mergeProfiles(corpus.profiles, profiles);
 
   // Step strictly older next time (relay `until` is inclusive) and honor the cap.
-  corpus.oldestFetchedAt = oldestCreatedAt(fresh, corpus.oldestFetchedAt) - 1;
+  corpus.oldestFetchedAtSec = oldestCreatedAt(fresh, corpus.oldestFetchedAtSec) - 1;
   if (corpus.orderedIds.length >= DEFAULTS.maxCorpus) corpus.exhausted = true;
 }
 

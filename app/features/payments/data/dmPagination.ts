@@ -17,13 +17,13 @@ function envelopeUnixSeconds(createdAt: DmEnvelope['createdAt']): number {
 }
 
 /** Oldest envelope (wrap) timestamp in a page — the correct `until` cursor. */
-function pageOldestWrapTs(page: DmEnvelopePage): number | undefined {
-  let oldest: number | undefined;
+function pageOldestWrapSec(page: DmEnvelopePage): number | undefined {
+  let oldestSec: number | undefined;
   for (const envelope of page.envelopes) {
-    const ts = envelopeUnixSeconds(envelope.createdAt);
-    if (ts > 0 && (oldest === undefined || ts < oldest)) oldest = ts;
+    const wrapSec = envelopeUnixSeconds(envelope.createdAt);
+    if (wrapSec > 0 && (oldestSec === undefined || wrapSec < oldestSec)) oldestSec = wrapSec;
   }
-  return oldest;
+  return oldestSec;
 }
 
 /**
@@ -46,12 +46,12 @@ interface DmEnvelopeCursor {
 
 export function createDmEnvelopeCursor(): DmEnvelopeCursor {
   let seenWrapIds = new Set<string>();
-  let oldestWrapTs: number | undefined;
+  let oldestWrapSec: number | undefined;
 
   return {
     reset() {
       seenWrapIds = new Set();
-      oldestWrapTs = undefined;
+      oldestWrapSec = undefined;
     },
     track(page) {
       let fresh = 0;
@@ -61,14 +61,15 @@ export function createDmEnvelopeCursor(): DmEnvelopeCursor {
           fresh += 1;
         }
       }
-      const oldest = pageOldestWrapTs(page);
-      if (oldest !== undefined) {
-        oldestWrapTs = oldestWrapTs === undefined ? oldest : Math.min(oldestWrapTs, oldest);
+      const oldestSec = pageOldestWrapSec(page);
+      if (oldestSec !== undefined) {
+        oldestWrapSec =
+          oldestWrapSec === undefined ? oldestSec : Math.min(oldestWrapSec, oldestSec);
       }
       return fresh;
     },
     nextUntil() {
-      return oldestWrapTs === undefined ? undefined : oldestWrapTs + 1;
+      return oldestWrapSec === undefined ? undefined : oldestWrapSec + 1;
     },
   };
 }

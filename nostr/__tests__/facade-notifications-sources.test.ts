@@ -112,7 +112,7 @@ describe('relay notificationsLiveSubscribe', () => {
     const tier = createRelayTier({ connection });
     const unsubscribe = tier.notificationsLiveSubscribe!(
       { viewerPubkey: ME, tab: 'ALL', ownEventIds: [MYPOST] },
-      { createdAt: 900, id: 'cursor' },
+      { createdAtSec: 900, id: 'cursor' },
       () => {},
     );
     const filters = connection.captured[0]!;

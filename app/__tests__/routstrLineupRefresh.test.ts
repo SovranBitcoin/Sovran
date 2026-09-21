@@ -24,7 +24,7 @@ jest.mock('@/shared/lib/logger', () => {
 });
 jest.mock('@/shared/lib/http/requestSignal', () => ({ buildAbortSignal: () => undefined }));
 
-const DAY = 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 const NOW = 1_800_000_000_000;
 const payload = {
   version: 1,
@@ -81,7 +81,7 @@ describe('Routstr lineup refresh policy', () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
-  it.each([null, NOW - DAY - 1])(
+  it.each([null, NOW - DAY_MS - 1])(
     'fetches a missing/stale lineup (%s) and applies node/auth mode',
     async (serverLineupAt) => {
       const { store, refresh } = await load();
@@ -102,7 +102,7 @@ describe('Routstr lineup refresh policy', () => {
     store.setState({ serverLineupAt: NOW });
     expect(await refresh()).toBe(false);
     expect(mockGetAiLineup).not.toHaveBeenCalled();
-    jest.spyOn(Date, 'now').mockReturnValue(NOW + DAY + 1);
+    jest.spyOn(Date, 'now').mockReturnValue(NOW + DAY_MS + 1);
     expect(await refresh()).toBe(true);
     expect(await refresh()).toBe(false);
     expect(mockGetAiLineup).toHaveBeenCalledTimes(1);
@@ -110,15 +110,15 @@ describe('Routstr lineup refresh policy', () => {
 
   it.each([6, 8])(
     'failed refresh allows derivation only after seven days (age %s)',
-    async (age) => {
+    async (ageDays) => {
       const { store, refresh, mapped } = await load();
       store.getState().setServerLineup({ ...mapped, lineup: mapped.lineup! });
-      store.setState({ serverLineupAt: NOW - age * DAY });
+      store.setState({ serverLineupAt: NOW - ageDays * DAY_MS });
       mockGetAiLineup.mockResolvedValue(err(new Error('offline')));
       expect(await refresh()).toBe(false);
-      expect(store.getState().serverLineupAt).toBe(age > 7 ? null : NOW - age * DAY);
+      expect(store.getState().serverLineupAt).toBe(ageDays > 7 ? null : NOW - ageDays * DAY_MS);
       store.getState().setCachedModels([]);
-      expect(store.getState().lineup?.openai.auto?.lastKnown).toBe(age > 7 ? true : undefined);
+      expect(store.getState().lineup?.openai.auto?.lastKnown).toBe(ageDays > 7 ? true : undefined);
       expect(require('@/shared/lib/logger').aiLog.warn).toHaveBeenCalledWith(
         'routstr.lineup.refresh_failed'
       );

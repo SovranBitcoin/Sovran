@@ -25,7 +25,7 @@ type EngagementRecord = {
   liked?: EngagementAction;
   reposted?: EngagementAction;
   replied?: EngagementAction;
-  /** Newest contributing action's `created_at`, for the recency cap. */
+  /** Newest contributing action's `created_at` (unix seconds), for the recency cap. */
   updatedAt: number;
 };
 
@@ -86,6 +86,7 @@ const MAX_ZAPPED_ENTRIES = 2000;
 interface NostrSocialState {
   contactsTags: string[][];
   contactsContent: string;
+  /** unix seconds (kind-3 `created_at`); persisted under this name */
   contactsUpdatedAt: number;
   followingPubkeys: Record<string, true>;
 
@@ -112,7 +113,11 @@ interface NostrSocialState {
 }
 
 interface NostrSocialActions {
-  setContactsFromRelay: (params: { tags: string[][]; content: string; createdAt: number }) => void;
+  setContactsFromRelay: (params: {
+    tags: string[][];
+    content: string;
+    createdAtSec: number;
+  }) => void;
   /**
    * Seed the read-side follow set from the tiered facade's social-graph bundle
    * (nagg → Primal → relay). Read-only accelerator: it sets `followingPubkeys`
@@ -122,7 +127,7 @@ interface NostrSocialActions {
    * the facade's parsed `follows` drop). LWW-gated by the kind-3 `created_at` so
    * a facade seed and a relay delta can't fight — the newer contact list wins.
    */
-  seedFollowsFromFacade: (params: { follows: string[]; createdAt: number }) => void;
+  seedFollowsFromFacade: (params: { follows: string[]; createdAtSec: number }) => void;
   setFollowOptimistic: (pubkey: string, value: boolean, pending: boolean) => void;
   clearFollowOptimistic: (pubkey: string) => void;
   clearSettledFollowOptimistic: () => void;
@@ -140,13 +145,13 @@ interface NostrSocialActions {
    * {@link applyOwnDeletions}.
    */
   ingestOwnLikes: (
-    likes: { targetEventId: string; reactionEventId: string; createdAt: number }[]
+    likes: { targetEventId: string; reactionEventId: string; createdAtSec: number }[]
   ) => void;
   ingestOwnReposts: (
-    reposts: { targetEventId: string; repostEventId: string; createdAt: number }[]
+    reposts: { targetEventId: string; repostEventId: string; createdAtSec: number }[]
   ) => void;
   ingestOwnReplies: (
-    replies: { targetEventId: string; replyEventId: string; createdAt: number }[]
+    replies: { targetEventId: string; replyEventId: string; createdAtSec: number }[]
   ) => void;
   /** Apply our own kind:5 deletions: drop any like/repost/reply whose own event id was deleted. */
   applyOwnDeletions: (deletedEventIds: string[]) => void;
@@ -306,15 +311,15 @@ export function migrateNostrSocialStore(state: unknown, version: number): unknow
 function ingestEngagementAction(
   base: Record<string, EngagementRecord>,
   action: EngagementActionKind,
-  rows: { targetEventId: string; ownEventId: string; createdAt: number }[]
+  rows: { targetEventId: string; ownEventId: string; createdAtSec: number }[]
 ): Record<string, EngagementRecord> {
   const next = { ...base };
-  for (const { targetEventId, ownEventId, createdAt } of rows) {
+  for (const { targetEventId, ownEventId, createdAtSec } of rows) {
     const existing = next[targetEventId];
     next[targetEventId] = {
       ...existing,
       [action]: { ownEventId },
-      updatedAt: Math.max(existing?.updatedAt ?? 0, createdAt),
+      updatedAt: Math.max(existing?.updatedAt ?? 0, createdAtSec),
     };
   }
   return capByRecency(next, MAX_ENGAGEMENT_ENTRIES);
@@ -413,11 +418,11 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
 
       // ---- contacts ----
 
-      setContactsFromRelay: ({ tags, content, createdAt }) => {
+      setContactsFromRelay: ({ tags, content, createdAtSec }) => {
         set((state) => {
-          if (createdAt < state.contactsUpdatedAt) {
+          if (createdAtSec < state.contactsUpdatedAt) {
             storeLog.debug('social.contacts.stale', {
-              createdAt,
+              createdAtSec,
               current: state.contactsUpdatedAt,
             });
             return state;
@@ -426,26 +431,26 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
           storeLog.info('social.contacts.set', {
             tagCount: tags.length,
             followingCount: Object.keys(following).length,
-            createdAt,
+            createdAtSec,
           });
           return {
             contactsTags: tags,
             contactsContent: content,
-            contactsUpdatedAt: createdAt,
+            contactsUpdatedAt: createdAtSec,
             followingPubkeys: following,
           };
         });
       },
 
-      seedFollowsFromFacade: ({ follows, createdAt }) => {
+      seedFollowsFromFacade: ({ follows, createdAtSec }) => {
         set((state) => {
           // LWW: skip when the authoritative kind-3 (relay sub) already landed
           // an equal-or-newer list. The relay path's own guard uses `<`, so an
           // equal `created_at` there still fills the raw `contactsTags` we leave
           // untouched here.
-          if (createdAt <= state.contactsUpdatedAt) {
+          if (createdAtSec <= state.contactsUpdatedAt) {
             storeLog.debug('social.contacts.seed.stale', {
-              createdAt,
+              createdAtSec,
               current: state.contactsUpdatedAt,
             });
             return state;
@@ -453,10 +458,10 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
           const following = extractFollowingFromTags(follows.map((pk) => ['p', pk]));
           storeLog.info('social.contacts.seed', {
             followingCount: Object.keys(following).length,
-            createdAt,
+            createdAtSec,
           });
           // Read side only — no `contactsTags`/`content`; the relay sub owns those.
-          return { followingPubkeys: following, contactsUpdatedAt: createdAt };
+          return { followingPubkeys: following, contactsUpdatedAt: createdAtSec };
         });
       },
 
@@ -540,7 +545,7 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
             likes.map((l) => ({
               targetEventId: l.targetEventId,
               ownEventId: l.reactionEventId,
-              createdAt: l.createdAt,
+              createdAtSec: l.createdAtSec,
             }))
           ),
         }));
@@ -556,7 +561,7 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
             reposts.map((r) => ({
               targetEventId: r.targetEventId,
               ownEventId: r.repostEventId,
-              createdAt: r.createdAt,
+              createdAtSec: r.createdAtSec,
             }))
           ),
         }));
@@ -572,7 +577,7 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
             replies.map((r) => ({
               targetEventId: r.targetEventId,
               ownEventId: r.replyEventId,
-              createdAt: r.createdAt,
+              createdAtSec: r.createdAtSec,
             }))
           ),
         }));

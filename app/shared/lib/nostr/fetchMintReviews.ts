@@ -21,7 +21,7 @@ function reviewsFromFacade(resolved: facade.ResolvedMintReviews): MintReviewsRes
       comment: stripScoreMarker(review.content),
       pubkey: review.reviewerPubkey,
       eventId: review.eventId,
-      created_at: review.createdAt,
+      created_at: review.createdAtSec,
       ...(review.name ? { name: review.name } : {}),
       ...(review.picture ? { picture: review.picture } : {}),
     })),

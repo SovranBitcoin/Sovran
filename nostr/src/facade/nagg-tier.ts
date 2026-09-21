@@ -353,7 +353,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
               mintUrl: item.mintUrl,
               score: item.score,
               content: item.content,
-              createdAt: item.createdAt,
+              createdAtSec: item.createdAt,
               ...(profile?.name ? { name: profile.name } : {}),
               ...(profile?.picture ? { picture: profile.picture } : {}),
             };

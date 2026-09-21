@@ -78,7 +78,7 @@ export function ProfileDetailsScreen({
     if (text) {
       log.info('settings.profile.copy', { target });
       await Clipboard.setStringAsync(text);
-      copyPopup(target, { duration: 1000 });
+      copyPopup(target, { durationMs: 1000 });
     }
   };
 

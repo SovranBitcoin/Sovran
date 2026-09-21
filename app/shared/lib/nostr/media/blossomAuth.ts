@@ -35,19 +35,19 @@ export function sha256Hex(bytes: Uint8Array): string {
 export function buildBlossomAuthEvent(opts: {
   action: BlossomAction;
   sha256: string;
-  createdAt: number;
+  createdAtSec: number;
   expirationSec?: number;
   content?: string;
 }): UnsignedBlossomAuth {
-  const expiration = opts.expirationSec ?? opts.createdAt + 5 * 60;
+  const expirationSec = opts.expirationSec ?? opts.createdAtSec + 5 * 60;
   return {
     kind: BLOSSOM_AUTH_KIND,
     content: opts.content ?? `Authorize ${opts.action}`,
-    created_at: opts.createdAt,
+    created_at: opts.createdAtSec,
     tags: [
       ['t', opts.action],
       ['x', opts.sha256],
-      ['expiration', String(expiration)],
+      ['expiration', String(expirationSec)],
     ],
   };
 }

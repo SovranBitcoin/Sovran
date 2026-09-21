@@ -6,6 +6,7 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 export const OwnProfileSnapshotSchema = z.object({
   content: z.record(z.string(), z.unknown()),
+  /** unix seconds (kind-0 `created_at`); persisted under this name */
   createdAt: z.number().int().nonnegative(),
   eventId: z.string().length(64),
 });

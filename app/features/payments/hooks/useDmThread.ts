@@ -25,7 +25,7 @@ export interface DmThreadMessage {
   content: string;
   senderPubkey: string;
   /** unix seconds */
-  createdAt: number;
+  createdAtSec: number;
   isOwn: boolean;
 }
 
@@ -80,7 +80,7 @@ export function useDmThread({
         if (isCurrentProfile && !isMockContactPubkey(dm.counterparty)) {
           useDmLastMessageStore.getState().recordLastMessage(dm.counterparty, {
             protocol: dm.protocol,
-            atSeconds: dm.createdAt,
+            atSeconds: dm.createdAtSec,
             isOwn: dm.isOwn,
           });
         }
@@ -105,11 +105,11 @@ export function useDmThread({
             id: dm.id,
             content: dm.content,
             senderPubkey: dm.senderPubkey,
-            createdAt: dm.createdAt,
+            createdAtSec: dm.createdAtSec,
             isOwn: dm.isOwn,
           })),
         ];
-        merged.sort((a, b) => a.createdAt - b.createdAt);
+        merged.sort((a, b) => a.createdAtSec - b.createdAtSec);
         if (cacheKey) dmThreadCache.setEntry(cacheKey, merged, { viewerKey: viewerPubkey });
         return merged;
       });

@@ -26,7 +26,7 @@ export type StandardSheetPayload = {
   submessage?: ReactNode | PopupTextSegment[];
   icon?: PopupIcon;
   dismissable?: boolean;
-  duration?: number;
+  durationMs?: number;
   buttons?: SheetButton[];
   /** Lay buttons side by side ('row') instead of the default vertical stack. */
   buttonLayout?: 'row' | 'stack';

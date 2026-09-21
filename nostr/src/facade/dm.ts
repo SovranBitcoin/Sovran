@@ -26,7 +26,7 @@ export type DmEnvelope = {
   content: string;
   tags: string[][];
   /** Randomized for gift wraps — display order is the client's job, post-decrypt. */
-  createdAt: number;
+  createdAtSec: number;
   sig?: string;
 };
 
@@ -73,10 +73,10 @@ export function bundleFromDmEnvelope(envelope: NaggEnvelope): DmEnvelopesBundle 
       kind: e.kind,
       content: e.content,
       tags: e.tags,
-      createdAt: e.created_at,
+      createdAtSec: e.created_at,
       ...(typeof sig === 'string' && sig ? { sig } : {}),
     };
   });
   const last = envelopes[envelopes.length - 1];
-  return { envelopes, cursor: last ? { createdAt: last.createdAt, id: last.id } : null };
+  return { envelopes, cursor: last ? { createdAt: last.createdAtSec, id: last.id } : null };
 }

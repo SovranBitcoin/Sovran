@@ -335,12 +335,12 @@ export function useChatKeyboardAnimationLogger({
       onEnd: (e) => {
         'worklet';
         cycleActive.set(0);
-        const duration = Date.now() - startTs.get();
+        const durationMs = Date.now() - startTs.get();
         scheduleOnRN(
           reportEnd,
           e.height,
           startHeight.get(),
-          duration,
+          durationMs,
           moveCount.get(),
           interactiveCount.get(),
           progressTickCount.get(),

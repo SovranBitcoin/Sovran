@@ -28,9 +28,9 @@ const pollEvent = {
   ],
 };
 
-const vote = (pubkey: string, createdAt: number, ...responses: string[]) => ({
+const vote = (pubkey: string, createdAtSec: number, ...responses: string[]) => ({
   pubkey,
-  created_at: createdAt,
+  created_at: createdAtSec,
   tags: [['e', 'poll1'], ...responses.map((r) => ['response', r])],
 });
 
@@ -110,7 +110,7 @@ describe('poll event builders', () => {
       pollType: 'singlechoice',
       endsAt: 1234,
       relays: ['wss://r'],
-      createdAt: 1,
+      createdAtSec: 1,
     });
     expect(event.kind).toBe(POLL_KIND);
     expect(event.content).toBe('Q?');
@@ -137,7 +137,7 @@ describe('poll event builders', () => {
         relayHint: 'wss://quote.example',
         pubkey: 'quote-author',
       },
-      createdAt: 1,
+      createdAtSec: 1,
     });
 
     expect(event.tags).toEqual(
@@ -149,7 +149,7 @@ describe('poll event builders', () => {
   });
 
   it('builds a kind:1018 vote', () => {
-    const event = buildVoteEvent({ pollId: 'poll1', optionIds: ['a', 'b'], createdAt: 1 });
+    const event = buildVoteEvent({ pollId: 'poll1', optionIds: ['a', 'b'], createdAtSec: 1 });
     expect(event.kind).toBe(POLL_VOTE_KIND);
     expect(event.tags).toEqual([
       ['e', 'poll1', ''],

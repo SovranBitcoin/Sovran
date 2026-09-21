@@ -28,7 +28,7 @@ export type MintReview = {
   /** Parsed `[n/5]` score clamped to 0..5, or null when the review has no score. */
   score: number | null;
   content: string;
-  createdAt: number;
+  createdAtSec: number;
   /** Reviewer kind-0 identity, bundled by nagg's profiles map (nagg tier only). */
   name?: string;
   picture?: string;
@@ -185,7 +185,7 @@ export function parseReviewEvent(event: NaggFeedEvent): MintReview | null {
     mintUrl,
     score: parseScore(event.content),
     content: event.content,
-    createdAt: event.created_at,
+    createdAtSec: event.created_at,
   };
 }
 
@@ -194,7 +194,7 @@ export function dedupeByReviewer(reviews: ReadonlyArray<MintReview>): MintReview
   const byPubkey = new Map<string, MintReview>();
   for (const review of reviews) {
     const existing = byPubkey.get(review.reviewerPubkey);
-    if (!existing || review.createdAt > existing.createdAt) byPubkey.set(review.reviewerPubkey, review);
+    if (!existing || review.createdAtSec > existing.createdAtSec) byPubkey.set(review.reviewerPubkey, review);
   }
   return [...byPubkey.values()];
 }
@@ -212,7 +212,7 @@ export function summarizeReviews(mintUrl: string, events: ReadonlyArray<NaggFeed
     events
       .map(parseReviewEvent)
       .filter((r): r is MintReview => r !== null && normalizeMintUrl(r.mintUrl) === target),
-  ).sort((a, b) => b.createdAt - a.createdAt);
+  ).sort((a, b) => b.createdAtSec - a.createdAtSec);
 
   return { mintUrl, averageScore: averageOf(reviews), reviewCount: reviews.length, reviews };
 }

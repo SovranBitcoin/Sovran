@@ -178,7 +178,7 @@ describe('demuxPrimalProfileStats — user_profile batch → profile header', ()
     expect(bundle.followingCount).toBe(42);
     expect(bundle.followersCount).toBe(100);
     expect(bundle.noteCount).toBe(7);
-    expect(bundle.joinedAt).toBe(1_600_000_000);
+    expect(bundle.joinedAtSec).toBe(1_600_000_000);
   });
 
   test('null time_joined is omitted, not coerced to 0', () => {
@@ -187,7 +187,7 @@ describe('demuxPrimalProfileStats — user_profile batch → profile header', ()
       PUB
     );
     expect(bundle.followersCount).toBe(3);
-    expect(bundle.joinedAt).toBeUndefined();
+    expect(bundle.joinedAtSec).toBeUndefined();
   });
 });
 

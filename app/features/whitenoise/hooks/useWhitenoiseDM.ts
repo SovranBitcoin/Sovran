@@ -24,7 +24,7 @@ export type WhitenoiseDmMessage = {
   id: string;
   authorPubkey: string;
   content: string;
-  createdAt: number;
+  createdAtSec: number;
   isSelf: boolean;
   isPending?: boolean;
 };
@@ -47,7 +47,7 @@ function rumorToMessage(
     id: rumor.id ?? `wn-${rumor.created_at}-${rumor.pubkey.slice(0, 8)}`,
     authorPubkey: rumor.pubkey,
     content: rumor.content,
-    createdAt: rumor.created_at,
+    createdAtSec: rumor.created_at,
     isSelf: rumor.pubkey === selfPubkey,
   };
 }
@@ -188,7 +188,7 @@ async function ingestGroupEvent(
 type WhitenoiseClient = ReturnType<typeof useWhitenoise>['client'];
 type WhitenoiseAccountIndex = ReturnType<typeof useWhitenoise>['accountIndex'];
 
-// Sorted insertion — ingest is monotonic by createdAt in the steady state,
+// Sorted insertion — ingest is monotonic by createdAtSec in the steady state,
 // but local sends carry now() and historical hydration may interleave, so
 // we still find the right slot. O(n) per upsert vs the previous full sort.
 // Audit 33.json F-012.
@@ -199,7 +199,7 @@ function upsertDmMessage(
   setMessages((prev) => {
     if (prev.some((m) => m.id === msg.id)) return prev;
     const next = [...prev];
-    const idx = next.findIndex((m) => m.createdAt > msg.createdAt);
+    const idx = next.findIndex((m) => m.createdAtSec > msg.createdAtSec);
     if (idx === -1) next.push(msg);
     else next.splice(idx, 0, msg);
     return next;
@@ -240,7 +240,7 @@ async function loadDmGroupImpl(
       if (isCancelled()) return;
       if (selfPubkey) {
         const hydrated = stored.map((s) => rumorToMessage(s.rumor, selfPubkey));
-        io.setMessages(hydrated.sort((a, b) => a.createdAt - b.createdAt));
+        io.setMessages(hydrated.sort((a, b) => a.createdAtSec - b.createdAtSec));
       }
     } catch (err) {
       wnLog.warn('whitenoise.dm.history_load_failed', {
@@ -343,7 +343,7 @@ async function sendDmImpl(ctx: SendDmCtx, text: string): Promise<void> {
     id: optimisticId,
     authorPubkey: selfPubkey,
     content: text,
-    createdAt: nowSec,
+    createdAtSec: nowSec,
     isSelf: true,
     isPending: true,
   });

@@ -51,7 +51,7 @@ export function PollComposeForm() {
 
   if (!poll) return null;
 
-  const selectedDuration =
+  const selectedDurationSec =
     poll.endsAt === undefined ? 0 : Math.max(0, poll.endsAt - Math.floor(Date.now() / 1000));
 
   return (
@@ -141,7 +141,7 @@ export function PollComposeForm() {
             label={d.label}
             accessibilityLabel={`Duration: ${d.spoken}`}
             active={
-              d.secs === 0 ? poll.endsAt === undefined : Math.abs(selectedDuration - d.secs) < 60
+              d.secs === 0 ? poll.endsAt === undefined : Math.abs(selectedDurationSec - d.secs) < 60
             }
             onPress={() =>
               update({

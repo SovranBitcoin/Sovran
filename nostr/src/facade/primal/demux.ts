@@ -356,7 +356,7 @@ export function demuxPrimalProfileStats(
   let followersCount: number | undefined;
   let followingCount: number | undefined;
   let noteCount: number | undefined;
-  let joinedAt: number | undefined;
+  let joinedAtSec: number | undefined;
 
   for (const raw of events) {
     if (raw.kind !== PRIMAL_KIND.userStats) continue;
@@ -365,7 +365,7 @@ export function demuxPrimalProfileStats(
     if (stats.followers_count != null) followersCount = stats.followers_count;
     if (stats.follows_count != null) followingCount = stats.follows_count;
     if (stats.note_count != null) noteCount = stats.note_count;
-    if (stats.time_joined != null) joinedAt = stats.time_joined;
+    if (stats.time_joined != null) joinedAtSec = stats.time_joined;
   }
 
   return {
@@ -374,7 +374,7 @@ export function demuxPrimalProfileStats(
     ...(followersCount !== undefined ? { followersCount } : {}),
     ...(followingCount !== undefined ? { followingCount } : {}),
     ...(noteCount !== undefined ? { noteCount } : {}),
-    ...(joinedAt !== undefined ? { joinedAt } : {}),
+    ...(joinedAtSec !== undefined ? { joinedAtSec } : {}),
   };
 }
 

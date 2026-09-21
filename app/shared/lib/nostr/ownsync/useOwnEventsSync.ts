@@ -86,10 +86,10 @@ export function useOwnEventsSync(): void {
   const processedRef = useRef<Set<string>>(new Set());
   // Newest kind:0 created_at applied so far — guards against an older profile
   // event (in a later/out-of-order batch) regressing the cached name/avatar.
-  const lastProfileAtRef = useRef(0);
+  const lastProfileCreatedAtSecRef = useRef(0);
   useEffect(() => {
     processedRef.current = new Set();
-    lastProfileAtRef.current = 0;
+    lastProfileCreatedAtSecRef.current = 0;
   }, [pubkey]);
 
   useEffect(() => {
@@ -118,13 +118,13 @@ export function useOwnEventsSync(): void {
       social.setContactsFromRelay({
         tags: part.latestContacts.tags,
         content: part.latestContacts.content,
-        createdAt: part.latestContacts.created_at,
+        createdAtSec: part.latestContacts.created_at,
       });
       social.clearSettledFollowOptimistic();
     }
-    if (part.latestProfile && part.latestProfile.created_at > lastProfileAtRef.current) {
+    if (part.latestProfile && part.latestProfile.created_at > lastProfileCreatedAtSecRef.current) {
       applyProfile(part.latestProfile, activeAccountIndex);
-      lastProfileAtRef.current = part.latestProfile.created_at;
+      lastProfileCreatedAtSecRef.current = part.latestProfile.created_at;
     }
 
     nostrLog.debug('nostr.ownsync.ingested', {

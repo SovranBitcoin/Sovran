@@ -25,9 +25,9 @@ export function useHeaderSearch() {
   }, []);
 
   const onCloseSearch = useCallback(() => {
-    const duration = openedAtRef.current ? Date.now() - openedAtRef.current : 0;
+    const durationMs = openedAtRef.current ? Date.now() - openedAtRef.current : 0;
     log.debug('header_search.close', {
-      duration_ms: duration,
+      duration_ms: durationMs,
       hadQuery: searchQuery.length > 0,
       queryLength: searchQuery.length,
     });

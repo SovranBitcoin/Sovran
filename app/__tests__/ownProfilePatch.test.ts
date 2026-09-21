@@ -1,6 +1,6 @@
 import {
   applyProfilePatch,
-  nextProfileCreatedAt,
+  nextProfileCreatedAtSec,
 } from '@/shared/lib/nostr/profile/publishOwnProfileMetadata';
 jest.mock('@/shared/lib/logger', () => ({
   nostrLog: { info: jest.fn(), warn: jest.fn() },
@@ -92,15 +92,15 @@ it('sets, keeps and removes the address and about fields independently', () => {
   expect(base.nip05).toBe('old@id.example');
 });
 it('keeps created_at monotonic even with clock skew or same-second saves', () => {
-  expect(nextProfileCreatedAt(100, 50)).toBe(101);
-  expect(nextProfileCreatedAt(100, 100)).toBe(101);
-  expect(nextProfileCreatedAt(100, 120)).toBe(120);
+  expect(nextProfileCreatedAtSec(100, 50)).toBe(101);
+  expect(nextProfileCreatedAtSec(100, 100)).toBe(101);
+  expect(nextProfileCreatedAtSec(100, 120)).toBe(120);
 });
 
 it('always supersedes a future-dated base instead of capping below it', () => {
   // Kind-0 is replaceable: a lower created_at than the current event is ignored
   // by relays, so a stray future base is still superseded by +1 (and logged).
-  expect(nextProfileCreatedAt(10000, 100)).toBe(10001);
-  expect(nextProfileCreatedAt(400, 100)).toBe(401);
-  expect(nextProfileCreatedAt(399, 100)).toBe(400);
+  expect(nextProfileCreatedAtSec(10000, 100)).toBe(10001);
+  expect(nextProfileCreatedAtSec(400, 100)).toBe(401);
+  expect(nextProfileCreatedAtSec(399, 100)).toBe(400);
 });

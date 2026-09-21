@@ -4,6 +4,7 @@ import type { FeedItem } from '../components/nostr/feedTypes';
 /** NIP-51 preserves unfamiliar tags and keeps private entries private. */
 export type MuteList = {
   id: string;
+  /** unix seconds (Nostr created_at); persisted in feed-ignore-store under this name */
   createdAt: number;
   tags: string[][];
   privateTags: string[][];

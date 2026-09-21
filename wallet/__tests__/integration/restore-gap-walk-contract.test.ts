@@ -70,7 +70,7 @@ async function createManager(): Promise<{
   repos: MemoryRepositories;
 }> {
   const repos = new MemoryRepositories();
-  const now = Math.floor(Date.now() / 1000);
+  const nowSec = Math.floor(Date.now() / 1000);
   const mintInfo = {
     name: "Restore Gap Contract Mint",
     pubkey: MINT_PUBLIC_KEY,
@@ -87,8 +87,8 @@ async function createManager(): Promise<{
     name: mintInfo.name,
     mintInfo,
     trusted: true,
-    createdAt: now,
-    updatedAt: now,
+    createdAt: nowSec,
+    updatedAt: nowSec,
   });
   await repos.keysetRepository.addKeyset({
     mintUrl: MINT_URL,

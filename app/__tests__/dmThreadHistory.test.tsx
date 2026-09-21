@@ -54,7 +54,7 @@ jest.mock('@/features/payments/data/dmDecryptPipeline', () => ({
       counterparty: e.pubkey,
       senderPubkey: e.pubkey,
       content: e.content,
-      createdAt: e.createdAt,
+      createdAtSec: e.createdAt,
       isOwn: false,
       protocol: e.kind === 4 ? 'nip04' : 'nip17',
     })),

@@ -43,11 +43,11 @@ export function getOrBuildBTCMapClusterManager(
   manager.load(points);
   CACHE.set(cacheKey, { manager, createdAt: Date.now(), pointsCount: points.length });
   evictIfNeeded();
-  const duration = Math.round((performance.now() - t0) * 100) / 100;
-  if (duration > 50) {
+  const durationMs = Math.round((performance.now() - t0) * 100) / 100;
+  if (durationMs > 50) {
     mapLog.warn('map.cluster.build_slow', {
       points: points.length,
-      duration_ms: duration,
+      duration_ms: durationMs,
       cacheKey,
     });
   }

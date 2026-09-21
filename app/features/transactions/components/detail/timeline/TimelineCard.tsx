@@ -74,15 +74,15 @@ function useExpiry(expiresAt: number | undefined): number {
   useEffect(() => {
     if (expiresAt === undefined) return;
     const flipAt = expiresAt + EXPIRY_FLIP_SLACK_MS;
-    const delay = flipAt - Date.now();
-    if (delay <= 0) {
+    const delayMs = flipAt - Date.now();
+    if (delayMs <= 0) {
       // Boundary already passed (e.g. the entry prop swapped to a long-expired
       // quote after mount): flip once so the model rebuilds as expired.
       setCurrentTime((prev) => (prev < flipAt ? Date.now() : prev));
       return;
     }
-    if (delay > MAX_TIMEOUT_MS) return;
-    const timeout = setTimeout(() => setCurrentTime(Date.now()), delay);
+    if (delayMs > MAX_TIMEOUT_MS) return;
+    const timeout = setTimeout(() => setCurrentTime(Date.now()), delayMs);
     return () => clearTimeout(timeout);
   }, [expiresAt]);
 
