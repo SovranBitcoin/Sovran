@@ -13,12 +13,12 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log, log } from '@/shared/lib/logger';
 
 interface AlbumPillTabsProps {
-  tabs: string[];
-  selectedTab: string;
-  onSelect: (tab: string) => void;
+  tabs: readonly { slug: string; label: string }[];
+  selectedSlug: string;
+  onSelect: (slug: string) => void;
 }
 
-export function AlbumPillTabs({ tabs, selectedTab, onSelect }: AlbumPillTabsProps) {
+export function AlbumPillTabs({ tabs, selectedSlug, onSelect }: AlbumPillTabsProps) {
   const [foreground, surfaceTertiary, surface] = useThemeColor([
     'foreground',
     'surface-tertiary',
@@ -26,9 +26,9 @@ export function AlbumPillTabs({ tabs, selectedTab, onSelect }: AlbumPillTabsProp
   ] as const);
 
   const handlePress = useCallback(
-    (tab: string) => {
-      log.info('theme.background.album.tab', { album: tab });
-      onSelect(tab);
+    (slug: string) => {
+      log.info('theme.background.album.tab', { album: slug });
+      onSelect(slug);
     },
     [onSelect]
   );
@@ -40,22 +40,22 @@ export function AlbumPillTabs({ tabs, selectedTab, onSelect }: AlbumPillTabsProp
         showsHorizontalScrollIndicator={false}
         contentContainerClassName="items-center px-4">
         <View className="flex-row items-center gap-1.5">
-          {tabs.map((tab) => {
-            const isSelected = selectedTab === tab;
+          {tabs.map(({ slug, label }) => {
+            const isSelected = selectedSlug === slug;
             return (
               <Pressable
-                key={tab}
-                onPress={() => handlePress(tab)}
+                key={slug}
+                onPress={() => handlePress(slug)}
                 activeOpacity={0.7}
-                testID={`background-album-tab-${tab}`}
+                testID={`background-album-tab-${slug}`}
                 accessibilityRole="tab"
-                accessibilityLabel={tab}
+                accessibilityLabel={label}
                 accessibilityState={{ selected: isSelected }}>
                 <View
                   className="rounded-2xl px-3.5 py-2"
                   style={{ backgroundColor: isSelected ? surfaceTertiary : surface }}>
                   <Text bold size={14} color={foreground}>
-                    {tab}
+                    {label}
                   </Text>
                 </View>
               </Pressable>
