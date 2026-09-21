@@ -4,7 +4,7 @@
  * across notification/feed/mint/contact rows.
  */
 
-import { formatRelative, formatRelativeUnixSeconds } from '@/shared/lib/date';
+import { formatDate, formatRelative, formatRelativeUnixSeconds } from '@/shared/lib/date';
 
 describe('formatRelativeUnixSeconds', () => {
   it('returns "" for unknown (0 or negative) timestamps instead of a 1970 date', () => {
@@ -44,5 +44,23 @@ describe("formatRelative 'terse'", () => {
 
   it("leaves the prose 'compact' style with its suffix", () => {
     expect(formatRelative(ago(3 * 3600), 'compact', nowMs)).toBe('3h ago');
+  });
+});
+
+describe('invalid dates', () => {
+  it("formats an unparseable input as '' instead of throwing a RangeError", () => {
+    expect(formatDate('garbage', 'short-date')).toBe('');
+    expect(formatDate(NaN, 'iso')).toBe('');
+    expect(formatDate(new Date('garbage'), 'time')).toBe('');
+    for (const style of [
+      'verbose',
+      'compact',
+      'terse',
+      'chat-bubble',
+      'conversation-list',
+    ] as const) {
+      expect(formatRelative(NaN, style)).toBe('');
+      expect(formatRelative('garbage', style)).toBe('');
+    }
   });
 });
