@@ -259,7 +259,7 @@ export function AmountSelector({
   // destination is fixed (the AI-credit wallet, not an arbitrary
   // recipient). Suppress the extras while the top-up flow is active so
   // the screen reduces to the keypad + Next button.
-  const isRoutstrTopUpActive = useRoutstrTopUpStore((s) => s.active);
+  const isRoutstrTopUpActive = useRoutstrTopUpStore((s) => s.phase === 'active');
 
   const extraButtons = buildExtraButtons(
     actions.paste,

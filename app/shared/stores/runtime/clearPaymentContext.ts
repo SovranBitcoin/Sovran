@@ -12,7 +12,7 @@ import { useRoutstrTopUpStore } from './routstrTopUpStore';
  * MUST be called at the ROOT of every payment/scan entry point (wallet Send,
  * Receive, Scan-QR, NFC, Nut-Drop, and the wallet mint selector). Mid-flow
  * state is fine; the danger is context surviving ACROSS flows. The canonical
- * example: tapping "Top up" on the AI tab sets `routstrTopUpStore.active = true`
+ * example: tapping "Top up" on the AI tab sets `routstrTopUpStore.phase = 'active'`
  * so the next ecash send is intercepted and routed to Routstr — if the user
  * abandons that flow, a later ordinary Send would silently pay Routstr instead
  * of the intended recipient. Clearing at every root closes that and every
@@ -23,7 +23,7 @@ import { useRoutstrTopUpStore } from './routstrTopUpStore';
  * This helper only clears the Sovran-side routing context layered on top.
  */
 export function clearPaymentContext(reason: string): void {
-  const routstrActive = useRoutstrTopUpStore.getState().active;
+  const routstrActive = useRoutstrTopUpStore.getState().phase === 'active';
   const nearPayActive = useNearPaySessionStore.getState().active != null;
   const contactSendActive = useContactSendStore.getState().active != null;
   if (routstrActive || nearPayActive || contactSendActive) {

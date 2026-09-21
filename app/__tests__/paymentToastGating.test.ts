@@ -70,7 +70,7 @@ jest.mock('@/shared/lib/routstr/topUp', () => ({
   formatRoutstrBalance: jest.fn(),
 }));
 jest.mock('@/shared/stores/runtime/routstrTopUpStore', () => ({
-  useRoutstrTopUpStore: { getState: jest.fn(() => ({ active: false, complete: jest.fn() })) },
+  useRoutstrTopUpStore: { getState: jest.fn(() => ({ phase: 'idle', complete: jest.fn() })) },
 }));
 jest.mock('@/shared/stores/runtime/nearPayStore', () => ({
   useNearPaySessionStore: { getState: jest.fn(() => ({ active: null })) },

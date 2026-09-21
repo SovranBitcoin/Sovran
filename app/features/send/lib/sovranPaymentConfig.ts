@@ -1512,7 +1512,7 @@ export function createSovranHandlers({
 
       // Routstr top-up: intercept the token and send it to the Routstr API
       const topUpState = useRoutstrTopUpStore.getState();
-      if (topUpState.active) {
+      if (topUpState.phase === 'active') {
         try {
           const entry = parseHistoryEntryOnce(historyEntry);
           const token = entry ? sendEntryToken(entry) : null;

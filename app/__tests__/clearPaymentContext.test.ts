@@ -22,12 +22,12 @@ describe('clearPaymentContext', () => {
       delivery: { locked: true },
     });
 
-    expect(useRoutstrTopUpStore.getState().active).toBe(true);
+    expect(useRoutstrTopUpStore.getState().phase).toBe('active');
     expect(useNearPaySessionStore.getState().active).not.toBeNull();
 
     clearPaymentContext('test');
 
-    expect(useRoutstrTopUpStore.getState().active).toBe(false);
+    expect(useRoutstrTopUpStore.getState().phase).toBe('idle');
     expect(useRoutstrTopUpStore.getState().pendingMessage).toBeNull();
     expect(useNearPaySessionStore.getState().active).toBeNull();
   });
