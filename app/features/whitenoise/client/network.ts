@@ -19,6 +19,29 @@ type ApplesauceEvent = Awaited<ReturnType<NostrNetworkInterface['request']>>[num
 
 const KEY_PACKAGE_RELAY_LIST_KIND = 10051 as NDKKind;
 
+const RELAY_READ_TIMEOUT_MS = 10_000;
+
+class WhitenoiseRelayTimeoutError extends Error {
+  constructor() {
+    super('Timed out waiting for relays.');
+    this.name = 'WhitenoiseRelayTimeoutError';
+  }
+}
+
+/**
+ * NDK one-shot reads settle only on EOSE, so they stay pending forever when no
+ * relay in the set connects. marmot's `request` signature has no signal, so the
+ * bound lives here. Rejects rather than resolving empty: "no events" means the
+ * relays answered.
+ */
+function withRelayDeadline<T>(read: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new WhitenoiseRelayTimeoutError()), RELAY_READ_TIMEOUT_MS);
+  });
+  return Promise.race([read, deadline]).finally(() => clearTimeout(timer));
+}
+
 function toFilterArray(filters: ApplesauceFilter): NDKFilter[] {
   return (Array.isArray(filters) ? filters : [filters]) as unknown as NDKFilter[];
 }
@@ -99,7 +122,9 @@ export function createWhitenoiseNetwork(
     async request(relays, filters) {
       const set = relaySet([...relays]);
       const filterArr = toFilterArray(filters);
-      const events = await ndk.fetchEvents(filterArr, { closeOnEose: true }, set);
+      const events = await withRelayDeadline(
+        ndk.fetchEvents(filterArr, { closeOnEose: true }, set)
+      );
       const out: ApplesauceEvent[] = [];
       events.forEach((e: NDKEvent) => out.push(ndkEventToNostr(e)));
       return out;
@@ -147,7 +172,7 @@ export function createWhitenoiseNetwork(
         authors: [pubkey],
         limit: 1,
       };
-      const event = await ndk.fetchEvent(filter);
+      const event = await withRelayDeadline(ndk.fetchEvent(filter));
       if (!event) return [...fallbackRelays];
       const urls = event.tags
         .filter((t: string[]) => t[0] === 'relay' && typeof t[1] === 'string')
