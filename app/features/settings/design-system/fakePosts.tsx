@@ -4,32 +4,31 @@
  * against fixture content so the inline relay card can be inspected without
  * hunting for real posts (or depending on live relays).
  *
- * Deterministic states come from seeding `relayMetadataStore` with fixture
- * entries on reserved `.example` hosts (RFC 2606 — they can never resolve, so
- * even an accidental fetch dies fast). Seeds are refcounted: retained by the
- * first mounted fake post, removed from the store when the last one unmounts,
- * so fixture rows don't linger in the persisted cache after leaving the screen.
+ * Deterministic states come from fixture NIP-11 documents on reserved
+ * `.example` hosts (RFC 2606 — they can never resolve), handed to RelayCard
+ * through `RelayCardFixturesContext`. They live in presentation memory only:
+ * nothing is written to the persisted `relayMetadataStore` and no fetch fires.
  */
-import { useLayoutEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 
 import type {
   FeedEvent,
   NoteMetrics,
   ProfileInfo,
 } from '@/features/feed/components/nostr/feedTypes';
+import { RelayCardFixturesContext } from '@/features/feed/components/nostr/relayCardFixtures';
 import type { RelayInformation } from '@/shared/lib/nostr/nip11';
-import { relayMetadataKey, useRelayMetadataStore } from '@/shared/stores/global/relayMetadataStore';
 
 import type { DesignSystemScenario } from './types';
 
 const RELAY_CARD_SOURCE = 'features/feed/components/nostr/RelayCard.tsx';
 const POST_CARD_SOURCE = 'features/feed/components/nostr/PostCard.tsx';
 
-// ─── Fixture relays (seeded into relayMetadataStore) ─────────────────────────
+// ─── Fixture relays (provided through RelayCardFixturesContext) ──────────────
 
 const BRANDED_RELAY = 'wss://buzz.team.example';
 const NEUTRAL_RELAY = 'wss://open.team.example';
-/** Seeded as a cached failure: the card falls back to domain + glyph. */
+/** No document: the card falls back to domain + glyph. */
 const FALLBACK_RELAY = 'wss://dead.team.example';
 /** Real relay — exercises the live NIP-11 pipeline when the sim has network. */
 const LIVE_BUZZ_RELAY = 'wss://buzz.cashu.space';
@@ -52,42 +51,12 @@ const NEUTRAL_INFO: RelayInformation = {
   software: 'https://github.com/example/generic-relay',
 };
 
-const SEEDED_INFO: readonly (readonly [string, RelayInformation])[] = [
+/** Keyed by `relayMetadataKey(url)` — the fixture urls are already in key form. */
+const RELAY_FIXTURES: ReadonlyMap<string, RelayInformation | null> = new Map([
   [BRANDED_RELAY, BRANDED_INFO],
   [NEUTRAL_RELAY, NEUTRAL_INFO],
-];
-
-let fixtureRefs = 0;
-
-function retainRelayFixtures() {
-  if (fixtureRefs++ > 0) return;
-  const now = Date.now();
-  useRelayMetadataStore.setState((state) => {
-    const next = { ...state.byRelayUrl };
-    for (const [url, info] of SEEDED_INFO) next[relayMetadataKey(url)] = { info, fetchedAt: now };
-    next[relayMetadataKey(FALLBACK_RELAY)] = { failedAt: now };
-    return { byRelayUrl: next };
-  });
-}
-
-function releaseRelayFixtures() {
-  if (--fixtureRefs > 0) return;
-  useRelayMetadataStore.setState((state) => {
-    const next = { ...state.byRelayUrl };
-    for (const [url] of SEEDED_INFO) delete next[relayMetadataKey(url)];
-    delete next[relayMetadataKey(FALLBACK_RELAY)];
-    return { byRelayUrl: next };
-  });
-}
-
-/** Layout effect so the seed lands before RelayCard's mount revalidation —
- *  child passive effects would otherwise fire a doomed fetch first. */
-function useRelayFixtures() {
-  useLayoutEffect(() => {
-    retainRelayFixtures();
-    return releaseRelayFixtures;
-  }, []);
-}
+  [FALLBACK_RELAY, null],
+]);
 
 // ─── Fixture posts ───────────────────────────────────────────────────────────
 
@@ -126,20 +95,21 @@ function FakePost({ event, quoted }: { event: FeedEvent; quoted?: FeedEvent }) {
   const { PostCard } = require('@/features/feed/components/nostr/PostCard') as {
     PostCard: typeof import('@/features/feed/components/nostr/PostCard').PostCard;
   };
-  useRelayFixtures();
   const quotedEvents = useMemo(
     () => (quoted ? new Map([[quoted.id, quoted]]) : EMPTY_QUOTED),
     [quoted]
   );
   return (
-    <PostCard
-      event={event}
-      metrics={METRICS}
-      quotedEvents={quotedEvents}
-      profiles={PROFILES}
-      getMetrics={getMetrics}
-      variant="feed"
-    />
+    <RelayCardFixturesContext.Provider value={RELAY_FIXTURES}>
+      <PostCard
+        event={event}
+        metrics={METRICS}
+        quotedEvents={quotedEvents}
+        profiles={PROFILES}
+        getMetrics={getMetrics}
+        variant="feed"
+      />
+    </RelayCardFixturesContext.Provider>
   );
 }
 
