@@ -18,9 +18,10 @@ export type RawWireEvent = {
   created_at?: number;
 };
 
-/** Coerce an untrusted wire event into a `NaggFeedEvent`, or null if it lacks an id/pubkey. */
+/** Coerce an untrusted wire event into a `NaggFeedEvent`, or null if it lacks an id, pubkey or numeric kind. */
 export function toFeedEvent(raw: RawWireEvent): NaggFeedEvent | null {
   if (typeof raw.id !== 'string' || typeof raw.pubkey !== 'string') return null;
+  if (typeof raw.kind !== 'number') return null;
   return {
     id: raw.id,
     kind: raw.kind,

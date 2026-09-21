@@ -54,20 +54,60 @@ describe('getRunDetail deviceType', () => {
 });
 
 describe('ledgerSafeToDelete', () => {
-  const leg = (kind: string, legId = 'asset-01') =>
-    JSON.stringify({ v: 1, runId: 'r', legId, kind });
+  const asset = { mintUrl: 'https://mint.example', unit: 'sat', accountIndex: 0 };
+  const base = { v: 1, runId: 'r', legId: 'asset-01', ts: 1 };
+  const lines = {
+    intent: {
+      ...base,
+      kind: 'intent',
+      custody: {
+        id: '0123456789abcdef',
+        kind: 'cashu-token',
+        len: 10,
+        fingerprint: '0123456789ab',
+      },
+      counterparty: 'faucet',
+      asset,
+      expectedAmount: 100,
+    },
+    funded: { ...base, kind: 'funded', amount: 100, fees: 0 },
+    sweep: {
+      ...base,
+      kind: 'sweep',
+      asset,
+      ok: true,
+      recoveredAmount: 100,
+      residualAmount: 0,
+      fees: 0,
+    },
+    reconciled: {
+      ...base,
+      kind: 'reconciled',
+      fundedAmount: 100,
+      recoveredAmount: 100,
+      outflowAmount: 0,
+      fees: 0,
+    },
+  };
+  const ledger = (...entries: object[]) => entries.map((entry) => JSON.stringify(entry)).join('\n');
 
   test('reconciled legs are safe', () => {
-    const text = [leg('intent'), leg('funded'), leg('sweep'), leg('reconciled')].join('\n');
+    const text = ledger(lines.intent, lines.funded, lines.sweep, lines.reconciled);
     expect(ledgerSafeToDelete(text)).toBe(true);
   });
 
   test('unreconciled leg is unsafe', () => {
-    expect(ledgerSafeToDelete([leg('intent'), leg('funded')].join('\n'))).toBe(false);
+    expect(ledgerSafeToDelete(ledger(lines.intent, lines.funded))).toBe(false);
   });
 
   test('unparseable ledger fails closed', () => {
     expect(ledgerSafeToDelete('not json\n')).toBe(false);
+  });
+
+  test('well-formed JSON that is not a ledger entry fails closed', () => {
+    expect(ledgerSafeToDelete(ledger({ v: 1, runId: 'r', legId: 'asset-01' }))).toBe(false);
+    expect(ledgerSafeToDelete(ledger({ ...base, kind: 'opened' }))).toBe(false);
+    expect(ledgerSafeToDelete(ledger({ kind: 'reconciled' }))).toBe(false);
   });
 
   test('empty ledger is safe', () => {

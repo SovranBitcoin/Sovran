@@ -122,29 +122,32 @@ export type MintFaultRuleSet = z.infer<typeof mintFaultRuleSetSchema>;
 
 /** Per-rule counters mirrored into the ledger. `matched` counts every request
  * the rule's static predicate claimed; `applied` counts faked outcomes. */
-export interface MintFaultLedgerCounts {
-  matched: number;
-  applied: number;
-}
+const mintFaultLedgerCountsSchema = z.object({
+  matched: z.number().int().nonnegative(),
+  applied: z.number().int().nonnegative(),
+});
+export type MintFaultLedgerCounts = z.infer<typeof mintFaultLedgerCountsSchema>;
 
-export interface MintFaultLedgerEntry {
-  seq: number;
-  at: number;
-  ruleId: string;
-  mode: MintFaultResponse['mode'];
-  outcome: 'applied' | 'passthrough';
-  method: string;
-  url: string;
-}
+const mintFaultLedgerEntrySchema = z.object({
+  seq: z.number().int().nonnegative(),
+  at: z.number(),
+  ruleId: z.string(),
+  mode: z.enum(['error', 'offline', 'timeout', 'httpStatus', 'malformed']),
+  outcome: z.enum(['applied', 'passthrough']),
+  method: z.string(),
+  url: z.string(),
+});
+export type MintFaultLedgerEntry = z.infer<typeof mintFaultLedgerEntrySchema>;
 
-export interface MintFaultLedger {
-  v: 1;
+const mintFaultLedgerSchema = z.object({
+  v: z.literal(1),
   /** Revision of the rule-set the entries were recorded under — the ack the
    * harness polls for after writing a new rules file. */
-  activeRevision: number;
-  counts: Record<string, MintFaultLedgerCounts>;
-  entries: MintFaultLedgerEntry[];
-}
+  activeRevision: z.number(),
+  counts: z.record(z.string(), mintFaultLedgerCountsSchema),
+  entries: z.array(mintFaultLedgerEntrySchema),
+});
+export type MintFaultLedger = z.infer<typeof mintFaultLedgerSchema>;
 
 export function serializeMintFaultRuleSet(set: MintFaultRuleSet): string {
   return JSON.stringify(mintFaultRuleSetSchema.parse(set));
@@ -161,9 +164,13 @@ export function parseMintFaultRuleSet(raw: string): MintFaultRuleSet {
 }
 
 export function parseMintFaultLedger(raw: string): MintFaultLedger {
-  const value = JSON.parse(raw) as MintFaultLedger;
-  if (!value || value.v !== 1 || typeof value.activeRevision !== 'number') {
-    throw new Error('mint-fault ledger has an invalid shape');
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    throw new Error('mint-fault ledger is malformed JSON');
   }
-  return value;
+  const parsed = mintFaultLedgerSchema.safeParse(value);
+  if (!parsed.success) throw new Error('mint-fault ledger has an invalid shape');
+  return parsed.data;
 }

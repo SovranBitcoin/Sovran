@@ -1,11 +1,32 @@
 import { log } from '@/shared/lib/logger';
-import {
-  useWallpaperStore,
-  type WallpaperCatalogEntry,
-} from '@/shared/stores/global/wallpaperStore';
+import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { fetchWallpaperCatalog } from '@/shared/lib/apiClient';
 import { PUBLIC_KEYS } from '@/shared/lib/constants';
 import { isLikelyHttpUrl } from '@/shared/lib/url';
+import type { ThemePalette } from '@/themes';
+
+// The schema validates `palette` as a string-keyed record of hex colours; the
+// theme engine reads every shade, so an entry must carry all of them.
+const THEME_SHADES: Record<keyof ThemePalette, true> = {
+  0: true,
+  50: true,
+  100: true,
+  200: true,
+  300: true,
+  400: true,
+  500: true,
+  600: true,
+  700: true,
+  800: true,
+  900: true,
+  950: true,
+};
+
+function hasEveryShade<T extends { palette: Record<string, string> }>(
+  wallpaper: T
+): wallpaper is T & { palette: ThemePalette } {
+  return Object.keys(THEME_SHADES).every((shade) => Object.hasOwn(wallpaper.palette, shade));
+}
 
 /**
  * Refresh the wallpaper catalog from the API. `signal` aborts the fetch
@@ -42,10 +63,12 @@ export async function refreshCatalog(signal?: AbortSignal): Promise<boolean> {
   const removedSlugs = new Set(
     albums.filter((a) => !isSovran(a.author?.pubkey)).map((a) => a.slug)
   );
-  const filteredWallpapers = wallpapers.filter((w) => !removedSlugs.has(w.albumSlug));
+  const sovranWallpapers = wallpapers.filter((w) => !removedSlugs.has(w.albumSlug));
+  const filteredWallpapers = sovranWallpapers.filter(hasEveryShade);
 
   const droppedAlbums = albums.length - filteredAlbums.length;
-  const droppedWallpapers = wallpapers.length - filteredWallpapers.length;
+  const droppedWallpapers = wallpapers.length - sovranWallpapers.length;
+  const incompletePalettes = sovranWallpapers.length - filteredWallpapers.length;
   const keptAlbumSlugs = new Set(filteredAlbums.map((a) => a.slug));
   const orphanAlbumSlugs = Array.from(
     new Set(
@@ -60,6 +83,7 @@ export async function refreshCatalog(signal?: AbortSignal): Promise<boolean> {
     keptAlbums: filteredAlbums.length,
     droppedWallpapers,
     droppedAlbums,
+    incompletePalettes,
     orphanAlbumSlugs,
     missingThumbUrls: filteredWallpapers.filter((w) => !isLikelyHttpUrl(w.thumbUrl)).length,
     missingBlossomUrls: filteredWallpapers.filter((w) => !isLikelyHttpUrl(w.blossomUrl)).length,
@@ -92,10 +116,6 @@ export async function refreshCatalog(signal?: AbortSignal): Promise<boolean> {
     });
   }
 
-  // Schema palette is typed as Record<string, string>; the app's WallpaperCatalogEntry
-  // narrows it to the specific shade-keyed ThemePalette. JSON shape matches.
-  useWallpaperStore
-    .getState()
-    .setCatalog(filteredWallpapers as WallpaperCatalogEntry[], filteredAlbums);
+  useWallpaperStore.getState().setCatalog(filteredWallpapers, filteredAlbums);
   return true;
 }

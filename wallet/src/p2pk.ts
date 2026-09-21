@@ -30,10 +30,10 @@ export function extractP2PKPubkey(
 ): string | null {
   for (const proof of proofs) {
     try {
-      const parsed = JSON.parse(proof.secret);
-      if (Array.isArray(parsed) && parsed[0] === "P2PK" && parsed[1]?.data) {
-        return parsed[1].data as string;
-      }
+      const parsed: unknown = JSON.parse(proof.secret);
+      if (!Array.isArray(parsed) || parsed[0] !== "P2PK") continue;
+      const data: unknown = parsed[1]?.data;
+      if (typeof data === "string" && data) return data;
     } catch {
       // not a structured secret
     }

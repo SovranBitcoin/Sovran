@@ -9,6 +9,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync } fro
 import { createServer as createHttpServer, type IncomingMessage } from 'node:http';
 import { createServer as createNetServer } from 'node:net';
 import { dirname, join } from 'node:path';
+import { z } from 'zod';
 import {
   captureEnvironment,
   LIBRARY_CAPTURE_PROFILE,
@@ -43,21 +44,24 @@ import {
 type ResetMode = 'erase' | 'reinstall' | 'none';
 type CommandExecutor = (command: string[], options?: RunOptions) => Promise<string>;
 
-interface RuntimeDevice {
-  name: string;
-  identifier: string;
-  productFamily?: string;
-}
+const runtimeDevice = z.object({
+  name: z.string(),
+  identifier: z.string(),
+  productFamily: z.string().optional(),
+});
 
-interface RuntimeRecord {
-  isAvailable: boolean;
-  identifier: string;
-  name: string;
-  version: string;
-  buildversion?: string;
-  platform?: string;
-  supportedDeviceTypes?: RuntimeDevice[];
-}
+const runtimeRecord = z.object({
+  isAvailable: z.boolean(),
+  identifier: z.string(),
+  name: z.string(),
+  version: z.string(),
+  buildversion: z.string().optional(),
+  platform: z.string().optional(),
+  supportedDeviceTypes: z.array(runtimeDevice).optional(),
+});
+
+// Runtimes parse one by one: a tvOS or watchOS record of another shape must not hide the iOS ones.
+const runtimeList = z.object({ runtimes: z.array(z.unknown()).optional() });
 
 interface SimulatorTarget {
   runtimeBuild?: string;
@@ -75,13 +79,19 @@ export function selectSimulatorTarget(
   preferred = DEFAULT_DEVICE,
   captureProfile?: CaptureProfile
 ): SimulatorTarget {
-  let parsed: { runtimes?: RuntimeRecord[] };
+  let json: unknown;
   try {
-    parsed = JSON.parse(raw) as { runtimes?: RuntimeRecord[] };
+    json = JSON.parse(raw);
   } catch {
     throw new Error('simctl returned invalid runtime JSON');
   }
-  const runtimes = (parsed.runtimes ?? [])
+  const parsed = runtimeList.safeParse(json);
+  if (!parsed.success) throw new Error('simctl returned invalid runtime JSON');
+  const runtimes = (parsed.data.runtimes ?? [])
+    .flatMap((runtime) => {
+      const record = runtimeRecord.safeParse(runtime);
+      return record.success ? [record.data] : [];
+    })
     .filter(
       (runtime) =>
         runtime.isAvailable &&

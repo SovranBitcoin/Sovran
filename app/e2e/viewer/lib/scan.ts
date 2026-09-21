@@ -1,9 +1,19 @@
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { z } from 'zod';
 
+import { blockingLegsFromEntries, parseLedgerText } from '../../ledger/ledger';
 import { ARTIFACTS, isValidRunDirName } from './paths';
 import { deriveScenarioStatuses, parseEvents, runLabel, timelinesFromDirScan } from './timeline';
 import type { RunDetail, RunSummary } from './types';
+
+/** `manifest.git` as e2e/core/git.ts writes it; anything else reads as no git info. */
+const gitInfoSchema = z.object({
+  sha: z.string(),
+  shortSha: z.string(),
+  branch: z.string(),
+  dirty: z.boolean(),
+});
 
 /** A run with no run.end whose events file went quiet for this long is
  * considered aborted rather than in-progress. */
@@ -62,24 +72,15 @@ async function readDeviceType(runDir: string): Promise<string | undefined> {
   }
 }
 
-/** Every funded leg that was opened (intent/funded) must close with a
- * reconciled entry. Unparseable ledgers fail closed. */
+/** No leg may still hold funds, by the ledger's own rules. A ledger the
+ * ledger schema or sequence check rejects fails closed. */
 export function ledgerSafeToDelete(ledgerText: string): boolean {
-  const opened = new Set<string>();
-  const reconciled = new Set<string>();
-  for (const line of ledgerText.split('\n')) {
-    if (!line.trim()) continue;
-    let entry: Record<string, unknown>;
-    try {
-      entry = JSON.parse(line);
-    } catch {
-      return false;
-    }
-    const key = `${entry.runId}:${entry.legId}`;
-    if (entry.kind === 'intent' || entry.kind === 'funded') opened.add(key);
-    if (entry.kind === 'reconciled') reconciled.add(key);
+  if (!ledgerText.trim()) return true;
+  try {
+    return blockingLegsFromEntries(parseLedgerText(ledgerText)).length === 0;
+  } catch {
+    return false;
   }
-  return [...opened].every((key) => reconciled.has(key));
 }
 
 async function fundsSafeToDelete(runDir: string): Promise<boolean> {
@@ -126,7 +127,7 @@ export async function getRunDetail(runDirName: string): Promise<RunDetail | unde
   const scenarios =
     parsed.scenarios.length > 0 ? parsed.scenarios : timelinesFromDirScan(runDir, scenarioIds);
 
-  const git = manifest.git as RunDetail['git'];
+  const git = gitInfoSchema.safeParse(manifest.git).data;
   const detail: RunDetail = {
     runId: runDirName.replace(/^run-/, ''),
     suite: String(manifest.suite ?? ''),

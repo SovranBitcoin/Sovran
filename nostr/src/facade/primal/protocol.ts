@@ -158,8 +158,11 @@ export function createPrimalWebSocketConnection(config: PrimalWebSocketConfig): 
           if (settled) return;
           const message = parseWireFrame(event.data);
           if (!message || message[1] !== subId) return;
-          if (message[0] === 'EVENT' && message[2] && typeof message[2] === 'object') {
-            events.push(message[2] as RawPrimalEvent);
+          if (message[0] === 'EVENT') {
+            // `kind` is the one field the raw type requires; the rest is checked at demux.
+            const frame: { kind?: unknown } | null =
+              message[2] && typeof message[2] === 'object' ? message[2] : null;
+            if (frame && typeof frame.kind === 'number') events.push(frame as RawPrimalEvent);
           } else if (message[0] === 'EOSE') {
             nostrLog.debug('nostr.primal.eose', { subId, events: events.length });
             finish(ok(events));

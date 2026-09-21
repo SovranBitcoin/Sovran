@@ -10,6 +10,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync, renameSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { z } from 'zod';
 import type { AppSourceStamp } from '../../../scripts/lib/app-source.mjs';
 import { ROOT, type Platform } from './plan';
 
@@ -52,12 +53,27 @@ type RegistryEntry = {
   [field: string]: unknown;
 };
 
-type CandidateManifest = {
-  runId: string;
-  platform: Platform;
-  startedAt: string;
-  screenshots: { file: string; key: string; context: string; page: string; sha256: string }[];
-};
+/** What promotion reads from a stored entry; curated fields pass through untouched. */
+const registrySchema = z.record(
+  z.string(),
+  z.looseObject({ context: z.string(), page: z.string(), file: z.string() })
+);
+
+/** `file` and `key` become read and write paths, so both are single safe path segments. */
+const candidateManifestSchema = z.object({
+  runId: z.string().regex(/^[A-Za-z0-9-]+$/),
+  platform: z.enum(['ios', 'android']),
+  startedAt: z.string(),
+  screenshots: z.array(
+    z.object({
+      file: z.string().regex(/^[a-z0-9][a-z0-9-]*\.png$/),
+      key: z.string().regex(/^(ios|android)\/[a-z0-9][a-z0-9-]*$/),
+      context: z.string(),
+      page: z.string(),
+      sha256: z.string().regex(/^[a-f0-9]{64}$/),
+    })
+  ),
+});
 
 export type LibraryPaths = { registry: string; artwork: string };
 const LIBRARY: LibraryPaths = {
@@ -65,9 +81,11 @@ const LIBRARY: LibraryPaths = {
   artwork: join(ROOT, 'press/artwork'),
 };
 
-function readJson<T>(path: string): { value: T; indent: number } {
+function readJson<T>(path: string, schema: z.ZodType<T>): { value: T; indent: number } {
   const text = readFileSync(path, 'utf8');
-  return { value: JSON.parse(text) as T, indent: /^\{\n( +)"/.exec(text)?.[1].length ?? 2 };
+  const parsed = schema.safeParse(JSON.parse(text));
+  if (!parsed.success) throw new Error(`Unexpected JSON shape: ${path}`);
+  return { value: parsed.data, indent: /^\{\n( +)"/.exec(text)?.[1].length ?? 2 };
 }
 
 function writeJsonAtomic(path: string, value: unknown, indent: number) {
@@ -106,12 +124,10 @@ export function promoteCandidates(
   const { builds, appSource } = stamps;
   // Without the app source a capture could silently outlive the UI it shows.
   if (!appSource?.fingerprint) throw new Error('No app source stamp; refusing to promote');
-  const { value: registry, indent } = readJson<Record<string, RegistryEntry>>(paths.registry);
+  const { value: registry, indent } = readJson(paths.registry, registrySchema);
   const staged: { key: string; bytes: Buffer; destination: string; entry: RegistryEntry }[] = [];
   for (const dir of pressDirs) {
-    const manifest = JSON.parse(
-      readFileSync(join(dir, 'manifest.json'), 'utf8')
-    ) as CandidateManifest;
+    const { value: manifest } = readJson(join(dir, 'manifest.json'), candidateManifestSchema);
     const build = builds[manifest.platform];
     if (!build)
       throw new Error(`No native build stamp for ${manifest.platform}; refusing to promote ${dir}`);
@@ -170,7 +186,7 @@ export function recordRefreshFailures(
   paths: LibraryPaths = LIBRARY
 ) {
   if (!failures.length) return;
-  const { value: registry, indent } = readJson<Record<string, RegistryEntry>>(paths.registry);
+  const { value: registry, indent } = readJson(paths.registry, registrySchema);
   for (const { key, reason } of failures)
     if (registry[key]) registry[key] = { ...registry[key], lastRefreshFailure: { at, reason } };
   writeJsonAtomic(paths.registry, registry, indent);

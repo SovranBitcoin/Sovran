@@ -6,25 +6,28 @@
  * beating a prefix, and an on-screen-center requirement so off-screen carousel
  * duplicates don't match.
  */
+import { z } from 'zod';
 import type { Selector } from '../schema/selectors';
 import type { AxNode, ObservedState } from './driver';
 import { parseE2EActionMenuTarget } from '../../shared/lib/e2e/actionMenuTarget';
 import { redactProfileSecretAxFields, redactProfileSecretAxNodes } from './ax-redaction';
 
-export interface AxElement {
-  id?: string;
-  label?: string;
+const axElement = z.object({
+  id: z.string().optional(),
+  label: z.string().optional(),
   /** Android content-desc, when different from the existing visible-text label. */
-  accessibilityLabel?: string;
-  role?: string;
-  enabled?: boolean;
-  value?: string;
-  frame: { x: number; y: number; width: number; height: number };
-}
-export interface AxSnapshot {
-  screen: { width: number; height: number };
-  elements: AxElement[];
-}
+  accessibilityLabel: z.string().optional(),
+  role: z.string().optional(),
+  enabled: z.boolean().optional(),
+  value: z.string().optional(),
+  frame: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }),
+});
+const axSnapshot = z.object({
+  screen: z.object({ width: z.number(), height: z.number() }),
+  elements: z.array(axElement),
+});
+export type AxElement = z.infer<typeof axElement>;
+export type AxSnapshot = z.infer<typeof axSnapshot>;
 
 /** Resolve a physical tap centre. Ordinary elements use their AX frame. An
  * iOS FullWindowOverlay action mirror carries the real row's measured centre
@@ -212,16 +215,16 @@ export function parseSseData(line: string): AxSnapshot | null {
   if (!line.startsWith('data:')) return null;
   const body = line.slice(5).trim();
   if (!body) return null;
+  let parsed: unknown;
   try {
-    const obj = JSON.parse(body);
-    if (obj && obj.screen && Array.isArray(obj.elements)) {
-      const snapshot = obj as AxSnapshot;
-      return { ...snapshot, elements: redactProfileSecretAxNodes(snapshot.elements) };
-    }
+    parsed = JSON.parse(body);
   } catch {
     /* partial/keep-alive */
+    return null;
   }
-  return null;
+  const snapshot = axSnapshot.safeParse(parsed);
+  if (!snapshot.success) return null;
+  return { ...snapshot.data, elements: redactProfileSecretAxNodes(snapshot.data.elements) };
 }
 
 /** Extract the sat amount from a wallet balance label like `₿ 100` / `-₿40`. */
