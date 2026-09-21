@@ -2,4 +2,4 @@
 
 export { WalletScreen } from './screens/WalletScreen';
 export { MintSelector } from './components/MintSelector';
-export { useAppBalance } from './hooks/useAppBalance';
+export { useProfileBalanceSync } from './hooks/useProfileBalanceSync';

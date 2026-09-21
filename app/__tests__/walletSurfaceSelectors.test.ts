@@ -238,7 +238,7 @@ describe('wallet surface e2e selectors', () => {
   });
 
   it('pins the drawer menu row ids', () => {
-    const drawer = read('app/(drawer)/_layout.tsx');
+    const drawer = read('navigation/DrawerContent.tsx');
     expect(drawer).toContain('testID={`drawer-menu-${id}`}');
     // Row ids are the e2e selector suffixes (drawer-menu-feed, …); renaming
     // one breaks every scenario that opens that route from the drawer.
