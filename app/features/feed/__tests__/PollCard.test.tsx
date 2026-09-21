@@ -74,14 +74,14 @@ it('does not let a previous poll submission finish the current poll submission',
   const view = render(<PollCard event={poll('first')} />);
   fireEvent.press(view.getByText('Choice'));
   fireEvent.press(view.getByText('Vote'));
-  expect(view.getByText('Voting…')).toBeTruthy();
+  expect(view.getByText('Voting…')).toBeOnTheScreen();
 
   view.rerender(<PollCard event={poll('second')} />);
   fireEvent.press(view.getByText('Choice'));
   fireEvent.press(view.getByText('Vote'));
   await act(async () => finishOld());
-  expect(view.getByText('Voting…')).toBeTruthy();
+  expect(view.getByText('Voting…')).toBeOnTheScreen();
 
   await act(async () => finishCurrent());
-  expect(view.getByText('Vote')).toBeTruthy();
+  expect(view.getByText('Vote')).toBeOnTheScreen();
 });
