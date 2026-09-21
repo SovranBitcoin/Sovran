@@ -12,6 +12,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { z } from 'zod';
 
 import { PROFILE_SCOPED_STORE_KEYS } from '@/shared/lib/cashu/profileScopedStorage';
 import { PROFILE_PRIMARY_UNIT_ID, isBuiltinColorTheme } from '@/shared/lib/theme/builtinAlbums';
@@ -22,6 +23,53 @@ const GLOBAL_MIGRATIONS_COMPLETED_KEY = 'global-migrations-completed';
 interface Migration {
   id: string;
   run: () => Promise<void>;
+}
+
+const PersistedProfileRow = z.object({
+  accountIndex: z.number().int(),
+  pubkey: z.string().min(1).max(128),
+});
+type PersistedProfileRow = z.infer<typeof PersistedProfileRow>;
+
+const PersistedProfileStore = z.object({
+  state: z.object({
+    profiles: z.array(z.unknown()),
+    activeAccountIndex: z.unknown().optional(),
+  }),
+});
+
+interface PersistedProfiles {
+  profiles: PersistedProfileRow[];
+  skippedCount: number;
+  activeAccountIndex: unknown;
+}
+
+/**
+ * Read the profile rows a migration may act on. A row without a usable
+ * `accountIndex`/`pubkey` is dropped here so no key is ever derived from it.
+ * Corrupt JSON yields null and the caller must leave storage untouched; a
+ * readable blob without a profile list reads as no profiles.
+ */
+function readPersistedProfiles(raw: string): PersistedProfiles | null {
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  const store = PersistedProfileStore.safeParse(json);
+  const rows = store.success ? store.data.state.profiles : [];
+
+  const profiles: PersistedProfileRow[] = [];
+  for (const row of rows) {
+    const profile = PersistedProfileRow.safeParse(row);
+    if (profile.success) profiles.push(profile.data);
+  }
+  return {
+    profiles,
+    skippedCount: rows.length - profiles.length,
+    activeAccountIndex: store.success ? store.data.state.activeAccountIndex : undefined,
+  };
 }
 
 /**
@@ -42,8 +90,14 @@ async function migrateIndexKeysToPubkeyKeys(): Promise<void> {
   const raw = await AsyncStorage.getItem('profile-store');
   if (!raw) return;
 
-  const parsed = JSON.parse(raw);
-  const profiles: { accountIndex: number; pubkey: string }[] = parsed?.state?.profiles ?? [];
+  const persisted = readPersistedProfiles(raw);
+  if (!persisted) {
+    log.warn('migrations.global.index_to_pubkey.profile_store_unreadable');
+    return;
+  }
+  const { profiles, skippedCount } = persisted;
+  if (skippedCount > 0)
+    log.warn('migrations.global.index_to_pubkey.rows_skipped', { skippedCount });
   if (profiles.length === 0) return;
 
   let migratedCount = 0;
@@ -109,13 +163,19 @@ async function migrateLegacyGlobalThemeToProfile(): Promise<void> {
 
   const profileRaw = await AsyncStorage.getItem('profile-store');
   if (profileRaw) {
-    const profileParsed = JSON.parse(profileRaw);
-    const profiles: { accountIndex: number; pubkey: string }[] =
-      profileParsed?.state?.profiles ?? [];
-    const activeIndex: number | undefined = profileParsed?.state?.activeAccountIndex;
-    const activeProfile = profiles.find((p) => p.accountIndex === activeIndex) ?? profiles[0];
+    const persisted = readPersistedProfiles(profileRaw);
+    if (!persisted) {
+      log.warn('migrations.global.theme_to_profile.profile_store_unreadable');
+      return;
+    }
+    const { profiles, skippedCount, activeAccountIndex } = persisted;
+    // The first-row fallback only holds when every row was readable; a skipped
+    // row may have been the active one, so nothing is seeded in its place.
+    const activeProfile =
+      profiles.find((p) => p.accountIndex === activeAccountIndex) ??
+      (skippedCount === 0 ? profiles[0] : undefined);
 
-    if (activeProfile?.pubkey && !isBuiltinColorTheme(legacyTheme)) {
+    if (activeProfile && !isBuiltinColorTheme(legacyTheme)) {
       const themeStoreKey = `theme-store:profile:${activeProfile.pubkey}`;
       const existingRaw = await AsyncStorage.getItem(themeStoreKey);
       let existing: {

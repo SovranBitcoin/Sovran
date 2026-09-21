@@ -196,6 +196,55 @@ describe("encodeAnnotation / decodeAnnotation", () => {
     expect(decoded.paymentRequest).toEqual({ requestId: "sovabc123" });
   });
 
+  it("drops only the field whose persisted value is outside its literal set", () => {
+    const decoded = decodeAnnotation({
+      counterpartyPubkey: "abc",
+      counterpartyDirection: "bystander",
+      scanMethod: "telepathy",
+      scanRaw: "bitcoin:bc1...",
+      lockType: "p2pk",
+      lockPubkey: "02deadbeef",
+      lockDirection: "sideways",
+      distributionSource: "pigeon",
+      swapGroupId: "g1",
+      swapRole: "burn",
+      swapHopIndex: "2",
+      geoLat: "51.5",
+      geoLng: "-0.12",
+    });
+    expect(decoded).toEqual({
+      counterparty: { pubkey: "abc" },
+      scan: { raw: "bitcoin:bc1..." },
+      lock: { type: "p2pk", pubkey: "02deadbeef" },
+      location: { lat: 51.5, lng: -0.12 },
+      swap: { groupId: "g1", hopIndex: 2 },
+    });
+  });
+
+  it("decodes every known literal of the narrowed fields", () => {
+    const decode = (key: string, value: string) =>
+      decodeAnnotation({ [key]: value });
+    for (const direction of ["sender", "recipient"] as const) {
+      expect(decode("counterpartyDirection", direction).counterparty).toEqual({
+        direction,
+      });
+    }
+    for (const method of ["qr", "nfc", "paste", "deeplink", "ble"] as const) {
+      expect(decode("scanMethod", method).scan).toEqual({ method });
+    }
+    for (const direction of ["incoming", "outgoing"] as const) {
+      expect(decode("lockDirection", direction).lock).toEqual({ direction });
+    }
+    for (const source of ["copy", "share", "airdrop", "displayed"] as const) {
+      expect(decode("distributionSource", source).distribution).toEqual({
+        source,
+      });
+    }
+    for (const role of ["mint", "melt"] as const) {
+      expect(decode("swapRole", role).swap).toEqual({ role });
+    }
+  });
+
   it("produces no sub-objects for an empty record", () => {
     expect(decodeAnnotation({})).toEqual({});
   });
