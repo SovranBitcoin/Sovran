@@ -14,7 +14,7 @@ import type { LayoutChangeEvent } from 'react-native';
  */
 
 import { avatarStateFor } from '@/shared/lib/imageLoadState';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
@@ -560,6 +560,7 @@ function BannerWithAvatar({
   visualScope,
   identityStyle,
   onIdentityLayout,
+  onAvatarLayout,
 }: {
   bannerUrl?: string;
   pictureUrl?: string;
@@ -588,6 +589,8 @@ function BannerWithAvatar({
   visualScope: string;
   identityStyle?: React.ComponentProps<typeof Animated.View>['style'];
   onIdentityLayout?: (event: LayoutChangeEvent) => void;
+  /** The picture's own box within this header — what the handoff waits for. */
+  onAvatarLayout?: (event: LayoutChangeEvent) => void;
 }) {
   const [foreground, surfaceSecondary, background] = useThemeColor([
     'foreground',
@@ -798,6 +801,7 @@ function BannerWithAvatar({
 
       {/* Avatar - positioned to overlap banner */}
       <Animated.View
+        onLayout={onAvatarLayout}
         style={[
           styles.avatarContainer,
           avatarSettled ? styles.settledReveal : avatarStyle,
@@ -1110,7 +1114,20 @@ export function UserProfileScreen() {
   // profile body.
   const displayName = resolveIdentityName({ pubkey, nostrProfile: cachedProfile });
   const headerHeight = useHeaderHeight();
+  // Where the page's PICTURE ends, in scroll coordinates. The handoff waits for
+  // the picture alone, not for the whole banner header: the name, the nip-05 and
+  // the follow button below it are not what the bar is about to show, and
+  // waiting for them left the bar empty while the picture was already gone.
   const [identityBottom, setIdentityBottom] = useState<number | null>(null);
+  const bannerTopRef = useRef(0);
+  const avatarBottomRef = useRef<number | null>(null);
+  const commitIdentityBottom = useCallback(() => {
+    if (avatarBottomRef.current === null) return;
+    const bottom = Math.round(bannerTopRef.current + avatarBottomRef.current);
+    setIdentityBottom((previous) =>
+      previous !== null && Math.abs(previous - bottom) < 2 ? previous : bottom
+    );
+  }, []);
   // headerRight below: mint info and the person menu when shown. Both are
   // conditional, so this side can be empty; the navigator's back button keeps
   // the left side at one action, which is the width the title must clear.
@@ -1431,11 +1448,13 @@ export function UserProfileScreen() {
               <BannerWithAvatar
                 identityStyle={morph.contentStyle}
                 onIdentityLayout={(event) => {
+                  bannerTopRef.current = event.nativeEvent.layout.y;
+                  commitIdentityBottom();
+                }}
+                onAvatarLayout={(event) => {
                   const { y, height } = event.nativeEvent.layout;
-                  const bottom = Math.round(y + height);
-                  setIdentityBottom((previous) =>
-                    previous !== null && Math.abs(previous - bottom) < 2 ? previous : bottom
-                  );
+                  avatarBottomRef.current = y + height;
+                  commitIdentityBottom();
                 }}
                 bannerUrl={cachedProfile?.banner}
                 pictureUrl={cachedProfile?.picture}
