@@ -1,13 +1,17 @@
 import { useModerationActions } from '@/features/feed/hooks/useModerationActions';
+import { HeaderHeightContext } from 'expo-router/react-navigation';
+
+import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useContext, useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import * as nip19 from 'nostr-tools/nip19';
-import { IdentityHeader } from '@/shared/ui/composed/IdentityHeader';
+import { IdentityBarTitle, IdentityNameBand } from '@/shared/ui/composed/IdentityHeader';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { zIndex } from '@/shared/styles/tokens';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
 
@@ -46,8 +50,8 @@ interface DmChatHeaderProps {
 }
 
 /**
- * Header for 1:1 DM chat screens — the shared `IdentityHeader` (avatar above
- * display name) + QR-share button. Lifted from `features/user/screens/UserMessagesScreen.tsx`
+ * Header for 1:1 DM chat screens — the shared bar identity (the picture at
+ * header-button size, name in the band beneath it) + QR-share button. Lifted from `features/user/screens/UserMessagesScreen.tsx`
  * (the non-Routstr DM path) so White Noise, BitChat-DM, and Nostr DMs all
  * present the same identity affordance. Internally renders a `<Stack.Screen>`
  * options block, so consumers just mount this component anywhere inside their
@@ -63,6 +67,7 @@ export function DmChatHeader({
 }: DmChatHeaderProps) {
   const { personMenu } = useModerationActions();
   const foreground = useThemeColor('foreground');
+  const headerHeight = useContext(HeaderHeightContext) ?? 0;
 
   const { metadata, isLoading } = useNostrProfileMetadata(pubkey);
 
@@ -108,51 +113,59 @@ export function DmChatHeader({
         accessibilityLabel="Share profile QR"
       />
     ) : null);
-  // The busier side of the bar: the trailing action plus the moderation menu.
-  const sideActions = Math.max(1, (trailingNode ? 1 : 0) + (pubkey ? 1 : 0));
-
   return (
-    <Stack.Screen
-      options={withGlassHeaderItems({
-        headerShown: true,
-        headerTransparent: true,
-        headerStyle: { backgroundColor: 'transparent' },
-        headerShadowVisible: false,
-        headerBackVisible: false,
-        headerTintColor: foreground,
-        headerLeft: () => (
-          <ScreenHeaderAction
-            icon="material-symbols:arrow-back-rounded"
-            onPress={onBack}
-            testID="dm-header-back"
-            accessibilityLabel="Go back"
-          />
-        ),
-        headerTitleAlign: 'center',
-        headerTitle: () => (
-          <IdentityHeader
-            name={displayName}
-            seed={seed ?? pubkey ?? nickname ?? displayName}
-            picture={userPicture}
-            isLoading={shouldShowAvatarLoading}
-            sideActions={sideActions}
-            nameTestID="dm-header-title"
-          />
-        ),
-        headerRight: () => (
-          <HStack className="gap-1">
-            {trailingNode}
-            {pubkey && (
-              <ScreenHeaderAction
-                icon="material-symbols:report-rounded"
-                testID="dm-header-moderation"
-                accessibilityLabel="Block or report person"
-                onPress={() => personMenu(pubkey)}
-              />
-            )}
-          </HStack>
-        ),
-      })}
-    />
+    <>
+      <Stack.Screen
+        options={withGlassHeaderItems({
+          headerShown: true,
+          headerTransparent: true,
+          headerStyle: { backgroundColor: 'transparent' },
+          headerShadowVisible: false,
+          headerBackVisible: false,
+          headerTintColor: foreground,
+          headerLeft: () => (
+            <ScreenHeaderAction
+              icon="material-symbols:arrow-back-rounded"
+              onPress={onBack}
+              testID="dm-header-back"
+              accessibilityLabel="Go back"
+            />
+          ),
+          headerTitleAlign: 'center',
+          headerTitle: () => (
+            <IdentityBarTitle
+              name={displayName}
+              seed={seed ?? pubkey ?? nickname ?? displayName}
+              picture={userPicture}
+              isLoading={shouldShowAvatarLoading}
+            />
+          ),
+          headerRight: () => (
+            <HStack className="gap-1">
+              {trailingNode}
+              {pubkey && (
+                <ScreenHeaderAction
+                  icon="material-symbols:report-rounded"
+                  testID="dm-header-moderation"
+                  accessibilityLabel="Block or report person"
+                  onPress={() => personMenu(pubkey)}
+                />
+              )}
+            </HStack>
+          ),
+        })}
+      />
+      {/* The name the bar no longer has room for. A chat has no scroll handoff
+          to fade it in, so it simply stays — the same chrome an identity page
+          shows once collapsed, at the same place under the bar. */}
+      {/* Sticky layer: this component is mounted BEFORE the chat list in every
+          DM screen, so without it the first bubbles would paint over the name. */}
+      <View
+        pointerEvents="none"
+        className="absolute left-0 right-0"
+        style={{ top: headerHeight, zIndex: zIndex.sticky }}>
+        <IdentityNameBand name={displayName} nameTestID="dm-header-title" />
+      </View>
+    </>
   );
 }

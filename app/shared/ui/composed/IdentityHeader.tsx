@@ -32,15 +32,8 @@ export interface HeaderIdentity {
   isLoading?: boolean;
 }
 
-interface IdentityHeaderProps extends HeaderIdentity {
-  /** The larger number of header actions on either side of the title (see `useCenteredTitleMaxWidth`). */
-  sideActions?: number;
-  nameTestID?: string;
-}
-
-const NAME_STYLE = { lineHeight: headerIdentity.nameLineHeight };
-// Native navigation titles do not follow Dynamic Type, and this one shares a fixed
-// row with the header buttons. The accessibility label carries the full name.
+// Native navigation titles do not follow Dynamic Type, and the band shares a
+// fixed row under the bar. The bar's title view carries the full name.
 const NAME_MAX_FONT_SCALE = 1.2;
 
 /** The identity's picture at whatever diameter its header shape allows. */
@@ -65,41 +58,43 @@ function IdentityIcon({
   );
 }
 
-/** Icon above name, inside the header-button box, so every identity page centres alike. */
-export function IdentityHeader({
+/**
+ * The identity as the navigation bar shows it: the icon alone, at the same
+ * diameter as every headerLeft/headerRight control. Every header that names a
+ * person uses this — a scroll handoff and a chat header are the same thing at
+ * rest, so neither gets its own size. The name it displaces rides in
+ * {@link IdentityNameBand} directly below the bar.
+ */
+export function IdentityBarTitle({
   name,
   seed,
   picture,
   kind = 'person',
   isLoading = false,
-  sideActions,
-  nameTestID,
-}: IdentityHeaderProps) {
-  const maxWidth = useCenteredTitleMaxWidth(sideActions);
-  const boxStyle = { maxWidth, height: headerIdentity.height, gap: headerIdentity.gap };
+}: HeaderIdentity) {
   return (
-    <View className="items-center justify-center" style={boxStyle}>
+    <View
+      className="items-center justify-center"
+      style={BAR_TITLE_STYLE}
+      accessible
+      accessibilityRole="header"
+      accessibilityLabel={name}>
       <IdentityIcon
         name={name}
         seed={seed}
         picture={picture}
         kind={kind}
         isLoading={isLoading}
-        size={headerIdentity.iconSize}
+        size={headerIdentity.barIconSize}
       />
-      <Text
-        bold
-        size={headerIdentity.nameSize}
-        numberOfLines={1}
-        maxFontSizeMultiplier={NAME_MAX_FONT_SCALE}
-        className="max-w-full text-center"
-        style={NAME_STYLE}
-        testID={nameTestID}>
-        {name}
-      </Text>
     </View>
   );
 }
+
+const BAR_TITLE_STYLE = {
+  height: headerIdentity.height,
+  width: headerIdentity.barIconSize,
+};
 
 function MorphTitle({
   identity,
@@ -171,8 +166,17 @@ const BAND_NAME_STYLE = {
  * view already announces the name, so this copy stays out of the accessibility
  * tree.
  */
-function IdentityNameBand({ name, progress }: { name: string; progress: SharedValue<number> }) {
-  const style = useAnimatedStyle(() => ({ opacity: progress.get() }));
+export function IdentityNameBand({
+  name,
+  progress,
+  nameTestID,
+}: {
+  name: string;
+  /** Fades the band in with a scroll handoff. Omit on a header that always names its person. */
+  progress?: SharedValue<number>;
+  nameTestID?: string;
+}) {
+  const style = useAnimatedStyle(() => ({ opacity: progress ? progress.get() : 1 }));
   return (
     <Animated.View
       pointerEvents="none"
@@ -185,7 +189,8 @@ function IdentityNameBand({ name, progress }: { name: string; progress: SharedVa
         numberOfLines={1}
         maxFontSizeMultiplier={NAME_MAX_FONT_SCALE}
         className="text-center"
-        style={BAND_NAME_STYLE}>
+        style={BAND_NAME_STYLE}
+        testID={nameTestID}>
         {name}
       </Text>
     </Animated.View>

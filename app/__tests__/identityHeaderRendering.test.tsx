@@ -1,5 +1,5 @@
 import TestRenderer, { act } from 'react-test-renderer';
-import { IdentityHeader, useIdentityHeader } from '@/shared/ui/composed/IdentityHeader';
+import { IdentityBarTitle, useIdentityHeader } from '@/shared/ui/composed/IdentityHeader';
 import { headerButtonSize } from '@/shared/styles/tokens';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -67,18 +67,19 @@ it('does not rerender the owning page during identity handoff or reversal', () =
 it('draws a mint identity with MintIcon, so a missing icon is the mint placeholder', () => {
   let tree!: TestRenderer.ReactTestRenderer;
   act(() => {
-    tree = TestRenderer.create(<IdentityHeader kind="mint" name="Mint" seed="https://mint" />);
+    tree = TestRenderer.create(<IdentityBarTitle kind="mint" name="Mint" seed="https://mint" />);
   });
   expect(tree.root.findAllByType('MintIcon' as never)).toHaveLength(1);
   expect(tree.root.findAllByType('Avatar' as never)).toHaveLength(0);
   act(() => tree.unmount());
 });
 
-it('draws a person with the seeded Avatar', () => {
+it('draws a person with the seeded Avatar, at header-button size', () => {
   let tree!: TestRenderer.ReactTestRenderer;
   act(() => {
-    tree = TestRenderer.create(<IdentityHeader name="Alex" seed="alex" />);
+    tree = TestRenderer.create(<IdentityBarTitle name="Alex" seed="alex" />);
   });
+  expect(tree.root.findByType('Avatar' as never).props.size).toBe(headerButtonSize);
   expect(tree.root.findAllByType('Avatar' as never)).toHaveLength(1);
   expect(tree.root.findAllByType('MintIcon' as never)).toHaveLength(0);
   act(() => tree.unmount());

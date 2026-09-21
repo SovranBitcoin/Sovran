@@ -24,8 +24,9 @@ it('caps a title on a wide window and keeps a usable floor on a crowded bar', ()
   expect(centeredTitleMaxWidth(320, 3)).toBe(HEADER_TITLE_MIN_WIDTH);
 });
 
-it('fits the identity stack exactly inside the header-button box', () => {
-  const { iconSize, gap, nameLineHeight, height } = headerIdentity;
+it('gives the bar identity the same box as a header button', () => {
+  const { barIconSize, height } = headerIdentity;
   expect(height).toBe(headerButtonSize);
-  expect(iconSize + gap + nameLineHeight).toBe(headerButtonSize);
+  // The picture IS the button box: one row of equal circles across the bar.
+  expect(barIconSize).toBe(headerButtonSize);
 });
