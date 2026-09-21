@@ -9,6 +9,10 @@ const MNEMONIC =
 const TOKEN = 'a'.repeat(64);
 
 describe('funded E2E seed export', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('posts only to the authenticated owned loopback endpoint without logging the mnemonic', async () => {
     const fetchImpl = jest.fn(async () => ({ ok: true, status: 204 }));
     const consoleLog = jest.spyOn(console, 'log').mockImplementation(() => {});
@@ -29,7 +33,6 @@ describe('funded E2E seed export', () => {
       })
     );
     expect(consoleLog).not.toHaveBeenCalled();
-    consoleLog.mockRestore();
   });
 
   it('does nothing outside the gated run and rejects non-owned configuration', async () => {
