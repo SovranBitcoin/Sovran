@@ -29,3 +29,28 @@ export function nearestSnap(
   }
   return target;
 }
+
+/**
+ * Worklet: how far to lift the thread list's content as the sheet collapses.
+ *
+ * The list reserves `headerClearance` at the top of its content so the thread
+ * can scroll behind the transparent navigation header while the sheet is at
+ * rest. Once the sheet slides down, that reserve is no longer under a header —
+ * it reads as an empty band between the grabber and the first post — so it is
+ * translated away over the rest→middle range.
+ *
+ * Only the part of the reserve still on screen is lifted: a thread opened on a
+ * reply has already scrolled past it, and lifting the full amount there would
+ * crop real content under the grabber instead.
+ */
+export function contentLift(
+  sheetTranslateY: number,
+  scrollY: number,
+  snapMiddle: number,
+  headerClearance: number
+): number {
+  'worklet';
+  const progress = Math.min(1, Math.max(0, sheetTranslateY / Math.max(1, snapMiddle)));
+  const remainingReserve = Math.min(headerClearance, Math.max(0, headerClearance - scrollY));
+  return progress * remainingReserve;
+}
