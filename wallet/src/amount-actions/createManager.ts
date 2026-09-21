@@ -196,15 +196,15 @@ export function createAmountActionManager(
   }
 
   // Suggestion cache — invalidated when proofs, price, or unit change
-  const EMPTY_SUGGESTIONS: QuickSendSuggestion[] = [];
+  const EMPTY_SUGGESTIONS: readonly QuickSendSuggestion[] = Object.freeze([]);
   let sugCache: {
     sig: string;
     price: number;
     unit: string;
-    result: QuickSendSuggestion[];
+    result: readonly QuickSendSuggestion[];
   } | null = null;
 
-  function getSuggestions(): QuickSendSuggestion[] {
+  function getSuggestions(): readonly QuickSendSuggestion[] {
     if (!getSuggestionsEnabled() || suggestionsDisabled)
       return EMPTY_SUGGESTIONS;
     const unitNow = getUnit();
