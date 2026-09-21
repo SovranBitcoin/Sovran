@@ -45,6 +45,13 @@ describe('normalizeContractState (list / bridge vocabulary)', () => {
     expect(normalizeContractState('send', 'prepared')).toBe('prepared');
     expect(normalizeContractState('melt', 'weird')).toBe('weird');
   });
+
+  it('passes inherited Object member names through as unknown states', () => {
+    for (const raw of ['constructor', '__proto__', 'toString']) {
+      expect(normalizeContractState('mint', raw)).toBe(raw);
+      expect(normalizeContractState('melt', raw)).toBe(raw);
+    }
+  });
 });
 
 describe('normalizeTimelineMintState', () => {
@@ -94,6 +101,12 @@ describe('entryStateRank', () => {
     expect(entryStateRank('receive', 'executing')).toBe(1);
     expect(entryStateRank('melt', 'weird')).toBe(-1);
     expect(entryStateRank('melt', null)).toBe(-1);
+  });
+
+  it('ranks inherited Object member names as unknown', () => {
+    for (const state of ['constructor', '__proto__', 'toString']) {
+      expect(entryStateRank('mint', state)).toBe(-1);
+    }
   });
 });
 

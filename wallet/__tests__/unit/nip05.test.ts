@@ -94,6 +94,18 @@ describe('NIP-05 recipient resolution', () => {
     await expect(fetchNip05Pubkey('alice@example.com')).resolves.toBeNull();
   });
 
+  it.each(['constructor', '__proto__', 'toString'])(
+    'returns null when the local part %s names an inherited Object member',
+    async (local) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => mockJsonResponse({ names: { alice: PUBKEY } }))
+      );
+
+      await expect(fetchNip05Pubkey(`${local}@example.com`)).resolves.toBeNull();
+    }
+  );
+
   it('only resolves lightning-address targets', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
