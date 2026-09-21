@@ -32,7 +32,12 @@ function ShareRoute() {
       withGlassHeaderItems({
         headerTitle,
         headerLeft: () => (
-          <ScreenHeaderAction icon="material-symbols:close-rounded" onPress={() => router.back()} />
+          <ScreenHeaderAction
+            icon="material-symbols:close-rounded"
+            accessibilityLabel="Close"
+            testID="share-close"
+            onPress={() => router.back()}
+          />
         ),
       }),
     [headerTitle]
