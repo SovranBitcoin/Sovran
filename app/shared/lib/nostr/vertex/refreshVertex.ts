@@ -4,6 +4,7 @@ import {
   facade,
   recipes,
   NaggProfilesEnvelopeSchema,
+  type NaggClient,
   type NaggProfilesEnvelope,
 } from 'nostr';
 import { z } from 'zod';
@@ -38,6 +39,8 @@ export async function refreshVertex(
     stale: boolean;
     ndk?: NDK;
     signal?: AbortSignal;
+    /** Defaults to a client for the configured Nagg app view. */
+    client?: Pick<NaggClient, 'rest'>;
   }
 ): Promise<NaggProfilesEnvelope | null> {
   if (!input.stale || !enabled() || input.signal?.aborted) return null;
@@ -83,8 +86,9 @@ export async function refreshVertex(
   attempted.set(scope, seen);
   const signed = await signVertexRequest(facade.buildVertexRequest(input), input.ndk);
   if (signed.isErr() || signed.value.pubkey !== owner || !stillCurrent()) return null;
-  const config = getNostrTierConfig();
-  const client = createNaggClient({ appView: { baseUrl: config.nagg.appViewBaseUrl } });
+  const client =
+    input.client ??
+    createNaggClient({ appView: { baseUrl: getNostrTierConfig().nagg.appViewBaseUrl } });
   const binding =
     input.kind === 'search'
       ? recipes.profileSearchAppView({

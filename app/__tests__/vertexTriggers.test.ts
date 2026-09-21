@@ -1,4 +1,5 @@
 import type NDK from '@nostr-dev-kit/ndk-mobile';
+import type { NaggClient } from 'nostr';
 import { ok } from 'neverthrow';
 import { refreshVertex, isVertexProfileStale } from '@/shared/lib/nostr/vertex/refreshVertex';
 import { getVertexBudgetStore } from '@/shared/stores/profile/vertexBudgetStore';
@@ -10,10 +11,6 @@ let mockNaggEnabled = true;
 let mockAutomation = false;
 const mockSign = jest.fn();
 const mockRest = jest.fn();
-jest.mock('nostr', () => {
-  const actual = jest.requireActual('nostr');
-  return { ...actual, createNaggClient: () => ({ rest: mockRest }) };
-});
 jest.mock('@/shared/lib/nostr/vertex/signVertexRequest', () => ({
   signVertexRequest: (...args: unknown[]) => mockSign(...args),
   vertexAutomationDisabled: () => mockAutomation,
@@ -45,7 +42,8 @@ jest.mock('@/shared/lib/logger', () => ({
 }));
 
 const ndk = { signer: { user: async () => ({ pubkey: mockOwner }) } } as unknown as NDK;
-const query = () => ({ kind: 'search' as const, query: 'alice', stale: true, ndk });
+const client = { rest: mockRest } as unknown as Pick<NaggClient, 'rest'>;
+const query = () => ({ kind: 'search' as const, query: 'alice', stale: true, ndk, client });
 let counter = 0;
 beforeEach(async () => {
   mockOwner = (++counter).toString(16).padStart(64, '0');
@@ -105,7 +103,7 @@ it.each(['fresh', 'toggle', 'mock', 'nagg', 'budget', 'no-signer', 'cancelled'] 
 it('blocks all later triggers after insufficient credits and logs exhaustion once', async () => {
   mockRest.mockResolvedValue(ok({ ok: false, reason: 'insufficient_credits' }));
   await refreshVertex(query());
-  await refreshVertex({ kind: 'profile', target: 'f'.repeat(64), stale: true, ndk });
+  await refreshVertex({ kind: 'profile', target: 'f'.repeat(64), stale: true, ndk, client });
   expect(mockRest).toHaveBeenCalledTimes(1);
   expect(mockSign).toHaveBeenCalledTimes(1);
   expect(nostrLog.info).toHaveBeenCalledWith('nostr.vertex.credits_exhausted');
@@ -132,8 +130,8 @@ it('profile age uses seven days in seconds, and a stale profile signs once', asy
   expect(isVertexProfileStale(null)).toBe(true);
   expect(isVertexProfileStale(Math.floor(Date.now() / 1000))).toBe(false);
   expect(isVertexProfileStale(Math.floor(Date.now() / 1000) - 7 * 86400)).toBe(true);
-  await refreshVertex({ kind: 'profile', target: 'f'.repeat(64), stale: true, ndk });
-  await refreshVertex({ kind: 'profile', target: 'f'.repeat(64), stale: true, ndk });
+  await refreshVertex({ kind: 'profile', target: 'f'.repeat(64), stale: true, ndk, client });
+  await refreshVertex({ kind: 'profile', target: 'f'.repeat(64), stale: true, ndk, client });
   expect(mockSign).toHaveBeenCalledTimes(1);
   expect(mockSign.mock.calls[0][0].kind).toBe(5312);
 });
