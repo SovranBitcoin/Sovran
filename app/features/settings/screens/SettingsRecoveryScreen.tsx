@@ -1138,6 +1138,8 @@ function getMintDisplayName(mint: Mint | undefined, fallbackUrl: string): string
   return mint?.mintInfo?.name || tryHostname(fallbackUrl);
 }
 
+const STILL_SCANNING_TICK_MS = 5_000;
+
 const MintRecoveryRow: React.FC<{
   mintUrl: string;
   mint?: Mint;
@@ -1155,9 +1157,16 @@ const MintRecoveryRow: React.FC<{
   const mintBalance = liveBalances.byMint[mintUrl]?.total || 0;
 
   const displayName = getMintDisplayName(mint, mintUrl);
-  // Derived at render rather than on a timer: renders arrive in bursts while
-  // the JS thread is blocked, and a timer would be starved anyway.
-  const progressLabel = describeMintProgress(state, Date.now());
+  // A stuck mint produces no state change, so the "still scanning" note needs
+  // its own clock. Coarse on purpose, and only while this mint is scanning.
+  const isRestoring = state.status === 'restoring';
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!isRestoring) return;
+    const interval = setInterval(() => setNowMs(Date.now()), STILL_SCANNING_TICK_MS);
+    return () => clearInterval(interval);
+  }, [isRestoring]);
+  const progressLabel = describeMintProgress(state, nowMs);
 
   return (
     <HStack gap={12} className="items-center">
