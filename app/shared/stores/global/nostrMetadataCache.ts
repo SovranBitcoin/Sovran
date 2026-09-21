@@ -35,15 +35,19 @@ export interface NostrProfileMetadata {
 export const NOSTR_METADATA_STALE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_ENTRIES = 500;
 
-function evictIfOverCap(byPubkey: Record<string, NostrProfileMetadata>): void {
-  if (Object.keys(byPubkey).length <= MAX_ENTRIES) return;
+/** `records` itself when under the cap; otherwise a copy without the oldest tenth. */
+function capEntries(
+  records: Record<string, NostrProfileMetadata>
+): Record<string, NostrProfileMetadata> {
+  if (Object.keys(records).length <= MAX_ENTRIES) return records;
   const evictCount = Math.floor(MAX_ENTRIES * 0.1);
-  const sorted = Object.entries(byPubkey).sort((a, b) => a[1].fetchedAt - b[1].fetchedAt);
-  for (let i = 0; i < evictCount; i++) delete byPubkey[sorted[i][0]];
+  const sorted = Object.entries(records).sort((a, b) => a[1].fetchedAt - b[1].fetchedAt);
+  const kept = Object.fromEntries(sorted.slice(evictCount));
   storeLog.debug('store.nostr_metadata.evicted', {
     evicted: evictCount,
-    remaining: Object.keys(byPubkey).length,
+    remaining: Object.keys(kept).length,
   });
+  return kept;
 }
 
 interface NostrMetadataCacheState {
@@ -113,11 +117,7 @@ export const useNostrMetadataCache = create<NostrMetadataCacheState>()(
     (set) => ({
       byPubkey: {},
 
-      persistOwnerSnapshot: (records) => {
-        const next = { ...records };
-        evictIfOverCap(next);
-        set({ byPubkey: next });
-      },
+      persistOwnerSnapshot: (records) => set({ byPubkey: capEntries(records) }),
 
       clear: () => set({ byPubkey: {} }),
     }),
