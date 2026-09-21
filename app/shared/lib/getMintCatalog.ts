@@ -244,12 +244,17 @@ async function fetchCatalogEntries(
     mintUrls.map(async (url) => {
       const cached = cachedByUrl[url] ?? readCachedEntry(url);
       const entry = await fetchEntry(url, getMintInfo, cached, signal).catch((err) => {
+        // Re-read rather than falling back to the pre-fetch snapshot: the steps
+        // inside write to the store as they land, so a later step throwing must
+        // not discard an audit the discovery call already persisted.
+        const recovered = readCachedEntry(url).entry;
         log.warn('mint.catalog.entries.entry_failed_using_cache', {
           ...mintUrlLogFields(url),
           hasCachedFields: hasCatalogFields(cached.entry),
+          hasRecoveredFields: hasCatalogFields(recovered),
           error: err instanceof Error ? err : new Error(String(err)),
         });
-        return cached.entry;
+        return recovered;
       });
       return [url, entry] as const;
     })
@@ -321,13 +326,37 @@ export async function getMintCatalog(
     return cachedCatalog;
   }
 
-  if (networkMode === 'cache-first' && Object.keys(cachedCatalog).length > 0) {
-    log.info('mint.catalog.get.cache_first_hit', {
+  // Cache-first is per MINT, not per batch. `cachedCatalog` only holds the
+  // mints that actually have cached fields, so returning it whole the moment
+  // any one mint was cached left every other mint with no entry at all — and
+  // `buildMintListItems` renders `catalog[mintUrl] ?? {}`, i.e. a row with no
+  // audit pill. That is the "select mint sometimes shows no auditor info": it
+  // depended on which mints happened to be warm. Serve the warm ones from
+  // cache, await the cold ones, and refresh the warm ones behind the result.
+  if (networkMode === 'cache-first') {
+    const coldUrls = mintUrls.filter((url) => !cachedCatalog[url]);
+    const warmUrls = mintUrls.filter((url) => cachedCatalog[url]);
+    log.info('mint.catalog.get.cache_first', {
       mintCount: mintUrls.length,
-      cachedCount: Object.keys(cachedCatalog).length,
+      cachedCount: warmUrls.length,
+      coldCount: coldUrls.length,
     });
-    refreshCatalogInBackground(mintUrls, getMintInfo, cachedByUrl, signal);
-    return cachedCatalog;
+    if (coldUrls.length === 0) {
+      refreshCatalogInBackground(mintUrls, getMintInfo, cachedByUrl, signal);
+      return cachedCatalog;
+    }
+    const coldCatalog = await fetchCatalogEntries(coldUrls, getMintInfo, cachedByUrl, signal);
+    if (warmUrls.length > 0) {
+      refreshCatalogInBackground(warmUrls, getMintInfo, cachedByUrl, signal);
+    }
+    const merged = { ...cachedCatalog, ...coldCatalog };
+    log.info('mint.catalog.get.cache_first_done', {
+      mintCount: mintUrls.length,
+      cachedCount: warmUrls.length,
+      coldResolvedCount: Object.keys(coldCatalog).length,
+      resultCount: Object.keys(merged).length,
+    });
+    return merged;
   }
 
   const freshCatalog = await fetchCatalogEntries(mintUrls, getMintInfo, cachedByUrl, signal);

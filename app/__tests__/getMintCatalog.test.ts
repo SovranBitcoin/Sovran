@@ -261,6 +261,37 @@ describe('getMintCatalog cache-first behavior', () => {
     expect(cached?.reviewCount).toBe(1);
   });
 
+  it('fetches the mints the cache does not cover instead of one warm mint serving the batch', async () => {
+    // Regression: `cache-first` returned the cached SUBSET whole as soon as any
+    // one mint was warm, so every cold mint reached `buildMintListItems` as
+    // `catalog[mintUrl] ?? {}` — a selector row with no audit pill. Which mints
+    // showed auditor info then depended on which happened to be cached.
+    const COLD_URL = 'https://cold.example.com';
+    useMintMetadataStore.getState().upsertFromDiscover([discoverRow()]);
+    (discoverMint as jest.Mock).mockImplementation((url: string) =>
+      Promise.resolve(
+        ok(url === COLD_URL ? { ...discoverRow(), mintUrl: COLD_URL, state: 'OK' } : undefined)
+      )
+    );
+    // The cold mint has no cached social group, so the operator-profile lookup
+    // actually runs for it.
+    (fetchNostrProfile as jest.Mock).mockResolvedValue(ok({ followers: 1, score: null }));
+
+    const catalog = await getMintCatalog([MINT_URL, COLD_URL], jest.fn(), {
+      networkMode: 'cache-first',
+    });
+
+    expect(catalog[MINT_URL]).toMatchObject({ auditState: 'OK' });
+    expect(catalog[COLD_URL]).toMatchObject({ auditState: 'OK' });
+    expect(discoverMint).toHaveBeenCalledWith(COLD_URL, { signal: undefined });
+  });
+
+  it('serves a fully warm batch from cache without awaiting the network', async () => {
+    useMintMetadataStore.getState().upsertFromDiscover([discoverRow()]);
+    const catalog = await getMintCatalog([MINT_URL], jest.fn(), { networkMode: 'cache-first' });
+    expect(catalog[MINT_URL]).toMatchObject({ auditState: 'OK' });
+  });
+
   it('keeps operator followers when Vertex reputation is null', async () => {
     (discoverMint as jest.Mock).mockResolvedValue(ok(discoverRow()));
     (fetchNostrProfile as jest.Mock).mockResolvedValue(ok({ followers: 55, score: null }));
