@@ -6,6 +6,7 @@ import {
   createMempoolSpaceChainAdapter,
   getOnchainConfirmationProgress,
   matchUniqueSendOutpoint,
+  MempoolAddressStatsSchema,
   parseOutpoint,
   shouldStopTxConfirmationPolling,
   summarizeMempoolAddress,
@@ -64,6 +65,18 @@ describe('chain address summaries', () => {
     );
 
     expect(summary.confirmedFundingConfirmations).toBe(2);
+  });
+
+  it('bounds the funding transactions a response or cache entry may carry', () => {
+    const tx = { txid: 'a'.repeat(64), valueSats: 1_000, confirmations: 1 };
+    expect(MempoolAddressStatsSchema.safeParse(stats({ fundingTxs: [tx] })).success).toBe(true);
+    expect(
+      MempoolAddressStatsSchema.safeParse(stats({ fundingTxs: [{ ...tx, txid: 'a'.repeat(65) }] }))
+        .success,
+    ).toBe(false);
+    expect(
+      MempoolAddressStatsSchema.safeParse(stats({ fundingTxs: Array(501).fill(tx) })).success,
+    ).toBe(false);
   });
 
   it('builds onchain confirmation progress from an address summary', () => {

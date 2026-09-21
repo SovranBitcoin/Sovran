@@ -42,8 +42,11 @@ const AddressStats = z.object({
   spent_txo_sum: z.number().int().nonnegative(),
 });
 
+// An address page is 50 mempool + 25 confirmed transactions.
+const MAX_TXS_PER_PAGE = 500;
+
 const FundingTx = z.object({
-  txid: z.string().min(1),
+  txid: z.string().min(1).max(64),
   valueSats: z.number().int().nonnegative(),
   confirmations: z.number().int().positive(),
 });
@@ -53,7 +56,7 @@ export const MempoolAddressStatsSchema = z
     address: z.string().min(1).max(256),
     chain_stats: AddressStats,
     mempool_stats: AddressStats,
-    fundingTxs: z.array(FundingTx).optional(),
+    fundingTxs: z.array(FundingTx).max(MAX_TXS_PER_PAGE).optional(),
   })
   .passthrough();
 
@@ -63,8 +66,6 @@ export type MempoolAddressSummary = ChainAddressSummary;
 // Above the consensus ceiling (1 MB of minimum-size outputs), so only a
 // malformed response trips it.
 const MAX_TX_OUTPUTS = 120_000;
-// An address page is 50 mempool + 25 confirmed transactions.
-const MAX_TXS_PER_PAGE = 500;
 
 const MempoolTxSchema = z
   .object({
