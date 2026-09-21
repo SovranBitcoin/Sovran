@@ -722,6 +722,116 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     });
   });
 
+  it("reads an onchain minimum in every AmountLike form the mint info can carry", () => {
+    // cashu-ts types NUT-04 bounds as AmountLike; a bound read as "numbers
+    // only" is silently dropped and onchain is offered below the minimum.
+    for (const min_amount of [1_000, "1000", 1_000n, { toNumber: () => 1_000 }]) {
+      const actions = getAvailableActions("amountEntry", {
+        destination: "mintQuote",
+        effectiveAmount: { value: 100, unit: "sat" },
+        unit: "sat",
+        methodContext: {
+          trustedMintUrls: [MINT1],
+          mintBalances: { [MINT1]: 0 },
+          mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+            {
+              mintUrl: MINT1,
+              mintInfo: {
+                nuts: {
+                  "4": {
+                    methods: [
+                      { method: "bolt11", unit: "sat" },
+                      { method: "onchain", unit: "sat", min_amount },
+                    ],
+                  },
+                },
+              },
+            },
+          ]),
+        },
+      });
+      expect(
+        actions.next.variants?.find((variant) => variant.id === "onchain"),
+      ).toMatchObject({ available: false, reason: "Minimum 1,000 sat" });
+    }
+  });
+
+  it("ignores an onchain bound that is not a safe positive integer of minor units", () => {
+    // NUT-04 bounds are untrusted mint input. `Number` alone reads "0x3e8" as
+    // 1000 and "1000.5" as a fractional sat; neither is a count of minor units,
+    // so each must read as "no bound advertised" rather than gate the rail on a
+    // number the mint did not mean.
+    for (const min_amount of ["0x3e8", "1000.5", " 1e3", "1,000", Number.MAX_SAFE_INTEGER + 2]) {
+      const actions = getAvailableActions("amountEntry", {
+        destination: "mintQuote",
+        effectiveAmount: { value: 100, unit: "sat" },
+        unit: "sat",
+        methodContext: {
+          trustedMintUrls: [MINT1],
+          mintBalances: { [MINT1]: 0 },
+          mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+            {
+              mintUrl: MINT1,
+              mintInfo: {
+                nuts: {
+                  "4": {
+                    methods: [
+                      { method: "bolt11", unit: "sat" },
+                      { method: "onchain", unit: "sat", min_amount },
+                    ],
+                  },
+                },
+              },
+            },
+          ]),
+        },
+      });
+      expect(
+        actions.next.variants?.find((variant) => variant.id === "onchain"),
+      ).toMatchObject({ available: true });
+    }
+  });
+
+  it("does not answer a sat question with a usd capability", () => {
+    // The capability map is derived for ONE unit and the wallet re-derives it
+    // when the active unit changes. In the window between, a `usd` map was
+    // being used to answer `sat`: the menu offered a rail whose bounds and
+    // support belonged to the other unit, and the picker it opened then found
+    // no mint. A mismatch must read as "not known for this unit".
+    const usdMap = deriveMintMethodCapabilityMapFromTrustedMints(
+      [
+        {
+          mintUrl: MINT1,
+          mintInfo: {
+            nuts: {
+              "4": {
+                methods: [
+                  { method: "bolt11", unit: "usd" },
+                  { method: "onchain", unit: "usd" },
+                ],
+              },
+            },
+          },
+        },
+      ],
+      "usd",
+    );
+    const actions = getAvailableActions("amountEntry", {
+      destination: "mintQuote",
+      effectiveAmount: { value: 100, unit: "sat" },
+      unit: "sat",
+      methodContext: {
+        trustedMintUrls: [MINT1],
+        mintBalances: { [MINT1]: 0 },
+        mintMethodCapabilities: usdMap,
+      },
+    });
+    const onchain = actions.next.variants?.find(
+      (variant) => variant.id === "onchain",
+    );
+    expect(onchain?.available ?? false).toBe(false);
+  });
+
   it("disables Lightning send when no trusted mint advertises NUT-05 bolt11", () => {
     const entry = {
       destination: "meltQuote",

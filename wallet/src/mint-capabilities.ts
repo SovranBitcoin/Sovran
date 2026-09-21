@@ -105,11 +105,31 @@ function readCapability(
   };
 }
 
-/** NUT-04/05 amount bounds are optional and untrusted input — numbers only. */
+/**
+ * NUT-04/05 amount bounds are optional and UNTRUSTED mint input. cashu-ts types
+ * them `AmountLike` (number, bigint, numeric string or an `Amount`), so every
+ * one of those forms is a bound: reading numbers only would drop the minimum
+ * and offer a rail below it.
+ *
+ * A bound is a count of minor units, so only a safe positive INTEGER is one.
+ * Anything else reads as "no bound advertised" rather than a number the caller
+ * would compare an amount against — `Number` alone would accept `"0x10"` as 16,
+ * `"12.5"` as a fractional sat, and integers past `MAX_SAFE_INTEGER` that no
+ * longer compare correctly.
+ */
 function readAmountBound(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) && value > 0
-    ? value
-    : null;
+  const amount =
+    typeof value === "number" || typeof value === "bigint"
+      ? Number(value)
+      : typeof value === "string"
+        ? // Digits only: no hex, exponent, sign, separator or fraction.
+          /^\d+$/.test(value.trim())
+          ? Number(value.trim())
+          : Number.NaN
+        : isRecord(value) && typeof value.toNumber === "function"
+          ? Number((value.toNumber as () => unknown).call(value))
+          : Number.NaN;
+  return Number.isSafeInteger(amount) && amount > 0 ? amount : null;
 }
 
 /** NUT-17 websocket support — tri-state: undefined when info is absent. */
@@ -157,6 +177,18 @@ export function deriveMintMethodSupportFromInfo(
     ),
     nut17: readNut17Support(mintInfo),
   };
+  // The parsed BOUNDS, not just the supported count. Whether a rail was offered
+  // below a mint's minimum turns on whether the bound was read at all, and
+  // "no AMOUNT_BELOW_MINT_MIN was logged" cannot tell "the mint advertises no
+  // bound" apart from "the amount was inside it".
+  const bounds = ([4, 5] as const).flatMap((nut) =>
+    METHODS.map((method) => {
+      const capability = (nut === 4 ? support.mint : support.melt)[method];
+      return capability?.supported
+        ? `${nut === 4 ? "mint" : "melt"}.${method}=${capability.minAmount ?? "_"}..${capability.maxAmount ?? "_"}`
+        : null;
+    }).filter((entry): entry is string => entry !== null),
+  );
   logger.debug("mintCapabilities.deriveSupport", {
     unit: normalizeUnit(unit),
     hasMintInfo: isRecord(mintInfo),
@@ -166,6 +198,7 @@ export function deriveMintMethodSupportFromInfo(
     meltSupported: Object.values(support.melt).filter(
       (capability) => capability?.supported,
     ).length,
+    bounds: bounds.join(","),
   });
   return support;
 }
@@ -418,15 +451,33 @@ export function getMintMethodCapability(
     ctx.mintMethodCapabilities?.[mintUrl]?.[requirement.operation]?.[
       requirement.method
     ];
+  const unit = normalizeUnit(requirement.unit);
   if (!support) {
     logger.debug("mintCapabilities.lookup.missing", {
       ...mintUrlFields(mintUrl),
       operation: requirement.operation,
       method: requirement.method,
-      unit: normalizeUnit(requirement.unit),
+      unit,
     });
+    return missingCapability(requirement);
   }
-  return support ?? missingCapability(requirement);
+  // The map is derived for ONE unit, and a mint's methods and NUT-04/05 bounds
+  // differ per unit. Answering a `sat` question from a `usd` map is not a
+  // near-miss, it is a different mint capability — so a mismatch reads as "not
+  // known for this unit" and the rail is offered only once the map catches up.
+  // The wallet re-derives the map whenever the active unit changes, so this is
+  // the window between the two, not a steady state.
+  if (support.unit !== unit) {
+    logger.info("mintCapabilities.lookup.unitMismatch", {
+      ...mintUrlFields(mintUrl),
+      operation: requirement.operation,
+      method: requirement.method,
+      requestedUnit: unit,
+      capabilityUnit: support.unit,
+    });
+    return missingCapability(requirement);
+  }
+  return support;
 }
 
 export function isMethodImplemented(
