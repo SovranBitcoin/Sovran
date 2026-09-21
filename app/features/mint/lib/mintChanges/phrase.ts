@@ -361,6 +361,14 @@ export function phraseFacts(facts: readonly MintChangeFact[]): MintChangePhrase[
 }
 
 type IdentityFact = Extract<MintChangeFact, { kind: 'identity' }>;
+type CosmeticField = 'name' | 'description' | 'icon';
+type CosmeticFact = IdentityFact & { field: CosmeticField };
+type OtherIdentityFact = IdentityFact & {
+  field: Exclude<IdentityFact['field'], CosmeticField>;
+};
+
+const isCosmetic = (fact: IdentityFact): fact is CosmeticFact =>
+  fact.field === 'name' || fact.field === 'description' || fact.field === 'icon';
 
 function phraseIdentity(facts: readonly MintChangeFact[]): MintChangePhrase[] {
   const identity = facts.filter((f): f is IdentityFact => f.kind === 'identity');
@@ -369,10 +377,8 @@ function phraseIdentity(facts: readonly MintChangeFact[]): MintChangePhrase[] {
   // Name, description and icon moving together is one event: the mint redid its
   // profile. Saying it three times is exactly the verbosity this file exists to
   // remove.
-  const cosmetic = identity.filter(
-    (f) => f.field === 'name' || f.field === 'description' || f.field === 'icon'
-  );
-  const rest = identity.filter((f) => !cosmetic.includes(f));
+  const cosmetic = identity.filter(isCosmetic);
+  const rest = identity.filter((f): f is OtherIdentityFact => !isCosmetic(f));
   const phrases: MintChangePhrase[] = [];
 
   const cosmeticFields = new Set(cosmetic.map((f) => f.field));
@@ -424,24 +430,25 @@ function cosmeticText(fact: IdentityFact): string {
   return fact.detail ? `renamed itself to ${fact.detail}` : 'changed its name';
 }
 
-function otherIdentityText(fact: IdentityFact): string {
-  if (fact.field === 'contact') {
-    if (fact.action === 'added') {
-      return fact.detail
-        ? `added ${article(fact.detail)} ${fact.detail} contact`
-        : 'added a contact';
-    }
-    return fact.action === 'removed' ? 'removed a contact' : 'updated its contact details';
+function otherIdentityText(fact: OtherIdentityFact): string {
+  switch (fact.field) {
+    case 'contact':
+      if (fact.action === 'added') {
+        return fact.detail
+          ? `added ${article(fact.detail)} ${fact.detail} contact`
+          : 'added a contact';
+      }
+      return fact.action === 'removed' ? 'removed a contact' : 'updated its contact details';
+    case 'urls':
+      if (fact.action === 'added') {
+        return fact.detail === 'tor' ? 'added a Tor address' : 'added a new address';
+      }
+      return fact.action === 'removed' ? 'removed an address' : 'changed its addresses';
+    case 'tos':
+      return fact.action === 'removed'
+        ? 'removed its terms of service'
+        : 'updated its terms of service';
   }
-  if (fact.field === 'urls') {
-    if (fact.action === 'added') {
-      return fact.detail === 'tor' ? 'added a Tor address' : 'added a new address';
-    }
-    return fact.action === 'removed' ? 'removed an address' : 'changed its addresses';
-  }
-  return fact.action === 'removed'
-    ? 'removed its terms of service'
-    : 'updated its terms of service';
 }
 
 function truncate(text: string, max: number): string {

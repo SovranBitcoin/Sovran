@@ -99,17 +99,14 @@ export function Notice({
     'danger-soft-foreground',
   ] as const);
   const soft = tone === 'soft';
-  const isWarning = status === 'warning';
-  const ink =
-    status === 'info'
-      ? foreground
-      : soft
-        ? isWarning
-          ? warningSoftFg
-          : dangerSoftFg
-        : isWarning
-          ? INVARIANT_BLACK
-          : INVARIANT_WHITE;
+  const statusInk = (
+    {
+      info: { solid: foreground, soft: foreground, softGlyph: muted },
+      warning: { solid: INVARIANT_BLACK, soft: warningSoftFg, softGlyph: warning },
+      danger: { solid: INVARIANT_WHITE, soft: dangerSoftFg, softGlyph: danger },
+    } satisfies Record<NoticeStatus, { solid: string; soft: string; softGlyph: string }>
+  )[status];
+  const ink = soft ? statusInk.soft : statusInk.solid;
   // Solid fills carry their own contrast, so the body is only dimmed against
   // the fill. A soft notice already reads as secondary — dimming it twice
   // pushes the body under the contrast floor.
@@ -117,7 +114,7 @@ export function Notice({
   // On a soft fill the glyph keeps the full amber/red so the notice still
   // reads as caution at a glance; only the copy steps down to the soft ink.
   // On a solid fill the glyph shares the copy's invariant ink.
-  const iconColor = status === 'info' ? muted : soft ? (isWarning ? warning : danger) : ink;
+  const iconColor = status === 'info' ? muted : soft ? statusInk.softGlyph : ink;
   const scale = SIZE[size];
   const root = soft ? SOFT_ROOT[status] : SOLID_ROOT[status];
   // The title and the description are two complete phrases the caller wrote

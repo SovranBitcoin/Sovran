@@ -45,41 +45,45 @@ export function threadReplyRankInput(
   sort: ThreadReplySort,
   options: { viewerPubkey?: string; shuffle?: ShuffleInput } = {}
 ): ReferenceRankInput | null {
-  if (sort === 'new') return null;
-  const base: ReferenceRankInput = {
-    references: { kinds: [7], limit: 500 },
-    via: { key: 'e' },
-    metric: { name: 'k7_e.actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
-    shuffle: options.shuffle,
-  };
-  if (sort === 'likes') return base;
-  if (sort === 'zaps') {
-    return {
-      references: { kinds: [9735], limit: 500 },
-      via: { key: 'e' },
-      metric: { name: 'k9735_e.value_total', op: 'SUM', derived: 'nip57.amount_sats' },
-      shuffle: options.shuffle,
-    };
+  switch (sort) {
+    case 'new':
+      return null;
+    case 'likes':
+      return {
+        references: { kinds: [7], limit: 500 },
+        via: { key: 'e' },
+        metric: { name: 'k7_e.actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
+        shuffle: options.shuffle,
+      };
+    case 'zaps':
+      return {
+        references: { kinds: [9735], limit: 500 },
+        via: { key: 'e' },
+        metric: { name: 'k9735_e.value_total', op: 'SUM', derived: 'nip57.amount_sats' },
+        shuffle: options.shuffle,
+      };
+    case 'reposts':
+      return {
+        references: { kinds: [6, 16], limit: 500 },
+        via: { key: 'e' },
+        metric: { name: 'k6_16_e.actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
+        shuffle: options.shuffle,
+      };
+    case 'relevant':
+      return {
+        references: { kinds: [7], limit: 500 },
+        via: { key: 'e' },
+        metric: { name: 'k7_e.actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
+        terms: [
+          contributionQualityTerm(3),
+          ...engagementRankTerms(),
+          vertexAuthorScoreTerm(0.25),
+          recencyTerm(0.8),
+        ],
+        candidatePubkeyBoosts: options.viewerPubkey
+          ? [viewerFollowBoost(options.viewerPubkey)]
+          : undefined,
+        shuffle: options.shuffle,
+      };
   }
-  if (sort === 'reposts') {
-    return {
-      references: { kinds: [6, 16], limit: 500 },
-      via: { key: 'e' },
-      metric: { name: 'k6_16_e.actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
-      shuffle: options.shuffle,
-    };
-  }
-  return {
-    references: { kinds: [7], limit: 500 },
-    via: { key: 'e' },
-    metric: { name: 'k7_e.actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
-    terms: [
-      contributionQualityTerm(3),
-      ...engagementRankTerms(),
-      vertexAuthorScoreTerm(0.25),
-      recencyTerm(0.8),
-    ],
-    candidatePubkeyBoosts: options.viewerPubkey ? [viewerFollowBoost(options.viewerPubkey)] : undefined,
-    shuffle: options.shuffle,
-  };
 }

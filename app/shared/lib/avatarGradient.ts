@@ -228,6 +228,36 @@ const TIER_BASE: Record<ProfileTier, TierBase> = {
 
 const TAU = Math.PI * 2;
 
+/** Quiet tints a step or two from the band, plus one white sheen. */
+function finishColors(base: TierBase, light: number, h: (offset: number) => number): string[] {
+  switch (base.finish) {
+    case 'metal':
+      return [
+        hsl(h(0), base.sat, light + 14),
+        hsl(h(base.spread), Math.max(base.sat - 6, 0), light - 10),
+        hsl(0, 0, 100),
+        hsl(h(-base.spread * 0.6), base.sat, light + 7),
+        hsl(h(base.spread * 0.4), base.sat, light - 5),
+      ];
+    case 'film':
+      return [
+        hsl(h(base.spread), base.sat - 10, light + 8),
+        hsl(h(-base.spread * 0.7), base.sat - 10, light + 4),
+        hsl(h(base.spread * 1.6), Math.max(base.sat - 20, 0), light + 10),
+        hsl(0, 0, 100),
+        hsl(h(base.spread * 0.3), base.sat - 10, light - 6),
+      ];
+    case 'gem':
+      return [
+        hsl(325, 70, 82),
+        hsl(262, 65, 80),
+        hsl(190, 75, 78),
+        hsl(42, 75, 80),
+        hsl(0, 0, 100),
+      ];
+  }
+}
+
 /**
  * Ring palette and blob choreography for a profile tier, varied per seed by
  * the same PRNG the banner and clay avatar use. Its own PRNG stream
@@ -240,25 +270,7 @@ export function generateTierRingTheme(tier: ProfileTier, seedInput: string): Tie
   const direction = random() > 0.5 ? 1 : -1;
   const h = (offset: number) => base.hue + offset * direction;
 
-  // Quiet tints a step or two from the band, plus one white sheen.
-  const colors: string[] =
-    base.finish === 'metal'
-      ? [
-          hsl(h(0), base.sat, light + 14),
-          hsl(h(base.spread), Math.max(base.sat - 6, 0), light - 10),
-          hsl(0, 0, 100),
-          hsl(h(-base.spread * 0.6), base.sat, light + 7),
-          hsl(h(base.spread * 0.4), base.sat, light - 5),
-        ]
-      : base.finish === 'film'
-        ? [
-            hsl(h(base.spread), base.sat - 10, light + 8),
-            hsl(h(-base.spread * 0.7), base.sat - 10, light + 4),
-            hsl(h(base.spread * 1.6), Math.max(base.sat - 20, 0), light + 10),
-            hsl(0, 0, 100),
-            hsl(h(base.spread * 0.3), base.sat - 10, light - 6),
-          ]
-        : [hsl(325, 70, 82), hsl(262, 65, 80), hsl(190, 75, 78), hsl(42, 75, 80), hsl(0, 0, 100)];
+  const colors = finishColors(base, light, h);
 
   // Start angles are staggered evenly (with a little jitter) so the blobs
   // never open bunched together; opposite directions pass through each other

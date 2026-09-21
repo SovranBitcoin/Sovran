@@ -137,6 +137,21 @@ type BlockFrame =
 
 // ─── Parser class ──────────────────────────────────────────────────────────
 
+/** `stage <name> <word> of` — the closed set of stage kinds, keyed by the DSL word. */
+const STAGE_KIND_BY_WORD = {
+  one: 'oneOf',
+  bundle: 'bundleOf',
+  each: 'eachOf',
+} as const satisfies Record<string, StageKind>;
+
+const STAGE_LINE = new RegExp(
+  `^([a-z][a-z0-9-]*)\\s+(${Object.keys(STAGE_KIND_BY_WORD).join('|')})\\s+of$`
+);
+
+function isStageWord(word: string | undefined): word is keyof typeof STAGE_KIND_BY_WORD {
+  return word !== undefined && Object.hasOwn(STAGE_KIND_BY_WORD, word);
+}
+
 class Parser {
   private readonly lines: SourceLine[];
   private readonly file: string;
@@ -602,19 +617,19 @@ class Parser {
     const rest = text.slice('stage '.length).trim();
     // Match `<name> (one|bundle|each) of` strictly so `stage probes
     // each OF` doesn't silently pass.
-    const m = /^([a-z][a-z0-9-]*)\s+(one|bundle|each)\s+of$/.exec(rest);
-    if (!m) {
+    const m = STAGE_LINE.exec(rest);
+    const kindWord = m?.[2];
+    if (!m || !isStageWord(kindWord)) {
       throw new ParseError(
         pos,
         `matrix '${parent.title}': stage must be 'stage <name> <one of|bundle of|each of>' (got '${rest}')`
       );
     }
-    const [, name, kindWord] = m;
+    const name = m[1];
     if (parent.stages.some((s) => s.name === name)) {
       throw new ParseError(pos, `matrix '${parent.title}': duplicate stage '${name}'`);
     }
-    const variantKind: StageKind =
-      kindWord === 'one' ? 'oneOf' : kindWord === 'bundle' ? 'bundleOf' : 'eachOf';
+    const variantKind: StageKind = STAGE_KIND_BY_WORD[kindWord];
     this.stack.push({
       kind: 'stage',
       name,
