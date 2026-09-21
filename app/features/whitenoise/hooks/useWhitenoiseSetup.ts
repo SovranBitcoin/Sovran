@@ -30,20 +30,24 @@ async function refreshImpl(
     setKeyPackageCount: (value: number) => void;
     setIsLoading: (value: boolean) => void;
     setError: (value: string | null) => void;
+    /** False once the client this read started for has been replaced. */
+    isCurrent: () => boolean;
   }
 ): Promise<void> {
   if (!client) return;
   io.setIsLoading(true);
   try {
     const count = await readCount(client);
+    if (!io.isCurrent()) return;
     io.setKeyPackageCount(count);
     io.setError(null);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    io.setError(message);
     wnLog.warn('whitenoise.setup.refresh_failed', { error: message });
+    if (!io.isCurrent()) return;
+    io.setError(message);
   } finally {
-    io.setIsLoading(false);
+    if (io.isCurrent()) io.setIsLoading(false);
   }
 }
 
@@ -98,8 +102,14 @@ export function useWhitenoiseSetup(): WhitenoiseSetupState {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void refreshImpl(client, { setKeyPackageCount, setIsLoading, setError });
     if (!client) return;
+    let cancelled = false;
+    void refreshImpl(client, {
+      setKeyPackageCount,
+      setIsLoading,
+      setError,
+      isCurrent: () => !cancelled,
+    });
     // Listener path updates the count directly. A full `refresh()` here
     // would (a) flash isLoading on every event and disable the action
     // button mid-bootstrap, and (b) fire one count() RPC per
@@ -109,6 +119,7 @@ export function useWhitenoiseSetup(): WhitenoiseSetupState {
     client.keyPackages.on('keyPackageAdded', onAdded);
     client.keyPackages.on('keyPackageRemoved', onRemoved);
     return () => {
+      cancelled = true;
       client.keyPackages.off('keyPackageAdded', onAdded);
       client.keyPackages.off('keyPackageRemoved', onRemoved);
     };

@@ -276,6 +276,7 @@ export function requestClear(): void {
               current2.diff.runA = undefined;
               current2.diff.runB = undefined;
               current2.diff.forRun = undefined;
+              current2.diff.computing = undefined;
               current2.diff.selectedScenarioId = undefined;
               current2.diff.pairIndex = 0;
             })
@@ -350,6 +351,8 @@ function retargetDiff(runId: string, scenarioId?: string): void {
     current.diff.result = undefined;
     current.diff.selectedScenarioId = undefined;
     current.diff.pairIndex = 0;
+    // an in-flight compute for the previous pair no longer reports back
+    current.diff.computing = undefined;
   });
   if (eligible && runA) void computeDiff(scenarioId);
 }
@@ -386,6 +389,8 @@ export function enterDiffMode(): void {
 export async function computeDiff(preferScenarioId?: string): Promise<void> {
   const { runA, runB } = state.diff;
   if (!runA || !runB) return;
+  // retargetDiff can swap the pair while this one is still computing
+  const isCurrent = () => state.diff.runA === runA && state.diff.runB === runB;
   const openOn = (result: DiffResult | undefined): string | undefined =>
     preferScenarioId && result?.scenarios.some((entry) => entry.scenarioId === preferScenarioId)
       ? preferScenarioId
@@ -398,25 +403,36 @@ export async function computeDiff(preferScenarioId?: string): Promise<void> {
   });
   try {
     const response = await api.diff(runA, runB);
+    if (!isCurrent()) return;
     if (!response.cached && response.jobId) {
       attachJob(response.jobId, 'diff');
       // poll until the result file lands (exit event also triggers refresh)
       const poll = setInterval(() => {
-        void api.diffResult(response.key).then((result) => {
-          if (result) {
+        if (!isCurrent()) {
+          clearInterval(poll);
+          return;
+        }
+        void api
+          .diffResult(response.key)
+          .then((result) => {
+            if (!result) return;
             clearInterval(poll);
+            if (!isCurrent()) return;
             update((current) => {
               current.diff.result = result;
               current.diff.computing = undefined;
               current.diff.selectedScenarioId = openOn(result);
               current.diff.pairIndex = 0;
             });
-          }
-        });
+          })
+          .catch(() => {
+            // a failed poll is retried by the next tick
+          });
       }, 1_000);
       return;
     }
     const result = await api.diffResult(response.key);
+    if (!isCurrent()) return;
     update((current) => {
       current.diff.result = result;
       current.diff.computing = undefined;
@@ -424,6 +440,7 @@ export async function computeDiff(preferScenarioId?: string): Promise<void> {
       current.diff.pairIndex = 0;
     });
   } catch (error) {
+    if (!isCurrent()) return;
     update((current) => {
       current.diff.computing = undefined;
       current.error = String(error);
