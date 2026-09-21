@@ -73,7 +73,9 @@ function allowAllLabel(count: number): string {
 }
 
 function batchConfirmTitle(count: number, appName: string): string {
-  return `Allow ${count} request${count === 1 ? '' : 's'} from ${appName}?`;
+  return count === 1
+    ? `Allow 1 request from ${appName}?`
+    : `Allow ${count} requests from ${appName}?`;
 }
 
 // ── Constants ───────────────────────────────────────────────────

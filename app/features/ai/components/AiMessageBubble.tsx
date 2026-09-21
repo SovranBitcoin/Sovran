@@ -57,8 +57,8 @@ interface AiMessageBubbleProps {
 function buildThinkingPrefix(durationSec: number | undefined, isLive: boolean): string {
   const seconds = durationSec ?? 0;
   if (seconds < 1) return isLive ? 'Thinking…' : 'Thought briefly';
-  const verb = isLive ? 'Thinking' : 'Thought';
-  return `${verb} for ${seconds} second${seconds === 1 ? '' : 's'}`;
+  const duration = seconds === 1 ? '1 second' : `${seconds} seconds`;
+  return isLive ? `Thinking for ${duration}` : `Thought for ${duration}`;
 }
 
 /**
