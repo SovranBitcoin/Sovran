@@ -13,11 +13,12 @@ import { TOTAL_BASIS_POINTS } from '@/shared/stores/profile/mintDistributionStor
 const MIN_TRANSFER_THRESHOLD = 5;
 
 /**
- * Estimated fee percentage for Lightning transfers (as a decimal, e.g., 0.02 = 2%)
+ * Estimated fee for Lightning transfers in basis points (200 = 2%), so sat
+ * amounts stay in integer math.
  * This is a conservative estimate to ensure we don't over-allocate from surplus mints.
  * Actual fees may be lower, but it's better to under-transfer than fail.
  */
-const ESTIMATED_FEE_PERCENTAGE = 0.02; // 2%
+const ESTIMATED_FEE_BPS = 200;
 
 /**
  * Minimum fee reserve in sats.
@@ -123,10 +124,10 @@ interface SurplusDeficit {
  */
 function maxTransferableAmount(availableBalance: number): number {
   // We need: transferAmount + fee <= availableBalance
-  // fee ≈ max(transferAmount * FEE_PERCENTAGE, MIN_FEE_RESERVE)
-  // Solving: transferAmount + transferAmount * FEE_PERCENTAGE <= availableBalance
-  // transferAmount * (1 + FEE_PERCENTAGE) <= availableBalance
-  // transferAmount <= availableBalance / (1 + FEE_PERCENTAGE)
+  // fee ≈ max(transferAmount * FEE_BPS / 10_000, MIN_FEE_RESERVE)
+  // Solving: transferAmount + transferAmount * FEE_BPS / 10_000 <= availableBalance
+  // transferAmount * (10_000 + FEE_BPS) <= availableBalance * 10_000
+  // transferAmount <= availableBalance * 10_000 / (10_000 + FEE_BPS)
 
   // First, check if we can cover minimum fee
   if (availableBalance <= MIN_FEE_RESERVE) {
@@ -134,7 +135,9 @@ function maxTransferableAmount(availableBalance: number): number {
   }
 
   // Calculate max amount accounting for percentage fee
-  const maxWithPercentage = Math.floor(availableBalance / (1 + ESTIMATED_FEE_PERCENTAGE));
+  const maxWithPercentage = Math.floor(
+    (availableBalance * TOTAL_BASIS_POINTS) / (TOTAL_BASIS_POINTS + ESTIMATED_FEE_BPS)
+  );
 
   // But also ensure we have at least MIN_FEE_RESERVE for the fee
   const maxWithMinFee = availableBalance - MIN_FEE_RESERVE;
@@ -212,7 +215,7 @@ function computeTransferSteps(
     // This ensures later steps from the same surplus see the real
     // remaining balance, not an inflated one that ignores prior fees.
     const estimatedStepFee = Math.max(
-      Math.ceil(transferAmount * ESTIMATED_FEE_PERCENTAGE),
+      Math.ceil((transferAmount * ESTIMATED_FEE_BPS) / TOTAL_BASIS_POINTS),
       MIN_FEE_RESERVE
     );
     surplus.amount -= transferAmount + estimatedStepFee;
