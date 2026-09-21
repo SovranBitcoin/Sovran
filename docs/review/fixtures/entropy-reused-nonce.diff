@@ -1,0 +1,12 @@
+# expect: entropy/reused-nonce
+# task: Review the changed behavior in this synthetic policy fixture.
+diff --git a/app/shared/review-fixture.ts b/app/shared/review-fixture.ts
+--- a/app/shared/review-fixture.ts
++++ b/app/shared/review-fixture.ts
+@@ -1,4 +1,6 @@
++const sharedNonce = randomBytes(24);
++
+ export function encryptDm(key: Uint8Array, plaintext: string): Envelope {
+-  return seal(key, randomBytes(24), plaintext);
++  return seal(key, sharedNonce, plaintext);
+ }

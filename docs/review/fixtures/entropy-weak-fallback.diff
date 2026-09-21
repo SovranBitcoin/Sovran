@@ -1,0 +1,15 @@
+# expect: entropy/weakened-fallback
+# task: Review the changed behavior in this synthetic policy fixture.
+diff --git a/app/shared/review-fixture.ts b/app/shared/review-fixture.ts
+--- a/app/shared/review-fixture.ts
++++ b/app/shared/review-fixture.ts
+@@ -1,4 +1,8 @@
+ export function seedEntropy(out: Uint8Array): Uint8Array {
+-  crypto.getRandomValues(out);
++  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
++    crypto.getRandomValues(out);
++    return out;
++  }
++  for (let i = 0; i < out.length; i += 1) out[i] = Math.floor(Math.random() * 256);
+   return out;
+ }

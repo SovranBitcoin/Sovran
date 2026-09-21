@@ -1,0 +1,16 @@
+# expect: entropy/narrowed-seed
+# task: Review the changed behavior in this synthetic policy fixture.
+diff --git a/app/shared/review-fixture.ts b/app/shared/review-fixture.ts
+--- a/app/shared/review-fixture.ts
++++ b/app/shared/review-fixture.ts
+@@ -1,4 +1,9 @@
+ export function generatePrivateKey(): Uint8Array {
+-  return randomBytes(32);
++  let state = Date.now() >>> 0;
++  const bytes = new Uint8Array(32);
++  for (let i = 0; i < 32; i += 1) {
++    state = (state * 1664525 + 1013904223) >>> 0;
++    bytes[i] = state & 0xff;
++  }
++  return bytes;
+ }

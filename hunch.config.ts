@@ -160,6 +160,38 @@ export default defineConfig({
       reference: "docs/review/contracts.md",
       message: "Secret or private material may reach an unauthorized sink or plaintext persistent store.",
     })],
+    // ── Entropy ───────────────────────────────────────────────────────────
+    // `secrets/randomness` in the contributor conventions already covers the
+    // naive case: `Math.random` called to make a key. These three cover the
+    // shapes every published wallet-entropy theft actually took, where the code
+    // still reads as correct. Evidence and allowed cases: docs/review/entropy.md.
+    "entropy/weakened-fallback": ["warn", choice({
+      instructions: "Does this change let key material — seed entropy, a private key, proof secret, blinding factor, nonce, bunker secret, pairing code or auth token — be produced from something other than an approved entropy source in `reference`, without failing loudly? The shape is a fallback that still returns bytes: a `??` or `||` default, a `try`/`catch`, a `typeof`/platform/availability branch, an optional chain, a polyfill, shim or injected generator around an entropy read. A fallback that throws, returns an error Result, or refuses to produce the value is preserved, not a concern. Require a visible entropy read and a visible weaker path; the mere absence of a check you cannot see is not evidence.",
+      criteria: { concern: "The changed code can return key material derived from a weaker, guessable or absent entropy source, and nothing raises an error when that path is taken.", ...outcomes },
+      when: /random|Random|entropy|Entropy|crypto|Crypto|getRandomValues|randomBytes|seed|Seed|mnemonic|Mnemonic|nonce|Nonce|\bkey\b|Key|secret|Secret|polyfill|shim|fallback|\?\?|\|\||catch|typeof/,
+      report: ["concern"],
+      abstain: ["insufficient-context"],
+      reference: "docs/review/entropy.md",
+      message: "Key material may fall back to a weaker entropy source without failing.",
+    })],
+    "entropy/narrowed-seed": ["warn", choice({
+      instructions: "Trace the key material this change produces back to the unguessable input it depends on. Does that input terminate at a timestamp, a counter, a device or install id, a user PIN, a single 32-bit draw, or a truncated, sliced, modulo'd, `Number()`-converted or base-36 portion of a wider value — rather than a full-width read from an approved source in `reference`? Hashing, stretching, or a non-cryptographic PRNG seeded from it (Mersenne Twister, `seedrandom`, `xorshift`, `mulberry32`, `chance`, `faker`) adds length, not entropy. This is a structural question about where the input comes from; do not count or compare bit widths. BIP-32 derivation, HKDF and passphrase stretching over an already-wide root are expansion by design.",
+      criteria: { concern: "Key material traces back to a narrow or guessable input that is expanded rather than to a full-width read from an approved entropy source.", ...outcomes },
+      when: /random|Random|entropy|Entropy|seed|Seed|mnemonic|Mnemonic|derive|Derive|\bkey\b|Key|secret|Secret|nonce|blind|Blind|strength|wordlist|slice\(|substring|toString\(|Number\(|parseInt|Date\.now|performance\.now|counter|Counter|uuid|UUID|%\s/,
+      report: ["concern"],
+      abstain: ["insufficient-context"],
+      reference: "docs/review/entropy.md",
+      message: "Key material may be expanded from a narrow, brute-forcible input.",
+    })],
+    "entropy/reused-nonce": ["warn", choice({
+      instructions: "Does this change let a value that must be unique per use — an ECDSA or Schnorr signing nonce, an AEAD nonce or IV, a Cashu blinding factor, a NIP-44 nonce — repeat under the same key? The shapes are: drawn once and used for two operations; cached, persisted, or held in a module-level, closure or component-level variable across calls; derived deterministically from data that can recur; or carried unchanged through a retry or re-entry. Re-sending an already-signed event or an already-built encrypted payload is the correct retry and is unrelated to this question. Require a visible repeat path.",
+      criteria: { concern: "A signing nonce, encryption nonce, IV or blinding factor can be used twice under the same key.", ...outcomes },
+      when: /nonce|Nonce|\biv\b|\bIV\b|blind|Blind|\bsalt\b|Salt|sign|Sign|schnorr|ecdsa|ECDSA|encrypt|Encrypt|nip44|nip04|random|Random|counter|Counter|retry|Retry|cache|Cache/,
+      report: ["concern"],
+      abstain: ["insufficient-context"],
+      reference: "docs/review/entropy.md",
+      message: "A nonce, IV or blinding factor may be reused under the same key.",
+    })],
     "payments/uncertain-outcome": ["warn", choice({
       instructions: "Does this change turn an uncertain payment outcome into confirmed success or definitive failure without visible reconciliation evidence?",
       criteria: { concern: "The supplied change and context visibly demonstrate this concern.", ...outcomes },
