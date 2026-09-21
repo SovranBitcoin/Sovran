@@ -11,6 +11,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 
+import { SECRET_KINDS } from '../core/redact';
 import { hasCustody, type CustodyHandle } from './custody';
 import {
   acquireDurableLease,
@@ -31,19 +32,7 @@ export type AssetLocation = z.infer<typeof assetLocationSchema>;
 
 const custodyHandleSchema = z.strictObject({
   id: z.string().regex(/^[0-9a-f]{16}$/),
-  kind: z.enum([
-    'mnemonic',
-    'nsec',
-    'privkey',
-    'cashu-token',
-    'cashu-proof',
-    'bolt11',
-    'payment-request',
-    'lightning-address',
-    'onchain-address',
-    'clipboard',
-    'cocod-arg',
-  ]),
+  kind: z.enum(SECRET_KINDS),
   len: z.number().int().positive(),
   fingerprint: z.string().regex(/^[0-9a-f]{12}$/),
 });
@@ -180,8 +169,8 @@ type AppendEntry = DistributiveOmit<LedgerEntry, 'v' | 'runId' | 'ts'>;
 const assetKey = (asset: AssetLocation): string =>
   `${asset.mintUrl}\u0000${asset.unit}\u0000${asset.accountIndex}`;
 
-export function effectLeasePath(base: string, runId: string, legId: string): string {
-  const key = createHash('sha256').update(runId).update('\0').update(legId).digest('hex');
+export function effectLeasePath(base: string, leg: { runId: string; legId: string }): string {
+  const key = createHash('sha256').update(leg.runId).update('\0').update(leg.legId).digest('hex');
   return join(base, 'effect-leases', `${key}.lock`);
 }
 
@@ -453,7 +442,10 @@ export class RunLedger {
     this.#intentFor(legId);
     const dir = join(this.#base, 'effect-leases');
     ensurePrivateDirectory(dir);
-    return acquireDurableLease(effectLeasePath(this.#base, this.runId, legId), `${process.pid}\n`);
+    return acquireDurableLease(
+      effectLeasePath(this.#base, { runId: this.runId, legId }),
+      `${process.pid}\n`
+    );
   }
 
   registerFunding(input: {

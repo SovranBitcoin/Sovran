@@ -9,18 +9,20 @@
  */
 import { createHash } from 'node:crypto';
 
-export type SecretKind =
-  | 'mnemonic'
-  | 'nsec'
-  | 'privkey'
-  | 'cashu-token'
-  | 'cashu-proof'
-  | 'bolt11'
-  | 'payment-request'
-  | 'lightning-address'
-  | 'onchain-address'
-  | 'clipboard'
-  | 'cocod-arg';
+export const SECRET_KINDS = [
+  'mnemonic',
+  'nsec',
+  'privkey',
+  'cashu-token',
+  'cashu-proof',
+  'bolt11',
+  'payment-request',
+  'lightning-address',
+  'onchain-address',
+  'clipboard',
+  'cocod-arg',
+] as const;
+export type SecretKind = (typeof SECRET_KINDS)[number];
 
 /** The only shape a secret may take once it crosses a reporter/artifact/log
  *  boundary. Fields here are classified safe to surface. */

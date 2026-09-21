@@ -7,7 +7,14 @@ import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { tolerantRecord } from '@/shared/lib/persist/tolerant';
 
-type SendReachabilityStatus = 'checking' | 'device-offline' | 'mint-unreachable' | 'mint-reachable';
+const SEND_REACHABILITY_STATUSES = [
+  'checking',
+  'device-offline',
+  'mint-unreachable',
+  'mint-reachable',
+] as const;
+
+type SendReachabilityStatus = (typeof SEND_REACHABILITY_STATUSES)[number];
 
 interface SendReachabilityEntry {
   status: SendReachabilityStatus;
@@ -36,7 +43,7 @@ const PersistedSendReachabilityEntry = z.looseObject({
   // value can't be mapped onto an existing reachability claim; the per-entry
   // safeParse below drops just the bad row instead of the blob.
   // ast-grep-ignore: persisted-enum-needs-catch
-  status: z.enum(['checking', 'device-offline', 'mint-unreachable', 'mint-reachable']),
+  status: z.enum(SEND_REACHABILITY_STATUSES),
   mintUrl: z.string().min(1).max(2048),
   updatedAt: z.number().int().nonnegative(),
 });

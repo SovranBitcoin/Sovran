@@ -50,7 +50,9 @@ import { tolerantRecord } from '@/shared/lib/persist/tolerant';
  * intentionally distinct from the inbound `ScanSource` ('qr' | 'nfc' |
  * 'paste' | 'deeplink') so the row can render a different icon for each.
  */
-type DistributionSource = 'copy' | 'share' | 'airdrop' | 'displayed';
+const DISTRIBUTION_SOURCES = ['copy', 'share', 'airdrop', 'displayed'] as const;
+
+type DistributionSource = (typeof DISTRIBUTION_SOURCES)[number];
 
 interface DistributionEntry {
   source: DistributionSource;
@@ -84,7 +86,7 @@ const PersistedDistributionEntry = z.looseObject({
   // unknown future value must never be guessed onto an existing meaning; the
   // per-entry safeParse below drops just the bad row instead of the blob.
   // ast-grep-ignore: persisted-enum-needs-catch
-  source: z.enum(['copy', 'share', 'airdrop', 'displayed']),
+  source: z.enum(DISTRIBUTION_SOURCES),
   recordedAt: z.number().int().nonnegative(),
 });
 
