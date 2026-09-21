@@ -3,6 +3,7 @@ import { useHeaderHeight } from 'expo-router/react-navigation';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import type { BLEPeer } from 'bitchat-module';
+import { accountMintUrls, toRealUnit } from 'wallet';
 import { usePaymentFlowMachine } from 'wallet/react';
 import { withAlpha } from '@/shared/lib/color';
 
@@ -14,10 +15,12 @@ import { lockableMintsFromCreq } from '@/shared/lib/nutCreq';
 import {
   confirmBearerDowngrade,
   notifyNoSharedMint,
+  notifyNutDropNeedsBitcoinAccount,
   notifyNutDropPeerNotReady,
 } from '@/features/nearPay/lib/startNearPaySend';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -131,14 +134,19 @@ export function NearPayPeerListScreen() {
     // Decide lock vs offline bearer from the peer's creq (accepted mints +
     // lock key), our trusted mints, and online status. Delivery is always a
     // private DM, but only after a valid creq proved the peer is patched.
-    const plan = planNearPaySend({
-      peer,
-      ourMints: walletContext.trustedMintUrls,
-      isOffline,
-    });
+    if (toRealUnit(useMintStore.getState().activeUnit) !== 'sat') {
+      paymentLog.info('near_pay.peer.needs_bitcoin_account', { source: 'peer-list' });
+      await notifyNutDropNeedsBitcoinAccount();
+      return;
+    }
+    // Only the active account's mints count as ours: a mint across the testnut
+    // split holds none of this account's funds, so a "shared" mint there would
+    // pass the plan and then fail as a balance error.
+    const ourMints = accountMintUrls(walletContext);
+    const plan = planNearPaySend({ peer, ourMints, isOffline });
     paymentLog.info('near_pay.peer.tap', {
       source: 'peer-list',
-      ...nearPayPeerTapLog({ peer, plan, ourMints: walletContext.trustedMintUrls, isOffline }),
+      ...nearPayPeerTapLog({ peer, plan, ourMints, isOffline }),
     });
     // No valid creq ⇒ not confirmed patched; no mint in common ⇒ the
     // recipient couldn't redeem. Block before any session/navigation state.

@@ -27,6 +27,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { withAlpha } from '@/shared/lib/color';
+import { accountMintUrls, toRealUnit } from 'wallet';
 import { usePaymentFlowMachine } from 'wallet/react';
 
 import Icon from 'assets/icons';
@@ -43,7 +44,9 @@ import type { StrikeState } from '@/features/nearPay/lib/nutDropStrikeState';
 import { peerAvatarState, peerNostrPubkey, toLayoutPeer } from '@/features/nearPay/lib/peerProfile';
 import { nearPayPeerTapLog, planNearPaySend } from '@/features/nearPay/lib/nearPaySendDecision';
 import {
+  confirmBearerDowngrade,
   notifyNoSharedMint,
+  notifyNutDropNeedsBitcoinAccount,
   notifyNutDropPeerNotReady,
 } from '@/features/nearPay/lib/startNearPaySend';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
@@ -51,6 +54,7 @@ import {
   useRecentPeopleProfiles,
   type RecentPeopleProfileRow,
 } from '@/features/feed/hooks/useRecentPeopleProfiles';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { normalizeRecentPersonPubkey } from '@/shared/stores/profile/recentPeopleStore';
 import { useRememberPeers } from '@/features/nearPay/hooks/useRememberPeers';
 import { useBluetoothState } from '@/features/bitchat/hooks/useBluetoothState';
@@ -1431,6 +1435,10 @@ export function NearPayScreen() {
   useRenderLogger('NearPayScreen', 30, paymentLog);
   const insets = useSafeAreaInsets();
   const walletContext = useWalletContext();
+  // Only the active account's mints count as ours: a mint across the testnut
+  // split holds none of this account's funds, so a "shared" mint there would
+  // pass the plan and then fail as a balance error.
+  const ourMints = useMemo(() => accountMintUrls(walletContext), [walletContext]);
   const { isOffline } = useOfflineStatus();
   // NearPay is sat-pinned at the protocol level — it does NOT follow the
   // wallet's active mint unit.
@@ -1758,15 +1766,13 @@ export function NearPayScreen() {
       // Decide lock vs offline bearer from the peer's creq (accepted mints +
       // lock key), our trusted mints, and online status. Delivery is always a
       // private DM, but only after a valid creq proved the peer is patched.
-      const plan = planNearPaySend({
-        peer,
-        ourMints: walletContext.trustedMintUrls,
-        isOffline,
-      });
-      paymentLog.info(
-        'near_pay.peer.tap',
-        nearPayPeerTapLog({ peer, plan, ourMints: walletContext.trustedMintUrls, isOffline })
-      );
+      if (toRealUnit(useMintStore.getState().activeUnit) !== 'sat') {
+        paymentLog.info('near_pay.peer.needs_bitcoin_account', { peerID: peer.peerID });
+        await notifyNutDropNeedsBitcoinAccount();
+        return;
+      }
+      const plan = planNearPaySend({ peer, ourMints, isOffline });
+      paymentLog.info('near_pay.peer.tap', nearPayPeerTapLog({ peer, plan, ourMints, isOffline }));
       // No valid creq ⇒ not confirmed patched; no mint in common ⇒ the
       // recipient couldn't redeem. Block BEFORE any session/transition state
       // (leaves the radar exactly as it was; also covers the Random button).
@@ -1783,6 +1789,15 @@ export function NearPayScreen() {
           await notifyNutDropPeerNotReady(peer.name);
         }
         return;
+      }
+      // Offline bearer downgrade is never silent: confirm before sending an
+      // unlocked (bearer) token, exactly as the peer list does. (audit ND-2)
+      if (plan.mode === 'bearer' && plan.requiresConsent) {
+        const proceed = await confirmBearerDowngrade(peer.name);
+        if (!proceed) {
+          paymentLog.info('near_pay.peer.bearer_downgrade_declined', { isOffline });
+          return;
+        }
       }
       const delivery: NearPayDelivery = { locked: plan.mode === 'lock' };
       paymentLog.info('near_pay.peer.select', {
@@ -1884,7 +1899,7 @@ export function NearPayScreen() {
     },
     [
       machine,
-      walletContext.trustedMintUrls,
+      ourMints,
       isOffline,
       amountContentOpacity,
       amountContentTranslateY,
