@@ -26,7 +26,7 @@ const routeMap: Record<string, unknown> = {
   './(drawer)/_layout.tsx': Stub,
   './(drawer)/(tabs)/_layout.tsx': {
     default: Stub,
-    unstable_settings: { initialRouteName: 'index' },
+    unstable_settings: { anchor: 'index' },
   },
   './(drawer)/(tabs)/index/_layout.tsx': Stub,
   './(drawer)/(tabs)/index/index.tsx': Stub,
