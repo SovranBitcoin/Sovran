@@ -16,7 +16,7 @@ import {
 type EntryWithMetadata = { metadata?: Record<string, string> | undefined };
 
 function entryRecord(entry: EntryWithMetadata): AnnotationRecord {
-  return (entry.metadata ?? {}) as AnnotationRecord;
+  return entry.metadata ?? {};
 }
 
 /** Decode the full annotation off a merged entry. */
@@ -74,19 +74,28 @@ export function getZap(
 
 type EntryWithToken = EntryWithMetadata & { token?: unknown };
 
+const hasSecret = (proof: unknown): proof is { secret: string } =>
+  typeof proof === "object" &&
+  proof !== null &&
+  "secret" in proof &&
+  typeof proof.secret === "string";
+
+const proofsOf = (holder: unknown): Array<{ secret: string }> =>
+  typeof holder === "object" &&
+  holder !== null &&
+  "proofs" in holder &&
+  Array.isArray(holder.proofs)
+    ? holder.proofs.filter(hasSecret)
+    : [];
+
 /** Best-effort proof extraction from a (send) history entry's token. */
 function entryProofs(entry: EntryWithToken): Array<{ secret: string }> {
-  const token = entry.token as
-    | { proofs?: unknown; token?: unknown }
-    | undefined;
-  if (!token) return [];
-  if (Array.isArray(token.proofs))
-    return token.proofs as Array<{ secret: string }>;
+  const token = entry.token;
+  if (typeof token !== "object" || token === null) return [];
+  if ("proofs" in token && Array.isArray(token.proofs)) return proofsOf(token);
   // Legacy v3 token: { token: [{ proofs: [...] }] }
-  if (Array.isArray(token.token)) {
-    return (token.token as Array<{ proofs?: unknown }>).flatMap((t) =>
-      Array.isArray(t?.proofs) ? (t.proofs as Array<{ secret: string }>) : [],
-    );
+  if ("token" in token && Array.isArray(token.token)) {
+    return token.token.flatMap(proofsOf);
   }
   return [];
 }

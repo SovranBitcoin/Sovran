@@ -1,5 +1,5 @@
 import { getMintQuoteRemoteState } from '@cashu/coco-core';
-import type { HistoryEntry } from '@cashu/coco-core';
+import type { BalancesByMint, HistoryEntry } from '@cashu/coco-core';
 
 import type {
   ColadaSubscriptionBus,
@@ -21,6 +21,7 @@ import {
 } from 'wallet';
 
 import { projectMintMeta } from '@/features/mint/lib/auditInfo';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { describeError } from '@/shared/lib/errors';
 import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { newReadId, readErrorType, readEvents, readKeyHash } from '@/shared/lib/read/readLog';
@@ -257,12 +258,31 @@ export function applyMintItemAddedUpdate(current: EntryRecord, newItem: EntryRec
     destination === 'paymentRequest' || destination === 'meltQuote' || destination === 'sendEcash';
   const skipBalance = !needsBalance || scope === 'selected' || scope === 'npc';
 
-  if (!skipBalance && ((item.balance as number) ?? 0) <= 0) {
+  const balance = typeof item.balance === 'number' ? item.balance : 0;
+  if (!skipBalance && balance <= 0) {
     item.status = 'disabled';
     item.reason = { code: 'NO_BALANCE', message: 'No balance' };
   }
 
   return { ...current, items: [...(current.items as EntryRecord[]), item] };
+}
+
+/** The `mintSelector.itemAdded` row for a newly added mint; coco reports balances as `Amount`s. */
+export function buildAddedMintItem(
+  mintUrl: string,
+  info: { name?: string; icon_url?: string } | null,
+  balances: BalancesByMint
+): JsonRecord {
+  return {
+    mintUrl,
+    displayName: info?.name ?? mintUrl,
+    ...(info?.icon_url ? { iconUrl: info.icon_url } : {}),
+    balance: amountToNumber(balances[mintUrl]?.total),
+    unit: 'sat',
+    status: 'available',
+    reason: null,
+    isPreferred: false,
+  };
 }
 
 function getSourceLabel(entry: EntryRecord | null): string | null {
@@ -420,22 +440,14 @@ export function createSovranScreenActionsBridge({
             try {
               const [info, balances] = await Promise.all([
                 getCachedMintInfo((u) => manager.mint.getMintInfo(u), mintUrl).catch(() => null),
-                manager.wallet.balances.byMint({ mintUrls: [mintUrl] }).catch(() => ({})),
+                manager.wallet.balances
+                  .byMint({ mintUrls: [mintUrl] })
+                  .catch((): BalancesByMint => ({})),
               ]);
-              const balancesByMint = balances as Record<string, { total?: number } | undefined>;
               bus.publish({
                 type: 'mintSelector.itemAdded',
                 mintUrl,
-                item: {
-                  mintUrl,
-                  displayName: info?.name ?? mintUrl,
-                  ...(info?.icon_url ? { iconUrl: info.icon_url } : {}),
-                  balance: balancesByMint[mintUrl]?.total ?? 0,
-                  unit: 'sat',
-                  status: 'available',
-                  reason: null,
-                  isPreferred: false,
-                },
+                item: buildAddedMintItem(mintUrl, info, balances),
               });
             } catch {
               bus.publish({

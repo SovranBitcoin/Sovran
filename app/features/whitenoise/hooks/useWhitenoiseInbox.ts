@@ -1,10 +1,13 @@
 import { useEffect, useMemo } from 'react';
+import type { InviteReader } from '@internet-privacy/marmot-ts';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useWhitenoise } from '../WhitenoiseContext';
 import { resolveInboxRelays } from '../client/network';
 import { AsyncStorageKVBackend } from '../storage/asyncStorageBackend';
 import { WhitenoiseNamespace, whitenoisePrefix } from '../storage/namespaces';
 import { wnLog } from '@/shared/lib/logger';
+
+type GiftWrapEvent = Parameters<InviteReader['ingestEvent']>[0];
 
 const GIFT_WRAP_KIND = 1059;
 const CURSOR_KEY = 'last-seen-at';
@@ -100,15 +103,14 @@ export function useWhitenoiseInbox() {
       unsubscribe = () => handle.unsubscribe();
     })();
 
-    async function handleGiftWrap(event: unknown): Promise<void> {
-      const ev = event as { id?: string; kind?: number; created_at?: number };
-      if (!ev?.id || ev.kind !== GIFT_WRAP_KIND) return;
+    async function handleGiftWrap(ev: GiftWrapEvent): Promise<void> {
+      if (!ev.id || ev.kind !== GIFT_WRAP_KIND) return;
       const reader = inviteReader;
       if (!reader) return;
 
       // Stage 1: ingest into the `received` store. Returns false if we've
       // seen this event before (deduped via the InviteReader's `seen` map).
-      const fresh = await reader.ingestEvent(event as Parameters<typeof reader.ingestEvent>[0]);
+      const fresh = await reader.ingestEvent(ev);
       if (cancelled) return;
       if (!fresh) return;
 

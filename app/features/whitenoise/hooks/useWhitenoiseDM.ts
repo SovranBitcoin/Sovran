@@ -173,8 +173,11 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
   };
 }
 
-async function ingestGroupEvent(group: WnGroup, event: unknown): Promise<void> {
-  for await (const _result of group.ingest([event as never])) {
+async function ingestGroupEvent(
+  group: WnGroup,
+  event: Parameters<WnGroup['ingest']>[0][number]
+): Promise<void> {
+  for await (const _result of group.ingest([event])) {
     // applicationMessage events are emitted via the group emitter and handled there.
   }
 }

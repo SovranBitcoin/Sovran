@@ -1,6 +1,6 @@
 import { facade } from 'nostr';
 
-import { parseJson } from '../components/nostr/feedParse';
+import { parseJsonRecord } from '../components/nostr/feedParse';
 import type { FeedEvent, FeedItem, ProfileInfo } from '../components/nostr/feedTypes';
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import type { FeedParseResult } from './feedClient';
@@ -15,7 +15,7 @@ export function mapAppSpecToFeedSpec(
   specJson: string,
   userPubkey?: string
 ): facade.FeedSpec | null {
-  const parsed = parseJson<Record<string, unknown>>(specJson);
+  const parsed = parseJsonRecord(specJson);
   if (!parsed || parsed.kind !== 'notes') return null;
   switch (parsed.id) {
     case 'for-you':

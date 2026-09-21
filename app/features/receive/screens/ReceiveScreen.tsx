@@ -24,7 +24,7 @@ import {
 } from 'wallet/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
-import { isAccountUnit, toAccountUnit, toRealUnit, type FormattedString } from 'wallet';
+import { isAccountUnit, toAccountUnit, toRealUnit } from 'wallet';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ReceiveReusableQuoteTab } from '@/features/receive/components/ReceiveReusableQuoteTab';
 import { ReceivePaymentRequestTab } from '@/features/receive/components/ReceivePaymentRequestTab';
@@ -77,9 +77,20 @@ function receiveEntryInUnit(
 }
 
 interface ReceiveHubEntry {
-  npcAddress?: FormattedString;
+  npcAddress?: string;
   p2pkKey?: string;
-  selectedMintUrl?: string;
+}
+
+/** The entry can be seeded from the `receiveEntry` route param, so its fields are narrowed here. */
+function readReceiveHubEntry(entry: Record<string, unknown>): ReceiveHubEntry {
+  const { npcAddress, p2pkKey } = entry;
+  return {
+    // The wallet session hands the address over as a FormattedString (a String object).
+    ...(typeof npcAddress === 'string' || npcAddress instanceof String
+      ? { npcAddress: npcAddress.toString() }
+      : {}),
+    ...(typeof p2pkKey === 'string' ? { p2pkKey } : {}),
+  };
 }
 
 interface ReceiveLightningTabProps {
@@ -135,11 +146,11 @@ const ReceiveLightningTab = memo(function ReceiveLightningTab({
 
   return (
     <>
-      <PaymentInfo data={npcAddress.toString()} copyTarget="address" unit="sat" />
+      <PaymentInfo data={npcAddress} copyTarget="address" unit="sat" />
       <CopyRequestCard
         title="RECEIVE ADDRESS"
         icon="mingcute:lightning-fill"
-        parts={[{ value: npcAddress.toString(), kind: 'lightningAddress' }]}
+        parts={[{ value: npcAddress, kind: 'lightningAddress' }]}
         muted={muted}
         onPress={async () => {
           await EnhancedHaptics.copyHaptic();
@@ -265,7 +276,7 @@ function ReceiveScreenForUnit({
     receiveEntry as string | Record<string, unknown> | undefined
   );
 
-  const receiveEntryData = entry as ReceiveHubEntry | null;
+  const receiveEntryData = useMemo(() => (entry ? readReceiveHubEntry(entry) : null), [entry]);
   const hasReceiveEntryData = Boolean(receiveEntryData);
 
   // Each rail reports its copyable payload as it resolves; the footer Copy
@@ -309,7 +320,7 @@ function ReceiveScreenForUnit({
       selectedTab === 'Lightning'
         ? lightningMode === 'address'
           ? npcAddress
-            ? { value: npcAddress.toString(), copyTarget: 'address' }
+            ? { value: npcAddress, copyTarget: 'address' }
             : null
           : (qrPayloads['lightning-offer'] ?? null)
         : selectedTab === 'Unified'

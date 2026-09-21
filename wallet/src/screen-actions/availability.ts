@@ -11,12 +11,57 @@ import {
 } from "../mint-capabilities";
 import { logger } from "../logger";
 import { meltMethodForTarget } from "../melt-target";
-import type { AmountEntryMethodContext, MintMethodRequirement } from "../types";
+import type {
+  AmountEntryMethodContext,
+  MintMethodCapabilityMap,
+  MintMethodRequirement,
+} from "../types";
 
 type AvailabilityMap<S extends ScreenType> = Record<
   ScreenActionName[S],
   ActionAvailability
 >;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+// Per-mint capability leaves are read with optional chaining, so the map is
+// checked one level deep.
+const isCapabilityMap = (value: unknown): value is MintMethodCapabilityMap =>
+  isRecord(value) && Object.values(value).every(isRecord);
+
+const isBalanceMap = (value: unknown): value is Record<string, number> =>
+  isRecord(value) &&
+  Object.values(value).every((balance) => typeof balance === "number");
+
+/** The entry's method context, or undefined when it is absent or malformed. */
+function readMethodContext(
+  entry: Record<string, unknown>,
+): AmountEntryMethodContext | undefined {
+  const ctx = entry.methodContext;
+  if (!isRecord(ctx)) return undefined;
+  const {
+    trustedMintUrls,
+    mintBalances,
+    preferredMintUrl,
+    mintMethodCapabilities,
+  } = ctx;
+  if (
+    !Array.isArray(trustedMintUrls) ||
+    !trustedMintUrls.every((url): url is string => typeof url === "string") ||
+    !isBalanceMap(mintBalances)
+  ) {
+    return undefined;
+  }
+  return {
+    trustedMintUrls,
+    mintBalances,
+    ...(typeof preferredMintUrl === "string" ? { preferredMintUrl } : {}),
+    ...(isCapabilityMap(mintMethodCapabilities)
+      ? { mintMethodCapabilities }
+      : {}),
+  };
+}
 
 function getSelectedMintUrl(
   entry: Record<string, unknown>,
@@ -276,8 +321,9 @@ function meltQuoteAvailability(
 function paymentRequestAvailability(
   entry: Record<string, unknown>,
 ): AvailabilityMap<"paymentRequest"> {
-  const metadata = entry.metadata as Record<string, unknown> | undefined;
-  const phase = metadata?.phase as string | undefined;
+  const metadata = isRecord(entry.metadata) ? entry.metadata : undefined;
+  const phase =
+    typeof metadata?.phase === "string" ? metadata.phase : undefined;
   const hasOperationId = !!(entry.operationId || metadata?.operationId);
   const isPreview = (phase === "preview" || !phase) && !hasOperationId;
   const isDelivered = phase === "delivered" || hasOperationId;
@@ -344,9 +390,7 @@ function amountEntryAvailability(
   // effectiveSatAmount — early-returns.
   const nextCanFire = effectiveAmount >= 1 && Number.isFinite(effectiveAmount);
   const unit = typeof entry.unit === "string" ? entry.unit : "sat";
-  const methodContext = entry.methodContext as
-    | AmountEntryMethodContext
-    | undefined;
+  const methodContext = readMethodContext(entry);
   const selectedMintUrl = getSelectedMintUrl(entry);
 
   // Whether the entered amount outstrips the spendable balance. A single
@@ -722,10 +766,8 @@ function receiveHubAvailability(
     entry.type === "receive" &&
     typeof entry.id === "string" &&
     entry.id === "receive-hub";
-  const unit = entry.unit as string | undefined;
-  const methodContext = entry.methodContext as
-    | AmountEntryMethodContext
-    | undefined;
+  const unit = typeof entry.unit === "string" ? entry.unit : undefined;
+  const methodContext = readMethodContext(entry);
   const canReceiveLightning = methodContextHasSupportingMint(methodContext, {
     operation: "mint",
     method: "bolt11",
@@ -761,11 +803,9 @@ function receiveAvailability(
     entry.type === "receive" &&
     typeof entry.id === "string" &&
     entry.id === "receive-hub";
-  const unit = entry.unit as string | undefined;
+  const unit = typeof entry.unit === "string" ? entry.unit : undefined;
   const hubLoaded = isReceiveHub;
-  const methodContext = entry.methodContext as
-    | AmountEntryMethodContext
-    | undefined;
+  const methodContext = readMethodContext(entry);
   // The receive-rail pickers open whenever ANY trusted mint could serve the
   // rail — mirroring the rail tab's own visibility gate.
   const canReceiveBolt12 = methodContextHasSupportingMint(methodContext, {

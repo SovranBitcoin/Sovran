@@ -1,8 +1,8 @@
-import { parseJson } from '@/features/feed/components/nostr/feedParse';
+import { parseJsonRecord } from '@/features/feed/components/nostr/feedParse';
 
 export function hydrateSpecWithPubkey(spec: string, pubkey: string | undefined): string {
   if (!pubkey) return spec;
-  const parsed = parseJson<Record<string, unknown>>(spec);
+  const parsed = parseJsonRecord(spec);
   if (!parsed || typeof parsed !== 'object') return spec;
   const hasExplicitPubkeys = Array.isArray(parsed.pubkeys);
   if (parsed.id === 'feed' && !parsed.pubkey && !hasExplicitPubkeys) {
@@ -12,6 +12,6 @@ export function hydrateSpecWithPubkey(spec: string, pubkey: string | undefined):
 }
 
 export function hasEmptyExplicitPubkeys(spec: string): boolean {
-  const parsed = parseJson<Record<string, unknown>>(spec);
+  const parsed = parseJsonRecord(spec);
   return !!parsed && Array.isArray(parsed.pubkeys) && parsed.pubkeys.length === 0;
 }

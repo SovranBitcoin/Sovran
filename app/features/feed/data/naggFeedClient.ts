@@ -43,7 +43,7 @@ import { emptyFeedParseResult } from './feedClient';
 import { ingestOwnContent } from '@/shared/stores/profile/ownContentStore';
 import { ingestOwnMediaBlobs } from '@/shared/stores/profile/ownedMediaStore';
 import { hasEmptyExplicitPubkeys, hydrateSpecWithPubkey } from './feedSpec';
-import { parseJson } from '../components/nostr/feedParse';
+import { parseJsonRecord } from '../components/nostr/feedParse';
 import type { FeedEvent, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';
 import { useFeedIgnoreStore } from '../stores/ignoreStore';
 
@@ -493,7 +493,7 @@ export function createNaggFeedClient(): Omit<FeedClient, 'getThread'> {
       if (hasEmptyExplicitPubkeys(hydratedSpec)) {
         return logResult('empty-explicit-pubkeys', emptyFeedParseResult());
       }
-      const parsedSpec = parseJson<Record<string, unknown>>(hydratedSpec);
+      const parsedSpec = parseJsonRecord(hydratedSpec);
       const preferenceFilters = currentFeedPreferenceFilters();
       const feedOptions = feedQueryOptionsFromPreferences(preferenceFilters);
       if (isForYouSpec(parsedSpec)) {
