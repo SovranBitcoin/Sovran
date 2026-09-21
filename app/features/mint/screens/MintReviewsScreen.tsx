@@ -30,7 +30,6 @@ import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { List } from '@/shared/ui/composed/List';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { formatRelative } from '@/shared/lib/date';
 
@@ -163,7 +162,6 @@ function ReviewItem({ review }: { review: MintRecommendation }) {
 export function MintReviewsScreen() {
   useLifecycleLogger('MintReviewsScreen');
   const background = useThemeColor('surface');
-  const insets = useSafeAreaInsets();
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.reviews' });
   const mintUrl = params?.mintUrl;
 
@@ -280,6 +278,7 @@ export function MintReviewsScreen() {
     <Screen
       name="MintReviewsScreen"
       scroll="custom"
+      safeArea="scroll"
       bgColor={background}
       footer={
         <BottomButtons>
@@ -317,10 +316,7 @@ export function MintReviewsScreen() {
             listEmpty
           )
         }
-        contentContainerStyle={{
-          paddingHorizontal: 16,
-          paddingTop: insets.top + 48,
-        }}
+        contentContainerStyle={{ paddingHorizontal: 16 }}
       />
     </Screen>
   );
