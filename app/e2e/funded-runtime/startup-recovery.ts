@@ -607,7 +607,7 @@ function inspectSession(
 
   const leases = leaseFiles(session.liabilityDir);
   const expectedLeases = new Set(
-    intents.map((intent) => effectLeasePath(session.liabilityDir, intent.runId, intent.legId))
+    intents.map((intent) => effectLeasePath(session.liabilityDir, intent))
   );
   if (leases.some((path) => !expectedLeases.has(path))) throw new Error('invalid effect lease');
   readSessionEvidence(session, { allowIncompleteCashu: true });
@@ -823,7 +823,7 @@ function acceptedEmptyAssets(
       .reduce((sum, entry) => sum + entry.amount + entry.fees, 0);
     const explained = observedOutflow + writtenOff + transferredOut;
     const retainedEffectLease = evidence.effectLeases.includes(
-      effectLeasePath(session.liabilityDir, intent.runId, intent.legId)
+      effectLeasePath(session.liabilityDir, intent)
     );
     if (
       (!funded && explained === 0 && !retainedEffectLease && !observedFundingEffect) ||
@@ -1083,9 +1083,7 @@ function clearEffectLeases(session: ManagedSession): number {
   const intents = entries.filter(
     (entry): entry is Extract<LedgerEntry, { kind: 'intent' }> => entry.kind === 'intent'
   );
-  const expected = new Set(
-    intents.map((intent) => effectLeasePath(session.liabilityDir, intent.runId, intent.legId))
-  );
+  const expected = new Set(intents.map((intent) => effectLeasePath(session.liabilityDir, intent)));
   const leases = leaseFiles(session.liabilityDir);
   if (leases.some((path) => !expected.has(path))) throw new Error('invalid effect lease');
   for (const path of leases) unlinkSync(path);

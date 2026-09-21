@@ -25,18 +25,25 @@ export interface DmThreadMessage {
   content: string;
   senderPubkey: string;
   /** unix seconds */
-  createdAt: number;
+  createdAtSec: number;
   isOwn: boolean;
 }
 
-export function useDmThread(
-  counterparty: string,
-  viewerPubkey?: string,
-  viewerPrivateKey?: Uint8Array,
-  protocol: DmProtocol = 'nip17'
-) {
+export function useDmThread({
+  counterparty,
+  viewerPubkey,
+  viewerPrivateKey,
+  protocol = 'nip17',
+}: {
+  counterparty: string;
+  viewerPubkey?: string;
+  viewerPrivateKey?: Uint8Array;
+  protocol?: DmProtocol;
+}) {
   const cacheKey =
-    viewerPubkey && counterparty ? dmThreadKey(viewerPubkey, protocol, counterparty) : null;
+    viewerPubkey && counterparty
+      ? dmThreadKey({ viewer: viewerPubkey, protocol, counterparty })
+      : null;
   // This session's snapshot of the conversation paints on the first frame; the
   // page walk revalidates behind it and merges by message id.
   const [initial] = useState<{ key: string | null; rows: DmThreadMessage[] }>(() => {
@@ -73,7 +80,7 @@ export function useDmThread(
         if (isCurrentProfile && !isMockContactPubkey(dm.counterparty)) {
           useDmLastMessageStore.getState().recordLastMessage(dm.counterparty, {
             protocol: dm.protocol,
-            atSeconds: dm.createdAt,
+            atSeconds: dm.createdAtSec,
             isOwn: dm.isOwn,
           });
         }
@@ -98,11 +105,11 @@ export function useDmThread(
             id: dm.id,
             content: dm.content,
             senderPubkey: dm.senderPubkey,
-            createdAt: dm.createdAt,
+            createdAtSec: dm.createdAtSec,
             isOwn: dm.isOwn,
           })),
         ];
-        merged.sort((a, b) => a.createdAt - b.createdAt);
+        merged.sort((a, b) => a.createdAtSec - b.createdAtSec);
         if (cacheKey) dmThreadCache.setEntry(cacheKey, merged, { viewerKey: viewerPubkey });
         return merged;
       });

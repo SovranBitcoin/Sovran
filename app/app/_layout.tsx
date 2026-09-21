@@ -20,7 +20,7 @@ import {
   useInitializationReset,
 } from '@/shared/providers/InitializationProvider';
 import { compose } from '@/shared/lib/utils';
-import { NostrKeysProvider, useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { NostrKeysProvider } from '@/shared/providers/NostrKeysProvider';
 import { NostrNDKProvider } from '@/shared/providers/NostrNDKProvider';
 import { NostrSignerProvider } from '@/shared/providers/NostrSignerProvider';
 import { PricelistProvider } from '@/shared/providers/PricelistProvider';
@@ -40,8 +40,9 @@ import { WalletContextProvider } from '@/shared/providers/WalletContextProvider'
 import { HeroTransitionProvider } from '@/shared/providers/hero-transition/HeroTransitionProvider';
 import { SovranColadaProvider } from '@/features/send/providers/Colada';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
-import { useAppBalance } from '@/features/wallet';
+import { useProfileBalanceSync } from '@/features/wallet';
 import { usePaymentStatusListener } from '@/shared/hooks/usePaymentStatusListener';
+import { useRegisterKeyDerivation } from '@/shared/hooks/useRegisterKeyDerivation';
 import { useSwapStatusListener } from '@/shared/hooks/useSwapStatusListener';
 import { useOwnEventsSync } from '@/shared/lib/nostr/ownsync/useOwnEventsSync';
 import { useOwnSocialGraphSeed } from '@/shared/lib/nostr/ownsync/useOwnSocialGraphSeed';
@@ -54,7 +55,6 @@ import { OfflineShell, OfflineStatusProvider } from '@/shared/providers/OfflineP
 import {
   clearTransitionGuardOnStartup,
   registerTransitionControls,
-  registerKeyDerivation,
 } from '@/shared/lib/profile/profileSessionOrchestrator';
 
 initLog('Module', '_layout loaded');
@@ -143,12 +143,7 @@ function TransitionControlRegistrar() {
 
 /** Registers key derivation function with the orchestrator so createAndSwitchProfile can derive keys. */
 function KeyDerivationRegistrar() {
-  const { getKeysForAccount } = useNostrKeysContext();
-
-  useEffect(() => {
-    registerKeyDerivation(getKeysForAccount);
-  }, [getKeysForAccount]);
-
+  useRegisterKeyDerivation();
   return null;
 }
 
@@ -186,13 +181,7 @@ function SwapStatusListener() {
 
 /** Invisible component that syncs the live balance to the profile store for the active profile */
 function ProfileBalanceSync() {
-  const balance = useAppBalance();
-  const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
-
-  useEffect(() => {
-    useProfileStore.getState().updateProfileBalance(activeAccountIndex, balance);
-  }, [balance, activeAccountIndex]);
-
+  useProfileBalanceSync();
   return null;
 }
 

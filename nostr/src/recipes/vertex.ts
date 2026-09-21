@@ -15,7 +15,7 @@ export const VertexFailureSchema = z.object({
   ]),
   message: z.string().nullish(),
 });
-export const VertexRelayResponseSchema = z.union([
+export const VertexRelayResponseSchema = z.discriminatedUnion('ok', [
   VertexFailureSchema,
   z.object({
     ok: z.literal(true),

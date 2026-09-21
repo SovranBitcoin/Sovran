@@ -8,7 +8,7 @@
 
 import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { Platform, StyleProp, ViewStyle } from 'react-native';
-import Animated, { useAnimatedStyle, interpolate } from 'react-native-reanimated';
+import Animated, { Extrapolation, useAnimatedStyle, interpolate } from 'react-native-reanimated';
 import { useDrawerProgress } from 'expo-router/drawer';
 
 import { Avatar } from '@/shared/ui/primitives/Avatar';
@@ -41,7 +41,7 @@ export function HeaderProfileButton({ onPress, style }: HeaderProfileButtonProps
   const progress = useDrawerProgress();
 
   const animatedStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [0, 1], [1, 0]),
+    opacity: interpolate(progress.value, [0, 1], [1, 0], Extrapolation.CLAMP),
   }));
 
   // Mint-selector chrome on Android — matches the app-wide header-button

@@ -1787,7 +1787,7 @@ async function execStable(step: StableStep, ctx: ExecCtx): Promise<StepResult> {
     } catch (err) {
       const innerMsg = err instanceof Error ? err.message : String(err);
       const firstLine = innerMsg.split('\n', 1)[0];
-      throw new Error(`aborted by inner step — ${firstLine}`);
+      throw new Error(`aborted by inner step — ${firstLine}`, { cause: err });
     }
 
     // Post-snapshot. Note this uses the *resolved* selector captured at

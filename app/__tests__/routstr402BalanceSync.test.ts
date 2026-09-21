@@ -193,4 +193,30 @@ describe('Routstr errors retain machine-readable evidence for shared presentatio
       }
     );
   });
+
+  it.each([
+    ['status', Object.assign(new Error('payment required'), { status: 402 })],
+    ['abort name', Object.assign(new Error('Aborted'), { name: 'AbortError' })],
+  ])('rethrows a mid-stream failure with its %s intact', async (_label, failure) => {
+    const body = {
+      getReader: () => ({ read: async () => Promise.reject(failure), releaseLock: jest.fn() }),
+    };
+    // eslint-disable-next-line no-restricted-properties -- fetch fixture boundary
+    global.fetch = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'text/event-stream' }),
+      body,
+    })) as unknown as typeof fetch;
+
+    const { stream } = await sendMessage('sk-test', [{ role: 'user', content: 'hi' }], {
+      model: 'test-model',
+    });
+    const drain = async () => {
+      for await (const _chunk of stream) {
+        // no chunks expected
+      }
+    };
+    await expect(drain()).rejects.toBe(failure);
+  });
 });

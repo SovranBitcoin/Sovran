@@ -135,27 +135,26 @@ export function describeMintProgress(
   nowMs: number,
   slowAfterMs = 20_000
 ): string | null {
-  if (state.status === 'failed') {
-    return state.error ?? 'Failed';
+  switch (state.status) {
+    case 'failed':
+      return state.error ?? 'Failed';
+    case 'already-recovered':
+      return 'Already recovered';
+    case 'skipped':
+      return state.error ?? 'Skipped';
+    case 'done':
+      return null;
+    case 'waiting':
+      return 'Waiting';
+    case 'restoring': {
+      if (state.keysetsTotal == null) {
+        return 'Reading keysets';
+      }
+      const base = `${state.keysetsDone} of ${state.keysetsTotal} keysets`;
+      const elapsed = state.startedAtMs == null ? 0 : nowMs - state.startedAtMs;
+      return elapsed >= slowAfterMs ? `${base} · still scanning` : base;
+    }
   }
-  if (state.status === 'already-recovered') {
-    return 'Already recovered';
-  }
-  if (state.status === 'skipped') {
-    return state.error ?? 'Skipped';
-  }
-  if (state.status === 'done') {
-    return null;
-  }
-  if (state.status === 'waiting') {
-    return 'Waiting';
-  }
-  if (state.keysetsTotal == null) {
-    return 'Reading keysets';
-  }
-  const base = `${state.keysetsDone} of ${state.keysetsTotal} keysets`;
-  const elapsed = state.startedAtMs == null ? 0 : nowMs - state.startedAtMs;
-  return elapsed >= slowAfterMs ? `${base} · still scanning` : base;
 }
 
 /**

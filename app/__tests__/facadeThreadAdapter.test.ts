@@ -7,7 +7,7 @@ const A = 'a'.repeat(64); // newest, most reposts
 const B = 'b'.repeat(64); // most likes
 const C = 'c'.repeat(64); // most zaps, oldest
 
-function note(id: string, createdAt: number): facade.FeedItem {
+function note(id: string, createdAtSec: number): facade.FeedItem {
   // Replies must carry a real NIP-10 parent tag now — the adapter's stack
   // holds only direct replies of the target.
   return {
@@ -18,12 +18,12 @@ function note(id: string, createdAt: number): facade.FeedItem {
       kind: 1,
       content: '',
       tags: [['e', ROOT, '', 'root']],
-      created_at: createdAt,
+      created_at: createdAtSec,
     },
   } as unknown as facade.FeedItem;
 }
 
-function rootNote(createdAt: number): facade.FeedItem {
+function rootNote(createdAtSec: number): facade.FeedItem {
   return {
     type: 'note',
     event: {
@@ -32,7 +32,7 @@ function rootNote(createdAt: number): facade.FeedItem {
       kind: 1,
       content: '',
       tags: [],
-      created_at: createdAt,
+      created_at: createdAtSec,
     },
   } as unknown as facade.FeedItem;
 }
@@ -93,7 +93,7 @@ describe('resolvedThreadToResult reply post-sorting', () => {
 describe('resolvedThreadToResult — tier-aware paging contract', () => {
   const OP = '9'.repeat(64);
 
-  function taggedNote(id: string, pubkey: string, createdAt: number): facade.FeedItem {
+  function taggedNote(id: string, pubkey: string, createdAtSec: number): facade.FeedItem {
     return {
       type: 'note',
       event: {
@@ -102,7 +102,7 @@ describe('resolvedThreadToResult — tier-aware paging contract', () => {
         kind: 1,
         content: '',
         tags: [['e', ROOT, '', 'root']],
-        created_at: createdAt,
+        created_at: createdAtSec,
       },
     } as unknown as facade.FeedItem;
   }

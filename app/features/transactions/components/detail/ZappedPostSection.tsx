@@ -16,15 +16,25 @@
  * The thread opens inside the SAME flow group (`(transactions-flow)/thread`)
  * so it pushes in FRONT of the modal — pushing the root `(user-flow)` stack
  * from here opened the thread BEHIND the transactions modal.
+ *
+ * The annotation keeps the post's id and a text preview, not the note itself,
+ * so there is no event to hand the thread through `threadSeedCache`. The card
+ * warms the entity cache instead (`prefetchThread`) while it is on screen, so
+ * the tap opens on a painted post rather than a spinner.
  */
 
-import { StyleSheet } from 'react-native';
+import { useEffect } from 'react';
+import { InteractionManager, StyleSheet } from 'react-native';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { withAlpha } from '@/shared/lib/color';
 
 import { getZap } from 'wallet';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useCachedNostrProfile } from '@/shared/lib/nostr/useEntityCache';
+import { prefetchThread } from '@/features/feed/lib/prefetchThread';
+import {
+  seedLowConfidenceProfiles,
+  useCachedNostrProfile,
+} from '@/shared/lib/nostr/useEntityCache';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Log } from '@/shared/lib/logger';
 import { zIndex } from '@/shared/styles/tokens';
@@ -47,6 +57,30 @@ export function ZappedPostSection({ entry }: ZappedPostSectionProps) {
   const { metadata: cachedProfile } = useCachedNostrProfile(zap?.authorPubkey ?? '');
 
   const eventId = zap?.eventId;
+  const authorPubkey = zap?.authorPubkey;
+  const snapshotName = zap?.authorName;
+  const snapshotPicture = zap?.authorAvatarUrl;
+
+  // Warm the thread while the card is visible, so the tap below paints from
+  // cache. The author snapshot we already persisted is seeded at LOW
+  // confidence (gap fill only, still counts as stale), so it can fill the
+  // thread's first frame without ever outranking a real kind-0.
+  useEffect(() => {
+    if (!eventId) return;
+    const task = InteractionManager.runAfterInteractions(() => {
+      if (authorPubkey && (snapshotName || snapshotPicture)) {
+        seedLowConfidenceProfiles({
+          [authorPubkey]: {
+            ...(snapshotName ? { name: snapshotName } : {}),
+            ...(snapshotPicture ? { picture: snapshotPicture } : {}),
+          },
+        });
+      }
+      void prefetchThread(eventId);
+    });
+    return () => task.cancel();
+  }, [eventId, authorPubkey, snapshotName, snapshotPicture]);
+
   const openThread = () => {
     if (!eventId) return;
     router.push({ pathname: '/(transactions-flow)/thread', params: { eventId } });

@@ -74,11 +74,11 @@ export function BackgroundScreen() {
     }
   }, [albums, activeIndex]);
 
-  const tabLabels = albums.map((a) => a.displayName);
-  const selectedTabLabel = tabLabels[activeIndex] ?? '';
+  const albumTabs = albums.map((a) => ({ slug: a.slug, label: a.displayName }));
+  const selectedAlbumSlug = albums[activeIndex]?.slug ?? '';
 
-  const handleTabSelect = (label: string) => {
-    const idx = tabLabels.indexOf(label);
+  const handleTabSelect = (slug: string) => {
+    const idx = albums.findIndex((a) => a.slug === slug);
     if (idx < 0) return;
     setActiveIndex(idx);
     pagerRef.current?.setPage(idx);
@@ -112,8 +112,8 @@ export function BackgroundScreen() {
         <View className="flex-1" style={{ paddingTop: headerHeight }}>
           <View className="justify-center" style={{ height: TABS_AREA_HEIGHT }}>
             <AlbumPillTabs
-              tabs={tabLabels}
-              selectedTab={selectedTabLabel}
+              tabs={albumTabs}
+              selectedSlug={selectedAlbumSlug}
               onSelect={handleTabSelect}
             />
           </View>

@@ -1,5 +1,5 @@
 import { ReactNode, useCallback, useMemo } from 'react';
-import { LayoutChangeEvent, Platform, StyleSheet, ViewStyle, StyleProp } from 'react-native';
+import { LayoutChangeEvent, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { useScreenInsets } from '@/shared/hooks/useScreenInsets';
 import { BlurView, BlurTint } from 'expo-blur';
 
@@ -11,6 +11,7 @@ import { withAlpha } from '@/shared/lib/color';
 import { Log } from '@/shared/lib/logger';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useCapabilities } from '@/shared/ui/capability';
 import { useScreenBackground, useScreenFooter } from './ScreenFooterContext';
 
 interface BottomButtonsProps {
@@ -96,7 +97,8 @@ export function BottomButtons({
   const resolvedGradientColor =
     gradientColor === null ? null : (gradientColor ?? screenBackground ?? themeBackground);
   const { setFooterHeight } = useScreenFooter();
-  const shouldRenderBlur = blur && Platform.OS !== 'android';
+  const { frostedSurface } = useCapabilities();
+  const shouldRenderBlur = blur && frostedSurface;
   const handleLayout = useCallback(
     (event: LayoutChangeEvent) => {
       setFooterHeight(event.nativeEvent.layout.height);

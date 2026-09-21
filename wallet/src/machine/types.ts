@@ -1315,6 +1315,12 @@ export interface PaymentMachine {
     recipientProfile?: RecipientProfile;
     /** See `FlowContext.p2pkLockPubkey` — P2PK-lock the sent token to this key. */
     p2pkLockPubkey?: string;
+    /**
+     * Mints the recipient accepts (e.g. from a nearby peer's creq). Binds the
+     * whole flow as `FlowContext.supportedMintUrls`: the auto-pick, the mint
+     * picker and any later mint change all stay inside it.
+     */
+    allowedMints?: string[];
     /** See `SendEntrySource` — how this flow was entered. */
     entrySource?: SendEntrySource;
   }) => Promise<void>;

@@ -30,6 +30,7 @@ export type WallpaperCatalogEntry = NaggWallpaperColors & {
   fileSize: number;
   dimensions: string;
   albumSlug: string;
+  /** Unix seconds (Nostr `created_at`); mirrors @sovranbitcoin/schemas and the persisted wallpaper catalog */
   createdAt: number;
 };
 

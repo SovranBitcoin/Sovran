@@ -81,7 +81,7 @@ function quote(
 
 async function createHarness(): Promise<MeltHarness> {
   const repos = new MemoryRepositories();
-  const now = Math.floor(Date.now() / 1000);
+  const nowSec = Math.floor(Date.now() / 1000);
   const bolt11 = {
     method: "bolt11",
     unit: "sat",
@@ -105,8 +105,8 @@ async function createHarness(): Promise<MeltHarness> {
     name: mintInfo.name,
     mintInfo,
     trusted: true,
-    createdAt: now,
-    updatedAt: now,
+    createdAt: nowSec,
+    updatedAt: nowSec,
   });
   await repos.keysetRepository.addKeyset({
     mintUrl: MINT_URL,

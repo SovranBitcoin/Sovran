@@ -11,6 +11,7 @@
 import { createSovranNotifications } from '@/features/send/lib/sovranPaymentConfig';
 import { paymentStatusPopup } from '@/shared/lib/popup';
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
+import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 
 jest.mock('expo-router', () => ({
   router: { navigate: jest.fn(), replace: jest.fn(), dismiss: jest.fn() },
@@ -20,7 +21,6 @@ jest.mock('expo-camera', () => ({ scanFromURLAsync: jest.fn() }));
 jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
 jest.mock('react-native', () => ({ Share: { share: jest.fn() } }));
-jest.mock('@cashu/cashu-ts', () => ({ getDecodedToken: jest.fn(), getEncodedToken: jest.fn() }));
 jest.mock('@/features/bitchat/lib/blePrivateDelivery', () => ({
   sendBLEPrivateMessageWhole: jest.fn(),
 }));
@@ -41,14 +41,6 @@ jest.mock('@/shared/lib/nfc', () => ({
   writeTokenToNFC: jest.fn(),
   NfcError: class NfcError extends Error {},
   isUserCancelError: jest.fn(() => false),
-}));
-jest.mock('wallet', () => ({
-  withTimeout: jest.fn((promise: Promise<unknown>) => promise),
-  rawAnnotationKey: jest.fn((raw: string) => `raw:${raw}`),
-  annotationKey: jest.fn((entry: { operationId?: string; id?: string }) =>
-    entry.operationId ? `op:${entry.operationId}` : `id:${entry.id ?? ''}`
-  ),
-  decodePaymentRequestInfo: jest.fn(() => ({ requestId: 'req-1' })),
 }));
 jest.mock('@/shared/stores/profile/transactionAnnotationStore', () => ({
   setTransactionAnnotation: jest.fn(),
@@ -78,7 +70,7 @@ jest.mock('@/shared/lib/routstr/topUp', () => ({
   formatRoutstrBalance: jest.fn(),
 }));
 jest.mock('@/shared/stores/runtime/routstrTopUpStore', () => ({
-  useRoutstrTopUpStore: { getState: jest.fn(() => ({ active: false, complete: jest.fn() })) },
+  useRoutstrTopUpStore: { getState: jest.fn(() => ({ phase: 'idle', complete: jest.fn() })) },
 }));
 jest.mock('@/shared/stores/runtime/nearPayStore', () => ({
   useNearPaySessionStore: { getState: jest.fn(() => ({ active: null })) },
@@ -105,54 +97,30 @@ jest.mock('@/shared/stores/profile/transactionDistributionStore', () => ({
   useTransactionDistributionStore: { getState: jest.fn(() => ({})) },
 }));
 
-// Functional store mock — records the active toast like the real store.
-type MockActive = Record<string, unknown> | null;
-const mockStoreState: { active: MockActive } = { active: null };
-const mockSetActive = jest.fn((payment: MockActive) => {
-  mockStoreState.active = payment;
-});
-const mockSetFailed = jest.fn();
-const mockSetConfirmed = jest.fn();
-const mockSetDelivered = jest.fn();
-const mockClearActive = jest.fn(() => {
-  mockStoreState.active = null;
-});
-jest.mock('@/shared/stores/runtime/paymentStatusStore', () => ({
-  usePaymentStatusStore: {
-    getState: jest.fn(() => ({
-      active: mockStoreState.active,
-      setActive: mockSetActive,
-      setFailed: mockSetFailed,
-      setConfirmed: mockSetConfirmed,
-      setDelivered: mockSetDelivered,
-      clearActive: mockClearActive,
-    })),
-  },
-}));
-
 const BASE = { mintUrl: 'https://mint1.example.com', amount: 200, unit: 'sat' };
+// NUT-18 request with id 'req-1' for 200 sat at BASE.mintUrl.
+const PAYMENT_REQUEST =
+  'creqApWF0gGFpZXJlcS0xYWEYyGF1Y3NhdGFtgXgZaHR0cHM6Ly9taW50MS5leGFtcGxlLmNvbQ==';
+const PROCESSING_MELT = { variant: 'melt' as const, id: 'melt-1', state: 'processing' as const };
+const activeStatus = () => usePaymentStatusStore.getState().active;
 
 describe('payment toast gating (onchain melt)', () => {
   beforeEach(() => {
-    mockStoreState.active = null;
-    mockSetActive.mockClear();
-    mockSetFailed.mockClear();
+    usePaymentStatusStore.setState({ active: null });
     (paymentStatusPopup as jest.Mock).mockClear();
   });
 
   it('suppresses the processing toast for an onchain melt', () => {
     const notifications = createSovranNotifications();
     void notifications.onPaymentProcessing!({ variant: 'melt', method: 'onchain', ...BASE });
-    expect(mockSetActive).not.toHaveBeenCalled();
+    expect(activeStatus()).toBeNull();
     expect(paymentStatusPopup).not.toHaveBeenCalled();
   });
 
   it('keeps the processing toast for a lightning melt (no method)', () => {
     const notifications = createSovranNotifications();
     void notifications.onPaymentProcessing!({ variant: 'melt', ...BASE });
-    expect(mockSetActive).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: 'melt', state: 'processing' })
-    );
+    expect(activeStatus()).toMatchObject({ variant: 'melt', state: 'processing' });
     expect(paymentStatusPopup).toHaveBeenCalledTimes(1);
   });
 
@@ -164,63 +132,57 @@ describe('payment toast gating (onchain melt)', () => {
       message: 'Mint rejected the melt',
       rolledBack: true,
     });
-    expect(mockSetActive).toHaveBeenCalledWith(
-      expect.objectContaining({
-        variant: 'melt',
-        state: 'failed',
-        errorMessage: expect.stringContaining('Your funds have been returned'),
-      })
-    );
+    expect(activeStatus()).toMatchObject({
+      variant: 'melt',
+      state: 'failed',
+      errorMessage: 'Mint rejected the melt\nYour funds have been returned.',
+    });
     expect(paymentStatusPopup).toHaveBeenCalledTimes(1);
-    expect(mockSetFailed).not.toHaveBeenCalled();
   });
 
   it('flips the existing processing toast on failure instead of creating a new one', () => {
-    mockStoreState.active = { variant: 'melt', id: 'melt-1', state: 'processing', ...BASE };
+    usePaymentStatusStore.setState({ active: { ...PROCESSING_MELT, ...BASE } });
     const notifications = createSovranNotifications();
     void notifications.onPaymentFailed!({
       variant: 'melt',
       ...BASE,
       message: 'Route failed',
     });
-    expect(mockSetFailed).toHaveBeenCalledWith('melt-1', expect.any(Error));
-    expect(mockSetActive).not.toHaveBeenCalled();
+    expect(activeStatus()).toMatchObject({ id: 'melt-1', state: 'failed' });
     expect(paymentStatusPopup).not.toHaveBeenCalled();
   });
 
   it('replaces an unrelated status instead of failing the wrong payment', () => {
-    mockStoreState.active = {
-      variant: 'melt',
-      id: 'other-melt',
-      state: 'processing',
-      mintUrl: 'https://other.example.com',
-      amount: 999,
-      unit: 'sat',
-    };
+    usePaymentStatusStore.setState({
+      active: {
+        ...PROCESSING_MELT,
+        id: 'other-melt',
+        mintUrl: 'https://other.example.com',
+        amount: 999,
+        unit: 'sat',
+      },
+    });
     const notifications = createSovranNotifications();
     void notifications.onPaymentFailed!({
       variant: 'melt',
       ...BASE,
       message: 'This melt failed',
     });
-    expect(mockSetFailed).not.toHaveBeenCalled();
-    expect(mockSetActive).toHaveBeenCalledWith(
-      expect.objectContaining({
-        variant: 'melt',
-        mintUrl: BASE.mintUrl,
-        amount: BASE.amount,
-        state: 'failed',
-      })
-    );
+    expect(activeStatus()).toMatchObject({
+      variant: 'melt',
+      mintUrl: BASE.mintUrl,
+      amount: BASE.amount,
+      state: 'failed',
+      errorMessage: 'This melt failed',
+    });
+    expect(activeStatus()?.id).not.toBe('other-melt');
     expect(paymentStatusPopup).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('payment confirmation history parsing', () => {
   beforeEach(() => {
-    mockStoreState.active = { variant: 'melt', id: 'melt-1', state: 'processing', ...BASE };
-    mockSetConfirmed.mockClear();
-    mockSetDelivered.mockClear();
+    usePaymentStatusStore.setState({ active: { ...PROCESSING_MELT, ...BASE } });
     (setTransactionAnnotation as jest.Mock).mockClear();
   });
 
@@ -230,7 +192,7 @@ describe('payment confirmation history parsing', () => {
       ...BASE,
       historyEntry: JSON.stringify({ id: 'h1', type: 'melt', state: 'PENDING' }),
     });
-    expect(mockSetConfirmed).not.toHaveBeenCalled();
+    expect(activeStatus()?.state).toBe('processing');
   });
 
   it('confirms the melt when the history entry is malformed', () => {
@@ -239,7 +201,7 @@ describe('payment confirmation history parsing', () => {
       ...BASE,
       historyEntry: 'not json',
     });
-    expect(mockSetConfirmed).toHaveBeenCalledWith('melt-1');
+    expect(activeStatus()).toMatchObject({ id: 'melt-1', state: 'confirmed' });
   });
 
   it('annotates a confirmed payment-request send from its parsed metadata', () => {
@@ -250,12 +212,12 @@ describe('payment confirmation history parsing', () => {
         id: 'h1',
         type: 'send',
         operationId: 'op-1',
-        metadata: { transportType: 'nostr', paymentRequest: 'creqA...' },
+        metadata: { transportType: 'nostr', paymentRequest: PAYMENT_REQUEST },
       }),
     });
     expect(setTransactionAnnotation).toHaveBeenCalledWith('op:op-1', {
       paymentRequest: { role: 'payer', requestId: 'req-1', transport: 'nostr' },
     });
-    expect(mockSetDelivered).toHaveBeenCalledWith('melt-1');
+    expect(activeStatus()).toMatchObject({ id: 'melt-1', state: 'delivered' });
   });
 });

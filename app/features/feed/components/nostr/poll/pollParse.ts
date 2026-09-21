@@ -74,11 +74,11 @@ export function tallyPoll(
   const latestByPubkey = new Map<string, EventLike>();
   for (const event of voteEvents) {
     const pubkey = event.pubkey;
-    const createdAt = event.created_at ?? 0;
+    const createdAtSec = event.created_at ?? 0;
     if (!pubkey) continue;
-    if (poll.endsAt !== undefined && createdAt > poll.endsAt) continue;
+    if (poll.endsAt !== undefined && createdAtSec > poll.endsAt) continue;
     const prev = latestByPubkey.get(pubkey);
-    if (!prev || createdAt > (prev.created_at ?? 0)) latestByPubkey.set(pubkey, event);
+    if (!prev || createdAtSec > (prev.created_at ?? 0)) latestByPubkey.set(pubkey, event);
   }
 
   const counts: Record<string, number> = {};

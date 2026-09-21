@@ -666,7 +666,15 @@ export function useMnemonic(autoLoad: boolean = true): UseMnemonicReturn {
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const stored = await retrieveMnemonic();
+    let stored: string | null;
+    try {
+      stored = await retrieveMnemonic();
+    } catch (error) {
+      // try/catch rather than try/finally: the React Compiler bails on a
+      // `try` with no `catch`.
+      setLoading(false);
+      throw error;
+    }
     setValue(stored);
     if (stored === null) {
       // `retrieveMnemonic` swallows errors and returns null on either

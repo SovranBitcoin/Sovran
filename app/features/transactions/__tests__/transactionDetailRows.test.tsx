@@ -4,7 +4,6 @@ import {
   quoteIdDetailItem,
   mintDetailItem,
 } from '../components/detail/transactionDetailRows';
-import { formatAmount } from '@/shared/lib/currency';
 import { CopyableValue } from '@/shared/ui/composed/CopyableValue';
 import { MiddleEllipsisValue } from '@/shared/ui/composed/MiddleEllipsisValue';
 
@@ -13,10 +12,7 @@ jest.mock('@/shared/lib/popup', () => ({ copyPopup: jest.fn() }));
 
 describe('transactionDetailRows', () => {
   it('amountDetailItem formats through the shared currency formatter', () => {
-    expect(amountDetailItem({ amount: 21, unit: 'sat' })).toEqual({
-      title: 'Amount',
-      value: formatAmount({ amount: 21, unit: 'sat' }),
-    });
+    expect(amountDetailItem({ amount: 21, unit: 'sat' })).toEqual({ title: 'Amount', value: '21' });
   });
 
   it('stateDetailItem passes the resolved state through', () => {

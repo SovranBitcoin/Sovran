@@ -229,7 +229,7 @@ function flattenSections<T>(
       firstIndex[section.id] = firstRowForSection;
     }
   }
-  const elapsed = Date.now() - start;
+  const elapsedMs = Date.now() - start;
   // Recomputed every render this component makes (the compiler may cache it
   // while `sections` / `rowChunkSize` / `keyExtractor` are stable). If this
   // logs hot, it's almost always because the caller is rebuilding `sections`
@@ -239,7 +239,7 @@ function flattenSections<T>(
     flatRowsOut: items.length,
     headers: items.filter((it) => it.kind === 'header').length,
     rows: items.filter((it) => it.kind === 'row').length,
-    elapsedMs: elapsed,
+    elapsedMs,
   });
   return { flatItems: items, sectionFirstIndex: firstIndex };
 }

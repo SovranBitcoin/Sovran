@@ -39,7 +39,6 @@ import { truncateMiddle } from '@/shared/lib/strings';
 import {
   createAndSwitchProfile,
   switchToExistingProfile,
-  switchToImportedProfile,
 } from '@/shared/lib/profile/profileSessionOrchestrator';
 import { useProfileStore, type ProfileEntry } from '@/shared/stores/global/profileStore';
 import { alpha, hitSlop, iconSize, radius, spacing } from '@/shared/styles/tokens';
@@ -115,7 +114,7 @@ function useProfileSwitcher(closeDrawer: () => void) {
           return;
         }
 
-        const imported = await switchToImportedProfile({ accountIndex: action.accountIndex });
+        const imported = await switchToExistingProfile({ accountIndex: action.accountIndex });
         if (!imported) {
           switchingRef.current = false;
           staticPopup('wallet-still-loading');

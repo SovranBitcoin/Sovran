@@ -6,12 +6,13 @@
 // re-renders only this badge — it never rebuilds the timeline model or the
 // rows (the card flips exactly once at the expiry boundary instead).
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { MintQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 
 import type { HistoryEntry } from '@cashu/coco-core';
 
+import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
 import { IS_ANDROID_E2E } from '@/shared/lib/e2e/isAndroidE2E';
 import { Text } from '@/shared/ui/primitives/Text';
 import {
@@ -69,28 +70,29 @@ export function ExpiryCountdown({
 }: ExpiryCountdownProps) {
   const [currentTime, setCurrentTime] = useState(() => Date.now());
 
-  const meltExpiry = meltQuote?.expiry;
+  const meltExpirySec = meltQuote?.expiry;
   const mintState = historyEntry.type === 'mint' ? historyEntry.state : null;
 
-  useEffect(() => {
-    // The 1s tick keeps uiautomator from ever reaching idle, blinding every AX
-    // dump on unpaid-quote screens — same class as the QRCode/LoadingIndicator/
-    // Skeleton gates. The badge still renders its initial value once.
-    if (IS_ANDROID_E2E) return;
-    const shouldUpdate =
-      (historyEntry.type === 'melt' && meltExpiry) ||
-      (historyEntry.type === 'mint' && !isOnchainMint && mintState === MintQuoteState.UNPAID);
+  const expiryBadge = getExpiryBadgeText(historyEntry, meltQuote, isOnchainMint, currentTime);
 
-    if (shouldUpdate) {
+  const shouldUpdate =
+    (historyEntry.type === 'melt' && !!meltExpirySec) ||
+    (historyEntry.type === 'mint' && !isOnchainMint && mintState === MintQuoteState.UNPAID);
+
+  // The 1s tick keeps uiautomator from ever reaching idle, blinding every AX
+  // dump on unpaid-quote screens — same class as the QRCode/LoadingIndicator/
+  // Skeleton gates. The badge still renders its initial value once. Expiry is
+  // final, so the tick also stops once the badge has gone.
+  useVisualActivityEffect(
+    useCallback(() => {
+      setCurrentTime(Date.now());
       const interval = setInterval(() => {
         setCurrentTime(Date.now());
       }, 1000);
-
       return () => clearInterval(interval);
-    }
-  }, [historyEntry.type, isOnchainMint, meltExpiry, mintState]);
-
-  const expiryBadge = getExpiryBadgeText(historyEntry, meltQuote, isOnchainMint, currentTime);
+    }, []),
+    shouldUpdate && expiryBadge != null && !IS_ANDROID_E2E
+  );
 
   // Countdown badge: log appear/disappear (with the value at the flip), not
   // every one-second tick.

@@ -1,4 +1,7 @@
 import * as nip19 from 'nostr-tools/nip19';
+
+import { isNostrEventId } from '@/shared/lib/protocolIds';
+
 import type { ContentSegment, FeedEvent } from './feedTypes';
 
 // SVG is intentionally absent: expo-image can't render remote SVGs, so an svg
@@ -28,7 +31,6 @@ export const URL_REGEX = /https?:\/\/[^\s<>"')\]]{1,2048}/gi;
 const RELAY_URL_REGEX = /wss?:\/\/[^\s<>"')\]]{1,2048}/gi;
 const RELAY_HOST_CHECK = /^wss?:\/\/[a-z0-9]/i;
 const NOSTR_URI_REGEX = /nostr:(npub1|nprofile1|nevent1|note1|naddr1)[a-z0-9]{1,512}/gi;
-const HEX_EVENT_ID_REGEX = /^[0-9a-f]{64}$/i;
 
 // Sanity ceiling on raw note content. This defensive client-side bound keeps
 // parseContent and _contentCache from retaining hostile inputs beyond the cap.
@@ -199,7 +201,7 @@ export function collectQuoteTagIds(event: FeedEvent): string[] {
   for (const tag of event.tags || []) {
     if (tag[0] !== 'q' || !tag[1]) continue;
     const id = tag[1].trim().toLowerCase();
-    if (!HEX_EVENT_ID_REGEX.test(id) || seen.has(id)) continue;
+    if (!isNostrEventId(id) || seen.has(id)) continue;
     seen.add(id);
     out.push(id);
   }
@@ -245,10 +247,15 @@ export function prettifyUrl(raw: string): string {
   }
 }
 
-export function parseJson<T>(raw: string): T | null {
+export function parseJsonRecord(raw: string): Record<string, unknown> | null {
   try {
-    return JSON.parse(raw) as T;
+    const value: unknown = JSON.parse(raw);
+    return isJsonRecord(value) ? value : null;
   } catch {
     return null;
   }
+}
+
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

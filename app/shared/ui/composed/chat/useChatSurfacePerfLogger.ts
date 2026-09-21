@@ -9,7 +9,8 @@ import {
   useKeyboardState,
   useReanimatedKeyboardAnimation,
 } from 'react-native-keyboard-controller';
-import { runOnJS, useAnimatedReaction, useSharedValue } from 'react-native-reanimated';
+import { useAnimatedReaction, useSharedValue } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import type { Logger } from '@/shared/lib/logger';
 
@@ -231,16 +232,16 @@ export function useChatKeyboardAnimationLogger({
   // `progress.value` changes. Cheap because it stays on the UI
   // thread; only counts and updates SharedValues.
   useAnimatedReaction(
-    () => ({ p: progress.value, h: animatedHeight.value }),
+    () => ({ p: progress.get(), h: animatedHeight.get() }),
     (curr, prev) => {
       'worklet';
-      if (cycleActive.value === 0) return;
+      if (cycleActive.get() === 0) return;
       if (prev && curr.p === prev.p && curr.h === prev.h) return;
-      progressTickCount.value += 1;
-      if (curr.p < progressMin.value) progressMin.value = curr.p;
-      if (curr.p > progressMax.value) progressMax.value = curr.p;
-      if (curr.h < heightMin.value) heightMin.value = curr.h;
-      if (curr.h > heightMax.value) heightMax.value = curr.h;
+      progressTickCount.set(progressTickCount.get() + 1);
+      if (curr.p < progressMin.get()) progressMin.set(curr.p);
+      if (curr.p > progressMax.get()) progressMax.set(curr.p);
+      if (curr.h < heightMin.get()) heightMin.set(curr.h);
+      if (curr.h > heightMax.get()) heightMax.set(curr.h);
     },
     []
   );
@@ -306,46 +307,47 @@ export function useChatKeyboardAnimationLogger({
       onStart: (e) => {
         'worklet';
         const now = Date.now();
-        startTs.value = now;
-        startHeight.value = e.height;
-        moveCount.value = 0;
-        interactiveCount.value = 0;
-        lastMoveTs.value = 0;
+        startTs.set(now);
+        startHeight.set(e.height);
+        moveCount.set(0);
+        interactiveCount.set(0);
+        lastMoveTs.set(0);
         // Reset progress observation window. Seed the min/max from
         // the current values so the first reaction fire isn't
         // counted as a delta from 0.
-        progressTickCount.value = 0;
-        progressMin.value = progress.value;
-        progressMax.value = progress.value;
-        heightMin.value = animatedHeight.value;
-        heightMax.value = animatedHeight.value;
-        cycleActive.value = 1;
-        runOnJS(reportStart)(e.height, now);
+        progressTickCount.set(0);
+        progressMin.set(progress.get());
+        progressMax.set(progress.get());
+        heightMin.set(animatedHeight.get());
+        heightMax.set(animatedHeight.get());
+        cycleActive.set(1);
+        scheduleOnRN(reportStart, e.height, now);
       },
       onMove: (_e) => {
         'worklet';
-        moveCount.value += 1;
-        lastMoveTs.value = Date.now();
+        moveCount.set(moveCount.get() + 1);
+        lastMoveTs.set(Date.now());
       },
       onInteractive: (_e) => {
         'worklet';
-        interactiveCount.value += 1;
+        interactiveCount.set(interactiveCount.get() + 1);
       },
       onEnd: (e) => {
         'worklet';
-        cycleActive.value = 0;
-        const duration = Date.now() - startTs.value;
-        runOnJS(reportEnd)(
+        cycleActive.set(0);
+        const durationMs = Date.now() - startTs.get();
+        scheduleOnRN(
+          reportEnd,
           e.height,
-          startHeight.value,
-          duration,
-          moveCount.value,
-          interactiveCount.value,
-          progressTickCount.value,
-          progressMin.value,
-          progressMax.value,
-          heightMin.value,
-          heightMax.value
+          startHeight.get(),
+          durationMs,
+          moveCount.get(),
+          interactiveCount.get(),
+          progressTickCount.get(),
+          progressMin.get(),
+          progressMax.get(),
+          heightMin.get(),
+          heightMax.get()
         );
       },
     },

@@ -52,6 +52,22 @@ export function notifyNoSharedMint(displayName: string): Promise<void> {
 }
 
 /**
+ * Nut Drops are denominated in sats (the machine is pinned to `sat`), but the
+ * wallet context the send draws on is scoped to the ACTIVE account's unit. On a
+ * fiat account those balances are cents, which the pinned machine would read as
+ * sats — so the send is blocked until a Bitcoin account (real or test) is
+ * active. Single acknowledge.
+ */
+export function notifyNutDropNeedsBitcoinAccount(): Promise<void> {
+  return acknowledge({
+    title: 'Switch to Bitcoin',
+    testID: 'near-pay-needs-bitcoin-account-ok',
+    description: 'Nut Drops send sats. Switch to your Bitcoin account to pay someone nearby.',
+    icon: 'mdi:bitcoin',
+  });
+}
+
+/**
  * Asks the user to confirm an offline Nut Drop that downgrades from a P2PK
  * **lock** to a **bearer** token. A P2PK lock needs an online mint swap, so
  * offline we can only send bearer — but a bearer token is redeemable by anyone

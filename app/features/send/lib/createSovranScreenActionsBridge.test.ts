@@ -70,10 +70,25 @@ jest.mock('@/shared/stores/profile/transactionDistributionStore', () => ({
   },
 }));
 
+import { Amount } from '@cashu/cashu-ts';
+import type { BalancesByMint } from '@cashu/coco-core';
+
 import {
   applyMintItemAddedUpdate,
+  buildAddedMintItem,
   shouldApplySovranEntryUpdate,
 } from './createSovranScreenActionsBridge';
+
+function cocoBalances(mintUrl: string, total: number): BalancesByMint {
+  return {
+    [mintUrl]: {
+      spendable: Amount.from(total),
+      reserved: Amount.zero(),
+      total: Amount.from(total),
+      unit: 'sat',
+    },
+  };
+}
 
 describe('shouldApplySovranEntryUpdate', () => {
   it('accepts receive-only sentinel updates', () => {
@@ -148,5 +163,40 @@ describe('applyMintItemAddedUpdate', () => {
     };
 
     expect(applyMintItemAddedUpdate(current, { mintUrl: 'https://mint.example' })).toBe(current);
+  });
+});
+
+describe('buildAddedMintItem', () => {
+  it("publishes coco's Amount balance as a plain number", () => {
+    const funded = 'https://funded.example';
+
+    expect(buildAddedMintItem(funded, { name: 'Funded' }, cocoBalances(funded, 21))).toEqual({
+      mintUrl: funded,
+      displayName: 'Funded',
+      balance: 21,
+      unit: 'sat',
+      status: 'available',
+      reason: null,
+      isPreferred: false,
+    });
+    expect(buildAddedMintItem(funded, null, {}).balance).toBe(0);
+  });
+
+  it('feeds the zero-balance check: an empty mint is disabled, a funded one stays available', () => {
+    const entry = { destination: 'sendEcash', items: [] };
+    const empty = 'https://empty.example';
+    const funded = 'https://funded.example';
+
+    const [emptyRow] = applyMintItemAddedUpdate(
+      entry,
+      buildAddedMintItem(empty, null, cocoBalances(empty, 0))
+    ).items as Record<string, unknown>[];
+    const [fundedRow] = applyMintItemAddedUpdate(
+      entry,
+      buildAddedMintItem(funded, null, cocoBalances(funded, 21))
+    ).items as Record<string, unknown>[];
+
+    expect(emptyRow).toMatchObject({ balance: 0, status: 'disabled' });
+    expect(fundedRow).toMatchObject({ balance: 21, status: 'available' });
   });
 });

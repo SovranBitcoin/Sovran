@@ -1,6 +1,6 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { Apple, appleRelease, copyScreenshots, prepareListing } from '../apple.mjs';
+import { appleRelease, copyScreenshots, prepareListing } from '../apple.mjs';
 import { config } from '../core.mjs';
 
 test('interrupted owned screenshot reservation resumes upload and checksum commit', async () => {
@@ -43,24 +43,22 @@ test('inherited screenshots from a previous release are not duplicated', async (
 
 test('READY_FOR_REVIEW resumes the existing owned item instead of creating another', async () => {
   const writes = [];
-  const api = mock.method(Apple.prototype, 'api', async (route, method, body) => {
+  const api = async (route, method, body) => {
     if (route === `apps/${config.appleAppId}`) return { data: { attributes: { bundleId: config.bundleId } } };
     if (route.startsWith('builds?')) return { data: [{ id: 'binary', attributes: { processingState: 'VALID', expired: false }, relationships: { preReleaseVersion: { data: { id: 'prerelease' } } } }], included: [{ id: 'prerelease', type: 'preReleaseVersions', attributes: { version: '0.1.1', platform: 'IOS' } }] };
     if (route === 'appStoreVersions/target/relationships/build') return { data: { id: 'binary' } };
     writes.push({ route, method, body }); return {};
-  });
-  const list = mock.method(Apple.prototype, 'list', async (route) => {
+  };
+  const list = async (route) => {
     if (route.includes('/appStoreVersions?')) return [{ id: 'target', attributes: { versionString: '0.1.1', appVersionState: 'READY_FOR_REVIEW' } }];
     if (route.includes('/reviewSubmissions?')) return [{ id: 'submission', attributes: { state: 'READY_FOR_REVIEW' } }];
     assert.equal(route, 'reviewSubmissions/submission/items?include=appStoreVersion');
     return [{ relationships: { appStoreVersion: { data: { id: 'target' } } } }];
-  });
-  try {
-    await appleRelease({ state: { version: '0.1.1', builds: { ios: { ready: true, number: '170' } } }, save: async () => {} });
-    assert.equal(writes.length, 1);
-    assert.equal(writes[0].route, 'reviewSubmissions/submission');
-    assert.equal(writes[0].body.data.attributes.submitted, true);
-  } finally { api.mock.restore(); list.mock.restore(); }
+  };
+  await appleRelease({ state: { version: '0.1.1', builds: { ios: { ready: true, number: '170' } } }, save: async () => {} }, { api, list });
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].route, 'reviewSubmissions/submission');
+  assert.equal(writes[0].body.data.attributes.submitted, true);
 });
 
 test('partial Apple drafts inherit missing required metadata while preserving edits', async () => {

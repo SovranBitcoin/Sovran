@@ -21,6 +21,9 @@ export function useWalletMintListRequest(): () => void {
       hasPreferredMint: !!walletContext.preferredMintUrl,
     });
     clearPaymentContext('wallet.mint_selector');
-    void machine.requestMintSelector({ reset: true });
+    // `selected` marks the wallet's OWN picker: the one place a mint across the
+    // testnut split can be picked, because picking here moves the wallet to
+    // that mint's account. Without it the machine treats this as a flow picker.
+    void machine.requestMintSelector({ reset: true, scope: 'selected' });
   }, [machine, walletContext.preferredMintUrl, walletContext.trustedMintUrls.length]);
 }

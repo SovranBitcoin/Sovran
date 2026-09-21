@@ -53,7 +53,7 @@ const metrics = { likeCount: 0, repostCount: 3, replyCount: 0, satsZapped: 0 };
 it('hides zero counts and shows real ones', () => {
   const view = render(<MetricsFooter metrics={metrics} borderColor="black" />);
   expect(view.queryByText('0')).toBeNull();
-  expect(view.getByText('3')).toBeTruthy();
+  expect(view.getByText('3')).toBeOnTheScreen();
 });
 
 it('shows a dash for tallies no source could count, never a zero', () => {

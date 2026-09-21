@@ -10,6 +10,7 @@
  */
 
 import React from 'react';
+import { AppState } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { HistoryEntryTimeline } from '@/features/transactions/components/detail/timeline';
 import { buildTimelineScenarios } from '@/features/settings/screens/designSystemTimelineScenarios';
@@ -214,6 +215,7 @@ function pinFrame(root: JsonNode): {
 
 describe('timeline scenario pins (redesign acceptance surface)', () => {
   let consoleErrorSpy: jest.SpyInstance;
+  let appStateSpy: jest.SpyInstance;
 
   beforeAll(() => {
     jest.useFakeTimers();
@@ -229,10 +231,13 @@ describe('timeline scenario pins (redesign acceptance surface)', () => {
       if (String(args[0]).includes('react-test-renderer is deprecated')) return;
       throw new Error(`Unexpected console.error: ${args.map(String).join(' ')}`);
     });
+    // The expiry countdown subscribes to app activity; the stock mock returns no subscription.
+    appStateSpy = jest.spyOn(AppState, 'addEventListener').mockReturnValue({ remove: jest.fn() });
   });
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
+    appStateSpy.mockRestore();
     jest.clearAllMocks();
   });
 

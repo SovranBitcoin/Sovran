@@ -12,7 +12,14 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 
-const OPTIONS = ['Gradient', 'Identity', 'Sticky tabs', 'Tab fade'];
+const OPTIONS = ['Gradient', 'Identity', 'Sticky tabs', 'Tab fade'] as const;
+type HeaderVariant = (typeof OPTIONS)[number];
+const VARIANT_ID = {
+  Gradient: 'gradient',
+  Identity: 'identity',
+  'Sticky tabs': 'sticky-tabs',
+  'Tab fade': 'tab-fade',
+} as const satisfies Record<HeaderVariant, string>;
 const CURRENCIES = SWITCHABLE_UNITS.map((unit) => unit.toUpperCase());
 const RAILS = ['Unified', 'Lightning', 'Onchain', 'Cashu'];
 const EXAMPLES = [
@@ -25,7 +32,7 @@ const EXAMPLES = [
 ];
 
 export function SettingsDesignSystemHeadersScreen() {
-  const [variant, setVariant] = useState('Gradient');
+  const [variant, setVariant] = useState<HeaderVariant>('Gradient');
   const [rail, setRail] = useState('Unified');
   const [currency, setCurrency] = useState('SAT');
   const morph = useIdentityHeader({
@@ -45,24 +52,37 @@ export function SettingsDesignSystemHeadersScreen() {
         variant === 'Sticky tabs' ? 'opaque' : variant === 'Tab fade' ? 'gradient-tabs' : 'gradient'
       }
       stickyContent={
-        <View className="px-4 pb-2">
-          <UnderlineTabs tabs={OPTIONS} selectedTab={variant} handleTabPress={setVariant} />
-          {variant === 'Tab fade' ? (
-            <MintCurrencyTabs
-              currencies={CURRENCIES}
-              selectedCurrency={currency}
-              onCurrencyChange={setCurrency}
-              scrollY={morph.scrollY}
+        // The tabs already hold the row under the bar, so the identity band
+        // stacks above them here rather than overlaying them as it does on a
+        // real identity page.
+        <>
+          {morph.headerBand}
+          <View className="px-4 pb-2">
+            <UnderlineTabs
+              tabs={OPTIONS}
+              selectedTab={variant}
+              handleTabPress={(tab) => {
+                const next = OPTIONS.find((option) => option === tab);
+                if (next) setVariant(next);
+              }}
             />
-          ) : null}
-          {variant === 'Sticky tabs' ? (
-            <UnderlineTabs tabs={RAILS} selectedTab={rail} handleTabPress={setRail} />
-          ) : null}
-        </View>
+            {variant === 'Tab fade' ? (
+              <MintCurrencyTabs
+                currencies={CURRENCIES}
+                selectedCurrency={currency}
+                onCurrencyChange={setCurrency}
+                scrollY={morph.scrollY}
+              />
+            ) : null}
+            {variant === 'Sticky tabs' ? (
+              <UnderlineTabs tabs={RAILS} selectedTab={rail} handleTabPress={setRail} />
+            ) : null}
+          </View>
+        </>
       }>
       {morph.probe}
       <E2EAccessibilityProbe
-        testID={`header-example-${variant.toLowerCase().replace(' ', '-')}`}
+        testID={`header-example-${VARIANT_ID[variant]}`}
         accessibilityLabel={`Header example: ${variant}`}
         value={variant === 'Tab fade' ? currency : rail}
       />

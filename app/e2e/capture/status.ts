@@ -2,18 +2,22 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { z } from 'zod';
 import { appSourceFingerprint } from '../../../scripts/lib/app-source.mjs';
 import { createCapturePlan, ROOT } from './plan';
-import type { CaptureRecord } from './import';
+import { captureRecord } from './import';
+
+const libraryManifest = z.object({ captures: z.array(captureRecord) });
 
 export function screenshotStatus(root = ROOT) {
   const plan = createCapturePlan(['ios', 'android'], root);
   const library = join(root, 'press/screenshots');
   const manifest = join(library, 'manifest.json');
-  const captures: CaptureRecord[] = existsSync(manifest)
-    ? JSON.parse(readFileSync(manifest, 'utf8')).captures
-    : [];
-  if (!Array.isArray(captures)) throw new Error('Invalid capture manifest');
+  const parsed = existsSync(manifest)
+    ? libraryManifest.safeParse(JSON.parse(readFileSync(manifest, 'utf8')))
+    : undefined;
+  if (parsed && !parsed.success) throw new Error('Invalid capture manifest');
+  const captures = parsed?.data.captures ?? [];
   const fingerprint = appSourceFingerprint(root);
   const rows = plan.targets.map((target) => {
     const key = `${target.platform}/${target.page}${target.state === 'default' ? '' : `--${target.state}`}`;

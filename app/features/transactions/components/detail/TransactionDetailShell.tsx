@@ -3,7 +3,7 @@ import { StyleSheet, type ScrollView, type View as NativeView } from 'react-nati
 import { useReducedMotion } from 'react-native-reanimated';
 
 import { useIdentityHeader, type HeaderIdentity } from '@/shared/ui/composed/IdentityHeader';
-import { getCounterparty } from 'wallet';
+import { getCounterparty, transactionHeaderTitle } from 'wallet';
 
 import { useDeferredMount } from '@/shared/hooks/useDeferredMount';
 import { Screen, useScreenOptions } from '@/shared/ui/composed/Screen';
@@ -13,6 +13,10 @@ import { HistoryEntryHeader } from '@/features/transactions/components/detail/Hi
 import { HistoryEntryRefresh } from '@/features/transactions/components/detail/HistoryEntryRefresh';
 import { HistoryEntryTimeline } from '@/features/transactions/components/detail/timeline';
 import { TransactionProbe } from '@/features/transactions/components/detail/TransactionProbe';
+import {
+  transactionIdentitySnapshot,
+  useTransactionIdentity,
+} from '@/features/transactions/lib/transactionIdentity';
 import { CounterpartyTransactions } from '@/features/transactions/components/CounterpartyTransactions';
 import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
@@ -43,10 +47,20 @@ interface TransactionDetailShellProps {
   /** Footer (bottom buttons). */
   footer: React.ReactNode;
   /**
-   * Optional counterparty identity that hands off from the body avatar to the
-   * compact navigation title while scrolling.
+   * Counterparty identity that hands off from the body avatar to the compact
+   * navigation title while scrolling. Optional: when a screen supplies none,
+   * the shell derives one from the entry (`useTransactionIdentity`), so a
+   * zapped post, a Nut Drop or a processing send all morph without each screen
+   * repeating the lookup. A screen only passes this to say something the entry
+   * cannot — the melt preview's "Pay <name>".
    */
   headerIdentity?: HeaderIdentity;
+  /**
+   * Overrides the derived title. Leave it unset: the shell names the screen
+   * from the entry's rail and state (`transactionHeaderTitle`), so a settled
+   * payment reads "Sent Lightning" / "Paid Alex" instead of instructing the
+   * user to send something the wallet already sent.
+   */
   headerTitle?: string;
   /**
    * Screen-specific content rendered between the header and the status/refresh
@@ -102,16 +116,24 @@ export function TransactionDetailShell({
   showRecipientAvatar = false,
   footer,
   headerIdentity,
-  headerTitle = '',
+  headerTitle,
   beforeStatus,
   statusRow,
   timeline,
   children,
 }: TransactionDetailShellProps): React.ReactElement {
-  const morph = useIdentityHeader({ identity: headerIdentity, title: headerTitle, collapseAt: 48 });
+  const entryIdentity = useTransactionIdentity(entry);
+  const namedIdentity = headerIdentity ?? entryIdentity;
+  // One phrase names the screen and the person: the collapsed bar shows the
+  // icon and this title beneath it, so "Paid Alex" must not become "Alex" on
+  // the way into the header.
+  const title =
+    headerTitle ?? transactionHeaderTitle(entry, { counterpartyName: namedIdentity?.name });
+  const identity = namedIdentity ? { ...namedIdentity, name: title } : undefined;
+  const morph = useIdentityHeader({ identity, title, collapseAt: 48 });
   useScreenOptions(
-    () => (headerTitle ? { headerTitle: morph.headerTitle } : {}),
-    [headerTitle, headerIdentity?.name, headerIdentity?.picture, headerIdentity?.seed]
+    () => (title ? { headerTitle: morph.headerTitle } : {}),
+    [title, identity?.picture, identity?.seed]
   );
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollContentRef = useRef<NativeView>(null);
@@ -144,20 +166,25 @@ export function TransactionDetailShell({
   // Other transactions with the same nostr counterparty (Nut Drop / lightning-
   // address-to-nostr). Rendered before technical details as a mini relationship view.
   const counterpartyPubkey = entry ? getCounterparty(entry)?.pubkey : undefined;
+  // The scroll mode picks its container, so it must not flip once mounted: it
+  // follows the pubkey the entry carries (known synchronously), not the name
+  // the profile fetch resolves later.
+  const canMorph = !!headerIdentity || !!transactionIdentitySnapshot(entry);
   // Paint the known header/QR frame immediately; unrelated-history enrichment
   // keeps its previous deferred mount below the transaction timeline.
   return (
     <Screen
       name={screenName}
-      scroll={headerIdentity ? 'animated' : 'auto'}
+      scroll={canMorph ? 'animated' : 'auto'}
       scrollY={morph.scrollY}
+      headerBand={morph.headerBand}
       contentPadding={0}
       footer={footer}
       deferContent={false}
       scrollViewRef={scrollViewRef}
       scrollContentRef={scrollContentRef}
       onHeaderHeightChange={recordHeaderHeight}>
-      {headerIdentity ? morph.probe : null}
+      {identity ? morph.probe : null}
       <E2EToastProbe />
       <E2EActionMenuProbe />
       <View

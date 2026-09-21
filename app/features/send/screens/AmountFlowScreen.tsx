@@ -7,8 +7,9 @@ import { Screen } from '@/shared/ui/composed/Screen';
  * passes it to useScreenActions, and renders UI.
  */
 
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Stack } from 'expo-router';
+import { HeaderHeightContext } from 'expo-router/react-navigation';
 
 import { useExecutionState, useScreenActions, usePaymentFlowMachine } from 'wallet/react';
 import { fetchNip05Pubkey, type RecipientProfile } from 'wallet';
@@ -25,11 +26,12 @@ import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { paymentLog, useLifecycleLogger, Log } from '@/shared/lib/logger';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { useAmountDraftStore } from '@/shared/stores/runtime/amountDraftStore';
+import { zIndex } from '@/shared/styles/tokens';
 import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
 
 import { AmountSelectedMintProbe } from '../components/AmountSelectedMintProbe';
 
-import { RecipientHeader } from '../components/RecipientHeader';
+import { RecipientHeader, RecipientHeaderBand } from '../components/RecipientHeader';
 
 import { AmountSelector } from './AmountSelector';
 
@@ -54,6 +56,9 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
 
 export function AmountFlowContent({ amountEntry, headerMode = 'native' }: AmountFlowContentProps) {
   useLifecycleLogger(headerMode === 'native' ? 'AmountFlowScreen' : 'NearPayInlineAmountFlow');
+  // Read the context directly, like `Screen` does: this content also renders
+  // inline (Nut Drop) where no navigator header exists, and the hook throws there.
+  const headerHeight = useContext(HeaderHeightContext) ?? 0;
   const foreground = useThemeColor('foreground');
   const background = useThemeColor('surface');
 
@@ -237,6 +242,12 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
   }, [machine]);
 
   const emptyEntryStyle = useMemo(() => ({ flex: 1, backgroundColor: background }), [background]);
+  // The band hangs off the measured bar, and is raised over the amount body
+  // because this screen mounts it first.
+  const recipientBandStyle = useMemo(
+    () => ({ top: headerHeight, zIndex: zIndex.sticky }),
+    [headerHeight]
+  );
   const amountBodyStyle = useMemo(() => ({ flex: 1 }), []);
   const isSendOperation = entry?.destination !== 'mintQuote';
   const offlineIconStyle = useMemo(
@@ -315,6 +326,13 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
   return (
     <Log name="AmountFlowContent">
       {headerMode === 'native' ? <Stack.Screen options={stackOptions} /> : null}
+      {/* The name the bar gave up for a full-size picture. Mounted before the
+          body, so it is raised over it rather than painted under. */}
+      {headerMode === 'native' && recipientReady ? (
+        <View pointerEvents="none" className="absolute left-0 right-0" style={recipientBandStyle}>
+          <RecipientHeaderBand displayName={headerDisplayName!} />
+        </View>
+      ) : null}
       <View style={amountBodyStyle}>
         <E2EActionMenuProbe />
         {mintUrl ? <AmountSelectedMintProbe mintUrl={mintUrl} /> : null}

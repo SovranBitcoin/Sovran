@@ -19,6 +19,10 @@ jest.mock('@/shared/lib/popup/popups/actionMenu', () => ({
   actionMenuPopup: (...args: unknown[]) => mockActionMenuPopup(...args),
 }));
 
+jest.mock('@/shared/ui/capability', () => ({
+  useCapabilities: () => ({ liquidGlass: false, frostedSurface: false }),
+}));
+
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (tokens: string | readonly string[]) =>
     Array.isArray(tokens) ? tokens.map((token) => token) : tokens,

@@ -21,8 +21,8 @@ function counterRepository(delayed = false): CounterRepository & {
   const key = (mintUrl: string, keysetId: string) => `${mintUrl}\u0000${keysetId}`;
   const setCounter = jest.fn(async (mintUrl: string, keysetId: string, counter: number) => {
     if (delayed) {
-      const delay = counter === 5 ? 30 : counter === 10 ? 20 : 10;
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      const delayMs = counter === 5 ? 30 : counter === 10 ? 20 : 10;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
     rows.set(key(mintUrl, keysetId), { counter, keysetId, mintUrl });
   });

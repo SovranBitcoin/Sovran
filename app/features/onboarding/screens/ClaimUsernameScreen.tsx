@@ -355,7 +355,10 @@ async function claimNpcUsername(ctx: {
       return;
     }
     log.error('onboarding.claim.failed', { error: redactError(error) });
-    Alert.alert('Could not claim', error instanceof Error ? error.message : 'Unknown error');
+    Alert.alert(
+      'Could not claim',
+      'We couldn’t claim that username. Check your connection and try again.'
+    );
   } finally {
     setIsClaiming(false);
   }

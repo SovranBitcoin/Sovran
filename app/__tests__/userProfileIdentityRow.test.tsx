@@ -10,6 +10,7 @@ const mockForeground = '#ffffff';
 jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => mockForeground }));
 jest.mock('@/shared/hooks/useColorScheme', () => ({ useColorScheme: () => 'dark' }));
 jest.mock('@/shared/lib/version', () => ({ supportsBlur: () => false }));
+jest.mock('@/shared/ui/capability', () => ({}));
 jest.mock('@/shared/lib/contentShiftLog', () => ({
   useVisualLayoutLogger: () => ({ ref: jest.fn(), onLayout: jest.fn() }),
 }));

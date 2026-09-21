@@ -17,7 +17,7 @@ const PUB = 'a'.repeat(64);
 const ROOT = 'b'.repeat(64);
 const REPLY = 'c'.repeat(64);
 
-function page(id: string, createdAt: number, reply = false): facade.ResolvedFeedPage {
+function page(id: string, createdAtSec: number, reply = false): facade.ResolvedFeedPage {
   return {
     tier: 'relay',
     items: [
@@ -28,7 +28,7 @@ function page(id: string, createdAt: number, reply = false): facade.ResolvedFeed
           pubkey: PUB,
           kind: 1,
           content: 'post',
-          created_at: createdAt,
+          created_at: createdAtSec,
           tags: reply ? [['e', ROOT, '', 'reply']] : [],
         },
       },
@@ -37,7 +37,7 @@ function page(id: string, createdAt: number, reply = false): facade.ResolvedFeed
     profiles: {},
     quoted: {},
     missingIds: [],
-    cursor: { createdAt, id },
+    cursor: { createdAt: createdAtSec, id },
   };
 }
 

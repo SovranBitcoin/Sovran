@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
 
-import type { MintInfo } from '@cashu/cashu-ts';
+import type { GetInfoResponse } from '@cashu/cashu-ts';
 import type { MintHistoryEntry } from '@cashu/coco-core';
 import { getOnchainConfirmationProgress, isMintQuotePaymentObserved } from 'wallet';
 import type { DecoratedEntryFields } from 'wallet';
@@ -55,7 +55,7 @@ interface OnchainReceiveScreenProps {
   actions: Record<'copy' | 'share' | 'back', BoundAction>;
   source: string | null;
   mintUrl?: string;
-  mintInfo: MintInfo | null;
+  mintInfo: GetInfoResponse | null;
   extraButtons?: ButtonHandlerButton[];
   onRequestMintList?: () => void;
 }

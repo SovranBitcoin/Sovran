@@ -43,6 +43,7 @@ import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
 import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
 import { Button } from '@/shared/ui/primitives/Button';
 import { useMintDetailRead, type MintDetailGroupStatus } from '../hooks/useMintDetailRead';
+import type { MintAuditSummary } from '../lib/auditInfo';
 import {
   formatMintInfoNostrFallback,
   getMintInfoNostrDisplayName,
@@ -161,25 +162,13 @@ const UNKNOWN = '—';
 function StatsGrid({
   status,
   onRetry,
-  successRate,
-  auditScore,
-  avgTimeMs,
-  swapSuccess,
-  swapTotal,
-  totalMints,
-  totalMelts,
+  audit,
 }: {
   /** The audit group's read status; the block is ALWAYS mounted and swaps content in place. */
   status: MintDetailGroupStatus;
   onRetry: () => void;
-  successRate?: number;
-  /** Ops-based 0..5 score (discovery) — the headline when no swap rate was measured. */
-  auditScore?: number;
-  avgTimeMs?: number;
-  swapSuccess?: number;
-  swapTotal?: number;
-  totalMints?: number;
-  totalMelts?: number;
+  /** The same `selectMintAudit` reading the mint rows show, so the two agree. */
+  audit?: MintAuditSummary;
 }) {
   const [foreground, surfaceSecondary, surfaceTertiary] = useThemeColor([
     'foreground',
@@ -187,32 +176,25 @@ function StatsGrid({
     'surface-tertiary',
   ] as const);
 
-  // Swap-based rate when measured; else the ops-based score, labelled as such.
-  const opsRate =
-    successRate === undefined && auditScore !== undefined ? auditScore / 5 : undefined;
-  const rate = successRate ?? opsRate;
+  const { successRate, avgLatencyMs, mints, melts } = audit ?? {};
   const displayValues = {
-    successRate: rate !== undefined ? `${(rate * 100).toFixed(1)}%` : UNKNOWN,
-    avgTimeMs: avgTimeMs !== undefined ? `${Math.round(avgTimeMs)} ms` : UNKNOWN,
-    totalMints: totalMints !== undefined ? Math.round(totalMints).toString() : UNKNOWN,
-    totalMelts: totalMelts !== undefined ? Math.round(totalMelts).toString() : UNKNOWN,
+    successRate: successRate !== undefined ? `${(successRate * 100).toFixed(1)}%` : UNKNOWN,
+    avgTimeMs: avgLatencyMs !== undefined ? `${Math.round(avgLatencyMs)} ms` : UNKNOWN,
+    totalMints: mints !== undefined ? Math.round(mints).toString() : UNKNOWN,
+    totalMelts: melts !== undefined ? Math.round(melts).toString() : UNKNOWN,
   };
 
   const stats = [
     {
       label: 'Success rate',
-      description:
-        typeof swapSuccess === 'number' && typeof swapTotal === 'number'
-          ? `${swapSuccess} of ${swapTotal} swaps`
-          : opsRate !== undefined
-            ? 'Of mint and melt operations'
-            : 'Successful rate of swaps',
+      description: 'Of mint and melt operations',
       value: displayValues.successRate,
       accent: true,
     },
     {
       label: 'Average time',
-      description: 'For successful swaps',
+      // ucash reports its own probe latency; the retired audit API timed swaps.
+      description: audit?.source === 'ucash' ? 'Measured by the auditor' : 'For successful swaps',
       value: displayValues.avgTimeMs,
       accent: true,
     },
@@ -336,7 +318,12 @@ export function MintInfoScreen() {
   const mintUrl = (entry?.mintUrl as string) ?? '';
   const displayName = (entry?.displayName as string) ?? mintUrl;
   const morph = useIdentityHeader({
-    identity: { name: displayName, seed: mintUrl, picture: entry?.iconUrl as string | undefined },
+    identity: {
+      kind: 'mint',
+      name: displayName,
+      seed: mintUrl,
+      picture: entry?.iconUrl as string | undefined,
+    },
     title: entry?.fromAccepter ? 'Verify Mint' : 'Mint Details',
     collapseAt: 110,
   });
@@ -348,14 +335,11 @@ export function MintInfoScreen() {
   const detail = useMintDetailRead(mintUrl, entry);
   const kymScore =
     typeof entry?.kymScore === 'number' ? entry.kymScore : (cachedMeta?.averageScore ?? undefined);
-  // Audit scalars: the entry (bridge enrichment) first, else the cached
-  // projection — both come from the same store, this just paints on the first
-  // frame before the bridge's enrichment pass has merged.
-  const auditScore =
-    typeof entry?.auditScore === 'number' ? entry.auditScore : detail.meta.auditScore;
-  const successRate = entry?.successRate as number | undefined;
-  const ringProgress =
-    successRate ?? (typeof auditScore === 'number' ? auditScore / 5 : undefined) ?? 0.5;
+  // Audit comes from the metadata store alone, through the selector the mint
+  // rows use. The entry's audit fields are a snapshot of that store taken at
+  // navigation, so reading them here let the page lag behind its own row.
+  const audit = detail.meta.audit;
+  const ringProgress = audit?.successRate ?? 0.5;
   const identityError = detail.identityError;
   const contact = entry?.contact as
     { method: string; info: import('wallet').FormattedString }[] | undefined;
@@ -411,6 +395,7 @@ export function MintInfoScreen() {
       name="MintInfoScreen"
       scroll="animated"
       scrollY={morph.scrollY}
+      headerBand={morph.headerBand}
       bgColor={background}
       footer={
         <BottomButtons>
@@ -498,7 +483,7 @@ export function MintInfoScreen() {
                 picture={entry?.iconUrl as string | undefined}
                 name={displayName}
                 alt={`${displayName} icon`}
-                status={(entry?.auditState as string | undefined) ?? detail.meta.auditState}
+                status={audit?.state}
                 size={70}
                 isLoading={detail.identity === 'loading'}
               />
@@ -516,17 +501,7 @@ export function MintInfoScreen() {
             <RatingBarChart key={mintUrl} score={kymScore} />
           )}
 
-          <StatsGrid
-            status={detail.audit}
-            onRetry={detail.retry}
-            successRate={successRate}
-            auditScore={auditScore}
-            avgTimeMs={entry?.avgTimeMs as number | undefined}
-            swapSuccess={entry?.swapSuccess as number | undefined}
-            swapTotal={entry?.swapTotal as number | undefined}
-            totalMints={(entry?.totalMints as number | undefined) ?? detail.meta.auditMints}
-            totalMelts={(entry?.totalMelts as number | undefined) ?? detail.meta.auditMelts}
-          />
+          <StatsGrid status={detail.audit} onRetry={detail.retry} audit={audit} />
         </VStack>
 
         {identityError && (

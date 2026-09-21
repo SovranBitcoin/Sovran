@@ -53,7 +53,7 @@ describe('useNip17RecentContacts read state', () => {
       {
         counterparty: PEER,
         lastMessagePreview: '',
-        lastMessageAt: 500,
+        lastMessageAtSec: 500,
         protocol: 'nip17',
         newestMessageId: '',
         previewPending: true,

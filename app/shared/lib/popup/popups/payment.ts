@@ -52,7 +52,7 @@ export function paymentStatusPopup(payload: {
         ...(operationId !== undefined && { operationId }),
         ...(receiveEntryId !== undefined && { receiveEntryId }),
       }),
-    duration: 'persistent',
+    durationMs: 'persistent',
     debugLabel: `payment-status:${variant}`,
     debugFields,
     onHide: () => {
@@ -96,7 +96,7 @@ export function swapStatusPopup(): void {
   popupLog.info('popup.swap_status.show');
   showCustomToast({
     component: (toastProps) => React.createElement(SwapStatusToast, toastProps),
-    duration: 'persistent',
+    durationMs: 'persistent',
     onHide: () => {
       swapToastMounted = false;
       const cur = useSwapStatusStore.getState().active;

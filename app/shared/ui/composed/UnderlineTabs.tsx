@@ -86,14 +86,14 @@ export function UnderlineTabs({
       title: 'More',
       buttons: overflow.map((tab) => ({
         text: tab,
-        testID: `underline-tabs-menu-${tab}`,
+        testID: `${testIDFor(tab)}-menu`,
         selected: tab === selectedTab,
         suffix:
           tab === selectedTab ? <Icon name="mdi:check" size={20} color={success} /> : undefined,
         onPress: () => handleTabPress(tab, tabs.indexOf(tab)),
       })),
     });
-  }, [overflow, selectedTab, selectedInOverflow, handleTabPress, tabs, success]);
+  }, [overflow, selectedTab, selectedInOverflow, handleTabPress, tabs, success, testIDFor]);
 
   return (
     <Log name="UnderlineTabs">

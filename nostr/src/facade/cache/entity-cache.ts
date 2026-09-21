@@ -76,7 +76,7 @@ export type CachedProfileStats = {
   followersCount?: number;
   followingCount?: number;
   noteCount?: number;
-  joinedAt?: number;
+  joinedAtSec?: number;
 };
 
 const DEFAULT_LIMITS = {

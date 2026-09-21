@@ -77,7 +77,6 @@ import { resolveIdentityName } from '@/shared/lib/identity';
 import { nostrLog } from '@/shared/lib/logger';
 import { popup, type ActionSheetPayloads } from '@/shared/lib/popup';
 import type { CustomSheetSharedProps } from '@/shared/lib/popup/sheets/types';
-import { truncateMiddle } from '@/shared/lib/strings';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useProfileStore, type ProfileEntry } from '@/shared/stores/global/profileStore';
 import { isCustomSheetPayload, usePopupStore } from '@/shared/stores/runtime/popupStore';
@@ -156,9 +155,11 @@ function connectedToastCopy(appName: string): { label: string; description: stri
 
 /** "5 saved permissions · 2 decrypt contacts" (decrypt segment omitted at 0). */
 function reconnectCountsLine(grantCount: number, decryptContactCount: number): string {
-  const grants = `${grantCount} saved permission${grantCount === 1 ? '' : 's'}`;
+  const grants = grantCount === 1 ? '1 saved permission' : `${grantCount} saved permissions`;
   if (decryptContactCount === 0) return grants;
-  return `${grants} · ${decryptContactCount} decrypt contact${decryptContactCount === 1 ? '' : 's'}`;
+  const contacts =
+    decryptContactCount === 1 ? '1 decrypt contact' : `${decryptContactCount} decrypt contacts`;
+  return `${grants} · ${contacts}`;
 }
 
 function blockedNoticeSegments(appName: string): CopySegment[] {
@@ -184,11 +185,8 @@ const safeNpubEncode = Result.fromThrowable(
   () => 'invalid_pubkey' as const
 );
 
-const NPUB_TRUNCATE_CHARS = 12;
-
-function truncatedNpubFor(pubkeyHex: string): string {
-  const npub = safeNpubEncode(pubkeyHex).unwrapOr(pubkeyHex);
-  return truncateMiddle(npub, NPUB_TRUNCATE_CHARS);
+function npubFor(pubkeyHex: string): string {
+  return safeNpubEncode(pubkeyHex).unwrapOr(pubkeyHex);
 }
 
 /**
@@ -700,11 +698,7 @@ function ConnectReview({
     overrideName: activeProfile?.cachedDisplayName,
   });
   const profileNpub =
-    keys !== null
-      ? truncateMiddle(keys.npub, NPUB_TRUNCATE_CHARS)
-      : activeProfile !== undefined
-        ? truncatedNpubFor(activeProfile.pubkey)
-        : '';
+    keys !== null ? keys.npub : activeProfile !== undefined ? npubFor(activeProfile.pubkey) : '';
 
   const hasStrippedRows = permRows.some((row) => !row.eligible);
   const primaryLabel = isConnecting
@@ -783,7 +777,7 @@ function ConnectReview({
               {profileDisplayName}
             </Text>
             {profileNpub.length > 0 ? (
-              <Text size={12} color={muted} numberOfLines={1}>
+              <Text size={12} color={muted} numberOfLines={1} ellipsizeMode="middle">
                 {profileNpub}
               </Text>
             ) : null}
@@ -1120,8 +1114,8 @@ export function SignerProfilePickerContent({
                   <Text size={15} bold color={foreground} numberOfLines={1}>
                     {displayName}
                   </Text>
-                  <Text size={12} color={muted} numberOfLines={1}>
-                    {truncatedNpubFor(profile.pubkey)}
+                  <Text size={12} color={muted} numberOfLines={1} ellipsizeMode="middle">
+                    {npubFor(profile.pubkey)}
                   </Text>
                 </VStack>
                 {isSelected ? <Icon name="mdi:check-circle" size={20} color={foreground} /> : null}

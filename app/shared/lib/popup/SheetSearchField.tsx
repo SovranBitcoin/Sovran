@@ -46,6 +46,7 @@ export function SheetSearchField({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder ?? 'Search...'}
+        accessibilityLabel={placeholder ?? 'Search'}
         placeholderTextColor={placeholderColor}
         autoCorrect={false}
         autoCapitalize="none"
@@ -62,6 +63,8 @@ export function SheetSearchField({
       {value.length > 0 ? (
         <Pressable
           testID={clearTestID}
+          accessibilityRole="button"
+          accessibilityLabel="Clear search"
           onPress={onClear}
           hitSlop={8}
           style={{ position: 'absolute', right: 10, padding: 4 }}>

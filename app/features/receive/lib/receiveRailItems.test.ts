@@ -45,21 +45,21 @@ describe('receiveRailItems classification', () => {
   });
 
   describe('isExpiryElapsed (mirrors coco isExpiredMintQuoteSnapshot)', () => {
-    const now = 1_783_520_800; // fixed "now" in seconds
+    const nowSeconds = 1_783_520_800;
 
     it('treats expiry 0 as expired — coco reads 0 <= now, so bolt12 offers (expiry 0) are never watched', () => {
-      expect(isExpiryElapsed(0, now)).toBe(true);
+      expect(isExpiryElapsed(0, nowSeconds)).toBe(true);
     });
 
     it('treats null / undefined expiry as never-expiring', () => {
-      expect(isExpiryElapsed(null, now)).toBe(false);
-      expect(isExpiryElapsed(undefined, now)).toBe(false);
+      expect(isExpiryElapsed(null, nowSeconds)).toBe(false);
+      expect(isExpiryElapsed(undefined, nowSeconds)).toBe(false);
     });
 
     it('marks a past absolute expiry as elapsed and a future one as live', () => {
-      expect(isExpiryElapsed(now - 1, now)).toBe(true);
-      expect(isExpiryElapsed(now, now)).toBe(true);
-      expect(isExpiryElapsed(now + 1, now)).toBe(false);
+      expect(isExpiryElapsed(nowSeconds - 1, nowSeconds)).toBe(true);
+      expect(isExpiryElapsed(nowSeconds, nowSeconds)).toBe(true);
+      expect(isExpiryElapsed(nowSeconds + 1, nowSeconds)).toBe(false);
     });
   });
 

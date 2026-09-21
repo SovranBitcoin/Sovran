@@ -4,5 +4,5 @@
 package expo.modules.bitchat
 
 object BitchatVendorVersion {
-    const val commit = "4dfec91"
+    const val commit = "4dfec917"
 }

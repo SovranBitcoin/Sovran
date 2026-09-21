@@ -322,9 +322,7 @@ export interface ProofStateTally {
 
 export async function restoreKeysetForMint(
   manager: Manager,
-  mintUrl: string,
-  keysetId: string,
-  unit: string,
+  { mintUrl, keysetId, unit }: { mintUrl: string; keysetId: string; unit: string },
   /**
    * Accumulated into, NOT returned.
    *

@@ -23,5 +23,6 @@ const RELAY_BRANDS: Record<string, RelayBrand> = {
 
 export function relayBrandForSoftware(software: string | undefined): RelayBrand | undefined {
   if (!software) return undefined;
-  return RELAY_BRANDS[software.trim().replace(/\/+$/, '').toLowerCase()];
+  const key = software.trim().replace(/\/+$/, '').toLowerCase();
+  return Object.hasOwn(RELAY_BRANDS, key) ? RELAY_BRANDS[key] : undefined;
 }

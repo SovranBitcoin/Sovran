@@ -25,7 +25,7 @@ const A = hex('authorA');
 const B = hex('authorB');
 const E = hex('authorE'); // discovered one hop out
 
-function reaction(reactor: string, target: string, eventId: string, createdAt = 1000): RawRelayEvent {
+function reaction(reactor: string, target: string, eventId: string, createdAtSec = 1000): RawRelayEvent {
   return {
     id: uid(),
     pubkey: reactor,
@@ -35,12 +35,12 @@ function reaction(reactor: string, target: string, eventId: string, createdAt = 
       ['e', eventId],
       ['p', target],
     ],
-    created_at: createdAt,
+    created_at: createdAtSec,
   };
 }
 
-function note(author: string, n: number, createdAt = 2000): RawRelayEvent {
-  return { id: uid(), pubkey: author, kind: 1, content: 'gm ' + n, tags: [], created_at: createdAt };
+function note(author: string, n: number, createdAtSec = 2000): RawRelayEvent {
+  return { id: uid(), pubkey: author, kind: 1, content: 'gm ' + n, tags: [], created_at: createdAtSec };
 }
 
 function profile(author: string, name: string): RawRelayEvent {
@@ -132,7 +132,7 @@ describe('tallyLikedAuthors', () => {
     expect(out.map((c) => c.pubkey)).toEqual([A, B]); // A (2) ranks above B (1)
     expect(out[0].score).toBe(2);
     expect(out[0].likeCount).toBe(2);
-    expect(out[0].latestLikeAt).toBe(20);
+    expect(out[0].latestLikeAtSec).toBe(20);
     expect(out.some((c) => c.pubkey === V)).toBe(false);
   });
 
@@ -169,7 +169,7 @@ describe('mergeCandidates', () => {
     score,
     likeCount: score,
     likedBy: [],
-    latestLikeAt: 0,
+    latestLikeAtSec: 0,
     source,
   });
 
@@ -196,8 +196,8 @@ describe('mergeCandidates', () => {
 describe('rankNotes', () => {
   test('ranks by affinity then recency, enforcing the per-author cap', () => {
     const candidates: CandidateAuthor[] = [
-      { pubkey: A, score: 10, likeCount: 10, likedBy: [], latestLikeAt: 0, source: 'viewer' },
-      { pubkey: B, score: 1, likeCount: 1, likedBy: [], latestLikeAt: 0, source: 'viewer' },
+      { pubkey: A, score: 10, likeCount: 10, likedBy: [], latestLikeAtSec: 0, source: 'viewer' },
+      { pubkey: B, score: 1, likeCount: 1, likedBy: [], latestLikeAtSec: 0, source: 'viewer' },
     ];
     const notes = [
       asFeedEvent(note(B, 1, 9000)), // high recency but low author affinity
@@ -215,7 +215,7 @@ describe('rankNotes', () => {
     const n = asFeedEvent(note(A, 1));
     const { rankedIds } = rankNotes({
       notes: [n, n],
-      candidates: [{ pubkey: A, score: 1, likeCount: 1, likedBy: [], latestLikeAt: 0, source: 'viewer' }],
+      candidates: [{ pubkey: A, score: 1, likeCount: 1, likedBy: [], latestLikeAtSec: 0, source: 'viewer' }],
       perAuthorCap: 5,
     });
     expect(rankedIds).toHaveLength(1);

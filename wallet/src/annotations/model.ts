@@ -66,11 +66,19 @@ export const ANNOTATION_KEYS = {
 /** The flat, persisted/merged form. coco-metadata-compatible. */
 export type AnnotationRecord = Record<string, string>;
 
-export type CounterpartyDirection = "sender" | "recipient";
-export type ScanMethod = "qr" | "nfc" | "paste" | "deeplink" | "ble";
-export type LockDirection = "incoming" | "outgoing";
-export type DistributionSource = "copy" | "share" | "airdrop" | "displayed";
-export type SwapRole = "mint" | "melt";
+// Literal sets double as the decode allowlist, so a new member is accepted on
+// read as soon as it is added here.
+const COUNTERPARTY_DIRECTIONS = ["sender", "recipient"] as const;
+const SCAN_METHODS = ["qr", "nfc", "paste", "deeplink", "ble"] as const;
+const LOCK_DIRECTIONS = ["incoming", "outgoing"] as const;
+const DISTRIBUTION_SOURCES = ["copy", "share", "airdrop", "displayed"] as const;
+const SWAP_ROLES = ["mint", "melt"] as const;
+
+export type CounterpartyDirection = (typeof COUNTERPARTY_DIRECTIONS)[number];
+export type ScanMethod = (typeof SCAN_METHODS)[number];
+export type LockDirection = (typeof LOCK_DIRECTIONS)[number];
+export type DistributionSource = (typeof DISTRIBUTION_SOURCES)[number];
+export type SwapRole = (typeof SWAP_ROLES)[number];
 /** Which side of a NUT-18 payment request this transaction was. */
 export type PaymentRequestRole = "payer" | "payee";
 /** How the token travelled (`http` = POST transport on the send side; coco's
@@ -409,6 +417,14 @@ function parseFiniteNumber(value: string | undefined): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+/** A persisted value outside its literal set decodes as absent. */
+function oneOf<T extends string>(
+  value: string | undefined,
+  allowed: readonly T[],
+): T | undefined {
+  return allowed.find((candidate) => candidate === value);
+}
+
 /**
  * Decode a flat record into the rich shape. A sub-object is only present when at
  * least one of its fields decoded, so callers can null-check `annotation.scan`
@@ -423,27 +439,28 @@ export function decodeAnnotation(
   const displayName = record[ANNOTATION_KEYS.counterpartyDisplayName];
   const avatarUrl = record[ANNOTATION_KEYS.counterpartyAvatarUrl];
   const nip05 = record[ANNOTATION_KEYS.counterpartyNip05];
-  const cpDirection = record[ANNOTATION_KEYS.counterpartyDirection];
+  const cpDirection = oneOf(
+    record[ANNOTATION_KEYS.counterpartyDirection],
+    COUNTERPARTY_DIRECTIONS,
+  );
   if (pubkey || displayName || avatarUrl || nip05 || cpDirection) {
     annotation.counterparty = {
       ...(pubkey ? { pubkey } : {}),
       ...(displayName ? { displayName } : {}),
       ...(avatarUrl ? { avatarUrl } : {}),
       ...(nip05 ? { nip05 } : {}),
-      ...(cpDirection
-        ? { direction: cpDirection as CounterpartyDirection }
-        : {}),
+      ...(cpDirection ? { direction: cpDirection } : {}),
     };
   }
 
-  const scanMethod = record[ANNOTATION_KEYS.scanMethod];
+  const scanMethod = oneOf(record[ANNOTATION_KEYS.scanMethod], SCAN_METHODS);
   const scanRaw = record[ANNOTATION_KEYS.scanRaw];
   const scanContainer = record[ANNOTATION_KEYS.scanContainer];
   const optionKinds = parseStringArray(record[ANNOTATION_KEYS.scanOptionKinds]);
   const scanInputType = record[ANNOTATION_KEYS.scanInputType];
   if (scanMethod || scanRaw || scanContainer || optionKinds || scanInputType) {
     annotation.scan = {
-      ...(scanMethod ? { method: scanMethod as ScanMethod } : {}),
+      ...(scanMethod ? { method: scanMethod } : {}),
       ...(scanRaw ? { raw: scanRaw } : {}),
       ...(scanContainer ? { container: scanContainer } : {}),
       ...(optionKinds ? { optionKinds } : {}),
@@ -453,20 +470,24 @@ export function decodeAnnotation(
 
   const lockType = record[ANNOTATION_KEYS.lockType];
   const lockPubkey = record[ANNOTATION_KEYS.lockPubkey];
-  const lockDirection = record[ANNOTATION_KEYS.lockDirection];
+  const lockDirection = oneOf(
+    record[ANNOTATION_KEYS.lockDirection],
+    LOCK_DIRECTIONS,
+  );
   if (lockType || lockPubkey || lockDirection) {
     annotation.lock = {
       ...(lockType === "p2pk" ? { type: "p2pk" as const } : {}),
       ...(lockPubkey ? { pubkey: lockPubkey } : {}),
-      ...(lockDirection ? { direction: lockDirection as LockDirection } : {}),
+      ...(lockDirection ? { direction: lockDirection } : {}),
     };
   }
 
-  const distributionSource = record[ANNOTATION_KEYS.distributionSource];
+  const distributionSource = oneOf(
+    record[ANNOTATION_KEYS.distributionSource],
+    DISTRIBUTION_SOURCES,
+  );
   if (distributionSource) {
-    annotation.distribution = {
-      source: distributionSource as DistributionSource,
-    };
+    annotation.distribution = { source: distributionSource };
   }
 
   const lat = parseFiniteNumber(record[ANNOTATION_KEYS.geoLat]);
@@ -476,13 +497,13 @@ export function decodeAnnotation(
   }
 
   const swapGroupId = record[ANNOTATION_KEYS.swapGroupId];
-  const swapRole = record[ANNOTATION_KEYS.swapRole];
+  const swapRole = oneOf(record[ANNOTATION_KEYS.swapRole], SWAP_ROLES);
   const swapChainId = record[ANNOTATION_KEYS.swapChainId];
   const swapHopIndex = parseFiniteNumber(record[ANNOTATION_KEYS.swapHopIndex]);
   if (swapGroupId || swapRole || swapChainId || swapHopIndex != null) {
     annotation.swap = {
       ...(swapGroupId ? { groupId: swapGroupId } : {}),
-      ...(swapRole ? { role: swapRole as SwapRole } : {}),
+      ...(swapRole ? { role: swapRole } : {}),
       ...(swapChainId ? { chainId: swapChainId } : {}),
       ...(swapHopIndex != null ? { hopIndex: swapHopIndex } : {}),
     };

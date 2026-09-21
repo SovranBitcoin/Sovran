@@ -4,6 +4,7 @@
 
 import type { ActionAvailability, ScreenActionName, ScreenType } from "./types";
 import {
+  accountMintUrls,
   evaluateMintMethodAmountAvailability,
   isMethodImplemented,
   methodContextHasSupportingMint,
@@ -11,12 +12,57 @@ import {
 } from "../mint-capabilities";
 import { logger } from "../logger";
 import { meltMethodForTarget } from "../melt-target";
-import type { AmountEntryMethodContext, MintMethodRequirement } from "../types";
+import type {
+  AmountEntryMethodContext,
+  MintMethodCapabilityMap,
+  MintMethodRequirement,
+} from "../types";
 
 type AvailabilityMap<S extends ScreenType> = Record<
   ScreenActionName[S],
   ActionAvailability
 >;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+// Per-mint capability leaves are read with optional chaining, so the map is
+// checked one level deep.
+const isCapabilityMap = (value: unknown): value is MintMethodCapabilityMap =>
+  isRecord(value) && Object.values(value).every(isRecord);
+
+const isBalanceMap = (value: unknown): value is Record<string, number> =>
+  isRecord(value) &&
+  Object.values(value).every((balance) => typeof balance === "number");
+
+/** The entry's method context, or undefined when it is absent or malformed. */
+function readMethodContext(
+  entry: Record<string, unknown>,
+): AmountEntryMethodContext | undefined {
+  const ctx = entry.methodContext;
+  if (!isRecord(ctx)) return undefined;
+  const {
+    trustedMintUrls,
+    mintBalances,
+    preferredMintUrl,
+    mintMethodCapabilities,
+  } = ctx;
+  if (
+    !Array.isArray(trustedMintUrls) ||
+    !trustedMintUrls.every((url): url is string => typeof url === "string") ||
+    !isBalanceMap(mintBalances)
+  ) {
+    return undefined;
+  }
+  return {
+    trustedMintUrls,
+    mintBalances,
+    ...(typeof preferredMintUrl === "string" ? { preferredMintUrl } : {}),
+    ...(isCapabilityMap(mintMethodCapabilities)
+      ? { mintMethodCapabilities }
+      : {}),
+  };
+}
 
 function getSelectedMintUrl(
   entry: Record<string, unknown>,
@@ -125,6 +171,32 @@ function methodAmountReason(
     fallback,
   });
   return boundsMessage ?? fallback;
+}
+
+/**
+ * Each trusted mint's verdict for one rail, for the per-method availability
+ * log. Keyed by mint with one short string each, the mints that enable the
+ * method first and the ones that merely lack it last: the app logger keeps
+ * only the first few items of an array and the first keys of an object.
+ */
+function describeMints(availability: MintMethodAmountAvailability | null) {
+  if (!availability) return null;
+  const rank = (candidate: MintMethodAmountAvailability["candidates"][number]) =>
+    candidate.status !== "disabled"
+      ? 0
+      : candidate.reason?.code === "MINT_METHOD_UNSUPPORTED"
+        ? 2
+        : 1;
+  return Object.fromEntries(
+    [...availability.candidates]
+      .sort((a, b) => rank(a) - rank(b))
+      .map((candidate) => [
+        candidate.mintUrl,
+        candidate.status !== "disabled"
+          ? `ENABLES IT (balance ${candidate.balance})`
+          : `${candidate.reason?.code ?? "DISABLED"}: ${candidate.reason?.message ?? ""} (balance ${candidate.balance})`,
+      ]),
+  );
 }
 
 function summarizeAvailabilityMap(
@@ -276,8 +348,9 @@ function meltQuoteAvailability(
 function paymentRequestAvailability(
   entry: Record<string, unknown>,
 ): AvailabilityMap<"paymentRequest"> {
-  const metadata = entry.metadata as Record<string, unknown> | undefined;
-  const phase = metadata?.phase as string | undefined;
+  const metadata = isRecord(entry.metadata) ? entry.metadata : undefined;
+  const phase =
+    typeof metadata?.phase === "string" ? metadata.phase : undefined;
   const hasOperationId = !!(entry.operationId || metadata?.operationId);
   const isPreview = (phase === "preview" || !phase) && !hasOperationId;
   const isDelivered = phase === "delivered" || hasOperationId;
@@ -344,9 +417,7 @@ function amountEntryAvailability(
   // effectiveSatAmount — early-returns.
   const nextCanFire = effectiveAmount >= 1 && Number.isFinite(effectiveAmount);
   const unit = typeof entry.unit === "string" ? entry.unit : "sat";
-  const methodContext = entry.methodContext as
-    | AmountEntryMethodContext
-    | undefined;
+  const methodContext = readMethodContext(entry);
   const selectedMintUrl = getSelectedMintUrl(entry);
 
   // Whether the entered amount outstrips the spendable balance. A single
@@ -445,13 +516,16 @@ function amountEntryAvailability(
   let ecashDescription: string | undefined;
   let ecashReason: string | undefined;
   let ecashLabel = "as Ecash";
+  const hasAccountMint =
+    methodContext != null && accountMintUrls(methodContext).length > 0;
   if (isMintQuote) {
     // Receive "as Ecash" = a single-use NUT-18 payment request. Mints never
-    // advertise NUT-18 (wallet-to-wallet), so any trusted mint qualifies.
-    const hasTrustedMint = (methodContext?.trustedMintUrls.length ?? 0) > 0;
-    ecashAvailable = nextCanFire && hasTrustedMint;
+    // advertise NUT-18 (wallet-to-wallet), so any of the ACCOUNT's mints
+    // qualifies — never one across the testnut split, whose ecash would land
+    // in the other account under the same real unit.
+    ecashAvailable = nextCanFire && hasAccountMint;
     ecashDescription = "Request as a Cashu payment request";
-    if (!hasTrustedMint) ecashReason = "No trusted mints";
+    if (!hasAccountMint) ecashReason = "No trusted mints";
   } else if (isMeltQuote) {
     ecashReason = meltTargetIsOnchain
       ? "Onchain destination"
@@ -634,6 +708,118 @@ function amountEntryAvailability(
       (availability) =>
         availability?.amountBoundsReason?.code === "AMOUNT_BELOW_MINT_MIN",
     );
+  // One line per Next-menu method carrying every input to its verdict, so an
+  // enabled or disabled row can be explained from the log alone. `rule` is the
+  // expression that decided `available` in this flow; `conditions` are its
+  // operands; `mints` is each trusted mint's verdict for the rail behind it.
+  // The method id is part of the event name because the app logger drops a
+  // repeat of the same event name inside its dedup window.
+  const flow = isMintQuote
+    ? "mintQuote"
+    : isMeltQuote
+      ? "meltQuote"
+      : isPaymentRequest
+        ? "paymentRequest"
+        : isSendEcash
+          ? "sendEcash"
+          : "unknown";
+  const sharedConditions = {
+    effectiveAmount,
+    unit,
+    nextCanFire,
+    methodContextPresent: methodContext != null,
+    trustedMintCount: methodContext?.trustedMintUrls.length ?? null,
+    selectedMintUrl: selectedMintUrl ?? null,
+    hasMeltTarget,
+    meltTargetMethod,
+  };
+  logger.info("screenActions.availability.amountEntry.method.ecash", {
+    id: "ecash",
+    flow,
+    shown: true,
+    available: ecashAvailable,
+    reason: ecashReason ?? null,
+    rule: isMintQuote
+      ? "nextCanFire && hasAccountMint"
+      : isPaymentRequest || isSendEcash
+        ? "nextCanFire"
+        : isMeltQuote
+          ? "never: a melt target is paid over its own rail, not as ecash"
+          : "never: unknown destination",
+    conditions: { ...sharedConditions, hasAccountMint },
+    mints: null,
+  });
+  const lightningUsesReceiveRail = isMintQuote;
+  const lightningUsesSendRail =
+    (isMeltQuote && !meltTargetIsOnchain) || (isSendEcash && hasMeltTarget);
+  logger.info("screenActions.availability.amountEntry.method.lightning", {
+    id: "lightning",
+    flow,
+    shown: true,
+    available: lightningAvailable,
+    reason: lightningReason ?? null,
+    rule: lightningUsesReceiveRail
+      ? "nextCanFire && receiveLightningCompatible"
+      : lightningUsesSendRail
+        ? "nextCanFire && sendLightningCompatible"
+        : isMeltQuote
+          ? "never: the melt target is a bitcoin address"
+          : isPaymentRequest
+            ? "never: payment requests are ecash only"
+            : isSendEcash
+              ? "never: no Lightning target on this send"
+              : "never: unknown destination",
+    conditions: {
+      ...sharedConditions,
+      // With no method context the Lightning rails assume a compatible mint.
+      receiveLightningCompatible,
+      sendLightningCompatible,
+      sendRequiresBalance: true,
+      amountBoundsReasonCode:
+        (lightningUsesReceiveRail
+          ? receiveLightningAvailability
+          : sendLightningAvailability
+        )?.amountBoundsReason?.code ?? null,
+    },
+    mints: lightningUsesReceiveRail
+      ? describeMints(receiveLightningAvailability)
+      : lightningUsesSendRail
+        ? describeMints(sendLightningAvailability)
+        : null,
+  });
+  logger.info("screenActions.availability.amountEntry.method.onchain", {
+    id: "onchain",
+    flow,
+    shown: showOnchainReceive || showOnchainSend,
+    available: onchainAvailable,
+    reason: onchainReason ?? null,
+    rule: showOnchainReceive
+      ? "nextCanFire && receiveOnchainCompatible"
+      : showOnchainSend
+        ? "nextCanFire && sendOnchainSupported && sendOnchainCompatible"
+        : isMintQuote
+          ? "hidden: shown on receive only when receiveOnchainImplemented && receiveOnchainSupported"
+          : "hidden: shown on send only when the melt target is a bitcoin address",
+    conditions: {
+      ...sharedConditions,
+      receiveOnchainImplemented,
+      receiveOnchainSupported,
+      // With no method context onchain receive assumes NO compatible mint.
+      receiveOnchainCompatible,
+      meltTargetIsOnchain,
+      sendOnchainSupported,
+      sendOnchainCompatible,
+      sendRequiresBalance: true,
+      amountBoundsReasonCode:
+        (showOnchainSend ? sendOnchainAvailability : receiveOnchainAvailability)
+          ?.amountBoundsReason?.code ?? null,
+    },
+    mints: showOnchainSend
+      ? describeMints(sendOnchainAvailability)
+      : isMintQuote
+        ? describeMints(receiveOnchainAvailability)
+        : null,
+  });
   logger.info("screenActions.availability.amountEntry.result", {
     destination: destination ?? null,
     effectiveAmount,
@@ -722,10 +908,8 @@ function receiveHubAvailability(
     entry.type === "receive" &&
     typeof entry.id === "string" &&
     entry.id === "receive-hub";
-  const unit = entry.unit as string | undefined;
-  const methodContext = entry.methodContext as
-    | AmountEntryMethodContext
-    | undefined;
+  const unit = typeof entry.unit === "string" ? entry.unit : undefined;
+  const methodContext = readMethodContext(entry);
   const canReceiveLightning = methodContextHasSupportingMint(methodContext, {
     operation: "mint",
     method: "bolt11",
@@ -761,11 +945,9 @@ function receiveAvailability(
     entry.type === "receive" &&
     typeof entry.id === "string" &&
     entry.id === "receive-hub";
-  const unit = entry.unit as string | undefined;
+  const unit = typeof entry.unit === "string" ? entry.unit : undefined;
   const hubLoaded = isReceiveHub;
-  const methodContext = entry.methodContext as
-    | AmountEntryMethodContext
-    | undefined;
+  const methodContext = readMethodContext(entry);
   // The receive-rail pickers open whenever ANY trusted mint could serve the
   // rail — mirroring the rail tab's own visibility gate.
   const canReceiveBolt12 = methodContextHasSupportingMint(methodContext, {

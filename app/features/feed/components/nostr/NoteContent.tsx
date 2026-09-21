@@ -259,8 +259,9 @@ const LightningBlock = React.memo(function LightningBlock({ meltTarget }: { melt
             <Text
               size={11}
               numberOfLines={1}
+              ellipsizeMode="middle"
               style={{ color: withAlpha(foreground, postInk.tertiary) }}>
-              {meltTarget.slice(0, 30)}…
+              {meltTarget}
             </Text>
           </VStack>
         </HStack>
@@ -269,15 +270,17 @@ const LightningBlock = React.memo(function LightningBlock({ meltTarget }: { melt
   }
 
   const subtitle =
-    decoded.amountSat !== null
-      ? `${decoded.amountSat.toLocaleString()} sats`
-      : `${meltTarget.slice(0, 30)}…`;
+    decoded.amountSat !== null ? `${decoded.amountSat.toLocaleString()} sats` : meltTarget;
 
   return (
     <Pressable
       testID={`note-lightning-invoice-${decoded.paymentHash ?? meltTarget}`}
       accessibilityRole="button"
-      accessibilityLabel={`Pay Lightning invoice, ${subtitle}`}
+      accessibilityLabel={
+        decoded.amountSat !== null
+          ? `Pay Lightning invoice, ${subtitle}`
+          : 'Pay Lightning invoice, amount not specified'
+      }
       onPress={() => {
         clearPaymentContext('feed.lightning_invoice');
         void machine.execute(meltTarget, { reset: true });
@@ -292,6 +295,7 @@ const LightningBlock = React.memo(function LightningBlock({ meltTarget }: { melt
           <Text
             size={11}
             numberOfLines={1}
+            ellipsizeMode="middle"
             style={{ color: withAlpha(foreground, postInk.tertiary) }}>
             {subtitle}
           </Text>
@@ -778,7 +782,9 @@ export const NoteContent = React.memo(function NoteContent({
   if (overlayEvent?.kind === POLL_KIND) {
     return (
       <VStack ref={attachVisualLayoutNode} gap={0} onLayout={noteLayoutHandler}>
-        <PollCard event={overlayEvent} />
+        <View className="my-1.5">
+          <PollCard event={overlayEvent} />
+        </View>
         {blockSegments.map((seg, i) => renderQuoteBlockSegment(seg, i))}
         {taggedQuoteIds.map((id) => renderQuoteCard(id, `q${id}`))}
       </VStack>

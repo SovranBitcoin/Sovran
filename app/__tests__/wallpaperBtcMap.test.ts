@@ -3,6 +3,7 @@ import { fetchWallpaperCatalog } from '@/shared/lib/apiClient';
 import { refreshCatalog } from '@/shared/lib/wallpaperSync';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
+import { THEMES } from '@/themes';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock')
@@ -36,6 +37,7 @@ jest.mock('@/shared/lib/wallpaperStorage', () => ({
 jest.mock('@/shared/stores/profile/themeStore', () => ({}));
 jest.mock('@/shared/lib/constants', () => ({ PUBLIC_KEYS: { SUPPORT: 'a'.repeat(64) } }));
 
+const palette = THEMES['coral-sunrise'];
 const wallpaper = {
   eventId: 'b'.repeat(64),
   themeName: 'fixture',
@@ -46,7 +48,7 @@ const wallpaper = {
   fileSize: 42,
   dimensions: '1080x1920',
   albumSlug: 'fixture',
-  palette: {},
+  palette,
   dominantColors: [],
   gradientColors: [],
   createdAt: 1,
@@ -91,6 +93,16 @@ it('fetches wallpapers from the app module and tolerates new fields and omitted 
       { ...album, description: '', sortOrder: 0, topic: 'Other' },
     ]);
   }
+  expect(await refreshCatalog()).toBe(true);
+  expect(useWallpaperStore.getState().catalog).toEqual([wallpaper]);
+});
+
+it('drops a wallpaper whose palette is missing a shade instead of caching undefined colours', async () => {
+  const { 950: _background, ...withoutBackground } = palette;
+  respond({
+    ...catalog,
+    wallpapers: [wallpaper, { ...wallpaper, themeName: 'partial', palette: withoutBackground }],
+  });
   expect(await refreshCatalog()).toBe(true);
   expect(useWallpaperStore.getState().catalog).toEqual([wallpaper]);
 });

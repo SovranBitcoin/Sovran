@@ -50,7 +50,7 @@ export function useOwnSocialGraphSeed(): void {
           });
           useNostrSocialStore.getState().seedFollowsFromFacade({
             follows: graph.follows,
-            createdAt: graph.contactsUpdatedAt,
+            createdAtSec: graph.contactsUpdatedAt,
           });
         },
         (error) =>

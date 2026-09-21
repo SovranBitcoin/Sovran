@@ -87,7 +87,11 @@ const nutLabel = (n: string) => {
   return title ? `NUT-${num} ${title}` : `NUT-${num}`;
 };
 
-const fieldLabel = (key: string) => LEAF_FIELDS[key] ?? key.replace(/_/g, ' ');
+/** Pointer tokens come from the feed, so `constructor` must not reach `Object.prototype`. */
+const own = (table: Record<string, string>, key: string) =>
+  Object.hasOwn(table, key) ? table[key] : undefined;
+
+const fieldLabel = (key: string) => own(LEAF_FIELDS, key) ?? key.replace(/_/g, ' ');
 
 /**
  * Turn a JSON Pointer into human label segments.
@@ -111,7 +115,7 @@ export function decodePointer(path: string): { label: string[]; append: boolean 
       if (parent === 'nuts') {
         label.push(nutLabel(t));
       } else {
-        const member = MEMBER[parent] ?? 'item';
+        const member = own(MEMBER, parent) ?? 'item';
         // The first segment opens the sentence, so it carries the capital.
         const shown = i === 1 ? member[0]!.toUpperCase() + member.slice(1) : member;
         label.push(`${shown} ${Number(t) + 1}`);
@@ -124,7 +128,7 @@ export function decodePointer(path: string): { label: string[]; append: boolean 
     const next = tokens[i + 1];
     const indexFollows = next !== undefined && (/^\d+$/.test(next) || next === '-');
     if (t !== 'nuts' && (!indexFollows || next === '-')) {
-      label.push(i === 0 ? (INFO_FIELDS[t] ?? fieldLabel(t)) : fieldLabel(t));
+      label.push(i === 0 ? (own(INFO_FIELDS, t) ?? fieldLabel(t)) : fieldLabel(t));
     }
     parent = t;
   }

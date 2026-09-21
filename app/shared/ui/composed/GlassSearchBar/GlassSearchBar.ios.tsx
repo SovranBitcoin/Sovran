@@ -77,7 +77,6 @@ const styles = StyleSheet.create({
   // Capsule (radius = height/2 applied inline) matching the liquid design
   // language; the GlassView owns the material, the input goes transparent.
   glassShell: {
-    overflow: 'hidden',
     width: '100%',
   },
   input: {

@@ -25,9 +25,9 @@ describe('useScanHistoryStore.addScan', () => {
 
   it('dedupes scheme-prefixed and bare forms onto a single entry', () => {
     const { addScan } = useScanHistoryStore.getState();
-    addScan('lnbc1foo', 'lightning', 'qr');
-    addScan('lightning:LNBC1Foo', 'lightning', 'paste');
-    addScan('  lnbc1foo  ', 'lightning', 'nfc');
+    addScan({ raw: 'lnbc1foo', type: 'lightning', source: 'qr' });
+    addScan({ raw: 'lightning:LNBC1Foo', type: 'lightning', source: 'paste' });
+    addScan({ raw: '  lnbc1foo  ', type: 'lightning', source: 'nfc' });
 
     const { entries } = useScanHistoryStore.getState();
     expect(entries).toHaveLength(1);
@@ -38,7 +38,7 @@ describe('useScanHistoryStore.addScan', () => {
 
   it('linkTransaction matches an equivalent normalized scan', () => {
     const { addScan, linkTransaction } = useScanHistoryStore.getState();
-    addScan('lnbc1foo', 'lightning', 'qr');
+    addScan({ raw: 'lnbc1foo', type: 'lightning', source: 'qr' });
     linkTransaction('  LIGHTNING:LNBC1FOO  ', 'tx-123');
     expect(useScanHistoryStore.getState().entries[0].transactionId).toBe('tx-123');
   });
@@ -50,8 +50,8 @@ describe('useScanHistoryStore.addScan', () => {
     ['creqAAbC', 'creqAaBc', 'paymentRequest'],
   ] as const)('keeps case-sensitive inputs distinct: %s', (first, second, type) => {
     const { addScan, linkTransaction } = useScanHistoryStore.getState();
-    addScan(first, type, 'qr');
-    addScan(second, type, 'paste');
+    addScan({ raw: first, type, source: 'qr' });
+    addScan({ raw: second, type, source: 'paste' });
     linkTransaction(second, 'tx-second');
     expect(
       useScanHistoryStore
@@ -65,8 +65,8 @@ describe('useScanHistoryStore.addScan', () => {
 
   it('dedupes a cashu URI without changing its case-sensitive payload', () => {
     const { addScan } = useScanHistoryStore.getState();
-    addScan('cashuBAbC', 'ecash', 'qr');
-    addScan(' CASHU:cashuBAbC ', 'ecash', 'paste');
+    addScan({ raw: 'cashuBAbC', type: 'ecash', source: 'qr' });
+    addScan({ raw: ' CASHU:cashuBAbC ', type: 'ecash', source: 'paste' });
     expect(useScanHistoryStore.getState().entries).toHaveLength(1);
     expect(useScanHistoryStore.getState().entries[0].raw).toBe('cashuBAbC');
   });
@@ -85,7 +85,7 @@ describe('useScanHistoryStore.addScan', () => {
       entriesByTransactionId: {},
     });
 
-    useScanHistoryStore.getState().addScan('newest', 'unknown', 'qr');
+    useScanHistoryStore.getState().addScan({ raw: 'newest', type: 'unknown', source: 'qr' });
 
     const { entries } = useScanHistoryStore.getState();
     expect(entries).toHaveLength(500);
@@ -103,7 +103,7 @@ describe('useScanHistoryStore.entriesByTransactionId', () => {
 
   it('linkTransaction populates the index for O(1) lookup by transactionId', () => {
     const { addScan, linkTransaction } = useScanHistoryStore.getState();
-    addScan('lnbc1foo', 'lightning', 'qr');
+    addScan({ raw: 'lnbc1foo', type: 'lightning', source: 'qr' });
     linkTransaction('lnbc1foo', 'tx-123');
 
     const { entries, entriesByTransactionId } = useScanHistoryStore.getState();
@@ -113,9 +113,9 @@ describe('useScanHistoryStore.entriesByTransactionId', () => {
 
   it('addScan dedupe path keeps the index in sync with the merged entry ref', () => {
     const { addScan, linkTransaction } = useScanHistoryStore.getState();
-    addScan('lnbc1foo', 'lightning', 'qr');
+    addScan({ raw: 'lnbc1foo', type: 'lightning', source: 'qr' });
     linkTransaction('lnbc1foo', 'tx-123');
-    addScan('lnbc1foo', 'lightning', 'nfc');
+    addScan({ raw: 'lnbc1foo', type: 'lightning', source: 'nfc' });
 
     const { entries, entriesByTransactionId } = useScanHistoryStore.getState();
     expect(entriesByTransactionId['tx-123']).toBe(entries[0]);
@@ -124,7 +124,7 @@ describe('useScanHistoryStore.entriesByTransactionId', () => {
 
   it('skips entries with no transactionId', () => {
     const { addScan } = useScanHistoryStore.getState();
-    addScan('lnbc1foo', 'lightning', 'qr');
+    addScan({ raw: 'lnbc1foo', type: 'lightning', source: 'qr' });
     expect(Object.keys(useScanHistoryStore.getState().entriesByTransactionId)).toHaveLength(0);
   });
 });

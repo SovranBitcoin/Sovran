@@ -37,6 +37,37 @@ interface ActiveUnitState {
   selectUnit: (unit: ActiveUnit) => void;
 }
 
+/** What `useActiveUnit` knows about the units some mint can issue. */
+interface UnitAvailability {
+  units: ActiveUnit[];
+  /**
+   * Whether any mint has actually reported yet. `sat` is seeded
+   * unconditionally, so a list of just `sat` is equally "nothing has loaded"
+   * and "no mint offers anything else".
+   */
+  resolved: boolean;
+}
+
+/**
+ * The account unit the wallet is denominated in: the persisted choice, retired
+ * to `sat` only once something has ANSWERED that no mint supports it.
+ *
+ * Mint info and keysets load asynchronously. Retiring the choice before then
+ * flips the whole wallet to `sat` and back the moment they arrive, and every
+ * per-unit derivation in between — the capability map, the rails a mint can
+ * serve, the bounds a rail is gated on — is computed for the wrong unit. A
+ * captured session showed the derived unit alternating usd/sat a dozen times.
+ */
+export function resolveActiveUnit(
+  persisted: ActiveUnit,
+  availability: UnitAvailability
+): ActiveUnit {
+  if (availability.units.includes(persisted)) return persisted;
+  if (!availability.resolved) return persisted;
+  walletLog.info('wallet.unit.fallback', { persisted, fallback: 'sat' });
+  return 'sat';
+}
+
 /**
  * The wallet's active mint unit (coco v2 multi-unit) — the unit ecash is
  * denominated in, scoping balance, amount entry, receive/send defaults, and
@@ -61,7 +92,7 @@ export function useActiveUnit(): ActiveUnitState {
   const keysetUnitsByMint = useMintKeysetUnits();
   const isTestnutMint = useIsTestnutMint();
 
-  const availableUnits = useMemo(() => {
+  const availability = useMemo(() => {
     const advertised = new Set<string>(['sat']);
     for (const mint of trustedMints) {
       const units = deriveSupportedUnitsFromInfo(mint.mintInfo, keysetUnitsByMint[mint.mintUrl]);
@@ -79,19 +110,27 @@ export function useActiveUnit(): ActiveUnitState {
       }
     }
     const units = ACCOUNT_UNITS.filter((unit) => advertised.has(unit));
+    // Whether anything has actually REPORTED yet. `sat` is seeded
+    // unconditionally, so a list of just `sat` is equally "no mint has loaded"
+    // and "no mint offers anything else" — and those must not be treated alike.
+    const resolved =
+      trustedMints.some((mint) => !!mint.mintInfo) ||
+      Object.keys(balances.byMintAndUnit ?? {}).length > 0;
     walletLog.debug('wallet.unit.available', {
       units: units.join(','),
       source: 'nut04+keysets+balances',
       mintCount: trustedMints.length,
+      resolved,
     });
-    return units;
+    return { units, resolved };
   }, [trustedMints, balances, keysetUnitsByMint, isTestnutMint]);
 
-  const unit = useMemo<ActiveUnit>(() => {
-    if (availableUnits.includes(persisted)) return persisted;
-    walletLog.info('wallet.unit.fallback', { persisted, fallback: 'sat' });
-    return 'sat';
-  }, [persisted, availableUnits]);
+  const availableUnits = availability.units;
+
+  const unit = useMemo<ActiveUnit>(
+    () => resolveActiveUnit(persisted, availability),
+    [persisted, availability]
+  );
 
   const selectUnit = useCallback(
     (next: ActiveUnit) => {

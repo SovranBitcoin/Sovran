@@ -56,7 +56,7 @@ describe('NIP-87 review parsing', () => {
     ]);
     expect(summary.reviewCount).toBe(2);
     expect(summary.averageScore).toBe(3.5); // (4 + 3) / 2
-    expect(summary.reviews[0].createdAt).toBeGreaterThan(summary.reviews[1].createdAt); // newest-first
+    expect(summary.reviews[0].createdAtSec).toBeGreaterThan(summary.reviews[1].createdAtSec); // newest-first
   });
 
   test('trailing-slash mint URLs are treated as the same mint', () => {

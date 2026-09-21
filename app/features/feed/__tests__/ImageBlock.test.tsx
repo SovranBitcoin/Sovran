@@ -42,15 +42,18 @@ describe('ImageBlock recycling', () => {
     );
     const firstImage = view.UNSAFE_getByType(Image);
     fireEvent(firstImage, 'error');
-    expect(view.getByText('Image unavailable — tap to open')).toBeTruthy();
+    expect(view.getByText('Image unavailable — tap to open')).toBeOnTheScreen();
 
     view.rerender(
       <ImageBlock url="https://example.com/next.jpg" eventId="second" initialAspectRatio={0.75} />
     );
 
     const nextImage = view.UNSAFE_getByType(Image);
-    expect(nextImage.props.source.uri).toBe('https://example.com/next.jpg');
-    expect(nextImage.props.style.aspectRatio).toBe(0.75);
+    expect(nextImage).toHaveProp(
+      'source',
+      expect.objectContaining({ uri: 'https://example.com/next.jpg' })
+    );
+    expect(nextImage).toHaveStyle({ aspectRatio: 0.75 });
     expect(view.queryByText('Image unavailable — tap to open')).toBeNull();
   });
 
@@ -67,9 +70,9 @@ describe('ImageBlock recycling', () => {
         initialAspectRatio={0.5}
       />
     );
-    expect(view.UNSAFE_getByType(Image).props.style.aspectRatio).toBe(0.5);
+    expect(view.UNSAFE_getByType(Image)).toHaveStyle({ aspectRatio: 0.5 });
 
     view.rerender(<ImageBlock url="https://example.com/cached.jpg" eventId="first" />);
-    expect(view.UNSAFE_getByType(Image).props.style.aspectRatio).toBe(3);
+    expect(view.UNSAFE_getByType(Image)).toHaveStyle({ aspectRatio: 3 });
   });
 });

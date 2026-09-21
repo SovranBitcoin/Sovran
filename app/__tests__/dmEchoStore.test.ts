@@ -18,31 +18,47 @@ describe('dmEchoStore', () => {
 
   it('appends per protocol thread and dedups by self-wrap id', () => {
     const { append, getForThread } = useDmEchoStore.getState();
-    append('nip17', 'own-pubkey', 'peer-a', echo('wrap-1'));
-    append('nip17', 'own-pubkey', 'peer-a', echo('wrap-1'));
-    append('nip17', 'own-pubkey', 'peer-b', echo('wrap-2'));
-    expect(getForThread('nip17', 'own-pubkey', 'peer-a')).toHaveLength(1);
-    expect(getForThread('nip17', 'own-pubkey', 'peer-b')).toHaveLength(1);
+    append({ viewer: 'own-pubkey', protocol: 'nip17', counterparty: 'peer-a' }, echo('wrap-1'));
+    append({ viewer: 'own-pubkey', protocol: 'nip17', counterparty: 'peer-a' }, echo('wrap-1'));
+    append({ viewer: 'own-pubkey', protocol: 'nip17', counterparty: 'peer-b' }, echo('wrap-2'));
+    expect(
+      getForThread({ viewer: 'own-pubkey', protocol: 'nip17', counterparty: 'peer-a' })
+    ).toHaveLength(1);
+    expect(
+      getForThread({ viewer: 'own-pubkey', protocol: 'nip17', counterparty: 'peer-b' })
+    ).toHaveLength(1);
   });
 
   it("never exposes a NIP-17 echo in the same peer's NIP-04 thread", () => {
     const { append, getForThread } = useDmEchoStore.getState();
-    append('nip17', 'own-pubkey', 'peer-a', echo('wrap-1'));
-    expect(getForThread('nip04', 'own-pubkey', 'peer-a')).toEqual([]);
+    append({ viewer: 'own-pubkey', protocol: 'nip17', counterparty: 'peer-a' }, echo('wrap-1'));
+    expect(
+      getForThread({ viewer: 'own-pubkey', protocol: 'nip04', counterparty: 'peer-a' })
+    ).toEqual([]);
   });
 
   it("never exposes one profile's bearer-token echo to another profile", () => {
     const { append, getForThread } = useDmEchoStore.getState();
-    append('nip17', 'profile-a', 'peer-a', echo('wrap-1', { pubkey: 'profile-a' }));
-    expect(getForThread('nip17', 'profile-b', 'peer-a')).toEqual([]);
-    expect(getForThread('nip17', 'profile-a', 'peer-a')).toHaveLength(1);
+    append(
+      { viewer: 'profile-a', protocol: 'nip17', counterparty: 'peer-a' },
+      echo('wrap-1', { pubkey: 'profile-a' })
+    );
+    expect(
+      getForThread({ viewer: 'profile-b', protocol: 'nip17', counterparty: 'peer-a' })
+    ).toEqual([]);
+    expect(
+      getForThread({ viewer: 'profile-a', protocol: 'nip17', counterparty: 'peer-a' })
+    ).toHaveLength(1);
   });
 
   it('caps echoes per profile thread, dropping the oldest', () => {
     const { append, getForThread } = useDmEchoStore.getState();
     for (let index = 0; index < 25; index++)
-      append('nip17', 'own-pubkey', 'peer-a', echo(`wrap-${index}`));
-    const kept = getForThread('nip17', 'own-pubkey', 'peer-a');
+      append(
+        { viewer: 'own-pubkey', protocol: 'nip17', counterparty: 'peer-a' },
+        echo(`wrap-${index}`)
+      );
+    const kept = getForThread({ viewer: 'own-pubkey', protocol: 'nip17', counterparty: 'peer-a' });
     expect(kept).toHaveLength(20);
     expect(kept[0]!.id).toBe('wrap-5');
     expect(kept.at(-1)!.id).toBe('wrap-24');
@@ -56,14 +72,14 @@ describe('dmEchoStore', () => {
       'utf8'
     );
     expect(screen).toContain(
-      'useDmEchoStore.getState().getForThread(protocol, nostrKeys.pubkey, pubkey)'
+      '.getForThread({ viewer: nostrKeys.pubkey, protocol, counterparty: pubkey })'
     );
     const colada = readFileSync(
       resolve(__dirname, '../features/send/providers/Colada.tsx'),
       'utf8'
     );
     expect(colada).toContain(
-      "useDmEchoStore.getState().append('nip17', ownPubkey, recipientPubkey"
+      "{ viewer: ownPubkey, protocol: 'nip17', counterparty: recipientPubkey }"
     );
   });
 });

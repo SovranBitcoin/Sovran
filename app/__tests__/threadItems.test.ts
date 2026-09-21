@@ -22,7 +22,7 @@ function note(params: {
   pubkey?: string;
   content?: string;
   tags?: string[][];
-  createdAt?: number;
+  createdAtSec?: number;
 }): FeedEvent {
   return {
     id: params.id,
@@ -30,7 +30,7 @@ function note(params: {
     pubkey: params.pubkey ?? 'a'.repeat(64),
     content: params.content ?? params.id,
     tags: params.tags ?? [],
-    created_at: params.createdAt ?? 1700000000,
+    created_at: params.createdAtSec ?? 1700000000,
   };
 }
 
@@ -50,17 +50,17 @@ function emptySeed(overrides: Partial<ThreadSeedBuckets> = {}): ThreadSeedBucket
 
 describe('thread item builders', () => {
   it('renders direct replies already present in a thread seed', () => {
-    const root = note({ id: 'root', content: 'root post', createdAt: 100 });
+    const root = note({ id: 'root', content: 'root post', createdAtSec: 100 });
     const seededReply = note({
       id: 'seeded-reply',
       content: 'reply already loaded by the feed',
       tags: [['e', 'root', '', 'reply']],
-      createdAt: 101,
+      createdAtSec: 101,
     });
     const quoteOnly = note({
       id: 'quote-only',
       tags: [['e', 'root', '', 'mention']],
-      createdAt: 102,
+      createdAtSec: 102,
     });
 
     const built = buildThreadItemsFromSeed(
@@ -80,16 +80,16 @@ describe('thread item builders', () => {
   });
 
   it('uses preview reply ids from the feed seed as the initial reply order', () => {
-    const root = note({ id: 'root', content: 'root post', createdAt: 100 });
+    const root = note({ id: 'root', content: 'root post', createdAtSec: 100 });
     const firstPreviewReply = note({
       id: 'first-preview',
       tags: [['e', 'root', '', 'reply']],
-      createdAt: 103,
+      createdAtSec: 103,
     });
     const secondPreviewReply = note({
       id: 'second-preview',
       tags: [['e', 'root', '', 'reply']],
-      createdAt: 101,
+      createdAtSec: 101,
     });
 
     const built = buildThreadItemsFromSeed(
@@ -106,12 +106,12 @@ describe('thread item builders', () => {
   });
 
   it('drops nested preview replies from the flat list (they belong to their own subtree)', () => {
-    const root = note({ id: 'root', content: 'root post', createdAt: 100, pubkey: 'alice' });
+    const root = note({ id: 'root', content: 'root post', createdAtSec: 100, pubkey: 'alice' });
     const authorReply = note({
       id: 'author-reply',
       pubkey: 'alice',
       tags: [['e', 'root', '', 'reply']],
-      createdAt: 101,
+      createdAtSec: 101,
     });
     const followedTail = note({
       id: 'followed-tail',
@@ -120,7 +120,7 @@ describe('thread item builders', () => {
         ['e', 'root', '', 'root'],
         ['e', 'author-reply', '', 'reply'],
       ],
-      createdAt: 102,
+      createdAtSec: 102,
     });
 
     const built = buildThreadItemsFromSeed(
@@ -139,18 +139,18 @@ describe('thread item builders', () => {
   });
 
   it('does not duplicate a seeded reply when the GraphQL page returns it again', () => {
-    const root = note({ id: 'root', content: 'root post', createdAt: 100 });
+    const root = note({ id: 'root', content: 'root post', createdAtSec: 100 });
     const seededReply = note({
       id: 'seeded-reply',
       content: 'reply already loaded by the feed',
       tags: [['e', 'root', '', 'reply']],
-      createdAt: 101,
+      createdAtSec: 101,
     });
     const nextReply = note({
       id: 'next-reply',
       content: 'reply from the first GraphQL page',
       tags: [['e', 'root', '', 'reply']],
-      createdAt: 102,
+      createdAtSec: 102,
     });
     const result: ThreadResult = {
       allEvents: mapEvents([root, seededReply, nextReply]),
@@ -180,18 +180,18 @@ describe('thread item builders', () => {
   });
 
   it('initial fetch keeps the seeded reply order as a stable prefix (no reshuffle)', () => {
-    const root = note({ id: 'root', content: 'root', tags: [], createdAt: 100 });
+    const root = note({ id: 'root', content: 'root', tags: [], createdAtSec: 100 });
     const seededReply = note({
       id: 'seeded-reply',
       content: 'seeded',
       tags: [['e', 'root', '', 'reply']],
-      createdAt: 101,
+      createdAtSec: 101,
     });
     const rankedFirst = note({
       id: 'ranked-first',
       content: 'ranked higher by the server',
       tags: [['e', 'root', '', 'reply']],
-      createdAt: 102,
+      createdAtSec: 102,
     });
     const result: ThreadResult = {
       allEvents: mapEvents([root, seededReply, rankedFirst]),

@@ -32,13 +32,13 @@ function ensureOffset(): { bearing: number; distance: number } {
 // Public API ----------------------------------------------------------------
 
 /** Apply the session-stable safety offset to a coordinate pair. */
-export function applySafetyOffset(
-  lat: number,
-  lon: number
-): { latitude: number; longitude: number } {
+export function applySafetyOffset(coords: { latitude: number; longitude: number }): {
+  latitude: number;
+  longitude: number;
+} {
   const { bearing, distance } = ensureOffset();
-  const latitude = (lat * Math.PI) / 180;
-  const longitude = (lon * Math.PI) / 180;
+  const latitude = (coords.latitude * Math.PI) / 180;
+  const longitude = (coords.longitude * Math.PI) / 180;
   const angularDistance = distance / EARTH_RADIUS_M;
   const safeLatitude = Math.asin(
     Math.sin(latitude) * Math.cos(angularDistance) +

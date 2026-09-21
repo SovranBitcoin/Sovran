@@ -177,9 +177,9 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
               <ListGroup.ItemContent>
                 <ListGroup.ItemTitle>Advanced</ListGroup.ItemTitle>
                 <ListGroup.ItemDescription>
-                  {`${mintSelection.advertisedCount} of ${mintSelection.totalCount} mint${
-                    mintSelection.totalCount === 1 ? '' : 's'
-                  } in this request`}
+                  {mintSelection.totalCount === 1
+                    ? `${mintSelection.advertisedCount} of 1 mint in this request`
+                    : `${mintSelection.advertisedCount} of ${mintSelection.totalCount} mints in this request`}
                 </ListGroup.ItemDescription>
               </ListGroup.ItemContent>
               <ListGroup.ItemSuffix>

@@ -138,4 +138,68 @@ describe('legacy theme migration', () => {
     await runGlobalMigrations();
     expect(mockStorage[`theme-store:profile:${activePubkey}`]).toBe(current);
   });
+
+  it('skips a profile row without a usable pubkey and keeps its index-scoped stores', async () => {
+    const first = JSON.stringify({ state: { activeAlbumSlug: 'first' }, version: 1 });
+    const second = JSON.stringify({ state: { activeAlbumSlug: 'second' }, version: 1 });
+    const third = JSON.stringify({ state: { activeAlbumSlug: 'third' }, version: 1 });
+    mockStorage = {
+      'profile-store': JSON.stringify({
+        state: {
+          profiles: [
+            { accountIndex: 0, pubkey: activePubkey },
+            { accountIndex: 1 },
+            { accountIndex: 2, pubkey: 42 },
+          ],
+        },
+        version: 0,
+      }),
+      'theme-store': first,
+      'theme-store:profile:1': second,
+      'theme-store:profile:2': third,
+    };
+
+    await runGlobalMigrations();
+
+    expect(mockStorage[`theme-store:profile:${activePubkey}`]).toBe(first);
+    expect(mockStorage['theme-store']).toBeUndefined();
+    expect(mockStorage['theme-store:profile:1']).toBe(second);
+    expect(mockStorage['theme-store:profile:2']).toBe(third);
+    expect(mockStorage['theme-store:profile:undefined']).toBeUndefined();
+    expect(mockStorage['theme-store:profile:42']).toBeUndefined();
+    expect(JSON.parse(mockStorage[COMPLETED_KEY])).toContain('index-to-pubkey-keys-v2');
+  });
+
+  it('leaves every store untouched when profile-store is corrupt JSON', async () => {
+    const before: StorageMap = {
+      'profile-store': '{"state":{"profiles":[',
+      'settings-store': JSON.stringify({ state: { theme: 'flowers-1' }, version: 0 }),
+      'theme-store': JSON.stringify({ state: { activeAlbumSlug: 'old' }, version: 1 }),
+      'theme-store:profile:1': JSON.stringify({ state: { activeAlbumSlug: 'other' }, version: 1 }),
+    };
+    mockStorage = { ...before };
+
+    await runGlobalMigrations();
+
+    const { [COMPLETED_KEY]: _completed, 'wallet-lifecycle': _lifecycle, ...rest } = mockStorage;
+    expect(rest).toEqual(before);
+  });
+
+  it('does not seed the legacy theme into another profile when the active row is unusable', async () => {
+    const store: StorageMap = {
+      'settings-store': JSON.stringify({ state: { theme: 'flowers-1' }, version: 0 }),
+      'profile-store': JSON.stringify({
+        state: {
+          profiles: [{ accountIndex: 0, pubkey: activePubkey }, { accountIndex: 1 }],
+          activeAccountIndex: 1,
+        },
+        version: 0,
+      }),
+    };
+
+    await runMigration(store);
+
+    expect(store[`theme-store:profile:${activePubkey}`]).toBeUndefined();
+    expect(store['theme-store:profile:undefined']).toBeUndefined();
+  });
 });

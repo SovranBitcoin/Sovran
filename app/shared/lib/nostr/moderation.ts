@@ -8,6 +8,7 @@ import {
   type MuteList,
   type ReportReason,
 } from '@/features/feed/lib/moderation';
+import type { NostrEventId, NostrPubkeyHex } from '@/shared/lib/protocolIds';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { publishEvent } from './publish';
 import { getOwnWriteRelays } from './outbox/relayListStore';
@@ -244,9 +245,9 @@ export function setPersonBlocked(
 export async function publishReport(
   ndk: NDK,
   ownPubkey: string,
-  target: string,
+  target: NostrPubkeyHex,
   reason: ReportReason,
-  publicEventId?: string
+  publicEventId?: NostrEventId
 ): Promise<void> {
   const scope = captureProfile(ownPubkey);
   try {

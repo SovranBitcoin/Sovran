@@ -23,6 +23,7 @@ async function runGenerator(fetch: () => Promise<unknown>) {
     __dirname: path.dirname(scriptPath),
     require: (name: keyof typeof modules) => modules[name],
     fetch,
+    AbortSignal,
     console: { log: jest.fn(), warn: jest.fn(), error: jest.fn() },
     process: { stdout: { write: jest.fn() }, exit },
   });

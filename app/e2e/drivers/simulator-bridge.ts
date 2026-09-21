@@ -5,7 +5,22 @@
  * unnecessary and (in serve-sim 0.1.44) a native crash surface.
  */
 import { createRequire } from 'node:module';
+import { z } from 'zod';
 import { isProfileSecretAxId, PROFILE_SECRET_AX_REDACTED } from './ax-redaction';
+
+const keyPacket = z.object({ type: z.string().max(32), usage: z.number().int().nonnegative() });
+const touchPacket = z.object({
+  type: z.string().max(32),
+  x: z.number().finite(),
+  y: z.number().finite(),
+  edge: z.number().int().optional(),
+});
+
+function parsePacket<T>(schema: z.ZodType<T>, bytes: Uint8Array): T {
+  const result = schema.safeParse(JSON.parse(new TextDecoder().decode(bytes.slice(1))));
+  if (!result.success) throw new Error('malformed packet fields');
+  return result.data;
+}
 
 interface NativeHid {
   touch(type: string, x: number, y: number, width: number, height: number, edge: number): void;
@@ -208,20 +223,12 @@ export function startSimulatorBridge(options: {
               ? new TextEncoder().encode(message)
               : new Uint8Array(message);
           if (bytes[0] === 4) {
-            const payload = JSON.parse(new TextDecoder().decode(bytes.slice(1))) as {
-              type: string;
-              usage: number;
-            };
+            const payload = parsePacket(keyPacket, bytes);
             hid.key(payload.type, payload.usage);
             return;
           }
           if (bytes[0] !== 3) return;
-          const payload = JSON.parse(new TextDecoder().decode(bytes.slice(1))) as {
-            type: string;
-            x: number;
-            y: number;
-            edge?: number;
-          };
+          const payload = parsePacket(touchPacket, bytes);
           if (width <= 1 || height <= 1) await describe();
           hid.touch(payload.type, payload.x, payload.y, width, height, payload.edge ?? 0);
         } catch (error) {

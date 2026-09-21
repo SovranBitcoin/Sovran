@@ -142,7 +142,7 @@ export function createRebalanceStepSink({
     mintReceiptCreated(legId, receipt) {
       const swapLegId = swapLegIds[legId];
       if (!groupId || !swapLegId || !receipt.quoteId) return;
-      swapStore().tagMintQuote(groupId, swapLegId, receipt.quoteId);
+      swapStore().tagMintQuote(groupId, swapLegId, { quoteId: receipt.quoteId });
       setTransactionAnnotation(`quote:${receipt.quoteId}`, swapAnnotation(groupId, legId, 'mint'));
     },
     meltPrepared(legId, melt) {

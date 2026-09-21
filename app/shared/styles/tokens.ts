@@ -240,6 +240,32 @@ export const controlHeight = {
 export const headerButtonSize = Platform.select({ android: 54, default: minTouchTarget });
 
 /**
+ * Header identity — one shape everywhere a header names a person: a chat, a
+ * scroll handoff, the amount screen's recipient.
+ *
+ * The bar row holds the picture ALONE, at the same diameter as every
+ * headerLeft/headerRight control, so the bar reads as one row of equal circles.
+ * The name it displaces cannot join it there — UIKit fixes the navigation row
+ * at 44pt, react-native-screens clips its Android header subview to its own
+ * bounds, and neither platform offers a native header subtitle — so it rides
+ * in the band directly below the bar.
+ */
+export const headerIdentity = {
+  height: headerButtonSize,
+  barIconSize: headerButtonSize,
+  /**
+   * Name band under the bar: the second line the navigation row has no room
+   * for. Just the name — the screen's own header gradient is the chrome here.
+   * The bar leaves slack under a title view, so `bandPullUp` lifts the row back
+   * toward the icon; the two read as one identity rather than two rows.
+   */
+  bandNameSize: 13,
+  bandNameLineHeight: 18,
+  bandHeight: 18,
+  bandPullUp: 8,
+} as const;
+
+/**
  * The tint every chrome surface (bottom button bars, scroll edge fades) blurs
  * with. iOS's system material renders true frosted glass that composes
  * correctly through a gradient mask; plain `'dark'` is a tinted overlay, not a

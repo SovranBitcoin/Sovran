@@ -12,7 +12,13 @@
  *   otherwise it yields and the list scrolls normally.
  *
  * The viewport fills the screen behind navigation; the list owns its initial
- * header clearance. The reply bar remains pinned to the sheet's bottom.
+ * header clearance. That clearance only belongs under the navigation header, so
+ * the list content is lifted by whatever of it is still on screen as the sheet
+ * collapses (see `contentLift`) — otherwise it reads as an empty band between
+ * the grabber and the first post. The lifted content is clipped at the top of
+ * the list viewport, and the matching shortfall at the bottom stays below the
+ * screen edge (the sheet has slid further down than the lift). The reply bar
+ * remains pinned to the sheet's bottom.
  * The grabber and pan are enabled only while an embed is active.
  *
  * The action bar is a layout-pinned sibling (in `ThreadView`) with its own pan,
@@ -39,7 +45,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { duration } from '@/shared/styles/tokens';
 import { SHEET_COLLAPSED_RADIUS, SHEET_PAN_ACTIVATION, SHEET_SPRING } from './embedConstants';
 import { embedHaptic } from './embedHaptics';
-import { nearestSnap } from './snapMath';
+import { contentLift, nearestSnap } from './snapMath';
 import { useThreadEmbed } from './ThreadEmbedProvider';
 
 export function ThreadEmbedSheet({
@@ -56,6 +62,7 @@ export function ThreadEmbedSheet({
   const embedActive = embed?.embedUrl != null;
   const startY = useSharedValue(0);
 
+  const headerClearance = embed?.headerClearance ?? 0;
   const snapMiddle = embed?.snapMiddle ?? 0;
   const snapInline = embed?.snapInline ?? 0;
   const sheetTranslateY = embed?.sheetTranslateY;
@@ -108,6 +115,16 @@ export function ThreadEmbedSheet({
     };
   });
 
+  const listStyle = useAnimatedStyle(() => {
+    const lift = contentLift(
+      sheetTranslateY?.get() ?? 0,
+      scrollY?.get() ?? 0,
+      snapMiddle,
+      headerClearance
+    );
+    return { transform: [{ translateY: -lift }] };
+  });
+
   return (
     <GestureDetector gesture={panGesture}>
       <Animated.View style={[styles.sheet, { backgroundColor: surface }, sheetStyle]}>
@@ -118,9 +135,11 @@ export function ThreadEmbedSheet({
             <SheetGrabber />
           </Animated.View>
         ) : null}
-        <GestureDetector gesture={nativeGesture}>
-          <View style={styles.listWrap}>{children}</View>
-        </GestureDetector>
+        <View style={styles.listClip}>
+          <GestureDetector gesture={nativeGesture}>
+            <Animated.View style={[styles.listWrap, listStyle]}>{children}</Animated.View>
+          </GestureDetector>
+        </View>
         {footer}
       </Animated.View>
     </GestureDetector>
@@ -134,6 +153,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    overflow: 'hidden',
+  },
+  // Clips the lifted content so it never draws over the grabber.
+  listClip: {
+    flex: 1,
     overflow: 'hidden',
   },
   listWrap: {

@@ -13,6 +13,18 @@ import type {
   NostrPrivateMessageEvent,
 } from './types';
 
+interface BitChatEvents {
+  onBLEMessage: BLEMessageEvent;
+  onBLEPrivateMessage: BLEPrivateMessageEvent;
+  onBLEPeerIdentity: BLEPeerIdentityEvent;
+  onBLEDeliveryStatus: BLEDeliveryStatusEvent;
+  onBLEPeerUpdate: BLEPeerEvent;
+  onBLEStateChanged: { state: string };
+  onBLEBackgroundTaskExpiring: { handle: number };
+  onNostrMessage: NostrMessageEvent;
+  onNostrPrivateMessage: NostrPrivateMessageEvent;
+}
+
 interface BitChatNativeModule {
   // BLE
   startBLE(
@@ -49,9 +61,12 @@ interface BitChatNativeModule {
   leaveGeohash(): Promise<void>;
   sendGeohashMessage(content: string, nickname: string): Promise<void>;
   sendGeohashPrivateMessage(recipientNostrPubkeyHex: string, content: string): Promise<void>;
-  // Events — `event` is unknown at the bridge boundary; typed wrappers below
-  // cast to the per-event payload that the native side actually dispatches.
-  addListener(eventName: string, listener: (event: unknown) => void): EventSubscription;
+  // Events — the payload each native event dispatches, declared once here like
+  // the method signatures above.
+  addListener<K extends keyof BitChatEvents>(
+    eventName: K,
+    listener: (event: BitChatEvents[K]) => void
+  ): EventSubscription;
   removeListeners(count: number): void;
 }
 
@@ -177,7 +192,7 @@ export function addBLEPrivateMessageListener(
   listener: (event: BLEPrivateMessageEvent) => void
 ): EventSubscription {
   if (!NativeModule) return NOOP_SUBSCRIPTION;
-  return NativeModule.addListener('onBLEPrivateMessage', listener as (e: unknown) => void);
+  return NativeModule.addListener('onBLEPrivateMessage', listener);
 }
 
 /**
@@ -202,7 +217,7 @@ export function addBLEPeerIdentityListener(
   listener: (event: BLEPeerIdentityEvent) => void
 ): EventSubscription {
   if (!NativeModule) return NOOP_SUBSCRIPTION;
-  return NativeModule.addListener('onBLEPeerIdentity', listener as (e: unknown) => void);
+  return NativeModule.addListener('onBLEPeerIdentity', listener);
 }
 
 /**
@@ -215,7 +230,7 @@ export function addBLEDeliveryStatusListener(
   listener: (event: BLEDeliveryStatusEvent) => void
 ): EventSubscription {
   if (!NativeModule) return NOOP_SUBSCRIPTION;
-  return NativeModule.addListener('onBLEDeliveryStatus', listener as (e: unknown) => void);
+  return NativeModule.addListener('onBLEDeliveryStatus', listener);
 }
 
 export function getBLEPeers(): BLEPeer[] {
@@ -251,19 +266,19 @@ export function addBLEMessageListener(
   listener: (event: BLEMessageEvent) => void
 ): EventSubscription {
   if (!NativeModule) return NOOP_SUBSCRIPTION;
-  return NativeModule.addListener('onBLEMessage', listener as (e: unknown) => void);
+  return NativeModule.addListener('onBLEMessage', listener);
 }
 
 export function addBLEPeerListener(listener: (event: BLEPeerEvent) => void): EventSubscription {
   if (!NativeModule) return NOOP_SUBSCRIPTION;
-  return NativeModule.addListener('onBLEPeerUpdate', listener as (e: unknown) => void);
+  return NativeModule.addListener('onBLEPeerUpdate', listener);
 }
 
 export function addBLEStateListener(
   listener: (event: { state: string }) => void
 ): EventSubscription {
   if (!NativeModule) return NOOP_SUBSCRIPTION;
-  return NativeModule.addListener('onBLEStateChanged', listener as (e: unknown) => void);
+  return NativeModule.addListener('onBLEStateChanged', listener);
 }
 
 // --- Background execution ---
@@ -293,7 +308,7 @@ export function addBLEBackgroundTaskExpiringListener(
   listener: (event: { handle: number }) => void
 ): EventSubscription {
   if (!NativeModule) return NOOP_SUBSCRIPTION;
-  return NativeModule.addListener('onBLEBackgroundTaskExpiring', listener as (e: unknown) => void);
+  return NativeModule.addListener('onBLEBackgroundTaskExpiring', listener);
 }
 
 // --- Bluetooth helpers ---
@@ -358,12 +373,12 @@ export function addNostrMessageListener(
   listener: (event: NostrMessageEvent) => void
 ): EventSubscription {
   if (!NativeModule) return NOOP_SUBSCRIPTION;
-  return NativeModule.addListener('onNostrMessage', listener as (e: unknown) => void);
+  return NativeModule.addListener('onNostrMessage', listener);
 }
 
 export function addNostrPrivateMessageListener(
   listener: (event: NostrPrivateMessageEvent) => void
 ): EventSubscription {
   if (!NativeModule) return NOOP_SUBSCRIPTION;
-  return NativeModule.addListener('onNostrPrivateMessage', listener as (e: unknown) => void);
+  return NativeModule.addListener('onNostrPrivateMessage', listener);
 }

@@ -155,34 +155,37 @@ export function ChatMessageBubble({
             </Text>
           ) : null}
 
-          {hasText ? (
-            <View
-              style={{
-                backgroundColor: message.isOwn ? defaultColor : surfaceTertiary,
-                ...cornerRadii,
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-                alignSelf: message.isOwn ? 'flex-end' : 'flex-start',
-                opacity: isSending ? 0.6 : 1,
-              }}>
-              <Text
-                size={16}
-                style={{
-                  color: message.isOwn ? '#FFFFFF' : foreground,
-                  lineHeight: 22,
-                }}>
-                {displayContent}
-              </Text>
-            </View>
-          ) : null}
+          {hasText || cashuToken ? (
+            <VStack className="min-w-0 gap-2.5 self-stretch">
+              {hasText ? (
+                <View
+                  style={{
+                    backgroundColor: message.isOwn ? defaultColor : surfaceTertiary,
+                    ...cornerRadii,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    alignSelf: message.isOwn ? 'flex-end' : 'flex-start',
+                    opacity: isSending ? 0.6 : 1,
+                  }}>
+                  <Text
+                    size={16}
+                    style={{
+                      color: message.isOwn ? '#FFFFFF' : foreground,
+                      lineHeight: 22,
+                    }}>
+                    {displayContent}
+                  </Text>
+                </View>
+              ) : null}
 
-          {cashuToken ? (
-            <CashuTokenBubble
-              token={cashuToken}
-              isOwn={message.isOwn}
-              hasText={hasText}
-              cornerRadii={cornerRadii}
-            />
+              {cashuToken ? (
+                <CashuTokenBubble
+                  token={cashuToken}
+                  isOwn={message.isOwn}
+                  cornerRadii={cornerRadii}
+                />
+              ) : null}
+            </VStack>
           ) : null}
 
           {showTimestamp ? (

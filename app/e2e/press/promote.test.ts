@@ -152,6 +152,38 @@ test('refuses to promote without a native build stamp or with changed bytes, wri
   }
 });
 
+test('refuses a manifest whose key or file would leave the library, writing nothing', async () => {
+  const { root, paths, cleanup } = library();
+  try {
+    const before = readFileSync(paths.registry, 'utf8');
+    const bytes = await png(60);
+    const dir = join(root, 'run-escape', 'press');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'ai.png'), bytes);
+    const shot = { file: 'ai.png', key: 'ios/ai', context: 'ai', page: 'ai', sha256: sha(bytes) };
+    for (const screenshot of [
+      { ...shot, key: 'ios/../../../escaped' },
+      { ...shot, file: '../press/ai.png' },
+    ]) {
+      writeFileSync(
+        join(dir, 'manifest.json'),
+        JSON.stringify({
+          runId: 'run-escape',
+          platform: 'ios',
+          startedAt: '2026-09-15T05:00:00.000Z',
+          screenshots: [screenshot],
+        })
+      );
+      expect(() => promoteCandidates([dir], { builds: { ios: build }, appSource }, paths)).toThrow(
+        'Unexpected JSON shape'
+      );
+    }
+    expect(readFileSync(paths.registry, 'utf8')).toBe(before);
+  } finally {
+    cleanup();
+  }
+});
+
 test('records the device each capture came from, so mixed geometry stays visible', async () => {
   const { root, paths, cleanup } = library();
   try {

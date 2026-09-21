@@ -14,7 +14,7 @@ import type { LayoutChangeEvent } from 'react-native';
  */
 
 import { avatarStateFor } from '@/shared/lib/imageLoadState';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
@@ -552,6 +552,7 @@ function BannerWithAvatar({
   isFollowLoading,
   onToggleFollow,
   onSendMoney,
+  onShareQr,
   onEditProfile,
   hasStories,
   onAvatarPress,
@@ -559,6 +560,7 @@ function BannerWithAvatar({
   visualScope,
   identityStyle,
   onIdentityLayout,
+  onAvatarLayout,
 }: {
   bannerUrl?: string;
   pictureUrl?: string;
@@ -577,6 +579,9 @@ function BannerWithAvatar({
   isFollowLoading: boolean;
   onToggleFollow: () => void;
   onSendMoney: () => void;
+  /** Opens the share page holding this profile's npub QR, and its Lightning
+   *  address QR too when the profile advertises one. */
+  onShareQr: () => void;
   /** Own profile only: opens the kind-0 editor where the Follow pill would be. */
   onEditProfile?: () => void;
   hasStories?: boolean;
@@ -584,6 +589,8 @@ function BannerWithAvatar({
   visualScope: string;
   identityStyle?: React.ComponentProps<typeof Animated.View>['style'];
   onIdentityLayout?: (event: LayoutChangeEvent) => void;
+  /** The picture's own box within this header — what the handoff waits for. */
+  onAvatarLayout?: (event: LayoutChangeEvent) => void;
 }) {
   const [foreground, surfaceSecondary, background] = useThemeColor([
     'foreground',
@@ -794,6 +801,7 @@ function BannerWithAvatar({
 
       {/* Avatar - positioned to overlap banner */}
       <Animated.View
+        onLayout={onAvatarLayout}
         style={[
           styles.avatarContainer,
           avatarSettled ? styles.settledReveal : avatarStyle,
@@ -885,21 +893,36 @@ function BannerWithAvatar({
           {isLoading && <SkeletonLoadingShimmer active />}
         </View>
 
-        {/* Send Money / Message — the wallet circle-action affordance, grouped
-            directly under the Follow button. Gated on showFollowButton so it
-            only shows for other people's profiles once our keys resolve. */}
-        {showFollowButton && (
-          <HStack justify="center" gap={28} style={{ marginTop: 16 }}>
-            <CircleActionButton
-              icon="mdi:cash-multiple"
-              systemIcon="bitcoinsign.circle"
-              label="Send Money"
-              testID="profile-send-money"
-              onPress={onSendMoney}
-            />
-            <SendMessageMenu pubkey={pubkey} displayName={displayName} circle />
-          </HStack>
-        )}
+        {/* Send Money / Message / QR Code — the wallet circle-action
+            affordance, grouped directly under the Follow button. Send Money and
+            Message are gated on showFollowButton so they only show for other
+            people's profiles once our keys resolve; the QR link belongs to
+            every profile, own included, where it is the only route to the
+            npub (and Lightning address) share page. Three labelled circles at
+            gap 28 measure ~225pt, so the centred row still clears a 320pt
+            screen without wrapping or shrinking a label. */}
+        <HStack justify="center" gap={28} style={{ marginTop: 16 }}>
+          {showFollowButton && (
+            <>
+              <CircleActionButton
+                icon="mdi:cash-multiple"
+                systemIcon="bitcoinsign.circle"
+                label="Send Money"
+                testID="profile-send-money"
+                onPress={onSendMoney}
+              />
+              <SendMessageMenu pubkey={pubkey} displayName={displayName} circle />
+            </>
+          )}
+          <CircleActionButton
+            icon="mdi:qrcode"
+            systemIcon="qrcode"
+            label="QR Code"
+            testID="profile-share-qr"
+            accessibilityLabel="Show public profile QR"
+            onPress={onShareQr}
+          />
+        </HStack>
       </VStack>
     </VisualLayoutProbe>
   );
@@ -994,20 +1017,20 @@ async function toggleFollowContacts(ctx: {
     pubkey,
     shouldFollow
   );
-  const createdAt = Math.floor(Date.now() / 1000);
+  const createdAtSec = Math.floor(Date.now() / 1000);
 
   try {
     const contactEvent = new NDKEvent(ndk);
     contactEvent.kind = Contacts;
     contactEvent.tags = nextTags;
     contactEvent.content = contactsContent;
-    contactEvent.created_at = createdAt;
+    contactEvent.created_at = createdAtSec;
     // Contact list is replaceable + important: land it on as many write relays
     // as possible via the central seam (outbox-aware, with retry).
     const published = await publishEvent({ ndk, event: contactEvent, resolveOn: 'all-settled' });
     if (published.isErr()) throw new Error('contacts publish failed');
     nostrLog.info('user.profile.follow.published', { pubkey, shouldFollow });
-    setContactsFromRelay({ tags: nextTags, content: contactsContent, createdAt });
+    setContactsFromRelay({ tags: nextTags, content: contactsContent, createdAtSec });
     clearFollowOptimistic(pubkey);
   } catch (e) {
     nostrLog.error('user.profile.follow.failed', {
@@ -1091,7 +1114,24 @@ export function UserProfileScreen() {
   // profile body.
   const displayName = resolveIdentityName({ pubkey, nostrProfile: cachedProfile });
   const headerHeight = useHeaderHeight();
+  // Where the page's PICTURE ends, in scroll coordinates. The handoff waits for
+  // the picture alone, not for the whole banner header: the name, the nip-05 and
+  // the follow button below it are not what the bar is about to show, and
+  // waiting for them left the bar empty while the picture was already gone.
   const [identityBottom, setIdentityBottom] = useState<number | null>(null);
+  const bannerTopRef = useRef(0);
+  const avatarBottomRef = useRef<number | null>(null);
+  const commitIdentityBottom = useCallback(() => {
+    if (avatarBottomRef.current === null) return;
+    const bottom = Math.round(bannerTopRef.current + avatarBottomRef.current);
+    setIdentityBottom((previous) =>
+      previous !== null && Math.abs(previous - bottom) < 2 ? previous : bottom
+    );
+  }, []);
+  // headerRight below: mint info and the person menu when shown. Both are
+  // conditional, so this side can be empty; the navigator's back button keeps
+  // the left side at one action, which is the width the title must clear.
+  const headerActionCount = (profileMintUrl ? 1 : 0) + (isOwnProfile ? 0 : 1);
   const morph = useIdentityHeader({
     identity: pubkey
       ? { name: displayName, seed: pubkey, picture: cachedProfile?.picture }
@@ -1100,6 +1140,7 @@ export function UserProfileScreen() {
       identityBottom === null
         ? Number.POSITIVE_INFINITY
         : Math.max(0, identityBottom - headerHeight),
+    sideActions: Math.max(1, headerActionCount),
   });
 
   // Send Money enters through colada's normal Send entrypoint so no-balance
@@ -1261,6 +1302,23 @@ export function UserProfileScreen() {
     router.navigate(buildMintInfoHref(profileMintUrl));
   };
 
+  // The share page tabs NPUB / LIGHTNING when the profile advertises a
+  // Lightning address, and shows the npub QR alone otherwise — passing lud16
+  // only when it exists is what makes that choice.
+  const handleShareQr = () => {
+    router.push(
+      buildProfileHref(
+        'share',
+        {
+          type: 'npub',
+          data: npub,
+          ...(cachedProfile?.lud16 && { lud16: cachedProfile.lud16 }),
+        },
+        profileFlowGroup
+      ) as never
+    );
+  };
+
   // ===========================
   // PROFILE INFO ITEMS (data-driven)
   // ===========================
@@ -1323,6 +1381,7 @@ export function UserProfileScreen() {
       name="UserProfileScreen"
       scroll="custom"
       bgColor={background}
+      headerBand={morph.headerBand}
       headerGradientStyle={morph.headerGradientStyle}>
       {/* The Send-Message/Send-Money menus present in a FullWindowOverlay whose
           rows never reach iOS AX — this dev-only marker is the waitable
@@ -1347,44 +1406,31 @@ export function UserProfileScreen() {
           // The banner already displays the name below the avatar. A second
           // transparent header title overlaps the avatar on both platforms.
           headerTitle: morph.headerTitle,
-          headerRight: () => (
-            <HStack gap={4}>
-              {!isOwnProfile && (
-                <ScreenHeaderAction
-                  icon="material-symbols:report-rounded"
-                  accessibilityLabel="Block or report person"
-                  testID="profile-person-menu"
-                  onPress={() => personMenu(pubkey)}
-                />
-              )}
-              {profileMintUrl && (
-                <ScreenHeaderAction
-                  icon="mingcute:bank-fill"
-                  onPress={handleMintInfoPress}
-                  testID="profile-mint-info"
-                  accessibilityLabel="Mint info"
-                />
-              )}
-              <ScreenHeaderAction
-                icon="mdi:qrcode"
-                testID="profile-share-qr"
-                accessibilityLabel="Show public profile QR"
-                onPress={() =>
-                  router.push(
-                    buildProfileHref(
-                      'share',
-                      {
-                        type: 'npub',
-                        data: npub,
-                        ...(cachedProfile?.lud16 && { lud16: cachedProfile.lud16 }),
-                      },
-                      profileFlowGroup
-                    ) as never
-                  )
-                }
-              />
-            </HStack>
-          ),
+          // Your own profile without a mint advertises nothing on this side;
+          // an empty item would still take a liquid-glass header slot.
+          headerRight:
+            headerActionCount === 0
+              ? undefined
+              : () => (
+                  <HStack gap={4}>
+                    {!isOwnProfile && (
+                      <ScreenHeaderAction
+                        icon="material-symbols:report-rounded"
+                        accessibilityLabel="Block or report person"
+                        testID="profile-person-menu"
+                        onPress={() => personMenu(pubkey)}
+                      />
+                    )}
+                    {profileMintUrl && (
+                      <ScreenHeaderAction
+                        icon="mingcute:bank-fill"
+                        onPress={handleMintInfoPress}
+                        testID="profile-mint-info"
+                        accessibilityLabel="Mint info"
+                      />
+                    )}
+                  </HStack>
+                ),
         })}
       />
 
@@ -1402,11 +1448,13 @@ export function UserProfileScreen() {
               <BannerWithAvatar
                 identityStyle={morph.contentStyle}
                 onIdentityLayout={(event) => {
+                  bannerTopRef.current = event.nativeEvent.layout.y;
+                  commitIdentityBottom();
+                }}
+                onAvatarLayout={(event) => {
                   const { y, height } = event.nativeEvent.layout;
-                  const bottom = Math.round(y + height);
-                  setIdentityBottom((previous) =>
-                    previous !== null && Math.abs(previous - bottom) < 2 ? previous : bottom
-                  );
+                  avatarBottomRef.current = y + height;
+                  commitIdentityBottom();
                 }}
                 bannerUrl={cachedProfile?.banner}
                 pictureUrl={cachedProfile?.picture}
@@ -1425,6 +1473,7 @@ export function UserProfileScreen() {
                 isFollowLoading={followInFlight}
                 onToggleFollow={handleToggleFollow}
                 onSendMoney={handleSendMoney}
+                onShareQr={handleShareQr}
                 onEditProfile={
                   isOwnProfile ? () => router.push('/(settings-flow)/edit-profile') : undefined
                 }

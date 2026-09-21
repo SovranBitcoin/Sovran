@@ -38,7 +38,7 @@ import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/Scree
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { formatAmount } from '@/shared/lib/currency';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
-import { truncateMiddle } from '@/shared/lib/strings';
+import { MiddleEllipsisValue } from '@/shared/ui/composed/MiddleEllipsisValue';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
@@ -85,8 +85,8 @@ export function LightningSendScreen({
   // fallback for the race-loss case where the entry has `recipientPubkey`
   // but `recipientDisplayName` wasn't populated yet at the moment of
   // navigation. On a warm cache it returns synchronously on first render
-  // — no flicker; on a cold cache the layout default "Send Lightning"
-  // stays visible until kind-0 lands (documented trade-off).
+  // — no flicker; on a cold cache the rail wording ("Send Lightning",
+  // "Sent Lightning") stays visible until kind-0 lands (documented trade-off).
   const recipientPubkey =
     typeof entry?.metadata?.recipientPubkey === 'string'
       ? entry.metadata.recipientPubkey
@@ -265,11 +265,12 @@ export function LightningSendScreen({
       entry={entry}
       source={source}
       footer={bottomButtons}
-      headerTitle="Send Lightning"
       headerIdentity={
         recipientPubkey && headerDisplayName
           ? {
-              name: `Pay ${headerDisplayName}`,
+              // The bare name: the shell puts it in the transaction's own
+              // tense ("Pay Alex" while unpaid, "Paid Alex" afterwards).
+              name: headerDisplayName,
               seed: recipientPubkey,
               picture: headerAvatarUrl,
             }
@@ -326,7 +327,7 @@ export function LightningSendScreen({
           quoteIdDetailItem(entry.quoteId),
           entry.metadata?.meltTarget && {
             title: 'Destination',
-            value: truncateMiddle(entry.metadata.meltTarget, 12),
+            value: <MiddleEllipsisValue value={entry.metadata.meltTarget} />,
           },
           mintDetailItem(mintUrl),
         ]}

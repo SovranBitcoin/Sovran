@@ -21,7 +21,7 @@ function reviewsFromFacade(resolved: facade.ResolvedMintReviews): MintReviewsRes
       comment: stripScoreMarker(review.content),
       pubkey: review.reviewerPubkey,
       eventId: review.eventId,
-      created_at: review.createdAt,
+      created_at: review.createdAtSec,
       ...(review.name ? { name: review.name } : {}),
       ...(review.picture ? { picture: review.picture } : {}),
     })),
@@ -55,7 +55,7 @@ export async function fetchMintReviews(args: {
     });
     return resolved.match(
       (value) => ok(reviewsFromFacade(value)),
-      (error) => err(new Error(`mint reviews: ${error.type}`))
+      (error) => err(new Error(`mint reviews: ${error.type}`, { cause: error }))
     );
   } catch (error) {
     return err(error instanceof Error ? error : new Error(String(error)));

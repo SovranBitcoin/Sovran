@@ -17,15 +17,29 @@ import { useMintTestnutStore } from '@/shared/stores/global/mintTestnutStore';
 /** nagg re-probes weekly; a daily re-check picks a new verdict up promptly. */
 const RECHECK_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * A row nagg answered with no `probedAt` is "not probed yet", NOT "real mint" —
+ * and `applyMintInfos` still stamps `checkedAt` on it so a pass does not spin.
+ * Re-asking on the daily clock therefore left an unprobed mint counted as real
+ * for a whole day, and every account-scoped decision in between trusted it: a
+ * captured session offered "as Onchain" for 1 sat because the only mint that
+ * could serve it was an unclassified testnut, and the rail vanished the moment
+ * an unrelated discovery call supplied the verdict.
+ */
+const UNPROBED_RECHECK_MS = 10 * 60 * 1000;
+
 /** nagg unreachable: leave it alone for a minute rather than retry per trigger. */
 const FAILURE_BACKOFF_MS = 60 * 1000;
 
 let inflight: Promise<void> | null = null;
 let lastFailureAt = 0;
 
-function needsCheck(mintUrl: string, now: number): boolean {
+export function needsCheck(mintUrl: string, now: number): boolean {
   const entry = useMintTestnutStore.getState().byMintUrl[normalizeMintUrlKey(mintUrl)];
-  return !entry || now - entry.checkedAt > RECHECK_MS;
+  if (!entry) return true;
+  // An answered verdict holds for a day; an unanswered one is re-asked soon.
+  const ttl = entry.probedAt == null ? UNPROBED_RECHECK_MS : RECHECK_MS;
+  return now - entry.checkedAt > ttl;
 }
 
 /**

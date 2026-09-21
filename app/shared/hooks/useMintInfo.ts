@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 
-import type { MintInfo } from '@cashu/cashu-ts';
+import type { GetInfoResponse } from '@cashu/cashu-ts';
 
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import { cashuLog, mintUrlLogFields } from '@/shared/lib/logger';
@@ -12,7 +12,7 @@ import { cashuLog, mintUrlLogFields } from '@/shared/lib/logger';
  * - Falls back to an async fetch only if the mint isn't in the local list yet.
  * - Does NOT throw on network errors; silently falls back to null.
  */
-export function useMintInfo(mintUrl: string | string | undefined | null): MintInfo | null {
+export function useMintInfo(mintUrl: string | string | undefined | null): GetInfoResponse | null {
   const { mints, getMintInfo } = useMintManagement();
   // Coerce to primitive string — FormattedString (extends String) breaks === comparisons
   const normalizedUrl = mintUrl ? `${mintUrl}` : null;
@@ -20,17 +20,14 @@ export function useMintInfo(mintUrl: string | string | undefined | null): MintIn
   const cachedInfo = useMemo(() => {
     if (!normalizedUrl) return null;
     const match = mints.find((m) => m.mintUrl === normalizedUrl);
-    const hit =
-      match?.mintInfo && Object.keys(match.mintInfo).length > 0
-        ? (match.mintInfo as MintInfo)
-        : null;
+    const hit = match?.mintInfo && Object.keys(match.mintInfo).length > 0 ? match.mintInfo : null;
     if (normalizedUrl) {
       cashuLog.debug('mintInfo.cache', { ...mintUrlLogFields(normalizedUrl), hit: !!hit });
     }
     return hit;
   }, [normalizedUrl, mints]);
 
-  const [fetchedInfo, setFetchedInfo] = useState<MintInfo | null>(null);
+  const [fetchedInfo, setFetchedInfo] = useState<GetInfoResponse | null>(null);
 
   useEffect(() => {
     if (!normalizedUrl || cachedInfo) {
@@ -46,7 +43,7 @@ export function useMintInfo(mintUrl: string | string | undefined | null): MintIn
             ...mintUrlLogFields(normalizedUrl),
             hasInfo: !!info,
           });
-          setFetchedInfo(info as MintInfo);
+          setFetchedInfo(info);
         }
       })
       .catch((err) => {

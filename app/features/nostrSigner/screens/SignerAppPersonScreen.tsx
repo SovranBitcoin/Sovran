@@ -92,7 +92,7 @@ export function SignerAppPersonScreen(): React.ReactElement {
     if (clientPubkey === undefined || peer === undefined) return;
     revokePeerDecryptGrant(clientPubkey, peer);
     revokeSessionGrant(clientPubkey, undefined, peer);
-    popup({ message: REVOKED_TOAST, type: 'success', variant: 'toast', duration: 1500 });
+    popup({ message: REVOKED_TOAST, type: 'success', variant: 'toast', durationMs: 1500 });
     router.back();
   };
 

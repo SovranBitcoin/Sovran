@@ -46,7 +46,7 @@ describe('swap leg patching', () => {
   it('tags a mint quote on one leg and indexes it back to that leg', () => {
     const { groupId, legA, legB } = freshGroup();
 
-    useSwapTransactionsStore.getState().tagMintQuote(groupId, legA, 'quote-mint');
+    useSwapTransactionsStore.getState().tagMintQuote(groupId, legA, { quoteId: 'quote-mint' });
 
     const state = useSwapTransactionsStore.getState();
     const legs = state.getGroup(groupId)!.legs;
@@ -72,7 +72,9 @@ describe('swap leg patching', () => {
   it('writes no quote index entry when the group is gone', () => {
     const { legA } = freshGroup();
 
-    useSwapTransactionsStore.getState().tagMintQuote('missing-group', legA, 'orphan-quote');
+    useSwapTransactionsStore
+      .getState()
+      .tagMintQuote('missing-group', legA, { quoteId: 'orphan-quote' });
     useSwapTransactionsStore
       .getState()
       .tagMelt('missing-group', legA, { quoteId: 'orphan-melt', operationId: 'op-1' });
@@ -85,7 +87,7 @@ describe('swap leg patching', () => {
   it('ignores an empty quote id entirely', () => {
     const { groupId, legA } = freshGroup();
 
-    useSwapTransactionsStore.getState().tagMintQuote(groupId, legA, '');
+    useSwapTransactionsStore.getState().tagMintQuote(groupId, legA, { quoteId: '' });
 
     const state = useSwapTransactionsStore.getState();
     expect(state.getGroup(groupId)!.legs.find((l) => l.id === legA)!.mintQuoteId).toBeUndefined();

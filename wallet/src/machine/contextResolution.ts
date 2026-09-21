@@ -1,10 +1,12 @@
 import {
+  accountMintCandidates,
   buildMethodAwareMintCandidates,
   createAmountEntryMethodContext,
   getCapabilityUnavailableReason,
   getMintMethodCapability,
 } from "../mint-capabilities";
 import { localizeReason } from "../formatting/locales";
+import { isValidSatAmount } from "../guards";
 import { logger, mintUrlFields } from "../logger";
 import {
   getValidMintCandidates,
@@ -618,7 +620,12 @@ export function requestMintSelector(
           ctx.destination!,
         )
       : null;
-  const candidates = getValidMintCandidates(walletCtx, { minAmount: amount });
+  const candidates = getValidMintCandidates(walletCtx, {
+    minAmount: amount,
+    ...(ctx.supportedMintUrls?.length
+      ? { allowedMints: ctx.supportedMintUrls }
+      : {}),
+  });
 
   const allTrustedCandidates = walletCtx.trustedMintUrls.map((mintUrl) => ({
     mintUrl,
@@ -655,7 +662,7 @@ export function requestMintSelector(
   // Receive-rail picks list every trusted mint with unsupported ones DISABLED
   // (with the capability reason) rather than hidden — the user should see
   // which mints could serve the rail, mirroring the NPC NUT-17 treatment.
-  const finalCandidates =
+  const scopedCandidates =
     methodScope && requirement
       ? buildMethodAwareMintCandidates(walletCtx, requirement, {})
       : (npcCandidates ??
@@ -664,6 +671,13 @@ export function requestMintSelector(
           : skipBalanceFilter
             ? allTrustedCandidates
             : candidates));
+  // Every flow picker is pinned to the active account. Only the wallet's own
+  // picker (`selected`) lists both sides, because picking there moves the
+  // wallet to that mint's account.
+  const finalCandidates =
+    event.scope === "selected"
+      ? scopedCandidates
+      : accountMintCandidates(walletCtx, scopedCandidates);
 
   return logContextResult("request_mint_selector", {
     step: "selectMint",
@@ -691,7 +705,9 @@ export function resolveFromContext(
 ): ContextResolutionResult {
   const destination = ctx.destination ?? "sendEcash";
   const unit = ctx.unit;
-  const amount = ctx.amount;
+  // NaN, Infinity, fractional and non-positive amounts resolve like a missing
+  // amount: back to amount entry, never on to a quote or send step.
+  const amount = isValidSatAmount(ctx.amount) ? ctx.amount : undefined;
   const mintUrl = ctx.mintUrl;
   logger.debug("contextResolution.resolve.start", {
     enableEcashSendMemo,
@@ -700,7 +716,7 @@ export function resolveFromContext(
   });
 
   if (destination === "mintQuote") {
-    if (amount == null || amount <= 0) {
+    if (amount == null) {
       return logContextResult("mint_quote_enter_amount", {
         step: "enterAmount",
         context: { ...ctx, destination },
@@ -782,7 +798,7 @@ export function resolveFromContext(
     // operation embeds the trusted allow-list itself — so once we have an
     // amount we go straight to the auto-execution step. Mirrors the mintQuote
     // "enter amount first" guard.
-    if (amount == null || amount <= 0) {
+    if (amount == null) {
       return logContextResult("receive_payment_request_enter_amount", {
         step: "enterAmount",
         context: { ...ctx, destination },
@@ -814,7 +830,7 @@ export function resolveFromContext(
         },
       });
     }
-    if (amount == null || amount <= 0) {
+    if (amount == null) {
       return logContextResult("melt_quote_enter_amount", {
         step: "enterAmount",
         context: { ...ctx, destination },
@@ -857,7 +873,7 @@ export function resolveFromContext(
     });
   }
 
-  if (amount == null || amount <= 0) {
+  if (amount == null) {
     return logContextResult("send_or_payment_enter_amount", {
       step: "enterAmount",
       context: { ...ctx, destination },

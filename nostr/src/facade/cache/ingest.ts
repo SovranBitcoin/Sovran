@@ -91,6 +91,6 @@ export function ingestProfileStats(cache: NostrEntityCache, resolved: ResolvedPr
     followersCount: resolved.followersCount,
     followingCount: resolved.followingCount,
     noteCount: resolved.noteCount,
-    joinedAt: resolved.joinedAt,
+    joinedAtSec: resolved.joinedAtSec,
   });
 }

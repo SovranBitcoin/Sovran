@@ -18,6 +18,7 @@ import {
   type AnnotationEntryLike,
   type TransactionAnnotation,
 } from "../../src/annotations";
+import { extractP2PKPubkey } from "../../src/p2pk";
 
 /**
  * An entry as the read model actually holds one: `metadata` is part of the
@@ -193,6 +194,55 @@ describe("encodeAnnotation / decodeAnnotation", () => {
       paymentRequestTransport: "carrier-pigeon",
     });
     expect(decoded.paymentRequest).toEqual({ requestId: "sovabc123" });
+  });
+
+  it("drops only the field whose persisted value is outside its literal set", () => {
+    const decoded = decodeAnnotation({
+      counterpartyPubkey: "abc",
+      counterpartyDirection: "bystander",
+      scanMethod: "telepathy",
+      scanRaw: "bitcoin:bc1...",
+      lockType: "p2pk",
+      lockPubkey: "02deadbeef",
+      lockDirection: "sideways",
+      distributionSource: "pigeon",
+      swapGroupId: "g1",
+      swapRole: "burn",
+      swapHopIndex: "2",
+      geoLat: "51.5",
+      geoLng: "-0.12",
+    });
+    expect(decoded).toEqual({
+      counterparty: { pubkey: "abc" },
+      scan: { raw: "bitcoin:bc1..." },
+      lock: { type: "p2pk", pubkey: "02deadbeef" },
+      location: { lat: 51.5, lng: -0.12 },
+      swap: { groupId: "g1", hopIndex: 2 },
+    });
+  });
+
+  it("decodes every known literal of the narrowed fields", () => {
+    const decode = (key: string, value: string) =>
+      decodeAnnotation({ [key]: value });
+    for (const direction of ["sender", "recipient"] as const) {
+      expect(decode("counterpartyDirection", direction).counterparty).toEqual({
+        direction,
+      });
+    }
+    for (const method of ["qr", "nfc", "paste", "deeplink", "ble"] as const) {
+      expect(decode("scanMethod", method).scan).toEqual({ method });
+    }
+    for (const direction of ["incoming", "outgoing"] as const) {
+      expect(decode("lockDirection", direction).lock).toEqual({ direction });
+    }
+    for (const source of ["copy", "share", "airdrop", "displayed"] as const) {
+      expect(decode("distributionSource", source).distribution).toEqual({
+        source,
+      });
+    }
+    for (const role of ["mint", "melt"] as const) {
+      expect(decode("swapRole", role).swap).toEqual({ role });
+    }
   });
 
   it("produces no sub-objects for an empty record", () => {
@@ -385,6 +435,22 @@ describe("selectors over a merged entry", () => {
     expect(isP2PKLocked(bearer)).toBe(false);
   });
 
+  it("ignores malformed proofs in the token instead of reading them as locked", () => {
+    const p2pkSecret = JSON.stringify(["P2PK", { data: "02abc" }]);
+    const malformed = {
+      id: "s4",
+      token: { proofs: [null, "proof", { secret: 7 }, { amount: 1 }] },
+    };
+    const mixed = {
+      id: "s5",
+      token: {
+        token: [null, { proofs: [{ secret: 7 }, { secret: p2pkSecret }] }],
+      },
+    };
+    expect(isP2PKLocked(malformed)).toBe(false);
+    expect(isP2PKLocked(mixed)).toBe(true);
+  });
+
   it("reads legacy v3 token shape for the proof fallback", () => {
     const p2pkSecret = JSON.stringify(["P2PK", { data: "02abc" }]);
     const v3 = {
@@ -392,6 +458,19 @@ describe("selectors over a merged entry", () => {
       token: { token: [{ proofs: [{ secret: p2pkSecret }] }] },
     };
     expect(isP2PKLocked(v3)).toBe(true);
+  });
+});
+
+describe("extractP2PKPubkey", () => {
+  it("returns only a string lock key, skipping secrets whose data is not one", () => {
+    const secret = (data: unknown) => ({
+      secret: JSON.stringify(["P2PK", { data }]),
+    });
+    expect(
+      extractP2PKPubkey([secret(42), secret({ key: "02abc" })]),
+    ).toBeNull();
+    expect(extractP2PKPubkey([secret(42), secret("02abc")])).toBe("02abc");
+    expect(extractP2PKPubkey([{ secret: "plain-secret" }])).toBeNull();
   });
 });
 

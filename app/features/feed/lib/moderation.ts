@@ -1,8 +1,10 @@
+import type { NostrEventId, NostrPubkeyHex } from '@/shared/lib/protocolIds';
 import type { FeedItem } from '../components/nostr/feedTypes';
 
 /** NIP-51 preserves unfamiliar tags and keeps private entries private. */
 export type MuteList = {
   id: string;
+  /** unix seconds (Nostr created_at); persisted in feed-ignore-store under this name */
   createdAt: number;
   tags: string[][];
   privateTags: string[][];
@@ -52,9 +54,9 @@ export type ReportReason = keyof typeof REPORT_REASONS;
 
 /** Only public post IDs belong here. Private messages are reported by author. */
 export function reportTags(
-  pubkey: string,
+  pubkey: NostrPubkeyHex,
   reason: ReportReason,
-  publicEventId?: string
+  publicEventId?: NostrEventId
 ): string[][] {
   if (
     !/^[0-9a-f]{64}$/.test(pubkey) ||

@@ -939,9 +939,14 @@ export function createSovranNotifications(
         deeplink: 'deeplink',
       };
       const scanSource = sourceMap[source ?? ''] ?? 'qr';
-      useScanHistoryStore
-        .getState()
-        .addScan(rawInput, scanType, scanSource, parsedType, container, optionKinds);
+      useScanHistoryStore.getState().addScan({
+        raw: rawInput,
+        type: scanType,
+        source: scanSource,
+        inputType: parsedType,
+        container,
+        optionKinds,
+      });
       // Annotation: stash the scan under a raw key now; bridged onto the final
       // transaction id in onTransactionCreated (colada owns the read model).
       setTransactionAnnotation(rawAnnotationKey(rawInput), {
@@ -1507,7 +1512,7 @@ export function createSovranHandlers({
 
       // Routstr top-up: intercept the token and send it to the Routstr API
       const topUpState = useRoutstrTopUpStore.getState();
-      if (topUpState.active) {
+      if (topUpState.phase === 'active') {
         try {
           const entry = parseHistoryEntryOnce(historyEntry);
           const token = entry ? sendEntryToken(entry) : null;

@@ -63,6 +63,15 @@ describe('serializeStoreState size cap', () => {
     expect(roundTrip(hostile)).toEqual({ __type: 'Error', message: 'getter failed' });
   });
 
+  it('keeps the message of a non-Error throwable', () => {
+    const hostile = {
+      get boom(): never {
+        throw 'plain string failure';
+      },
+    };
+    expect(roundTrip(hostile)).toEqual({ __type: 'Error', message: 'plain string failure' });
+  });
+
   it('caps giant stores with a Truncated marker keeping the key list', () => {
     const giant = { blob: 'y'.repeat(300 * 1024), other: 1 };
     const parsed = roundTrip(giant);

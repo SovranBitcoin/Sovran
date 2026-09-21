@@ -58,10 +58,10 @@ interface PlaceDetailsCache {
 }
 
 /** 1 hour — places don't change frequently */
-const PLACES_CACHE_TTL = 60 * 60 * 1000;
+const PLACES_CACHE_TTL_MS = 60 * 60 * 1000;
 
 /** 24 hours for individual place details */
-const PLACE_DETAILS_CACHE_TTL = 24 * 60 * 60 * 1000;
+const PLACE_DETAILS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Cap on persisted per-place detail entries. Bounds AsyncStorage write size
@@ -73,8 +73,8 @@ const MAX_PLACE_DETAILS_ENTRIES = 200;
 
 const BTCMAP_BASE_URL = `${backendConfig.scoreApiBaseUrl}/app/btcmap`;
 
-function isCacheExpired(timestamp: number, ttl: number): boolean {
-  return Date.now() - timestamp > ttl;
+function isCacheExpired(timestampMs: number, ttlMs: number, nowMs: number): boolean {
+  return nowMs - timestampMs > ttlMs;
 }
 
 // Shared schemas tolerate new upstream fields; detail parsing preserves osm:*.
@@ -156,7 +156,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
 
       getCachedPlaces: () => {
         const cache = get().placesCache;
-        if (!cache || isCacheExpired(cache.timestamp, PLACES_CACHE_TTL)) return null;
+        if (!cache || isCacheExpired(cache.timestamp, PLACES_CACHE_TTL_MS, Date.now())) return null;
         return cache.data;
       },
 
@@ -233,7 +233,8 @@ export const useBTCMapStore = create<BTCMapStore>()(
 
       getCachedPlaceDetails: (id: number) => {
         const cache = get().placeDetailsCache[id];
-        if (!cache || isCacheExpired(cache.timestamp, PLACE_DETAILS_CACHE_TTL)) return null;
+        if (!cache || isCacheExpired(cache.timestamp, PLACE_DETAILS_CACHE_TTL_MS, Date.now()))
+          return null;
         return cache.data;
       },
 

@@ -134,6 +134,10 @@ export {
   normalizeTimelineMintState,
   resolveEntryState,
   isCancellablePendingEcash,
+  railHeaderTitle,
+  transactionHeaderPhase,
+  transactionHeaderRail,
+  transactionHeaderTitle,
   isMeltQuotePaid,
   isMeltQuoteReadyToPay,
   isMintExpired,
@@ -142,7 +146,6 @@ export {
   isPendingTransaction,
   isReceiveTokenPending,
   isReceiveTokenRedeemed,
-  isReservedSendHistoryEntry,
   isSendTokenCancelled,
   isSendTokenComplete,
   isSettledReceiveHistoryEntry,
@@ -153,6 +156,8 @@ export {
   shouldShowMintOfflineWarning,
 } from "./history";
 export type {
+  TransactionHeaderPhase,
+  TransactionHeaderRail,
   BuildTimelineInput,
   ColadaTimelineItem,
   OnchainConfirmationProgress,
@@ -374,6 +379,8 @@ export {
   type MintSelectionConfig,
 } from "./mint-selection";
 export {
+  accountMintCandidates,
+  accountMintUrls,
   buildMethodAwareMintCandidates,
   createAmountEntryMethodContext,
   deriveMintMethodCapabilityMapFromTrustedMints,

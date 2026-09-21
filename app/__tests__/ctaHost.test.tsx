@@ -276,7 +276,8 @@ it.each(['primary', 'secondary'])(
     const view = render(<HostWithScreen />);
     mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: '(prompt-flow)' }] };
     view.rerender(<HostWithScreen id="backup-recovery-phrase" />);
-    await act(async () => fireEvent.press(view.UNSAFE_getByProps({ testID: `cta-${action}` })));
+    fireEvent.press(view.UNSAFE_getByProps({ testID: `cta-${action}` }));
+    await act(async () => {});
     act(() => mockAddListener.mock.calls.at(-1)![1]());
     mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
     view.rerender(<HostWithScreen />);
@@ -322,7 +323,8 @@ it('hands off a directly opened CTA route even without a reserved active ID', as
   mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }, { name: '(prompt-flow)' }] };
   const view = render(<HostWithScreen id="backup-recovery-phrase" />);
   expect(useCtaStore.getState().activeId).toBeNull();
-  await act(async () => fireEvent.press(view.UNSAFE_getByProps({ testID: 'cta-primary' })));
+  fireEvent.press(view.UNSAFE_getByProps({ testID: 'cta-primary' }));
+  await act(async () => {});
   mockNavigation = { key: 'root', routes: [{ name: '(drawer)' }] };
   view.rerender(<HostWithScreen />);
   expect(mockPush).toHaveBeenCalledWith('/(prompt-flow)/backup-intro');

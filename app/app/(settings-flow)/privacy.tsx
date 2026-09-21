@@ -1,5 +1,5 @@
-import { SettingsLegalScreen } from '@/features/settings/screens/SettingsLegalScreen';
+import { LegalDocumentScreen } from '@/shared/blocks/LegalDocumentScreen';
 
 export default function PrivacyRoute() {
-  return <SettingsLegalScreen documentId="privacy" />;
+  return <LegalDocumentScreen documentId="privacy" />;
 }

@@ -16,7 +16,7 @@ import React, { memo, useCallback, useEffect, useState } from 'react';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
-import { type WalletContext } from 'wallet';
+import { accountMintUrls, type WalletContext } from 'wallet';
 import { type UseStandingPaymentRequestResult } from 'wallet/react';
 import { paymentLog } from '@/shared/lib/logger';
 import { expectedQrPayloadLength } from '@/shared/lib/qr';
@@ -36,7 +36,7 @@ import Icon from 'assets/icons';
 interface ReceivePaymentRequestTabProps {
   unit: string;
   active?: boolean;
-  walletContext: Pick<WalletContext, 'trustedMintUrls'>;
+  walletContext: Pick<WalletContext, 'trustedMintUrls' | 'mintMethodCapabilities'>;
   /** Latest keyring P2PK pubkey (02-prefixed) — the only key coco's claim
    *  path can sign for (exact persisted-'p2pk' lookup). Absent → the lock
    *  toggle is disabled. */
@@ -75,7 +75,7 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
   const creqP2pkLock = useMintStore((s) => s.creqP2pkLock);
   const setCreqP2pkLock = useMintStore((s) => s.setCreqP2pkLock);
   const setCreqMintExcluded = useMintStore((s) => s.setCreqMintExcluded);
-  const mints = walletContext.trustedMintUrls;
+  const mints = accountMintUrls(walletContext);
 
   const { request, error, rotate } = creq;
 

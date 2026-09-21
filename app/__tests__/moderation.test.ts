@@ -10,10 +10,15 @@ import {
   type MuteList,
 } from '../features/feed/lib/moderation';
 import type { FeedEvent, FeedItem } from '../features/feed/components/nostr/feedTypes';
+import {
+  asNostrPubkeyHex,
+  NostrEventIdSchema,
+  type NostrPubkeyHex,
+} from '../shared/lib/protocolIds';
 
-const person = 'a'.repeat(64);
+const person = asNostrPubkeyHex('a'.repeat(64));
 const other = 'b'.repeat(64);
-const post = 'c'.repeat(64);
+const post = NostrEventIdSchema.parse('c'.repeat(64));
 const list = (tags: string[][] = [], privateTags: string[][] = []): MuteList => ({
   id: 'd'.repeat(64),
   createdAt: 10,
@@ -106,7 +111,7 @@ describe('Nostr moderation contracts', () => {
       ['p', person, 'illegal'],
       ['e', post, 'illegal'],
     ]);
-    expect(() => reportTags('not-a-key', 'spam')).toThrow();
+    expect(() => reportTags('not-a-key' as NostrPubkeyHex, 'spam')).toThrow();
   });
 });
 

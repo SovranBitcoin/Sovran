@@ -146,7 +146,7 @@ export function MapScreen() {
 
         const loc = await Location.getCurrentPositionAsync({});
         // Privacy: offset camera so it doesn't centre on exact position
-        const safe = applySafetyOffset(loc.coords.latitude, loc.coords.longitude);
+        const safe = applySafetyOffset(loc.coords);
         setCamera({ lat: safe.latitude, lon: safe.longitude, zoom: 12 });
         updateMarkersForCamera(safe.latitude, safe.longitude, 12);
       } catch (err) {
@@ -160,7 +160,7 @@ export function MapScreen() {
   const handleMyLocation = async () => {
     try {
       const loc = await Location.getCurrentPositionAsync({});
-      const safe = applySafetyOffset(loc.coords.latitude, loc.coords.longitude);
+      const safe = applySafetyOffset(loc.coords);
       setCamera({ lat: safe.latitude, lon: safe.longitude, zoom: 15 });
       updateMarkersForCamera(safe.latitude, safe.longitude, 15);
     } catch (err) {

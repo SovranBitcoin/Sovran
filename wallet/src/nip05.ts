@@ -153,7 +153,8 @@ export async function fetchNip05Pubkey(
   }
 
   const names = result.data.names;
-  const hex = names[username] ?? names[username.toLowerCase()] ?? null;
+  const pick = (key: string) => (Object.hasOwn(names, key) ? names[key] : undefined);
+  const hex = pick(username) ?? pick(username.toLowerCase()) ?? null;
   if (!hex) {
     logger.info('nip05.resolve.empty', {
       domain,

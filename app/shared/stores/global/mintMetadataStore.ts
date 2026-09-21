@@ -16,8 +16,9 @@
  * `getMintCatalog`, the discover seed (`upsertFromDiscover`) and the manager
  * attach below — screens read, they do not write ad-hoc derived fields.
  *
- * Raw `info` (NUT-06) and `auditData` blobs are retained verbatim because the
- * mint-info screen derives swap success-rate / latency from `auditData.swaps`
+ * Raw `info` (NUT-06) and `auditData` blobs are retained verbatim because
+ * rebalance routing builds its swap graph from `auditData.swaps` (and
+ * `selectMintAudit` falls back to the blob for a mint nagg has no audit for),
  * and operator-pubkey extraction needs the full NUT-06 contact array. "Cache
  * the aggregate, not the rows" applies strictly to KYM review rows, which are
  * never persisted here — only their `averageScore` / `reviewCount`.
@@ -32,7 +33,7 @@ import { z } from 'zod';
 import { create } from 'zustand';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 
-import { transformAuditData } from '@/features/mint/lib/auditInfo';
+import { auditGroupFromDiscover } from '@/features/mint/lib/auditInfo';
 import { auditScoreFromOps } from '@/features/mint/lib/auditScore';
 import type { LegacyMintAudit, MintMetadataEntry } from './mintMetadataTypes';
 import type { DiscoverMint } from '@/shared/lib/apiClient';
@@ -72,7 +73,12 @@ interface MintMetadataState {
     partial: Partial<MintMetadataEntry>,
     groups: MintMetaGroup[]
   ) => void;
-  isStale: (mintUrl: string, group: MintMetaGroup, maxAgeMinutes?: number) => boolean;
+  isStale: (
+    mintUrl: string,
+    group: MintMetaGroup,
+    maxAgeMinutes?: number,
+    nowMs?: number
+  ) => boolean;
 
   // Thin group setters — 1:1 replacements for the old stores' `setCached`.
   setIdentity: (mintUrl: string, info: GetInfoResponse) => void;
@@ -140,6 +146,18 @@ const PersistedMintMetadataStore = z.object({
   legacyMigrated: z.boolean().default(false),
 });
 
+/** True when the entry is missing, the group was never stamped, or its stamp is older than the window. */
+export function isMintMetaGroupStale(
+  entry: MintMetadataEntry | undefined,
+  group: MintMetaGroup,
+  nowMs: number,
+  maxAgeMinutes: number = MINT_META_TTL_MIN[group]
+): boolean {
+  const stampedAt = entry?.[GROUP_STAMP[group]];
+  if (!entry || typeof stampedAt !== 'number') return true;
+  return (nowMs - stampedAt) / (1000 * 60) > maxAgeMinutes;
+}
+
 /** Most-recent touch across all groups — drives LRU eviction. */
 function lastTouched(entry: MintMetadataEntry): number {
   return Math.max(
@@ -169,14 +187,16 @@ function identityFromInfo(info: GetInfoResponse): Partial<MintMetadataEntry> {
 
 /** Audit scalars projected from a raw auditor response. */
 function auditScalarsFrom(auditData: LegacyMintAudit): Partial<MintMetadataEntry> {
-  const { score } = transformAuditData(auditData);
-  return {
-    auditData,
-    auditScore: typeof score === 'number' ? score : null,
-    auditState: auditData.state,
+  const counts = {
     nMints: auditData.n_mints,
     nMelts: auditData.n_melts,
     nErrors: auditData.n_errors,
+  };
+  return {
+    auditData,
+    auditScore: auditScoreFromOps(counts).score,
+    auditState: auditData.state,
+    ...counts,
   };
 }
 
@@ -204,12 +224,13 @@ export const useMintMetadataStore = create<MintMetadataState>()(
           });
         },
 
-        isStale: (mintUrl, group, maxAgeMinutes = MINT_META_TTL_MIN[group]) => {
-          const entry = get().byMintUrl[normalizeMintUrlKey(mintUrl)];
-          const stampedAt = entry?.[GROUP_STAMP[group]];
-          if (!entry || typeof stampedAt !== 'number') return true;
-          return (Date.now() - stampedAt) / (1000 * 60) > maxAgeMinutes;
-        },
+        isStale: (mintUrl, group, maxAgeMinutes, nowMs = Date.now()) =>
+          isMintMetaGroupStale(
+            get().byMintUrl[normalizeMintUrlKey(mintUrl)],
+            group,
+            nowMs,
+            maxAgeMinutes
+          ),
 
         setIdentity: (mintUrl, info) => {
           get().mergeCached(mintUrl, identityFromInfo(info), ['identity']);
@@ -261,16 +282,7 @@ export const useMintMetadataStore = create<MintMetadataState>()(
               // Stamp a group's `*At` ONLY when this row actually carried that
               // group's data — otherwise `isStale` lies and a consumer skips a
               // needed refetch.
-              const hasAudit =
-                m.state !== undefined ||
-                m.nMints !== undefined ||
-                m.nMelts !== undefined ||
-                m.nErrors !== undefined ||
-                m.uptime24h !== undefined ||
-                m.avgLatencyMs !== undefined;
-              // Discovery's operation score (successes vs errors) — one owner
-              // for the formula so search, store and detail can never disagree.
-              const auditScore = auditScoreFromOps(m).score;
+              const auditGroup = auditGroupFromDiscover(m);
               // A follower COUNT alone is not "social resolved": `resolveNostrProfile`
               // reads the `social` group to decide whether the operator-profile
               // fetch (which yields reputation) can be skipped. A discover row that
@@ -300,18 +312,10 @@ export const useMintMetadataStore = create<MintMetadataState>()(
                 ...(m.reviewCount !== undefined ? { reviewCount: m.reviewCount } : {}),
                 ...(m.favouriteCount !== undefined ? { favouriteCount: m.favouriteCount } : {}),
                 reviewsAt: now,
-                // audit scalars (no raw swaps) — stamp only when present.
-                // Use `!== undefined` (not truthiness) to match `hasAudit`, so a
-                // falsy-but-present state can't stamp `auditAt` without storing it.
-                ...(m.state !== undefined ? { auditState: m.state } : {}),
-                ...(m.nMints !== undefined ? { nMints: m.nMints } : {}),
-                ...(m.nMelts !== undefined ? { nMelts: m.nMelts } : {}),
-                ...(m.nErrors !== undefined ? { nErrors: m.nErrors } : {}),
-                ...(hasAudit ? { auditScore, auditAt: now } : {}),
-                ...(m.uptime24h !== undefined ? { uptime24h: m.uptime24h } : {}),
-                ...(m.avgLatencyMs !== undefined ? { avgLatencyMs: m.avgLatencyMs } : {}),
-                ...(m.auditSource !== undefined ? { auditSource: m.auditSource } : {}),
-                ...(m.auditUpdatedAt !== undefined ? { auditUpdatedAt: m.auditUpdatedAt } : {}),
+                // audit — the whole group at once. Its `undefined` keys are
+                // deliberate: they drop what the previous auditor's row left
+                // behind (a mint moving from ucash to 8333 loses its latency).
+                ...(auditGroup ? { ...auditGroup, auditAt: now } : {}),
                 // social — guard reputation on a real number so a `null`
                 // ("unknown") row can't clobber a previously-resolved reputation.
                 ...(m.followers !== undefined ? { contactFollowers: m.followers } : {}),
@@ -377,23 +381,28 @@ export async function getCachedMintInfo(
   const key = normalizeMintUrlKey(mintUrl);
   const entry = useMintMetadataStore.getState().byMintUrl[key];
   const now = Date.now();
+  // `info` rehydrates as `unknown`; anything that is not an object is a miss.
+  const cachedInfo =
+    typeof entry?.info === 'object' && entry.info !== null && !Array.isArray(entry.info)
+      ? entry.info
+      : undefined;
   const isFresh =
-    !!entry?.info &&
-    typeof entry.identityAt === 'number' &&
+    !!cachedInfo &&
+    typeof entry?.identityAt === 'number' &&
     now - entry.identityAt <= IDENTITY_STALE_TTL_MS;
 
-  if (isFresh) {
+  if (cachedInfo && isFresh) {
     storeLog.debug('store.mint_metadata.info.hit_fresh', {
       key,
-      ageMs: now - (entry.identityAt ?? 0),
+      ageMs: now - (entry?.identityAt ?? 0),
     });
-    return entry.info as GetInfoResponse;
+    return cachedInfo;
   }
 
-  if (entry?.info) {
+  if (cachedInfo) {
     storeLog.info('store.mint_metadata.info.hit_stale', { key });
     refreshInBackground(fetcher, mintUrl);
-    return entry.info as GetInfoResponse;
+    return cachedInfo;
   }
 
   storeLog.info('store.mint_metadata.info.miss', { key });
@@ -508,7 +517,7 @@ const LegacyMintInfo = z.looseObject({
   description: z.string().optional().catch(undefined),
 });
 
-/** Auditor fields `auditScalarsFrom` / `transformAuditData` read. */
+/** Auditor fields `auditScalarsFrom` / `selectMintAudit` read. */
 const LegacyAuditData = z.looseObject({
   url: z.string(),
   name: z.string(),

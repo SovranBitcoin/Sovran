@@ -37,8 +37,8 @@ function parseLock(path: string): LockRecord {
   let value: unknown;
   try {
     value = JSON.parse(readFileSync(path, 'utf8'));
-  } catch {
-    throw new Error('funded-run lock is corrupt');
+  } catch (cause) {
+    throw new Error('funded-run lock is corrupt', { cause });
   }
   const record = value as Partial<LockRecord>;
   if (

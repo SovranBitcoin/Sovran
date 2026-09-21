@@ -21,7 +21,7 @@ interface DecryptedDm {
   senderPubkey: string;
   content: string;
   /** Send time (unix seconds): inner rumor time for NIP-17, event time for NIP-04. */
-  createdAt: number;
+  createdAtSec: number;
   isOwn: boolean;
   protocol: DmProtocol;
 }
@@ -30,7 +30,7 @@ function pTagValue(tags: string[][]): string | undefined {
   return tags.find((t) => t[0] === 'p')?.[1];
 }
 
-function envelopeCreatedAt(envelope: DmEnvelope): number {
+function envelopeCreatedAtSec(envelope: DmEnvelope): number {
   const raw = envelope.createdAt;
   if (raw instanceof Date) return Math.floor(raw.getTime() / 1000);
   // nagg returns `createdAt` as a number OR a string (numeric or ISO-8601);
@@ -80,7 +80,7 @@ export function decryptDmEnvelopes(
         counterparty,
         senderPubkey: unwrapped.senderPubkey,
         content: unwrapped.content,
-        createdAt: unwrapped.created_at,
+        createdAtSec: unwrapped.created_at,
         isOwn: unwrapped.senderPubkey === viewerPubkey,
         protocol: 'nip17',
       });
@@ -116,7 +116,7 @@ export function decryptDmEnvelopes(
         counterparty,
         senderPubkey: envelope.pubkey,
         content,
-        createdAt: envelopeCreatedAt(envelope),
+        createdAtSec: envelopeCreatedAtSec(envelope),
         isOwn,
         protocol: 'nip04',
       });

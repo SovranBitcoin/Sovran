@@ -140,7 +140,7 @@ export function useMintContacts(
         dmEvent: convo
           ? { content: convo.lastMessagePreview, isOwn: convo.lastMessageIsOwn }
           : undefined,
-        timestamp: convo?.lastMessageAt ?? 0,
+        timestamp: convo?.lastMessageAtSec ?? 0,
       };
     });
   }, [mintsWithInfo, conversations]);

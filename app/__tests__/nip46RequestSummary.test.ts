@@ -346,7 +346,17 @@ describe('kind 9734 zap requests', () => {
   });
 
   it('rejects malformed and absurd amounts', () => {
-    for (const amount of ['-5', 'abc', '1.5', String(10 ** 16)]) {
+    for (const amount of [
+      '-5',
+      'abc',
+      '1.5',
+      String(10 ** 16),
+      '1e6',
+      '0x3e8',
+      ' 5000 ',
+      '1000.0',
+      '',
+    ]) {
       const summary = summarizeRequest(signEvent({ kind: 9734, tags: [['amount', amount]] }));
       expect((summary.detail as { amountSats?: number }).amountSats).toBeUndefined();
     }

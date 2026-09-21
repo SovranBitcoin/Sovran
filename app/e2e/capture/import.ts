@@ -36,7 +36,7 @@ const captureMetadata = z.object({
   fontScale: z.literal(1),
   motion: z.literal('reduced').optional(),
 });
-const captureRecord = z.object({
+export const captureRecord = z.object({
   platform: z.enum(['ios', 'android']),
   page: z.enum(CANONICAL_PAGES),
   state: z.string().regex(/^[a-z][a-z0-9-]*$/),
@@ -64,7 +64,6 @@ const captureRecord = z.object({
   sessionSha256: digest,
   captureProfile: captureMetadata,
 });
-export type CaptureRecord = z.infer<typeof captureRecord>;
 const attestation = z.object({
   sourceFingerprint: digest,
   appSourceBefore: stamp,

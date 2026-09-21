@@ -18,6 +18,8 @@ import { Badge } from '@/shared/ui/primitives/Badge';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
+import { Button } from '@/shared/ui/primitives/Button';
+import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -48,8 +50,17 @@ async function loadMerchantDetails(ctx: {
   getCachedPlaceDetails: (id: number) => BTCMapPlaceDetails | null;
   setPlace: (place: BTCMapPlaceDetails | null) => void;
   setIsLoading: (loading: boolean) => void;
+  setLoadFailed: (failed: boolean) => void;
 }): Promise<void> {
-  const { placeId, signal, fetchPlaceDetails, getCachedPlaceDetails, setPlace, setIsLoading } = ctx;
+  const {
+    placeId,
+    signal,
+    fetchPlaceDetails,
+    getCachedPlaceDetails,
+    setPlace,
+    setIsLoading,
+    setLoadFailed,
+  } = ctx;
   if (!placeId) {
     setIsLoading(false);
     return;
@@ -75,6 +86,7 @@ async function loadMerchantDetails(ctx: {
   } catch (err) {
     if (isAbortError(err)) return;
     log.error('map.merchant.fetch_failed', { error: err });
+    setLoadFailed(true);
   } finally {
     if (!signal.aborted) setIsLoading(false);
   }
@@ -143,6 +155,8 @@ export function MerchantDetailScreen() {
 
   const [place, setPlace] = useState<BTCMapPlaceDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -154,9 +168,16 @@ export function MerchantDetailScreen() {
       getCachedPlaceDetails,
       setPlace,
       setIsLoading,
+      setLoadFailed,
     });
     return () => controller.abort();
-  }, [placeId, fetchPlaceDetails, getCachedPlaceDetails]);
+  }, [placeId, fetchPlaceDetails, getCachedPlaceDetails, retryCount]);
+
+  const handleRetry = () => {
+    setLoadFailed(false);
+    setIsLoading(true);
+    setRetryCount((count) => count + 1);
+  };
 
   useEffect(() => {
     if (place?.name) {
@@ -233,6 +254,28 @@ export function MerchantDetailScreen() {
           <Text size={14} style={{ color: withAlpha(foreground, 0.5), marginTop: 12 }}>
             Loading merchant details...
           </Text>
+        </View>
+      </Screen>
+    );
+  }
+
+  if (loadFailed && !place) {
+    return (
+      <Screen name="MerchantDetailScreen" scroll="custom" bgColor={background}>
+        <View style={styles.loadingContainer}>
+          <EmptyState
+            icon="mdi:cloud-off-outline"
+            title="Couldn't load this merchant"
+            subtitle="Check your connection and try again."
+            action={
+              <Button
+                testID="merchant-detail-retry"
+                text="Try again"
+                variant="secondary"
+                onPress={handleRetry}
+              />
+            }
+          />
         </View>
       </Screen>
     );

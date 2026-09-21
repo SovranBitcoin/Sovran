@@ -57,6 +57,11 @@ const MELT_OP_STATE_TO_LEGACY: Record<string, string> = {
   finalized: "PAID",
 };
 
+/** States are open strings from Coco and mint responses; never read inherited members. */
+function own<T>(table: Record<string, T>, key: string): T | undefined {
+  return Object.hasOwn(table, key) ? table[key] : undefined;
+}
+
 /**
  * Map a v2 operation state to the legacy consumer-contract vocabulary.
  * Legacy states and unknown values pass through unchanged. This is the
@@ -65,8 +70,8 @@ const MELT_OP_STATE_TO_LEGACY: Record<string, string> = {
  */
 export function normalizeContractState(flow: TimelineFlow, raw: string): string {
   if (raw === "rolled_back") return "rolledBack";
-  if (flow === "mint") return MINT_OP_STATE_TO_LEGACY[raw] ?? raw;
-  if (flow === "melt") return MELT_OP_STATE_TO_LEGACY[raw] ?? raw;
+  if (flow === "mint") return own(MINT_OP_STATE_TO_LEGACY, raw) ?? raw;
+  if (flow === "melt") return own(MELT_OP_STATE_TO_LEGACY, raw) ?? raw;
   return raw;
 }
 
@@ -161,8 +166,7 @@ export function entryStateRank(
   state: string | null | undefined,
 ): number {
   if (state == null) return -1;
-  const rank = STATE_RANKS[flow][state.toLowerCase()];
-  return rank == null ? -1 : rank;
+  return own(STATE_RANKS[flow], state.toLowerCase()) ?? -1;
 }
 
 /**

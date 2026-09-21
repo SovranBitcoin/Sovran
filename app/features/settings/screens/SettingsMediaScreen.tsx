@@ -255,7 +255,7 @@ export const SettingsMediaScreen = () => {
       url: blob.url,
     });
     if (deleted) {
-      popup({ message: 'Image deleted', type: 'success', variant: 'toast', duration: 1500 });
+      popup({ message: 'Image deleted', type: 'success', variant: 'toast', durationMs: 1500 });
     } else {
       popup({
         message: "Couldn't delete image",

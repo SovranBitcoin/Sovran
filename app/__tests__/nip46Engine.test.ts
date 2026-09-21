@@ -378,6 +378,23 @@ describe('pipeline auto verdicts', () => {
     expect(useNip46RequestsStore.getState().throttledApps[APP]).toBe(now + 1); // cooldownUntil
   });
 
+  it('logs a detached response the transport could not send', async () => {
+    pairApp();
+    const { emit, transport, rateLimiter } = makeEngine();
+    rateLimiter.take.mockReturnValue({ allowed: false, throttled: false });
+    transport.sendResponse.mockReturnValueOnce(errAsync({ type: 'no-relays' as const }) as never);
+
+    emit(makeEvent(rpc('sign_event', signEventParams())));
+    await flush();
+
+    const { nostrLog } = jest.requireMock('@/shared/lib/logger') as {
+      nostrLog: { warn: jest.Mock };
+    };
+    expect(nostrLog.warn).toHaveBeenCalledWith('nostr.signer.engine_respond_failed', {
+      type: 'no-relays',
+    });
+  });
+
   it('answers "malformed request" for an unparseable sign_event payload', async () => {
     pairApp();
     const { emit, sent } = makeEngine();

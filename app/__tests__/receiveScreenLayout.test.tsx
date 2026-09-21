@@ -8,7 +8,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 
 import { useScreenOptions } from '@/shared/ui/composed/Screen';
 import { UnitSwitcherPillFallback } from '@/features/wallet/components/UnitSwitcherPill/UnitSwitcherPill.fallback';
-import { createPaymentMachine, type PaymentMachine } from 'wallet';
+import { createPaymentMachine, FormattedString, type PaymentMachine } from 'wallet';
 import { ReceiveScreen } from '@/features/receive/screens/ReceiveScreen';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -413,10 +413,7 @@ describe('ReceiveScreen layout stability', () => {
   });
 
   it('renders the QR display shell and footer Copy on the first valid entry render', () => {
-    const npcAddress = {
-      toString: () => 'npubcash1example',
-      truncate: () => 'npubca...ample',
-    };
+    const npcAddress = new FormattedString('npubcash1example');
     mockUseScreenActions.mockReturnValue({
       entry: {
         type: 'receive',
@@ -471,7 +468,7 @@ describe('ReceiveScreen layout stability', () => {
       entry: {
         type: 'receive',
         id: 'receive-hub',
-        npcAddress: { toString: () => 'fixture@npub.cash', truncate: () => 'fixture' },
+        npcAddress: new FormattedString('fixture@npub.cash'),
       },
       error: null,
       actions: receiveActions(),
@@ -507,7 +504,7 @@ describe('ReceiveScreen layout stability', () => {
     };
     const entry = {
       ...raw,
-      npcAddress: { toString: () => raw.npcAddress, truncate: () => 'fixture' },
+      npcAddress: new FormattedString(raw.npcAddress),
     };
     mockUseScreenActions.mockReturnValue({ entry, error: null, actions: receiveActions() });
     let renderer!: TestRenderer.ReactTestRenderer;

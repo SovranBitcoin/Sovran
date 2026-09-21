@@ -1,7 +1,7 @@
 /** @jest-environment node */
 import { err, ok } from 'neverthrow';
 import { createPricelistFeed, POLL_MS } from '@/shared/lib/pricelistFeed';
-import { ApiHttpError, fetchBtcRates } from '@/shared/lib/apiClient';
+import { ApiHttpError, ApiParseError, fetchBtcRates } from '@/shared/lib/apiClient';
 import { log } from '@/shared/lib/logger';
 import { PRICE_STALE_MINUTES, usePricelistStore } from '@/shared/stores/global/pricelistStore';
 
@@ -116,8 +116,8 @@ describe('pricelist polling', () => {
     feed.start();
     await settle();
     let calls = 1;
-    for (const delay of [30_000, 60_000, 120_000, 300_000, 300_000]) {
-      await jest.advanceTimersByTimeAsync(delay - 1);
+    for (const delayMs of [30_000, 60_000, 120_000, 300_000, 300_000]) {
+      await jest.advanceTimersByTimeAsync(delayMs - 1);
       expect(fetcher).toHaveBeenCalledTimes(calls);
       await jest.advanceTimersByTimeAsync(1);
       expect(fetcher).toHaveBeenCalledTimes(++calls);
@@ -284,6 +284,21 @@ describe('pricelist HTTP boundary', () => {
     if (result.isErr()) {
       expect(result.error).toBeInstanceOf(ApiHttpError);
       expect(result.error).toMatchObject({ status: 503 });
+    }
+  });
+
+  it('types a schema failure so callers can tell it from a transport failure', async () => {
+    jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify({ ...payload, rates: { USD: { price: 'leaked-input' } } }))
+      );
+    const result = await fetchBtcRates();
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error).toBeInstanceOf(ApiParseError);
+      expect(JSON.stringify(result.error)).not.toContain('leaked-input');
+      expect(result.error.cause).toBeUndefined();
     }
   });
 });

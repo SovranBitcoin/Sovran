@@ -35,7 +35,7 @@ interface PopupConfig {
   icon?: PopupIcon;
   variant?: PopupVariant;
   dismissable?: boolean;
-  duration?: number;
+  durationMs?: number;
   buttons?: PopupButton[];
   buttonLayout?: 'row' | 'stack';
   onOpen?: () => void;
@@ -71,7 +71,7 @@ export const popup = (config: PopupConfig) => {
     variant,
     type: severity,
     buttonCount: resolvedButtons.length,
-    duration: options.duration,
+    durationMs: options.durationMs,
     hasIcon: !!icon,
     hasLive: !!options.live,
     errorId: errorPresentation?.id,
@@ -84,7 +84,7 @@ export const popup = (config: PopupConfig) => {
       submessage: text,
       icon,
       dismissable: options.dismissable ?? true,
-      duration: options.duration,
+      durationMs: options.durationMs,
       buttons: resolvedButtons,
       buttonLayout: options.buttonLayout,
       onClose: options.onClose,
@@ -105,7 +105,7 @@ export const popup = (config: PopupConfig) => {
     label: message,
     description,
     icon,
-    duration: options.duration,
+    durationMs: options.durationMs,
     onShow: options.onOpen,
     onHide: options.onClose ? () => options.onClose!({ reason: 'dismiss' }) : undefined,
     e2eProbeKey,

@@ -165,7 +165,7 @@ export function useNutDropCelebration({
   useEffect(() => {
     if (celebrationPhase === 'idle') return;
     const holdMs = abbreviated ? CELEBRATION_HOLD_ABBREVIATED_MS : CELEBRATION_HOLD_MS;
-    const delay =
+    const delayMs =
       celebrationPhase === 'centering'
         ? CELEBRATION_CENTERING_MS
         : celebrationPhase === 'awaiting'
@@ -179,7 +179,7 @@ export function useNutDropCelebration({
     const scheduledDebug = celebrationDebugRef.current;
     paymentLog.debug('near_pay.celebration.phase_scheduled', {
       phase: scheduledPhase,
-      delayMs: delay,
+      delayMs,
       peerID: scheduledDebug.peerID,
       waiting: scheduledDebug.waiting,
       hasAmount: scheduledDebug.hasAmount,
@@ -191,7 +191,7 @@ export function useNutDropCelebration({
         peerID: scheduledDebug.peerID,
       });
       dispatch({ type: 'phase-complete', phase: scheduledPhase, now: Date.now() });
-    }, delay);
+    }, delayMs);
     return () => clearTimeout(timer);
   }, [abbreviated, celebrationPhase]);
 

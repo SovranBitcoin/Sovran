@@ -1,10 +1,13 @@
 import { useEffect, useMemo } from 'react';
+import type { InviteReader } from '@internet-privacy/marmot-ts';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useWhitenoise } from '../WhitenoiseContext';
 import { resolveInboxRelays } from '../client/network';
 import { AsyncStorageKVBackend } from '../storage/asyncStorageBackend';
 import { WhitenoiseNamespace, whitenoisePrefix } from '../storage/namespaces';
 import { wnLog } from '@/shared/lib/logger';
+
+type GiftWrapEvent = Parameters<InviteReader['ingestEvent']>[0];
 
 const GIFT_WRAP_KIND = 1059;
 const CURSOR_KEY = 'last-seen-at';
@@ -52,7 +55,7 @@ export function useWhitenoiseInbox() {
     // Track the highest created_at seen this session so listener-side
     // ingest events can update the persisted cursor without racing each
     // other on the AsyncStorage write.
-    let cursorHigh = 0;
+    let cursorHighSec = 0;
 
     void (async () => {
       // Prefer the user's published kind-10051 inbox relays if any; fall
@@ -63,10 +66,11 @@ export function useWhitenoiseInbox() {
       // No cursor on first cold start: full backfill once so users with
       // pre-cursor history don't silently drop unread invites. Subsequent
       // starts bound the relay-to-device fetch to events we haven't seen.
-      const persistedCursor = await cursorStore.getItem(CURSOR_KEY);
+      const persistedCursorSec = await cursorStore.getItem(CURSOR_KEY);
       if (cancelled) return;
-      cursorHigh = persistedCursor ?? 0;
-      const since = persistedCursor !== null ? persistedCursor - CURSOR_SLACK_SECONDS : undefined;
+      cursorHighSec = persistedCursorSec ?? 0;
+      const since =
+        persistedCursorSec !== null ? persistedCursorSec - CURSOR_SLACK_SECONDS : undefined;
 
       wnLog.info('whitenoise.inbox.start', {
         relayCount: inboxRelays.length,
@@ -100,25 +104,24 @@ export function useWhitenoiseInbox() {
       unsubscribe = () => handle.unsubscribe();
     })();
 
-    async function handleGiftWrap(event: unknown): Promise<void> {
-      const ev = event as { id?: string; kind?: number; created_at?: number };
-      if (!ev?.id || ev.kind !== GIFT_WRAP_KIND) return;
+    async function handleGiftWrap(ev: GiftWrapEvent): Promise<void> {
+      if (!ev.id || ev.kind !== GIFT_WRAP_KIND) return;
       const reader = inviteReader;
       if (!reader) return;
 
       // Stage 1: ingest into the `received` store. Returns false if we've
       // seen this event before (deduped via the InviteReader's `seen` map).
-      const fresh = await reader.ingestEvent(event as Parameters<typeof reader.ingestEvent>[0]);
+      const fresh = await reader.ingestEvent(ev);
       if (cancelled) return;
       if (!fresh) return;
 
       // Advance the persisted cursor monotonically. created_at is seconds.
       // Skipping the write on stale events bounds AsyncStorage churn to the
       // narrow tail of newer gift wraps once we've caught up.
-      const createdAt = typeof ev.created_at === 'number' ? ev.created_at : 0;
-      if (createdAt > cursorHigh) {
-        cursorHigh = createdAt;
-        cursorStore.setItem(CURSOR_KEY, cursorHigh).catch((err) => {
+      const createdAtSec = typeof ev.created_at === 'number' ? ev.created_at : 0;
+      if (createdAtSec > cursorHighSec) {
+        cursorHighSec = createdAtSec;
+        cursorStore.setItem(CURSOR_KEY, cursorHighSec).catch((err) => {
           wnLog.debug('whitenoise.inbox.cursor_persist_failed', {
             error: err instanceof Error ? err.message : String(err),
           });

@@ -346,9 +346,7 @@ describe('SettingsRecoveryScreen gate confirmation', () => {
     expect(mockRestoreKeyset).toHaveBeenCalledTimes(2);
     expect(mockRestoreKeyset).toHaveBeenCalledWith(
       expect.anything(),
-      MINT_URL,
-      KEYSET_A,
-      'sat',
+      { mintUrl: MINT_URL, keysetId: KEYSET_A, unit: 'sat' },
       expect.objectContaining({ ready: expect.any(Number), spent: expect.any(Number) })
     );
     expect(
@@ -444,9 +442,7 @@ describe('SettingsRecoveryScreen gate confirmation', () => {
     expect(mockRestoreKeyset).toHaveBeenCalledTimes(1);
     expect(mockRestoreKeyset).toHaveBeenCalledWith(
       expect.anything(),
-      MINT_URL,
-      KEYSET_A,
-      'sat',
+      { mintUrl: MINT_URL, keysetId: KEYSET_A, unit: 'sat' },
       expect.objectContaining({ ready: expect.any(Number), spent: expect.any(Number) })
     );
     const texts = renderer!.root

@@ -1,7 +1,9 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# log-doctor working file
+# log-doctor working files. LOG.txt is what `bun run dev` tees the session to;
+# both spellings are listed because only macOS matches them case-insensitively.
 log.txt
+LOG.txt
 
 # WebDriverAgent bring-up log (start-wda.sh)
 wda.log

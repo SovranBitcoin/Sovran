@@ -13,12 +13,13 @@
  * delivered (i.e. operationId is present or phase is 'delivered').
  */
 
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
 import {
   getAvailableActions,
   isPaymentRequestPreview,
 } from "../../src/screen-actions/availability";
 import { deriveMintMethodCapabilityMapFromTrustedMints } from "../../src/mint-capabilities";
+import { setLogger } from "../../src/logger";
 import { INPUTS, MINT1, MINT2 } from "../_harness/fixtures";
 
 describe("screen action availability — back", () => {
@@ -722,6 +723,147 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     });
   });
 
+  it("reads an onchain minimum in every AmountLike form the mint info can carry", () => {
+    // cashu-ts types NUT-04 bounds as AmountLike; a bound read as "numbers
+    // only" is silently dropped and onchain is offered below the minimum.
+    for (const min_amount of [1_000, "1000", 1_000n, { toNumber: () => 1_000 }]) {
+      const actions = getAvailableActions("amountEntry", {
+        destination: "mintQuote",
+        effectiveAmount: { value: 100, unit: "sat" },
+        unit: "sat",
+        methodContext: {
+          trustedMintUrls: [MINT1],
+          mintBalances: { [MINT1]: 0 },
+          mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+            {
+              mintUrl: MINT1,
+              mintInfo: {
+                nuts: {
+                  "4": {
+                    methods: [
+                      { method: "bolt11", unit: "sat" },
+                      { method: "onchain", unit: "sat", min_amount },
+                    ],
+                  },
+                },
+              },
+            },
+          ]),
+        },
+      });
+      expect(
+        actions.next.variants?.find((variant) => variant.id === "onchain"),
+      ).toMatchObject({ available: false, reason: "Minimum 1,000 sat" });
+    }
+  });
+
+  it("ignores an onchain bound that is not a safe positive integer of minor units", () => {
+    // NUT-04 bounds are untrusted mint input. `Number` alone reads "0x3e8" as
+    // 1000 and "1000.5" as a fractional sat; neither is a count of minor units,
+    // so each must read as "no bound advertised" rather than gate the rail on a
+    // number the mint did not mean.
+    for (const min_amount of ["0x3e8", "1000.5", " 1e3", "1,000", Number.MAX_SAFE_INTEGER + 2]) {
+      const actions = getAvailableActions("amountEntry", {
+        destination: "mintQuote",
+        effectiveAmount: { value: 100, unit: "sat" },
+        unit: "sat",
+        methodContext: {
+          trustedMintUrls: [MINT1],
+          mintBalances: { [MINT1]: 0 },
+          mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+            {
+              mintUrl: MINT1,
+              mintInfo: {
+                nuts: {
+                  "4": {
+                    methods: [
+                      { method: "bolt11", unit: "sat" },
+                      { method: "onchain", unit: "sat", min_amount },
+                    ],
+                  },
+                },
+              },
+            },
+          ]),
+        },
+      });
+      expect(
+        actions.next.variants?.find((variant) => variant.id === "onchain"),
+      ).toMatchObject({ available: true });
+    }
+  });
+
+  it("does not answer a sat question with a usd capability", () => {
+    // The capability map is derived for ONE unit and the wallet re-derives it
+    // when the active unit changes. In the window between, a `usd` map was
+    // being used to answer `sat`: the menu offered a rail whose bounds and
+    // support belonged to the other unit, and the picker it opened then found
+    // no mint. A mismatch must read as "not known for this unit".
+    const usdMap = deriveMintMethodCapabilityMapFromTrustedMints(
+      [
+        {
+          mintUrl: MINT1,
+          mintInfo: {
+            nuts: {
+              "4": {
+                methods: [
+                  { method: "bolt11", unit: "usd" },
+                  { method: "onchain", unit: "usd" },
+                ],
+              },
+            },
+          },
+        },
+      ],
+      "usd",
+    );
+    const actions = getAvailableActions("amountEntry", {
+      destination: "mintQuote",
+      effectiveAmount: { value: 100, unit: "sat" },
+      unit: "sat",
+      methodContext: {
+        trustedMintUrls: [MINT1],
+        mintBalances: { [MINT1]: 0 },
+        mintMethodCapabilities: usdMap,
+      },
+    });
+    const onchain = actions.next.variants?.find(
+      (variant) => variant.id === "onchain",
+    );
+    expect(onchain?.available ?? false).toBe(false);
+  });
+
+  it("never offers onchain receive through a mint across the testnut split", () => {
+    // MINT2 is a testnut with no onchain minimum; the real account's only
+    // onchain mint (MINT1) wants 1 000 sat. 100 sat must stay unavailable.
+    const onchainInfo = (min_amount?: number) => ({
+      nuts: {
+        "4": {
+          methods: [
+            { method: "bolt11", unit: "sat" },
+            { method: "onchain", unit: "sat", ...(min_amount ? { min_amount } : {}) },
+          ],
+        },
+      },
+    });
+    const actions = getAvailableActions("amountEntry", {
+      destination: "mintQuote",
+      effectiveAmount: { value: 100, unit: "sat" },
+      unit: "sat",
+      methodContext: {
+        trustedMintUrls: [MINT1, MINT2],
+        mintBalances: { [MINT1]: 0, [MINT2]: 0 },
+        mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+          { mintUrl: MINT1, mintInfo: onchainInfo(1_000) },
+          { mintUrl: MINT2, mintInfo: onchainInfo(), outsideAccount: true },
+        ]),
+      },
+    });
+    expect(
+      actions.next.variants?.find((variant) => variant.id === "onchain"),
+    ).toMatchObject({ available: false, reason: "Minimum 1,000 sat" });
+  });
+
   it("disables Lightning send when no trusted mint advertises NUT-05 bolt11", () => {
     const entry = {
       destination: "meltQuote",
@@ -825,6 +967,21 @@ describe("amountEntryAvailability — receive as Ecash (NUT-18 payment request)"
       (variant) => variant.id === "ecash",
     );
     expect(ecash?.available).toBe(true);
+  });
+
+  it("disables the ecash variant when every trusted mint is across the testnut split", () => {
+    // A real `sat` request must not be served by a testnut mint: both speak
+    // the real unit `sat`, so only the account scope keeps them apart.
+    const entry = mintQuoteEntry([MINT1]);
+    entry.methodContext.mintMethodCapabilities =
+      deriveMintMethodCapabilityMapFromTrustedMints([
+        { mintUrl: MINT1, outsideAccount: true },
+      ]);
+    const actions = getAvailableActions("amountEntry", entry);
+    const ecash = actions.next.variants?.find(
+      (variant) => variant.id === "ecash",
+    );
+    expect(ecash).toMatchObject({ available: false, reason: "No trusted mints" });
   });
 
   it("disables the ecash variant on receive when no trusted mints exist", () => {
@@ -966,5 +1123,81 @@ describe("receiveHubAvailability", () => {
     expect(actions.paste.available).toBe(false);
     expect(actions.fixedAmount.available).toBe(false);
     expect(actions.back.available).toBe(true);
+  });
+});
+
+describe("amountEntry — the log explains each Next method", () => {
+  afterEach(() => setLogger(null));
+
+  const methodLogs = (entry: Record<string, unknown>) => {
+    const logs: Record<string, unknown>[] = [];
+    const record = (event: string, fields?: Record<string, unknown>) => {
+      if (event.startsWith("screenActions.availability.amountEntry.method.")) {
+        logs.push(fields ?? {});
+      }
+    };
+    setLogger({ debug: record, info: record, warn: record, error: record });
+    getAvailableActions("amountEntry", entry);
+    return Object.fromEntries(logs.map((log) => [log.id, log]));
+  };
+
+  it("names the rule, its operands and each mint's verdict for a disabled method", () => {
+    const logs = methodLogs({
+      destination: "mintQuote",
+      effectiveAmount: { value: 500, unit: "sat" },
+      unit: "sat",
+      methodContext: {
+        trustedMintUrls: [MINT1, MINT2],
+        mintBalances: { [MINT1]: 0, [MINT2]: 0 },
+        mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+          {
+            mintUrl: MINT1,
+            mintInfo: {
+              nuts: { "4": { methods: [{ method: "bolt11", unit: "sat", min_amount: 1_000 }] } },
+            },
+          },
+          { mintUrl: MINT2, mintInfo: { nuts: { "4": { methods: [] } } } },
+        ]),
+      },
+    });
+
+    expect(logs.lightning).toMatchObject({
+      flow: "mintQuote",
+      shown: true,
+      available: false,
+      rule: "nextCanFire && receiveLightningCompatible",
+      conditions: { nextCanFire: true, receiveLightningCompatible: false },
+    });
+    const mints = logs.lightning?.mints as Record<string, string>;
+    // The mint that merely lacks the method sorts after the one the amount rules out.
+    expect(Object.keys(mints)).toEqual([MINT1, MINT2]);
+    expect(mints[MINT1]).toMatch(/^AMOUNT_BELOW_MINT_MIN: .*1,000/);
+    expect(mints[MINT2]).toMatch(/^MINT_METHOD_UNSUPPORTED/);
+    expect(logs.ecash).toMatchObject({
+      available: true,
+      rule: "nextCanFire && hasAccountMint",
+      conditions: { hasAccountMint: true },
+    });
+    expect(logs.onchain).toMatchObject({ shown: false, available: false });
+    expect(String(logs.onchain?.rule)).toMatch(/^hidden:/);
+  });
+
+  it("says why Lightning is never offered for a bitcoin address", () => {
+    const logs = methodLogs({
+      destination: "meltQuote",
+      meltTarget: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080",
+      effectiveAmount: { value: 5_000, unit: "sat" },
+      unit: "sat",
+    });
+
+    expect(logs.lightning).toMatchObject({
+      available: false,
+      rule: "never: the melt target is a bitcoin address",
+      mints: null,
+    });
+    expect(logs.onchain).toMatchObject({
+      shown: true,
+      rule: "nextCanFire && sendOnchainSupported && sendOnchainCompatible",
+    });
   });
 });

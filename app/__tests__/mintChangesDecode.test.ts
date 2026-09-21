@@ -38,6 +38,15 @@ describe('decodePointer', () => {
   it('uses NUT-06 field names at the top level', () => {
     expect(decodePointer('/description_long').label).toEqual(['Long description']);
   });
+
+  it('treats inherited Object member names as unknown fields', () => {
+    expect(decodePointer('/constructor/0').label).toEqual(['Item 1']);
+    expect(decodePointer('/constructor').label).toEqual(['constructor']);
+    expect(decodePointer('/nuts/4/__proto__').label).toEqual([
+      'NUT-04 Minting tokens',
+      '  proto  ',
+    ]);
+  });
 });
 
 describe('pairPatchOps', () => {

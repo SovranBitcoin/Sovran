@@ -58,12 +58,12 @@ const note = (id: string) => ({ id, kind: 1, content, tags: [], pubkey: 'author'
 it('keeps expansion on the same post but collapses a different recycled post, even with identical text', () => {
   const view = render(<NoteContent {...props} event={note('first')} />);
   fireEvent.press(view.getByText('show more'));
-  expect(view.getByText('show less')).toBeTruthy();
+  expect(view.getByText('show less')).toBeOnTheScreen();
 
   view.rerender(<NoteContent {...props} event={note('first')} profiles={new Map()} />);
-  expect(view.getByText('show less')).toBeTruthy();
+  expect(view.getByText('show less')).toBeOnTheScreen();
 
   view.rerender(<NoteContent {...props} event={note('second')} />);
-  expect(view.getByText('show more')).toBeTruthy();
+  expect(view.getByText('show more')).toBeOnTheScreen();
   expect(view.queryByText('show less')).toBeNull();
 });

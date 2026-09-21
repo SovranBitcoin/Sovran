@@ -26,7 +26,7 @@ export function deleteStatusPopup(): void {
   popupLog.info('popup.delete_status.show');
   showCustomToast({
     component: (toastProps) => React.createElement(DeleteStatusToast, toastProps),
-    duration: 'persistent',
+    durationMs: 'persistent',
     onHide: () => {
       deleteToastMounted = false;
       popupLog.info('popup.delete_status.hide');

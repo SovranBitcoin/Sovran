@@ -30,6 +30,7 @@ import { BlurView } from 'expo-blur';
 import { withAlpha } from '@/shared/lib/color';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useCapabilities } from '@/shared/ui/capability';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { ThreadReplyBar } from '@/features/feed/components/ThreadReplyBar';
 import { feedLog, Log } from '@/shared/lib/logger';
@@ -107,6 +108,7 @@ function AnimatedImageOverlayContent({
   safeBottom: number;
 }) {
   const rawInsets = useSafeAreaInsets();
+  const { frostedSurface } = useCapabilities();
   // Override the unreliable in-overlay bottom inset with the correct one.
   const insets = useMemo(() => ({ ...rawInsets, bottom: safeBottom }), [rawInsets, safeBottom]);
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -1121,7 +1123,7 @@ function AnimatedImageOverlayContent({
             style={[StyleSheet.absoluteFill, rContainerStyle]}>
             {/* box-none so taps on the blur fall through to the gesture (tapBackdrop → triggerClose); overlay root still blocks content behind */}
             <View style={StyleSheet.absoluteFill} pointerEvents="box-none" />
-            {Platform.OS === 'android' ? (
+            {!frostedSurface ? (
               <Animated.View
                 style={[StyleSheet.absoluteFill, overlayStyles.androidScrim, rAndroidScrimStyle]}
                 pointerEvents="none"

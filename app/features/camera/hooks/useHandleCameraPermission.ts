@@ -1,5 +1,3 @@
-import { useState, useEffect } from 'react';
-
 import { useCameraPermissions } from 'expo-camera';
 
 import { paramPopup } from '@/shared/lib/popup';
@@ -7,11 +5,7 @@ import { log } from '@/shared/lib/logger';
 
 export function useHandleCameraPermission() {
   const [permission, requestPermission] = useCameraPermissions();
-  const [isChecking, setIsChecking] = useState(true);
-
-  useEffect(() => {
-    if (permission) setIsChecking(false);
-  }, [permission]);
+  const isChecking = permission === null;
 
   const handlePermission = async (): Promise<boolean> => {
     if (!permission) {

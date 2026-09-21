@@ -74,14 +74,14 @@ function buildEntriesByTransactionId(
 
 interface ScanHistoryActions {
   /** Add a scan to history. Dedupes on the normalised raw (see `normaliseForDedupe`). */
-  addScan: (
-    raw: string,
-    type: ScanType,
-    source: ScanSource,
-    inputType?: string,
-    container?: string,
-    optionKinds?: string[]
-  ) => void;
+  addScan: (scan: {
+    raw: string;
+    type: ScanType;
+    source: ScanSource;
+    inputType?: string;
+    container?: string;
+    optionKinds?: string[];
+  }) => void;
   /** Link a scan entry to a transaction by matching the raw string. */
   linkTransaction: (raw: string, transactionId: string) => void;
 }
@@ -131,14 +131,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
         entries: [],
         entriesByTransactionId: {},
 
-        addScan: (
-          raw: string,
-          type: ScanType,
-          source: ScanSource,
-          inputType?: string,
-          container?: string,
-          optionKinds?: string[]
-        ) => {
+        addScan: ({ raw, type, source, inputType, container, optionKinds }) => {
           storeLog.info('store.scan_history.add', { type, source, inputType, container });
           const now = Date.now();
           const key = normaliseForDedupe(raw);

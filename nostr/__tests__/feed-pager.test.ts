@@ -288,12 +288,12 @@ it("uses the complete pager backoff schedule without the nagg surface cooldown",
     spec: { kind: "for-you" },
     clock: () => now,
   });
-  for (const delay of [1_000, 4_000, 15_000, 60_000, 60_000]) {
+  for (const delayMs of [1_000, 4_000, 15_000, 60_000, 60_000]) {
     expect(await pager.nextPage()).toMatchObject({
       hasMore: true,
-      retryAfterMs: delay,
+      retryAfterMs: delayMs,
     });
-    now += delay;
+    now += delayMs;
   }
   expect(fetchImpl).toHaveBeenCalledTimes(5);
 });

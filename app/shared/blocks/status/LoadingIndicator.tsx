@@ -612,14 +612,14 @@ export function LoadingIndicator({
   // rather than an instant flip to the disc.
   const finalBatchTail = segmentedComplete ? finalBatchTailMs : 0;
   const resultDelayMs = segmentedComplete ? SEGMENT_ANIM_MS + finalBatchTail : 0;
-  const resultColor =
-    effectiveResult === 'error'
-      ? errColor
-      : effectiveResult === 'reverted'
-        ? revColor
-        : effectiveResult === 'warning'
-          ? warnColor
-          : okColor;
+  const resultColor = (
+    {
+      success: okColor,
+      error: errColor,
+      reverted: revColor,
+      warning: warnColor,
+    } satisfies Record<Result, string>
+  )[effectiveResult];
 
   const debugSnapshotRef = useLatestRef<Record<string, unknown>>({
     size,

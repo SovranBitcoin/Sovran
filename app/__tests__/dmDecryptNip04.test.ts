@@ -76,7 +76,7 @@ describe('decryptDmEnvelopes — NIP-04 (kind 4)', () => {
       content: 'hello from peer',
       isOwn: false,
       protocol: 'nip04',
-      createdAt: 1_700_000_000,
+      createdAtSec: 1_700_000_000,
     });
   });
 
@@ -127,7 +127,7 @@ describe('decryptDmEnvelopes — NIP-04 (kind 4)', () => {
     };
     const out = decryptDmEnvelopes([env], viewerPk, viewerSk);
     expect(out).toHaveLength(1);
-    expect(out[0].createdAt).toBe(1_700_000_000);
+    expect(out[0].createdAtSec).toBe(1_700_000_000);
   });
 
   it('downscales a millisecond numeric createdAt to seconds', () => {
@@ -137,6 +137,6 @@ describe('decryptDmEnvelopes — NIP-04 (kind 4)', () => {
     };
     const out = decryptDmEnvelopes([env], viewerPk, viewerSk);
     expect(out).toHaveLength(1);
-    expect(out[0].createdAt).toBe(1_700_000_000);
+    expect(out[0].createdAtSec).toBe(1_700_000_000);
   });
 });

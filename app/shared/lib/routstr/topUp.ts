@@ -38,7 +38,7 @@ export async function executeRoutstrTopUp(
     if (apiKey) {
       apiLog.debug('routstr.topup.path', { strategy: 'existing_wallet' });
       const topUpStart = performance.now();
-      await topUpBalance(apiKey, encodedToken);
+      await topUpBalance({ apiKey, cashuToken: encodedToken });
       apiLog.debug('routstr.topup.topup_call_done', {
         duration_ms: Math.round(performance.now() - topUpStart),
       });

@@ -29,7 +29,7 @@ export function notePublishedPopup(payload: { eventId: string }): void {
         debugFields: { eventId },
         toastProps,
       }),
-    duration: 3000,
+    durationMs: 3000,
     debugLabel: 'note-published',
     debugFields: { eventId },
   });

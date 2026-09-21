@@ -227,15 +227,15 @@ export function mintHistoryEntryExpired(
     return false;
   }
 
-  const expiry = decoded.expirySec ?? 3600;
-  const timestamp = decoded.timestampSec ?? 0;
-  const expiryTime = (timestamp + expiry) * 1000;
+  const expirySec = decoded.expirySec ?? 3600;
+  const timestampSec = decoded.timestampSec ?? 0;
+  const expiresAt = (timestampSec + expirySec) * 1000;
 
-  const expired = Date.now() > expiryTime;
+  const expired = Date.now() > expiresAt;
   logger.debug("history.timeline.mintExpired.result", {
     reason: "decoded",
     expired,
-    expiry,
+    expirySec,
     paymentRequestLength: historyEntry.paymentRequest.length,
   });
   return expired;

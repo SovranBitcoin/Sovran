@@ -34,7 +34,7 @@ interface BuildNoteInput {
   mentionPubkeys?: readonly string[];
   /** Explicit content-warning reason. Empty string = warning with no reason. */
   contentWarning?: string;
-  createdAt?: number;
+  createdAtSec?: number;
 }
 
 interface UnsignedNote {
@@ -101,7 +101,7 @@ export function buildNoteEvent(input: BuildNoteInput): UnsignedNote {
   return {
     kind: 1,
     content,
-    created_at: input.createdAt ?? Math.floor(Date.now() / 1000),
+    created_at: input.createdAtSec ?? Math.floor(Date.now() / 1000),
     tags,
   };
 }

@@ -24,7 +24,7 @@ import {
 } from 'wallet/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
-import { isAccountUnit, toAccountUnit, toRealUnit, type FormattedString } from 'wallet';
+import { accountMintUrls, isAccountUnit, toAccountUnit, toRealUnit } from 'wallet';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ReceiveReusableQuoteTab } from '@/features/receive/components/ReceiveReusableQuoteTab';
 import { ReceivePaymentRequestTab } from '@/features/receive/components/ReceivePaymentRequestTab';
@@ -77,9 +77,20 @@ function receiveEntryInUnit(
 }
 
 interface ReceiveHubEntry {
-  npcAddress?: FormattedString;
+  npcAddress?: string;
   p2pkKey?: string;
-  selectedMintUrl?: string;
+}
+
+/** The entry can be seeded from the `receiveEntry` route param, so its fields are narrowed here. */
+function readReceiveHubEntry(entry: Record<string, unknown>): ReceiveHubEntry {
+  const { npcAddress, p2pkKey } = entry;
+  return {
+    // The wallet session hands the address over as a FormattedString (a String object).
+    ...(typeof npcAddress === 'string' || npcAddress instanceof String
+      ? { npcAddress: npcAddress.toString() }
+      : {}),
+    ...(typeof p2pkKey === 'string' ? { p2pkKey } : {}),
+  };
 }
 
 interface ReceiveLightningTabProps {
@@ -135,11 +146,11 @@ const ReceiveLightningTab = memo(function ReceiveLightningTab({
 
   return (
     <>
-      <PaymentInfo data={npcAddress.toString()} copyTarget="address" unit="sat" />
+      <PaymentInfo data={npcAddress} copyTarget="address" unit="sat" />
       <CopyRequestCard
         title="RECEIVE ADDRESS"
         icon="mingcute:lightning-fill"
-        parts={[{ value: npcAddress.toString(), kind: 'lightningAddress' }]}
+        parts={[{ value: npcAddress, kind: 'lightningAddress' }]}
         muted={muted}
         onPress={async () => {
           await EnhancedHaptics.copyHaptic();
@@ -265,7 +276,7 @@ function ReceiveScreenForUnit({
     receiveEntry as string | Record<string, unknown> | undefined
   );
 
-  const receiveEntryData = entry as ReceiveHubEntry | null;
+  const receiveEntryData = useMemo(() => (entry ? readReceiveHubEntry(entry) : null), [entry]);
   const hasReceiveEntryData = Boolean(receiveEntryData);
 
   // Each rail reports its copyable payload as it resolves; the footer Copy
@@ -309,7 +320,7 @@ function ReceiveScreenForUnit({
       selectedTab === 'Lightning'
         ? lightningMode === 'address'
           ? npcAddress
-            ? { value: npcAddress.toString(), copyTarget: 'address' }
+            ? { value: npcAddress, copyTarget: 'address' }
             : null
           : (qrPayloads['lightning-offer'] ?? null)
         : selectedTab === 'Unified'
@@ -378,23 +389,32 @@ function ReceiveScreenForUnit({
   // the hook deliberately reports loading (no stale cache seed) until the
   // fresh request lands, so neither tab can flash a retired creq.
   //
-  // The durable op carries the FULL trusted list (a payment from any trusted
-  // mint claims); what the QR ADVERTISES is the selection below — the user's
+  // The durable op carries the account's FULL trusted list (a payment from any
+  // of them claims); what the QR ADVERTISES is the selection below — the user's
   // Advanced toggles, forced down to NUT-11-capable mints while the P2PK
   // lock is on, capped at MAX_ADVERTISED_MINTS. The lock itself only applies
   // when a capable mint exists (p2pkLockEffective).
+  //
+  // Both lists stop at the testnut split: the request names the REAL unit,
+  // which a testnut mint shares with its real counterpart, so a mint from the
+  // other account would let test ecash settle a real request (or the reverse).
   const creqP2pkLock = useMintStore((s) => s.creqP2pkLock);
   const creqExcludedMints = useMintStore((s) => s.creqExcludedMints);
   const { trustedMints: rawTrustedMints } = useMints();
+  const creqMints = useMemo(() => accountMintUrls(walletContext), [walletContext]);
+  const creqAccountMints = useMemo(
+    () => rawTrustedMints.filter((mint) => creqMints.includes(mint.mintUrl)),
+    [rawTrustedMints, creqMints]
+  );
   const creqMintSelection = useMemo(
     () =>
       deriveCreqMintSelection({
-        mints: rawTrustedMints,
+        mints: creqAccountMints,
         excluded: creqExcludedMints,
         p2pkLockActive: creqP2pkLock && !!receiveEntryData?.p2pkKey,
         maxAdvertised: MAX_ADVERTISED_MINTS,
       }),
-    [rawTrustedMints, creqExcludedMints, creqP2pkLock, receiveEntryData?.p2pkKey]
+    [creqAccountMints, creqExcludedMints, creqP2pkLock, receiveEntryData?.p2pkKey]
   );
   const creqLockPubkey = creqMintSelection.p2pkLockEffective
     ? receiveEntryData?.p2pkKey
@@ -403,7 +423,6 @@ function ReceiveScreenForUnit({
   const creqEnabled =
     selectedTab === 'Cashu' ||
     bip321.selection.rails.some((rail) => rail.id === 'creq' && rail.state === 'included');
-  const creqMints = walletContext.trustedMintUrls;
   const creq = useStandingPaymentRequest(
     creqEnabled && creqMints.length > 0
       ? {

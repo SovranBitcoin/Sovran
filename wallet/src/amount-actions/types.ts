@@ -70,7 +70,7 @@ export interface AmountResolution extends CoreAmountResolution {
   /** Current BTC price in the configured display currency. 0 when unavailable. */
   btcPrice: number;
   /** Quick send suggestions — offline-composable amounts for one-tap entry. Empty when N/A. */
-  suggestions: QuickSendSuggestion[];
+  suggestions: readonly QuickSendSuggestion[];
   /** True when the last setInput was replaced by the envelope cap. */
   clampedToCap: boolean;
   /** The envelope max the keypad is capped at. null when uncapped. */

@@ -183,7 +183,7 @@ export function PollCard({ event }: { event: FeedEvent }) {
 }
 
 const styles = StyleSheet.create({
-  card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, padding: 12, marginVertical: 6 },
+  card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, padding: 12 },
   option: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 10,

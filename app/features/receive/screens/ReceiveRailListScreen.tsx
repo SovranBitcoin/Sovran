@@ -33,9 +33,11 @@ import {
   type RailStatus,
   type ReceiveRailItem,
 } from '@/features/receive/lib/receiveRailItems';
+import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Badge } from '@/shared/ui/primitives/Badge';
+import { Button } from '@/shared/ui/primitives/Button';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -60,6 +62,12 @@ const RAIL_TITLE: Record<ReceiveRail, string> = {
   paymentRequest: 'Payment requests',
   onchain: 'Onchain addresses',
   bolt12: 'Bolt12 offers',
+};
+
+const RAIL_LOAD_FAILED_TITLE: Record<ReceiveRail, string> = {
+  paymentRequest: "Couldn't load payment requests",
+  onchain: "Couldn't load onchain addresses",
+  bolt12: "Couldn't load Bolt12 offers",
 };
 
 // `secondary` renders its text in `surface-secondary` (a near-background tone)
@@ -244,6 +252,7 @@ export function ReceiveRailListScreen() {
     failed: false,
     items: [],
   });
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!rail) return;
@@ -264,7 +273,7 @@ export function ReceiveRailListScreen() {
     return () => {
       cancelled = true;
     };
-  }, [manager, rail, unit]);
+  }, [manager, rail, unit, retryCount]);
 
   const handlePress = useCallback((item: ReceiveRailItem) => {
     if (isRailItemCopyable(item.status)) {
@@ -301,6 +310,12 @@ export function ReceiveRailListScreen() {
           accessibilityLabel={`${RAIL_TITLE[rail]} loaded with no entries`}
         />
       )}
+      {__DEV__ && state.failed && (
+        <E2EAccessibilityProbe
+          testID={`receive-rail-list-failed-${rail}`}
+          accessibilityLabel={RAIL_LOAD_FAILED_TITLE[rail]}
+        />
+      )}
       <ScreenScrollView
         bottomSpacing={32}
         // Android form-sheet: top-edge drag dismisses, mid-scroll scrolls.
@@ -318,6 +333,20 @@ export function ReceiveRailListScreen() {
             accessibilityRole="progressbar">
             <Spinner size={32} />
           </View>
+        ) : state.failed ? (
+          <EmptyState
+            icon="mdi:cloud-off-outline"
+            title={RAIL_LOAD_FAILED_TITLE[rail]}
+            subtitle="Nothing was changed. Try again."
+            action={
+              <Button
+                testID="receive-rail-list-retry"
+                text="Try again"
+                variant="secondary"
+                onPress={() => setRetryCount((count) => count + 1)}
+              />
+            }
+          />
         ) : state.items.length === 0 ? (
           <Text size={14} className="text-muted mt-6 text-center">
             Nothing here yet.

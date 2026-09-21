@@ -31,12 +31,12 @@ interface RelayListState {
 
 interface RelayListActions {
   /** Ingest a relay list parsed from a relay event (last-writer-wins). */
-  setFromRelay: (entries: RelayListEntry[], createdAt: number) => void;
+  setFromRelay: (entries: RelayListEntry[], createdAtSec: number) => void;
   addRelay: (url: string, marker: { read: boolean; write: boolean }) => void;
   removeRelay: (url: string) => void;
   setMarker: (url: string, marker: { read: boolean; write: boolean }) => void;
   restoreDefaults: () => void;
-  markPublished: (createdAt: number) => void;
+  markPublished: (createdAtSec: number) => void;
 }
 
 type RelayListStore = RelayListState & RelayListActions;
@@ -84,11 +84,11 @@ export const useRelayListStore = create<RelayListStore>()(
       hasPublished: false,
       source: 'default',
 
-      setFromRelay: (entries, createdAt) => {
+      setFromRelay: (entries, createdAtSec) => {
         // Last-writer-wins: ignore an older or equal list than what we hold.
-        if (createdAt <= get().updatedAt && get().source === 'relay') return;
-        storeLog.info('nostr.relays.ingested', { count: entries.length, createdAt });
-        set({ entries, updatedAt: createdAt, source: 'relay', hasPublished: true });
+        if (createdAtSec <= get().updatedAt && get().source === 'relay') return;
+        storeLog.info('nostr.relays.ingested', { count: entries.length, createdAtSec });
+        set({ entries, updatedAt: createdAtSec, source: 'relay', hasPublished: true });
       },
 
       addRelay: (url, marker) => {
@@ -109,8 +109,8 @@ export const useRelayListStore = create<RelayListStore>()(
         set({ entries: defaultEntries(), source: 'local' });
       },
 
-      markPublished: (createdAt) => {
-        set({ updatedAt: createdAt, hasPublished: true, source: 'relay' });
+      markPublished: (createdAtSec) => {
+        set({ updatedAt: createdAtSec, hasPublished: true, source: 'relay' });
       },
     }),
     persistConfig({

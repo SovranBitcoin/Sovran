@@ -69,17 +69,49 @@ test('resume requires matching recipe, source, binary fingerprint and retained b
         { file: 'ios/wallet.png', sha256: createHash('sha256').update('test bytes').digest('hex') },
       ],
     };
-    expect(resumable(session, invocation, 'app', 'native', directory)).toBe(true);
-    expect(resumable(session, invocation, 'changed', 'native', directory)).toBe(false);
-    expect(resumable(session, invocation, 'app', 'changed', directory)).toBe(false);
     expect(
-      resumable({ ...session, recipeSha256: 'changed' }, invocation, 'app', 'native', directory)
+      resumable(session, invocation, {
+        appFingerprint: 'app',
+        nativeFingerprint: 'native',
+        library: directory,
+      })
+    ).toBe(true);
+    expect(
+      resumable(session, invocation, {
+        appFingerprint: 'changed',
+        nativeFingerprint: 'native',
+        library: directory,
+      })
     ).toBe(false);
     expect(
-      resumable({ ...session, status: 'failed' }, invocation, 'app', 'native', directory)
+      resumable(session, invocation, {
+        appFingerprint: 'app',
+        nativeFingerprint: 'changed',
+        library: directory,
+      })
+    ).toBe(false);
+    expect(
+      resumable({ ...session, recipeSha256: 'changed' }, invocation, {
+        appFingerprint: 'app',
+        nativeFingerprint: 'native',
+        library: directory,
+      })
+    ).toBe(false);
+    expect(
+      resumable({ ...session, status: 'failed' }, invocation, {
+        appFingerprint: 'app',
+        nativeFingerprint: 'native',
+        library: directory,
+      })
     ).toBe(false);
     writeFileSync(join(directory, 'ios/wallet.png'), 'altered bytes');
-    expect(resumable(session, invocation, 'app', 'native', directory)).toBe(false);
+    expect(
+      resumable(session, invocation, {
+        appFingerprint: 'app',
+        nativeFingerprint: 'native',
+        library: directory,
+      })
+    ).toBe(false);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

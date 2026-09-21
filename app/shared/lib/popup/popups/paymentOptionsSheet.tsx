@@ -20,29 +20,11 @@ import Icon from 'assets/icons';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { cashuLog } from '@/shared/lib/logger';
 
+import { getMethodIcon, getMethodLabel } from './paymentMethodPresentation';
 import { showActionSheet } from './bridge';
 import { SheetMenuRowContent } from './sheetMenuRow';
 import type { ActionSheetPayloads } from '../actionSheetTypes';
 import type { CustomSheetSharedProps } from '../sheets/types';
-
-type OptionKind = AnnotatedOption['option']['kind'];
-
-const CASHU_KINDS: readonly OptionKind[] = ['paymentRequest', 'ecashToken'];
-const LIGHTNING_KINDS: readonly OptionKind[] = ['lightningInvoice', 'lightningAddress', 'lnurlp'];
-
-function getMethodLabel(kind: OptionKind): string {
-  if (CASHU_KINDS.includes(kind)) return 'Cashu';
-  if (LIGHTNING_KINDS.includes(kind)) return 'Lightning';
-  if (kind === 'onchainAddress') return 'Onchain';
-  return kind;
-}
-
-function getMethodIcon(kind: OptionKind): string {
-  if (CASHU_KINDS.includes(kind)) return 'majesticons:coins';
-  if (LIGHTNING_KINDS.includes(kind)) return 'mdi:lightning-bolt';
-  if (kind === 'onchainAddress') return 'hugeicons:blockchain-01';
-  return 'ph:contactless-payment-fill';
-}
 
 function getOptionAmount(option: AnnotatedOption['option']): number | undefined {
   if (option.amount != null && option.amount > 0) {

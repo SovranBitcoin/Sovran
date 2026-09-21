@@ -26,13 +26,13 @@ export async function formatSource(source) {
   const prettier = createRequire(new URL('../app/package.json', import.meta.url))('prettier');
   return prettier.format(JSON.stringify(source), { parser: 'json' });
 }
-export async function freedomRelease(ledger) {
+export async function freedomRelease(ledger, { github = (repository) => new GitHub(required('FREEDOM_TOKEN'), repository) } = {}) {
   const state = ledger.state;
   if (!state.steps.assetsHosted || state.channels.freedomStore?.version === state.version) return;
   const forkName = required('FREEDOM_FORK');
   check(/^[A-Za-z\d-]+\/freedomstore$/.test(forkName) && forkName !== config.freedomRepository, 'FREEDOM_FORK must identify the dedicated bot fork');
-  const upstream = new GitHub(required('FREEDOM_TOKEN'), config.freedomRepository);
-  const fork = new GitHub(required('FREEDOM_TOKEN'), forkName);
+  const upstream = github(config.freedomRepository);
+  const fork = github(forkName);
   const live = await request(config.freedomSource, { hosts: ['source.freedomstore.io'] });
   const liveApp = live.apps?.find((a) => a.bundleIdentifier === config.bundleId && String(a.marketplaceID) === config.appleAppId);
   const liveVersion = liveApp?.versions?.find((v) => v.version === state.version && String(v.buildVersion) === state.builds.ios.number);
@@ -58,7 +58,7 @@ export async function freedomRelease(ledger) {
       const baseFile = await upstream.file('altstore-source.json', candidate.base.sha);
       const headRepo = candidate.head.repo?.full_name;
       check(headRepo && /^[A-Za-z\d_.-]+\/[A-Za-z\d_.-]+$/.test(headRepo), 'Cannot inspect open Freedom PR');
-      const headFile = await new GitHub(required('FREEDOM_TOKEN'), headRepo).file('altstore-source.json', candidate.head.sha);
+      const headFile = await github(headRepo).file('altstore-source.json', candidate.head.sha);
       check(baseFile && headFile, 'Cannot inspect open Freedom PR source');
       const sovran = (file) => JSON.parse(file.bytes).apps.find((a) => a.bundleIdentifier === config.bundleId);
       check(JSON.stringify(sovran(baseFile)) === JSON.stringify(sovran(headFile)), 'Another Freedom PR changes Sovran; no duplicate PR will be created');

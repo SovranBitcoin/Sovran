@@ -13,6 +13,7 @@ import Icon from '@/assets/icons';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -460,7 +461,7 @@ function ProfileEditor({
           className="relative items-center justify-center p-1">
           <Avatar
             size={96}
-            state={preview ? 'image' : 'fallback'}
+            state={avatarStateFor(preview, ready)}
             picture={preview}
             name={name}
             seed={pubkey}

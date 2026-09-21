@@ -195,7 +195,7 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
       // notifications, minus `limit`. `since` only bounds relay-side backfill
       // volume — classification stays unbounded so evidence for already-known
       // rows still merges as count bumps.
-      const bounds = since?.createdAt ? { since: since.createdAt } : {};
+      const bounds = since?.createdAtSec ? { since: since.createdAtSec } : {};
       const filters: NostrFilter[] = [
         { kinds: isMentions ? [1] : [1, 6, 7, 9735], '#p': [request.viewerPubkey], ...bounds },
       ];
@@ -335,7 +335,7 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
               kind: raw.kind,
               content: typeof raw.content === 'string' ? raw.content : '',
               tags: Array.isArray(raw.tags) ? (raw.tags as string[][]) : [],
-              createdAt: typeof raw.created_at === 'number' ? raw.created_at : 0,
+              createdAtSec: typeof raw.created_at === 'number' ? raw.created_at : 0,
             });
           }
           // Relay can't paginate gift wraps by arrival → no cursor.
@@ -365,7 +365,7 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
           kind: raw.kind,
           content: typeof raw.content === 'string' ? raw.content : '',
           tags: Array.isArray(raw.tags) ? (raw.tags as string[][]) : [],
-          createdAt: typeof raw.created_at === 'number' ? raw.created_at : 0,
+          createdAtSec: typeof raw.created_at === 'number' ? raw.created_at : 0,
         });
       });
     },

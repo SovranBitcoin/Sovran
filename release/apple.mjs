@@ -55,7 +55,7 @@ export async function copyScreenshots(apple, sourceLocale, targetLocale) {
         check(op.method === 'PUT' && Number.isSafeInteger(op.offset) && Number.isSafeInteger(op.length) && op.offset >= 0 && op.length > 0 && op.offset + op.length <= bytes.length, 'Invalid ASC upload range');
         let response;
         try { response = await fetch(u, { method: 'PUT', headers: Object.fromEntries(op.requestHeaders.map((h) => [h.name, h.value])), body: bytes.subarray(op.offset, op.offset + op.length), redirect: 'error', signal: AbortSignal.timeout(120_000) }); }
-        catch { throw new Error('ASC screenshot upload failed'); }
+        catch (error) { throw new Error('ASC screenshot upload failed', { cause: error }); }
         check(response.ok, 'ASC screenshot upload rejected'); await response.body?.cancel();
       }
       await apple.api(`appScreenshots/${shot.id}`, 'PATCH', { data: { type: 'appScreenshots', id: shot.id, attributes: { uploaded: true, sourceFileChecksum: createHash('md5').update(bytes).digest('hex') } } });
@@ -104,10 +104,9 @@ export async function prepareListing(apple, previous, target, version) {
   return mediaReady;
 }
 
-export async function appleRelease(ledger) {
+export async function appleRelease(ledger, apple = new Apple()) {
   const state = ledger.state;
   if (!state.builds.ios?.ready) return;
-  const apple = new Apple();
   const app = (await apple.api(`apps/${config.appleAppId}`)).data;
   check(app.attributes.bundleId === config.bundleId, 'ASC app identity mismatch');
   const builds = await apple.api(`builds?filter[app]=${config.appleAppId}&filter[version]=${state.builds.ios.number}&include=preReleaseVersion`);

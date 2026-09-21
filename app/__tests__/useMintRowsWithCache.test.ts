@@ -40,6 +40,7 @@ function cacheOf(entry: MintMetadataEntry): Record<string, MintMetadataEntry> {
 describe('resolveMintRows', () => {
   it('is cold (skeleton) when not enriched and no cache exists', () => {
     const { rows, allCold } = resolveMintRows({
+      isTestnutMint: () => false,
       baseItems: [base()],
       itemsStatus: 'loading',
       byMintUrl: {},
@@ -50,6 +51,7 @@ describe('resolveMintRows', () => {
 
   it('cached: cache name/icon/scores win over the base url before enrichment', () => {
     const { rows } = resolveMintRows({
+      isTestnutMint: () => false,
       baseItems: [base({ displayName: URL })],
       itemsStatus: 'loading',
       byMintUrl: cacheOf({
@@ -68,6 +70,7 @@ describe('resolveMintRows', () => {
 
   it('live: base wins outright once enriched; cache only fills holes', () => {
     const { rows } = resolveMintRows({
+      isTestnutMint: () => false,
       baseItems: [base({ displayName: 'Live Name', kymScore: 3 })],
       itemsStatus: 'ready',
       byMintUrl: cacheOf({ displayName: 'Cached Name', averageScore: 4.5, contactFollowers: 50 }),
@@ -80,6 +83,7 @@ describe('resolveMintRows', () => {
 
   it('preserves a fresh live 0 over a cached non-zero score', () => {
     const { rows } = resolveMintRows({
+      isTestnutMint: () => false,
       baseItems: [base({ kymScore: 0 })],
       itemsStatus: 'ready',
       byMintUrl: cacheOf({ averageScore: 4.5 }),
@@ -89,6 +93,7 @@ describe('resolveMintRows', () => {
 
   it('treats a terminal `failed` status as done — rows are live + selectable, not cold', () => {
     const { rows, allCold } = resolveMintRows({
+      isTestnutMint: () => false,
       baseItems: [base()],
       itemsStatus: 'failed',
       byMintUrl: {},
@@ -98,8 +103,57 @@ describe('resolveMintRows', () => {
     expect(allCold).toBe(false);
   });
 
+  // Colada's synchronous fallback rows carry no `supportedUnits`, and the
+  // currency-tab filter shows a row with unknown units under every tab. Without
+  // the cache backfill the picker listed every mint for a moment and then
+  // dropped the ones that could not issue the selected unit.
+  describe('supportedUnits backfill', () => {
+    it('fills units from cache before enrichment, tagged onto the account', () => {
+      const { rows } = resolveMintRows({
+        isTestnutMint: () => true,
+        baseItems: [base()],
+        itemsStatus: 'loading',
+        byMintUrl: cacheOf({ supportedUnits: ['sat', 'usd'] }),
+      });
+      expect(rows[0].supportedUnits).toEqual(['tsat', 'tusd']);
+    });
+
+    it("leaves a real mint's cached units alone", () => {
+      const { rows } = resolveMintRows({
+        isTestnutMint: () => false,
+        baseItems: [base()],
+        itemsStatus: 'loading',
+        byMintUrl: cacheOf({ supportedUnits: ['sat'] }),
+      });
+      expect(rows[0].supportedUnits).toEqual(['sat']);
+    });
+
+    it('lets enrichment own the units once it lands', () => {
+      const { rows } = resolveMintRows({
+        isTestnutMint: () => false,
+        baseItems: [base({ supportedUnits: ['sat'] })],
+        itemsStatus: 'ready',
+        // The mint advertises usd but holds no usd keyset; enrichment knows,
+        // the cache does not.
+        byMintUrl: cacheOf({ supportedUnits: ['sat', 'usd'] }),
+      });
+      expect(rows[0].supportedUnits).toEqual(['sat']);
+    });
+
+    it('stays absent when neither side knows the units', () => {
+      const { rows } = resolveMintRows({
+        isTestnutMint: () => false,
+        baseItems: [base()],
+        itemsStatus: 'loading',
+        byMintUrl: cacheOf({ displayName: 'X' }),
+      });
+      expect(rows[0].supportedUnits).toBeUndefined();
+    });
+  });
+
   it('never sources balance / status / isPreferred / worksOffline from cache', () => {
     const { rows } = resolveMintRows({
+      isTestnutMint: () => false,
       baseItems: [
         base({ balance: 999, status: 'available', isPreferred: true, worksOffline: true }),
       ],

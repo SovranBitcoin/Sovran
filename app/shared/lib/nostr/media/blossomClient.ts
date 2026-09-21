@@ -171,7 +171,7 @@ async function signAuthHeader(
   const unsigned = buildBlossomAuthEvent({
     action,
     sha256,
-    createdAt: Math.floor(Date.now() / 1000),
+    createdAtSec: Math.floor(Date.now() / 1000),
   });
   const authEvent = new NDKEvent(ndk);
   authEvent.kind = unsigned.kind;

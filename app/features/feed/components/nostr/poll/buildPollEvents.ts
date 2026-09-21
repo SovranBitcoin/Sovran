@@ -26,7 +26,7 @@ export function buildPollEvent(opts: {
   endsAt?: number;
   relays?: readonly string[];
   quote?: PollQuoteReference;
-  createdAt?: number;
+  createdAtSec?: number;
 }): UnsignedPollEvent {
   const tags: string[][] = [];
   for (const option of opts.options) tags.push(['option', option.id, option.label]);
@@ -40,7 +40,7 @@ export function buildPollEvent(opts: {
   return {
     kind: POLL_KIND,
     content: opts.question,
-    created_at: opts.createdAt ?? Math.floor(Date.now() / 1000),
+    created_at: opts.createdAtSec ?? Math.floor(Date.now() / 1000),
     tags,
   };
 }
@@ -50,14 +50,14 @@ export function buildVoteEvent(opts: {
   pollId: string;
   optionIds: readonly string[];
   relayHint?: string;
-  createdAt?: number;
+  createdAtSec?: number;
 }): UnsignedPollEvent {
   const tags: string[][] = [['e', opts.pollId, opts.relayHint ?? '']];
   for (const optionId of opts.optionIds) tags.push(['response', optionId]);
   return {
     kind: POLL_VOTE_KIND,
     content: '',
-    created_at: opts.createdAt ?? Math.floor(Date.now() / 1000),
+    created_at: opts.createdAtSec ?? Math.floor(Date.now() / 1000),
     tags,
   };
 }

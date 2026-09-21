@@ -44,12 +44,12 @@ describe('imeta', () => {
 
 describe('blossom auth', () => {
   it('builds a kind:24242 upload auth with t/x/expiration tags', () => {
-    const event = buildBlossomAuthEvent({ action: 'upload', sha256: 'abc123', createdAt: 1000 });
+    const event = buildBlossomAuthEvent({ action: 'upload', sha256: 'abc123', createdAtSec: 1000 });
     expect(event.kind).toBe(BLOSSOM_AUTH_KIND);
     expect(event.tags).toEqual([
       ['t', 'upload'],
       ['x', 'abc123'],
-      ['expiration', '1300'], // createdAt + 5m default
+      ['expiration', '1300'], // createdAtSec + 5m default
     ]);
   });
 
@@ -57,7 +57,7 @@ describe('blossom auth', () => {
     const event = buildBlossomAuthEvent({
       action: 'upload',
       sha256: 'x',
-      createdAt: 1000,
+      createdAtSec: 1000,
       expirationSec: 2000,
     });
     expect(event.tags).toContainEqual(['expiration', '2000']);

@@ -148,9 +148,47 @@ describe('PaymentInfo device data probe', () => {
       testID: 'payment-info-sensitive-visual',
     });
     expect(sensitiveVisual.props.accessible).toBe(true);
-    expect(sensitiveVisual.props.accessibilityRole).toBe('image');
+    expect(sensitiveVisual.props.accessibilityRole).toBe('imagebutton');
     expect(sensitiveVisual.props.accessibilityLabel).not.toContain('lnbc100n-test-value');
     expect(sensitiveVisual.props.collapsable).toBe(false);
+  });
+
+  it('copies the value when a screen reader activates the sensitive visual', async () => {
+    const Clipboard = jest.requireMock<typeof import('expo-clipboard')>('expo-clipboard');
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <PaymentInfo unit="sat" data="lnbc100n-test-value" copyTarget="lightningInvoice" />
+      );
+    });
+    const sensitiveVisual = renderer!.root.findByProps({
+      testID: 'payment-info-sensitive-visual',
+    });
+    expect(sensitiveVisual.props.accessibilityActions).toEqual([{ name: 'activate' }]);
+
+    await act(async () => {
+      sensitiveVisual.props.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } });
+    });
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith('lnbc100n-test-value');
+  });
+
+  it('offers no copy action while copying is disabled', async () => {
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <PaymentInfo
+          unit="sat"
+          data="lnbc100n-test-value"
+          copyTarget="lightningInvoice"
+          copyDisabled
+        />
+      );
+    });
+    const sensitiveVisual = renderer!.root.findByProps({
+      testID: 'payment-info-sensitive-visual',
+    });
+    expect(sensitiveVisual.props.accessibilityState).toEqual({ disabled: true });
+    expect(sensitiveVisual.props.onAccessibilityAction).toBeUndefined();
   });
 
   it('mounts the Lightning invoice probe on the fixed-amount destination screen', () => {

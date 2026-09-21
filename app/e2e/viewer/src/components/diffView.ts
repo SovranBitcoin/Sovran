@@ -324,6 +324,7 @@ function wirePickers(root: HTMLElement): void {
       update((current) => {
         current.diff.runA = (event.target as HTMLSelectElement).value || undefined;
         current.diff.forRun = undefined;
+        current.diff.computing = undefined;
       })
     );
   root
@@ -332,6 +333,7 @@ function wirePickers(root: HTMLElement): void {
       update((current) => {
         current.diff.runB = (event.target as HTMLSelectElement).value || undefined;
         current.diff.forRun = undefined;
+        current.diff.computing = undefined;
       })
     );
   root.querySelector('[data-action=compute]')?.addEventListener('click', () => void computeDiff());

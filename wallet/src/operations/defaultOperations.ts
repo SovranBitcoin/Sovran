@@ -40,7 +40,7 @@ import type {
   MintReviewsFetcher,
 } from "../types";
 import { defaultDetectors } from "../detectors";
-import { localizeReason } from "../formatting/locales";
+import { createMintRowRules } from "../mint-list-rows";
 import { errField, logger, mintUrlFields } from "../logger";
 import {
   requestInvoiceFromLnurl,
@@ -53,7 +53,6 @@ import { normalizeNostrPubkey, resolveRecipientPubkey } from "../recipient";
 import { amountToNumber, type AmountLike } from "../amount";
 import { toAccountUnit } from "../units/accounts";
 import {
-  buildMethodAwareMintCandidates,
   compareMintDisplayOrder,
   deriveMintMethodCapabilityMapFromTrustedMints,
   deriveSupportedUnitsFromInfo,
@@ -997,124 +996,42 @@ export function createDefaultOperations(
           ),
         );
 
-      const requestInfo = data.paymentRequest
-        ? defaultDetectors.getPaymentRequestInfo(data.paymentRequest)
-        : null;
-      const preferredSet =
-        requestInfo?.mintsPreferred && requestInfo.mints.length
-          ? new Set(requestInfo.mints)
-          : null;
-      const supportedSet = data.supportedMintUrls
-        ? new Set(data.supportedMintUrls)
-        : null;
       const testnutAccount = config.isTestnutAccount?.() ?? false;
       const isTestnut = (mintUrl: string) =>
         config.isTestnutMint?.(mintUrl) ?? false;
-      // The wallet's own picker lists both sides: picking a mint there moves
-      // the wallet to that mint's account. Every flow picker is pinned to the
-      // active account, so test and real funds never meet in one payment.
+      // Every trusted mint is listed in every picker; a mint across the testnut
+      // split sits under its own unit tab (TSAT, TUSD). Whether it can be
+      // PICKED is the row rules' call: only the wallet's own picker allows it,
+      // because picking there moves the wallet to that mint's account.
       const crossesAccounts = (mintUrl: string) =>
-        data.scope !== "selected" && isTestnut(mintUrl) !== testnutAccount;
-      const capabilityCtx = {
-        trustedMintUrls: mintUrls,
-        mintBalances: balances,
-        mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints(
-          allTrustedMints.map((mint) => ({
-            mintUrl: mint.mintUrl,
-            mintInfo: mintInfoMap.get(mint.mintUrl) ?? mint.mintInfo,
-            keysetUnits: keysetUnitsByMint[mint.mintUrl],
-            outsideAccount: crossesAccounts(mint.mintUrl),
-          })),
-          data.unit,
-        ),
-      };
-      const methodCandidates = data.methodRequirement
-        ? buildMethodAwareMintCandidates(
-            capabilityCtx,
-            data.methodRequirement,
-            {
-              amount: data.amount,
-              allowedMints: data.supportedMintUrls,
-              requireBalance:
-                data.destination === "paymentRequest" ||
-                data.destination === "meltQuote" ||
-                data.destination === "sendEcash",
-            },
-          )
-        : data.candidates;
-      const candidateByMint = new Map(
-        methodCandidates.map((candidate) => [candidate.mintUrl, candidate]),
-      );
+        isTestnut(mintUrl) !== testnutAccount;
+      const listedMints = allTrustedMints;
+      const rowVerdict = createMintRowRules({
+        data,
+        capabilityCtx: {
+          trustedMintUrls: mintUrls,
+          mintBalances: balances,
+          mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints(
+            allTrustedMints.map((mint) => ({
+              mintUrl: mint.mintUrl,
+              mintInfo: mintInfoMap.get(mint.mintUrl) ?? mint.mintInfo,
+              keysetUnits: keysetUnitsByMint[mint.mintUrl],
+              outsideAccount:
+                data.scope !== "selected" && crossesAccounts(mint.mintUrl),
+            })),
+            data.unit,
+          ),
+        },
+        crossesAccounts,
+        supportsWebsocket: (mintUrl) =>
+          (mintInfoMap.get(mintUrl)?.nuts?.["17"]?.supported?.length ?? 0) > 0,
+      });
 
-      const items = allTrustedMints.map((mint: Mint): MintListItem => {
+      const items = listedMints.map((mint: Mint): MintListItem => {
         const mintUrl = mint.mintUrl;
         const info = mintInfoMap.get(mintUrl);
         const balance = balances[mintUrl] ?? 0;
-        const candidate = candidateByMint.get(mintUrl);
-        const isInCandidate = data.candidates.some(
-          (c) => c.mintUrl === mintUrl,
-        );
-
-        let status: "available" | "disabled" = "available";
-        let reason: MintListItem["reason"] = null;
-
-        // Balance checks only apply in send-type flows (melt/send/payment request).
-        // All other cases (no destination, mintQuote, scope override) allow every mint.
-        const needsBalanceCheck =
-          data.destination === "paymentRequest" ||
-          data.destination === "meltQuote" ||
-          data.destination === "sendEcash";
-        const skipBalanceCheck =
-          !needsBalanceCheck ||
-          data.scope === "selected" ||
-          data.scope === "npc";
-
-        // NPC receive only works against mints that speak NUT-17 websockets:
-        // the npub.cash plugin forwards paid quotes to the mint operation
-        // service, which subscribes via the mint's websocket to know when the
-        // quote settles. Mints without NUT-17 are shown for context but
-        // disabled so the user can't pick one that won't auto-receive.
-        const supportsWebsocket =
-          (info?.nuts?.["17"]?.supported?.length ?? 0) > 0;
-        if (crossesAccounts(mintUrl)) {
-          status = "disabled";
-          reason = localizeReason("TESTNUT_ACCOUNT_MISMATCH");
-        } else if (data.scope === "npc" && !supportsWebsocket) {
-          status = "disabled";
-          reason = {
-            code: "NO_WEBSOCKET",
-            message: "Does not support live updates (NUT-17)",
-          };
-        } else if (supportedSet && !supportedSet.has(mintUrl)) {
-          status = "disabled";
-          reason = {
-            code: "NOT_IN_PAYMENT_REQUEST",
-            message: "Not accepted by payment request",
-          };
-        } else if (candidate?.status === "disabled") {
-          status = "disabled";
-          reason = candidate.reason ?? {
-            code: "UNSUPPORTED_FOR_FLOW",
-            message: "Unsupported for this flow",
-          };
-        } else if (!skipBalanceCheck && data.amount && balance < data.amount) {
-          status = "disabled";
-          reason = {
-            code: "INSUFFICIENT_BALANCE",
-            message: "Insufficient balance",
-          };
-        } else if (!skipBalanceCheck && !isInCandidate && balance <= 0) {
-          status = "disabled";
-          reason = { code: "NO_BALANCE", message: "No balance" };
-        }
-
-        if (
-          status === "available" &&
-          preferredSet &&
-          !preferredSet.has(mintUrl)
-        ) {
-          reason = localizeReason("MINT_NOT_PREFERRED");
-        }
+        const { status, reason } = rowVerdict(mintUrl, balance);
         const entry = catalog[mintUrl] ?? {};
         return {
           mintUrl,
@@ -1154,6 +1071,41 @@ export function createDefaultOperations(
         },
         {},
       );
+      // What this picker was asked for, which trusted mints sit across the
+      // testnut split, and each row it returns. Keyed by mint with one short string each:
+      // the app logger keeps only the first few items of an array.
+      logger.info("operations.buildMintListItems.scope", {
+        scope: data.scope ?? null,
+        destination: data.destination ?? null,
+        unit: data.unit,
+        amount: data.amount ?? null,
+        method: data.methodRequirement
+          ? `${data.methodRequirement.operation}:${data.methodRequirement.method}:${data.methodRequirement.unit}`
+          : null,
+        testnutAccount,
+        trustedCount: allTrustedMints.length,
+        listedCount: listedMints.length,
+        // Listed under their own unit tab; pickable only when scope is "selected".
+        otherAccount: Object.fromEntries(
+          allTrustedMints
+            .filter((mint) => crossesAccounts(mint.mintUrl))
+            .map((mint) => [
+              mint.mintUrl,
+              isTestnut(mint.mintUrl)
+                ? "testnut mint, real account active"
+                : "real mint, testnut account active",
+            ]),
+        ),
+      });
+      logger.info("operations.buildMintListItems.rows", {
+        scope: data.scope ?? null,
+        rows: Object.fromEntries(
+          items.map((item) => [
+            item.mintUrl,
+            `${item.status}${item.reason ? `(${item.reason.code})` : ""} balance=${item.balance} units=${item.supportedUnits?.join(",") ?? "unknown"}`,
+          ]),
+        ),
+      });
       logger.info("operations.buildMintListItems.done", {
         total: items.length,
         available: items.filter((item) => item.status === "available").length,
@@ -1166,13 +1118,22 @@ export function createDefaultOperations(
     },
 
     // Receive "as Ecash": single-use NUT-18 request over the registered
-    // transport. Every trusted mint qualifies (mints never advertise NUT-18
-    // — wallet-to-wallet), so the allow-list is simply the trusted set,
-    // capped to keep the QR sane.
+    // transport. Mints never advertise NUT-18 (wallet-to-wallet), so the
+    // allow-list is the active account's trusted mints, capped to keep the QR
+    // sane. The request names the REAL unit, which a testnut mint shares with
+    // its real counterpart — listing both sides would let a payer settle a
+    // real `sat` request in worthless test ecash.
     createPaymentRequestReceive: async ({ amount, unit }) => {
       const mgr = requireManager();
       const trusted = await mgr.mint.getAllTrustedMints();
-      const mints = trusted.map((mint) => mint.mintUrl).slice(0, 5);
+      const testnutAccount = config.isTestnutAccount?.() ?? false;
+      const mints = trusted
+        .map((mint) => mint.mintUrl)
+        .filter(
+          (mintUrl) =>
+            (config.isTestnutMint?.(mintUrl) ?? false) === testnutAccount,
+        )
+        .slice(0, 5);
       logger.info("operations.createPaymentRequestReceive.start", {
         amount,
         unit,

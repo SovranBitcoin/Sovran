@@ -14,16 +14,17 @@
  */
 
 import { Stack } from 'expo-router';
+import { railHeaderTitle } from 'wallet';
 
 import { AndroidSheetFlowStack } from '../../config/flowLayoutOptions';
 
 const RECEIVE_OPTIONS = { title: 'Receive' };
 const AMOUNT_OPTIONS = { title: 'Select amount' };
 const MINT_SELECT_OPTIONS = { title: 'Select mint' };
-const LIGHTNING_RECEIVE_OPTIONS = { title: 'Receive Lightning' };
-const ONCHAIN_RECEIVE_OPTIONS = { title: 'Receive onchain' };
+const LIGHTNING_RECEIVE_OPTIONS = { title: railHeaderTitle('lightningReceive') };
+const ONCHAIN_RECEIVE_OPTIONS = { title: railHeaderTitle('onchainReceive') };
 const MINT_QUOTE_OPTIONS = { title: 'Receive' };
-const RECEIVE_TOKEN_OPTIONS = { title: 'Receive ecash' };
+const RECEIVE_TOKEN_OPTIONS = { title: railHeaderTitle('ecashReceive') };
 const RAIL_LIST_OPTIONS = { title: 'View all' };
 const CAMERA_HEADER_STYLE = { backgroundColor: 'transparent' };
 const CAMERA_OPTIONS = {

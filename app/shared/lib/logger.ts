@@ -31,6 +31,8 @@ export {
   initPhaseSync,
   useInitMount,
   redactError,
+  redactKnownSecretSubstrings,
+  secretStringKind,
   mintUrlLogFields,
   nfcLog,
   cashuLog,

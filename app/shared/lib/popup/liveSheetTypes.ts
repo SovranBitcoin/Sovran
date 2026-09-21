@@ -9,7 +9,7 @@ type LiveSheetGetResult = Partial<{
   submessage: ReactNode | PopupTextSegment[];
   icon: PopupIcon;
   message: string;
-  duration: number;
+  durationMs: number;
   buttons: { text: string; page?: string; onPress?: () => void }[];
   status: LiveSheetStatus;
 }>;

@@ -3,6 +3,7 @@ import { parsePaymentInput } from "../parse";
 import { rankMintCandidates } from "../mint-selection";
 import { isValidSatAmount } from "../guards";
 import { defaultDetectors } from "../detectors";
+import { createMintRowRules } from "../mint-list-rows";
 import { isMeltUserCancelledError, isMintOfflineError } from "../errors";
 import { t } from "../formatting/locales";
 import { compareMintDisplayOrder } from "../mint-capabilities";
@@ -586,20 +587,47 @@ export function createPaymentMachine(
   function buildFallbackMintListItems(
     data: StepDataMap["selectMint"],
   ): MintListItem[] {
+    const walletCtx = getContext();
+    const balanceByCandidate = new Map(
+      data.candidates.map((candidate) => [candidate.mintUrl, candidate.balance]),
+    );
+    // The same MINTS and the same VERDICTS the enrichment will give. Every
+    // trusted mint is listed (`data.candidates` is only what the flow may
+    // pick), and each row's status and reason come from the rules the
+    // enrichment uses, read against the wallet context instead of freshly
+    // fetched mint info. Guessing here (an unfunded mint "has no balance", even
+    // on a receive) made every row change a moment after the picker opened.
+    const rowVerdict = createMintRowRules({
+      data,
+      capabilityCtx: walletCtx,
+      crossesAccounts: (mintUrl) =>
+        walletCtx.mintMethodCapabilities?.[mintUrl]?.outsideAccount === true,
+      supportsWebsocket: (mintUrl) =>
+        walletCtx.mintMethodCapabilities?.[mintUrl]?.nut17,
+    });
     // Sorted with the SAME comparator the async enrichment uses, so the
     // first painted frame is already in the final order and the enriched
     // rows land without re-shuffling the list.
-    return data.candidates
-      .map((candidate) => ({
-        mintUrl: candidate.mintUrl,
-        displayName: candidate.mintUrl,
-        balance: candidate.balance,
-        unit: data.unit,
-        status: candidate.status ?? ("available" as const),
-        reason: candidate.reason ?? null,
-        isPreferred: false,
-      }))
+    const items = walletCtx.trustedMintUrls
+      .map((mintUrl): MintListItem => {
+        const balance =
+          balanceByCandidate.get(mintUrl) ?? walletCtx.mintBalances[mintUrl] ?? 0;
+        return {
+          mintUrl,
+          displayName: mintUrl,
+          balance,
+          unit: data.unit,
+          ...rowVerdict(mintUrl, balance),
+          isPreferred: false,
+        };
+      })
       .sort(compareMintDisplayOrder);
+    logger.debug("machine.selectMint.fallbackItems", {
+      candidateCount: data.candidates.length,
+      itemCount: items.length,
+      scope: data.scope ?? null,
+    });
+    return items;
   }
 
   function startMintListEnrichment(

@@ -26,6 +26,7 @@ import type { MintListItem, StepDataMap } from 'wallet';
 
 import { MintListScreen } from './MintListScreen';
 import { useMintRowsWithCache } from '../hooks/useMintRowsWithCache';
+import { useMintSelectorFrameLog } from '../hooks/useMintSelectorFrameLog';
 import { useRefreshMintSelectorOnFocus } from '../hooks/useRefreshMintSelectorOnFocus';
 import { useStickyMintSelectorItems } from '../hooks/useStickyMintSelectorItems';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
@@ -117,6 +118,22 @@ export function MintSelectFlowScreen({ flow, mintSelectorEntry }: MintSelectFlow
       allCold,
     });
   }, [flow, rows, allCold]);
+
+  useMintSelectorFrameLog({
+    flow,
+    scope: entry?.scope,
+    destination: entry?.destination,
+    step: execution.step,
+    source: liveItems?.length
+      ? 'live'
+      : items.length === 0
+        ? 'none'
+        : items === entryItems
+          ? 'entry'
+          : 'previous-live',
+    itemsStatus,
+    rows,
+  });
 
   // NPC-scoped selection picks the receive mint for the npub.cash flow; the
   // user is choosing among existing trusted mints (gated to NUT-17), not

@@ -13,9 +13,6 @@ jest.mock('@/features/feed/stores/ignoreStore', () => ({
     selector: (s: { ignoredPubkeys: string[]; ignoredEventIds: string[] }) => unknown
   ) => selector({ ignoredPubkeys: [], ignoredEventIds: [] }),
 }));
-jest.mock('@/features/feed/lib/moderation', () => ({
-  moderateFeedItems: (items: unknown[]) => items,
-}));
 
 const note = (id: string): FeedItem => ({
   type: 'note',

@@ -3,10 +3,25 @@
  */
 
 import React from 'react';
-import { cleanup, render } from '@testing-library/react-native';
+import { render as renderBare } from '@testing-library/react-native';
 
 import { getDesignSystemFamily } from '@/features/settings/design-system/catalog';
 import { canonicalizeReactTestTree } from '@/__tests__/helpers/canonicalizeReactTestTree';
+import { CapabilityProvider, type Capabilities } from '@/shared/ui/capability';
+
+/** Scenarios render under the app's root provider; the snapshots pin the iOS frosted chrome. */
+const SNAPSHOT_CAPABILITIES: Capabilities = {
+  liquidGlass: false,
+  blur: false,
+  frostedSurface: true,
+  linearGradient: true,
+  meshGradient: true,
+  icon: 'sf-symbol',
+};
+function SnapshotCapabilities({ children }: { children: React.ReactNode }) {
+  return <CapabilityProvider value={SNAPSHOT_CAPABILITIES}>{children}</CapabilityProvider>;
+}
+const render = (ui: React.ReactElement) => renderBare(ui, { wrapper: SnapshotCapabilities });
 
 jest.mock('@/shared/lib/logger', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
@@ -241,8 +256,6 @@ const TIMELINE_FAMILY = getDesignSystemFamily('timeline');
 const WALLET_CONTROLS_FAMILY = getDesignSystemFamily('wallet-controls');
 
 describe('Design System exact structural snapshots', () => {
-  afterEach(cleanup);
-
   it('removes unstable renderer fields without dropping visual or accessibility output', () => {
     const callback = jest.fn();
 

@@ -26,12 +26,6 @@ export function isCancellablePendingEcash(
   return entry.type === "send" && CANCELLABLE_SEND_STATES.has(state);
 }
 
-export function isReservedSendHistoryEntry(
-  entry: HistoryEntry,
-): entry is SendHistoryEntry {
-  return isCancellablePendingEcash(entry);
-}
-
 export function isMintQuotePaymentObserved(
   entry: { state?: unknown; remoteState?: unknown } | null | undefined,
 ): boolean {

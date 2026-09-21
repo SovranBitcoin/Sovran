@@ -17,7 +17,6 @@ import {
 import { navigateToProfile } from '@/features/contacts/lib/navigateToProfile';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { resolveIdentityName } from '@/shared/lib/identity';
-import { truncateMiddle } from '@/shared/lib/strings';
 import { useRecentPeopleStore } from '@/shared/stores/profile/recentPeopleStore';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
@@ -125,7 +124,8 @@ export function RecentPeopleSearchStrip({
                 nostrProfile: row.metadata,
               })}
               picture={row.metadata?.picture}
-              subtitle={row.metadata?.nip05 ?? safeShortNpub(row.pubkey)}
+              subtitle={row.metadata?.nip05 ?? safeNpub(row.pubkey)}
+              subtitleEllipsizeMode={row.metadata?.nip05 ? 'tail' : 'middle'}
               isLoading={row.isLoading && !row.metadata}
               foreground={foreground}
               muted={muted}
@@ -142,6 +142,7 @@ function RecentPersonCard({
   displayName,
   picture,
   subtitle,
+  subtitleEllipsizeMode,
   isLoading,
   foreground,
   muted,
@@ -150,6 +151,7 @@ function RecentPersonCard({
   displayName: string;
   picture?: string;
   subtitle: string;
+  subtitleEllipsizeMode: 'tail' | 'middle';
   isLoading: boolean;
   foreground: string;
   muted: string;
@@ -174,18 +176,23 @@ function RecentPersonCard({
       <Text bold size={13} color={foreground} numberOfLines={1} style={styles.nameText}>
         {displayName}
       </Text>
-      <Text size={11} color={muted} numberOfLines={1} style={styles.subtitleText}>
+      <Text
+        size={11}
+        color={muted}
+        numberOfLines={1}
+        ellipsizeMode={subtitleEllipsizeMode}
+        style={styles.subtitleText}>
         {subtitle}
       </Text>
     </Pressable>
   );
 }
 
-function safeShortNpub(pubkey: string): string {
+function safeNpub(pubkey: string): string {
   try {
-    return truncateMiddle(nip19.npubEncode(pubkey), 6);
+    return nip19.npubEncode(pubkey);
   } catch {
-    return truncateMiddle(pubkey, 6);
+    return pubkey;
   }
 }
 

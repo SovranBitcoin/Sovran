@@ -105,6 +105,9 @@ jest.mock('@/shared/ui/primitives/Text', () => ({
 jest.mock('@/shared/ui/primitives/Button', () => ({
   Button: (props: Record<string, unknown>) => <button {...props} />,
 }));
+jest.mock('@/shared/ui/composed/EmptyState', () => ({
+  EmptyState: ({ action }: { action?: React.ReactNode }) => <>{action}</>,
+}));
 jest.mock('@/shared/ui/primitives/Pressable', () => ({
   Pressable: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }));
@@ -266,6 +269,31 @@ describe('receive rail presentation', () => {
       act(() => renderer.unmount());
     }
   );
+  it('shows a retryable failure instead of the empty list when loading rejects', async () => {
+    mockRail = 'bolt12';
+    mockLoadItems.mockRejectedValueOnce(new Error('db unavailable'));
+    let renderer!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(<ReceiveRailListScreen />);
+    });
+    expect(
+      renderer.root.findAllByProps({ testID: 'receive-rail-list-failed-bolt12' }).length
+    ).toBeGreaterThan(0);
+    expect(renderer.root.findAllByProps({ testID: 'receive-rail-list-empty-bolt12' })).toHaveLength(
+      0
+    );
+    mockLoadItems.mockResolvedValueOnce([]);
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'receive-rail-list-retry' }).props.onPress();
+    });
+    expect(
+      renderer.root.findAllByProps({ testID: 'receive-rail-list-failed-bolt12' })
+    ).toHaveLength(0);
+    expect(
+      renderer.root.findAllByProps({ testID: 'receive-rail-list-empty-bolt12' }).length
+    ).toBeGreaterThan(0);
+    act(() => renderer.unmount());
+  });
   it.each([
     ['sat', 'real-offer'],
     ['tsat', 'testnut-offer'],

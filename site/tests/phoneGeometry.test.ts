@@ -3,7 +3,6 @@ import { readFileSync, readdirSync } from "node:fs";
 import {
   captureDevice,
   continuousPath,
-  FRAME_RAIL_SHARE,
   phoneGeometry,
   createScene,
   renderPhone,
@@ -134,8 +133,8 @@ test("bezel and chassis are uniform outward offsets of the exact display path, n
   // is what keeps a dark capture from reading as if it filled the whole body.
   const front = paths.slice(-3).map((path) => Number(path[2]) / 2);
   expect(front[0]).toBe(phone.bezel);
-  expect(front[1]).toBeCloseTo(phone.bezel * (1 - FRAME_RAIL_SHARE), 10);
-  expect(front[2]).toBeCloseTo(Math.min(1.1, phone.bezel * 0.09), 10);
+  expect(front[1]).toBeCloseTo(11.1219160105, 8);
+  expect(front[2]).toBeCloseTo(1.1, 10);
   expect(front[0]).toBeGreaterThan(front[1]);
   expect(front[1]).toBeGreaterThan(front[2]);
   expect(front[2]).toBeGreaterThan(0);

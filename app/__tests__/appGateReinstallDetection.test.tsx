@@ -149,7 +149,7 @@ describe('AppGate locked recovery', () => {
     const screen = render(
       <AppGate>{React.createElement('View', { testID: 'wallet-content' })}</AppGate>
     );
-    expect(screen.getByTestId('secure-locked-screen')).toBeTruthy();
+    expect(screen.getByTestId('secure-locked-screen')).toBeOnTheScreen();
     expect(screen.queryByTestId('wallet-content')).toBeNull();
     fireEvent.press(screen.getByTestId('secure-locked-import'));
     const menu = jest.mocked(actionMenuPopup).mock.calls.at(-1)![0];

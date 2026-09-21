@@ -27,15 +27,15 @@ describe('partitionOwnEvents', () => {
       ev({ kind: 7, id: 'r4', content: '+', tags: [] }), // no target
     ]);
     expect(part.likes).toEqual([
-      { targetEventId: 'target1', reactionEventId: 'r1', createdAt: 1000 },
-      { targetEventId: 'target2', reactionEventId: 'r2', createdAt: 1000 },
+      { targetEventId: 'target1', reactionEventId: 'r1', createdAtSec: 1000 },
+      { targetEventId: 'target2', reactionEventId: 'r2', createdAtSec: 1000 },
     ]);
   });
 
   it('routes reposts from kind:6 by their e-tag target', () => {
     const part = partitionOwnEvents([ev({ kind: 6, id: 'rp1', tags: [['e', 'orig1']] })]);
     expect(part.reposts).toEqual([
-      { targetEventId: 'orig1', repostEventId: 'rp1', createdAt: 1000 },
+      { targetEventId: 'orig1', repostEventId: 'rp1', createdAtSec: 1000 },
     ]);
   });
 
@@ -75,9 +75,9 @@ describe('partitionOwnEvents', () => {
     ]);
 
     expect(part.replies).toEqual([
-      { targetEventId: 'parent2', replyEventId: 'a', createdAt: 1000 },
-      { targetEventId: 'root3', replyEventId: 'b', createdAt: 1000 },
-      { targetEventId: 'last4', replyEventId: 'c', createdAt: 1000 },
+      { targetEventId: 'parent2', replyEventId: 'a', createdAtSec: 1000 },
+      { targetEventId: 'root3', replyEventId: 'b', createdAtSec: 1000 },
+      { targetEventId: 'last4', replyEventId: 'c', createdAtSec: 1000 },
     ]);
     // All kind:1 (incl. quote + top-level) are captured as own notes.
     expect(part.ownNotes.map((n) => n.id)).toEqual(['a', 'b', 'c', 'd', 'e']);

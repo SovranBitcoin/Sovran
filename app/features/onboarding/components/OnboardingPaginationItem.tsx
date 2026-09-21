@@ -37,7 +37,7 @@ type OnboardingPaginationItemProps = {
   inactiveWidth: number;
   activeWidth: number;
   totalSlides: number;
-  slideDuration: number;
+  slideDurationMs: number;
   isDragging: SharedValue<boolean>;
   handleScrollToIndex: (index: number) => void;
   translateY: SharedValue<number>;
@@ -51,7 +51,7 @@ const OnboardingPaginationItem: React.FC<OnboardingPaginationItemProps> = ({
   inactiveWidth,
   activeWidth,
   totalSlides,
-  slideDuration,
+  slideDurationMs,
   isDragging,
   handleScrollToIndex,
   translateY,
@@ -117,11 +117,11 @@ const OnboardingPaginationItem: React.FC<OnboardingPaginationItemProps> = ({
     }
     if (currentSlideIndex === index) {
       slideProgress.set(0);
-      slideProgress.set(withTiming(1, { duration: slideDuration }));
+      slideProgress.set(withTiming(1, { duration: slideDurationMs }));
     } else {
       slideProgress.set(0);
     }
-  }, [currentSlideIndex, index, slideDuration, slideProgress]);
+  }, [currentSlideIndex, index, slideDurationMs, slideProgress]);
 
   useAnimatedReaction(
     () => ({ isDraggingVal: isDragging.get() }),
@@ -129,7 +129,7 @@ const OnboardingPaginationItem: React.FC<OnboardingPaginationItemProps> = ({
       if (E2E_MANUAL_SLIDES) return;
       if (!isDraggingVal && currentSlideIndex === index && slideProgress.get() > 0) {
         slideProgress.set(0);
-        slideProgress.set(withTiming(1, { duration: slideDuration }));
+        slideProgress.set(withTiming(1, { duration: slideDurationMs }));
       }
     }
   );

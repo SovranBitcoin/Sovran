@@ -403,7 +403,10 @@ const NaggLineupModelSchema = z.object({
   created: z.number().int().nonnegative().catch(0),
   contextLength: z.number().int().nonnegative().catch(0),
   maxCompletionTokens: z.number().int().positive().nullable().catch(null).optional(),
-  inputModalities: z.array(z.string().max(32)).max(16).catch([]),
+  inputModalities: z
+    .array(z.string().max(32))
+    .max(16)
+    .catch(() => []),
   pricing: z
     .object({
       prompt: z.number().nullable().catch(null),
@@ -413,7 +416,7 @@ const NaggLineupModelSchema = z.object({
       maxCost: z.number().nullable().catch(null),
     })
     .partial()
-    .catch({}),
+    .catch(() => ({})),
 });
 
 export const NaggAiLineupSchema = z.object({
@@ -425,17 +428,20 @@ export const NaggAiLineupSchema = z.object({
       authMode: z.enum(['bearer', 'x-cashu']).optional().catch(undefined),
       fallbackUsed: z.boolean().optional().catch(undefined),
     })
-    .catch({ baseUrl: '' }),
+    .catch(() => ({ baseUrl: '' })),
   providers: z
     .array(
       z.object({
         id: z.string().max(64),
         vendor: z.string().max(64).catch(''),
-        models: z.array(NaggLineupModelSchema).max(16).catch([]),
+        models: z
+          .array(NaggLineupModelSchema)
+          .max(16)
+          .catch(() => []),
       })
     )
     .max(64)
-    .catch([]),
+    .catch(() => []),
 });
 type NaggAiLineup = z.infer<typeof NaggAiLineupSchema>;
 

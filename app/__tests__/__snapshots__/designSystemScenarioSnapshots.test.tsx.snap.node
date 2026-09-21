@@ -34414,10 +34414,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/select
     {
       "children": null,
       "props": {
-        "aria-label": "Unchecked mint",
-        "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+        "className": "css-view-g5y9jx",
         "dir": null,
-        "role": "checkbox",
         "style": {
           "alignItems": "center",
           "backgroundColor": "rgba(0,0,0,0.00)",
@@ -34438,7 +34436,6 @@ exports[`Design System exact structural snapshots renders wallet-controls/select
           "opacity": 1,
           "width": "20px",
         },
-        "tabIndex": 0,
       },
       "type": "div",
     },
@@ -34465,10 +34462,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/select
         },
       ],
       "props": {
-        "aria-label": "Selected mint",
-        "className": "css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73",
+        "className": "css-view-g5y9jx",
         "dir": null,
-        "role": "checkbox",
         "style": {
           "alignItems": "center",
           "backgroundColor": "rgba(48,96,192,1.00)",
@@ -34489,7 +34484,6 @@ exports[`Design System exact structural snapshots renders wallet-controls/select
           "opacity": 1,
           "width": "20px",
         },
-        "tabIndex": 0,
       },
       "type": "div",
     },
@@ -34516,11 +34510,8 @@ exports[`Design System exact structural snapshots renders wallet-controls/select
         },
       ],
       "props": {
-        "aria-disabled": true,
-        "aria-label": "Disabled mint",
-        "className": "css-view-g5y9jx r-pointerEvents-12vffkv",
+        "className": "css-view-g5y9jx",
         "dir": null,
-        "role": "checkbox",
         "style": {
           "alignItems": "center",
           "backgroundColor": "rgba(192,48,48,1.00)",
@@ -34541,7 +34532,6 @@ exports[`Design System exact structural snapshots renders wallet-controls/select
           "opacity": 0.5,
           "width": "20px",
         },
-        "tabIndex": -1,
       },
       "type": "div",
     },

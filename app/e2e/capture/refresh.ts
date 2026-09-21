@@ -136,15 +136,17 @@ function describeRunFailure(runDir: string | undefined, exit: string) {
 export function resumable(
   session: Session,
   invocation: Invocation,
-  fingerprint: string,
-  native: string,
-  library = LIBRARY
+  {
+    appFingerprint,
+    nativeFingerprint,
+    library = LIBRARY,
+  }: { appFingerprint: string; nativeFingerprint: string; library?: string }
 ) {
   return (
     session.status === 'captured' &&
     session.recipeSha256 === invocation.recipeSha256 &&
-    session.appFingerprint === fingerprint &&
-    session.nativeFingerprint === native &&
+    session.appFingerprint === appFingerprint &&
+    session.nativeFingerprint === nativeFingerprint &&
     Boolean(session.captures?.length) &&
     session.captures!.every((capture) => {
       if (!/^(ios|android)\/[a-z][a-z0-9-]*\.png$/.test(capture.file)) return false;
@@ -423,7 +425,10 @@ async function refresh(args: string[]) {
         if (
           previous &&
           previous.artifactSha256 === stamp.artifactSha256 &&
-          resumable(previous, invocation, appSource.fingerprint, stamp.fingerprint)
+          resumable(previous, invocation, {
+            appFingerprint: appSource.fingerprint,
+            nativeFingerprint: stamp.fingerprint,
+          })
         ) {
           Object.assign(session, previous);
           console.log(`Reuse ${platform} ${invocation.scenario}`);

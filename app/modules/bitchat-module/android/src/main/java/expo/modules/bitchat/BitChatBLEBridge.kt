@@ -168,7 +168,11 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         if (!BluetoothStateMonitor.hasPermissions(context)) {
             throw BitChatUnauthorizedException()
         }
-        val identity = BitchatIdentityMaterial(noisePrivateKeyHex, signingPrivateKeyHex, p2pkPubkeyHex)
+        val identity = BitchatIdentityMaterial(
+            noisePrivateKeyHex = noisePrivateKeyHex,
+            signingPrivateKeyHex = signingPrivateKeyHex,
+            p2pkPubkeyHex = p2pkPubkeyHex,
+        )
         val suffix = BitchatProfileScope.storageSuffix(profileScope)
 
         synchronized(lock) {

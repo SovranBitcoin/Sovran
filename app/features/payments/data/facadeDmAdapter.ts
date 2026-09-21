@@ -41,7 +41,7 @@ export function resolvedDmEnvelopesToPage(resolved: facade.ResolvedDmEnvelopes):
     id: e.id,
     pubkey: e.pubkey,
     kind: e.kind,
-    createdAt: e.createdAt,
+    createdAt: e.createdAtSec,
     content: e.content,
     tags: e.tags,
     ...(e.sig ? { sig: e.sig } : {}),

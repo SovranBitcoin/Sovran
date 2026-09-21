@@ -118,12 +118,12 @@ export function UserMessagesScreen({
     loadMore,
     refresh,
     error: threadError,
-  } = useDmThread(
-    isFictionalContact || blocked ? '' : pubkey,
-    nostrKeys?.pubkey,
-    nostrKeys?.privateKey,
-    protocol
-  );
+  } = useDmThread({
+    counterparty: isFictionalContact || blocked ? '' : pubkey,
+    viewerPubkey: nostrKeys?.pubkey,
+    viewerPrivateKey: nostrKeys?.privateKey,
+    protocol,
+  });
 
   // Local messages contain only real optimistic sent echoes. Demo messages
   // have a separate lifetime and can never merge into the live conversation. Echoes are keyed on the self-copy wrap id so they dedup against the
@@ -139,7 +139,9 @@ export function UserMessagesScreen({
   // another profile's plaintext DM (which may be bearer ecash).
   useEffect(() => {
     const seeded = nostrKeys?.pubkey
-      ? useDmEchoStore.getState().getForThread(protocol, nostrKeys.pubkey, pubkey)
+      ? useDmEchoStore
+          .getState()
+          .getForThread({ viewer: nostrKeys.pubkey, protocol, counterparty: pubkey })
       : [];
     chatLog.info('dm.echo.seed', { count: seeded.length });
     setLocalMessages(seeded);
@@ -176,7 +178,7 @@ export function UserMessagesScreen({
       id: m.id,
       content: m.content,
       isOwn: m.isOwn,
-      created_at: m.createdAt,
+      created_at: m.createdAtSec,
       pubkey: m.senderPubkey,
     }));
     const pending = localMessages.filter((m) => !serverIds.has(m.id));
@@ -249,14 +251,14 @@ export function UserMessagesScreen({
       // Mock thread: append locally and stop. Publishing here would broadcast
       // demo messages outside the isolated conversation.
       if (isMockThread) {
-        const timestamp = Math.floor(Date.now() / 1000);
+        const createdAtSec = Math.floor(Date.now() / 1000);
         setDemoMessages((prev) => [
           ...prev,
           {
-            id: `demo-dm-local-${timestamp}`,
+            id: `demo-dm-local-${createdAtSec}`,
             content: text,
             isOwn: true,
-            created_at: timestamp,
+            created_at: createdAtSec,
             pubkey: '',
           },
         ]);
@@ -281,7 +283,7 @@ export function UserMessagesScreen({
         return;
       }
 
-      const timestamp = Math.floor(Date.now() / 1000);
+      const createdAtSec = Math.floor(Date.now() / 1000);
 
       // NIP-04 (legacy): a single signed kind-4 event authored by us and
       // addressed to the recipient via a `p` tag. No gift wrap / self-copy —
@@ -303,7 +305,7 @@ export function UserMessagesScreen({
               content: text,
               isOwn: true,
               isSending: true,
-              created_at: timestamp,
+              created_at: createdAtSec,
               pubkey: myPubkey,
             },
           ]);
@@ -358,7 +360,7 @@ export function UserMessagesScreen({
             content: text,
             isOwn: true,
             isSending: true,
-            created_at: timestamp,
+            created_at: createdAtSec,
             pubkey: myPubkey,
           },
         ]);

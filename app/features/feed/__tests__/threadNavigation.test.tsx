@@ -245,7 +245,7 @@ test('a real post tap mounts its known content at the top before deferred work',
   mockParams = mockPush.mock.calls[0][0].params;
   source.unmount();
   const destination = render(<ThreadScreen />);
-  expect(destination.getByTestId('note-Clicked post')).toBeTruthy();
+  expect(destination.getByTestId('note-Clicked post')).toBeOnTheScreen();
   expect(mockListProps[0].data[0].type).toBe('target');
   expect(mockListProps[0].initialScrollIndex).toBeUndefined();
   expect(mockGetThread).not.toHaveBeenCalled();
@@ -281,5 +281,5 @@ test('a card reply button opens its thread with the reply box focused', () => {
   mockParams = mockPush.mock.calls[0][0].params;
   source.unmount();
   const destination = render(<ThreadScreen />);
-  expect(destination.getByTestId('note-Clicked post')).toBeTruthy();
+  expect(destination.getByTestId('note-Clicked post')).toBeOnTheScreen();
 });

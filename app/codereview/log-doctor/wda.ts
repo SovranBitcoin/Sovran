@@ -111,6 +111,10 @@ async function recoverWDA(): Promise<void> {
   return wdaRecoveryPromise;
 }
 
+function errMsg(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 export async function wdaRequest(
   method: 'GET' | 'POST' | 'DELETE',
   path: string,
@@ -150,7 +154,7 @@ export async function wdaRequest(
     } catch (err) {
       transportErr = err;
       if (attempt === 0) {
-        emitRecoveryLine(`▸ WDA request failed (${(err as Error).message}) — attempting recovery…`);
+        emitRecoveryLine(`▸ WDA request failed (${errMsg(err)}) — attempting recovery…`);
         try {
           await recoverWDA();
           emitRecoveryLine(`▸ WDA recovered, retrying ${method} ${path}`);
@@ -166,8 +170,9 @@ export async function wdaRequest(
               `  scripts/start-wda.sh # WDA only\n` +
               `\n` +
               `See docs/device-automation.md for the full setup.\n` +
-              `Transport error: ${(err as Error).message}\n` +
-              `Recovery error:  ${(recoveryErr as Error).message}`
+              `Transport error: ${errMsg(err)}\n` +
+              `Recovery error:  ${errMsg(recoveryErr)}`,
+            { cause: new AggregateError([err, recoveryErr]) }
           );
         }
         continue;
@@ -181,7 +186,8 @@ export async function wdaRequest(
           `  scripts/start-wda.sh # WDA only\n` +
           `\n` +
           `See docs/device-automation.md for the full setup.\n` +
-          `Underlying error: ${(err as Error).message}`
+          `Underlying error: ${errMsg(err)}`,
+        { cause: err }
       );
     }
   }
@@ -189,7 +195,8 @@ export async function wdaRequest(
     // Unreachable because either `break` ran (res set) or the loop
     // threw — but TS needs a narrowing for the block below.
     throw new Error(
-      `WDA unreachable at ${WDA_BASE}: ${transportErr instanceof Error ? transportErr.message : 'unknown'}`
+      `WDA unreachable at ${WDA_BASE}: ${transportErr instanceof Error ? transportErr.message : 'unknown'}`,
+      { cause: transportErr }
     );
   }
 
@@ -214,8 +221,10 @@ export async function wdaRequest(
 /** Get the current accessibility tree without creating a session. */
 export async function getCurrentTree(): Promise<AXNode> {
   const res = await wdaRequest('GET', '/source?format=json');
-  if (!res.value) throw new Error('WDA /source returned no value');
-  return res.value as AXNode;
+  if (!res.value || typeof res.value !== 'object') {
+    throw new Error('WDA /source returned no value');
+  }
+  return res.value;
 }
 
 export function flattenAll(node: AXNode, out: FlatNode[] = []): FlatNode[] {

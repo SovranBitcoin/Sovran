@@ -92,7 +92,7 @@ async function fetchPrefix(prefix, names) {
 
   for (const chunk of chunks) {
     const url = `${urlPrefix}${chunk.join(',')}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
     if (!res.ok) {
       console.warn(`[${prefix}] HTTP ${res.status} for ${chunk.length} icons`);
       continue;

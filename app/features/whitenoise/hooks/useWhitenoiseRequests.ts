@@ -13,7 +13,7 @@ export type WhitenoiseRequest = {
   /** Inviter's hex pubkey. */
   fromPubkey: string;
   /** Rumor created_at (Unix seconds). */
-  createdAt: number;
+  createdAtSec: number;
   /** The unread rumor — kept intact for accept(). */
   rumor: UnreadInvite;
 };
@@ -84,7 +84,7 @@ function toRequest(rumor: UnreadInvite): WhitenoiseRequest {
   return {
     id: rumor.id,
     fromPubkey: rumor.pubkey,
-    createdAt: rumor.created_at,
+    createdAtSec: rumor.created_at,
     rumor,
   };
 }
@@ -104,7 +104,7 @@ async function refreshRequestsImpl(
     const unread = await inviteReader.getUnread();
     if (isCancelled()) return;
     const mapped = unread.map(toRequest);
-    mapped.sort((a, b) => b.createdAt - a.createdAt);
+    mapped.sort((a, b) => b.createdAtSec - a.createdAtSec);
     setRequests(mapped);
   } catch (err) {
     wnLog.warn('whitenoise.requests.refresh_failed', {

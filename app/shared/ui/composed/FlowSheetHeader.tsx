@@ -1,4 +1,4 @@
-import type { ComponentProps } from 'react';
+import { useState, type ComponentProps } from 'react';
 /**
  * JS header for nested flow stacks presented as Android formSheets.
  *
@@ -13,7 +13,7 @@ import type { ComponentProps } from 'react';
  * It interprets the SAME per-screen options the native header would have —
  * headerLeft/headerRight/headerTitle/title/headerStyle — so screens need no
  * changes. Visuals match FormSheetChrome (grabber + centered bold title +
- * 44pt side slots).
+ * equal-width side slots).
  *
  * The header OWNS the Android scrim (HeaderGradient) rather than reading
  * it from options.headerBackground: createFlowLayoutScreenOptions strips that
@@ -32,8 +32,9 @@ import type { ComponentProps } from 'react';
  * No top safe-area inset — the sheet already sits below the status bar.
  */
 import Animated from 'react-native-reanimated';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 import type { NativeStackHeaderProps } from 'expo-router';
+import { HEADER_TITLE_MIN_WIDTH } from '@/navigation/headerLayout';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { headerButtonSize, spacing, fontSize } from '@/shared/styles/tokens';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -93,6 +94,21 @@ export function FlowSheetHeader({
   const left = options.headerLeft?.({ tintColor, canGoBack: !!back });
   const right = options.headerRight?.({ tintColor, canGoBack: !!back });
 
+  // Both slots reserve the WIDER side's measured width. A flex title between
+  // unequal slots is centred in the space left over, not on the sheet: two
+  // actions against one shifted it by half the difference. The mirror stops
+  // where it would squeeze the title below HEADER_TITLE_MIN_WIDTH (three actions
+  // on a narrow sheet); past that the title keeps its room and gives up the centre.
+  const { width: sheetWidth } = useWindowDimensions();
+  const [leftWidth, setLeftWidth] = useState(0);
+  const [rightWidth, setRightWidth] = useState(0);
+  const mirrorLimit = (sheetWidth - spacing.sm * 2 - HEADER_TITLE_MIN_WIDTH) / 2;
+  const sideSlotWidth = {
+    minWidth: Math.max(headerButtonSize, Math.min(Math.max(leftWidth, rightWidth), mirrorLimit)),
+  };
+  const measureLeft = (event: LayoutChangeEvent) => setLeftWidth(event.nativeEvent.layout.width);
+  const measureRight = (event: LayoutChangeEvent) => setRightWidth(event.nativeEvent.layout.width);
+
   // Screen declares its page color here on Android sheets. Native iOS bars
   // stay transparent; this custom header owns the Android gradient.
   const headerStyleBackground = (
@@ -132,9 +148,13 @@ export function FlowSheetHeader({
       ) : null}
       <SheetGrabber />
       <HStack align="center" style={styles.titleRow}>
-        <View style={styles.sideSlot}>{left}</View>
+        <View style={[styles.sideSlot, sideSlotWidth]}>
+          <View onLayout={measureLeft}>{left}</View>
+        </View>
         <View style={styles.titleSlot}>{title}</View>
-        <View style={[styles.sideSlot, styles.rightSlot]}>{right}</View>
+        <View style={[styles.sideSlot, styles.rightSlot, sideSlotWidth]}>
+          <View onLayout={measureRight}>{right}</View>
+        </View>
       </HStack>
     </View>
   );
@@ -159,9 +179,10 @@ const styles = StyleSheet.create({
     minHeight: headerButtonSize,
   },
   // Min-width (not fixed) so wide headerRight content (e.g. mint list's
-  // inspect Link) isn't clipped; empty slots still balance the title.
+  // inspect Link) isn't clipped. Content hugs its own edge so the measured
+  // width is the content's, never the slot's.
   sideSlot: {
-    minWidth: headerButtonSize,
+    alignItems: 'flex-start',
     justifyContent: 'center',
   },
   rightSlot: {
@@ -169,6 +190,7 @@ const styles = StyleSheet.create({
   },
   titleSlot: {
     flex: 1,
+    minWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },

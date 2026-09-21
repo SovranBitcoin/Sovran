@@ -363,10 +363,10 @@ it.each(['timeout', 'error', 'invalid', 'synthetic-eose', 'partial-eose'])(
 );
 it('clamps a future base and logs only its delta once per publish', async () => {
   jest.useFakeTimers().setSystemTime(1000000);
-  const createdAt = 100000;
+  const createdAtSec = 100000;
   useOwnProfileMetadataStore.getState().setLatest({
     content: { lud16: 'keep', nip05: 'keep', banner: 'keep', about: 'keep', website: 'keep' },
-    createdAt,
+    createdAt: createdAtSec,
     eventId: 'b'.repeat(64),
   });
   await publish();
@@ -381,7 +381,7 @@ it('clamps a future base and logs only its delta once per publish', async () => 
   });
   expect(nostrLog.warn).toHaveBeenCalledTimes(1);
   expect(nostrLog.warn).toHaveBeenCalledWith('nostr.profile.publish.clock_skew', {
-    deltaSeconds: createdAt - 1000,
+    deltaSeconds: createdAtSec - 1000,
   });
   jest.useRealTimers();
 });

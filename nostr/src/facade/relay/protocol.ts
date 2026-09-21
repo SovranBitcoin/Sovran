@@ -49,6 +49,14 @@ export type RawRelayEvent = {
   created_at?: number;
 };
 
+/** An EVENT payload with the id and kind every consumer keys on; other fields are coerced in `toFeedEvent`. */
+function readRelayEvent(payload: unknown): (RawRelayEvent & { id: string }) | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const { id, kind }: { id?: unknown; kind?: unknown } = payload;
+  if (typeof id !== 'string' || typeof kind !== 'number') return null;
+  return { ...payload, id, kind };
+}
+
 export interface RelayConnection {
   request(
     filters: NostrFilter[],
@@ -183,9 +191,9 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
             const message = parseWireFrame(event.data);
             if (!message || message[1] !== subId) return;
             anyResponded = true;
-            if (message[0] === 'EVENT' && message[2] && typeof message[2] === 'object') {
-              const raw = message[2] as RawRelayEvent;
-              if (typeof raw.id === 'string' && !byId.has(raw.id)) byId.set(raw.id, raw);
+            if (message[0] === 'EVENT') {
+              const raw = readRelayEvent(message[2]);
+              if (raw && !byId.has(raw.id)) byId.set(raw.id, raw);
             } else if (message[0] === 'EOSE' && !receivedEose) {
               receivedEose = true;
               eoseCount += 1;
@@ -223,10 +231,8 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
           const message = parseWireFrame(event.data);
           // Stay open past EOSE — a live listener only cares about EVENTs.
           if (!message || message[1] !== subId || message[0] !== 'EVENT') return;
-          const raw = message[2];
-          if (!raw || typeof raw !== 'object') return;
-          const candidate = raw as RawRelayEvent;
-          if (typeof candidate.id !== 'string' || seen.has(candidate.id)) return;
+          const candidate = readRelayEvent(message[2]);
+          if (!candidate || seen.has(candidate.id)) return;
           seen.add(candidate.id);
           onEvent(candidate);
         };

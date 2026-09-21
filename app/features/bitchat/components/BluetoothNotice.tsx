@@ -55,7 +55,11 @@ function noticeAction(
   }
 }
 
-const COPY: Record<string, { title: string; subtitle: string }> = {
+type NoticeCopy = { title: string; subtitle: string };
+
+const COPY: Record<UseBluetoothStateResult['status'], NoticeCopy | null> = {
+  ready: null,
+  unknown: null,
   poweredOff: {
     title: 'Bluetooth is off',
     subtitle:

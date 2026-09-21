@@ -3,6 +3,7 @@
  */
 
 import { LightningReceiveRoute } from '@/features/receive';
+import { railHeaderTitle } from 'wallet';
 import { FormSheetChrome } from '@/shared/ui/composed/FormSheetChrome';
 import { View } from '@/shared/ui/primitives/View/View';
 
@@ -16,7 +17,7 @@ const ROUTE_READY_PROBE_STYLE = {
 
 export default function LightningReceiveStandaloneRoute() {
   return (
-    <FormSheetChrome title="Receive Lightning">
+    <FormSheetChrome title={railHeaderTitle('lightningReceive')}>
       {__DEV__ ? (
         <View
           testID="lightning-receive-standalone-ready"

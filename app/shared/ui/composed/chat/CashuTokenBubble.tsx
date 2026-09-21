@@ -22,7 +22,6 @@ import { alpha, radius, spacing } from '@/shared/styles/tokens';
 interface CashuTokenBubbleProps {
   token: string;
   isOwn: boolean;
-  hasText?: boolean;
   cornerRadii?: Pick<
     ViewStyle,
     | 'borderTopLeftRadius'
@@ -119,12 +118,7 @@ function buildReceiveEntrySafe(
  * surface (NIP-04, NIP-17, MLS, BitChat nostr-dm/ble-dm) can present the
  * same Redeem/Cancel card.
  */
-export function CashuTokenBubble({
-  token,
-  isOwn,
-  hasText = false,
-  cornerRadii,
-}: CashuTokenBubbleProps) {
+export function CashuTokenBubble({ token, isOwn, cornerRadii }: CashuTokenBubbleProps) {
   const [foreground, defaultColor, surfaceTertiary, success] = useThemeColor([
     'foreground',
     'default',
@@ -187,11 +181,7 @@ export function CashuTokenBubble({
   const { amount, unit, mintUrl } = decodedToken;
 
   return (
-    <View
-      className="mb-0 min-w-0 self-stretch"
-      style={{
-        marginTop: hasText ? spacing.sm : 0,
-      }}>
+    <View className="min-w-0 self-stretch">
       <Pressable
         onPress={handlePress}
         testID={isOwn ? 'cashu-bubble-own' : 'cashu-bubble-incoming'}

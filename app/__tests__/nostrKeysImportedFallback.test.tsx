@@ -126,7 +126,7 @@ it('shows Re-import on a pubkey mismatch and never configures the wallet', async
       <Consumer />
     </NostrKeysProvider>
   );
-  await waitFor(() => expect(screen.getByTestId('reimport')).toBeTruthy());
+  expect(await screen.findByTestId('reimport')).toBeOnTheScreen();
   expect(useProfileStore.getState().getActiveProfile()?.source).toBe('imported');
   expect(clearAccountDerivedCache).not.toHaveBeenCalled();
   expect(deriveCashuMnemonicForImported).not.toHaveBeenCalled();
@@ -141,7 +141,7 @@ it('refuses repair if an old chain cache cannot be deleted', async () => {
       <Consumer />
     </NostrKeysProvider>
   );
-  await waitFor(() => expect(screen.getByTestId('reimport')).toBeTruthy());
+  expect(await screen.findByTestId('reimport')).toBeOnTheScreen();
   expect(useProfileStore.getState().getActiveProfile()?.source).toBe('imported');
   expect(CocoManager.setAccountIndex).not.toHaveBeenCalled();
 });
@@ -153,5 +153,5 @@ it('keeps recovery reachable at the provider boundary when secure storage is loc
       <Consumer />
     </NostrKeysProvider>
   );
-  expect(screen.getByTestId('locked')).toBeTruthy();
+  expect(screen.getByTestId('locked')).toBeOnTheScreen();
 });

@@ -39,7 +39,10 @@ export function serializeStoreState(value: unknown): string {
   try {
     json = JSON.stringify(value, createSafeReplacer()) ?? 'null';
   } catch (error) {
-    return JSON.stringify({ __type: 'Error', message: (error as Error).message });
+    return JSON.stringify({
+      __type: 'Error',
+      message: error instanceof Error ? error.message : String(error),
+    });
   }
   if (json.length <= MAX_STORE_BYTES) return json;
   const keys =

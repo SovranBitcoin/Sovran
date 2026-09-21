@@ -8,9 +8,9 @@ Scope: `repository-wide`
 
 A schema field that carries sats, msats, fees or any amount that can decide a payment is an integer schema, because `z.number()` accepts fractions, negatives and integers beyond 2^53.
 
-Does `hunk` declare a schema field for a payable amount (`amount`, `sats`, `msat`, `fee`, `reserve`, `balance`, `total`, a proof or quote amount) as `z.number()` — alone or with only `.positive()`, `.nonnegative()`, `.min(…)` or `.max(…)` — without `.int()`, `z.int()` or the shared `Sats` primitive, or as `z.union([z.number(), z.string()])` that is later used as a number without an integer check?
+Does `hunk` declare a schema field for a payable amount (`amount`, `sats`, `msat`, `fee`, `reserve`, `balance`, `total`, a proof or quote amount) as `z.number()` — alone or with only `.positive()`, `.nonnegative()`, `.min(…)` or `.max(…)` — without `.int()`, `z.int()` or the shared `Sats` primitive, or as `z.union([z.number(), z.string()])` that the hunk or the schema's consumer then compares, adds or sends as an amount without an integer check?
 
-Allowed cases: `Sats`, `CountInt` or `z.number().int()`/`z.int()` (both enforce the safe-integer range in Zod 4); fiat rates, prices, scores, percentages, latencies and other display-only floats; a loose read of a third-party history row whose amount is only displayed or logged and is re-validated before it decides a payment; bigint or decimal-string amounts validated by a digit regex.
+Allowed cases: `Sats`, `CountInt` or `z.number().int()`/`z.int()` (both enforce the safe-integer range in Zod 4); fiat rates, prices, scores, percentages, latencies and other display-only floats; a loose read of a third-party history row whose amount is only displayed or logged and is re-validated before it decides a payment; a serialised SDK amount kept as `number | string` on a row that is only logged or forwarded; bigint or decimal-string amounts validated by a digit regex.
 
 ## zod/coerce-beyond-number
 
@@ -48,9 +48,9 @@ Scope: `repository-wide`
 
 A Nostr event id, pubkey, signature or SHA-256 digest is validated for length and hex charset, not as a bare or length-only string.
 
-Does `hunk` declare a schema field for a Nostr event id, pubkey, signature, P2PK key or hash (`id`, `eventId`, `pubkey`, `peer`, `author`, `sig`, `sha256`, `x`) on relay, network, route, QR or persisted input as `z.string()`, `z.string().max(…)`, `z.string().length(64)` or another length-only check with no charset constraint, or use `z.hex()` alone (no length)?
+Does `hunk` declare a schema field for a Nostr event id, pubkey, signature, P2PK key or hash (`id`, `eventId`, `pubkey`, `peer`, `author`, `sig`, `sha256`, `x`) on relay, network, route, QR or persisted input as `z.string()`, `z.string().max(…)`, `z.string().length(64)` or another length-only check with no charset constraint, or use `z.hex()` alone (no length), so that the value is used without its hex format ever being checked?
 
-Allowed cases: `Hex64`, `Hex128`, `Sha256Hex`, `HexOrNpub` from `@sovranbitcoin/schemas`; `NostrPubkeyHexSchema`/`NostrEventIdSchema` from `app/shared/lib/protocolIds.ts` (deliberately case-tolerant for reads); `z.string().refine(isNostrPubkeyHex)`; `z.hash('sha256')` or `z.hex().length(64)` on a read path where uppercase is acceptable; opaque non-Nostr ids (operation ids, quote ids, UUIDs) bounded with `.max(…)`; a loose upstream envelope whose events are signature-verified before use.
+Allowed cases: `Hex64`, `Hex128`, `Sha256Hex`, `HexOrNpub` from `@sovranbitcoin/schemas`; `NostrPubkeyHexSchema`/`NostrEventIdSchema` from `app/shared/lib/protocolIds.ts` (deliberately case-tolerant for reads); `z.string().refine(isNostrPubkeyHex)`; `z.hash('sha256')` or `z.hex().length(64)` on a read path where uppercase is acceptable; opaque non-Nostr ids (operation ids, quote ids, UUIDs) bounded with `.max(…)`; a loose upstream envelope whose events are signature-verified before use; a field that the same function passes through a hex predicate (`isNostrPubkeyHex`, a 64-hex regex) before any use, dropping or nulling it on failure.
 
 ## nostr/event-schema-bounds
 
@@ -108,9 +108,9 @@ Scope: `repository-wide`
 
 `.catch(value)` returns the very same object on every fallback, and `.default(value)` clones only one level, so a mutable fallback is shared state between parses.
 
-Does `hunk` pass an array or object to `.catch(` by value — `.catch([])`, `.catch({})`, `.catch({ … })`, `.catch(SOME_CONSTANT)` — or pass `.default(` an object or array that itself contains nested arrays or objects (`.default({ items: [] })`, `.default(DEFAULTS)`), where the parsed result enters a store, cache or any value that is later mutated, pushed to or handed to immer?
+Does `hunk` pass an array or object to `.catch(` by value — `.catch([])`, `.catch({})`, `.catch({ … })`, or `.catch(SOME_CONSTANT)` where the constant holds an array or object — or pass `.default(` an object or array that itself contains nested arrays or objects (`.default({ items: [] })`, `.default(DEFAULTS)`), where the parsed result enters a store, cache or any value that is later mutated, pushed to or handed to immer?
 
-Allowed cases: A factory (`.catch(() => [])`, `.catch(() => ({}))`, `.default(() => ({ items: [] }))`); `.prefault(…)` (re-parsed, so nested values are fresh); primitives, `undefined` and `null`; flat `.default([])`/`.default({})` (Zod 4 returns a fresh shallow copy per parse); a fallback that is frozen (`Object.freeze`) or provably never mutated.
+Allowed cases: A factory (`.catch(() => [])`, `.catch(() => ({}))`, `.default(() => ({ items: [] }))`); `.prefault(…)` (re-parsed, so nested values are fresh); primitives, `undefined` and `null`, including a constant that is a string, number, boolean or enum member (`.catch(DEFAULT_MODE)` where `DEFAULT_MODE = 'relaxed'`); flat `.default([])`/`.default({})` (Zod 4 returns a fresh shallow copy per parse); a fallback that is frozen (`Object.freeze`) or provably never mutated.
 
 ## persist/additive-fields
 

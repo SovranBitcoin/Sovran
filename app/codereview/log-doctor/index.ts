@@ -1016,11 +1016,11 @@ function renderGroupedTimeline(title: string, entries: LogEntry[], opts: Options
   for (const [groupId, group] of page) {
     const first = group[0];
     const last = group[group.length - 1];
-    const duration = Math.round(((last?._t ?? 0) - (first?._t ?? 0)) * 100) / 100;
+    const durationMs = Math.round(((last?._t ?? 0) - (first?._t ?? 0)) * 100) / 100;
     const hasError = group.some((entry) => entry.level === 'error' || entry.level === 'fatal');
     const hasWarning = group.some((entry) => entry.level === 'warn');
     const outcome = hasError ? 'ERROR' : hasWarning ? 'WARN' : 'OK';
-    lines.push(`  ${groupId} (${duration}ms, ${outcome})`);
+    lines.push(`  ${groupId} (${durationMs}ms, ${outcome})`);
 
     const startT = first?._t ?? 0;
     for (const entry of group) {
@@ -1459,7 +1459,7 @@ function modeScreens(entries: LogEntry[], opts: Options): string {
 
   // ── Section 1: Navigation flow (mount/unmount timeline with durations) ──
   const mounts = new Map<string, number>(); // component → mount timestamp
-  const durations: Array<{ component: string; duration: number; mountT: number }> = [];
+  const durations: Array<{ component: string; durationMs: number; mountT: number }> = [];
   const mountOrder: Array<{ component: string; t: number; action: 'mount' | 'unmount' }> = [];
 
   for (const e of screenEvents) {
@@ -1472,7 +1472,7 @@ function modeScreens(entries: LogEntry[], opts: Options): string {
       const name = (e.params?.component as string) ?? '?';
       const mountT = mounts.get(name);
       if (mountT !== undefined) {
-        durations.push({ component: name, duration: t - mountT, mountT });
+        durations.push({ component: name, durationMs: t - mountT, mountT });
         mounts.delete(name);
       }
       mountOrder.push({ component: name, t, action: 'unmount' });
@@ -1492,7 +1492,7 @@ function modeScreens(entries: LogEntry[], opts: Options): string {
         m.action === 'unmount'
           ? (() => {
               const d = durations.find((d) => d.component === m.component);
-              return d ? ` (visible ${formatDelta(d.duration).trim()})` : '';
+              return d ? ` (visible ${formatDelta(d.durationMs).trim()})` : '';
             })()
           : '';
       lines.push(`${formatDelta(delta)} ${icon} ${m.component}${dur}`);
@@ -1546,9 +1546,9 @@ function modeScreens(entries: LogEntry[], opts: Options): string {
   // ── Section 4: Screen duration summary ──
   if (durations.length > 0) {
     lines.push('SCREEN DURATIONS:');
-    durations.sort((a, b) => b.duration - a.duration);
+    durations.sort((a, b) => b.durationMs - a.durationMs);
     for (const d of durations.slice(0, 20)) {
-      lines.push(`  ${formatDelta(d.duration).trim().padEnd(10)} ${d.component}`);
+      lines.push(`  ${formatDelta(d.durationMs).trim().padEnd(10)} ${d.component}`);
     }
   }
 
@@ -3276,14 +3276,14 @@ function modeFlows(entries: LogEntry[], opts: Options): string {
   for (const [flowId, events] of page) {
     const first = events[0];
     const last = events[events.length - 1];
-    const duration = Math.round(((last._t ?? 0) - (first._t ?? 0)) * 100) / 100;
+    const durationMs = Math.round(((last._t ?? 0) - (first._t ?? 0)) * 100) / 100;
 
     // Determine outcome
     const hasError = events.some((e) => e.level === 'error' || e.level === 'fatal');
     const hasEnd = events.some((e) => e.event === 'flow.end');
     const outcome = hasError ? 'ERROR' : hasEnd ? 'COMPLETED' : 'IN-PROGRESS';
 
-    lines.push(`  ${flowId} (${duration}ms, ${outcome})`);
+    lines.push(`  ${flowId} (${durationMs}ms, ${outcome})`);
 
     const startT = first._t ?? 0;
     for (const e of events) {
@@ -3925,10 +3925,10 @@ export function pairSpans(entries: LogEntry[]): SpanAggregate[] {
     let index = corrId ? list.findIndex((s) => s.corrId === corrId) : -1;
     if (index === -1) index = 0; // FIFO fallback
     const [start] = list.splice(index, 1);
-    const duration = entry._t - start.t;
-    if (duration < 0) continue;
+    const durationMs = entry._t - start.t;
+    if (durationMs < 0) continue;
     const agg = aggregate(base);
-    agg.samples.push(duration);
+    agg.samples.push(durationMs);
     if (!end.ok) agg.failures++;
   }
 

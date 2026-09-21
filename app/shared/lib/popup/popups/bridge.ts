@@ -59,7 +59,7 @@ export type ToastConfig = {
   /** Declarative icon — resolved inside CompactToast so the icon color
    * tracks the (theme-aware) toast foreground. */
   icon?: PopupIcon;
-  duration?: number | 'persistent';
+  durationMs?: number | 'persistent';
   onShow?: () => void;
   onHide?: () => void;
   debugLabel?: string;
@@ -72,7 +72,7 @@ type CustomToastConfig = {
   component: (
     props: Record<string, unknown> & { hide: (ids?: string | string[] | 'all') => void }
   ) => React.ReactElement;
-  duration?: number | 'persistent';
+  durationMs?: number | 'persistent';
   onShow?: () => void;
   onHide?: () => void;
   debugLabel?: string;
@@ -84,7 +84,7 @@ export type SheetConfig = {
   submessage?: ReactNode | PopupTextSegment[];
   icon?: PopupIcon;
   dismissable?: boolean;
-  duration?: number;
+  durationMs?: number;
   buttons?: { text: string; page?: string; onPress?: () => void; testID?: string }[];
   buttonLayout?: 'row' | 'stack';
   onClose?: (event: SheetCloseEvent) => void;
@@ -102,7 +102,7 @@ export function showToast(config: ToastConfig) {
     label: config.label,
     debugLabel: config.debugLabel,
     description: config.description?.slice(0, 160),
-    duration: config.duration,
+    durationMs: config.durationMs,
     hasIcon: !!config.icon,
     caller,
     ...(config.debugFields ?? {}),
@@ -130,7 +130,7 @@ export function showToast(config: ToastConfig) {
           icon: config.icon,
         })
       ),
-    duration: config.duration,
+    duration: config.durationMs,
     onShow: () => {
       popupLog.info('popup.toast.shown', {
         toastId,
@@ -167,7 +167,7 @@ export function showCustomToast(config: CustomToastConfig) {
     toastId,
     componentName,
     debugLabel: config.debugLabel,
-    duration: config.duration,
+    durationMs: config.durationMs,
     caller,
     ...(config.debugFields ?? {}),
   });
@@ -188,7 +188,7 @@ export function showCustomToast(config: CustomToastConfig) {
       } as unknown as Record<string, unknown> & {
         hide: (ids?: string | string[] | 'all') => void;
       }),
-    duration: config.duration,
+    duration: config.durationMs,
     onShow: () => {
       popupLog.info('popup.toast.custom_shown', {
         toastId,
@@ -220,7 +220,7 @@ export function showSheet(config: SheetConfig) {
     buttonCount: config.buttons?.length ?? 0,
     buttonLabels: config.buttons?.map((b) => b.text),
     dismissable: config.dismissable ?? true,
-    duration: config.duration,
+    durationMs: config.durationMs,
     hasIcon: !!config.icon,
     hasLive: !!config.live,
     caller,

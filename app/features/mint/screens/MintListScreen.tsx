@@ -1,4 +1,5 @@
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { getMockMintBalance } from '@/shared/stores/runtime/mockDataStore';
 /**
  * @fileoverview Shared Mint List screen component
@@ -15,7 +16,7 @@ import { useEffect, useRef, useState } from 'react';
 import { List } from '@/shared/ui/composed/List';
 
 import type { MintListItem } from 'wallet';
-import { accountUnitLabel } from 'wallet';
+import { accountUnitLabel, isTestnutUnit } from 'wallet';
 import type { MintRow } from '@/features/mint/hooks/useMintRowsWithCache';
 
 import { Text } from '@/shared/ui/primitives/Text';
@@ -24,7 +25,10 @@ import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { MINT_CURRENCY_TABS_HEIGHT } from '@/features/mint/components/MintCurrencyTabs';
-import { extractAvailableCurrencies } from '@/features/mint/lib/availableCurrencies';
+import {
+  extractAvailableCurrencies,
+  filterMintsForCurrencyTab,
+} from '@/features/mint/lib/availableCurrencies';
 import { useStickyCurrencyTabs } from '@/features/mint/hooks/useStickyCurrencyTabs';
 import { useShiftLogger } from '@/shared/lib/contentShiftLog';
 import { Screen } from '@/shared/ui/composed/Screen';
@@ -112,6 +116,7 @@ export function MintListScreen({
 }: MintListScreenProps) {
   useLifecycleLogger('MintListScreen', cashuLog);
   const mockMode = useSettingsStore((state) => state.mockMode);
+  const testnutAccount = useMintStore((state) => isTestnutUnit(state.activeUnit));
 
   const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
   const [selectedCurrency, setSelectedCurrency] = useState<string>('ALL');
@@ -128,23 +133,49 @@ export function MintListScreen({
   // Tabs list every unit some mint can ACTUALLY issue (keyset-backed
   // `supportedUnits` from colada). `item.unit` is only the flow's
   // denomination — every row carries the same value, which is why filtering
-  // on it used to be a visible no-op. Fallback rows without supportedUnits
-  // (pre-enrichment) contribute nothing here and pass every filter below.
+  // on it used to be a visible no-op.
+  //
+  // `items` are the cache-overlaid rows, so a mint the wallet has seen before
+  // brings its units to the FIRST frame (`useMintRowsWithCache`). Only a row
+  // neither the cache nor enrichment knows the units for is left unknown, and
+  // that one contributes no tab and passes every filter below.
   const availableCurrencies = [
     'ALL',
     ...extractAvailableCurrencies(items.map((item) => item.supportedUnits ?? [])),
   ];
 
-  // Filter to mints that can issue the selected unit. Unknown supportedUnits
-  // (fallback rows) always pass — never hide a mint on missing data.
-  const filteredItems =
-    selectedCurrency === 'ALL'
-      ? items
-      : items.filter(
-          (item) =>
-            !item.supportedUnits ||
-            item.supportedUnits.some((unit) => unit.toUpperCase() === selectedCurrency)
-        );
+  const filteredItems = filterMintsForCurrencyTab(items, selectedCurrency, testnutAccount);
+
+  // Which unit tabs exist, which is selected, and which rows that tab hides
+  // (with the units that ruled them out). Logged on change only. A testnut tab
+  // (TSAT, TUSD) can only appear when a test mint reaches `items` at all; see
+  // `operations.buildMintListItems.scope` for the mints a flow picker leaves out.
+  const hiddenByTab = Object.fromEntries(
+    items
+      .filter((item) => !filteredItems.includes(item))
+      .map((item) => [item.mintUrl, `units=${item.supportedUnits?.join(',') || 'none'}`])
+  );
+  const tabsLogKey = JSON.stringify([
+    availableCurrencies,
+    selectedCurrency,
+    testnutAccount,
+    hiddenByTab,
+    items.length,
+  ]);
+  const prevTabsLogKey = useRef('');
+  useEffect(() => {
+    if (tabsLogKey === prevTabsLogKey.current) return;
+    prevTabsLogKey.current = tabsLogKey;
+    cashuLog.info('mint.list.tabs', {
+      tabs: availableCurrencies.join(','),
+      selectedCurrency,
+      testnutAccount,
+      itemCount: items.length,
+      shownCount: filteredItems.length,
+      unknownUnitsCount: items.filter((item) => !item.supportedUnits).length,
+      hiddenByTab,
+    });
+  });
 
   const handleCurrencyChange = (currency: string) => {
     cashuLog.info('mint.list.currency.change', { currency });

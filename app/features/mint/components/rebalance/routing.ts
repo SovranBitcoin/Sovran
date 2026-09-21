@@ -50,12 +50,14 @@ function isSuccessfulSwap(swap: LegacyMintAudit['swaps'][number]): boolean {
 
 function addEdge(
   graph: SwapGraph,
-  from: string,
-  to: string,
-  fee: number,
-  timeTaken: number,
-  ts: number,
-  ok: boolean
+  {
+    from,
+    to,
+    fee,
+    timeTaken,
+    ts,
+    ok,
+  }: { from: string; to: string; fee: number; timeTaken: number; ts: number; ok: boolean }
 ) {
   if (!from || !to) return;
   if (from === to) return;
@@ -103,7 +105,14 @@ export function buildSwapGraph(audits: LegacyMintAudit[]): SwapGraph {
       const from = swap.from_url;
       const to = swap.to_url;
       const ok = isSuccessfulSwap(swap);
-      addEdge(graph, from, to, swap.fee ?? 0, swap.time_taken ?? 0, parseTs(swap.created_at), ok);
+      addEdge(graph, {
+        from,
+        to,
+        fee: swap.fee ?? 0,
+        timeTaken: swap.time_taken ?? 0,
+        ts: parseTs(swap.created_at),
+        ok,
+      });
     }
   }
 
@@ -185,11 +194,11 @@ export function pickIntermediaryPath({
   from: string;
   to: string;
   graph: SwapGraph;
-  settings?: Partial<MiddlemanRoutingSettings>;
+  settings?: MiddlemanRoutingSettings;
   /** Set of mint URLs the user trusts. Used for trust-mode filtering. */
   trustedMintUrls?: Set<string>;
 }): RoutingResult {
-  const cfg: MiddlemanRoutingSettings = { ...DEFAULT_SETTINGS, ...settings };
+  const cfg = settings ?? DEFAULT_SETTINGS;
   const maxDepth = cfg.maxHops + 1; // maxHops intermediaries = maxHops+1 edges
   const trusted = trustedMintUrls ?? new Set<string>();
 
@@ -308,7 +317,14 @@ export function addLocalHistoryEdges(graph: SwapGraph, groups: SwapGroup[]): voi
 
       // We don't track exact fees/time per leg, so use 0 for both.
       // The timestamp comes from the parent group.
-      addEdge(graph, leg.fromMintUrl, leg.toMintUrl, 0, 0, group.createdAt, ok);
+      addEdge(graph, {
+        from: leg.fromMintUrl,
+        to: leg.toMintUrl,
+        fee: 0,
+        timeTaken: 0,
+        ts: group.createdAt,
+        ok,
+      });
     }
   }
 }

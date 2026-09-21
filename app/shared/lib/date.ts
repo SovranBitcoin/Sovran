@@ -147,10 +147,11 @@ const ISO_OPTIONS: Intl.DateTimeFormatOptions = {
 /**
  * Format an absolute timestamp. The output respects the user's iOS/Android
  * regional preferences (or the in-app language override when set) — see
- * `resolveLocale`.
+ * `resolveLocale`. An unparseable input is '' (Intl throws on an Invalid Date).
  */
 export function formatDate(input: DateInput, style: AbsoluteDateStyle): string {
   const date = toDate(input);
+  if (Number.isNaN(date.getTime())) return '';
   if (style === 'iso') return getDateTimeFormat('en-US', ISO_OPTIONS).format(date);
   return getDateTimeFormat(resolveLocale(), ABSOLUTE_OPTIONS[style]).format(date);
 }
@@ -241,14 +242,15 @@ export function formatRelativeUnixSeconds(seconds: number): string {
 /**
  * Format a relative-or-anchored timestamp. Accepts unix milliseconds,
  * a `Date`, or anything `new Date(input)` parses; non-millisecond inputs
- * are coerced first.
+ * are coerced first. An unparseable input is ''.
  */
 export function formatRelative(
   input: DateInput,
   style: RelativeDateStyle,
   nowMs: number = Date.now()
 ): string {
-  const ms = input instanceof Date ? input.getTime() : new Date(input).getTime();
+  const ms = toDate(input).getTime();
+  if (Number.isNaN(ms)) return '';
   switch (style) {
     case 'verbose':
       return formatVerboseRelative(ms, resolveLocale(), nowMs);

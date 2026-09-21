@@ -419,6 +419,26 @@ describe('checkWalletCapabilities', () => {
     // mintSelection is required for payment requests but not provided
     expect(result.missing).toContain('mintSelection');
   });
+
+  it.each(['meltBolt12Offer', 'meltOnchainAddress'] as const)(
+    'requires the amount-entry melt capabilities for %s',
+    (type) => {
+      // Both rails arrive amountless, like a Lightning address: the user enters
+      // the amount, then the wallet picks a mint, proofs and a melt quote.
+      const intent: ResolvedIntent = {
+        type,
+        option: makeOption(type === 'meltBolt12Offer' ? 'bolt12Offer' : 'onchainAddress', 'dest'),
+      };
+      const result = checkWalletCapabilities(new Set<WalletCapability>(), intent);
+      expect(result.covered).toBe(false);
+      expect([...result.missing].sort()).toEqual([
+        'amountEntry',
+        'meltQuoteFetch',
+        'mintSelection',
+        'proofSelection',
+      ]);
+    }
+  );
 });
 
 // ---------------------------------------------------------------------------

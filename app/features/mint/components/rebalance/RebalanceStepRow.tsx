@@ -174,7 +174,7 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
 
   return (
     <Log name="RebalanceStepRow">
-      <View className="mx-4 my-1.5" style={isDone ? { opacity: 0.85 } : undefined}>
+      <View className="mx-4" style={isDone ? { opacity: 0.85 } : undefined}>
         <TransferCard>
           {chainInfo ? (
             <VStack gap={6} className="px-4 pt-4">

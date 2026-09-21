@@ -16,13 +16,19 @@
  *   funds or flow-availability. Metadata fields are `live ?? cache` when enriched
  *   and `cache ?? base` before, so a `cached` row shows the cached name instead
  *   of the url fallback, and once live data lands it wins (and the pill animates).
+ *   The audit pill is the exception: the base row's audit is a snapshot of this
+ *   same cache, so the cache's `selectMintAudit` reading always wins and the
+ *   three audit fields move together. The mint info page reads that selector
+ *   too, so a row and the page it opens never disagree.
  */
 import { useMemo } from 'react';
 
-import type { MintListItem } from 'wallet';
+import { toAccountUnit, type MintListItem } from 'wallet';
 
+import { selectMintAudit } from '@/features/mint/lib/auditInfo';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
+import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import type { MintMetadataEntry } from '@/shared/stores/global/mintMetadataTypes';
 
 type MintRowMetaState = 'cold' | 'cached' | 'live';
@@ -38,6 +44,8 @@ interface ResolveMintRowsArgs {
   itemsStatus: 'loading' | 'ready' | 'failed' | undefined;
   /** Snapshot of the unified cache keyed by normalized mint URL. */
   byMintUrl: Record<string, MintMetadataEntry>;
+  /** The testnut verdict, for tagging cached units onto their account. */
+  isTestnutMint: (mintUrl: string) => boolean;
 }
 
 /**
@@ -45,7 +53,12 @@ interface ResolveMintRowsArgs {
  * tested directly (the hook is a thin reactive wrapper), mirroring the
  * `resolveStickyMintSelectorItems` convention.
  */
-export function resolveMintRows({ baseItems, itemsStatus, byMintUrl }: ResolveMintRowsArgs): {
+export function resolveMintRows({
+  baseItems,
+  itemsStatus,
+  byMintUrl,
+  isTestnutMint,
+}: ResolveMintRowsArgs): {
   rows: MintRow[];
   allCold: boolean;
 } {
@@ -57,6 +70,8 @@ export function resolveMintRows({ baseItems, itemsStatus, byMintUrl }: ResolveMi
   // before enrichment the cache wins over the base url/fallback placeholders.
   const pickStr = (b: string | undefined, c: string | undefined) => (ready ? (b ?? c) : (c ?? b));
   const pickNum = (b: number | undefined, c: number | undefined) => (ready ? (b ?? c) : (c ?? b));
+  const pickUnits = (b: string[] | undefined, c: string[] | undefined) =>
+    ready ? (b ?? c) : (c ?? b);
 
   const rows = baseItems.map((base): MintRow => {
     const cache = byMintUrl[normalizeMintUrlKey(base.mintUrl)];
@@ -65,8 +80,16 @@ export function resolveMintRows({ baseItems, itemsStatus, byMintUrl }: ResolveMi
 
     const cacheReputation =
       typeof cache.contactReputation === 'number' ? Math.round(cache.contactReputation) : undefined;
-    const cacheAuditOps =
-      cache.nMints != null && cache.nMelts != null ? cache.nMints + cache.nMelts : undefined;
+    const audit = selectMintAudit(cache);
+    // The currency tabs and their filter read `supportedUnits`, and colada's
+    // synchronous fallback rows carry none — so before enrichment every row
+    // passed every tab, and the list visibly dropped rows once the real units
+    // landed. The cache already knows them; it stores the mint's REAL units, so
+    // they are tagged onto their account here exactly as `buildMintListItems`
+    // does (a testnut mint's `sat` is `tsat`).
+    const cachedUnits = cache.supportedUnits?.length
+      ? cache.supportedUnits.map((unit) => toAccountUnit(unit, isTestnutMint(base.mintUrl)))
+      : undefined;
 
     return {
       ...base,
@@ -75,12 +98,19 @@ export function resolveMintRows({ baseItems, itemsStatus, byMintUrl }: ResolveMi
       // (pickStr is `string | undefined`); it's type-load-bearing, not redundant.
       displayName: pickStr(base.displayName, cache.displayName) ?? base.displayName,
       iconUrl: pickStr(base.iconUrl, cache.iconUrl),
+      // Enrichment owns the units once it lands (it reads the mint's real
+      // keysets, which the cache does not); before that the cache fills the
+      // hole. Left absent when neither knows them, which the tab filter reads
+      // as "unknown" and shows the row under every tab.
+      ...(pickUnits(base.supportedUnits, cachedUnits)
+        ? { supportedUnits: pickUnits(base.supportedUnits, cachedUnits) }
+        : {}),
       // review + audit + social metadata (animate targets)
       kymScore: pickNum(base.kymScore, cache.averageScore ?? undefined),
       reviewCount: pickNum(base.reviewCount, cache.reviewCount),
-      auditScore: pickNum(base.auditScore, cache.auditScore ?? undefined),
-      auditState: pickStr(base.auditState, cache.auditState),
-      auditTotalOps: pickNum(base.auditTotalOps, cacheAuditOps),
+      ...(audit
+        ? { auditScore: audit.score, auditState: audit.state, auditTotalOps: audit.totalOps }
+        : {}),
       contactFollowers: pickNum(base.contactFollowers, cache.contactFollowers),
       contactReputation: pickNum(base.contactReputation, cacheReputation),
       metaState,
@@ -94,12 +124,16 @@ export function resolveMintRows({ baseItems, itemsStatus, byMintUrl }: ResolveMi
 export function useMintRowsWithCache({
   baseItems,
   itemsStatus,
-}: Omit<ResolveMintRowsArgs, 'byMintUrl'>): { rows: MintRow[]; allCold: boolean } {
+}: Omit<ResolveMintRowsArgs, 'byMintUrl' | 'isTestnutMint'>): {
+  rows: MintRow[];
+  allCold: boolean;
+} {
   // Subscribe to the cache map so a background refresh or bulk discover upsert
   // re-runs the merge and promotes cached values to fresh ones.
   const byMintUrl = useMintMetadataStore((s) => s.byMintUrl);
+  const isTestnutMint = useIsTestnutMint();
   return useMemo(
-    () => resolveMintRows({ baseItems, itemsStatus, byMintUrl }),
-    [baseItems, itemsStatus, byMintUrl]
+    () => resolveMintRows({ baseItems, itemsStatus, byMintUrl, isTestnutMint }),
+    [baseItems, itemsStatus, byMintUrl, isTestnutMint]
   );
 }

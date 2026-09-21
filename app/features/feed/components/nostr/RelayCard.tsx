@@ -13,7 +13,7 @@
  * Privacy: rendering this card fetches https://<relay-host>, revealing the
  * reader's IP to that host — the same class of auto-load as inline images.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Image as ExpoImage } from 'expo-image';
 import { withAlpha } from '@/shared/lib/color';
 import { StyleSheet, View as RNView } from 'react-native';
@@ -28,9 +28,10 @@ import { feedLog } from '@/shared/lib/logger';
 import { prefetchImage } from '@/shared/lib/imageCache';
 import { staticPopup } from '@/shared/lib/popup';
 import { extractDomain, openExternalUrl } from '@/shared/lib/url';
-import { useRelayMetadata } from '@/shared/stores/global/relayMetadataStore';
+import { relayMetadataKey, useRelayMetadata } from '@/shared/stores/global/relayMetadataStore';
 import type { RelayInformation } from '@/shared/lib/nostr/nip11';
 import { relayBrandForSoftware } from './relayBrands';
+import { RelayCardFixturesContext } from './relayCardFixtures';
 import { sharedStyles } from './feedStyles';
 
 const RELAY_GLYPH = 'mdi:broadcast';
@@ -174,7 +175,10 @@ export const RelayCard = React.memo(function RelayCard({
   /** Per-note fan-out cap: render without mounting the SWR hook (domain-only card). */
   noFetch?: boolean;
 }) {
+  const fixture = useContext(RelayCardFixturesContext)?.get(relayMetadataKey(url));
   if (noFetch) return <RelayCardBody url={url} info={undefined} resolved />;
+  if (fixture !== undefined)
+    return <RelayCardBody url={url} info={fixture ?? undefined} resolved />;
   return <RelayCardLive url={url} />;
 });
 

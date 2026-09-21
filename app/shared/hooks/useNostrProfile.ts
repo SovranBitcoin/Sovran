@@ -44,7 +44,7 @@ function profileFullFromStats(
     score: null,
     ...(stats.followersCount !== undefined ? { followers: stats.followersCount } : {}),
     ...(stats.followingCount !== undefined ? { follows: stats.followingCount } : {}),
-    created_at: stats.joinedAt ?? null,
+    created_at: stats.joinedAtSec ?? null,
     topFollowers: [],
     fromCache: false,
     ...(m?.name ? { name: m.name } : {}),
@@ -296,7 +296,7 @@ export function useNostrProfile(
         cacheProfileStats(pubkey, {
           followers: result.value.followers,
           follows: result.value.follows,
-          joinedAt: result.value.created_at,
+          joinedAtSec: result.value.created_at,
         });
         // nagg without the nostr module answers a valid envelope with no
         // aggregates; the other sources fill the counts in parallel with the

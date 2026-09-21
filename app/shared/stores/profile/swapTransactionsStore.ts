@@ -103,7 +103,7 @@ interface SwapTransactionsActions {
     leg: Omit<SwapLeg, 'id' | 'mintQuoteId' | 'meltQuoteId' | 'meltOperationId'>
   ) => string;
 
-  tagMintQuote: (groupId: string, legId: string, quoteId: string) => void;
+  tagMintQuote: (groupId: string, legId: string, params: { quoteId: string }) => void;
   tagMelt: (
     groupId: string,
     legId: string,
@@ -238,7 +238,7 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
         return legId;
       },
 
-      tagMintQuote: (groupId, legId, quoteId) => {
+      tagMintQuote: (groupId, legId, { quoteId }) => {
         if (!quoteId) return;
         storeLog.debug('store.swap_tx.tag_mint_quote', { groupId, legId, quoteId });
 
