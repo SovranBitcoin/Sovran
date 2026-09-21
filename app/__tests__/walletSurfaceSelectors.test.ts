@@ -68,6 +68,19 @@ describe('wallet surface e2e selectors', () => {
     );
   });
 
+  it('keeps profile-share-qr outside the follow gate', () => {
+    const source = read('features/user/screens/UserProfileScreen.tsx');
+    // capture.account-entry taps this on the viewer's OWN profile, where
+    // Send Money and Message are absent — so the QR circle must sit in the
+    // action row itself, not inside its `showFollowButton &&` branch.
+    const row = source.slice(
+      source.indexOf('<HStack justify="center" gap={28}'),
+      source.indexOf('</HStack>', source.indexOf('<HStack justify="center" gap={28}'))
+    );
+    expect(row).toContain('testID="profile-share-qr"');
+    expect(row.indexOf('testID="profile-share-qr"')).toBeGreaterThan(row.indexOf('</>'));
+  });
+
   it('pins the P2PK lock row toggle and its state probe', () => {
     const source = read('features/receive/components/CreqCustomizationCard.tsx');
     // The HeroSwitch collapses inside the grouped ListGroup row on device, so

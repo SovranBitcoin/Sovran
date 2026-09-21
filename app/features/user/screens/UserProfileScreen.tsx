@@ -552,6 +552,7 @@ function BannerWithAvatar({
   isFollowLoading,
   onToggleFollow,
   onSendMoney,
+  onShareQr,
   onEditProfile,
   hasStories,
   onAvatarPress,
@@ -577,6 +578,9 @@ function BannerWithAvatar({
   isFollowLoading: boolean;
   onToggleFollow: () => void;
   onSendMoney: () => void;
+  /** Opens the share page holding this profile's npub QR, and its Lightning
+   *  address QR too when the profile advertises one. */
+  onShareQr: () => void;
   /** Own profile only: opens the kind-0 editor where the Follow pill would be. */
   onEditProfile?: () => void;
   hasStories?: boolean;
@@ -885,21 +889,36 @@ function BannerWithAvatar({
           {isLoading && <SkeletonLoadingShimmer active />}
         </View>
 
-        {/* Send Money / Message — the wallet circle-action affordance, grouped
-            directly under the Follow button. Gated on showFollowButton so it
-            only shows for other people's profiles once our keys resolve. */}
-        {showFollowButton && (
-          <HStack justify="center" gap={28} style={{ marginTop: 16 }}>
-            <CircleActionButton
-              icon="mdi:cash-multiple"
-              systemIcon="bitcoinsign.circle"
-              label="Send Money"
-              testID="profile-send-money"
-              onPress={onSendMoney}
-            />
-            <SendMessageMenu pubkey={pubkey} displayName={displayName} circle />
-          </HStack>
-        )}
+        {/* Send Money / Message / QR Code — the wallet circle-action
+            affordance, grouped directly under the Follow button. Send Money and
+            Message are gated on showFollowButton so they only show for other
+            people's profiles once our keys resolve; the QR link belongs to
+            every profile, own included, where it is the only route to the
+            npub (and Lightning address) share page. Three labelled circles at
+            gap 28 measure ~225pt, so the centred row still clears a 320pt
+            screen without wrapping or shrinking a label. */}
+        <HStack justify="center" gap={28} style={{ marginTop: 16 }}>
+          {showFollowButton && (
+            <>
+              <CircleActionButton
+                icon="mdi:cash-multiple"
+                systemIcon="bitcoinsign.circle"
+                label="Send Money"
+                testID="profile-send-money"
+                onPress={onSendMoney}
+              />
+              <SendMessageMenu pubkey={pubkey} displayName={displayName} circle />
+            </>
+          )}
+          <CircleActionButton
+            icon="mdi:qrcode"
+            systemIcon="qrcode"
+            label="QR Code"
+            testID="profile-share-qr"
+            accessibilityLabel="Show public profile QR"
+            onPress={onShareQr}
+          />
+        </HStack>
       </VStack>
     </VisualLayoutProbe>
   );
@@ -1092,6 +1111,10 @@ export function UserProfileScreen() {
   const displayName = resolveIdentityName({ pubkey, nostrProfile: cachedProfile });
   const headerHeight = useHeaderHeight();
   const [identityBottom, setIdentityBottom] = useState<number | null>(null);
+  // headerRight below: mint info and the person menu when shown. Both are
+  // conditional, so this side can be empty; the navigator's back button keeps
+  // the left side at one action, which is the width the title must clear.
+  const headerActionCount = (profileMintUrl ? 1 : 0) + (isOwnProfile ? 0 : 1);
   const morph = useIdentityHeader({
     identity: pubkey
       ? { name: displayName, seed: pubkey, picture: cachedProfile?.picture }
@@ -1100,6 +1123,7 @@ export function UserProfileScreen() {
       identityBottom === null
         ? Number.POSITIVE_INFINITY
         : Math.max(0, identityBottom - headerHeight),
+    sideActions: Math.max(1, headerActionCount),
   });
 
   // Send Money enters through colada's normal Send entrypoint so no-balance
@@ -1261,6 +1285,23 @@ export function UserProfileScreen() {
     router.navigate(buildMintInfoHref(profileMintUrl));
   };
 
+  // The share page tabs NPUB / LIGHTNING when the profile advertises a
+  // Lightning address, and shows the npub QR alone otherwise — passing lud16
+  // only when it exists is what makes that choice.
+  const handleShareQr = () => {
+    router.push(
+      buildProfileHref(
+        'share',
+        {
+          type: 'npub',
+          data: npub,
+          ...(cachedProfile?.lud16 && { lud16: cachedProfile.lud16 }),
+        },
+        profileFlowGroup
+      ) as never
+    );
+  };
+
   // ===========================
   // PROFILE INFO ITEMS (data-driven)
   // ===========================
@@ -1347,44 +1388,31 @@ export function UserProfileScreen() {
           // The banner already displays the name below the avatar. A second
           // transparent header title overlaps the avatar on both platforms.
           headerTitle: morph.headerTitle,
-          headerRight: () => (
-            <HStack gap={4}>
-              {!isOwnProfile && (
-                <ScreenHeaderAction
-                  icon="material-symbols:report-rounded"
-                  accessibilityLabel="Block or report person"
-                  testID="profile-person-menu"
-                  onPress={() => personMenu(pubkey)}
-                />
-              )}
-              {profileMintUrl && (
-                <ScreenHeaderAction
-                  icon="mingcute:bank-fill"
-                  onPress={handleMintInfoPress}
-                  testID="profile-mint-info"
-                  accessibilityLabel="Mint info"
-                />
-              )}
-              <ScreenHeaderAction
-                icon="mdi:qrcode"
-                testID="profile-share-qr"
-                accessibilityLabel="Show public profile QR"
-                onPress={() =>
-                  router.push(
-                    buildProfileHref(
-                      'share',
-                      {
-                        type: 'npub',
-                        data: npub,
-                        ...(cachedProfile?.lud16 && { lud16: cachedProfile.lud16 }),
-                      },
-                      profileFlowGroup
-                    ) as never
-                  )
-                }
-              />
-            </HStack>
-          ),
+          // Your own profile without a mint advertises nothing on this side;
+          // an empty item would still take a liquid-glass header slot.
+          headerRight:
+            headerActionCount === 0
+              ? undefined
+              : () => (
+                  <HStack gap={4}>
+                    {!isOwnProfile && (
+                      <ScreenHeaderAction
+                        icon="material-symbols:report-rounded"
+                        accessibilityLabel="Block or report person"
+                        testID="profile-person-menu"
+                        onPress={() => personMenu(pubkey)}
+                      />
+                    )}
+                    {profileMintUrl && (
+                      <ScreenHeaderAction
+                        icon="mingcute:bank-fill"
+                        onPress={handleMintInfoPress}
+                        testID="profile-mint-info"
+                        accessibilityLabel="Mint info"
+                      />
+                    )}
+                  </HStack>
+                ),
         })}
       />
 
@@ -1425,6 +1453,7 @@ export function UserProfileScreen() {
                 isFollowLoading={followInFlight}
                 onToggleFollow={handleToggleFollow}
                 onSendMoney={handleSendMoney}
+                onShareQr={handleShareQr}
                 onEditProfile={
                   isOwnProfile ? () => router.push('/(settings-flow)/edit-profile') : undefined
                 }
