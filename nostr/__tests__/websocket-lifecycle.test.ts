@@ -81,11 +81,17 @@ describe.each(Object.entries(requests))(
       const socket = Socket.instances[0];
       socket.onopen?.({});
       socket.message(["EVENT", "sov-1", { id: "no-kind", pubkey: "p" }]);
-      socket.message(["EVENT", "sov-1", { id: "text-kind", pubkey: "p", kind: "1" }]);
+      socket.message([
+        "EVENT",
+        "sov-1",
+        { id: "text-kind", pubkey: "p", kind: "1" },
+      ]);
       socket.message(["EVENT", "sov-1", { id: "note", pubkey: "p", kind: 1 }]);
       socket.message(["EOSE", "sov-1"]);
       await vi.advanceTimersByTimeAsync(0);
-      expect((await pending)._unsafeUnwrap()).toEqual([{ id: "note", pubkey: "p", kind: 1 }]);
+      expect((await pending)._unsafeUnwrap()).toEqual([
+        { id: "note", pubkey: "p", kind: 1 },
+      ]);
     });
 
     test("an already cancelled request opens no socket", async () => {
