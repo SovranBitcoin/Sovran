@@ -26,21 +26,27 @@ import { useLifecycleLogger, log } from '@/shared/lib/logger';
 import { UnitPreviewCard } from '@/features/theme/components/UnitPreviewCard';
 import { useThemeDraft } from '@/features/theme/lib/themeDraft';
 import { useAlbumList } from '@/features/theme/lib/useAlbumList';
+import {
+  SWITCHABLE_UNITS,
+  accountUnitLabel,
+  unitDefinition,
+  type SwitchableUnit,
+} from 'wallet/units';
 
 // Preview unit list — broader than the wallet's live ACCOUNTS so users can
 // theme units that don't exist yet.
 interface PreviewUnit {
-  id: string;
+  id: SwitchableUnit;
   label: string;
   sublabel: string;
 }
 
-const PREVIEW_UNITS: PreviewUnit[] = [
-  { id: 'sat', label: 'Bitcoin', sublabel: 'SATS' },
-  { id: 'usd', label: 'Personal', sublabel: 'USD' },
-  { id: 'eur', label: 'Personal', sublabel: 'EUR' },
-  { id: 'gbp', label: 'Personal', sublabel: 'GBP' },
-];
+// Bitcoin reads by name and denomination; fiat accounts by their code.
+const PREVIEW_UNITS: PreviewUnit[] = SWITCHABLE_UNITS.map((id) => ({
+  id,
+  label: id === 'sat' ? (unitDefinition(id)?.name ?? 'Bitcoin') : 'Personal',
+  sublabel: id === 'sat' ? 'SATS' : accountUnitLabel(id),
+}));
 
 const UNIT_IDS = PREVIEW_UNITS.map((u) => u.id);
 
