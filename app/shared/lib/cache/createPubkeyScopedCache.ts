@@ -35,9 +35,8 @@ interface PubkeyScopedCacheOpts<T> {
   /**
    * Discard hydrated entries that fail this guard. Defensive — protects
    * against partial / corrupt blobs without wiping the whole cache.
-   * Default: accept any non-nullish value.
    */
-  validate?: (value: unknown) => value is T;
+  validate: (value: unknown) => value is T;
 }
 
 interface PubkeyScopedCache<T> {
@@ -72,8 +71,7 @@ export function createPubkeyScopedCache<T>(opts: PubkeyScopedCacheOpts<T>): Pubk
   const maxEntries = opts.maxEntries ?? 1000;
   const maxNegEntries = opts.maxNegEntries ?? 200;
   const flushDebounceMs = opts.flushDebounceMs ?? 1000;
-  const validate = opts.validate ?? ((v): v is T => v !== null && v !== undefined);
-  const { log } = opts;
+  const { log, validate } = opts;
   const negEnabled = !!opts.storagePrefixNeg;
 
   const scopes = new Map<string, PerScopeCache<T>>();
