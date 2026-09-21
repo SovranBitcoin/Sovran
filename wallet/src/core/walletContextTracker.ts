@@ -40,6 +40,17 @@ interface WalletContextTrackerConfig {
    * never mix usd-cents with sat proofs. Omit for sat-only wallets.
    */
   getActiveUnit?: () => string;
+  /**
+   * The testnut split. A mint on the other side of it (a testnut mint while a
+   * real account is active, or the reverse) stays trusted but is marked
+   * `outsideAccount`: every method reads unsupported and its balance reads 0,
+   * so it can neither enable a payment method nor lend its funds to the active
+   * account. The machine gates the amount screen on this context, so omitting
+   * the split here lets a test mint's 1 sat onchain floor enable onchain for
+   * real sats. Omit both for wallets without a test account.
+   */
+  isTestnutMint?: (mintUrl: string) => boolean;
+  isTestnutAccount?: () => boolean;
 }
 
 type TrustedMint = Awaited<
@@ -87,6 +98,8 @@ export function createWalletContextTracker(
   let unitView: {
     unit: string;
     revision: number;
+    /** Which mints sat across the split when this view was derived. */
+    outsideAccountKey: string;
     trustedMintUrls: string[];
     mintBalances: Record<string, number>;
     proofAmounts: Record<string, number[]>;
@@ -97,17 +110,32 @@ export function createWalletContextTracker(
     (config?.getActiveUnit?.() || 'sat').toLowerCase();
 
   function viewFor(unit: string) {
-    if (unitView && unitView.unit === unit && unitView.revision === revision) {
+    // Read live, like the unit: neither switching account nor a mint being
+    // classified as testnut after the last refresh may serve a stale side.
+    const testnutAccount = config?.isTestnutAccount?.() ?? false;
+    const outsideAccount = (mintUrl: string) =>
+      (config?.isTestnutMint?.(mintUrl) ?? false) !== testnutAccount;
+    const outsideAccountKey = trustedMints
+      .filter((mint) => outsideAccount(mint.mintUrl))
+      .map((mint) => mint.mintUrl)
+      .join(' ');
+    if (
+      unitView &&
+      unitView.unit === unit &&
+      unitView.revision === revision &&
+      unitView.outsideAccountKey === outsideAccountKey
+    ) {
       return unitView;
     }
     unitView = {
       unit,
       revision,
+      outsideAccountKey,
       trustedMintUrls: trustedMints.map((m) => m.mintUrl),
       mintBalances: Object.fromEntries(
         Object.entries(balancesByMintAndUnit).map(([url, byUnit]) => [
           url,
-          byUnit[unit] ?? 0,
+          outsideAccount(url) ? 0 : (byUnit[unit] ?? 0),
         ]),
       ),
       proofAmounts: Object.fromEntries(
@@ -120,7 +148,11 @@ export function createWalletContextTracker(
         ]),
       ),
       mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints(
-        trustedMints,
+        trustedMints.map((mint) => ({
+          mintUrl: mint.mintUrl,
+          mintInfo: mint.mintInfo,
+          outsideAccount: outsideAccount(mint.mintUrl),
+        })),
         unit,
       ),
     };

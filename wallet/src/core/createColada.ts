@@ -204,6 +204,8 @@ export function createColada(config: ColadaConfig): ColadaInstance {
   const tracker = createWalletContextTracker(manager, {
     getPreferredMintUrl: config.getPreferredMintUrl,
     getActiveUnit: config.getActiveUnit,
+    isTestnutMint: config.isTestnutMint,
+    isTestnutAccount: config.isTestnutAccount,
   });
 
   const appViewEnrichment = config.nostrAppViewBaseUrl

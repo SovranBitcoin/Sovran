@@ -14,6 +14,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createColada } from '../../src/core/createColada';
 import { createWalletContextTracker } from '../../src/core/walletContextTracker';
+import { createAmountEntryMethodContext } from '../../src/mint-capabilities';
+import { getAvailableActions } from '../../src/screen-actions/availability';
 
 const MINT1 = 'https://mint1.example.com';
 const MINT2 = 'https://mint2.example.com';
@@ -270,6 +272,47 @@ describe('createWalletContextTracker', () => {
     unit = 'usd';
     expect(tracker.getContext().mintBalances[MINT1]).toBe(250);
     expect(tracker.getContext().proofAmounts[MINT1]).toEqual([50, 200]);
+
+    tracker.dispose();
+  });
+
+  it('keeps a mint across the testnut split from enabling a payment method', async () => {
+    // MINT2 is a testnut mint whose onchain floor is 1; MINT1 is the real mint
+    // and floors onchain at 10,000. On the real account, 1 sat must not be
+    // receivable onchain just because the test mint would take it.
+    const onchain = (min_amount: number) => ({
+      nuts: { '4': { methods: [{ method: 'onchain', unit: 'sat', min_amount }] } },
+    });
+    mockManager.manager.mint.getAllTrustedMints.mockResolvedValue([
+      { mintUrl: MINT1, mintInfo: onchain(10_000) },
+      { mintUrl: MINT2, mintInfo: onchain(1) },
+    ]);
+    let testnutAccount = false;
+    const tracker = createWalletContextTracker(mockManager.manager, {
+      isTestnutMint: (mintUrl) => mintUrl === MINT2,
+      isTestnutAccount: () => testnutAccount,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await tracker.refresh();
+
+    const onchainVariant = (amount: number) =>
+      getAvailableActions('amountEntry', {
+        destination: 'mintQuote',
+        effectiveAmount: { value: amount, unit: 'sat' },
+        unit: 'sat',
+        methodContext: createAmountEntryMethodContext(tracker.getContext()),
+      }).next.variants?.find((variant) => variant.id === 'onchain');
+
+    expect(tracker.getContext().mintMethodCapabilities?.[MINT2]?.outsideAccount).toBe(true);
+    expect(onchainVariant(1)).toMatchObject({ available: false, reason: 'Minimum 10,000 sat' });
+    expect(onchainVariant(10_000)?.available).toBe(true);
+    // The test mint's balance is not this account's money either.
+    expect(tracker.getContext().mintBalances[MINT2]).toBe(0);
+
+    // The split is read live: on the testnut account the sides swap.
+    testnutAccount = true;
+    expect(tracker.getContext().mintMethodCapabilities?.[MINT1]?.outsideAccount).toBe(true);
+    expect(onchainVariant(1)?.available).toBe(true);
 
     tracker.dispose();
   });
