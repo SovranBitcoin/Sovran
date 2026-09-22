@@ -23,11 +23,13 @@ test("web and QR logos use the exact native/artwork master path", async () => {
   assert.match(files["site/public/sovran-mark.svg"], /viewBox="0 0 621 621"/);
 });
 
-test("web mark preserves the pre-consolidation 24px and 32px silhouettes", async () => {
-  // Alpha hashes captured from the original two-path site mark before replacement.
+test("web mark holds its 24px and 32px silhouettes", async () => {
+  // Rebaselined 2026-09-22 when the master's three unintended curvature breaks
+  // were faired. Against the pre-consolidation capture the silhouette shifts by
+  // at most 9/255 alpha on 4% of pixels at these sizes; anything larger is drift.
   const originals = {
-    24: "35e972fcfd04a5831fb7ec0d40726e52b3213493016f0c9e33a07743d2681752",
-    32: "e2f8a31c9b25b0a270360df7d7b3777b183dc906f189a56d5ae9ee14c4ae27c3",
+    24: "bce71754209d98eae3c579f86ddb6524c9eaf73554dce2680b4fd1f3282825f9",
+    32: "63081c8199e89007eb5170f68a4fb042528bad55ed6930fc93c19c9f942a12d7",
   };
   for (const [size, expected] of Object.entries(originals)) {
     const alpha = await sharp(Buffer.from(files["site/public/sovran-mark.svg"]))

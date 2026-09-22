@@ -59,7 +59,10 @@ colorways. Keep directory context with a file when copying it elsewhere.
 
 Only `source/` contains editable design inputs. The S was extracted from Group
 2748, lettering from Group 2749, and version layout informed by Group 2750.
-Superseded originals and intermediate artwork are not retained. The version's
+Superseded originals and intermediate artwork are not retained. On 2026-09-22
+the S's three unintended curvature breaks were faired so each join shares one
+tangent and one curvature; the four stroke tips stay sharp, the bounding box is
+unchanged, and the outline moved by at most 0.13% of the mark height. The version's
 digits use bundled Mona Sans ExtraBold outlines. Every SVG uses identical S
 geometry with uniform scaling; no runtime fonts or remote resources are needed.
 `generated/manifest.json` records input hashes, layout bounds, dimensions and

@@ -43,5 +43,5 @@
   },
   "versionSource": "app/app.json#expo.version",
   "versionFont": "app/assets/fonts/MonaSans/MonaSans-ExtraBold.ttf",
-  "provenance": "User-supplied Sovran artwork, 2026-09-11. Group 2748 owns the shared S; Group 2749 owns the outlined wordmark; Group 2750 is the version-layout reference."
+  "provenance": "User-supplied Sovran artwork, 2026-09-11. Group 2748 owns the shared S; Group 2749 owns the outlined wordmark; Group 2750 is the version-layout reference. 2026-09-22: the S's three unintended curvature breaks were faired; the four stroke tips stay sharp and the bounding box is unchanged."
 }
