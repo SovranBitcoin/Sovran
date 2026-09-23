@@ -54,7 +54,7 @@ type Encoding = {
   fragmentSize: number;
   result: ReturnType<typeof encodeUrParts>;
 };
-const EMPTY_PARTS: string[] = [];
+const EMPTY_PARTS: readonly string[] = [];
 
 /** Payload-bound UR frames. A prop change hides old fragments in the same
  * render, before the encoding effect runs. Only a visible foreground route
