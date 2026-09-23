@@ -6,13 +6,25 @@
  * "refuse to send" and a thrown error would invite a catch-and-fallback.
  */
 
-import {
-  createDmRelayResolver,
-  type DmDiscoveryPool,
-} from '@/shared/lib/nostr/dmRelayDiscovery';
+import type { Event as NostrEvent } from 'nostr-tools/core';
+
+import { createDmRelayResolver, type DmDiscoveryPool } from '@/shared/lib/nostr/dmRelayDiscovery';
 import { DM_RELAY_LIST_KIND } from '@/shared/lib/nostr/outbox/nip17DmRelays';
 
 const pubkey = 'a'.repeat(64);
+
+/** A structurally valid kind:10050 event; only `tags` matters to the parser. */
+function dmRelayListEvent(tags: string[][]): NostrEvent {
+  return {
+    id: 'b'.repeat(64),
+    pubkey,
+    created_at: 0,
+    kind: DM_RELAY_LIST_KIND,
+    tags,
+    content: '',
+    sig: 'c'.repeat(128),
+  };
+}
 
 function resolverOver(get: DmDiscoveryPool['get']) {
   const pool = { get: jest.fn(get) } as unknown as DmDiscoveryPool;
@@ -35,9 +47,9 @@ describe('createDmRelayResolver', () => {
   });
 
   it('returns the relays the recipient declared', async () => {
-    const { resolve } = resolverOver(async () => ({
-      tags: [['relay', 'wss://inbox.example']],
-    }));
+    const { resolve } = resolverOver(async () =>
+      dmRelayListEvent([['relay', 'wss://inbox.example']])
+    );
 
     await expect(resolve(pubkey)).resolves.toEqual(['wss://inbox.example/']);
   });
@@ -48,7 +60,7 @@ describe('createDmRelayResolver', () => {
   });
 
   it('returns [] when the list holds no usable relay', async () => {
-    const { resolve } = resolverOver(async () => ({ tags: [['relay', 'not a url']] }));
+    const { resolve } = resolverOver(async () => dmRelayListEvent([['relay', 'not a url']]));
     await expect(resolve(pubkey)).resolves.toEqual([]);
   });
 
