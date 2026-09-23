@@ -45,7 +45,11 @@ export function TermsAndConditionsScreen({
   if (showRecovery) return <SettingsProfileRecoveryScreen onBack={() => setShowRecovery(false)} />;
 
   const recovery = (
-    <Button variant="ghost" onPress={() => setShowRecovery(true)}>
+    <Button
+      variant="ghost"
+      testID="legal-view-recovery"
+      accessibilityLabel="View existing recovery information"
+      onPress={() => setShowRecovery(true)}>
       <Button.Label>View existing recovery information</Button.Label>
     </Button>
   );
@@ -60,7 +64,10 @@ export function TermsAndConditionsScreen({
             Your saved agreement could not be read. Retry before continuing; this page will not
             replace unreadable settings with defaults.
           </Text>
-          <Button onPress={onRetry}>
+          <Button
+            testID="legal-settings-retry"
+            accessibilityLabel="Retry loading settings"
+            onPress={onRetry}>
             <Button.Label>Retry loading settings</Button.Label>
           </Button>
           {recovery}
@@ -77,7 +84,11 @@ export function TermsAndConditionsScreen({
       navigation={
         <VStack className="gap-1">
           {step === 'privacy' && (
-            <Button variant="secondary" onPress={backToTerms}>
+            <Button
+              variant="secondary"
+              testID="privacy-back-to-terms"
+              accessibilityLabel="Back to Terms"
+              onPress={backToTerms}>
               <Button.Label>Back to Terms</Button.Label>
             </Button>
           )}
@@ -104,6 +115,8 @@ export function TermsAndConditionsScreen({
           </ControlField>
           <Button
             isDisabled={!isChecked}
+            testID="terms-continue"
+            accessibilityLabel="Continue to Privacy"
             onPress={() => {
               if (isChecked) setStep('privacy');
             }}>
@@ -130,6 +143,8 @@ export function TermsAndConditionsScreen({
           </ControlField>
           <Button
             isDisabled={!isChecked || !privacyChecked}
+            testID="privacy-confirm"
+            accessibilityLabel="Confirm and continue"
             onPress={() => {
               if (isChecked && privacyChecked) onClose();
             }}>
