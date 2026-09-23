@@ -30,7 +30,9 @@ function boundPeers(byPeer: Record<string, LastMessageEntry>): Record<string, La
 }
 
 const PersistedDmLastMessageStore = z.object({
-  byPeer: tolerantRecord(NostrPubkeyHexSchema, LastMessageSchema).catch({}).transform(boundPeers),
+  byPeer: tolerantRecord(NostrPubkeyHexSchema, LastMessageSchema)
+    .catch(() => ({}))
+    .transform(boundPeers),
 });
 
 interface DmLastMessageStore {

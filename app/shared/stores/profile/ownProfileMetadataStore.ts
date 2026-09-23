@@ -39,7 +39,7 @@ const ProfileHistorySchema = z
     z.array(HistoryEntrySchema).max(PROFILE_HISTORY_PER_FIELD)
   )
   .default({})
-  .catch({});
+  .catch(() => ({}));
 
 /** The value a kind-0 carries for a history field (`name` reads the display
  *  name first, the same precedence the editor uses). */

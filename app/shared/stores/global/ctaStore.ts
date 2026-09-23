@@ -66,7 +66,7 @@ export const useCtaStore = create<CtaState>()(
             })
           )
           .default({})
-          .catch({}),
+          .catch(() => ({})),
       }),
       partialize: (state) => ({ dismissed: state.dismissed }),
     })

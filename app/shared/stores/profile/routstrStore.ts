@@ -314,7 +314,11 @@ const PersistedRoutstrMessage = z.looseObject({
   role: z.enum(['user', 'assistant']),
   content: z.string().max(65_536),
   timestamp: z.number().int().nonnegative(),
-  attachments: z.array(PersistedChatAttachment).max(4).optional().catch([]),
+  attachments: z
+    .array(PersistedChatAttachment)
+    .max(4)
+    .optional()
+    .catch(() => []),
   parentId: z.string().max(128).nullable().optional(),
   thinkingDurationSec: z.number().nonnegative().optional(),
   reasoningContent: z.string().max(65_536).optional(),
