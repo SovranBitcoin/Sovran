@@ -20,8 +20,8 @@ Branch: `feat/receive-nut-drop`.
 | 8 | `ui` | done | 22 findings, 22 false positives; rule sharpened 22 → 1 |
 | 9 | `nip17`, `nip59` | done | repo-wide re-run: 11 findings, 0 defects; `room-identity` de-selected |
 | 10 | `nip61`, `nip60`, `nip46`, `nip65`, `nip04`, `nip19`, `nip01`, `nip06` | **blocked** | provider outage: 3 runs, none complete. 1 defect found (F43), rest triaged |
-| 11 | `nut06`, `nut10`, `nut11`, `nut12`, `nut18` | pending | |
-| 12 | `bip32`, `bip39`, `bip43`, `bip21`, `bip321` | pending | |
+| 11 | `nut06`, `nut10`, `nut11`, `nut12`, `nut18` | done | 2 defects **fixed**, 1 blocked (F44), 9 false-positive/intentional |
+| 12 | `bip32`, `bip39`, `bip43`, `bip21`, `bip321` | in-progress | |
 | 13 | `agents-md` | pending | |
 | 14 | `skill/*` (by skill) | pending | |
 | 15 | `doc/*` (by convention file) | pending | |
@@ -455,3 +455,57 @@ Findings triaged (all verified in source):
   verdict: blocked
   evidence: not verified — this arrived in attempt 3 and the domain hit its stop condition before it could be read against the replaceable-event tie-break rule (same `created_at` → lowest id wins).
   action: verify on the re-run. Recorded rather than guessed.
+
+### nut06, nut10, nut11, nut12, nut18 — done
+
+Scoped to `app/shared/lib/cashu` and `wallet/src`. 409 chunks / 13,024
+questions / **407 of 409 requests answered** — the provider recovered, and
+this is the most complete run since `ui`. **12 findings.**
+
+Two defects, both fixed:
+
+- [nut11/keys-compared-by-x-coordinate] wallet/src/payment-request.ts (0.87)
+  verdict: defect
+  evidence: `P2PK_PUBKEY_RE = /^02[0-9a-f]{64}$/i` dropped any `03`-parity lock at decode, and `lockableMintsFromRequest` compared whole keys against `` `02${nostrPubkeyHex}` ``. NUT-11 keys are compressed points, so `02<x>` and `03<x>` are the same key. Sovran only mints `02` (the x-only lift of a Nostr key), so our own requests were unaffected; a SEC1-compressed key from another wallet can be `03`, and for those we answered "not yours" about a request that is. Blame `4f049644` "feat(send): describe payment destinations" — the comparison was written against our own output format and the docstring stated the `02` assumption as the definition. Not a funds risk: both consumers gate on `hasSpendingCondition || lockP2pkPubkey`, and `hasSpendingCondition` comes from `decoded.nut10` regardless of parity, so an `03` request was refused rather than paid unlocked.
+  action: **fixed** in `e04bcd45`, then given a single owner in `451bd157`.
+
+- [nut11/keys-compared-by-x-coordinate] wallet/src/transport/classify.ts (implied by the same rule)
+  verdict: defect
+  evidence: `classifyMeshToken` compared `expected[0] === myKey` over whole strings, where `expected` comes from `getP2PKExpectedWitnessPubkeys` — a key chosen by whoever locked the token. A Nut Drop locked to `03<our x>` was classified `locked-to-other` and silently ignored rather than auto-redeemed.
+  action: **fixed** in `451bd157`. Rather than copy the helper, the canonicalisation moved into `wallet/src/p2pk.ts`, which already owns "is anything locked?" and "locked to whom?" and whose header says why: "A divergence between two copies of this check is a funds-visibility bug, not a style nit." Both fixes verified with tests confirmed to **fail first** against the old comparison, then pass — not merely to pass after.
+
+One defect deferred:
+
+- [nut18/transport-shape-and-preference] defaultOperations.ts:1759-1782 (0.78), machine/transitions.ts:79 (0.70)
+  verdict: defect
+  evidence: NUT-18 sorts a request's `t` array by preference. Selection does `find(t => t.type === 'nostr')` and `find(t => t.type === 'post')` independently, then takes Nostr only when there is no HTTP — so a payee listing `[nostr, post]` is paid over HTTP against their stated preference. The cause is recorded at :1790 as an implementation constraint: coco's `PaymentRequestsApi` has no Nostr support.
+  action: blocked — recorded as **F44**. Changing transport selection in the payment path deserves its own focused change with coverage over both orderings, and funded E2E is off limits during the sweep.
+
+False positives (guard exists, in another package or in a dependency):
+
+- [nut10/unsupported-kind-is-anyone-can-spend] payment-request-receive.ts:1,148 (0.84, 0.82), transport/classify.ts:1 (0.75), defaultOperations.ts:624 (0.73)
+  evidence: the capability check exists, one package up. `app/features/receive/lib/creqMintSelection.ts:68-76` computes `supportsP2pk` from `nutSupported(nuts, '11')`, sets `p2pkLockEffective = p2pkLockActive && hasP2pkCapableMint`, filters candidates to capable mints and disables the rest with `REASON_NO_P2PK` — with the comment "A lock over only-incapable mints would advertise anyone-can-spend ecash as locked". `ReceiveScreen.tsx:419` then drops the lock entirely when it is not effective: `creqLockPubkey = p2pkLockEffective ? p2pkKey : undefined`. Mechanism in `wallet/`, guard in `app/` — the same cross-package blindness as the `payments` abstentions.
+
+- [nut11/tag-appears-once] wallet/src/transport/classify.ts:1 (0.74)
+  evidence: **verified by experiment, not by reading.** `getP2PKRequiredSigs` reads `n_sigs` with `tags.find(...)`, which would take the first of a duplicate pair, and NUT-11 says a repeated tag makes the proof unspendable. But cashu-ts rejects it upstream: `parseP2PKSecret` throws `Duplicate P2PK tag "n_sigs"`, and `classify.ts:130` catches that and skips the proof. I wrote a fix and a test for this before checking, found the test passed with the fix reverted, probed cashu-ts directly, and reverted both. A no-op change with a test that pins nothing is worse than no change.
+
+- [nut11/keys-compared-by-x-coordinate] app/shared/lib/cashu/cocoRepositories.ts:1 (0.75)
+  evidence: `ephemeralPubkeys.has(keyPair.publicKeyHex)` is a Set lookup over *our own* keyring entries — both sides from the same source and always `02` by construction (see the comment at :124). No counterparty key is involved.
+
+- [nut06/nuts-settings-consulted] app/shared/lib/cashu/offlineReceiveDleq.ts:1 (0.77)
+  evidence: consulting the mint's NUT-06 settings would add nothing here. The file requires a DLEQ on each proof and verifies it locally; a mint that does not implement NUT-12 produces proofs without one, which fails closed at `missing-dleq`. The capability is proven by the data, not asserted by the mint.
+
+- [nut12/wallet-verifies-received-dleq] wallet/src/transport/classify.ts:1 (0.75)
+  evidence: `classify` answers "does this token look locked to me?" and redeems nothing. Acceptance runs through coco's receive path, and the offline path's DLEQ gate is `offlineReceiveDleq.ts`.
+
+- [nut18/transport-shape-and-preference] wallet/src/guards.ts:96 (0.72)
+  evidence: `validateIntent` handles no transports at all; the rule's own text says answer false in that case.
+
+Sibling comparison for NUT-12, since the protocol asks for it: Sovran is the
+**only** wallet in the reference set that verifies DLEQ. Searching
+`~/Documents/GitHub` for DLEQ handling returns nothing in macadamia, minibits
+or cdk, and a single hit in cashu.me — a display label, `"12: DLEQ proofs"`,
+in its mint-details NUT list. `offlineReceiveDleq.ts` refuses on a missing
+DLEQ, a missing blinding factor `r`, a missing keyset, a missing amount key,
+and on a throw inside `hasValidDleq`, and classifies the failure distinctly
+"so an offline transport never queues forged ecash for retry".
