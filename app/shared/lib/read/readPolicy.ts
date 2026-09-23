@@ -43,6 +43,9 @@ const READ_GATES: Record<ReadSurface, FirstPaintGate> = {
   mintReviews: { kind: 'aggregate', minItems: 1, capMs: 800 },
   mintAudit: { kind: 'sequential' },
   mintChanges: { kind: 'sequential' },
+  // Relay-only in practice: nagg answers `unsupported` for the DM index, so the
+  // first answering tier is the page.
+  paymentRequestInbox: { kind: 'sequential' },
 };
 
 /** The `strategy` a surface's `read.<surface>.request` carries by default (its gate's engine). */

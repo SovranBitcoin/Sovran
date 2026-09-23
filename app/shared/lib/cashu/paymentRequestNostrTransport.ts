@@ -33,7 +33,8 @@ import type { PaymentRequestReceiveOperation } from '@cashu/coco-core';
 
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { PAYMENT_RELAYS } from '@/shared/lib/nostr/sendDirectMessage';
-import { cashuLog } from '@/shared/lib/logger';
+import { cashuLog, monotonicNow } from '@/shared/lib/logger';
+import { newReadId, readErrorType, readEvents, readKeyHash } from '@/shared/lib/read/readLog';
 import { reportCocoIssue } from '@/shared/lib/cashu/cocoFeedback';
 
 /** Poll cadence while at least one payment-request op is active. Pull-based
@@ -81,6 +82,8 @@ export function createPaymentRequestNostrTransportPlugin(
       let disposed = false;
       let liveUnsub: (() => void) | null = null;
       let liveStarting = false;
+      /** Monotonic per-tick counter, so a `reads` report can order the poll's ticks. */
+      let pollGeneration = 0;
 
       const capSeenWraps = (): void => {
         if (seenWraps.size <= SEEN_CAP) return;
@@ -151,6 +154,32 @@ export function createPaymentRequestNostrTransportPlugin(
           return;
         }
         polling = true;
+        // This poll reads the viewer's whole gift-wrap inbox on a timer. It
+        // carries the standard read lifecycle under its OWN surface so
+        // log-doctor's `reads` mode can price it: without these, the poll shows
+        // up only as `nostr.read.dmEnvelopes.*` from the facade, which reads as
+        // "the DM list fetched" and is invisible in the per-surface report.
+        // `trigger: 'poll'` + `mode: 'refresh'` is what makes a tick that
+        // ingests nothing recognisable as wasted work.
+        const readId = newReadId('paymentRequestInbox');
+        const keyHash = readKeyHash(viewerPubkey);
+        const t0 = monotonicNow();
+        readEvents.request({
+          readId,
+          surface: 'paymentRequestInbox',
+          keyHash,
+          mode: 'refresh',
+          trigger: 'poll',
+          // `refresh: true` below bypasses whatever the facade holds, so this is
+          // always a fetch — never a cache serve, however fresh the last tick was.
+          action: 'fetch',
+          strategy: 'sequential',
+          cached: false,
+          stale: false,
+          coldStart: false,
+          gen: pollGeneration,
+        });
+        pollGeneration += 1;
         try {
           // The persistent unwrap cache is the cross-restart dedupe: the
           // in-memory seenWraps set dies with every manager re-init (profile
@@ -176,9 +205,39 @@ export function createPaymentRequestNostrTransportPlugin(
             ingested,
             activeOps: activeOps.size,
           });
+          readEvents.done({
+            readId,
+            surface: 'paymentRequestInbox',
+            keyHash,
+            gen: pollGeneration,
+            durationMs: Math.round(monotonicNow() - t0),
+            source: 'network',
+            // `count` is what this tick actually DELIVERED to coco, not what the
+            // relay returned: a tick that re-reads 133 wraps and ingests none is
+            // an `empty` read that cost a full round-trip, and that is the
+            // number the `reads` report should show.
+            count: ingested,
+            empty: ingested === 0,
+            // The transport asks for `POLL_LIMIT` but the relay tier ignores
+            // `limit` by design (randomized gift-wrap `created_at`), so record
+            // the gap between what was requested and what arrived.
+            degraded: envelopes.length > POLL_LIMIT,
+            complete: true,
+          });
         } catch (error) {
           cashuLog.warn('cashu.creq.transport.poll_failed', {
             error: error instanceof Error ? error.message : String(error),
+          });
+          readEvents.failed({
+            readId,
+            surface: 'paymentRequestInbox',
+            keyHash,
+            gen: pollGeneration,
+            durationMs: Math.round(monotonicNow() - t0),
+            errorType: readErrorType(error),
+            // Nothing is on screen for this read; a failed tick simply means the
+            // next one is the backstop.
+            retained: false,
           });
         } finally {
           polling = false;

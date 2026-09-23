@@ -32,7 +32,8 @@ import { projectMintMeta } from '@/features/mint/lib/auditInfo';
 import { fetchNostrProfile } from '@/shared/lib/apiClient';
 import { fetchMintReviews } from '@/shared/lib/nostr/fetchMintReviews';
 import { getDiscoveredMintMetadata } from '@/shared/lib/getDiscoveredMintMetadata';
-import { log, mintUrlLogFields } from '@/shared/lib/logger';
+import { log, mintUrlLogFields, monotonicNow } from '@/shared/lib/logger';
+import { newReadId, readErrorType, readEvents, readKeyHash } from '@/shared/lib/read/readLog';
 import {
   extractMintNostrPubkey,
   type MintInfoForNostr,
@@ -136,6 +137,29 @@ async function fetchEntry(
     hasCachedFields: hasCatalogFields(cached.entry),
     hasCachedInfo: isMintInfoObject(cached.info),
   });
+  // The catalog fans out one reviews read PER MINT. Each one reaches the facade
+  // and shows up as `nostr.read.mintReviews.*`, so without a `readId` and the
+  // app-side pair below, a 13-mint catalog refresh reads as 13 anonymous
+  // transport fetches that no surface in the `reads` report claims — the exact
+  // shape that hid a 14-vs-1 gap between the facade and the app.
+  const reviewsReadId = newReadId('mintReviews');
+  const reviewsKeyHash = readKeyHash(mintUrl);
+  const reviewsT0 = monotonicNow();
+  readEvents.request({
+    readId: reviewsReadId,
+    surface: 'mintReviews',
+    keyHash: reviewsKeyHash,
+    mode: 'revalidate',
+    // Not a screen mounting: the catalog prefetches this alongside the audit so
+    // a mint row can paint its score without waiting for the reviews screen.
+    trigger: 'prefetch',
+    action: 'fetch',
+    strategy: 'aggregate',
+    cached: hasCatalogFields(cached.entry),
+    stale: true,
+    coldStart: !hasCatalogFields(cached.entry),
+    gen: 0,
+  });
   const [metadata, reviewRes] = await Promise.all([
     getDiscoveredMintMetadata(mintUrl, { signal }).catch((err) => {
       log.warn('mint.catalog.entry.audit_failed', {
@@ -144,14 +168,41 @@ async function fetchEntry(
       });
       return null;
     }),
-    fetchMintReviews({ mintUrl, signal }).catch((err) => {
+    fetchMintReviews({ mintUrl, signal, readId: reviewsReadId }).catch((err) => {
       log.warn('mint.catalog.entry.review_failed', {
         ...mintUrlLogFields(mintUrl),
         error: err instanceof Error ? err : new Error(String(err)),
       });
+      readEvents.failed({
+        readId: reviewsReadId,
+        surface: 'mintReviews',
+        keyHash: reviewsKeyHash,
+        gen: 0,
+        durationMs: Math.round(monotonicNow() - reviewsT0),
+        errorType: readErrorType(err),
+        retained: hasCatalogFields(cached.entry),
+      });
       return null;
     }),
   ]);
+  // `fetchMintReviews` returns a Result, so a resolved-but-Err outcome is a
+  // completed read that delivered nothing — reported as empty, not as a failure
+  // (the `.catch` above owns the thrown path).
+  if (reviewRes) {
+    const reviews = reviewRes.isOk() ? reviewRes.value : null;
+    readEvents.done({
+      readId: reviewsReadId,
+      surface: 'mintReviews',
+      keyHash: reviewsKeyHash,
+      gen: 0,
+      durationMs: Math.round(monotonicNow() - reviewsT0),
+      source: 'network',
+      count: reviews?.recommendations.length ?? 0,
+      empty: (reviews?.recommendations.length ?? 0) === 0,
+      degraded: reviews?.degraded === true || reviews === null,
+      complete: reviews !== null,
+    });
+  }
 
   if (signal?.aborted) return cached.entry;
 
