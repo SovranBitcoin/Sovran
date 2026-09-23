@@ -89,6 +89,19 @@ export class FormattedString extends String {
     super(value);
     this._defaultMode = defaultMode;
     this._locale = locale;
+    // Frozen so React Native's dev-only `deepFreezeAndThrowOnMutationInDev`
+    // SKIPS this object (it returns early on anything already frozen).
+    //
+    // Without that, any bridge argument carrying a FormattedString crashes in
+    // dev: RN walks every own enumerable key and redefines it, and a String
+    // exotic object's character indices are enumerable but NON-CONFIGURABLE, so
+    // the redefine throws — Hermes words it `property is not configurable`,
+    // V8 `Cannot redefine property: 0`. A mint whose NUT-06 contact rows reach
+    // a native call is exactly that case.
+    //
+    // Nothing here mutates after construction (both fields are readonly and
+    // every method only reads), so freezing costs nothing.
+    Object.freeze(this);
   }
 
   /**
