@@ -651,9 +651,14 @@ nothing and exits 2 — my first attempt did exactly that.
   verdict: intentional (historyEntry), recorded (the rest)
   evidence: `historyEntry.ts:21` is `amount: z.union([z.number(), z.string()]).optional()`, the rule's exact named shape, but the docstring explains it: "`amount` is a plain number in colada's own entries but a serialized coco `Amount` (a string) when the row comes straight from coco's history." The union is deliberate. The missing integer check is downstream in `amountToNumber`, which is already **F03**.
 
-- remaining 47 findings — `hex-ids` (13), `input-size-caps` (14), `nostr-event-schema-bounds` (4), `route-json-param-unbounded` (4), `url-scheme` (3), `branded-id-as-cast` (2), `default-nested-container`, `use-parsed-output`
+- [hex-ids] 13 findings and [input-size-caps] 14 findings — `nostr/src/schemas.ts`, `envelope.ts`, `facade/mint-reviews.ts`, `facade/primal/schemas.ts`, `recipes/wallpapers.ts`, plus app-side stores
+  verdict: defect
+  evidence: read in source after the first write-up marked them unverified. `nostr/src/schemas.ts` parses relay and Nagg responses, and `id` (:29) and `pubkey` (:31) are bare `z.string()` rather than 64-hex, `content` (:32) is unbounded, and `tags` (:33) is `z.array(z.array(z.string()))` with no cap. The same file caps one array at `:22` with `.max(5000)`, so the intent exists and is applied in exactly one place. `nostr/src` has no hex primitive of its own and cannot import the app's `NostrPubkeyHexSchema` from `protocolIds.ts`, because `nostr` must not import from `app`.
+  action: blocked — recorded as **F45**. The caps are a policy decision on the untrusted-input boundary, where too low rejects legitimate events, so they want choosing against real event sizes rather than by reflex at the end of a sweep.
+
+- remaining 20 findings — `nostr-event-schema-bounds` (4), `route-json-param-unbounded` (4), `url-scheme` (3), `branded-id-as-cast` (2), `default-nested-container`, `use-parsed-output`, and the app-side members of the two clusters above
   verdict: recorded, not verified
-  action: none. Not read in source. `hex-ids` and `input-size-caps` cluster on the Nostr wire schemas (`nostr/src/schemas.ts`, `envelope.ts`, `facade/*`) and are about bounding untrusted relay input — plausible and worth a focused pass, but asserting verdicts on 47 findings I have not read would be exactly the false progress this protocol forbids.
+  action: none. Not read in source. Asserting verdicts on findings I have not opened would be exactly the false progress this protocol forbids.
 
 Two prep checks recorded because I caught them before reporting either as a finding:
 `transactionDistributionStore` looked like it had zero schema tolerance; it uses
