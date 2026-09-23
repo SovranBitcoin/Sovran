@@ -4,9 +4,18 @@
  * The header owns the search state and input. This layer keeps the underlying
  * Wallet, Feed, or Contacts surface mounted while search is active, so closing
  * search returns to the exact same tab/list state.
+ *
+ * The layer is `absoluteFill`, and an absolutely-positioned child is laid out
+ * against its parent's BORDER box — `Screen`'s `safeArea` padding does not move
+ * it. Every surface that mounts this runs `headerTransparent: true`
+ * (SearchLayout), so without an inset of its own the scope tabs and the first
+ * results row paint UNDER the profile button and the search field. The inset is
+ * therefore taken from the navigator by default rather than left to each caller
+ * to remember.
  */
-import { useMemo } from 'react';
+import { useContext, useMemo } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { HeaderHeightContext } from 'expo-router/react-navigation';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { zIndex } from '@/shared/styles/tokens';
@@ -18,7 +27,11 @@ import type { RecentSearchSurface } from './useRecentSearches';
 type SearchOverlayProps = {
   recentContext: RecentSearchSurface;
   emptyPrompt?: EmptySearchPrompt;
-  /** Used by transparent-header surfaces such as Wallet. */
+  /**
+   * Overrides the navigator header height. Only pass this where the header
+   * height in context is not the right offset; every ordinary surface should
+   * leave it unset and get the measured header.
+   */
   topInset?: number;
   style?: StyleProp<ViewStyle>;
   testID?: string;
@@ -27,16 +40,23 @@ type SearchOverlayProps = {
 export function SearchOverlay({
   recentContext,
   emptyPrompt,
-  topInset = 0,
+  topInset,
   style,
   testID,
 }: SearchOverlayProps) {
   const { isSearching } = useSearchContext();
   const resolvedTestID = testID ?? `search-overlay-${recentContext}`;
   const surface = useThemeColor('surface');
+  // Read the context directly (the ModalLayoutWrapper precedent):
+  // `useHeaderHeight()` throws outside a Stack, and 0 is the right answer there.
+  const navigatorHeaderHeight = useContext(HeaderHeightContext) ?? 0;
+  const resolvedTopInset = topInset ?? navigatorHeaderHeight;
+  // `paddingTop`, not `top`: the opaque surface must still cover the full
+  // screen so the page underneath cannot show through the transparent header,
+  // while the CONTENT starts below it.
   const overlayStyle = useMemo<StyleProp<ViewStyle>>(
-    () => [styles.overlay, { backgroundColor: surface, paddingTop: topInset }, style],
-    [surface, style, topInset]
+    () => [styles.overlay, { backgroundColor: surface, paddingTop: resolvedTopInset }, style],
+    [surface, style, resolvedTopInset]
   );
 
   if (!isSearching) return null;
