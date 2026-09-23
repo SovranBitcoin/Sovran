@@ -13,8 +13,8 @@ Branch: `feat/receive-nut-drop`.
 | 1 | `entropy` | done | 0 defects; 4 chunks blocked by a provider content filter, hand-verified |
 | 2 | `secrets` | done | 3 defects (all blocked: durable data), ~17 false positives, rule sharpened |
 | 3 | `payments` | done | 0 defects; 4 abstentions hand-verified, all correctly guarded |
-| 4 | `money` | in-progress | |
-| 5 | `state` | pending | |
+| 4 | `money` | done | 1 defect (blocked: 5-way refactor), 1 intentional, 1 false-positive |
+| 5 | `state` | in-progress | |
 | 6 | `nostr` | pending | |
 | 7 | `errors` | pending | |
 | 8 | `ui` | pending | |
@@ -222,3 +222,25 @@ Blocked (provider content filter, same as entropy and secrets):
 `openExternalUrl.test.ts:1`, `patch-bitchat-imports.js:244`,
 `composition.test.mjs:1`, `sync-bitchat-android.js:379`. Hand-verified: none
 initiates a payment effect.
+
+### money — done
+
+Scope run: `check --all --only "money/*"` (whole repo). 3,278 questions /
+3,278 requests. `complete: false` — 4 requests failed (the content-filtered
+scripts, plus `copy/src/site.ts` this time). **3 findings**, all low
+confidence (0.16–0.23), all verified in source.
+
+- [money/amount-meaning] wallet/src/amount.ts:1-67 and wallet/src/balance/breakdown.ts:1-67 — `amountToNumber` loses the unknown-versus-zero distinction, and disagrees with itself across copies
+  verdict: defect
+  evidence: five implementations, four behaviours for bad input. `app/shared/lib/cashu/amount.ts` (24 importers) and `wallet/src/amount.ts` return `NaN` for an unparseable string with a warn/debug log; `wallet/src/balance/breakdown.ts:36` (`Number(value) || 0`) and `wallet/src/history/timeline/context.ts:44` silently return `0`; `app/e2e/funded-runtime/payment-request-payer.ts:64` throws. All five map `null` to `0`. Blame says incidental: `breakdown.ts` was last touched by `4b4b5020` "delete three pass-through wrappers" and `wallet/src/amount.ts` by `1911f46f` "remove dead code, assets, and duplicate implementations" — two cleanup passes that both missed it. No ADR, test or contract pins the divergence.
+  action: blocked — F03 extended in `c574b780` to name all five and the disagreement, and to take the e2e copy's refusal as the model. Converging them across ~35 call sites is a refactor, which the protocol forbids inside a fix commit.
+
+- [money/amount-meaning] nostr/src/facade/noteStatsContract.ts:1-58 — flagged for flooring `satsZapped`
+  verdict: intentional
+  evidence: this is the guard, not the defect. Its docstring explains that `NoteStats` declared `CountInt`/`Sats` but the tier mappers were casts, both wire schemas accept a bare `z.number()`, and `recordZapPaid` persists under `z.number().int()` — so one fractional `satsZapped` from a non-Nagg tier would fail parse and, because the persist merge is all-or-nothing, discard the whole social store on every launch. Clamping at the one place every tier converges is deliberate and documented.
+  action: none. Not a rule-precision problem either: asking about a coercion and being shown a deliberate clamp is the rule working; a human reading the docstring settles it in seconds.
+
+Blocked (provider content filter): `openExternalUrl.test.ts:1`,
+`sync-bitchat-android.js:379`, `composition.test.mjs:1`, `copy/src/site.ts:1`
+— 1 rule each. Hand-verified: none carries a monetary amount;
+`copy/src/site.ts` is marketing strings.
