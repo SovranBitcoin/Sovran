@@ -19,7 +19,7 @@
  * still surfaces as an `other` fact built from the decoder's label, so an
  * unmapped change is never silently swallowed.
  */
-import { decodePointer, pairPatchOps, type PatchOp } from './decode';
+import { decodePointer, pairPatchOps, type PatchOp, own } from './decode';
 import { NUT_TITLES } from './nuts';
 
 export type Direction = 'receive' | 'send';
@@ -74,7 +74,7 @@ const RAIL_NAMES: Record<string, string> = {
 };
 
 export function railName(method: string): string {
-  return RAIL_NAMES[method.toLowerCase()] ?? method;
+  return own(RAIL_NAMES, method.toLowerCase()) ?? method;
 }
 
 /**
@@ -100,7 +100,7 @@ const FEATURE_NAMES: Record<string, string> = {
 const NOISE_NUTS = new Set(['7']);
 
 function featureName(nut: string): string {
-  const known = FEATURE_NAMES[nut];
+  const known = own(FEATURE_NAMES, nut);
   if (known) return known;
   const title = NUT_TITLES[String(Number(nut))];
   return title ? title.toLowerCase() : `NUT-${nut}`;
