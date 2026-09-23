@@ -79,6 +79,12 @@ export default defineConfig({
     // nip17 + nip59: the DM envelope, thread history and the NUT-18 nostr
     //   transport unwrap gift wraps and seals themselves.
     //   `seal-pubkey-matches-rumor` is the impersonation check.
+    //   `room-identity` is left out until group DMs exist, the same way
+    //   `bip321/pop` is: every NIP-17 wrap this app builds carries exactly one
+    //   `p` tag (`nip17.ts:131,196`), so keying a conversation on the
+    //   counterparty *is* keying it on the participant set. Group chat is
+    //   Whitenoise/MLS, a different protocol. It flagged 7 DM stores and hooks
+    //   on the 2026-09-23 sweep, all false. Re-select it with group DMs.
     // nip60 + nip61: the Cashu wallet and nutzap kinds are this app's own
     //   integration of the two protocols, not something coco or nostr-tools
     //   decides — which mint, which lock key, what stays unencrypted.
@@ -113,7 +119,6 @@ export default defineConfig({
       "nip06/derivation-path",
       "nip17/seal-pubkey-matches-rumor",
       "nip17/chat-content-plain-text",
-      "nip17/room-identity",
       "nip17/subject-latest-wins",
       "nip17/publish-to-recipient-dm-relays",
       "nip17/dm-relay-list-shape",

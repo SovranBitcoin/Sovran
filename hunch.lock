@@ -6127,7 +6127,6 @@
         "nip06/derivation-path",
         "nip17/seal-pubkey-matches-rumor",
         "nip17/chat-content-plain-text",
-        "nip17/room-identity",
         "nip17/subject-latest-wins",
         "nip17/publish-to-recipient-dm-relays",
         "nip17/dm-relay-list-shape",
@@ -6802,37 +6801,6 @@
             "criteria": {
               "true": "Kind 14 content is not plain text, or the rumor lacks id or created_at.",
               "false": "Content is plain text with id and created_at present, or the hunk does not build kind 14."
-            },
-            "threshold": 0.7,
-            "files": [
-              "**/*.ts",
-              "**/*.tsx",
-              "**/*.js",
-              "**/*.jsx",
-              "**/*.mjs",
-              "**/*.py",
-              "**/*.rs",
-              "**/*.go",
-              "**/*.kt",
-              "**/*.java",
-              "**/*.swift",
-              "**/*.dart",
-              "**/*.cs",
-              "**/*.rb",
-              "**/*.ex",
-              "**/*.exs"
-            ]
-          }
-        },
-        "nip17/room-identity": {
-          "level": "warn",
-          "question": {
-            "kind": "noul",
-            "instructions": "Nostr NIP-17. Requirement: a chat room is identified by the set of the author `pubkey` plus the `p` tags; adding or removing a participant creates a different room with a clean message history, rather than continuing the old one. Does the code in `hunk` key a conversation on something else, such as a stored thread id or only the counterparty, so that a changed participant set silently merges into an existing room? Answer false if `hunk` does not group messages into conversations.",
-            "message": "NIP-17: a room is the set of pubkey + p tags; a changed participant set is a different room.",
-            "criteria": {
-              "true": "Conversations are keyed on something other than the full participant set, merging distinct rooms.",
-              "false": "The room key is the pubkey plus p tag set, or the hunk does not group conversations."
             },
             "threshold": 0.7,
             "files": [
