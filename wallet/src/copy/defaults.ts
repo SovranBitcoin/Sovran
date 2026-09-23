@@ -47,7 +47,7 @@ export const paymentCopyDefaults = {
 
   "timeline.paymentRequest.prepared.label": "Created",
   "timeline.paymentRequest.prepared.info": "Creating token...",
-  "timeline.paymentRequest.nostrSent.label": "Delivered",
+  "timeline.paymentRequest.nostrSent.label": "Sent",
   "timeline.paymentRequest.nostrSent.infoSending": "Sending...",
   "timeline.paymentRequest.nostrSent.infoSent": "Sent via Nostr",
   "timeline.paymentRequest.finalized.label": "Claimed",
@@ -122,7 +122,7 @@ export const paymentCopyDefaults = {
   "toast.send.failed": "Payment failed",
   "toast.paymentRequest.message": "Payment request sent",
   "toast.paymentRequest.processing": "Waiting for recipient",
-  "toast.paymentRequest.delivered": "Delivered to recipient",
+  "toast.paymentRequest.delivered": "Sent via Nostr",
   "toast.paymentRequest.confirmed": "Claimed by recipient",
   "toast.paymentRequest.failed": "Payment failed",
   "toast.melt.message": "Payment sent",
