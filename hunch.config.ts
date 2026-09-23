@@ -449,6 +449,23 @@ export default defineConfig({
       reference: "docs/review/contracts.md",
       message: "A persisted schema change may reset existing user data.",
     })],
+    // `state/persisted-compatibility` asks whether a *change* breaks stored
+    // data, so on a whole-file conformance sweep (`check --all`) it has nothing
+    // to judge and stays silent. This asks the standing question instead: does
+    // the decoder already in the tree throw the whole blob away when one field
+    // fails? That is the shape behind the Balance-split enum rename wiping
+    // `settingsStore`, and `createMergeWithSchema` still returns `current` on
+    // any `safeParse` failure for 16 call sites. Keep both: one guards a diff,
+    // this one guards the code that is already there.
+    "state/all-or-nothing-rehydrate": ["warn", choice({
+      instructions: "Does this code discard a whole persisted blob, or reset a store to its defaults, because part of it failed to decode? The shape is a rehydrate, `merge`, `migrate` or storage read whose failure branch returns the initial/current state, `{}`, `null` or a default object for the entire store rather than salvaging the fields that did parse. A per-field `.catch()`, `.default()`, a tolerant array or record that drops only bad entries, a `version` bump with a `migrate` that maps old data forward, or a failure branch that refuses and surfaces an error instead of substituting defaults, are all the correct shapes — answer no. Judge what happens to the user's *other* fields when one is bad: losing unrelated settings, acceptance flags, keys or balances is the concern. A decoder for network or clipboard input is unrelated; this is about data already on the device. An in-memory or ephemeral cache is unrelated.",
+      criteria: { concern: "A decode failure in one part of persisted state discards or resets state the user would otherwise keep.", ...outcomes },
+      when: /persist|rehydrate|merge|migrate|partialize|safeParse|\.parse\(|getItem|setItem|storage|Storage|createJSONStorage|initialState|default/,
+      report: ["concern"],
+      abstain: ["insufficient-context"],
+      reference: "docs/review/contracts.md",
+      message: "A partial decode failure may reset the whole persisted store.",
+    })],
     "state/authority-read-failure": ["warn", choice({
       instructions: "Does this change treat a failed or invalid durable wallet-authority read as an empty first-run store, allowing existing authority to be replaced? Exclude ephemeral cache defaults. Writes without a changed read-failure or initialization path are unrelated.",
       criteria: { concern: "The supplied change and context visibly demonstrate this concern.", ...outcomes },
