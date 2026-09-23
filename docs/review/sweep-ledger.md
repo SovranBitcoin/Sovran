@@ -12,8 +12,8 @@ Branch: `feat/receive-nut-drop`.
 | --- | --- | --- | --- |
 | 1 | `entropy` | done | 0 defects; 4 chunks blocked by a provider content filter, hand-verified |
 | 2 | `secrets` | done | 3 defects (all blocked: durable data), ~17 false positives, rule sharpened |
-| 3 | `payments` | in-progress | |
-| 4 | `money` | pending | |
+| 3 | `payments` | done | 0 defects; 4 abstentions hand-verified, all correctly guarded |
+| 4 | `money` | in-progress | |
 | 5 | `state` | pending | |
 | 6 | `nostr` | pending | |
 | 7 | `errors` | pending | |
@@ -183,3 +183,42 @@ Blocked (provider content filter, same as entropy): `patch-bitchat-imports.js:24
 `sync-bitchat-android.js:379`, `composition.test.mjs:1` — 2 rules each.
 Hand-verified: none handles secret material; they rewrite Swift imports, copy
 files by name, and test site composition.
+
+### payments — done
+
+Scope run: `check --all --only "payments/*"` (whole repo). 4,614 chunks /
+10,014 questions / 3,761 requests. `complete: false` — 4 requests failed (the
+same content-filtered build scripts as entropy and secrets). **0 findings**.
+
+Zero is not taken on trust. Four chunks abstained `insufficient-context`, and
+all four sit on the highest-value payment paths — exactly where a defect would
+hide — so each was hand-verified:
+
+- [payments/cancellation-state] app/shared/lib/cashu/manager.ts:1290 — `restoreInflightProofsForMint` returns *all* inflight proofs to ready with no settlement check, and its docstring names `timeout` as a trigger. `contracts.md` says a timeout is not proof a melt failed.
+  verdict: intentional (not a defect)
+  evidence: the only non-test caller is `rebalanceWalletPort.ts:45`, which the rebalance engine drives. `wallet/src/rebalance/engine.ts:137-143` guards it: `if (run.unsettledMints.has(mintUrl)) { log.warn('mint.rebalance.restore_skipped_unsettled_melt'); return; }` with the comment "A melt from this mint may still pay; its proofs must stay reserved." The uncertain case is excluded before the call.
+  action: none. The abstention was *correct*: the guard lives in another package, so no `contextLines` value could have shown it. Not a rule-precision problem — see the note below.
+
+- [payments/uncertain-outcome] app/shared/lib/routstr/api.ts:567 — `topUpBalance` POSTs a Cashu token under an abort timeout.
+  verdict: intentional (not a defect)
+  evidence: `topUp.ts:87-91` handles the uncertain outcome rather than resolving it — on failure it still persists the apiKey and logs `routstr.topup.partial_success` with reason `api_key_set_but_balance_failed`, so a timed-out top-up leaves the token's value recoverable through the stored key instead of discarded.
+
+- [payments/request-constraints] app/features/send/lib/sovranPaymentConfig.ts:133
+  verdict: false-positive
+  evidence: `findReceiveHistoryEntryForOperation` is a read-only reconciliation lookup over `manager.history`. It carries no amount, unit, mint or lock constraint, so there is none to drop.
+
+- [payments/repeated-effect] app/features/feed/components/nostr/NoteContent.tsx:230
+  verdict: intentional (not a defect)
+  evidence: `LightningBlock` decodes the relay-supplied `meltTarget` once through colada's canonical `decodeBolt11Invoice` — by its own comment, "the same one the payment machine seeds its amount from, so the chip can never advertise a different number than the flow charges" — and an undecodable target renders as a non-tappable "Invalid Lightning invoice" chip so "a relay-supplied lnbc-shaped string never reaches `machine.execute`".
+
+Rule-precision note (no action taken): 4 abstentions in 10,014 questions is
+0.04%, and each one is a cross-package guard — the mechanism is in
+`app/`, the guard in `wallet/`. The protocol's remedy for chronic abstention
+(raise `contextLines`, or ask it whole-file) cannot reach across a package
+boundary, and `--all` already sends whole files. Abstaining is the honest
+answer here, so the rules are left alone.
+
+Blocked (provider content filter, same as entropy and secrets):
+`openExternalUrl.test.ts:1`, `patch-bitchat-imports.js:244`,
+`composition.test.mjs:1`, `sync-bitchat-android.js:379`. Hand-verified: none
+initiates a payment effect.
