@@ -332,6 +332,28 @@ export default defineConfig({
     "skill/typescript-best-practices/brand-shape-convention": "off",
     "skill/typescript-best-practices/type-guard-naming": "off",
 
+    // ── Compiled AGENTS.md rules switched off ─────────────────────────────
+    // `app-alias-imports` compiled AGENTS.md:43 ("App imports use `@/…`") into
+    // "any `../` in app/ is a violation", and asked it of every file. On the
+    // 2026-09-23 sweep that produced 208 findings — 78 in `app/features`, 76 in
+    // `app/e2e`, 36 in `app/shared` — including files with no relative import at
+    // all (`AiMessageBubble.tsx`, `ModelChip.tsx`), which is the tell.
+    //
+    // Three reasons it is off rather than retuned. The sentence's own named
+    // violation is `../../wallet/src`, a cross-package traversal, and that is
+    // already asked by `cross-package-subpath-imports`. What it actually flags
+    // is intra-feature sibling imports (`../lib/finalize` inside
+    // `features/ai/`), which 123 of 1,128 app source files use and which
+    // `no-restricted-imports` in `app/eslint.config.js` deliberately does not
+    // restrict — it names packages, never path shapes. And an import path is a
+    // string pattern: `import/no-relative-parent-imports` decides it exactly,
+    // where a semantic model guesses.
+    //
+    // If the intent is that intra-feature relatives are banned too, that is a
+    // lint rule and a codemod, not a review question. AGENTS.md:43-44 is worth
+    // rewording either way, so the next `install` does not recompile this.
+    "agents-md/root/app-alias-imports": "off",
+
     "ui/header-continuity": ["warn", choice({
       instructions: "Does this change visibly break the shared header contract: a page identity is duplicated or lost during its scroll handoff, header actions or content are obscured by incorrect inset ownership, a section selector becomes unreachable while scrolling its content, a fixed inset around a scrolling viewport prevents content from ever entering its gradient header, an opaque strip defeats the combined header/tab gradient, or identity handoff activates before the measured identity section clears navigation? Judge the visible layout and scroll ownership together, on iOS and Android; an isolated use of a header API without evidence of a broken behavior is unrelated.",
       criteria: { concern: "The changed layout or scroll wiring visibly causes one of these continuity or reachability failures.", ...outcomes },
