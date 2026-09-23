@@ -9,7 +9,7 @@ add the regression, then remove the item here.
 
 | ID | Priority | Work | Done when |
 | --- | --- | --- | --- |
-| F02 | High, confirmed | `app/shared/lib/nostr/nip04Cache.ts` persists decrypted DMs in AsyncStorage. Make plaintext memory-only, or design encrypted storage with retention. | Safe key migration; no plaintext at rest; offline and profile-isolation tests |
+| F02 | High, confirmed | Decrypted DMs persist in AsyncStorage through `app/shared/lib/cache/createPubkeyScopedCache.ts` — **both** `nip04Cache.ts` (NIP-04 plaintext) and `giftWrapCache.ts` (NIP-17 `UnwrappedDM`), which this entry used to omit. Make plaintext memory-only, or design encrypted storage with retention. Fix the factory, not the two call sites. Existing `nip04-cache:v1`, `nip04-cache-neg:v1`, `nip17-unwrap-cache:v1` and `nip17-unwrap-cache-neg:v1` blobs already hold plaintext on disk, so the change must also erase them. | Safe key migration; no plaintext at rest, including blobs written before the fix; offline and profile-isolation tests |
 | F03 | High, review | `app/shared/lib/cashu/amount.ts` mixes display coercion with validation (`amountToNumber` maps bad input to 0; `toSafeSatAmount` truncates). Separate them. | Invalid, unsafe or fractional values can't authorize a spend; callers classified |
 | F04 | High, confirmed | Raw exception text reaches UI in `ClaimUsernameScreen`, the Settings export alert and the Colada deep-link popup. Route through `describeError`/popup failures. | No raw upstream detail on those surfaces; original error preserved |
 | F05 | High, review | `createMergeWithSchema` falls back to defaults on rejection, including for critical stores. | Corruption can't silently reset identity or funds state; unrelated preferences survive |
