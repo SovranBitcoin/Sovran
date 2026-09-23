@@ -15,7 +15,26 @@ import type { PaymentRequestInfo, PaymentRequestTransport } from "./types";
 
 const CREQ_PREFIX = /^creq[ab]/i;
 const CREQB_PREFIX = /^creqb1/i;
-const P2PK_PUBKEY_RE = /^02[0-9a-f]{64}$/i;
+/**
+ * NUT-11 lock key: 33-byte compressed secp256k1, so `02` OR `03` — both parities
+ * are legal and both encode the same x coordinate. Sovran only ever mints the
+ * `02` form (the x-only lift of a Nostr key), but a true SEC1-compressed key
+ * from another wallet can legitimately arrive as `03`, and rejecting it here
+ * made a request that IS locked to us look like one that is not.
+ */
+const P2PK_PUBKEY_RE = /^0[23][0-9a-f]{64}$/i;
+
+/**
+ * The x coordinate of a compressed P2PK key, lowercased — the form NUT-11
+ * compares by. `null` when the input is not a compressed key.
+ *
+ * Mirrors `nostrPubkeyHexFromCashuP2pk` in `app/shared/lib/protocolIds.ts`,
+ * deliberately duplicated: `wallet` must not import from `app`.
+ */
+function p2pkXOnly(value: string | undefined | null): string | null {
+  if (!value || !P2PK_PUBKEY_RE.test(value)) return null;
+  return value.slice(2).toLowerCase();
+}
 
 const tryDecode = <T>(fn: () => T): T | null => {
   try {
@@ -96,9 +115,10 @@ export function decodePaymentRequestInfo(
 }
 
 /**
- * A request is lockable to `nostrPubkeyHex` iff its `nut10` P2PK key equals
- * `02` + that 32-byte x-only hex key. Returns the accepted mints when lockable,
- * else null (no request, undecodable, or lock mismatch).
+ * A request is lockable to `nostrPubkeyHex` iff its `nut10` P2PK key shares
+ * that 32-byte x coordinate, whatever its `02`/`03` parity prefix. Returns the
+ * accepted mints when lockable, else null (no request, undecodable, or lock
+ * mismatch).
  */
 export function lockableMintsFromRequest(
   value: string | undefined,
@@ -107,8 +127,11 @@ export function lockableMintsFromRequest(
   if (!value || !nostrPubkeyHex) return null;
   const info = decodePaymentRequestInfo(value);
   if (!info) return null;
-  const expected = `02${nostrPubkeyHex}`.toLowerCase();
-  if (!info.lockP2pkPubkey || info.lockP2pkPubkey.toLowerCase() !== expected) {
+  // Compare x coordinates, not whole keys: NUT-11 treats `02<x>` and `03<x>`
+  // as the same key, and only the x coordinate is carried by NIP-01.
+  const expected = nostrPubkeyHex.toLowerCase();
+  const actual = p2pkXOnly(info.lockP2pkPubkey);
+  if (!actual || actual !== expected) {
     logger.debug("paymentRequest.lockable.mismatch", {
       mintCount: info.mints.length,
       hasLock: !!info.lockP2pkPubkey,

@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { decodePaymentRequest } from '@cashu/cashu-ts';
+import { decodePaymentRequest, PaymentRequest, type NUT10Option } from '@cashu/cashu-ts';
 
 import {
   decodePaymentRequestInfo,
@@ -18,6 +18,21 @@ import { INPUTS, MINT1 } from '../_harness/fixtures';
 
 const LOCK_KEY = `02${'a'.repeat(64)}`;
 const LOCK_HEX = 'a'.repeat(64);
+
+/** A creq locked to `pubkey33`, built here because the CBOR fixtures only
+ *  carry the `02` parity and NUT-11 allows `03` for the same key. */
+function lockedRequest(pubkey33: string): string {
+  return new PaymentRequest(
+    undefined,
+    undefined,
+    50,
+    'sat',
+    [MINT1],
+    undefined,
+    false,
+    { kind: 'P2PK', data: pubkey33, tags: [] } satisfies NUT10Option,
+  ).toEncodedRequest();
+}
 
 describe('decodePaymentRequestInfo', () => {
   it('decodes mints + amount', () => {
@@ -85,6 +100,21 @@ describe('lockableMintsFromRequest', () => {
     expect(lockableMintsFromRequest(INPUTS.paymentRequestLocked, LOCK_HEX)).toEqual([
       MINT1,
     ]);
+  });
+
+  // NUT-11: `02<x>` and `03<x>` are the SAME key — only the x coordinate is
+  // carried by NIP-01, so a SEC1-compressed key from another wallet may arrive
+  // with either parity and must still resolve to us.
+  it('matches a lock that uses the 03 parity for the same x coordinate', () => {
+    expect(lockableMintsFromRequest(lockedRequest(`03${LOCK_HEX}`), LOCK_HEX)).toEqual([
+      MINT1,
+    ]);
+  });
+
+  it('still rejects a 03 lock whose x coordinate is someone else', () => {
+    expect(
+      lockableMintsFromRequest(lockedRequest(`03${'b'.repeat(64)}`), LOCK_HEX),
+    ).toBeNull();
   });
 
   it('returns null on lock mismatch', () => {
