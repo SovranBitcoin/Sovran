@@ -14,8 +14,8 @@ Branch: `feat/receive-nut-drop`.
 | 2 | `secrets` | done | 3 defects (all blocked: durable data), ~17 false positives, rule sharpened |
 | 3 | `payments` | done | 0 defects; 4 abstentions hand-verified, all correctly guarded |
 | 4 | `money` | done | 1 defect (blocked: 5-way refactor), 1 intentional, 1 false-positive |
-| 5 | `state` | in-progress | |
-| 6 | `nostr` | pending | |
+| 5 | `state` | done | 0 findings, but exposed a rule blind spot; new rule added |
+| 6 | `nostr` | in-progress | |
 | 7 | `errors` | pending | |
 | 8 | `ui` | pending | |
 | 9 | `nip17`, `nip59` | partly done | see the pre-sweep rows below; re-run to confirm |
@@ -244,3 +244,36 @@ Blocked (provider content filter): `openExternalUrl.test.ts:1`,
 `sync-bitchat-android.js:379`, `composition.test.mjs:1`, `copy/src/site.ts:1`
 — 1 rule each. Hand-verified: none carries a monetary amount;
 `copy/src/site.ts` is marketing strings.
+
+### state — done
+
+Scope run: `check --all --only "state/*"` (whole repo). 7,287 questions /
+3,946 requests. `complete: false` — 4 requests failed (content-filtered
+scripts + `copy/src/site.ts`). **0 findings**, 2 abstentions.
+
+Both abstentions hand-verified, no defects:
+
+- [state/stale-owner] app/features/wallet/components/PrimaryBalance.tsx:145 — `recoverPendingOperations` runs coco send/melt/receive recovery off a `CocoManager.getInstance()` singleton.
+  verdict: false-positive
+  evidence: recovery mutates coco's own profile-scoped store through the manager it captured. A profile switch builds a new manager; the old recovery finishing against the old profile's operations is the intended outcome, not a stale write to the new owner.
+
+- [state/stale-owner] app/shared/lib/cashu/initializeDefaultMints.ts:1
+  verdict: false-positive
+  evidence: this is the pattern the rule wants. An injected `isLive()` generation guard is checked before each mint iteration, before the selection branch, and — the part that matters — re-checked together with the state itself after the await: `if (!isLive() || useMintStore.getState().selectedMint) return;`. The rule abstained only because `isLive` is injected and its binding is not in the window.
+
+Rule gap found and closed (the domain's real result):
+
+- [state/persisted-compatibility] app/shared/lib/persist/createMergeWithSchema.ts:24 — not flagged, but the defect is there
+  verdict: defect (pre-existing, registered as F05)
+  evidence: `if (!r.success) return current;` discards the entire persisted blob on any `safeParse` failure, for 16 call sites including `settingsStore` (terms acceptance, onboarding) and `profileStore`. This is the shape behind the Balance-split enum rename wiping settings.
+  action: blocked as code (F05 is an existing entry; fixing it is a persisted-data change the protocol hands back). But the *rule* gap is closed: `persisted-compatibility` asks whether a **change** breaks stored data, so on `--all` there is no change and it correctly says nothing — nothing asked the standing question. Added `state/all-or-nothing-rehydrate` in `ab791089`, which asks what happens to the user's other fields when one fails to decode. Measured on `app/shared/lib/persist`, `settingsStore`, `routstrStore` and `createPubkeyScopedCache`: flags `createMergeWithSchema.ts` at 0.49 and `persistConfig.ts` at 0.12, and leaves the three stores alone — they consume the merge, they do not implement the discard.
+
+Standing lesson for the rest of the sweep: a rule phrased around "does this
+**change** …" contributes nothing to a `--all` conformance pass. Several
+`payments/*` and `state/*` rules are phrased that way. Their zero scores are
+evidence about the rule's framing, not about the code, and should not be read
+as the code being clean.
+
+Blocked (provider content filter): `sync-bitchat-android.js:379` (3 rules),
+`patch-bitchat-imports.js:244` (2), `composition.test.mjs:1` (3),
+`copy/src/site.ts:1` (3). Hand-verified: none owns persisted state.
