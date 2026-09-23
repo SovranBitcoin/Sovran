@@ -27,8 +27,8 @@ Branch: `feat/receive-nut-drop`.
 | 15a | `doc/…/conventions-typescript` (16 rules) | done | 29 findings; 3 fixed, rest recorded |
 | 15b | `doc/…/conventions-zod` (28 rules) | done | 54 findings; 7 sites fixed, rest recorded |
 | 15c | `doc/…/conventions-react-native` (29 rules) | done | 20 findings; 3 defects **fixed** incl. a WebView scheme escape |
-| 15d | `doc/…/conventions-async-tests` (31 rules) | in-progress | |
-| 15e | `doc/…/conventions-state` (34 rules) | pending | |
+| 15d | `doc/…/conventions-async-tests` (31 rules) | done | 85 findings; 61 in shipping code, recorded as F47 |
+| 15e | `doc/…/conventions-state` (34 rules) | in-progress | |
 | 15f | `doc/…/contributor-conventions` (122 rules) | pending | largest in the config |
 
 ## Findings
@@ -696,3 +696,21 @@ The most serious defect of the whole sweep is here.
 - remaining 11 — `inline-slot-components` (5), `small-touch-target` (2), `list-unique-keys`, `shadow-clipped-by-overflow`, `key-inside-recycled-row`, `hermes-missing-builtins`
   verdict: recorded, not verified
   action: none. Not read in source. All are render-performance or layout questions, none touching money, keys, persisted data or an untrusted boundary — which is how the three that were read got chosen.
+
+#### conventions-async-tests — done
+
+31 rules, 4,307 requests, **27,977 questions**, 6 failed. **85 findings** —
+the largest of any convention file, across 19 distinct rules.
+
+Split by where they land, which is the useful cut: **61 in shipping code**,
+17 in tooling (`app/e2e`, `app/codereview/log-doctor`), 7 in tests.
+
+- 61 shipping-code findings
+  verdict: defect (cluster-level), blocked
+  evidence: the clusters are coherent rather than scattered — `signal-unchecked-after-await` (17), `unbounded-fanout` (10), `sleep-ignores-cancel` (9), `guard-released-on-every-path` (8), `guard-before-await` (7). Spot-verified the money-path member: `wallet/src/operations/defaultOperations.ts:~2030` is a bare `await new Promise(resolve => setTimeout(resolve, DELAY_MS))` inside `executeAutoRedeem`'s history-reconciliation poll, which no abort can interrupt. Worth stating precisely rather than alarmingly: `mgr.wallet.receive()` has already committed by that point, so the cost is a poll outliving navigation, not a stranded payment. Three more `sleep-ignores-cancel` sit in `sovranPaymentConfig.ts` (:133, :405, :555) and a `guard-released-on-every-path` in `wallet/src/machine/createMachine.ts:1501`.
+  action: blocked — recorded as **F47**. Sixty-one call sites across cancellation, fan-out and single-flight discipline is a program of work, and the protocol forbids a refactor inside a fix commit. The rule family is the way to enumerate the current set.
+  **Depth stated honestly:** one finding was read in source. The other 60 were grouped by rule and location. The cluster verdict is a judgement about the rules' coherence, not sixty individual confirmations, and the follow-up says so.
+
+- 17 tooling + 7 test findings
+  verdict: recorded, lower priority
+  evidence: `app/e2e/**` and `app/codereview/log-doctor/**` are Node CLIs the app never imports — established earlier in the `errors` domain, where only comment references exist (`MintInfoScreen.tsx:397-399`). Cancellation discipline matters less in a CLI that exits. The 7 test findings (`restore-global-fakes`, `singleton-state-reset`, `fake-timers-with-promises`) are test-hygiene rather than product behaviour.
