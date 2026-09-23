@@ -5578,7 +5578,7 @@
       "id": "pack/bips-spec",
       "spec": "bips-spec",
       "origin": "Kelbie/hunch/bips-spec",
-      "commit": "37d9cc4d0ca632c8164f3f51c6eafebbcb22c701",
+      "commit": "af7332631238c4312d58abb9726ff56a4b9a960c",
       "path": "rules/bips-spec.json",
       "hash": "04fe5cae10cdd2e34bb4d74b035eb4cf3c6754f455d8e71bcbd400ea1a0eef4d",
       "select": [
@@ -6102,7 +6102,7 @@
       "id": "pack/nips-spec",
       "spec": "nips-spec",
       "origin": "Kelbie/hunch/nips-spec",
-      "commit": "37d9cc4d0ca632c8164f3f51c6eafebbcb22c701",
+      "commit": "af7332631238c4312d58abb9726ff56a4b9a960c",
       "path": "rules/nips-spec.json",
       "hash": "9659579ae794198082bc3037531841a27c90a3075d2c2eaa8da2e9331818e7e9",
       "select": [
@@ -8194,7 +8194,7 @@
       "id": "pack/nuts-spec",
       "spec": "nuts-spec",
       "origin": "Kelbie/hunch/nuts-spec",
-      "commit": "37d9cc4d0ca632c8164f3f51c6eafebbcb22c701",
+      "commit": "af7332631238c4312d58abb9726ff56a4b9a960c",
       "path": "rules/nuts-spec.json",
       "hash": "6bb0e4a672bbb3548ea909218ddb9c2a7b6fb616e88cc4f205c47eb57c05fb30",
       "select": [
@@ -8229,9 +8229,7 @@
         "nut18/empty-transport-is-in-band",
         "nut18/nostr-transport",
         "nut18/payment-payload-shape",
-        "nut18/single-use-honoured",
-        "errors/no-raw-error-leakage",
-        "errors/codes-used-as-specified"
+        "nut18/single-use-honoured"
       ],
       "rules": {
         "nut06/nuts-settings-consulted": {
@@ -9204,68 +9202,6 @@
             "criteria": {
               "true": "A single-use payment request stays payable after the first payment.",
               "false": "Single use is enforced, or the hunk does not track payment request state."
-            },
-            "threshold": 0.75,
-            "files": [
-              "**/*.ts",
-              "**/*.tsx",
-              "**/*.js",
-              "**/*.jsx",
-              "**/*.mjs",
-              "**/*.py",
-              "**/*.rs",
-              "**/*.go",
-              "**/*.kt",
-              "**/*.java",
-              "**/*.swift",
-              "**/*.dart",
-              "**/*.cs",
-              "**/*.rb",
-              "**/*.ex",
-              "**/*.exs"
-            ]
-          }
-        },
-        "errors/no-raw-error-leakage": {
-          "level": "error",
-          "question": {
-            "kind": "noul",
-            "instructions": "Cashu NUT-00 error responses, mint side. Requirement: the mint answers with a `detail` message and a numeric `code`; the detail reaches an untrusted client, so backend internals must not travel with it. Does the code in `hunk` put a raw backend error into `detail` — a Lightning node or blockchain RPC error body, a database error, a stack trace, an internal URL, a file path, or a credential? Answer false if `hunk` does not build mint error responses.",
-            "message": "NUT-00: keep backend error bodies, traces and credentials out of the client-visible `detail`.",
-            "criteria": {
-              "true": "A raw backend error, stack trace, internal identifier or credential reaches the client-visible detail.",
-              "false": "The detail is a safe message, or the hunk does not build mint error responses."
-            },
-            "threshold": 0.75,
-            "files": [
-              "**/*.ts",
-              "**/*.tsx",
-              "**/*.js",
-              "**/*.jsx",
-              "**/*.mjs",
-              "**/*.py",
-              "**/*.rs",
-              "**/*.go",
-              "**/*.kt",
-              "**/*.java",
-              "**/*.swift",
-              "**/*.dart",
-              "**/*.cs",
-              "**/*.rb",
-              "**/*.ex",
-              "**/*.exs"
-            ]
-          }
-        },
-        "errors/codes-used-as-specified": {
-          "level": "error",
-          "question": {
-            "kind": "noul",
-            "instructions": "Cashu error codes. Requirement: the mint's numeric `code` values are fixed by the error table — 10001 proof verification failed; 11001 proofs already spent; 11002 proofs pending; 11003 outputs already signed; 11004 outputs pending; 11005 transaction not balanced; 11006 amount outside limit range; 11007 duplicate inputs; 11008 duplicate outputs; 11009 inputs/outputs of multiple units; 11010 inputs and outputs not of same unit; 11011 amountless invoice unsupported; 11012 amount does not equal invoice; 11013 unit not supported; 11014 max inputs exceeded; 11015 max outputs exceeded; 11016 duplicate quote ids; 11017 max batch size exceeded; 12001 keyset not known; 12002 keyset inactive; 12003 keyset expired; 20001 quote not paid; 20002 quote already issued; 20003 minting disabled; 20004 lightning payment failed; 20005 quote pending; 20006 invoice already paid; 20007 quote expired; 20008 invalid mint signature; 20009 pubkey required. Does the code in `hunk` emit a different numeric code for one of these conditions, reuse one code for several distinct conditions, or invent a code outside the table? Answer false if `hunk` does not emit Cashu error codes.",
-            "message": "Cashu error codes: use the numeric code the error table assigns to each condition.",
-            "criteria": {
-              "true": "A Cashu error condition is signalled with a code other than the one the table assigns it.",
-              "false": "The table's codes are used, or the hunk does not emit Cashu error codes."
             },
             "threshold": 0.75,
             "files": [

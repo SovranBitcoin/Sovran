@@ -174,8 +174,13 @@ export default defineConfig({
     //   choose the lock key, its `02` prefix and its locktime. The SIG_ALL
     //   message construction and threshold counting stay with cashu-ts.
     // nut06: `mintNuts.ts` reads what a mint supports before relying on it.
-    // errors: AGENTS.md already forbids publishing raw error bodies; this is
-    //   the same rule asked of mint responses.
+    // errors/*: dropped. Both rules are mint-side — `no-raw-error-leakage`
+    //   says "answer false if hunk does not build mint error responses", and
+    //   `codes-used-as-specified` is about emitting the NUT-00 numeric codes.
+    //   A wallet consumes those, it never emits them, so neither can fire here
+    //   and both failed the selection principle above. The wallet-side concern
+    //   they were kept for — raw upstream text reaching a user — is asked
+    //   directly by `errors/raw-error-to-ui` below.
     { pack: "nuts-spec", rules: [
       "nut06/nuts-settings-consulted",
       "nut06/feature-setting-shape",
@@ -209,8 +214,6 @@ export default defineConfig({
       "nut18/nostr-transport",
       "nut18/payment-payload-shape",
       "nut18/single-use-honoured",
-      "errors/no-raw-error-leakage",
-      "errors/codes-used-as-specified",
     ] },
   ],
   // Vetted against the installed library versions and the contributor
@@ -457,6 +460,20 @@ export default defineConfig({
     // `settingsStore`, and `createMergeWithSchema` still returns `current` on
     // any `safeParse` failure for 16 call sites. Keep both: one guards a diff,
     // this one guards the code that is already there.
+    // Replaces the two mint-side `errors/*` pack rules that were dropped above.
+    // They could never fire in a wallet, while the concern they were kept for —
+    // F04 in docs/architecture/follow-ups.md, raw exception text reaching a
+    // user — was live in the tree the whole time and unflagged.
+    "errors/raw-error-to-ui": ["warn", choice({
+      instructions: "Does this put raw upstream error text in front of a user? The shape is an `Error.message`, `String(error)`, a caught value, a response body, `err.detail`, or a JSON-serialized error reaching an `Alert`, a toast, a popup, a sheet, or rendered text. This repository routes such text through `describeError(error, service)` (`app/shared/lib/errors`) or the payment copy catalog, which map a failure onto wording chosen for a user; passing an error to one of those, or to a logger, is correct and is unrelated. Also unrelated: showing a message the app itself authored, a validation message written for this form, an error surfaced only in a developer-only or `__DEV__` screen, and anything in a test. The concern is upstream prose the user cannot act on — a stack trace, an HTTP body, a mint or relay's own words, a library's internal message — presented as if it were app copy.",
+      criteria: { concern: "Raw error text from an exception, a response body or a library reaches a user-visible surface without going through the app's error-presentation layer.", ...outcomes },
+      files: ["**/*.{ts,tsx,js,jsx}"],
+      when: /Alert\.|alert\(|toast|Toast|popup|Popup|message|Message|error|Error|catch|detail|describeError|setError|errorText/,
+      report: ["concern"],
+      abstain: ["insufficient-context"],
+      reference: "docs/review/contracts.md",
+      message: "Raw upstream error text may reach the user instead of app copy.",
+    })],
     "state/all-or-nothing-rehydrate": ["warn", choice({
       instructions: "Does this code discard a whole persisted blob, or reset a store to its defaults, because part of it failed to decode? The shape is a rehydrate, `merge`, `migrate` or storage read whose failure branch returns the initial/current state, `{}`, `null` or a default object for the entire store rather than salvaging the fields that did parse. A per-field `.catch()`, `.default()`, a tolerant array or record that drops only bad entries, a `version` bump with a `migrate` that maps old data forward, or a failure branch that refuses and surfaces an error instead of substituting defaults, are all the correct shapes — answer no. Judge what happens to the user's *other* fields when one is bad: losing unrelated settings, acceptance flags, keys or balances is the concern. A decoder for network or clipboard input is unrelated; this is about data already on the device. An in-memory or ephemeral cache is unrelated.",
       criteria: { concern: "A decode failure in one part of persisted state discards or resets state the user would otherwise keep.", ...outcomes },
