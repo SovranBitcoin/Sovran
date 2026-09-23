@@ -26,8 +26,8 @@ Branch: `feat/receive-nut-drop`.
 | 14 | `skill/*/*` (7 skills) | done | 21 findings, 0 defects; 1 compiled-rule scope gap recorded |
 | 15a | `doc/…/conventions-typescript` (16 rules) | done | 29 findings; 3 fixed, rest recorded |
 | 15b | `doc/…/conventions-zod` (28 rules) | done | 54 findings; 7 sites fixed, rest recorded |
-| 15c | `doc/…/conventions-react-native` (29 rules) | pending | next |
-| 15d | `doc/…/conventions-async-tests` (31 rules) | pending | |
+| 15c | `doc/…/conventions-react-native` (29 rules) | done | 20 findings; 3 defects **fixed** incl. a WebView scheme escape |
+| 15d | `doc/…/conventions-async-tests` (31 rules) | in-progress | |
 | 15e | `doc/…/conventions-state` (34 rules) | pending | |
 | 15f | `doc/…/contributor-conventions` (122 rules) | pending | largest in the config |
 
@@ -667,3 +667,32 @@ the record. And `persist-additive-fields` is change-framed ("does `hunk` **add**
 a field"), so a conformance pass cannot exercise it — the same structural gap
 as `state/persisted-compatibility`, which means **both** of this repo's
 catastrophic persisted-data invariants are only checked on diffs.
+
+#### conventions-react-native — done
+
+29 rules, 2,040 requests, 5,137 questions, 3 failed. **20 findings.**
+The most serious defect of the whole sweep is here.
+
+- [webview-scheme-escape] app/features/feed/components/thread-embed/LinkEmbedView.tsx (0.90)
+  verdict: defect
+  evidence: confirmed by reading the installed dependency, not inferred. `react-native-webview`'s `WebViewShared` does this with a url that fails `originWhitelist`: `Linking.canOpenURL(url).then(supported => { if (supported) return Linking.openURL(url); }); shouldStart = false;` — it is **handed to the OS**, not dropped. With `originWhitelist={['http://*','https://*']}`, a page reached from a relay-supplied link could navigate to `intent://`, a custom app scheme or our own `sovran://` deep link and have the system open it with no user tap. And `onShouldStartLoadWithRequest` sits in the `else` branch, so adding a gate without widening the whitelist would never have run for exactly those urls — which is why the rule asks for `['*']` plus a gate rather than a narrower list.
+  action: **fixed** in `1ac8de7e`. `originWhitelist={['*']}` so every request reaches the gate, plus `isHttpNavigationUrl` in `shared/lib/url.ts` allowing only http(s). Put in the shared module rather than kept local so the test drives the real function and no component surface is widened for a test — both patterns flagged earlier in this sweep. 12 cases pin it. Verified: type-check 0, 29 tests across 3 url suites, lint 0 errors, knip clean.
+
+- [untrusted-image-uri] MintIcon.tsx, GalleryScreen.tsx:124
+  verdict: defect
+  evidence: the guard existed one layer away. `imageCache.prefetchImage:71` refuses a non-http(s) scheme via `isSafeImageUrl` and logs `image.prefetch.rejected_scheme`; the render paths had none. `MintIcon.normalizeIconUrl` only trimmed, and `GalleryScreen:150` gated its avatar on `author?.picture` being truthy. So a mint's NIP-11 `icon_url` or a Nostr kind-0 `picture` could be `file:`, `data:` or a custom scheme — refused for caching, accepted for display.
+  action: **fixed** in `f5945e38`. Exported `isSafeImageUrl` and applied it at both render sites. Deliberately **not** unified with `isHttpNavigationUrl` despite identical bodies today: a WebView must never load `data:`, an image may legitimately allow `data:image/` raster later, and collapsing them would make a change to one silently change the other.
+
+- [focus-not-foreground] 5 findings — useAmbientNfcArm.ts (0.93), useNostrTierHealth.ts, ShareSignerScreen.tsx, SignerRequestsScreen.tsx, UserMessagesScreen.tsx
+  verdict: defect
+  evidence: all five use `useFocusEffect`/`useIsFocused` with **zero** `AppState` handling — verified by grep across the cluster. `useFocusEffect` fires on screen focus, not app foreground, so a screen that stays focused across a background/return never re-runs it, and the UI can report NFC armed or a relay subscribed while the resource is gone. The repo uses `AppState` in eight places including `nip46Engine.ts` and `nip46Transport.ts`, so the signer internals handle this and the signer screens do not; there is no shared helper, which is why it is uneven.
+  action: blocked — recorded as **F46**. Neither the OS teardown behaviour nor expo-router's refocus behaviour can be settled by reading, and the sweep may not run device scenarios.
+
+- [webview-bridge-props] LinkEmbedView.tsx (0.81)
+  verdict: false-positive
+  evidence: the rule flags the *presence* of `allowFileAccess` and `setSupportMultipleWindows` regardless of value. `LinkEmbedView` sets both to `false`, which is the hardening, and its fileoverview states there is no bridge — no `injectedJavaScript`, no `onMessage`. The rule cannot tell a safe explicit value from a dangerous one.
+  action: none. Left rather than tuned: it is a pack-style compiled rule whose question is right for `true`, and one false positive against a real `onMessage`/`injectedJavaScript` regression is a trade worth keeping.
+
+- remaining 11 — `inline-slot-components` (5), `small-touch-target` (2), `list-unique-keys`, `shadow-clipped-by-overflow`, `key-inside-recycled-row`, `hermes-missing-builtins`
+  verdict: recorded, not verified
+  action: none. Not read in source. All are render-performance or layout questions, none touching money, keys, persisted data or an untrusted boundary — which is how the three that were read got chosen.
