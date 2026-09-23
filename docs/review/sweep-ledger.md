@@ -23,8 +23,8 @@ Branch: `feat/receive-nut-drop`.
 | 11 | `nut06`, `nut10`, `nut11`, `nut12`, `nut18` | done | 2 defects **fixed**, 1 blocked (F44), 9 false-positive/intentional |
 | 12 | `bip32`, `bip39`, `bip43`, `bip21`, `bip321` | done | complete run, 0 failed; 4 findings, all false-positive |
 | 13 | `agents-md/root` | done | 1 defect fixed, 21 testability gaps recorded, 208-finding rule switched off |
-| 14 | `skill/*` (by skill) | in-progress | |
-| 15 | `doc/*` (by convention file) | pending | |
+| 14 | `skill/*/*` (7 skills) | done | 21 findings, 0 defects; 1 compiled-rule scope gap recorded |
+| 15 | `doc/*` (by convention file) | in-progress | |
 
 ## Findings
 
@@ -569,3 +569,39 @@ across four rules.
   verdict: blocked
   evidence: not verified — reached at the end of the domain, and unlike the alias rule this one asks the question AGENTS.md actually means (`wallet/react`, never `../../wallet/src`), so it deserves a real read rather than a guess.
   action: verify on the next pass. Recorded rather than assumed.
+
+### skill/* — done
+
+Note the id again: compiled skill rules are three-segment (`skill/<name>/<rule>`),
+so `--only "skill/*"` matches nothing and exits 2. My first run did exactly
+that and produced no output at all; `skill/*/*` is the working glob. Worth
+recording because an `--only` typo exits 2 rather than reporting a clean
+domain — that is the only reason this was caught rather than filed as "0
+findings".
+
+4,615 chunks / **33,702 questions** — the largest batch of the sweep — /
+4,611 of 4,615 requests, 4 failed (the usual content-filtered scripts).
+**21 findings across 7 rules, no defects.**
+
+Scope context: 77 compiled rules across the 7 selected skills, of which 42 are
+already `"off"` in `hunch.config.ts` as either lint-decidable (`no-explicit-any`,
+`no-console`) or contradicting deliberate practice here (React Compiler
+memoizes, so `gesture-memoized` is off; duration tokens make `no-ease-in-on-ui`
+wrong). So these 21 came from an already-vetted subset.
+
+- [skill/principle-type-system-discipline/brand-semantic-primitives] 8 findings
+  verdict: false-positive (4) / intentional (4)
+  evidence: **half are on native source** — `BitChatBLEBridge.kt`, `BitChatModule.swift`, `BitChatModule.kt`, `BitChatBLEBridge.swift` — where a TypeScript branded-type question is meaningless. The cause is specific: `config --explain` shows this rule is "asked about **every reviewed file**" with no `when` at all, while its siblings carry regexes that exclude native code by construction (`no-unearned-as-cast` has `/\bas\s+[A-Za-z_$]/`, `no-layout-property-animation` has `/useAnimatedStyle|withTiming|…/`). The compiler gave this one no scope. The 4 TypeScript hits (`geohash.ts` 0.93, `mapClustering.ts`, `useMapMarkers.ts`, `MapScreen.tsx`) are legitimate but are design suggestions, not defects: `encodeGeohash(latitude: number, longitude: number, precision: number): string` could brand its inputs the way `protocolIds.ts` brands `NostrPubkeyHex`.
+  action: left on, recorded rather than switched off. The question it asks is correct and the TS hits are real instances of it; the fault is a missing `when` in compilation, which belongs upstream in the rule source, not in a local override that would also discard the signal. Re-check after the next `install`.
+
+- [skill/codebase-design/no-test-only-public-surface] app/shared/lib/loggerGlobalErrors.ts:133 (0.95)
+  verdict: intentional
+  evidence: `export const armGlobalErrorCaptureForTest = armGlobalErrorCapture;` — the rule's literal claim is correct, this export exists only for tests, and `app/__tests__/loggerGlobalErrors.test.ts:11,47` is its only consumer. But the `ForTest` suffix makes it a deliberately labelled seam rather than surface widened by accident. (My first check reported "nothing imports it" — that was my grep excluding the filename `loggerGlobalErrors`, which also hid its own test. Corrected before acting on it.)
+
+- [skill/codebase-design/return-results-dont-mutate-inputs] routing.ts:298 (0.78), managerInternals.ts:265 (0.91)
+  verdict: intentional / false-positive
+  evidence: `routing.ts:308` is `addLocalHistoryEdges(graph: SwapGraph, groups: SwapGroup[]): void` — it does mutate `graph` in place, so the rule is right, but the name states the mutation and `: void` signals it; a builder-style mutator during graph construction is a deliberate shape, and returning a new graph is a rebalance-routing refactor, not a sweep fix. The higher-confidence `managerInternals.ts` hit is a false positive: the function at that chunk is `isAlreadyRecoveredError(error: unknown): boolean`, a pure predicate that mutates nothing.
+
+- [skill/expo-animation/no-layout-property-animation] MintCurrencyTabs.tsx (0.89, 0.86), SendScreen.tsx:410 (0.81); [interpolate-clamp] SendScreen.tsx:410 (0.81); [skill/typescript-best-practices/no-unearned-as-cast] secureStorage.ts:523 (0.79), SettingsRecoveryScreen.tsx:441 (0.76), e2e/store/export.ts (0.75); [skill/codebase-design/tests-assert-through-interface] useGuardedRouter.test.ts (0.81), operations.test.ts (0.78), loggerChild.test.ts:282 (0.77)
+  verdict: recorded, sampled not exhaustively verified
+  action: none. Stating the depth honestly: the findings above this line were read in source; these ten were triaged by rule and location rather than line-by-line. They are style and design questions from vetted skills, none touching money, keys or persisted data, and none rose above 0.81. They are the right candidates for a focused follow-up pass, not for changes made at the end of a long sweep on a sampled read.
