@@ -249,7 +249,10 @@ export function HistoryEntryTimeline({
   const timelineStepTypes = useMemo(() => timeline.map((item) => item.stepType), [timeline]);
 
   useEffect(() => {
-    paymentLog.debug('tx.history_timeline.render', {
+    // Thunk: two scans plus a stepTypes copy, in a file the React Compiler
+    // bailed out of (`Cannot access refs during render`), so this effect is on
+    // a genuinely hot path.
+    paymentLog.debug('tx.history_timeline.render', () => ({
       type: historyEntry.type,
       state: String((historyEntry as { state?: unknown }).state ?? ''),
       timelineItemCount: timelineStepTypes.length,
@@ -268,7 +271,7 @@ export function HistoryEntryTimeline({
       nostrSent: nostrSent ?? null,
       isOnchainMint,
       hasOnchainConfirmationProgress: !!onchainConfirmationProgress,
-    });
+    }));
   }, [
     cardLabel.length,
     historyEntry,
@@ -454,6 +457,9 @@ export function HistoryEntryTimeline({
       });
     }
   }, [
+    // Stable ref object: listed only because the read now sits inside the log
+    // params thunk, where the lint rule can no longer see it is a ref.
+    renderCountRef,
     rowsSignature,
     headerSignature,
     rowsDiag,

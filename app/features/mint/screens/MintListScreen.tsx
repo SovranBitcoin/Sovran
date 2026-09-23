@@ -35,8 +35,19 @@ import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { cashuLog, useLifecycleLogger, mintUrlLogFields } from '@/shared/lib/logger';
+import {
+  cashuLog,
+  countRowRender,
+  mintUrlLogFields,
+  useLifecycleLogger,
+  useQueryResultLogger,
+  useStateChangeLogger,
+  useWhyDidRender,
+} from '@/shared/lib/logger';
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
+
+/** Hoisted: a fresh options object per ROW render is pure instrumentation cost in a release build. */
+const ROW_LOG_OPTIONS = { logger: cashuLog } as const;
 
 const CURRENCY_TABS_HEIGHT = MINT_CURRENCY_TABS_HEIGHT;
 
@@ -226,6 +237,41 @@ export function MintListScreen({
     onMintSelect(item);
   };
 
+  // ── Instrumentation ───────────────────────────────────────────────────────
+  // The header shift probe above covers layout. These cover data and renders:
+  // which rows are cold vs cached vs live as enrichment lands, which local
+  // state churns while it does, and what re-rendered the screen.
+  // Thunk: `items.filter(...)` below is a full scan per render otherwise.
+  useQueryResultLogger(() => ({
+    source: 'MintListScreen.items',
+    status: loading ? 'loading' : 'ready',
+    count: filteredItems.length,
+    extra: {
+      items: items.length,
+      hidden: items.length - filteredItems.length,
+      tabs: availableCurrencies.length,
+      selectedCurrency,
+      unknownUnits: items.filter((item) => !item.supportedUnits).length,
+      isExecuting,
+    },
+  }));
+  useStateChangeLogger('MintListScreen', () => ({ selectedCurrency, totalHeaderHeight }), cashuLog);
+  useWhyDidRender(
+    'MintListScreen',
+    () => ({
+      items,
+      filteredItems,
+      loading,
+      isExecuting,
+      selectedCurrency,
+      availableCurrencies,
+      totalHeaderHeight,
+      onMintSelect,
+      onInspectMint,
+    }),
+    cashuLog
+  );
+
   const emptyComponent = (
     <Text style={{ color: withAlpha(foreground, 0.66), textAlign: 'center', marginTop: 20 }}>
       {selectedCurrency === 'ALL'
@@ -291,8 +337,13 @@ export function MintListScreen({
   // ContactRow; a cached/live row renders the real one. This is what guarantees
   // we never paint a bare url + bank-icon fallback — a row is either a skeleton
   // or carries a real cached/live name + icon.
-  const renderRow = ({ item }: { item: MintRow }) =>
-    item.metaState === 'cold' ? renderSkeletonItem({ item }) : renderItem({ item });
+  const renderRow = ({ item }: { item: MintRow }) => {
+    // Aggregated per second, so a fifty-mint list costs one log line, not
+    // fifty. `wasted` rising with `rows` means enrichment redrew rows that did
+    // not change.
+    countRowRender('MintListScreen', item.mintUrl, ROW_LOG_OPTIONS);
+    return item.metaState === 'cold' ? renderSkeletonItem({ item }) : renderItem({ item });
+  };
 
   // The cohesive full-list shimmer wave shows only when EVERY row is cold (cold
   // first-ever open). A mixed/cached list renders real rows immediately and lets

@@ -44,7 +44,15 @@ jest.mock('@/shared/ui/primitives/View/View', () => ({
 }));
 jest.mock('@/shared/ui/primitives/Pressable', () => ({ Pressable: 'Pressable' }));
 jest.mock('@/shared/ui/primitives/Skeleton', () => ({ Skeleton: 'Skeleton' }));
-jest.mock('@/shared/lib/logger', () => ({ chatLog: { debug: jest.fn() } }));
+jest.mock('@/shared/lib/logger', () => ({
+  chatLog: { debug: jest.fn() },
+  // Render-diagnostics emitters (loggerRender) — no-ops here: they only emit.
+  useWhyDidRender: () => {},
+  useStateChangeLogger: () => {},
+  useQueryResultLogger: () => {},
+  useRowRenderLogger: () => {},
+  countRowRender: () => {},
+}));
 
 beforeAll(() => Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true }));
 

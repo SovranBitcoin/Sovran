@@ -41,7 +41,15 @@ import { resolveIdentityName } from '@/shared/lib/identity';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { useDmThread } from '@/features/payments/hooks/useDmThread';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { chatLog, log, useLifecycleLogger } from '@/shared/lib/logger';
+import {
+  chatLog,
+  log,
+  useLifecycleLogger,
+  useQueryResultLogger,
+  useStateChangeLogger,
+  useWhyDidRender,
+} from '@/shared/lib/logger';
+import { useVisualStateLogger } from '@/shared/lib/contentShiftLog';
 import { LightningAddress } from '@sovranbitcoin/schemas';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -223,6 +231,84 @@ export function UserMessagesScreen({
       })),
     [messages, displayName]
   );
+
+  // ── Instrumentation ───────────────────────────────────────────────────────
+  // Three sources merge into one list: nagg's decrypted history, optimistic
+  // echoes seeded from the store, and (in mock mode) the demo thread. Counts
+  // only — DM plaintext never reaches a log.
+  useQueryResultLogger(
+    {
+      source: 'useDmThread',
+      status: threadStatus,
+      count: messages.length,
+      extra: {
+        protocol,
+        server: threadMessages.length,
+        echoes: localMessages.length,
+        demo: demoMessages.length,
+        bubbles: bubbleMessages.length,
+        hasMore,
+        blocked,
+        metadataKnown: !!counterpartyMetadata,
+        counterpartyResolving,
+        pictureKnown: !!userPicture,
+        hasError: !!threadError,
+      },
+    },
+    chatLog
+  );
+  useStateChangeLogger(
+    'UserMessagesScreen',
+    { localMessages, demoMessages, threadStatus, blocked },
+    chatLog
+  );
+  useWhyDidRender(
+    'UserMessagesScreen',
+    {
+      pubkey,
+      protocol,
+      threadMessages,
+      threadStatus,
+      localMessages,
+      messages,
+      bubbleMessages,
+      counterpartyMetadata,
+      counterpartyResolving,
+      filterWords,
+      blocked,
+      machine,
+    },
+    chatLog
+  );
+  useVisualStateLogger({
+    scope: `dm.${pubkey.slice(0, 12)}.${protocol}`,
+    surface: 'dmThread',
+    component: 'UserMessagesScreen',
+    stateKey: 'dm-thread-state',
+    phase: isLoading
+      ? 'cold-skeleton'
+      : threadStatus === 'error'
+        ? 'error'
+        : threadSettled && messages.length === 0
+          ? 'empty'
+          : threadStatus === 'revalidating'
+            ? 'revalidating'
+            : 'ready',
+    state: {
+      threadStatus,
+      bubbles: bubbleMessages.length,
+      server: threadMessages.length,
+      echoes: localMessages.length,
+      hasMore,
+      blocked,
+      nameKnown: displayName.length > 0,
+      avatarKnown: !!userPicture,
+      counterpartyResolving,
+      sendMoneyAvailable: !!sendMoneyTarget,
+      hasError: !!threadError,
+    },
+    remeasure: true,
+  });
 
   const counterpartyAvatar = useMemo(
     () => (

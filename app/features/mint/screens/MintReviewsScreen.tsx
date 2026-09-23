@@ -30,7 +30,14 @@ import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { List } from '@/shared/ui/composed/List';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
-import { cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
+import {
+  cashuLog,
+  useLifecycleLogger,
+  useQueryResultLogger,
+  useRowRenderLogger,
+  useWhyDidRender,
+} from '@/shared/lib/logger';
+import { urlHost, useVisualStateLogger, visualLayoutScopePart } from '@/shared/lib/contentShiftLog';
 import { formatRelative } from '@/shared/lib/date';
 
 /** Only reviews with written text, newest-first; score-only ones still count in the header. */
@@ -151,6 +158,9 @@ function ReviewRow({
 
 function ReviewItem({ review }: { review: MintRecommendation }) {
   const { displayName: fallbackDisplayName } = useIdentityName(review.pubkey);
+  // Rows roll up into one `render.count` per second: `wasted` shows how many
+  // rows redrew because the name lookup landed for a DIFFERENT row.
+  useRowRenderLogger('MintReviewsScreen', review.pubkey);
   return (
     <ReviewRow
       review={review}
@@ -253,6 +263,66 @@ export function MintReviewsScreen() {
   ) : null;
 
   const showEmptyState = !isLoading && !loadFailed && allReviews.length === 0;
+
+  // ── Instrumentation ───────────────────────────────────────────────────────
+  // Two sources land separately: the durable AGGREGATE (score + count) paints
+  // the header, the session-cached ROWS fill the body. The visual probe records
+  // which of those the user saw appear, and in which order.
+  const reviewsVisualScope = `mint-reviews.${visualLayoutScopePart(mintUrl ? urlHost(mintUrl) : undefined)}`;
+  useQueryResultLogger({
+    source: 'MintReviewsScreen.useCachedRead',
+    status: read.status,
+    count: reviews.length,
+    readId: read.readId,
+    source_kind: read.source,
+    extra: {
+      allReviews: allReviews.length,
+      totalReviews,
+      scoreKnown: kymScore !== null,
+      aggregateCountKnown: aggregateCount !== undefined,
+      stale: read.stale,
+      partial: read.partial,
+      loadFailed,
+    },
+  });
+  useWhyDidRender('MintReviewsScreen', {
+    mintUrl,
+    meta,
+    readData: read.data,
+    readStatus: read.status,
+    reviews,
+    favouriteCount,
+  });
+  useVisualStateLogger({
+    enabled: !!mintUrl,
+    scope: reviewsVisualScope,
+    surface: 'mintReviews',
+    component: 'MintReviewsScreen',
+    stateKey: 'mint-reviews-state',
+    phase: isLoading
+      ? aggregateLoading
+        ? 'cold-skeleton'
+        : 'rows-loading'
+      : loadFailed
+        ? 'error'
+        : showEmptyState
+          ? 'empty'
+          : 'ready',
+    state: {
+      readStatus: read.status,
+      source: read.source ?? 'none',
+      rows: reviews.length,
+      allReviews: allReviews.length,
+      totalReviews,
+      scoreKnown: kymScore !== null,
+      aggregateLoading,
+      favouriteCount,
+      skeletonFooter: isLoading && !showEmptyState,
+      showEmptyState,
+      loadFailed,
+    },
+    remeasure: true,
+  });
 
   // A failed fetch is distinct from a confirmed empty result, even on a cold open.
   // Score-only reviews leave the list empty but the header already covers them.

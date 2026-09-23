@@ -32,7 +32,12 @@ import { useStickyMintSelectorItems } from '../hooks/useStickyMintSelectorItems'
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
-import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
+import {
+  paymentLog,
+  useLifecycleLogger,
+  useQueryResultLogger,
+  useWhyDidRender,
+} from '@/shared/lib/logger';
 
 type MintSelectFlow = 'send' | 'receive';
 
@@ -87,36 +92,34 @@ export function MintSelectFlowScreen({ flow, mintSelectorEntry }: MintSelectFlow
   const { rows, allCold } = useMintRowsWithCache({ baseItems: items, itemsStatus });
 
   useEffect(() => {
-    const available = items.filter((i) => i.status === 'available').length;
-    const disabled = items.filter((i) => i.status === 'disabled').length;
-    const withIcon = items.filter((i) => i.iconUrl).length;
-    const withReputation = items.filter((i) => (i.contactReputation ?? 0) > 0).length;
-    paymentLog.info('mint.selector.entry', {
+    // Thunk: five scans of the row list, and this effect re-runs on every
+    // enrichment arrival. A release build pays for none of it.
+    paymentLog.info('mint.selector.entry', () => ({
       flow,
       scope: entry?.scope,
       destination: entry?.destination,
       total: items.length,
-      available,
-      disabled,
-      withIcon,
-      withReputation,
+      available: items.filter((i) => i.status === 'available').length,
+      disabled: items.filter((i) => i.status === 'disabled').length,
+      withIcon: items.filter((i) => i.iconUrl).length,
+      withReputation: items.filter((i) => (i.contactReputation ?? 0) > 0).length,
       disabledReasons: items
         .filter((i) => i.reason)
         .map((i) => ({ mint: i.displayName, reason: i.reason?.code })),
-    });
+    }));
   }, [flow, items, entry?.scope, entry?.destination]);
 
   // Row metadata composition — diagnoses "skeleton too long": all-cold means the
   // cache was empty (cold open), not a stuck enrichment.
   useEffect(() => {
-    paymentLog.debug('mint.selector.rows', {
+    paymentLog.debug('mint.selector.rows', () => ({
       flow,
       cold: rows.filter((r) => r.metaState === 'cold').length,
       cached: rows.filter((r) => r.metaState === 'cached').length,
       live: rows.filter((r) => r.metaState === 'live').length,
       total: rows.length,
       allCold,
-    });
+    }));
   }, [flow, rows, allCold]);
 
   useMintSelectorFrameLog({
@@ -134,6 +137,45 @@ export function MintSelectFlowScreen({ flow, mintSelectorEntry }: MintSelectFlow
     itemsStatus,
     rows,
   });
+
+  // ── Instrumentation ───────────────────────────────────────────────────────
+  // `mint.selector.entry` / `.rows` already describe WHAT arrived. These two
+  // answer why this screen re-rendered while it arrived: the payment machine
+  // pushes a new `execution` object on every step tick, so `render.why` is what
+  // separates a real row change from machine churn.
+  // Thunk: the three `rows.filter` scans below would otherwise run on every
+  // render of a shipped build, where the logger is a no-op.
+  useQueryResultLogger(() => ({
+    source: 'MintSelectFlowScreen.rows',
+    status: itemsStatus ?? 'unknown',
+    count: rows.length,
+    extra: {
+      flow,
+      step: execution.step,
+      items: items.length,
+      cold: rows.filter((r) => r.metaState === 'cold').length,
+      cached: rows.filter((r) => r.metaState === 'cached').length,
+      live: rows.filter((r) => r.metaState === 'live').length,
+      allCold,
+      liveItems: liveItems?.length ?? 0,
+      entryItems: entryItems?.length ?? 0,
+    },
+  }));
+  useWhyDidRender(
+    'MintSelectFlowScreen',
+    () => ({
+      entry,
+      actions,
+      execution,
+      liveSelectMint,
+      items,
+      rows,
+      itemsStatus,
+      trackedTrustedMintUrls,
+      walletContext,
+    }),
+    paymentLog
+  );
 
   // NPC-scoped selection picks the receive mint for the npub.cash flow; the
   // user is choosing among existing trusted mints (gated to NUT-17), not

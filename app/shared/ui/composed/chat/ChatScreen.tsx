@@ -12,7 +12,13 @@ import { FlashList } from '@shopify/flash-list';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import type { Logger } from '@/shared/lib/logger';
+import {
+  countRowRender,
+  useQueryResultLogger,
+  useStateChangeLogger,
+  useWhyDidRender,
+  type Logger,
+} from '@/shared/lib/logger';
 
 import { LiquidChatComposer } from './LiquidChatComposer';
 import { ChatMessageBubble } from './ChatMessageBubble';
@@ -222,6 +228,45 @@ export function ChatScreen({
 
   const groupingMap = useMessageGrouping(messages);
 
+  // `log` is a prop here, so this cannot be a module constant — memoised
+  // instead, to keep a fresh options object off every ROW render.
+  const rowLogOptions = useMemo(() => ({ logger: log }), [log]);
+
+  // ── Instrumentation ───────────────────────────────────────────────────────
+  // Shared by every chat surface (DM, White Noise, Bitchat, AI), so one filter
+  // compares them. Counts and flags only: message bodies never reach a log.
+  useQueryResultLogger(
+    {
+      source: `ChatScreen:${surface}`,
+      status: isLoading ? 'loading' : messages.length === 0 ? 'empty' : 'ready',
+      count: messages.length,
+      extra: {
+        surface,
+        groups: groupingMap.size,
+        hasBanner: !!banner,
+        hasEmptyContent: !!emptyContent,
+        composerDisabled: !!composerDisabled,
+      },
+    },
+    log
+  );
+  useStateChangeLogger(`ChatScreen:${surface}`, { draftLen: draft.length, isLoading }, log);
+  useWhyDidRender(
+    `ChatScreen:${surface}`,
+    {
+      messages,
+      groupingMap,
+      counterpartyAvatar,
+      renderBubble,
+      banner,
+      emptyContent,
+      isLoading,
+      composerDisabled,
+      draftLen: draft.length,
+    },
+    log
+  );
+
   const dispatchSend = useLoggedChatSend({
     log,
     surface,
@@ -241,6 +286,9 @@ export function ChatScreen({
 
   const renderItem = useCallback(
     ({ item }: { item: ChatBubbleMessage; index: number }) => {
+      // Rolled up per second for every chat surface (`<surface>/row`). A bubble
+      // redrawing because a LATER message arrived shows as `wasted` > 0.
+      countRowRender(`chat:${surface}`, item.id, rowLogOptions);
       const group = groupingMap.get(item.id);
       const isFirstInGroup = group?.isFirst ?? true;
       const isLastInGroup = group?.isLast ?? true;
@@ -259,7 +307,7 @@ export function ChatScreen({
         </RNView>
       );
     },
-    [counterpartyAvatar, groupingMap, renderBubble]
+    [counterpartyAvatar, groupingMap, renderBubble, surface, log, rowLogOptions]
   );
 
   const keyExtractor = useCallback((m: ChatBubbleMessage) => m.id, []);

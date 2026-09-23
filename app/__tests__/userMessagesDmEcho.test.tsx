@@ -143,6 +143,12 @@ jest.mock('@/shared/lib/logger', () => {
     mintUrlLogFields: () => ({}),
     redactError: (error: unknown) => error,
     storeLog: logger,
+    // Render-diagnostics emitters (loggerRender) — no-ops here: they only emit.
+    useWhyDidRender: () => {},
+    useStateChangeLogger: () => {},
+    useQueryResultLogger: () => {},
+    useRowRenderLogger: () => {},
+    countRowRender: () => {},
   };
 });
 jest.mock('@/shared/hooks/useThemeColor', () => ({
