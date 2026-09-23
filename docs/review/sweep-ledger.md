@@ -11,8 +11,8 @@ Branch: `feat/receive-nut-drop`.
 | # | Domain | Status | Notes |
 | --- | --- | --- | --- |
 | 1 | `entropy` | done | 0 defects; 4 chunks blocked by a provider content filter, hand-verified |
-| 2 | `secrets` | in-progress | |
-| 3 | `payments` | pending | |
+| 2 | `secrets` | done | 3 defects (all blocked: durable data), ~17 false positives, rule sharpened |
+| 3 | `payments` | in-progress | |
 | 4 | `money` | pending | |
 | 5 | `state` | pending | |
 | 6 | `nostr` | pending | |
@@ -122,3 +122,64 @@ Standing caveat for the rest of the sweep: provider content filtering will
 recur on any chunk holding attack-shaped fixtures (URL schemes, injection
 payloads, path traversal). Expect `blocked` rows on security *tests*, and
 hand-verify rather than re-running a fourth time.
+
+### secrets — done
+
+Scope run: `check --all --only "secrets/*"` (whole repo). 4,614 chunks /
+4,876 questions / 3,456 requests / 18.3M input tokens. `complete: false` —
+3 requests failed (the same content-filtered build scripts as the entropy
+domain) and 2 chunks abstained `insufficient-context`. **23 findings**, all
+`secrets/disclosure`; `secrets/recovery-after-read-failure` returned **zero**,
+which matches the hand audit below.
+
+`recovery-after-read-failure` scoring zero is correct, not a blunted question.
+`ensureMnemonicExists` (`secureStorage.ts:377-450`) separates "locked",
+"read failed", "present but invalid" and "confirmed absent" before it will
+generate: a read error calls `lockMnemonic` and returns null, a present-but-
+invalid value logs `refusing_overwrite_corrupt_mnemonic` and returns null, and
+only a confirmed absence falls through to generation. Blame `e08037f6`
+"fix(recovery): preserve stored identity across reinstalls" — deliberate, and
+`docs/review/contracts.md:10-12` names this function as the contract.
+
+Real findings:
+
+- [secrets/disclosure] app/features/bitchat/stores/bitchatDmMessages.ts:132-281 — BLE 1:1 message plaintext persisted to AsyncStorage
+  verdict: defect
+  evidence: the store persists `byPeer[].content` for messages it marks `isPrivate: true` (fileoverview at :137 says "Persisted to AsyncStorage so chat history survives app kill"). `docs/review/contracts.md:13-14` forbids decrypted private messages in unencrypted persistent stores. Same defect class as F02, which named neither this store nor `giftWrapCache`.
+  action: blocked for this sweep — recorded by extending F02 in `aae214c6`. The fix is F02's existing open design choice (memory-only vs encrypted-with-retention) and must also erase blobs already written, which is durable user data; the protocol says to hand that back rather than improvise.
+
+- [secrets/disclosure] app/shared/lib/routstr/topUp.ts:45 + app/shared/stores/profile/routstrStore.ts — bearer payment material persisted in plaintext
+  verdict: defect
+  evidence: `topUp.ts:45` sets `apiKey = encodedToken` — a raw Cashu token — and calls `store.setApiKey`. `routstrStore` persists `apiKey` through `createProfileScopedStorage`, which is AsyncStorage (its own comment at :335 lists "the API key" among what a failed parse discards). A Routstr key carries a prepaid balance, so this is bearer payment material at rest unencrypted, which `contracts.md:13-14` forbids in the same sentence as mnemonics. Blame shows no deliberate decision: the only commit touching it is the monorepo move `126dd78c`, and no ADR, test or contract entry pins it.
+  action: blocked — recorded as new follow-up **F42** in `aae214c6`. Moving the key to SecureStore is a durable-data migration, a protocol stop condition.
+
+- [secrets/disclosure] app/shared/lib/nostr/giftWrapCache.ts:1 — abstained `insufficient-context`, but the concern is real
+  verdict: defect
+  evidence: found by hand, not by the rule. `giftWrapCache` stores NIP-17 `UnwrappedDM` objects through `createPubkeyScopedCache`, which is AsyncStorage-backed. F02 named only `nip04Cache`, so the NIP-17 path — the one payment DMs and the messages screen use — was unlisted.
+  action: blocked — F02 corrected in `696ab69e` to name the factory and both call sites, and to require erasing the four existing blobs.
+
+Intentional (verified, not fixed):
+
+- [secrets/disclosure] app/scripts/gen-giveaway-key.mjs, app/scripts/find-vanity-giveaway-key.mjs — operator CLI scripts whose stated purpose is printing a keypair they just generated, to stdout, for the operator to paste into `.env`/EAS. Both carry an explicit SECURITY note about bundle extractability and point at `skills/sovran-security/references/secure-storage-key-derivation.md`. No log, analytics or persistent sink.
+- [secrets/disclosure] app/scripts/generate-test-vectors.ts — prints derived values from the *published* NIP-06 spec mnemonics (`leader monkey parrot …`). Printing them is the script's purpose and they are public.
+- [secrets/disclosure] app/e2e/funded/custody.ts, app/e2e/funded-runtime/* — the funded-E2E custody handoff. `e2eSeedExport.ts` gates it on `__DEV__`, requires both an endpoint and a 64-hex token, and `assertOwnedLoopbackEndpoint` pins the target to `http://127.0.0.1:<port>/seed` with no credentials, query or fragment.
+
+False positives (no sink present in the window):
+
+- `wallet/src/normalize.ts` (both chunks), `app/shared/lib/nfc/adapter.ts`, `wallet/src/screen-actions/createManager.ts`, `app/shared/lib/popup/popups/payment.ts`, `app/shared/ui/composed/CopyableValue.tsx`, `app/shared/blocks/PaymentInfo.tsx`, `app/shared/ui/composed/chat/ChatMessageBubble.tsx` (both chunks), `app/features/receive/screens/ReceiveScreen.tsx`, `app/features/receive/screens/OnchainReceiveScreen.tsx`, `app/shared/lib/routstr/api.ts`, `app/modules/bitchat-module/ios/BitChatBLEBridge.swift`, `app/features/send/lib/sovranPaymentConfig.ts`
+  verdict: false-positive
+  evidence: grepped every one for `AsyncStorage`/`setItem`/`console.`/`analytics`/`captureException`/`Sentry` — zero sinks in all of them. They parse, normalize, render to the owning user, or send a credential to the service it authenticates against.
+  action: rule sharpened, `062bd8d4`. Before/after on the same 20 flagged files plus `routstrStore.ts`, same rule: **23 findings over 20 files → 9 over 6**. Every true positive survived with *higher* confidence (bitchatDmMessages 0.24/0.32 → 0.41/0.57; topUp 0.67 → 0.79), and recall improved — `routstrStore.ts`, which holds the actual F42 sink, was never flagged by the old wording and now scores 0.63.
+
+Rule-precision note: thresholding was considered and rejected. The two real
+findings scored 0.24 and 0.32, *below* most false positives, so any confidence
+floor that cleared the noise would have discarded them. The first rewrite also
+over-corrected — excluding "passing it between functions" made
+`setApiKey(token)` read as an in-memory pass and lost `topUp.ts` — so the
+final wording states that a persisted store or storage-prefixed cache is a
+sink even when the persistence is configured elsewhere.
+
+Blocked (provider content filter, same as entropy): `patch-bitchat-imports.js:244`,
+`sync-bitchat-android.js:379`, `composition.test.mjs:1` — 2 rules each.
+Hand-verified: none handles secret material; they rewrite Swift imports, copy
+files by name, and test site composition.
