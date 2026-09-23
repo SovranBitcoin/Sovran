@@ -12,6 +12,7 @@ import {
 import { useCachedNostrProfile, useProfileRecordsMany } from '@/shared/lib/nostr/useEntityCache';
 import { fetchProfilesViaFacade } from '@/shared/lib/nostr/fetchProfiles';
 import { newReadId, readEvents, readKeyHash } from '@/shared/lib/read/readLog';
+import { useQueryResultLogger } from '@/shared/lib/logger';
 
 /** A pubkey that missed is retried after this long (a tier may have been momentarily down). */
 const RETRY_ATTEMPT_WINDOW_MS = 60_000;
@@ -183,6 +184,33 @@ export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrPro
   // `isFetching` covers the in-flight window (needsFetch can flip false the
   // moment attempts are bumped). Settles false once resolved or attempts cap.
   const isResolving = isFetching || needsFetch;
+
+  // Logged in the hook, not per screen: ~30 call sites consume this, and each
+  // one re-renders when a kind-0 lands. `source` is the same for all of them, so
+  // log-doctor's DATA HOOK UPDATES row is the total churn this one cache
+  // inflicts on the app — the number a screen-level probe can never show.
+  useQueryResultLogger({
+    source: 'useNostrProfileMetadata',
+    status: !pubkey
+      ? 'idle'
+      : optimistic
+        ? 'optimistic'
+        : isLoading
+          ? 'loading'
+          : isResolving
+            ? 'resolving'
+            : metadata
+              ? 'ready'
+              : 'empty',
+    count: metadata ? 1 : 0,
+    extra: {
+      nameKnown: !!metadata?.name,
+      pictureKnown: !!metadata?.picture,
+      nip05Known: !!metadata?.nip05,
+      isMissing,
+    },
+  });
+
   return { metadata, isLoading: !optimistic && isLoading, isResolving: !optimistic && isResolving };
 }
 
@@ -241,19 +269,32 @@ export function useNostrProfileMetadataMany(
   const records = useProfileRecordsMany(pubkeys);
   const mockMode = useSettingsStore((state) => state.mockMode);
 
+  // Keyed on the pubkey LIST, not the array identity. Callers build this set
+  // inline — ContactsScreen unions five sources in its render body — so a fresh
+  // array arrives on most renders with identical contents. Depending on it
+  // rebuilt this Map every time, and since ~30 surfaces consume it, that one
+  // identity change redrew each of their lists: measured on Contacts as 2177
+  // row renders for 19 distinct rows, 1443 of them wasted.
+  //
+  // `records` is already identity-stable across unrelated cache writes
+  // (`useProfileRecordsMany` only rebuilds when a REQUESTED record changed), so
+  // once the list key is stable too the Map survives.
+  const pubkeysKey = useMemo(() => pubkeys.join('\u0000'), [pubkeys]);
   const metadata = useMemo(() => {
     const map = new Map<string, NostrProfileMetadata>();
     for (const [pk, record] of records) {
       const mapped = cachedProfileToMetadata(record);
       if (mapped) map.set(pk, mapped);
     }
+    // Only the mock branch reads the list itself; rebuild it from the key so
+    // the memo does not have to depend on the caller's array identity.
     if (mockMode)
-      for (const pubkey of pubkeys) {
+      for (const pubkey of pubkeysKey ? pubkeysKey.split('\u0000') : []) {
         const fixture = getMockProfileMetadata(pubkey);
         if (fixture) map.set(pubkey, fixture);
       }
     return map;
-  }, [records, mockMode, pubkeys]);
+  }, [records, mockMode, pubkeysKey]);
 
   // Pubkeys missing or stale in the cache and not attempted within the retry
   // window: a miss is retried after RETRY_ATTEMPT_WINDOW_MS, not never.
@@ -305,5 +346,23 @@ export function useNostrProfileMetadataMany(
   const isLoading =
     pubkeys.some((pk) => pendingPubkeys.has(pk)) ||
     toFetch.some((pk) => !attempted.current.has(pk));
+
+  // The batched form is the one that redraws a whole list: every arriving batch
+  // rebuilds `metadata`, so `resolved` climbing toward `asked` one batch at a
+  // time is the signal that a list is repainting per batch instead of once.
+  // Pair it with the `<List>/row` render.count rollups.
+  useQueryResultLogger({
+    source: 'useNostrProfileMetadataMany',
+    status: isLoading ? 'loading' : 'ready',
+    count: metadata.size,
+    extra: {
+      asked: pubkeys.length,
+      resolved: metadata.size,
+      missing: pubkeys.length - metadata.size,
+      pending: pendingPubkeys.size,
+      toFetch: toFetch.length,
+    },
+  });
+
   return { metadata, isLoading };
 }
