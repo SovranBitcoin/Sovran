@@ -18,8 +18,8 @@ Branch: `feat/receive-nut-drop`.
 | 6 | `nostr` | done | 1 defect found and **fixed** (`33953ab4`) |
 | 7 | `errors` | done | both rules deleted (mint-side), 1 added; 1 defect fixed, ~52 blocked |
 | 8 | `ui` | done | 22 findings, 22 false positives; rule sharpened 22 → 1 |
-| 9 | `nip17`, `nip59` | in-progress | pre-sweep rows below; re-running to confirm |
-| 10 | `nip61`, `nip60`, `nip46`, `nip65`, `nip04`, `nip19`, `nip01`, `nip06` | pending | |
+| 9 | `nip17`, `nip59` | done | repo-wide re-run: 11 findings, 0 defects; `room-identity` de-selected |
+| 10 | `nip61`, `nip60`, `nip46`, `nip65`, `nip04`, `nip19`, `nip01`, `nip06` | in-progress | scope by owning directory, not repo-wide |
 | 11 | `nut06`, `nut10`, `nut11`, `nut12`, `nut18` | pending | |
 | 12 | `bip32`, `bip39`, `bip43`, `bip21`, `bip321` | pending | |
 | 13 | `agents-md` | pending | |
@@ -365,3 +365,38 @@ Note on the domain's zeros: unlike `payments`, `state` and `errors`, the two
 header rules scoring zero is *not* a framing artefact — both are whole-file
 questions over `**/*.{tsx,jsx}` with no "does this change …" phrasing, so
 their zero is about the code.
+
+### nip17, nip59 — done
+
+The pre-sweep pass only covered three directories. Re-ran repo-wide:
+`check --all --only "nip17/*,nip59/*"`. 4,614 chunks / **82,980 questions** /
+4,610 requests — by far the largest batch of the sweep, 19 rules over every
+file. `complete: false`, 4 requests failed (the usual content-filtered
+scripts, 18 rules each). **11 findings, 0 defects.**
+
+First, the open item from the pre-sweep rows is now closed:
+`resolveWriteRelays.ts` and `recipientRelays.ts` **no longer appear**, so
+`4d2d992b` (the docstring correction) did clear that false positive. The row
+above said "re-run pending to confirm"; this is the confirmation.
+
+- [nip17/publish-to-recipient-dm-relays] app/modules/bitchat-module/ios/BitChatNostrBridge.swift:151 (0.91) and .../android/…/BitChatNostrBridge.kt:151 (0.75); [nip59/broadcast-selectively] same Swift file (0.73)
+  verdict: intentional
+  evidence: this is BitChat's geohash chat, not the wallet's DM path. The recipient is addressed by a *per-geohash derived* pubkey, an ephemeral identity that by definition publishes no `kind:10050` — grep for `10050` across both native bridges returns nothing. The code is symmetric: line 151 subscribes to gift wraps for its own per-geohash pubkey on `currentGeohashRelays`, and line 237 publishes to that same set, with the comment "Keeps the DM reachable wherever the recipient is subscribed." The recipient is provably listening exactly there. It also mirrors upstream (`NostrTransport.sendPrivateMessageGeohash:235`) for cross-client interop.
+  action: none. A change here would also be a native change, which the protocol hands back regardless. The rule stays selected — it caught the real defect in the wallet's own DM path earlier this sweep (`8bcf6f06`); the geohash bridge is a legitimate exception, not a reason to drop it.
+
+- [nip17/room-identity] ×7 — useDmConversations.ts, useDmThread.ts, bitchatDmMessages.ts, dmLastMessageStore.ts, mockDataStore.ts
+  verdict: false-positive
+  evidence: the rule asks whether a conversation is keyed on something other than author + the `p`-tag set, so a changed participant set silently merges into an existing room. That only bites with group DMs. Every NIP-17 wrap this app builds carries exactly one `p` tag (`nip17.ts:131`, `:196`), and group chat is Whitenoise/MLS — a different protocol. In a 1:1-only client, keying on the counterparty *is* keying on the participant set.
+  action: de-selected in `459be95d`, following the precedent already in `hunch.config.ts` for `bip321/pop` — "not implemented, so those two are left out until it is." Noted inline to re-select with group DMs. Verified on the flagged paths: **7 → 0**, complete, nothing else lost. Lock regenerated, 113 pack rules → 112.
+
+- [nip59/wrap-kind-and-p-tag] nostr/__tests__/facade-dm.test.ts:1 (0.76)
+  verdict: false-positive
+  evidence: a test file. The shared `unrelated` criterion in `hunch.config.ts` already says "Tests constructing the bad case are not violations."
+  action: none — one test-file hit is not worth tuning a rule that is otherwise correct.
+
+Cost note for the remaining pack domains: this run asked 82,980 questions
+because 19 rules with no `when` were put to all 2,473 files. The remaining NIP
+families should be scoped to the directories that own them (`nostr/src`,
+`app/shared/lib/nostr`, `app/features/nostrSigner`), which the protocol
+explicitly permits — the original three-directory `nip17/nip59` batch finished
+in about a minute at 1,530 questions.
