@@ -21,8 +21,8 @@ Branch: `feat/receive-nut-drop`.
 | 9 | `nip17`, `nip59` | done | repo-wide re-run: 11 findings, 0 defects; `room-identity` de-selected |
 | 10 | `nip61`, `nip60`, `nip46`, `nip65`, `nip04`, `nip19`, `nip01`, `nip06` | **blocked** | provider outage: 3 runs, none complete. 1 defect found (F43), rest triaged |
 | 11 | `nut06`, `nut10`, `nut11`, `nut12`, `nut18` | done | 2 defects **fixed**, 1 blocked (F44), 9 false-positive/intentional |
-| 12 | `bip32`, `bip39`, `bip43`, `bip21`, `bip321` | in-progress | |
-| 13 | `agents-md` | pending | |
+| 12 | `bip32`, `bip39`, `bip43`, `bip21`, `bip321` | done | complete run, 0 failed; 4 findings, all false-positive |
+| 13 | `agents-md` | in-progress | |
 | 14 | `skill/*` (by skill) | pending | |
 | 15 | `doc/*` (by convention file) | pending | |
 
@@ -509,3 +509,33 @@ in its mint-details NUT list. `offlineReceiveDleq.ts` refuses on a missing
 DLEQ, a missing blinding factor `r`, a missing keyset, a missing amount key,
 and on a throw inside `hasValidDleq`, and classifies the failure distinctly
 "so an offline transport never queues forged ecash for retry".
+
+### bip21, bip32, bip39, bip43, bip321 — done
+
+Scoped to `app/shared/lib/nostr`, `wallet/src`, `app/features/{backup,profile,receive,send}`.
+566 requests / 9,056 questions. **complete: true, 0 failed, 0 notices** — a
+fully complete run, the second of the sweep after `ui`.
+
+**4 findings, all false positives**, and both clusters are the same
+cross-file blindness seen in `payments` and `nut10`: the mechanism is in one
+file, the guard in another.
+
+- [bip39/checksum-not-verified] app/shared/lib/nostr/keyDerivation.ts:1 (0.78), :148 (0.72)
+  verdict: false-positive
+  evidence: the rule is right that this file never validates — it goes straight to `bip39.mnemonicToSeedSync`, which by design does not check the checksum. But nothing reaches it unvalidated. `validateMnemonic(x, wordlist)` gates every boundary: `secureStorage.ts:240` (debug override), `:269` (store), `:316` (retrieve), `keyRecovery.ts:30`, `profileSessionOrchestrator.ts:328`, and `BackupFlowProvider.tsx:33`. `wallet/src/wallet-seed.ts` gates its own at `:64`, `:106`, `:176`. The store gate at `secureStorage.ts:266-268` states the exact concern the rule asks about, in a comment: "Reject mnemonics that fail the BIP-39 wordlist or checksum: a single mistyped word on restore otherwise persists, derives a wrong identity, and silently strands the user's funds against the correct mnemonic." Deliberate, documented, and upstream of every derivation call.
+
+- [bip39/wordlist-mismatch] wallet/src/wallet-seed.ts:1 (0.80), :141 (0.76)
+  verdict: false-positive
+  evidence: there is no second wordlist to mismatch against. Every `wordlists/` import in `app`, `wallet` and `nostr` — **9 of 9** — is `wordlists/english.js`, and `wallet-seed.ts` uses that one import at `:64`, `:73`, `:106` and `:176` for both `validateMnemonic` and `generateMnemonic`.
+
+No rule edits. Both rules are correct and would catch a real regression — a
+second wordlist, or a derivation path that skipped the boundary — and the
+evidence that clears them lives in files the window cannot see. Blunting them
+to silence a cross-file guard is the failure mode the protocol names, so they
+stay as they are.
+
+Note on the zeros: `bip32/*`, `bip43/*`, `bip21/*` and `bip321/*` returned
+nothing on a **complete** run with no unanswered chunks, so unlike the
+change-framed zeros in `payments`, `state` and `errors`, these are about the
+code. `bip321` in particular covers `wallet/src/bip321.ts`, `normalize.ts` and
+`detectors.ts`, which this scope included.
