@@ -22,8 +22,8 @@ Branch: `feat/receive-nut-drop`.
 | 10 | `nip61`, `nip60`, `nip46`, `nip65`, `nip04`, `nip19`, `nip01`, `nip06` | **blocked** | provider outage: 3 runs, none complete. 1 defect found (F43), rest triaged |
 | 11 | `nut06`, `nut10`, `nut11`, `nut12`, `nut18` | done | 2 defects **fixed**, 1 blocked (F44), 9 false-positive/intentional |
 | 12 | `bip32`, `bip39`, `bip43`, `bip21`, `bip321` | done | complete run, 0 failed; 4 findings, all false-positive |
-| 13 | `agents-md` | in-progress | |
-| 14 | `skill/*` (by skill) | pending | |
+| 13 | `agents-md/root` | done | 1 defect fixed, 21 testability gaps recorded, 208-finding rule switched off |
+| 14 | `skill/*` (by skill) | in-progress | |
 | 15 | `doc/*` (by convention file) | pending | |
 
 ## Findings
@@ -539,3 +539,33 @@ nothing on a **complete** run with no unanswered chunks, so unlike the
 change-framed zeros in `payments`, `state` and `errors`, these are about the
 code. `bip321` in particular covers `wallet/src/bip321.ts`, `normalize.ts` and
 `detectors.ts`, which this scope included.
+
+### agents-md/root — done
+
+Note the id: the namespace is `agents-md/root/*`, not `agents-md/*`. The
+latter matches no rule and exits 2 rather than silently reviewing nothing.
+
+4,614 chunks / 9,528 questions / 4,014 of 4,018 requests, 4 failed (a new
+`GatewayRateLimitError` this run rather than the usual 500). **231 findings**,
+across four rules.
+
+- [agents-md/root/app-alias-imports] 208 findings
+  verdict: false-positive
+  evidence: the rule compiled AGENTS.md:43 ("App imports use `@/…`") into "any `../` in `app/` is a violation". Distribution: 78 `app/features`, 76 `app/e2e`, 36 `app/shared`, 9 `app/__tests__`, 6 `app/codereview`, 2 `app/app`, 1 `app/scripts`. Two of the first four sampled — `AiMessageBubble.tsx`, `ModelChip.tsx` — contain no relative import at all, which is the tell. The rest are intra-feature siblings (`../lib/finalize` inside `features/ai/`), not the cross-package traversal the sentence names. Settled from the repo rather than by asking: `no-restricted-imports` in `app/eslint.config.js:242` restricts *packages* (expo-router, react-native, clipboard), never path shapes, and 123 of 1,128 app source files use `../`.
+  action: switched off in `8260b9ba`. Not retuned, because the sentence's own named violation (`../../wallet/src`) is already asked by `cross-package-subpath-imports`, and an import path is a string pattern that `import/no-relative-parent-imports` decides exactly — the protocol puts such questions in the linter. Verified on `app/features/ai` and `app/e2e/core`: `agents-md/root/*` now returns 0, complete.
+  **Left for a human:** AGENTS.md:43-44 is genuinely ambiguous and the next `install` will recompile the same rule from it. Rewording it changes what the convention *is*, which is the project's call, not the sweep's. If intra-feature relatives are meant to be banned, that is a lint rule plus a codemod across 123 files.
+
+- [agents-md/root/actionable-control-testid] app/features/onboarding/screens/TermsAndConditionsScreen.tsx:1 (0.96)
+  verdict: defect
+  evidence: five `Button`s carried an `onPress` and no `testID` — view recovery (:48), retry settings (:63), back to Terms (:80), continue to Privacy (:105), confirm and continue (:131). Only the two `ControlField` checkboxes had ids. AGENTS.md requires every actionable control to carry a stable semantic `testID` and an accessible label, because the JSON harness addresses controls by id. `app/e2e/drivers/simulator.test.ts:34,39` already drives a control called `terms-continue`, which did not exist on the screen. This is the app's first gate, and F23 records the Android run stopping at Terms acceptance.
+  action: **fixed** in `500751bb`. Presentational only. Verified: type-check 0, 12 tests across 5 terms/legal/onboarding suites, lint 0 errors, and the rule re-run on the file returns 0 findings, complete.
+
+- [agents-md/root/actionable-control-testid] 17 further findings; [actionable-control-accessible-label] 4
+  verdict: defect (recorded, not fixed)
+  evidence: same class, same requirement, spread across `SettingsDesignSystemFadeStressScreen` (0.95), `NutDropCelebrationOverlay:241` (0.93), `CameraLayout` (0.92), `ThreadView:134` (0.90), `DetailsList:101` (0.90), `LiquidChatComposerGlass.ios` (0.89, 0.88), `PaymentInfo:151` (0.86), `MintChangesScreen:118` (0.85), `CircleActionButton.flat` (0.85), and others down to 0.75. The accessible-label hits are on `ActionMenuButton:142,292`, `CircleActionButton.flat` and `FormSheetChrome`.
+  action: blocked for this pass. Each needs the same judgement the Terms screen got — which control, what stable name, does a scenario address it — and 21 of them is a testability sweep of its own rather than one fix. They belong with **F22** ("Not every route, alias, gesture and modal exit has a native journey on both platforms"), which is the entry that already owns this gap; the rule id is the way to enumerate the current set.
+
+- [agents-md/root/cross-package-subpath-imports] app/__tests__/walletReadModels.test.ts:1 (0.95)
+  verdict: blocked
+  evidence: not verified — reached at the end of the domain, and unlike the alias rule this one asks the question AGENTS.md actually means (`wallet/react`, never `../../wallet/src`), so it deserves a real read rather than a guess.
+  action: verify on the next pass. Recorded rather than assumed.
