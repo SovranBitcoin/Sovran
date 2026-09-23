@@ -354,6 +354,21 @@ export default defineConfig({
     // rewording either way, so the next `install` does not recompile this.
     "agents-md/root/app-alias-imports": "off",
 
+    // ── Compiled convention rules switched off ────────────────────────────
+    // `inline-slot-components` asks whether a list slot gets an inline function
+    // that closes over changing props. True in general; moot here. React
+    // Compiler is on, and a bailout is itself gated by the ratcheted
+    // `react-compiler-bailouts.json` (33 known, a new one fails
+    // `check:react-compiler`). All four files it flagged on the 2026-09-23
+    // sweep — NotificationsScreen, NotificationFollowersScreen,
+    // MintChangesList, SearchResultRows — have zero entries in that baseline,
+    // so the compiler memoizes exactly the closures the rule is worried about.
+    //
+    // Same reasoning as `skill/expo-animation/gesture-memoized` above. Two of
+    // the three slots it flagged on NotificationsScreen were element props, not
+    // functions, which the rule does not distinguish either.
+    "doc/docs/review/conventions-react-native/inline-slot-components": "off",
+
     "ui/header-continuity": ["warn", choice({
       instructions: "Does this change visibly break the shared header contract: a page identity is duplicated or lost during its scroll handoff, header actions or content are obscured by incorrect inset ownership, a section selector becomes unreachable while scrolling its content, a fixed inset around a scrolling viewport prevents content from ever entering its gradient header, an opaque strip defeats the combined header/tab gradient, or identity handoff activates before the measured identity section clears navigation? Judge the visible layout and scroll ownership together, on iOS and Android; an isolated use of a header API without evidence of a broken behavior is unrelated.",
       criteria: { concern: "The changed layout or scroll wiring visibly causes one of these continuity or reachability failures.", ...outcomes },
