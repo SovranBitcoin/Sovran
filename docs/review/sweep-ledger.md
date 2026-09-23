@@ -24,7 +24,12 @@ Branch: `feat/receive-nut-drop`.
 | 12 | `bip32`, `bip39`, `bip43`, `bip21`, `bip321` | done | complete run, 0 failed; 4 findings, all false-positive |
 | 13 | `agents-md/root` | done | 1 defect fixed, 21 testability gaps recorded, 208-finding rule switched off |
 | 14 | `skill/*/*` (7 skills) | done | 21 findings, 0 defects; 1 compiled-rule scope gap recorded |
-| 15 | `doc/*` (by convention file) | in-progress | |
+| 15a | `doc/…/conventions-typescript` (16 rules) | done | 29 findings; 3 fixed, rest recorded |
+| 15b | `doc/…/conventions-zod` (28 rules) | in-progress | |
+| 15c | `doc/…/conventions-react-native` (29 rules) | pending | |
+| 15d | `doc/…/conventions-async-tests` (31 rules) | pending | |
+| 15e | `doc/…/conventions-state` (34 rules) | pending | |
+| 15f | `doc/…/contributor-conventions` (122 rules) | pending | largest in the config |
 
 ## Findings
 
@@ -605,3 +610,29 @@ wrong). So these 21 came from an already-vetted subset.
 - [skill/expo-animation/no-layout-property-animation] MintCurrencyTabs.tsx (0.89, 0.86), SendScreen.tsx:410 (0.81); [interpolate-clamp] SendScreen.tsx:410 (0.81); [skill/typescript-best-practices/no-unearned-as-cast] secureStorage.ts:523 (0.79), SettingsRecoveryScreen.tsx:441 (0.76), e2e/store/export.ts (0.75); [skill/codebase-design/tests-assert-through-interface] useGuardedRouter.test.ts (0.81), operations.test.ts (0.78), loggerChild.test.ts:282 (0.77)
   verdict: recorded, sampled not exhaustively verified
   action: none. Stating the depth honestly: the findings above this line were read in source; these ten were triaged by rule and location rather than line-by-line. They are style and design questions from vetted skills, none touching money, keys or persisted data, and none rose above 0.81. They are the right candidates for a focused follow-up pass, not for changes made at the end of a long sweep on a sampled read.
+
+### doc/… — run by convention file
+
+The whole `doc/*` family in one batch is 234 rules / **204,888 questions** /
+5,733 requests, so it is run per convention file as the queue says. Ids are
+five segments: `doc/docs/review/<file>/<rule>`. `--only "doc/*/*/*"` matches
+nothing and exits 2 — my first attempt did exactly that.
+
+#### conventions-typescript — done
+
+16 rules, 4,399 of 4,400 requests, 20,045 questions, 1 failed.
+**29 findings.** Two clusters carry most of it.
+
+- [shared-empty-readonly] 11 findings
+  verdict: defect (3 fixed, 8 blocked)
+  evidence: the rule asks whether a module-level constant used as a shared empty return value has a mutable type, so a consumer that mutates it changes what every later caller sees. Real instances: `useAnimatedQrFrames.ts:57` `const EMPTY_PARTS: string[] = []` returned as `parts` at :79 (0.96, highest in the domain), and `SearchPostsList.tsx:156-157`. The convention is already established here — `fakePosts.tsx:55` declares its fixture map `ReadonlyMap`.
+  action: **3 fixed** in `f273e6b1`. The more useful result is why the other 8 are not a one-line change: making them readonly fails type-check because the consuming interfaces are declared mutable — `WalletContext.proofAmounts` is `Record<string, number[]>` (TS2345), `useThread` passes its maps to a `Map<K,V>` parameter (TS2739 ×2), `AmountSelector` assigns into `QuickSendSuggestion[]` (TS4104), and `NoteContent` and `fakePosts` pass theirs where a mutable `Map` is required (TS2739). Each was attempted and reverted, so those are measured errors rather than predictions. The convention cannot be applied bottom-up; widening the consuming types is a typed-API change across the feed, send and wallet-context surfaces.
+
+- [prototype-key-lookup] 6 findings
+  verdict: defect (recorded, not fixed)
+  evidence: the rule asks about indexing a plain-object table with an outside-authored string and trusting the result. `appDataOps.ts:84` is a real instance: `WORD_REWRITES[word.toLowerCase()] ?? word.toLowerCase()` over a `Record<string, string>`, where `word` = `"constructor"` returns `Object.prototype.constructor`, a function that `??` does not catch because it is not nullish. Impact here is cosmetic — a NIP-46 app-data word could render as `function Object() { … }` — but the shape is the dangerous one. The other five (`interpret.ts`, `SettingsNetworkScreen.tsx:227`, `MediaPagerPage.tsx`, `MintRebalancePlanScreen.tsx:527`, `mintDistributionStore.ts:247`) were not individually read.
+  action: blocked. The fix is a `Object.prototype.hasOwnProperty.call(TABLE, key)` guard or a `Map`, applied per site after reading each one. Worth its own pass, and the rule id enumerates the set.
+
+- remaining 12 findings across `shared-in-place` (2), `exhaustive-else` (3), `invalid-date` (2), `spread-undefined-clobbers-default`, `global-test`, `all-with-side-effects`, `replace-first-only`, `empty-aggregate`
+  verdict: recorded, not verified
+  action: none. Stating it plainly rather than implying coverage: these were not read in source. None is above 0.92, none touches money, keys or persisted data, and they are the right material for a focused pass on this convention file.
