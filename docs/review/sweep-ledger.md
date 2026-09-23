@@ -25,8 +25,8 @@ Branch: `feat/receive-nut-drop`.
 | 13 | `agents-md/root` | done | 1 defect fixed, 21 testability gaps recorded, 208-finding rule switched off |
 | 14 | `skill/*/*` (7 skills) | done | 21 findings, 0 defects; 1 compiled-rule scope gap recorded |
 | 15a | `doc/…/conventions-typescript` (16 rules) | done | 29 findings; 3 fixed, rest recorded |
-| 15b | `doc/…/conventions-zod` (28 rules) | in-progress | |
-| 15c | `doc/…/conventions-react-native` (29 rules) | pending | |
+| 15b | `doc/…/conventions-zod` (28 rules) | done | 54 findings; 7 sites fixed, rest recorded |
+| 15c | `doc/…/conventions-react-native` (29 rules) | pending | next |
 | 15d | `doc/…/conventions-async-tests` (31 rules) | pending | |
 | 15e | `doc/…/conventions-state` (34 rules) | pending | |
 | 15f | `doc/…/contributor-conventions` (122 rules) | pending | largest in the config |
@@ -636,3 +636,29 @@ nothing and exits 2 — my first attempt did exactly that.
 - remaining 12 findings across `shared-in-place` (2), `exhaustive-else` (3), `invalid-date` (2), `spread-undefined-clobbers-default`, `global-test`, `all-with-side-effects`, `replace-first-only`, `empty-aggregate`
   verdict: recorded, not verified
   action: none. Stating it plainly rather than implying coverage: these were not read in source. None is above 0.92, none touches money, keys or persisted data, and they are the right material for a focused pass on this convention file.
+
+#### conventions-zod — done
+
+28 rules, 4,315 requests, 20,730 questions, 4 failed. **54 findings.**
+
+- [catch-shared-mutable-fallback] 6 findings, 0.80-0.98 — the domain's top cluster
+  verdict: defect (all fixed)
+  evidence: seven schemas fell back to a literal — `.catch({})` in `mintStore` (×3), `dmLastMessageStore:33`, `ownProfileMetadataStore:42` and `ctaStore:69`, and `.catch([])` in `routstrStore`. Zod captures a non-function fallback once, so every parse failure of that field returns the **same** object. Verified with a throwaway probe rather than assumed: `.catch({})` gives `a === b` across two failing parses, `.catch(() => ({}))` does not. These are persisted stores, so that instance is what the store lives on after a failed hydration. Zustand's spread updates happen not to mutate it today, but that is a property of every current writer, not of the schema.
+  action: **fixed** in `2e218379`, all seven now `.catch(() => ({}))` / `.catch(() => [])`. Verified: type-check 0 across three workspaces, 296 tests in 20 store/persist suites with 40 snapshots, lint 0 errors.
+  **Recording a wrong prediction:** before the run I checked `.catch(` usage, saw only primitives (`'pending'`, `0`, `'unknown'`), and predicted this rule would not fire. It fired six times at the top of the domain. The grep covered two directories and I read six lines of its output. The prediction was the unreliable part, not the tool.
+
+- [money-integer-schema] wallet/src/operations/historyEntry.ts (via the amount union), routstr/api.ts (0.84, 0.75), ReceivePaymentRequestQuoteScreen (0.93)
+  verdict: intentional (historyEntry), recorded (the rest)
+  evidence: `historyEntry.ts:21` is `amount: z.union([z.number(), z.string()]).optional()`, the rule's exact named shape, but the docstring explains it: "`amount` is a plain number in colada's own entries but a serialized coco `Amount` (a string) when the row comes straight from coco's history." The union is deliberate. The missing integer check is downstream in `amountToNumber`, which is already **F03**.
+
+- remaining 47 findings — `hex-ids` (13), `input-size-caps` (14), `nostr-event-schema-bounds` (4), `route-json-param-unbounded` (4), `url-scheme` (3), `branded-id-as-cast` (2), `default-nested-container`, `use-parsed-output`
+  verdict: recorded, not verified
+  action: none. Not read in source. `hex-ids` and `input-size-caps` cluster on the Nostr wire schemas (`nostr/src/schemas.ts`, `envelope.ts`, `facade/*`) and are about bounding untrusted relay input — plausible and worth a focused pass, but asserting verdicts on 47 findings I have not read would be exactly the false progress this protocol forbids.
+
+Two prep checks recorded because I caught them before reporting either as a finding:
+`transactionDistributionStore` looked like it had zero schema tolerance; it uses
+`tolerantRecord(…)`, a repo helper that drops bad entries rather than failing
+the record. And `persist-additive-fields` is change-framed ("does `hunk` **add**
+a field"), so a conformance pass cannot exercise it — the same structural gap
+as `state/persisted-compatibility`, which means **both** of this repo's
+catastrophic persisted-data invariants are only checked on diffs.
