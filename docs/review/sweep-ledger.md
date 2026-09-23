@@ -28,8 +28,8 @@ Branch: `feat/receive-nut-drop`.
 | 15b | `doc/…/conventions-zod` (28 rules) | done | 54 findings; 7 sites fixed, rest recorded |
 | 15c | `doc/…/conventions-react-native` (29 rules) | done | 20 findings; 3 defects **fixed** incl. a WebView scheme escape |
 | 15d | `doc/…/conventions-async-tests` (31 rules) | done | 85 findings; 61 in shipping code, recorded as F47 |
-| 15e | `doc/…/conventions-state` (34 rules) | in-progress | |
-| 15f | `doc/…/contributor-conventions` (122 rules) | pending | largest in the config |
+| 15e | `doc/…/conventions-state` (34 rules) | done | 40 findings; top cluster recorded as F48 |
+| 15f | `doc/…/contributor-conventions` (122 rules) | in-progress | largest in the config |
 
 ## Findings
 
@@ -714,3 +714,24 @@ Split by where they land, which is the useful cut: **61 in shipping code**,
 - 17 tooling + 7 test findings
   verdict: recorded, lower priority
   evidence: `app/e2e/**` and `app/codereview/log-doctor/**` are Node CLIs the app never imports — established earlier in the `errors` domain, where only comment references exist (`MintInfoScreen.tsx:397-399`). Cancellation discipline matters less in a CLI that exits. The 7 test findings (`restore-global-fakes`, `singleton-state-reset`, `fake-timers-with-promises`) are test-hygiene rather than product behaviour.
+
+#### conventions-state — done
+
+34 rules, 3,997 requests, 24,568 questions, 3 failed. **40 findings.**
+
+- [persist-unbounded-collection] 14 findings, 0.75-0.96
+  verdict: defect
+  evidence: verified the top one properly rather than by grep. `ownedMediaStore.ts:89` is `byBlob: tolerantRecord(z.string().max(600), PersistedEntry)` — key length capped, inner `sourceNoteIds` capped at `.max(2000)`, and **nothing caps the number of entries**. Every blob a user ever uploads accumulates forever. The same holds across 13 persisted stores.
+  action: blocked — recorded as **F48**. Severity stated honestly: `tolerantRecord` means this degrades (slower hydration, larger AsyncStorage) rather than failing parse, so it is not the data-loss shape. But `routstrStore` already solved exactly this, trimming in `partialize` against named ceilings, and its comment records why — 1,024 sessions was a schema `.max()` with no trimming, so session 1,025 failed parse and `createMergeWithSchema`, being all-or-nothing, discarded the whole store. **The pattern exists in this codebase and was not propagated.** Adding ceilings and eviction touches durable user data, which the protocol hands back.
+
+- remaining 26 — `render-clock` (6), `derived-state-effect` (5), `inflight-key-missing-input` (4), `migrate-drops-state` (2), `after-hydrate-mutates-state` (2), and eight singletons including `record-key-untrusted` and `persist-hydration-gate`
+  verdict: recorded, not verified
+  action: none. Not read in source. `migrate-drops-state` (2) and `record-key-untrusted` are the ones worth opening first on a focused pass — the first touches durable data, the second is the prototype-key class already fixed once in `a789dbc6`.
+
+This domain closes the loop on a theme the sweep found repeatedly: the
+codebase usually **knows** the answer and fails to carry it to the sibling that
+arrived later. Four instances now — `isSafeImageUrl` guarded prefetch but not
+render (`f5945e38`), `own()` guarded `decode.ts` but not `interpret.ts`
+(`a789dbc6`), `AppState` covered the nip46 internals but not the signer
+screens (F46), and `routstrStore` capped its collections while thirteen other
+stores did not (F48).
