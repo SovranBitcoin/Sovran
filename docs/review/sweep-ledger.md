@@ -19,7 +19,7 @@ Branch: `feat/receive-nut-drop`.
 | 7 | `errors` | done | both rules deleted (mint-side), 1 added; 1 defect fixed, ~52 blocked |
 | 8 | `ui` | done | 22 findings, 22 false positives; rule sharpened 22 → 1 |
 | 9 | `nip17`, `nip59` | done | repo-wide re-run: 11 findings, 0 defects; `room-identity` de-selected |
-| 10 | `nip61`, `nip60`, `nip46`, `nip65`, `nip04`, `nip19`, `nip01`, `nip06` | in-progress | scope by owning directory, not repo-wide |
+| 10 | `nip61`, `nip60`, `nip46`, `nip65`, `nip04`, `nip19`, `nip01`, `nip06` | **blocked** | provider outage: 3 runs, none complete. 1 defect found (F43), rest triaged |
 | 11 | `nut06`, `nut10`, `nut11`, `nut12`, `nut18` | pending | |
 | 12 | `bip32`, `bip39`, `bip43`, `bip21`, `bip321` | pending | |
 | 13 | `agents-md` | pending | |
@@ -400,3 +400,58 @@ families should be scoped to the directories that own them (`nostr/src`,
 `app/shared/lib/nostr`, `app/features/nostrSigner`), which the protocol
 explicitly permits — the original three-directory `nip17/nip59` batch finished
 in about a minute at 1,530 questions.
+
+### nip01, nip04, nip06, nip19, nip46, nip60, nip61, nip65 — BLOCKED (incomplete coverage)
+
+Scoped to the owning directories (`nostr/src`, `app/shared/lib/nostr`,
+`app/features/nostrSigner`, `app/features/payments/data`,
+`app/shared/lib/cashu`) — 213 files / 388 chunks / 18,236 questions, which is
+12× cheaper than the repo-wide `nip17/nip59` run for the same coverage.
+
+**Three attempts, none complete.** This is the protocol's "same command
+failing three times" stop condition, and the reason is provider-side, not
+ours:
+
+| attempt | requests answered | failed | scope |
+| --- | --- | --- | --- |
+| 1 | 27 of 388 | 16 | full batch — tripped the outage circuit-breaker at ~7% |
+| 2 | 217 of 388 | 171 | full batch |
+| 3 | 156 of 281 | 125 | only the 121 files attempt 2 left unanswered |
+
+Every failure is `GatewayInternalServerError: Service temporarily unavailable`
+after 6 internal retries. The findings below are therefore **not a complete
+picture of these eight NIPs** — they are what surfaced from partial coverage.
+Re-run when the provider recovers.
+
+Findings triaged (all verified in source):
+
+- [nip01/single-connection-per-relay] nostr/src/facade/relay/protocol.ts:86 (0.80)
+  verdict: defect
+  evidence: `openWebSocket` at :163 and :220 opens a fresh socket per relay per request. NIP-01 asks for one connection per relay with subscriptions multiplexed over it. Unlike its sibling, this file's header documents the tier and the REQ/EVENT/EOSE wire but says nothing about socket lifecycle, so there is no recorded decision behind it. Blame `cdc8b5a4` is a JSON-parsing fix, unrelated.
+  action: blocked — recorded as **F43**. Connection pooling is an architectural change to the `nostr` package, not the smallest correct fix, and the protocol forbids a refactor inside a fix commit.
+
+- [nip01/single-connection-per-relay] nostr/src/facade/primal/protocol.ts:1,87 (0.94, 0.95)
+  verdict: intentional
+  evidence: same shape, different endpoint. This talks to Primal's **cache API** (`wss://cache2.primal.net/v1`), a proprietary RPC service, not a NIP-01 relay — so the rule's premise does not hold. The file also records the tradeoff explicitly: "One socket per request (simple + correct; a pooled multiplexed connection is a later optimization)."
+
+- [nip04/deprecated-prefer-nip17] app/shared/lib/nostr/nip04.ts:1 (0.92)
+  verdict: intentional
+  evidence: we do prefer NIP-17. `UserMessagesScreen.tsx:93` defaults `protocol = 'nip17'`; the NIP-04 branch at :378 is opt-in legacy interop for peers that need it. The module's own fileoverview calls it "the legacy encrypted-DM scheme". `hunch.config.ts` selected this rule precisely because "the deprecation notice is ours".
+
+- [nip01/verify-against-event-pubkey] relay/protocol.ts:86 (0.89), facade/event.ts:1 (0.77), primal/protocol.ts:87 (0.77), recipes/wallpapers.ts:1 (0.72), ownsync/useOwnEventsSync.ts:1 (0.71)
+  verdict: false-positive
+  evidence: the rule's own text says "answer false if `hunk` does not verify signatures". None of these files calls `verifyEvent` or `verifySignature` — grep returns 0 across all five. `hunch.config.ts` selected this rule for `app/shared/lib/nostr/moderation.ts`, which does the check by hand; these transports do not verify at all, they hand events to the demux.
+  action: none for now — the rule is correct and earns its place on `moderation.ts`. Revisit if it keeps firing on transports once coverage is complete; with three partial runs there is not enough evidence to tune it.
+
+- [nip19/length-limit] memoMentions.ts:123 (0.83), client.ts:1 (0.79), cashu/manager.ts:1140 (0.76), sendDirectMessage.ts:1 (0.82)
+  verdict: false-positive
+  evidence: the rule asks whether bech32 is the *internal storage* form for keys and ids. In `memoMentions.ts` the `nprofile` on `MemoMentionEntity` is the literal text span inside a user-typed memo (`start`/`end`/`display`/`nprofile`); the hex form lives separately on `MemoNprofileReference.pubkey`. `sendDirectMessage.ts` decodes an nprofile and immediately uses the hex `pubkey`.
+
+- [nip65/publish-relay-list-alongside] sendDirectMessage.ts:1 (0.77), nip46Transport.ts:289 (0.72)
+  verdict: false-positive (but see the open gap)
+  evidence: `nip46Transport.ts:289` is the `stop()` teardown path, unrelated to relay lists. The `sendDirectMessage.ts` hit is adjacent to a real gap already recorded above — we publish no `kind:10050` of our own — but that is a missing feature, not this rule's question about publishing a relay list alongside something else.
+
+- [nip01/replaceable-tie-break] ownsync/partitionOwnEvents.ts:91 (0.72)
+  verdict: blocked
+  evidence: not verified — this arrived in attempt 3 and the domain hit its stop condition before it could be read against the replaceable-event tie-break rule (same `created_at` → lowest id wins).
+  action: verify on the re-run. Recorded rather than guessed.
