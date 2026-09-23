@@ -232,6 +232,27 @@ export function getMintDisplayName(url: string, mintInfo?: { name?: string } | n
  * download) rather than reach an `<Image>` or a fetch. Deliberately looser than
  * {@link validateExternalUrl}: no parse, no allowlist — a shape check only.
  */
+/**
+ * Whether a url may be navigated to INSIDE an embedded WebView.
+ *
+ * Deliberately stricter than {@link validateExternalUrl}, which also allows
+ * `mailto:` and `tel:` because it feeds the OS opener. Nothing but http(s) may
+ * load in an embed: `intent:`, `file:`, `javascript:`, a custom app scheme or
+ * our own deep link must be refused, not handed onward.
+ *
+ * Parses rather than pattern-matches — unlike {@link isLikelyHttpUrl}, which is
+ * a display heuristic. A url that does not parse is refused.
+ */
+export function isHttpNavigationUrl(url: string | undefined | null): boolean {
+  if (typeof url !== 'string' || url.length === 0) return false;
+  try {
+    const { protocol } = new URL(url);
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export function isLikelyHttpUrl(url: string | undefined | null): url is string {
   return typeof url === 'string' && /^https?:\/\/\S+/i.test(url.trim());
 }

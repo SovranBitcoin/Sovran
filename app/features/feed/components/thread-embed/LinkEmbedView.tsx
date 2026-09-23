@@ -12,6 +12,8 @@ import { StyleSheet } from 'react-native';
 import Animated, { type SharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { WebView, type WebViewProps } from 'react-native-webview';
 
+import { isHttpNavigationUrl } from '@/shared/lib/url';
+
 export const LinkEmbedView = React.memo(function LinkEmbedView({
   url,
   opacity: embedOpacity,
@@ -45,7 +47,15 @@ export const LinkEmbedView = React.memo(function LinkEmbedView({
         javaScriptEnabled
         setSupportMultipleWindows={false}
         allowFileAccess={false}
-        originWhitelist={['http://*', 'https://*']}
+        // `['*']` plus an explicit gate, NOT a narrow whitelist. In
+        // react-native-webview a url that FAILS originWhitelist is not blocked —
+        // WebViewShared hands it to `Linking.openURL(url)`. A narrow whitelist
+        // therefore turns `intent://`, a custom app scheme or our own deep link,
+        // reached from a relay-supplied page, into an OS open with no tap.
+        // `onShouldStartLoadWithRequest` is only consulted for urls that already
+        // passed, so widening the whitelist is what lets this gate see them.
+        originWhitelist={['*']}
+        onShouldStartLoadWithRequest={(request) => isHttpNavigationUrl(request.url)}
       />
     </Animated.View>
   );
