@@ -107,6 +107,7 @@ function createMockConfig(overrides?: {
 
   const navigation: NavigationCallbacks = {
     scanQr: vi.fn(),
+    nutDrop: vi.fn(),
     mintInfo: vi.fn(),
     addMint: vi.fn(),
     goBack: vi.fn(),
@@ -967,6 +968,22 @@ describe("receiveHub default handlers", () => {
         unit: "sat",
         context: "receive",
       });
+    });
+  });
+
+  describe("nutDrop", () => {
+    // Pure navigation to the shared radar: the drop is redeemed by the app's
+    // own mesh pipeline, so starting a machine flow here would leave a receive
+    // operation stranded.
+    it("navigates to the shared Nut Drop radar without touching the machine", async () => {
+      const { handlers, navigation, machine } = createMockConfig();
+      const { mgr } = createManager("receiveHub", handlers, hubEntry);
+
+      await mgr.execute("nutDrop");
+      expect(navigation.nutDrop).toHaveBeenCalledWith({ unit: "sat" });
+      expect(machine.showReceiveQr).not.toHaveBeenCalled();
+      expect(machine.startReceiveLightning).not.toHaveBeenCalled();
+      expect(machine.scan).not.toHaveBeenCalled();
     });
   });
 });

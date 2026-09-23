@@ -85,6 +85,7 @@ function hubActions(overrides?: Record<string, ReturnType<typeof action>>) {
     scanQr: action(),
     fixedAmount: action(),
     paste: action(),
+    nutDrop: action(),
     ...overrides,
   };
 }
@@ -98,7 +99,7 @@ describe('ReceiveHubScreen', () => {
     mockUseScreenActions.mockReset();
   });
 
-  it('renders all four method rows enabled when the entry is loaded', () => {
+  it('renders every method row enabled when the entry is loaded', () => {
     const actions = hubActions();
     mockUseScreenActions.mockReturnValue({
       entry: { type: 'receive', id: 'receive-hub', unit: 'sat' },
@@ -111,11 +112,50 @@ describe('ReceiveHubScreen', () => {
       renderer = TestRenderer.create(<ReceiveHubScreen receiveHubEntry="{}" unit="sat" />);
     });
 
-    for (const id of ['qrDisplay', 'scanQr', 'fixedAmount', 'paste']) {
+    for (const id of ['qrDisplay', 'scanQr', 'fixedAmount', 'paste', 'nutDrop']) {
       const row = findByTestID(renderer!, `receive-method-${id}`);
       expect(row).toBeTruthy();
       expect(row.props.disabled).toBe(false);
     }
+  });
+
+  // Nut Drop exists on both front doors; the receive row has to read as the
+  // same method as the send one, so it keeps the send hub's name and glyph.
+  it('offers Nut Drop as a receive method under the send hub name and glyph', () => {
+    mockUseScreenActions.mockReturnValue({
+      entry: { type: 'receive', id: 'receive-hub', unit: 'sat' },
+      error: null,
+      actions: hubActions(),
+    });
+
+    let renderer: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(<ReceiveHubScreen receiveHubEntry="{}" unit="sat" />);
+    });
+
+    const row = findByTestID(renderer!, 'receive-method-nutDrop');
+    expect(row.props.title).toBe('Nut Drop');
+    expect(row.props.subtitle).toBe('Be paid by someone nearby');
+    expect(row.props.leading.props.icon).toBe('mdi:bluetooth');
+  });
+
+  it('disables Nut Drop with its reason on a non-Bitcoin account', () => {
+    mockUseScreenActions.mockReturnValue({
+      entry: { type: 'receive', id: 'receive-hub', unit: 'usd' },
+      error: null,
+      actions: hubActions({
+        nutDrop: action(false, 'Nut Drops are sats — switch to your Bitcoin account'),
+      }),
+    });
+
+    let renderer: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(<ReceiveHubScreen receiveHubEntry="{}" unit="usd" />);
+    });
+
+    const row = findByTestID(renderer!, 'receive-method-nutDrop');
+    expect(row.props.disabled).toBe(true);
+    expect(row.props.subtitle).toBe('Nut Drops are sats — switch to your Bitcoin account');
   });
 
   it('executes the matching screen action when a row is pressed', async () => {
@@ -170,7 +210,7 @@ describe('ReceiveHubScreen', () => {
       renderer = TestRenderer.create(<ReceiveHubScreen unit="sat" />);
     });
 
-    for (const id of ['qrDisplay', 'scanQr', 'fixedAmount', 'paste']) {
+    for (const id of ['qrDisplay', 'scanQr', 'fixedAmount', 'paste', 'nutDrop']) {
       expect(findByTestID(renderer!, `receive-method-${id}`).props.disabled).toBe(true);
     }
   });

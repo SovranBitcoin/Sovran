@@ -915,10 +915,15 @@ function receiveHubAvailability(
     method: "bolt11",
     unit: unit ?? "sat",
   });
+  // Nut Drop is sat-pinned at the protocol level (the advertised standing
+  // request names `sat`), so the row explains itself on a fiat account rather
+  // than opening a surface that could never be paid.
+  const isBitcoinAccount = (unit ?? "sat") === "sat";
   logger.debug("screenActions.availability.receiveHub.context", {
     isReceiveHub,
     unit: unit ?? null,
     canReceiveLightning,
+    isBitcoinAccount,
   });
 
   return {
@@ -931,6 +936,12 @@ function receiveHubAvailability(
         : {}),
     },
     paste: { available: isReceiveHub },
+    nutDrop: {
+      available: isReceiveHub && isBitcoinAccount,
+      ...(!isBitcoinAccount
+        ? { reason: "Nut Drops are sats — switch to your Bitcoin account" }
+        : {}),
+    },
     back: { available: true },
   };
 }

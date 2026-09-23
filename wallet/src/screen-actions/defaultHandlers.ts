@@ -34,6 +34,8 @@ import type { ScreenActionContext, ScreenActionHandlerMap } from "./types";
 
 export interface NavigationCallbacks {
   scanQr?: (params: { unit: string; context: "receive" | "amount" }) => void;
+  /** Nut Drop — the nearby-peer radar, shared by both payment hubs. */
+  nutDrop?: (params: { unit: string }) => void;
   mintInfo?: (mintInfoEntry: string) => void;
   addMint?: () => void;
   goBack?: () => void;
@@ -644,6 +646,15 @@ export function createDefaultScreenActionHandlers(
       paste: async () => {
         const machine = getMachine();
         await machine?.scan?.(undefined, { reset: true });
+      },
+
+      // The SAME radar the send hub opens: one Nut Drop surface, reached from
+      // either hub. It is pure navigation — the drop itself is redeemed by the
+      // app's own mesh pipeline, not by this flow.
+      nutDrop: async (ctx: ScreenActionContext) => {
+        const entry = ctx.entry as EntryLike;
+        const unit = getString(entry, "unit") ?? "sat";
+        navigation.nutDrop?.({ unit });
       },
     },
 

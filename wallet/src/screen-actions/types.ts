@@ -45,8 +45,14 @@ export type ScreenActionName = {
   meltQuote: "pay" | "cancel" | "back";
   paymentRequest: "confirm" | "cancel" | "back";
   /** Receive modal root — the method chooser (QR Display / Scan QR / Fixed
-   *  Amount / Paste). */
-  receiveHub: "qrDisplay" | "scanQr" | "fixedAmount" | "paste" | "back";
+   *  Amount / Paste / Nut Drop). */
+  receiveHub:
+    | "qrDisplay"
+    | "scanQr"
+    | "fixedAmount"
+    | "paste"
+    | "nutDrop"
+    | "back";
   /** Receive QR display — the standing-rail tabs behind the hub's QR Display. */
   receive:
     | "copy"

@@ -1092,7 +1092,7 @@ describe("receiveHubAvailability", () => {
     },
   });
 
-  it("exposes all four options when a bolt11 mint exists", () => {
+  it("exposes every option when a bolt11 mint exists on the Bitcoin account", () => {
     const actions = getAvailableActions(
       "receiveHub",
       hubEntry({ "4": { methods: [{ method: "bolt11", unit: "sat" }] } }),
@@ -1102,6 +1102,20 @@ describe("receiveHubAvailability", () => {
     expect(actions.scanQr.available).toBe(true);
     expect(actions.paste.available).toBe(true);
     expect(actions.fixedAmount.available).toBe(true);
+    expect(actions.nutDrop.available).toBe(true);
+  });
+
+  // Nut Drop advertises a standing request that names `sat`, so a fiat account
+  // could never be dropped to — the row says why instead of opening a dead end.
+  it("disables nutDrop (with reason) on a non-sat account", () => {
+    const actions = getAvailableActions("receiveHub", {
+      ...hubEntry({ "4": { methods: [{ method: "bolt11", unit: "usd" }] } }),
+      unit: "usd",
+    });
+
+    expect(actions.nutDrop.available).toBe(false);
+    expect(actions.nutDrop.reason).toMatch(/Bitcoin account/);
+    expect(actions.qrDisplay.available).toBe(true);
   });
 
   it("disables fixedAmount (with reason) when no mint supports bolt11", () => {
@@ -1122,6 +1136,7 @@ describe("receiveHubAvailability", () => {
     expect(actions.scanQr.available).toBe(false);
     expect(actions.paste.available).toBe(false);
     expect(actions.fixedAmount.available).toBe(false);
+    expect(actions.nutDrop.available).toBe(false);
     expect(actions.back.available).toBe(true);
   });
 });
