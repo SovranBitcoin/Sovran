@@ -17,8 +17,8 @@ Branch: `feat/receive-nut-drop`.
 | 5 | `state` | done | 0 findings, but exposed a rule blind spot; new rule added |
 | 6 | `nostr` | done | 1 defect found and **fixed** (`33953ab4`) |
 | 7 | `errors` | done | both rules deleted (mint-side), 1 added; 1 defect fixed, ~52 blocked |
-| 8 | `ui` | in-progress | |
-| 9 | `nip17`, `nip59` | partly done | see the pre-sweep rows below; re-run to confirm |
+| 8 | `ui` | done | 22 findings, 22 false positives; rule sharpened 22 → 1 |
+| 9 | `nip17`, `nip59` | in-progress | pre-sweep rows below; re-running to confirm |
 | 10 | `nip61`, `nip60`, `nip46`, `nip65`, `nip04`, `nip19`, `nip01`, `nip06` | pending | |
 | 11 | `nut06`, `nut10`, `nut11`, `nut12`, `nut18` | pending | |
 | 12 | `bip32`, `bip39`, `bip43`, `bip21`, `bip321` | pending | |
@@ -331,3 +331,37 @@ hits out of 68 is a better trade than a wording that might drop real ones.
 This domain is the clearest evidence for the `state` domain's standing lesson.
 Two rules scoring zero looked like a clean domain and was in fact a rule that
 could never fire over a defect present in ~52 places.
+
+### ui — done
+
+Scope run: `check --all --only "ui/*"` (whole repo). 3,388 questions / 2,664
+requests. **complete: true, 0 failed requests** — the only fully complete run
+of the sweep so far. **22 findings**, every one `ui/status-notice`;
+`ui/header-continuity` and `ui/header-scroll-work` returned zero.
+
+- [ui/status-notice] 22 findings across 18 files
+  verdict: false-positive (all 22)
+  evidence: the rule's criteria require a notice on "its own tinted or bordered surface", but 17 of the 18 flagged files contain no status tint at all. What it matched was any icon-beside-text composition. The clearest cases: `StatusToast.tsx` (0.83) and its siblings `ToastSlab.tsx` and `CompactToast.tsx` are the shared toast system — transient overlays spread with `toastProps` from the heroui toast manager, not inline notices; `SearchTip.tsx` (0.37) is an `HStack` with a muted icon and one line of copy and no surface whatsoever; `SignerConnectSheetContent.tsx` (0.65) was flagged while already rendering `Notice` three times.
+  action: rule sharpened in `6530c73e`, not the code. Before/after on the same 18 files plus `Notice.tsx` and `ActionMenuHost.tsx`: **22 → 1**. The survivor is `TransferStepChain.tsx:234` (0.48 → 0.55), an animated progress chain that reads `dangerColor`/`warningColor` from the theme — still false, and deliberately left rather than chased to zero.
+
+Ground truth established before touching the rule: searching the whole app for
+a status tint plus an icon, outside `Notice`'s own implementation, returns
+only two files, and both are the same deliberate pattern — a `bg-danger/10`
+wrapper laid over an existing row to mark that row's state
+(`paymentOptionsSheet.tsx:123`, `ActionMenuHost.tsx:473`). The latter carries
+a comment explaining the choice, including that "colour alone is not an
+accessibility signal". Both are intentional row highlights, not notices.
+
+So this repository contains **no genuine hand-built status notice**. That is
+worth stating plainly for two reasons. First, it means every one of the 22
+findings was false and no code needed changing. Second, it means **recall
+could not be measured** — there is no positive example here to confirm the
+sharpened rule still catches one. The rule earns its keep by catching a future
+regression, so it was tightened to require the shape (surface + icon +
+sentence) rather than narrowed to match fewer files, which is the distinction
+between sharpening and blunting.
+
+Note on the domain's zeros: unlike `payments`, `state` and `errors`, the two
+header rules scoring zero is *not* a framing artefact — both are whole-file
+questions over `**/*.{tsx,jsx}` with no "does this change …" phrasing, so
+their zero is about the code.
