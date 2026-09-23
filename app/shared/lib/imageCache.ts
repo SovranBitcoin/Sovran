@@ -32,7 +32,7 @@ function normalizeUrl(url: string): string {
 // `javascript:` / `data:` / `file:` / `chrome:` URL never reaches the
 // image loader. http is permitted (some self-hosted mints publish
 // http-only logos) but logged so it's visible in log-doctor.
-function isSafeImageUrl(url: string): boolean {
+export function isSafeImageUrl(url: string): boolean {
   try {
     const proto = new URL(url).protocol;
     return proto === 'https:' || proto === 'http:';
