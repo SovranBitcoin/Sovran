@@ -310,7 +310,16 @@ function parseBip321Container(input: string): Bip321Container | null {
   if (!trimmed.toLowerCase().startsWith("bitcoin:")) return null;
 
   let address: string | null = null;
-  let params: Record<string, string[]> = {};
+  // Null-prototype: every key here comes from a scanned QR, a deep link or a
+  // paste. With a normal object literal, `?constructor=`, `?__proto__=` or
+  // `?toString=` makes `params[key]` resolve an inherited value, so the
+  // `if (!params[key])` init is skipped and `params[key].push(value)` throws
+  // `TypeError: params[key].push is not a function` — out of parsePaymentInput,
+  // which is the path a scanned payment takes.
+  let params: Record<string, string[]> = Object.create(null) as Record<
+    string,
+    string[]
+  >;
 
   try {
     const url = new URL(trimmed.replace(/^bitcoin:/i, "bitcoin://x/"));
