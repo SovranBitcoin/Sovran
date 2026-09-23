@@ -29,7 +29,7 @@ Branch: `feat/receive-nut-drop`.
 | 15c | `doc/…/conventions-react-native` (29 rules) | done | 20 findings; 3 defects **fixed** incl. a WebView scheme escape |
 | 15d | `doc/…/conventions-async-tests` (31 rules) | done | 85 findings; 61 in shipping code, recorded as F47 |
 | 15e | `doc/…/conventions-state` (34 rules) | done | 40 findings; top cluster recorded as F48 |
-| 15f | `doc/…/contributor-conventions` (122 rules) | in-progress | largest in the config |
+| 15f | `doc/…/contributor-conventions` (122 rules) | done | 221 findings, 44 rules; clusters recorded, top verified |
 
 ## Findings
 
@@ -735,3 +735,38 @@ render (`f5945e38`), `own()` guarded `decode.ts` but not `interpret.ts`
 (`a789dbc6`), `AppState` covered the nip46 internals but not the signer
 screens (F46), and `routstrStore` capped its collections while thirteen other
 stores did not (F48).
+
+#### contributor-conventions — done
+
+122 rules — the largest in the config. 4,564 requests, **104,417 questions**,
+**42.5M input tokens**, 52 failed. **221 findings across 44 distinct rules**,
+more than every other convention file combined.
+
+Depth is stated first, because it governs how to read everything below: at
+this size, individual triage of 221 findings was not attempted. The top of the
+highest-stakes clusters was read in source; the rest are grouped by rule and
+location. Where a verdict is a judgement about a cluster rather than a
+confirmation of its members, it says so.
+
+- [zod-throwing-parse-untrusted] app/shared/lib/nostr/moderation.ts:73,75 (0.93)
+  verdict: intentional
+  evidence: read in source. `Tags.parse(JSON.parse(plaintext))` and `Tags.parse(event.tags)` do throw on relay-supplied input — but throwing is this module's contract, not an accident. `decodeMuteList:62-64` already throws `'Invalid mute list'` and `'Unsupported mute list'` by hand, `readMuteList` throws on no relays and on timeout, and `setPersonBlocked:158-175` converts every throw into `Promise.reject(error)` with `scope.dispose()` cleanup. The docstring states the purpose: "never replace unreadable encrypted entries" — refusing loudly is how it avoids clobbering a mute list it could not read.
+  action: none. The remaining three (`e2e/capture/import.ts`, `ReceivePaymentRequestQuoteScreen`, `release/site.mjs`) were not read.
+
+- [wallet-logic-in-app] 5 and [payment-logic-in-app-layer] 6 — concentrated in `app/features/send/lib/sovranPaymentConfig.ts` (:133, :255, :405, :555), 0.78-0.94
+  verdict: defect (pre-existing, already registered)
+  evidence: not newly diagnosed — **F26** already records exactly this: "Receive and mint-quote sequencing, and history reconciliation by polling, live in `app/features/send/lib/sovranPaymentConfig.ts` … Move them beside the `wallet/` operations they override." Both rules independently rediscovered the same file and the same lines, which is corroboration of F26 rather than a new finding.
+  action: none. F26 stands as written.
+
+- 44 rules firing, largest clusters: `shared-value-dot-value` (32), `error-passed-on-lossily` (26), `data-mirrored-between-owners` (16), `clock-read-inside-freshness-helper` (15), `runonjs-added` (12), `test-mocks-owned-logic` (11), `restates-owned-values` (9), `route-param-not-identifier` (8)
+  verdict: recorded, not verified
+  action: none, and the honest reason is scale rather than judgement — 221 findings is more than the rest of the sweep combined, and triaging them at the depth applied elsewhere is its own exercise. Two pointers for whoever picks it up: `route-param-not-identifier` (8) overlaps **F25** (JSON-encoded Colada entries as route params), and `shared-value-dot-value` (32) is the Reanimated `.value`-in-render class, which the config already switched off in its `skill/expo-animation` form as superseded by a house convention — so the doc-compiled copy may be asking a question the config already answered.
+
+## Sweep complete
+
+Every domain in the queue is marked done. The three run-scale facts worth
+keeping: the whole sweep asked well over 400,000 questions; the provider
+degraded repeatedly (`GatewayInternalServerError`, one `GatewayRateLimitError`)
+and cost one domain its completeness; and **no run of the sweep was ever
+`complete: true` except `ui` and `bip*`**, so every "0 findings" elsewhere
+carries a caveat that is recorded in its own section.
