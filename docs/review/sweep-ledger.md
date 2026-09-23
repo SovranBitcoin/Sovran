@@ -16,8 +16,8 @@ Branch: `feat/receive-nut-drop`.
 | 4 | `money` | done | 1 defect (blocked: 5-way refactor), 1 intentional, 1 false-positive |
 | 5 | `state` | done | 0 findings, but exposed a rule blind spot; new rule added |
 | 6 | `nostr` | done | 1 defect found and **fixed** (`33953ab4`) |
-| 7 | `errors` | in-progress | |
-| 8 | `ui` | pending | |
+| 7 | `errors` | done | both rules deleted (mint-side), 1 added; 1 defect fixed, ~52 blocked |
+| 8 | `ui` | in-progress | |
 | 9 | `nip17`, `nip59` | partly done | see the pre-sweep rows below; re-run to confirm |
 | 10 | `nip61`, `nip60`, `nip46`, `nip65`, `nip04`, `nip19`, `nip01`, `nip06` | pending | |
 | 11 | `nut06`, `nut10`, `nut11`, `nut12`, `nut18` | pending | |
@@ -300,3 +300,34 @@ Both `nostr/*` rules are change-framed ("Does this **change** …"), so per the
 `state` domain's standing lesson their yield on `--all` understates the code.
 The one finding that did land came through because the false claim is in a
 static copy string, which reads the same with or without a diff.
+
+### errors — done
+
+Scope run: `check --all --only "errors/*"` (whole repo). 9,220 questions /
+4,610 requests. **0 findings** — and the zero was structural, not clean.
+
+- [errors/no-raw-error-leakage], [errors/codes-used-as-specified] — cannot fire in this repository
+  verdict: false-positive (rules review code we do not own)
+  evidence: `config --explain` shows both are mint-side. `no-raw-error-leakage` instructs "answer false if `hunk` does not build mint error responses"; `codes-used-as-specified` is about emitting the NUT-00 numeric code table. Sovran is a wallet — it consumes those codes and never emits them. Both failed the selection principle already written at the top of `hunch.config.ts`. The comment that justified keeping them claimed they stood in for AGENTS.md's ban on publishing raw error bodies; they cannot, because each one's first instruction is to answer false outside a mint.
+  action: both deleted and replaced with `errors/raw-error-to-ui` in `8c624d6f`, which asks the question this repository can answer. `hunch install` regenerated the lock: 115 pack rules → 113, 4 insertions / 68 deletions, no compiled rule changed.
+
+- [errors/raw-error-to-ui] app/features/settings/screens/SettingsScreen.tsx:250 — `Alert.alert('Export Failed', error.message)`
+  verdict: defect
+  evidence: named directly by F04. Blame is the incidental case — no test or doc pinned the wording.
+  action: **fixed** in `45f5924d`, now `describeError(error, 'cashu').text`, with the raw error still going to `log.error` two lines above. Honest caveat recorded in the commit: the row sits inside `SettingsScreen.tsx:392`'s `{devMode ? …}` Developer section, so only a developer with dev mode on can reach it — the fix is correctness and consistency, not a user-facing leak closed. Verified: type-check 0 across three workspaces, lint 0 errors (160 warnings = baseline), 50 tests across 4 settings suites.
+
+- [errors/raw-error-to-ui] repo-wide — 68 candidates
+  verdict: defect (~52), intentional (16)
+  evidence: the new rule, run over the whole repo, returns 68. Sampling the top confirms they are real, not noise: `ReceivePaymentRequestTab.tsx:156` interpolates `${error}` straight into empty-state copy; `sovranPaymentConfig.ts` ~2014 puts `rawError.message` into `nfcSendFailedPopup`; `wallet/src/screen-actions/defaultHandlers.ts` ~228 sets `message: err.message` on a UI-bound field. Classification: 45 in `app/features`/`app/shared` and 7 in `wallet/` are shipped surfaces → defects. 10 are CLI tooling (`app/codereview/log-doctor`, `app/e2e/viewer`), which the app never imports — only comment references exist, in `MintInfoScreen.tsx:397-399` → intentional. 6 are in the devMode-gated settings section where raw text is the point → intentional.
+  action: blocked. F04 rewritten in `71c364cc` from "three places" to the true scope, pointing at the rule id as the way to enumerate the current set rather than a list that goes stale. Fixing ~52 call sites consistently is a refactor the protocol forbids inside a fix commit, and it needs a prior decision on whether `describeError`'s five services (`routstr`/`cashu`/`nostr`/`nagg`/`app`) cover NFC, clipboard, filesystem and BLE failures or need extending.
+
+Rule-precision note: `errors/raw-error-to-ui` excludes developer-only screens,
+but the devMode gate for the settings surfaces lives in `SettingsScreen.tsx`
+while the error lives in `SettingsStorageScreen.tsx` — a different file. The
+rule cannot see cross-file route gating, the same blindness as the `payments`
+cross-package abstentions. Left alone rather than blunted: 6 known-intentional
+hits out of 68 is a better trade than a wording that might drop real ones.
+
+This domain is the clearest evidence for the `state` domain's standing lesson.
+Two rules scoring zero looked like a clean domain and was in fact a rule that
+could never fire over a defect present in ~52 places.
