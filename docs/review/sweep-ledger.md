@@ -15,8 +15,8 @@ Branch: `feat/receive-nut-drop`.
 | 3 | `payments` | done | 0 defects; 4 abstentions hand-verified, all correctly guarded |
 | 4 | `money` | done | 1 defect (blocked: 5-way refactor), 1 intentional, 1 false-positive |
 | 5 | `state` | done | 0 findings, but exposed a rule blind spot; new rule added |
-| 6 | `nostr` | in-progress | |
-| 7 | `errors` | pending | |
+| 6 | `nostr` | done | 1 defect found and **fixed** (`33953ab4`) |
+| 7 | `errors` | in-progress | |
 | 8 | `ui` | pending | |
 | 9 | `nip17`, `nip59` | partly done | see the pre-sweep rows below; re-run to confirm |
 | 10 | `nip61`, `nip60`, `nip46`, `nip65`, `nip04`, `nip19`, `nip01`, `nip06` | pending | |
@@ -277,3 +277,26 @@ as the code being clean.
 Blocked (provider content filter): `sync-bitchat-android.js:379` (3 rules),
 `patch-bitchat-imports.js:244` (2), `composition.test.mjs:1` (3),
 `copy/src/site.ts:1` (3). Hand-verified: none owns persisted state.
+
+### nostr — done
+
+Scope run: `check --all --only "nostr/*"` (whole repo). 4,592 questions /
+3,174 requests. `complete: false` — 2 requests failed (content-filtered
+scripts). **1 finding**, fixed.
+
+- [nostr/delivery-claim] wallet/src/screen-actions/defaultHandlers.ts:594-743 — a relay OK presented to the user as recipient receipt
+  verdict: defect
+  evidence: the success path sets `phase: "delivered"`, and the copy behind it read `toast.paymentRequest.delivered` = "Delivered to recipient" and `timeline.paymentRequest.nostrSent.label` = "Delivered". The only evidence at that point is one relay accepting a gift wrap — `sendDirectMessage` resolves on `Promise.any(pool.publish(...))`, the first relay OK — and under NIP-17 the recipient may not read that relay at all. `docs/protocols/nostr.md:45` states it directly: "Relay acceptance does not prove that a recipient received or read a message." `CLAIMS.md:163-166` had already listed these two labels as meriting state-specific review. Blame `70d052de` is a feature commit about surfacing pending payment-request receives — the wording arrived incidentally, with no test or doc pinning it.
+  action: **fixed** in `33953ab4`. The honest words were already in the file: `nostrSent.infoSent` says "Sent via Nostr" one line below the label, and the real receipt signal is the separate finalized/confirmed state "Claimed by recipient", which fires when the recipient redeems. Label → "Sent", toast → "Sent via Nostr", leaving "Claimed by recipient" as the only phrase asserting receipt. Keys unchanged, so nothing persisted or wired moved. Verified: type-check 0 across three workspaces, 216 tests in 12 suites, lint 0 errors (160 warnings = baseline), and `check --only "nostr/*"` on both files now returns **0 findings**. Five timeline snapshots re-pinned; their diff is exactly "Delivered" → "Sent" and nothing else, so this is re-pinning intended output, not loosening an assertion.
+
+Self-correction recorded: `8bcf6f06` and its ledger row claimed `bun run
+type-check` clean. That was true when measured, but `dmRelayDiscovery.test.ts`
+was written afterwards and typed its `SimplePool.get` fake as `{ tags }`,
+which does not satisfy `NostrEvent`. Type-check was red from that commit until
+`77805601` fixed it. The rule to keep: re-run the gate after the last edit,
+not the last edit you remember.
+
+Both `nostr/*` rules are change-framed ("Does this **change** …"), so per the
+`state` domain's standing lesson their yield on `--all` understates the code.
+The one finding that did land came through because the false claim is in a
+static copy string, which reads the same with or without a diff.
