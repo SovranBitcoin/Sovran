@@ -70,7 +70,10 @@ export function useMintSelectorFrameLog({
   const previousKeyRef = useRef('');
 
   useEffect(() => {
-    mountedAtRef.current ??= performance.now();
+    // Plain assignment, not `??=`: the React Compiler cannot lower a logical
+    // assignment operator and bails out of the whole hook when it sees one,
+    // which leaves the mint selector rendering unmemoized.
+    if (mountedAtRef.current === null) mountedAtRef.current = performance.now();
     const described = describeMintSelectorFrame(previousRef.current, rows);
     const key = JSON.stringify([source, itemsStatus, step, described.rows]);
     if (key === previousKeyRef.current) return;
