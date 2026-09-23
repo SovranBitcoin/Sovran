@@ -89,10 +89,17 @@ function ScopeBody({
   aggregates: SearchAggregates;
   searchQuery: string;
 }) {
+  // `key={scope}`: every branch below (bar Posts) returns the SAME component
+  // type at the SAME position, so React reconciles them as one element and the
+  // FlashList underneath keeps its recycled cells and scroll offset across a
+  // scope change. The rows for the new scope then only appear once a scroll
+  // forces the cells to re-render. A per-scope key makes each scope its own
+  // list, which is what it is.
   switch (scope) {
     case 'People':
       return (
         <SearchResultRows
+          key={scope}
           results={aggregates.people}
           status={aggregates.peopleStatus}
           onRetry={aggregates.retryPeople}
@@ -104,6 +111,7 @@ function ScopeBody({
     case 'Mints':
       return (
         <SearchResultRows
+          key={scope}
           results={aggregates.mints}
           status={aggregates.mintsStatus}
           onRetry={aggregates.retryMints}
@@ -112,13 +120,19 @@ function ScopeBody({
       );
     case 'Groups':
       return (
-        <SearchResultRows results={aggregates.groups} status="ready" searchQuery={searchQuery} />
+        <SearchResultRows
+          key={scope}
+          results={aggregates.groups}
+          status="ready"
+          searchQuery={searchQuery}
+        />
       );
     case 'All':
     default:
       // People is the primary read for the All scope; mints ride along.
       return (
         <SearchResultRows
+          key="All"
           results={aggregates.all}
           status={aggregates.peopleStatus}
           onRetry={aggregates.retryPeople}

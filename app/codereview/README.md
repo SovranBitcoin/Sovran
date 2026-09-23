@@ -37,13 +37,13 @@ exactly what gets run.
 These hold across all three tools so you don't have to re-derive flag
 shapes per tool.
 
-| Convention                     | What it means                                                                                                                                                              |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Convention                     | What it means                                                                                                                                               |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Positional first arg**       | Scopes the run. For `analyze-structure` and `lookalikes`, it's a path (subtree to scan). For `log-doctor`, it's a mode name (`stats`, `errors`, `slow`, …). |
-| `--json`                       | Machine-readable output — present everywhere. Pipe through `jq` to filter.                                                                                                 |
-| Compact output for LLM context | `analyze-structure --llm` (~5K tokens), `log-doctor full --format md` (~6K).                                                                                               |
-| `--no-<report>`                | Suppress a default-on report to compress output.                                                                                                                           |
-| `--<threshold> N`              | Numeric tuning flag. Each tool documents its set below.                                                                                                                    |
+| `--json`                       | Machine-readable output — present everywhere. Pipe through `jq` to filter.                                                                                  |
+| Compact output for LLM context | `analyze-structure --llm` (~5K tokens), `log-doctor full --format md` (~6K).                                                                                |
+| `--no-<report>`                | Suppress a default-on report to compress output.                                                                                                            |
+| `--<threshold> N`              | Numeric tuning flag. Each tool documents its set below.                                                                                                     |
 
 Output too large to reason with? Pipe through `head -200`, narrow with
 grep, or scope harder. Never paste raw 100k-line output into a finding,
@@ -51,20 +51,20 @@ slice plan, or commit message.
 
 ## When to reach for which
 
-| Symptom or question                               | Tool                           | Mode / flag                     |
-| ------------------------------------------------- | ------------------------------ | ------------------------------- |
-| "Where should we refactor next?"                  | `analyze-structure`            | `--llm` (score block)           |
-| "Which files are too coupled?"                    | `analyze-structure`            | default — fanin/coupling/cycles |
-| "Does this one file show up in any hotspot?"      | `analyze-structure`            | `--focus path/to/file.ts`       |
-| "Where are the duplicate names?"                  | `lookalikes`                   | default reports                 |
-| "Two values look the same — are they?"            | `lookalikes`                   | `--by-value '#FF0000'`          |
-| "What's `red` defined as in this repo?"           | `lookalikes`                   | `--by-name red`                 |
-| "Did this file change touch any near-duplicates?" | `lookalikes`                   | `--focus path/to/file.ts`       |
-| "What broke in the last session?"                 | `log-doctor`                   | `errors --latest --context 5`   |
-| "Why is the app slow on launch?"                  | `log-doctor`                   | `startup --latest`              |
-| "What screens did the user hit before crashing?"  | `log-doctor`                   | `screens --latest`              |
-| "Is there a memory leak?"                         | `log-doctor`                   | `gc --latest`                   |
-| "Which mode fits in my context window?"           | `log-doctor`                   | `budget`                        |
+| Symptom or question                               | Tool                | Mode / flag                     |
+| ------------------------------------------------- | ------------------- | ------------------------------- |
+| "Where should we refactor next?"                  | `analyze-structure` | `--llm` (score block)           |
+| "Which files are too coupled?"                    | `analyze-structure` | default — fanin/coupling/cycles |
+| "Does this one file show up in any hotspot?"      | `analyze-structure` | `--focus path/to/file.ts`       |
+| "Where are the duplicate names?"                  | `lookalikes`        | default reports                 |
+| "Two values look the same — are they?"            | `lookalikes`        | `--by-value '#FF0000'`          |
+| "What's `red` defined as in this repo?"           | `lookalikes`        | `--by-name red`                 |
+| "Did this file change touch any near-duplicates?" | `lookalikes`        | `--focus path/to/file.ts`       |
+| "What broke in the last session?"                 | `log-doctor`        | `errors --latest --context 5`   |
+| "Why is the app slow on launch?"                  | `log-doctor`        | `startup --latest`              |
+| "What screens did the user hit before crashing?"  | `log-doctor`        | `screens --latest`              |
+| "Is there a memory leak?"                         | `log-doctor`        | `gc --latest`                   |
+| "Which mode fits in my context window?"           | `log-doctor`        | `budget`                        |
 
 ## analyze-structure
 
@@ -164,24 +164,24 @@ Reads structured JSON logs (from `dumpForLLM()` or piped input). Token
 costs below come from `npx tsx codereview/log-doctor/index.ts budget` on
 a typical session — your numbers will differ.
 
-| Mode               | Typical tokens | What it shows                            |
-| ------------------ | -------------- | ---------------------------------------- |
-| `renders`          | ~266           | Re-render counts, why-did-update hints   |
-| `stats`            | ~1.1K          | Event frequency, slowest ops, error rate |
-| `coco`             | ~3K            | Coco wallet module breakdown             |
-| `network`          | ~4K            | Request/response pairs with latency      |
-| `visual`           | session-sized  | Layout rows, overlaps, container bounds  |
-| `timeline`         | ~5K            | One-line-per-entry with delta timing     |
-| `startup`          | ~5K            | Initialization waterfall, gate sequence  |
-| `full --format md` | ~6K            | Pipe-delimited dense summary             |
-| `slow`             | ~18K           | Gaps between consecutive log lines (NOT op durations — use `perf`/`spans`) |
+| Mode               | Typical tokens | What it shows                                                                                                 |
+| ------------------ | -------------- | ------------------------------------------------------------------------------------------------------------- |
+| `renders`          | ~266           | Re-render counts, why-did-update hints                                                                        |
+| `stats`            | ~1.1K          | Event frequency, slowest ops, error rate                                                                      |
+| `coco`             | ~3K            | Coco wallet module breakdown                                                                                  |
+| `network`          | ~4K            | Request/response pairs with latency                                                                           |
+| `visual`           | session-sized  | Layout rows, overlaps, container bounds                                                                       |
+| `timeline`         | ~5K            | One-line-per-entry with delta timing                                                                          |
+| `startup`          | ~5K            | Initialization waterfall, gate sequence                                                                       |
+| `full --format md` | ~6K            | Pipe-delimited dense summary                                                                                  |
+| `slow`             | ~18K           | Gaps between consecutive log lines (NOT op durations — use `perf`/`spans`)                                    |
 | `perf`             | varies         | Per-event duration p50/p95/p99 + sparkline (reads `ms`, `duration_ms`, `durationMs`, `elapsedMs`, `decodeMs`) |
-| `spans`            | small          | Durations synthesized by pairing `.start` → `.done`/`.failed` entries |
-| `waste`            | small          | Repeated identical work: same event + same params ≥ `--min-repeats`, with wasted-ms rollup |
-| `tiers`            | small          | Nostr tier waterfall: per-tier health, failover cost, per-surface serving |
-| `redaction`        | ~1K            | Secret-redaction audit (brands + un-redacted flags) |
-| `screens`          | ~70K           | Screen flow + content snapshots          |
-| `errors`           | clustered      | Errors collapsed to exemplars (`--all` = full context) |
+| `spans`            | small          | Durations synthesized by pairing `.start` → `.done`/`.failed` entries                                         |
+| `waste`            | small          | Repeated identical work: same event + same params ≥ `--min-repeats`, with wasted-ms rollup                    |
+| `tiers`            | small          | Nostr tier waterfall: per-tier health, failover cost, per-surface serving                                     |
+| `redaction`        | ~1K            | Secret-redaction audit (brands + un-redacted flags)                                                           |
+| `screens`          | ~70K           | Screen flow + content snapshots                                                                               |
+| `errors`           | clustered      | Errors collapsed to exemplars (`--all` = full context)                                                        |
 
 Run `--help` for the full mode list. Unknown flags are fatal (they used to
 silently fall through to `stats`).
@@ -221,6 +221,81 @@ npx tsx codereview/log-doctor/index.ts timeline --event 'visual\\.layout|\\.shif
 # `VIEWABLE POSITION COVERAGE` flags visible rows missing measured or virtual positions.
 # `--scope`, `--component`, `--key`, and `--item-type` narrow visual summaries by params.
 
+# Re-render + data-arrival investigation (profile, DMs, feed, thread, mint surfaces).
+# These surfaces carry the full triple: read lifecycle (`read.<surface>.*`), render
+# diagnostics (`render.count` / `render.why` / `state.change` / `query.*`, from
+# `shared/lib/loggerRender.ts`), and visual state (`visual.layout.state_change`).
+# Exercise each surface in a dev build, then:
+npx tsx codereview/log-doctor/index.ts reads   --latest   # cache hits, TTFUD, blank flashes
+npx tsx codereview/log-doctor/index.ts renders --latest   # counts, why-did-update, state churn, data-hook updates
+npx tsx codereview/log-doctor/index.ts visual  --latest --component HomeFeed
+
+# Read the three together for one surface — same order the user experiences it:
+# what was fetched, what the tree was handed, what moved on screen.
+npx tsx codereview/log-doctor/index.ts timeline --latest \
+  --event 'read\\.mintDetail|query\\.|render\\.why|visual\\.layout\\.state_change'
+
+# `render.count` rows named `<List>/row` are per-second rollups of list rows.
+# `wasted` = renders beyond the first for a row in that second; near zero is healthy,
+# climbing toward `rows` means one arrival redrew the whole visible list.
+npx tsx codereview/log-doctor/index.ts timeline --latest --event 'render\\.count'
+
+# `render.why` with `unexplained: true` is a commit where NO named input changed —
+# a parent re-rendering the subtree for nothing, the cheapest re-render to delete.
+npx tsx codereview/log-doctor/index.ts timeline --latest --event 'render\\.why'
+
+# Production cost of instrumentation. Emission is fully gated — `SHOW_LOGS` is
+# `__DEV__`, checked at the top of `emit`, and every hook in `loggerRender.ts` /
+# `contentShiftLog.ts` resolves to a no-op at module init. But a no-op still lets
+# the CALLER evaluate its arguments, so params that DO work cost a shipped build.
+# Pass a thunk instead; it is resolved only after the gates:
+#     paymentLog.debug('mint.selector.rows', () => ({ cold: rows.filter(...).length }))
+#     useQueryResultLogger(() => ({ source, extra: { n: Object.keys(map).length } }))
+# Find the call sites that still evaluate eagerly:
+grep -rn --include='*.ts' --include='*.tsx' -E '\b(log|feedLog|cashuLog|paymentLog|nostrLog|chatLog)\.(info|debug|warn)\(' features shared \
+  | cut -d: -f1 | sort -u | xargs grep -l -E '\.filter\(|Object\.keys\('
+# Most remaining hits are cold paths (rebalance planning, storage inventory,
+# recovery benchmark); convert one only when it sits on a per-render, per-row or
+# per-store-write path.
+
+# Timer-driven re-reads. `reads` prices a poll only if its caller emits the app-side
+# lifecycle; a poll that calls the facade directly shows up as `nostr.read.<surface>.*`
+# with no app surface claiming it, and the per-surface report cannot see it at all.
+# Compare the two layers to find those:
+npx tsx codereview/log-doctor/index.ts reads --latest
+grep -o '"event":"nostr\.read\.[a-zA-Z]*\.' log-clean.jsonl | sort | uniq -c   # facade
+grep -o '"event":"read\.[a-zA-Z]*\.'       log-clean.jsonl | sort | uniq -c   # app
+# A facade count far above its app count is an unattributed fan-out or poll.
+npx tsx codereview/log-doctor/index.ts waste --latest --min-repeats 5
+
+# `log.txt` from `expo start` is ANSI-coloured with a level prefix, so log-doctor
+# reports "No valid log entries found in input". Strip to the JSON object first:
+python3 -c "
+import re
+a=re.compile(r'\x1b\[[0-9;]*m')
+for l in open('log.txt',encoding='utf8',errors='replace'):
+    s=a.sub('',l); i=s.find('{\"ts\"')
+    if i>=0: print(s[i:].rstrip())
+" > /tmp/log-clean.jsonl
+
+# Render-heavy code that ACTUALLY costs something. A semantic search for
+# unmemoized collection work in a render body returns ~120 files here, and ~115
+# of them are free: the React Compiler memoized them. Intersect the search with
+# `react-compiler-bailouts.json` — only a bailed-out file re-runs the work every
+# render. This narrowed 121 candidates to 6.
+python3 -c "
+import json,sys
+bail=json.load(open('react-compiler-bailouts.json'))['bailouts']
+hits=json.load(open('/tmp/render-heavy.json'))['matches']   # hunch --reporter json
+best={}
+for m in hits:
+    f=m['file'].replace('app/','',1)
+    best[f]=max(best.get(f,0), m['score'])
+for f,sc in sorted(((f,sc) for f,sc in best.items() if f in bail), reverse=True, key=lambda x:x[1]):
+    print(f'{sc:.2f}  {f}'); [print('        ↳',r) for r in bail[f]]
+"
+# The same trick applies to any condition whose cost depends on memoization.
+
 # Perf-hunting sequence: measured spans, repeated identical work, nostr waterfall health.
 npx tsx codereview/log-doctor/index.ts perf  --latest
 npx tsx codereview/log-doctor/index.ts spans --latest
@@ -236,17 +311,17 @@ npx tsx codereview/log-doctor/index.ts timeline --limit 200 --offset 0
 
 ### Tuning flags
 
-| Flag                            | Default   | What it does                                                 |
-| ------------------------------- | --------- | ------------------------------------------------------------ |
+| Flag                            | Default   | What it does                                                                                                    |
+| ------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------- |
 | `--latest`                      | off       | Only the most recent session (`_t` resets / session-id changes; idle gaps within one logSessionId do NOT split) |
-| `--no-inst`                     | off       | Strip instrumentation events (render.count, state.change, …) |
-| `--threshold <ms>`              | 500       | Duration threshold for `slow` mode                           |
-| `--min-repeats <n>`             | 3         | `waste` mode: identical repeats before a signature is reported |
-| `--context <n>`                 | 3         | Entries before/after each error                              |
-| `--token-budget <n>`            | unlimited | Auto-prune output to fit                                     |
-| `--event <pattern>`             | —         | Filter to events matching substring                          |
-| `--since <ms>` / `--until <ms>` | —         | Time-window filter                                           |
-| `--format json\|yaml\|md`       | json      | Output format for `full` mode                                |
+| `--no-inst`                     | off       | Strip instrumentation events (render.count, state.change, …)                                                    |
+| `--threshold <ms>`              | 500       | Duration threshold for `slow` mode                                                                              |
+| `--min-repeats <n>`             | 3         | `waste` mode: identical repeats before a signature is reported                                                  |
+| `--context <n>`                 | 3         | Entries before/after each error                                                                                 |
+| `--token-budget <n>`            | unlimited | Auto-prune output to fit                                                                                        |
+| `--event <pattern>`             | —         | Filter to events matching substring                                                                             |
+| `--since <ms>` / `--until <ms>` | —         | Time-window filter                                                                                              |
+| `--format json\|yaml\|md`       | json      | Output format for `full` mode                                                                                   |
 
 ## How audit.md and fix.md use these
 

@@ -93,7 +93,15 @@ import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useVisualStateLogger } from '@/shared/lib/contentShiftLog';
-import { nostrLog, paymentLog, useLifecycleLogger, mintUrlLogFields } from '@/shared/lib/logger';
+import {
+  mintUrlLogFields,
+  nostrLog,
+  paymentLog,
+  useLifecycleLogger,
+  useQueryResultLogger,
+  useStateChangeLogger,
+  useWhyDidRender,
+} from '@/shared/lib/logger';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { fontSize, iconSize } from '@/shared/styles/tokens';
 import { resolveProfileTier, type ProfileTier } from '@/shared/lib/profile/profileTier';
@@ -409,6 +417,11 @@ function startFadeReveal(fadeAnim: SharedValue<number>, durationMs: number, onSe
   );
 }
 
+/** The follower grid reserves a fixed 3x2; the loaded grid is `slice(0, 6)` of
+ *  whatever has metadata, so these two numbers diverge and that gap is a shift. */
+const TOP_FOLLOWER_SKELETON_CELLS = 6;
+const TOP_FOLLOWER_SKELETON_INDICES = [0, 1, 2, 3, 4, 5];
+
 function TopFollowers({
   topFollowers,
   isLoading,
@@ -513,7 +526,18 @@ function TopFollowers({
       itemKey={isLoading ? 'top-followers-skeleton' : 'top-followers-loaded'}
       itemType={isLoading ? 'skeleton' : 'loaded'}
       style={styles.topFollowersSection}
-      extra={{ isLoading, followers: followersWithProfiles.length }}>
+      // `reserved` vs `followers` IS the shift: the skeleton grid is always six
+      // cells, while the loaded grid is however many followers have a name or
+      // picture yet — 0 to 6, growing as batched kind-0 metadata lands. Without
+      // `reserved` a log reader sees the loaded count and cannot tell that the
+      // section shrank (or, at zero, unmounted entirely) underneath it.
+      extra={{
+        isLoading,
+        followers: followersWithProfiles.length,
+        reserved: TOP_FOLLOWER_SKELETON_CELLS,
+        shortfall: isLoading ? null : TOP_FOLLOWER_SKELETON_CELLS - followersWithProfiles.length,
+        rawFollowers: topFollowers.length,
+      }}>
       <Text
         bold
         size={12}
@@ -522,7 +546,7 @@ function TopFollowers({
       </Text>
       {isLoading ? (
         <View style={styles.topFollowersGrid}>
-          {[0, 1, 2, 3, 4, 5].map(renderSkeleton)}
+          {TOP_FOLLOWER_SKELETON_INDICES.map(renderSkeleton)}
           <SkeletonLoadingShimmer active />
         </View>
       ) : (
@@ -1333,6 +1357,53 @@ export function UserProfileScreen() {
     handleOpenLink
   );
 
+  // ── Instrumentation ───────────────────────────────────────────────────────
+  // The visual-state probe below records what the user saw appear. These record
+  // the data behind it and the render cost: kind-0 metadata, the profile API
+  // (followers / following / reputation), stories and the mint row all land
+  // separately, and each landing can redraw the whole header.
+  useQueryResultLogger(
+    {
+      source: 'UserProfileScreen.profile',
+      status: isMetadataLoading ? 'loading' : isProfileApiLoading ? 'revalidating' : 'ready',
+      count: profileInfoItems.length,
+      extra: {
+        metadataKnown: !!cachedProfile,
+        displayNameKnown: displayName.length > 0,
+        pictureKnown: !!cachedProfile?.picture,
+        bannerKnown: !!cachedProfile?.banner,
+        followerCountKnown: followerCount !== undefined,
+        followingCountKnown: followingCount !== undefined,
+        reputationKnown: reputationScore !== undefined,
+        topFollowers: profileData?.topFollowers?.length ?? 0,
+        videos: userVideoPosts.length,
+        hasStories,
+        mintKnown: !!profileMintUrl,
+        followInFlight,
+      },
+    },
+    nostrLog
+  );
+  useStateChangeLogger('UserProfileScreen', { followInFlight, isFollowingProfile }, nostrLog);
+  useWhyDidRender(
+    'UserProfileScreen',
+    {
+      pubkey,
+      cachedProfile,
+      profileData,
+      followerCount,
+      followingCount,
+      reputationScore,
+      userVideoPosts,
+      profileInfoItems,
+      isMetadataLoading,
+      isProfileApiLoading,
+      isFollowingProfile,
+      followInFlight,
+      profileMintUrl,
+    },
+    nostrLog
+  );
   useVisualStateLogger({
     enabled: !!pubkey,
     scope: profileHeaderVisualScope,

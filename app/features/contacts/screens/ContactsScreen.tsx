@@ -21,7 +21,16 @@ import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetad
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatRelativeUnixSeconds } from '@/shared/lib/date';
 import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
-import { log, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
+import {
+  countRowRender,
+  log,
+  paymentLog,
+  useLifecycleLogger,
+  useQueryResultLogger,
+  useStateChangeLogger,
+  useWhyDidRender,
+} from '@/shared/lib/logger';
+import { useVisualStateLogger } from '@/shared/lib/contentShiftLog';
 import {
   ContactRow,
   mintIdentity,
@@ -52,6 +61,9 @@ import {
   MOCK_ALLOWED_PUBKEYS_HEX,
   isMockContactPubkey,
 } from '@/shared/stores/runtime/mockDataStore';
+
+/** Hoisted: a fresh options object per ROW render is pure instrumentation cost in a release build. */
+const ROW_LOG_OPTIONS = { logger: paymentLog } as const;
 
 type TopTab = 'contacts' | 'groups';
 
@@ -241,12 +253,94 @@ export const ContactsScreen = () => {
           (MOCK_ALLOWED_PUBKEYS_HEX.has(item.pubkey) || isMockContactPubkey(item.pubkey))
       )
     : rawListData;
+  // ── Instrumentation ───────────────────────────────────────────────────────
+  // Five independent sources merge into this list (NIP-17 conversations, mint
+  // contacts, White Noise invites, White Noise DMs, batched kind-0 metadata),
+  // each landing at its own time and each able to redraw every row.
+  useQueryResultLogger(
+    {
+      source: 'ContactsScreen.list',
+      status: showContactsSpinner
+        ? 'loading'
+        : showContactsError
+          ? 'error'
+          : currentListData.length === 0
+            ? 'empty'
+            : contactsStatus,
+      count: currentListData.length,
+      extra: {
+        filter: activeFilter,
+        conversations: dmConversations.length,
+        contacts: displayContacts.length,
+        mints: displayMints.length,
+        mintsWithProfile: mintsWithProfile.length,
+        mintInfoLoading,
+        requests: requestRows.length,
+        whitenoiseDms: whitenoiseContactRows.length,
+        profiles: profilesMap.size,
+        pubkeysAsked: allPubkeys.length,
+        blocked: blockedPeople.length,
+        hasMore: hasMoreContacts,
+      },
+    },
+    paymentLog
+  );
+  useStateChangeLogger('ContactsScreen', { activeFilter, contactsStatus }, paymentLog);
+  useWhyDidRender(
+    'ContactsScreen',
+    {
+      activeFilter,
+      dmConversations,
+      displayContacts,
+      displayMints,
+      profilesMap,
+      whitenoiseRequests,
+      whitenoiseDmEntries,
+      currentListData,
+      blockedPeople,
+      filterWords,
+      locationTiers,
+    },
+    paymentLog
+  );
+  useVisualStateLogger({
+    scope: `contacts.${activeFilter}`,
+    surface: 'dmConversations',
+    component: 'ContactsScreen',
+    stateKey: 'contacts-state',
+    phase: showContactsSpinner
+      ? 'cold-spinner'
+      : showContactsError
+        ? 'error'
+        : currentListData.length === 0
+          ? 'empty'
+          : contactsStatus === 'revalidating'
+            ? 'revalidating'
+            : 'ready',
+    state: {
+      filter: activeFilter,
+      rows: currentListData.length,
+      conversations: dmConversations.length,
+      mintsWithProfile: mintsWithProfile.length,
+      requests: requestRows.length,
+      profiles: profilesMap.size,
+      pubkeysAsked: allPubkeys.length,
+      mintInfoLoading,
+      hasMore: hasMoreContacts,
+    },
+    remeasure: true,
+  });
+
   const handleFilterChange = (filter: ContactsFilter) => {
     log.debug('contacts.filter_changed', { filter });
     setActiveFilter(filter);
   };
 
-  const renderContactItem = ({ item }: { item: ContactsListItem; index: number }) => {
+  const renderContactItem = ({ item, index }: { item: ContactsListItem; index: number }) => {
+    // Rolled up per second. Every batched kind-0 arrival rebuilds `profilesMap`,
+    // which is the classic cause of the whole list redrawing for one new name —
+    // `wasted` is where that shows.
+    countRowRender('ContactsScreen', contactsListItemKey(item, index), ROW_LOG_OPTIONS);
     // White Noise pending invite — keep it in this list so the empty/
     // loading/scrolling behaviour is the same as the other pills, but
     // swap the trailing slot for accept/decline buttons.

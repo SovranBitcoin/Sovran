@@ -174,6 +174,12 @@ jest.mock('@/shared/lib/logger', () => ({
   paymentLog: { debug: jest.fn() },
   useLifecycleLogger: jest.fn(),
   Log: ({ children }: { children: ReactNode }) => children,
+  // Render-diagnostics emitters (loggerRender) — no-ops here: they only emit.
+  useWhyDidRender: () => {},
+  useStateChangeLogger: () => {},
+  useQueryResultLogger: () => {},
+  useRowRenderLogger: () => {},
+  countRowRender: () => {},
 }));
 jest.mock('../data/useFeedClient', () => ({ getFeedClient: () => ({ getThread: mockGetThread }) }));
 jest.mock('@/shared/lib/nostr/buildNostrDataLayer', () => ({

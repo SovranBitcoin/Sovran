@@ -37,7 +37,13 @@ jest.mock('@/shared/lib/nostr/fetchProfiles', () => ({
 const mockFetchFollowing = jest.fn();
 jest.mock('@/shared/lib/logger', () => {
   const sink = { debug: jest.fn(), info: jest.fn(), warn: jest.fn() };
-  return { log: { ...sink, child: () => sink }, monotonicNow: () => Date.now() };
+  return {
+    log: { ...sink, child: () => sink },
+    monotonicNow: () => Date.now(),
+    // Render-diagnostics emitter (loggerRender) — a no-op here: it only emits,
+    // and these tests assert on the hook's returned state.
+    useQueryResultLogger: () => {},
+  };
 });
 
 beforeEach(() => {

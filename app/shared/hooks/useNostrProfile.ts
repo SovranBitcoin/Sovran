@@ -22,7 +22,7 @@ import {
   fetchProfileStatsViaFacade,
   readCachedProfileStats,
 } from '@/shared/lib/nostr/fetchProfiles';
-import { log } from '@/shared/lib/logger';
+import { log, useQueryResultLogger } from '@/shared/lib/logger';
 
 export type TopFollower = NostrProfileFull['topFollowers'][number];
 
@@ -427,6 +427,45 @@ export function useNostrProfile(
   // Hide the previous person's stats on the first render of a new route,
   // before the effect can reset request state.
   const current = state.pubkey === pubkey;
+
+  // Logged HERE rather than per screen, because this hook feeds four surfaces
+  // (profile, mint info, the drawer chrome, the API client's profile path) and
+  // it lands in TWO stages: the kind-0 metadata, then the counts. Every consumer
+  // therefore re-renders at least twice per profile, and a screen-level probe
+  // can only see its own share of that.
+  // `followers` / `follows` are the second stage: the kind-0 metadata lands
+  // first, these arrive from the profile API (or kind-3) afterwards.
+  const countsKnown =
+    current &&
+    state.data !== null &&
+    state.data.followers !== undefined &&
+    state.data.follows !== undefined;
+  useQueryResultLogger({
+    source: 'useNostrProfile',
+    status: !pubkey
+      ? 'idle'
+      : !current
+        ? 'switching'
+        : state.isLoading
+          ? 'loading'
+          : state.error
+            ? 'error'
+            : state.countsLoading
+              ? 'counts-loading'
+              : 'ready',
+    // The profile is one item; `count` carries the follower list instead, which
+    // is the part that grows after first paint.
+    count: current ? (state.data?.topFollowers?.length ?? 0) : 0,
+    extra: {
+      metadataKnown: current && !!state.data,
+      countsKnown,
+      reputationRequested: refreshReputation,
+      // A `pubkey` change with the old person's data still in state is the
+      // profile-switch flash; `switching` above names it.
+      keyChanged: !current,
+    },
+  });
+
   return {
     data: current ? state.data : null,
     isLoading: current ? state.isLoading : !!pubkey,

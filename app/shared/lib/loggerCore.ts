@@ -112,12 +112,23 @@ interface DumpOptions {
   errorsFirst?: boolean;
 }
 
+/**
+ * Log params, or a function producing them.
+ *
+ * `emit` short-circuits in a release build, but the CALLER still evaluates what
+ * it passes — and plenty of call sites compute there (`rows.filter(…).length`,
+ * `Object.keys(map).length`). A thunk moves that behind the same gate: shipped
+ * builds allocate one closure and never call it. Prefer it whenever the params
+ * do more than read a field, especially on a per-render or per-row path.
+ */
+export type LogParams = Record<string, unknown> | (() => Record<string, unknown>);
+
 export interface Logger {
-  debug(event: string, params?: Record<string, unknown>): void;
-  info(event: string, params?: Record<string, unknown>): void;
-  warn(event: string, params?: Record<string, unknown>): void;
-  error(event: string, params?: Record<string, unknown>): void;
-  fatal(event: string, params?: Record<string, unknown>): void;
+  debug(event: string, params?: LogParams): void;
+  info(event: string, params?: LogParams): void;
+  warn(event: string, params?: LogParams): void;
+  error(event: string, params?: LogParams): void;
+  fatal(event: string, params?: LogParams): void;
   child(context: Record<string, unknown>): Logger;
   setLevel(level: LogLevel): void;
   /**
@@ -727,9 +738,16 @@ export function createLogger(options: LoggerOptions = {}): Logger {
 }
 
 function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger {
-  function emit(logLevel: LogLevel, event: string, params?: Record<string, unknown>): void {
+  function emit(logLevel: LogLevel, event: string, lazyParams?: LogParams): void {
     if (!SHOW_LOGS || !core.enabled) return;
     if (LEVEL_SEVERITY[logLevel] < core.minSeverity) return;
+
+    // Resolved only AFTER the gates above, which is the whole point of
+    // accepting a thunk: a dropped entry never pays for its params.
+    const params =
+      typeof lazyParams === 'function'
+        ? (lazyParams as () => Record<string, unknown>)()
+        : lazyParams;
 
     if (
       core.dedupWindowMs > 0 &&

@@ -29,7 +29,6 @@ import { useAmbientNfcArm } from '@/features/wallet/hooks/useAmbientNfcArm';
 import { useWalletTabFocusPublisher } from '@/features/wallet/hooks/useWalletTabFocusPublisher';
 import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
-import { useHeaderHeight } from 'expo-router/react-navigation';
 import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
 import { toRealUnit } from 'wallet';
 import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
@@ -62,8 +61,6 @@ const SEND_SYSTEM_ICON = Platform.OS === 'ios' ? 'arrow.up.right' : undefined;
 export function WalletScreen() {
   useLifecycleLogger('WalletScreen');
   useBackgroundConfig({ blurMode: 'partial' });
-
-  const headerHeight = useHeaderHeight();
 
   const { height: windowHeight } = useWindowDimensions();
   // Phone-dimension floor for the balance region. It grows naturally with its
@@ -271,7 +268,8 @@ export function WalletScreen() {
           </View>
         </Log>
       </LayoutDebugWrapper>
-      <SearchOverlay recentContext="wallet" topInset={headerHeight} />
+      {/* No `topInset`: the overlay reads the navigator header height itself. */}
+      <SearchOverlay recentContext="wallet" />
     </BootEntrance>
   );
 }

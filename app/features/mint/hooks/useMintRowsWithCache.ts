@@ -22,6 +22,7 @@
  *   too, so a row and the page it opens never disagree.
  */
 import { useMemo } from 'react';
+import { useShallow } from 'zustand/shallow';
 
 import { toAccountUnit, type MintListItem } from 'wallet';
 
@@ -128,10 +129,39 @@ export function useMintRowsWithCache({
   rows: MintRow[];
   allCold: boolean;
 } {
-  // Subscribe to the cache map so a background refresh or bulk discover upsert
-  // re-runs the merge and promotes cached values to fresh ones.
-  const byMintUrl = useMintMetadataStore((s) => s.byMintUrl);
   const isTestnutMint = useIsTestnutMint();
+
+  // Normalised once per base-row change, not once per store write: the selector
+  // below runs on EVERY write to the metadata store, and `normalizeMintUrlKey`
+  // is itself a logged hot path.
+  const mintKeys = useMemo(
+    () => baseItems.map((item) => normalizeMintUrlKey(item.mintUrl)),
+    [baseItems]
+  );
+
+  // Subscribe to the entries for the mints ON SCREEN, not the whole map.
+  //
+  // `byMintUrl` is replaced wholesale by every `mergeCached` — an audit, a
+  // reviews aggregate, a social read or an identity upsert, for ANY mint in the
+  // wallet. Depending on the map meant each of those rebuilt all thirteen rows,
+  // which invalidated `filteredItems` and `availableCurrencies` and redrew the
+  // list: measured at 954 row renders for 12 distinct rows, 846 of them wasted.
+  //
+  // `mergeCached` spreads the previous map, so entries it did not touch keep
+  // their identity — which is what makes a shallow compare here effective. A
+  // write to an on-screen mint still changes that entry's reference and still
+  // re-runs the merge, so nothing is lost; only the unrelated writes stop.
+  const byMintUrl = useMintMetadataStore(
+    useShallow((s) => {
+      const relevant: Record<string, MintMetadataEntry> = {};
+      for (const key of mintKeys) {
+        const entry = s.byMintUrl[key];
+        if (entry) relevant[key] = entry;
+      }
+      return relevant;
+    })
+  );
+
   return useMemo(
     () => resolveMintRows({ baseItems, itemsStatus, byMintUrl, isTestnutMint }),
     [baseItems, itemsStatus, byMintUrl, isTestnutMint]

@@ -7,8 +7,11 @@
  *   loggerCore.ts    — types, RingBuffer, createLogger, log, child loggers,
  *                      init helpers, redactError
  *   loggerJsThread   — JS-thread heartbeat monitor (auto-arms on import)
+ *   loggerGlobalErrors — uncaught + React-reported error capture (auto-arms)
  *   loggerDefer      — InteractionManager-aware scheduler
  *   loggerHooks      — useRenderLogger / useLifecycleLogger
+ *   loggerRender     — useWhyDidRender / useStateChangeLogger /
+ *                      useQueryResultLogger / useRowRenderLogger
  *   loggerUI         — <Log> JSX component + UIPath context
  *
  * Importing this barrel arms the JS-thread monitor as a side effect; the
@@ -16,8 +19,10 @@
  * still skip the heartbeat.
  */
 
-// Side-effect import: must run on barrel load so the dev heartbeat starts.
+// Side-effect imports: must run on barrel load so the dev heartbeat starts and
+// uncaught errors get a stack in the ring buffer from the first frame.
 import './loggerJsThread';
+import './loggerGlobalErrors';
 
 export type { Logger, RedactedError } from './loggerCore';
 
@@ -57,4 +62,13 @@ export type { LogFileInfo } from './loggerFile';
 export { stopJSThreadMonitor } from './loggerJsThread';
 export { deferWork } from './loggerDefer';
 export { useRenderLogger, useLifecycleLogger, useMountLog } from './loggerHooks';
+// `flushRowRenderWindows` stays off the barrel deliberately: it is a teardown
+// hook for tests, which import it from './loggerRender' directly.
+export {
+  useWhyDidRender,
+  useStateChangeLogger,
+  useQueryResultLogger,
+  useRowRenderLogger,
+  countRowRender,
+} from './loggerRender';
 export { Log } from './loggerUI';

@@ -37,12 +37,19 @@ import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
-import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import {
+  log,
+  useLifecycleLogger,
+  useQueryResultLogger,
+  useWhyDidRender,
+} from '@/shared/lib/logger';
+import { urlHost, useVisualStateLogger, visualLayoutScopePart } from '@/shared/lib/contentShiftLog';
 import { openExternalUrl } from '@/shared/lib/url';
 import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
 import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
 import { Button } from '@/shared/ui/primitives/Button';
 import { useMintDetailRead, type MintDetailGroupStatus } from '../hooks/useMintDetailRead';
+import { useIsMintTrusted } from '../hooks/useIsMintTrusted';
 import type { MintAuditSummary } from '../lib/auditInfo';
 import {
   formatMintInfoNostrFallback,
@@ -315,14 +322,31 @@ export function MintInfoScreen() {
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.info' });
   const { entry, actions } = useScreenActions('mintInfo', params?.mintInfoEntry);
 
-  const mintUrl = (entry?.mintUrl as string) ?? '';
-  const displayName = (entry?.displayName as string) ?? mintUrl;
+  // COERCED, not cast: the screen-actions manager puts a `FormattedString` (a
+  // String SUBCLASS) on the entry, so `as string` was a lie. It matters twice.
+  // A boxed string fails `===` against a primitive, and it gets a fresh object
+  // identity every time the entry is rebuilt — which showed up in the render
+  // log as `mintUrl: 24x new object identity`, invalidating everything keyed on
+  // it. A primitive compares by value, so those re-renders simply stop.
+  const mintUrl = entry?.mintUrl != null ? String(entry.mintUrl) : '';
+  // Fetched value first, then whatever the caller already had on screen, then
+  // the URL. The seed is why opening a mint from search paints its name and
+  // icon on the first frame instead of skeletoning them for a round-trip.
+  const seedDisplayName = entry?.seedDisplayName;
+  const displayName =
+    entry?.displayName != null
+      ? String(entry.displayName)
+      : typeof seedDisplayName === 'string' && seedDisplayName.length > 0
+        ? seedDisplayName
+        : mintUrl;
+  const iconUrl =
+    (entry?.iconUrl as string | undefined) ?? (entry?.seedIconUrl as string | undefined);
   const morph = useIdentityHeader({
     identity: {
       kind: 'mint',
       name: displayName,
       seed: mintUrl,
-      picture: entry?.iconUrl as string | undefined,
+      picture: iconUrl,
     },
     title: entry?.fromAccepter ? 'Verify Mint' : 'Mint Details',
     collapseAt: 110,
@@ -331,10 +355,19 @@ export function MintInfoScreen() {
   // data never arrives via the entry on that route. Fall back to the same
   // review cache the mint list rows read,
   // otherwise the reviews header action and rating chart silently vanish.
+  // Installed-or-not, answered from the in-memory trusted list on the FIRST
+  // render. The bridge's async `isTrusted` still arrives on the entry and is
+  // taken as confirmation, but nothing waits for it: gating on the entry alone
+  // made an installed mint flash "Add mint" and delayed its Settings section,
+  // because `!entry?.isTrusted` reads UNKNOWN as UNTRUSTED.
+  const isTrusted = useIsMintTrusted(mintUrl) || entry?.isTrusted === true;
   const cachedMeta = useCachedMintMetadata(mintUrl || null);
   const detail = useMintDetailRead(mintUrl, entry);
   const kymScore =
-    typeof entry?.kymScore === 'number' ? entry.kymScore : (cachedMeta?.averageScore ?? undefined);
+    typeof entry?.kymScore === 'number'
+      ? entry.kymScore
+      : (cachedMeta?.averageScore ??
+        (typeof entry?.seedKymScore === 'number' ? entry.seedKymScore : undefined));
   // Audit comes from the metadata store alone, through the selector the mint
   // rows use. The entry's audit fields are a snapshot of that store taken at
   // navigation, so reading them here let the page lag behind its own row.
@@ -354,6 +387,82 @@ export function MintInfoScreen() {
     nostrContactPubkey ?? null
   );
   const nostrContactPicture = nostrContactProfile?.picture || nostrContactProfile?.image;
+
+  // ── Instrumentation ───────────────────────────────────────────────────────
+  // Four groups land independently (identity from the route entry, audit and
+  // reviews from their own reads, social from the operator profile), each
+  // flipping one section from skeleton to content. These three probes say, in
+  // order: what the tree was handed, why it re-rendered, and what the user saw
+  // move. Read together with
+  //   npx tsx codereview/log-doctor/index.ts reads --latest
+  //   npx tsx codereview/log-doctor/index.ts renders --latest
+  //   npx tsx codereview/log-doctor/index.ts visual --scope 'mint-info' --latest
+  const mintInfoVisualScope = `mint-info.${visualLayoutScopePart(urlHost(mintUrl))}`;
+  useQueryResultLogger({
+    source: 'useMintDetailRead',
+    status: detail.identity,
+    count: contactRows.length,
+    extra: {
+      audit: detail.audit,
+      reviews: detail.reviews,
+      social: detail.social,
+      kymScoreKnown: kymScore !== undefined,
+      auditKnown: audit !== undefined,
+      operatorProfileLoading: nostrContactLoading,
+      identityError: !!identityError,
+      isTrusted,
+    },
+  });
+  useWhyDidRender('MintInfoScreen', {
+    mintUrl,
+    entry,
+    actions,
+    cachedMeta,
+    detail,
+    audit,
+    contactRows,
+    nostrContactProfile,
+    nostrContactLoading,
+    morphScrollY: morph.scrollY,
+  });
+  useVisualStateLogger({
+    enabled: !!mintUrl,
+    scope: mintInfoVisualScope,
+    surface: 'mintDetail',
+    component: 'MintInfoScreen',
+    stateKey: 'mint-info-state',
+    phase:
+      detail.identity === 'loading'
+        ? 'identity-loading'
+        : detail.audit === 'loading' || detail.reviews === 'loading'
+          ? 'groups-loading'
+          : detail.social === 'loading'
+            ? 'social-loading'
+            : 'ready',
+    state: {
+      identity: detail.identity,
+      audit: detail.audit,
+      reviews: detail.reviews,
+      social: detail.social,
+      contactRows: contactRows.length,
+      // The pair that made the button flash: `isTrusted` is what the UI gates
+      // on, `entryTrustConfirmed` is the async answer catching up. They should
+      // agree from the first frame for an installed mint.
+      isTrusted,
+      entryTrustConfirmed: entry?.isTrusted === true,
+      auditKnown: audit !== undefined,
+      kymScoreKnown: kymScore !== undefined,
+      iconKnown: Boolean(iconUrl),
+      // Was this page opened with what the caller already had on screen? A
+      // `seeded: true` row whose phase is `ready` on the first frame is the
+      // whole point; `seeded: false` means a caller still has plumbing to do.
+      seeded: Boolean(entry?.seedDisplayName || entry?.seedIconUrl),
+      nameFromSeed: entry?.displayName == null && Boolean(entry?.seedDisplayName),
+      operatorAvatarKnown: Boolean(nostrContactPicture),
+      identityError: Boolean(identityError),
+    },
+    remeasure: true,
+  });
 
   const handleMintUrlPress = async () => {
     if (!mintUrl) return;
@@ -419,7 +528,7 @@ export function MintInfoScreen() {
                       onPress: () => actions.trust.execute(),
                     },
                   ]
-                : mintUrl && (entry?.fromScan || !entry?.isTrusted)
+                : mintUrl && (entry?.fromScan || !isTrusted)
                   ? [
                       {
                         testID: 'mint-info-close',
@@ -480,7 +589,7 @@ export function MintInfoScreen() {
               successColor={success}
               errorColor={danger}>
               <AnimatedAvatar
-                picture={entry?.iconUrl as string | undefined}
+                picture={iconUrl}
                 name={displayName}
                 alt={`${displayName} icon`}
                 status={audit?.state}
@@ -653,7 +762,7 @@ export function MintInfoScreen() {
           </Section>
         )}
 
-        {entry?.isTrusted === true && !entry?.fromAccepter && (
+        {isTrusted && !entry?.fromAccepter && (
           <Section title="Settings">
             <ListGroup variant="secondary">
               <PressableFeedback

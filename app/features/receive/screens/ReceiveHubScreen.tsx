@@ -12,11 +12,13 @@ import { Screen } from '@/shared/ui/composed/Screen';
  *   • Scan QR — camera scan of a token / invoice / creq;
  *   • Fixed Amount — request a specific amount (Lightning / Onchain / Ecash
  *     variants on the amount screen);
- *   • Paste — redeem whatever payment string is on the clipboard.
+ *   • Paste — redeem whatever payment string is on the clipboard;
+ *   • Nut Drop — the SAME nearby radar the send hub opens ((send-flow)/nearPay),
+ *     reached from this side too so the method is not send-only.
  *
- * All four run through the `receiveHub` screen actions, so availability
- * (e.g. Fixed Amount needs a bolt11-capable mint) and machine resets stay
- * colada-owned.
+ * All five run through the `receiveHub` screen actions, so availability
+ * (e.g. Fixed Amount needs a bolt11-capable mint, Nut Drop needs the Bitcoin
+ * account) and machine resets stay colada-owned.
  */
 
 import { useMemo } from 'react';
@@ -34,7 +36,7 @@ import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 import Icon from 'assets/icons';
 
-type HubActionName = 'qrDisplay' | 'scanQr' | 'fixedAmount' | 'paste';
+type HubActionName = 'qrDisplay' | 'scanQr' | 'fixedAmount' | 'paste' | 'nutDrop';
 
 interface ReceiveMethod {
   id: HubActionName;
@@ -76,6 +78,15 @@ const METHODS: ReceiveMethod[] = [
     subtitle: 'Redeem from your clipboard',
     icon: 'lets-icons:copy',
     systemIcon: 'doc.on.clipboard',
+  },
+  // Same glyph and name as the Send hub's Nut Drop row, and the same
+  // destination — one Nut Drop surface, reachable from either hub.
+  {
+    id: 'nutDrop',
+    title: 'Nut Drop',
+    subtitle: 'Be paid by someone nearby',
+    icon: 'mdi:bluetooth',
+    systemIcon: 'dot.radiowaves.left.and.right',
   },
 ];
 

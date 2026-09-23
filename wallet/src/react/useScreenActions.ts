@@ -442,6 +442,7 @@ function buildDefaultHandlers(refs: {
     notify: notifyThrough(refs.notificationsRef),
     navigation: {
       scanQr: (...args) => navigationRef.current?.scanQr?.(...args),
+      nutDrop: (...args) => navigationRef.current?.nutDrop?.(...args),
       mintInfo: (...args) => navigationRef.current?.mintInfo?.(...args),
       addMint: () => navigationRef.current?.addMint?.(),
       goBack: () => navigationRef.current?.goBack?.(),

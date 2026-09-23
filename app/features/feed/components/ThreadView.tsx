@@ -43,12 +43,23 @@ import type { ThreadReplySort } from '@/features/feed/data/feedClient';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
 import { useZap } from '@/features/feed/hooks/useZap';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { feedLog, Log } from '@/shared/lib/logger';
+import {
+  countRowRender,
+  feedLog,
+  Log,
+  useQueryResultLogger,
+  useStateChangeLogger,
+  useWhyDidRender,
+} from '@/shared/lib/logger';
+import { useVisualStateLogger } from '@/shared/lib/contentShiftLog';
 import { actionMenuPopup } from '@/shared/lib/popup';
 import {
   DEFAULT_REPLY_SKELETON_COUNT,
   MAX_REPLY_SKELETON_COUNT,
 } from '@/features/feed/lib/threadReplySkeletons';
+
+/** Hoisted: a fresh options object per ROW render is pure instrumentation cost in a release build. */
+const ROW_LOG_OPTIONS = { logger: feedLog } as const;
 
 /** How long a pushed thread waits before focusing the reply box, so the
  *  keyboard doesn't ride the push transition. */
@@ -435,6 +446,76 @@ function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps)
   } = useNostrEngagement(actionableEvents, getMetrics);
   const { openZapMenu } = useZap();
 
+  // ── Instrumentation ───────────────────────────────────────────────────────
+  // `thread.shift.phase` above records the visual transitions. These record the
+  // data behind them and what re-rendered the view: the thread hook bumps
+  // `dataVersion` on every arrival (target, parents, replies, profiles,
+  // metrics), and each bump is a candidate re-render of every visible row.
+  useQueryResultLogger(
+    {
+      source: 'useThread',
+      status: threadPhase,
+      count: items.length,
+      extra: {
+        dataVersion,
+        rows: displayItems.length,
+        hasTarget: !!targetEvent,
+        hasParents,
+        targetProfileKnown: !!targetProfile,
+        replySort,
+        isLoading,
+        isFetching,
+        isLoadingMoreReplies,
+        hasMoreReplies,
+        hasError: !!error,
+      },
+    },
+    feedLog
+  );
+  useStateChangeLogger('ThreadView', { replyBarHeight, replyFocusRequest, replySort }, feedLog);
+  useWhyDidRender(
+    'ThreadView',
+    {
+      eventId,
+      items,
+      displayItems,
+      dataVersion,
+      targetEvent,
+      targetProfile,
+      isLoading,
+      isFetching,
+      replySort,
+      replyBarHeight,
+      focusReserve,
+      engagementRevision,
+      embedOpen,
+    },
+    feedLog
+  );
+  useVisualStateLogger({
+    scope: `thread.${eventId.slice(0, 12)}`,
+    surface: 'thread',
+    component: 'ThreadView',
+    stateKey: 'thread-state',
+    phase: threadPhase,
+    state: {
+      rows: displayItems.length,
+      realItems: items.length,
+      hasTarget: !!targetEvent,
+      hasParents,
+      targetProfileKnown: !!targetProfile,
+      replySort,
+      focusReserve: Math.round(focusReserve),
+      replyBarHeight: Math.round(replyBarHeight),
+      isLoading,
+      isFetching,
+      isLoadingMoreReplies,
+      hasMoreReplies,
+      hasError: !!error,
+    },
+    remeasure: true,
+  });
+
   const getThreadContext = useCallback(() => {
     const allEvents = new Map<string, FeedEvent>();
     for (const it of items) {
@@ -451,6 +532,10 @@ function ThreadViewInner({ eventId, focusReplyOnOpen = false }: ThreadViewProps)
 
   const renderThreadItem = useCallback(
     ({ item, index }: { item: ThreadListItem; index: number }) => {
+      // One rolled-up `render.count` per second for the whole list. A reply that
+      // redraws because ANOTHER reply's profile or metrics landed shows up as
+      // `wasted` climbing toward `rows`.
+      countRowRender('ThreadView', threadKeyExtractor(item), ROW_LOG_OPTIONS);
       if (item.type === 'target-skeleton') {
         return <PostCardSkeleton variant="thread-target" index={index} />;
       }

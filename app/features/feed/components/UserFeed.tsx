@@ -29,7 +29,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { seedThread, type ThreadSeed } from '@/features/feed/lib/threadSeedCache';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
-import { log, Log, feedLog } from '@/shared/lib/logger';
+import { countRowRender, log, Log, feedLog, useQueryResultLogger } from '@/shared/lib/logger';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
@@ -97,6 +97,9 @@ import { useFeedRows } from '@/features/feed/hooks/useFeedRows';
 import { usePostActions } from '@/features/feed/hooks/usePostActions';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { List } from '@/shared/ui/composed/List';
+
+/** Hoisted: a fresh options object per ROW render is pure instrumentation cost in a release build. */
+const ROW_LOG_OPTIONS = { logger: feedLog } as const;
 
 // ============================================================================
 // Types (UserFeed-specific)
@@ -732,13 +735,35 @@ export function UserFeed({
   // First paint with nothing cached: skeleton rows as list items through the
   // shared PostCardSkeleton, never a spinner over an empty list.
   const listRows: UserFeedListRow[] = isLoading && feedRows.length === 0 ? SKELETON_ROWS : feedRows;
+
+  // The profile feed reserves a FIXED four skeleton rows and then renders
+  // however many posts arrived. `reserved` next to `rows` is what lets a log
+  // reader compute the jump when the real page is shorter (or empty).
+  useQueryResultLogger(
+    {
+      source: 'UserFeed.rows',
+      status: isLoading ? (feedRows.length === 0 ? 'cold-skeleton' : 'revalidating') : 'ready',
+      count: feedRows.length,
+      extra: {
+        rows: listRows.length,
+        reserved: SKELETON_ROWS.length,
+        showingSkeletons: listRows === SKELETON_ROWS,
+        shortfall: isLoading ? null : SKELETON_ROWS.length - feedRows.length,
+      },
+    },
+    feedLog
+  );
   const renderListRow = useCallback(
-    ({ item, index }: { item: UserFeedListRow; index: number }) =>
-      'skeleton' in item ? (
+    ({ item, index }: { item: UserFeedListRow; index: number }) => {
+      // Aggregated per second — the profile feed shares the feed's enrichment
+      // path, so the same `wasted` reading applies.
+      countRowRender('UserFeed', getListRowKey(item), ROW_LOG_OPTIONS);
+      return 'skeleton' in item ? (
         <PostCardSkeleton variant="thread-reply" index={index} />
       ) : (
         renderFeedItem({ item, index })
-      ),
+      );
+    },
     [renderFeedItem]
   );
 

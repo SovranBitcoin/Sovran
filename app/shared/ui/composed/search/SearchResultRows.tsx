@@ -130,7 +130,17 @@ function MintRow({ mint }: { mint: Extract<AllSearchResult, { type: 'mint' }>['m
       trailingVariant="chevron"
       onPress={() => {
         cashuLog.info('mint.search.press', { ...mintUrlLogFields(mint.url), source: 'search' });
-        router.push(buildMintInfoHref(mint.url));
+        // Hand the destination everything this row is ALREADY showing. Without
+        // it the mint page re-fetches a name and icon the user can see right
+        // now, and skeletons them meanwhile.
+        router.push(
+          buildMintInfoHref(mint.url, {
+            displayName: getMintDisplayName(mint.url, info),
+            iconUrl: info.icon_url ?? undefined,
+            kymScore: mint.review_score ?? undefined,
+            reviewCount: mint.review_count,
+          })
+        );
       }}
       testID={`contact-row:mint:${mint.url}`}
     />

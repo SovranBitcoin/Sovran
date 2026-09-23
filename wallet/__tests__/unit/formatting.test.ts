@@ -83,6 +83,64 @@ describe('FormattedString.truncate', () => {
   });
 });
 
+/**
+ * React Native's dev-only `deepFreezeAndThrowOnMutationInDev` walks every own
+ * enumerable key of a bridge argument and redefines it. A String exotic
+ * object's character indices are enumerable but NON-CONFIGURABLE, so that
+ * redefine throws (`property is not configurable` on Hermes). RN skips
+ * anything already frozen, which is why the constructor freezes.
+ */
+describe('FormattedString immutability', () => {
+  /** The exact algorithm from react-native/Libraries/Utilities/deepFreezeAndThrowOnMutationInDev.js */
+  function deepFreezeAndThrowOnMutationInDev(object: unknown): unknown {
+    if (
+      typeof object !== 'object' ||
+      object === null ||
+      Object.isFrozen(object) ||
+      Object.isSealed(object)
+    ) {
+      return object;
+    }
+    const keys = Object.keys(object as object);
+    for (const key of keys) {
+      if (Object.prototype.hasOwnProperty.call(object, key)) {
+        const value = (object as Record<string, unknown>)[key];
+        Object.defineProperty(object, key, { get: () => value });
+        Object.defineProperty(object, key, {
+          set: () => {
+            throw new Error(`immutable ${key}`);
+          },
+        });
+      }
+    }
+    Object.freeze(object);
+    Object.seal(object);
+    for (const key of keys) {
+      if (Object.prototype.hasOwnProperty.call(object, key)) {
+        deepFreezeAndThrowOnMutationInDev((object as Record<string, unknown>)[key]);
+      }
+    }
+    return object;
+  }
+
+  it('survives the native-bridge deep freeze that its character indices would otherwise break', () => {
+    const contact = [{ method: 'nostr', info: new FormattedString('npub1abcdefghijklmnop') }];
+    expect(() => deepFreezeAndThrowOnMutationInDev({ contact })).not.toThrow();
+  });
+
+  it('is frozen, which is what makes the walk skip it', () => {
+    expect(Object.isFrozen(new FormattedString('cashuABCD'))).toBe(true);
+  });
+
+  it('still behaves as a string once frozen', () => {
+    const formatted = new FormattedString('npub1abcdefghijklmnop', 'middle');
+    expect(formatted.valueOf()).toBe('npub1abcdefghijklmnop');
+    expect(String(formatted)).toBe('npub1abcdefghijklmnop');
+    expect(formatted.length).toBe(21);
+    expect(formatted.truncate(6)).toContain('...');
+  });
+});
+
 describe('FormattedTimestamp', () => {
   // Two fixed instants exactly 24h apart — chosen so `relative` is locale-invariant
   // ("1 day ago" / equivalent). The tests assert behavior, not a specific string.

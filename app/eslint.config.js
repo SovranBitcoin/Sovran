@@ -404,7 +404,7 @@ module.exports = defineConfig([
       'no-restricted-globals': 'off',
     },
   },
-  // `no-console` exemptions — three legitimate sites:
+  // `no-console` exemptions — five legitimate sites:
   //   - shared/lib/loggerCore.ts: transport-fallback escape hatch. When
   //     the logger's own transport throws, it falls through to
   //     `console.error` rather than swallow the failure (F-017).
@@ -413,8 +413,20 @@ module.exports = defineConfig([
   //   - polyfills.js: runtime bootstrap that loads BEFORE the logger
   //     module exists; can't route through a logger that hasn't been
   //     initialised yet.
+  //   - shared/lib/loggerGlobalErrors.ts: it IS the `console.error`
+  //     interceptor. React reports a render throw through console.error
+  //     after LogBox has swallowed it, so capturing that path means
+  //     wrapping the function and calling the original.
+  //   - __tests__/loggerGlobalErrors.test.ts: drives that interceptor by
+  //     calling `console.error` the way React does.
   {
-    files: ['shared/lib/loggerCore.ts', 'app.config.js', 'polyfills.js'],
+    files: [
+      'shared/lib/loggerCore.ts',
+      'shared/lib/loggerGlobalErrors.ts',
+      '__tests__/loggerGlobalErrors.test.ts',
+      'app.config.js',
+      'polyfills.js',
+    ],
     rules: {
       'no-console': 'off',
     },

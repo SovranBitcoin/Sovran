@@ -563,6 +563,15 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
           }
         })();
       },
+      // Nut Drop from the receive hub opens the SAME radar as SendScreen's Nut
+      // Drop row — one nearby surface, not a receive-side copy. It starts no
+      // machine flow, so the payment context is cleared the way that row does
+      // it: the radar owns the send it may start from a peer tap.
+      nutDrop: ({ unit }) => {
+        paymentLog.info('receive.nut_drop.open', { unit });
+        clearPaymentContext('send.near_pay');
+        router.push('/(send-flow)/nearPay');
+      },
       mintInfo: (mintInfoEntry) => {
         router.navigate({
           pathname: '/(mint-flow)/info',

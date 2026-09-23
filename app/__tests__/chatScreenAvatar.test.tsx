@@ -94,7 +94,15 @@ jest.mock('@/shared/ui/primitives/Spinner', () => ({ Spinner: () => null }));
 jest.mock('assets/icons', () => () => null);
 jest.mock('@/shared/ui/composed/chat/CashuTokenBubble', () => ({ CashuTokenBubble: () => null }));
 jest.mock('@/shared/lib/date', () => ({ formatRelative: () => 'now' }));
-jest.mock('@/shared/lib/logger', () => ({ chatLog: { debug: jest.fn() } }));
+jest.mock('@/shared/lib/logger', () => ({
+  chatLog: { debug: jest.fn() },
+  // Render-diagnostics emitters (loggerRender) — no-ops here: they only emit.
+  useWhyDidRender: () => {},
+  useStateChangeLogger: () => {},
+  useQueryResultLogger: () => {},
+  useRowRenderLogger: () => {},
+  countRowRender: () => {},
+}));
 
 const incoming: ChatBubbleMessage = {
   id: 'incoming-1',

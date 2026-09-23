@@ -16,7 +16,16 @@ import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshContro
 import { View } from '@/shared/ui/primitives/View/View';
 import { withAlpha } from '@/shared/lib/color';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
-import { log, Log, feedLog } from '@/shared/lib/logger';
+import {
+  countRowRender,
+  feedLog,
+  log,
+  Log,
+  useQueryResultLogger,
+  useStateChangeLogger,
+  useWhyDidRender,
+} from '@/shared/lib/logger';
+import { useVisualStateLogger } from '@/shared/lib/contentShiftLog';
 import { List } from '@/shared/ui/composed/List';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
@@ -73,6 +82,9 @@ import { useFeedInteractions } from '@/features/feed/hooks/useFeedInteractions';
 import { useFeedRows } from '@/features/feed/hooks/useFeedRows';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
+
+/** Hoisted: a fresh options object per ROW render is pure instrumentation cost in a release build. */
+const ROW_LOG_OPTIONS = { logger: feedLog } as const;
 
 // ============================================================================
 // Types
@@ -654,14 +666,99 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
 
   const listRows: HomeFeedListRow[] = isLoading && feedRows.length === 0 ? SKELETON_ROWS : feedRows;
   const renderListRow = useCallback(
-    ({ item, index }: { item: HomeFeedListRow; index: number }) =>
-      'skeleton' in item ? (
+    ({ item, index }: { item: HomeFeedListRow; index: number }) => {
+      // Rolled up per second across the whole list. Enrichment (profiles,
+      // metrics, quotes) arrives after the first page paints, and every arrival
+      // is a chance to redraw every visible card: that shows here as `wasted`
+      // approaching `rows` rather than staying near zero.
+      countRowRender('HomeFeed', getListRowKey(item), ROW_LOG_OPTIONS);
+      return 'skeleton' in item ? (
         <PostCardSkeleton variant="thread-reply" index={index} />
       ) : (
         renderFeedItem({ item, index })
-      ),
+      );
+    },
     [renderFeedItem]
   );
+
+  // ── Instrumentation ───────────────────────────────────────────────────────
+  // `feed.ui.render` and `feed.shift.*` already record what arrived and what
+  // moved. These record the render cost of that arrival: which of the four
+  // enrichment maps changed identity, which local flag churned, and whether a
+  // commit changed nothing at all (`unexplained` in log-doctor's renders mode).
+  useQueryResultLogger(
+    {
+      source: 'useFeedContentState',
+      status: isLoading ? 'loading' : loadError ? 'error' : isRefreshing ? 'refreshing' : 'ready',
+      count: feedRows.length,
+      extra: {
+        spec: feedSpecs[activeSpecIndex]?.name,
+        feedItems: feedItems.length,
+        rows: listRows.length,
+        skeletons: listRows === SKELETON_ROWS ? SKELETON_ROWS.length : 0,
+        profiles: profilesMap.size,
+        metrics: metricsMap.size,
+        quoted: quotedEventsMap.size,
+        followCount,
+        isLoadingMore,
+        retryAfterMs: pageStatus.retryAfterMs ?? null,
+      },
+    },
+    feedLog
+  );
+  useStateChangeLogger(
+    'HomeFeed',
+    { isLoading, isRefreshing, isLoadingMore, loadError, pageStatus, activeSpecIndex },
+    feedLog
+  );
+  useWhyDidRender(
+    'HomeFeed',
+    {
+      activeFilter,
+      feedItems,
+      feedRows,
+      listRows,
+      profilesMap,
+      metricsMap,
+      quotedEventsMap,
+      isLoading,
+      isRefreshing,
+      isLoadingMore,
+      pageStatus,
+      followCount,
+      ignoredPubkeysKey,
+      ignoredEventIdsKey,
+    },
+    feedLog
+  );
+  useVisualStateLogger({
+    scope: `feed.${feedSpecs[activeSpecIndex]?.name ?? 'unknown'}`,
+    surface: 'feed',
+    component: 'HomeFeed',
+    stateKey: 'feed-state',
+    phase: isLoading
+      ? feedRows.length === 0
+        ? 'cold-skeleton'
+        : 'revalidating'
+      : loadError
+        ? 'error'
+        : feedRows.length === 0
+          ? 'empty'
+          : 'ready',
+    state: {
+      rows: listRows.length,
+      feedItems: feedItems.length,
+      showingSkeletons: listRows === SKELETON_ROWS,
+      profiles: profilesMap.size,
+      metrics: metricsMap.size,
+      quoted: quotedEventsMap.size,
+      isRefreshing,
+      isLoadingMore,
+      loadError,
+      rateLimited: pageStatus.retryAfterMs !== undefined,
+    },
+    remeasure: true,
+  });
 
   const refreshTintColor = useMemo(() => withAlpha(foreground, 0.5), [foreground]);
 

@@ -45,7 +45,14 @@ export type ReadSurface =
   | 'mintDetail'
   | 'mintReviews'
   | 'mintAudit'
-  | 'mintChanges';
+  | 'mintChanges'
+  /**
+   * The NUT-18 payment-request backstop poll (`paymentRequestNostrTransport`).
+   * It reads the SAME gift-wrap inbox as `dmConversations` but on a timer and
+   * for a different reason, so it gets its own surface: otherwise a 15s poll
+   * and a user opening the DM list are indistinguishable in the `reads` report.
+   */
+  | 'paymentRequestInbox';
 
 export type ReadMode = 'initial' | 'refresh' | 'revalidate' | 'loadMore';
 export type ReadTrigger = 'mount' | 'focus' | 'key-change' | 'user' | 'poll' | 'prefetch';

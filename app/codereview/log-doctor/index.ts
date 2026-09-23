@@ -1289,6 +1289,12 @@ function modeRenders(entries: LogEntry[], _opts: Options): string {
     maxRendersPerSec: number;
     aliveMs: number;
     warned: boolean;
+    /** Summed across flush windows, so it is comparable with `wasted`. */
+    totalRenders: number;
+    /** Row rollups (`<List>/row`) carry a distribution; a plain component does not. */
+    rows: number;
+    wasted: number;
+    maxRowRenders: number;
   }
   const componentRenders = new Map<string, ComponentStats>();
   for (const e of renderEvents) {
@@ -1299,10 +1305,20 @@ function modeRenders(entries: LogEntry[], _opts: Options): string {
     const alive = (e.params?.aliveMs as number) ?? 0;
     const prev = componentRenders.get(name);
     componentRenders.set(name, {
+      // A row rollup emits one entry per second, so its counts ACCUMULATE
+      // across entries; a component's `renders` is already cumulative, so it
+      // takes the max. `rows` distinguishes the two.
       maxRenders: Math.max(prev?.maxRenders ?? 0, renders),
+      // Renders summed the same way `wasted` is, so the two are comparable:
+      // reporting a max render count beside a summed waste count read as if a
+      // list wasted more renders than it performed.
+      totalRenders: (prev?.totalRenders ?? 0) + renders,
       maxRendersPerSec: Math.max(prev?.maxRendersPerSec ?? 0, rps),
       aliveMs: Math.max(prev?.aliveMs ?? 0, alive),
       warned: prev?.warned || e.level === 'warn',
+      rows: Math.max(prev?.rows ?? 0, (e.params?.rows as number) ?? 0),
+      wasted: (prev?.wasted ?? 0) + (((e.params?.wasted as number) ?? 0) || 0),
+      maxRowRenders: Math.max(prev?.maxRowRenders ?? 0, (e.params?.maxRowRenders as number) ?? 0),
     });
   }
 
@@ -1315,8 +1331,15 @@ function modeRenders(entries: LogEntry[], _opts: Options): string {
     for (const [name, stats] of sorted) {
       const flag = stats.warned ? 'EXCESSIVE' : stats.maxRenders > 10 ? 'HIGH' : 'ok';
       const rps = stats.maxRendersPerSec > 0 ? ` ${stats.maxRendersPerSec.toFixed(1)}/s` : '';
+      // Row rollups: `wasted` (renders beyond the first for a row inside one
+      // flush window) is the number to drive to zero, so lead with it.
+      const rowDist =
+        stats.rows > 0
+          ? ` — ${stats.totalRenders} total across windows, ${stats.rows} distinct rows, ` +
+            `${stats.wasted} wasted, worst row ${stats.maxRowRenders}x in one window`
+          : '';
       lines.push(
-        `  [${flag.padEnd(9)}] ${name}: ${stats.maxRenders} renders${rps} (alive ${formatDelta(stats.aliveMs).trim()})`
+        `  [${flag.padEnd(9)}] ${name}: ${stats.maxRenders} renders${rps} (alive ${formatDelta(stats.aliveMs).trim()})${rowDist}`
       );
     }
     lines.push('');
@@ -1362,6 +1385,26 @@ function modeRenders(entries: LogEntry[], _opts: Options): string {
         lines.push(`    ${prop}: ${info.count}x — ${info.hint}`);
       }
       if (propsSorted.length > 5) lines.push(`    ... +${propsSorted.length - 5} more props`);
+    }
+    lines.push('');
+  }
+
+  // ── Section 2b: Commits with NO changed input (render.why unexplained) ──
+  // A parent re-rendered this subtree and nothing it reads moved — the cheapest
+  // re-render to delete, and invisible in the per-prop summary above.
+  const unexplained = new Map<string, number>();
+  for (const e of renderEvents) {
+    if (e.event !== 'render.why' || e.params?.unexplained !== true) continue;
+    const name = (e.params?.component as string) ?? '?';
+    unexplained.set(name, (unexplained.get(name) ?? 0) + 1);
+  }
+
+  if (unexplained.size > 0) {
+    lines.push('RE-RENDERS WITH NO CHANGED INPUT (parent churn):');
+    lines.push('');
+    for (const [name, count] of [...unexplained.entries()].sort((a, b) => b[1] - a[1])) {
+      const flag = count > 10 ? 'EXCESSIVE' : count > 3 ? 'HIGH' : 'ok';
+      lines.push(`  [${flag.padEnd(9)}] ${name}: ${count}x`);
     }
     lines.push('');
   }

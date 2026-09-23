@@ -12,7 +12,13 @@ import {
   shouldSettleZap,
 } from '@/features/feed/lib/engagementOverlay';
 import { reconcileToggle } from '@/features/feed/lib/engagementToggle';
-import { log } from '@/shared/lib/logger';
+import {
+  feedLog,
+  log,
+  SHOW_LOGS,
+  useQueryResultLogger,
+  useWhyDidRender,
+} from '@/shared/lib/logger';
 import { publishEvent } from '@/shared/lib/nostr/publish';
 import { readNoteMetrics } from '@/shared/lib/nostr/useEntityCache';
 import { paramPopup } from '@/shared/lib/popup';
@@ -32,6 +38,9 @@ type EngagementState = {
 export type EngagementViewState = EngagementState;
 
 const OPTIMISTIC_STALE_WARN_MS = 30_000;
+
+/** One shared empty array, so "no events" is the same identity every time. */
+const EMPTY_EVENT_IDS: readonly string[] = [];
 
 type Ndk = NonNullable<ReturnType<typeof useNDK>['ndk']>;
 type ToggleKind = 'like' | 'repost';
@@ -222,7 +231,18 @@ export function useNostrEngagement(
     return map;
   }, [events]);
 
-  const eventIds = useMemo(() => Array.from(eventsById.keys()), [eventsById]);
+  // Identity-stable while the ID SET is unchanged. `events` gets a fresh array
+  // on every data-version bump, so deriving straight off `eventsById` handed
+  // `engagementRevision` a new `eventIds` each time — measured as
+  // `events: 26x new array identity, len 0`, i.e. bumping the revision (and
+  // through it every consumer's FlashList `extraData`) for an EMPTY list that
+  // had not changed. The joined key is the repo's usual shape for this
+  // (`ignoredPubkeysKey` in the feed ignore store).
+  const eventIdsKey = useMemo(() => Array.from(eventsById.keys()).join('\u0000'), [eventsById]);
+  const eventIds = useMemo(
+    () => (eventIdsKey ? eventIdsKey.split('\u0000') : EMPTY_EVENT_IDS),
+    [eventIdsKey]
+  );
 
   // ---- settle overlays once the sync catches up; resume orphaned intents ----
 
@@ -230,17 +250,48 @@ export function useNostrEngagement(
     const { clearLikeOptimistic, clearRepostOptimistic, clearZapOptimistic } =
       useNostrSocialStore.getState();
     const now = Date.now();
+    // Collected across the whole pass and emitted once: a feed page settling
+    // forty overlays must not cost forty log lines.
+    const settles: {
+      kind: 'like' | 'repost';
+      flipped: boolean;
+      confirmed: boolean;
+      ageMs: number;
+      wasPending: boolean;
+    }[] = [];
 
     for (const [eventId, target] of eventsById) {
       const base = getSharedBaseMetrics(eventId);
       const like = optimisticLikesByEventId[eventId];
       const repost = optimisticRepostsByEventId[eventId];
-      if (shouldSettleToggle(like, !!engagementByEventId[eventId]?.liked, base.likeCount, now)) {
+      const confirmedLiked = !!engagementByEventId[eventId]?.liked;
+      const confirmedReposted = !!engagementByEventId[eventId]?.reposted;
+      if (shouldSettleToggle(like, confirmedLiked, base.likeCount, now)) {
+        // The overlay is coming off, so the control's value is about to become
+        // the confirmed one. `flipped` is the case that matters: the confirmed
+        // answer DISAGREES with what the user has been looking at — the
+        // "already liked it on another client" correction. Nothing logged this,
+        // so a control changing under the user was indistinguishable from a
+        // normal settle.
+        if (SHOW_LOGS)
+          settles.push({
+            kind: 'like',
+            flipped: like.value !== confirmedLiked,
+            confirmed: confirmedLiked,
+            ageMs: Math.round(now - (like.updatedAt || now)),
+            wasPending: !!like.pending,
+          });
         clearLikeOptimistic(eventId);
       }
-      if (
-        shouldSettleToggle(repost, !!engagementByEventId[eventId]?.reposted, base.repostCount, now)
-      ) {
+      if (shouldSettleToggle(repost, confirmedReposted, base.repostCount, now)) {
+        if (SHOW_LOGS)
+          settles.push({
+            kind: 'repost',
+            flipped: repost.value !== confirmedReposted,
+            confirmed: confirmedReposted,
+            ageMs: Math.round(now - (repost.updatedAt || now)),
+            wasPending: !!repost.pending,
+          });
         clearRepostOptimistic(eventId);
       }
       // Zap overlay: clear only when the aggregated 9735 counts have caught
@@ -260,6 +311,24 @@ export function useNostrEngagement(
       if (repost?.pending && !reconcilingActions.has(actionKey('repost', eventId))) {
         startReconcile(ndk, 'repost', target, () => getSharedBaseMetrics(eventId).repostCount);
       }
+    }
+
+    if (SHOW_LOGS && settles.length > 0) {
+      const flipped = settles.filter((entry) => entry.flipped);
+      // A flip is a visible correction of an already-painted control, so it
+      // escalates; a plain settle is the happy path.
+      feedLog[flipped.length > 0 ? 'info' : 'debug']('feed.engagement.settled', {
+        settled: settles.length,
+        flipped: flipped.length,
+        likes: settles.filter((entry) => entry.kind === 'like').length,
+        reposts: settles.filter((entry) => entry.kind === 'repost').length,
+        stillPending: settles.filter((entry) => entry.wasPending).length,
+        maxAgeMs: Math.max(...settles.map((entry) => entry.ageMs)),
+        // Which way the corrections went — `confirmed: true` with no local
+        // intent is the other-client case.
+        flippedToActive: flipped.filter((entry) => entry.confirmed).length,
+        flippedToInactive: flipped.filter((entry) => !entry.confirmed).length,
+      });
     }
   }, [
     eventsById,
@@ -313,6 +382,44 @@ export function useNostrEngagement(
     optimisticZapsByEventId,
     zappedByEventId,
   ]);
+
+  // Every consumer folds `engagementRevision` into a FlashList `extraData`
+  // string, so ONE bump invalidates every visible row in the feed and the
+  // thread. Six independent inputs can cause that bump, and until now nothing
+  // said which: a user tapping like, a kind-7 batch landing, and the social
+  // store re-keying were indistinguishable while all three redrew the list.
+  // Emitted on change only, never per render.
+  useWhyDidRender(
+    'useNostrEngagement.revision',
+    () => ({
+      events: eventIds,
+      confirmed: engagementByEventId,
+      optimisticLikes: optimisticLikesByEventId,
+      optimisticReposts: optimisticRepostsByEventId,
+      optimisticZaps: optimisticZapsByEventId,
+      zapped: zappedByEventId,
+    }),
+    feedLog
+  );
+  // Thunk, not an object: those four `Object.keys` walk the whole social store
+  // (115 confirmed entries in a measured session) and would run on EVERY render
+  // of a shipped build, where the logger is a no-op.
+  useQueryResultLogger(
+    () => ({
+      source: 'useNostrEngagement',
+      status: 'ready',
+      count: eventIds.length,
+      extra: {
+        revision: engagementRevision,
+        confirmed: Object.keys(engagementByEventId).length,
+        pendingLikes: Object.keys(optimisticLikesByEventId).length,
+        pendingReposts: Object.keys(optimisticRepostsByEventId).length,
+        pendingZaps: Object.keys(optimisticZapsByEventId).length,
+        reconciling: reconcilingActions.size,
+      },
+    }),
+    feedLog
+  );
 
   // ---- public getters ----
 

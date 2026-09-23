@@ -15,6 +15,204 @@ export default defineConfig({
   zeroDataRetention: false,
   include: ["**/*.{ts,tsx,js,jsx,mjs,cjs,swift,kt,java,cpp,h,mm,rs}"],
   ignore: ["hunch.config.ts", "**/dist/**", "**/build/**", "**/vendor/**", "**/BitChatVendor/**", "**/generated/**"],
+  // Published specification packs, installed into hunch.lock by `hunch install`
+  // and reviewed there like any other rule. Selection principle: a pack rule is
+  // kept only where this repository makes the decision the rule is about. Cashu's
+  // cryptography and wire format belong to @cashu/cashu-ts and coco, and Nostr's
+  // to nostr-tools and NDK; asking about those would review code we do not ship.
+  // 115 of the 1,011 published rules survive that test.
+  packs: [
+    // ── Bitcoin BIPs ────────────────────────────────────────────────────
+    // Only the wallet-level BIPs this app implements itself. It never builds a
+    // script, signs a transaction or encodes an address: on-chain deposit
+    // addresses come from the mint and are only displayed, so the address,
+    // segwit, taproot, PSBT and descriptor families are not selected.
+    //
+    // bip39 + bip32: `app/shared/lib/nostr/keyDerivation.ts`,
+    //   `wallet/src/wallet-seed.ts`, `features/backup/**` and
+    //   `profile/keyRecovery.ts` own mnemonic generation, validation and the
+    //   seed. @scure/bip39 and @scure/bip32 own the PBKDF2, the checksum bits
+    //   and the HMAC/ser256 arithmetic, so those rules are left out; what is
+    //   ours is which value is fed in and whether an imported phrase is
+    //   checked. `seed-is-not-entropy` is the sharpest of them here, because
+    //   `deriveCashuMnemonic` deliberately turns a derived private key back
+    //   into entropy in the same file that also derives a seed.
+    // bip43: our paths are `m/44'/1237'` (NIP-06) and `m/44'/129372'` (Cashu);
+    //   the purpose level must stay hardened. `bip44/*` is not selected: the
+    //   Cashu path adds a fourth hardened level and the coin type is not
+    //   Bitcoin's, so BIP-44's five-level shape and `coin_type 0'/1'` would
+    //   flag a deliberate scheme.
+    // bip321: `wallet/src/bip321.ts`, `wallet/src/normalize.ts`,
+    //   `wallet/src/detectors.ts` and the receive rails parse and build these
+    //   URIs. `pop`/`req-pop` is not implemented, so those two are left out
+    //   until it is.
+    { pack: "bips-spec", rules: [
+      "bip39/checksum-not-verified",
+      "bip39/seed-is-not-entropy",
+      "bip39/entropy-size",
+      "bip39/wordlist-mismatch",
+      "bip39/user-supplied-sentence",
+      "bip32/hardened-boundary",
+      "bip32/seed-length",
+      "bip43/purpose-hardened",
+      "bip321/req-prefix-unknown",
+      "bip321/amount-is-decimal-btc",
+      "bip321/user-authorisation",
+      "bip321/case-insensitive-keys",
+      "bip321/duplicate-keys",
+      "bip321/empty-address-body",
+      "bip321/address-is-one-time",
+      "bip21/superseded-by-321",
+    ] },
+    // ── Nostr NIPs ──────────────────────────────────────────────────────
+    // nostr-tools and NDK own the primitives, so the rules about them are not
+    // selected: event id serialization, the Schnorr signature, NIP-44's
+    // ChaCha20 and HKDF, NIP-19's bech32 and TLV encoding, NIP-05 resolution
+    // (no `.well-known/nostr.json` fetch exists in this repo) and NIP-42 relay
+    // AUTH (NDK answers the challenge). Relay-side obligations are left out
+    // for the same reason: we are a client and a signer, not a relay.
+    //
+    // What remains is the layer this app writes:
+    // nip46: `app/features/nostrSigner/**` is a remote signer, so all eleven
+    //   apply — the request/response shape, the connect secret, per-method and
+    //   per-kind grants, and that client metadata is never authorization.
+    // nip17 + nip59: the DM envelope, thread history and the NUT-18 nostr
+    //   transport unwrap gift wraps and seals themselves.
+    //   `seal-pubkey-matches-rumor` is the impersonation check.
+    // nip60 + nip61: the Cashu wallet and nutzap kinds are this app's own
+    //   integration of the two protocols, not something coco or nostr-tools
+    //   decides — which mint, which lock key, what stays unencrypted.
+    // nip01: `nostr/src/**` is our own relay layer, with 53 places that build
+    //   filters and subscriptions, so the filter, limit, EOSE, subscription-id
+    //   and replaceable-storage rules are about our code.
+    //   `verify-against-event-pubkey` is the one signature rule kept, because
+    //   `app/shared/lib/nostr/moderation.ts` does that check by hand.
+    // nip04: `app/shared/lib/nostr/nip04.ts` is the legacy path; the mention-
+    //   tag leak and the deprecation notice are ours, the ECDH is not.
+    // nip06 + nip19 + nip65: the derivation path, keeping bech32 identifiers
+    //   off the wire, and read/write relay direction.
+    { pack: "nips-spec", rules: [
+      "nip01/verify-against-event-pubkey",
+      "nip01/kind-range-classification",
+      "nip01/replaceable-storage-key",
+      "nip01/replaceable-tie-break",
+      "nip01/subscription-id-constraints",
+      "nip01/req-replaces-subscription",
+      "nip01/event-message-subscription-id",
+      "nip01/filter-list-semantics",
+      "nip01/tag-filter-intersection",
+      "nip01/since-until-inclusive",
+      "nip01/limit-initial-query-only",
+      "nip01/limit-zero",
+      "nip01/eose-after-stored",
+      "nip01/single-connection-per-relay",
+      "nip01/a-tag-coordinate",
+      "nip04/deprecated-prefer-nip17",
+      "nip04/no-mention-tagging-in-dms",
+      "nip04/leaks-metadata",
+      "nip06/derivation-path",
+      "nip17/seal-pubkey-matches-rumor",
+      "nip17/chat-content-plain-text",
+      "nip17/room-identity",
+      "nip17/subject-latest-wins",
+      "nip17/publish-to-recipient-dm-relays",
+      "nip17/dm-relay-list-shape",
+      "nip17/file-message-shape",
+      "nip17/expiration-on-both-layers",
+      "nip19/bech32-not-on-the-wire",
+      "nip19/length-limit",
+      "nip46/request-event-shape",
+      "nip46/rpc-message-shape",
+      "nip46/distinguish-signer-and-user-pubkey",
+      "nip46/nostrconnect-secret-validated",
+      "nip46/bunker-secret-single-use",
+      "nip46/client-metadata-not-authorization",
+      "nip46/unknown-method-errors",
+      "nip46/auth-url-challenge",
+      "nip46/switch-relays",
+      "nip46/logout-not-a-boundary",
+      "nip46/client-keypair-disposable",
+      "nip59/rumor-unsigned",
+      "nip59/rumor-keeps-id",
+      "nip59/seal-kind-and-empty-tags",
+      "nip59/seal-signed-by-real-author",
+      "nip59/wrap-ephemeral-key-per-message",
+      "nip59/wrap-kind-and-p-tag",
+      "nip59/wrap-encrypted-to-recipient-with-wrapper-key",
+      "nip59/one-wrap-per-recipient",
+      "nip59/timestamps-tweaked-and-past",
+      "nip59/broadcast-selectively",
+      "nip60/wallet-privkey-is-separate",
+      "nip60/proofs-encrypted",
+      "nip60/rollover-on-spend",
+      "nip60/history-markers",
+      "nip60/wallet-relay-discovery",
+      "nip60/quote-event-expiration",
+      "nip61/p2pk-to-declared-pubkey",
+      "nip61/p2pk-key-prefix",
+      "nip61/mint-must-be-declared",
+      "nip61/nutzap-verification",
+      "nip61/redemption-recorded-once",
+      "nip61/filter-by-declared-mints",
+      "nip65/relay-list-shape",
+      "nip65/read-write-direction",
+      "nip65/publish-relay-list-alongside",
+    ] },
+    // ── Cashu NUTs ──────────────────────────────────────────────────────
+    // cashu-ts and coco implement the protocol: BDHKE, keysets, swap and melt,
+    // token serialization, deterministic secrets and the P2PK signing itself.
+    // Selecting those rules would review libraries we do not ship. What is
+    // ours is the orchestration around them, and it is where the money is:
+    //
+    // nut12: `app/shared/lib/cashu/offlineReceiveDleq.ts` decides that an
+    //   offline receive verifies the DLEQ before accepting ecash, and that a
+    //   local verification failure is not a retryable transport failure.
+    // nut18: `app/shared/lib/nutCreq.ts` builds and parses standing payment
+    //   requests directly against cashu-ts because coco does not, and
+    //   `paymentRequestNostrTransport.ts` is our own transport.
+    // nut11 + nut10: `protocolIds.ts`, `nutCreq.ts` and the p2pk-import plugin
+    //   choose the lock key, its `02` prefix and its locktime. The SIG_ALL
+    //   message construction and threshold counting stay with cashu-ts.
+    // nut06: `mintNuts.ts` reads what a mint supports before relying on it.
+    // errors: AGENTS.md already forbids publishing raw error bodies; this is
+    //   the same rule asked of mint responses.
+    { pack: "nuts-spec", rules: [
+      "nut06/nuts-settings-consulted",
+      "nut06/feature-setting-shape",
+      "nut06/max-array-length-batching",
+      "nut06/motd-displayed",
+      "nut10/unsupported-kind-is-anyone-can-spend",
+      "nut10/secret-parsed-not-assumed",
+      "nut10/conditions-are-per-proof",
+      "nut10/tag-values-cast",
+      "nut11/pubkey-compressed",
+      "nut11/keys-compared-by-x-coordinate",
+      "nut11/locktime-boundary",
+      "nut11/locktime-permanent",
+      "nut11/expired-without-refund-is-open",
+      "nut11/tag-appears-once",
+      "nut11/n-sigs-bounds",
+      "nut12/wallet-verifies-mint-dleq",
+      "nut12/wallet-verifies-received-dleq",
+      "nut12/proof-dleq-includes-r",
+      "nut12/strip-dleq-before-mint",
+      "nut18/payment-request-fields",
+      "nut18/unit-required-with-amount",
+      "nut18/mint-list-strict-default",
+      "nut18/supported-methods-constraint",
+      "nut18/per-method-fee-scope",
+      "nut18/amount-is-net-of-input-fees",
+      "nut18/nut10-option-shape",
+      "nut18/payee-validates-incoming-token",
+      "nut18/transport-shape-and-preference",
+      "nut18/empty-transport-is-in-band",
+      "nut18/nostr-transport",
+      "nut18/payment-payload-shape",
+      "nut18/single-use-honoured",
+      "errors/no-raw-error-leakage",
+      "errors/codes-used-as-specified",
+    ] },
+  ],
   // Vetted against the installed library versions and the contributor
   // conventions before selection (.agents/skills/sources.json). Compiled rules
   // that contradict a house convention are switched off by id below.
@@ -46,9 +244,14 @@ export default defineConfig({
   // alternation. `everywhere` asked all 346 compiled rules of all 2,460 files, which the hosted
   // App's 3,000-request cap truncated; the relaxed restrictions cover more of a PR, not less.
   review: { contextLines: 40, chunkLines: 150, overlapLines: 0, localize: false, compiledScope: "inferred" },
-  // Sized from `check --all --dry-run`: 4,593 chunks, 280k questions in 12,394 requests, down from
-  // 1.43M questions in 25,980 under `everywhere`. The hosted App applies its own caps to a PR
-  // (3,000 requests, 8 in flight, 240 seconds).
+  // Sized from `check --all --dry-run`: 4,585 chunks, 815k questions in 23,099 requests — 280k in
+  // 12,394 before the packs, since their 115 rules carry no `when` and are asked of every chunk.
+  // That is the whole-repository audit; a pull request pays about two extra requests per chunk,
+  // which is why this stays unscoped. Narrow it with `--only nut18/*` for a targeted audit, or
+  // scope a family to the directory that owns it with an override if the audit cost bites.
+  // Earlier reference points: 1.43M questions in 25,980 under `compiledScope: "everywhere"`. The
+  // hosted App applies its own caps to a PR (3,000 requests, 8 in flight, 240 seconds), which the
+  // packs bring within reach at roughly 500 changed chunks instead of 750.
   budget: { maxHunks: 10000, maxRulesPerHunk: 1024, maxRequests: 40000, concurrency: 16, timeoutSeconds: 43200 },
   rules: {
     // ── Compiled skill rules switched off ─────────────────────────────────
