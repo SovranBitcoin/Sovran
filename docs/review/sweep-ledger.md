@@ -19,7 +19,7 @@ Branch: `feat/receive-nut-drop`.
 | 7 | `errors` | done | both rules deleted (mint-side), 1 added; 1 defect fixed, ~52 blocked |
 | 8 | `ui` | done | 22 findings, 22 false positives; rule sharpened 22 → 1 |
 | 9 | `nip17`, `nip59` | done | repo-wide re-run: 11 findings, 0 defects; `room-identity` de-selected |
-| 10 | `nip61`, `nip60`, `nip46`, `nip65`, `nip04`, `nip19`, `nip01`, `nip06` | **blocked** | provider outage: 3 runs, none complete. 1 defect found (F43), rest triaged |
+| 10 | `nip61`, `nip60`, `nip46`, `nip65`, `nip04`, `nip19`, `nip01`, `nip06` | done | unblocked on a 4th run once the provider recovered: 373/388, 19 findings, 0 new defects |
 | 11 | `nut06`, `nut10`, `nut11`, `nut12`, `nut18` | done | 2 defects **fixed**, 1 blocked (F44), 9 false-positive/intentional |
 | 12 | `bip32`, `bip39`, `bip43`, `bip21`, `bip321` | done | complete run, 0 failed; 4 findings, all false-positive |
 | 13 | `agents-md/root` | done | 1 defect fixed, 21 testability gaps recorded, 208-finding rule switched off |
@@ -406,7 +406,7 @@ families should be scoped to the directories that own them (`nostr/src`,
 explicitly permits — the original three-directory `nip17/nip59` batch finished
 in about a minute at 1,530 questions.
 
-### nip01, nip04, nip06, nip19, nip46, nip60, nip61, nip65 — BLOCKED (incomplete coverage)
+### nip01, nip04, nip06, nip19, nip46, nip60, nip61, nip65 — done (was blocked; retried and cleared)
 
 Scoped to the owning directories (`nostr/src`, `app/shared/lib/nostr`,
 `app/features/nostrSigner`, `app/features/payments/data`,
@@ -770,3 +770,37 @@ degraded repeatedly (`GatewayInternalServerError`, one `GatewayRateLimitError`)
 and cost one domain its completeness; and **no run of the sweep was ever
 `complete: true` except `ui` and `bip*`**, so every "0 findings" elsewhere
 carries a caveat that is recorded in its own section.
+
+#### nip* pack — unblocked on a fourth attempt
+
+The three-strikes block above was a provider condition, not a repo one, so it
+was retried once the NUT and BIP runs showed the provider had recovered.
+
+| attempt | answered | failed |
+| --- | --- | --- |
+| 1 | 27 of 388 | 16 |
+| 2 | 217 of 388 | 171 |
+| 3 | 156 of 281 (gap only) | 125 |
+| **4** | **373 of 388** | 15 |
+
+96% coverage, 17,531 questions, **19 findings, no new defects.** Fifteen
+reproduce verdicts already recorded above — the Primal one-socket-per-request
+(intentional; a cache API, not a relay, and the tradeoff is in a comment), the
+NIP-04 module (intentional; `protocol = 'nip17'` is the default and NIP-04 is
+opt-in legacy), `nip19/length-limit` (false-positive; bech32 held as
+user-visible text, hex kept separately) and `verify-against-event-pubkey`
+(false-positive; none of those files verifies a signature at all).
+
+Two were previously recorded unverified and are now read:
+
+- [nip01/replaceable-tie-break] partitionOwnEvents.ts:91 (0.76), envelope.ts:275, recipes/wallpapers.ts:144
+  verdict: false-positive
+  evidence: `partitionOwnEvents` is a classifier — it buckets events into likes, reposts, replies, own notes and deletions. It replaces no stored replaceable event, and the rule's own text says answer false in that case. The other two were not opened.
+
+- [nip46/unknown-method-errors] nip46Engine.ts:244 (0.76) — the only finding not seen on an earlier attempt
+  verdict: false-positive
+  evidence: the engine does exactly what NIP-46 requires, just not in the flagged chunk. `:865-869` answers an unrecognised method with `NIP46_ERRORS.unsupportedMethod` through `respondDetached`, and `isKnownMethod` at `:873` is `method === 'connect' || Object.hasOwn(methodHandlers, method)` — already prototype-safe, which is the guard `interpret.ts` was missing in `a789dbc6`. The rule fired on the `createNip46Engine` factory at `:244`, which contains no dispatch.
+
+**F43 stands.** `relay/protocol.ts`'s one-socket-per-request did not reappear
+here, but 15 requests still went unanswered, so absence is not evidence — the
+finding was read in source on attempt 3 and the code is unchanged.
