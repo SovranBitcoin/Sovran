@@ -10,31 +10,13 @@
 import { decodePaymentRequest } from "@cashu/cashu-ts";
 
 import { amountToNumberOrUndefined } from "./amount";
+import { P2PK_PUBKEY_RE, p2pkXOnly } from "./p2pk";
 import { logger } from "./logger";
 import type { PaymentRequestInfo, PaymentRequestTransport } from "./types";
 
 const CREQ_PREFIX = /^creq[ab]/i;
 const CREQB_PREFIX = /^creqb1/i;
-/**
- * NUT-11 lock key: 33-byte compressed secp256k1, so `02` OR `03` — both parities
- * are legal and both encode the same x coordinate. Sovran only ever mints the
- * `02` form (the x-only lift of a Nostr key), but a true SEC1-compressed key
- * from another wallet can legitimately arrive as `03`, and rejecting it here
- * made a request that IS locked to us look like one that is not.
- */
-const P2PK_PUBKEY_RE = /^0[23][0-9a-f]{64}$/i;
 
-/**
- * The x coordinate of a compressed P2PK key, lowercased — the form NUT-11
- * compares by. `null` when the input is not a compressed key.
- *
- * Mirrors `nostrPubkeyHexFromCashuP2pk` in `app/shared/lib/protocolIds.ts`,
- * deliberately duplicated: `wallet` must not import from `app`.
- */
-function p2pkXOnly(value: string | undefined | null): string | null {
-  if (!value || !P2PK_PUBKEY_RE.test(value)) return null;
-  return value.slice(2).toLowerCase();
-}
 
 const tryDecode = <T>(fn: () => T): T | null => {
   try {
