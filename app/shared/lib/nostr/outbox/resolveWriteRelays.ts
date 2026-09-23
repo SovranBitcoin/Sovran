@@ -1,13 +1,17 @@
 /**
  * @fileoverview Outbox write-relay routing (pure).
  *
- * Computes where an event should be published: the author's own NIP-65 write
- * relays, plus — for mentions/replies/DMs — each recipient's NIP-65 read relays
- * (the outbox model: write to the reader's inbox). Falls back to the default
- * bootstrap set whenever a side has no known relays, so a write never silently
- * targets nothing. Network fetching of recipient relay lists lives in the
- * integration layer; this function takes already-resolved relays so it stays
- * pure and unit-testable.
+ * Computes where a public event should be published: the author's own NIP-65
+ * write relays, plus — for mentions and replies — each recipient's NIP-65 read
+ * relays (the outbox model: write to the reader's inbox). Falls back to the
+ * default bootstrap set whenever a side has no known relays, so a write never
+ * silently targets nothing. Network fetching of recipient relay lists lives in
+ * the integration layer; this function takes already-resolved relays so it
+ * stays pure and unit-testable.
+ *
+ * Not for direct messages. NIP-17 routes DMs by the recipient's `kind:10050`
+ * DM relay list, and a missing list means "do not send" — the opposite of the
+ * bootstrap fallback below. DMs go through `sendDirectMessage.ts`.
  */
 import {
   DEFAULT_RELAYS,
