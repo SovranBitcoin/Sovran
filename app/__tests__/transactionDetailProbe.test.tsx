@@ -323,6 +323,8 @@ describe('TransactionDetailShell device probe', () => {
       mintHost: 'mint.sovran.money',
       status: 'finalized',
       source: 'paste',
+      lock: 'none',
+      reclaim: 'none',
     });
     expect(probe.props.accessibilityValue.text).not.toContain('cashuB');
   });

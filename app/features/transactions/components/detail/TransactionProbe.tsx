@@ -7,18 +7,27 @@ import {
   type TransactionProbeEntry,
 } from '@/features/transactions/lib/transactionProbe';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
+import type { SpendingConditions } from 'wallet';
 
 export function TransactionProbe({
   entry,
   source,
   transactionId,
+  conditions,
 }: {
   entry: TransactionProbeEntry;
   source?: string | null;
   transactionId: string;
+  conditions?: SpendingConditions | null;
 }): React.ReactElement {
-  const probe = React.useMemo(() => createTransactionProbe(entry, source), [entry, source]);
-  const serialized = React.useMemo(() => serializeTransactionProbe(entry, source), [entry, source]);
+  const probe = React.useMemo(
+    () => createTransactionProbe(entry, source, conditions),
+    [entry, source, conditions]
+  );
+  const serialized = React.useMemo(
+    () => serializeTransactionProbe(entry, source, conditions),
+    [entry, source, conditions]
+  );
   const summary = `${probe.direction === 'out' ? 'Outgoing' : 'Incoming'} ${probe.amount} ${probe.unit} transaction, ${probe.status}`;
   // Android carries the payload in accessibilityLabel (→ content-desc → the
   // ax-adapter's value), matching the working `routeReadyProbe` structure

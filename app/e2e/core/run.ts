@@ -939,6 +939,8 @@ async function assertStep(
           mintHost: step.mintHost,
           status: step.status,
           source: step.source,
+          lock: step.lock,
+          reclaim: step.reclaim,
         };
         for (const [k, v] of Object.entries(fields)) {
           if (v !== undefined && tx[k] !== v)

@@ -3,7 +3,7 @@ import { StyleSheet, type ScrollView, type View as NativeView } from 'react-nati
 import { useReducedMotion } from 'react-native-reanimated';
 
 import { useIdentityHeader, type HeaderIdentity } from '@/shared/ui/composed/IdentityHeader';
-import { getCounterparty, transactionHeaderTitle } from 'wallet';
+import { getCounterparty, transactionHeaderTitle, type SpendingConditions } from 'wallet';
 
 import { useDeferredMount } from '@/shared/hooks/useDeferredMount';
 import { Screen, useScreenOptions } from '@/shared/ui/composed/Screen';
@@ -46,6 +46,8 @@ interface TransactionDetailShellProps {
   showRecipientAvatar?: boolean;
   /** See `HistoryEntryHeader.badge` — what the avatar's corner disc says. */
   headerBadge?: 'direction' | 'lock' | 'none';
+  /** The send's spending conditions, surfaced to the device harness as enums. */
+  conditions?: SpendingConditions | null;
   /** Footer (bottom buttons). */
   footer: React.ReactNode;
   /**
@@ -117,6 +119,7 @@ export function TransactionDetailShell({
   source,
   showRecipientAvatar = false,
   headerBadge = 'direction',
+  conditions = null,
   footer,
   headerIdentity,
   headerTitle,
@@ -204,7 +207,12 @@ export function TransactionDetailShell({
         <VStack gap={12}>
           {entry ? (
             <>
-              <TransactionProbe entry={entry} source={source} transactionId={entry.id} />
+              <TransactionProbe
+                entry={entry}
+                source={source}
+                transactionId={entry.id}
+                conditions={conditions}
+              />
               <HistoryEntryHeader
                 historyEntry={entry}
                 showRecipientAvatar={showRecipientAvatar}

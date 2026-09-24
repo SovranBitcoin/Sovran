@@ -433,6 +433,10 @@ const assertTx = z.strictObject({
     .enum(['qr', 'nfc', 'paste', 'deeplink', 'ble', 'copy', 'share', 'airdrop', 'displayed', 'npc'])
     .nullable()
     .optional(),
+  /** The P2PK lock, as an enum — the probe carries no keys and no dates. */
+  lock: z.enum(['none', 'permanent', 'timed-active', 'timed-expired', 'unknown']).optional(),
+  /** Whether the sender can take it back, as an enum. */
+  reclaim: z.enum(['none', 'never', 'at', 'now', 'unknown']).optional(),
   /** Poll until every field matches — transient op states (e.g. ISSUED right
    * after a mint quote pays) settle moments later. Omitted = one-shot read. */
   timeoutMs: z.number().int().positive().max(600_000).optional(),

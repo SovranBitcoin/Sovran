@@ -1,4 +1,5 @@
 import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
+import type { SpendingConditions } from 'wallet';
 
 export type TransactionProbeEntry = {
   type: 'mint' | 'melt' | 'send' | 'receive';
@@ -8,6 +9,13 @@ export type TransactionProbeEntry = {
   state: unknown;
 };
 
+/** The lock, as an enum. No keys and no dates cross this seam. */
+type TransactionProbeLock =
+  'none' | 'permanent' | 'timed-active' | 'timed-expired' | 'unknown';
+
+/** Whether the sender can take it back, as an enum. Same rule. */
+type TransactionProbeReclaim = 'none' | 'never' | 'at' | 'now' | 'unknown';
+
 type TransactionProbe = {
   direction: 'in' | 'out';
   amount: number;
@@ -15,6 +23,8 @@ type TransactionProbe = {
   mintHost: string;
   status: string;
   source: string | null;
+  lock: TransactionProbeLock;
+  reclaim: TransactionProbeReclaim;
 };
 
 const SOURCE_LABEL_TO_CANONICAL: Readonly<Record<string, string>> = {
@@ -38,6 +48,18 @@ const CANONICAL_SOURCES = new Set([
   'displayed',
   'npc',
 ]);
+
+function probeLock(conditions?: SpendingConditions | null): TransactionProbeLock {
+  if (!conditions || conditions.kind === 'unlocked') return 'none';
+  if (conditions.kind !== 'p2pk') return 'unknown';
+  return conditions.phase ?? 'unknown';
+}
+
+function probeReclaim(conditions?: SpendingConditions | null): TransactionProbeReclaim {
+  if (!conditions) return 'none';
+  const { reclaim } = conditions;
+  return reclaim.kind === 'not-locked' ? 'none' : reclaim.kind;
+}
 
 function mintHost(mintUrl: string): string {
   try {
@@ -64,7 +86,8 @@ function canonicalSource(source?: string | null): string | null {
  */
 export function createTransactionProbe(
   entry: TransactionProbeEntry,
-  source?: string | null
+  source?: string | null,
+  conditions?: SpendingConditions | null
 ): TransactionProbe {
   return {
     direction: entry.type === 'melt' || entry.type === 'send' ? 'out' : 'in',
@@ -73,12 +96,18 @@ export function createTransactionProbe(
     mintHost: mintHost(entry.mintUrl),
     status: String(entry.state),
     source: canonicalSource(source),
+    // Enums only. A date would let a scenario assert a locktime, which means
+    // writing one into a fixture, which means the harness starts carrying
+    // payment material it has no business holding.
+    lock: probeLock(conditions),
+    reclaim: probeReclaim(conditions),
   };
 }
 
 export function serializeTransactionProbe(
   entry: TransactionProbeEntry,
-  source?: string | null
+  source?: string | null,
+  conditions?: SpendingConditions | null
 ): string {
-  return JSON.stringify(createTransactionProbe(entry, source));
+  return JSON.stringify(createTransactionProbe(entry, source, conditions));
 }

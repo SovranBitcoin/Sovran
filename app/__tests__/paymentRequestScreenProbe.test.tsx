@@ -172,6 +172,8 @@ describe('PaymentRequestScreen QA probes', () => {
       mintHost: 'mint.sovran.money',
       status: 'prepared',
       source: 'paste',
+      lock: 'none',
+      reclaim: 'none',
     });
     expect(probe.props.accessibilityValue.text).not.toContain('creqA');
     expect(probe.props.accessibilityValue.text).not.toContain('/private/path');
@@ -211,6 +213,8 @@ describe('PaymentRequestScreen QA probes', () => {
       mintHost: 'mint.sovran.money',
       status: 'rolledBack',
       source: 'paste',
+      lock: 'none',
+      reclaim: 'none',
     });
     expect(probe.props.accessibilityValue.text).not.toContain('creqA');
     expect(probe.props.accessibilityValue.text).not.toContain('cashuA');
