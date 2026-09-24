@@ -11,6 +11,7 @@ import {
   getCounterparty,
   getScanSource,
   getSwap,
+  describeSendLock,
   isP2PKLocked,
   mergeAnnotationsIntoEntry,
   normaliseAnnotationRaw,
@@ -634,5 +635,119 @@ describe("AI payment annotation", () => {
 
   it("leaves the annotation absent when nothing about a payment is known", () => {
     expect(decodeAnnotation({}).ai).toBeUndefined();
+  });
+});
+
+describe("lock annotation — what survives the token", () => {
+  const THEIR_KEY = `02${"11".repeat(32)}`;
+  const OUR_KEY = `02${"22".repeat(32)}`;
+  const LOCKTIME = 1_800_003_600;
+
+  it("round-trips every condition we can apply to a send", () => {
+    const lock: TransactionAnnotation["lock"] = {
+      type: "p2pk",
+      pubkey: THEIR_KEY,
+      direction: "outgoing",
+      pubkeys: [THEIR_KEY],
+      requiredSignatures: 1,
+      locktime: LOCKTIME,
+      refundKeys: [OUR_KEY],
+      refundRequiredSignatures: 1,
+      sigFlag: "SIG_INPUTS",
+    };
+    expect(decodeAnnotation(encodeAnnotation({ lock })).lock).toEqual(lock);
+  });
+
+  it("keeps an absent refund list distinct from an empty one", () => {
+    // No refund tag means anyone can spend after the locktime; an empty list
+    // is a token nobody can refund. Collapsing them would misreport who can
+    // take the money.
+    const withoutTag = decodeAnnotation(
+      encodeAnnotation({ lock: { type: "p2pk", locktime: LOCKTIME } }),
+    );
+    expect(withoutTag.lock?.refundKeys).toBeUndefined();
+
+    const withEmptyTag = decodeAnnotation(
+      encodeAnnotation({
+        lock: { type: "p2pk", locktime: LOCKTIME, refundKeys: [] },
+      }),
+    );
+    expect(withEmptyTag.lock?.refundKeys).toEqual([]);
+  });
+
+  it("still decodes a record written before locks carried terms", () => {
+    expect(
+      decodeAnnotation({
+        lockType: "p2pk",
+        lockPubkey: THEIR_KEY,
+        lockDirection: "incoming",
+      }).lock,
+    ).toEqual({ type: "p2pk", pubkey: THEIR_KEY, direction: "incoming" });
+  });
+
+  it("decodes a record that carries only a locktime", () => {
+    // The old guard only looked at type/pubkey/direction, so a lock described
+    // solely by its terms decoded to nothing and read as unlocked.
+    expect(decodeAnnotation({ lockLocktime: String(LOCKTIME) }).lock).toEqual({
+      locktime: LOCKTIME,
+    });
+  });
+
+  it("drops a sigflag it does not recognise rather than trusting it", () => {
+    expect(
+      decodeAnnotation({ lockType: "p2pk", lockSigFlag: "SIG_SOMEDAY" }).lock,
+    ).toEqual({ type: "p2pk" });
+  });
+});
+
+describe("describeSendLock — proofs first, the record after", () => {
+  const THEIR_KEY = `02${"11".repeat(32)}`;
+  const OUR_KEY = `02${"22".repeat(32)}`;
+  const LOCKTIME = 1_800_003_600;
+  const NOW = 1_800_000_000_000;
+
+  const lockedToken = (tags: string[][] = []) => ({
+    proofs: [
+      {
+        secret: JSON.stringify([
+          "P2PK",
+          { nonce: "ab".repeat(16), data: THEIR_KEY, tags },
+        ]),
+      },
+    ],
+  });
+
+  it("reads the token while it still has proofs", () => {
+    const conditions = describeSendLock({ token: lockedToken() }, { now: NOW });
+    expect(conditions?.kind).toBe("p2pk");
+    expect(conditions?.phase).toBe("permanent");
+  });
+
+  it("falls back to what we recorded once the token is gone", () => {
+    const entry = {
+      metadata: encodeAnnotation({
+        lock: {
+          type: "p2pk",
+          pubkey: THEIR_KEY,
+          direction: "outgoing",
+          locktime: LOCKTIME,
+          refundKeys: [OUR_KEY],
+        },
+      }),
+    };
+    const conditions = describeSendLock(entry, {
+      now: NOW,
+      ourPubkeys: [OUR_KEY],
+    });
+    expect(conditions?.unlockAt).toBe(LOCKTIME * 1000);
+    expect(conditions?.reclaim).toEqual({
+      kind: "at",
+      at: LOCKTIME * 1000,
+      via: "refund",
+    });
+  });
+
+  it("says nothing at all when there is neither a token nor a record", () => {
+    expect(describeSendLock({}, { now: NOW })).toBeNull();
   });
 });

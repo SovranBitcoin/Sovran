@@ -246,28 +246,14 @@ const UNLOCKED_CONDITIONS: Omit<SpendingConditions, "proofCount"> = {
  * `now` is injected rather than read, so every surface that renders a lock —
  * and every test — agrees on when "expired" began.
  */
-export function describeSpendingConditions(input: {
-  proofs: readonly { secret: string }[];
-  now: number;
-  /** Public keys this wallet can sign for; omit when unknown. */
-  ourPubkeys?: readonly string[];
-  skewMs?: number;
-}): SpendingConditions {
-  const { proofs, now, ourPubkeys, skewMs = LOCK_CLOCK_SKEW_MS } = input;
-  const locks = proofs.map((proof) => readProofLock(proof.secret));
-  const locked = locks.filter((lock) => lock.kind !== "unlocked");
-
-  if (locked.length === 0) {
-    return { ...UNLOCKED_CONDITIONS, proofCount: proofs.length };
-  }
-
-  // The first locked condition set speaks for the token; `mixed` warns when
-  // the rest disagree, because a partially-locked token is not safe to
-  // summarise with one sentence.
-  const lock = locked[0]!;
-  const signatures = new Set(locked.map(lockSignature));
-  const mixed = signatures.size > 1 || locked.length !== proofs.length;
-
+/** Assemble the public model from one condition set and its proof counts. */
+function assemble(
+  lock: ProofLock,
+  counts: { proofCount: number; lockedProofCount: number; mixed: boolean },
+  now: number,
+  ourPubkeys: readonly string[] | undefined,
+  skewMs: number,
+): SpendingConditions {
   const main: LockParty = {
     pubkeys: lock.mainKeys,
     requiredSignatures: lock.requiredSignatures,
@@ -303,9 +289,9 @@ export function describeSpendingConditions(input: {
     main,
     refund: lock.refundKeys === null ? null : refund,
     sigFlag: lock.sigFlag,
-    mixed,
-    proofCount: proofs.length,
-    lockedProofCount: locked.length,
+    mixed: counts.mixed,
+    proofCount: counts.proofCount,
+    lockedProofCount: counts.lockedProofCount,
     reclaim: verdict(lock, refund, unlockAt, now, skewMs),
     limits,
     unknownTags: lock.unknownTags,
@@ -323,4 +309,89 @@ export function describeSpendingConditions(input: {
   });
 
   return conditions;
+}
+
+/**
+ * Describe a whole token's spending conditions.
+ *
+ * `now` is injected rather than read, so every surface that renders a lock —
+ * and every test — agrees on when "expired" began.
+ */
+export function describeSpendingConditions(input: {
+  proofs: readonly { secret: string }[];
+  now: number;
+  /** Public keys this wallet can sign for; omit when unknown. */
+  ourPubkeys?: readonly string[];
+  skewMs?: number;
+}): SpendingConditions {
+  const { proofs, now, ourPubkeys, skewMs = LOCK_CLOCK_SKEW_MS } = input;
+  const locks = proofs.map((proof) => readProofLock(proof.secret));
+  const locked = locks.filter((lock) => lock.kind !== "unlocked");
+
+  if (locked.length === 0) {
+    return { ...UNLOCKED_CONDITIONS, proofCount: proofs.length };
+  }
+
+  // The first locked condition set speaks for the token; `mixed` warns when
+  // the rest disagree, because a partially-locked token is not safe to
+  // summarise with one sentence.
+  const signatures = new Set(locked.map(lockSignature));
+  return assemble(
+    locked[0]!,
+    {
+      proofCount: proofs.length,
+      lockedProofCount: locked.length,
+      mixed: signatures.size > 1 || locked.length !== proofs.length,
+    },
+    now,
+    ourPubkeys,
+    skewMs,
+  );
+}
+
+/**
+ * The same description, rebuilt from what we recorded when the token was
+ * created — for after it has been handed over and its proofs are gone.
+ *
+ * `refundKeys: undefined` means the token carried no `refund` tag at all, which
+ * is the difference between "you can take this back" and "anyone can".
+ */
+export function describeRecordedLock(input: {
+  lock: {
+    pubkey?: string;
+    pubkeys?: string[];
+    requiredSignatures?: number;
+    locktime?: number;
+    refundKeys?: string[];
+    refundRequiredSignatures?: number;
+    sigFlag?: "SIG_INPUTS" | "SIG_ALL";
+  };
+  now: number;
+  ourPubkeys?: readonly string[];
+  skewMs?: number;
+}): SpendingConditions {
+  const { lock, now, ourPubkeys, skewMs = LOCK_CLOCK_SKEW_MS } = input;
+  const mainKeys = lock.pubkeys?.length
+    ? lock.pubkeys
+    : lock.pubkey
+      ? [lock.pubkey]
+      : [];
+  return assemble(
+    {
+      kind: "p2pk",
+      mainKeys,
+      requiredSignatures: lock.requiredSignatures ?? 1,
+      refundKeys: lock.refundKeys ?? null,
+      requiredRefundSignatures: lock.refundRequiredSignatures ?? 1,
+      locktimeSec: lock.locktime ?? null,
+      sigFlag: lock.sigFlag ?? null,
+      unknownTags: [],
+    },
+    // A record describes the lock we applied to the whole token, so there is
+    // no proof-level disagreement to report.
+    { proofCount: 0, lockedProofCount: 0, mixed: false },
+    now,
+    ourPubkeys,
+    skewMs,
+  );
 }

@@ -200,6 +200,7 @@ export {
   getScanSource,
   getSwap,
   getZap,
+  describeSendLock,
   isP2PKLocked,
   mergeAnnotationRecords,
   mergeAnnotationsIntoEntry,

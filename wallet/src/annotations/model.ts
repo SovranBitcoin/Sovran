@@ -31,6 +31,12 @@ export const ANNOTATION_KEYS = {
   lockType: "lockType",
   lockPubkey: "lockPubkey",
   lockDirection: "lockDirection",
+  lockPubkeys: "lockPubkeys",
+  lockRequiredSigs: "lockRequiredSigs",
+  lockLocktime: "lockLocktime",
+  lockRefundKeys: "lockRefundKeys",
+  lockRefundRequiredSigs: "lockRefundRequiredSigs",
+  lockSigFlag: "lockSigFlag",
   distributionSource: "distributionSource",
   geoLat: "geoLat",
   geoLng: "geoLng",
@@ -76,12 +82,14 @@ export type AnnotationRecord = Record<string, string>;
 const COUNTERPARTY_DIRECTIONS = ["sender", "recipient"] as const;
 const SCAN_METHODS = ["qr", "nfc", "paste", "deeplink", "ble"] as const;
 const LOCK_DIRECTIONS = ["incoming", "outgoing"] as const;
+const LOCK_SIG_FLAGS = ["SIG_INPUTS", "SIG_ALL"] as const;
 const DISTRIBUTION_SOURCES = ["copy", "share", "airdrop", "displayed"] as const;
 const SWAP_ROLES = ["mint", "melt"] as const;
 
 export type CounterpartyDirection = (typeof COUNTERPARTY_DIRECTIONS)[number];
 export type ScanMethod = (typeof SCAN_METHODS)[number];
 export type LockDirection = (typeof LOCK_DIRECTIONS)[number];
+export type LockSigFlag = (typeof LOCK_SIG_FLAGS)[number];
 export type DistributionSource = (typeof DISTRIBUTION_SOURCES)[number];
 export type SwapRole = (typeof SWAP_ROLES)[number];
 
@@ -126,8 +134,24 @@ export interface TransactionAnnotation {
   };
   lock?: {
     type?: "p2pk";
+    /** The key the token's `data` field named — the primary lock target. */
     pubkey?: string;
     direction?: LockDirection;
+    /** Every key on the main path, when the lock named more than one. */
+    pubkeys?: string[];
+    /** `n_sigs`; absent means the NUT-11 default of one. */
+    requiredSignatures?: number;
+    /** Unix SECONDS, the unit NUT-11 writes — converted at the UI edge only. */
+    locktime?: number;
+    /**
+     * Keys that may spend after `locktime`. An ABSENT list is not an empty
+     * one: absent means the token carried no `refund` tag, so after the
+     * locktime anyone holding it can spend. Never collapse the two.
+     */
+    refundKeys?: string[];
+    /** `n_sigs_refund`; absent means one. */
+    refundRequiredSignatures?: number;
+    sigFlag?: LockSigFlag;
   };
   distribution?: {
     source?: DistributionSource;
@@ -249,6 +273,17 @@ function setString(
   if (typeof value === "string" && value.length > 0) record[key] = value;
 }
 
+/** Numbers persist as strings, the same way the location fields do. */
+function setNumberString(
+  record: AnnotationRecord,
+  key: string,
+  value: number | undefined | null,
+): void {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    record[key] = String(value);
+  }
+}
+
 /**
  * Flatten a rich annotation patch into the persisted `Record<string, string>`.
  * Only defined, non-empty fields are written, so patches are additive and a
@@ -303,6 +338,28 @@ export function encodeAnnotation(
     setString(record, ANNOTATION_KEYS.lockType, patch.lock.type);
     setString(record, ANNOTATION_KEYS.lockPubkey, patch.lock.pubkey);
     setString(record, ANNOTATION_KEYS.lockDirection, patch.lock.direction);
+    if (patch.lock.pubkeys?.length) {
+      record[ANNOTATION_KEYS.lockPubkeys] = JSON.stringify(patch.lock.pubkeys);
+    }
+    if (patch.lock.refundKeys) {
+      // Written even when empty: "no refund tag" and "an empty refund tag"
+      // mean different things to whoever holds the token.
+      record[ANNOTATION_KEYS.lockRefundKeys] = JSON.stringify(
+        patch.lock.refundKeys,
+      );
+    }
+    setNumberString(
+      record,
+      ANNOTATION_KEYS.lockRequiredSigs,
+      patch.lock.requiredSignatures,
+    );
+    setNumberString(record, ANNOTATION_KEYS.lockLocktime, patch.lock.locktime);
+    setNumberString(
+      record,
+      ANNOTATION_KEYS.lockRefundRequiredSigs,
+      patch.lock.refundRequiredSignatures,
+    );
+    setString(record, ANNOTATION_KEYS.lockSigFlag, patch.lock.sigFlag);
   }
 
   if (patch.distribution) {
@@ -511,11 +568,48 @@ export function decodeAnnotation(
     record[ANNOTATION_KEYS.lockDirection],
     LOCK_DIRECTIONS,
   );
-  if (lockType || lockPubkey || lockDirection) {
+  const lockPubkeys = parseStringArray(record[ANNOTATION_KEYS.lockPubkeys]);
+  const lockRefundKeys = parseStringArray(
+    record[ANNOTATION_KEYS.lockRefundKeys],
+  );
+  const lockLocktime = parseFiniteNumber(record[ANNOTATION_KEYS.lockLocktime]);
+  const lockRequiredSigs = parseFiniteNumber(
+    record[ANNOTATION_KEYS.lockRequiredSigs],
+  );
+  const lockRefundRequiredSigs = parseFiniteNumber(
+    record[ANNOTATION_KEYS.lockRefundRequiredSigs],
+  );
+  const lockSigFlag = oneOf(
+    record[ANNOTATION_KEYS.lockSigFlag],
+    LOCK_SIG_FLAGS,
+  );
+  // Every lock field counts: a record holding only a locktime still describes
+  // a lock, and dropping it would report the token as unlocked.
+  if (
+    lockType ||
+    lockPubkey ||
+    lockDirection ||
+    lockPubkeys ||
+    lockRefundKeys ||
+    lockLocktime !== undefined ||
+    lockRequiredSigs !== undefined ||
+    lockRefundRequiredSigs !== undefined ||
+    lockSigFlag
+  ) {
     annotation.lock = {
       ...(lockType === "p2pk" ? { type: "p2pk" as const } : {}),
       ...(lockPubkey ? { pubkey: lockPubkey } : {}),
       ...(lockDirection ? { direction: lockDirection } : {}),
+      ...(lockPubkeys ? { pubkeys: lockPubkeys } : {}),
+      ...(lockRequiredSigs !== undefined
+        ? { requiredSignatures: lockRequiredSigs }
+        : {}),
+      ...(lockLocktime !== undefined ? { locktime: lockLocktime } : {}),
+      ...(lockRefundKeys ? { refundKeys: lockRefundKeys } : {}),
+      ...(lockRefundRequiredSigs !== undefined
+        ? { refundRequiredSignatures: lockRefundRequiredSigs }
+        : {}),
+      ...(lockSigFlag ? { sigFlag: lockSigFlag } : {}),
     };
   }
 

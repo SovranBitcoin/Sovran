@@ -43,5 +43,6 @@ export {
   getPaymentRequest,
   getOnchainMelt,
   getZap,
+  describeSendLock,
   isP2PKLocked,
 } from "./selectors";
