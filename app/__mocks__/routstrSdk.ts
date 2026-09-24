@@ -221,7 +221,10 @@ export class RoutstrClient {
     const bank = async () => {
       const change = response.headers.get('x-cashu');
       if (!change) return required;
-      const received = await this.wallet.receiveToken(change);
+      // CashuSpender converts adapter rejections into failed receipts.
+      const received = await this.wallet
+        .receiveToken(change)
+        .catch(() => ({ success: false, amount: 0 }));
       // Exercise the adapter against an SDK removal even when receipt failed.
       this.storage.removeXcashuToken(params.baseUrl, token);
       return Math.max(0, required - (received.success ? received.amount : 0));

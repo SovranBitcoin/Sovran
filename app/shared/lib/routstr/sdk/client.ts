@@ -146,10 +146,17 @@ export async function getRoutstrClient(baseUrl: string, canDispatch: () => boole
       },
       async receiveToken(token) {
         received = false;
-        const result = await wallet.receiveToken(token);
-        received = result.success;
-        if (!result.success) receiveFailed = true;
-        return result;
+        try {
+          const result = await wallet.receiveToken(token);
+          received = result.success;
+          if (!result.success) receiveFailed = true;
+          return result;
+        } catch (error) {
+          // The SDK converts adapter throws into failed receipts. Preserve
+          // that outcome for finish even when its finalize promise resolves.
+          receiveFailed = true;
+          throw error;
+        }
       },
     },
     storage,

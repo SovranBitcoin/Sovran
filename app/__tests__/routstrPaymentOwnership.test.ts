@@ -132,6 +132,13 @@ describe('Routstr payment ownership boundary', () => {
     expect(mockWrites.at(-1)?.value).toContain('cashuB-fixture');
   });
 
+  it('retains recovery and refuses settlement when the receipt adapter throws', async () => {
+    mockReceive.mockRejectedValueOnce(new Error('Payment belongs to another profile'));
+    const { bound } = await request();
+    await expect(bound.finish()).rejects.toThrow('awaiting recovery');
+    expect(mockWrites.at(-1)?.value).toContain('cashuB-fixture');
+  });
+
   it('keeps unresolved payments across repeated 404 sweeps and removes only after receipt', async () => {
     mockReceive.mockResolvedValue({ success: false, amount: 0, unit: 'sat' });
     await request();
