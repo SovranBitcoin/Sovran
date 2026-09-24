@@ -315,7 +315,9 @@ describe('createSovranHandlers profile routing', () => {
   it('waits for contact DM delivery before opening the thread and clears the target', async () => {
     const recipientPubkey = 'ab'.repeat(32);
     const bearerToken = 'cashuA-private-contact-token';
-    useContactSendStore.getState().start({ pubkey: recipientPubkey, displayName: 'Alice' });
+    useContactSendStore
+      .getState()
+      .start({ pubkey: recipientPubkey, displayName: 'Alice', delivery: 'nip17' });
 
     let markDeliveryStarted!: () => void;
     let releaseDelivery!: () => void;
@@ -368,10 +370,58 @@ describe('createSovranHandlers profile routing', () => {
     expect(JSON.stringify(paymentLogCalls())).not.toContain(bearerToken);
   });
 
+  it('still DMs a LOCKED token to the contact it was locked to', async () => {
+    // Regression: sendComplete read "has a P2PK lock" as "this was a Nut Drop",
+    // so a locked contact send skipped the DM and dropped the user on the
+    // bearer hand-off screen instead of the thread.
+    const recipientPubkey = 'ef'.repeat(32);
+    const lockedToken = 'cashuA-locked-contact-token';
+    useContactSendStore
+      .getState()
+      .start({ pubkey: recipientPubkey, displayName: 'Dave', delivery: 'nip17' });
+    const deliverContactEcashDm = jest.fn(async () => {});
+    // @ts-expect-error sendComplete only reads getContext.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    const handlers = createSovranHandlers({
+      machine,
+      getManager: () => null,
+      deliverContactEcashDm,
+    });
+
+    await handlers.sendComplete?.({
+      historyEntry: JSON.stringify({
+        id: 'send-contact-locked',
+        type: 'send',
+        mintUrl: 'https://mint.example',
+        tokenString: lockedToken,
+      }),
+      createdOffline: false,
+      mintWasOffline: false,
+      recipientPubkey,
+      p2pkLockPubkey: `02${'34'.repeat(32)}`,
+      p2pkLock: {
+        pubkey: `02${'34'.repeat(32)}`,
+        locktimeSec: 1_800_003_600,
+        refundKeys: [`02${'56'.repeat(32)}`],
+      },
+    });
+
+    expect(deliverContactEcashDm).toHaveBeenCalledWith({
+      recipientPubkey,
+      token: lockedToken,
+    });
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/userMessages',
+      params: { pubkey: recipientPubkey },
+    });
+  });
+
   it('keeps the contact target and opens bearer hand-off when DM delivery fails', async () => {
     const recipientPubkey = 'cd'.repeat(32);
     const bearerToken = 'cashuA-recoverable-contact-token';
-    useContactSendStore.getState().start({ pubkey: recipientPubkey, displayName: 'Carol' });
+    useContactSendStore
+      .getState()
+      .start({ pubkey: recipientPubkey, displayName: 'Carol', delivery: 'nip17' });
     const deliverContactEcashDm = jest.fn(async () => {
       throw new Error('relay unavailable');
     });

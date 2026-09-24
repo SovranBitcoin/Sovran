@@ -312,6 +312,7 @@ export function SendScreen({ unit }: { unit: string }) {
       const { pubkey, displayName, picture, nip05, lud16 } = target;
       useContactSendStore.getState().start({
         pubkey,
+        delivery: 'nip17',
         ...(displayName ? { displayName } : {}),
         avatarUrl: picture,
         nip05,

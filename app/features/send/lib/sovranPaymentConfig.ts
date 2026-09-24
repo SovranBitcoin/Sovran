@@ -1502,12 +1502,15 @@ export function createSovranHandlers({
       recipientPubkey,
       recipientProfile,
       p2pkLockPubkey,
+      p2pkLock,
     }) => {
       paymentLog.info('payment.step.send_complete', {
         createdOffline: !!createdOffline,
         mintWasOffline: !!mintWasOffline,
         recipientPubkeyPresent: !!recipientPubkey,
-        p2pkLocked: !!p2pkLockPubkey,
+        p2pkLocked: !!(p2pkLock ?? p2pkLockPubkey),
+        hasLocktime: !!p2pkLock?.locktimeSec,
+        refundKeyCount: p2pkLock?.refundKeys?.length ?? 0,
       });
 
       // Routstr top-up: intercept the token and send it to the Routstr API
@@ -1553,23 +1556,44 @@ export function createSovranHandlers({
           ? injectSendMetadata(historyEntry, { recipientPubkey, p2pkLockPubkey })
           : historyEntry;
 
-      // Persist the recipient's nostr identity as a counterparty annotation so
-      // the transactions row + detail show their avatar (the transient
-      // metadata injection above only survives this navigation).
-      if (recipientPubkey) {
+      // Persist what we agreed to, so the transaction can still describe itself
+      // after the token is handed over: the recipient's identity (for the
+      // avatar) and the lock's terms (for "when can I take this back?").
+      // The transient metadata injection above only survives this navigation.
+      if (recipientPubkey || p2pkLock) {
         try {
           const entry = parseHistoryEntryOnce(enrichedHistoryEntry);
           if (entry?.id) {
             setTransactionAnnotation(`id:${entry.id}`, {
-              counterparty: {
-                pubkey: recipientPubkey,
-                direction: 'recipient',
-                ...(recipientProfile?.displayName
-                  ? { displayName: recipientProfile.displayName }
-                  : {}),
-                ...(recipientProfile?.avatarUrl ? { avatarUrl: recipientProfile.avatarUrl } : {}),
-                ...(recipientProfile?.nip05 ? { nip05: recipientProfile.nip05 } : {}),
-              },
+              ...(p2pkLock
+                ? {
+                    lock: {
+                      type: 'p2pk' as const,
+                      pubkey: p2pkLock.pubkey,
+                      direction: 'outgoing' as const,
+                      ...(p2pkLock.locktimeSec ? { locktime: p2pkLock.locktimeSec } : {}),
+                      // Written only when the token really carries the tag —
+                      // an absent list means anyone may spend after the
+                      // locktime, and that is not what we created.
+                      ...(p2pkLock.refundKeys?.length ? { refundKeys: p2pkLock.refundKeys } : {}),
+                    },
+                  }
+                : {}),
+              ...(recipientPubkey
+                ? {
+                    counterparty: {
+                      pubkey: recipientPubkey,
+                      direction: 'recipient' as const,
+                      ...(recipientProfile?.displayName
+                        ? { displayName: recipientProfile.displayName }
+                        : {}),
+                      ...(recipientProfile?.avatarUrl
+                        ? { avatarUrl: recipientProfile.avatarUrl }
+                        : {}),
+                      ...(recipientProfile?.nip05 ? { nip05: recipientProfile.nip05 } : {}),
+                    },
+                  }
+                : {}),
             });
           }
         } catch (e) {
@@ -1595,12 +1619,18 @@ export function createSovranHandlers({
 
       await deliverNearPayIfActive(enrichedHistoryEntry, getBitchatIdentityMaterial);
 
-      // Remote-contact ecash: deliver the bearer token over an encrypted Nostr
-      // DM and drop the user into that chat thread (the self-copy wrap surfaces
-      // the sent token bubble), instead of the bearer hand-off screen. A P2PK
-      // lock means this was a Nut Drop, not a contact DM — leave those alone.
+      // Remote-contact ecash: deliver the token over an encrypted Nostr DM and
+      // drop the user into that chat thread (the self-copy wrap surfaces the
+      // sent token bubble), instead of the bearer hand-off screen. The token
+      // may be P2PK-locked to them; the DM is the envelope, the lock is what
+      // is inside it.
+      //
+      // This used to read "no P2PK lock" as "not a Nut Drop", which made a
+      // locked contact send impossible. Nut Drop is identified by its own
+      // session store, handled by `deliverNearPayIfActive` immediately above,
+      // and never populates this one.
       const contactTarget = useContactSendStore.getState().active;
-      if (contactTarget && !p2pkLockPubkey) {
+      if (contactTarget) {
         const recipientPubkey = contactTarget.pubkey;
         const delivered = await deliverContactDmIfActive(
           enrichedHistoryEntry,
