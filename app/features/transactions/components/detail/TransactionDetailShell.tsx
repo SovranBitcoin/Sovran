@@ -44,6 +44,8 @@ interface TransactionDetailShellProps {
   source?: string | null;
   /** Whether the header shows the recipient avatar (sends with a recipient). */
   showRecipientAvatar?: boolean;
+  /** See `HistoryEntryHeader.badge` — what the avatar's corner disc says. */
+  headerBadge?: 'direction' | 'lock' | 'none';
   /** Footer (bottom buttons). */
   footer: React.ReactNode;
   /**
@@ -114,6 +116,7 @@ export function TransactionDetailShell({
   mintInfo,
   source,
   showRecipientAvatar = false,
+  headerBadge = 'direction',
   footer,
   headerIdentity,
   headerTitle,
@@ -205,6 +208,7 @@ export function TransactionDetailShell({
               <HistoryEntryHeader
                 historyEntry={entry}
                 showRecipientAvatar={showRecipientAvatar}
+                badge={headerBadge}
                 identity={headerIdentity}
                 identityStyle={morph.contentStyle}
               />

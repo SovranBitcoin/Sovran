@@ -296,6 +296,13 @@ export function SendTokenScreen({
       mintInfo={mintInfo}
       source={source}
       footer={bottomButtons}
+      // Who it went to, with a lock over the corner when it is locked to them.
+      // The template avatar stands in when we have no picture; we never go
+      // looking for an identity behind a bare lock key.
+      showRecipientAvatar
+      headerBadge={
+        spendingConditions && spendingConditions.kind !== 'unlocked' ? 'lock' : 'direction'
+      }
       beforeStatus={
         <>
           <SpendingConditionsCard

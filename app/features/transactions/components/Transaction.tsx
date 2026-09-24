@@ -10,7 +10,7 @@ import { SwipeableRow } from '@/features/transactions/components/SwipeableRow';
 import TransactionIcon from '@/features/transactions/components/TransactionIcon';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
-import { isCancellablePendingEcash, isSendTokenCancelled } from 'wallet';
+import { isCancellablePendingEcash, isP2PKLocked, isSendTokenCancelled } from 'wallet';
 import {
   COLLAPSE_DURATION_MS,
   useIsCollapsing,
@@ -177,6 +177,9 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
   const sendOperationId =
     historyEntry.type === 'send' ? (historyEntry as SendHistoryEntry).operationId : '';
   const cancellable = isCancellablePendingEcash(historyEntry);
+  // Reads the annotation first and the token's proofs after, so a row still
+  // shows the lock once the token itself is gone.
+  const locked = isP2PKLocked(historyEntry);
   const isReclaiming = useIsReclaiming(sendOperationId);
   const isCollapsing = useIsCollapsing(sendOperationId);
   const swipeable = !!onCancel && cancellable;
@@ -239,6 +242,15 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
                   size={10}
                   color={withAlpha(foreground, 0.8)}
                 />
+              )}
+              {locked && (
+                // Metadata, not the primary cue: in a list, direction is what
+                // the eye is scanning for, and the avatar's corner badge is
+                // already carrying it. The row's own label carries "Locked"
+                // for screen readers, since a 10px glyph cannot.
+                <HStack accessible accessibilityRole="image" accessibilityLabel="Locked">
+                  <Icon name="solar:key-bold" size={10} color={withAlpha(foreground, 0.8)} />
+                </HStack>
               )}
               {bip321Options &&
                 (() => {

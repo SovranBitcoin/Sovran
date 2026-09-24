@@ -7,6 +7,7 @@ import { avatarStateFor } from '@/shared/lib/imageLoadState';
 import { HistoryEntry } from '@cashu/coco-core';
 import { getCounterparty } from 'wallet';
 import { withAlpha } from '@/shared/lib/color';
+import { headerBadgeIcon, headerBadgeLabel, type HeaderBadge } from './headerBadge';
 
 import Icon from 'assets/icons';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
@@ -44,6 +45,13 @@ interface HistoryEntryHeaderProps {
   recipientPubkey?: string;
   /** Whether recipientPubkey should replace the transaction icon with an avatar. */
   showRecipientAvatar?: boolean;
+  /**
+   * What the corner disc over the avatar says. The caller decides, because
+   * whether a transaction is locked is a wallet question, not a layout one.
+   * There is room for ONE badge: a lock replaces the direction arrow, and
+   * direction is still carried by the amount's colour and sign.
+   */
+  badge?: HeaderBadge;
   /** Show loading state on the icon */
   isLoading?: boolean;
   identity?: HeaderIdentity;
@@ -55,6 +63,7 @@ export function HistoryEntryHeader({
   pendingData,
   recipientPubkey,
   showRecipientAvatar = true,
+  badge = 'direction',
   isLoading,
   identity,
   identityStyle,
@@ -116,25 +125,55 @@ export function HistoryEntryHeader({
   const avatarSize = 48;
   const iconOverlaySize = 24;
 
+  /** The corner disc, or nothing when this transaction has nothing to say. */
+  const renderBadge = () => {
+    if (badge === 'none') return null;
+    const icon = headerBadgeIcon(badge, isSend);
+    return (
+      <View
+        // The glyph is the only carrier of this fact, so it is spoken too.
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel={headerBadgeLabel(badge, isSend)}
+        style={{
+          position: 'absolute',
+          bottom: -4,
+          right: -4,
+          backgroundColor: surface,
+          borderRadius: iconOverlaySize / 2,
+          width: iconOverlaySize,
+          height: iconOverlaySize,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: 2,
+          borderColor: background,
+        }}>
+        <Icon name={icon} color={withAlpha(foreground, 0.9)} size={iconOverlaySize - 8} />
+      </View>
+    );
+  };
+
   const renderIcon = () => {
     if (identity) {
       return (
-        <Avatar
-          state={identity.picture ? 'image' : 'fallback'}
-          picture={identity.picture ?? undefined}
-          seed={identity.seed}
-          size={avatarSize}
-          name={identity.name}
-        />
+        // Wrapped so a supplied identity can carry a badge too; before this it
+        // won over the recipient branch below and silently dropped it.
+        <View>
+          <Avatar
+            state={identity.picture ? 'image' : 'fallback'}
+            picture={identity.picture ?? undefined}
+            seed={identity.seed}
+            size={avatarSize}
+            name={identity.name}
+          />
+          {renderBadge()}
+        </View>
       );
     }
     if (avatarRecipientPubkey) {
       const recipientName =
         recipientMetadata?.displayName ?? recipientMetadata?.name ?? counterparty?.displayName;
       const recipientPicture = recipientMetadata?.picture ?? counterparty?.avatarUrl;
-      const overlayIcon = isSend
-        ? 'fluent:arrow-upload-16-filled'
-        : 'fluent:arrow-download-16-filled';
       return (
         <View>
           <Avatar
@@ -144,26 +183,7 @@ export function HistoryEntryHeader({
             size={avatarSize}
             name={recipientName}
           />
-          <View
-            style={{
-              position: 'absolute',
-              bottom: -4,
-              right: -4,
-              backgroundColor: surface,
-              borderRadius: iconOverlaySize / 2,
-              width: iconOverlaySize,
-              height: iconOverlaySize,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderWidth: 2,
-              borderColor: background,
-            }}>
-            <Icon
-              name={overlayIcon}
-              color={withAlpha(foreground, 0.9)}
-              size={iconOverlaySize - 8}
-            />
-          </View>
+          {renderBadge()}
         </View>
       );
     }
