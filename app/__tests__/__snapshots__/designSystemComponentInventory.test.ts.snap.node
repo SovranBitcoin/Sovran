@@ -125,6 +125,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/send/components/MeltSelectedMintProbe.tsx",
     "features/send/components/P2PKLockIndicator.tsx",
     "features/send/components/RecipientHeader.tsx",
+    "features/send/components/SpendingConditionsCard.tsx",
     "features/settings/components/ProfileDetailsScreen.tsx",
     "features/theme/components/AlbumPillTabs.tsx",
     "features/theme/components/UnitPreviewCard.tsx",
@@ -268,6 +269,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 262,
+  "total": 263,
 }
 `;

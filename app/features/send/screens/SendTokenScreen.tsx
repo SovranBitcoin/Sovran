@@ -54,7 +54,8 @@ import {
   formatMemoForDisplay,
 } from '@/shared/lib/nostr/memoMentions';
 import { resolveIdentityName } from '@/shared/lib/identity';
-import { hasP2PKLock, P2PKLockIndicator } from '../components/P2PKLockIndicator';
+import { SpendingConditionsCard } from '../components/SpendingConditionsCard';
+import { useSpendingConditions } from '../hooks/useSpendingConditions';
 
 interface SendTokenScreenProps {
   sendHistoryEntry?: SendHistoryEntry | string;
@@ -84,6 +85,11 @@ export function SendTokenScreen({
   const muted = useThemeColor('muted');
   const transactionId = typeof entry?.id === 'string' ? entry.id : undefined;
   const reachability = useSendReachability(transactionId);
+  // What the token can and cannot do — read from its own proofs while it
+  // still has them, and from what we recorded once it does not. Above the
+  // error/loading returns below, because hook order cannot depend on them.
+  const spendingConditions = useSpendingConditions(entry);
+  const counterparty = useColadaTransactionAnnotation(entry).counterparty;
 
   useEffect(() => {
     const shouldTrackReachability = createdOffline === true || !!reachability;
@@ -186,7 +192,6 @@ export function SendTokenScreen({
   });
   const isComplete = isSendTokenComplete(entry);
   const isCancelled = isSendTokenCancelled(entry);
-  const p2pkLocked = hasP2PKLock(entry);
   const tokenMemo =
     typeof entry.token?.memo === 'string' && entry.token.memo.trim().length > 0
       ? entry.token.memo.trim()
@@ -293,7 +298,10 @@ export function SendTokenScreen({
       footer={bottomButtons}
       beforeStatus={
         <>
-          {p2pkLocked ? <P2PKLockIndicator /> : null}
+          <SpendingConditionsCard
+            conditions={spendingConditions}
+            recipientName={counterparty?.displayName ?? null}
+          />
           {reachabilityWarning && (
             <View style={styles.reachabilityWarning}>
               <Alert status="warning" className="bg-surface-secondary">
