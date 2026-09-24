@@ -201,11 +201,12 @@ export function SearchResultRows({
   );
   const showEmptyState = state === 'no-results' || state === 'error';
 
-  const renderEmpty = () => {
-    if (state === 'no-results') return <ListEmptyComponent />;
-    if (state === 'error') return <SearchUnavailable onRetry={onRetry} />;
-    return null;
-  };
+  const emptyContent =
+    state === 'no-results' ? (
+      <ListEmptyComponent />
+    ) : state === 'error' ? (
+      <SearchUnavailable onRetry={onRetry} />
+    ) : null;
 
   const listData = state === 'placeholders' ? PLACEHOLDER_DATA : state === 'rows' ? results : [];
 
@@ -219,7 +220,7 @@ export function SearchResultRows({
         getItemType={searchResultItemType}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="always"
-        ListEmptyComponent={renderEmpty}
+        ListEmptyComponent={emptyContent}
         contentContainerStyle={showEmptyState ? styles.emptyList : undefined}
       />
     </View>
