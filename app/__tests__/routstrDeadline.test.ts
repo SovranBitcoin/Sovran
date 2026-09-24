@@ -113,4 +113,27 @@ describe('Routstr response deadlines', () => {
     expect(mockRoute.mock.calls[0][0].signal?.aborted).toBe(false);
     expect(jest.getTimerCount()).toBe(0);
   });
+
+  it('keeps the stream deadline after the SDK cost settles early', async () => {
+    mockRoute.mockResolvedValue(
+      Object.assign(
+        new Response(new ReadableStream<Uint8Array>(), {
+          headers: { 'content-type': 'text/event-stream' },
+        }),
+        { finalize: async () => 1 }
+      )
+    );
+    const { stream, cost } = await sendMessage([{ role: 'user', content: 'hi' }], { model: 'm' });
+    await expect(cost).resolves.toBe(1);
+    let failure: unknown;
+    const reading = stream[Symbol.asyncIterator]()
+      .next()
+      .catch((error) => {
+        failure = error;
+      });
+    await jest.advanceTimersByTimeAsync(60_001);
+    expect(failure).toMatchObject({ name: 'TimeoutError' });
+    await reading;
+    expect(jest.getTimerCount()).toBe(0);
+  });
 });

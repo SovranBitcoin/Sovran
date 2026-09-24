@@ -1294,6 +1294,11 @@ export async function sendMessage(
 
   // Started here rather than awaited: the SDK banks the change as soon as the
   // stream ends, and reading the figure must not hold up the first chunk.
+  let pendingCompletions = 2;
+  const completed = () => {
+    pendingCompletions -= 1;
+    if (pendingCompletions === 0) deadline.dispose();
+  };
   const cost = deadline
     .wait(
       (async () => {
@@ -1305,10 +1310,17 @@ export async function sendMessage(
         return sats;
       })()
     )
-    .finally(deadline.dispose);
+    .finally(completed);
   // A stream error can make the caller exit before awaiting its cost.
   // Keep the rejection observable to awaiters without an unhandled promise.
   void cost.catch(() => {});
 
-  return { stream: parseSSEStream(response, deadline), cost };
+  const stream = (async function* () {
+    try {
+      yield* parseSSEStream(response, deadline);
+    } finally {
+      completed();
+    }
+  })();
+  return { stream, cost };
 }

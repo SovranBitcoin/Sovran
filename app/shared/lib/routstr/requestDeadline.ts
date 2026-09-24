@@ -18,6 +18,7 @@ export function createRequestDeadline(caller?: AbortSignal) {
       controller.abort(error);
     }, milliseconds);
   };
+  controller.signal.addEventListener('abort', dispose, { once: true });
   caller?.addEventListener('abort', cancel, { once: true });
   if (caller?.aborted) cancel();
   touch(30_000);
