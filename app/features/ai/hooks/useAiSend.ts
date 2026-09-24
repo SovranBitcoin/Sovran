@@ -373,7 +373,24 @@ export function useAiSend() {
             // nothing stale to refresh) and without touching the balance.
             if (status === 402 && !isWalletBalanceError(err)) {
               declinedAttempts += 1;
-              if (declinedAttempts >= MAX_DECLINED_ATTEMPTS || i === candidateChain.length - 1) {
+              // Skip every remaining candidate behind the upstream that just
+              // refused. A node fronts several upstream accounts and they fail
+              // independently — when one runs out of credit, every model
+              // behind it answers 402 identically, so trying a sibling is
+              // paying to be refused again. Observed: three candidates, three
+              // 402s, all `openrouter`. Only narrows when the node reports
+              // upstreams; otherwise the walk is exactly as before.
+              const declinedUpstream = candidateEntries[i]?.upstreamId ?? null;
+              let next = i + 1;
+              if (declinedUpstream) {
+                while (
+                  next < candidateChain.length &&
+                  candidateEntries[next]?.upstreamId === declinedUpstream
+                ) {
+                  next++;
+                }
+              }
+              if (declinedAttempts >= MAX_DECLINED_ATTEMPTS || next >= candidateChain.length) {
                 throw err;
               }
               aiLog.warn('ai.send.provider_declined', {
@@ -381,9 +398,12 @@ export function useAiSend() {
                 tier: tier.id,
                 provider: provider.id,
                 candidate,
+                declinedUpstream,
+                skippedSameUpstream: next - i - 1,
                 attempt: declinedAttempts,
-                nextCandidate: candidateChain[i + 1],
+                nextCandidate: candidateChain[next],
               });
+              i = next - 1; // the loop's i++ lands on `next`
               continue;
             }
             const modelRejected = isModelRejectedError(err, candidate);

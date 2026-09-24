@@ -59,8 +59,13 @@ comparing auth modes if a prior request did not return usable change.
   then reported "Insufficient balance" on a funded wallet. It is a log, not
   user-facing copy; `describeError` still owns what the user sees.
 - `ai.send.provider_declined`: a 402 carrying none of routstr's wallet markers,
-  i.e. the AI provider behind this model refused. The send advances to the next
-  candidate (usually a different upstream), capped at `MAX_DECLINED_ATTEMPTS`.
+  i.e. the AI provider behind this model refused. `declinedUpstream` names the
+  upstream account (nagg's `upstreamId`, absent on nodes too old to report it)
+  and `skippedSameUpstream` counts the candidates jumped over because they sit
+  behind it. The walk is capped at `MAX_DECLINED_ATTEMPTS`. One node fronts
+  several upstream accounts and they fail independently — a node whose credit
+  with one is exhausted answers 402 for every model behind it while its
+  catalog, wallet and other upstreams stay healthy.
 - `routstr.change_token.applied`: change adopted, with no token contents.
 - `routstr.auth.kept_key`: ambiguous 401 retained the current credential.
 - `api.routstr.api_key_expired`: explicit invalid/expired/spent/unknown/revoked key.

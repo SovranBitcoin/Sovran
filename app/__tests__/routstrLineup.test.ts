@@ -20,6 +20,7 @@ import {
   deriveLineup,
   emptyLineup,
   lineupFromNaggPayload,
+  PersistedLineupSchema,
   lineupHasEntries,
   mergeLineupWithLastKnown,
   providerIdForModel,
@@ -387,5 +388,89 @@ describe('lineupFromNaggPayload (server-curated lineup)', () => {
     );
     expect(lineup).toBeNull();
     expect(nodeBaseUrl).toBeNull();
+  });
+});
+
+describe('upstream identity', () => {
+  it('carries upstreamId from nagg and leaves it null when the node omits it', () => {
+    const payload = NaggAiLineupSchema.parse({
+      version: 1,
+      updatedAt: 1_751_000_000,
+      node: { baseUrl: 'https://node.example' },
+      providers: [
+        {
+          id: 'claude',
+          vendor: 'anthropic',
+          models: [
+            {
+              tier: 'auto',
+              id: 'claude-haiku-4.5',
+              name: 'Claude Haiku',
+              created: 100,
+              contextLength: 200_000,
+              inputModalities: ['text'],
+              upstreamId: 'openrouter',
+              pricing: { prompt: 0.0002, completion: 0.001, request: 0.001, maxCost: 64 },
+            },
+          ],
+        },
+        {
+          // A node too old to report upstreams must still map cleanly; the
+          // send path simply cannot narrow on it.
+          id: 'openai',
+          vendor: 'openai',
+          models: [
+            {
+              tier: 'auto',
+              id: 'gpt-mini',
+              name: 'GPT mini',
+              created: 100,
+              contextLength: 200_000,
+              inputModalities: ['text'],
+              pricing: { prompt: 0.0001, completion: 0.0004, request: 0.001, maxCost: 32 },
+            },
+          ],
+        },
+      ],
+    });
+
+    const { lineup } = lineupFromNaggPayload(payload);
+    expect(lineup?.claude.auto?.upstreamId).toBe('openrouter');
+    expect(lineup?.openai.auto?.upstreamId).toBeNull();
+  });
+
+  it('accepts a persisted lineup written before upstreamId existed', () => {
+    // The `routstr-store` merge is all-or-nothing: a required new key would
+    // fail every pre-existing blob and take the apiKey and sessions with it.
+    const legacy = {
+      derivedAt: 1_751_000_000,
+      nodeBaseUrl: 'https://node.example',
+      lineup: {
+        openai: {
+          auto: {
+            modelId: 'gpt-mini',
+            displayName: 'GPT mini',
+            contextLength: 200_000,
+            created: 100,
+            visionInput: false,
+            satsPricing: {
+              prompt: 0.0001,
+              completion: 0.0004,
+              request: 0.001,
+              image: 0,
+              max_cost: 32,
+            },
+          },
+          pro: null,
+          max: null,
+        },
+        claude: { auto: null, pro: null, max: null },
+        grok: { auto: null, pro: null, max: null },
+        google: { auto: null, pro: null, max: null },
+      },
+    };
+    const parsed = PersistedLineupSchema.safeParse(legacy);
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.lineup.openai.auto?.modelId).toBe('gpt-mini');
   });
 });

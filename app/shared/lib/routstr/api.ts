@@ -102,6 +102,9 @@ const ModelsResponseSpine = z.looseObject({
       context_length: undef(z.number()),
       name: undef(z.string()),
       canonical_slug: undef(z.string().nullable()),
+      // The node's upstream account for this row. `deriveLineup` carries it so
+      // the send path can tell a dead upstream from a dead node.
+      upstream_provider_id: undef(z.string().nullable()),
       architecture: undef(
         z.looseObject({
           input_modalities: undef(z.array(z.string())),

@@ -80,6 +80,17 @@ const LineupEntrySchema = z.object({
    */
   maxCompletionTokens: z.number().int().positive().nullable().catch(null).optional(),
   /**
+   * The node's id for the upstream account serving this model
+   * (`openrouter`, `tinfoil`, …). Models sharing one are a single failure
+   * domain: a node whose credit with one upstream is exhausted answers 402
+   * for every model behind it while its catalog, wallet and other upstreams
+   * stay healthy — so retrying a sibling from the same upstream only pays to
+   * be refused again. Additive + optional: absent on lineups persisted before
+   * this field existed and on nodes too old to report it, in which case the
+   * send path simply cannot narrow and behaves as it did.
+   */
+  upstreamId: z.string().max(64).nullable().catch(null).optional(),
+  /**
    * True when this entry was substituted from the persisted last-known
    * lineup because a successful fetch returned zero qualifying models for
    * its provider. Rendered as a "last known" annotation; the id may be
@@ -273,6 +284,7 @@ function toLineupEntry(model: RoutstrModel): LineupEntry {
     displayName: displayNameFor(model),
     contextLength: typeof model.context_length === 'number' ? model.context_length : 0,
     created: typeof model.created === 'number' ? model.created : 0,
+    upstreamId: typeof model.upstream_provider_id === 'string' ? model.upstream_provider_id : null,
     visionInput:
       Array.isArray(model.architecture?.input_modalities) &&
       model.architecture.input_modalities.includes('image'),
@@ -403,6 +415,7 @@ const NaggLineupModelSchema = z.object({
   created: z.number().int().nonnegative().catch(0),
   contextLength: z.number().int().nonnegative().catch(0),
   maxCompletionTokens: z.number().int().positive().nullable().catch(null).optional(),
+  upstreamId: z.string().max(64).nullable().catch(null).optional(),
   inputModalities: z
     .array(z.string().max(32))
     .max(16)
@@ -481,6 +494,7 @@ export function lineupFromNaggPayload(payload: NaggAiLineup): {
           max_cost: model.pricing?.maxCost ?? null,
         },
         maxCompletionTokens: model.maxCompletionTokens ?? null,
+        upstreamId: model.upstreamId ?? null,
       };
       filled++;
     }

@@ -50,8 +50,9 @@ jest.mock('@/shared/lib/logger', () => {
   return { apiLog: log, aiLog: log, storeLog: log, log, applyFileLogging: jest.fn() };
 });
 
-const entry = (modelId: string): LineupEntry => ({
+const entry = (modelId: string, upstreamId?: string): LineupEntry => ({
   modelId,
+  ...(upstreamId != null ? { upstreamId } : {}),
   displayName: modelId,
   contextLength: 100000,
   created: 1,
@@ -180,6 +181,39 @@ describe('AI send lineup recovery', () => {
     expect(sendMock.mock.calls[1][2].model).not.toBe(sendMock.mock.calls[0][2].model);
     // The node is reachable and the catalog is current — nothing to refresh.
     expect(refreshMock).not.toHaveBeenCalled();
+  });
+
+  it('skips the rest of the upstream that just declined', async () => {
+    // The chain is old-pro, old-auto, other-auto. The first two sit behind one
+    // upstream account; a 402 from it means every model behind it refuses
+    // identically, so the walk must jump straight to the other upstream rather
+    // than pay to be refused again.
+    const lineup = emptyLineup();
+    lineup.openai.pro = entry('old-pro', 'openrouter');
+    lineup.openai.auto = entry('old-auto', 'openrouter');
+    lineup.claude.auto = entry('other-auto', 'tinfoil');
+    useRoutstrStore.setState({ lineup });
+
+    sendMock
+      .mockRejectedValueOnce(failure(402, 'Payment Required'))
+      .mockResolvedValueOnce(success());
+    await send();
+
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(sendMock.mock.calls[0][2].model).toBe('old-pro');
+    expect(sendMock.mock.calls[1][2].model).toBe('other-auto');
+  });
+
+  it('does not narrow the walk when the node reports no upstreams', async () => {
+    // Older nodes omit `upstream_provider_id`; the walk must then behave
+    // exactly as it did before, one candidate at a time.
+    sendMock
+      .mockRejectedValueOnce(failure(402, 'Payment Required'))
+      .mockResolvedValueOnce(success());
+    await send();
+
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(sendMock.mock.calls[1][2].model).toBe('old-auto');
   });
 
   it('stops declining after the attempt cap rather than fanning out the lineup', async () => {

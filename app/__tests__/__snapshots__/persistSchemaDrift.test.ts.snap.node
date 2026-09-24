@@ -4243,6 +4243,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                   },
                                   "type": "object",
                                 },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
+                                },
                                 "visionInput": {
                                   "default": false,
                                   "type": "boolean",
@@ -4361,6 +4373,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                   },
                                   "type": "object",
                                 },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
+                                },
                                 "visionInput": {
                                   "default": false,
                                   "type": "boolean",
@@ -4478,6 +4502,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                     },
                                   },
                                   "type": "object",
+                                },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
                                 },
                                 "visionInput": {
                                   "default": false,
@@ -4602,6 +4638,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                   },
                                   "type": "object",
                                 },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
+                                },
                                 "visionInput": {
                                   "default": false,
                                   "type": "boolean",
@@ -4720,6 +4768,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                   },
                                   "type": "object",
                                 },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
+                                },
                                 "visionInput": {
                                   "default": false,
                                   "type": "boolean",
@@ -4837,6 +4897,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                     },
                                   },
                                   "type": "object",
+                                },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
                                 },
                                 "visionInput": {
                                   "default": false,
@@ -4961,6 +5033,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                   },
                                   "type": "object",
                                 },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
+                                },
                                 "visionInput": {
                                   "default": false,
                                   "type": "boolean",
@@ -5079,6 +5163,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                   },
                                   "type": "object",
                                 },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
+                                },
                                 "visionInput": {
                                   "default": false,
                                   "type": "boolean",
@@ -5196,6 +5292,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                     },
                                   },
                                   "type": "object",
+                                },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
                                 },
                                 "visionInput": {
                                   "default": false,
@@ -5320,6 +5428,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                   },
                                   "type": "object",
                                 },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
+                                },
                                 "visionInput": {
                                   "default": false,
                                   "type": "boolean",
@@ -5438,6 +5558,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                   },
                                   "type": "object",
                                 },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
+                                },
                                 "visionInput": {
                                   "default": false,
                                   "type": "boolean",
@@ -5555,6 +5687,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                     },
                                   },
                                   "type": "object",
+                                },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
                                 },
                                 "visionInput": {
                                   "default": false,
@@ -5960,6 +6104,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                   ],
                                   "type": "object",
                                 },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
+                                },
                                 "visionInput": {
                                   "default": false,
                                   "type": "boolean",
@@ -6090,6 +6246,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                   ],
                                   "type": "object",
                                 },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
+                                },
                                 "visionInput": {
                                   "default": false,
                                   "type": "boolean",
@@ -6219,6 +6387,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                     "max_cost",
                                   ],
                                   "type": "object",
+                                },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
                                 },
                                 "visionInput": {
                                   "default": false,
@@ -6361,6 +6541,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                   ],
                                   "type": "object",
                                 },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
+                                },
                                 "visionInput": {
                                   "default": false,
                                   "type": "boolean",
@@ -6491,6 +6683,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                   ],
                                   "type": "object",
                                 },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
+                                },
                                 "visionInput": {
                                   "default": false,
                                   "type": "boolean",
@@ -6620,6 +6824,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                     "max_cost",
                                   ],
                                   "type": "object",
+                                },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
                                 },
                                 "visionInput": {
                                   "default": false,
@@ -6762,6 +6978,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                   ],
                                   "type": "object",
                                 },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
+                                },
                                 "visionInput": {
                                   "default": false,
                                   "type": "boolean",
@@ -6892,6 +7120,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                   ],
                                   "type": "object",
                                 },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
+                                },
                                 "visionInput": {
                                   "default": false,
                                   "type": "boolean",
@@ -7021,6 +7261,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                     "max_cost",
                                   ],
                                   "type": "object",
+                                },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
                                 },
                                 "visionInput": {
                                   "default": false,
@@ -7163,6 +7415,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                   ],
                                   "type": "object",
                                 },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
+                                },
                                 "visionInput": {
                                   "default": false,
                                   "type": "boolean",
@@ -7293,6 +7557,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                   ],
                                   "type": "object",
                                 },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
+                                },
                                 "visionInput": {
                                   "default": false,
                                   "type": "boolean",
@@ -7422,6 +7698,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                                     "max_cost",
                                   ],
                                   "type": "object",
+                                },
+                                "upstreamId": {
+                                  "anyOf": [
+                                    {
+                                      "maxLength": 64,
+                                      "type": "string",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                  "default": null,
                                 },
                                 "visionInput": {
                                   "default": false,
