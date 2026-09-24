@@ -46,6 +46,7 @@
     "submit:ios": "cd app && bun run submit:ios",
     "submit:android": "cd app && bun run submit:android",
     "test:release": "node --test release/tests/*.test.mjs && python3 -m unittest discover -s release/tests -p 'test_*.py'",
+    "release:verify": "node release/verify.mjs",
     "legal:sync": "node scripts/legal.mjs --sync-site",
     "legal:check": "node scripts/legal.mjs --check-site",
     "legal:publication-check": "node scripts/legal.mjs --publication-check",

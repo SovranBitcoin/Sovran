@@ -4,6 +4,7 @@ import { config, sha256 } from '../core.mjs';
 import { updateSource, formatSource } from '../freedom.mjs';
 import { validateManifest, verifyHosted, commitFiles } from '../hosting.mjs';
 import { selectUniversal } from '../android.mjs';
+import { crossChannel, certificateContinuity, zapstoreEvidence, signingBlocks } from '../verify.mjs';
 import { validateBuild } from '../build.mjs';
 import { mergeChannels } from '../site.mjs';
 
@@ -119,4 +120,70 @@ test('Freedom source keeps upstream Prettier formatting and date shape', async (
   const formatted = await formatSource(next);
   assert.ok(!formatted.includes('[\n        "https://'), 'short arrays stay on one line');
   assert.ok(formatted.endsWith('\n') && !formatted.endsWith('\n\n'));
+});
+
+const certificate = 'c'.repeat(64);
+const androidState = () => ({
+  version: '0.1.3', sourceSha: 'd'.repeat(40), builds: { android: { number: '24' } },
+  channels: {
+    googlePlay: { version: '0.1.3', build: '24', sourceSha: 'd'.repeat(40) },
+    githubApk: { version: '0.1.3', build: '24', sourceSha: 'd'.repeat(40), sha256: 'e'.repeat(64), certificateSha256: certificate, size: 10, url: 'https://github.com/x/y/releases/download/v0.1.3/a.apk' },
+    zapstore: { version: '0.1.3', build: '24', sourceSha: 'd'.repeat(40), sha256: 'e'.repeat(64), certificateSha256: certificate, size: 10 },
+  },
+});
+const zapstoreEvents = () => ({
+  app: { tags: [['d', config.bundleId]] },
+  release: { tags: [['d', `${config.bundleId}@0.1.3`], ['i', config.bundleId], ['version', '0.1.3'], ['c', 'main'], ['e', 'asset-id']] },
+  asset: { id: 'asset-id', tags: [['i', config.bundleId], ['x', 'e'.repeat(64)], ['version', '0.1.3'], ['version_code', '24'], ['size', '10'], ['apk_certificate_hash', certificate], ['commit', 'd'.repeat(40)]] },
+});
+
+test('a channel serving different APK bytes, certificate or build is not cross-updatable', () => {
+  const expected = crossChannel(androidState());
+  assert.deepEqual(expected, { version: '0.1.3', versionCode: '24', sha256: 'e'.repeat(64), certificateSha256: certificate, size: 10, url: androidState().channels.githubApk.url });
+  for (const [channel, field, value] of [['zapstore', 'sha256', 'f'.repeat(64)], ['zapstore', 'certificateSha256', 'f'.repeat(64)], ['zapstore', 'size', 11]]) {
+    const state = androidState(); state.channels[channel][field] = value;
+    assert.throws(() => crossChannel(state), /different APKs/);
+  }
+  for (const [channel, field, value] of [['googlePlay', 'build', '25'], ['githubApk', 'version', '0.1.2'], ['zapstore', 'sourceSha', 'a'.repeat(40)]]) {
+    const state = androidState(); state.channels[channel][field] = value;
+    assert.throws(() => crossChannel(state), /disagree/);
+  }
+  for (const channel of ['googlePlay', 'githubApk', 'zapstore']) {
+    const state = androidState(); delete state.channels[channel];
+    assert.throws(() => crossChannel(state), /has not confirmed/);
+  }
+});
+
+test('the signing certificate may never change and version codes only rise', () => {
+  const releases = [{ version: '0.1.4', versionCode: '25', certificateSha256: certificate }, { version: '0.1.3', versionCode: '24', certificateSha256: certificate }, { version: '0.1.2', versionCode: '23' }];
+  assert.deepEqual(certificateContinuity(releases), { certificate, releases: ['0.1.3 (24)', '0.1.4 (25)'] });
+  assert.throws(() => certificateContinuity([...releases.slice(1), { version: '0.1.5', versionCode: '26', certificateSha256: 'f'.repeat(64) }]), /second signing certificate/);
+  assert.throws(() => certificateContinuity([...releases.slice(1), { version: '0.1.5', versionCode: '24', certificateSha256: certificate }]), /version code/);
+  assert.throws(() => certificateContinuity([{ version: '0.1.2', versionCode: '23' }]), /No published Android release/);
+});
+
+test('Zapstore events must describe the published APK, not merely the same app', () => {
+  const expected = crossChannel(androidState());
+  assert.equal(zapstoreEvidence(zapstoreEvents(), expected).commit, 'd'.repeat(40));
+  const mutate = (part, tag, value) => { const events = zapstoreEvents(); events[part].tags = events[part].tags.map((t) => (t[0] === tag ? [tag, value] : t)); return events; };
+  assert.throws(() => zapstoreEvidence(mutate('asset', 'x', 'f'.repeat(64)), expected), /does not describe/);
+  assert.throws(() => zapstoreEvidence(mutate('asset', 'apk_certificate_hash', 'f'.repeat(64)), expected), /certificate or version code/);
+  assert.throws(() => zapstoreEvidence(mutate('asset', 'version_code', '25'), expected), /certificate or version code/);
+  assert.throws(() => zapstoreEvidence(mutate('release', 'e', 'other-asset'), expected), /does not reference/);
+  assert.throws(() => zapstoreEvidence(mutate('app', 'd', 'com.other.app'), expected), /another package/);
+  assert.throws(() => zapstoreEvidence({ ...zapstoreEvents(), asset: undefined }, expected), /missing an application/);
+  const duplicate = zapstoreEvents(); duplicate.asset.tags.push(['x', 'f'.repeat(64)]);
+  assert.throws(() => zapstoreEvidence(duplicate, expected), /Duplicate Zapstore scalar tag/);
+});
+
+test('every APK signing block is named, so a new scheme cannot pass unnoticed', () => {
+  const entry = (id, size) => { const value = Buffer.alloc(size); const head = Buffer.alloc(12); head.writeBigUInt64LE(BigInt(size + 4)); head.writeUInt32LE(id, 8); return Buffer.concat([head, value]); };
+  const entries = Buffer.concat([entry(0x7109871a, 16), entry(0x70e1c89f, 32), entry(0xdeadbeef, 8)]);
+  const size = BigInt(entries.length + 24);
+  const head = Buffer.alloc(8); head.writeBigUInt64LE(size);
+  const foot = Buffer.alloc(8); foot.writeBigUInt64LE(size);
+  const block = Buffer.concat([head, entries, foot, Buffer.from('APK Sig Block 42')]);
+  const eocd = Buffer.alloc(22); eocd.writeUInt32LE(0x06054b50); eocd.writeUInt32LE(block.length, 16);
+  assert.deepEqual(signingBlocks(Buffer.concat([block, eocd])), ['v2', 'v3.2 hybrid', 'unknown 0xdeadbeef']);
+  assert.throws(() => signingBlocks(Buffer.concat([Buffer.alloc(block.length), eocd])), /no signing block/);
 });
