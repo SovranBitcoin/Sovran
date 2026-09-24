@@ -15,7 +15,7 @@ import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import BalancePill from '@/shared/ui/composed/BalancePill';
 
 import { ProviderPillIcon } from './ProviderAvatar';
-import { openProviderPicker } from '../lib/providerPicker';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 /**
  * AI tab header — the structural twin of the wallet's `<MintSelector />`, and
@@ -65,8 +65,10 @@ export function AiHeaderTitle() {
     return () => controller.abort();
   }, [activeUrl]);
 
+  // A pushed page, not a sheet: choosing a provider means reading about one
+  // first, and the mint selector answers the same question the same way.
   const onPress = useCallback(() => {
-    void openProviderPicker();
+    router.navigate('/(ai-flow)/providers');
   }, []);
 
   // Read exactly as the wallet header reads it (`useMintSelector`), so the two

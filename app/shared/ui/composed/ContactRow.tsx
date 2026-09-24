@@ -144,6 +144,20 @@ interface GeohashIdentity {
   icon?: string;
 }
 
+/**
+ * A Routstr AI provider.
+ *
+ * Providers publish a name and no icon, so the row's face is the seeded avatar
+ * every identity without a picture gets, keyed on the node URL. Deliberately
+ * its own kind rather than borrowed from `mint`: a mint row falls back to a
+ * bank glyph and carries mint statistics, neither of which is true here.
+ */
+interface ProviderIdentity {
+  kind: 'provider';
+  baseUrl: string;
+  displayName?: string;
+}
+
 interface SelfIdentity {
   kind: 'self';
   pubkey: string;
@@ -153,7 +167,8 @@ interface SelfIdentity {
   subtitle?: string;
 }
 
-export type Identity = NostrIdentity | MintIdentity | BleIdentity | GeohashIdentity | SelfIdentity;
+export type Identity =
+  NostrIdentity | MintIdentity | ProviderIdentity | BleIdentity | GeohashIdentity | SelfIdentity;
 
 type StatKey =
   'balance' | 'units' | 'score' | 'audit' | 'reputation' | 'followers' | 'offline' | 'connection';
@@ -181,6 +196,15 @@ export function nostrIdentity(
     isLoadingProfile: opts?.isLoadingProfile,
     verified: opts?.verified,
   };
+}
+
+/** A provider row's identity. The seeded avatar is its face; there is no icon
+ *  to fetch. */
+export function providerIdentity(input: {
+  baseUrl: string;
+  displayName?: string;
+}): ProviderIdentity {
+  return { kind: 'provider', ...input };
 }
 
 /** Overload: accept either a full `MintListItem` or a minimal shape. */
@@ -379,6 +403,9 @@ const DEFAULT_STATS_BY_KIND: Record<Identity['kind'], readonly StatKey[]> = {
   // row where a second "people" number alongside followers doesn't earn its
   // space. UserProfileScreen still shows it on the full profile header.
   nostr: ['reputation', 'followers'],
+  // A provider's usefulness is its mints and its liveness, and both are said
+  // in the subtitle. Nothing here is a number worth a pill.
+  provider: [],
   mint: ['units', 'score', 'audit', 'reputation', 'followers', 'offline'],
   ble: [],
   geohash: [],
@@ -409,6 +436,8 @@ function resolvePicture(ids: Identity[]): string | undefined {
 function resolveAvatarSeed(ids: Identity[]): string | undefined {
   const mint = find(ids, 'mint');
   if (mint) return mint.mintUrl;
+  const provider = find(ids, 'provider');
+  if (provider) return provider.baseUrl;
   const nostr = find(ids, 'nostr');
   if (nostr) return nostr.pubkey;
   const self = find(ids, 'self');
@@ -426,6 +455,9 @@ function resolveName(ids: Identity[]): string | undefined {
   const self = find(ids, 'self');
   const ble = find(ids, 'ble');
   const geohash = find(ids, 'geohash');
+
+  const provider = find(ids, 'provider');
+  if (provider) return provider.displayName || provider.baseUrl.replace(/^https:\/\//, '');
 
   const resolved = resolveIdentityName({
     mintName: mint?.displayName,

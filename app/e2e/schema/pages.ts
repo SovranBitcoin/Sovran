@@ -44,6 +44,7 @@ export const CANONICAL_PAGES = [
   'mint-select', // mint selector list (receive and send flows)
   'mint-add', // add-mints screen (search or enter URL, MintAddScreen)
   'mint-info', // mint info / trust decision screen (MintInfoScreen)
+  'ai-provider-select', // Routstr provider list, the AI pill's destination (ProviderListScreen)
   'ai-provider-info', // Routstr provider details + reclaim (ProviderInfoScreen)
   'mint-reviews', // mint KYM reviews list (MintReviewsScreen)
   'profile', // nostr user profile (UserProfileScreen)

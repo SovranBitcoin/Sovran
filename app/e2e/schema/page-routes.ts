@@ -25,6 +25,7 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
   'mint-add': ['(mint-flow)/add.tsx'],
   'balance-split': ['(mint-flow)/distribution.tsx'],
   'mint-info': ['(mint-flow)/info.tsx'],
+  'ai-provider-select': ['(ai-flow)/providers.tsx'],
   'ai-provider-info': ['(ai-flow)/provider.tsx'],
   'rebalance-plan': ['(mint-flow)/rebalancePlan.tsx'],
   'mint-reviews': ['(mint-flow)/reviews.tsx'],
