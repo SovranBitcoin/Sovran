@@ -26,11 +26,26 @@ export type NostrTierConfig = {
 // changes (boot + toggle flips), not once per resolution.
 let lastLoggedConfigKey: string | null = null;
 
+/**
+ * The cache hosts still switched on, in their configured order.
+ *
+ * `primalHostsDisabled` is a denylist, so an unknown or stale entry simply
+ * matches nothing — it can never disable a host the user can still see. Turning
+ * every host off is the same as turning the tier off, and is reported that way
+ * rather than handing the connection an empty list.
+ */
+function enabledPrimalUrls(disabled: readonly string[]): string[] {
+  return backendConfig.primalCacheUrls.filter((url) => !disabled.includes(url));
+}
+
 export function getNostrTierConfig(): NostrTierConfig {
   const s = useSettingsStore.getState();
   const config: NostrTierConfig = {
     nagg: { enabled: s.naggTierEnabled, appViewBaseUrl: backendConfig.nostrAppViewBaseUrl },
-    primal: { enabled: s.primalTierEnabled, urls: backendConfig.primalCacheUrls },
+    primal: (() => {
+      const urls = enabledPrimalUrls(s.primalHostsDisabled);
+      return { enabled: s.primalTierEnabled && urls.length > 0, urls };
+    })(),
     relay: { enabled: s.relayTierEnabled, relays: DEFAULT_RELAYS },
   };
   const configKey = [
@@ -62,9 +77,14 @@ export function useNostrTierConfig(): NostrTierConfig {
   const naggTierEnabled = useSettingsStore((st) => st.naggTierEnabled);
   const primalTierEnabled = useSettingsStore((st) => st.primalTierEnabled);
   const relayTierEnabled = useSettingsStore((st) => st.relayTierEnabled);
+  const primalHostsDisabled = useSettingsStore((st) => st.primalHostsDisabled);
+  const primalUrls = enabledPrimalUrls(primalHostsDisabled);
   return {
     nagg: { enabled: naggTierEnabled, appViewBaseUrl: backendConfig.nostrAppViewBaseUrl },
-    primal: { enabled: primalTierEnabled, urls: backendConfig.primalCacheUrls },
+    primal: {
+      enabled: primalTierEnabled && primalUrls.length > 0,
+      urls: primalUrls,
+    },
     relay: { enabled: relayTierEnabled, relays: DEFAULT_RELAYS },
   };
 }

@@ -82,7 +82,10 @@ export function SettingsNetworkScreen() {
   const setVertexCreditsEnabled = useSettingsStore((s) => s.setVertexCreditsEnabled);
   const naggTierEnabled = useSettingsStore((s) => s.naggTierEnabled);
   const setNaggTierEnabled = useSettingsStore((s) => s.setNaggTierEnabled);
-  const primalHostCount = backendConfig.primalCacheUrls.length;
+  const primalHosts = backendConfig.primalCacheUrls;
+  const primalHostsDisabled = useSettingsStore((st) => st.primalHostsDisabled);
+  const setPrimalHostEnabled = useSettingsStore((st) => st.setPrimalHostEnabled);
+  const enabledPrimalCount = primalHosts.filter((url) => !primalHostsDisabled.includes(url)).length;
   const primalTierEnabled = useSettingsStore((s) => s.primalTierEnabled);
   const setPrimalTierEnabled = useSettingsStore((s) => s.setPrimalTierEnabled);
   const relayTierEnabled = useSettingsStore((s) => s.relayTierEnabled);
@@ -126,10 +129,10 @@ export function SettingsNetworkScreen() {
     },
     {
       id: 'primal',
-      name: primalHostCount > 1 ? `Primal caches (${primalHostCount})` : 'Primal cache',
+      name: 'Primal cache',
       description:
-        primalHostCount > 1
-          ? `Public fallback caches. Tried in order; the tier is online while any host answers.`
+        primalHosts.length > 1
+          ? `Public fallback. ${enabledPrimalCount} of ${primalHosts.length} hosts on, tried in order.`
           : 'Public fallback cache.',
       status: tierHealth.primal,
       enabled: primalTierEnabled,
@@ -195,6 +198,32 @@ export function SettingsNetworkScreen() {
                     />
                   </ListGroup.ItemSuffix>
                 </ListGroup.Item>
+                {/* Per-host switches, only when there is a choice to make. The
+                    tier switch above still wins: turning the tier off disables
+                    every host regardless of its own state. */}
+                {tier.id === 'primal' && primalHosts.length > 1
+                  ? primalHosts.map((url) => {
+                      const hostEnabled = !primalHostsDisabled.includes(url);
+                      return (
+                        <View
+                          key={url}
+                          className={`flex-row items-center gap-3 py-2 pl-8 pr-4 ${
+                            tier.enabled && hostEnabled ? '' : 'opacity-40'
+                          }`}>
+                          <Text size={13} numberOfLines={1} className="flex-1">
+                            {hostLabel(url)}
+                          </Text>
+                          <Switch
+                            testID={`settings-network-primal-host-${url}`}
+                            accessibilityLabel={`Use ${hostLabel(url)}`}
+                            isSelected={hostEnabled}
+                            isDisabled={!tier.enabled}
+                            onSelectedChange={(next) => setPrimalHostEnabled(url, next)}
+                          />
+                        </View>
+                      );
+                    })
+                  : null}
               </React.Fragment>
             ))}
           </ListGroup>
@@ -245,19 +274,21 @@ export function SettingsNetworkScreen() {
               {sortedEntries.map((entry, index) => (
                 <React.Fragment key={entry.url}>
                   {index > 0 ? <Separator className="mx-4" /> : null}
-                  <View className="flex-row items-center gap-3 px-4 py-3">
-                    <View
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 4,
-                        backgroundColor: healthColor[health[entry.url] ?? 'disconnected'],
-                      }}
-                    />
-                    <View className="flex-1">
-                      <Text size={14} numberOfLines={1}>
-                        {entry.url.replace(/^wss:\/\//, '')}
-                      </Text>
+                  <ListGroup.Item>
+                    <ListGroup.ItemContent>
+                      <View className="flex-row items-center gap-2">
+                        <View
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: 4,
+                            backgroundColor: healthColor[health[entry.url] ?? 'disconnected'],
+                          }}
+                        />
+                        <ListGroup.ItemTitle numberOfLines={1}>
+                          {hostLabel(entry.url)}
+                        </ListGroup.ItemTitle>
+                      </View>
                       <View className="mt-1 flex-row gap-4">
                         <RelayMarkerToggle
                           label="Read"
@@ -272,16 +303,18 @@ export function SettingsNetworkScreen() {
                           onChange={(write) => setMarker(entry.url, { read: entry.read, write })}
                         />
                       </View>
-                    </View>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onPress={() => removeRelay(entry.url)}
-                      testID={`settings-network-relay-remove-${entry.url}`}
-                      accessibilityLabel={`Remove ${entry.url}`}>
-                      <Icon name="mdi:trash-can-outline" size={18} color={mutedColor} />
-                    </Button>
-                  </View>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onPress={() => removeRelay(entry.url)}
+                        testID={`settings-network-relay-remove-${entry.url}`}
+                        accessibilityLabel={`Remove ${entry.url}`}>
+                        <Icon name="mdi:trash-can-outline" size={18} color={mutedColor} />
+                      </Button>
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
                 </React.Fragment>
               ))}
             </ListGroup>
@@ -377,6 +410,15 @@ function TierHealthBadge({ status, checkingColor }: { status: TierStatus; checki
       );
     case 'disabled':
       return null;
+  }
+}
+
+/** `wss://cache1.primal.net/v1` → `cache1.primal.net`, the part worth reading. */
+function hostLabel(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url.replace(/^wss?:\/\//, '');
   }
 }
 

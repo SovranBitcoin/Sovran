@@ -88,6 +88,42 @@ describe('settingsStore persist resilience', () => {
   });
 
   it.each([
+    ['a missing field', undefined],
+    ['a non-array', 'wss://cache2.primal.net/v1'],
+    ['a null', null],
+    ['entries of the wrong type', [1, true, {}]],
+    ['an over-long entry', ['x'.repeat(2049)]],
+  ])(
+    'never disables a Primal host because of %s, and keeps terms',
+    async (_label, primalHostsDisabled) => {
+      preload(
+        {
+          primalHostsDisabled,
+          termsAccepted: { termsAccepted: true, date: '2025-01-01' },
+        },
+        4
+      );
+      const store = await loadStore();
+      // The denylist degrades to empty, i.e. every host stays ON. An allowlist
+      // would have degraded to "no hosts", silently killing the tier.
+      expect(store.getState().primalHostsDisabled).toEqual([]);
+      expect(store.getState().isTermsAccepted()).toBe(true);
+    }
+  );
+
+  it('keeps a valid Primal denylist across rehydrate', async () => {
+    preload({ primalHostsDisabled: ['wss://cache2.primal.net/v1'] }, 4);
+    const store = await loadStore();
+    expect(store.getState().primalHostsDisabled).toEqual(['wss://cache2.primal.net/v1']);
+  });
+
+  it('drops only the bad entries of a partly-valid denylist', async () => {
+    preload({ primalHostsDisabled: ['wss://cache2.primal.net/v1', 42] }, 4);
+    const store = await loadStore();
+    expect(store.getState().primalHostsDisabled).toEqual(['wss://cache2.primal.net/v1']);
+  });
+
+  it.each([
     { version: '0.1.3', fetchedAt: 0 },
     { version: '0.1.3', minVersion: '0.1.2', message: 'Please update', fetchedAt: 123 },
   ])('rehydrates valid app version metadata: %j', async (lastKnownAppVersion) => {

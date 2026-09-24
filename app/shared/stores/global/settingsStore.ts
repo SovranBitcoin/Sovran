@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { FIAT_UNITS, type FiatUnit } from 'wallet/units';
 import { storeLog, applyFileLogging } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { tolerantArray } from '@/shared/lib/persist/tolerant';
 import { legalRevisions, type LegalAcceptance } from '@/shared/lib/legal/legalDocuments';
 
 // Separate, non-persisted status: setting an error must never write default settings over unreadable data.
@@ -89,6 +90,7 @@ interface SettingsState {
   naggTierEnabled: boolean;
   primalTierEnabled: boolean;
   relayTierEnabled: boolean;
+  primalHostsDisabled: string[];
   /** Minimum transfer amount in sats to include in a rebalance plan. */
   minTransferThreshold: number;
   middlemanRouting: MiddlemanRoutingSettings;
@@ -192,6 +194,17 @@ const PersistedSettings = z.object({
   naggTierEnabled: z.boolean().default(true).catch(true),
   primalTierEnabled: z.boolean().default(true).catch(true),
   relayTierEnabled: z.boolean().default(true).catch(true),
+  /**
+   * Primal cache hosts the user switched OFF, by url.
+   *
+   * A DENYLIST on purpose. The host list itself lives in `backendConfig`, so an
+   * allowlist would silently disable the whole tier the moment this blob reset
+   * or a new host shipped. An empty denylist means "all of them", which is both
+   * the default and the safe direction to fail in.
+   */
+  primalHostsDisabled: tolerantArray(z.string().max(2048), 16)
+    .default([])
+    .catch(() => []),
   minTransferThreshold: z.number().int().nonnegative().default(5).catch(5),
   middlemanRouting: PersistedMiddlemanRouting.default(DEFAULT_MIDDLEMAN_ROUTING_PERSISTED).catch(
     DEFAULT_MIDDLEMAN_ROUTING_PERSISTED
@@ -223,6 +236,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   naggTierEnabled: true,
   primalTierEnabled: true,
   relayTierEnabled: true,
+  primalHostsDisabled: [],
   minTransferThreshold: 5,
   middlemanRouting: DEFAULT_MIDDLEMAN_ROUTING,
 };
@@ -268,6 +282,7 @@ interface SettingsActions {
   setNaggTierEnabled: (enabled: boolean) => void;
   setPrimalTierEnabled: (enabled: boolean) => void;
   setRelayTierEnabled: (enabled: boolean) => void;
+  setPrimalHostEnabled: (url: string, enabled: boolean) => void;
 
   // Rebalancing
   setMinTransferThreshold: (sats: number) => void;
@@ -397,6 +412,13 @@ export const useSettingsStore = create<SettingsStore>()(
           storeLog.info('store.settings.set_relay_tier_enabled', { enabled });
           set({ relayTierEnabled: enabled });
         },
+        setPrimalHostEnabled: (url: string, enabled: boolean) => {
+          storeLog.info('store.settings.set_primal_host_enabled', { url, enabled });
+          set((state) => {
+            const withoutUrl = state.primalHostsDisabled.filter((entry) => entry !== url);
+            return { primalHostsDisabled: enabled ? withoutUrl : [...withoutUrl, url] };
+          });
+        },
 
         // Rebalancing
         setMinTransferThreshold: (sats: number) => {
@@ -479,6 +501,7 @@ export const useSettingsStore = create<SettingsStore>()(
           naggTierEnabled: state.naggTierEnabled,
           primalTierEnabled: state.primalTierEnabled,
           relayTierEnabled: state.relayTierEnabled,
+          primalHostsDisabled: state.primalHostsDisabled,
         }),
         afterHydrate: (state, error) => {
           useSettingsHydration.setState({ status: error ? 'error' : 'ready' });
