@@ -3,9 +3,12 @@ import { StyleSheet, type ScrollView, type View as NativeView } from 'react-nati
 import { useReducedMotion } from 'react-native-reanimated';
 
 import { useIdentityHeader, type HeaderIdentity } from '@/shared/ui/composed/IdentityHeader';
-import { getCounterparty, transactionHeaderTitle, type SpendingConditions } from 'wallet';
+import { transactionHeaderTitle, type SpendingConditions } from 'wallet';
 
 import { useDeferredMount } from '@/shared/hooks/useDeferredMount';
+import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
+import { ContactRow, nostrIdentity } from '@/shared/ui/composed/ContactRow';
+import { navigateToProfile } from '@/features/contacts/lib/navigateToProfile';
 import { Screen, useScreenOptions } from '@/shared/ui/composed/Screen';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -171,7 +174,8 @@ export function TransactionDetailShell({
   }, []);
   // Other transactions with the same nostr counterparty (Nut Drop / lightning-
   // address-to-nostr). Rendered before technical details as a mini relationship view.
-  const counterpartyPubkey = entry ? getCounterparty(entry)?.pubkey : undefined;
+  const counterpartyPubkey = transactionIdentitySnapshot(entry)?.pubkey;
+  const { metadata: counterpartyProfile } = useNostrProfileMetadata(counterpartyPubkey);
   // The scroll mode picks its container, so it must not flip once mounted: it
   // follows the pubkey the entry carries (known synchronously), not the name
   // the profile fetch resolves later.
@@ -240,7 +244,17 @@ export function TransactionDetailShell({
             </View>
           )}
           {entry && counterpartyPubkey ? (
-            <DeferredCounterpartyTransactions pubkey={counterpartyPubkey} excludeId={entry.id} />
+            <>
+              <ContactRow
+                identity={nostrIdentity(counterpartyPubkey, counterpartyProfile ?? undefined)}
+                subtitle="View this person’s profile"
+                hideMetadata
+                trailingVariant="chevron"
+                testID="transaction-counterparty-profile"
+                onPress={() => navigateToProfile(counterpartyPubkey)}
+              />
+              <DeferredCounterpartyTransactions pubkey={counterpartyPubkey} excludeId={entry.id} />
+            </>
           ) : null}
           {children}
         </VStack>

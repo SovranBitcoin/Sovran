@@ -22,7 +22,7 @@
  * keeps the plain title.
  */
 
-import { getCounterparty, getZap } from 'wallet';
+import { getCounterparty, getZap, normalizeNostrPubkey } from 'wallet';
 
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
@@ -53,7 +53,7 @@ export function transactionIdentitySnapshot(
   entry: AnnotatedEntry | null | undefined
 ): TransactionIdentitySnapshot | undefined {
   if (!entry) return undefined;
-  const recipientPubkey = metadataString(entry, 'recipientPubkey');
+  const recipientPubkey = normalizeNostrPubkey(metadataString(entry, 'recipientPubkey') ?? '');
   if (recipientPubkey) {
     return {
       pubkey: recipientPubkey,
@@ -62,19 +62,21 @@ export function transactionIdentitySnapshot(
     };
   }
   const counterparty = getCounterparty(entry);
-  if (counterparty?.pubkey) {
+  const counterpartyPubkey = normalizeNostrPubkey(counterparty?.pubkey ?? '');
+  if (counterpartyPubkey) {
     return {
-      pubkey: counterparty.pubkey,
-      name: counterparty.displayName,
-      picture: counterparty.avatarUrl,
+      pubkey: counterpartyPubkey,
+      name: counterparty?.displayName,
+      picture: counterparty?.avatarUrl,
     };
   }
   const zap = getZap(entry);
-  if (zap?.authorPubkey) {
+  const authorPubkey = normalizeNostrPubkey(zap?.authorPubkey ?? '');
+  if (authorPubkey) {
     return {
-      pubkey: zap.authorPubkey,
-      name: zap.authorName,
-      picture: zap.authorAvatarUrl,
+      pubkey: authorPubkey,
+      name: zap?.authorName,
+      picture: zap?.authorAvatarUrl,
     };
   }
   return undefined;

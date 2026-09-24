@@ -46,6 +46,9 @@
     {"action":"tapUntil","sequence":[{"tap":{"id":"send-token-cancel-transaction"}}],"until":{"id":"e2e-toast-transaction-cancelled"},"attempts":4,"settleMs":6000},
     {"action":"waitFor","selector":{"id":"e2e-toast-transaction-cancelled"},"timeoutMs":60000},
     {"action":"assert","that":"tx","txRef":"${sendTx}","direction":"out","amount":20,"unit":"sat","mintHost":"mint.sovran.money","status":"rolledBack"},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"transaction-counterparty-profile"},"attempts":4},
+    {"action":"tap","selector":{"id":"transaction-counterparty-profile"}},
+    {"action":"waitFor","selector":{"id":"user-profile:other"},"timeoutMs":30000},
     {"action":"goHome"},
     {"action":"waitFor","selector":{"label":"₿ 50"},"timeoutMs":60000},
     {"action":"assert","that":"balanceDelta","unit":"sat","delta":0}

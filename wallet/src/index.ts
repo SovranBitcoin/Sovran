@@ -570,7 +570,7 @@ export {
 
 // Recipient identity resolution (Lightning Address → Nostr hex pubkey)
 export { fetchNip05Pubkey } from "./nip05";
-export { resolveRecipientPubkey } from "./recipient";
+export { normalizeNostrPubkey, resolveRecipientPubkey } from "./recipient";
 
 // Cancellable-fetch primitives (timeout + AbortSignal). Hermes lacks
 // `DOMException`, so callers must duck-type aborts via `isAbortError`
