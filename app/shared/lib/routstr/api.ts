@@ -218,9 +218,30 @@ async function parseErrorResponse(response: Response): Promise<ParsedErrorData> 
       type: response.status >= 500 ? 'server_error' : 'client_error',
     };
   }
+  let raw: unknown;
   try {
-    const parsed = ErrorBodySchema.safeParse(await response.json());
-    if (!parsed.success) return fallback;
+    raw = await response.json();
+  } catch {
+    // An empty or non-JSON body under a JSON content type. `fallback.message`
+    // is then the platform's status text ("payment required" on iOS), which
+    // reads like a server explanation but is the app talking to itself — so
+    // record that there was nothing to read.
+    apiLog.warn('api.routstr.error_body_unreadable', { status: response.status });
+    return fallback;
+  }
+  try {
+    const parsed = ErrorBodySchema.safeParse(raw);
+    if (!parsed.success) {
+      // A shape none of the three envelopes match. Keep a bounded preview: the
+      // alternative is `fallback`, whose message is the platform status text,
+      // and losing the body is precisely what hid this class of failure.
+      apiLog.warn('api.routstr.error_body_unrecognized', {
+        status: response.status,
+        keys: raw && typeof raw === 'object' ? Object.keys(raw).slice(0, 8) : typeof raw,
+        preview: JSON.stringify(raw).slice(0, 200),
+      });
+      return fallback;
+    }
     const body = parsed.data;
     let result: ParsedErrorData;
     if ('error' in body) {
