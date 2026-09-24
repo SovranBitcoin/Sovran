@@ -16,7 +16,7 @@
 
 import type { BalancesByMint, HistoryEntry } from "@cashu/coco-core";
 
-import { isCancellablePendingEcash } from "../history/filters";
+import { isReservedPendingEcash } from "../history/filters";
 
 export interface WalletBalanceBreakdown {
   spendable: number;
@@ -39,11 +39,18 @@ export function amountToNumber(value: AmountLike): number {
   return 0;
 }
 
-/** Sum the amounts of cancellable pending ecash sends in a history slice. */
+/**
+ * Sum the amounts of reserved pending ecash sends in a history slice.
+ *
+ * Reserved, not cancellable: a P2PK-locked send cannot be taken back, but its
+ * funds are just as gone from the spendable balance as any other pending
+ * send's. Counting only the cancellable ones would report locked money as
+ * spendable.
+ */
 export function sumReservedSends(history: readonly HistoryEntry[]): number {
   return history.reduce(
     (sum, entry) =>
-      isCancellablePendingEcash(entry)
+      isReservedPendingEcash(entry)
         ? sum + amountToNumber((entry as { amount?: AmountLike }).amount)
         : sum,
     0,

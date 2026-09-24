@@ -19,11 +19,25 @@ export type TransactionBucket = "pending" | "confirmed" | "expired";
 
 const CANCELLABLE_SEND_STATES = new Set(["pending", "prepared"]);
 
-export function isCancellablePendingEcash(
+/**
+ * A send whose funds have left the spendable balance but have not been claimed.
+ *
+ * This is about MONEY, not about buttons: a locked send is still reserved even
+ * though nobody can cancel it, so the balance breakdown must keep counting it.
+ * `isCancellablePendingEcash` is the narrower question of whether an action can
+ * be offered, and the two used to be the same predicate.
+ */
+export function isReservedPendingEcash(
   entry: HistoryEntry,
 ): entry is SendHistoryEntry {
   const state = String((entry as SendHistoryEntry).state ?? "");
   return entry.type === "send" && CANCELLABLE_SEND_STATES.has(state);
+}
+
+export function isCancellablePendingEcash(
+  entry: HistoryEntry,
+): entry is SendHistoryEntry {
+  return isReservedPendingEcash(entry);
 }
 
 export function isMintQuotePaymentObserved(

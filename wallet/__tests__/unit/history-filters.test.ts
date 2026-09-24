@@ -5,6 +5,7 @@ import {
   bucketTransaction,
   inFlightReceiveToHistoryEntry,
   isCancellablePendingEcash,
+  isReservedPendingEcash,
   isMeltQuotePaid,
   isMeltQuoteReadyToPay,
   isMintExpired,
@@ -207,5 +208,23 @@ describe('inFlightReceiveToHistoryEntry', () => {
       unit: undefined,
     } as unknown as ReceiveOperation);
     expect(entry.unit).toBe('sat');
+  });
+});
+
+describe("reserved vs cancellable pending sends", () => {
+  const pendingSend = { type: "send", state: "pending" } as never;
+
+  it("counts a pending send as reserved", () => {
+    // Its funds have left the spendable balance whether or not it can be
+    // cancelled — a locked send is money that is gone, not money you have.
+    expect(isReservedPendingEcash(pendingSend)).toBe(true);
+  });
+
+  it("keeps the two questions separable", () => {
+    // They answer the same today for unlocked sends; the balance must not
+    // start tracking whichever one the cancel button happens to use.
+    expect(isCancellablePendingEcash(pendingSend)).toBe(
+      isReservedPendingEcash(pendingSend),
+    );
   });
 });

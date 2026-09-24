@@ -143,6 +143,7 @@ export {
   normalizeTimelineMintState,
   resolveEntryState,
   isCancellablePendingEcash,
+  isReservedPendingEcash,
   railHeaderTitle,
   transactionHeaderPhase,
   transactionHeaderRail,

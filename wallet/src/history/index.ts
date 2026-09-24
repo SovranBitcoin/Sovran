@@ -1,6 +1,7 @@
 export {
   bucketTransaction,
   isCancellablePendingEcash,
+  isReservedPendingEcash,
   isMeltQuotePaid,
   isMeltQuoteReadyToPay,
   isMintExpired,

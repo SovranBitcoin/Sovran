@@ -10,7 +10,9 @@ import {
   methodContextHasSupportingMint,
   type MintMethodAmountAvailability,
 } from "../mint-capabilities";
+import { describeSendLock } from "../annotations";
 import { logger } from "../logger";
+import { LOCK_CLOCK_SKEW_MS } from "../p2pk";
 import { meltMethodForTarget } from "../melt-target";
 import type {
   AmountEntryMethodContext,
@@ -220,8 +222,57 @@ function summarizeAvailabilityMap(
 // Per-screen rules
 // ---------------------------------------------------------------------------
 
+/**
+ * Whether this send can be taken back, and what to say when it cannot.
+ *
+ * A locked send that has already executed cannot be rolled back — coco throws
+ * rather than trying — so offering the button would be offering a failure. A
+ * still-`prepared` send is different: nothing was swapped, the cancel is local,
+ * and it works whatever the lock says.
+ */
+function sendTokenCancelAvailability(
+  entry: Record<string, unknown>,
+  ctx: {
+    canAct: boolean;
+    hasOperationId: boolean;
+    state: string | undefined;
+    now: number;
+  },
+): ActionAvailability {
+  if (!ctx.canAct) return { available: false };
+  if (!ctx.hasOperationId) {
+    return { available: false, reason: "Missing operation ID — cannot cancel" };
+  }
+  if (ctx.state === "prepared") return { available: true };
+
+  const lock = describeSendLock(entry, { now: ctx.now });
+  if (!lock || lock.kind === "unlocked") return { available: true };
+
+  // No refund tag and no locktime: only the recipient can ever spend it.
+  if (lock.refund === null && lock.unlockAt === null) {
+    return {
+      available: false,
+      reason: "Locked to the recipient — this cannot be taken back",
+      reasonCode: "lock-permanent",
+    };
+  }
+  if (lock.unlockAt !== null && ctx.now < lock.unlockAt + LOCK_CLOCK_SKEW_MS) {
+    return {
+      available: false,
+      reason: "You can take this back once the lock opens",
+      reasonCode: "lock-active",
+      // The token's own date, not ours: the skew margin above is this
+      // wallet's caution about mint clocks, and showing it as the lock's
+      // terms would be reporting our caution as the recipient's deadline.
+      availableAt: lock.unlockAt,
+    };
+  }
+  return { available: true };
+}
+
 function sendTokenAvailability(
   entry: Record<string, unknown>,
+  now: number = Date.now(),
 ): AvailabilityMap<"sendToken"> {
   const state = entry.state as string | undefined;
   const token = entry.token;
@@ -263,12 +314,12 @@ function sendTokenAvailability(
     checkStatus: {
       available: canAct && state === "pending",
     },
-    cancel: {
-      available: canAct && operationId != null,
-      ...(!operationId && canAct
-        ? { reason: "Missing operation ID — cannot cancel" }
-        : {}),
-    },
+    cancel: sendTokenCancelAvailability(entry, {
+      canAct,
+      hasOperationId: operationId != null,
+      state,
+      now,
+    }),
     back: { available: true },
   };
 }
@@ -995,7 +1046,10 @@ function receiveAvailability(
 // ---------------------------------------------------------------------------
 
 const AVAILABILITY_FNS: {
-  [S in ScreenType]: (entry: Record<string, unknown>) => AvailabilityMap<S>;
+  [S in ScreenType]: (
+    entry: Record<string, unknown>,
+    now?: number,
+  ) => AvailabilityMap<S>;
 } = {
   sendToken: sendTokenAvailability,
   receiveToken: receiveTokenAvailability,
@@ -1035,11 +1089,15 @@ export function isPaymentRequestPreview(
 export function getAvailableActions<S extends ScreenType>(
   screenType: S,
   entry: Record<string, unknown>,
+  // Injectable so a lock's "reclaimable from" boundary is testable without
+  // fake timers; every other screen ignores it.
+  now: number = Date.now(),
 ): Record<ScreenActionName[S], ActionAvailability> {
   const fn = AVAILABILITY_FNS[screenType] as (
     e: Record<string, unknown>,
+    n?: number,
   ) => Record<ScreenActionName[S], ActionAvailability>;
-  const availability = fn(entry);
+  const availability = fn(entry, now);
   logger.info("screenActions.availability.result", {
     screenType,
     entryType: typeof entry.type === "string" ? entry.type : null,

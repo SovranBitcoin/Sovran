@@ -1216,3 +1216,78 @@ describe("amountEntry — the log explains each Next method", () => {
     });
   });
 });
+
+describe("sendTokenAvailability — cancelling a locked send", () => {
+  const THEIR_KEY = `02${"11".repeat(32)}`;
+  const OUR_KEY = `02${"22".repeat(32)}`;
+  const NOW = 1_800_000_000_000;
+  const LOCKTIME_SEC = Math.floor(NOW / 1000) + 3600;
+
+  const lockedEntry = (
+    tags: string[][],
+    state = "pending",
+  ): Record<string, unknown> => ({
+    type: "send",
+    state,
+    operationId: "op-1",
+    token: {
+      proofs: [
+        {
+          secret: JSON.stringify([
+            "P2PK",
+            { nonce: "ab".repeat(16), data: THEIR_KEY, tags },
+          ]),
+        },
+      ],
+    },
+  });
+
+  const cancelFor = (entry: Record<string, unknown>, now = NOW) =>
+    getAvailableActions("sendToken", entry, now).cancel;
+
+  it("offers cancel for an ordinary pending send", () => {
+    expect(
+      cancelFor({
+        type: "send",
+        state: "pending",
+        operationId: "op-1",
+        token: { proofs: [{ secret: "plain-random-secret" }] },
+      }).available,
+    ).toBe(true);
+  });
+
+  it("refuses a permanent lock, and says why", () => {
+    // Coco throws on reclaiming an executed P2PK send, so offering the button
+    // would be offering a failure.
+    const cancel = cancelFor(lockedEntry([]));
+    expect(cancel.available).toBe(false);
+    expect(cancel.reasonCode).toBe("lock-permanent");
+  });
+
+  it("says when a timed lock can be taken back, not just that it cannot now", () => {
+    const cancel = cancelFor(
+      lockedEntry([
+        ["locktime", String(LOCKTIME_SEC)],
+        ["refund", OUR_KEY],
+      ]),
+    );
+    expect(cancel.available).toBe(false);
+    expect(cancel.reasonCode).toBe("lock-active");
+    // The token's own date — the clock-skew margin is this wallet's caution,
+    // not the recipient's deadline.
+    expect(cancel.availableAt).toBe(LOCKTIME_SEC * 1000);
+  });
+
+  it("offers it again once the lock has opened", () => {
+    const entry = lockedEntry([
+      ["locktime", String(LOCKTIME_SEC)],
+      ["refund", OUR_KEY],
+    ]);
+    expect(cancelFor(entry, LOCKTIME_SEC * 1000 + 120_000).available).toBe(true);
+  });
+
+  it("still cancels a locked send that never executed", () => {
+    // Nothing was swapped, so the rollback is local and the lock is irrelevant.
+    expect(cancelFor(lockedEntry([], "prepared")).available).toBe(true);
+  });
+});
