@@ -15,6 +15,7 @@ const config = getDefaultConfig(__dirname);
 // libs (react, react-native, zod, neverthrow, @cashu/coco-*) to a single realm
 // so we never bundle duplicate copies (which would break hooks identity and
 // cross-package `instanceof ZodError` / Result identity).
+const zlibShimPath = path.resolve(__dirname, 'shared/lib/routstr/e2ee/zlibShim.ts');
 const appNodeModules = path.resolve(__dirname, 'node_modules');
 const workspaceRoot = path.resolve(__dirname, '..');
 const rootNodeModules = path.resolve(workspaceRoot, 'node_modules');
@@ -219,6 +220,14 @@ const appResolveRequest = (context, moduleName, platform) => {
       moduleName,
       platform
     );
+  }
+  // `@tinfoilsh/verifier` gunzips the SEV-SNP attestation report, reaching for
+  // `DecompressionStream` and falling back to Node's `zlib`. Hermes has
+  // neither, so point the bare specifier at the one-function pako shim. Kept
+  // narrow on purpose: any other consumer of `zlib` should fail to resolve
+  // rather than quietly receive a module that implements almost none of it.
+  if (moduleName === 'zlib' || moduleName === 'node:zlib') {
+    return { type: 'sourceFile', filePath: zlibShimPath };
   }
   if (appReactEntryPaths[moduleName]) {
     return { type: 'sourceFile', filePath: appReactEntryPaths[moduleName] };

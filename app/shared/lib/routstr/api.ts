@@ -1,4 +1,14 @@
 import { z } from 'zod';
+
+import { attestEnclave, invalidateAttestation } from './e2ee/attestation';
+import {
+  isKeyConfigMismatch,
+  isSealedResponse,
+  openResponse,
+  sealRequest,
+  type SealedRequest,
+} from './e2ee/ehbpTransport';
+import { isTinfoilModel, tinfoilUpstreamModelId } from './e2ee/tinfoilModels';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { apiLog } from '../logger';
 import { buildAbortSignal } from '@/shared/lib/http/requestSignal';
@@ -883,40 +893,96 @@ export async function sendMessage(
   });
   const start = performance.now();
   const ownsScope = captureRequestScope();
+  const sealedTransport = isTinfoilModel(model);
 
   try {
-    const response = await fetch(`${routstrBaseUrl()}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        ...(routstrStoreState().authMode === 'x-cashu' && apiKey.startsWith('cashu')
-          ? { 'X-Cashu': apiKey }
-          : { Authorization: `Bearer ${apiKey}` }),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature,
-        ...(max_tokens != null && { max_tokens }),
-        stream: true,
-      }),
-      signal,
-    });
+    const authHeaders: Record<string, string> =
+      routstrStoreState().authMode === 'x-cashu' && apiKey.startsWith('cashu')
+        ? { 'X-Cashu': apiKey }
+        : { Authorization: `Bearer ${apiKey}` };
+
+    // The enclave is told the bare model id; the node is told the catalog's
+    // prefixed one, out of band in `X-Routstr-Model`, because that is what it
+    // bills and routes on and it can no longer read the body.
+    const payload = {
+      model: sealedTransport ? tinfoilUpstreamModelId(model) : model,
+      messages,
+      temperature,
+      ...(max_tokens != null && { max_tokens }),
+      stream: true,
+    };
+
+    const build = async (): Promise<{ init: RequestInit; sealed: SealedRequest | null }> => {
+      if (!sealedTransport) {
+        return {
+          sealed: null,
+          init: {
+            method: 'POST',
+            headers: { ...authHeaders, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal,
+          },
+        };
+      }
+      const { hpkePublicKey } = await attestEnclave({ signal });
+      const sealed = await sealRequest(hpkePublicKey, payload);
+      return {
+        sealed,
+        init: {
+          method: 'POST',
+          headers: {
+            ...authHeaders,
+            ...sealed.headers,
+            'X-Routstr-Model': model,
+            'Content-Type': 'application/octet-stream',
+          },
+          body: sealed.body,
+          signal,
+        },
+      };
+    };
+
+    // One send, plus at most one resend when the enclave rejects our key
+    // configuration (422 problem+json) — that means it rotated under us, so
+    // re-attesting and resending is the recovery. A second mismatch is a real
+    // failure, not a race. Built as a loop so there is a single `fetch` site.
+    let sealed: SealedRequest | null = null;
+    let response: Response;
+    for (let resends = 0; ; resends++) {
+      const built = await build();
+      sealed = built.sealed;
+      response = await fetch(`${routstrBaseUrl()}/chat/completions`, built.init);
+      if (resends > 0 || !sealed || !isKeyConfigMismatch(response)) break;
+      apiLog.warn('routstr.e2ee.key_rotated', { model });
+      invalidateAttestation();
+    }
+
     const balanceKey = applyResponseChange(response, apiKey, ownsScope);
     const requestId = response.headers.get('x-routstr-request-id') || undefined;
     apiLog.debug('api.routstr.chat.response_received', {
       status: response.status,
       requestId,
+      sealed: sealedTransport,
       duration_ms: Math.round(performance.now() - start),
     });
+    // Error responses reach us in PLAINTEXT: the node produces them before the
+    // request ever gets to the enclave, so they carry no response nonce.
+    // Decrypting unconditionally would throw and destroy the real status and
+    // body — the 402/401 handling below depends on reading them intact.
     if (!response.ok) await throwResponseError(response, apiKey, balanceKey, ownsScope);
+
+    const decrypted =
+      sealed && isSealedResponse(response)
+        ? await openResponse(response, sealed.context)
+        : response;
 
     apiLog.info('api.routstr.chat.stream_started', {
       model,
       requestId,
+      sealed: sealedTransport,
       ttfb_ms: Math.round(performance.now() - start),
     });
-    return { stream: parseSSEStream(response) };
+    return { stream: parseSSEStream(decrypted) };
   } catch (error: unknown) {
     apiLog.error('api.routstr.chat.failed', {
       model,

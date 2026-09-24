@@ -19,6 +19,7 @@
         "shim.js",
         "polyfills.js",
         "metro.config.js",
+        "shared/lib/routstr/e2ee/zlibShim.ts",
         "app/**/*.{ts,tsx}",
         "plugins/*.js",
         "scripts/*.{js,ts}",

@@ -66,6 +66,17 @@ comparing auth modes if a prior request did not return usable change.
   several upstream accounts and they fail independently — a node whose credit
   with one is exhausted answers 402 for every model behind it while its
   catalog, wallet and other upstreams stay healthy.
+- `routstr.e2ee.attested`: an enclave was verified, with how long it took and a
+  measurement prefix. The measurement identifies the CODE the enclave runs, not
+  the user, and it is what makes "which enclave answered" answerable later.
+- `routstr.e2ee.attestation_failed` / `routstr.e2ee.key_rotated`: verification
+  refused, or the enclave rejected our key configuration (422 problem+json) and
+  the send re-attested once.
+- `api.routstr.chat.start` / `.response_received` / `.stream_started` carry
+  `sealed`, which is true only when the model id begins `tinfoil-`. That prefix
+  is the ONLY sound test for end-to-end encryption: the live catalog lists
+  `glm-5-3` and `tinfoil-glm-5-3` at identical prices under the identical name
+  "Private (E2EE) GLM 5.3", and only the prefixed one travels sealed.
 - `routstr.change_token.applied`: change adopted, with no token contents.
 - `routstr.auth.kept_key`: ambiguous 401 retained the current credential.
 - `api.routstr.api_key_expired`: explicit invalid/expired/spent/unknown/revoked key.
