@@ -51,8 +51,16 @@ comparing auth modes if a prior request did not return usable change.
 
 ## Log evidence
 
-- `api.routstr.http_error`: status/type and numeric required/available msats;
-  raw upstream messages are excluded.
+- `api.routstr.http_error`: status, type, code, the node's `x-routstr-request-id`,
+  numeric required/available msats, and the parsed message (capped at 200 chars
+  and passed through the logger's secret redaction). The message used to be
+  excluded, which made a 402 the node forwarded from the AI provider
+  indistinguishable from one routstr raised about the key's balance — every send
+  then reported "Insufficient balance" on a funded wallet. It is a log, not
+  user-facing copy; `describeError` still owns what the user sees.
+- `ai.send.provider_declined`: a 402 carrying none of routstr's wallet markers,
+  i.e. the AI provider behind this model refused. The send advances to the next
+  candidate (usually a different upstream), capped at `MAX_DECLINED_ATTEMPTS`.
 - `routstr.change_token.applied`: change adopted, with no token contents.
 - `routstr.auth.kept_key`: ambiguous 401 retained the current credential.
 - `api.routstr.api_key_expired`: explicit invalid/expired/spent/unknown/revoked key.
