@@ -1,0 +1,146 @@
+/**
+ * Stand-in for `@routstr/sdk/browser` under Jest.
+ *
+ * The real package reaches `applesauce-relay`, which is ESM-only and pulls
+ * `node:crypto` through a chain Jest's CJS runtime cannot transform. Rather
+ * than widen `transformIgnorePatterns` down a dependency tree the app never
+ * executes in a test, `moduleNameMapper` points the SDK here.
+ *
+ * What this proves and what it does not: the seams Sovran owns — the wallet
+ * adapter, the payment annotation, the cost arithmetic and this app's error
+ * classification — run against a `routeRequest` that behaves the way the real
+ * one does (spend, send, bank the change from `X-Cashu`, report spent minus
+ * returned). It proves nothing about the SDK's own transport, failover or
+ * Tinfoil sealing; the Metro bundle build and a funded device run are what
+ * cover those.
+ */
+
+interface WalletAdapter {
+  getBalances(): Promise<Record<string, number>>;
+  getMintUnits(): Record<string, 'sat' | 'msat'>;
+  getActiveMintUrl(): string | null;
+  sendToken(mintUrl: string, amount: number): Promise<string>;
+  receiveToken(
+    token: string
+  ): Promise<{ success: boolean; amount: number; unit: 'sat' | 'msat'; message?: string }>;
+}
+
+export interface Model {
+  id: string;
+  sats_pricing?: { max_cost?: number } | null;
+}
+
+export class InsufficientBalanceError extends Error {
+  constructor(
+    public required: number,
+    public available: number,
+    public maxMintBalance = 0,
+    public maxMintUrl = ''
+  ) {
+    super(`Insufficient balance: need ${required} sats, have ${available} sats available.`);
+    this.name = 'InsufficientBalanceError';
+  }
+}
+
+/** The gate amount the stub funds when the seeded catalog does not price the
+ *  model. Tests that assert on the minted amount set the catalog instead. */
+const DEFAULT_REQUIRED_SATS = 10;
+
+type CacheRecord = Record<string, unknown>;
+
+export const createSdkStore = () => {
+  const state: CacheRecord = {};
+  return { store: state as never, hydrate: Promise.resolve() };
+};
+
+export const createStorageAdapterFromStore = () => ({});
+
+export type DiscoveryAdapter = ReturnType<typeof createDiscoveryAdapterFromStore>;
+
+export const createDiscoveryAdapterFromStore = () => {
+  let models: Record<string, Model[]> = {};
+  let mints: Record<string, string[]> = {};
+  const updates: Record<string, number> = {};
+  return {
+    getCachedModels: () => models,
+    setCachedModels: (next: Record<string, Model[]>) => {
+      models = next;
+    },
+    getCachedMints: () => mints,
+    setCachedMints: (next: Record<string, string[]>) => {
+      mints = next;
+    },
+    getProviderLastUpdate: (baseUrl: string) => updates[baseUrl] ?? null,
+    setProviderLastUpdate: (baseUrl: string, at: number) => {
+      updates[baseUrl] = at;
+    },
+  };
+};
+
+interface RoutedResponse extends Response {
+  satsSpent?: number;
+  finalize?: () => Promise<number>;
+}
+
+export class RoutstrClient {
+  constructor(
+    private wallet: WalletAdapter,
+    _storage: unknown,
+    private discovery: ReturnType<typeof createDiscoveryAdapterFromStore>,
+    _alertLevel: 'max' | 'min',
+    _mode?: 'xcashu' | 'apikeys'
+  ) {}
+
+  getCashuSpender() {
+    return { refundXcashuTokens: async () => [] };
+  }
+
+  private requiredSats(baseUrl: string, modelId?: string): number {
+    const key = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+    const priced = this.discovery.getCachedModels()[key]?.find((m) => m.id === modelId);
+    return Math.ceil(priced?.sats_pricing?.max_cost ?? DEFAULT_REQUIRED_SATS);
+  }
+
+  async routeRequest(params: {
+    path: string;
+    method: string;
+    baseUrl: string;
+    mintUrl: string;
+    modelId?: string;
+    body?: unknown;
+    signal?: AbortSignal;
+  }): Promise<Response> {
+    const balances = await this.wallet.getBalances();
+    const total = Object.values(balances).reduce((sum, v) => sum + v, 0);
+    const required = this.requiredSats(params.baseUrl, params.modelId);
+    if (total <= 0) throw new InsufficientBalanceError(required, total);
+
+    const token = await this.wallet.sendToken(params.mintUrl, required);
+    // Raw fetch on purpose: this stands in for the SDK's own transport, which
+    // streams, and the tests around it stub this exact call.
+    // eslint-disable-next-line no-restricted-globals -- see above
+    const response = (await fetch(`${params.baseUrl}${params.path}`, {
+      method: params.method,
+      headers: { 'X-Cashu': token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(params.body),
+      signal: params.signal,
+    })) as RoutedResponse;
+
+    const bank = async () => {
+      const change = response.headers.get('x-cashu');
+      if (!change) return required;
+      const received = await this.wallet.receiveToken(change);
+      return Math.max(0, required - (received.success ? received.amount : 0));
+    };
+
+    if ((response.headers.get('content-type') || '').includes('text/event-stream')) {
+      // The real client starts this eagerly, so the change comes home whether
+      // or not the caller ever consumes the stream.
+      const pending = bank();
+      response.finalize = () => pending;
+      return response;
+    }
+    response.satsSpent = await bank();
+    return response;
+  }
+}

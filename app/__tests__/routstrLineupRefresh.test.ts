@@ -72,15 +72,21 @@ async function load() {
   };
 }
 
-jest.mock('@/shared/lib/routstr/payment', () => ({
-  mintRequestPayment: jest.fn(async (amountSats: number) => ({
-    encoded: 'cashuB-request-payment',
-    operationId: 'op-1',
-    mintUrl: 'https://mint.example',
-    amountSats,
-  })),
-  receiveChange: jest.fn(async () => undefined),
-  reclaimUnspentPayment: jest.fn(async () => undefined),
+// The wallet half of a pay-per-request send. `@routstr/sdk` spends through
+// this adapter, so stubbing it here is what keeps these tests about the
+// classification above it rather than about Coco.
+jest.mock('@/shared/lib/routstr/sdk/walletAdapter', () => ({
+  cocoWalletAdapter: {
+    getBalances: jest.fn(async () => ({ 'https://mint.example': 1000 })),
+    getMintUnits: () => ({ 'https://mint.example': 'sat' }),
+    getActiveMintUrl: () => 'https://mint.example',
+    sendToken: jest.fn(async () => 'cashuB-request-payment'),
+    receiveToken: jest.fn(async () => ({ success: true, amount: 0, unit: 'sat' })),
+  },
+}));
+
+jest.mock('@/shared/stores/profile/mintStore', () => ({
+  useMintStore: { getState: () => ({ selectedMint: 'https://mint.example' }) },
 }));
 
 describe('Routstr lineup refresh policy', () => {
@@ -196,7 +202,7 @@ describe('Routstr lineup refresh policy', () => {
         );
       const { sendMessage } =
         require('@/shared/lib/routstr/api') as typeof import('@/shared/lib/routstr/api');
-      await expect(sendMessage([], { model: 'new-model', paymentSats: 10 })).rejects.toMatchObject({
+      await expect(sendMessage([], { model: 'new-model' })).rejects.toMatchObject({
         status,
       });
       expect(store.getState()).toMatchObject({ serverLineupAt: null, lineup: null });

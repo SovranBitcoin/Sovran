@@ -1,20 +1,9 @@
 import { z } from 'zod';
 
-import { attestEnclave, invalidateAttestation } from './e2ee/attestation';
-import {
-  isKeyConfigMismatch,
-  isSealedResponse,
-  openResponse,
-  sealRequest,
-  type SealedRequest,
-} from './e2ee/ehbpTransport';
-import { isTinfoilModel, tinfoilUpstreamModelId } from './e2ee/tinfoilModels';
-import {
-  mintRequestPayment,
-  receiveChange,
-  reclaimUnspentPayment,
-  type PaymentContext,
-} from './payment';
+import { InsufficientBalanceError, type Model } from '@routstr/sdk/browser';
+
+import { getRoutstrClient, seedProviderCatalog, sweepUnsettledPayments } from './sdk/client';
+import { withPaymentScope, type PaymentContext } from './sdk/paymentScope';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { apiLog } from '../logger';
 import { buildAbortSignal } from '@/shared/lib/http/requestSignal';
@@ -41,6 +30,27 @@ export function setRoutstrNodeBaseUrl(url: string | null): void {
 
 function routstrBaseUrl(): string {
   return routstrBaseUrlOverride ?? ROUTSTR_DEFAULT_BASE_URL;
+}
+
+/**
+ * The node's origin, without the `/v1` API prefix.
+ *
+ * `@routstr/sdk` joins a base URL and a path itself, and asks that base for
+ * `/v1/info` when it wants to know who it is talking to. Handing it the `/v1`
+ * form produces `/v1/v1/info`, so the prefix travels in the path instead.
+ */
+function routstrOrigin(): string {
+  return routstrBaseUrl().replace(/\/v1$/, '');
+}
+
+/** The mint AI requests are paid from — the same one the wallet spends from.
+ *  Lazily required so a Routstr consumer does not drag the profile-scoped mint
+ *  store into its module graph; Metro handles both spellings, Jest's CJS VM
+ *  only this one. */
+function selectedMintUrl(): string | undefined {
+  const { useMintStore } =
+    require('@/shared/stores/profile/mintStore') as typeof import('@/shared/stores/profile/mintStore');
+  return useMintStore.getState().selectedMint;
 }
 
 /**
@@ -611,6 +621,15 @@ export async function getModels(controls: RequestControls = {}): Promise<Routstr
       count: enabled.length,
       duration_ms: Math.round((performance.now() - start) * 100) / 100,
     });
+    // The SDK sizes every request's token from ITS cached pricing, so the
+    // catalog nagg's lineup already fetched is handed over rather than
+    // discovered a second time over Nostr. Without this the SDK prices each
+    // request at one sat and the node refuses it at the admission gate.
+    if (ownsScope())
+      void seedProviderCatalog(routstrOrigin(), enabled as unknown as Model[]).catch(() => {
+        // Already logged inside; a stale catalog is the SDK's next 402, not
+        // a reason to fail the model list the picker is waiting on.
+      });
     return enabled;
   } catch (error) {
     // Resolve lazily to avoid api → refresh → store → api initialisation cycles.
@@ -896,19 +915,48 @@ export function measureMessageContent(messages: RoutstrChatMessage[]): {
  * is held on the node between requests, which is what stops a node change from
  * stranding a balance.
  */
+/**
+ * A `routeRequest` response, with what the SDK attaches to it.
+ *
+ * The SDK's own typings return a plain `Response`; these three properties are
+ * added at runtime and are the whole reason to route through it — `finalize`
+ * banks the change and resolves to what the node actually took.
+ */
+interface RoutedResponse extends Response {
+  satsSpent?: number;
+  requestId?: string;
+  finalize?: () => Promise<number>;
+}
+
+/**
+ * Send one chat turn, paid per request out of the wallet.
+ *
+ * Transport, payment and E2EE are `@routstr/sdk`'s: it prices the request the
+ * way the node's admission gate does, mints a token for that amount through the
+ * Coco wallet adapter, seals the body for a Tinfoil model, redeems the change
+ * from the `X-Cashu` response header, and records the token in between so an
+ * app that dies mid-request can still chase the money.
+ *
+ * What stays here is Sovran's: which node, which mint, this app's error
+ * classification, and the annotation that ties both money legs to the message
+ * they bought.
+ *
+ * `cost` resolves after the stream ends, because that is when the exact figure
+ * exists — spent minus returned. It settles whether or not the caller consumes
+ * the stream, so the change never depends on the UI finishing.
+ */
 export async function sendMessage(
   messages: RoutstrChatMessage[],
   options: {
     model: string;
-    paymentSats: number;
     /** What this request is buying, so both money legs can point at it. */
     payment?: PaymentContext;
     temperature?: number;
     max_tokens?: number;
     signal?: AbortSignal;
   }
-): Promise<{ stream: AsyncIterable<ChatCompletionChunk>; costSats: number }> {
-  const { model, paymentSats, payment: context, temperature = 0.7, max_tokens, signal } = options;
+): Promise<{ stream: AsyncIterable<ChatCompletionChunk>; cost: Promise<number> }> {
+  const { model, payment: context, temperature = 0.7, max_tokens, signal } = options;
   const { textChars, imageParts } = measureMessageContent(messages);
   apiLog.info('api.routstr.chat.start', {
     model,
@@ -920,127 +968,101 @@ export async function sendMessage(
   });
   const start = performance.now();
   const ownsScope = captureRequestScope();
-  const sealedTransport = isTinfoilModel(model);
+  const mintUrl = selectedMintUrl();
+  if (!mintUrl) throw { status: 0, error: { message: 'No mint selected', type: 'no_mint' } };
 
-  const payment = await mintRequestPayment(paymentSats, routstrBaseUrl(), context);
-  let settled = false;
-  // Spent minus returned is what the node actually took. Exact, local, and
-  // known before the first chunk — the change header is set before the body
-  // streams. It replaces a balance diff that a concurrent write could corrupt
-  // and that a node change made meaningless.
-  let costSats = paymentSats;
-
+  let response: RoutedResponse;
   try {
-    const authHeaders: Record<string, string> = { 'X-Cashu': payment.encoded };
-
-    // The enclave is told the bare model id; the node is told the catalog's
-    // prefixed one, out of band in `X-Routstr-Model`, because that is what it
-    // bills and routes on and it can no longer read the body.
-    const payload = {
-      model: sealedTransport ? tinfoilUpstreamModelId(model) : model,
-      messages,
-      temperature,
-      ...(max_tokens != null && { max_tokens }),
-      stream: true,
-    };
-
-    const build = async (): Promise<{ init: RequestInit; sealed: SealedRequest | null }> => {
-      if (!sealedTransport) {
-        return {
-          sealed: null,
-          init: {
-            method: 'POST',
-            headers: { ...authHeaders, 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-            signal,
-          },
-        };
-      }
-      const { hpkePublicKey } = await attestEnclave({ signal });
-      const sealed = await sealRequest(hpkePublicKey, payload);
-      return {
-        sealed,
-        init: {
-          method: 'POST',
-          headers: {
-            ...authHeaders,
-            ...sealed.headers,
-            'X-Routstr-Model': model,
-            'Content-Type': 'application/octet-stream',
-          },
-          body: sealed.body,
-          signal,
+    const client = await getRoutstrClient();
+    response = (await withPaymentScope(context, () =>
+      client.routeRequest({
+        path: '/v1/chat/completions',
+        method: 'POST',
+        baseUrl: routstrOrigin(),
+        mintUrl,
+        // The catalog id, not the upstream one: the SDK maps a `tinfoil-`
+        // model to its enclave name and carries the catalog id separately in
+        // `X-Routstr-Model`, which is what the node bills and routes on when
+        // it can no longer read the body.
+        modelId: model,
+        body: {
+          model,
+          messages,
+          temperature,
+          ...(max_tokens != null && { max_tokens }),
+          stream: true,
         },
-      };
-    };
-
-    // One send, plus at most one resend when the enclave rejects our key
-    // configuration (422 problem+json) — that means it rotated under us, so
-    // re-attesting and resending is the recovery. A second mismatch is a real
-    // failure, not a race. Built as a loop so there is a single `fetch` site.
-    let sealed: SealedRequest | null = null;
-    let response: Response;
-    for (let resends = 0; ; resends++) {
-      const built = await build();
-      sealed = built.sealed;
-      response = await fetch(`${routstrBaseUrl()}/chat/completions`, built.init);
-      if (resends > 0 || !sealed || !isKeyConfigMismatch(response)) break;
-      apiLog.warn('routstr.e2ee.key_rotated', { model });
-      invalidateAttestation();
-    }
-
-    // Change comes back on refusals too, so this runs before the status is
-    // even looked at. `ownsScope` is logged rather than enforced: a profile
-    // switch mid-request would send it to the wrong wallet, but dropping a
-    // bearer token burns it outright, and the send is aborted on that switch
-    // anyway.
-    const change = response.headers.get('x-cashu');
-    if (change) {
-      settled = true;
-      if (!ownsScope()) apiLog.warn('routstr.payment.change_out_of_scope');
-      costSats = Math.max(0, paymentSats - (await receiveChange(change, context)));
-      // The change is home, so there is nothing left to recover for this one.
-      routstrStoreState().settlePayment(payment.id);
-    }
-    const requestId = response.headers.get('x-routstr-request-id') || undefined;
-    apiLog.debug('api.routstr.chat.response_received', {
-      status: response.status,
-      requestId,
-      sealed: sealedTransport,
-      duration_ms: Math.round(performance.now() - start),
-    });
-    // Error responses reach us in PLAINTEXT: the node produces them before the
-    // request ever gets to the enclave, so they carry no response nonce.
-    // Decrypting unconditionally would throw and destroy the real status and
-    // body — the 402/401 handling below depends on reading them intact.
-    if (!response.ok) await throwResponseError(response, undefined, undefined, ownsScope);
-
-    const decrypted =
-      sealed && isSealedResponse(response)
-        ? await openResponse(response, sealed.context)
-        : response;
-
-    settled = true;
-    apiLog.info('api.routstr.chat.stream_started', {
-      model,
-      requestId,
-      sealed: sealedTransport,
-      ttfb_ms: Math.round(performance.now() - start),
-    });
-    apiLog.info('routstr.payment.settled', { model, paymentSats, costSats });
-    return { stream: parseSSEStream(decrypted), costSats };
-  } catch (error: unknown) {
-    // No change header and no stream means the node never took the money —
-    // a transport failure, or a refusal before redemption. Put it back. If it
-    // DID redeem, the proofs are spent and this is a no-op by construction.
-    if (!settled) await reclaimUnspentPayment(payment);
+        signal,
+      })
+    )) as RoutedResponse;
+  } catch (error) {
     apiLog.error('api.routstr.chat.failed', {
       model,
-      status: error && typeof error === 'object' && 'status' in error ? error.status : 0,
+      status: 0,
       duration_ms: Math.round(performance.now() - start),
     });
-    if (ownsScope() && isModelRejectedError(error, model))
-      routstrStoreState().invalidateServerLineup();
+    // The wallet could not fund the gate. Said in the node's own vocabulary so
+    // the send path treats it as a balance problem — which it is — instead of
+    // a transport failure it would pointlessly fail over.
+    if (error instanceof InsufficientBalanceError) {
+      const walletShortfall: RoutstrError = {
+        status: 402,
+        error: {
+          message: error.message,
+          code: 'insufficient_balance',
+          type: 'insufficient_quota',
+          // The node speaks in millisats; so must this, or the balance sync
+          // reading `available` would be out by a factor of a thousand.
+          details: { required: error.required * 1000, available: error.available * 1000 },
+        },
+      };
+      throw walletShortfall;
+    }
+    // Anything still in flight is money the node may or may not have taken;
+    // only the node can say, and the sweep is how it is asked.
+    void sweepUnsettledPayments(mintUrl);
     toRoutstrError(error);
   }
+
+  const requestId = response.headers.get('x-routstr-request-id') || response.requestId || undefined;
+  apiLog.debug('api.routstr.chat.response_received', {
+    status: response.status,
+    requestId,
+    duration_ms: Math.round(performance.now() - start),
+  });
+
+  if (!response.ok) {
+    // The change, if the node returned any, is already home: a non-streaming
+    // response is finalized inside `routeRequest` before it comes back.
+    try {
+      await throwResponseError(response, undefined, undefined, ownsScope);
+    } catch (error) {
+      apiLog.error('api.routstr.chat.failed', {
+        model,
+        status: response.status,
+        duration_ms: Math.round(performance.now() - start),
+      });
+      if (ownsScope() && isModelRejectedError(error, model))
+        routstrStoreState().invalidateServerLineup();
+      throw error;
+    }
+  }
+
+  apiLog.info('api.routstr.chat.stream_started', {
+    model,
+    requestId,
+    ttfb_ms: Math.round(performance.now() - start),
+  });
+
+  // Started here rather than awaited: the SDK banks the change as soon as the
+  // stream ends, and reading the figure must not hold up the first chunk.
+  const cost = (async () => {
+    const sats = response.finalize
+      ? await withPaymentScope(context, () => response.finalize!())
+      : (response.satsSpent ?? 0);
+    apiLog.info('routstr.payment.settled', { model, costSats: sats });
+    return sats;
+  })();
+
+  return { stream: parseSSEStream(response), cost };
 }

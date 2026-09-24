@@ -29,6 +29,7 @@ import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleS
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { restartApp } from '@/shared/lib/profile/appRestart';
 import { clearAllQueryCaches } from '@/shared/lib/cache/createQueryCacheStore';
+import { resetRoutstrClient } from '@/shared/lib/routstr/sdk/client';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import {
@@ -207,6 +208,13 @@ export async function switchToExistingProfile(opts: {
     }
 
     await cleanupCocoWithTimeout();
+
+    // The Routstr client holds a hydrated, profile-scoped store and a wallet
+    // adapter bound to the Coco manager just torn down. A restart discards it
+    // anyway; this covers the in-process fallback below, where the module
+    // survives and would otherwise spend the new profile's wallet against the
+    // old profile's provider state.
+    resetRoutstrClient();
 
     // Persist the switch target and restart into it WITHOUT the in-memory
     // store flip — the flip remounts the whole provider tree and would boot

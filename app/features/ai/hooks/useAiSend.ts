@@ -26,7 +26,6 @@ import {
   AUTO_ICON,
   estimateTurnCostSats,
   getAffordabilityDetails,
-  requiredReserveSatsFromPricing,
   getModelDisplayName,
   getProviderById,
   getTierById,
@@ -303,6 +302,10 @@ export function useAiSend() {
         });
 
         let stream: AsyncIterable<any> | undefined;
+        // Resolved after the stream ends: the exact figure is the token we
+        // spent minus the change the node returned, and the change is only
+        // banked once the response is complete.
+        let costPromise: Promise<number> | undefined;
         let costSats: number | undefined;
         let lastConnectErr: unknown = null;
         let recoveryRetried = false;
@@ -324,23 +327,14 @@ export function useAiSend() {
             candidateCeiling != null && candidateCeiling > 0
               ? Math.min(ROUTSTR_MAX_COMPLETION_TOKENS, candidateCeiling)
               : ROUTSTR_MAX_COMPLETION_TOKENS;
-          // The token attached to the request has to clear the node's
-          // admission gate, which is the same figure the affordability chip
-          // shows — not the expected cost. Anything unspent comes straight
-          // back as change, so over-funding costs nothing but a swap.
-          const gateSats = Math.max(
-            1,
-            Math.ceil(
-              (requiredReserveSatsFromPricing(
-                candidateEntries[i]?.satsPricing ?? null,
-                imageCount
-              ) ?? 1) * AFFORD_BUFFER
-            )
-          );
           try {
+            // The token attached to the request has to clear the node's
+            // admission gate — not the expected cost — and `@routstr/sdk`
+            // sizes it the same way the node does, from the catalog pricing
+            // the lineup already seeded. Anything unspent comes straight back
+            // as change, so over-funding costs nothing but a swap.
             const result = await sendMessage(apiMessages, {
               model: candidate,
-              paymentSats: gateSats,
               // Both money legs point back at the exchange they bought, so a
               // cost in history can be traced to the answer it produced.
               payment: {
@@ -354,7 +348,7 @@ export function useAiSend() {
               signal: controller.signal,
             });
             stream = result.stream;
-            costSats = result.costSats;
+            costPromise = result.cost;
             modelToUse = candidate;
             if (i > 0) {
               aiLog.warn('ai.send.fallback_used', {
@@ -596,6 +590,11 @@ export function useAiSend() {
           fullReasoning,
           chunkCount,
         });
+        // The change is home by now, so the figure is final. A failure here
+        // is a missing cost label, never a lost message: the send already
+        // happened and the sweep chases anything the node still holds.
+        costSats = await costPromise?.catch(() => undefined);
+
         if (finalizePayload) {
           // One atomic write, cost included. The cost is exact and already
           // known — `sendMessage` returns what the node took (the token we

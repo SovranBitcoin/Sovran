@@ -11,6 +11,7 @@
     "app/features/feed/data/recentPeopleProfiles.ts": ["exports"],
     "app/shared/lib/e2e/stateMirror.ts": ["exports"],
     "app/shared/lib/popup/popups/sendMemoSheet.tsx": ["exports"],
+    "app/shared/lib/routstr/sdk/walletAdapter.ts": ["exports"],
     "scripts/lib/phone-frame.mjs": ["exports"]
   },
   "workspaces": {
@@ -19,7 +20,7 @@
         "shim.js",
         "polyfills.js",
         "metro.config.js",
-        "shared/lib/routstr/e2ee/zlibShim.ts",
+        "shared/lib/routstr/sdk/zlibShim.ts",
         "app/**/*.{ts,tsx}",
         "plugins/*.js",
         "scripts/*.{js,ts}",

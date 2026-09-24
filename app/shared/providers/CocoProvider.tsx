@@ -3,6 +3,7 @@ import { CocoCashuProvider } from '@cashu/coco-react';
 import { Manager } from '@cashu/coco-core';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { reclaimRoutstrBalances, recoverPendingPayments } from '@/shared/lib/routstr/reclaim';
+import { sweepUnsettledPayments } from '@/shared/lib/routstr/sdk/client';
 import { reportCocoApiFailure } from '@/shared/lib/cashu/cocoFeedback';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
@@ -14,6 +15,7 @@ import { getBootMorphCompleted, subscribeBootMorphCompleted } from '@/shared/lib
 import { awaitRestoreReady } from '@/shared/providers/awaitRestoreReady';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { initializeDefaultMints } from '@/shared/lib/cashu/initializeDefaultMints';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
 
 initLog('Module', 'CocoProvider loaded');
 
@@ -173,6 +175,15 @@ async function runCocoPhase2({ bgStage, chainManager, isLive }: CocoPhase2Args):
       // one with a deadline (a node sweeps unclaimed refunds eventually).
       log.info('coco.recovery.routstr_payments.start');
       await initPhase('Coco-bg.routstrPaymentRecovery', () => recoverPendingPayments());
+      if (!isLive()) return;
+      // The same window, for payments `@routstr/sdk` now owns: it records each
+      // request token before it leaves and clears it when the change is home,
+      // so anything still recorded is money the node has to be asked about.
+      // The sweep above drains rows written before the SDK took over; this one
+      // drains everything since.
+      const sweepMint = useMintStore.getState().selectedMint;
+      if (sweepMint)
+        await initPhase('Coco-bg.routstrSdkSweep', () => sweepUnsettledPayments(sweepMint));
       if (!isLive()) return;
       log.info('coco.recovery.routstr_payments.done');
       log.info('coco.recovery.routstr_reclaim.start');

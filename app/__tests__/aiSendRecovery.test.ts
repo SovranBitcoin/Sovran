@@ -57,17 +57,6 @@ jest.mock('@/shared/lib/logger', () => {
   return { apiLog: log, aiLog: log, storeLog: log, log, applyFileLogging: jest.fn() };
 });
 
-jest.mock('@/shared/lib/routstr/payment', () => ({
-  mintRequestPayment: jest.fn(async (amountSats: number) => ({
-    encoded: 'cashuB-request-payment',
-    operationId: 'op-1',
-    mintUrl: 'https://mint.example',
-    amountSats,
-  })),
-  receiveChange: jest.fn(async () => undefined),
-  reclaimUnspentPayment: jest.fn(async () => undefined),
-}));
-
 jest.mock('@cashu/coco-react', () => ({
   // The gate prices against the wallet now; a funded mint keeps the
   // affordability snapshot realistic without booting a wallet.
@@ -102,7 +91,7 @@ const walletBalanceFailure = () => ({
   },
 });
 const success = (costSats = 3) => ({
-  costSats,
+  cost: Promise.resolve(costSats),
   stream: (async function* () {
     yield { choices: [{ delta: { content: 'reply' } }] };
   })(),
@@ -171,7 +160,6 @@ describe('AI send lineup recovery', () => {
       expect(sendMock.mock.calls[1][1]).toMatchObject({
         model: 'new-auto',
         max_tokens: 4096,
-        paymentSats: expect.any(Number),
       });
       expect(refreshMock).toHaveBeenCalledWith('failure');
       expect(staticPopup).not.toHaveBeenCalled();
@@ -288,7 +276,7 @@ describe('AI send lineup recovery', () => {
 
   it('never retries after a stream has started', async () => {
     sendMock.mockResolvedValueOnce({
-      costSats: 3,
+      cost: Promise.resolve(3),
       stream: (async function* () {
         yield { choices: [{ delta: { content: 'partial' } }] };
         throw new Error('disconnected');

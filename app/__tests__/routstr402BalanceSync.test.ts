@@ -50,15 +50,21 @@ jest.mock('@/shared/lib/http/requestSignal', () => ({
   buildAbortSignal: () => undefined,
 }));
 
-jest.mock('@/shared/lib/routstr/payment', () => ({
-  mintRequestPayment: jest.fn(async (amountSats: number) => ({
-    encoded: 'cashuB-request-payment',
-    operationId: 'op-1',
-    mintUrl: 'https://mint.example',
-    amountSats,
-  })),
-  receiveChange: jest.fn(async () => undefined),
-  reclaimUnspentPayment: jest.fn(async () => undefined),
+// The wallet half of a pay-per-request send. `@routstr/sdk` spends through
+// this adapter, so stubbing it here is what keeps these tests about the
+// classification above it rather than about Coco.
+jest.mock('@/shared/lib/routstr/sdk/walletAdapter', () => ({
+  cocoWalletAdapter: {
+    getBalances: jest.fn(async () => ({ 'https://mint.example': 1000 })),
+    getMintUnits: () => ({ 'https://mint.example': 'sat' }),
+    getActiveMintUrl: () => 'https://mint.example',
+    sendToken: jest.fn(async () => 'cashuB-request-payment'),
+    receiveToken: jest.fn(async () => ({ success: true, amount: 0, unit: 'sat' })),
+  },
+}));
+
+jest.mock('@/shared/stores/profile/mintStore', () => ({
+  useMintStore: { getState: () => ({ selectedMint: 'https://mint.example' }) },
 }));
 
 const INSUFFICIENT_BODY = {
@@ -144,7 +150,6 @@ describe('402 → balance truth-sync', () => {
 
     const error = await sendMessage([{ role: 'user', content: 'hi' }], {
       model: 'gpt-oss-20b',
-      paymentSats: 10,
     }).catch((e: unknown) => e);
 
     expect(isWalletBalanceError(error)).toBe(false);
@@ -161,7 +166,6 @@ describe('402 → balance truth-sync', () => {
 
     const error = await sendMessage([{ role: 'user', content: 'hi' }], {
       model: 'gpt-oss-20b',
-      paymentSats: 10,
     }).catch((e: unknown) => e);
 
     expect(isWalletBalanceError(error)).toBe(true);
@@ -173,7 +177,7 @@ describe('402 → balance truth-sync', () => {
     stubFetch402({ error: { message: 'Payment required', type: 'x' } });
 
     await expect(
-      sendMessage([{ role: 'user', content: 'hi' }], { model: 'any', paymentSats: 10 })
+      sendMessage([{ role: 'user', content: 'hi' }], { model: 'any' })
     ).rejects.toMatchObject({ status: 402 });
 
     expect(useRoutstrStore.getState().balance).toBe(299_841);
@@ -237,7 +241,6 @@ describe('Routstr errors retain machine-readable evidence for shared presentatio
     ) as unknown as typeof fetch;
     await sendMessage([{ role: 'user', content: 'hi' }], {
       model: 'test-model',
-      paymentSats: 10,
     }).then(
       () => {
         throw new Error('Expected request to fail');
@@ -268,7 +271,6 @@ describe('Routstr errors retain machine-readable evidence for shared presentatio
 
     const { stream } = await sendMessage([{ role: 'user', content: 'hi' }], {
       model: 'test-model',
-      paymentSats: 10,
     });
     const drain = async () => {
       for await (const _chunk of stream) {

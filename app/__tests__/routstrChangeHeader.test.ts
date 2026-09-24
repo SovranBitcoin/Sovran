@@ -23,28 +23,33 @@ jest.mock('@/shared/lib/logger', () => {
   return { apiLog: log, aiLog: log, storeLog: log, log, applyFileLogging: jest.fn() };
 });
 jest.mock('@/shared/lib/http/requestSignal', () => ({ buildAbortSignal: () => undefined }));
-jest.mock('@/shared/lib/routstr/payment', () => {
-  const mintRequestPayment = jest.fn(async (amountSats: number) => ({
-    encoded: 'cashuB-request-payment',
-    operationId: 'op-1',
-    mintUrl: 'https://mint.example',
-    amountSats,
-  }));
-  const receiveChange = jest.fn(async () => undefined);
-  const reclaimUnspentPayment = jest.fn(async () => undefined);
-  return { mintRequestPayment, receiveChange, reclaimUnspentPayment };
-});
+// The wallet half of a pay-per-request send. `@routstr/sdk` mints and banks
+// through this adapter, so stubbing it here watches the money move without
+// booting Coco.
+jest.mock('@/shared/lib/routstr/sdk/walletAdapter', () => ({
+  cocoWalletAdapter: {
+    getBalances: jest.fn(async () => ({ 'https://mint.example': 1000 })),
+    getMintUnits: () => ({ 'https://mint.example': 'sat' }),
+    getActiveMintUrl: () => 'https://mint.example',
+    sendToken: jest.fn(async () => 'cashuB-request-payment'),
+    receiveToken: jest.fn(async () => ({ success: true, amount: 4, unit: 'sat' })),
+  },
+}));
 
-const payment = jest.requireMock('@/shared/lib/routstr/payment') as {
-  mintRequestPayment: jest.Mock;
-  receiveChange: jest.Mock;
-  reclaimUnspentPayment: jest.Mock;
-};
+jest.mock('@/shared/stores/profile/mintStore', () => ({
+  useMintStore: { getState: () => ({ selectedMint: 'https://mint.example' }) },
+}));
+
+const wallet = (
+  jest.requireMock('@/shared/lib/routstr/sdk/walletAdapter') as {
+    cocoWalletAdapter: { sendToken: jest.Mock; receiveToken: jest.Mock };
+  }
+).cocoWalletAdapter;
 
 const completion = () =>
   sendMessage([{ role: 'user', content: 'hi' }], {
     model: 'test-model',
-    paymentSats: 10,
+
     max_tokens: 4096,
   });
 // A chat completion no longer carries a stored credential — it pays per
@@ -65,6 +70,8 @@ describe('Routstr response credentials', () => {
     mockProfile = 0;
     setRoutstrNodeBaseUrl(null);
     useRoutstrStore.setState({ apiKey: 'cashuA-test-original', balance: 999, authMode: 'bearer' });
+    wallet.sendToken.mockClear();
+    wallet.receiveToken.mockClear();
   });
   afterEach(() => jest.restoreAllMocks());
 
@@ -82,14 +89,17 @@ describe('Routstr response credentials', () => {
     }
   );
 
-  it('banks the change before any stream chunk is consumed', async () => {
-    jest
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(
-        new Response('data: [DONE]\n', { headers: { 'x-cashu': 'cashuB-test-change' } })
-      );
-    const { stream } = await completion();
-    expect(payment.receiveChange).toHaveBeenCalledWith('cashuB-test-change', undefined);
+  it('banks the change without waiting for the stream to be consumed', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('data: [DONE]\n', {
+        headers: { 'x-cashu': 'cashuB-test-change', 'content-type': 'text/event-stream' },
+      })
+    );
+    const { stream, cost } = await completion();
+    // Nothing has read a chunk yet. The change still has to come home, because
+    // a caller that abandons the stream must not abandon the money with it.
+    await expect(cost).resolves.toBe(6);
+    expect(wallet.receiveToken).toHaveBeenCalledWith('cashuB-test-change');
     for await (const _chunk of stream) {
       /* empty fixture */
     }
@@ -166,11 +176,8 @@ describe('Routstr response credentials', () => {
     useRoutstrStore.setState({ authMode: 'bearer', apiKey: 'sk-should-not-be-used' });
     const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response());
     await completion();
-    expect(payment.mintRequestPayment).toHaveBeenCalledWith(
-      10,
-      expect.stringContaining('routstr'),
-      undefined
-    );
+    expect(wallet.sendToken).toHaveBeenCalledWith('https://mint.example', expect.any(Number));
+    expect(fetchMock.mock.calls[0][0]).toContain('/v1/chat/completions');
     expect(fetchMock.mock.calls[0][1]?.headers).toEqual({
       'X-Cashu': 'cashuB-request-payment',
       'Content-Type': 'application/json',
@@ -182,7 +189,7 @@ describe('Routstr response credentials', () => {
     });
   });
 
-  it('banks the change on a 402 and does not reclaim what the node took', async () => {
+  it('banks the change on a 402 before the refusal is raised', async () => {
     jest.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -192,15 +199,16 @@ describe('Routstr response credentials', () => {
       )
     );
     await expect(completion()).rejects.toMatchObject({ status: 402 });
-    // Routstr returns change on refusals too. Banking it is the whole point;
-    // reclaiming on top would try to unspend proofs the node already redeemed.
-    expect(payment.receiveChange).toHaveBeenCalledWith('cashuB-test-change', undefined);
-    expect(payment.reclaimUnspentPayment).not.toHaveBeenCalled();
+    // Routstr returns change on refusals too, and a refusal that dropped it
+    // would charge the user for being turned away.
+    expect(wallet.receiveToken).toHaveBeenCalledWith('cashuB-test-change');
   });
 
-  it('puts the payment back when the node never took it', async () => {
+  it('reports a transport failure as one, leaving the token to the sweep', async () => {
     jest.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('network down'));
+    // Whether the node took the token is a question only the node can answer,
+    // so the recovery sweep asks it rather than the app guessing locally.
     await expect(completion()).rejects.toMatchObject({ status: 0 });
-    expect(payment.reclaimUnspentPayment).toHaveBeenCalled();
+    expect(wallet.receiveToken).not.toHaveBeenCalled();
   });
 });
