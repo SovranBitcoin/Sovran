@@ -82,10 +82,13 @@ export type PrimalWebSocketConfig = {
    * Primal cache WebSocket URL, or several tried in order.
    *
    * Primal runs more than one cache host and they do not fail together —
-   * `cache2` refusing connections while `cache1` served normally is what
-   * prompted this. A list is exhausted before the caller sees an error, so the
-   * facade only falls through to the raw-relay floor when NO cache answered,
-   * rather than when the first one happened to be down.
+   * `cache2.primal.net` serving an EXPIRED TLS CERTIFICATE while `cache1`
+   * answered normally is what prompted this. That failure mode matters: it is
+   * not a refused connection that a health check trivially spots, it is a
+   * handshake the platform rejects, and it persists for as long as nobody at
+   * Primal renews the certificate. A list is exhausted before the caller sees
+   * an error, so the facade only falls through to the raw-relay floor when NO
+   * cache answered, rather than when the first one happened to be down.
    */
   url: string | readonly string[];
   /** Inject a WebSocket constructor (tests / non-browser runtimes); defaults to global. */

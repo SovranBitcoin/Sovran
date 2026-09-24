@@ -105,28 +105,34 @@ export function SettingsNetworkScreen() {
   const [addError, setAddError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [publishMsg, setPublishMsg] = useState<string | null>(null);
-  const [successColor, accentColor, mutedColor, dangerColor] = useThemeColor([
+  const [successColor, mutedColor, dangerColor] = useThemeColor([
     'success',
-    'accent',
     'muted',
     'danger',
   ] as const);
 
+  // Two colours only: green carries, red does not. A relay that is merely
+  // `disconnected` was amber-grey before, which read as a third, milder state
+  // and hid exactly the thing this list exists to show. Grey is kept for the
+  // one case that is genuinely neither — the ~1s before the first probe
+  // answers.
   const healthColor: Record<RelayHealth, string> = {
     connected: successColor,
-    connecting: accentColor,
-    disconnected: mutedColor,
+    connecting: mutedColor,
+    disconnected: dangerColor,
     failed: dangerColor,
   };
 
   // Cache hosts get the same dot vocabulary as relays, so "which one is down"
   // reads the same way in both lists. The tier badge above only says whether
   // ANY host answered — without these a dead cache hides behind a healthy one.
+  // `disabled` is red under the row's 40% opacity: the user switched it off, so
+  // it is not carrying traffic, which is the question the dot answers.
   const tierStatusColor: Record<TierStatus, string> = {
     online: successColor,
     offline: dangerColor,
-    checking: accentColor,
-    disabled: mutedColor,
+    checking: mutedColor,
+    disabled: dangerColor,
   };
 
   const tiers = [
@@ -454,11 +460,7 @@ function RelayMarkerToggle({
   value: boolean;
   onChange: (next: boolean) => void;
 }) {
-  const [accentColor, mutedColor, borderColor] = useThemeColor([
-    'accent',
-    'muted',
-    'border',
-  ] as const);
+  const [successColor, dangerColor] = useThemeColor(['success', 'danger'] as const);
   return (
     <Pressable
       testID={`settings-network-relay-${label.toLowerCase()}-${relayUrl}`}
@@ -473,10 +475,10 @@ function RelayMarkerToggle({
         paddingVertical: 3,
         borderRadius: 999,
         borderWidth: 1,
-        borderColor: value ? accentColor : borderColor,
-        backgroundColor: value ? withAlpha(accentColor, 0.16) : 'transparent',
+        borderColor: value ? successColor : dangerColor,
+        backgroundColor: withAlpha(value ? successColor : dangerColor, 0.16),
       }}>
-      <Text size={12} style={{ color: value ? accentColor : mutedColor }}>
+      <Text size={12} style={{ color: value ? successColor : dangerColor }}>
         {label}
       </Text>
     </Pressable>
