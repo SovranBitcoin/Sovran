@@ -30,7 +30,7 @@ import type {
 } from "@cashu/coco-core";
 import { getEncodedToken, operationHistoryId } from "@cashu/coco-core";
 import { emitPaymentRequestCreated } from "../paymentRequestEvents";
-import { proofsHaveP2PK } from "../p2pk";
+import { normalizeP2pkLock, proofsHaveP2PK } from "../p2pk";
 import type { MachineOperations, StepDataMap } from "../machine/types";
 import type {
   MintCatalogEntry,
@@ -688,17 +688,39 @@ export function createDefaultOperations(
   return {
     executeSend: async (mintUrl, amount, memo, options) => {
       const mgr = requireManager();
-      const p2pkLockPubkey = options?.p2pkLockPubkey;
+      const lock = normalizeP2pkLock(
+        options?.p2pkLock ?? options?.p2pkLockPubkey,
+      );
       logger.info("operations.executeSend.prepare", {
         ...mintUrlFields(mintUrl),
         amount,
-        p2pkLocked: !!p2pkLockPubkey,
+        p2pkLocked: !!lock,
+        hasLocktime: !!lock?.locktimeSec,
+        refundKeyCount: lock?.refundKeys?.length ?? 0,
       });
       const prepared = await mgr.ops.send.prepare({
         mintUrl,
         amount,
-        ...(p2pkLockPubkey
-          ? { target: { type: "p2pk" as const, pubkey: p2pkLockPubkey } }
+        // `pubkey` and `options` are mutually exclusive in coco's target
+        // type, so the terms replace the shorthand rather than joining it.
+        // n_sigs and sigflag are deliberately left unset: cashu-ts omits
+        // n_sigs at 1, and SIG_INPUTS is the NUT-11 default a plain send
+        // wants.
+        ...(lock
+          ? {
+              target: {
+                type: "p2pk" as const,
+                options: {
+                  pubkey: lock.pubkey,
+                  ...(lock.locktimeSec !== undefined
+                    ? { locktime: lock.locktimeSec }
+                    : {}),
+                  ...(lock.refundKeys?.length
+                    ? { refundKeys: lock.refundKeys }
+                    : {}),
+                },
+              },
+            }
           : {}),
       });
       logger.info("operations.executeSend.prepared", {

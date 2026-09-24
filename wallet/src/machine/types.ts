@@ -1,3 +1,4 @@
+import type { P2pkLockSpec } from "../p2pk";
 import type {
   AnnotatedOption,
   MintCandidate,
@@ -181,6 +182,8 @@ export interface StepDataMap {
       recipientProfile?: RecipientProfile;
       /** Presence-only UI evidence and route survival for locked ecash sends. */
       p2pkLockPubkey?: string;
+      /** See `FlowContext.p2pkLock` — the terms, so the screen can show them. */
+      p2pkLock?: P2pkLockSpec;
       methodContext?: AmountEntryConstraints["methodContext"];
       /** See `SendEntrySource` — how the flow was entered. */
       entrySource?: SendEntrySource;
@@ -237,6 +240,8 @@ export interface StepDataMap {
     recipientProfile?: RecipientProfile;
     /** See `FlowContext.p2pkLockPubkey` — present when the sent token is P2PK-locked. */
     p2pkLockPubkey?: string;
+    /** See `FlowContext.p2pkLock` — the terms, for the record we persist. */
+    p2pkLock?: P2pkLockSpec;
   };
   navigateToMeltPreview: {
     mintUrl: string;
@@ -380,6 +385,13 @@ export interface FlowContext {
    * bearer token.
    */
   p2pkLockPubkey?: string;
+  /**
+   * The full lock the send must apply, including a locktime and the keys that
+   * may reclaim after it. `p2pkLockPubkey` mirrors `p2pkLock.pubkey` for the
+   * many places that only ask "is this locked"; write BOTH, and only through
+   * `normalizeP2pkLock`.
+   */
+  p2pkLock?: P2pkLockSpec;
   amountEntryDisplay?: AmountEntryDisplayMetadata;
   /**
    * True after the user accepts a locally composable proof suggestion. The
@@ -565,6 +577,8 @@ export type FlowEvent =
       recipientProfile?: RecipientProfile;
       /** See `FlowContext.p2pkLockPubkey` — nearby-pay flows seed this. */
       p2pkLockPubkey?: string;
+      /** See `FlowContext.p2pkLock` — supersedes `p2pkLockPubkey` when set. */
+      p2pkLock?: P2pkLockSpec;
       /** Constrain the source mint to a set the recipient accepts (NUT-18 creq). */
       allowedMints?: string[];
       /** See `SendEntrySource` — how this flow was entered. */
@@ -918,6 +932,8 @@ export interface MachineOperations {
     options?: {
       /** See `FlowContext.p2pkLockPubkey` — lock outputs to this pubkey via a mint swap. */
       p2pkLockPubkey?: string;
+      /** See `FlowContext.p2pkLock` — the full NUT-11 terms to apply. */
+      p2pkLock?: P2pkLockSpec;
     },
   ) => Promise<{ historyEntry: string }>;
   /**
@@ -1315,6 +1331,8 @@ export interface PaymentMachine {
     recipientProfile?: RecipientProfile;
     /** See `FlowContext.p2pkLockPubkey` — P2PK-lock the sent token to this key. */
     p2pkLockPubkey?: string;
+    /** See `FlowContext.p2pkLock` — supersedes `p2pkLockPubkey` when set. */
+    p2pkLock?: P2pkLockSpec;
     /**
      * Mints the recipient accepts (e.g. from a nearby peer's creq). Binds the
      * whole flow as `FlowContext.supportedMintUrls`: the auto-pick, the mint

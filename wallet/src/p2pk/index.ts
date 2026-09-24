@@ -9,3 +9,4 @@
 
 export * from "./secret";
 export * from "./conditions";
+export * from "./lock";

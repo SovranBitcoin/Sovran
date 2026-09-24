@@ -26,6 +26,11 @@ import { setLogger } from '../../src/logger';
 
 /** 33-byte compressed pubkey: "02" + 32-byte x-only hex (Cashu↔Nostr convention). */
 const LOCK_PUBKEY = `02${'ab'.repeat(32)}`;
+/** Our own keyring key — the one a refund path would have to sign with. */
+const REFUND_PUBKEY = `02${'cd'.repeat(32)}`;
+/** A key from a wallet that does not derive from a nostr identity. */
+const ODD_PARITY_PUBKEY = `03${'ef'.repeat(32)}`;
+const LOCKTIME_SEC = 1_800_003_600;
 
 afterEach(() => setLogger(null));
 
@@ -44,7 +49,14 @@ describe('ecash send — P2PK locked', () => {
 
     tm.assertStep('sendComplete');
     const sendCall = tm.operationCalls.find((call) => call.name === 'executeSend');
-    expect(sendCall?.args).toEqual([MINT1, 100, undefined, { p2pkLockPubkey: LOCK_PUBKEY }]);
+    // The terms are what the operation acts on; the bare key rides along for
+    // the many call sites that only ask "is this locked".
+    expect(sendCall?.args).toEqual([
+      MINT1,
+      100,
+      undefined,
+      { p2pkLockPubkey: LOCK_PUBKEY, p2pkLock: { pubkey: LOCK_PUBKEY } },
+    ]);
 
     const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
     expect(lastHandler).toMatchObject({
@@ -159,7 +171,52 @@ describe('ecash send — P2PK locked', () => {
     await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     tm.assertStep('sendComplete');
     const sendCall = tm.operationCalls.find((call) => call.name === 'executeSend');
-    expect(sendCall?.args[3]).toEqual({ p2pkLockPubkey: LOCK_PUBKEY });
+    expect(sendCall?.args[3]).toEqual({
+      p2pkLockPubkey: LOCK_PUBKEY,
+      p2pkLock: { pubkey: LOCK_PUBKEY },
+    });
+  });
+
+  it('carries a locktime and a refund key through to the mint call', async () => {
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash({
+      p2pkLock: {
+        pubkey: LOCK_PUBKEY,
+        locktimeSec: LOCKTIME_SEC,
+        refundKeys: [REFUND_PUBKEY],
+      },
+    });
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
+
+    tm.assertStep('sendComplete');
+    const sendCall = tm.operationCalls.find((call) => call.name === 'executeSend');
+    expect(sendCall?.args[3]).toMatchObject({
+      p2pkLock: {
+        pubkey: LOCK_PUBKEY,
+        locktimeSec: LOCKTIME_SEC,
+        refundKeys: [REFUND_PUBKEY],
+      },
+    });
+  });
+
+  it('refuses a locktime with no way back, instead of sending it', async () => {
+    // Past that locktime the proof needs no signature at all: anyone holding
+    // the token could redeem it, while the sender was told the opposite.
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash({
+      p2pkLock: { pubkey: LOCK_PUBKEY, locktimeSec: LOCKTIME_SEC },
+    });
+    tm.assertStep('error');
+    expect(tm.operationCalls.find((call) => call.name === 'executeSend')).toBeUndefined();
+  });
+
+  it('accepts an odd-parity key from another wallet', async () => {
+    // The old guard hardcoded ^02, which would reject every key published by
+    // a wallet that does not derive from a nostr identity.
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash({ p2pkLockPubkey: ODD_PARITY_PUBKEY });
+    tm.assertStep('enterAmount');
+    tm.assertContext({ p2pkLockPubkey: ODD_PARITY_PUBKEY });
   });
 
   it('unlocked sends are unaffected: localFirst still used with exact proofs', async () => {

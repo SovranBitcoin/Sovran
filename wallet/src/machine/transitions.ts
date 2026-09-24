@@ -385,6 +385,7 @@ function handleAmountEntered(
           recipientPubkey: currentCtx.recipientPubkey,
           recipientProfile: currentCtx.recipientProfile,
           p2pkLockPubkey: currentCtx.p2pkLockPubkey,
+          ...(currentCtx.p2pkLock ? { p2pkLock: currentCtx.p2pkLock } : {}),
           methodContext: createAmountEntryMethodContext(walletCtx),
           ...(currentCtx.entrySource
             ? { entrySource: currentCtx.entrySource }
@@ -671,7 +672,7 @@ export function transition(
         hasMeltTarget: !!event.meltTarget,
         recipientPubkeyPresent: !!event.recipientPubkey,
         recipientProfilePresent: !!event.recipientProfile,
-        p2pkLockPubkeyPresent: !!event.p2pkLockPubkey,
+        p2pkLockPubkeyPresent: !!(event.p2pkLock ?? event.p2pkLockPubkey),
       });
       return stamp(
         startSendEcashFlow(walletCtx, unit, {
@@ -683,6 +684,7 @@ export function transition(
           ...(event.recipientProfile
             ? { recipientProfile: event.recipientProfile }
             : {}),
+          ...(event.p2pkLock ? { p2pkLock: event.p2pkLock } : {}),
           ...(event.p2pkLockPubkey
             ? { p2pkLockPubkey: event.p2pkLockPubkey }
             : {}),

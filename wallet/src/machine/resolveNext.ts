@@ -1,5 +1,6 @@
 import type { LocalizedReason } from "../formatting/locales";
 import { logger } from "../logger";
+import { isLockedSend } from "../p2pk";
 import {
   buildMethodAwareMintCandidates,
   createAmountEntryMethodContext,
@@ -66,8 +67,8 @@ function summarizeContext(ctx: FlowContext): Record<string, unknown> {
     hasRecipientPubkey: !!ctx.recipientPubkey,
     recipientPubkeyLength: ctx.recipientPubkey?.length ?? 0,
     hasRecipientProfile: !!ctx.recipientProfile,
-    hasP2pkLockPubkey: !!ctx.p2pkLockPubkey,
-    p2pkLockPubkeyLength: ctx.p2pkLockPubkey?.length ?? 0,
+    hasP2pkLockPubkey: isLockedSend(ctx),
+    hasLocktime: !!ctx.p2pkLock?.locktimeSec,
     localProofSend: !!ctx.localProofSend,
     sendMemoHandled: !!ctx.sendMemoHandled,
     mintUnreachableConfirmed: !!ctx.mintUnreachableConfirmed,
@@ -291,14 +292,14 @@ function checkProofComposition(
   }
 
   // Locked sends never use local proofs — a P2PK lock requires a mint swap.
-  if (ctx.p2pkLockPubkey) {
+  if (isLockedSend(ctx)) {
     logger.info("resolveNext.proofComposition.skipped", {
       reason: "p2pk-lock-requires-mint-swap",
       amount,
       unit,
       hasMintUrl: !!mintUrl,
       mintUrlLength: mintUrl.length,
-      p2pkLockPubkeyLength: ctx.p2pkLockPubkey.length,
+      hasLocktime: !!ctx.p2pkLock?.locktimeSec,
     });
     return null;
   }
@@ -678,6 +679,7 @@ export function resolveNext(
             recipientPubkey: ctx.recipientPubkey,
             recipientProfile: ctx.recipientProfile,
             p2pkLockPubkey: ctx.p2pkLockPubkey,
+            ...(ctx.p2pkLock ? { p2pkLock: ctx.p2pkLock } : {}),
           },
         },
         contextPatch: { destination },
