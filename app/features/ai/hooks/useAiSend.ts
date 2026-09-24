@@ -391,6 +391,15 @@ export function useAiSend() {
                 }
               }
               if (declinedAttempts >= MAX_DECLINED_ATTEMPTS || next >= candidateChain.length) {
+                // Every candidate we were willing to try refused. A 402 is not
+                // an `isRoutstrNodeFailure`, so nothing else on this path ever
+                // re-asks nagg — and a node whose upstream credit has run out
+                // serves a perfect catalog forever, so the foreground refresh's
+                // 24-hour freshness rule keeps the app pinned to it. Ask once
+                // (throttled to 5 minutes) so the NEXT send can land on a node
+                // nagg has since repointed to. Not retried here: a repoint also
+                // invalidates the key, so this send is over either way.
+                void refreshRoutstrLineup('failure');
                 throw err;
               }
               aiLog.warn('ai.send.provider_declined', {

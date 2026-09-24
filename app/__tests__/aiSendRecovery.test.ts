@@ -220,7 +220,10 @@ describe('AI send lineup recovery', () => {
     sendMock.mockRejectedValue(failure(402, 'Payment Required'));
     await send();
     expect(sendMock).toHaveBeenCalledTimes(3);
-    expect(refreshMock).not.toHaveBeenCalled();
+    // Once the walk is exhausted, re-ask nagg: a 402 is not a node failure, so
+    // nothing else would, and a node with a dead upstream serves a healthy
+    // catalog indefinitely.
+    expect(refreshMock).toHaveBeenCalledWith('failure');
   });
 
   it('stops on an unchanged failed node and removes the assistant placeholder', async () => {
