@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRoutstrStore, type ChatAttachment } from '@/shared/stores/profile/routstrStore';
-import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
+import { useBalanceContext } from '@cashu/coco-react';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import {
   sendMessage,
   isModelRejectedError,
   isRoutstrNodeFailure,
   isWalletBalanceError,
-  checkBalance,
   measureMessageContent,
   ROUTSTR_MAX_COMPLETION_TOKENS,
   type RoutstrChatMessage,
@@ -100,7 +99,8 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
  *   - Refresh the lineup on connect-time node/model failures, retrying
  *     once with the refreshed Auto entry. Never replay a started stream.
  *   - Snapshot balance before send, compute `costSats` from the post-stream
- *     `checkBalance()` diff, and stamp it on the message asynchronously.
+ *     exact spent-minus-change figure the send returns, and stamp it on
+ *     the message.
  *   - Cashu-token-redeem flow is intentionally out of scope (still lives in
  *     `UserMessagesScreen`).
  */
@@ -110,7 +110,6 @@ export function useAiSend() {
     streamingMessageId: null,
   });
 
-  const apiKey = useRoutstrStore((s) => s.apiKey);
   const isAnonymous = useRoutstrStore((s) => s.isAnonymousMode);
   const currentSessionId = useRoutstrStore((s) => s.currentSessionId);
   const createSession = useRoutstrStore((s) => s.createSession);
@@ -119,20 +118,20 @@ export function useAiSend() {
   const removeMessages = useRoutstrStore((s) => s.removeMessages);
   const finalizeAssistantMessage = useRoutstrStore((s) => s.finalizeAssistantMessage);
   const setActiveBranch = useRoutstrStore((s) => s.setActiveBranch);
-  const setBalance = useRoutstrStore((s) => s.setBalance);
   const setSelectedSlot = useRoutstrStore((s) => s.setSelectedSlot);
   const updateCurrentSessionTitle = useRoutstrStore((s) => s.updateCurrentSessionTitle);
 
-  const { keys: nostrKeys } = useNostrKeysContext();
-
-  // Stream + balance lifecycle. Each `streamIntoPlaceholder` aborts the
-  // prior stream (so backgrounding mid-stream stops billing) and awaits
-  // the prior balance promise so the new flow's `balanceBeforeMsats`
-  // snapshot is fresh — without that wait, a retry-during-balance-refresh
-  // captures the same pre-send balance as the first call and double-counts
-  // the cost diff.
+  // Each `streamIntoPlaceholder` aborts the prior stream, so backgrounding
+  // mid-stream stops billing. There is no longer a balance promise to wait on:
+  // the cost of a request is returned by the request itself.
   const streamControllerRef = useRef<AbortController | null>(null);
-  const balancePromiseRef = useRef<Promise<unknown> | null>(null);
+
+  // The balance every gate and estimate prices against is the WALLET's, read
+  // exactly as the header reads it. There is no separate AI balance any more,
+  // so there is nothing that can disagree with it or go stale.
+  const { balances: liveBalances } = useBalanceContext();
+  const selectedMint = useMintStore((s) => s.selectedMint);
+  const walletSats = selectedMint ? amountToNumber(liveBalances.byMint[selectedMint]?.total) : 0;
 
   useEffect(
     () => () => {
@@ -141,27 +140,21 @@ export function useAiSend() {
     []
   );
 
-  const navigateToTopUp = useCallback(
-    (pendingMessage: string) => {
-      if (!nostrKeys?.pubkey) {
-        staticPopup('no-wallet-available');
-        return;
-      }
-      useRoutstrTopUpStore.getState().start(pendingMessage);
-      const preferredMint = useMintStore.getState().selectedMint ?? '';
-      router.navigate({
-        pathname: '/(send-flow)/amount',
-        params: {
-          amountEntry: JSON.stringify({
-            destination: 'sendEcash',
-            unit: 'sat',
-            selectedMintUrl: preferredMint,
-          }),
-        },
-      });
-    },
-    [nostrKeys?.pubkey]
-  );
+  // Funding is the wallet's job now: there is no Routstr account to top up,
+  // so this goes to the wallet's own receive flow rather than the send flow
+  // that used to mint a deposit token for a node.
+  const navigateToAddFunds = useCallback(() => {
+    router.navigate({
+      pathname: '/(receive-flow)/amount',
+      params: {
+        amountEntry: JSON.stringify({
+          destination: 'mintQuote',
+          unit: 'sat',
+          selectedMintUrl: useMintStore.getState().selectedMint ?? '',
+        }),
+      },
+    });
+  }, []);
 
   /**
    * Drives a single placeholder assistant message to completion: walks the
@@ -178,19 +171,13 @@ export function useAiSend() {
       imageCount: number;
       flowId: string;
       retriedFromMessageId?: string;
-      pendingUserMessageForTopUp: string;
     }) => {
-      const { assistantMessageId, flowId, pendingUserMessageForTopUp } = params;
+      const { assistantMessageId, flowId } = params;
       let { apiMessages, imageCount } = params;
-      if (!apiKey) {
-        staticPopup('no-api-key');
-        return;
-      }
 
       const profile = useProfileStore.getState().activeAccountIndex;
       const storeState = useRoutstrStore.getState();
-      const balanceBeforeMsats = storeState.balance ?? 0;
-      const balanceSats = Math.floor(balanceBeforeMsats / 1000);
+      const balanceSats = walletSats;
       const tier = getTierById(storeState.selectedTier);
       const provider = getProviderById(storeState.selectedProvider);
       const cachedModels = storeState.modelsCache?.data ?? [];
@@ -211,12 +198,7 @@ export function useAiSend() {
         return;
       }
 
-      // Abort any prior in-flight stream and wait for its balance refresh
-      // to settle so this flow's snapshot reflects the prior call's debit.
       streamControllerRef.current?.abort();
-      if (balancePromiseRef.current) {
-        await balancePromiseRef.current.catch(() => {});
-      }
       const controller = new AbortController();
       streamControllerRef.current = controller;
 
@@ -306,7 +288,6 @@ export function useAiSend() {
         });
         aiLog.info('ai.send.affordability_check', {
           flowId,
-          balanceMsats: balanceBeforeMsats,
           balanceSats,
           selectedTier: tier.id,
           selectedProvider: provider.id,
@@ -321,6 +302,7 @@ export function useAiSend() {
         });
 
         let stream: AsyncIterable<any> | undefined;
+        let costSats: number | undefined;
         let lastConnectErr: unknown = null;
         let recoveryRetried = false;
         let declinedAttempts = 0;
@@ -363,6 +345,7 @@ export function useAiSend() {
               signal: controller.signal,
             });
             stream = result.stream;
+            costSats = result.costSats;
             modelToUse = candidate;
             if (i > 0) {
               aiLog.warn('ai.send.fallback_used', {
@@ -618,82 +601,42 @@ export function useAiSend() {
 
         if (!isAnonymous) updateCurrentSessionTitle();
 
-        // Balance refresh runs detached. We use the diff (before − after) to
-        // stamp `costSats` on the just-finalised message — works for both
-        // the initial send and retries because each retry has its own
-        // pre-call balance snapshot.
-        const balanceStart = performance.now();
+        // The cost is exact and already known: `sendMessage` returns what the
+        // node actually took (the token we minted minus the change it handed
+        // back). It replaces a `checkBalance` diff that only worked while a
+        // balance lived on the node, that a concurrent write could corrupt,
+        // and that a node change made meaningless.
+        if (finalizePayload && costSats != null) {
+          finalizeAssistantMessage(assistantMessageId, {
+            ...finalizePayload,
+            thinkingDurationSec: thinkingSec,
+            costSats,
+          });
+        }
         // Snapshot what the affordability gate predicted for the model we
-        // actually used, so the post-stream log can quote both numbers.
+        // actually used, so this log can quote both numbers.
         const predicted = getAffordabilityDetails(modelToUse, balanceSats, cachedModels);
         const usedModelCatalogEntry = cachedModels.find((m) => m.id === modelToUse) ?? null;
-        // Track this flow's balance promise so the next streamIntoPlaceholder
-        // call awaits it before snapshotting balanceBeforeMsats — without that
-        // a retry tap during balance refresh re-uses the stale store balance
-        // and double-counts the cost diff.
-        const balanceKey = useRoutstrStore.getState().apiKey;
-        if (!balanceKey) return;
-        const balancePromise = checkBalance(balanceKey, { signal: controller.signal })
-          .then((data) => {
-            if (useProfileStore.getState().activeAccountIndex !== profile) return;
-            if (controller.signal.aborted) return;
-            setBalance(data.balance);
-            const costMsats = balanceBeforeMsats - data.balance;
-            const costSats = costMsats > 0 ? Math.ceil(costMsats / 1000) : undefined;
-            if (costSats != null && finalizePayload) {
-              finalizeAssistantMessage(assistantMessageId, {
-                ...finalizePayload,
-                thinkingDurationSec: thinkingSec,
-                costSats,
-              });
-            }
-            aiLog.info('ai.balance.refresh', {
-              flowId,
-              duration_ms: r2(performance.now() - balanceStart),
-              balance_msats: data.balance,
-              balance_sats: Math.floor(data.balance / 1000),
-              costSats: costSats ?? null,
-            });
-            // Predicted-vs-actual reconciliation. This is the log that
-            // proves the "Top up X sats" indicator is over-conservative
-            // when actual cost is much lower than the buffered threshold.
-            const predictedCeilingSats = predicted.bufferedThresholdSats;
-            const ratio =
-              predictedCeilingSats != null && costSats != null && costSats > 0
-                ? r2(predictedCeilingSats / costSats)
-                : null;
-            aiLog.info('ai.send.actual_cost', {
-              flowId,
-              modelUsed: modelToUse,
-              tier: tier.id,
-              provider: provider.id,
-              actualCostMsats: costMsats,
-              actualCostSats: costSats ?? 0,
-              // New realistic estimate (what `canAffordModel` now gates on).
-              predicted_estimated_turn_sats: predicted.estimatedTurnCostSats,
-              // Raw catalog ceiling, kept so we can keep watching the
-              // estimate-vs-worst-case spread over time.
-              predicted_max_cost_sats: predicted.maxCostSats,
-              predicted_buffered_threshold_sats: predictedCeilingSats,
-              predicted_affordable: predicted.affordable,
-              predicted_deficit_sats: predicted.deficitSats,
-              balance_before_msats: balanceBeforeMsats,
-              balance_before_sats: Math.floor(balanceBeforeMsats / 1000),
-              balance_after_msats: data.balance,
-              balance_after_sats: Math.floor(data.balance / 1000),
-              // ratio = how many times larger the buffered threshold is
-              // than reality. We want this near 1; the previous max_cost
-              // gate was producing 100× ratios for chat turns.
-              predicted_to_actual_ratio: ratio,
-              catalog_sats_pricing: usedModelCatalogEntry?.sats_pricing ?? null,
-              catalog_context_length: usedModelCatalogEntry?.context_length ?? null,
-            });
-          })
-          .catch((err) => {
-            if (isAbortError(err)) return;
-            aiLog.warn('ai.send.balance_refresh_failed', { flowId });
-          });
-        balancePromiseRef.current = balancePromise;
+        const predictedCeilingSats = predicted.bufferedThresholdSats;
+        aiLog.info('ai.send.actual_cost', {
+          flowId,
+          modelUsed: modelToUse,
+          tier: tier.id,
+          provider: provider.id,
+          actualCostSats: costSats ?? 0,
+          predicted_estimated_turn_sats: predicted.estimatedTurnCostSats,
+          predicted_max_cost_sats: predicted.maxCostSats,
+          predicted_buffered_threshold_sats: predictedCeilingSats,
+          // ratio = how many times larger the gate is than reality. Now that
+          // the gate is what we actually LOCK for the request, a large ratio
+          // is money held needlessly, not just a pessimistic label.
+          predicted_to_actual_ratio:
+            predictedCeilingSats != null && costSats != null && costSats > 0
+              ? r2(predictedCeilingSats / costSats)
+              : null,
+          catalog_sats_pricing: usedModelCatalogEntry?.sats_pricing ?? null,
+          catalog_context_length: usedModelCatalogEntry?.context_length ?? null,
+        });
 
         span.end({ outcome: 'ok', chunks: chunkCount, chars: fullContent.length });
       } catch (err: any) {
@@ -713,29 +656,6 @@ export function useAiSend() {
         // Drop the placeholder on failure so the chat list doesn't show an
         // empty bubble. The active path re-derives to the previous leaf.
         removeMessages(new Set([assistantMessageId]));
-
-        if ((err as { status?: number })?.status === 402) {
-          // The post-stream balance diff only runs on a SUCCESSFUL stream, and
-          // the 402 balance sync needs a parseable `available` the node does
-          // not always send. Without this the store keeps the figure it had
-          // when the send started, the chip keeps calling the model affordable,
-          // and the popup recurs on every message. Re-read the authoritative
-          // balance so the pill, the picker fades and the estimates agree with
-          // the node the moment it disagrees with us.
-          const balanceKey = useRoutstrStore.getState().apiKey;
-          if (balanceKey) {
-            void checkBalance(balanceKey)
-              .then((data) => {
-                if (useProfileStore.getState().activeAccountIndex !== profile) return;
-                if (useRoutstrStore.getState().apiKey !== balanceKey) return;
-                setBalance(data.balance);
-              })
-              .catch(() => {
-                // Offline keeps the last-known balance, same policy as the
-                // chip's mount self-heal.
-              });
-          }
-        }
 
         // A 402 is only OUR problem when routstr raised it about this key's
         // balance. The node forwards an upstream provider's error body verbatim
@@ -758,8 +678,8 @@ export function useAiSend() {
               : null;
           const detail =
             requiredSats != null && availableSats != null
-              ? `${friendlyName} needs ${requiredSats} sats reserved; you have ${availableSats}. Top up at least ${shortfallSats} sats.`
-              : `${friendlyName} costs more than your current balance.`;
+              ? `${friendlyName} reserves ${requiredSats} sats per request; ${availableSats} available. Add at least ${shortfallSats} sats.`
+              : `${friendlyName} reserves more per request than your wallet holds.`;
           actionMenuPopup({
             title: 'Insufficient balance',
             buttons: [
@@ -783,11 +703,11 @@ export function useAiSend() {
               },
               {
                 testID: 'ai-insufficient-balance-topup',
-                text: 'Top up',
+                text: 'Add funds',
                 icon: 'fluent:wallet-20-filled',
                 onPress: (close) => {
                   close();
-                  navigateToTopUp(pendingUserMessageForTopUp);
+                  navigateToAddFunds();
                 },
               },
             ],
@@ -801,14 +721,12 @@ export function useAiSend() {
       }
     },
     [
-      apiKey,
       isAnonymous,
       removeMessages,
       finalizeAssistantMessage,
-      setBalance,
       setSelectedSlot,
       updateCurrentSessionTitle,
-      navigateToTopUp,
+      navigateToAddFunds,
     ]
   );
 
@@ -816,11 +734,6 @@ export function useAiSend() {
     async (userMessage: string, attachments?: ChatAttachment[]) => {
       const trimmed = userMessage.trim();
       if (!trimmed) return;
-
-      if (!apiKey) {
-        staticPopup('no-api-key');
-        return;
-      }
 
       if (!isAnonymous && !currentSessionId) {
         createSession();
@@ -876,7 +789,6 @@ export function useAiSend() {
           apiMessages,
           imageCount,
           flowId,
-          pendingUserMessageForTopUp: trimmed,
         });
       } finally {
         // The user message's optimistic spinner clears the moment the
@@ -887,7 +799,6 @@ export function useAiSend() {
       }
     },
     [
-      apiKey,
       isAnonymous,
       currentSessionId,
       createSession,
@@ -913,10 +824,6 @@ export function useAiSend() {
    */
   const retryInner = useCallback(
     async (messageId: string) => {
-      if (!apiKey) {
-        staticPopup('no-api-key');
-        return;
-      }
       const stateNow = useRoutstrStore.getState();
       const original = stateNow.conversationHistory.find((m) => m.id === messageId);
       if (!original || original.role !== 'assistant') {
@@ -957,20 +864,15 @@ export function useAiSend() {
         setActiveBranch(parentId, newAssistantId);
       }
 
-      // The user message that prompted this exchange — used as the "pending
-      // message" if the retry hits a 402 and we need to surface a top-up.
-      const lastUserContent = ancestors.filter((m) => m.role === 'user').pop()?.content ?? '';
-
       await streamIntoPlaceholder({
         assistantMessageId: newAssistantId,
         apiMessages,
         imageCount,
         flowId,
         retriedFromMessageId: messageId,
-        pendingUserMessageForTopUp: lastUserContent,
       });
     },
-    [apiKey, addMessage, setActiveBranch, streamIntoPlaceholder]
+    [addMessage, setActiveBranch, streamIntoPlaceholder]
   );
 
   // Retry shares the double-tap exposure with `send`: a rapid tap on the

@@ -25,7 +25,14 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
 jest.mock('@/shared/stores/runtime/routstrTopUpStore', () => ({
   useRoutstrTopUpStore: { getState: jest.fn() },
 }));
-jest.mock('@/shared/stores/profile/mintStore', () => ({ useMintStore: { getState: jest.fn() } }));
+jest.mock('@/shared/stores/profile/mintStore', () => {
+  const useMintStore = Object.assign(
+    (selector: (s: { selectedMint: string }) => unknown) =>
+      selector({ selectedMint: 'https://mint.example' }),
+    { getState: () => ({ selectedMint: 'https://mint.example' }) }
+  );
+  return { useMintStore };
+});
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
   useNostrKeysContext: () => ({ keys: null }),
 }));
@@ -61,6 +68,14 @@ jest.mock('@/shared/lib/routstr/payment', () => ({
   reclaimUnspentPayment: jest.fn(async () => undefined),
 }));
 
+jest.mock('@cashu/coco-react', () => ({
+  // The gate prices against the wallet now; a funded mint keeps the
+  // affordability snapshot realistic without booting a wallet.
+  useBalanceContext: () => ({
+    balances: { byMint: { 'https://mint.example': { total: 100_000 } } },
+  }),
+}));
+
 const entry = (modelId: string, upstreamId?: string): LineupEntry => ({
   modelId,
   ...(upstreamId != null ? { upstreamId } : {}),
@@ -86,7 +101,8 @@ const walletBalanceFailure = () => ({
     details: { required: 85577, available: 216 },
   },
 });
-const success = () => ({
+const success = (costSats = 3) => ({
+  costSats,
   stream: (async function* () {
     yield { choices: [{ delta: { content: 'reply' } }] };
   })(),
@@ -269,6 +285,7 @@ describe('AI send lineup recovery', () => {
 
   it('never retries after a stream has started', async () => {
     sendMock.mockResolvedValueOnce({
+      costSats: 3,
       stream: (async function* () {
         yield { choices: [{ delta: { content: 'partial' } }] };
         throw new Error('disconnected');

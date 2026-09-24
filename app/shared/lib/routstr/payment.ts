@@ -1,4 +1,4 @@
-import { getEncodedToken } from '@cashu/cashu-ts';
+import { getEncodedToken, getTokenMetadata } from '@cashu/cashu-ts';
 
 import { apiLog } from '@/shared/lib/logger';
 
@@ -72,19 +72,36 @@ export async function mintRequestPayment(amountSats: number): Promise<RequestPay
   };
 }
 
+/** Face value of an encoded token, in sats. Reading it from the proofs rather
+ *  than from the receive result means the figure is known even if banking it
+ *  has to be retried. */
+function tokenValueSats(encoded: string): number {
+  try {
+    return getTokenMetadata(encoded).amount.toNumber();
+  } catch {
+    return 0;
+  }
+}
+
 /**
- * Put the node's change back in the wallet.
+ * Put the node's change back in the wallet, and report what it was worth.
  *
  * Routstr returns change on error responses too, so this runs on the failure
  * path as well — a refused request that still handed money back must not leave
  * it on the floor.
+ *
+ * The returned figure is what makes a request's cost EXACT: spent minus
+ * returned is what the node actually took, with no estimate and no balance
+ * diff that a concurrent write could corrupt.
  */
-export async function receiveChange(encoded: string): Promise<void> {
+export async function receiveChange(encoded: string): Promise<number> {
   const manager = wallet();
   if (!manager) throw new Error('wallet is not ready');
+  const sats = tokenValueSats(encoded);
   const prepared = await manager.ops.receive.prepare({ token: encoded });
   await manager.ops.receive.execute(prepared);
-  apiLog.info('routstr.payment.change_received');
+  apiLog.info('routstr.payment.change_received', { sats });
+  return sats;
 }
 
 /**

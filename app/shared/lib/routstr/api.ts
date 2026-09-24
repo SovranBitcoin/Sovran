@@ -900,7 +900,7 @@ export async function sendMessage(
     max_tokens?: number;
     signal?: AbortSignal;
   }
-): Promise<{ stream: AsyncIterable<ChatCompletionChunk> }> {
+): Promise<{ stream: AsyncIterable<ChatCompletionChunk>; costSats: number }> {
   const { model, paymentSats, temperature = 0.7, max_tokens, signal } = options;
   const { textChars, imageParts } = measureMessageContent(messages);
   apiLog.info('api.routstr.chat.start', {
@@ -917,6 +917,11 @@ export async function sendMessage(
 
   const payment = await mintRequestPayment(paymentSats);
   let settled = false;
+  // Spent minus returned is what the node actually took. Exact, local, and
+  // known before the first chunk — the change header is set before the body
+  // streams. It replaces a balance diff that a concurrent write could corrupt
+  // and that a node change made meaningless.
+  let costSats = paymentSats;
 
   try {
     const authHeaders: Record<string, string> = { 'X-Cashu': payment.encoded };
@@ -986,7 +991,7 @@ export async function sendMessage(
     if (change) {
       settled = true;
       if (!ownsScope()) apiLog.warn('routstr.payment.change_out_of_scope');
-      await receiveChange(change);
+      costSats = Math.max(0, paymentSats - (await receiveChange(change)));
     }
     const requestId = response.headers.get('x-routstr-request-id') || undefined;
     apiLog.debug('api.routstr.chat.response_received', {
@@ -1013,7 +1018,8 @@ export async function sendMessage(
       sealed: sealedTransport,
       ttfb_ms: Math.round(performance.now() - start),
     });
-    return { stream: parseSSEStream(decrypted) };
+    apiLog.info('routstr.payment.settled', { model, paymentSats, costSats });
+    return { stream: parseSSEStream(decrypted), costSats };
   } catch (error: unknown) {
     // No change header and no stream means the node never took the money —
     // a transport failure, or a refusal before redemption. Put it back. If it
