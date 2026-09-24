@@ -1,4 +1,6 @@
 import { actionMenuPopup, paramPopup } from '@/shared/lib/popup';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { buildProviderInfoHref } from '@/shared/lib/nav/providerInfoRoutes';
 import { aiLog } from '@/shared/lib/logger';
 import {
   fetchProviderDirectory,
@@ -73,5 +75,18 @@ export async function openProviderPicker(): Promise<void> {
         },
       })),
     ],
+    footerButtons: active
+      ? [
+          {
+            text: 'Provider details',
+            icon: 'mdi:information',
+            testID: 'ai-provider-details',
+            onPress: (close: () => void) => {
+              close();
+              router.navigate(buildProviderInfoHref(active, { seedName: known.get(active)?.name }));
+            },
+          },
+        ]
+      : [],
   });
 }

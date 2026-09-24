@@ -89,3 +89,59 @@ export async function fetchProviderDirectory(
     return [];
   }
 }
+
+const NodeInfoSpine = z.looseObject({
+  name: z.string().max(200).optional(),
+  description: z.string().max(2000).optional(),
+  version: z.string().max(64).optional(),
+  npub: z.string().max(128).optional(),
+  mints: z.array(z.string().max(512)).max(32).optional(),
+  onion_url: z.string().max(512).nullable().optional(),
+});
+
+export interface NodeInfo {
+  name?: string;
+  description?: string;
+  version?: string;
+  npub?: string;
+  /** Mints this node will redeem a payment token from. A token minted anywhere
+   *  else is refused, so this is the one field that decides whether the user
+   *  can pay this provider at all. */
+  mints: string[];
+  onionUrl?: string;
+}
+
+/**
+ * A node's own description of itself.
+ *
+ * Unauthenticated and cheap. Older nodes do not serve it — routstr-core's own
+ * discovery falls back to `/v1/models` and then `/` — so a `null` here means
+ * "this node does not say", not "this node is broken".
+ */
+export async function fetchNodeInfo(
+  nodeBaseUrl: string,
+  controls: RequestControls = {}
+): Promise<NodeInfo | null> {
+  try {
+    // An arbitrary node base, not the configured one, and the payload is the
+    // node's own free-form description rather than an envelope.
+    // eslint-disable-next-line no-restricted-globals -- see the note above
+    const response = await fetch(`${normalizeNodeUrl(nodeBaseUrl)}/v1/info`, {
+      signal: buildAbortSignal({ timeoutMs: 20_000, ...controls }),
+    });
+    if (!response.ok) return null;
+    const parsed = NodeInfoSpine.safeParse(await response.json());
+    if (!parsed.success) return null;
+    const info = parsed.data;
+    return {
+      name: info.name?.trim() || undefined,
+      description: info.description?.trim() || undefined,
+      version: info.version,
+      npub: info.npub,
+      mints: info.mints ?? [],
+      onionUrl: info.onion_url ?? undefined,
+    };
+  } catch {
+    return null;
+  }
+}

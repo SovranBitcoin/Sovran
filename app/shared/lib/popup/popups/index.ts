@@ -267,6 +267,16 @@ const STATIC_POPUPS = {
   },
 
   // routstr
+  'routstr-reclaim-done': {
+    message: 'Balance returned to your wallet',
+    icon: 'icon:fluent:wallet-20-filled',
+    type: 'success',
+  },
+  'routstr-reclaim-empty': {
+    message: 'Nothing left to reclaim',
+    icon: 'icon:fluent:wallet-20-filled',
+    type: 'info',
+  },
   'routstr-transaction-failed': {
     message: 'AI transaction failed',
     icon: 'icon:mdi:alert-circle',

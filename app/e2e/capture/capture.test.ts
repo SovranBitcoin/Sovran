@@ -162,7 +162,7 @@ async function evidence(scenarioId = 'settings.routing.navigate') {
 
 describe('capture inventory', () => {
   it('keeps every canonical native baseline, plus explicit press variants', () => {
-    expect(CANONICAL_PAGES.length).toBe(102);
+    expect(CANONICAL_PAGES.length).toBe(103);
     expect(plan.baselineDenominator).toBe(CANONICAL_PAGES.length * 2);
     expect(plan.targets.filter((t) => t.baseline)).toHaveLength(CANONICAL_PAGES.length * 2);
     for (const platform of ['ios', 'android'])
