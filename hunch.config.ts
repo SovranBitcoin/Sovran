@@ -79,12 +79,8 @@ export default defineConfig({
     // nip17 + nip59: the DM envelope, thread history and the NUT-18 nostr
     //   transport unwrap gift wraps and seals themselves.
     //   `seal-pubkey-matches-rumor` is the impersonation check.
-    //   `room-identity` is left out until group DMs exist, the same way
-    //   `bip321/pop` is: every NIP-17 wrap this app builds carries exactly one
-    //   `p` tag (`nip17.ts:131,196`), so keying a conversation on the
-    //   counterparty *is* keying it on the participant set. Group chat is
-    //   Whitenoise/MLS, a different protocol. It flagged 7 DM stores and hooks
-    //   on the 2026-09-23 sweep, all false. Re-select it with group DMs.
+    //   Incoming recipients can include a group even without a group composer;
+    //   one-recipient outgoing wraps do not justify merging those rooms.
     // nip60 + nip61: the Cashu wallet and nutzap kinds are this app's own
     //   integration of the two protocols, not something coco or nostr-tools
     //   decides — which mint, which lock key, what stays unencrypted.
@@ -118,6 +114,7 @@ export default defineConfig({
       "nip04/leaks-metadata",
       "nip06/derivation-path",
       "nip17/seal-pubkey-matches-rumor",
+      "nip17/room-identity",
       "nip17/chat-content-plain-text",
       "nip17/subject-latest-wins",
       "nip17/publish-to-recipient-dm-relays",
@@ -354,20 +351,15 @@ export default defineConfig({
     // rewording either way, so the next `install` does not recompile this.
     "agents-md/root/app-alias-imports": "off",
 
-    // ── Compiled convention rules switched off ────────────────────────────
-    // `inline-slot-components` asks whether a list slot gets an inline function
-    // that closes over changing props. True in general; moot here. React
-    // Compiler is on, and a bailout is itself gated by the ratcheted
-    // `react-compiler-bailouts.json` (33 known, a new one fails
-    // `check:react-compiler`). All four files it flagged on the 2026-09-23
-    // sweep — NotificationsScreen, NotificationFollowersScreen,
-    // MintChangesList, SearchResultRows — have zero entries in that baseline,
-    // so the compiler memoizes exactly the closures the rule is worried about.
-    //
-    // Same reasoning as `skill/expo-animation/gesture-memoized` above. Two of
-    // the three slots it flagged on NotificationsScreen were element props, not
-    // functions, which the rule does not distinguish either.
-    "doc/docs/review/conventions-react-native/inline-slot-components": "off",
+    "ui/modal-menu-layering": ["warn", choice({
+      instructions: "Does an action opened from a native modal or Expo modal route render its menu in a host below that modal, making the action obscured or unreachable? Trace the opener's presentation and the menu host's native window together on the affected platform. A root menu host without full-window overlay support cannot present above an iOS native modal; use a modal-safe sheet lane or a host inside the active modal. A component name or the word modal alone is not evidence. Android and iOS must be judged separately.",
+      criteria: { concern: "The changed opener and host demonstrably put the requested menu below the active native modal.", ...outcomes },
+      files: ["**/*.{ts,tsx,js,jsx}"],
+      report: ["concern"],
+      abstain: ["insufficient-context"],
+      reference: "docs/review/modal-menu-contract.md",
+      message: "An action menu may be obscured by the native modal that opened it.",
+    })],
 
     "ui/header-continuity": ["warn", choice({
       instructions: "Does this change visibly break the shared header contract: a page identity is duplicated or lost during its scroll handoff, header actions or content are obscured by incorrect inset ownership, a section selector becomes unreachable while scrolling its content, a fixed inset around a scrolling viewport prevents content from ever entering its gradient header, an opaque strip defeats the combined header/tab gradient, or identity handoff activates before the measured identity section clears navigation? Judge the visible layout and scroll ownership together, on iOS and Android; an isolated use of a header API without evidence of a broken behavior is unrelated.",

@@ -5578,7 +5578,7 @@
       "id": "pack/bips-spec",
       "spec": "bips-spec",
       "origin": "Kelbie/hunch/bips-spec",
-      "commit": "af7332631238c4312d58abb9726ff56a4b9a960c",
+      "commit": "c2c680ed2c12c42c8a1b668a4b0b0858c5f463a6",
       "path": "rules/bips-spec.json",
       "hash": "04fe5cae10cdd2e34bb4d74b035eb4cf3c6754f455d8e71bcbd400ea1a0eef4d",
       "select": [
@@ -6102,7 +6102,7 @@
       "id": "pack/nips-spec",
       "spec": "nips-spec",
       "origin": "Kelbie/hunch/nips-spec",
-      "commit": "af7332631238c4312d58abb9726ff56a4b9a960c",
+      "commit": "c2c680ed2c12c42c8a1b668a4b0b0858c5f463a6",
       "path": "rules/nips-spec.json",
       "hash": "9659579ae794198082bc3037531841a27c90a3075d2c2eaa8da2e9331818e7e9",
       "select": [
@@ -6126,6 +6126,7 @@
         "nip04/leaks-metadata",
         "nip06/derivation-path",
         "nip17/seal-pubkey-matches-rumor",
+        "nip17/room-identity",
         "nip17/chat-content-plain-text",
         "nip17/subject-latest-wins",
         "nip17/publish-to-recipient-dm-relays",
@@ -6770,6 +6771,37 @@
             "criteria": {
               "true": "The rumor's pubkey is taken as the author without being compared to the seal's pubkey.",
               "false": "The two pubkeys are compared and a mismatch rejected, or the hunk does not unwrap sealed rumors."
+            },
+            "threshold": 0.7,
+            "files": [
+              "**/*.ts",
+              "**/*.tsx",
+              "**/*.js",
+              "**/*.jsx",
+              "**/*.mjs",
+              "**/*.py",
+              "**/*.rs",
+              "**/*.go",
+              "**/*.kt",
+              "**/*.java",
+              "**/*.swift",
+              "**/*.dart",
+              "**/*.cs",
+              "**/*.rb",
+              "**/*.ex",
+              "**/*.exs"
+            ]
+          }
+        },
+        "nip17/room-identity": {
+          "level": "warn",
+          "question": {
+            "kind": "noul",
+            "instructions": "Nostr NIP-17. Requirement: a chat room is identified by the set of the author `pubkey` plus the `p` tags; adding or removing a participant creates a different room with a clean message history, rather than continuing the old one. Does the code in `hunk` key a conversation on something else, such as a stored thread id or only the counterparty, so that a changed participant set silently merges into an existing room? Answer false if `hunk` does not group messages into conversations.",
+            "message": "NIP-17: a room is the set of pubkey + p tags; a changed participant set is a different room.",
+            "criteria": {
+              "true": "Conversations are keyed on something other than the full participant set, merging distinct rooms.",
+              "false": "The room key is the pubkey plus p tag set, or the hunk does not group conversations."
             },
             "threshold": 0.7,
             "files": [
@@ -8162,7 +8194,7 @@
       "id": "pack/nuts-spec",
       "spec": "nuts-spec",
       "origin": "Kelbie/hunch/nuts-spec",
-      "commit": "af7332631238c4312d58abb9726ff56a4b9a960c",
+      "commit": "c2c680ed2c12c42c8a1b668a4b0b0858c5f463a6",
       "path": "rules/nuts-spec.json",
       "hash": "6bb0e4a672bbb3548ea909218ddb9c2a7b6fb616e88cc4f205c47eb57c05fb30",
       "select": [
