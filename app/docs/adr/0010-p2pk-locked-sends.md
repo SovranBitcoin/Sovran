@@ -3,6 +3,9 @@
 Date: 2026-09-24
 Status: Accepted
 
+The header-toggle and uncertainty-copy decisions, and the parity claim below,
+are superseded by [ADR 0011](0011-explicit-lock-method-and-provider-ownership.md).
+
 ## Context
 
 Sovran used to lock ecash automatically when you sent it to a nostr contact:

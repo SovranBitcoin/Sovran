@@ -108,11 +108,8 @@ One finding, one commit — never a pile of uncommitted work. Conventional-commi
 subject, scope = the domain. The body states: the rule that flagged it, the blame
 finding (sha + whether it was deliberate), the sibling prior art if it informed
 the fix, and the verification that ran with its result. Work on the current
-branch; never commit to `main`, never push. End each message with:
-
-```
-Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
-```
+branch; never commit to `main`, never push. Do not add agent attribution or
+co-author trailers.
 
 Rule edits commit **separately** from code fixes (`chore(hunch): …`), so a rule
 change can be reverted without losing a real fix.

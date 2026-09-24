@@ -20,6 +20,11 @@ This reorganizes the claims in the app `README.md`; it does not add new ones.
   - [x] Online send (machine-driven), offline token handoff, share targets (QR,
     system share, NFC, BLE mesh), copy as text, copy as emoji
   - [x] **Pending-ecash sweeper** — mass-reclaim unclaimed outgoing tokens
+  - [x] **Lock Ecash method** — recipient locks and timed refund terms selected
+    in the amount menu; spending details expand inside the transaction timeline.
+    Native locked-send/reclaim validation remains tracked in F54.
+  - [x] **Transaction profile link** — recipient, counterparty and zap-author
+    identities link to their profile from the shared transaction detail shell
 - [x] **NPubCash (NPC)** — receive to an `npubx.cash` Lightning address
 
 ## Mint management & discovery
