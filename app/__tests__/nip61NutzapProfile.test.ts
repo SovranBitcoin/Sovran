@@ -97,43 +97,47 @@ describe('readNutzapInfo', () => {
 });
 
 function resolverOver(get: NutzapDiscoveryPool['get']) {
-  const pool = { get: jest.fn(get) } as unknown as NutzapDiscoveryPool;
+  const destroy = jest.fn();
+  const pool = { get: jest.fn(get), destroy };
   const resolve = createNutzapProfileResolver({
     openPool: () => pool,
     discoveryRelays: ['wss://discovery.example'],
   });
-  return { resolve, getMock: pool.get as jest.Mock };
+  return { resolve, getMock: pool.get, destroy };
 }
 
 describe('createNutzapProfileResolver', () => {
   beforeEach(() => clearNutzapProfileCache());
 
   it('asks the discovery relays for that author’s kind:10019', async () => {
-    const { resolve, getMock } = resolverOver(async () => null);
+    const { resolve, getMock, destroy } = resolverOver(async () => null);
     await resolve(IDENTITY);
 
     const [relays, filter] = getMock.mock.calls[0];
     expect(relays).toEqual(['wss://discovery.example']);
     expect(filter).toEqual({ kinds: [NUTZAP_INFO_KIND], authors: [IDENTITY] });
+    expect(destroy).toHaveBeenCalledTimes(1);
   });
 
   it('falls back instead of rejecting when the lookup fails', async () => {
-    const { resolve } = resolverOver(async () => {
+    const { resolve, destroy } = resolverOver(async () => {
       throw new Error('relay unreachable');
     });
     await expect(resolve(IDENTITY)).resolves.toMatchObject({
       lockKey: `02${IDENTITY}`,
       source: 'identityFallback',
     });
+    expect(destroy).toHaveBeenCalledTimes(1);
   });
 
   it('reuses a resolved profile instead of asking again', async () => {
-    const { resolve, getMock } = resolverOver(async () =>
+    const { resolve, getMock, destroy } = resolverOver(async () =>
       nutzapInfoEvent([['pubkey', `02${WALLET_KEY_X}`]])
     );
     await resolve(IDENTITY);
     await resolve(IDENTITY);
     expect(getMock).toHaveBeenCalledTimes(1);
+    expect(destroy).toHaveBeenCalledTimes(1);
   });
 
   it('forgets everything when the payment context is cleared', async () => {

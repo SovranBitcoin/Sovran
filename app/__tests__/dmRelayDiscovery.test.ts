@@ -27,12 +27,13 @@ function dmRelayListEvent(tags: string[][]): NostrEvent {
 }
 
 function resolverOver(get: DmDiscoveryPool['get']) {
-  const pool = { get: jest.fn(get) } as unknown as DmDiscoveryPool;
+  const destroy = jest.fn();
+  const pool = { get: jest.fn(get), destroy };
   const resolve = createDmRelayResolver({
     openPool: () => pool,
     discoveryRelays: ['wss://discovery.example'],
   });
-  return { resolve, getMock: pool.get as jest.Mock };
+  return { resolve, getMock: pool.get, destroy };
 }
 
 describe('createDmRelayResolver', () => {
@@ -47,16 +48,18 @@ describe('createDmRelayResolver', () => {
   });
 
   it('returns the relays the recipient declared', async () => {
-    const { resolve } = resolverOver(async () =>
+    const { resolve, destroy } = resolverOver(async () =>
       dmRelayListEvent([['relay', 'wss://inbox.example']])
     );
 
     await expect(resolve(pubkey)).resolves.toEqual(['wss://inbox.example/']);
+    expect(destroy).toHaveBeenCalledTimes(1);
   });
 
   it('returns [] when the recipient has published no list', async () => {
-    const { resolve } = resolverOver(async () => null);
+    const { resolve, destroy } = resolverOver(async () => null);
     await expect(resolve(pubkey)).resolves.toEqual([]);
+    expect(destroy).toHaveBeenCalledTimes(1);
   });
 
   it('returns [] when the list holds no usable relay', async () => {
@@ -65,7 +68,7 @@ describe('createDmRelayResolver', () => {
   });
 
   it('returns [] rather than throwing when the lookup itself fails', async () => {
-    const { resolve } = resolverOver(async () => {
+    const { resolve, destroy } = resolverOver(async () => {
       throw new Error('relay unreachable');
     });
 
@@ -73,5 +76,6 @@ describe('createDmRelayResolver', () => {
     // prepared proofs, and the safe answer to "we don't know" is the same as
     // the answer to "there is no list" — don't send.
     await expect(resolve(pubkey)).resolves.toEqual([]);
+    expect(destroy).toHaveBeenCalledTimes(1);
   });
 });

@@ -19,7 +19,7 @@ import { nostrLog } from '@/shared/lib/logger';
 import { DM_RELAY_LIST_KIND, readDmRelays } from '@/shared/lib/nostr/outbox/nip17DmRelays';
 
 /** The slice of `SimplePool` a discovery lookup needs. */
-export type DmDiscoveryPool = Pick<SimplePool, 'get'>;
+export type DmDiscoveryPool = Pick<SimplePool, 'get' | 'destroy'>;
 
 /** How long to wait for a `kind:10050` before treating it as absent. */
 const DEFAULT_LOOKUP_TIMEOUT_MS = 5_000;
@@ -59,6 +59,8 @@ export function createDmRelayResolver(deps: {
         error: error instanceof Error ? error.message : String(error),
       });
       return [];
+    } finally {
+      pool.destroy();
     }
   };
 }

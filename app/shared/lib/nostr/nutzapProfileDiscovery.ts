@@ -24,7 +24,7 @@ import {
 } from '@/shared/lib/nostr/nip61NutzapProfile';
 
 /** The slice of `SimplePool` a discovery lookup needs. */
-export type NutzapDiscoveryPool = Pick<SimplePool, 'get'>;
+export type NutzapDiscoveryPool = Pick<SimplePool, 'get' | 'destroy'>;
 
 /** How long to wait for a `kind:10019` before treating it as absent. */
 const DEFAULT_LOOKUP_TIMEOUT_MS = 5_000;
@@ -117,6 +117,8 @@ export function createNutzapProfileResolver(deps: {
         pubkeyPreview: pubkeyHex.slice(0, 12) + '…',
         error: error instanceof Error ? error.message : String(error),
       });
+    } finally {
+      pool.destroy();
     }
     writeCache(pubkeyHex, profile, clock());
     return profile;
