@@ -34,6 +34,11 @@ export const ANNOTATION_KEYS = {
   distributionSource: "distributionSource",
   geoLat: "geoLat",
   geoLng: "geoLng",
+  aiGroupId: "aiGroupId",
+  aiRole: "aiRole",
+  aiSessionId: "aiSessionId",
+  aiMessageId: "aiMessageId",
+  aiModel: "aiModel",
   swapGroupId: "swapGroupId",
   swapRole: "swapRole",
   swapChainId: "swapChainId",
@@ -79,6 +84,11 @@ export type ScanMethod = (typeof SCAN_METHODS)[number];
 export type LockDirection = (typeof LOCK_DIRECTIONS)[number];
 export type DistributionSource = (typeof DISTRIBUTION_SOURCES)[number];
 export type SwapRole = (typeof SWAP_ROLES)[number];
+
+/** Which half of an AI request a movement is: the token handed to the node, or
+ *  the unused remainder it gave back. */
+const AI_PAYMENT_ROLES = ["payment", "change"] as const;
+export type AiPaymentRole = (typeof AI_PAYMENT_ROLES)[number];
 /** Which side of a NUT-18 payment request this transaction was. */
 export type PaymentRequestRole = "payer" | "payee";
 /** How the token travelled (`http` = POST transport on the send side; coco's
@@ -131,6 +141,25 @@ export interface TransactionAnnotation {
     role?: SwapRole;
     chainId?: string;
     hopIndex?: number;
+  };
+  /**
+   * An AI request paid per call, which is a send and a receive that mean one
+   * thing. The node is handed a token worth its admission gate and returns
+   * whatever it did not use, so history otherwise shows two unexplained
+   * movements minutes or milliseconds apart. `groupId` pairs them the way
+   * `swap.groupId` pairs a swap's legs.
+   *
+   * `sessionId` and `messageId` tie the payment to the exchange it bought, so
+   * a cost can be traced to the answer it produced and back — the same
+   * relationship a zap has to the post it was sent for.
+   */
+  ai?: {
+    groupId?: string;
+    role?: AiPaymentRole;
+    sessionId?: string;
+    /** The assistant message this paid for. */
+    messageId?: string;
+    model?: string;
   };
   /**
    * Per-request Cashu-payment-request advertise conditions for a single-use
@@ -291,6 +320,14 @@ export function encodeAnnotation(
   ) {
     record[ANNOTATION_KEYS.geoLat] = String(patch.location.lat);
     record[ANNOTATION_KEYS.geoLng] = String(patch.location.lng);
+  }
+
+  if (patch.ai) {
+    setString(record, ANNOTATION_KEYS.aiGroupId, patch.ai.groupId);
+    setString(record, ANNOTATION_KEYS.aiRole, patch.ai.role);
+    setString(record, ANNOTATION_KEYS.aiSessionId, patch.ai.sessionId);
+    setString(record, ANNOTATION_KEYS.aiMessageId, patch.ai.messageId);
+    setString(record, ANNOTATION_KEYS.aiModel, patch.ai.model);
   }
 
   if (patch.swap) {
@@ -494,6 +531,21 @@ export function decodeAnnotation(
   const lng = parseFiniteNumber(record[ANNOTATION_KEYS.geoLng]);
   if (lat != null && lng != null) {
     annotation.location = { lat, lng };
+  }
+
+  const aiGroupId = record[ANNOTATION_KEYS.aiGroupId];
+  const aiRole = oneOf(record[ANNOTATION_KEYS.aiRole], AI_PAYMENT_ROLES);
+  const aiSessionId = record[ANNOTATION_KEYS.aiSessionId];
+  const aiMessageId = record[ANNOTATION_KEYS.aiMessageId];
+  const aiModel = record[ANNOTATION_KEYS.aiModel];
+  if (aiGroupId || aiRole || aiSessionId || aiMessageId || aiModel) {
+    annotation.ai = {
+      ...(aiGroupId ? { groupId: aiGroupId } : {}),
+      ...(aiRole ? { role: aiRole } : {}),
+      ...(aiSessionId ? { sessionId: aiSessionId } : {}),
+      ...(aiMessageId ? { messageId: aiMessageId } : {}),
+      ...(aiModel ? { model: aiModel } : {}),
+    };
   }
 
   const swapGroupId = record[ANNOTATION_KEYS.swapGroupId];

@@ -44,6 +44,52 @@ function routstrStoreState() {
   return useRoutstrStore.getState();
 }
 
+/**
+ * What an AI payment bought, carried onto both of its legs.
+ *
+ * A pay-per-request call is a send and a receive that mean one thing, so
+ * history otherwise shows two unexplained movements. Annotating both with one
+ * `groupId` pairs them the way a swap's legs are paired, and the message ids
+ * tie the money to the exchange it paid for — the relationship a zap has to
+ * its post.
+ */
+export interface PaymentContext {
+  groupId: string;
+  sessionId?: string;
+  messageId?: string;
+  model?: string;
+}
+
+function annotate(
+  leg: 'send' | 'receive',
+  operationId: string,
+  role: 'payment' | 'change',
+  context: PaymentContext | undefined
+): void {
+  if (!context) return;
+  try {
+    const { setTransactionAnnotation } =
+      require('@/shared/stores/profile/transactionAnnotationStore') as typeof import('@/shared/stores/profile/transactionAnnotationStore');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy graph boundary, see above
+    const { annotationKey } = require('wallet') as typeof import('wallet');
+    setTransactionAnnotation(annotationKey({ type: leg, operationId }), {
+      ai: {
+        groupId: context.groupId,
+        role,
+        ...(context.sessionId ? { sessionId: context.sessionId } : {}),
+        ...(context.messageId ? { messageId: context.messageId } : {}),
+        ...(context.model ? { model: context.model } : {}),
+      },
+    });
+  } catch (error) {
+    // An unlabelled movement is a worse history entry, not a failed payment.
+    apiLog.warn('routstr.payment.annotate_failed', {
+      leg,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 interface RequestPayment {
   /** Encoded Cashu token for the `X-Cashu` header. */
   encoded: string;
@@ -65,7 +111,8 @@ interface RequestPayment {
  */
 export async function mintRequestPayment(
   amountSats: number,
-  nodeBaseUrl: string
+  nodeBaseUrl: string,
+  context?: PaymentContext
 ): Promise<RequestPayment> {
   const manager = wallet();
   if (!manager) throw new Error('wallet is not ready');
@@ -85,6 +132,7 @@ export async function mintRequestPayment(
     operationId: operation.id,
     startedAt: Date.now(),
   });
+  annotate('send', operation.id, 'payment', context);
   apiLog.info('routstr.payment.minted', { amountSats, operationId: operation.id });
   return { encoded, operationId: operation.id, mintUrl, amountSats, id: operation.id };
 }
@@ -111,12 +159,13 @@ function tokenValueSats(encoded: string): number {
  * returned is what the node actually took, with no estimate and no balance
  * diff that a concurrent write could corrupt.
  */
-export async function receiveChange(encoded: string): Promise<number> {
+export async function receiveChange(encoded: string, context?: PaymentContext): Promise<number> {
   const manager = wallet();
   if (!manager) throw new Error('wallet is not ready');
   const sats = tokenValueSats(encoded);
   const prepared = await manager.ops.receive.prepare({ token: encoded });
-  await manager.ops.receive.execute(prepared);
+  const finalized = await manager.ops.receive.execute(prepared);
+  annotate('receive', finalized.id, 'change', context);
   apiLog.info('routstr.payment.change_received', { sats });
   return sats;
 }

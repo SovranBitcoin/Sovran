@@ -341,6 +341,14 @@ export function useAiSend() {
             const result = await sendMessage(apiMessages, {
               model: candidate,
               paymentSats: gateSats,
+              // Both money legs point back at the exchange they bought, so a
+              // cost in history can be traced to the answer it produced.
+              payment: {
+                groupId: flowId,
+                sessionId: useRoutstrStore.getState().currentSessionId ?? undefined,
+                messageId: assistantMessageId,
+                model: candidate,
+              },
               temperature: 0.7,
               max_tokens: maxTokens,
               signal: controller.signal,

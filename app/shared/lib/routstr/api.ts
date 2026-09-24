@@ -9,7 +9,12 @@ import {
   type SealedRequest,
 } from './e2ee/ehbpTransport';
 import { isTinfoilModel, tinfoilUpstreamModelId } from './e2ee/tinfoilModels';
-import { mintRequestPayment, receiveChange, reclaimUnspentPayment } from './payment';
+import {
+  mintRequestPayment,
+  receiveChange,
+  reclaimUnspentPayment,
+  type PaymentContext,
+} from './payment';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { apiLog } from '../logger';
 import { buildAbortSignal } from '@/shared/lib/http/requestSignal';
@@ -896,12 +901,14 @@ export async function sendMessage(
   options: {
     model: string;
     paymentSats: number;
+    /** What this request is buying, so both money legs can point at it. */
+    payment?: PaymentContext;
     temperature?: number;
     max_tokens?: number;
     signal?: AbortSignal;
   }
 ): Promise<{ stream: AsyncIterable<ChatCompletionChunk>; costSats: number }> {
-  const { model, paymentSats, temperature = 0.7, max_tokens, signal } = options;
+  const { model, paymentSats, payment: context, temperature = 0.7, max_tokens, signal } = options;
   const { textChars, imageParts } = measureMessageContent(messages);
   apiLog.info('api.routstr.chat.start', {
     model,
@@ -915,7 +922,7 @@ export async function sendMessage(
   const ownsScope = captureRequestScope();
   const sealedTransport = isTinfoilModel(model);
 
-  const payment = await mintRequestPayment(paymentSats, routstrBaseUrl());
+  const payment = await mintRequestPayment(paymentSats, routstrBaseUrl(), context);
   let settled = false;
   // Spent minus returned is what the node actually took. Exact, local, and
   // known before the first chunk — the change header is set before the body
@@ -991,7 +998,7 @@ export async function sendMessage(
     if (change) {
       settled = true;
       if (!ownsScope()) apiLog.warn('routstr.payment.change_out_of_scope');
-      costSats = Math.max(0, paymentSats - (await receiveChange(change)));
+      costSats = Math.max(0, paymentSats - (await receiveChange(change, context)));
       // The change is home, so there is nothing left to recover for this one.
       routstrStoreState().settlePayment(payment.id);
     }

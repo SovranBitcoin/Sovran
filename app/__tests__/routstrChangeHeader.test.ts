@@ -89,7 +89,7 @@ describe('Routstr response credentials', () => {
         new Response('data: [DONE]\n', { headers: { 'x-cashu': 'cashuB-test-change' } })
       );
     const { stream } = await completion();
-    expect(payment.receiveChange).toHaveBeenCalledWith('cashuB-test-change');
+    expect(payment.receiveChange).toHaveBeenCalledWith('cashuB-test-change', undefined);
     for await (const _chunk of stream) {
       /* empty fixture */
     }
@@ -166,7 +166,7 @@ describe('Routstr response credentials', () => {
     useRoutstrStore.setState({ authMode: 'bearer', apiKey: 'sk-should-not-be-used' });
     const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response());
     await completion();
-    expect(payment.mintRequestPayment).toHaveBeenCalledWith(10, expect.stringContaining('routstr'));
+    expect(payment.mintRequestPayment).toHaveBeenCalledWith(10, expect.stringContaining('routstr'), undefined);
     expect(fetchMock.mock.calls[0][1]?.headers).toEqual({
       'X-Cashu': 'cashuB-request-payment',
       'Content-Type': 'application/json',
@@ -190,7 +190,7 @@ describe('Routstr response credentials', () => {
     await expect(completion()).rejects.toMatchObject({ status: 402 });
     // Routstr returns change on refusals too. Banking it is the whole point;
     // reclaiming on top would try to unspend proofs the node already redeemed.
-    expect(payment.receiveChange).toHaveBeenCalledWith('cashuB-test-change');
+    expect(payment.receiveChange).toHaveBeenCalledWith('cashuB-test-change', undefined);
     expect(payment.reclaimUnspentPayment).not.toHaveBeenCalled();
   });
 
