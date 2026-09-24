@@ -150,7 +150,7 @@ export async function fetchNodeStatus(
       signal: buildAbortSignal({ timeoutMs: 20_000, ...controls }),
     });
     if (!response.ok) return { status: response.status >= 500 ? 'offline' : 'unknown', info: null };
-    const parsed = NodeInfoSpine.safeParse(await response.json());
+    const parsed = NodeInfoSpine.safeParse(await response.json().catch(() => null));
     if (!parsed.success) return { status: 'unknown', info: null };
     const info = parsed.data;
     return {

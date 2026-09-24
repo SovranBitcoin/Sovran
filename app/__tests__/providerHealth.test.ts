@@ -8,6 +8,13 @@ jest.mock('@/shared/lib/http/requestSignal', () => ({
 
 afterEach(() => jest.restoreAllMocks());
 
+it('reports a responding provider with non-JSON info as unknown', async () => {
+  jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('<html>unsupported</html>'));
+  const onResult = jest.fn();
+  await probeProviders(['https://non-json.example'], { onResult });
+  expect(onResult).toHaveBeenCalledWith(expect.objectContaining({ status: 'unknown' }));
+});
+
 it.each([
   [200, 'online'],
   [404, 'unknown'],
