@@ -102,6 +102,16 @@ function buildPaymentCopyGroups(text: PaymentCopyText) {
         label: text("timeline.send.rolledBack.label"),
         info: text("timeline.send.rolledBack.info"),
       },
+      locked: {
+        label: text("timeline.send.locked.label"),
+        info: text("timeline.send.locked.info"),
+      },
+      unlock: {
+        label: text("timeline.send.unlock.label"),
+        infoUpcoming: text("timeline.send.unlock.infoUpcoming"),
+        infoRefund: text("timeline.send.unlock.infoRefund"),
+        infoPublic: text("timeline.send.unlock.infoPublic"),
+      },
     },
 
     PAYMENT_REQUEST_COPY: {

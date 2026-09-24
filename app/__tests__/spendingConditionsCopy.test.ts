@@ -12,6 +12,7 @@ import {
   describeSpendingConditionsCopy,
   withDate,
 } from '@/features/send/lib/spendingConditionsCopy';
+import { getTimeUntilUnlock } from '@/shared/lib/utils';
 import { describeSpendingConditions } from 'wallet';
 
 const THEIR_KEY = `02${'11'.repeat(32)}`;
@@ -148,5 +149,21 @@ describe('spending-conditions copy', () => {
     ]);
     expect(copy?.title).toContain('{date}');
     expect(withDate(copy!.title, '16 Mar 2026')).toContain('16 Mar 2026');
+  });
+});
+
+describe('unlock countdown', () => {
+  it('counts down to a lock opening, and says "unlocks", not "expires"', () => {
+    // A lock opening is not a deadline passing; under NUT-11 the two have
+    // opposite consequences for who ends up with the money.
+    const text = getTimeUntilUnlock(NOW + 3_723_000, NOW);
+    expect(text).toBe('unlocks in 1h 2m 3s');
+    expect(text).not.toMatch(/expire/);
+  });
+
+  it('says nothing once the lock has opened, or when there is none', () => {
+    expect(getTimeUntilUnlock(NOW - 1, NOW)).toBeNull();
+    expect(getTimeUntilUnlock(null, NOW)).toBeNull();
+    expect(getTimeUntilUnlock(undefined, NOW)).toBeNull();
   });
 });

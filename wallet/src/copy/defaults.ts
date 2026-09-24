@@ -42,6 +42,12 @@ export const paymentCopyDefaults = {
   "timeline.send.pending.info": "Waiting for recipient",
   "timeline.send.finalized.label": "Claimed",
   "timeline.send.finalized.info": "Claimed by recipient",
+  "timeline.send.locked.label": "Locked",
+  "timeline.send.locked.info": "Only the recipient can redeem it",
+  "timeline.send.unlock.label": "Reclaimable",
+  "timeline.send.unlock.infoUpcoming": "Unlocks",
+  "timeline.send.unlock.infoRefund": "You can take this back",
+  "timeline.send.unlock.infoPublic": "Anyone with the token can redeem it",
   "timeline.send.rolledBack.label": "Cancelled",
   "timeline.send.rolledBack.info": "Funds returned to your balance",
 

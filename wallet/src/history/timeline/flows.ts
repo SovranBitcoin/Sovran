@@ -477,6 +477,131 @@ const onchainMeltFlow: FlowDef = {
 const sendKnown = (ctx: TimelineContext) =>
   ctx.state === "prepared" || ctx.state === "pending" || ctx.state === "finalized";
 
+/**
+ * A send that is locked to somebody.
+ *
+ * Its own flow rather than five conditionals inside `sendFlow`: the rows are
+ * different (what it is locked to, and when that opens), and the terminal
+ * states differ too. Built from the same milestones so the two cannot drift
+ * apart on the shared parts.
+ */
+const lockedSendFlow: FlowDef = {
+  variant: "locked-send",
+  outcomes: [
+    {
+      id: "rolled-back",
+      kind: "rolled-back",
+      when: (ctx) => ctx.state === "rolledBack" || ctx.state === "rolled_back",
+      rows: (ctx) => [
+        {
+          slot: "prepared",
+          state: "prepared",
+          label: ctx.copy.SEND_COPY.prepared.label,
+          stepType: "complete",
+          timestamp: ctx.createdAt,
+        },
+        {
+          slot: "locked",
+          id: "rolled-back",
+          state: "rolledBack",
+          label: ctx.copy.SEND_COPY.rolledBack.label,
+          stepType: "rolled-back",
+          info: ctx.copy.SEND_COPY.rolledBack.info,
+        },
+      ],
+    },
+    {
+      // Claimed is an OUTCOME, not a milestone. As a milestone, a send claimed
+      // before its locktime would draw a checkmark on "Reclaimable" — a moment
+      // that never happened. Outcomes are matched first and own their rows, so
+      // a claimed lock simply never shows an unlock row.
+      id: "claimed",
+      kind: "settled",
+      when: (ctx) => ctx.state === "finalized",
+      rows: (ctx) => [
+        {
+          slot: "prepared",
+          state: "prepared",
+          label: ctx.copy.SEND_COPY.prepared.label,
+          stepType: "complete",
+          timestamp: ctx.createdAt,
+        },
+        {
+          slot: "locked",
+          state: "pending",
+          label: ctx.copy.SEND_COPY.locked.label,
+          stepType: "complete",
+        },
+        {
+          slot: "unlock",
+          id: "finalized",
+          state: "finalized",
+          label: ctx.copy.SEND_COPY.finalized.label,
+          stepType: "success",
+          info: ctx.copy.SEND_COPY.finalized.info,
+        },
+      ],
+    },
+  ],
+  milestones: [
+    {
+      id: "prepared",
+      reached: sendKnown,
+      activeStyle: () => "current",
+      copy: (ctx) => ({
+        state: "prepared",
+        label: ctx.copy.SEND_COPY.prepared.label,
+        ...(ctx.state === "prepared"
+          ? { info: ctx.copy.SEND_COPY.prepared.info }
+          : { timestamp: ctx.createdAt }),
+      }),
+    },
+    {
+      id: "locked",
+      reached: (ctx) => ctx.state === "pending" || ctx.state === "finalized",
+      activeStyle: () => "next-pending",
+      upcomingStyle: () => "next-pending",
+      copy: (ctx) => ({
+        state: "pending",
+        label: ctx.copy.SEND_COPY.locked.label,
+        info: ctx.copy.SEND_COPY.locked.info,
+      }),
+    },
+    {
+      id: "unlock",
+      // Monotone in time, which is what the engine requires: once the clock
+      // passes the locktime it never goes back.
+      reached: (ctx) =>
+        ctx.lock?.unlockAt != null && ctx.currentTime >= ctx.lock.unlockAt,
+      copy: (ctx) => {
+        const { SEND_COPY } = ctx.copy;
+        const unlockAt = ctx.lock?.unlockAt ?? null;
+        const reclaimable = ctx.lock?.refund !== null;
+        if (unlockAt !== null && ctx.currentTime >= unlockAt) {
+          return {
+            state: "pending",
+            label: SEND_COPY.unlock.label,
+            // Who can take it, now that it is open. A lock with no refund tag
+            // opens to whoever holds the token, not to us.
+            info: reclaimable
+              ? SEND_COPY.unlock.infoRefund
+              : SEND_COPY.unlock.infoPublic,
+          };
+        }
+        return {
+          state: "pending",
+          label: SEND_COPY.unlock.label,
+          // An ABSOLUTE date, because this row rebuilds only at the boundary:
+          // a live "in 3 hours" would be wrong for the three hours after it.
+          ...(unlockAt !== null
+            ? { info: SEND_COPY.unlock.infoUpcoming, timestamp: unlockAt }
+            : {}),
+        };
+      },
+    },
+  ],
+};
+
 const sendFlow: FlowDef = {
   variant: "send",
   outcomes: [
@@ -914,6 +1039,7 @@ export const TIMELINE_FLOWS: Partial<Record<TimelineFlowVariant, FlowDef>> = {
   "lightning-melt": lightningMeltFlow,
   "onchain-melt": onchainMeltFlow,
   send: sendFlow,
+  "locked-send": lockedSendFlow,
   "payment-request-send": paymentRequestSendFlow,
   receive: receiveFlow,
   "receive-recovery": receiveRecoveryFlow,

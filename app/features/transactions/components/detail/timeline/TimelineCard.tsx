@@ -15,6 +15,7 @@ import { MintQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 import {
   buildTimelineModel,
   decodeBolt11Invoice,
+  describeSendLock,
   getCardLabel,
   getStatusColorType,
   getStatusHeader,
@@ -22,6 +23,7 @@ import {
   type TimelineStep,
 } from 'wallet';
 import { withAlpha } from '@/shared/lib/color';
+import { useOurP2pkPubkeys } from '@/shared/hooks/useOurP2pkPubkeys';
 
 import type { HistoryEntry } from '@cashu/coco-core';
 
@@ -191,7 +193,20 @@ export function HistoryEntryTimeline({
     if (!info) return undefined;
     return ((info.timestampSec ?? 0) + (info.expirySec ?? 3600)) * 1000;
   }, [historyEntry, isOnchainMint]);
-  const currentTime = useExpiry(meltExpiresAt ?? mintExpiresAt);
+  // A locked send has a boundary too: the moment its locktime opens changes
+  // what the last row says. Same one-shot timeout as an expiry, derived before
+  // the model so the clock exists when it builds.
+  const ourPubkeys = useOurP2pkPubkeys();
+  const unlockAt = useMemo(() => {
+    if (historyEntry.type !== 'send') return undefined;
+    return (
+      describeSendLock(historyEntry, {
+        now: Date.now(),
+        ...(ourPubkeys ? { ourPubkeys } : {}),
+      })?.unlockAt ?? undefined
+    );
+  }, [historyEntry, ourPubkeys]);
+  const currentTime = useExpiry(meltExpiresAt ?? mintExpiresAt ?? unlockAt);
 
   const model = useMemo(
     () =>
@@ -204,8 +219,10 @@ export function HistoryEntryTimeline({
         onchainConfirmationProgress,
         onchainSettledInternally,
         paymentCopy,
+        ...(ourPubkeys ? { ourPubkeys } : {}),
       }),
     [
+      ourPubkeys,
       historyEntry,
       meltQuote,
       currentTime,
@@ -513,6 +530,7 @@ export function HistoryEntryTimeline({
             isOnchainMint={isOnchainMint}
             color={statusHeaderColor}
             entryId={entryId}
+            unlockAtMs={unlockAt}
           />
         </HStack>
 

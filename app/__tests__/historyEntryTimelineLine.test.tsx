@@ -29,6 +29,7 @@ jest.mock('@/shared/lib/color', () => ({
 jest.mock('@/shared/lib/utils', () => ({
   meltQuoteExpired: () => false,
   getMeltQuoteTimeUntilExpiry: () => null,
+  getTimeUntilUnlock: () => null,
   mintHistoryEntryExpired: jest.fn(() => false),
   getMintHistoryEntryTimeUntilExpiry: () => null,
 }));

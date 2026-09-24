@@ -26,14 +26,32 @@ type AnyMintHistoryEntry = Extract<HistoryEntry, { type: 'mint' }>;
  * store, so every component suite that mocks it hand-lists its exports — moving
  * this there makes those factories silently return `undefined` for it.
  */
-function formatExpiryCountdown(secondsRemaining: number): string | null {
+function formatCountdown(secondsRemaining: number, verb: string): string | null {
   if (secondsRemaining <= 0) return null;
   const hours = Math.floor(secondsRemaining / 3600);
   const minutes = Math.floor((secondsRemaining % 3600) / 60);
   const seconds = secondsRemaining % 60;
-  if (hours > 0) return `expires in ${hours}h ${minutes}m ${seconds}s`;
-  if (minutes > 0) return `expires in ${minutes}m ${seconds}s`;
-  return `expires in ${seconds}s`;
+  if (hours > 0) return `${verb} in ${hours}h ${minutes}m ${seconds}s`;
+  if (minutes > 0) return `${verb} in ${minutes}m ${seconds}s`;
+  return `${verb} in ${seconds}s`;
+}
+
+function formatExpiryCountdown(secondsRemaining: number): string | null {
+  return formatCountdown(secondsRemaining, 'expires');
+}
+
+/**
+ * "unlocks in 3h 2m 1s" for a P2PK lock that has not opened yet, or null once
+ * it has. Deliberately NOT "expires": a lock opening is not a deadline
+ * passing, and under NUT-11 the two have opposite consequences.
+ */
+export function getTimeUntilUnlock(
+  unlockAtMs: number | null | undefined,
+  currentTimeMs?: number
+): string | null {
+  if (!unlockAtMs) return null;
+  const remainingSec = Math.floor((unlockAtMs - (currentTimeMs ?? Date.now())) / 1000);
+  return formatCountdown(remainingSec, 'unlocks');
 }
 
 /** Outgoing = ecash send or Lightning melt */
