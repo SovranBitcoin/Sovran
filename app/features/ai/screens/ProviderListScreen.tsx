@@ -17,6 +17,7 @@ import { ContactRow, providerIdentity } from '@/shared/ui/composed/ContactRow';
 import { List } from '@/shared/ui/composed/List';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Text } from '@/shared/ui/primitives/Text';
+import { Badge } from '@/shared/ui/primitives/Badge';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 
 import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
@@ -90,6 +91,14 @@ function ProviderListRow({
         ...(row.pubkey ? [nostrIdentity(row.pubkey, profile ?? undefined)] : []),
       ]}
       title={row.name}
+      titleTrailing={
+        <Badge
+          variant={
+            row.status === 'online' ? 'success' : row.status === 'offline' ? 'error' : 'secondary'
+          }>
+          {row.status === 'online' ? 'Online' : row.status === 'offline' ? 'Offline' : 'Unknown'}
+        </Badge>
+      }
       subtitle={row.blockedReason ?? describeProvider(row)}
       disabled={row.blockedReason != null}
       disabledReason={row.blockedReason ?? undefined}

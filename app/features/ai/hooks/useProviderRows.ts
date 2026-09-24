@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { useBalanceContext } from '@cashu/coco-react';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { routstrMintKey, spendableMintBalances } from '@/shared/lib/routstr/payingMint';
 import { cachedProbe, type ProviderStatus } from '@/shared/lib/routstr/providerHealth';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
@@ -16,8 +16,7 @@ import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
  * different product from one that can.
  *
  * The ranking follows from that. E2EE first, then by spendable balance, then
- * by whether the provider is answering at all. Unusable rows sort last but are
- * never dropped — they stay, dimmed, with the reason.
+ * by name. Health updates never move a row under the user's finger.
  */
 
 export interface ProviderRow {
@@ -35,8 +34,6 @@ export interface ProviderRow {
   /** Why this provider cannot be chosen, or `null` when it can. */
   blockedReason: string | null;
 }
-
-const canonicalMint = (url: string) => url.trim().replace(/\/+$/, '').toLowerCase();
 
 const host = (baseUrl: string) => baseUrl.replace(/^https:\/\//, '');
 
@@ -58,9 +55,9 @@ export function useProviderRows(probed: Record<string, ProviderStatus> = {}): Pr
 
   const byMint = useMemo(() => {
     const out = new Map<string, number>();
-    for (const [url, snapshot] of Object.entries(balances.byMint)) {
-      const sats = amountToNumber(snapshot?.total);
-      if (sats > 0) out.set(canonicalMint(url), sats);
+    for (const [url, sats] of Object.entries(spendableMintBalances(balances.byMint))) {
+      const key = routstrMintKey(url);
+      if (key && sats > 0) out.set(key, sats);
     }
     return out;
   }, [balances]);
@@ -70,18 +67,18 @@ export function useProviderRows(probed: Record<string, ProviderStatus> = {}): Pr
     [byMint]
   );
 
-  return useMemo(() => {
+  const ranked = useMemo(() => {
     const rows: ProviderRow[] = Object.entries(knownProviders).map(([baseUrl, provider]) => {
       const status = probed[baseUrl] ?? cachedProbe(baseUrl)?.status ?? 'unknown';
-      const accepted = provider.mints.map(canonicalMint);
+      const accepted = new Set(provider.mints.map(routstrMintKey).filter((url) => url !== null));
       // No published list means no restriction, so every sat is spendable
       // there. An empty intersection means none of it is.
-      const spendableSats = accepted.length
-        ? accepted.reduce((sum, mint) => sum + (byMint.get(mint) ?? 0), 0)
+      const spendableSats = provider.mints.length
+        ? [...accepted].reduce((sum, mint) => sum + (byMint.get(mint) ?? 0), 0)
         : walletTotal;
       const blockedReason =
-        accepted.length > 0 && spendableSats <= 0
-          ? `Redeems ecash only from ${accepted.length === 1 ? 'a mint' : 'mints'} you do not hold`
+        provider.mints.length > 0 && spendableSats <= 0
+          ? `Redeems ecash only from ${accepted.size === 1 ? 'a mint' : 'mints'} you do not hold`
           : status === 'offline'
             ? 'Not answering right now'
             : null;
@@ -99,19 +96,30 @@ export function useProviderRows(probed: Record<string, ProviderStatus> = {}): Pr
       };
     });
 
-    // Usable before blocked; inside that, end-to-end encryption before
-    // everything, then the deepest pocket, then whoever is actually answering.
-    // Name last so the order is stable between launches rather than following
-    // whatever order discovery happened to return.
+    // Health updates change the badge, never the row's position under a finger.
     return rows.sort((a, b) => {
-      const blocked = Number(a.blockedReason != null) - Number(b.blockedReason != null);
+      const blocked = Number(a.spendableSats <= 0) - Number(b.spendableSats <= 0);
       if (blocked !== 0) return blocked;
       const e2ee = Number(b.e2ee === true) - Number(a.e2ee === true);
       if (e2ee !== 0) return e2ee;
       if (b.spendableSats !== a.spendableSats) return b.spendableSats - a.spendableSats;
-      const live = Number(b.status === 'online') - Number(a.status === 'online');
-      if (live !== 0) return live;
-      return a.name.localeCompare(b.name);
+      return a.name.localeCompare(b.name) || a.baseUrl.localeCompare(b.baseUrl);
     });
   }, [knownProviders, byMint, walletTotal, probed]);
+
+  // Rank on entry. Discovery may append providers, but asynchronous metadata
+  // must not move an existing choice while the user is reaching for it.
+  const [order, setOrder] = useState(() => ranked.map((row) => row.baseUrl));
+  useEffect(() => {
+    setOrder((previous) => {
+      const seen = new Set(previous);
+      const additions = ranked.filter((row) => !seen.has(row.baseUrl)).map((row) => row.baseUrl);
+      return additions.length ? [...previous, ...additions] : previous;
+    });
+  }, [ranked]);
+  const positions = new Map(order.map((url, index) => [url, index]));
+  return [...ranked].sort(
+    (a, b) =>
+      (positions.get(a.baseUrl) ?? order.length) - (positions.get(b.baseUrl) ?? order.length)
+  );
 }

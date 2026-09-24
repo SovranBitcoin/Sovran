@@ -134,6 +134,14 @@ export async function fetchNodeInfo(
   nodeBaseUrl: string,
   controls: RequestControls = {}
 ): Promise<NodeInfo | null> {
+  return (await fetchNodeStatus(nodeBaseUrl, controls)).info;
+}
+
+/** A responding older node is unknown, rather than falsely labelled offline. */
+export async function fetchNodeStatus(
+  nodeBaseUrl: string,
+  controls: RequestControls = {}
+): Promise<{ status: 'online' | 'offline' | 'unknown'; info: NodeInfo | null }> {
   try {
     // An arbitrary node base, not the configured one, and the payload is the
     // node's own free-form description rather than an envelope.
@@ -141,21 +149,24 @@ export async function fetchNodeInfo(
     const response = await fetch(`${normalizeNodeUrl(nodeBaseUrl)}/v1/info`, {
       signal: buildAbortSignal({ timeoutMs: 20_000, ...controls }),
     });
-    if (!response.ok) return null;
+    if (!response.ok) return { status: response.status >= 500 ? 'offline' : 'unknown', info: null };
     const parsed = NodeInfoSpine.safeParse(await response.json());
-    if (!parsed.success) return null;
+    if (!parsed.success) return { status: 'unknown', info: null };
     const info = parsed.data;
     return {
-      name: info.name?.trim() || undefined,
-      description: info.description?.trim() || undefined,
-      version: info.version,
-      npub: info.npub,
-      pubkey: info.npub ? npubToPubkey(info.npub) || undefined : undefined,
-      mints: info.mints ?? [],
-      onionUrl: info.onion_url ?? undefined,
+      status: 'online',
+      info: {
+        name: info.name?.trim() || undefined,
+        description: info.description?.trim() || undefined,
+        version: info.version,
+        npub: info.npub,
+        pubkey: info.npub ? npubToPubkey(info.npub) || undefined : undefined,
+        mints: info.mints ?? [],
+        onionUrl: info.onion_url ?? undefined,
+      },
     };
   } catch {
-    return null;
+    return { status: controls.signal?.aborted ? 'unknown' : 'offline', info: null };
   }
 }
 

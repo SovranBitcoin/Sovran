@@ -18,8 +18,8 @@ const CUBA = 'https://mint.cubabitcoin.org';
 let mockProviders: Record<string, unknown> = {};
 const mockBalances = {
   byMint: {
-    [MINIBITS]: { total: 1_000 },
-    [SOVRAN]: { total: 9_000 },
+    [MINIBITS]: { total: 1_000, spendable: 1_000, unit: 'sat' },
+    [SOVRAN]: { total: 9_000, spendable: 9_000, unit: 'sat' },
   },
 };
 
@@ -52,6 +52,52 @@ const provider = (over: Record<string, unknown> = {}) => ({
 const rows = () => renderHook(() => useProviderRows()).result.current;
 
 describe('provider rows', () => {
+  it('keeps rows in place as live health results arrive', () => {
+    mockProviders = {
+      'https://a.example': provider({ name: 'A' }),
+      'https://b.example': provider({ name: 'B' }),
+    };
+    const { result, rerender } = renderHook(
+      ({ probed }: { probed: Record<string, 'online' | 'offline' | 'unknown'> }) =>
+        useProviderRows(probed),
+      {
+        initialProps: { probed: {} },
+      }
+    );
+    expect(result.current.map((row) => row.name)).toEqual(['A', 'B']);
+    rerender({ probed: { 'https://a.example': 'offline', 'https://b.example': 'online' } });
+    expect(result.current.map((row) => row.name)).toEqual(['A', 'B']);
+    expect(result.current[0].status).toBe('offline');
+  });
+
+  it('ignores malformed and duplicate mint entries without making an invalid restriction unrestricted', () => {
+    mockProviders = {
+      'https://a.example': provider({ name: 'A', mints: ['not a URL'] }),
+      'https://b.example': provider({ name: 'B', mints: [MINIBITS, `${MINIBITS}/`, 'not a URL'] }),
+    };
+    const byName = Object.fromEntries(rows().map((r) => [r.name, r.spendableSats]));
+    expect(byName).toEqual({ A: 0, B: 1_000 });
+  });
+
+  it('keeps existing choices in place when discovery refines metadata', () => {
+    mockProviders = {
+      'https://a.example': provider({ name: 'A' }),
+      'https://b.example': provider({ name: 'B' }),
+    };
+    const { result, rerender } = renderHook(() => useProviderRows());
+    mockProviders = {
+      'https://a.example': provider({ name: 'Z' }),
+      'https://b.example': provider({ name: 'B', e2ee: true }),
+      'https://c.example': provider({ name: 'C', mints: [SOVRAN] }),
+    };
+    rerender({});
+    expect(result.current.map((row) => row.baseUrl)).toEqual([
+      'https://a.example',
+      'https://b.example',
+      'https://c.example',
+    ]);
+  });
+
   it('counts only the mints a provider will redeem', () => {
     mockProviders = {
       'https://a.example': provider({ name: 'A', mints: [MINIBITS] }),

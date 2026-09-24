@@ -1,6 +1,6 @@
 import { apiLog } from '@/shared/lib/logger';
 
-import { fetchNodeInfo, normalizeNodeUrl, type NodeInfo } from './providers';
+import { fetchNodeStatus, normalizeNodeUrl, type NodeInfo } from './providers';
 
 /**
  * Is a provider answering, and what does it say about itself?
@@ -43,12 +43,9 @@ export function cachedProbe(baseUrl: string): ProviderProbe | undefined {
 
 async function probeOne(baseUrl: string, signal?: AbortSignal): Promise<ProviderProbe> {
   const url = normalizeNodeUrl(baseUrl);
-  const info = await fetchNodeInfo(url, { signal });
-  // `fetchNodeInfo` swallows its own failures and answers null, which conflates
-  // "unreachable" with "too old to serve /v1/info". Both mean the same thing
-  // to someone choosing a provider: this one cannot be confirmed working.
-  const probe: ProviderProbe = { baseUrl: url, status: info ? 'online' : 'offline', info };
-  cache.set(url, { at: Date.now(), probe });
+  const result = await fetchNodeStatus(url, { signal });
+  const probe: ProviderProbe = { baseUrl: url, ...result };
+  if (!signal?.aborted) cache.set(url, { at: Date.now(), probe });
   return probe;
 }
 
@@ -65,6 +62,7 @@ export async function probeProviders(
 ): Promise<void> {
   const pending: string[] = [];
   for (const baseUrl of baseUrls) {
+    if (options.signal?.aborted) return;
     const cached = cachedProbe(baseUrl);
     if (cached) options.onResult(cached);
     else pending.push(baseUrl);
@@ -77,7 +75,8 @@ export async function probeProviders(
       if (options.signal?.aborted) return;
       const baseUrl = pending[cursor++];
       try {
-        options.onResult(await probeOne(baseUrl, options.signal));
+        const probe = await probeOne(baseUrl, options.signal);
+        if (!options.signal?.aborted) options.onResult(probe);
       } catch {
         // A thrown probe is the same news as a failed one, and the row simply
         // stays unmarked rather than taking the sheet down with it.

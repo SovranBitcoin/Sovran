@@ -21,7 +21,7 @@ const ROBOT_PATH =
 
 // The glyph fills the viewBox edge to edge; a hair of inset keeps the antenna
 // and the chassis shoulders off the avatar's rounded frame.
-const ROBOT_SCALE = 0.86;
+const ROBOT_SCALE = 0.8;
 const ROBOT_OFFSET = (24 - 24 * ROBOT_SCALE) / 2;
 
 interface ClayRobotAvatarProps {
@@ -86,7 +86,7 @@ export function ClayRobotAvatar({ seed, size }: ClayRobotAvatarProps) {
         height="24"
         fill={`url(#${uid}-bg)`}
       />
-      <G transform={`translate(${ROBOT_OFFSET}, ${ROBOT_OFFSET}) scale(${ROBOT_SCALE})`}>
+      <G transform={`translate(${ROBOT_OFFSET}, ${ROBOT_OFFSET - 0.6}) scale(${ROBOT_SCALE})`}>
         {/* One path, one continuous vertical gradient. `evenodd` is what makes
             the two eye circles read as cut-outs showing the background through,
             rather than as discs painted over the chassis. */}
