@@ -9,6 +9,7 @@ import {
   type SealedRequest,
 } from './e2ee/ehbpTransport';
 import { isTinfoilModel, tinfoilUpstreamModelId } from './e2ee/tinfoilModels';
+import { mintRequestPayment, receiveChange, reclaimUnspentPayment } from './payment';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { apiLog } from '../logger';
 import { buildAbortSignal } from '@/shared/lib/http/requestSignal';
@@ -880,17 +881,27 @@ export function measureMessageContent(messages: RoutstrChatMessage[]): {
   return { textChars, imageParts };
 }
 
+/**
+ * One chat completion, paid per request out of the wallet.
+ *
+ * `paymentSats` must clear the node's admission gate, not the expected cost:
+ * routstr refuses an under-funded token before it forwards anything. Whatever
+ * the request does not consume comes back as change in the `X-Cashu` response
+ * header — including on refusals — and goes straight into the wallet. Nothing
+ * is held on the node between requests, which is what stops a node change from
+ * stranding a balance.
+ */
 export async function sendMessage(
-  apiKey: string,
   messages: RoutstrChatMessage[],
   options: {
     model: string;
+    paymentSats: number;
     temperature?: number;
     max_tokens?: number;
     signal?: AbortSignal;
   }
 ): Promise<{ stream: AsyncIterable<ChatCompletionChunk> }> {
-  const { model, temperature = 0.7, max_tokens, signal } = options;
+  const { model, paymentSats, temperature = 0.7, max_tokens, signal } = options;
   const { textChars, imageParts } = measureMessageContent(messages);
   apiLog.info('api.routstr.chat.start', {
     model,
@@ -904,11 +915,11 @@ export async function sendMessage(
   const ownsScope = captureRequestScope();
   const sealedTransport = isTinfoilModel(model);
 
+  const payment = await mintRequestPayment(paymentSats);
+  let settled = false;
+
   try {
-    const authHeaders: Record<string, string> =
-      routstrStoreState().authMode === 'x-cashu' && apiKey.startsWith('cashu')
-        ? { 'X-Cashu': apiKey }
-        : { Authorization: `Bearer ${apiKey}` };
+    const authHeaders: Record<string, string> = { 'X-Cashu': payment.encoded };
 
     // The enclave is told the bare model id; the node is told the catalog's
     // prefixed one, out of band in `X-Routstr-Model`, because that is what it
@@ -966,7 +977,17 @@ export async function sendMessage(
       invalidateAttestation();
     }
 
-    const balanceKey = applyResponseChange(response, apiKey, ownsScope);
+    // Change comes back on refusals too, so this runs before the status is
+    // even looked at. `ownsScope` is logged rather than enforced: a profile
+    // switch mid-request would send it to the wrong wallet, but dropping a
+    // bearer token burns it outright, and the send is aborted on that switch
+    // anyway.
+    const change = response.headers.get('x-cashu');
+    if (change) {
+      settled = true;
+      if (!ownsScope()) apiLog.warn('routstr.payment.change_out_of_scope');
+      await receiveChange(change);
+    }
     const requestId = response.headers.get('x-routstr-request-id') || undefined;
     apiLog.debug('api.routstr.chat.response_received', {
       status: response.status,
@@ -978,13 +999,14 @@ export async function sendMessage(
     // request ever gets to the enclave, so they carry no response nonce.
     // Decrypting unconditionally would throw and destroy the real status and
     // body — the 402/401 handling below depends on reading them intact.
-    if (!response.ok) await throwResponseError(response, apiKey, balanceKey, ownsScope);
+    if (!response.ok) await throwResponseError(response, undefined, undefined, ownsScope);
 
     const decrypted =
       sealed && isSealedResponse(response)
         ? await openResponse(response, sealed.context)
         : response;
 
+    settled = true;
     apiLog.info('api.routstr.chat.stream_started', {
       model,
       requestId,
@@ -993,6 +1015,10 @@ export async function sendMessage(
     });
     return { stream: parseSSEStream(decrypted) };
   } catch (error: unknown) {
+    // No change header and no stream means the node never took the money —
+    // a transport failure, or a refusal before redemption. Put it back. If it
+    // DID redeem, the proofs are spent and this is a no-op by construction.
+    if (!settled) await reclaimUnspentPayment(payment);
     apiLog.error('api.routstr.chat.failed', {
       model,
       status: error && typeof error === 'object' && 'status' in error ? error.status : 0,

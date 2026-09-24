@@ -50,6 +50,17 @@ jest.mock('@/shared/lib/logger', () => {
   return { apiLog: log, aiLog: log, storeLog: log, log, applyFileLogging: jest.fn() };
 });
 
+jest.mock('@/shared/lib/routstr/payment', () => ({
+  mintRequestPayment: jest.fn(async (amountSats: number) => ({
+    encoded: 'cashuB-request-payment',
+    operationId: 'op-1',
+    mintUrl: 'https://mint.example',
+    amountSats,
+  })),
+  receiveChange: jest.fn(async () => undefined),
+  reclaimUnspentPayment: jest.fn(async () => undefined),
+}));
+
 const entry = (modelId: string, upstreamId?: string): LineupEntry => ({
   modelId,
   ...(upstreamId != null ? { upstreamId } : {}),
@@ -118,7 +129,7 @@ describe('AI send lineup recovery', () => {
   });
 
   it.each([404, 503, 0])(
-    'refreshes after node failure %s and retries once on the changed node with its Auto model and current token',
+    'refreshes after node failure %s and retries once on the changed node with its Auto model',
     async (status) => {
       sendMock
         .mockRejectedValueOnce(failure(status, 'Unavailable'))
@@ -135,11 +146,16 @@ describe('AI send lineup recovery', () => {
       });
       await send();
       expect(sendMock).toHaveBeenCalledTimes(2);
-      expect(sendMock.mock.calls[1][0]).toBe('cashuB-change');
-      expect(sendMock.mock.calls[1][2]).toMatchObject({ model: 'new-auto', max_tokens: 4096 });
+      // There is no credential to carry across the repoint any more: the retry
+      // mints its own payment from the wallet, which is what makes a node
+      // change cost the user nothing.
+      expect(sendMock.mock.calls[1][1]).toMatchObject({
+        model: 'new-auto',
+        max_tokens: 4096,
+        paymentSats: expect.any(Number),
+      });
       expect(refreshMock).toHaveBeenCalledWith('failure');
       expect(staticPopup).not.toHaveBeenCalled();
-      expect(jest.mocked(checkBalance).mock.calls[0][0]).toBe('cashuB-change');
     }
   );
 
@@ -152,7 +168,7 @@ describe('AI send lineup recovery', () => {
       return true;
     });
     await send();
-    expect(sendMock.mock.calls[1][2].model).toBe('replacement');
+    expect(sendMock.mock.calls[1][1].model).toBe('replacement');
   });
 
   it.each([401, 429])('never retries or refreshes auth/rate failures (%s)', async (status) => {
@@ -178,7 +194,7 @@ describe('AI send lineup recovery', () => {
       .mockResolvedValueOnce(success());
     await send();
     expect(sendMock).toHaveBeenCalledTimes(2);
-    expect(sendMock.mock.calls[1][2].model).not.toBe(sendMock.mock.calls[0][2].model);
+    expect(sendMock.mock.calls[1][1].model).not.toBe(sendMock.mock.calls[0][1].model);
     // The node is reachable and the catalog is current — nothing to refresh.
     expect(refreshMock).not.toHaveBeenCalled();
   });
@@ -200,8 +216,8 @@ describe('AI send lineup recovery', () => {
     await send();
 
     expect(sendMock).toHaveBeenCalledTimes(2);
-    expect(sendMock.mock.calls[0][2].model).toBe('old-pro');
-    expect(sendMock.mock.calls[1][2].model).toBe('other-auto');
+    expect(sendMock.mock.calls[0][1].model).toBe('old-pro');
+    expect(sendMock.mock.calls[1][1].model).toBe('other-auto');
   });
 
   it('does not narrow the walk when the node reports no upstreams', async () => {
@@ -213,7 +229,7 @@ describe('AI send lineup recovery', () => {
     await send();
 
     expect(sendMock).toHaveBeenCalledTimes(2);
-    expect(sendMock.mock.calls[1][2].model).toBe('old-auto');
+    expect(sendMock.mock.calls[1][1].model).toBe('old-auto');
   });
 
   it('stops declining after the attempt cap rather than fanning out the lineup', async () => {

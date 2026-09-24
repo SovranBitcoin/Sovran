@@ -23,11 +23,34 @@ jest.mock('@/shared/lib/logger', () => {
   return { apiLog: log, aiLog: log, storeLog: log, log, applyFileLogging: jest.fn() };
 });
 jest.mock('@/shared/lib/http/requestSignal', () => ({ buildAbortSignal: () => undefined }));
+jest.mock('@/shared/lib/routstr/payment', () => {
+  const mintRequestPayment = jest.fn(async (amountSats: number) => ({
+    encoded: 'cashuB-request-payment',
+    operationId: 'op-1',
+    mintUrl: 'https://mint.example',
+    amountSats,
+  }));
+  const receiveChange = jest.fn(async () => undefined);
+  const reclaimUnspentPayment = jest.fn(async () => undefined);
+  return { mintRequestPayment, receiveChange, reclaimUnspentPayment };
+});
 
-const completion = (key: string) =>
-  sendMessage(key, [{ role: 'user', content: 'hi' }], { model: 'test-model', max_tokens: 4096 });
+const payment = jest.requireMock('@/shared/lib/routstr/payment') as {
+  mintRequestPayment: jest.Mock;
+  receiveChange: jest.Mock;
+  reclaimUnspentPayment: jest.Mock;
+};
+
+const completion = () =>
+  sendMessage([{ role: 'user', content: 'hi' }], {
+    model: 'test-model',
+    paymentSats: 10,
+    max_tokens: 4096,
+  });
+// A chat completion no longer carries a stored credential — it pays per
+// request out of the wallet — so it is not part of this matrix. The wallet
+// operations below still hold a node-issued key and still rotate it.
 const operations = [
-  ['completion', completion],
   ['balance', (key: string) => checkBalance(key)],
   ['topup', (key: string) => topUpBalance({ apiKey: key, cashuToken: 'cashuA-test-topup' })],
 ] as const;
@@ -59,14 +82,14 @@ describe('Routstr response credentials', () => {
     }
   );
 
-  it('adopts stream headers before any stream chunk is consumed', async () => {
+  it('banks the change before any stream chunk is consumed', async () => {
     jest
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(
         new Response('data: [DONE]\n', { headers: { 'x-cashu': 'cashuB-test-change' } })
       );
-    const { stream } = await completion('cashuA-test-original');
-    expect(useRoutstrStore.getState().apiKey).toBe('cashuB-test-change');
+    const { stream } = await completion();
+    expect(payment.receiveChange).toHaveBeenCalledWith('cashuB-test-change');
     for await (const _chunk of stream) {
       /* empty fixture */
     }
@@ -88,7 +111,7 @@ describe('Routstr response credentials', () => {
         if (change === 'node') setRoutstrNodeBaseUrl('https://node.example');
         return response(401, 'Expired key');
       });
-      await expect(completion('cashuA-test-original')).rejects.toMatchObject({ status: 401 });
+      await expect(checkBalance('cashuA-test-original')).rejects.toMatchObject({ status: 401 });
       expect(useRoutstrStore.getState().apiKey).toBe(
         change === 'key' ? 'cashuB-newer' : 'cashuA-test-original'
       );
@@ -106,7 +129,7 @@ describe('Routstr response credentials', () => {
   ])('retires a definitively rejected key without destroying it: %s', async (message) => {
     useRoutstrStore.setState({ nodeBaseUrl: 'https://old.example', balance: 250_000 });
     jest.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response(401, message, ''));
-    await expect(completion('cashuA-test-original')).rejects.toMatchObject({ status: 401 });
+    await expect(checkBalance('cashuA-test-original')).rejects.toMatchObject({ status: 401 });
 
     expect(useRoutstrStore.getState().apiKey).toBeNull();
     expect(useRoutstrStore.getState().balance).toBeNull();
@@ -125,7 +148,7 @@ describe('Routstr response credentials', () => {
     'keeps the key for an ambiguous 401: %s',
     async (message) => {
       jest.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response(401, message, ''));
-      await expect(completion('cashuA-test-original')).rejects.toMatchObject({ status: 401 });
+      await expect(checkBalance('cashuA-test-original')).rejects.toMatchObject({ status: 401 });
       expect(useRoutstrStore.getState().apiKey).toBe('cashuA-test-original');
       expect(apiLog.warn).toHaveBeenCalledWith('routstr.auth.kept_key');
     }
@@ -133,20 +156,19 @@ describe('Routstr response credentials', () => {
 
   it('preserves returned change on a spent-key 401', async () => {
     jest.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response(401, 'Spent token'));
-    await expect(completion('cashuA-test-original')).rejects.toMatchObject({ status: 401 });
+    await expect(checkBalance('cashuA-test-original')).rejects.toMatchObject({ status: 401 });
     expect(useRoutstrStore.getState().apiKey).toBe('cashuB-test-change');
   });
 
-  it.each([
-    ['bearer', 'cashuA-test-original', { Authorization: 'Bearer cashuA-test-original' }],
-    ['x-cashu', 'cashuA-test-original', { 'X-Cashu': 'cashuA-test-original' }],
-    ['x-cashu', 'sk-test', { Authorization: 'Bearer sk-test' }],
-  ] as const)('uses %s mode for the completion credential', async (authMode, key, authHeaders) => {
-    useRoutstrStore.setState({ authMode, apiKey: key });
+  it('pays a completion with a freshly minted token, not a stored key', async () => {
+    // The stored key is deliberately left set: a completion must not reach for
+    // it, because a key is scoped to one node and that is what stranded money.
+    useRoutstrStore.setState({ authMode: 'bearer', apiKey: 'sk-should-not-be-used' });
     const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response());
-    await completion(key);
+    await completion();
+    expect(payment.mintRequestPayment).toHaveBeenCalledWith(10);
     expect(fetchMock.mock.calls[0][1]?.headers).toEqual({
-      ...authHeaders,
+      'X-Cashu': 'cashuB-request-payment',
       'Content-Type': 'application/json',
     });
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toMatchObject({
@@ -156,7 +178,7 @@ describe('Routstr response credentials', () => {
     });
   });
 
-  it('syncs 402 balance even when the response also rotates the token', async () => {
+  it('banks the change on a 402 and does not reclaim what the node took', async () => {
     jest.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -165,7 +187,16 @@ describe('Routstr response credentials', () => {
         { status: 402, headers: { 'x-cashu': 'cashuB-test-change' } }
       )
     );
-    await expect(completion('cashuA-test-original')).rejects.toMatchObject({ status: 402 });
-    expect(useRoutstrStore.getState()).toMatchObject({ apiKey: 'cashuB-test-change', balance: 0 });
+    await expect(completion()).rejects.toMatchObject({ status: 402 });
+    // Routstr returns change on refusals too. Banking it is the whole point;
+    // reclaiming on top would try to unspend proofs the node already redeemed.
+    expect(payment.receiveChange).toHaveBeenCalledWith('cashuB-test-change');
+    expect(payment.reclaimUnspentPayment).not.toHaveBeenCalled();
+  });
+
+  it('puts the payment back when the node never took it', async () => {
+    jest.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('network down'));
+    await expect(completion()).rejects.toMatchObject({ status: 0 });
+    expect(payment.reclaimUnspentPayment).toHaveBeenCalled();
   });
 });

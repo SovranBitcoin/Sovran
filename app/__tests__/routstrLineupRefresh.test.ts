@@ -72,6 +72,17 @@ async function load() {
   };
 }
 
+jest.mock('@/shared/lib/routstr/payment', () => ({
+  mintRequestPayment: jest.fn(async (amountSats: number) => ({
+    encoded: 'cashuB-request-payment',
+    operationId: 'op-1',
+    mintUrl: 'https://mint.example',
+    amountSats,
+  })),
+  receiveChange: jest.fn(async () => undefined),
+  reclaimUnspentPayment: jest.fn(async () => undefined),
+}));
+
 describe('Routstr lineup refresh policy', () => {
   beforeEach(() => {
     jest.resetModules();
@@ -185,7 +196,7 @@ describe('Routstr lineup refresh policy', () => {
         );
       const { sendMessage } =
         require('@/shared/lib/routstr/api') as typeof import('@/shared/lib/routstr/api');
-      await expect(sendMessage('sk-test', [], { model: 'new-model' })).rejects.toMatchObject({
+      await expect(sendMessage([], { model: 'new-model', paymentSats: 10 })).rejects.toMatchObject({
         status,
       });
       expect(store.getState()).toMatchObject({ serverLineupAt: null, lineup: null });

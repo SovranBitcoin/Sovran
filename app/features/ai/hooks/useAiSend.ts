@@ -27,6 +27,7 @@ import {
   AUTO_ICON,
   estimateTurnCostSats,
   getAffordabilityDetails,
+  requiredReserveSatsFromPricing,
   getModelDisplayName,
   getProviderById,
   getTierById,
@@ -340,11 +341,23 @@ export function useAiSend() {
             candidateCeiling != null && candidateCeiling > 0
               ? Math.min(ROUTSTR_MAX_COMPLETION_TOKENS, candidateCeiling)
               : ROUTSTR_MAX_COMPLETION_TOKENS;
+          // The token attached to the request has to clear the node's
+          // admission gate, which is the same figure the affordability chip
+          // shows — not the expected cost. Anything unspent comes straight
+          // back as change, so over-funding costs nothing but a swap.
+          const gateSats = Math.max(
+            1,
+            Math.ceil(
+              (requiredReserveSatsFromPricing(
+                candidateEntries[i]?.satsPricing ?? null,
+                imageCount
+              ) ?? 1) * AFFORD_BUFFER
+            )
+          );
           try {
-            const currentKey = useRoutstrStore.getState().apiKey;
-            if (!currentKey) throw { status: 401, error: { message: 'Missing key', type: 'auth' } };
-            const result = await sendMessage(currentKey, apiMessages, {
+            const result = await sendMessage(apiMessages, {
               model: candidate,
+              paymentSats: gateSats,
               temperature: 0.7,
               max_tokens: maxTokens,
               signal: controller.signal,

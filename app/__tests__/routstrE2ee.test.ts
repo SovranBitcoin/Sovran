@@ -51,6 +51,17 @@ jest.mock('@/shared/lib/http/requestSignal', () => ({
   buildAbortSignal: () => undefined,
 }));
 
+jest.mock('@/shared/lib/routstr/payment', () => ({
+  mintRequestPayment: jest.fn(async (amountSats: number) => ({
+    encoded: 'cashuB-request-payment',
+    operationId: 'op-1',
+    mintUrl: 'https://mint.example',
+    amountSats,
+  })),
+  receiveChange: jest.fn(async () => undefined),
+  reclaimUnspentPayment: jest.fn(async () => undefined),
+}));
+
 describe('tinfoil model identity', () => {
   it('keys E2EE on the id prefix, not the display name', () => {
     expect(isTinfoilModel('tinfoil-glm-5-3')).toBe(true);
@@ -144,8 +155,9 @@ describe('sendMessage over EHBP', () => {
       })
     );
 
-    await sendMessage('sk-test', [{ role: 'user', content: 'a secret prompt' }], {
+    await sendMessage([{ role: 'user', content: 'a secret prompt' }], {
       model: 'tinfoil-glm-5-2',
+      paymentSats: 10,
       max_tokens: 4096,
     });
 
@@ -174,7 +186,10 @@ describe('sendMessage over EHBP', () => {
       })
     );
 
-    await sendMessage('sk-test', [{ role: 'user', content: 'hi' }], { model: 'claude-haiku-4.5' });
+    await sendMessage([{ role: 'user', content: 'hi' }], {
+      model: 'claude-haiku-4.5',
+      paymentSats: 10,
+    });
 
     const headers = calls[0].init.headers as Record<string, string>;
     expect(headers['Content-Type']).toBe('application/json');
@@ -201,7 +216,7 @@ describe('sendMessage over EHBP', () => {
     );
 
     await expect(
-      sendMessage('sk-test', [{ role: 'user', content: 'hi' }], { model: 'tinfoil-glm-5-2' })
+      sendMessage([{ role: 'user', content: 'hi' }], { model: 'tinfoil-glm-5-2', paymentSats: 10 })
     ).rejects.toMatchObject({
       status: 402,
       error: { code: 'insufficient_balance', details: { required: 85577, available: 216 } },

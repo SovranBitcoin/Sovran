@@ -50,6 +50,17 @@ jest.mock('@/shared/lib/http/requestSignal', () => ({
   buildAbortSignal: () => undefined,
 }));
 
+jest.mock('@/shared/lib/routstr/payment', () => ({
+  mintRequestPayment: jest.fn(async (amountSats: number) => ({
+    encoded: 'cashuB-request-payment',
+    operationId: 'op-1',
+    mintUrl: 'https://mint.example',
+    amountSats,
+  })),
+  receiveChange: jest.fn(async () => undefined),
+  reclaimUnspentPayment: jest.fn(async () => undefined),
+}));
+
 const INSUFFICIENT_BODY = {
   error: {
     message: 'Insufficient balance: 85577 mSats required for this model. 216 available.',
@@ -80,13 +91,14 @@ describe('402 → balance truth-sync', () => {
     global.fetch = realFetch;
   });
 
+  // A chat completion no longer carries a hosted balance — it pays per request
+  // out of the wallet — so the balance sync now only has a credential to own
+  // on the wallet calls that still hold one. Those are what `reclaim` drains.
   it('overwrites the stale store balance with the 402 available mSats', async () => {
     useRoutstrStore.getState().setBalance(299_841); // the phantom figure
     stubFetch402(INSUFFICIENT_BODY);
 
-    await expect(
-      sendMessage('sk-test', [{ role: 'user', content: 'hi' }], { model: 'gemma-4-26b-a4b-it' })
-    ).rejects.toMatchObject({ status: 402 });
+    await expect(checkBalance('sk-test')).rejects.toMatchObject({ status: 402 });
 
     expect(useRoutstrStore.getState().balance).toBe(216);
   });
@@ -99,7 +111,7 @@ describe('402 → balance truth-sync', () => {
   ])('parses the v0.4.7 detail object without inventing a balance', async (detail, expected) => {
     useRoutstrStore.getState().setBalance(299841);
     stubFetch402({ detail });
-    await expect(sendMessage('sk-test', [], { model: 'test-model' })).rejects.toMatchObject({
+    await expect(checkBalance('sk-test')).rejects.toMatchObject({
       status: 402,
       error: { message: 'Insufficient balance', details: { required: 85577 } },
     });
@@ -108,7 +120,7 @@ describe('402 → balance truth-sync', () => {
 
   it('keeps the legacy FastAPI string balance extraction', async () => {
     stubFetch402({ detail: 'Insufficient balance: 85577 mSats required, 216 available' });
-    await expect(sendMessage('sk-test', [], { model: 'test-model' })).rejects.toMatchObject({
+    await expect(checkBalance('sk-test')).rejects.toMatchObject({
       error: { details: { required: 85577, available: 216 } },
     });
     expect(useRoutstrStore.getState().balance).toBe(216);
@@ -130,8 +142,9 @@ describe('402 → balance truth-sync', () => {
     useRoutstrStore.getState().setBalance(100_000);
     stubFetch402(UPSTREAM_402);
 
-    const error = await sendMessage('sk-test', [{ role: 'user', content: 'hi' }], {
+    const error = await sendMessage([{ role: 'user', content: 'hi' }], {
       model: 'gpt-oss-20b',
+      paymentSats: 10,
     }).catch((e: unknown) => e);
 
     expect(isWalletBalanceError(error)).toBe(false);
@@ -146,8 +159,9 @@ describe('402 → balance truth-sync', () => {
   it('still calls a routstr-raised 402 a wallet problem', async () => {
     stubFetch402(INSUFFICIENT_BODY);
 
-    const error = await sendMessage('sk-test', [{ role: 'user', content: 'hi' }], {
+    const error = await sendMessage([{ role: 'user', content: 'hi' }], {
       model: 'gpt-oss-20b',
+      paymentSats: 10,
     }).catch((e: unknown) => e);
 
     expect(isWalletBalanceError(error)).toBe(true);
@@ -159,7 +173,7 @@ describe('402 → balance truth-sync', () => {
     stubFetch402({ error: { message: 'Payment required', type: 'x' } });
 
     await expect(
-      sendMessage('sk-test', [{ role: 'user', content: 'hi' }], { model: 'any' })
+      sendMessage([{ role: 'user', content: 'hi' }], { model: 'any', paymentSats: 10 })
     ).rejects.toMatchObject({ status: 402 });
 
     expect(useRoutstrStore.getState().balance).toBe(299_841);
@@ -221,7 +235,10 @@ describe('Routstr errors retain machine-readable evidence for shared presentatio
           headers: { 'content-type': 'application/json' },
         })
     ) as unknown as typeof fetch;
-    await sendMessage('sk-test', [{ role: 'user', content: 'hi' }], { model: 'test-model' }).then(
+    await sendMessage([{ role: 'user', content: 'hi' }], {
+      model: 'test-model',
+      paymentSats: 10,
+    }).then(
       () => {
         throw new Error('Expected request to fail');
       },
@@ -249,8 +266,9 @@ describe('Routstr errors retain machine-readable evidence for shared presentatio
       body,
     })) as unknown as typeof fetch;
 
-    const { stream } = await sendMessage('sk-test', [{ role: 'user', content: 'hi' }], {
+    const { stream } = await sendMessage([{ role: 'user', content: 'hi' }], {
       model: 'test-model',
+      paymentSats: 10,
     });
     const drain = async () => {
       for await (const _chunk of stream) {
