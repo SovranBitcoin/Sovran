@@ -2,14 +2,20 @@
  * @jest-environment node
  */
 
-import { confirmBearerDowngrade } from '@/features/nearPay/lib/startNearPaySend';
-import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
+import {
+  confirmBearerDowngrade,
+  notifyNoSharedMint,
+  notifyNutDropNeedsBitcoinAccount,
+  notifyNutDropPeerNotReady,
+} from '@/features/nearPay/lib/startNearPaySend';
+import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
 
 jest.mock('@/shared/lib/popup/popups/actionMenu', () => ({
   actionMenuPopup: jest.fn(),
 }));
+jest.mock('@/shared/lib/popup/popups/actionMenuSheet', () => ({ actionMenuSheet: jest.fn() }));
 
-const mockPopup = actionMenuPopup as jest.MockedFunction<typeof actionMenuPopup>;
+const mockPopup = jest.mocked(actionMenuSheet);
 
 function latestConfig() {
   const config = mockPopup.mock.calls.at(-1)?.[0];
@@ -19,6 +25,18 @@ function latestConfig() {
 
 describe('confirmBearerDowngrade', () => {
   beforeEach(() => mockPopup.mockClear());
+
+  it.each([
+    ['near-pay-no-shared-mint-ok', () => notifyNoSharedMint('Alice')],
+    ['near-pay-needs-bitcoin-account-ok', () => notifyNutDropNeedsBitcoinAccount()],
+    ['near-pay-peer-not-ready-ok', () => notifyNutDropPeerNotReady('Alice')],
+  ] as const)('puts notice %s in the modal-safe sheet', async (testID, notify) => {
+    const decision = notify();
+    const config = latestConfig();
+    expect(config.buttons[0].testID).toBe(testID);
+    config.onDismiss?.();
+    await expect(decision).resolves.toBeUndefined();
+  });
 
   it('resolves true only from the explicit Send unlocked action', async () => {
     const decision = confirmBearerDowngrade('Alice');

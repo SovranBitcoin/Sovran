@@ -1,4 +1,4 @@
-import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
+import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
 
 /** A one-button notice, resolved once — on the button or on dismiss. */
 function acknowledge(notice: {
@@ -14,7 +14,7 @@ function acknowledge(notice: {
       settled = true;
       resolve();
     };
-    actionMenuPopup({
+    actionMenuSheet({
       title: notice.title,
       buttons: [
         {
@@ -83,7 +83,7 @@ export function confirmBearerDowngrade(displayName: string): Promise<boolean> {
       settled = true;
       resolve(value);
     };
-    actionMenuPopup({
+    actionMenuSheet({
       title: 'Send unlocked while offline?',
       buttons: [
         {
