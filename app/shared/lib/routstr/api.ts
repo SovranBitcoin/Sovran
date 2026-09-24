@@ -915,7 +915,7 @@ export async function sendMessage(
   const ownsScope = captureRequestScope();
   const sealedTransport = isTinfoilModel(model);
 
-  const payment = await mintRequestPayment(paymentSats);
+  const payment = await mintRequestPayment(paymentSats, routstrBaseUrl());
   let settled = false;
   // Spent minus returned is what the node actually took. Exact, local, and
   // known before the first chunk — the change header is set before the body
@@ -992,6 +992,8 @@ export async function sendMessage(
       settled = true;
       if (!ownsScope()) apiLog.warn('routstr.payment.change_out_of_scope');
       costSats = Math.max(0, paymentSats - (await receiveChange(change)));
+      // The change is home, so there is nothing left to recover for this one.
+      routstrStoreState().settlePayment(payment.id);
     }
     const requestId = response.headers.get('x-routstr-request-id') || undefined;
     apiLog.debug('api.routstr.chat.response_received', {

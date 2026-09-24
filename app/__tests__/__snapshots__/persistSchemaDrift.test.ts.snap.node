@@ -5826,6 +5826,52 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
           ],
           "default": null,
         },
+        "pendingPayments": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "properties": {
+              "encoded": {
+                "maxLength": 65536,
+                "type": "string",
+              },
+              "nodeBaseUrl": {
+                "maxLength": 512,
+                "type": "string",
+              },
+              "operationId": {
+                "maxLength": 128,
+                "type": "string",
+              },
+              "startedAt": {
+                "default": 0,
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+            },
+            "required": [
+              "encoded",
+              "nodeBaseUrl",
+              "operationId",
+            ],
+            "type": "object",
+          },
+          "default": {},
+          "propertyNames": {
+            "type": "string",
+          },
+          "tolerantKey": {
+            "input": {
+              "maxLength": 128,
+              "type": "string",
+            },
+            "output": {
+              "maxLength": 128,
+              "type": "string",
+            },
+          },
+          "type": "object",
+        },
         "selectedModel": {
           "anyOf": [
             {
@@ -7859,6 +7905,7 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
           ],
           "default": null,
         },
+        "pendingPayments": {},
         "selectedModel": {
           "anyOf": [
             {
@@ -7951,6 +7998,7 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
         "nodeBaseUrl",
         "legacyAccounts",
         "userNodeBaseUrl",
+        "pendingPayments",
       ],
       "type": "object",
     },

@@ -38,6 +38,12 @@ function selectedMintUrl(): string | undefined {
   return useMintStore.getState().selectedMint;
 }
 
+function routstrStoreState() {
+  const { useRoutstrStore } =
+    require('@/shared/stores/profile/routstrStore') as typeof import('@/shared/stores/profile/routstrStore');
+  return useRoutstrStore.getState();
+}
+
 interface RequestPayment {
   /** Encoded Cashu token for the `X-Cashu` header. */
   encoded: string;
@@ -45,6 +51,8 @@ interface RequestPayment {
   operationId: string;
   mintUrl: string;
   amountSats: number;
+  /** Key of the `pendingPayments` row that keeps this recoverable. */
+  id: string;
 }
 
 /**
@@ -55,7 +63,10 @@ interface RequestPayment {
  * — so callers pass the gate figure, not the expected cost. Whatever the
  * request does not consume comes back as change.
  */
-export async function mintRequestPayment(amountSats: number): Promise<RequestPayment> {
+export async function mintRequestPayment(
+  amountSats: number,
+  nodeBaseUrl: string
+): Promise<RequestPayment> {
   const manager = wallet();
   if (!manager) throw new Error('wallet is not ready');
   const mintUrl = selectedMintUrl();
@@ -63,13 +74,19 @@ export async function mintRequestPayment(amountSats: number): Promise<RequestPay
 
   const prepared = await manager.ops.send.prepare({ mintUrl, amount: amountSats, unit: 'sat' });
   const { operation, token } = await manager.ops.send.execute(prepared);
-  apiLog.info('routstr.payment.minted', { amountSats, operationId: operation.id });
-  return {
-    encoded: getEncodedToken(token),
+  const encoded = getEncodedToken(token);
+  // Recorded BEFORE it leaves. Between here and the change header the money is
+  // in the node's hands with no local trace; if the app dies in that window
+  // this row is the only way back, because routstr will refund against the
+  // original token.
+  routstrStoreState().beginPayment(operation.id, {
+    encoded,
+    nodeBaseUrl,
     operationId: operation.id,
-    mintUrl,
-    amountSats,
-  };
+    startedAt: Date.now(),
+  });
+  apiLog.info('routstr.payment.minted', { amountSats, operationId: operation.id });
+  return { encoded, operationId: operation.id, mintUrl, amountSats, id: operation.id };
 }
 
 /** Face value of an encoded token, in sats. Reading it from the proofs rather
@@ -119,8 +136,12 @@ export async function reclaimUnspentPayment(payment: RequestPayment): Promise<vo
   if (!manager) return;
   try {
     await manager.ops.send.reclaim(payment.operationId);
+    routstrStoreState().settlePayment(payment.id);
     apiLog.info('routstr.payment.reclaimed', { operationId: payment.operationId });
   } catch (error) {
+    // Left pending on purpose: the recovery sweep asks the node whether it
+    // took this token, which is the question a local reclaim failure cannot
+    // answer.
     apiLog.warn('routstr.payment.reclaim_deferred', {
       operationId: payment.operationId,
       error: error instanceof Error ? error.message : String(error),

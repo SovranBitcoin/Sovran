@@ -101,6 +101,88 @@ async function askNode(
   return parsed.data.token;
 }
 
+/**
+ * Chase the change for payments the app never finished collecting.
+ *
+ * The dangerous window in pay-per-request is between handing a token to a node
+ * and reading the change out of its response header. Die there — force quit,
+ * crash, OS reclaim — and the header never arrives. routstr closes it: its
+ * refund endpoint takes the ORIGINAL token in `X-Cashu` and returns that
+ * request's change (`routstr/balance.py`), so a payment recorded before it
+ * left can always be asked about again.
+ *
+ * The four answers are all distinct and all matter:
+ *   200 — here is the change. Bank it, forget the row.
+ *   404 — this node never saw the token. It was never spent, so undo the send.
+ *   425 — the upstream request is still running. Ask again later.
+ *   410 — the refund was swept. Nothing to collect; stop asking.
+ */
+export async function recoverPendingPayments(controls: RequestControls = {}): Promise<number> {
+  const manager = CocoManager.peekInstance();
+  if (!manager) return 0;
+
+  const store = useRoutstrStore.getState();
+  const pending = Object.entries(store.pendingPayments);
+  if (pending.length === 0) return 0;
+
+  let recovered = 0;
+  for (const [id, payment] of pending) {
+    let response: Response;
+    try {
+      // An arbitrary node base, and the reply is a bearer token rather than a
+      // validatable envelope.
+      // eslint-disable-next-line no-restricted-globals -- see the note above
+      response = await fetch(refundUrl(payment.nodeBaseUrl), {
+        method: 'POST',
+        headers: { 'X-Cashu': payment.encoded, 'Content-Type': 'application/json' },
+        body: '{}',
+        signal: buildAbortSignal({ timeoutMs: 20_000, ...controls }),
+      });
+    } catch {
+      continue; // offline; the row survives for the next sweep
+    }
+
+    if (response.status === 404) {
+      // The node has no record of this token, so it was never redeemed. The
+      // proofs are still ours — give them back to the wallet.
+      try {
+        await manager.ops.send.reclaim(payment.operationId);
+        useRoutstrStore.getState().settlePayment(id);
+        apiLog.info('routstr.payment.recovered_unspent', { operationId: payment.operationId });
+      } catch (error) {
+        apiLog.warn('routstr.payment.recover_reclaim_failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      continue;
+    }
+    if (response.status === 410) {
+      apiLog.warn('routstr.payment.change_swept', { startedAt: payment.startedAt });
+      useRoutstrStore.getState().settlePayment(id);
+      continue;
+    }
+    if (!response.ok) continue; // 425 and anything else: try again later
+
+    const parsed = RefundSpine.safeParse(await response.json().catch(() => null));
+    if (!parsed.success || !parsed.data.token) continue;
+    try {
+      const prepared = await manager.ops.receive.prepare({ token: parsed.data.token });
+      await manager.ops.receive.execute(prepared);
+      useRoutstrStore.getState().settlePayment(id);
+      recovered += 1;
+      apiLog.info('routstr.payment.change_recovered', { startedAt: payment.startedAt });
+    } catch (error) {
+      // Leave the row: the refund is idempotent, so the next sweep re-asks.
+      apiLog.error('routstr.payment.change_receive_failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  if (recovered > 0) apiLog.info('routstr.payment.recovery_swept', { recovered });
+  return recovered;
+}
+
 interface ReclaimOutcome {
   /** Credentials examined this pass. */
   attempted: number;

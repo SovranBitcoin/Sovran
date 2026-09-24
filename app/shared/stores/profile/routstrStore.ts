@@ -135,6 +135,16 @@ interface RoutstrAccount {
   reclaimedAt: number | null;
 }
 
+/** A payment in the window between spending and being paid back. */
+interface PendingPayment {
+  /** The token as sent. It is the lookup key the node refunds against. */
+  encoded: string;
+  nodeBaseUrl: string;
+  /** Coco send operation, so a token the node never redeemed can be undone. */
+  operationId: string;
+  startedAt: number;
+}
+
 interface RoutstrState {
   /** Cashu token or persistent wallet key */
   apiKey: string | null;
@@ -161,6 +171,21 @@ interface RoutstrState {
    * default everyone starts on.
    */
   userNodeBaseUrl: string | null;
+  /**
+   * Payments handed to a node whose change has not come home yet.
+   *
+   * Paying per request means spending a token and taking change back in the
+   * same round trip. Between those two moments the money is in the node's
+   * hands and the only record of it is a response header we have not read. If
+   * the app dies there — force quit, crash, OS reclaim — that header never
+   * arrives and the change is lost.
+   *
+   * Recording the token BEFORE sending closes that window, because routstr's
+   * refund endpoint accepts the original token and returns that specific
+   * request's change (`routstr/balance.py`, the `X-Cashu` branch). So a
+   * payment written here can always be asked about again.
+   */
+  pendingPayments: Record<string, PendingPayment>;
   /**
    * Working copy of the active session's messages. The canonical home is
    * `sessions[currentSessionId].messages`; this field is rehydrated from
@@ -287,6 +312,10 @@ interface RoutstrActions {
    *  server lineup and model cache so the menu re-derives from the new node's
    *  own catalog rather than showing another node's models. */
   setUserNode: (nodeBaseUrl: string | null) => void;
+  /** Record a payment before it leaves, so its change stays recoverable. */
+  beginPayment: (id: string, payment: PendingPayment) => void;
+  /** Forget a payment whose change is home, or which was never taken. */
+  settlePayment: (id: string) => void;
   isCacheStale: (nowMs?: number) => boolean;
 
   createSession: () => string;
@@ -404,6 +433,23 @@ const PersistedRoutstrMessages = tolerantArray(
   MAX_PERSISTED_SESSION_MESSAGES
 );
 
+/** Stuck payments, bounded to what the schema accepts. Oldest first when it
+ *  has to give — a row that has survived that long has almost certainly been
+ *  swept by the node already, and an unbounded blob is its own failure. */
+function boundedPendingPayments(
+  payments: Record<string, PendingPayment>
+): Record<string, PendingPayment> {
+  const entries = Object.entries(payments);
+  if (entries.length <= MAX_PENDING_PAYMENTS) return payments;
+  const kept = entries
+    .sort((a, b) => b[1].startedAt - a[1].startedAt)
+    .slice(0, MAX_PENDING_PAYMENTS);
+  storeLog.warn('store.routstr.pending_payments_evicted', {
+    dropped: entries.length - kept.length,
+  });
+  return Object.fromEntries(kept);
+}
+
 /**
  * Archived credentials, bounded to what the schema accepts.
  *
@@ -512,6 +558,18 @@ const PersistedRoutstrAccount = z.looseObject({
   reclaimedAt: z.number().int().nonnegative().nullable().default(null).catch(null),
 });
 
+/** Capped low: a row only survives here while a payment is genuinely stuck,
+ *  and the node sweeps unclaimed refunds on its own timetable, so an ancient
+ *  row is worth less than the blob it costs. */
+const MAX_PENDING_PAYMENTS = 32;
+
+const PersistedPendingPayment = z.looseObject({
+  encoded: z.string().max(65_536),
+  nodeBaseUrl: z.string().max(512),
+  operationId: z.string().max(128),
+  startedAt: z.number().int().nonnegative().default(0).catch(0),
+});
+
 const PersistedRoutstrStore = z.object({
   authMode: z.enum(['bearer', 'x-cashu']).default('bearer').catch('bearer'),
   serverLineupAt: z.number().int().nonnegative().nullable().default(null).catch(null),
@@ -534,6 +592,7 @@ const PersistedRoutstrStore = z.object({
   // Additive + tolerant: a malformed value parses to null, which simply means
   // "follow nagg" — the default.
   userNodeBaseUrl: z.string().max(512).nullable().default(null).catch(null),
+  pendingPayments: tolerantRecord(z.string().max(128), PersistedPendingPayment),
 });
 
 export const useRoutstrStore = create<RoutstrStore>()(
@@ -553,6 +612,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
       serverLineupAt: null,
       nodeBaseUrl: null,
       userNodeBaseUrl: null,
+      pendingPayments: {},
       legacyAccounts: {},
       sessions: [],
       currentSessionId: null,
@@ -782,6 +842,19 @@ export const useRoutstrStore = create<RoutstrStore>()(
         });
       },
 
+      beginPayment: (id, payment) => {
+        set((state) => ({ pendingPayments: { ...state.pendingPayments, [id]: payment } }));
+      },
+
+      settlePayment: (id) => {
+        set((state) => {
+          if (!Object.hasOwn(state.pendingPayments, id)) return state;
+          const next = { ...state.pendingPayments };
+          delete next[id];
+          return { pendingPayments: next };
+        });
+      },
+
       setUserNode: (nodeBaseUrl) => {
         const next = nodeBaseUrl?.trim().replace(/\/+$/, '') || null;
         storeLog.info('store.routstr.user_node_set', { pinned: next != null });
@@ -884,6 +957,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
         nodeBaseUrl: state.nodeBaseUrl,
         legacyAccounts: boundedAccounts(state.legacyAccounts),
         userNodeBaseUrl: state.userNodeBaseUrl,
+        pendingPayments: boundedPendingPayments(state.pendingPayments),
       }),
       afterHydrate: (state) => {
         if (!state) return;

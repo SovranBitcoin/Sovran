@@ -217,3 +217,113 @@ describe('reclaimRoutstrBalances', () => {
     expect(mockPrepare).not.toHaveBeenCalled();
   });
 });
+
+describe('recoverPendingPayments', () => {
+  /**
+   * The window this exists for: the token has left, the node has it, and the
+   * app dies before reading the change header. Nothing local knows the amount,
+   * so the only route back is asking the node about the ORIGINAL token.
+   */
+  const { recoverPendingPayments } = require('@/shared/lib/routstr/reclaim') as {
+    recoverPendingPayments: () => Promise<number>;
+  };
+  const reclaim = jest.fn(async () => undefined);
+
+  // eslint-disable-next-line no-restricted-properties -- restore seam for the stub
+  const realFetch = global.fetch;
+  afterEach(() => {
+    // eslint-disable-next-line no-restricted-properties -- restore seam for the stub
+    global.fetch = realFetch;
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    const manager = jest.requireMock('@/shared/lib/cashu/manager') as {
+      CocoManager: { peekInstance: () => unknown };
+    };
+    jest.spyOn(manager.CocoManager, 'peekInstance').mockReturnValue({
+      ops: { receive: { prepare: mockPrepare, execute: mockExecute }, send: { reclaim } },
+    });
+    useRoutstrStore.setState({
+      pendingPayments: {
+        'op-stuck': {
+          encoded: 'cashuB-paid',
+          nodeBaseUrl: 'https://node.example',
+          operationId: 'op-stuck',
+          startedAt: 1,
+        },
+      },
+    });
+  });
+
+  const stub = (status: number, body: unknown = {}) => {
+    // eslint-disable-next-line no-restricted-properties -- test seam
+    global.fetch = jest.fn(
+      async () =>
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'content-type': 'application/json' },
+        })
+    ) as unknown as typeof fetch;
+  };
+
+  it('collects the change the app never read', async () => {
+    stub(200, { token: 'cashuB-change', sats: '7' });
+
+    await expect(recoverPendingPayments()).resolves.toBe(1);
+
+    expect(mockPrepare).toHaveBeenCalledWith({ token: 'cashuB-change' });
+    expect(useRoutstrStore.getState().pendingPayments).toEqual({});
+  });
+
+  it('undoes the send when the node never saw the token', async () => {
+    // 404 is proof of non-redemption: the proofs are still ours.
+    stub(404, { detail: 'Refund not found' });
+
+    await recoverPendingPayments();
+
+    expect(reclaim).toHaveBeenCalledWith('op-stuck');
+    expect(useRoutstrStore.getState().pendingPayments).toEqual({});
+  });
+
+  it('keeps the row while the upstream request is still running', async () => {
+    // 425 means the refund row does not exist YET. Dropping the row here would
+    // discard the money a moment before it became collectable.
+    stub(425, { detail: 'Refund is pending; retry shortly.' });
+
+    await expect(recoverPendingPayments()).resolves.toBe(0);
+
+    expect(reclaim).not.toHaveBeenCalled();
+    expect(useRoutstrStore.getState().pendingPayments['op-stuck']).toBeDefined();
+  });
+
+  it('stops asking once the refund has been swept', async () => {
+    stub(410, { detail: 'Refund has been swept' });
+
+    await recoverPendingPayments();
+
+    expect(reclaim).not.toHaveBeenCalled();
+    expect(useRoutstrStore.getState().pendingPayments).toEqual({});
+  });
+
+  it('keeps the row when the change cannot be banked', async () => {
+    stub(200, { token: 'cashuB-change' });
+    mockExecute.mockRejectedValueOnce(new Error('mint unreachable'));
+
+    await expect(recoverPendingPayments()).resolves.toBe(0);
+
+    // The refund is idempotent, so re-asking recovers it.
+    expect(useRoutstrStore.getState().pendingPayments['op-stuck']).toBeDefined();
+  });
+
+  it('survives being offline without losing the record', async () => {
+    // eslint-disable-next-line no-restricted-properties -- test seam
+    global.fetch = jest.fn(async () => {
+      throw new TypeError('Network request failed');
+    }) as unknown as typeof fetch;
+
+    await expect(recoverPendingPayments()).resolves.toBe(0);
+
+    expect(useRoutstrStore.getState().pendingPayments['op-stuck']).toBeDefined();
+  });
+});
