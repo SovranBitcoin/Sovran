@@ -125,6 +125,19 @@ describe('describeDestination', () => {
     });
   });
 
+  it('P2PK key → the same payable person, with the key as the lock target', () => {
+    const d = describeInput('p2pkKey');
+    expect(d.kind).toBe('person');
+    expect(d.action).toBe('startContactSend');
+    // Identity display still goes through the npub ref, so the app's existing
+    // kind-0 hydration is unchanged.
+    expect(d.recipient).toEqual({
+      ref: { type: 'npub', value: INPUTS.npub },
+      pending: true,
+      lockKey: INPUTS.p2pkKey,
+    });
+  });
+
   it('mint URL → open mint', () => {
     const d = describeInput('mintUrl');
     expect(d.kind).toBe('mint');

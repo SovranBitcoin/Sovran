@@ -65,7 +65,9 @@ function summarizeIntent(intent: ResolvedIntent): Record<string, unknown> {
     case "openMint":
       return { hasUrl: !!intent.url };
     case "openProfile":
-      return { hasNpub: !!intent.npub };
+      // Booleans only — a pubkey is public, but logging identities by default
+      // turns a diagnostic log into a contact graph.
+      return { hasNpub: !!intent.npub, fromP2pkKey: !!intent.p2pkPubkey };
     case "chooseOption":
       return {
         optionCount: intent.options.length,

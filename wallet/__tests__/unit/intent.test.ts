@@ -166,6 +166,21 @@ describe('resolveIntent — non-payment', () => {
     expect(intent.type).toBe('openProfile');
     if (intent.type === 'openProfile') {
       expect(intent.npub).toBeTruthy();
+      expect(intent.pubkeyHex).toBeTruthy();
+      // Nothing was scanned to lock to, so nothing is carried.
+      expect(intent.p2pkPubkey).toBeUndefined();
+    }
+  });
+
+  it('resolves a P2PK key to the same profile, carrying the key', () => {
+    // The key is the lock target; the npub is who it belongs to.
+    const parsed = parse(INPUTS.p2pkKey);
+    const intent = resolveIntent(parsed, defaultDetectors);
+    expect(intent.type).toBe('openProfile');
+    if (intent.type === 'openProfile') {
+      expect(intent.npub).toBe(INPUTS.npub);
+      expect(intent.pubkeyHex).toBe(INPUTS.p2pkKey.slice(2));
+      expect(intent.p2pkPubkey).toBe(INPUTS.p2pkKey);
     }
   });
 

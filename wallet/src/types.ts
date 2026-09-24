@@ -231,7 +231,17 @@ export type ResolvedIntent =
   | { type: 'meltLnurlp'; option: PaymentOption }
   | { type: 'meltOnchainAddress'; option: PaymentOption }
   | { type: 'openMint'; url: string }
-  | { type: 'openProfile'; npub: string }
+  | {
+      type: 'openProfile';
+      npub: string;
+      /** 32-byte x-only hex for the same identity. */
+      pubkeyHex: string;
+      /**
+       * The compressed key the input carried, when it WAS one — the exact
+       * lock target, parity included. Absent for an npub/nprofile/hex input.
+       */
+      p2pkPubkey?: string;
+    }
   | { type: 'chooseOption'; options: AnnotatedOption[] }
   | { type: 'ignore'; reason: import('./formatting/locales').LocalizedReason };
 
@@ -292,6 +302,12 @@ export interface DestinationRecipient {
   ref: DestinationRecipientRef;
   /** True until the app resolves a display name / avatar for `ref`. */
   pending: boolean;
+  /**
+   * The compressed P2PK key the input literally carried, when it was one.
+   * Identity display still goes through `ref`; this is the lock target only,
+   * so a `03` key locks to itself rather than to our `02` lift of it.
+   */
+  lockKey?: string;
 }
 
 export interface DestinationDescriptor {

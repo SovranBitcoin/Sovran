@@ -261,7 +261,14 @@ export function describeDestination(
         icon: "person",
         action: "startContactSend",
         hasAlternatives: false,
-        recipient: { ref: { type: "npub", value: intent.npub }, pending: true },
+        // The ref stays an npub whatever was scanned, so the app's existing
+        // kind-0 hydration works unchanged; a scanned key rides alongside as
+        // the lock target.
+        recipient: {
+          ref: { type: "npub", value: intent.npub },
+          pending: true,
+          ...(intent.p2pkPubkey ? { lockKey: intent.p2pkPubkey } : {}),
+        },
         raw,
       };
       break;

@@ -159,6 +159,11 @@ jest.mock('@/features/send/components/DetectedActionRow', () => ({
 }));
 
 const TOKEN = 'lnbc100n1exampleinvoice';
+// The compressed P2PK key other Cashu wallets display. Before it parsed as an
+// identity the descriptor came back `unsupported` and the row was hidden
+// entirely, so there was nothing to tap.
+const P2PK_KEY =
+  '020000000000000000000000000000000000000000000000000000000000000001';
 // A long multi-option BIP-321 (lightning invoice + creq). The row must hand the
 // machine the FULL string untruncated, so `machine.scan` re-parses both options
 // and shows the same chooser as the Paste button. Regression for "tapping the
@@ -240,6 +245,15 @@ describe('SendScreen — destination entry routes through machine.scan', () => {
     expect(passed).toContain('lightning=');
     expect(passed).toContain('creq=');
     expect(mockExecute).not.toHaveBeenCalled();
+  });
+
+  it('a pasted P2PK key shows a row instead of vanishing', () => {
+    const renderer = renderSend();
+    typeDestination(renderer, P2PK_KEY);
+    act(() => {
+      byTestID(renderer, 'detected-row').props.onPress();
+    });
+    expect(mockScan).toHaveBeenCalledWith(P2PK_KEY, { source: 'clipboard', reset: true });
   });
 
   it('whitespace (a name search) is never handed to the parser', () => {
