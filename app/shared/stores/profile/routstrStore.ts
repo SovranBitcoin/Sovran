@@ -187,6 +187,15 @@ interface RoutstrState {
    */
   pendingPayments: Record<string, PendingPayment>;
   /**
+   * Ask before each message what it could cost.
+   *
+   * Paying per request LOCKS the node's admission gate for the duration of the
+   * call, and on a frontier model that is thousands of sats even when the
+   * message itself costs a fraction of one. The user should see that number
+   * before it leaves, not discover it in the history.
+   */
+  confirmSpend: boolean;
+  /**
    * Working copy of the active session's messages. The canonical home is
    * `sessions[currentSessionId].messages`; this field is rehydrated from
    * the active session in `afterHydrate` and is *not* persisted on its
@@ -312,6 +321,7 @@ interface RoutstrActions {
    *  server lineup and model cache so the menu re-derives from the new node's
    *  own catalog rather than showing another node's models. */
   setUserNode: (nodeBaseUrl: string | null) => void;
+  setConfirmSpend: (confirmSpend: boolean) => void;
   /** Record a payment before it leaves, so its change stays recoverable. */
   beginPayment: (id: string, payment: PendingPayment) => void;
   /** Forget a payment whose change is home, or which was never taken. */
@@ -593,6 +603,9 @@ const PersistedRoutstrStore = z.object({
   // "follow nagg" — the default.
   userNodeBaseUrl: z.string().max(512).nullable().default(null).catch(null),
   pendingPayments: tolerantRecord(z.string().max(128), PersistedPendingPayment),
+  // Additive, and defaulting to ON: spending is the kind of thing that should
+  // have to be turned off deliberately, never left off by a parse failure.
+  confirmSpend: z.boolean().default(true).catch(true),
 });
 
 export const useRoutstrStore = create<RoutstrStore>()(
@@ -613,6 +626,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
       nodeBaseUrl: null,
       userNodeBaseUrl: null,
       pendingPayments: {},
+      confirmSpend: true,
       legacyAccounts: {},
       sessions: [],
       currentSessionId: null,
@@ -855,6 +869,11 @@ export const useRoutstrStore = create<RoutstrStore>()(
         });
       },
 
+      setConfirmSpend: (confirmSpend) => {
+        storeLog.info('store.routstr.confirm_spend', { confirmSpend });
+        set({ confirmSpend });
+      },
+
       setUserNode: (nodeBaseUrl) => {
         const next = nodeBaseUrl?.trim().replace(/\/+$/, '') || null;
         storeLog.info('store.routstr.user_node_set', { pinned: next != null });
@@ -958,6 +977,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
         legacyAccounts: boundedAccounts(state.legacyAccounts),
         userNodeBaseUrl: state.userNodeBaseUrl,
         pendingPayments: boundedPendingPayments(state.pendingPayments),
+        confirmSpend: state.confirmSpend,
       }),
       afterHydrate: (state) => {
         if (!state) return;

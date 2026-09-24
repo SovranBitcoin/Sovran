@@ -129,6 +129,9 @@ describe('AI send lineup recovery', () => {
     useRoutstrStore.setState({
       apiKey: 'cashuA-original',
       authMode: 'bearer',
+      // These tests are about recovery, not the spend prompt; the prompt has
+      // its own suite.
+      confirmSpend: false,
       balance: 100000,
       lineup,
       lastKnownLineup: null,

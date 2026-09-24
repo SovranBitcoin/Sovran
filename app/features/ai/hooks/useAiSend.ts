@@ -33,6 +33,7 @@ import {
   resolveCandidateEntries,
   resolveSelectedEntry,
 } from '../lib/format';
+import { confirmSpend, maxSpendSats } from '../lib/spendConfirm';
 import { assembleApiMessages, stripImageParts } from '../lib/assembleApiMessages';
 import { encodeChatImage } from '../lib/attachments';
 import { deriveActivePath, getAncestorsExclusive } from '../lib/branching';
@@ -734,6 +735,21 @@ export function useAiSend() {
     async (userMessage: string, attachments?: ChatAttachment[]) => {
       const trimmed = userMessage.trim();
       if (!trimmed) return;
+
+      // Ask BEFORE the optimistic bubbles go in: declining after them would
+      // leave a user message with no answer and nothing to retry.
+      const storeNow = useRoutstrStore.getState();
+      const plannedEntry = resolveSelectedEntry(
+        getProviderById(storeNow.selectedProvider).id,
+        getTierById(storeNow.selectedTier).id,
+        walletSats,
+        storeNow.lineup ?? storeNow.lastKnownLineup?.lineup ?? null
+      );
+      const allowed = await confirmSpend({
+        modelName: plannedEntry?.displayName ?? getTierById(storeNow.selectedTier).label,
+        maxSats: maxSpendSats(plannedEntry, attachments?.length ?? 0),
+      });
+      if (!allowed) return;
 
       if (!isAnonymous && !currentSessionId) {
         createSession();

@@ -4117,6 +4117,10 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
           ],
           "default": null,
         },
+        "confirmSpend": {
+          "default": true,
+          "type": "boolean",
+        },
         "currentSessionId": {
           "anyOf": [
             {
@@ -6084,6 +6088,10 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
           ],
           "default": null,
         },
+        "confirmSpend": {
+          "default": true,
+          "type": "boolean",
+        },
         "currentSessionId": {
           "anyOf": [
             {
@@ -7999,6 +8007,7 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
         "legacyAccounts",
         "userNodeBaseUrl",
         "pendingPayments",
+        "confirmSpend",
       ],
       "type": "object",
     },
