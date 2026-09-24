@@ -4691,6 +4691,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                 ],
                 "default": null,
               },
+              "nodeBaseUrl": {
+                "anyOf": [
+                  {
+                    "maxLength": 512,
+                    "type": "string",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+                "default": null,
+              },
               "reclaimedAt": {
                 "anyOf": [
                   {
@@ -5685,6 +5697,15 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           "default": true,
           "type": "boolean",
         },
+        "primalHostsDisabled": {
+          "default": [],
+          "items": {
+            "maxLength": 2048,
+            "type": "string",
+          },
+          "maxItems": 16,
+          "type": "array",
+        },
         "primalTierEnabled": {
           "default": true,
           "type": "boolean",
@@ -5927,6 +5948,9 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           "default": true,
           "type": "boolean",
         },
+        "primalHostsDisabled": {
+          "default": [],
+        },
         "primalTierEnabled": {
           "default": true,
           "type": "boolean",
@@ -6005,6 +6029,7 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
         "naggTierEnabled",
         "primalTierEnabled",
         "relayTierEnabled",
+        "primalHostsDisabled",
         "minTransferThreshold",
         "middlemanRouting",
       ],

@@ -31481,7 +31481,7 @@ exports[`Design System exact structural snapshots renders timeline/payment-reque
                           "children": [
                             {
                               "children": [
-                                "Delivered",
+                                "Sent",
                               ],
                               "props": {
                                 "className": "css-text-146c3p1",
