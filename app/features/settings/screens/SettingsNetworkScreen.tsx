@@ -40,7 +40,9 @@ import { Section } from '@/shared/ui/composed/Section';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import { Badge } from '@/shared/ui/primitives/Badge';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
+import { withAlpha } from '@/shared/lib/color';
 
 const VERTEX_CREDITS_DESCRIPTION =
   "Uses your Nostr identity's free Vertex credits to refresh reputation scores for everyone. Vertex and nagg see which profiles you look up; your keys never leave the device.";
@@ -85,7 +87,6 @@ export function SettingsNetworkScreen() {
   const primalHosts = backendConfig.primalCacheUrls;
   const primalHostsDisabled = useSettingsStore((st) => st.primalHostsDisabled);
   const setPrimalHostEnabled = useSettingsStore((st) => st.setPrimalHostEnabled);
-  const enabledPrimalCount = primalHosts.filter((url) => !primalHostsDisabled.includes(url)).length;
   const primalTierEnabled = useSettingsStore((s) => s.primalTierEnabled);
   const setPrimalTierEnabled = useSettingsStore((s) => s.setPrimalTierEnabled);
   const relayTierEnabled = useSettingsStore((s) => s.relayTierEnabled);
@@ -118,11 +119,21 @@ export function SettingsNetworkScreen() {
     failed: dangerColor,
   };
 
+  // Cache hosts get the same dot vocabulary as relays, so "which one is down"
+  // reads the same way in both lists. The tier badge above only says whether
+  // ANY host answered — without these a dead cache hides behind a healthy one.
+  const tierStatusColor: Record<TierStatus, string> = {
+    online: successColor,
+    offline: dangerColor,
+    checking: accentColor,
+    disabled: mutedColor,
+  };
+
   const tiers = [
     {
       id: 'nagg',
       name: 'nagg',
-      description: 'App-view. Ranked, fully bundled feeds.',
+      description: 'Ranked, fully bundled feeds',
       status: tierHealth.nagg,
       enabled: naggTierEnabled,
       onToggle: setNaggTierEnabled,
@@ -130,10 +141,9 @@ export function SettingsNetworkScreen() {
     {
       id: 'primal',
       name: 'Primal cache',
-      description:
-        primalHosts.length > 1
-          ? `Public fallback. ${enabledPrimalCount} of ${primalHosts.length} hosts on, tried in order.`
-          : 'Public fallback cache.',
+      // The host rows below already show how many are on and in what order, so
+      // the tier line does not repeat it.
+      description: primalHosts.length > 1 ? 'Public fallback, tried in order' : 'Public fallback',
       status: tierHealth.primal,
       enabled: primalTierEnabled,
       onToggle: setPrimalTierEnabled,
@@ -141,7 +151,7 @@ export function SettingsNetworkScreen() {
     {
       id: 'relay',
       name: 'Raw relays',
-      description: 'Decentralized floor. Direct relay reads.',
+      description: 'Decentralized floor',
       status: tierHealth.relay,
       enabled: relayTierEnabled,
       onToggle: setRelayTierEnabled,
@@ -207,9 +217,18 @@ export function SettingsNetworkScreen() {
                       return (
                         <View
                           key={url}
-                          className={`flex-row items-center gap-3 py-2 pl-8 pr-4 ${
+                          className={`flex-row items-center gap-2 py-2 pl-9 pr-4 ${
                             tier.enabled && hostEnabled ? '' : 'opacity-40'
                           }`}>
+                          <StatusDot
+                            color={
+                              tierStatusColor[
+                                hostEnabled
+                                  ? (tierHealth.primalHosts[url] ?? 'checking')
+                                  : 'disabled'
+                              ]
+                            }
+                          />
                           <Text size={13} numberOfLines={1} className="flex-1">
                             {hostLabel(url)}
                           </Text>
@@ -274,47 +293,36 @@ export function SettingsNetworkScreen() {
               {sortedEntries.map((entry, index) => (
                 <React.Fragment key={entry.url}>
                   {index > 0 ? <Separator className="mx-4" /> : null}
-                  <ListGroup.Item>
-                    <ListGroup.ItemContent>
-                      <View className="flex-row items-center gap-2">
-                        <View
-                          style={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: 4,
-                            backgroundColor: healthColor[health[entry.url] ?? 'disconnected'],
-                          }}
-                        />
-                        <ListGroup.ItemTitle numberOfLines={1}>
-                          {hostLabel(entry.url)}
-                        </ListGroup.ItemTitle>
-                      </View>
-                      <View className="mt-1 flex-row gap-4">
-                        <RelayMarkerToggle
-                          label="Read"
-                          relayUrl={entry.url}
-                          value={entry.read}
-                          onChange={(read) => setMarker(entry.url, { read, write: entry.write })}
-                        />
-                        <RelayMarkerToggle
-                          label="Write"
-                          relayUrl={entry.url}
-                          value={entry.write}
-                          onChange={(write) => setMarker(entry.url, { read: entry.read, write })}
-                        />
-                      </View>
-                    </ListGroup.ItemContent>
-                    <ListGroup.ItemSuffix>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onPress={() => removeRelay(entry.url)}
-                        testID={`settings-network-relay-remove-${entry.url}`}
-                        accessibilityLabel={`Remove ${entry.url}`}>
-                        <Icon name="mdi:trash-can-outline" size={18} color={mutedColor} />
-                      </Button>
-                    </ListGroup.ItemSuffix>
-                  </ListGroup.Item>
+                  {/* One line per relay: health, host, its two NIP-65 markers
+                      and remove. The markers were full switches stacked on a
+                      second row, which made every relay two lines tall and left
+                      the remove button floating between them. */}
+                  <View className="flex-row items-center gap-2 py-2 pl-4 pr-1">
+                    <StatusDot color={healthColor[health[entry.url] ?? 'disconnected']} />
+                    <Text size={14} numberOfLines={1} className="flex-1">
+                      {hostLabel(entry.url)}
+                    </Text>
+                    <RelayMarkerToggle
+                      label="Read"
+                      relayUrl={entry.url}
+                      value={entry.read}
+                      onChange={(read) => setMarker(entry.url, { read, write: entry.write })}
+                    />
+                    <RelayMarkerToggle
+                      label="Write"
+                      relayUrl={entry.url}
+                      value={entry.write}
+                      onChange={(write) => setMarker(entry.url, { read: entry.read, write })}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => removeRelay(entry.url)}
+                      testID={`settings-network-relay-remove-${entry.url}`}
+                      accessibilityLabel={`Remove ${entry.url}`}>
+                      <Icon name="mdi:trash-can-outline" size={18} color={mutedColor} />
+                    </Button>
+                  </View>
                 </React.Fragment>
               ))}
             </ListGroup>
@@ -356,7 +364,7 @@ export function SettingsNetworkScreen() {
 
         <Section title="Publish">
           {hasUnpublished ? (
-            <Text size={13} className="mb-2 px-1" style={{ color: mutedColor }}>
+            <Text size={13} className="text-muted mb-2 px-1">
               Unpublished changes. Publish so others can find your posts.
             </Text>
           ) : null}
@@ -377,7 +385,7 @@ export function SettingsNetworkScreen() {
               <Button.Label>Restore defaults</Button.Label>
             </Button>
             {publishMsg ? (
-              <Text size={12} className="px-1" style={{ color: mutedColor }}>
+              <Text size={12} className="text-muted px-1">
                 {publishMsg}
               </Text>
             ) : null}
@@ -413,6 +421,11 @@ function TierHealthBadge({ status, checkingColor }: { status: TierStatus; checki
   }
 }
 
+/** The 8px health dot shared by the cache-host rows and the relay rows. */
+function StatusDot({ color }: { color: string }) {
+  return <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />;
+}
+
 /** `wss://cache1.primal.net/v1` → `cache1.primal.net`, the part worth reading. */
 function hostLabel(url: string): string {
   try {
@@ -422,6 +435,14 @@ function hostLabel(url: string): string {
   }
 }
 
+/**
+ * One NIP-65 marker as a compact on/off chip.
+ *
+ * A `Switch` per marker cost two rows per relay and read as four unrelated
+ * controls; the chip carries the same state in the width of its own word. It
+ * keeps `accessibilityRole="switch"` and the checked state, so to a screen
+ * reader nothing changed.
+ */
 function RelayMarkerToggle({
   label,
   relayUrl,
@@ -433,17 +454,31 @@ function RelayMarkerToggle({
   value: boolean;
   onChange: (next: boolean) => void;
 }) {
+  const [accentColor, mutedColor, borderColor] = useThemeColor([
+    'accent',
+    'muted',
+    'border',
+  ] as const);
   return (
-    <View className="flex-row items-center gap-1">
-      <Switch
-        testID={`settings-network-relay-${label.toLowerCase()}-${relayUrl}`}
-        accessibilityLabel={`${label === 'Read' ? 'Read from' : 'Write to'} ${relayUrl}`}
-        isSelected={value}
-        onSelectedChange={onChange}
-      />
-      <Text size={12} className="text-muted">
+    <Pressable
+      testID={`settings-network-relay-${label.toLowerCase()}-${relayUrl}`}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      accessibilityLabel={`${label === 'Read' ? 'Read from' : 'Write to'} ${relayUrl}`}
+      haptics
+      onPress={() => onChange(!value)}
+      hitSlop={6}
+      style={{
+        paddingHorizontal: 9,
+        paddingVertical: 3,
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: value ? accentColor : borderColor,
+        backgroundColor: value ? withAlpha(accentColor, 0.16) : 'transparent',
+      }}>
+      <Text size={12} style={{ color: value ? accentColor : mutedColor }}>
         {label}
       </Text>
-    </View>
+    </Pressable>
   );
 }

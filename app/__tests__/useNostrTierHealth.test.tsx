@@ -257,4 +257,53 @@ describe('useNostrTierHealth', () => {
 
     unmount();
   });
+
+  it('reports each cache host separately when one is dead and another answers', async () => {
+    // The state that started this: cache2 refuses every connection while cache1
+    // serves. The tier is genuinely online — the connection fails over — but the
+    // settings page lists the hosts, so a green tier must not hide the dead one.
+    mockedUseNostrTierConfig.mockReturnValue({
+      ...ENABLED_CONFIG,
+      // Live host FIRST: a probe loop that stopped at the first success would
+      // make one call and leave the dead host unreported.
+      primal: { enabled: true, urls: ['wss://cache-live.example', 'wss://cache-dead.example'] },
+    });
+    mockedProbeNaggHealth.mockReturnValue(probeResult(Promise.resolve(false)));
+    mockedProbePrimalHealth.mockImplementation((url: string) =>
+      probeResult(Promise.resolve(url === 'wss://cache-live.example'))
+    );
+
+    const { result, unmount } = renderHook(() => useNostrTierHealth({}));
+    await flushEffects();
+
+    // Every host is probed, not just up to the first that answers.
+    expect(mockedProbePrimalHealth).toHaveBeenCalledTimes(2);
+    expect(result.current.primal).toBe('online');
+    expect(result.current.primalHosts).toEqual({
+      'wss://cache-dead.example': 'offline',
+      'wss://cache-live.example': 'online',
+    });
+
+    unmount();
+  });
+
+  it('marks every cache host disabled when the tier is off', async () => {
+    mockedUseNostrTierConfig.mockReturnValue({
+      ...ENABLED_CONFIG,
+      primal: { enabled: false, urls: ['wss://cache1.example', 'wss://cache2.example'] },
+    });
+    mockedProbeNaggHealth.mockReturnValue(probeResult(Promise.resolve(true)));
+
+    const { result, unmount } = renderHook(() => useNostrTierHealth({}));
+    await flushEffects();
+
+    expect(mockedProbePrimalHealth).not.toHaveBeenCalled();
+    expect(result.current.primal).toBe('disabled');
+    expect(result.current.primalHosts).toEqual({
+      'wss://cache1.example': 'disabled',
+      'wss://cache2.example': 'disabled',
+    });
+
+    unmount();
+  });
 });
