@@ -597,9 +597,16 @@ export function useAiSend() {
           chunkCount,
         });
         if (finalizePayload) {
+          // One atomic write, cost included. The cost is exact and already
+          // known — `sendMessage` returns what the node took (the token we
+          // minted minus the change it returned), and the change header
+          // arrives before the first chunk — so there is nothing to stamp on
+          // afterwards. That second write was only ever needed because the old
+          // figure came from a balance re-read that had to wait for the stream.
           finalizeAssistantMessage(assistantMessageId, {
             ...finalizePayload,
             thinkingDurationSec: thinkingSec,
+            ...(costSats != null && costSats > 0 ? { costSats } : {}),
           });
         }
         aiLog.info('ai.send.assistant_finalized', {
@@ -610,18 +617,6 @@ export function useAiSend() {
 
         if (!isAnonymous) updateCurrentSessionTitle();
 
-        // The cost is exact and already known: `sendMessage` returns what the
-        // node actually took (the token we minted minus the change it handed
-        // back). It replaces a `checkBalance` diff that only worked while a
-        // balance lived on the node, that a concurrent write could corrupt,
-        // and that a node change made meaningless.
-        if (finalizePayload && costSats != null) {
-          finalizeAssistantMessage(assistantMessageId, {
-            ...finalizePayload,
-            thinkingDurationSec: thinkingSec,
-            costSats,
-          });
-        }
         // Snapshot what the affordability gate predicted for the model we
         // actually used, so this log can quote both numbers.
         const predicted = getAffordabilityDetails(modelToUse, balanceSats, cachedModels);

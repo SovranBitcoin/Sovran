@@ -166,7 +166,11 @@ describe('Routstr response credentials', () => {
     useRoutstrStore.setState({ authMode: 'bearer', apiKey: 'sk-should-not-be-used' });
     const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response());
     await completion();
-    expect(payment.mintRequestPayment).toHaveBeenCalledWith(10, expect.stringContaining('routstr'), undefined);
+    expect(payment.mintRequestPayment).toHaveBeenCalledWith(
+      10,
+      expect.stringContaining('routstr'),
+      undefined
+    );
     expect(fetchMock.mock.calls[0][1]?.headers).toEqual({
       'X-Cashu': 'cashuB-request-payment',
       'Content-Type': 'application/json',
