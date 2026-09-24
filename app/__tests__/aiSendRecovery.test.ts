@@ -62,6 +62,18 @@ const failure = (status: number, message: string) => ({
   status,
   error: { message, type: status === 0 ? 'network_error' : 'server_error' },
 });
+/** A 402 routstr raised about this key's own balance — carries the markers
+ *  `isWalletBalanceError` looks for. Distinct from a 402 the node forwarded
+ *  verbatim from the AI provider, which has none of them. */
+const walletBalanceFailure = () => ({
+  status: 402,
+  error: {
+    message: 'Insufficient balance: 85577 mSats required. 216 available.',
+    type: 'insufficient_quota',
+    code: 'insufficient_balance',
+    details: { required: 85577, available: 216 },
+  },
+});
 const success = () => ({
   stream: (async function* () {
     yield { choices: [{ delta: { content: 'reply' } }] };
@@ -142,15 +154,40 @@ describe('AI send lineup recovery', () => {
     expect(sendMock.mock.calls[1][2].model).toBe('replacement');
   });
 
-  it.each([401, 402, 429])(
-    'never retries or refreshes auth/payment/rate failures (%s)',
-    async (status) => {
-      sendMock.mockRejectedValueOnce(failure(status, 'Rejected'));
-      await send();
-      expect(sendMock).toHaveBeenCalledTimes(1);
-      expect(refreshMock).not.toHaveBeenCalled();
-    }
-  );
+  it.each([401, 429])('never retries or refreshes auth/rate failures (%s)', async (status) => {
+    sendMock.mockRejectedValueOnce(failure(status, 'Rejected'));
+    await send();
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(refreshMock).not.toHaveBeenCalled();
+  });
+
+  it('never retries or refreshes a wallet 402 — more attempts cannot fund it', async () => {
+    sendMock.mockRejectedValueOnce(walletBalanceFailure());
+    await send();
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(refreshMock).not.toHaveBeenCalled();
+  });
+
+  it('advances to the next candidate when the upstream declines with a bare 402', async () => {
+    // The node forwards the AI provider's own error body under the provider's
+    // status, so this 402 says nothing about the node or the user's credit.
+    // The next candidate usually sits behind a different upstream.
+    sendMock
+      .mockRejectedValueOnce(failure(402, 'Payment Required'))
+      .mockResolvedValueOnce(success());
+    await send();
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(sendMock.mock.calls[1][2].model).not.toBe(sendMock.mock.calls[0][2].model);
+    // The node is reachable and the catalog is current — nothing to refresh.
+    expect(refreshMock).not.toHaveBeenCalled();
+  });
+
+  it('stops declining after the attempt cap rather than fanning out the lineup', async () => {
+    sendMock.mockRejectedValue(failure(402, 'Payment Required'));
+    await send();
+    expect(sendMock).toHaveBeenCalledTimes(3);
+    expect(refreshMock).not.toHaveBeenCalled();
+  });
 
   it('stops on an unchanged failed node and removes the assistant placeholder', async () => {
     const error = failure(404, 'Not found');

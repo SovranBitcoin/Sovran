@@ -46,7 +46,8 @@ const SOURCE_HTTP: Partial<Record<ErrorService, Readonly<Partial<Record<number, 
   routstr: {
     400: 'routstr.invalid_request',
     401: 'routstr.auth',
-    402: 'routstr.balance',
+    // 402 is deliberately absent: it needs the error's own markers to tell a
+    // wallet shortfall from an upstream passthrough. See `balanceId` below.
     404: 'routstr.not_found',
     408: 'routstr.timeout',
     504: 'routstr.timeout',
@@ -118,6 +119,20 @@ export function describeError(error: unknown, service: ErrorService): ErrorPrese
           ['invalid_model', 'routstr.model_unavailable'],
         ])
       : undefined;
+  // A routstr 402 is ambiguous by status alone: the node hands back the AI
+  // provider's own error body verbatim under the provider's status, so an
+  // upstream decline looks identical to a wallet shortfall. Only routstr's own
+  // markers mean the user's AI credit is actually short; anything else is the
+  // provider refusing, and telling the user to top up is both wrong and
+  // unfixable by topping up.
+  const balanceId: ErrorId | undefined =
+    service === 'routstr' && status === 402
+      ? (typeMatch([
+          ['insufficient_balance', 'routstr.balance'],
+          ['insufficient_quota', 'routstr.balance'],
+          ['minimum_balance_required', 'routstr.balance'],
+        ]) ?? 'routstr.provider_declined')
+      : undefined;
   const httpId =
     status == null
       ? undefined
@@ -151,6 +166,7 @@ export function describeError(error: unknown, service: ErrorService): ErrorPrese
     protocolId ??
     sourceId ??
     modelId ??
+    balanceId ??
     httpId ??
     transportId ??
     sdkId ??

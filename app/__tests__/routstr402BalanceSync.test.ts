@@ -12,7 +12,7 @@
  */
 
 import { describeError } from '@/shared/lib/errors';
-import { checkBalance, sendMessage } from '@/shared/lib/routstr/api';
+import { checkBalance, isWalletBalanceError, sendMessage } from '@/shared/lib/routstr/api';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
 const mockMemory: Record<string, string> = {};
@@ -112,6 +112,46 @@ describe('402 → balance truth-sync', () => {
       error: { details: { required: 85577, available: 216 } },
     });
     expect(useRoutstrStore.getState().balance).toBe(216);
+  });
+
+  /**
+   * routstr-core's `forward_upstream_error_response` hands the AI provider's
+   * own JSON error body back verbatim under the provider's status. An
+   * OpenRouter-shaped 402 has no `type` and a NUMERIC `code`, so it carries
+   * none of routstr's wallet markers. Observed on device 2026-09-24: 100 sats
+   * credited, 0 reserved, `gpt-oss-20b` (max_cost 19.86 sats), four of these
+   * in a row — reported to the user as "Insufficient balance".
+   */
+  const UPSTREAM_402 = {
+    error: { message: 'Provider returned error', code: 402 },
+  };
+
+  it('does not call a forwarded upstream 402 a wallet problem', async () => {
+    useRoutstrStore.getState().setBalance(100_000);
+    stubFetch402(UPSTREAM_402);
+
+    const error = await sendMessage('sk-test', [{ role: 'user', content: 'hi' }], {
+      model: 'gpt-oss-20b',
+    }).catch((e: unknown) => e);
+
+    expect(isWalletBalanceError(error)).toBe(false);
+    // The numeric code must survive parsing — dropping it is what left `type`
+    // to fall through to `unknown_error` and made the two 402s look identical.
+    expect(error).toMatchObject({ status: 402, error: { code: '402' } });
+    expect(describeError(error, 'routstr').id).toBe('routstr.provider_declined');
+    // A funded wallet must not be rewritten by an error that is not about it.
+    expect(useRoutstrStore.getState().balance).toBe(100_000);
+  });
+
+  it('still calls a routstr-raised 402 a wallet problem', async () => {
+    stubFetch402(INSUFFICIENT_BODY);
+
+    const error = await sendMessage('sk-test', [{ role: 'user', content: 'hi' }], {
+      model: 'gpt-oss-20b',
+    }).catch((e: unknown) => e);
+
+    expect(isWalletBalanceError(error)).toBe(true);
+    expect(describeError(error, 'routstr').id).toBe('routstr.balance');
   });
 
   it('leaves the balance untouched when the 402 carries no parseable available figure', async () => {

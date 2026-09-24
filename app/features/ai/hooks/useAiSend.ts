@@ -8,6 +8,7 @@ import {
   sendMessage,
   isModelRejectedError,
   isRoutstrNodeFailure,
+  isWalletBalanceError,
   checkBalance,
   measureMessageContent,
   ROUTSTR_MAX_COMPLETION_TOKENS,
@@ -62,6 +63,17 @@ const STREAM_PROGRESS_INTERVAL_MS = 500;
  * are the spikes that cause the visible "burst then pause" feel during a
  * stream. Tuned from iOS reanimated keyboard-controller's typical idle gap. */
 const STREAM_STALL_THRESHOLD_MS = 500;
+
+/**
+ * How many models one send may try after an upstream provider declines it.
+ *
+ * A 402 the node forwarded from the AI provider (see `isWalletBalanceError`)
+ * says nothing about the node or the user's credit, so the next candidate —
+ * which usually sits behind a different upstream — is worth one attempt. The
+ * cap exists because each attempt is a real paid round-trip: a node whose whole
+ * upstream is down would otherwise fan out across all twelve lineup cells.
+ */
+const MAX_DECLINED_ATTEMPTS = 3;
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -310,6 +322,7 @@ export function useAiSend() {
         let stream: AsyncIterable<any> | undefined;
         let lastConnectErr: unknown = null;
         let recoveryRetried = false;
+        let declinedAttempts = 0;
         for (let i = 0; i < candidateChain.length; i++) {
           if (useProfileStore.getState().activeAccountIndex !== profile) return;
           if (controller.signal.aborted) throw { status: 0, error: { type: 'aborted' } };
@@ -352,6 +365,27 @@ export function useAiSend() {
           } catch (err) {
             lastConnectErr = err;
             if (isAbortError(err) || controller.signal.aborted) throw err;
+            const status = (err as { status?: number })?.status;
+            // An upstream decline: the node is healthy, the catalog is current
+            // and the user's credit is fine — the AI provider behind THIS model
+            // refused. Another candidate usually sits behind a different
+            // upstream, so advance without refreshing the lineup (there is
+            // nothing stale to refresh) and without touching the balance.
+            if (status === 402 && !isWalletBalanceError(err)) {
+              declinedAttempts += 1;
+              if (declinedAttempts >= MAX_DECLINED_ATTEMPTS || i === candidateChain.length - 1) {
+                throw err;
+              }
+              aiLog.warn('ai.send.provider_declined', {
+                flowId,
+                tier: tier.id,
+                provider: provider.id,
+                candidate,
+                attempt: declinedAttempts,
+                nextCandidate: candidateChain[i + 1],
+              });
+              continue;
+            }
             const modelRejected = isModelRejectedError(err, candidate);
             const nodeFailed = isRoutstrNodeFailure(err);
             if (!modelRejected && !nodeFailed) throw err;
@@ -638,7 +672,36 @@ export function useAiSend() {
         // empty bubble. The active path re-derives to the previous leaf.
         removeMessages(new Set([assistantMessageId]));
 
-        if (err?.status === 402) {
+        if ((err as { status?: number })?.status === 402) {
+          // The post-stream balance diff only runs on a SUCCESSFUL stream, and
+          // the 402 balance sync needs a parseable `available` the node does
+          // not always send. Without this the store keeps the figure it had
+          // when the send started, the chip keeps calling the model affordable,
+          // and the popup recurs on every message. Re-read the authoritative
+          // balance so the pill, the picker fades and the estimates agree with
+          // the node the moment it disagrees with us.
+          const balanceKey = useRoutstrStore.getState().apiKey;
+          if (balanceKey) {
+            void checkBalance(balanceKey)
+              .then((data) => {
+                if (useProfileStore.getState().activeAccountIndex !== profile) return;
+                if (useRoutstrStore.getState().apiKey !== balanceKey) return;
+                setBalance(data.balance);
+              })
+              .catch(() => {
+                // Offline keeps the last-known balance, same policy as the
+                // chip's mount self-heal.
+              });
+          }
+        }
+
+        // A 402 is only OUR problem when routstr raised it about this key's
+        // balance. The node forwards an upstream provider's error body verbatim
+        // under the provider's status, so an upstream 402 is indistinguishable
+        // by status alone — and sending the user to top up a wallet that is
+        // already funded cannot clear it. Everything else goes through the
+        // shared error catalog.
+        if (isWalletBalanceError(err)) {
           const requiredMsats = err?.error?.details?.required as number | undefined;
           const availableMsats = err?.error?.details?.available as number | undefined;
           const requiredSats = requiredMsats != null ? Math.ceil(requiredMsats / 1000) : null;

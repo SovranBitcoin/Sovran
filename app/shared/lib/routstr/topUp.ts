@@ -38,10 +38,19 @@ export async function executeRoutstrTopUp(
     if (apiKey) {
       apiLog.debug('routstr.topup.path', { strategy: 'existing_wallet' });
       const topUpStart = performance.now();
-      await topUpBalance({ apiKey, cashuToken: encodedToken });
+      const { added_amount } = await topUpBalance({ apiKey, cashuToken: encodedToken });
       apiLog.debug('routstr.topup.topup_call_done', {
+        addedMsats: added_amount,
         duration_ms: Math.round(performance.now() - topUpStart),
       });
+      // A 200 that credits nothing is a silent loss: the token has left the
+      // wallet and the node kept it without raising. `TopUpSpine` makes `msats`
+      // optional (nodes have changed this field's spelling before), so a
+      // response the app cannot read parses cleanly as zero — which is exactly
+      // the case that must not be reported as success.
+      if (!(added_amount > 0)) {
+        throw new Error('Routstr accepted the token but credited nothing');
+      }
     } else {
       apiKey = encodedToken;
       isNewWallet = true;
@@ -52,17 +61,36 @@ export async function executeRoutstrTopUp(
     // Verify balance
     apiLog.debug('routstr.topup.verify_balance_start');
     const balanceStart = performance.now();
-    const balanceResult = await checkBalance(apiKey);
+    let balanceResult = await checkBalance(apiKey);
     apiLog.debug('routstr.topup.verify_balance_done', {
       balance: balanceResult.balance,
       duration_ms: Math.round(performance.now() - balanceStart),
     });
 
-    // Server may return a persistent api_key — prefer it
+    // Server may return a persistent api_key — prefer it, but never inherit the
+    // OLD credential's balance. `sk-<hash>` and the raw Cashu token address the
+    // same account row on a healthy node, so the second read should agree; if
+    // it does not, the figure the UI gates sends against would be a lie about a
+    // wallet the app can no longer reach, and every send would 402 while the
+    // pill showed funds. Re-read, and keep the credential that actually
+    // answered if the upgrade cannot be verified.
     if (balanceResult.api_key && balanceResult.api_key !== apiKey) {
-      apiLog.info('routstr.topup.api_key_upgraded', { reason: 'server_returned_persistent_key' });
-      apiKey = balanceResult.api_key;
-      store.setApiKey(apiKey);
+      const previousKey = apiKey;
+      try {
+        const upgraded = await checkBalance(balanceResult.api_key);
+        apiKey = balanceResult.api_key;
+        balanceResult = { ...upgraded, api_key: balanceResult.api_key };
+        store.setApiKey(apiKey);
+        apiLog.info('routstr.topup.api_key_upgraded', {
+          reason: 'server_returned_persistent_key',
+          balance: upgraded.balance,
+        });
+      } catch (upgradeError) {
+        apiLog.warn('routstr.topup.api_key_upgrade_rejected', {
+          error: upgradeError instanceof Error ? upgradeError.message : String(upgradeError),
+        });
+        apiKey = previousKey;
+      }
     }
 
     store.setBalance(balanceResult.balance);

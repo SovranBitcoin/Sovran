@@ -78,6 +78,12 @@ export function ModelChip() {
   // Read at mount, never a trigger: a key rotation mid-session must not refire
   // the self-heal fetch.
   const apiKeyRef = useLatestRef(apiKey);
+  // Presence, not identity, is the trigger. Keying the effect on `apiKey`
+  // itself would refire on every `x-cashu` change-token rotation; keying it on
+  // nothing at all meant a chip mounted before the first top-up (the fresh-
+  // profile case) saw `null`, returned, and never ran again — the balance then
+  // stayed at whatever the top-up wrote, forever.
+  const hasApiKey = apiKey != null;
   useEffect(() => {
     const key = apiKeyRef.current;
     if (!key) return;
@@ -95,7 +101,7 @@ export function ModelChip() {
     return () => {
       cancelled = true;
     };
-  }, [apiKeyRef, setBalance]);
+  }, [hasApiKey, apiKeyRef, setBalance]);
 
   useVisualActivityEffect(() => {
     void refreshRoutstrLineup();

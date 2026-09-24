@@ -166,12 +166,26 @@ const ErrorDetailsSchema = z.object({
   available: undef(z.number().nonnegative()),
   retry_after: undef(z.number().nonnegative()),
 });
+
+/**
+ * `error.code`, coerced from either spelling. Routstr's own errors use string
+ * codes (`insufficient_balance`, `model_not_found`); a forwarded upstream error
+ * — routstr-core `forward_upstream_error_response` returns the AI provider's
+ * JSON body verbatim under the provider's status — usually carries the numeric
+ * HTTP status instead. Dropping the number the way a bare `z.string()` does
+ * leaves `type` to fall through to `unknown_error`, which is exactly how an
+ * upstream 402 came to be indistinguishable from a wallet 402.
+ */
+const ErrorCodeSchema = z
+  .union([z.string(), z.number().transform(String)])
+  .optional()
+  .catch(undefined);
 const ErrorBodySchema = z.union([
   z.object({
     error: z.object({
       message: z.string(),
       type: undef(z.string()),
-      code: undef(z.string()),
+      code: ErrorCodeSchema,
       details: undef(ErrorDetailsSchema),
     }),
   }),
@@ -295,6 +309,55 @@ const ErrorEvidenceSchema = z.object({
   error: z.object({ message: z.string().optional(), type: z.string().optional() }).optional(),
 });
 
+const BalanceEvidenceSchema = z.object({
+  status: z.number(),
+  error: z
+    .object({
+      message: z.string().optional(),
+      type: z.string().optional(),
+      code: z.string().optional(),
+      details: z
+        .object({
+          required: z.number().optional(),
+          available: z.number().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
+/** Markers routstr-core stamps on a 402 it raised about THIS key's balance:
+ *  `insufficient_quota`/`insufficient_balance` on the Bearer path
+ *  (`routstr/auth.py`), `minimum_balance_required` on the X-Cashu path
+ *  (`routstr/payment/helpers.py`). */
+const WALLET_BALANCE_TYPES = new Set(['insufficient_quota', 'minimum_balance_required']);
+const WALLET_BALANCE_CODES = new Set(['insufficient_balance', 'minimum_balance_required']);
+
+/**
+ * True only for a 402 the NODE raised about this key's wallet balance.
+ *
+ * A bare `status === 402` is not enough. `forward_upstream_error_response` in
+ * routstr-core hands the AI provider's own JSON error body back verbatim under
+ * the provider's status, so an upstream that declines for its own reasons — an
+ * operator out of credit, a provider-side payment fault — arrives as a 402 that
+ * has nothing to do with the user's ecash. Observed on device: 100 sats
+ * credited, 0 reserved, a model whose worst case is 19.86 sats, and a 402 whose
+ * body carried no routstr marker at all. Treating that as "Insufficient
+ * balance" sends the user to top up a wallet that is already funded, and no
+ * amount of topping up can clear it.
+ *
+ * A wallet 402 must carry one of routstr's markers, or the msat figures its
+ * message embeds (`parseErrorResponse` lifts those out of the prose).
+ */
+export function isWalletBalanceError(error: unknown): boolean {
+  const parsed = BalanceEvidenceSchema.safeParse(error);
+  if (!parsed.success || parsed.data.status !== 402) return false;
+  const detail = parsed.data.error;
+  if (detail?.type && WALLET_BALANCE_TYPES.has(detail.type)) return true;
+  if (detail?.code && WALLET_BALANCE_CODES.has(detail.code)) return true;
+  return typeof detail?.details?.required === 'number';
+}
+
 export function isModelRejectedError(error: unknown, model: string): boolean {
   const parsed = ErrorEvidenceSchema.safeParse(error);
   if (!parsed.success || ![400, 404].includes(parsed.data.status)) return false;
@@ -325,9 +388,18 @@ async function throwResponseError(
 ): Promise<never> {
   const errorData = await parseErrorResponse(response);
   const status = response.status;
+  // `message` and `code` are the only fields that separate a wallet 402 from a
+  // 402 the node forwarded verbatim from the AI provider upstream. Dropping
+  // them — as this log used to — makes the difference unobservable from the
+  // app, which is how every 402 came to be reported as "Insufficient balance".
+  // The logger's own sanitizer redacts embedded secrets and caps length; the
+  // slice keeps a hostile upstream from filling a line with prose.
   apiLog.warn('api.routstr.http_error', {
     status,
     type: errorData.type,
+    code: errorData.code,
+    message: errorData.message.slice(0, 200),
+    requestId: response.headers.get('x-routstr-request-id') ?? undefined,
     requiredMsats: errorData.details?.required,
     availableMsats: errorData.details?.available,
   });

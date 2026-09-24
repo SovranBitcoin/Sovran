@@ -6,6 +6,8 @@ export const ERROR_COPY = {
   'routstr.model_unavailable': 'This AI model is unavailable. Choose another model and try again.',
   'routstr.auth': 'The AI service did not accept your credit key. Check your AI credit settings.',
   'routstr.balance': 'Your AI credit cannot cover this request. Choose a cheaper model or top up.',
+  'routstr.provider_declined':
+    'The AI provider declined this request. Try another model, or try again in a minute.',
   'routstr.unavailable': 'The AI provider is unreachable right now. Try again in a minute.',
   'routstr.timeout': 'The AI service took too long to respond. Try again later.',
   'routstr.invalid_request':
