@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.3",
   "packageManager": "bun@1.3.5",
-  "description": "Sovran monorepo \u2014 the app and its self-contained wallet (colada) and nostr (nagg-ts) packages, plus the docs site.",
+  "description": "Sovran monorepo — the app and its self-contained wallet (colada) and nostr (nagg-ts) packages, plus the docs site.",
   "workspaces": [
     "app",
     "wallet",
@@ -84,6 +84,7 @@
     "expo-modules-jsi@56.0.12": "app/patches/expo-modules-jsi+56.0.12.patch",
     "react-native-screens@4.25.2": "app/patches/react-native-screens+4.25.2.patch",
     "expo-router@56.2.11": "app/patches/expo-router+56.2.11.patch",
-    "@gorhom/bottom-sheet@5.2.14": "app/patches/@gorhom+bottom-sheet+5.2.14.patch"
+    "@gorhom/bottom-sheet@5.2.14": "app/patches/@gorhom+bottom-sheet+5.2.14.patch",
+    "@cashu/coco-core@2.0.0": "app/patches/@cashu+coco-core+2.0.0.patch"
   }
 }

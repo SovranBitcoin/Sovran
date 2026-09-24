@@ -1,0 +1,145 @@
+diff --git a/dist/index.js b/dist/index.js
+index 680223d0a4201f4b29fbce8458cda9fcbf2d78e0..35266ba3e093439d61653a44fb82e8927e3cd0e9 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1,6 +1,6 @@
+ import { $ as normalizeUnitList, A as buildYHexMapsForSecrets, B as normalizeMintUrl, C as projectLegacyHistoryRow, D as projectReceiveOperation, E as projectOperationToHistoryEntry, G as sumAmounts, I as generateSubId, J as assertSameUnit, K as toAmount, L as getProofStateInputsFromSerializedOutputs, O as projectSendOperation, P as deserializeOutputData, Q as normalizeUnitAmount, R as getSecretsFromSerializedOutputData, S as parseHistoryEntryId, T as projectMintOperation, U as serializeOutputData, X as isUnitAmountLikeObject, Y as assertUnitAmount, Z as normalizeUnit, _ as compareHistoryEntries, _t as UnitMismatchError, a as getMintQuoteAvailableAmount, at as KeysetSyncError, b as legacyHistoryId, c as isStatefulMintQuote, ct as MintQuoteKeyError, d as mintQuoteFromOnchainResponse, dt as OperationInProgressError, et as parseUnitAmount, f as mintQuoteToMethodSnapshot, ft as PaymentRequestError, g as mintQuoteObservationFromOnchainResponse, gt as TokenValidationError, h as mintQuoteObservationFromBolt12Response, ht as QuoteIdentityConflictError, i as getMintQuoteAmount, it as HttpResponseError, j as computeYHexForSecrets, k as assertNonNegativeInteger, l as mintQuoteFromBolt11Response, lt as MintQuoteValidationError, m as mintQuoteObservationFromBolt11Response, mt as ProofValidationError, n as applyBolt11MintQuoteStateFallback, nt as AuthSessionError, o as getMintQuoteRemoteState, ot as MintFetchError, p as assessMintQuoteClaimability, pt as ProofOperationError, q as DEFAULT_UNIT, r as deriveBolt11MintQuoteState, rt as AuthSessionExpiredError, s as isMintQuotePending, st as MintOperationError, t as normalizeMeltMethodData, tt as sameUnitAmount, u as mintQuoteFromBolt12Response, ut as NetworkError, v as isLegacyHistoryEntry, vt as UnitValidationError, w as projectMeltOperation, x as operationHistoryId, y as isOperationHistoryEntry, yt as UnknownMintError, z as mapProofToCoreProof } from "./MeltMethodHandler-D3kBkMXU.js";
+ import { n as ExtensionRegistrationError, t as DuplicatePluginRegistrationError } from "./types-Bs_2hNvG.js";
+-import { Amount, Amount as Amount$1, AuthManager, JSONInt, Mint, OutputData, PaymentRequest, PaymentRequestTransportType, Wallet, getDecodedToken, getDecodedToken as getDecodedToken$1, getEncodedToken, getEncodedToken as getEncodedToken$1, getTokenMetadata, getTokenMetadata as getTokenMetadata$1, isBlsKeyset, splitAmount, sumProofs } from "@cashu/cashu-ts";
++import { Amount, Amount as Amount$1, AuthManager, JSONInt, Mint, OutputData, PaymentRequest, PaymentRequestTransportType, Wallet, getDecodedToken, getDecodedToken as getDecodedToken$1, getEncodedToken, getEncodedToken as getEncodedToken$1, getP2PKExpectedWitnessPubkeys, getTokenMetadata, getTokenMetadata as getTokenMetadata$1, isBlsKeyset, splitAmount, sumProofs } from "@cashu/cashu-ts";
+ import { schnorr, secp256k1 } from "@noble/curves/secp256k1.js";
+ import { bytesToHex } from "@noble/curves/utils.js";
+ import { sha256 } from "@noble/hashes/sha2.js";
+@@ -5653,7 +5653,6 @@ var SendOperationService = class {
+ 			if (!hasPreparedData$1(operation)) throw new Error(`Operation ${operationId} is not in a rollbackable state`);
+ 			const handler = this.handlerProvider.get(operation.method);
+ 			if (!handler.rollback) throw new Error(`Send operations of method ${operation.method} can not be rolled back`);
+-			if (operation.state === "pending" && operation.method === "p2pk") throw new Error("Cannot rollback pending P2PK send operation");
+ 			const { wallet } = await this.walletService.getWalletWithActiveKeysetId(operation.mintUrl, operation.unit);
+ 			let opForRollback = operation;
+ 			if (operation.state === "pending") {
+@@ -10632,8 +10631,10 @@ var DefaultSendHandler = class {
+ */
+ var P2pkSendHandler = class {
+ 	outputDataCreator;
+-	constructor(outputDataCreator) {
++	keyRingService;
++	constructor(outputDataCreator, keyRingService) {
+ 		this.outputDataCreator = outputDataCreator ?? OutputData;
++		this.keyRingService = keyRingService;
+ 	}
+ 	/**
+ 	* Prepare the send operation by selecting proofs and creating outputs.
+@@ -10805,17 +10806,99 @@ var P2pkSendHandler = class {
+ 		if (keepSecrets.length > 0) await proofService.releaseProofs(operation.mintUrl, keepSecrets);
+ 	}
+ 	/**
++	* Private keys this wallet holds that may spend these proofs RIGHT NOW.
++	*
++	* cashu-ts decides which pubkeys a proof currently expects: the main keys
++	* while the lock is active or permanent, and the refund keys too once the
++	* locktime has passed. So a refund-to-self send becomes reclaimable exactly
++	* when its lock opens, and not a moment before.
++	*/
++	async collectSigningKeys(proofs, logger) {
++		if (!this.keyRingService) return [];
++		const privkeys = new Map();
++		for (const proof of proofs) {
++			let expected;
++			try {
++				expected = getP2PKExpectedWitnessPubkeys(proof.secret);
++			} catch {
++				continue;
++			}
++			for (const pubkey of expected) {
++				if (privkeys.has(pubkey)) continue;
++				const keyPair = await this.keyRingService.getKeyPair(pubkey).catch(() => null);
++				if (keyPair?.secretKey) privkeys.set(pubkey, bytesToHex(keyPair.secretKey));
++			}
++		}
++		logger?.info("Resolved P2PK reclaim signers", { signerCount: privkeys.size });
++		return [...privkeys.values()];
++	}
++	/**
+ 	* Rollback the send operation.
+-	* Note: P2PK tokens sent to an external pubkey cannot be reclaimed without the private key.
+-	* This rollback only handles the prepared state (before swap) and releases reservations.
++	*
++	* A prepared operation never swapped, so releasing the reservation is the
++	* whole job. A pending one holds proofs the mint has already locked: they
++	* can be swapped back only by a key that may spend them — the refund key of
++	* an expired locktime, or our own key on a self-lock. When no such key is
++	* held the swap is refused here rather than attempted and rejected by the
++	* mint, so the operation stays pending and the recipient can still claim.
+ 	*/
+ 	async rollback(ctx) {
+-		const { operation, proofService, logger } = ctx;
++		const { operation, wallet, proofRepository, proofService, logger } = ctx;
+ 		const { mintUrl, inputProofSecrets } = operation;
+ 		if (operation.state === "prepared") {
+ 			await proofService.releaseProofs(mintUrl, inputProofSecrets);
+ 			logger?.info("Rolling back prepared P2PK operation - released reserved proofs", { operationId: operation.id });
+-		} else throw new Error(`P2PK Send Operation in ${operation.state} state can not be rolled back.`);
++			return;
++		}
++		if (operation.state !== "pending" && operation.state !== "rolling_back") throw new Error(`P2PK Send Operation in ${operation.state} state can not be rolled back.`);
++		const sendSecrets = getSendProofSecrets(operation);
++		if (sendSecrets.length > 0) {
++			const sendProofs = (await proofRepository.getProofsByOperationId(mintUrl, operation.id)).filter((p) => sendSecrets.includes(p.secret) && p.state === "inflight");
++			if (sendProofs.length > 0) {
++				const privkeys = await this.collectSigningKeys(sendProofs, logger);
++				if (privkeys.length === 0) throw new ProofValidationError("Cannot reclaim this P2PK send: no key held that may spend it yet");
++				const totalAmount = sumProofs(sendProofs);
++				const fee = wallet.getFeesForProofs(sendProofs);
++				if (totalAmount.lessThanOrEqual(fee)) logger?.warn("Cannot reclaim send proofs because fees consume the amount", {
++					operationId: operation.id,
++					amount: totalAmount,
++					fee
++				});
++				else {
++					const reclaimAmount = totalAmount.subtract(fee);
++					if (!reclaimAmount.isZero()) {
++						const outputResult = await proofService.createOutputsAndIncrementCounters(mintUrl, {
++							keep: {
++								amount: reclaimAmount,
++								unit: operation.unit
++							},
++							send: {
++								amount: Amount$1.zero(),
++								unit: operation.unit
++							}
++						}, {});
++						const keep = await wallet.receive({
++							mint: mintUrl,
++							proofs: sendProofs,
++							unit: operation.unit
++						}, { privkey: privkeys }, {
++							type: "custom",
++							data: outputResult.keep
++						});
++						await proofService.saveProofs(mintUrl, mapProofToCoreProof(mintUrl, "ready", keep, { unit: operation.unit }));
++						await proofService.setProofState(mintUrl, sendProofs.map((p) => p.secret), "spent");
++						logger?.info("Reclaimed proofs from pending P2PK operation", {
++							operationId: operation.id,
++							reclaimedAmount: reclaimAmount,
++							proofCount: keep.length
++						});
++					}
++				}
++			}
++		}
++		await proofService.releaseProofs(mintUrl, inputProofSecrets);
++		const keepSecrets = getKeepProofSecrets(operation);
++		if (keepSecrets.length > 0) await proofService.releaseProofs(mintUrl, keepSecrets);
+ 	}
+ 	/**
+ 	* Recover an executing operation that failed mid-execution.
+@@ -14099,7 +14182,7 @@ var Manager = class {
+ 		const sendOperationLogger = this.getChildLogger("SendOperationService");
+ 		const sendHandlerProvider = new SendHandlerProvider({
+ 			default: new DefaultSendHandler(),
+-			p2pk: new P2pkSendHandler(this.outputDataCreator)
++			p2pk: new P2pkSendHandler(this.outputDataCreator, keyRingService)
+ 		});
+ 		const sendOperationService = new SendOperationService(repositories.sendOperationRepository, repositories.proofRepository, proofService, mintService, walletService, this.eventBus, sendHandlerProvider, sendOperationLogger, mintScopedLock);
+ 		const sendOperationRepository = repositories.sendOperationRepository;
