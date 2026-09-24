@@ -16,6 +16,7 @@ import { getEncodedToken, getTokenMetadata } from "@cashu/cashu-ts";
 import { isMintOfflineError } from "../errors";
 import { errField, logger, mintUrlFields } from "../logger";
 import { meltMethodForTarget } from "../melt-target";
+import type { P2pkLockSpec } from "../p2pk";
 import type {
   AmountEntryDisplayMetadata,
   Destination,
@@ -835,6 +836,17 @@ export function createDefaultScreenActionHandlers(
               })
             : undefined;
         const recipientProfile = ctxRecipientProfile ?? entryRecipientProfile;
+        // The lock is the amount screen's to change, so it arrives the same
+        // per-call way the identity fields do. `undefined` means the screen
+        // said nothing and the flow's own lock stands; `null` is the user
+        // turning it off.
+        const hasLockParam = "p2pkLock" in (ctx as Record<string, unknown>);
+        const requestedLock = hasLockParam
+          ? ((ctx as Record<string, unknown>).p2pkLock as
+              | P2pkLockSpec
+              | null
+              | undefined)
+          : undefined;
 
         let destination: Destination = entryDestination;
         let mintQuoteMethod: MintQuoteMethod | undefined;
@@ -914,7 +926,20 @@ export function createDefaultScreenActionHandlers(
           meltTargetLength: meltTarget?.length ?? 0,
           recipientPubkeyPresent: !!recipientPubkey,
           recipientProfilePresent: !!recipientProfile,
+          lockRequested: hasLockParam ? !!requestedLock : null,
         });
+        // Only an ecash send can be locked. The Lightning and onchain variants
+        // above have already reassigned `destination` to a melt, and a melt
+        // pays an invoice — there is nothing to lock — so the lock is dropped
+        // rather than carried into a flow that cannot honour it.
+        const lockForDestination =
+          destination === "sendEcash" ? requestedLock : null;
+        if (hasLockParam && lockForDestination !== requestedLock) {
+          logger.info("screenAction.amountEntry.next.lockDroppedForVariant", {
+            destination,
+            variantId: variantId ?? null,
+          });
+        }
         try {
           await machine.enterAmount(effectiveAmount, mintUrl, {
             destination,
@@ -923,6 +948,7 @@ export function createDefaultScreenActionHandlers(
             meltTarget,
             recipientPubkey,
             recipientProfile,
+            ...(hasLockParam ? { p2pkLock: lockForDestination } : {}),
             amountEntryDisplay: readAmountEntryDisplay(entry),
           });
           logger.info("screenAction.amountEntry.next.resolved");

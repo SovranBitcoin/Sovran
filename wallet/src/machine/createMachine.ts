@@ -1803,6 +1803,8 @@ export function createPaymentMachine(
       meltTarget?: string;
       recipientPubkey?: string;
       recipientProfile?: RecipientProfile;
+      /** See the AMOUNT_ENTERED event — tri-state: leave, clear, or set. */
+      p2pkLock?: P2pkLockSpec | null;
       amountEntryDisplay?: AmountEntryDisplayMetadata;
     },
   ) =>
@@ -1818,6 +1820,7 @@ export function createPaymentMachine(
       meltTarget: opts?.meltTarget,
       recipientPubkey: opts?.recipientPubkey,
       recipientProfile: opts?.recipientProfile,
+      ...(opts && "p2pkLock" in opts ? { p2pkLock: opts.p2pkLock } : {}),
       amountEntryDisplay: opts?.amountEntryDisplay,
     });
 

@@ -4,6 +4,7 @@ import { createAmountEntryMethodContext } from "../mint-capabilities";
 import { parsePaymentInput } from "../parse";
 import { isValidSatAmount } from "../guards";
 import { normalizeNostrPubkey } from "../recipient";
+import { normalizeP2pkLock, type P2pkLockSpec } from "../p2pk";
 import type { Detectors, WalletContext } from "../types";
 import { resolveNext, type StepResult } from "./resolveNext";
 import { buildProofSuggestions } from "./amountFallback";
@@ -409,6 +410,10 @@ function handleAmountEntered(
         recipientPubkey: event.recipientPubkey,
         recipientProfile: event.recipientProfile,
         amountEntryDisplay: event.amountEntryDisplay,
+        // No lock here on purpose: a destination change means a different
+        // payment (a melt, say), and a melt cannot be P2PK-locked. Spreading
+        // currentCtx to "keep" it would carry a lock into a flow that cannot
+        // honour one.
         memo: undefined,
         sendMemoHandled: false,
       }
@@ -425,6 +430,7 @@ function handleAmountEntered(
         recipientProfile: event.recipientProfile ?? currentCtx.recipientProfile,
         amountEntryDisplay:
           event.amountEntryDisplay ?? currentCtx.amountEntryDisplay,
+        ...resolveLockPatch(event.p2pkLock, currentCtx),
         memo: undefined,
         sendMemoHandled: false,
       };
@@ -439,6 +445,53 @@ function handleAmountEntered(
     resolveNext(ctx.intent, ctx, walletCtx, enableEcashSendMemo),
     ctx,
   );
+}
+
+/**
+ * Fold an AMOUNT_ENTERED lock change into the context.
+ *
+ * `undefined` means the screen said nothing about the lock, so whatever the
+ * flow was seeded with stands (a Nut Drop's protocol-mandated lock, say).
+ * `null` is the user turning it off, and must clear BOTH fields — leaving the
+ * mirrored pubkey behind would keep every "is this locked" check true while
+ * the terms were gone.
+ */
+function resolveLockPatch(
+  requested: P2pkLockSpec | null | undefined,
+  currentCtx: FlowContext,
+): Pick<FlowContext, "p2pkLock" | "p2pkLockPubkey"> {
+  if (requested === undefined) {
+    return {
+      ...(currentCtx.p2pkLock ? { p2pkLock: currentCtx.p2pkLock } : {}),
+      ...(currentCtx.p2pkLockPubkey
+        ? { p2pkLockPubkey: currentCtx.p2pkLockPubkey }
+        : {}),
+    };
+  }
+  if (requested === null) {
+    logger.info("transitions.amountEntered.lockCleared");
+    return { p2pkLock: undefined, p2pkLockPubkey: undefined };
+  }
+  const lock = normalizeP2pkLock(requested);
+  if (!lock) {
+    // Refuse rather than fall back to the old lock or to none: both would
+    // send something other than what the user just chose.
+    logger.warn("transitions.amountEntered.invalidLock", {
+      hasLocktime: !!requested.locktimeSec,
+      refundKeyCount: requested.refundKeys?.length ?? 0,
+    });
+    return {
+      ...(currentCtx.p2pkLock ? { p2pkLock: currentCtx.p2pkLock } : {}),
+      ...(currentCtx.p2pkLockPubkey
+        ? { p2pkLockPubkey: currentCtx.p2pkLockPubkey }
+        : {}),
+    };
+  }
+  logger.info("transitions.amountEntered.lockSet", {
+    hasLocktime: !!lock.locktimeSec,
+    refundKeyCount: lock.refundKeys?.length ?? 0,
+  });
+  return { p2pkLock: lock, p2pkLockPubkey: lock.pubkey };
 }
 
 function handleMintSelected(

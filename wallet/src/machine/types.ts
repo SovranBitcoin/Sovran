@@ -548,6 +548,15 @@ export type FlowEvent =
       recipientPubkey?: string;
       /** See `FlowContext.recipientProfile` — chat-launched flows can seed this. */
       recipientProfile?: RecipientProfile;
+      /**
+       * Change the lock as part of confirming the amount. Tri-state:
+       * `undefined` leaves whatever the flow started with alone, `null`
+       * clears it (the user turned the lock off), and a spec sets it.
+       *
+       * This is what makes the lock a decision on the amount screen rather
+       * than something fixed when the flow began.
+       */
+      p2pkLock?: P2pkLockSpec | null;
       amountEntryDisplay?: AmountEntryDisplayMetadata;
     }
   | {
@@ -1291,6 +1300,8 @@ export interface PaymentMachine {
       meltTarget?: string;
       recipientPubkey?: string;
       recipientProfile?: RecipientProfile;
+      /** See the AMOUNT_ENTERED event — tri-state: leave, clear, or set. */
+      p2pkLock?: P2pkLockSpec | null;
       amountEntryDisplay?: AmountEntryDisplayMetadata;
     },
   ) => Promise<void>;

@@ -219,6 +219,47 @@ describe('ecash send — P2PK locked', () => {
     tm.assertContext({ p2pkLockPubkey: ODD_PARITY_PUBKEY });
   });
 
+  it('takes a lock chosen on the amount screen, not only at flow start', async () => {
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash();
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1, {
+      p2pkLock: {
+        pubkey: LOCK_PUBKEY,
+        locktimeSec: LOCKTIME_SEC,
+        refundKeys: [REFUND_PUBKEY],
+      },
+    });
+
+    tm.assertStep('sendComplete');
+    const sendCall = tm.operationCalls.find((call) => call.name === 'executeSend');
+    expect(sendCall?.args[3]).toMatchObject({
+      p2pkLock: { pubkey: LOCK_PUBKEY, locktimeSec: LOCKTIME_SEC },
+    });
+  });
+
+  it('lets the amount screen turn a seeded lock back off', async () => {
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash({ p2pkLockPubkey: LOCK_PUBKEY });
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1, {
+      p2pkLock: null,
+    });
+
+    tm.assertStep('sendComplete');
+    const sendCall = tm.operationCalls.find((call) => call.name === 'executeSend');
+    // Both fields must clear together: leaving the mirrored key behind would
+    // keep every "is this locked" check true while the terms were gone.
+    expect(sendCall?.args[3]).toBeUndefined();
+  });
+
+  it('leaves a seeded lock alone when the screen says nothing about it', async () => {
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash({ p2pkLockPubkey: LOCK_PUBKEY });
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
+
+    const sendCall = tm.operationCalls.find((call) => call.name === 'executeSend');
+    expect(sendCall?.args[3]).toMatchObject({ p2pkLockPubkey: LOCK_PUBKEY });
+  });
+
   it('unlocked sends are unaffected: localFirst still used with exact proofs', async () => {
     const tm = createTestMachine();
     await tm.machine.startSendEcash();
