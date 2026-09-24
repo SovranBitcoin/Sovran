@@ -353,6 +353,12 @@ const PARAM_POPUPS = {
     type: 'success',
   }),
 
+  'ai-provider-switched': (p: { providerName: string }): PopupSpec => ({
+    message: `Now using ${p.providerName}`,
+    icon: 'icon:humbleicons:url',
+    type: 'success',
+  }),
+
   'routstr-top-up-success': (p: { balance: string }): PopupSpec => ({
     message: `Balance topped up! New balance: ${p.balance}`,
     icon: WALLET_ICON,

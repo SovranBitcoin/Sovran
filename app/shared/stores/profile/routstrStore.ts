@@ -152,6 +152,16 @@ interface RoutstrState {
    */
   legacyAccounts: Record<string, RoutstrAccount>;
   /**
+   * A provider the USER chose, which outranks nagg's pick.
+   *
+   * nagg moves `nodeBaseUrl` on its own — its ladder switches on catalog
+   * health, and the app follows. That is right as a default and wrong as a
+   * rule: a user who deliberately picked a provider must not be moved off it
+   * by a background refresh. `null` means "whatever nagg says", which is the
+   * default everyone starts on.
+   */
+  userNodeBaseUrl: string | null;
+  /**
    * Working copy of the active session's messages. The canonical home is
    * `sessions[currentSessionId].messages`; this field is rehydrated from
    * the active session in `afterHydrate` and is *not* persisted on its
@@ -273,6 +283,10 @@ interface RoutstrActions {
     nodeBaseUrl: string | null;
     authMode?: 'bearer' | 'x-cashu';
   }) => void;
+  /** Pin the app to a provider, or pass `null` to follow nagg again. Drops the
+   *  server lineup and model cache so the menu re-derives from the new node's
+   *  own catalog rather than showing another node's models. */
+  setUserNode: (nodeBaseUrl: string | null) => void;
   isCacheStale: (nowMs?: number) => boolean;
 
   createSession: () => string;
@@ -517,6 +531,9 @@ const PersistedRoutstrStore = z.object({
   // `createMergeWithSchema` the whole blob — so a single bad entry would take
   // every OTHER provider's key with it. Here it loses one row.
   legacyAccounts: tolerantRecord(z.string().max(512), PersistedRoutstrAccount),
+  // Additive + tolerant: a malformed value parses to null, which simply means
+  // "follow nagg" — the default.
+  userNodeBaseUrl: z.string().max(512).nullable().default(null).catch(null),
 });
 
 export const useRoutstrStore = create<RoutstrStore>()(
@@ -535,6 +552,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
       lastKnownLineup: null,
       serverLineupAt: null,
       nodeBaseUrl: null,
+      userNodeBaseUrl: null,
       legacyAccounts: {},
       sessions: [],
       currentSessionId: null,
@@ -740,6 +758,19 @@ export const useRoutstrStore = create<RoutstrStore>()(
           providers: PROVIDER_IDS.filter((p) => TIER_IDS.some((t) => lineup[p][t] != null)),
         });
         const now = Date.now();
+        // A provider the user chose outranks nagg's. Take the lineup — it is
+        // still the curated model ladder — but leave the node alone, and do
+        // not adopt an `authMode` declared for a node we are not using.
+        const pinned = get().userNodeBaseUrl;
+        if (pinned) {
+          setRoutstrNodeBaseUrl(pinned);
+          set({
+            lineup,
+            serverLineupAt: now,
+            lastKnownLineup: { derivedAt: now, lineup, nodeBaseUrl: pinned },
+          });
+          return;
+        }
         setRoutstrNodeBaseUrl(nodeBaseUrl);
         set({
           lineup,
@@ -748,6 +779,22 @@ export const useRoutstrStore = create<RoutstrStore>()(
           authMode: authMode ?? (nodeBaseUrl === get().nodeBaseUrl ? get().authMode : 'bearer'),
           modelsCache: nodeBaseUrl === get().nodeBaseUrl ? get().modelsCache : null,
           lastKnownLineup: { derivedAt: now, lineup, nodeBaseUrl },
+        });
+      },
+
+      setUserNode: (nodeBaseUrl) => {
+        const next = nodeBaseUrl?.trim().replace(/\/+$/, '') || null;
+        storeLog.info('store.routstr.user_node_set', { pinned: next != null });
+        setRoutstrNodeBaseUrl(next ?? get().nodeBaseUrl);
+        set({
+          userNodeBaseUrl: next,
+          // The model menu is per node. Clearing the server lineup and the
+          // catalog forces a re-derive from whichever node is now in play,
+          // rather than offering another node's models against it.
+          lineup: null,
+          serverLineupAt: null,
+          modelsCache: null,
+          ...(next != null ? { nodeBaseUrl: next } : {}),
         });
       },
 
@@ -836,13 +883,17 @@ export const useRoutstrStore = create<RoutstrStore>()(
         lastKnownLineup: state.lastKnownLineup,
         nodeBaseUrl: state.nodeBaseUrl,
         legacyAccounts: boundedAccounts(state.legacyAccounts),
+        userNodeBaseUrl: state.userNodeBaseUrl,
       }),
       afterHydrate: (state) => {
         if (!state) return;
         // Re-apply the nagg-served node override before any Routstr call
         // this session — a repointed node must survive offline relaunches.
         state.nodeBaseUrl = state.nodeBaseUrl ?? state.lastKnownLineup?.nodeBaseUrl ?? null;
-        setRoutstrNodeBaseUrl(state.nodeBaseUrl);
+        // A pinned provider wins over whatever the last lineup left behind —
+        // the point of pinning is that a background refresh cannot move the
+        // user off it, and a relaunch is not an exception.
+        setRoutstrNodeBaseUrl(state.userNodeBaseUrl ?? state.nodeBaseUrl);
         // Record the live credential in the archive on the way in, so it is
         // already recoverable before anything this session can clear it. A
         // blob written before `legacyAccounts` existed has no other way to

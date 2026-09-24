@@ -1,5 +1,4 @@
 import { useCallback } from 'react';
-import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 import Icon from 'assets/icons';
 import { useBalanceContext } from '@cashu/coco-react';
@@ -7,10 +6,8 @@ import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { getMockMintBalance } from '@/shared/stores/runtime/mockDataStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
-import { staticPopup } from '@/shared/lib/popup';
+import { openProviderPicker } from '../lib/providerPicker';
 import BalancePill from '@/shared/ui/composed/BalancePill';
 
 /**
@@ -24,6 +21,10 @@ import BalancePill from '@/shared/ui/composed/BalancePill';
  * behind it were stranded. Requests are now paid per call out of the wallet,
  * so the wallet's own balance is the only balance there is, and it cannot go
  * stale.
+ *
+ * Tapping opens the provider picker, which is what the wallet pill's twin does
+ * with mints. It used to start a top-up — an operation that only existed
+ * because the balance lived on a node.
  */
 export function AiHeaderTitle() {
   const accent = useThemeColor('accent');
@@ -31,26 +32,10 @@ export function AiHeaderTitle() {
   const { balances: liveBalances } = useBalanceContext();
   const mintUrl = useMintStore((s) => s.selectedMint);
   const mockMode = useSettingsStore((s) => s.mockMode);
-  const { keys: nostrKeys } = useNostrKeysContext();
 
   const onPress = useCallback(() => {
-    if (!nostrKeys?.pubkey) {
-      staticPopup('no-wallet-available');
-      return;
-    }
-    useRoutstrTopUpStore.getState().start(null);
-    const preferredMint = useMintStore.getState().selectedMint ?? '';
-    router.navigate({
-      pathname: '/(send-flow)/amount',
-      params: {
-        amountEntry: JSON.stringify({
-          destination: 'sendEcash',
-          unit: 'sat',
-          selectedMintUrl: preferredMint,
-        }),
-      },
-    });
-  }, [nostrKeys?.pubkey]);
+    void openProviderPicker();
+  }, []);
 
   // Read exactly as the wallet header reads it (`useMintSelector`), so the two
   // pills cannot disagree about the same pot.

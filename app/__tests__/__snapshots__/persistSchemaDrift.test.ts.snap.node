@@ -5988,6 +5988,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
           "maxItems": 1024,
           "type": "array",
         },
+        "userNodeBaseUrl": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
       },
       "type": "object",
     },
@@ -7914,6 +7926,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
           "maxItems": 1024,
           "type": "array",
         },
+        "userNodeBaseUrl": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
       },
       "required": [
         "authMode",
@@ -7926,6 +7950,7 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
         "lastKnownLineup",
         "nodeBaseUrl",
         "legacyAccounts",
+        "userNodeBaseUrl",
       ],
       "type": "object",
     },
