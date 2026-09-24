@@ -438,13 +438,22 @@ async function throwResponseError(
     availableMsats: errorData.details?.available,
   });
 
-  // 401 with expired/spent key — clear stored API key so user can re-authenticate
+  // A 401 retires the credential from active use — but it is ARCHIVED, never
+  // deleted. The key is `sk-<sha256(token)>`, a row in one node's database, and
+  // the only bearer instrument for whatever was deposited there; deleting it
+  // makes that balance permanently unreachable. Worse, the message this branch
+  // reads cannot tell the two cases apart: "the node that issued this key says
+  // it is spent" and "a node that never issued it has never heard of it" both
+  // match. A repoint produces the second, so the old behaviour turned a routine
+  // node change into silent loss. Archive, and let reclaim ask each node.
   const ownsKey = ownsScope() && requestKey != null && routstrStoreState().apiKey === requestKey;
-  if (status === 401 && ownsKey) {
+  if (status === 401 && ownsKey && requestKey != null) {
     if (/invalid|expired|spent|unknown|not found|revoked/i.test(errorData.message)) {
-      apiLog.warn('api.routstr.api_key_expired');
-      routstrStoreState().clearApiKey();
-      routstrStoreState().clearBalance();
+      const state = routstrStoreState();
+      apiLog.warn('api.routstr.api_key_retired', { hadBalance: (state.balance ?? 0) > 0 });
+      state.archiveAccount(state.nodeBaseUrl, requestKey, state.balance);
+      state.clearApiKey();
+      state.clearBalance();
     } else {
       apiLog.warn('routstr.auth.kept_key');
     }

@@ -5754,6 +5754,66 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
           ],
           "default": null,
         },
+        "legacyAccounts": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "properties": {
+              "apiKey": {
+                "maxLength": 8192,
+                "type": "string",
+              },
+              "archivedAt": {
+                "default": 0,
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "lastKnownBalanceMsats": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+                "default": null,
+              },
+              "reclaimedAt": {
+                "anyOf": [
+                  {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+                "default": null,
+              },
+            },
+            "required": [
+              "apiKey",
+            ],
+            "type": "object",
+          },
+          "default": {},
+          "propertyNames": {
+            "type": "string",
+          },
+          "tolerantKey": {
+            "input": {
+              "maxLength": 512,
+              "type": "string",
+            },
+            "output": {
+              "maxLength": 512,
+              "type": "string",
+            },
+          },
+          "type": "object",
+        },
         "nodeBaseUrl": {
           "anyOf": [
             {
@@ -7774,6 +7834,7 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
           ],
           "default": null,
         },
+        "legacyAccounts": {},
         "nodeBaseUrl": {
           "anyOf": [
             {
@@ -7864,6 +7925,7 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
         "currentSessionId",
         "lastKnownLineup",
         "nodeBaseUrl",
+        "legacyAccounts",
       ],
       "type": "object",
     },

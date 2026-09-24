@@ -103,11 +103,22 @@ describe('Routstr response credentials', () => {
     'Unknown key',
     'Key not found',
     'Revoked key',
-  ])('clears a definitively rejected key: %s', async (message) => {
+  ])('retires a definitively rejected key without destroying it: %s', async (message) => {
+    useRoutstrStore.setState({ nodeBaseUrl: 'https://old.example', balance: 250_000 });
     jest.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response(401, message, ''));
     await expect(completion('cashuA-test-original')).rejects.toMatchObject({ status: 401 });
+
     expect(useRoutstrStore.getState().apiKey).toBeNull();
     expect(useRoutstrStore.getState().balance).toBeNull();
+    // The key is the only bearer instrument for whatever was deposited, and
+    // this message cannot distinguish "the issuing node says it is spent" from
+    // "a node that never issued it has never heard of it". Archive, so reclaim
+    // can ask each node later.
+    expect(useRoutstrStore.getState().legacyAccounts['https://old.example']).toMatchObject({
+      apiKey: 'cashuA-test-original',
+      lastKnownBalanceMsats: 250_000,
+      reclaimedAt: null,
+    });
   });
 
   it.each(['Unauthorized', 'Authentication service unavailable'])(

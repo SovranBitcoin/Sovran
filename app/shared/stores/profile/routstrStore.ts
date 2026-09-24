@@ -18,7 +18,7 @@ import {
   type PersistedLineup,
 } from '@/shared/lib/routstr/lineup';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
-import { tolerantArray } from '@/shared/lib/persist/tolerant';
+import { tolerantRecord, tolerantArray } from '@/shared/lib/persist/tolerant';
 import { restoreActiveSessionView } from '@/shared/stores/profile/restoreActiveSessionView';
 
 // AI tab tier + provider ids — imported from the shared lineup module,
@@ -115,12 +115,42 @@ interface ModelsCache {
   timestamp: number;
 }
 
+/**
+ * A Routstr credential this profile has held, kept so the sats behind it stay
+ * reachable.
+ *
+ * A Routstr key is `sk-<sha256(token)>` — a row in ONE node's database — and it
+ * is the only bearer instrument for whatever was deposited. Until now a 401
+ * deleted it outright, which made that balance permanently unreachable; and
+ * because a node repoint leaves the key addressed at a node that never issued
+ * it, a 401 was exactly what a repoint produced.
+ */
+interface RoutstrAccount {
+  apiKey: string;
+  /** Last balance this key was observed to hold, in msats. A hint for the UI,
+   *  never a substitute for asking the node. */
+  lastKnownBalanceMsats: number | null;
+  archivedAt: number;
+  /** Set once the balance has been swept back into the wallet. */
+  reclaimedAt: number | null;
+}
+
 interface RoutstrState {
   /** Cashu token or persistent wallet key */
   apiKey: string | null;
   authMode: 'bearer' | 'x-cashu';
   /** Balance in msats */
   balance: number | null;
+  /**
+   * Superseded credentials, keyed by the node they are BELIEVED to belong to.
+   *
+   * The key is a hint, not a fact: a repoint can move `nodeBaseUrl` out from
+   * under a credential before anything archives it, so the pairing recorded
+   * here may be wrong. Reclaim must therefore try each archived key against
+   * every node we know of rather than trusting this key — asking a node that
+   * never issued it is free and answers `401 key_not_found`.
+   */
+  legacyAccounts: Record<string, RoutstrAccount>;
   /**
    * Working copy of the active session's messages. The canonical home is
    * `sessions[currentSessionId].messages`; this field is rehydrated from
@@ -192,6 +222,12 @@ interface RoutstrState {
 interface RoutstrActions {
   setApiKey: (apiKey: string) => void;
   clearApiKey: () => void;
+  /** Move a credential into `legacyAccounts` so its balance stays reachable.
+   *  Idempotent, and never overwrites a richer record with a poorer one. */
+  archiveAccount: (nodeBaseUrl: string | null, apiKey: string, balanceMsats: number | null) => void;
+  /** Mark an archived credential as swept. Keeps the row (the node may still
+   *  hold dust, and a refund is idempotent) but stops it being retried. */
+  markAccountReclaimed: (nodeBaseUrl: string) => void;
   applyChangeToken: (token: string) => void;
   invalidateServerLineup: () => void;
 
@@ -355,6 +391,30 @@ const PersistedRoutstrMessages = tolerantArray(
 );
 
 /**
+ * Archived credentials, bounded to what the schema accepts.
+ *
+ * The ceiling is applied here, like `boundedSessions`, so the blob is trimmed
+ * at the one point where store state becomes persisted state rather than at
+ * each writer. Eviction is deliberately NOT least-recently-used: a row is a
+ * candidate only once it has been reclaimed, because the alternative is
+ * deleting the one string that can reach a user's money. If every row is still
+ * unreclaimed the record is left over its ceiling — an oversized blob is
+ * recoverable; a deleted key is not.
+ */
+function boundedAccounts(accounts: Record<string, RoutstrAccount>): Record<string, RoutstrAccount> {
+  const entries = Object.entries(accounts);
+  if (entries.length <= MAX_ARCHIVED_ACCOUNTS) return accounts;
+  const reclaimed = entries
+    .filter(([, a]) => a.reclaimedAt != null)
+    .sort((a, b) => (a[1].reclaimedAt ?? 0) - (b[1].reclaimedAt ?? 0));
+  const dropCount = Math.min(entries.length - MAX_ARCHIVED_ACCOUNTS, reclaimed.length);
+  if (dropCount === 0) return accounts;
+  const dropped = new Set(reclaimed.slice(0, dropCount).map(([key]) => key));
+  storeLog.debug('store.routstr.accounts_evicted', { dropped: dropped.size });
+  return Object.fromEntries(entries.filter(([key]) => !dropped.has(key)));
+}
+
+/**
  * The session list, bounded to what the schema accepts.
  *
  * Returns the SAME array when nothing exceeds a ceiling — which is every write
@@ -423,6 +483,21 @@ const PersistedRoutstrSession = z.looseObject({
   activeChildren: z.record(z.string().max(128), z.string().max(128)).optional(),
 });
 
+/**
+ * Archived credentials never expire on a clock. Eviction is balance-aware by
+ * construction: only rows already reclaimed, or holding no key, are
+ * candidates. A pure LRU here would delete the one string that can reach a
+ * user's money, which is the failure this whole record exists to prevent.
+ */
+const MAX_ARCHIVED_ACCOUNTS = 32;
+
+const PersistedRoutstrAccount = z.looseObject({
+  apiKey: z.string().max(8192),
+  lastKnownBalanceMsats: z.number().nullable().default(null).catch(null),
+  archivedAt: z.number().int().nonnegative().default(0).catch(0),
+  reclaimedAt: z.number().int().nonnegative().nullable().default(null).catch(null),
+});
+
 const PersistedRoutstrStore = z.object({
   authMode: z.enum(['bearer', 'x-cashu']).default('bearer').catch('bearer'),
   serverLineupAt: z.number().int().nonnegative().nullable().default(null).catch(null),
@@ -437,6 +512,11 @@ const PersistedRoutstrStore = z.object({
   // Additive + tolerant: a malformed value parses to null and the app
   // falls back to the built-in default node.
   nodeBaseUrl: z.string().max(512).nullable().default(null).catch(null),
+  // Additive, and `tolerantRecord` rather than a bare `z.record` on purpose:
+  // under `z.record` one malformed row rejects the record, and through
+  // `createMergeWithSchema` the whole blob — so a single bad entry would take
+  // every OTHER provider's key with it. Here it loses one row.
+  legacyAccounts: tolerantRecord(z.string().max(512), PersistedRoutstrAccount),
 });
 
 export const useRoutstrStore = create<RoutstrStore>()(
@@ -455,6 +535,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
       lastKnownLineup: null,
       serverLineupAt: null,
       nodeBaseUrl: null,
+      legacyAccounts: {},
       sessions: [],
       currentSessionId: null,
       isAnonymousMode: false,
@@ -462,6 +543,48 @@ export const useRoutstrStore = create<RoutstrStore>()(
       setApiKey: (apiKey: string) => {
         storeLog.info('store.routstr.set_api_key');
         set({ apiKey });
+      },
+
+      archiveAccount: (nodeBaseUrl, apiKey, balanceMsats) => {
+        if (!apiKey) return;
+        const key = nodeBaseUrl ?? 'unknown';
+        set((state) => {
+          const existing = state.legacyAccounts[key];
+          // Same credential already recorded: keep the richer record rather
+          // than overwriting a known balance with a null one.
+          if (existing?.apiKey === apiKey && existing.lastKnownBalanceMsats != null) {
+            return state;
+          }
+          storeLog.info('store.routstr.account_archived', {
+            node: key,
+            hadBalance: balanceMsats != null && balanceMsats > 0,
+          });
+          return {
+            legacyAccounts: {
+              ...state.legacyAccounts,
+              [key]: {
+                apiKey,
+                lastKnownBalanceMsats: balanceMsats ?? existing?.lastKnownBalanceMsats ?? null,
+                archivedAt: Date.now(),
+                reclaimedAt: null,
+              },
+            },
+          };
+        });
+      },
+
+      markAccountReclaimed: (nodeBaseUrl) => {
+        set((state) => {
+          const existing = state.legacyAccounts[nodeBaseUrl];
+          if (!existing) return state;
+          storeLog.info('store.routstr.account_reclaimed', { node: nodeBaseUrl });
+          return {
+            legacyAccounts: {
+              ...state.legacyAccounts,
+              [nodeBaseUrl]: { ...existing, reclaimedAt: Date.now(), lastKnownBalanceMsats: 0 },
+            },
+          };
+        });
       },
 
       applyChangeToken: (token) => {
@@ -712,6 +835,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
         currentSessionId: state.currentSessionId,
         lastKnownLineup: state.lastKnownLineup,
         nodeBaseUrl: state.nodeBaseUrl,
+        legacyAccounts: boundedAccounts(state.legacyAccounts),
       }),
       afterHydrate: (state) => {
         if (!state) return;
@@ -719,6 +843,25 @@ export const useRoutstrStore = create<RoutstrStore>()(
         // this session — a repointed node must survive offline relaunches.
         state.nodeBaseUrl = state.nodeBaseUrl ?? state.lastKnownLineup?.nodeBaseUrl ?? null;
         setRoutstrNodeBaseUrl(state.nodeBaseUrl);
+        // Record the live credential in the archive on the way in, so it is
+        // already recoverable before anything this session can clear it. A
+        // blob written before `legacyAccounts` existed has no other way to
+        // learn about its own key, and that key may be the only route back to
+        // a balance sitting on a node the app has since been repointed away
+        // from. Idempotent: an existing row is left alone.
+        state.legacyAccounts ??= {};
+        const liveKey = state.apiKey;
+        if (liveKey) {
+          const node = state.nodeBaseUrl ?? 'unknown';
+          if (state.legacyAccounts[node]?.apiKey !== liveKey) {
+            state.legacyAccounts[node] = {
+              apiKey: liveKey,
+              lastKnownBalanceMsats: state.balance ?? null,
+              archivedAt: Date.now(),
+              reclaimedAt: null,
+            };
+          }
+        }
         // Drop transient `pending: true` flags — any user message marked
         // pending at persist time (e.g. app killed mid-send) resolves to
         // "not in flight" on the next launch so the user sees a static

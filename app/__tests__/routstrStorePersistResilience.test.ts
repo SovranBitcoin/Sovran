@@ -257,3 +257,69 @@ describe('routstrStore persist resilience', () => {
     expect(store.getState().lastKnownLineup?.lineup.claude.max?.modelId).toBe('claude-sonnet-5');
   });
 });
+
+describe('archived credentials survive a bad blob', () => {
+  beforeEach(() => {
+    jest.resetModules();
+    for (const k of Object.keys(mockMemory)) delete mockMemory[k];
+  });
+
+  it('loses one malformed row, not every provider key', async () => {
+    // Under a bare `z.record` a single bad entry rejects the record and, through
+    // `createMergeWithSchema`, the whole blob — taking every other provider's
+    // key with it. `tolerantRecord` costs one row.
+    preload({
+      apiKey: 'sk-live',
+      legacyAccounts: {
+        'https://good.example': { apiKey: 'sk-good', lastKnownBalanceMsats: 250_000 },
+        'https://bad.example': { apiKey: 42 },
+      },
+    });
+
+    const store = await loadStore();
+
+    expect(store.getState().legacyAccounts['https://good.example']?.apiKey).toBe('sk-good');
+    expect(store.getState().legacyAccounts['https://bad.example']).toBeUndefined();
+    expect(store.getState().apiKey).toBe('sk-live');
+  });
+
+  it('seeds the live credential on hydrate so it is recoverable before anything clears it', async () => {
+    // A blob written before this field existed has no other way to learn about
+    // its own key, and that key may be the only route back to a balance on a
+    // node the app has since been repointed away from.
+    preload({ apiKey: 'sk-live', balance: 250_000, nodeBaseUrl: 'https://old.example' });
+
+    const store = await loadStore();
+
+    expect(store.getState().legacyAccounts['https://old.example']).toMatchObject({
+      apiKey: 'sk-live',
+      lastKnownBalanceMsats: 250_000,
+      reclaimedAt: null,
+    });
+  });
+
+  it('does not re-seed a credential already archived', async () => {
+    preload({
+      apiKey: 'sk-live',
+      balance: 0,
+      nodeBaseUrl: 'https://old.example',
+      legacyAccounts: {
+        'https://old.example': {
+          apiKey: 'sk-live',
+          lastKnownBalanceMsats: 250_000,
+          archivedAt: 7,
+          reclaimedAt: null,
+        },
+      },
+    });
+
+    const store = await loadStore();
+
+    // The richer record wins: a later zero reading must not erase what the
+    // node was last known to hold.
+    expect(store.getState().legacyAccounts['https://old.example']).toMatchObject({
+      lastKnownBalanceMsats: 250_000,
+      archivedAt: 7,
+    });
+  });
+});
