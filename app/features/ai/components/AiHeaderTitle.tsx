@@ -2,27 +2,35 @@ import { useCallback } from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 import Icon from 'assets/icons';
+import { useBalanceContext } from '@cashu/coco-react';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { getMockMintBalance } from '@/shared/stores/runtime/mockDataStore';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { staticPopup } from '@/shared/lib/popup';
 import BalancePill from '@/shared/ui/composed/BalancePill';
 
 /**
  * AI tab header — same `<BalancePill />` chrome the wallet tab uses for its
- * mint selector, just fed Routstr data instead of mint data: a wallet glyph
- * (no provider logo), the literal label "Balance", and the user's Routstr
- * balance in sats. Tapping opens the top-up flow (mirrors the previous pill
- * behavior). Sharing one component keeps the two headers visually identical
- * across liquid-glass / blur-card variants without copy-pasting the chrome.
+ * mint selector, and now the same NUMBER: the balance of the mint AI requests
+ * are paid from.
+ *
+ * It used to read `routstrStore.balance`, a figure held on one Routstr node.
+ * That number could not be trusted the moment the node changed — the header
+ * kept showing 250 sats against a node that had never seen them — and the sats
+ * behind it were stranded. Requests are now paid per call out of the wallet,
+ * so the wallet's own balance is the only balance there is, and it cannot go
+ * stale.
  */
 export function AiHeaderTitle() {
   const accent = useThemeColor('accent');
 
-  const apiKey = useRoutstrStore((s) => s.apiKey);
-  const balance = useRoutstrStore((s) => s.balance);
+  const { balances: liveBalances } = useBalanceContext();
+  const mintUrl = useMintStore((s) => s.selectedMint);
+  const mockMode = useSettingsStore((s) => s.mockMode);
   const { keys: nostrKeys } = useNostrKeysContext();
 
   const onPress = useCallback(() => {
@@ -44,24 +52,25 @@ export function AiHeaderTitle() {
     });
   }, [nostrKeys?.pubkey]);
 
-  // Routstr stores msats — floor to whole sats for display.
-  const sats = balance != null ? Math.floor(balance / 1000) : 0;
+  // Read exactly as the wallet header reads it (`useMintSelector`), so the two
+  // pills cannot disagree about the same pot.
+  const sats = mintUrl
+    ? mockMode
+      ? getMockMintBalance(mintUrl, 'sat')
+      : amountToNumber(liveBalances.byMint[mintUrl]?.total)
+    : 0;
 
-  // Loading vs empty: only show the skeleton while we genuinely have a
-  // request inflight (apiKey present, balance not yet resolved). When the
-  // user has no Routstr account at all (no apiKey) OR the account has a
-  // zero balance, fall through to the "Top up balance" CTA so the header
-  // is actionable instead of reading "0 sats".
-  const isLoadingBalance = apiKey != null && balance == null;
-  const isEmpty = !isLoadingBalance && sats <= 0;
+  // No skeleton: this is local wallet state, not a request in flight. Empty
+  // means the wallet is empty, and the CTA now points at funding the wallet
+  // rather than topping up an account on somebody's node.
+  const isEmpty = sats <= 0;
 
   return (
     <BalancePill
       title="Balance"
       balance={sats}
       unit="sat"
-      isLoading={isLoadingBalance}
-      ctaLabel={isEmpty ? 'Top up balance' : undefined}
+      ctaLabel={isEmpty ? 'Add funds' : undefined}
       iconNode={<Icon name="fluent:wallet-20-filled" size={20} color={accent} />}
       loadingTitlePlaceholder="Balance"
       onPress={onPress}
