@@ -59,7 +59,9 @@ function assembleLayer(config: TierConfig): facade.NostrDataLayer | null {
   }
 
   if (config.primal.enabled) {
-    const connection = facade.primal.createPrimalWebSocketConnection({ url: config.primal.url });
+    const connection = facade.primal.createPrimalWebSocketConnection({
+      url: config.primal.urls,
+    });
     tiers.push(facade.primal.createPrimalTier({ connection }));
   }
 

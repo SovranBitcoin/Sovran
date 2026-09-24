@@ -56,7 +56,9 @@ export function useNostrTierHealth(relayMap: Record<string, RelayHealth>): Nostr
   const naggEnabled = config.nagg.enabled;
   const naggUrl = config.nagg.appViewBaseUrl;
   const primalEnabled = config.primal.enabled;
-  const primalUrl = config.primal.url;
+  const primalUrls = config.primal.urls;
+  // Identity for the deps array — the list itself is rebuilt on every config read.
+  const primalUrlKey = primalUrls.join(',');
 
   const runProbes = useCallback(
     (trigger: 'focus' | 'interval' | 'pull') => {
@@ -76,11 +78,23 @@ export function useNostrTierHealth(relayMap: Record<string, RelayHealth>): Nostr
             () => 'offline'
           )
         : Promise.resolve('disabled');
+      // The tier is online when ANY cache host answers, because the connection
+      // falls over between them before the facade drops to the relay floor.
+      // Probing only the first would report the whole tier down for one dead
+      // host — which is the state this failover exists to survive.
+      const probeUntilOnline = async (): Promise<TierStatus> => {
+        for (const url of primalUrls) {
+          if (controller.signal.aborted) return 'offline';
+          const online = await probePrimalHealth(url, { signal: controller.signal }).match(
+            (reachable) => reachable,
+            () => false
+          );
+          if (online) return 'online';
+        }
+        return 'offline';
+      };
       const primalTask: Promise<TierStatus> = primalEnabled
-        ? probePrimalHealth(primalUrl, { signal: controller.signal }).match(
-            (online) => (online ? 'online' : 'offline'),
-            () => 'offline'
-          )
+        ? probeUntilOnline()
         : Promise.resolve('disabled');
 
       void Promise.all([naggTask, primalTask]).then(([naggStatus, primalStatus]) => {
@@ -92,7 +106,7 @@ export function useNostrTierHealth(relayMap: Record<string, RelayHealth>): Nostr
         log.info('settings.network.health.probe', { tier: 'primal', status: primalStatus });
       });
     },
-    [naggEnabled, naggUrl, primalEnabled, primalUrl]
+    [naggEnabled, naggUrl, primalEnabled, primalUrls, primalUrlKey]
   );
 
   useFocusEffect(

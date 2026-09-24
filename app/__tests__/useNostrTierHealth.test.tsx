@@ -51,7 +51,7 @@ const mockedProbePrimalHealth = jest.mocked(probePrimalHealth);
 
 const ENABLED_CONFIG: NostrTierConfig = {
   nagg: { appViewBaseUrl: 'https://nagg.example', enabled: true },
-  primal: { enabled: true, url: 'wss://primal.example' },
+  primal: { enabled: true, urls: ['wss://primal.example'] },
   relay: { enabled: true, relays: ['wss://relay.example'] },
 };
 

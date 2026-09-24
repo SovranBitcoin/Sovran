@@ -17,7 +17,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
  */
 export type NostrTierConfig = {
   nagg: { enabled: boolean; appViewBaseUrl: string };
-  primal: { enabled: boolean; url: string };
+  primal: { enabled: boolean; urls: readonly string[] };
   relay: { enabled: boolean; relays: readonly string[] };
 };
 
@@ -30,7 +30,7 @@ export function getNostrTierConfig(): NostrTierConfig {
   const s = useSettingsStore.getState();
   const config: NostrTierConfig = {
     nagg: { enabled: s.naggTierEnabled, appViewBaseUrl: backendConfig.nostrAppViewBaseUrl },
-    primal: { enabled: s.primalTierEnabled, url: backendConfig.primalCacheUrl },
+    primal: { enabled: s.primalTierEnabled, urls: backendConfig.primalCacheUrls },
     relay: { enabled: s.relayTierEnabled, relays: DEFAULT_RELAYS },
   };
   const configKey = [
@@ -38,7 +38,7 @@ export function getNostrTierConfig(): NostrTierConfig {
     config.primal.enabled,
     config.relay.enabled,
     config.nagg.appViewBaseUrl,
-    config.primal.url,
+    config.primal.urls.join(','),
     config.relay.relays.length,
   ].join('|');
   if (configKey !== lastLoggedConfigKey) {
@@ -50,7 +50,7 @@ export function getNostrTierConfig(): NostrTierConfig {
         config.relay.enabled ? 'relay' : null,
       ].filter(Boolean),
       naggUrl: config.nagg.appViewBaseUrl,
-      primalUrl: config.primal.url,
+      primalUrls: config.primal.urls,
       relays: config.relay.relays.length,
     });
   }
@@ -64,7 +64,7 @@ export function useNostrTierConfig(): NostrTierConfig {
   const relayTierEnabled = useSettingsStore((st) => st.relayTierEnabled);
   return {
     nagg: { enabled: naggTierEnabled, appViewBaseUrl: backendConfig.nostrAppViewBaseUrl },
-    primal: { enabled: primalTierEnabled, url: backendConfig.primalCacheUrl },
+    primal: { enabled: primalTierEnabled, urls: backendConfig.primalCacheUrls },
     relay: { enabled: relayTierEnabled, relays: DEFAULT_RELAYS },
   };
 }

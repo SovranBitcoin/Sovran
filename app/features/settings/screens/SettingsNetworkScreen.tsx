@@ -32,6 +32,7 @@ import { useNostrTierHealth } from '@/shared/hooks/useNostrTierHealth';
 import { type TierStatus } from '@/shared/lib/nostr/tierHealth';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { publishEvent } from '@/shared/lib/nostr/publish';
+import { backendConfig } from '@/shared/config/backend';
 import { DEFAULT_RELAYS, safeNormalizeRelay } from '@/shared/lib/nostr/outbox/defaults';
 import { RELAY_LIST_KIND, serializeRelayList } from '@/shared/lib/nostr/outbox/nip65';
 import { getOwnWriteRelays, useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
@@ -81,6 +82,7 @@ export function SettingsNetworkScreen() {
   const setVertexCreditsEnabled = useSettingsStore((s) => s.setVertexCreditsEnabled);
   const naggTierEnabled = useSettingsStore((s) => s.naggTierEnabled);
   const setNaggTierEnabled = useSettingsStore((s) => s.setNaggTierEnabled);
+  const primalHostCount = backendConfig.primalCacheUrls.length;
   const primalTierEnabled = useSettingsStore((s) => s.primalTierEnabled);
   const setPrimalTierEnabled = useSettingsStore((s) => s.setPrimalTierEnabled);
   const relayTierEnabled = useSettingsStore((s) => s.relayTierEnabled);
@@ -124,8 +126,11 @@ export function SettingsNetworkScreen() {
     },
     {
       id: 'primal',
-      name: 'Primal cache',
-      description: 'Public fallback cache.',
+      name: primalHostCount > 1 ? `Primal caches (${primalHostCount})` : 'Primal cache',
+      description:
+        primalHostCount > 1
+          ? `Public fallback caches. Tried in order; the tier is online while any host answers.`
+          : 'Public fallback cache.',
       status: tierHealth.primal,
       enabled: primalTierEnabled,
       onToggle: setPrimalTierEnabled,

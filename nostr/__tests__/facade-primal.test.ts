@@ -298,6 +298,87 @@ describe('Primal WebSocket connection — protocol plumbing', () => {
     }
   }
 
+  /** Refuses the connection, as a host that is down does — close, never open. */
+  class DeadWebSocket {
+    onopen: ((ev: unknown) => void) | null = null;
+    onmessage: ((ev: { data: unknown }) => void) | null = null;
+    onerror: ((ev: unknown) => void) | null = null;
+    onclose: ((ev: unknown) => void) | null = null;
+    static urls: string[] = [];
+    constructor(public url: string) {
+      DeadWebSocket.urls.push(url);
+      queueMicrotask(() => this.onerror?.({}));
+    }
+    send() {}
+    close() {}
+  }
+
+  /** Dead for the first host in the list, alive for every one after it. */
+  function failFirstHost(deadUrl: string) {
+    const tried: string[] = [];
+    class Switching {
+      onopen: ((ev: unknown) => void) | null = null;
+      onmessage: ((ev: { data: unknown }) => void) | null = null;
+      onerror: ((ev: unknown) => void) | null = null;
+      onclose: ((ev: unknown) => void) | null = null;
+      private live: FakeWebSocket | null = null;
+      constructor(public url: string) {
+        tried.push(url);
+        if (url === deadUrl) {
+          queueMicrotask(() => this.onerror?.({}));
+          return;
+        }
+        this.live = new FakeWebSocket(url);
+        this.live.onopen = (ev) => this.onopen?.(ev);
+        this.live.onmessage = (ev) => this.onmessage?.(ev);
+        queueMicrotask(() => this.live?.onopen?.({}));
+      }
+      send(data: string) {
+        this.live!.onmessage = (ev) => this.onmessage?.(ev);
+        this.live!.send(data);
+      }
+      close() {}
+    }
+    return { Switching, tried };
+  }
+
+  test('falls over to the next host when the first refuses, and reports which served', async () => {
+    const { Switching, tried } = failFirstHost('wss://dead.test');
+    const connection = createPrimalWebSocketConnection({
+      url: ['wss://dead.test', 'wss://alive.test'],
+      WebSocketImpl: Switching as unknown as new (url: string) => never,
+    });
+
+    const result = await connection.request({ verb: 'mega_feed_directive', params: { limit: 30 } });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toHaveLength(BATCH.length);
+    // In order, and it stopped as soon as one answered.
+    expect(tried).toEqual(['wss://dead.test', 'wss://alive.test']);
+  });
+
+  test('errors only after every host has been tried, so the facade falls to relays', async () => {
+    DeadWebSocket.urls = [];
+    const connection = createPrimalWebSocketConnection({
+      url: ['wss://a.test', 'wss://b.test', 'wss://c.test'],
+      WebSocketImpl: DeadWebSocket as unknown as new (url: string) => never,
+    });
+
+    const result = await connection.request({ verb: 'mega_feed_directive', params: { limit: 30 } });
+
+    expect(result.isErr()).toBe(true);
+    expect(DeadWebSocket.urls).toEqual(['wss://a.test', 'wss://b.test', 'wss://c.test']);
+  });
+
+  test('a single url string still works, and is not treated as a list of characters', async () => {
+    const connection = createPrimalWebSocketConnection({
+      url: 'wss://cache.test',
+      WebSocketImpl: FakeWebSocket as unknown as new (url: string) => never,
+    });
+    const result = await connection.request({ verb: 'mega_feed_directive', params: { limit: 30 } });
+    expect(result.isOk()).toBe(true);
+  });
+
   test('sends a cache REQ and collects events until EOSE', async () => {
     const connection = createPrimalWebSocketConnection({
       url: 'wss://cache.test',

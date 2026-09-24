@@ -4,11 +4,29 @@ import { z } from 'zod';
 // EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL only for local development.
 const DEFAULT_NOSTR_APPVIEW_BASE_URL = 'https://nagg.up.railway.app';
 /**
- * Primal's PUBLIC cache server (Primal operates it; we only connect). Tier 2 of
- * the resilient Nostr data layer — the `nagg → Primal cache → raw relays`
- * fallback. Override via EXPO_PUBLIC_PRIMAL_CACHE_URL for a different instance.
+ * Primal's PUBLIC cache servers (Primal operates them; we only connect). Tier 2
+ * of the resilient Nostr data layer — the `nagg → Primal caches → raw relays`
+ * fallback.
+ *
+ * A LIST, tried in order, because these hosts do not fail together: on
+ * 2026-09-24 `cache2` refused every connection while `cache1` served normally,
+ * which put every feed, thread and profile on the raw-relay floor. Exhausting
+ * the list before falling through keeps one dead host from costing the whole
+ * tier.
+ *
+ * Override with EXPO_PUBLIC_PRIMAL_CACHE_URL (comma-separated for several).
  */
-const DEFAULT_PRIMAL_CACHE_URL = 'wss://cache2.primal.net/v1';
+const DEFAULT_PRIMAL_CACHE_URLS = ['wss://cache1.primal.net/v1', 'wss://cache2.primal.net/v1'];
+
+/** A comma-separated override becomes the ordered host list; blank entries drop. */
+function splitUrls(value: string | undefined): string[] | undefined {
+  if (!value) return undefined;
+  const urls = value
+    .split(',')
+    .map((url) => url.trim())
+    .filter((url) => url.length > 0);
+  return urls.length > 0 ? urls : undefined;
+}
 
 const emptyStringToUndefined = (value: unknown) =>
   typeof value === 'string' && value.trim() === '' ? undefined : value;
@@ -41,8 +59,8 @@ type BackendConfig = {
    * through nagg-ts. Pending their own migration to REST.
    */
   nostrGraphqlEndpoint: string;
-  /** Primal public cache server URL (tier 2 of the Nostr data layer). */
-  primalCacheUrl: string;
+  /** Primal public cache server URLs, tried in order (tier 2 of the data layer). */
+  primalCacheUrls: readonly string[];
 };
 
 function readBackendEnv(): BackendEnvInput {
@@ -76,7 +94,8 @@ export function parseBackendConfig(env: BackendEnvInput = readBackendEnv()): Bac
     scoreApiBaseUrl: parsed.data.EXPO_PUBLIC_SCORE_API_BASE_URL ?? nostrAppViewBaseUrl,
     nostrGraphqlEndpoint:
       parsed.data.EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT ?? `${nostrAppViewBaseUrl}/graphql`,
-    primalCacheUrl: parsed.data.EXPO_PUBLIC_PRIMAL_CACHE_URL ?? DEFAULT_PRIMAL_CACHE_URL,
+    primalCacheUrls:
+      splitUrls(parsed.data.EXPO_PUBLIC_PRIMAL_CACHE_URL) ?? DEFAULT_PRIMAL_CACHE_URLS,
   };
 }
 

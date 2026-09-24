@@ -78,44 +78,101 @@ export interface PrimalConnection {
 // ---------------------------------------------------------------------------
 
 export type PrimalWebSocketConfig = {
-  /** Primal cache WebSocket URL, e.g. `wss://cache2.primal.net/v1`. */
-  url: string;
+  /**
+   * Primal cache WebSocket URL, or several tried in order.
+   *
+   * Primal runs more than one cache host and they do not fail together —
+   * `cache2` refusing connections while `cache1` served normally is what
+   * prompted this. A list is exhausted before the caller sees an error, so the
+   * facade only falls through to the raw-relay floor when NO cache answered,
+   * rather than when the first one happened to be down.
+   */
+  url: string | readonly string[];
   /** Inject a WebSocket constructor (tests / non-browser runtimes); defaults to global. */
   WebSocketImpl?: new (url: string) => WebSocketLike;
 };
 
 export function createPrimalWebSocketConnection(config: PrimalWebSocketConfig): PrimalConnection {
   const Ctor = config.WebSocketImpl ?? (globalThis as { WebSocket?: new (url: string) => WebSocketLike }).WebSocket;
+  const urls = (typeof config.url === 'string' ? [config.url] : [...config.url]).filter(
+    (url) => url.length > 0,
+  );
   let counter = 0;
 
   return {
-    request(request, controls) {
+    async request(request, controls) {
       if (controls?.signal?.aborted) {
-        return Promise.resolve(
-          err<RawPrimalEvent[], NaggError>({
+        return err<RawPrimalEvent[], NaggError>({
+          type: 'network',
+          message: 'Primal request aborted',
+          cause: controls.signal.reason,
+        });
+      }
+      if (!Ctor) {
+        return err<RawPrimalEvent[], NaggError>({
+          type: 'network',
+          message: 'no WebSocket implementation available for the Primal connection',
+          cause: undefined,
+        });
+      }
+      if (urls.length === 0) {
+        return err<RawPrimalEvent[], NaggError>({
+          type: 'network',
+          message: 'no Primal cache url configured',
+          cause: undefined,
+        });
+      }
+
+      let lastError: NaggError | null = null;
+      for (const [index, url] of urls.entries()) {
+        // An abort between hosts stops the walk: the caller is gone, and trying
+        // the next one would spend a socket on a result nobody reads.
+        if (controls?.signal?.aborted) {
+          return err<RawPrimalEvent[], NaggError>({
             type: 'network',
             message: 'Primal request aborted',
             cause: controls.signal.reason,
-          }),
-        );
+          });
+        }
+        const attempt = await requestOnce(Ctor, url, request, controls);
+        if (attempt.isOk()) {
+          if (index > 0) {
+            nostrLog.info('nostr.primal.host.failover', {
+              url,
+              attempt: index + 1,
+              of: urls.length,
+            });
+          }
+          return attempt;
+        }
+        lastError = attempt.error;
+        nostrLog.warn('nostr.primal.host.unavailable', {
+          url,
+          attempt: index + 1,
+          of: urls.length,
+          message: attempt.error.message,
+        });
       }
-      if (!Ctor) {
-        return Promise.resolve(
-          err<RawPrimalEvent[], NaggError>({
-            type: 'network',
-            message: 'no WebSocket implementation available for the Primal connection',
-            cause: undefined,
-          }),
-        );
-      }
+      // Every host failed, so the facade should fall through to the relay floor.
+      return err<RawPrimalEvent[], NaggError>(
+        lastError ?? { type: 'network', message: 'Primal request failed', cause: undefined },
+      );
+    },
+  };
 
+  function requestOnce(
+    Ctor: new (url: string) => WebSocketLike,
+    url: string,
+    request: PrimalCacheRequest,
+    controls: RequestControls | undefined,
+  ): Promise<Result<RawPrimalEvent[], NaggError>> {
       return new Promise<Result<RawPrimalEvent[], NaggError>>((resolve) => {
         const subId = `sov-${++counter}`;
         const events: RawPrimalEvent[] = [];
         let settled = false;
         const startedAt = Date.now();
-        nostrLog.debug('nostr.primal.connect', { url: config.url, verb: request.verb, subId });
-        const opened = openWebSocket(Ctor, config.url);
+        nostrLog.debug('nostr.primal.connect', { url, verb: request.verb, subId });
+        const opened = openWebSocket(Ctor, url);
         if (opened.isErr()) {
           resolve(err(opened.error));
           return;
@@ -170,7 +227,7 @@ export function createPrimalWebSocketConnection(config: PrimalWebSocketConfig): 
         };
 
         socket.onerror = () => {
-          nostrLog.warn('nostr.primal.error', { subId, url: config.url });
+          nostrLog.warn('nostr.primal.error', { subId, url });
           finish(err({ type: 'network', message: 'Primal socket error', cause: undefined }));
         };
 
@@ -182,6 +239,5 @@ export function createPrimalWebSocketConnection(config: PrimalWebSocketConfig): 
           finish(err({ type: 'network', message: 'Primal closed before EOSE', cause: undefined }));
         };
       });
-    },
-  };
+  }
 }
