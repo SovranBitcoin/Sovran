@@ -394,6 +394,62 @@ describe('parsePaymentInput — npub', () => {
     // The decoded npub hex should be present
     expect(result.npub).toBeTruthy();
   });
+
+  it('describes the identity behind the npub', () => {
+    const result = parse(INPUTS.npub);
+    expect(result.nostr).toMatchObject({
+      npub: INPUTS.npub,
+      source: 'npub',
+    });
+    // No key was written, so none is carried — a lock target must come from
+    // the identity, not be invented here.
+    expect(result.nostr?.p2pkPubkey).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cashu P2PK keys
+// ---------------------------------------------------------------------------
+
+/**
+ * A bare 33-byte compressed key is what cashu.me, macadamia and minibits show
+ * when they display "your P2PK key". It denotes the same nostr identity an
+ * npub does — same x coordinate — so it resolves to the same `npub` result
+ * rather than a destination kind of its own.
+ */
+describe('parsePaymentInput — P2PK key', () => {
+  it('reads a compressed key as the nostr identity it is', () => {
+    const result = parse(INPUTS.p2pkKey);
+    expect(result.type).toBe('npub');
+    expect(result.npub).toBe(INPUTS.npub);
+    expect(result.nostr).toEqual({
+      npub: INPUTS.npub,
+      pubkeyHex: INPUTS.p2pkKey.slice(2),
+      source: 'p2pkKey',
+      p2pkPubkey: INPUTS.p2pkKey,
+    });
+  });
+
+  it('resolves both parities to the same identity, keeping the one scanned', () => {
+    const even = parse(INPUTS.p2pkKey);
+    const odd = parse(INPUTS.p2pkKeyOddParity);
+    expect(odd.npub).toBe(even.npub);
+    // The lock target keeps its parity: locking an 03 key to our 02 lift
+    // would produce a token its holder cannot redeem.
+    expect(odd.nostr?.p2pkPubkey).toBe(INPUTS.p2pkKeyOddParity);
+  });
+
+  it('lowercases the key so comparisons never depend on case', () => {
+    const result = parse(INPUTS.p2pkKey.toUpperCase());
+    expect(result.nostr?.p2pkPubkey).toBe(INPUTS.p2pkKey);
+  });
+
+  it('ignores near-misses rather than guessing', () => {
+    // 65 and 67 characters, and a parity byte NUT-11 does not define.
+    expect(parse(INPUTS.p2pkKey.slice(0, -1)).type).toBe('unknown');
+    expect(parse(`${INPUTS.p2pkKey}0`).type).toBe('unknown');
+    expect(parse(`04${INPUTS.p2pkKey.slice(2)}`).type).toBe('unknown');
+  });
 });
 
 // ---------------------------------------------------------------------------

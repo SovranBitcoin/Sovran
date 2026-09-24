@@ -14,11 +14,13 @@ import {
   inputVariants,
 } from "./normalize";
 import { logger } from "./logger";
+import { normalizeNostrPubkey } from "./recipient";
 import type {
   Detectors,
   PaymentOption,
   PaymentOptionKind,
   Bip321Container,
+  ParsedNostrIdentity,
   ParsedPaymentInput,
 } from "./types";
 
@@ -131,6 +133,26 @@ function logParseResult(
 
 function firstOrNull(values?: string[]): string | null {
   return values && values.length > 0 ? values[0] : null;
+}
+
+/**
+ * The identity behind an npub the detector already accepted, tagged with the
+ * form the user actually gave us. Undefined only when the npub cannot be
+ * decoded, which `parseNpub` has already ruled out.
+ */
+function nostrIdentityFromNpub(
+  npub: string,
+  input: string,
+): ParsedNostrIdentity | undefined {
+  const pubkeyHex = normalizeNostrPubkey(npub);
+  if (!pubkeyHex) return undefined;
+  const value = input.replace(/^nostr:/i, "").trim();
+  const source: ParsedNostrIdentity["source"] = value.startsWith("nprofile1")
+    ? "nprofile"
+    : value.startsWith("npub1")
+      ? "npub"
+      : "hex";
+  return { npub, pubkeyHex, source };
 }
 
 export function looksLikeBitcoinAddress(value: string): boolean {
@@ -510,6 +532,35 @@ export function parsePaymentInput(
     return logParseResult("bip321", result);
   }
 
+  // A bare compressed P2PK key IS a nostr identity — same x coordinate, just
+  // written the way a Cashu wallet writes it. Resolve it to the very same
+  // `npub` result so intent, routing and the detected row need no new case.
+  // Before parseNpub: a 66-hex key is not 64-hex, so the two never collide,
+  // but keeping the narrower check first documents the precedence.
+  const p2pkPubkey = detectors.parseP2pkPubkey(normalized);
+  if (p2pkPubkey) {
+    const pubkeyHex = p2pkPubkey.slice(2);
+    const npubFromKey = detectors.parseNpub(pubkeyHex);
+    if (npubFromKey) {
+      return logParseResult("p2pk_pubkey", {
+        raw: rawInput,
+        normalized,
+        type: "npub",
+        container: null,
+        options: [],
+        npub: npubFromKey,
+        nostr: {
+          npub: npubFromKey,
+          pubkeyHex,
+          source: "p2pkKey",
+          p2pkPubkey,
+        },
+        warnings,
+        errors,
+      });
+    }
+  }
+
   // Nostr npub. Keep this before raw onchain detection because npubs are
   // bech32-shaped and can otherwise look like loose testnet base58 addresses.
   const npub = detectors.parseNpub(normalized);
@@ -521,6 +572,7 @@ export function parsePaymentInput(
       container: null,
       options: [],
       npub,
+      nostr: nostrIdentityFromNpub(npub, normalized),
       warnings,
       errors,
     });

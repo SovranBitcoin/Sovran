@@ -23,6 +23,32 @@ export interface Detectors {
   getBolt12Amount(offer: string): number | null;
   getPaymentRequestInfo(value: string): PaymentRequestInfo | null;
   parseNpub(value: string): string | null;
+  /**
+   * A bare 33-byte compressed secp256k1 key (`02`/`03` + 32 bytes of x) — the
+   * Cashu P2PK form of a nostr identity, as cashu.me and macadamia display it.
+   * Returns it lowercased, or null.
+   */
+  parseP2pkPubkey(value: string): string | null;
+}
+
+/**
+ * A nostr identity resolved from input, whatever form it was written in. An
+ * npub and a compressed P2PK key denote the SAME identity — they share the x
+ * coordinate — so both parse to this.
+ */
+export interface ParsedNostrIdentity {
+  /** bech32 npub — the canonical display and route form. */
+  npub: string;
+  /** 32-byte x-only hex (NIP-01). */
+  pubkeyHex: string;
+  source: 'npub' | 'nprofile' | 'hex' | 'p2pkKey';
+  /**
+   * The 33-byte compressed key EXACTLY as written, when the input WAS one,
+   * parity included. A `03` key from another wallet is a different point than
+   * our `02` lift of the same x (NUT-11 compares by x, but the holder signs
+   * for the key they published), so a lock must target what was scanned.
+   */
+  p2pkPubkey?: string;
 }
 
 export interface PaymentRequestInfo {
@@ -171,6 +197,11 @@ export interface ParsedPaymentInput {
   bip321?: Bip321Container;
   mintUrl?: string;
   npub?: string;
+  /**
+   * The identity behind `npub`, with the form it arrived in. Set whenever
+   * `type === 'npub'`; `npub` stays for callers that only need the bech32.
+   */
+  nostr?: ParsedNostrIdentity;
   warnings: string[];
   errors: string[];
 }

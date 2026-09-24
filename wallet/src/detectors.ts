@@ -14,6 +14,7 @@ import { nip19 } from "nostr-tools";
 import { decodeBolt11Invoice } from "./bolt11";
 import { isValidEcashToken as decodeIsValidEcashToken } from "./ecash";
 import { logger } from "./logger";
+import { P2PK_PUBKEY_RE } from "./p2pk";
 import { decodePaymentRequestInfo } from "./payment-request";
 import type { Detectors, PaymentRequestInfo } from "./types";
 
@@ -142,6 +143,21 @@ const parseNpub = (input: string): string | null => {
   return null;
 };
 
+/**
+ * A bare compressed P2PK key. Other wallets (cashu.me, macadamia, minibits)
+ * display and accept this form directly, so a Sovran user scanning one must
+ * land on the same identity an npub would.
+ */
+const parseP2pkPubkey = (input: string): string | null => {
+  const v = input
+    .replace(/^nostr:/i, "")
+    .replace(/^cashu:/i, "")
+    .trim();
+  if (!P2PK_PUBKEY_RE.test(v)) return null;
+  logger.debug("detectors.nostr.p2pkKey.checked", { parity: v.slice(0, 2) });
+  return v.toLowerCase();
+};
+
 export const defaultDetectors: Detectors = {
   isValidEcashToken,
   isPaymentRequest,
@@ -153,4 +169,5 @@ export const defaultDetectors: Detectors = {
   isLightningAddress,
   isLnurlp,
   parseNpub,
+  parseP2pkPubkey,
 };

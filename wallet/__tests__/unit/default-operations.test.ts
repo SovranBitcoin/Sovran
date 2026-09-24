@@ -142,6 +142,7 @@ vi.mock("../../src/detectors", () => ({
     // walks the full detector surface; stub the rest as no-matches so raw
     // onchain addresses fall through to the built-in address recognizer.
     parseNpub: vi.fn(() => null),
+    parseP2pkPubkey: vi.fn(() => null),
     isLightningInvoice: vi.fn(() => false),
     isBolt12Offer: vi.fn(() => false),
     getBolt12Amount: vi.fn(() => null),
