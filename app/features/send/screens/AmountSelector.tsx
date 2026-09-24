@@ -6,7 +6,7 @@
 
 import { PixelRatio, StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import type { ActionVariant, RecipientProfile, ScreenActionName } from 'wallet';
+import type { ActionVariant, P2pkLockSpec, RecipientProfile, ScreenActionName } from 'wallet';
 import type { BoundAction, QuickSendSuggestion } from 'wallet/react';
 
 import { MintSelector } from '@/features/wallet';
@@ -62,6 +62,12 @@ function readAmountEntryFields(entry: Record<string, unknown>) {
 type NextExecuteParams = {
   recipientPubkey?: string;
   recipientProfile?: RecipientProfile;
+  /**
+   * The lock the sender chose, tri-state. Present only when this screen owns
+   * the choice: `null` means they turned it off, so the machine must clear a
+   * lock the flow started with rather than leave it standing.
+   */
+  p2pkLock?: P2pkLockSpec | null;
 };
 
 // Map the colada availability variants (ecash/lightning/onchain on
@@ -161,6 +167,15 @@ interface AmountSelectorProps {
    */
   recipientPubkey?: string;
   recipientProfile?: RecipientProfile;
+  /**
+   * The lock the sender chose on this screen, tri-state: `undefined` when the
+   * screen does not own the choice (the flow arrived locked, or there is
+   * nobody to lock to), `null` when they turned it off, a spec when they
+   * chose one.
+   */
+  lockChoice?: P2pkLockSpec | null;
+  /** Short line under the amount when the lock is worth a caveat. */
+  lockWarning?: string | null;
   /** Hide variant menu when the caller owns delivery after ecash creation. */
   suppressNextVariants?: boolean;
 }
@@ -176,6 +191,8 @@ export function AmountSelector({
   onRequestMintList,
   recipientPubkey,
   recipientProfile,
+  lockChoice,
+  lockWarning = null,
   suppressNextVariants = false,
 }: AmountSelectorProps) {
   useLifecycleLogger('AmountSelector', walletLog);
@@ -223,6 +240,9 @@ export function AmountSelector({
   const nextExecuteParams: NextExecuteParams = {
     ...(recipientPubkey ? { recipientPubkey } : {}),
     ...(recipientProfile ? { recipientProfile } : {}),
+    // One object for both `handleNext` and every delivery variant, so the
+    // lock can never reach the machine down one path and not the other.
+    ...(lockChoice !== undefined ? { p2pkLock: lockChoice } : {}),
   };
 
   const handleNext = async () => {
@@ -234,6 +254,7 @@ export function AmountSelector({
       recipientPubkeyPresent: nextExecuteParams.recipientPubkey !== undefined,
       recipientProfilePresent: nextExecuteParams.recipientProfile !== undefined,
       recipientDisplayName: nextExecuteParams.recipientProfile?.displayName ?? null,
+      locked: !!nextExecuteParams.p2pkLock,
     });
     await actions.next.execute(nextExecuteParams);
   };
@@ -294,7 +315,9 @@ export function AmountSelector({
   // The amount still reads as a problem (red) when the entry exceeds balance.
   const exceedsBalance = actions.next.exceedsBalance === true;
   const transactionTypeForView: AmountEntryTransactionType = transactionType;
-  const p2pkLocked = hasP2PKLock(entry);
+  // The flow's own lock, plus the one just chosen on this screen — which the
+  // entry will not know about until the send is on its way.
+  const p2pkLocked = hasP2PKLock(entry) || !!lockChoice;
 
   // When the recipient header is in play, surface the mint as a 50/50
   // bottom-bar pill — same component the header uses, so balance, icon,
@@ -355,7 +378,11 @@ export function AmountSelector({
         onToggleMode={handleToggle}
         unitIndicator={unitIndicator}
         contextIndicator={p2pkLocked ? <P2PKLockIndicator /> : null}
-        warningText={clampNoticeText ?? minNoticeText}
+        warningText={
+          // An amount problem is about to block the send; a lock caveat is
+          // only worth saying while nothing else is wrong.
+          clampNoticeText ?? minNoticeText ?? (p2pkLocked ? lockWarning : null)
+        }
         suggestions={suggestions}
         onSuggestionTap={handleSuggestionTap}
         extraButtons={extraButtons}

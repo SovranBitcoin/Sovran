@@ -12,7 +12,9 @@ import { Stack } from 'expo-router';
 import { HeaderHeightContext } from 'expo-router/react-navigation';
 
 import { useExecutionState, useScreenActions, usePaymentFlowMachine } from 'wallet/react';
-import { fetchNip05Pubkey, type RecipientProfile } from 'wallet';
+import { fetchNip05Pubkey, type P2pkLockSpec, type RecipientProfile } from 'wallet';
+
+import { useMints } from '@cashu/coco-react';
 
 import { useWalletContextWithOverride } from '@/shared/providers/WalletContextProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -28,10 +30,21 @@ import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { useAmountDraftStore } from '@/shared/stores/runtime/amountDraftStore';
 import { zIndex } from '@/shared/styles/tokens';
 import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
+import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
+import { useSendLockStore } from '@/shared/stores/runtime/sendLockStore';
+import type { MintNuts } from '@/shared/lib/cashu/mintNuts';
 
 import { AmountSelectedMintProbe } from '../components/AmountSelectedMintProbe';
 
 import { RecipientHeader, RecipientHeaderBand } from '../components/RecipientHeader';
+import { hasP2PKLock } from '../components/P2PKLockIndicator';
+import { useSendLockTarget } from '../hooks/useSendLockTarget';
+import {
+  buildSendLockMenuItems,
+  lockUntilSec,
+  type SendLockDurationId,
+  type SendLockDurationOption,
+} from '../lib/sendLockMenu';
 
 import { AmountSelector } from './AmountSelector';
 
@@ -175,6 +188,95 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
   const headerSeed = nearPayRecipient?.peerID ?? recipientPubkey;
   const recipientReady = !!(headerDisplayName && (recipientPubkey || nearPayRecipient));
 
+  // ── The lock ────────────────────────────────────────────────────────────
+  // Only an ecash send can be locked, and only when we know who to lock to.
+  // A flow that ARRIVED locked (Nut Drop, a creq) is honouring a protocol
+  // requirement, not a preference, so its lock is not the user's to edit.
+  const isEcashSend = entry?.destination === 'sendEcash';
+  const arrivedLocked = hasP2PKLock(entry as Record<string, unknown> | undefined);
+  const lockDraft = useSendLockStore((state) => state.draft);
+  const setLockDraft = useSendLockStore((state) => state.set);
+  const clearLockDraft = useSendLockStore((state) => state.clear);
+  const { trustedMints } = useMints();
+  const selectedMintNuts = useMemo(() => {
+    const mint = trustedMints.find((m) => m.mintUrl === mintUrl);
+    return (mint?.mintInfo as { nuts?: MintNuts } | undefined)?.nuts;
+  }, [trustedMints, mintUrl]);
+  const { gate: lockGate, refundKey } = useSendLockTarget({
+    ...(recipientPubkey ? { recipientPubkey } : {}),
+    ...(mintUrl ? { selectedMintUrl: mintUrl } : {}),
+    ...(selectedMintNuts ? { selectedMintNuts } : {}),
+  });
+  const lockControlVisible = isEcashSend && !arrivedLocked && !!recipientPubkey;
+
+  // A draft that outlived its recipient or its mint would lock this payment
+  // to the last one. Drop it rather than carry it.
+  useEffect(() => {
+    if (!lockDraft) return;
+    if (!lockControlVisible || lockDraft.recipientPubkey !== recipientPubkey) {
+      clearLockDraft();
+    }
+  }, [lockDraft, lockControlVisible, recipientPubkey, clearLockDraft]);
+
+  const lockRecipientName = headerDisplayName ?? 'them';
+  // Tri-state for the machine: say nothing unless this screen owns the choice,
+  // so a Nut Drop's protocol lock is never cleared by a screen that was not
+  // offering to change it.
+  const lockChoice = useMemo<P2pkLockSpec | null | undefined>(() => {
+    if (!lockControlVisible) return undefined;
+    if (!lockDraft) return null;
+    return {
+      pubkey: lockDraft.lockKey,
+      ...(lockDraft.locktimeSec && lockDraft.refundKey
+        ? { locktimeSec: lockDraft.locktimeSec, refundKeys: [lockDraft.refundKey] }
+        : {}),
+    };
+  }, [lockControlVisible, lockDraft]);
+  const lockWarning =
+    lockDraft && !lockDraft.confirmed
+      ? `We couldn't confirm ${lockRecipientName} can unlock this`
+      : null;
+  const openLockMenu = useCallback(() => {
+    const lockKey = lockGate.kind === 'unavailable' ? null : lockGate.lockKey;
+    if (!lockKey || !recipientPubkey) return;
+    const current: SendLockDurationId = lockDraft
+      ? (lockDraft.durationId as SendLockDurationId)
+      : 'off';
+    actionMenuSheet({
+      title: `Lock to ${lockRecipientName}`,
+      buttons: buildSendLockMenuItems({
+        recipientName: lockRecipientName,
+        current,
+        hasRefundKey: !!refundKey,
+        nowMs: Date.now(),
+        onPick: (option: SendLockDurationOption) => {
+          if (option.id === 'off') {
+            clearLockDraft();
+            return;
+          }
+          const locktimeSec = lockUntilSec(option, Date.now());
+          setLockDraft({
+            lockKey,
+            recipientPubkey,
+            durationId: option.id,
+            // NUT-11 refuses one without the other, so they are set together
+            // or not at all.
+            ...(locktimeSec && refundKey ? { locktimeSec, refundKey } : {}),
+            confirmed: lockGate.kind === 'ready',
+          });
+        },
+      }),
+    });
+  }, [
+    lockGate,
+    lockDraft,
+    lockRecipientName,
+    recipientPubkey,
+    refundKey,
+    setLockDraft,
+    clearLockDraft,
+  ]);
+
   useEffect(() => {
     if (!nearPayRecipient) return;
     return () => {
@@ -282,21 +384,49 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
   );
   const renderHeaderRight = useCallback(
     () => (
-      <View style={offlineIconStyle}>
-        <ScreenHeaderAction
-          icon={canSendOffline === true ? 'mdi:airplane' : 'mdi:wifi'}
-          size={18}
-          accessibilityLabel={
-            canSendOffline === true
-              ? 'Offline send available'
-              : canSendOffline === false
-                ? 'Network required'
-                : 'Checking offline send availability'
-          }
-        />
+      // withGlassHeaderItems takes one element per side, so the lock control
+      // and the offline indicator share a row.
+      <View className="flex-row items-center gap-2">
+        {lockControlVisible ? (
+          <ScreenHeaderAction
+            testID="amount-lock-toggle"
+            icon={lockDraft ? 'mdi:lock-outline' : 'mdi:lock-open-variant-outline'}
+            size={18}
+            disabled={lockGate.kind === 'unavailable'}
+            accessibilityLabel={
+              lockGate.kind === 'unavailable'
+                ? lockGate.reason
+                : lockDraft
+                  ? `Locked to ${lockRecipientName}`
+                  : 'Lock this ecash to the recipient'
+            }
+            onPress={openLockMenu}
+          />
+        ) : null}
+        <View style={offlineIconStyle}>
+          <ScreenHeaderAction
+            icon={canSendOffline === true ? 'mdi:airplane' : 'mdi:wifi'}
+            size={18}
+            accessibilityLabel={
+              canSendOffline === true
+                ? 'Offline send available'
+                : canSendOffline === false
+                  ? 'Network required'
+                  : 'Checking offline send availability'
+            }
+          />
+        </View>
       </View>
     ),
-    [canSendOffline, offlineIconStyle]
+    [
+      canSendOffline,
+      offlineIconStyle,
+      lockControlVisible,
+      lockDraft,
+      lockGate,
+      lockRecipientName,
+      openLockMenu,
+    ]
   );
   const stackOptions = useMemo(
     () =>
@@ -307,9 +437,10 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
         headerTitleAlign: 'center' as const,
         headerTitle: renderHeaderTitle,
         headerTintColor: foreground,
-        headerRight: isSendOperation && mintUrl ? renderHeaderRight : undefined,
+        headerRight:
+          (isSendOperation && mintUrl) || lockControlVisible ? renderHeaderRight : undefined,
       }),
-    [foreground, isSendOperation, mintUrl, renderHeaderRight, renderHeaderTitle]
+    [foreground, isSendOperation, mintUrl, lockControlVisible, renderHeaderRight, renderHeaderTitle]
   );
   const handleErrorGoBack = useCallback(() => {
     void actions.back.execute();
@@ -347,6 +478,8 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
           onRequestMintList={handleRequestMintList}
           recipientPubkey={recipientPubkey}
           recipientProfile={forwardedRecipientProfile}
+          lockChoice={lockChoice}
+          lockWarning={lockWarning}
           suppressNextVariants={!!nearPayRecipient}
         />
       </View>

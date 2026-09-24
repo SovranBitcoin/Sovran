@@ -16,6 +16,15 @@ export {
 // Re-export Manager type so consumers don't need to import coco-cashu-core
 export type { Manager } from "@cashu/coco-core";
 
+// P2PK locks — the terms a send applies, and what a token's conditions say.
+export {
+  describeSpendingConditions,
+  isLockedSend,
+  LOCK_CLOCK_SKEW_MS,
+  normalizeP2pkLock,
+} from "./p2pk";
+export type { P2pkLockSpec, SpendingConditions } from "./p2pk";
+
 // Wallet seed helpers
 export {
   CashuSeedError,

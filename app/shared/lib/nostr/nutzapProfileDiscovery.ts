@@ -13,9 +13,10 @@
  * state, not profile metadata: it must not survive an account switch, and a
  * key someone rotated is worse than one we look up again.
  */
-import type { SimplePool } from 'nostr-tools/pool';
+import { SimplePool } from 'nostr-tools/pool';
 
 import { nostrLog } from '@/shared/lib/logger';
+import { PAYMENT_RELAYS } from '@/shared/lib/nostr/sendDirectMessage';
 import {
   NUTZAP_INFO_KIND,
   readNutzapInfo,
@@ -121,3 +122,12 @@ export function createNutzapProfileResolver(deps: {
     return profile;
   };
 }
+
+/**
+ * App wiring: a short-lived nostr-tools `SimplePool`, over the relays we
+ * already keep open for payments.
+ */
+export const resolveNutzapProfile = createNutzapProfileResolver({
+  openPool: () => new SimplePool(),
+  discoveryRelays: PAYMENT_RELAYS,
+});

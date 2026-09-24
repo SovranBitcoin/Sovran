@@ -56,6 +56,23 @@ jest.mock('@/shared/lib/logger', () => ({
   redactError: (error: unknown) => error,
 }));
 jest.mock('wallet', () => ({ fetchNip05Pubkey: jest.fn(async () => null) }));
+// The lock control's menu host and its coco/nostr lookups are React Native
+// and network surfaces; this suite only cares what the header renders.
+jest.mock('@/shared/lib/popup/popups/actionMenuSheet', () => ({
+  actionMenuSheet: jest.fn(),
+}));
+jest.mock('@/features/send/hooks/useSendLockTarget', () => ({
+  useSendLockTarget: () => ({
+    gate: { kind: 'unavailable', reason: 'Locking needs a Nostr recipient' },
+    refundKey: null,
+    loading: false,
+  }),
+}));
+jest.mock('@cashu/coco-react', () => ({ useMints: () => ({ trustedMints: [] }) }));
+jest.mock('@/shared/stores/runtime/sendLockStore', () => ({
+  useSendLockStore: (selector: (s: unknown) => unknown) =>
+    selector({ draft: null, set: jest.fn(), clear: jest.fn() }),
+}));
 
 jest.mock('wallet/react', () => {
   const mockAction = { available: true, loading: false, execute: jest.fn(async () => undefined) };
