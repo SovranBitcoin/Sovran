@@ -1222,6 +1222,19 @@ describe("quoteMelt / executeMelt quote-first (BTC-05)", () => {
 // ---------------------------------------------------------------------------
 
 describe("executeSend — reservation rescue (BTC-07)", () => {
+  it("rejects invalid lock terms before reserving proofs", async () => {
+    const manager = createMockManager();
+    const ops = createDefaultOperations({
+      getManager: () => manager as unknown as Manager,
+    });
+
+    await expect(ops.executeSend!(MINT1, 100, undefined, {
+      p2pkLock: { pubkey: `02${"ab".repeat(32)}`, locktimeSec: 1_800_003_600 },
+    })).rejects.toThrow("Invalid P2PK lock");
+    expect(manager.ops.send.prepare).not.toHaveBeenCalled();
+    expect(manager.ops.send.execute).not.toHaveBeenCalled();
+  });
+
   it.each([null, { id: "send:other", type: "send", operationId: "other" }])(
     "uses the existing operation-derived fallback when the exact history row is missing or unrelated: %j",
     async (history) => {

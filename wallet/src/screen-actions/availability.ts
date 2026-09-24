@@ -249,7 +249,10 @@ function sendTokenCancelAvailability(
   if (!lock || lock.kind === "unlocked") return { available: true };
 
   // No refund tag and no locktime: only the recipient can ever spend it.
-  if (lock.refund === null && lock.unlockAt === null) {
+  if (
+    lock.reclaim.kind === "never" ||
+    (lock.refund === null && lock.unlockAt === null)
+  ) {
     return {
       available: false,
       reason: "Locked to the recipient — this cannot be taken back",
@@ -423,10 +426,10 @@ function amountEntryAvailability(
   entry: Record<string, unknown>,
 ): AvailabilityMap<"amountEntry"> {
   const effectiveRaw = entry.effectiveAmount as
-    | { value?: unknown; unit?: unknown }
-    | undefined;
+    { value?: unknown; unit?: unknown } | undefined;
   const effectiveAmount =
-    typeof effectiveRaw?.value === "number" && Number.isFinite(effectiveRaw.value)
+    typeof effectiveRaw?.value === "number" &&
+    Number.isFinite(effectiveRaw.value)
       ? effectiveRaw.value
       : 0;
   const destination = entry.destination as string | undefined;
@@ -718,6 +721,18 @@ function amountEntryAvailability(
       ...(lightningDescription ? { description: lightningDescription } : {}),
       ...(lightningReason ? { reason: lightningReason } : {}),
     },
+    ...(isSendEcash
+      ? [
+          {
+            id: "locked-ecash",
+            label: "Lock Ecash",
+            icon: "mdi:lock-outline",
+            available: ecashAvailable,
+            description: "Lock a Cashu token to its recipient",
+            ...(ecashReason ? { reason: ecashReason } : {}),
+          },
+        ]
+      : []),
     ...(showOnchainReceive || showOnchainSend
       ? [
           {

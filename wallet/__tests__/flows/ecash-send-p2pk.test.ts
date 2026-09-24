@@ -237,6 +237,21 @@ describe('ecash send — P2PK locked', () => {
     });
   });
 
+  it.each([false, true])('rejects invalid amount-screen lock terms (seeded: %s)', async (seeded) => {
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash(seeded ? { p2pkLockPubkey: LOCK_PUBKEY } : {});
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1, {
+      p2pkLock: { pubkey: LOCK_PUBKEY, locktimeSec: LOCKTIME_SEC },
+    });
+
+    tm.assertStep('error');
+    expect(tm.handlerCalls.at(-1)).toMatchObject({
+      step: 'error',
+      data: { code: 'INVALID_P2PK_LOCK' },
+    });
+    expect(tm.operationCalls).toEqual([]);
+  });
+
   it('lets the amount screen turn a seeded lock back off', async () => {
     const tm = createTestMachine();
     await tm.machine.startSendEcash({ p2pkLockPubkey: LOCK_PUBKEY });

@@ -397,6 +397,19 @@ function handleAmountEntered(
   }
   const shouldResetContext =
     !!event.destination && event.destination !== currentCtx.destination;
+  const lockPatch = shouldResetContext
+    ? {}
+    : resolveLockPatch(event.p2pkLock, currentCtx);
+  if (lockPatch === null) {
+    return {
+      step: "error",
+      context: currentCtx,
+      data: {
+        code: "INVALID_P2PK_LOCK",
+        message: "Invalid P2PK lock terms for this send.",
+      },
+    };
+  }
   const ctx: FlowContext = shouldResetContext
     ? {
         unit: currentCtx.unit,
@@ -430,7 +443,7 @@ function handleAmountEntered(
         recipientProfile: event.recipientProfile ?? currentCtx.recipientProfile,
         amountEntryDisplay:
           event.amountEntryDisplay ?? currentCtx.amountEntryDisplay,
-        ...resolveLockPatch(event.p2pkLock, currentCtx),
+        ...lockPatch,
         memo: undefined,
         sendMemoHandled: false,
       };
@@ -459,7 +472,7 @@ function handleAmountEntered(
 function resolveLockPatch(
   requested: P2pkLockSpec | null | undefined,
   currentCtx: FlowContext,
-): Pick<FlowContext, "p2pkLock" | "p2pkLockPubkey"> {
+): Pick<FlowContext, "p2pkLock" | "p2pkLockPubkey"> | null {
   if (requested === undefined) {
     return {
       ...(currentCtx.p2pkLock ? { p2pkLock: currentCtx.p2pkLock } : {}),
@@ -480,12 +493,7 @@ function resolveLockPatch(
       hasLocktime: !!requested.locktimeSec,
       refundKeyCount: requested.refundKeys?.length ?? 0,
     });
-    return {
-      ...(currentCtx.p2pkLock ? { p2pkLock: currentCtx.p2pkLock } : {}),
-      ...(currentCtx.p2pkLockPubkey
-        ? { p2pkLockPubkey: currentCtx.p2pkLockPubkey }
-        : {}),
-    };
+    return null;
   }
   logger.info("transitions.amountEntered.lockSet", {
     hasLocktime: !!lock.locktimeSec,

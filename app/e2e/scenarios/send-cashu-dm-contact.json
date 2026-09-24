@@ -27,6 +27,7 @@
     {"action":"screenshot","name":"send-amount"},
     {"action":"tapUntil","sequence":[{"tap":{"id":"amount-next"}}],"until":{"id":"e2e-action-menu-open"},"attempts":6,"settleMs":8000},
     {"action":"screenshot","name":"send-amount"},
+    {"action":"assert","that":"visible","selector":{"id":"amount-next-menu-locked-ecash"}},
     {"action":"tap","selector":{"id":"amount-next-menu-ecash"}},
     {"action":"waitFor","selector":{"id":"dm-chat-probe"},"timeoutMs":120000},
     {"action":"waitFor","selector":{"id":"cashu-bubble-own"},"timeoutMs":120000},

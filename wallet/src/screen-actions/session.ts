@@ -5,6 +5,7 @@ import type {
   QuickSendSuggestion,
 } from '../amount-actions';
 import { errField, logger } from '../logger';
+import { LOCK_CLOCK_SKEW_MS } from '../p2pk';
 import type { ColadaSubscriptionBus } from '../subscriptions';
 import {
   createScreenActionManager,
@@ -209,6 +210,7 @@ export function createScreenActionSession<S extends ScreenType>(
   let snapshot: ScreenActionSessionSnapshot<S> | null = null;
   let disposed = false;
   let entryUpdateUnsubscribe: (() => void) | null = null;
+  let lockBoundaryTimer: ReturnType<typeof setTimeout> | undefined;
 
   const listeners = new Set<() => void>();
 
@@ -244,6 +246,22 @@ export function createScreenActionSession<S extends ScreenType>(
   function notify(): void {
     if (disposed) return;
     snapshot = null;
+    clearTimeout(lockBoundaryTimer);
+    lockBoundaryTimer = undefined;
+    const now = Date.now();
+    const boundaries = (Object.values(manager.inspect()) as ActionState[])
+      .filter((action) => action.reasonCode === 'lock-active')
+      .flatMap((action) => typeof action.availableAt === 'number'
+        ? [action.availableAt + LOCK_CLOCK_SKEW_MS]
+        : [])
+      .filter((at) => at > now);
+    if (boundaries.length > 0) {
+      // Long locks re-arm at the timer limit rather than overflowing it.
+      lockBoundaryTimer = setTimeout(() => {
+        const entry = manager.getEntry();
+        if (!disposed && entry) manager.setEntry({ ...entry });
+      }, Math.min(Math.min(...boundaries) - now, 0x7fffffff));
+    }
     logger.debug('screenActionSession.notify', {
       screenType,
       listenerCount: listeners.size,
@@ -423,6 +441,7 @@ export function createScreenActionSession<S extends ScreenType>(
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      clearTimeout(lockBoundaryTimer);
       logger.info('screenActionSession.dispose', {
         screenType,
         listenerCount: listeners.size,

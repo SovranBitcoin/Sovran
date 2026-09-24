@@ -59,12 +59,15 @@ describe('spending-conditions copy', () => {
   });
 
   it('promises a way back only when the token carries one', () => {
-    const withRefund = copyFor([
-      proof(THEIR_KEY, [
-        ['locktime', String(LOCKTIME_SEC)],
-        ['refund', OUR_KEY],
-      ]),
-    ]);
+    const withRefund = copyFor(
+      [
+        proof(THEIR_KEY, [
+          ['locktime', String(LOCKTIME_SEC)],
+          ['refund', OUR_KEY],
+        ]),
+      ],
+      { ourPubkeys: [OUR_KEY] }
+    );
     expect(allText(withRefund)).toMatch(/you can take it back/i);
     expect(withRefund?.dateMs).toBe(UNLOCK_AT);
 
@@ -81,7 +84,7 @@ describe('spending-conditions copy', () => {
           ['refund', OUR_KEY],
         ]),
       ],
-      { now: UNLOCK_AT + 120_000 }
+      { now: UNLOCK_AT + 120_000, ourPubkeys: [OUR_KEY] }
     );
     expect(allText(copy)).toMatch(/They can still redeem it/);
     expect(allText(copy)).toMatch(/whoever spends first wins/);
@@ -97,7 +100,8 @@ describe('spending-conditions copy', () => {
 
   it('adds the unconfirmed caveat without changing the promise', () => {
     const copy = copyFor([proof(THEIR_KEY)], { confirmed: false });
-    expect(allText(copy)).toMatch(/couldn't confirm Alice can unlock this/);
+    expect(allText(copy)).toMatch(/Alice’s Nostr identity key/);
+    expect(allText(copy)).toMatch(/wallet that can sign with that key/);
   });
 
   it('says plainly when this wallet cannot redeem a multisig token', () => {
@@ -113,6 +117,28 @@ describe('spending-conditions copy', () => {
   it('does not describe a hash lock as a key lock', () => {
     const copy = copyFor([proof('ff'.repeat(32), [], 'HTLC')]);
     expect(copy?.title).toBe('Hash-locked');
+  });
+
+  it('does not claim one owned key can satisfy two required signatures', () => {
+    const copy = copyFor(
+      [
+        proof(THEIR_KEY, [
+          ['pubkeys', OUR_KEY],
+          ['n_sigs', '2'],
+        ]),
+      ],
+      { ourPubkeys: [OUR_KEY] }
+    );
+    expect(copy?.title).toBe('Needs 2 of 2 signatures');
+    expect(allText(copy)).toContain('cannot redeem it');
+  });
+
+  it('does not claim exclusive ownership of a one-of-two lock', () => {
+    const copy = copyFor([proof(THEIR_KEY, [['pubkeys', OUR_KEY]])], {
+      ourPubkeys: [OUR_KEY],
+    });
+    expect(allText(copy)).toContain('This wallet has a key that can redeem it.');
+    expect(allText(copy)).not.toContain('Only this wallet');
   });
 
   it('admits when it does not understand the conditions', () => {

@@ -157,6 +157,8 @@ export interface TimelineContext {
 export interface MilestoneDef {
   /** Semantic step id, stable across states. Doubles as the default rowKey. */
   id: string;
+  /** Omit a milestone that cannot occur for this flow's conditions. */
+  included?(ctx: TimelineContext): boolean;
   /** MONOTONE "the flow has arrived at (or passed) this milestone". The engine
    *  takes the max reached index as the active position. */
   reached(ctx: TimelineContext): boolean;

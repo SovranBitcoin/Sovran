@@ -11,24 +11,13 @@
 import React, { useMemo } from 'react';
 
 import { formatDate } from '@/shared/lib/date';
-import { Alert } from 'heroui-native';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { MiddleEllipsisValue } from '@/shared/ui/composed/MiddleEllipsisValue';
 import { View } from '@/shared/ui/primitives/View/View';
+import { Text } from '@/shared/ui/primitives/Text';
 import type { SpendingConditions } from 'wallet';
 
-import {
-  describeSpendingConditionsCopy,
-  withDate,
-  type SpendingConditionsTone,
-} from '../lib/spendingConditionsCopy';
-
-const ALERT_STATUS: Record<SpendingConditionsTone, 'default' | 'warning' | 'danger'> = {
-  neutral: 'default',
-  accent: 'default',
-  warning: 'warning',
-  danger: 'danger',
-};
+import { describeSpendingConditionsCopy, withDate } from '../lib/spendingConditionsCopy';
 
 interface SpendingConditionsCardProps {
   conditions: SpendingConditions | null;
@@ -58,19 +47,15 @@ export function SpendingConditionsCard({
   if (!conditions || !copy) return null;
 
   const date = copy.dateMs ? formatDate(copy.dateMs, 'short-date-time') : '';
-  const title = withDate(copy.title, date);
   const body = copy.body.map((line) => withDate(line, date)).join(' ');
 
   return (
-    <View className="mx-4 mb-3" testID="send-token-spending-conditions">
-      <Alert status={ALERT_STATUS[copy.tone]} className="bg-surface-secondary">
-        <Alert.Content>
-          <Alert.Title>{title}</Alert.Title>
-          <Alert.Description>{body}</Alert.Description>
-        </Alert.Content>
-      </Alert>
+    <View testID="send-token-spending-conditions">
+      <Text size={12} color="muted">
+        {body}
+      </Text>
       <DetailsSection
-        label="Spending conditions"
+        label={conditions.mixed ? 'Spending conditions (first locked part)' : 'Spending conditions'}
         testID="send-token-spending-conditions-details"
         items={[
           // Keys are shown, not summarised: "locked to Alice" is our reading

@@ -219,54 +219,45 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
   }, [lockDraft, lockControlVisible, recipientPubkey, clearLockDraft]);
 
   const lockRecipientName = headerDisplayName ?? 'them';
-  // Tri-state for the machine: say nothing unless this screen owns the choice,
-  // so a Nut Drop's protocol lock is never cleared by a screen that was not
-  // offering to change it.
-  const lockChoice = useMemo<P2pkLockSpec | null | undefined>(() => {
-    if (!lockControlVisible) return undefined;
-    if (!lockDraft) return null;
-    return {
-      pubkey: lockDraft.lockKey,
-      ...(lockDraft.locktimeSec && lockDraft.refundKey
-        ? { locktimeSec: lockDraft.locktimeSec, refundKeys: [lockDraft.refundKey] }
-        : {}),
-    };
-  }, [lockControlVisible, lockDraft]);
-  const lockWarning =
-    lockDraft && !lockDraft.confirmed
-      ? `We couldn't confirm ${lockRecipientName} can unlock this`
-      : null;
-  const openLockMenu = useCallback(() => {
+  const openLockMenu = useCallback((): Promise<P2pkLockSpec | null> => {
     const lockKey = lockGate.kind === 'unavailable' ? null : lockGate.lockKey;
-    if (!lockKey || !recipientPubkey) return;
+    if (!lockKey || !recipientPubkey) return Promise.resolve(null);
     const current: SendLockDurationId = lockDraft
       ? (lockDraft.durationId as SendLockDurationId)
       : 'off';
-    actionMenuSheet({
-      title: `Lock to ${lockRecipientName}`,
-      buttons: buildSendLockMenuItems({
-        recipientName: lockRecipientName,
-        current,
-        hasRefundKey: !!refundKey,
-        nowMs: Date.now(),
-        onPick: (option: SendLockDurationOption) => {
-          if (option.id === 'off') {
-            clearLockDraft();
-            return;
-          }
-          const locktimeSec = lockUntilSec(option, Date.now());
-          setLockDraft({
-            lockKey,
-            recipientPubkey,
-            durationId: option.id,
-            // NUT-11 refuses one without the other, so they are set together
-            // or not at all.
-            ...(locktimeSec && refundKey ? { locktimeSec, refundKey } : {}),
-            confirmed: lockGate.kind === 'ready',
-          });
-        },
-      }),
-    });
+    return new Promise((resolve) =>
+      actionMenuSheet({
+        title: `Lock to ${lockRecipientName}`,
+        onDismiss: () => resolve(null),
+        buttons: buildSendLockMenuItems({
+          recipientName: lockRecipientName,
+          current,
+          hasRefundKey: !!refundKey,
+          nowMs: Date.now(),
+          onPick: (option: SendLockDurationOption) => {
+            if (option.id === 'off') {
+              clearLockDraft();
+              resolve(null);
+              return;
+            }
+            const locktimeSec = lockUntilSec(option, Date.now());
+            setLockDraft({
+              lockKey,
+              recipientPubkey,
+              durationId: option.id,
+              // NUT-11 refuses one without the other, so they are set together
+              // or not at all.
+              ...(locktimeSec && refundKey ? { locktimeSec, refundKey } : {}),
+              confirmed: lockGate.kind === 'ready',
+            });
+            resolve({
+              pubkey: lockKey,
+              ...(locktimeSec && refundKey ? { locktimeSec, refundKeys: [refundKey] } : {}),
+            });
+          },
+        }).filter((item) => item.testID !== 'send-lock-off'),
+      })
+    );
   }, [
     lockGate,
     lockDraft,
@@ -384,25 +375,7 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
   );
   const renderHeaderRight = useCallback(
     () => (
-      // withGlassHeaderItems takes one element per side, so the lock control
-      // and the offline indicator share a row.
       <View className="flex-row items-center gap-2">
-        {lockControlVisible ? (
-          <ScreenHeaderAction
-            testID="amount-lock-toggle"
-            icon={lockDraft ? 'mdi:lock-outline' : 'mdi:lock-open-variant-outline'}
-            size={18}
-            disabled={lockGate.kind === 'unavailable'}
-            accessibilityLabel={
-              lockGate.kind === 'unavailable'
-                ? lockGate.reason
-                : lockDraft
-                  ? `Locked to ${lockRecipientName}`
-                  : 'Lock this ecash to the recipient'
-            }
-            onPress={openLockMenu}
-          />
-        ) : null}
         <View style={offlineIconStyle}>
           <ScreenHeaderAction
             icon={canSendOffline === true ? 'mdi:airplane' : 'mdi:wifi'}
@@ -418,15 +391,7 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
         </View>
       </View>
     ),
-    [
-      canSendOffline,
-      offlineIconStyle,
-      lockControlVisible,
-      lockDraft,
-      lockGate,
-      lockRecipientName,
-      openLockMenu,
-    ]
+    [canSendOffline, offlineIconStyle]
   );
   const stackOptions = useMemo(
     () =>
@@ -478,8 +443,15 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
           onRequestMintList={handleRequestMintList}
           recipientPubkey={recipientPubkey}
           recipientProfile={forwardedRecipientProfile}
-          lockChoice={lockChoice}
-          lockWarning={lockWarning}
+          lockChoice={lockControlVisible ? null : undefined}
+          lockOption={
+            lockControlVisible
+              ? {
+                  ...(lockGate.kind === 'unavailable' ? { reason: lockGate.reason } : {}),
+                  choose: openLockMenu,
+                }
+              : undefined
+          }
           suppressNextVariants={!!nearPayRecipient}
         />
       </View>

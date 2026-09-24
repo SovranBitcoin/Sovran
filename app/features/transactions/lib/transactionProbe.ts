@@ -10,8 +10,7 @@ export type TransactionProbeEntry = {
 };
 
 /** The lock, as an enum. No keys and no dates cross this seam. */
-type TransactionProbeLock =
-  'none' | 'permanent' | 'timed-active' | 'timed-expired' | 'unknown';
+type TransactionProbeLock = 'none' | 'permanent' | 'timed-active' | 'timed-expired' | 'unknown';
 
 /** Whether the sender can take it back, as an enum. Same rule. */
 type TransactionProbeReclaim = 'none' | 'never' | 'at' | 'now' | 'unknown';

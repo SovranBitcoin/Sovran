@@ -884,7 +884,10 @@ export function createDefaultScreenActionHandlers(
             );
             return;
           }
-        } else if (variantId === "ecash") {
+        } else if (variantId === "ecash" || variantId === "locked-ecash") {
+          if (variantId === "locked-ecash" && !requestedLock) {
+            throw new Error("Locked ecash requires spending conditions");
+          }
           if (entryDestination === "mintQuote") {
             // Receive "as Ecash": a single-use NUT-18 request. Route it through
             // the machine (createPaymentRequestReceive → paymentRequestReceived)

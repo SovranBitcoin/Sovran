@@ -13,7 +13,7 @@
 // sign helpers belong at the crypto boundary, where a real witness exists.
 // ---------------------------------------------------------------------------
 
-import { parseP2PKSecret } from "@cashu/cashu-ts";
+import { parseP2PKSecret, parseSecret } from "@cashu/cashu-ts";
 
 import { logger } from "../logger";
 import { p2pkXOnly } from "./secret";
@@ -130,13 +130,20 @@ const UNLOCKED: ProofLock = {
   unknownTags: [],
 };
 
+const UNKNOWN: ProofLock = { ...UNLOCKED, kind: "unknown" };
+
 function readProofLock(secret: string): ProofLock {
   let parsed: ReturnType<typeof parseP2PKSecret>;
   try {
-    parsed = parseP2PKSecret(secret);
+    parsed = parseSecret(secret);
   } catch {
     // A plain random secret is an ordinary bearer proof, not a malformed lock.
-    return UNLOCKED;
+    return secret.trimStart().startsWith("[") ? UNKNOWN : UNLOCKED;
+  }
+  try {
+    parsed = parseP2PKSecret(parsed);
+  } catch {
+    return UNKNOWN;
   }
 
   const [rawKind, body] = parsed as [string, { data?: string; tags?: Tag[] }];
@@ -149,14 +156,33 @@ function readProofLock(secret: string): ProofLock {
   const refundKeys = tagValues(tags, "refund");
   const locktime = positiveInt(tagValues(tags, "locktime")?.[0]);
   const rawSigFlag = tagValues(tags, "sigflag")?.[0];
+  const mainKeys = data ? [data, ...extraMain] : extraMain;
+  const mainThreshold = tagValues(tags, "n_sigs");
+  const refundThreshold = tagValues(tags, "n_sigs_refund");
+  const requiredSignatures =
+    mainThreshold === null ? 1 : positiveInt(mainThreshold[0]);
+  const requiredRefundSignatures =
+    refundThreshold === null ? 1 : positiveInt(refundThreshold[0]);
+  if (
+    kind === "p2pk" &&
+    (mainKeys.some((key) => p2pkXOnly(key) === null) ||
+      refundKeys?.some((key) => p2pkXOnly(key) === null) ||
+      requiredSignatures === null ||
+      requiredRefundSignatures === null ||
+      requiredSignatures > new Set(mainKeys.map(p2pkXOnly)).size ||
+      (refundThreshold !== null &&
+        requiredRefundSignatures >
+          new Set((refundKeys ?? []).map(p2pkXOnly)).size))
+  ) {
+    return UNKNOWN;
+  }
 
   return {
     kind,
-    mainKeys: data ? [data, ...extraMain] : extraMain,
-    requiredSignatures: positiveInt(tagValues(tags, "n_sigs")?.[0]) ?? 1,
+    mainKeys,
+    requiredSignatures: requiredSignatures ?? 1,
     refundKeys,
-    requiredRefundSignatures:
-      positiveInt(tagValues(tags, "n_sigs_refund")?.[0]) ?? 1,
+    requiredRefundSignatures: requiredRefundSignatures ?? 1,
     locktimeSec: locktime,
     sigFlag:
       rawSigFlag === "SIG_ALL"
@@ -216,6 +242,9 @@ function verdict(
   // the refund path once the locktime has passed, and an absent locktime is a
   // permanent lock.
   if (unlockAt === null) return { kind: "never", because: "no-refund-tag" };
+  if (lock.sigFlag === "SIG_ALL" || refund.requiredSignatures > 1) {
+    return { kind: "never", because: "cannot-sign" };
+  }
   if (refund.ourKeys === null) return { kind: "unknown" };
   if (refund.ourKeys === 0) return { kind: "never", because: "not-our-key" };
   if (refund.ourKeys < refund.requiredSignatures) {
@@ -292,7 +321,10 @@ function assemble(
     mixed: counts.mixed,
     proofCount: counts.proofCount,
     lockedProofCount: counts.lockedProofCount,
-    reclaim: verdict(lock, refund, unlockAt, now, skewMs),
+    reclaim:
+      lock.kind === "unknown" || lock.kind === "htlc"
+        ? { kind: "unknown" }
+        : verdict(lock, refund, unlockAt, now, skewMs),
     limits,
     unknownTags: lock.unknownTags,
   };
@@ -335,18 +367,54 @@ export function describeSpendingConditions(input: {
   // The first locked condition set speaks for the token; `mixed` warns when
   // the rest disagree, because a partially-locked token is not safe to
   // summarise with one sentence.
-  const signatures = new Set(locked.map(lockSignature));
-  return assemble(
-    locked[0]!,
-    {
-      proofCount: proofs.length,
-      lockedProofCount: locked.length,
-      mixed: signatures.size > 1 || locked.length !== proofs.length,
-    },
-    now,
-    ourPubkeys,
-    skewMs,
+  const unique = new Map(locked.map((lock) => [lockSignature(lock), lock]));
+  const counts = {
+    proofCount: proofs.length,
+    lockedProofCount: locked.length,
+    mixed: unique.size > 1 || locked.length !== proofs.length,
+  };
+  const descriptions = [...unique.values()].map((lock) =>
+    assemble(lock, counts, now, ourPubkeys, skewMs),
   );
+  const first = descriptions[0]!;
+  if (descriptions.length === 1) return first;
+  const verdicts = descriptions.map((description) => description.reclaim);
+  const never = verdicts.find((value) => value.kind === "never");
+  const pending = verdicts.filter((value) => value.kind === "at");
+  const via = verdicts.some((value) => "via" in value && value.via === "refund")
+    ? "refund"
+    : "public";
+  const reclaim: ReclaimVerdict =
+    never ??
+    (verdicts.some((value) => value.kind === "unknown")
+      ? { kind: "unknown" }
+      : pending.length > 0
+        ? { kind: "at", at: Math.max(...pending.map((value) => value.at)), via }
+        : { kind: "now", via });
+  const unlockAt = descriptions.some(
+    (description) => description.unlockAt === null,
+  )
+    ? null
+    : Math.max(...descriptions.map((description) => description.unlockAt!));
+  return {
+    ...first,
+    reclaim,
+    unlockAt,
+    phase:
+      unlockAt === null
+        ? "permanent"
+        : now <= unlockAt
+          ? "timed-active"
+          : "timed-expired",
+    limits: [
+      ...new Set(descriptions.flatMap((description) => description.limits)),
+    ],
+    unknownTags: [
+      ...new Set(
+        descriptions.flatMap((description) => description.unknownTags),
+      ),
+    ],
+  };
 }
 
 /**

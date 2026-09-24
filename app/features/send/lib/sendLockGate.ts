@@ -23,7 +23,8 @@ import type { CashuP2pkPubkey } from '@/shared/lib/protocolIds';
 export const REASON_NO_RECIPIENT = 'Locking needs a Nostr recipient';
 export const REASON_MINT_NO_P2PK = "This mint doesn't support P2PK locks";
 const REASON_LOOKING_UP = 'Checking how they receive ecash…';
-export const WARNING_UNCONFIRMED = "We couldn't confirm they can unlock it";
+export const WARNING_UNCONFIRMED =
+  'Locked to their Nostr identity key. They need a wallet that can sign with that key.';
 export const WARNING_MINT_NOT_LISTED = "They haven't listed this mint";
 
 export type SendLockGate =

@@ -688,9 +688,11 @@ export function createDefaultOperations(
   return {
     executeSend: async (mintUrl, amount, memo, options) => {
       const mgr = requireManager();
-      const lock = normalizeP2pkLock(
-        options?.p2pkLock ?? options?.p2pkLockPubkey,
-      );
+      const requestedLock = options?.p2pkLock ?? options?.p2pkLockPubkey;
+      const lock = normalizeP2pkLock(requestedLock);
+      if (requestedLock !== undefined && !lock) {
+        throw new Error("Invalid P2PK lock terms for this send.");
+      }
       logger.info("operations.executeSend.prepare", {
         ...mintUrlFields(mintUrl),
         amount,

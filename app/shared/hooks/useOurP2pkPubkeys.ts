@@ -19,14 +19,17 @@ export function useOurP2pkPubkeys(): readonly string[] | undefined {
   // Not `useManager()`: that throws before the wallet is ready, and these
   // screens open from route params, including on a cold start.
   const { manager } = useManagerContext();
-  const [pubkeys, setPubkeys] = useState<readonly string[] | undefined>(undefined);
+  const [resolved, setResolved] = useState<{
+    owner: typeof manager;
+    keys: readonly string[];
+  } | null>(null);
 
   useEffect(() => {
     if (!manager) return;
     let cancelled = false;
     void resolveReceiveP2PKPublicKeys(manager)
       .then((keys) => {
-        if (!cancelled) setPubkeys(keys);
+        if (!cancelled) setResolved({ owner: manager, keys });
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -39,5 +42,5 @@ export function useOurP2pkPubkeys(): readonly string[] | undefined {
     };
   }, [manager]);
 
-  return pubkeys;
+  return resolved && resolved.owner === manager ? resolved.keys : undefined;
 }

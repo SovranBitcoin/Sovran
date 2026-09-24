@@ -33,17 +33,10 @@ const UNLOCK_AT = LOCKTIME_SEC * 1000;
 
 let nonce = 0;
 
-function lockedProof(
-  data: string,
-  tags: string[][] = [],
-  kind: 'P2PK' | 'HTLC' = 'P2PK'
-) {
+function lockedProof(data: string, tags: string[][] = [], kind: 'P2PK' | 'HTLC' = 'P2PK') {
   nonce += 1;
   return {
-    secret: JSON.stringify([
-      kind,
-      { nonce: nonce.toString(16).padStart(32, '0'), data, tags },
-    ]),
+    secret: JSON.stringify([kind, { nonce: nonce.toString(16).padStart(32, '0'), data, tags }]),
   };
 }
 
@@ -54,13 +47,46 @@ function describe_(
   now = NOW,
   ourPubkeys?: string[]
 ): SpendingConditions {
-  return describeSpendingConditions({ proofs, now, ...(ourPubkeys ? { ourPubkeys } : {}) });
+  return describeSpendingConditions({
+    proofs,
+    now,
+    ...(ourPubkeys ? { ourPubkeys } : {}),
+  });
 }
 
 /** Every verdict the UI must be able to render. */
 const EVERY_VERDICT: ReclaimVerdict['kind'][] = ['not-locked', 'unknown', 'never', 'at', 'now'];
 
 describe('describeSpendingConditions — nothing is locked', () => {
+  it('does not treat a malformed structured secret without a nonce as bearer ecash', () => {
+    const c = describe_([{ secret: JSON.stringify(['P2PK', { data: THEIR_KEY }]) }]);
+    expect(c.kind).toBe('unknown');
+    expect(c.reclaim).toEqual({ kind: 'unknown' });
+  });
+  it.each([
+    { tags: [['sigflag', 'INVALID']] },
+    { tags: [['n_sigs', '0']] },
+    { tags: [['n_sigs', '2']] },
+    { tags: [['n_sigs', '1.5']] },
+    {
+      tags: [
+        ['n_sigs_refund', '0'],
+        ['refund', OUR_KEY],
+      ],
+    },
+    {
+      tags: [
+        ['n_sigs_refund', '2'],
+        ['refund', OUR_KEY],
+      ],
+    },
+  ])('keeps malformed conditions unknown instead of authorizing reclaim: $tags', ({ tags }) => {
+    const c = describe_([lockedProof(THEIR_KEY, tags)], NOW, [OUR_KEY]);
+    expect(c.kind).toBe('unknown');
+    expect(c.reclaim).toEqual({ kind: 'unknown' });
+    expect(c.limits).toContain('unparseable');
+  });
+
   it('reads plain bearer proofs as unlocked', () => {
     const c = describe_([bearerProof, bearerProof]);
     expect(c.kind).toBe('unlocked');
@@ -112,19 +138,25 @@ describe('describeSpendingConditions — locktime with a refund to us', () => {
     expect(describe_([proof()], UNLOCK_AT, [OUR_KEY]).reclaim).toMatchObject({
       kind: 'at',
     });
-    expect(
-      describe_([proof()], UNLOCK_AT + LOCK_CLOCK_SKEW_MS, [OUR_KEY]).reclaim
-    ).toEqual({ kind: 'now', via: 'refund' });
+    expect(describe_([proof()], UNLOCK_AT + LOCK_CLOCK_SKEW_MS, [OUR_KEY]).reclaim).toEqual({
+      kind: 'now',
+      via: 'refund',
+    });
   });
 
-  it('still reports the token\'s own date, not the date plus our margin', () => {
+  it("still reports the token's own date, not the date plus our margin", () => {
     const c = describe_([proof()], NOW, [OUR_KEY]);
     expect(c.unlockAt).toBe(UNLOCK_AT);
   });
 
-  it('will not promise a reclaim with someone else\'s refund key', () => {
+  it("will not promise a reclaim with someone else's refund key", () => {
     const c = describe_(
-      [lockedProof(THEIR_KEY, [['locktime', String(LOCKTIME_SEC)], ['refund', OTHER_KEY]])],
+      [
+        lockedProof(THEIR_KEY, [
+          ['locktime', String(LOCKTIME_SEC)],
+          ['refund', OTHER_KEY],
+        ]),
+      ],
       NOW,
       [OUR_KEY]
     );
@@ -160,7 +192,11 @@ describe('describeSpendingConditions — locktime with NO refund tag', () => {
   it('becomes spendable by anyone, and says so', () => {
     const before = describe_([proof()], NOW, [OUR_KEY]);
     expect(before.refund).toBeNull();
-    expect(before.reclaim).toEqual({ kind: 'at', at: UNLOCK_AT, via: 'public' });
+    expect(before.reclaim).toEqual({
+      kind: 'at',
+      at: UNLOCK_AT,
+      via: 'public',
+    });
 
     const after = describe_([proof()], UNLOCK_AT + LOCK_CLOCK_SKEW_MS, [OUR_KEY]);
     expect(after.phase).toBe('timed-expired');
@@ -171,7 +207,12 @@ describe('describeSpendingConditions — locktime with NO refund tag', () => {
 describe('describeSpendingConditions — shapes this wallet cannot claim', () => {
   it('flags multisig on the main path', () => {
     const c = describe_(
-      [lockedProof(THEIR_KEY, [['pubkeys', OTHER_KEY], ['n_sigs', '2']])],
+      [
+        lockedProof(THEIR_KEY, [
+          ['pubkeys', OTHER_KEY],
+          ['n_sigs', '2'],
+        ]),
+      ],
       NOW,
       [OUR_KEY]
     );
@@ -199,6 +240,40 @@ describe('describeSpendingConditions — shapes this wallet cannot claim', () =>
 });
 
 describe('describeSpendingConditions — mixed tokens', () => {
+  it('cannot reclaim a mixed token while one proof remains permanently locked', () => {
+    const expired = lockedProof(THEIR_KEY, [
+      ['locktime', String(LOCKTIME_SEC)],
+      ['refund', OUR_KEY],
+    ]);
+    for (const proofs of [
+      [expired, lockedProof(OTHER_KEY)],
+      [lockedProof(OTHER_KEY), expired],
+    ]) {
+      expect(describe_(proofs, UNLOCK_AT + LOCK_CLOCK_SKEW_MS, [OUR_KEY]).reclaim).toMatchObject({
+        kind: 'never',
+      });
+    }
+  });
+
+  it('waits for the latest locktime when every proof has a usable refund path', () => {
+    const first = lockedProof(THEIR_KEY, [
+      ['locktime', String(LOCKTIME_SEC)],
+      ['refund', OUR_KEY],
+    ]);
+    const later = lockedProof(OTHER_KEY, [
+      ['locktime', String(LOCKTIME_SEC + 7200)],
+      ['refund', OUR_KEY],
+    ]);
+    expect(describe_([first, later], UNLOCK_AT + LOCK_CLOCK_SKEW_MS, [OUR_KEY]).reclaim).toEqual({
+      kind: 'at',
+      at: UNLOCK_AT + 7_200_000,
+      via: 'refund',
+    });
+    expect(
+      describe_([first, later, bearerProof], UNLOCK_AT + 7_200_000 + LOCK_CLOCK_SKEW_MS, [OUR_KEY])
+        .reclaim
+    ).toEqual({ kind: 'now', via: 'refund' });
+  });
   it('flags a token whose proofs are not all locked', () => {
     const c = describe_([lockedProof(THEIR_KEY), bearerProof], NOW, [OUR_KEY]);
     expect(c.mixed).toBe(true);

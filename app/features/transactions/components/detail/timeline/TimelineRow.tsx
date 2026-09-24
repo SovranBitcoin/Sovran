@@ -205,6 +205,7 @@ interface TimelineRowProps {
   segmentedInProgress?: boolean;
   /** Diagnostics context for the tx.history_timeline.* taxonomy. */
   entryId: string;
+  detail?: React.ReactNode;
 }
 
 export function TimelineRow({
@@ -216,6 +217,7 @@ export function TimelineRow({
   confirmationProgress,
   segmentedInProgress,
   entryId,
+  detail,
 }: TimelineRowProps) {
   const [foreground, mutedColor, successColor, dangerColor, warningColor] = useThemeColor([
     'foreground',
@@ -319,11 +321,12 @@ export function TimelineRow({
                 {formatDate(step.timestamp, 'iso')}
               </Text>
             )}
-            {step.info && (
+            {step.info && !detail && (
               <Text size={12} style={{ color: foreground66, marginTop: 2 }}>
                 {step.info}
               </Text>
             )}
+            {detail}
           </Animated.View>
         </VStack>
       </HStack>

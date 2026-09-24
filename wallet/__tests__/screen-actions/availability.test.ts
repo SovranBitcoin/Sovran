@@ -1264,6 +1264,31 @@ describe("sendTokenAvailability — cancelling a locked send", () => {
     expect(cancel.reasonCode).toBe("lock-permanent");
   });
 
+  it("refuses mixed proofs when one remains permanently locked", () => {
+    const secret = (tags: string[][]) =>
+      JSON.stringify([
+        "P2PK",
+        { nonce: "ab".repeat(16), data: THEIR_KEY, tags },
+      ]);
+    const entry = {
+      type: "send",
+      state: "pending",
+      operationId: "op-1",
+      token: {
+        proofs: [
+          {
+            secret: secret([
+              ["locktime", String(Math.floor(NOW / 1000) - 120)],
+              ["refund", OUR_KEY],
+            ]),
+          },
+          { secret: secret([]) },
+        ],
+      },
+    };
+    expect(cancelFor(entry).available).toBe(false);
+  });
+
   it("says when a timed lock can be taken back, not just that it cannot now", () => {
     const cancel = cancelFor(
       lockedEntry([

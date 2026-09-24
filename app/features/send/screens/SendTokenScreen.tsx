@@ -54,7 +54,6 @@ import {
   formatMemoForDisplay,
 } from '@/shared/lib/nostr/memoMentions';
 import { resolveIdentityName } from '@/shared/lib/identity';
-import { SpendingConditionsCard } from '../components/SpendingConditionsCard';
 import { useSpendingConditions } from '../hooks/useSpendingConditions';
 
 interface SendTokenScreenProps {
@@ -89,7 +88,6 @@ export function SendTokenScreen({
   // still has them, and from what we recorded once it does not. Above the
   // error/loading returns below, because hook order cannot depend on them.
   const spendingConditions = useSpendingConditions(entry);
-  const counterparty = useColadaTransactionAnnotation(entry).counterparty;
 
   useEffect(() => {
     const shouldTrackReachability = createdOffline === true || !!reachability;
@@ -305,10 +303,6 @@ export function SendTokenScreen({
       }
       beforeStatus={
         <>
-          <SpendingConditionsCard
-            conditions={spendingConditions}
-            recipientName={counterparty?.displayName ?? null}
-          />
           {reachabilityWarning && (
             <View style={styles.reachabilityWarning}>
               <Alert status="warning" className="bg-surface-secondary">

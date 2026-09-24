@@ -278,6 +278,12 @@ const STATIC_POPUPS = {
     icon: 'icon:mdi:robot',
     type: 'info',
   },
+  'ai-payment-options-changed': {
+    message: 'Payment options changed',
+    text: 'Review the provider, model and available funds, then send again.',
+    icon: 'icon:mdi:robot',
+    type: 'info',
+  },
   'ai-mint-not-accepted': {
     message: 'This provider does not take your mints',
     text: 'It redeems ecash only from mints you do not hold. Open its details to see which, or choose another provider.',

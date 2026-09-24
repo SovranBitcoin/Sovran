@@ -569,32 +569,47 @@ const lockedSendFlow: FlowDef = {
     },
     {
       id: "unlock",
+      included: (ctx) => ctx.lock?.unlockAt != null,
       // Monotone in time, which is what the engine requires: once the clock
       // passes the locktime it never goes back.
       reached: (ctx) =>
-        ctx.lock?.unlockAt != null && ctx.currentTime >= ctx.lock.unlockAt,
+        ctx.lock?.reclaim.kind === "now" ||
+        (ctx.lock?.reclaim.kind !== "at" &&
+          ctx.lock?.unlockAt != null &&
+          ctx.currentTime >= ctx.lock.unlockAt),
       copy: (ctx) => {
         const { SEND_COPY } = ctx.copy;
         const unlockAt = ctx.lock?.unlockAt ?? null;
-        const reclaimable = ctx.lock?.refund !== null;
-        if (unlockAt !== null && ctx.currentTime >= unlockAt) {
+        const reclaim = ctx.lock?.reclaim;
+        const label =
+          reclaim?.kind === "at" || reclaim?.kind === "now"
+            ? SEND_COPY.unlock.label
+            : "Unlocks";
+        if (reclaim?.kind === "now") {
           return {
             state: "pending",
-            label: SEND_COPY.unlock.label,
+            label,
             // Who can take it, now that it is open. A lock with no refund tag
             // opens to whoever holds the token, not to us.
-            info: reclaimable
-              ? SEND_COPY.unlock.infoRefund
-              : SEND_COPY.unlock.infoPublic,
+            info:
+              reclaim.via === "refund"
+                ? SEND_COPY.unlock.infoRefund
+                : SEND_COPY.unlock.infoPublic,
           };
         }
         return {
           state: "pending",
-          label: SEND_COPY.unlock.label,
+          label,
           // An ABSOLUTE date, because this row rebuilds only at the boundary:
           // a live "in 3 hours" would be wrong for the three hours after it.
           ...(unlockAt !== null
-            ? { info: SEND_COPY.unlock.infoUpcoming, timestamp: unlockAt }
+            ? {
+                info:
+                  reclaim?.kind === "at"
+                    ? SEND_COPY.unlock.infoUpcoming
+                    : "Refund signatures are required",
+                timestamp: unlockAt,
+              }
             : {}),
         };
       },

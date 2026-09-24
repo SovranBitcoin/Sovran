@@ -77,29 +77,42 @@ type NextExecuteParams = {
 function buildNextVariants(
   nextAction: AmountEntryActions['next'],
   nextExecuteParams: NextExecuteParams,
-  suppress: boolean
+  suppress: boolean,
+  lockOption?: { reason?: string; choose: () => Promise<P2pkLockSpec | null> }
 ): ActionMenuVariant[] | undefined {
   if (suppress) return undefined;
   const raw = nextAction.variants as ActionVariant[] | undefined;
   if (!raw || raw.length === 0) return undefined;
-  return raw.map((v) => ({
-    id: v.id,
-    label: v.label,
-    description: v.description,
-    icon: v.icon,
-    isDisabled: !v.available,
-    reason: v.reason,
-    isDestructive: v.isDestructive,
-    onPress: async () => {
-      walletLog.info('amount.next.variant', {
-        variantId: v.id,
-        recipientPubkeyPresent: nextExecuteParams.recipientPubkey !== undefined,
-        recipientProfilePresent: nextExecuteParams.recipientProfile !== undefined,
-        recipientDisplayName: nextExecuteParams.recipientProfile?.displayName ?? null,
-      });
-      await nextAction.execute({ variantId: v.id, ...nextExecuteParams });
-    },
-  }));
+  return raw
+    .filter((v) => v.id !== 'locked-ecash' || lockOption)
+    .map((v) => ({
+      id: v.id,
+      label: v.label,
+      description: v.description,
+      icon: v.icon,
+      isDisabled: !v.available || (v.id === 'locked-ecash' && !!lockOption?.reason),
+      reason: v.id === 'locked-ecash' ? (lockOption?.reason ?? v.reason) : v.reason,
+      isDestructive: v.isDestructive,
+      onPress: async () => {
+        walletLog.info('amount.next.variant', {
+          variantId: v.id,
+          recipientPubkeyPresent: nextExecuteParams.recipientPubkey !== undefined,
+          recipientProfilePresent: nextExecuteParams.recipientProfile !== undefined,
+          recipientDisplayName: nextExecuteParams.recipientProfile?.displayName ?? null,
+        });
+        if (v.id === 'locked-ecash') {
+          const lock = await lockOption?.choose();
+          if (!lock) return;
+          await nextAction.execute({ ...nextExecuteParams, variantId: v.id, p2pkLock: lock });
+        } else {
+          await nextAction.execute({
+            ...nextExecuteParams,
+            variantId: v.id,
+            ...(lockOption ? { p2pkLock: null } : {}),
+          });
+        }
+      },
+    }));
 }
 
 function buildExtraButtons(
@@ -176,6 +189,7 @@ interface AmountSelectorProps {
   lockChoice?: P2pkLockSpec | null;
   /** Short line under the amount when the lock is worth a caveat. */
   lockWarning?: string | null;
+  lockOption?: { reason?: string; choose: () => Promise<P2pkLockSpec | null> };
   /** Hide variant menu when the caller owns delivery after ecash creation. */
   suppressNextVariants?: boolean;
 }
@@ -193,6 +207,7 @@ export function AmountSelector({
   recipientProfile,
   lockChoice,
   lockWarning = null,
+  lockOption,
   suppressNextVariants = false,
 }: AmountSelectorProps) {
   useLifecycleLogger('AmountSelector', walletLog);
@@ -270,7 +285,8 @@ export function AmountSelector({
   const nextVariants = buildNextVariants(
     actions.next,
     nextExecuteParams,
-    suppressNextVariants || isCreateEcashEntry
+    suppressNextVariants || isCreateEcashEntry,
+    lockOption
   );
 
   // The AI-credit top-up flow lands on this screen via a hand-rolled

@@ -33,24 +33,28 @@ export function useSendLockTarget(params: {
 }): SendLockTarget {
   const { recipientPubkey, selectedMintUrl, selectedMintNuts } = params;
   const manager = useManager();
-  const [profile, setProfile] = useState<NutzapProfile | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [refundKey, setRefundKey] = useState<CashuP2pkPubkey | null>(null);
+  const [resolved, setResolved] = useState<{
+    recipient: string;
+    profile: NutzapProfile | null;
+  } | null>(null);
+  const [refund, setRefund] = useState<{
+    owner: typeof manager;
+    key: CashuP2pkPubkey | null;
+  } | null>(null);
+  const profile = resolved && resolved.recipient === recipientPubkey ? resolved.profile : null;
+  const loading = !!recipientPubkey && resolved?.recipient !== recipientPubkey;
+  const refundKey = refund && refund.owner === manager ? refund.key : null;
 
   useEffect(() => {
-    if (!recipientPubkey) {
-      setProfile(null);
-      return;
-    }
+    if (!recipientPubkey) return;
     let cancelled = false;
-    setLoading(true);
     void resolveNutzapProfile(recipientPubkey)
-      .then((resolved) => {
+      .then((value) => {
         if (cancelled) return;
-        setProfile(resolved);
+        setResolved({ recipient: recipientPubkey, profile: value });
       })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+      .catch(() => {
+        if (!cancelled) setResolved({ recipient: recipientPubkey, profile: null });
       });
     return () => {
       cancelled = true;
@@ -66,16 +70,18 @@ export function useSendLockTarget(params: {
         // Guard the shape here rather than at use: a reclaim signed with
         // something that is not a compressed key fails at the mint, long after
         // the user was promised they could take the money back.
-        setRefundKey(
-          key && CASHU_P2PK_PUBKEY_RE.test(key) ? (key.toLowerCase() as CashuP2pkPubkey) : null
-        );
+        setRefund({
+          owner: manager,
+          key:
+            key && CASHU_P2PK_PUBKEY_RE.test(key) ? (key.toLowerCase() as CashuP2pkPubkey) : null,
+        });
       })
       .catch((error: unknown) => {
         if (cancelled) return;
         paymentLog.warn('send.lock.refundKeyUnavailable', {
           error: error instanceof Error ? error.message : String(error),
         });
-        setRefundKey(null);
+        setRefund({ owner: manager, key: null });
       });
     return () => {
       cancelled = true;

@@ -17,7 +17,7 @@
 
 import type { SpendingConditions } from 'wallet';
 
-export type SpendingConditionsTone = 'neutral' | 'accent' | 'warning' | 'danger';
+type SpendingConditionsTone = 'neutral' | 'accent' | 'warning' | 'danger';
 
 interface SpendingConditionsCopy {
   tone: SpendingConditionsTone;
@@ -36,7 +36,8 @@ interface SpendingConditionsCopyInput {
   confirmedRecipient?: boolean;
 }
 
-const UNCONFIRMED = (name: string) => `We couldn't confirm ${name} can unlock this.`;
+const UNCONFIRMED = (name: string) =>
+  `This uses ${name}’s Nostr identity key. Redeeming needs a wallet that can sign with that key.`;
 
 export function describeSpendingConditionsCopy(
   input: SpendingConditionsCopyInput
@@ -61,7 +62,7 @@ export function describeSpendingConditionsCopy(
       title: 'Unknown spending conditions',
       body: [
         'This token carries conditions this wallet does not understand.',
-        'Only the mint can say who may redeem it.',
+        'This wallet cannot redeem it.',
       ],
     };
   }
@@ -72,22 +73,12 @@ export function describeSpendingConditionsCopy(
       title: 'Mixed spending conditions',
       body: [
         `${conditions.lockedProofCount} of ${conditions.proofCount} parts of this token are locked, and not all the same way.`,
-        'Open the details to see each one.',
+        'The details show the first locked part. Its keys do not describe every part of this token.',
       ],
     };
   }
 
-  // Locked to us: the one case where the lock is protection rather than a
-  // promise to somebody else.
-  if ((conditions.main?.ourKeys ?? 0) > 0 && conditions.phase !== 'timed-expired') {
-    return {
-      tone: 'accent',
-      title: 'Locked to you',
-      body: ['Only this wallet can redeem it.'],
-    };
-  }
-
-  if (conditions.limits.includes('multisig')) {
+  if ((conditions.main?.requiredSignatures ?? 1) > 1 && conditions.phase !== 'timed-expired') {
     const total = conditions.main?.pubkeys.length ?? 0;
     return {
       tone: 'warning',
@@ -102,6 +93,18 @@ export function describeSpendingConditionsCopy(
   const sigAll = conditions.limits.includes('sig-all')
     ? ['Their wallet must sign the whole transaction (SIG_ALL); not every wallet can.']
     : [];
+
+  if ((conditions.main?.ourKeys ?? 0) > 0 && conditions.phase !== 'timed-expired') {
+    return {
+      tone: 'accent',
+      title: 'Locked to you',
+      body: conditions.limits.includes('sig-all')
+        ? [
+            'This wallet holds a matching key, but cannot sign the required whole transaction (SIG_ALL).',
+          ]
+        : ['This wallet has a key that can redeem it.'],
+    };
+  }
 
   if (conditions.phase === 'permanent') {
     return {
@@ -119,6 +122,15 @@ export function describeSpendingConditionsCopy(
   const unlockAt = conditions.unlockAt ?? undefined;
   const hasRefund = conditions.refund !== null;
   const expired = conditions.phase === 'timed-expired';
+  const reclaim = conditions.reclaim;
+  const refundCopy =
+    reclaim.kind === 'now'
+      ? 'You can also take it back now — whoever spends first wins.'
+      : reclaim.kind === 'at'
+        ? expired
+          ? 'Reclaim will be available shortly, allowing for the mint’s clock.'
+          : 'After that you can take it back.'
+        : 'Reclaim requires the listed refund keys and signature threshold.';
 
   if (!hasRefund) {
     // We never create this shape. A scanned or foreign token can be it, and
@@ -150,21 +162,13 @@ export function describeSpendingConditionsCopy(
     ? {
         tone: 'warning',
         title: 'The lock has expired',
-        body: [
-          'They can still redeem it.',
-          'You can also take it back now — whoever spends first wins.',
-        ],
+        body: ['They can still redeem it.', refundCopy],
         ...(unlockAt ? { dateMs: unlockAt } : {}),
       }
     : {
         tone: 'accent',
         title: `Locked to ${who} until {date}`,
-        body: [
-          'Only they can redeem it before {date}.',
-          'After that you can take it back.',
-          ...sigAll,
-          ...caveat,
-        ],
+        body: ['Only they can redeem it before {date}.', refundCopy, ...sigAll, ...caveat],
         ...(unlockAt ? { dateMs: unlockAt } : {}),
       };
 }

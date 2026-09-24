@@ -92,7 +92,10 @@ describe('history timeline — onchain SEND (melt)', () => {
         displayLabel: 'Broadcasting…',
         stepType: 'future-small',
       }),
-      expect.objectContaining({ displayLabel: 'Confirmed', stepType: 'future-small' }),
+      expect.objectContaining({
+        displayLabel: 'Confirmed',
+        stepType: 'future-small',
+      }),
     ]);
     expect(timeline[0].timestamp).toBeUndefined();
   });
@@ -110,7 +113,10 @@ describe('history timeline — onchain SEND (melt)', () => {
         stepType: 'current',
         info: 'Sending the transaction to the network',
       }),
-      expect.objectContaining({ displayLabel: 'Confirmed', stepType: 'future-small' }),
+      expect.objectContaining({
+        displayLabel: 'Confirmed',
+        stepType: 'future-small',
+      }),
     ]);
     // The broadcasting row shows no confirmation ring yet (no tx to count).
     expect(timeline[1].confirmationRing).toBeUndefined();
@@ -120,7 +126,10 @@ describe('history timeline — onchain SEND (melt)', () => {
     const timeline = buildTimeline({
       historyEntry: meltEntry('PAID'),
       currentTime: 1_700_000_000_000,
-      onchainConfirmationProgress: progress({ hasPayment: true, currentConfirmations: 3 }),
+      onchainConfirmationProgress: progress({
+        hasPayment: true,
+        currentConfirmations: 3,
+      }),
     });
     expect(timeline[1]).toMatchObject({
       displayLabel: 'In mempool',
@@ -128,7 +137,10 @@ describe('history timeline — onchain SEND (melt)', () => {
       info: '3/6 blocks',
       confirmationRing: true,
     });
-    expect(timeline[2]).toMatchObject({ displayLabel: 'Confirmed', stepType: 'future-small' });
+    expect(timeline[2]).toMatchObject({
+      displayLabel: 'Confirmed',
+      stepType: 'future-small',
+    });
   });
 
   it('fully confirmed → "Confirmed" success, mempool row complete', () => {
@@ -141,8 +153,14 @@ describe('history timeline — onchain SEND (melt)', () => {
         isSatisfied: true,
       }),
     });
-    expect(timeline[1]).toMatchObject({ displayLabel: 'In mempool', stepType: 'complete' });
-    expect(timeline[2]).toMatchObject({ displayLabel: 'Confirmed', stepType: 'success' });
+    expect(timeline[1]).toMatchObject({
+      displayLabel: 'In mempool',
+      stepType: 'complete',
+    });
+    expect(timeline[2]).toMatchObject({
+      displayLabel: 'Confirmed',
+      stepType: 'success',
+    });
   });
 
   // The mint can settle an onchain melt OFF-CHAIN (no outpoint / no broadcast).
@@ -151,11 +169,17 @@ describe('history timeline — onchain SEND (melt)', () => {
     const timeline = buildTimeline({
       historyEntry: meltEntry('PAID'),
       currentTime: 1_700_000_000_000,
-      onchainConfirmationProgress: progress({ hasPayment: false, isSatisfied: true }),
+      onchainConfirmationProgress: progress({
+        hasPayment: false,
+        isSatisfied: true,
+      }),
       onchainSettledInternally: true,
     });
     expect(timeline).toHaveLength(2);
-    expect(timeline[0]).toMatchObject({ displayLabel: 'Sent', stepType: 'complete' });
+    expect(timeline[0]).toMatchObject({
+      displayLabel: 'Sent',
+      stepType: 'complete',
+    });
     expect(timeline[1]).toMatchObject({
       displayLabel: 'Settled off-chain',
       stepType: 'success',
@@ -174,11 +198,20 @@ describe('history timeline — onchain SEND (melt)', () => {
     const timeline = buildTimeline({
       historyEntry: meltEntry('UNPAID'),
       currentTime: 1_700_000_000_000,
-      onchainConfirmationProgress: progress({ hasPayment: false, isSatisfied: false }),
+      onchainConfirmationProgress: progress({
+        hasPayment: false,
+        isSatisfied: false,
+      }),
       onchainSettledInternally: true,
     });
-    expect(timeline[0]).toMatchObject({ displayLabel: 'Sent', stepType: 'complete' });
-    expect(timeline[1]).toMatchObject({ displayLabel: 'Settled off-chain', stepType: 'success' });
+    expect(timeline[0]).toMatchObject({
+      displayLabel: 'Sent',
+      stepType: 'complete',
+    });
+    expect(timeline[1]).toMatchObject({
+      displayLabel: 'Settled off-chain',
+      stepType: 'success',
+    });
   });
 
   // coco v2 spells a reversed melt `rolled_back` (normalized to `rolledBack`);
@@ -215,7 +248,10 @@ describe('history timeline — incoming payment request (receive)', () => {
     operationId: 'op-1',
   };
   const build = (entry: unknown) =>
-    buildTimeline({ historyEntry: entry as never, currentTime: 1_700_000_000_000 });
+    buildTimeline({
+      historyEntry: entry as never,
+      currentTime: 1_700_000_000_000,
+    });
 
   it('pending request (paymentRequestPending) leads with "waiting for payment"', () => {
     // The list pending row is state:executing but must NOT read "redeeming".
@@ -298,7 +334,11 @@ describe('history timeline — mint (receive) arms', () => {
   });
 
   const build = (entry: never, extra: Record<string, unknown> = {}) =>
-    buildTimeline({ historyEntry: entry, currentTime: 1_700_000_000_000, ...extra });
+    buildTimeline({
+      historyEntry: entry,
+      currentTime: 1_700_000_000_000,
+      ...extra,
+    });
 
   const shape = (timeline: ReturnType<typeof buildTimeline>) =>
     timeline.map((t) => [t.displayLabel, t.stepType, t.info ?? null]);
@@ -424,10 +464,7 @@ describe('history timeline — a send that is locked until a date', () => {
       token: {
         proofs: [
           {
-            secret: JSON.stringify([
-              'P2PK',
-              { nonce: 'ab'.repeat(16), data: THEIR_KEY, tags },
-            ]),
+            secret: JSON.stringify(['P2PK', { nonce: 'ab'.repeat(16), data: THEIR_KEY, tags }]),
           },
         ],
       },
@@ -438,6 +475,25 @@ describe('history timeline — a send that is locked until a date', () => {
     ['refund', OUR_KEY],
   ];
 
+  it('does not promise a reclaim milestone for a permanent lock', () => {
+    const timeline = buildTimeline({
+      historyEntry: lockedSend([]),
+      currentTime: CREATED_AT,
+      ourPubkeys: [OUR_KEY],
+    });
+    expect(timeline.map((step) => step.displayLabel)).toEqual(['Created', 'Locked']);
+  });
+
+  it('does not say this wallet can reclaim a refund locked to someone else', () => {
+    const timeline = buildTimeline({
+      historyEntry: lockedSend(refundTags),
+      currentTime: UNLOCK_AT + 60_001,
+      ourPubkeys: [THEIR_KEY],
+    });
+    expect(timeline[2].displayLabel).toBe('Unlocks');
+    expect(timeline[2].info).not.toBe('You can take this back');
+  });
+
   it('shows when it unlocks, as a date rather than a countdown', () => {
     // The row rebuilds only at the boundary, so a live "in 3 hours" would be
     // wrong for the three hours after it.
@@ -447,18 +503,17 @@ describe('history timeline — a send that is locked until a date', () => {
       ourPubkeys: [OUR_KEY],
     });
 
-    expect(timeline.map((step) => step.displayLabel)).toEqual([
-      'Created',
-      'Locked',
-      'Reclaimable',
-    ]);
-    expect(timeline[2]).toMatchObject({ info: 'Unlocks', timestamp: UNLOCK_AT });
+    expect(timeline.map((step) => step.displayLabel)).toEqual(['Created', 'Locked', 'Reclaimable']);
+    expect(timeline[2]).toMatchObject({
+      info: 'Unlocks',
+      timestamp: UNLOCK_AT,
+    });
   });
 
   it('says who may take it once the lock has opened', () => {
     const mine = buildTimeline({
       historyEntry: lockedSend(refundTags),
-      currentTime: UNLOCK_AT + 1,
+      currentTime: UNLOCK_AT + 60_001,
       ourPubkeys: [OUR_KEY],
     });
     expect(mine[2]).toMatchObject({ info: 'You can take this back' });
@@ -466,10 +521,12 @@ describe('history timeline — a send that is locked until a date', () => {
     // No refund tag: it opens to whoever holds the token, not to us.
     const anyones = buildTimeline({
       historyEntry: lockedSend([['locktime', String(LOCKTIME_SEC)]]),
-      currentTime: UNLOCK_AT + 1,
+      currentTime: UNLOCK_AT + 60_001,
       ourPubkeys: [OUR_KEY],
     });
-    expect(anyones[2]).toMatchObject({ info: 'Anyone with the token can redeem it' });
+    expect(anyones[2]).toMatchObject({
+      info: 'Anyone with the token can redeem it',
+    });
   });
 
   it('never draws a checkmark on a moment that did not happen', () => {
@@ -480,11 +537,7 @@ describe('history timeline — a send that is locked until a date', () => {
       currentTime: CREATED_AT + 60_000,
       ourPubkeys: [OUR_KEY],
     });
-    expect(timeline.map((step) => step.displayLabel)).toEqual([
-      'Created',
-      'Locked',
-      'Claimed',
-    ]);
+    expect(timeline.map((step) => step.displayLabel)).toEqual(['Created', 'Locked', 'Claimed']);
   });
 
   it('leaves an unlocked send on the ordinary send timeline', () => {
@@ -503,10 +556,6 @@ describe('history timeline — a send that is locked until a date', () => {
       } as never,
       currentTime: CREATED_AT,
     });
-    expect(timeline.map((step) => step.displayLabel)).toEqual([
-      'Created',
-      'Pending',
-      'Claimed',
-    ]);
+    expect(timeline.map((step) => step.displayLabel)).toEqual(['Created', 'Pending', 'Claimed']);
   });
 });
