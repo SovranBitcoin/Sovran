@@ -36,12 +36,15 @@ export function AiHeaderTitle() {
   const mintUrl = useMintStore((s) => s.selectedMint);
   const mockMode = useSettingsStore((s) => s.mockMode);
 
-  const nodeBaseUrl = useRoutstrStore((s) => s.nodeBaseUrl);
+  // Only the user's own choice. There is no recommendation and no default:
+  // picking who gets paid for AI is not this app's call, so an empty pill says
+  // so rather than quietly naming somebody.
   const userNodeBaseUrl = useRoutstrStore((s) => s.userNodeBaseUrl);
   const knownProviders = useRoutstrStore((s) => s.knownProviders);
-  const activeUrl = normalizeNodeUrl(userNodeBaseUrl ?? nodeBaseUrl ?? '');
-  const providerName =
-    knownProviders[activeUrl]?.name || activeUrl.replace(/^https:\/\//, '') || 'AI provider';
+  const activeUrl = normalizeNodeUrl(userNodeBaseUrl ?? '');
+  const providerName = activeUrl
+    ? knownProviders[activeUrl]?.name || activeUrl.replace(/^https:\/\//, '')
+    : 'Choose provider';
 
   const [status, setStatus] = useState<ProviderStatus>(
     () => cachedProbe(activeUrl)?.status ?? 'unknown'
@@ -76,15 +79,17 @@ export function AiHeaderTitle() {
 
   // No skeleton: this is local wallet state, not a request in flight. Empty
   // means the wallet is empty, and the CTA points at funding the wallet rather
-  // than topping up an account on somebody's node.
+  // than topping up an account on somebody's node. No provider outranks it —
+  // there is nothing to spend on until one is chosen.
   const isEmpty = sats <= 0;
+  const ctaLabel = !activeUrl ? 'Pick one' : isEmpty ? 'Add funds' : undefined;
 
   return (
     <BalancePill
       title={providerName}
       balance={sats}
       unit="sat"
-      ctaLabel={isEmpty ? 'Add funds' : undefined}
+      ctaLabel={ctaLabel}
       iconNode={<ProviderPillIcon status={status} size={20} />}
       loadingTitlePlaceholder="AI provider"
       onPress={onPress}

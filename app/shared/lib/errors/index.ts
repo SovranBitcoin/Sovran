@@ -31,6 +31,7 @@ const SOURCE_TYPES: Partial<Record<ErrorService, TypeRules>> = {
   // from a published list and refuses the rest, so these two say "change mint
   // or provider" where the generic copy would say "try again" forever.
   routstr: [
+    ['no_provider', 'routstr.no_provider'],
     ['mint_not_accepted', 'routstr.mint_not_accepted'],
     ['mint_error', 'routstr.mint_refused'],
   ],

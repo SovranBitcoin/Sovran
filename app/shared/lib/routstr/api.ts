@@ -42,14 +42,39 @@ let routstrBaseUrlOverride: string | null = null;
 
 /** Set (or clear with null) the Routstr node base URL, e.g.
  *  "https://api.routstr.com". The `/v1` path segment is appended here so the
- *  server payload stays a plain origin. */
+ *  caller passes a plain origin. */
 export function setRoutstrNodeBaseUrl(url: string | null): void {
   const trimmed = typeof url === 'string' ? url.trim().replace(/\/+$/, '') : '';
   routstrBaseUrlOverride = trimmed ? `${trimmed}/v1` : null;
 }
 
+/**
+ * Whether the user has chosen a provider.
+ *
+ * There is deliberately no default. Picking a provider on someone's behalf
+ * makes this app the arbiter of who gets paid for AI, and silently sends the
+ * user's money to whoever we favoured — so nothing is sent until they choose.
+ * The old `ROUTSTR_DEFAULT_BASE_URL` remains only as the shape a URL takes.
+ */
+function hasRoutstrProvider(): boolean {
+  return routstrBaseUrlOverride != null;
+}
+
 function routstrBaseUrl(): string {
   return routstrBaseUrlOverride ?? ROUTSTR_DEFAULT_BASE_URL;
+}
+
+/** The error every path raises before a provider is chosen. */
+function noProviderChosen(): RoutstrError {
+  return {
+    status: 0,
+    error: {
+      message: 'Choose an AI provider first',
+      code: 'no_provider',
+      type: 'no_provider',
+      details: undefined,
+    },
+  };
 }
 
 /**
@@ -708,6 +733,9 @@ async function seedFromNode(origin: string, models: Model[]): Promise<void> {
 }
 
 export async function getModels(controls: RequestControls = {}): Promise<RoutstrModel[]> {
+  // No provider, no catalog. A model list fetched from a node the user did not
+  // pick would be a menu of things they cannot buy.
+  if (!hasRoutstrProvider()) throw noProviderChosen();
   apiLog.info('api.routstr.models.start');
   const start = performance.now();
   const ownsScope = captureRequestScope();
@@ -871,13 +899,34 @@ async function* parseSSEStream(response: Response): AsyncGenerator<ChatCompletio
   }
 
   apiLog.warn('routstr.sse.no_readable_stream', { fallback: 'full_text_parse' });
-  yield* parseSSEFromText(await response.text());
+  const text = await response.text();
+  let chunks = 0;
+  for (const chunk of parseSSEFromText(text)) {
+    chunks++;
+    yield chunk;
+  }
+  if (chunks === 0) {
+    // A 200 that yields nothing is indistinguishable on screen from a hang,
+    // and the three causes need different fixes: an empty body, a body that is
+    // not SSE at all, or a stream object stringified by a `Response` polyfill
+    // with no stream support (`"[object ReadableStream]"`). The head says
+    // which. Bounded and shape-only — an SSE frame's payload is the user's own
+    // prompt coming back.
+    apiLog.error('routstr.sse.empty_text', {
+      length: text.length,
+      head: text.slice(0, 120),
+      contentType: response.headers.get('content-type'),
+    });
+  }
 }
 
 function tryParseSSELine(line: string): ChatCompletionChunk | 'done' | null {
   const trimmed = line.trim();
-  if (!trimmed || !trimmed.startsWith('data: ')) return null;
-  const data = trimmed.slice(6).trim();
+  // `data:` with no space is legal SSE and the routstr SDK's own parser accepts
+  // it; requiring the space silently discarded every line of a well-formed
+  // stream, which reads on screen as an answer that never arrived.
+  if (!trimmed || !trimmed.startsWith('data:')) return null;
+  const data = trimmed.slice(5).trim();
   if (data === '[DONE]') return 'done';
   if (!data) return null;
   let raw: unknown;
@@ -1142,6 +1191,7 @@ export async function sendMessage(
   });
   const start = performance.now();
   const ownsScope = captureRequestScope();
+  if (!hasRoutstrProvider()) throw noProviderChosen();
   const origin = routstrOrigin();
   const mintUrl = await payingMintUrl(origin);
 

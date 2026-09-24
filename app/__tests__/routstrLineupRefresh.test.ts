@@ -63,6 +63,12 @@ async function load() {
     lineup: null,
     lastKnownLineup: null,
   });
+  // A provider the user picked. Nothing reaches a node until one is chosen,
+  // and `nodeBaseUrl` — nagg's own node — is a discovery seed rather than the
+  // request target, so the two are set separately.
+  const { setRoutstrNodeBaseUrl } =
+    require('@/shared/lib/routstr/api') as typeof import('@/shared/lib/routstr/api');
+  setRoutstrNodeBaseUrl('https://chosen.example');
   mockGetAiLineup.mockResolvedValue(ok(parsed));
   return {
     store: useRoutstrStore,

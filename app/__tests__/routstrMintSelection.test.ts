@@ -20,9 +20,16 @@ let mockSelectedMint: string | undefined = MINIBITS;
 let mockBalances: Record<string, number> = { [SOVRAN]: 9000, [MINIBITS]: 1200 };
 let mockNodeMints: string[] | undefined;
 
+// A profile that has already chosen a provider. Nothing is sent until one is
+// chosen, and the store applies the choice on hydrate — so a test about paying
+// has to start from a hydrated choice rather than poking module state, which
+// hydration would then clear.
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   createProfileScopedStorage: () => ({
-    getItem: async () => null,
+    getItem: async (key: string) =>
+      key.includes('routstr-store')
+        ? JSON.stringify({ state: { userNodeBaseUrl: 'https://node.example' }, version: 1 })
+        : null,
     setItem: async () => {},
     removeItem: async () => {},
   }),
@@ -68,7 +75,7 @@ jest.mock('@/shared/lib/routstr/providers', () => ({
   fetchNodeInfo: async () => (mockNodeMints ? { mints: mockNodeMints } : null),
 }));
 
-import { getModels, sendMessage } from '@/shared/lib/routstr/api';
+import { getModels, sendMessage, setRoutstrNodeBaseUrl } from '@/shared/lib/routstr/api';
 import { resetRoutstrClient } from '@/shared/lib/routstr/sdk/client';
 
 const wallet = (
@@ -79,6 +86,9 @@ const wallet = (
 
 /** Fetch the catalog once so the SDK is seeded, then answer the completion. */
 async function seedThenSend() {
+  // Re-applied per call: each case resets the SDK client, and the store's
+  // hydration is what normally installs this.
+  setRoutstrNodeBaseUrl('https://node.example');
   // eslint-disable-next-line no-restricted-properties -- test stub
   global.fetch = jest.fn(async (url: string) =>
     String(url).includes('/models')

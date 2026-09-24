@@ -68,7 +68,9 @@ const response = (status = 200, message = 'upstream unavailable', change = 'cash
 describe('Routstr response credentials', () => {
   beforeEach(() => {
     mockProfile = 0;
-    setRoutstrNodeBaseUrl(null);
+    // A provider is a precondition now: nothing is sent until the user picks
+    // one, so a test that exercises sending has to have picked one.
+    setRoutstrNodeBaseUrl('https://node.example');
     useRoutstrStore.setState({ apiKey: 'cashuA-test-original', balance: 999, authMode: 'bearer' });
     wallet.sendToken.mockClear();
     wallet.receiveToken.mockClear();
@@ -118,7 +120,7 @@ describe('Routstr response credentials', () => {
       jest.spyOn(globalThis, 'fetch').mockImplementationOnce(async () => {
         if (change === 'profile') mockProfile = 1;
         if (change === 'key') useRoutstrStore.getState().setApiKey('cashuB-newer');
-        if (change === 'node') setRoutstrNodeBaseUrl('https://node.example');
+        if (change === 'node') setRoutstrNodeBaseUrl('https://other-node.example');
         return response(401, 'Expired key');
       });
       await expect(checkBalance('cashuA-test-original')).rejects.toMatchObject({ status: 401 });

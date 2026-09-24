@@ -921,7 +921,9 @@ export const useRoutstrStore = create<RoutstrStore>()(
           });
           return;
         }
-        setRoutstrNodeBaseUrl(nodeBaseUrl);
+        // nagg's own node is remembered as a discovery seed, never adopted as
+        // the request target: the user picks who gets paid, and this app does
+        // not get to recommend one on their behalf.
         set({
           lineup,
           serverLineupAt: now,
@@ -976,7 +978,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
       setUserNode: (nodeBaseUrl) => {
         const next = nodeBaseUrl?.trim().replace(/\/+$/, '') || null;
         storeLog.info('store.routstr.user_node_set', { pinned: next != null });
-        setRoutstrNodeBaseUrl(next ?? get().nodeBaseUrl);
+        setRoutstrNodeBaseUrl(next);
         set({
           userNodeBaseUrl: next,
           // The model menu is per node. Clearing the server lineup and the
@@ -1087,7 +1089,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
         // A pinned provider wins over whatever the last lineup left behind —
         // the point of pinning is that a background refresh cannot move the
         // user off it, and a relaunch is not an exception.
-        setRoutstrNodeBaseUrl(state.userNodeBaseUrl ?? state.nodeBaseUrl);
+        setRoutstrNodeBaseUrl(state.userNodeBaseUrl);
         // Record the live credential in the archive on the way in, so it is
         // already recoverable before anything this session can clear it. A
         // blob written before `legacyAccounts` existed has no other way to

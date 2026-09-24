@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import Animated from 'react-native-reanimated';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useCallback, useEffect, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
@@ -21,7 +22,9 @@ import {
 import { cachedProbe, probeProviders } from '@/shared/lib/routstr/providerHealth';
 import { useBalanceContext } from '@cashu/coco-react';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { useIdentityHeader } from '@/shared/ui/composed/IdentityHeader';
 import { ProviderAvatar } from '../components/ProviderAvatar';
+import { ProviderMintRow } from '../components/ProviderMintRow';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -153,11 +156,6 @@ export function ProviderInfoScreen() {
     router.back();
   }, [nodeBaseUrl, info?.name]);
 
-  const onUseRecommended = useCallback(() => {
-    useRoutstrStore.getState().setUserNode(null);
-    router.back();
-  }, []);
-
   const onReclaim = useCallback(async () => {
     const outcome = await reclaimRoutstrBalances();
     aiLog.info('ai.provider_info.reclaimed', { ...outcome });
@@ -165,6 +163,21 @@ export function ProviderInfoScreen() {
     // report is what came home, not what this one node returned.
     staticPopup(outcome.reclaimed > 0 ? 'routstr-reclaim-done' : 'routstr-reclaim-empty');
   }, []);
+
+  const displayName =
+    info?.name ?? entry?.seedName ?? (nodeBaseUrl ?? '').replace(/^https:\/\//, '');
+
+  // The same scroll handoff the mint details page uses: the identity rides in
+  // the navigation bar once the name band scrolls away, so a provider page and
+  // a mint page are the same surface answering the same question about
+  // different counterparties. `person` rather than `mint` because a Routstr
+  // node publishes no icon — the seeded avatar IS its face, and it is the same
+  // one the picker draws.
+  const morph = useIdentityHeader({
+    identity: { kind: 'person', name: displayName, seed: nodeBaseUrl ?? '' },
+    title: 'Provider details',
+    collapseAt: 110,
+  });
 
   if (!nodeBaseUrl) {
     return (
@@ -178,12 +191,12 @@ export function ProviderInfoScreen() {
     );
   }
 
-  const displayName = info?.name ?? entry?.seedName ?? nodeBaseUrl.replace(/^https:\/\//, '');
-
   return (
     <Screen
       name="ProviderInfoScreen"
-      scroll="auto"
+      scroll="animated"
+      scrollY={morph.scrollY}
+      headerBand={morph.headerBand}
       bgColor={background}
       footer={
         <BottomButtons>
@@ -196,17 +209,7 @@ export function ProviderInfoScreen() {
                 testID: 'ai-provider-info-close',
               },
               ...(isActive
-                ? [
-                    // The picker has no "Automatic" row — a list of providers
-                    // should be providers. Handing the choice back belongs
-                    // here, on the one that currently holds it.
-                    {
-                      text: 'Use the recommended provider',
-                      variant: 'secondary' as const,
-                      onPress: onUseRecommended,
-                      testID: 'ai-provider-info-auto',
-                    },
-                  ]
+                ? []
                 : [
                     {
                       text: 'Use this provider',
@@ -219,14 +222,21 @@ export function ProviderInfoScreen() {
           />
         </BottomButtons>
       }>
-      <Stack.Screen options={{ title: 'Provider details' }} />
+      <Stack.Screen options={{ title: 'Provider details', headerTitle: morph.headerTitle }} />
 
-      <VStack className="items-center py-4">
-        <ProviderAvatar name={displayName} baseUrl={nodeBaseUrl} status={status} size={56} />
-        <Spacer size={8} />
-        <Text bold size={22} testID="ai-provider-info-name">
-          {displayName}
-        </Text>
+      {morph.probe}
+      <VStack className="w-full items-center pb-4 pt-6">
+        <Animated.View className="items-center" style={morph.contentStyle}>
+          <ProviderAvatar name={displayName} baseUrl={nodeBaseUrl} status={status} size={70} />
+          <Text
+            bold
+            size={22}
+            numberOfLines={2}
+            className="mt-3 text-center"
+            testID="ai-provider-info-name">
+            {displayName}
+          </Text>
+        </Animated.View>
         {info?.description ? (
           <>
             <Spacer size={4} />
@@ -279,20 +289,9 @@ export function ProviderInfoScreen() {
             </>
           ) : null}
           <ListGroup variant="secondary">
-            {info.mints.map((mint) => {
-              const held = heldMints.has(mint.trim().replace(/\/+$/, '').toLowerCase());
-              return (
-                <ListGroup.Item key={mint} disabled>
-                  <ListGroup.ItemContent>
-                    <ListGroup.ItemTitle>{mint.replace(/^https:\/\//, '')}</ListGroup.ItemTitle>
-                    <ListGroup.ItemDescription>
-                      {held ? 'In your wallet' : 'Not in your wallet'}
-                    </ListGroup.ItemDescription>
-                  </ListGroup.ItemContent>
-                  {held ? <Icon name="mdi:check-circle" size={18} color={foreground} /> : null}
-                </ListGroup.Item>
-              );
-            })}
+            {info.mints.map((mint) => (
+              <ProviderMintRow key={mint} mintUrl={mint} />
+            ))}
           </ListGroup>
         </Section>
       ) : null}

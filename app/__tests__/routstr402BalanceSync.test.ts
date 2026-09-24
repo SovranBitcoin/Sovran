@@ -12,7 +12,12 @@
  */
 
 import { describeError } from '@/shared/lib/errors';
-import { checkBalance, isWalletBalanceError, sendMessage } from '@/shared/lib/routstr/api';
+import {
+  checkBalance,
+  isWalletBalanceError,
+  sendMessage,
+  setRoutstrNodeBaseUrl,
+} from '@/shared/lib/routstr/api';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
 const mockMemory: Record<string, string> = {};
@@ -89,7 +94,11 @@ function stubFetch402(body: unknown) {
 }
 
 describe('402 → balance truth-sync', () => {
-  beforeEach(() => useRoutstrStore.getState().setApiKey('sk-test'));
+  beforeEach(() => {
+    useRoutstrStore.getState().setApiKey('sk-test');
+    // A provider is a precondition now: nothing is sent until one is picked.
+    setRoutstrNodeBaseUrl('https://node.example');
+  });
   // eslint-disable-next-line no-restricted-properties -- restore seam for the stub
   const realFetch = global.fetch;
   afterEach(() => {
@@ -282,6 +291,8 @@ describe('Routstr errors retain machine-readable evidence for shared presentatio
 });
 
 describe('SDK failures keep their status', () => {
+  beforeEach(() => setRoutstrNodeBaseUrl('https://node.example'));
+
   /**
    * `@routstr/sdk` throws typed errors carrying the upstream status, the
    * provider and the request id. Flattening them into `status: 0` — which this

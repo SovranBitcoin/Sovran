@@ -1,33 +1,22 @@
 /**
- * Choosing a Routstr provider, and not being moved off it.
+ * Nothing is paid to a provider the user did not choose.
  *
- * nagg picks a node on catalog health alone and the app follows. That is the
- * right default and the wrong rule: it is how a user ended up on a node whose
- * every completion 402'd, and how a balance got left behind. Pinning is what
- * makes the choice the user's; these tests pin that a background refresh, and
- * a relaunch, both respect it.
+ * Sovran used to ship a default node and let nagg move it, which made this app
+ * the arbiter of who gets paid for AI — and sent the user's ecash there
+ * without them ever naming a recipient. There is no default now, and no
+ * recommendation: every path that would reach a node refuses until a provider
+ * is picked, and says so in words the user can act on.
  */
 
-import { emptyLineup } from '@/shared/lib/routstr/lineup';
-import { fetchProviderDirectory, normalizeNodeUrl } from '@/shared/lib/routstr/providers';
-import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
-
-const mockMemory: Record<string, string> = {};
+import { describeError } from '@/shared/lib/errors';
+import { getModels, sendMessage, setRoutstrNodeBaseUrl } from '@/shared/lib/routstr/api';
 
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   createProfileScopedStorage: () => ({
-    getItem: async (k: string) => mockMemory[k] ?? null,
-    setItem: async (k: string, v: string) => {
-      mockMemory[k] = v;
-    },
-    removeItem: async (k: string) => {
-      delete mockMemory[k];
-    },
+    getItem: async () => null,
+    setItem: async () => {},
+    removeItem: async () => {},
   }),
-}));
-
-jest.mock('@sovranbitcoin/schemas', () => ({
-  loggableIssues: (e: { issues: unknown[] }) => e.issues,
 }));
 
 jest.mock('@/shared/lib/logger', () => {
@@ -47,126 +36,48 @@ jest.mock('@/shared/lib/http/requestSignal', () => ({
   buildAbortSignal: () => undefined,
 }));
 
-const lineupWith = (modelId: string) => {
-  const lineup = emptyLineup();
-  lineup.openai.auto = {
-    modelId,
-    displayName: modelId,
-    contextLength: 200_000,
-    created: 1,
-    visionInput: false,
-    satsPricing: { prompt: 0.0001, completion: 0.0004, request: 0.001, image: 0, max_cost: 32 },
-  };
-  return lineup;
-};
+jest.mock('@/shared/stores/global/profileStore', () => ({
+  useProfileStore: { getState: () => ({ activeAccountIndex: 0 }) },
+}));
 
-describe('pinning a provider', () => {
+jest.mock('@/shared/stores/profile/mintStore', () => ({
+  useMintStore: { getState: () => ({ selectedMint: 'https://mint.example' }) },
+}));
+
+describe('no provider is chosen by default', () => {
+  let attempted: jest.Mock;
+
   beforeEach(() => {
-    useRoutstrStore.setState({
-      userNodeBaseUrl: null,
-      nodeBaseUrl: 'https://nagg-pick.example',
-      lineup: null,
-      serverLineupAt: null,
-      modelsCache: { data: [], timestamp: 1 },
+    setRoutstrNodeBaseUrl(null);
+    attempted = jest.fn(async () => {
+      throw new Error('a request left the app with no provider chosen');
     });
+    // eslint-disable-next-line no-restricted-properties -- test stub; nothing should reach it
+    global.fetch = attempted as unknown as typeof fetch;
   });
 
-  it('drops the other node’s models when the provider changes', () => {
-    // The model menu is per node. Keeping the old catalog would offer models
-    // the new node may not serve, priced at the old node's rates.
-    useRoutstrStore.getState().setUserNode('https://chosen.example/');
-
-    expect(useRoutstrStore.getState()).toMatchObject({
-      userNodeBaseUrl: 'https://chosen.example',
-      nodeBaseUrl: 'https://chosen.example',
-      lineup: null,
-      serverLineupAt: null,
-      modelsCache: null,
-    });
+  it('refuses to send, without reaching the network', async () => {
+    await expect(
+      sendMessage([{ role: 'user', content: 'hi' }], { model: 'm' })
+    ).rejects.toMatchObject({ error: { code: 'no_provider' } });
+    expect(attempted).not.toHaveBeenCalled();
   });
 
-  it('does not let a nagg refresh move a pinned user off their provider', () => {
-    useRoutstrStore.getState().setUserNode('https://chosen.example');
-
-    useRoutstrStore.getState().setServerLineup({
-      lineup: lineupWith('some-model'),
-      nodeBaseUrl: 'https://nagg-moved-on.example',
-      authMode: 'x-cashu',
-    });
-
-    expect(useRoutstrStore.getState().nodeBaseUrl).toBe('https://chosen.example');
-    // The curated ladder is still worth taking — it is the models, not the node.
-    expect(useRoutstrStore.getState().lineup?.openai.auto?.modelId).toBe('some-model');
-    // An authMode declared for a node we are not using must not be adopted.
-    expect(useRoutstrStore.getState().authMode).toBe('bearer');
+  it('refuses to fetch a catalog — a menu of things you cannot buy', async () => {
+    await expect(getModels()).rejects.toMatchObject({ error: { code: 'no_provider' } });
+    expect(attempted).not.toHaveBeenCalled();
   });
 
-  it('follows nagg again once the pin is released', () => {
-    useRoutstrStore.getState().setUserNode('https://chosen.example');
-    useRoutstrStore.getState().setUserNode(null);
-
-    useRoutstrStore.getState().setServerLineup({
-      lineup: lineupWith('some-model'),
-      nodeBaseUrl: 'https://nagg-moved-on.example',
-    });
-
-    expect(useRoutstrStore.getState().nodeBaseUrl).toBe('https://nagg-moved-on.example');
-    expect(useRoutstrStore.getState().userNodeBaseUrl).toBeNull();
-  });
-});
-
-describe('provider directory', () => {
-  // eslint-disable-next-line no-restricted-properties -- restore seam for the stub
-  const realFetch = global.fetch;
-  afterEach(() => {
-    // eslint-disable-next-line no-restricted-properties -- restore seam for the stub
-    global.fetch = realFetch;
-  });
-  const stub = (body: unknown, status = 200) => {
-    // eslint-disable-next-line no-restricted-properties -- test seam
-    global.fetch = jest.fn(
-      async () =>
-        new Response(JSON.stringify(body), {
-          status,
-          headers: { 'content-type': 'application/json' },
-        })
-    ) as unknown as typeof fetch;
-  };
-
-  it('normalises two spellings of one node to one row', () => {
-    expect(normalizeNodeUrl('https://a.example/v1')).toBe('https://a.example');
-    expect(normalizeNodeUrl('https://a.example///')).toBe('https://a.example');
+  it('tells the user what to do about it', async () => {
+    const refusal = await getModels().catch((error: unknown) => error);
+    expect(describeError(refusal, 'routstr').id).toBe('routstr.no_provider');
   });
 
-  it('keeps https endpoints and drops what the app cannot reach', async () => {
-    stub({
-      providers: [
-        { endpoint_url: 'https://good.example', name: 'Good' },
-        // Tor needs a proxy the app does not have.
-        { endpoint_url: 'http://abc.onion', name: 'Onion' },
-        // Plain http would put a bearer Cashu token on the wire in the clear.
-        { endpoint_url: 'http://insecure.example', name: 'Insecure' },
-        { endpoint_urls: ['http://x.onion', 'https://second.example'], name: 'Second' },
-        // Same node, different spelling.
-        { endpoint_url: 'https://good.example/v1/', name: 'Duplicate' },
-      ],
-    });
-
-    const providers = await fetchProviderDirectory('https://node.example');
-
-    expect(providers.map((p) => p.baseUrl)).toEqual([
-      'https://good.example',
-      'https://second.example',
-    ]);
-  });
-
-  it('treats a node without a directory as a node, not an error', async () => {
-    stub({ detail: 'Not found' }, 404);
-    await expect(fetchProviderDirectory('https://node.example')).resolves.toEqual([]);
-  });
-
-  it('survives a body it cannot parse', async () => {
-    stub({ providers: 'not-an-array' });
-    await expect(fetchProviderDirectory('https://node.example')).resolves.toEqual([]);
+  it('sends once a provider is chosen', async () => {
+    setRoutstrNodeBaseUrl('https://node.example');
+    // Reaching the stub is the proof: the guard is gone and the request left.
+    await expect(
+      sendMessage([{ role: 'user', content: 'hi' }], { model: 'm' })
+    ).rejects.not.toMatchObject({ error: { code: 'no_provider' } });
   });
 });
