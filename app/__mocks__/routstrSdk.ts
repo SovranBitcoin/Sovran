@@ -30,6 +30,56 @@ export interface Model {
   sats_pricing?: { max_cost?: number } | null;
 }
 
+export class ProviderError extends Error {
+  constructor(
+    public baseUrl: string,
+    public statusCode: number,
+    message: string,
+    public requestId?: string
+  ) {
+    super(message);
+    this.name = 'ProviderError';
+  }
+}
+
+export class MintError extends Error {
+  statusCode: number;
+  mintUrl?: string;
+  code?: string;
+  constructor(opts: { baseUrl: string; statusCode?: number; mintUrl?: string; code?: string }) {
+    super(`Mint error from ${opts.mintUrl ?? opts.baseUrl}`);
+    this.name = 'MintError';
+    this.statusCode = opts.statusCode ?? 422;
+    this.mintUrl = opts.mintUrl;
+    this.code = opts.code;
+  }
+}
+
+export class MintUnreachableError extends Error {
+  constructor(public mintUrl: string) {
+    super(`Mint ${mintUrl} is unreachable`);
+    this.name = 'MintUnreachableError';
+  }
+}
+
+export class NoProvidersAvailableError extends Error {
+  constructor() {
+    super('No providers available');
+    this.name = 'NoProvidersAvailableError';
+  }
+}
+
+export class FailoverError extends Error {
+  constructor(
+    public originalProvider: string,
+    public failedProviders: string[],
+    message = 'All providers failed'
+  ) {
+    super(message);
+    this.name = 'FailoverError';
+  }
+}
+
 export class InsufficientBalanceError extends Error {
   constructor(
     public required: number,

@@ -111,10 +111,47 @@ export async function seedProviderCatalog(
   const key = providerKey(baseUrl);
   discovery.setCachedModels({ ...discovery.getCachedModels(), [key]: models });
   if (mints?.length) {
-    discovery.setCachedMints({ ...discovery.getCachedMints(), [key]: mints });
+    discovery.setCachedMints({
+      ...discovery.getCachedMints(),
+      [key]: await inWalletSpelling(mints),
+    });
   }
   discovery.setProviderLastUpdate(baseUrl, Date.now());
-  apiLog.debug('routstr.sdk.catalog_seeded', { models: models.length, mints: mints?.length ?? 0 });
+  apiLog.info('routstr.sdk.catalog_seeded', { models: models.length, mints: mints?.length ?? 0 });
+}
+
+const canonicalMint = (url: string) => url.trim().replace(/\/+$/, '').toLowerCase();
+
+/**
+ * Re-spell the node's accepted mints the way the wallet spells them.
+ *
+ * The SDK matches an accepted mint against a wallet mint with `includes`, on
+ * the raw string. Nodes and wallets disagree about trailing slashes and case —
+ * `https://ecashmint.otrta.me/` against `https://ecashmint.otrta.me` — and an
+ * exact-match miss reads as "you do not hold a mint this provider accepts",
+ * which silently sends the payment from a mint the provider will refuse.
+ */
+async function inWalletSpelling(mints: string[]): Promise<string[]> {
+  let held: string[] = [];
+  try {
+    held = Object.keys(await walletAdapter().getBalances());
+  } catch {
+    // Wallet not ready. The node's own spelling is still better than nothing:
+    // it is right whenever the two already agree.
+    return mints;
+  }
+  const byCanonical = new Map(held.map((url) => [canonicalMint(url), url]));
+  return mints.map((mint) => byCanonical.get(canonicalMint(mint)) ?? mint);
+}
+
+/**
+ * The mints this provider accepts, as the wallet spells them — or `null` when
+ * the node does not publish a list, which means it accepts anything.
+ */
+export async function acceptedMintsForProvider(baseUrl: string): Promise<string[] | null> {
+  const { discovery } = await ensure();
+  const mints = discovery.getCachedMints()[providerKey(baseUrl)];
+  return mints?.length ? mints : null;
 }
 
 /**

@@ -70,9 +70,7 @@ describe('AI payment annotation', () => {
   });
 
   it('ties both legs to the message they bought', async () => {
-    await withPaymentScope(context, () =>
-      cocoWalletAdapter.sendToken('https://mint.example', 10)
-    );
+    await withPaymentScope(context, () => cocoWalletAdapter.sendToken('https://mint.example', 10));
     // The change comes back later, in its own scope — that is the shape of a
     // streamed response, where the money returns only once the stream ends.
     await withPaymentScope(context, () => cocoWalletAdapter.receiveToken('cashuB-change'));

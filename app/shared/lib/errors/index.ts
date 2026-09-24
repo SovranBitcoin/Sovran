@@ -27,6 +27,13 @@ const SOURCE_TYPES: Partial<Record<ErrorService, TypeRules>> = {
     ['missing_data', 'nagg.invalid_response'],
     ['graphql', 'nagg.unknown'],
   ],
+  // Which mint paid is not a transport detail: a Routstr node redeems tokens
+  // from a published list and refuses the rest, so these two say "change mint
+  // or provider" where the generic copy would say "try again" forever.
+  routstr: [
+    ['mint_not_accepted', 'routstr.mint_not_accepted'],
+    ['mint_error', 'routstr.mint_refused'],
+  ],
 };
 const CASHU_TYPES: TypeRules = [
   ['OperationInProgressError', 'cashu.operation_pending'],

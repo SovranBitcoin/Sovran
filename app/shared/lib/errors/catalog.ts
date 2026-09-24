@@ -9,6 +9,10 @@ export const ERROR_COPY = {
   'routstr.provider_declined':
     'The AI provider declined this request. Try another model, or try again in a minute.',
   'routstr.unavailable': 'The AI provider is unreachable right now. Try again in a minute.',
+  'routstr.mint_not_accepted':
+    'This AI provider does not accept any of your mints. Choose another provider, or add one of the mints it accepts.',
+  'routstr.mint_refused':
+    'Your mint could not complete the payment for this request. Try another mint, or a provider that accepts one.',
   'routstr.timeout': 'The AI service took too long to respond. Try again later.',
   'routstr.invalid_request':
     'The AI service could not accept this message. Check the message and attachments, or choose another model.',

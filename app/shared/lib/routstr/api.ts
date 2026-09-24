@@ -1,8 +1,22 @@
 import { z } from 'zod';
 
-import { InsufficientBalanceError, type Model } from '@routstr/sdk/browser';
+import {
+  FailoverError,
+  InsufficientBalanceError,
+  MintError,
+  MintUnreachableError,
+  NoProvidersAvailableError,
+  ProviderError,
+  type Model,
+} from '@routstr/sdk/browser';
 
-import { getRoutstrClient, seedProviderCatalog, sweepUnsettledPayments } from './sdk/client';
+import { fetchNodeInfo } from './providers';
+import {
+  acceptedMintsForProvider,
+  getRoutstrClient,
+  seedProviderCatalog,
+  sweepUnsettledPayments,
+} from './sdk/client';
 import { withPaymentScope, type PaymentContext } from './sdk/paymentScope';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { apiLog } from '../logger';
@@ -43,14 +57,67 @@ function routstrOrigin(): string {
   return routstrBaseUrl().replace(/\/v1$/, '');
 }
 
-/** The mint AI requests are paid from — the same one the wallet spends from.
- *  Lazily required so a Routstr consumer does not drag the profile-scoped mint
- *  store into its module graph; Metro handles both spellings, Jest's CJS VM
- *  only this one. */
+/** The mint the wallet spends from. Lazily required so a Routstr consumer does
+ *  not drag the profile-scoped mint store into its module graph; Metro handles
+ *  both spellings, Jest's CJS VM only this one. */
 function selectedMintUrl(): string | undefined {
   const { useMintStore } =
     require('@/shared/stores/profile/mintStore') as typeof import('@/shared/stores/profile/mintStore');
   return useMintStore.getState().selectedMint;
+}
+
+/**
+ * The mint this request is paid from.
+ *
+ * A Routstr node redeems tokens from a published list of mints and refuses
+ * everything else, so "which mint" is not the wallet's choice alone. The
+ * wallet's selected mint wins when the node accepts it; otherwise the largest
+ * accepted balance does, because paying from an accepted mint the user already
+ * holds is better than a refusal they cannot act on.
+ *
+ * This is deliberately decided here rather than left to the SDK. Its own
+ * candidate order puts the biggest balance first and the caller's preference
+ * second, which is how a request came to be paid from `mint.sovran.money`
+ * against a node that only takes Minibits.
+ */
+async function payingMintUrl(origin: string): Promise<string> {
+  const selected = selectedMintUrl();
+  const accepted = await acceptedMintsForProvider(origin);
+  if (!accepted) {
+    if (selected) return selected;
+    const noMint: RoutstrError = {
+      status: 0,
+      error: { message: 'No mint selected', type: 'no_mint' },
+    };
+    throw noMint;
+  }
+  const acceptable = new Set(accepted);
+  if (selected && acceptable.has(selected)) return selected;
+
+  const { cocoWalletAdapter } =
+    require('./sdk/walletAdapter') as typeof import('./sdk/walletAdapter');
+  const balances = await cocoWalletAdapter.getBalances().catch(() => ({}));
+  const fallback = Object.entries(balances)
+    .filter(([mintUrl, sats]) => acceptable.has(mintUrl) && sats > 0)
+    .sort(([, a], [, b]) => b - a)[0]?.[0];
+  if (fallback) {
+    apiLog.info('routstr.payment.mint_substituted', { accepted: accepted.length });
+    return fallback;
+  }
+
+  // Nothing the node takes. Said plainly, because the user can act on it —
+  // switch mint, or switch provider — and every other phrasing of this ends up
+  // reading as "insufficient balance" against a funded wallet.
+  const refusal: RoutstrError = {
+    status: 0,
+    error: {
+      message: 'This provider does not accept any of your mints',
+      code: 'mint_not_accepted',
+      type: 'mint_not_accepted',
+      details: undefined,
+    },
+  };
+  throw refusal;
 }
 
 /**
@@ -602,6 +669,24 @@ async function readRoutstrEnvelope<TSpine extends z.ZodType>(
 
 // ── Public API ───────────────────────────────────────────────────────────
 
+/**
+ * Hand this node's catalog and accepted-mint list to the SDK.
+ *
+ * `/v1/info` is unauthenticated, cheap and stable, and `mints` is the one
+ * field that decides whether the user can pay this provider at all: a token
+ * minted anywhere else is refused. Absent or empty means the node does not
+ * say, which the SDK reads as "any mint".
+ */
+async function seedFromNode(origin: string, models: Model[]): Promise<void> {
+  try {
+    const info = await fetchNodeInfo(origin);
+    await seedProviderCatalog(origin, models, info?.mints);
+  } catch {
+    // Already logged inside. A stale catalog is the SDK's next 402, not a
+    // reason to fail the model list the picker is waiting on.
+  }
+}
+
 export async function getModels(controls: RequestControls = {}): Promise<RoutstrModel[]> {
   apiLog.info('api.routstr.models.start');
   const start = performance.now();
@@ -621,15 +706,13 @@ export async function getModels(controls: RequestControls = {}): Promise<Routstr
       count: enabled.length,
       duration_ms: Math.round((performance.now() - start) * 100) / 100,
     });
-    // The SDK sizes every request's token from ITS cached pricing, so the
-    // catalog nagg's lineup already fetched is handed over rather than
-    // discovered a second time over Nostr. Without this the SDK prices each
-    // request at one sat and the node refuses it at the admission gate.
-    if (ownsScope())
-      void seedProviderCatalog(routstrOrigin(), enabled as unknown as Model[]).catch(() => {
-        // Already logged inside; a stale catalog is the SDK's next 402, not
-        // a reason to fail the model list the picker is waiting on.
-      });
+    // The SDK sizes every request's token from ITS cached pricing and picks
+    // the paying mint from ITS accepted-mint list, so the catalog nagg's
+    // lineup already fetched is handed over rather than discovered a second
+    // time over Nostr. Without the pricing the SDK funds each request at one
+    // sat; without the mint list it pays from whichever mint holds the most,
+    // which this node then refuses.
+    if (ownsScope()) void seedFromNode(routstrOrigin(), enabled as unknown as Model[]);
     return enabled;
   } catch (error) {
     // Resolve lazily to avoid api → refresh → store → api initialisation cycles.
@@ -916,6 +999,77 @@ export function measureMessageContent(messages: RoutstrChatMessage[]): {
  * stranding a balance.
  */
 /**
+ * Give an SDK failure back its status and its words.
+ *
+ * `@routstr/sdk` throws typed errors that carry the upstream status, the
+ * provider and the request id — and then this app used to flatten every one of
+ * them into `status: 0, type: network_error`, which is why a provider refusing
+ * a model reads on screen as "Failed to send message". Translating them keeps
+ * the candidate walk working (it advances on a 402 that is not a wallet
+ * shortfall) and lets the error catalog say something true.
+ *
+ * Returns `null` for anything unrecognised, which `toRoutstrError` then handles
+ * as the transport failure it probably is.
+ */
+function fromSdkError(error: unknown): RoutstrError | null {
+  // The wallet could not fund the gate. Said in the node's own vocabulary so
+  // the send path treats it as a balance problem — which it is — instead of a
+  // transport failure it would pointlessly fail over. The node speaks in
+  // millisats, so these must too or the 402 balance sync is out by 1000x.
+  if (error instanceof InsufficientBalanceError) {
+    return {
+      status: 402,
+      error: {
+        message: error.message,
+        code: 'insufficient_balance',
+        type: 'insufficient_quota',
+        details: { required: error.required * 1000, available: error.available * 1000 },
+      },
+    };
+  }
+  // The mint refused the swap — usually its fees against a token too small to
+  // survive them. A provider change will not help; a mint change will.
+  if (error instanceof MintError) {
+    return {
+      status: error.statusCode || 422,
+      error: {
+        message: error.message,
+        code: error.code ?? 'mint_error',
+        type: 'mint_error',
+        details: undefined,
+      },
+    };
+  }
+  if (error instanceof MintUnreachableError) {
+    return {
+      status: 0,
+      error: { message: error.message, code: 'mint_unreachable', type: 'mint_error' },
+    };
+  }
+  // The node answered, and badly. `statusCode` is the upstream's own status,
+  // which is the difference between "this model is out of credit" and "this
+  // node is down" — a distinction the whole candidate walk is built on.
+  if (error instanceof ProviderError) {
+    return {
+      status: error.statusCode || 0,
+      error: {
+        message: error.message,
+        code: 'provider_error',
+        type: 'provider_error',
+        details: undefined,
+      },
+    };
+  }
+  if (error instanceof NoProvidersAvailableError || error instanceof FailoverError) {
+    return {
+      status: 503,
+      error: { message: error.message, code: 'no_providers', type: 'provider_error' },
+    };
+  }
+  return null;
+}
+
+/**
  * A `routeRequest` response, with what the SDK attaches to it.
  *
  * The SDK's own typings return a plain `Response`; these three properties are
@@ -968,8 +1122,8 @@ export async function sendMessage(
   });
   const start = performance.now();
   const ownsScope = captureRequestScope();
-  const mintUrl = selectedMintUrl();
-  if (!mintUrl) throw { status: 0, error: { message: 'No mint selected', type: 'no_mint' } };
+  const origin = routstrOrigin();
+  const mintUrl = await payingMintUrl(origin);
 
   let response: RoutedResponse;
   try {
@@ -978,7 +1132,7 @@ export async function sendMessage(
       client.routeRequest({
         path: '/v1/chat/completions',
         method: 'POST',
-        baseUrl: routstrOrigin(),
+        baseUrl: origin,
         mintUrl,
         // The catalog id, not the upstream one: the SDK maps a `tinfoil-`
         // model to its enclave name and carries the catalog id separately in
@@ -996,28 +1150,15 @@ export async function sendMessage(
       })
     )) as RoutedResponse;
   } catch (error) {
+    const translated = fromSdkError(error);
     apiLog.error('api.routstr.chat.failed', {
       model,
-      status: 0,
+      status: translated?.status ?? 0,
+      code: translated?.error.code,
+      message: translated?.error.message.slice(0, 200),
       duration_ms: Math.round(performance.now() - start),
     });
-    // The wallet could not fund the gate. Said in the node's own vocabulary so
-    // the send path treats it as a balance problem — which it is — instead of
-    // a transport failure it would pointlessly fail over.
-    if (error instanceof InsufficientBalanceError) {
-      const walletShortfall: RoutstrError = {
-        status: 402,
-        error: {
-          message: error.message,
-          code: 'insufficient_balance',
-          type: 'insufficient_quota',
-          // The node speaks in millisats; so must this, or the balance sync
-          // reading `available` would be out by a factor of a thousand.
-          details: { required: error.required * 1000, available: error.available * 1000 },
-        },
-      };
-      throw walletShortfall;
-    }
+    if (translated) throw translated;
     // Anything still in flight is money the node may or may not have taken;
     // only the node can say, and the sweep is how it is asked.
     void sweepUnsettledPayments(mintUrl);

@@ -280,3 +280,49 @@ describe('Routstr errors retain machine-readable evidence for shared presentatio
     await expect(drain()).rejects.toBe(failure);
   });
 });
+
+describe('SDK failures keep their status', () => {
+  /**
+   * `@routstr/sdk` throws typed errors carrying the upstream status, the
+   * provider and the request id. Flattening them into `status: 0` — which this
+   * app did — is why a provider refusing a model read on screen as a bare
+   * "Failed to send message", and why the candidate walk could not advance
+   * past it: that walk turns on the difference between a 402 and a 503.
+   */
+  const routeRequestThrowing = (error: unknown) => {
+    jest.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      throw error;
+    });
+  };
+
+  const send = () => sendMessage([{ role: 'user', content: 'hi' }], { model: 'any' });
+
+  it('gives a provider refusal back its upstream status', async () => {
+    const { ProviderError } = require('@routstr/sdk/browser');
+    routeRequestThrowing(new ProviderError('https://node.example', 402, 'upstream declined'));
+    await expect(send()).rejects.toMatchObject({
+      status: 402,
+      error: { code: 'provider_error' },
+    });
+  });
+
+  it('names a mint refusal as one, so the advice is to change mint', async () => {
+    const { MintError } = require('@routstr/sdk/browser');
+    routeRequestThrowing(
+      new MintError({
+        baseUrl: 'https://node.example',
+        statusCode: 422,
+        code: 'cashu_token_swap_fees_exceed_amount',
+      })
+    );
+    const rejection = await send().catch((e: unknown) => e);
+    expect(rejection).toMatchObject({ status: 422, error: { type: 'mint_error' } });
+    expect(describeError(rejection, 'routstr').id).toBe('routstr.mint_refused');
+  });
+
+  it('reports exhausted failover as unavailable, not as a network blip', async () => {
+    const { NoProvidersAvailableError } = require('@routstr/sdk/browser');
+    routeRequestThrowing(new NoProvidersAvailableError());
+    await expect(send()).rejects.toMatchObject({ status: 503, error: { code: 'no_providers' } });
+  });
+});

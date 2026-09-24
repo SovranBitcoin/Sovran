@@ -81,6 +81,15 @@ export const cocoWalletAdapter = {
     } catch {
       // Report what we banked, not what we could parse.
     }
+    // Routstr prices in millisats and change in sats, so a request costing a
+    // fraction of a sat comes back as a token worth nothing. Coco rightly
+    // refuses to receive one ("amount is not sufficient after fees"), and
+    // reporting that as a failure makes the SDK treat a fully settled request
+    // as money still in flight. Nothing to bank is a settled request.
+    if (amount <= 0) {
+      apiLog.debug('routstr.sdk.change_empty');
+      return { success: true, amount: 0, unit: 'sat' };
+    }
     try {
       const instance = manager();
       const prepared = await instance.ops.receive.prepare({ token });
@@ -90,7 +99,7 @@ export const cocoWalletAdapter = {
       return { success: true, amount, unit: 'sat' };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      apiLog.error('routstr.sdk.receive_failed', { message });
+      apiLog.error('routstr.sdk.receive_failed', { message, amount });
       return { success: false, amount: 0, unit: 'sat', message };
     }
   },
