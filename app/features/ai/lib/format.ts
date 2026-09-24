@@ -2,6 +2,7 @@ import { ROUTSTR_MAX_COMPLETION_TOKENS, type RoutstrModel } from '@/shared/lib/r
 import {
   AI_PROVIDER_IDS,
   AI_TIER_IDS,
+  lineupProviderIds,
   type AiLineup,
   type AiProviderId,
   type AiTierId,
@@ -54,14 +55,38 @@ export interface AiTier {
   icon: string;
 }
 
-/** Ordered to match `AI_PROVIDER_IDS` — the provider-id union and this
- *  display metadata stay in lockstep by construction (same source array). */
-export const AI_PROVIDERS: readonly AiProvider[] = [
+/**
+ * Display metadata for the vendors the app ships a logo for.
+ *
+ * No longer the whole menu. The lineup's vendors come from the catalog, so
+ * anything outside this table gets a title-cased label and the generic glyph
+ * — a vendor without a brand icon is still a vendor the user can pick.
+ */
+const AI_PROVIDERS: readonly AiProvider[] = [
   { id: 'openai', label: 'OpenAI', icon: 'ri:openai-fill' },
   { id: 'claude', label: 'Claude', icon: 'ri:anthropic-fill' },
   { id: 'grok', label: 'Grok', icon: 'ri:twitter-x-fill' },
   { id: 'google', label: 'Google', icon: 'ri:google-fill' },
 ] as const;
+
+/** Catalog slugs are lowercase and hyphenated (`mistralai`, `bytedance-seed`,
+ *  `z-ai`); this is the smallest rule that turns one into something readable
+ *  without a table nobody will maintain. */
+function labelForVendor(id: string): string {
+  return id
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+/** The vendors a lineup offers, with display metadata, in the lineup's own
+ *  order. This — not `AI_PROVIDERS` — is what a picker should iterate. */
+export function providersForLineup(lineup: AiLineup | null | undefined): AiProvider[] {
+  const ids = lineupProviderIds(lineup);
+  if (ids.length === 0) return [...AI_PROVIDERS];
+  return ids.map((id) => getProviderById(id));
+}
 
 export const AI_TIERS: readonly AiTier[] = [
   {
@@ -94,6 +119,9 @@ const DEFAULT_TIER_ID: AiTierId = 'auto';
  *  ladder (e.g. the 402 "Switch to Auto" button). Distinct from the Auto
  *  tier's own icon so the chip's fallback doesn't mimic a tier glyph. */
 export const AUTO_ICON = 'mdi:brain';
+
+/** Stand-in glyph for a vendor the app ships no logo for. */
+const GENERIC_PROVIDER_ICON = 'fluent:apps-16-filled';
 
 const PROVIDER_BY_ID = new Map<AiProviderId, AiProvider>(
   AI_PROVIDERS.map((p) => [p.id, p] as const)
@@ -317,11 +345,19 @@ export function getAffordabilityDetails(
   };
 }
 
+/**
+ * Display metadata for a vendor id.
+ *
+ * An id the app has no logo for is not an error and must not silently become
+ * OpenAI — that is how a Qwen selection used to render as somebody else's
+ * brand. Unknown ids get a readable label and the generic glyph; only a
+ * genuinely absent id falls back to the default.
+ */
 export function getProviderById(id: AiProviderId | string | null | undefined): AiProvider {
-  if (id && PROVIDER_BY_ID.has(id as AiProviderId)) {
-    return PROVIDER_BY_ID.get(id as AiProviderId)!;
-  }
-  return PROVIDER_BY_ID.get(DEFAULT_PROVIDER_ID)!;
+  if (!id) return PROVIDER_BY_ID.get(DEFAULT_PROVIDER_ID)!;
+  const known = PROVIDER_BY_ID.get(id);
+  if (known) return known;
+  return { id, label: labelForVendor(id), icon: GENERIC_PROVIDER_ICON };
 }
 
 export function getTierById(id: AiTierId | string | null | undefined): AiTier {

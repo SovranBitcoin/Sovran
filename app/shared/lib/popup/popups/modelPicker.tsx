@@ -41,12 +41,12 @@ import { SheetMenuRowContent } from './sheetMenuRow';
 import { log, useMountLog } from '@/shared/lib/logger';
 
 import {
-  AI_PROVIDERS,
   AI_TIERS,
   type AiProvider,
   type AiTier,
   canAffordPricing,
   entryForSlot,
+  providersForLineup,
   estimateMessagesRemainingFromPricing,
   estimateTurnCostSatsFromPricing,
   topUpDeficitSatsFromPricing,
@@ -208,9 +208,13 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
   );
 
   const balanceSats = balanceMsats != null ? Math.floor(balanceMsats / 1000) : 0;
+  // Tabs come from the lineup, not from a list compiled into the app: the
+  // catalog decides which vendors a node actually serves, and pinning the
+  // menu to four of them hid most of what the user was paying for.
+  const providers = useMemo(() => providersForLineup(lineup), [lineup]);
   const activeProvider = useMemo(
-    () => AI_PROVIDERS.find((p) => p.id === activeProviderTab) ?? AI_PROVIDERS[0],
-    [activeProviderTab]
+    () => providers.find((p) => p.id === activeProviderTab) ?? providers[0],
+    [activeProviderTab, providers]
   );
 
   const handleSelect = useCallback(
@@ -247,7 +251,7 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={[styles.anchorBarContent, { paddingHorizontal: 24 }]}
           style={styles.anchorBarWrapper}>
-          {AI_PROVIDERS.map((p) => {
+          {providers.map((p) => {
             const isSelected = activeProviderTab === p.id;
             return (
               <Pressable

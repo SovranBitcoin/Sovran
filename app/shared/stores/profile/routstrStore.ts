@@ -11,6 +11,7 @@ import {
   PersistedLineupSchema,
   deriveLineup,
   lineupHasEntries,
+  lineupProviderIds,
   mergeLineupWithLastKnown,
   type AiLineup,
   type AiProviderId,
@@ -842,9 +843,13 @@ export const useRoutstrStore = create<RoutstrStore>()(
       },
 
       setSelectedSlot: (slot) => {
-        const safeProvider = PROVIDER_IDS.includes(slot.provider)
-          ? slot.provider
-          : DEFAULT_PROVIDER;
+        // A vendor is valid when the live lineup offers it, not when it is one
+        // of four names compiled into the app: the menu now comes from the
+        // catalog, so its ids do too. The known-four remain acceptable so a
+        // selection survives a lineup that has not landed yet.
+        const lineup = get().lineup ?? get().lastKnownLineup?.lineup ?? null;
+        const offered = new Set<string>([...PROVIDER_IDS, ...lineupProviderIds(lineup)]);
+        const safeProvider = offered.has(slot.provider) ? slot.provider : DEFAULT_PROVIDER;
         const safeTier = TIER_IDS.includes(slot.tier) ? slot.tier : DEFAULT_TIER;
         storeLog.info('store.routstr.set_slot', {
           provider: safeProvider,
@@ -876,7 +881,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
           catalogSize: models.length,
           totalQualifying: stats.totalQualifying,
           perProvider: stats.perProvider,
-          substitutedProviders: PROVIDER_IDS.filter(
+          substitutedProviders: Object.keys(merged).filter(
             (p) => merged[p] !== derived[p] // mergeLineupWithLastKnown replaces the block reference
           ),
           allProvidersEmpty: !lineupHasEntries(derived),
@@ -898,7 +903,9 @@ export const useRoutstrStore = create<RoutstrStore>()(
         }
         aiLog.info('ai.lineup.server_applied', {
           nodeChanged: nodeBaseUrl !== get().nodeBaseUrl,
-          providers: PROVIDER_IDS.filter((p) => TIER_IDS.some((t) => lineup[p][t] != null)),
+          providers: lineupProviderIds(lineup).filter((p) =>
+            TIER_IDS.some((t) => lineup[p]?.[t] != null)
+          ),
         });
         const now = Date.now();
         // A provider the user chose outranks nagg's. Take the lineup — it is

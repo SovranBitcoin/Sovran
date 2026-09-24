@@ -13,10 +13,10 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import {
   AFFORD_BUFFER,
-  AI_PROVIDERS,
   AI_TIERS,
   canAffordPricing,
   entryForSlot,
+  providersForLineup,
   estimateTurnCostSatsFromPricing,
   getProviderById,
   getTierById,
@@ -145,7 +145,7 @@ export function ModelChip() {
     if (!lineup) return;
     const cellSnapshots: Record<string, unknown>[] = [];
     for (const tier of AI_TIERS) {
-      for (const provider of AI_PROVIDERS) {
+      for (const provider of providersForLineup(lineup)) {
         const entry = entryForSlot(lineup, provider.id, tier.id);
         if (!entry) continue; // partial provider — cell deliberately empty
         cellSnapshots.push({

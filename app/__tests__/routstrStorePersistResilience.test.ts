@@ -298,6 +298,71 @@ describe('archived credentials survive a bad blob', () => {
     });
   });
 
+  it('reads a lineup written under the old four-key shape', async () => {
+    // The lineup used to be `{openai, claude, grok, google}` and is now keyed
+    // by vendor, so the catalog can supply the menu. That widening must be
+    // read-compatible byte for byte: `createMergeWithSchema` parses this blob
+    // once and discards ALL of it on failure — and it holds the apiKey and
+    // every chat session.
+    const legacyEntry = {
+      modelId: 'gpt-5-mini',
+      displayName: 'GPT-5 Mini',
+      contextLength: 128_000,
+      created: 1_750_000_000,
+      visionInput: false,
+      satsPricing: { prompt: 1e-6, completion: 4e-6, request: 0, image: null, max_cost: 0.5 },
+    };
+    preload({
+      apiKey: 'sk-key',
+      sessions: [baseSession],
+      lastKnownLineup: {
+        derivedAt: 123,
+        nodeBaseUrl: 'https://working.example',
+        lineup: {
+          openai: { auto: legacyEntry, pro: null, max: null },
+          claude: { auto: null, pro: null, max: null },
+          grok: { auto: null, pro: null, max: null },
+          google: { auto: null, pro: null, max: null },
+        },
+      },
+    });
+
+    const store = await loadStore();
+
+    expect(store.getState().apiKey).toBe('sk-key');
+    expect(store.getState().sessions).toEqual([baseSession]);
+    expect(store.getState().lastKnownLineup?.lineup.openai.auto).toMatchObject({
+      modelId: 'gpt-5-mini',
+    });
+  });
+
+  it('keeps a vendor the app has no id for', async () => {
+    preload({
+      apiKey: 'sk-key',
+      lastKnownLineup: {
+        derivedAt: 123,
+        nodeBaseUrl: null,
+        lineup: {
+          qwen: {
+            auto: {
+              modelId: 'qwen3.5-plus',
+              displayName: 'Qwen3.5 Plus',
+              contextLength: 128_000,
+              created: 1_750_000_000,
+              visionInput: false,
+              satsPricing: { prompt: 1e-6, completion: 4e-6, request: 0, image: null, max_cost: 1 },
+            },
+            pro: null,
+            max: null,
+          },
+        },
+      },
+    });
+
+    const store = await loadStore();
+    expect(store.getState().lastKnownLineup?.lineup.qwen?.auto?.modelId).toBe('qwen3.5-plus');
+  });
+
   it('does not re-seed a credential already archived', async () => {
     preload({
       apiKey: 'sk-live',
