@@ -11,6 +11,10 @@
 import { describeError } from '@/shared/lib/errors';
 import { getModels, sendMessage, setRoutstrNodeBaseUrl } from '@/shared/lib/routstr/api';
 
+jest.mock('@/shared/lib/routstr/securePersistence', () => ({
+  createRoutstrPersistence: () =>
+    jest.requireMock('@/shared/lib/cashu/profileScopedStorage').createProfileScopedStorage(),
+}));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   createProfileScopedStorage: () => ({
     getItem: async () => null,

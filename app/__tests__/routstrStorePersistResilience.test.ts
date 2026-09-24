@@ -12,6 +12,10 @@ import { emptyLineup } from '@/shared/lib/routstr/lineup';
 
 const mockMemory: Record<string, string> = {};
 
+jest.mock('@/shared/lib/routstr/securePersistence', () => ({
+  createRoutstrPersistence: () =>
+    jest.requireMock('@/shared/lib/cashu/profileScopedStorage').createProfileScopedStorage(),
+}));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   createProfileScopedStorage: () => ({
     getItem: async (k: string) => mockMemory[k] ?? null,
@@ -66,6 +70,59 @@ describe('routstrStore persist resilience', () => {
     for (const k of Object.keys(mockMemory)) delete mockMemory[k];
   });
 
+  it('retains every unsettled payment instead of evicting the oldest recovery token', async () => {
+    const store = await loadStore();
+    for (let index = 0; index < 33; index++) {
+      store.getState().beginPayment(`payment-${index}`, {
+        encoded: `cashuB-fixture-${index}`,
+        nodeBaseUrl: 'https://node.example',
+        operationId: `operation-${index}`,
+        startedAt: index,
+      });
+    }
+    const saved = JSON.parse(mockMemory[STORAGE_KEY]);
+    expect(Object.keys(saved.state.pendingPayments)).toHaveLength(33);
+    expect(saved.state.pendingPayments['payment-0'].encoded).toBe('cashuB-fixture-0');
+  });
+
+  it('does not relabel another node catalog as the chosen provider', async () => {
+    const store = await loadStore();
+    store.getState().setUserNode('https://chosen.example');
+    const lineup = emptyLineup();
+    lineup.openai.auto = {
+      modelId: 'other-node-model',
+      displayName: 'Other model',
+      contextLength: 8192,
+      created: 1,
+      visionInput: false,
+      satsPricing: {
+        prompt: 0,
+        completion: 0,
+        request: 1,
+        image: null,
+        max_cost: 1,
+      },
+      maxCompletionTokens: null,
+    };
+    store.getState().setServerLineup({ lineup, nodeBaseUrl: 'https://other.example' });
+    expect(store.getState().lineup).toBeNull();
+    expect(store.getState().lastKnownLineup).toBeNull();
+    expect(store.getState().nodeBaseUrl).toBe('https://chosen.example');
+  });
+
+  it('does not retain another provider catalog after an explicit switch', async () => {
+    const lineup = emptyLineup();
+    preload({
+      nodeBaseUrl: 'https://old.example',
+      userNodeBaseUrl: 'https://old.example',
+      lastKnownLineup: { lineup, derivedAt: 1, nodeBaseUrl: 'https://old.example' },
+    });
+    const store = await loadStore();
+    store.getState().setUserNode('https://new.example');
+    expect(store.getState().lastKnownLineup).toBeNull();
+    expect(store.getState().modelsCache).toBeNull();
+  });
+
   it('parses a legacy blob that predates lastKnownLineup and attachments', async () => {
     preload({
       apiKey: 'sk-legacy-key',
@@ -82,6 +139,20 @@ describe('routstrStore persist resilience', () => {
     expect(store.getState().lastKnownLineup).toBeNull();
     // Working copy restored from the active session row.
     expect(store.getState().conversationHistory).toHaveLength(1);
+  });
+
+  it('drops a mismatched catalog on hydrate while retaining its old-node credential', async () => {
+    preload({
+      apiKey: 'sk-old-node',
+      nodeBaseUrl: 'https://old.example',
+      userNodeBaseUrl: 'https://chosen.example',
+      lastKnownLineup: { lineup: emptyLineup(), derivedAt: 1, nodeBaseUrl: 'https://old.example' },
+    });
+    const store = await loadStore();
+    expect(store.getState().lastKnownLineup).toBeNull();
+    expect(store.getState().userNodeBaseUrl).toBe('https://chosen.example');
+    expect(store.getState().nodeBaseUrl).toBe('https://old.example');
+    expect(store.getState().legacyAccounts['https://old.example'].apiKey).toBe('sk-old-node');
   });
 
   it.each([undefined, 'future', null, 42])(

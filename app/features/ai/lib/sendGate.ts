@@ -1,4 +1,5 @@
 import type { LineupEntry } from '@/shared/lib/routstr/lineup';
+import { routstrMintKey } from '@/shared/lib/routstr/payingMint';
 
 import { maxSpendSats } from './format';
 
@@ -55,8 +56,6 @@ type SendGateOutcome =
   /** Ready to send. */
   | { state: 'ready'; maxSats: number };
 
-const canonicalMint = (url: string) => url.trim().replace(/\/+$/, '').toLowerCase();
-
 /**
  * The order is the point.
  *
@@ -72,7 +71,7 @@ export function evaluateSendGate(input: SendGateInput): SendGateOutcome {
 
   if (
     input.providerMints.length > 0 &&
-    !input.providerMints.some((mint) => input.heldMints.has(canonicalMint(mint)))
+    !input.providerMints.some((mint) => input.heldMints.has(routstrMintKey(mint) ?? ''))
   ) {
     return { state: 'mint-not-accepted', providerMints: input.providerMints };
   }

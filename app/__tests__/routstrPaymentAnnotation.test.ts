@@ -16,6 +16,7 @@
  */
 
 const annotations: Record<string, unknown> = {};
+const mockTokenMetadata = jest.fn(() => ({ amount: { toNumber: () => 4 }, unit: 'sat' }));
 
 jest.mock('@/shared/stores/profile/transactionAnnotationStore', () => ({
   setTransactionAnnotation: (key: string, patch: unknown) => {
@@ -30,29 +31,28 @@ jest.mock('@/shared/lib/logger', () => {
 
 jest.mock('@cashu/cashu-ts', () => ({
   getEncodedToken: () => 'cashuB-minted',
-  getTokenMetadata: () => ({ amount: { toNumber: () => 4 } }),
+  getTokenMetadata: () => mockTokenMetadata(),
 }));
 
 jest.mock('@/shared/stores/profile/mintStore', () => ({
   useMintStore: { getState: () => ({ selectedMint: 'https://mint.example' }) },
 }));
 
-jest.mock('@/shared/lib/cashu/manager', () => ({
-  CocoManager: {
-    peekInstance: () => ({
-      ops: {
-        send: {
-          prepare: async () => ({}),
-          execute: async () => ({ operation: { id: 'op-send' }, token: {} }),
-        },
-        receive: {
-          prepare: async () => ({}),
-          execute: async () => ({ id: 'op-receive' }),
-        },
+jest.mock('@/shared/lib/cashu/manager', () => {
+  const instance = {
+    ops: {
+      send: {
+        prepare: async () => ({}),
+        execute: async () => ({ operation: { id: 'op-send' }, token: {} }),
       },
-    }),
-  },
-}));
+      receive: {
+        prepare: async () => ({}),
+        execute: async () => ({ id: 'op-receive' }),
+      },
+    },
+  };
+  return { CocoManager: { peekInstance: () => instance } };
+});
 
 import { cocoWalletAdapter } from '@/shared/lib/routstr/sdk/walletAdapter';
 import { withPaymentScope } from '@/shared/lib/routstr/sdk/paymentScope';
@@ -67,6 +67,13 @@ const context = {
 describe('AI payment annotation', () => {
   beforeEach(() => {
     for (const key of Object.keys(annotations)) delete annotations[key];
+  });
+
+  it('does not report malformed change as a successful zero-value refund', async () => {
+    mockTokenMetadata.mockImplementationOnce(() => {
+      throw new Error('invalid token');
+    });
+    expect(await cocoWalletAdapter.receiveToken('invalid')).toMatchObject({ success: false });
   });
 
   it('ties both legs to the message they bought', async () => {

@@ -15,7 +15,6 @@ import { getBootMorphCompleted, subscribeBootMorphCompleted } from '@/shared/lib
 import { awaitRestoreReady } from '@/shared/providers/awaitRestoreReady';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { initializeDefaultMints } from '@/shared/lib/cashu/initializeDefaultMints';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
 
 initLog('Module', 'CocoProvider loaded');
 
@@ -181,9 +180,7 @@ async function runCocoPhase2({ bgStage, chainManager, isLive }: CocoPhase2Args):
       // so anything still recorded is money the node has to be asked about.
       // The sweep above drains rows written before the SDK took over; this one
       // drains everything since.
-      const sweepMint = useMintStore.getState().selectedMint;
-      if (sweepMint)
-        await initPhase('Coco-bg.routstrSdkSweep', () => sweepUnsettledPayments(sweepMint));
+      await initPhase('Coco-bg.routstrSdkSweep', () => sweepUnsettledPayments());
       if (!isLive()) return;
       log.info('coco.recovery.routstr_payments.done');
       log.info('coco.recovery.routstr_reclaim.start');

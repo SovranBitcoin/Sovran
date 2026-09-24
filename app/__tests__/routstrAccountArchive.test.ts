@@ -14,6 +14,10 @@ import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
 const mockMemory: Record<string, string> = {};
 
+jest.mock('@/shared/lib/routstr/securePersistence', () => ({
+  createRoutstrPersistence: () =>
+    jest.requireMock('@/shared/lib/cashu/profileScopedStorage').createProfileScopedStorage(),
+}));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   createProfileScopedStorage: () => ({
     getItem: async (k: string) => mockMemory[k] ?? null,
@@ -51,6 +55,31 @@ const account = (apiKey: string, reclaimed: boolean) => ({
 
 describe('archiveAccount', () => {
   beforeEach(() => useRoutstrStore.setState({ legacyAccounts: {} }));
+
+  it('archives the old provider credential before changing the active provider', () => {
+    useRoutstrStore.setState({
+      apiKey: 'sk-old',
+      balance: 1000,
+      nodeBaseUrl: 'https://old.example',
+      userNodeBaseUrl: 'https://old.example',
+    });
+    useRoutstrStore.getState().setUserNode('https://new.example');
+    expect(useRoutstrStore.getState().legacyAccounts['https://old.example']).toMatchObject({
+      apiKey: 'sk-old',
+    });
+    expect(useRoutstrStore.getState().apiKey).toBeNull();
+    expect(useRoutstrStore.getState().balance).toBeNull();
+  });
+
+  it('retains two unreclaimed credentials from the same provider', () => {
+    useRoutstrStore.getState().archiveAccount('https://a.example', 'sk-first', 1000);
+    useRoutstrStore.getState().archiveAccount('https://a.example', 'sk-second', 2000);
+    expect(
+      Object.values(useRoutstrStore.getState().legacyAccounts)
+        .map((account) => account.apiKey)
+        .sort()
+    ).toEqual(['sk-first', 'sk-second']);
+  });
 
   it('records the credential under the node it is believed to belong to', () => {
     useRoutstrStore.getState().archiveAccount('https://a.example', 'sk-aaa', 250_000);

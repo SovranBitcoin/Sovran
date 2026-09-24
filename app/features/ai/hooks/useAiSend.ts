@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRoutstrStore, type ChatAttachment } from '@/shared/stores/profile/routstrStore';
-import { useBalanceContext } from '@cashu/coco-react';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { useRoutstrFunds } from './useRoutstrFunds';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import {
@@ -20,6 +19,7 @@ import { pickFinalizeMessage } from '../lib/finalize';
 import { actionMenuPopup, staticPopup, paramPopup } from '@/shared/lib/popup';
 import { aiLog } from '@/shared/lib/logger';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import {
   AFFORD_BUFFER,
@@ -128,12 +128,9 @@ export function useAiSend() {
   // the cost of a request is returned by the request itself.
   const streamControllerRef = useRef<AbortController | null>(null);
 
-  // The balance every gate and estimate prices against is the WALLET's, read
-  // exactly as the header reads it. There is no separate AI balance any more,
-  // so there is nothing that can disagree with it or go stale.
-  const { balances: liveBalances } = useBalanceContext();
-  const selectedMint = useMintStore((s) => s.selectedMint);
-  const walletSats = selectedMint ? amountToNumber(liveBalances.byMint[selectedMint]?.total) : 0;
+  const funds = useRoutstrFunds();
+  const latestFunds = useLatestRef(funds);
+  const walletSats = funds?.balanceSats ?? 0;
   const heldMints = useHeldMints();
 
   useEffect(
@@ -733,6 +730,7 @@ export function useAiSend() {
       setSelectedSlot,
       updateCurrentSessionTitle,
       navigateToAddFunds,
+      walletSats,
     ]
   );
 
@@ -746,6 +744,8 @@ export function useAiSend() {
       // to be indistinguishable from outside.
       const trimmed = userMessage.trim();
       const storeNow = useRoutstrStore.getState();
+      const owner = useProfileStore.getState().activeAccountIndex;
+      const quotedFunds = latestFunds.current;
       const activeProvider = storeNow.userNodeBaseUrl;
       const plannedEntry = resolveSelectedEntry(
         getProviderById(storeNow.selectedProvider).id,
@@ -785,6 +785,20 @@ export function useAiSend() {
             maxSats: gate.maxSats,
           });
           if (!allowed) return;
+          const current = useRoutstrStore.getState();
+          const currentFunds = latestFunds.current;
+          if (
+            useProfileStore.getState().activeAccountIndex !== owner ||
+            current.userNodeBaseUrl !== activeProvider ||
+            current.selectedProvider !== storeNow.selectedProvider ||
+            current.selectedTier !== storeNow.selectedTier ||
+            current.lineup !== storeNow.lineup ||
+            currentFunds?.mintUrl !== quotedFunds?.mintUrl ||
+            currentFunds?.balanceSats !== quotedFunds?.balanceSats
+          ) {
+            staticPopup('ai-payment-options-changed');
+            return;
+          }
           break;
         }
         case 'ready':
@@ -861,6 +875,10 @@ export function useAiSend() {
       addMessage,
       setMessagePending,
       streamIntoPlaceholder,
+      walletSats,
+      heldMints,
+      latestFunds,
+      navigateToAddFunds,
     ]
   );
 

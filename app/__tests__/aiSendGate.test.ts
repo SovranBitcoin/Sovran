@@ -32,7 +32,7 @@ const base = (overrides: Partial<SendGateInput> = {}): SendGateInput => ({
   text: 'hello',
   providerBaseUrl: 'https://node.example',
   providerMints: [MINIBITS],
-  heldMints: new Set([MINIBITS.toLowerCase()]),
+  heldMints: new Set([MINIBITS]),
   walletSats: 10_000,
   entry: entry(4e-6),
   imageCount: 0,
@@ -61,14 +61,20 @@ describe('AI send gate', () => {
     expect(outcome).toMatchObject({ state: 'mint-not-accepted', providerMints: [MINIBITS] });
   });
 
-  it('matches an accepted mint across a trailing slash and case', () => {
+  it('matches a trailing slash and host case without changing the path', () => {
     const outcome = evaluateSendGate(
       base({
-        providerMints: [`${MINIBITS.toUpperCase()}/`],
-        heldMints: new Set([MINIBITS.toLowerCase()]),
+        providerMints: ['https://MINT.MINIBITS.CASH/Bitcoin/'],
+        heldMints: new Set([MINIBITS]),
       })
     );
     expect(outcome.state).not.toBe('mint-not-accepted');
+  });
+
+  it('does not treat a differently cased path as the same mint', () => {
+    expect(evaluateSendGate(base({ providerMints: [MINIBITS.toLowerCase()] })).state).toBe(
+      'mint-not-accepted'
+    );
   });
 
   it('treats a provider that publishes no mints as taking any', () => {

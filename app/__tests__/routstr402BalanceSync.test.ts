@@ -22,7 +22,23 @@ import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
 const mockMemory: Record<string, string> = {};
 
+jest.mock('@/shared/stores/global/profileStore', () => ({
+  useProfileStore: {
+    getState: () => ({
+      activeAccountIndex: 0,
+      profiles: [{ accountIndex: 0, pubkey: 'a'.repeat(64) }],
+    }),
+  },
+}));
+jest.mock('@/shared/lib/routstr/securePersistence', () => ({
+  createRoutstrPersistence: () =>
+    jest.requireMock('@/shared/lib/cashu/profileScopedStorage').createProfileScopedStorage(),
+}));
+jest.mock('@/shared/lib/routstr/secureVault', () => ({
+  createSecureVault: () => ({ read: async () => null, write: async () => {} }),
+}));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
+  captureProfileStorageOwner: async () => 'a'.repeat(64),
   createProfileScopedStorage: () => ({
     getItem: async (k: string) => mockMemory[k] ?? null,
     setItem: async (k: string, v: string) => {
@@ -59,6 +75,8 @@ jest.mock('@/shared/lib/http/requestSignal', () => ({
 // this adapter, so stubbing it here is what keeps these tests about the
 // classification above it rather than about Coco.
 jest.mock('@/shared/lib/routstr/sdk/walletAdapter', () => ({
+  createCocoWalletAdapter: () =>
+    jest.requireMock('@/shared/lib/routstr/sdk/walletAdapter').cocoWalletAdapter,
   cocoWalletAdapter: {
     getBalances: jest.fn(async () => ({ 'https://mint.example': 1000 })),
     getMintUnits: () => ({ 'https://mint.example': 'sat' }),

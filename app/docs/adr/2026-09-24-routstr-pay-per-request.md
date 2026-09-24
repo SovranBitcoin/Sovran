@@ -2,6 +2,9 @@
 
 Status: accepted; device validation of the payment round trip outstanding.
 
+Storage, automatic failover and unconditional recovery claims below are
+superseded by [ADR 0012](0012-routstr-durable-profile-bound-recovery.md).
+
 Supersedes the first revision of this ADR, which recorded the same payment
 model implemented by hand and gave reasons against adopting `@routstr/sdk`.
 Those reasons are answered below; the payment decision is unchanged.

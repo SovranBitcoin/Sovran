@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useLatestRef } from '@/shared/hooks/useLatestRef';
+import { useRoutstrFunds } from '../hooks/useRoutstrFunds';
 import { Keyboard } from 'react-native';
 import Icon from 'assets/icons';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
-import { checkBalance, getModels, type RoutstrModel } from '@/shared/lib/routstr/api';
+import { getModels, type RoutstrModel } from '@/shared/lib/routstr/api';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
 import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
 import { modelPickerPopup } from '@/shared/lib/popup';
@@ -55,7 +55,7 @@ export function ModelChip() {
 
   const selectedTier = useRoutstrStore((s) => s.selectedTier);
   const selectedProvider = useRoutstrStore((s) => s.selectedProvider);
-  const balanceMsats = useRoutstrStore((s) => s.balance);
+  const funds = useRoutstrFunds();
   const nodeBaseUrl = useRoutstrStore((s) => s.nodeBaseUrl);
   const cachedModels = useRoutstrStore((s) => s.modelsCache?.data ?? null);
   const setCachedModels = useRoutstrStore((s) => s.setCachedModels);
@@ -66,42 +66,6 @@ export function ModelChip() {
   const lineupSource = sessionLineup ? 'live' : lastKnownLineup ? 'persisted' : 'empty';
 
   const [models, setModels] = useState<RoutstrModel[]>(cachedModels ?? []);
-
-  // Balance self-heal on mount. The only other refresh point is the
-  // post-stream diff in `useAiSend`, which a 402 never reaches — so a
-  // drained key would otherwise leave the persisted balance stale
-  // indefinitely and every affordability gate lying (observed: UI at 299
-  // sats vs 0.2 sats actually available → endless insufficient-balance
-  // popups). One fetch per chip mount keeps the pill and picker honest.
-  const apiKey = useRoutstrStore((s) => s.apiKey);
-  const setBalance = useRoutstrStore((s) => s.setBalance);
-  // Read at mount, never a trigger: a key rotation mid-session must not refire
-  // the self-heal fetch.
-  const apiKeyRef = useLatestRef(apiKey);
-  // Presence, not identity, is the trigger. Keying the effect on `apiKey`
-  // itself would refire on every `x-cashu` change-token rotation; keying it on
-  // nothing at all meant a chip mounted before the first top-up (the fresh-
-  // profile case) saw `null`, returned, and never ran again — the balance then
-  // stayed at whatever the top-up wrote, forever.
-  const hasApiKey = apiKey != null;
-  useEffect(() => {
-    const key = apiKeyRef.current;
-    if (!key) return;
-    let cancelled = false;
-    const requestNode = useRoutstrStore.getState().nodeBaseUrl;
-    checkBalance(key)
-      .then((data) => {
-        if (!cancelled && useRoutstrStore.getState().nodeBaseUrl === requestNode)
-          setBalance(data.balance);
-      })
-      .catch(() => {
-        // Silent — offline keeps the last-known balance, same policy as
-        // the models fetch below.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [hasApiKey, apiKeyRef, setBalance]);
 
   useVisualActivityEffect(() => {
     void refreshRoutstrLineup();
@@ -127,7 +91,7 @@ export function ModelChip() {
     };
   }, [cachedModels, isCacheStale, nodeBaseUrl, setCachedModels]);
 
-  const balanceSats = balanceMsats != null ? Math.floor(balanceMsats / 1000) : 0;
+  const balanceSats = funds?.balanceSats ?? 0;
   const currentTier = getTierById(selectedTier);
   const currentProvider = getProviderById(selectedProvider);
   const resolvedEntry = resolveSelectedEntry(
@@ -163,7 +127,6 @@ export function ModelChip() {
       }
     }
     aiLog.info('ai.tier.affordability_snapshot', {
-      balanceMsats: balanceMsats ?? 0,
       balanceSats,
       selectedTier,
       selectedProvider,
@@ -172,15 +135,7 @@ export function ModelChip() {
       catalogSize: models.length,
       cells: cellSnapshots,
     });
-  }, [
-    balanceMsats,
-    balanceSats,
-    models.length,
-    lineup,
-    lineupSource,
-    selectedTier,
-    selectedProvider,
-  ]);
+  }, [balanceSats, models.length, lineup, lineupSource, selectedTier, selectedProvider]);
 
   // No lineup yet (first run, fetch pending) → show the tier label so the
   // chip never reads like a dev string.

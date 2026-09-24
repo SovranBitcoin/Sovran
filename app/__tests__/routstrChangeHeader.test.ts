@@ -9,9 +9,25 @@ import { apiLog, aiLog } from '@/shared/lib/logger';
 
 let mockProfile = 0;
 jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: { getState: () => ({ activeAccountIndex: mockProfile }) },
+  useProfileStore: {
+    getState: () => ({
+      activeAccountIndex: mockProfile,
+      profiles: [
+        { accountIndex: 0, pubkey: 'a'.repeat(64) },
+        { accountIndex: 1, pubkey: 'b'.repeat(64) },
+      ],
+    }),
+  },
+}));
+jest.mock('@/shared/lib/routstr/securePersistence', () => ({
+  createRoutstrPersistence: () =>
+    jest.requireMock('@/shared/lib/cashu/profileScopedStorage').createProfileScopedStorage(),
+}));
+jest.mock('@/shared/lib/routstr/secureVault', () => ({
+  createSecureVault: () => ({ read: async () => null, write: async () => {} }),
 }));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
+  captureProfileStorageOwner: async () => (mockProfile === 0 ? 'a' : 'b').repeat(64),
   createProfileScopedStorage: () => ({
     getItem: async () => null,
     setItem: async () => {},
@@ -27,6 +43,8 @@ jest.mock('@/shared/lib/http/requestSignal', () => ({ buildAbortSignal: () => un
 // through this adapter, so stubbing it here watches the money move without
 // booting Coco.
 jest.mock('@/shared/lib/routstr/sdk/walletAdapter', () => ({
+  createCocoWalletAdapter: () =>
+    jest.requireMock('@/shared/lib/routstr/sdk/walletAdapter').cocoWalletAdapter,
   cocoWalletAdapter: {
     getBalances: jest.fn(async () => ({ 'https://mint.example': 1000 })),
     getMintUnits: () => ({ 'https://mint.example': 'sat' }),

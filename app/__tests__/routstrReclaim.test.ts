@@ -14,7 +14,15 @@ import { reclaimRoutstrBalances } from '@/shared/lib/routstr/reclaim';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
 const mockMemory: Record<string, string> = {};
+let mockProfile = 0;
+jest.mock('@/shared/stores/global/profileStore', () => ({
+  useProfileStore: { getState: () => ({ activeAccountIndex: mockProfile }) },
+}));
 
+jest.mock('@/shared/lib/routstr/securePersistence', () => ({
+  createRoutstrPersistence: () =>
+    jest.requireMock('@/shared/lib/cashu/profileScopedStorage').createProfileScopedStorage(),
+}));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   createProfileScopedStorage: () => ({
     getItem: async (k: string) => mockMemory[k] ?? null,
@@ -51,8 +59,9 @@ jest.mock('@/shared/lib/http/requestSignal', () => ({
 jest.mock('@/shared/lib/cashu/manager', () => {
   const prepare = jest.fn(async ({ token }: { token: string }) => ({ id: 'op', token }));
   const execute = jest.fn(async () => ({ id: 'op', state: 'completed' }));
+  const manager = { ops: { receive: { prepare, execute } } };
   return {
-    CocoManager: { peekInstance: () => ({ ops: { receive: { prepare, execute } } }) },
+    CocoManager: { peekInstance: () => manager },
     __receive: { prepare, execute },
   };
 });
@@ -93,12 +102,15 @@ describe('reclaimRoutstrBalances', () => {
   });
   beforeEach(() => {
     jest.clearAllMocks();
+    mockProfile = 0;
     useRoutstrStore.setState({ legacyAccounts: {} });
   });
 
   const stub = (fn: (url: string) => Response) => {
+    const transport = jest.fn(async (url: string) => fn(url));
     // eslint-disable-next-line no-restricted-properties -- test seam for the sweep
-    global.fetch = jest.fn(async (url: string) => fn(url)) as unknown as typeof fetch;
+    global.fetch = transport as unknown as typeof fetch;
+    return transport;
   };
 
   it('collects a refund and puts the token in the wallet', async () => {
@@ -119,12 +131,21 @@ describe('reclaimRoutstrBalances', () => {
     );
   });
 
-  it('asks the historical nodes when the archive names the wrong one', async () => {
-    // A repoint can move `nodeBaseUrl` out from under a credential before
-    // anything archives it, so the recorded node is a hint. The key only
-    // exists on the node that redeemed it, and asking the others is free.
+  it('ignores a late refund after the active profile changes', async () => {
+    archive({ 'https://old.example': 'sk-old' });
+    stub(() => {
+      mockProfile = 1;
+      return json(200, { token: 'cashuB-refund' });
+    });
+    await reclaimRoutstrBalances();
+    expect(mockPrepare).not.toHaveBeenCalled();
+    expect(useRoutstrStore.getState().legacyAccounts['https://old.example'].reclaimedAt).toBeNull();
+  });
+
+  it('retains an unknown-owner credential without disclosing it to other providers', async () => {
+    // Unknown ownership must not disclose bearer credentials to guessed nodes.
     archive({ unknown: 'sk-orphan' });
-    stub((url) =>
+    const transport = stub((url) =>
       url.startsWith('https://api.routstr.com')
         ? json(200, { token: 'cashuB-recovered', sats: '250' })
         : keyNotFound()
@@ -132,20 +153,23 @@ describe('reclaimRoutstrBalances', () => {
 
     const outcome = await reclaimRoutstrBalances();
 
-    expect(mockPrepare).toHaveBeenCalledWith({ token: 'cashuB-recovered' });
-    expect(outcome.reclaimed).toBe(1);
+    expect(transport).not.toHaveBeenCalled();
+    expect(mockPrepare).not.toHaveBeenCalled();
+    expect(outcome).toMatchObject({ reclaimed: 0, deferred: 1 });
+    expect(useRoutstrStore.getState().legacyAccounts.unknown.reclaimedAt).toBeNull();
   });
 
-  it('stops asking once every node says the key holds nothing', async () => {
+  it('retains a credential when its issuing provider rejects authentication', async () => {
     archive({ 'https://old.example': 'sk-empty' });
-    stub(() => keyNotFound());
+    const transport = stub(() => keyNotFound());
 
     const outcome = await reclaimRoutstrBalances();
 
-    expect(outcome).toMatchObject({ reclaimed: 0, deferred: 0 });
-    expect(useRoutstrStore.getState().legacyAccounts['https://old.example']?.reclaimedAt).toEqual(
-      expect.any(Number)
-    );
+    expect(outcome).toMatchObject({ reclaimed: 0, deferred: 1 });
+    expect(transport).toHaveBeenCalledTimes(1);
+    expect(
+      useRoutstrStore.getState().legacyAccounts['https://old.example']?.reclaimedAt
+    ).toBeNull();
   });
 
   it.each([
@@ -153,6 +177,8 @@ describe('reclaimRoutstrBalances', () => {
     [409, 'a claim is already settling'],
     [503, 'mint unreachable'],
     [500, 'payout failed before dispatch'],
+    [502, 'dispatched but unconfirmed'],
+    [400, 'ongoing requests or dust'],
   ])('defers on %s (%s) and leaves the row for the next pass', async (status) => {
     archive({ 'https://old.example': 'sk-pending' });
     stub(() => json(status, { detail: 'later' }));
@@ -165,20 +191,28 @@ describe('reclaimRoutstrBalances', () => {
     ).toBeNull();
   });
 
-  it.each([
-    [410, 'already swept — the money is gone'],
-    [502, 'dispatched but unconfirmed — retrying risks a double spend'],
-    [400, 'dust, or no balance'],
-  ])('treats %s (%s) as final', async (status) => {
-    archive({ 'https://old.example': 'sk-terminal' });
-    stub(() => json(status, { detail: 'no' }));
+  it.each([[410, 'already swept — the money is gone']])(
+    'treats %s (%s) as final',
+    async (status) => {
+      archive({ 'https://old.example': 'sk-terminal' });
+      stub(() => json(status, { detail: 'no' }));
 
-    const outcome = await reclaimRoutstrBalances();
+      const outcome = await reclaimRoutstrBalances();
 
-    expect(outcome.deferred).toBe(0);
-    expect(useRoutstrStore.getState().legacyAccounts['https://old.example']?.reclaimedAt).toEqual(
-      expect.any(Number)
-    );
+      expect(outcome.deferred).toBe(0);
+      expect(useRoutstrStore.getState().legacyAccounts['https://old.example']?.reclaimedAt).toEqual(
+        expect.any(Number)
+      );
+    }
+  );
+
+  it('retains recovery when a successful response has no usable refund', async () => {
+    archive({ 'https://old.example': 'sk-pending' });
+    stub(() => json(200, { unexpected: true }));
+    expect(await reclaimRoutstrBalances()).toMatchObject({ reclaimed: 0, deferred: 1 });
+    expect(
+      useRoutstrStore.getState().legacyAccounts['https://old.example']?.reclaimedAt
+    ).toBeNull();
   });
 
   it('defers when the token cannot be received, so the refund can be replayed', async () => {
@@ -238,6 +272,7 @@ describe('recoverPendingPayments', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockProfile = 0;
     const manager = jest.requireMock('@/shared/lib/cashu/manager') as {
       CocoManager: { peekInstance: () => unknown };
     };

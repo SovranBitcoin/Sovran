@@ -49,8 +49,7 @@ export function refreshRoutstrLineup(
     if (result.isOk() && result.value.isOk()) {
       const mapped = lineupFromNaggPayload(result.value.value);
       if (mapped.lineup) {
-        useRoutstrStore.getState().setServerLineup({ ...mapped, lineup: mapped.lineup });
-        return true;
+        return useRoutstrStore.getState().setServerLineup({ ...mapped, lineup: mapped.lineup });
       }
     }
     aiLog.warn('routstr.lineup.refresh_failed');

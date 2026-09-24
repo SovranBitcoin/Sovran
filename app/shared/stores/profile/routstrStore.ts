@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
-import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
+import { createRoutstrPersistence } from '@/shared/lib/routstr/securePersistence';
 import { mintLocalId } from '@/shared/lib/id';
 import { aiLog, storeLog } from '@/shared/lib/logger';
 import { RoutstrModel, setRoutstrNodeBaseUrl } from '@/shared/lib/routstr/api';
@@ -21,6 +21,7 @@ import {
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { tolerantRecord, tolerantArray } from '@/shared/lib/persist/tolerant';
 import { restoreActiveSessionView } from '@/shared/stores/profile/restoreActiveSessionView';
+import { normalizeNodeUrl } from '@/shared/lib/routstr/providers';
 
 // AI tab tier + provider ids — imported from the shared lineup module,
 // which is the single source of truth for both this store's selection
@@ -128,12 +129,38 @@ interface ModelsCache {
  */
 interface RoutstrAccount {
   apiKey: string;
+  /** Issuing provider; old records use their map key when this is absent. */
+  nodeBaseUrl?: string | null;
   /** Last balance this key was observed to hold, in msats. A hint for the UI,
    *  never a substitute for asking the node. */
   lastKnownBalanceMsats: number | null;
   archivedAt: number;
   /** Set once the balance has been swept back into the wallet. */
   reclaimedAt: number | null;
+}
+
+function withArchivedAccount(
+  accounts: Record<string, RoutstrAccount>,
+  nodeBaseUrl: string | null,
+  apiKey: string,
+  balanceMsats: number | null
+): Record<string, RoutstrAccount> {
+  const node = nodeBaseUrl ?? 'unknown';
+  const match = Object.entries(accounts).find(
+    ([key, account]) => (account.nodeBaseUrl ?? key) === node && account.apiKey === apiKey
+  );
+  const key = match?.[0] ?? (accounts[node] ? mintLocalId('routstr-account') : node);
+  const existing = accounts[key];
+  return {
+    ...accounts,
+    [key]: {
+      apiKey,
+      nodeBaseUrl,
+      lastKnownBalanceMsats: existing?.lastKnownBalanceMsats ?? balanceMsats ?? null,
+      archivedAt: existing?.archivedAt ?? Date.now(),
+      reclaimedAt: existing?.reclaimedAt ?? null,
+    },
+  };
 }
 
 /** A payment in the window between spending and being paid back. */
@@ -348,7 +375,7 @@ interface RoutstrActions {
     lineup: AiLineup;
     nodeBaseUrl: string | null;
     authMode?: 'bearer' | 'x-cashu';
-  }) => void;
+  }) => boolean;
   /** Pin the app to a provider, or pass `null` to follow nagg again. Drops the
    *  server lineup and model cache so the menu re-derives from the new node's
    *  own catalog rather than showing another node's models. */
@@ -478,23 +505,6 @@ const PersistedRoutstrMessages = tolerantArray(
   PersistedRoutstrMessage,
   MAX_PERSISTED_SESSION_MESSAGES
 );
-
-/** Stuck payments, bounded to what the schema accepts. Oldest first when it
- *  has to give — a row that has survived that long has almost certainly been
- *  swept by the node already, and an unbounded blob is its own failure. */
-function boundedPendingPayments(
-  payments: Record<string, PendingPayment>
-): Record<string, PendingPayment> {
-  const entries = Object.entries(payments);
-  if (entries.length <= MAX_PENDING_PAYMENTS) return payments;
-  const kept = entries
-    .sort((a, b) => b[1].startedAt - a[1].startedAt)
-    .slice(0, MAX_PENDING_PAYMENTS);
-  storeLog.warn('store.routstr.pending_payments_evicted', {
-    dropped: entries.length - kept.length,
-  });
-  return Object.fromEntries(kept);
-}
 
 /**
  * Archived credentials, bounded to what the schema accepts.
@@ -634,15 +644,11 @@ const MAX_ARCHIVED_ACCOUNTS = 32;
 
 const PersistedRoutstrAccount = z.looseObject({
   apiKey: z.string().max(8192),
+  nodeBaseUrl: z.string().max(512).nullable().default(null).catch(null),
   lastKnownBalanceMsats: z.number().nullable().default(null).catch(null),
   archivedAt: z.number().int().nonnegative().default(0).catch(0),
   reclaimedAt: z.number().int().nonnegative().nullable().default(null).catch(null),
 });
-
-/** Capped low: a row only survives here while a payment is genuinely stuck,
- *  and the node sweeps unclaimed refunds on its own timetable, so an ancient
- *  row is worth less than the blob it costs. */
-const MAX_PENDING_PAYMENTS = 32;
 
 const PersistedPendingPayment = z.looseObject({
   encoded: z.string().max(65_536),
@@ -714,30 +720,14 @@ export const useRoutstrStore = create<RoutstrStore>()(
 
       archiveAccount: (nodeBaseUrl, apiKey, balanceMsats) => {
         if (!apiKey) return;
-        const key = nodeBaseUrl ?? 'unknown';
-        set((state) => {
-          const existing = state.legacyAccounts[key];
-          // Same credential already recorded: keep the richer record rather
-          // than overwriting a known balance with a null one.
-          if (existing?.apiKey === apiKey && existing.lastKnownBalanceMsats != null) {
-            return state;
-          }
-          storeLog.info('store.routstr.account_archived', {
-            node: key,
-            hadBalance: balanceMsats != null && balanceMsats > 0,
-          });
-          return {
-            legacyAccounts: {
-              ...state.legacyAccounts,
-              [key]: {
-                apiKey,
-                lastKnownBalanceMsats: balanceMsats ?? existing?.lastKnownBalanceMsats ?? null,
-                archivedAt: Date.now(),
-                reclaimedAt: null,
-              },
-            },
-          };
-        });
+        set((state) => ({
+          legacyAccounts: withArchivedAccount(
+            state.legacyAccounts,
+            nodeBaseUrl,
+            apiKey,
+            balanceMsats
+          ),
+        }));
       },
 
       markAccountReclaimed: (nodeBaseUrl) => {
@@ -880,7 +870,8 @@ export const useRoutstrStore = create<RoutstrStore>()(
           return;
         }
         const { lineup: derived, stats } = deriveLineup(models);
-        const previous = get().lastKnownLineup;
+        const snapshot = get().lastKnownLineup;
+        const previous = snapshot?.nodeBaseUrl === get().nodeBaseUrl ? snapshot : null;
         const merged = mergeLineupWithLastKnown(derived, previous?.lineup ?? null);
         aiLog.info('ai.lineup.derived', {
           catalogSize: models.length,
@@ -902,9 +893,16 @@ export const useRoutstrStore = create<RoutstrStore>()(
       },
 
       setServerLineup: ({ lineup, nodeBaseUrl, authMode }) => {
+        const pinned = get().userNodeBaseUrl;
+        if (
+          pinned &&
+          (!nodeBaseUrl || normalizeNodeUrl(pinned) !== normalizeNodeUrl(nodeBaseUrl))
+        ) {
+          return false;
+        }
         if (!lineupHasEntries(lineup)) {
           aiLog.warn('ai.lineup.server_empty');
-          return;
+          return false;
         }
         aiLog.info('ai.lineup.server_applied', {
           nodeChanged: nodeBaseUrl !== get().nodeBaseUrl,
@@ -913,10 +911,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
           ),
         });
         const now = Date.now();
-        // A provider the user chose outranks nagg's. Take the lineup — it is
-        // still the curated model ladder — but leave the node alone, and do
-        // not adopt an `authMode` declared for a node we are not using.
-        const pinned = get().userNodeBaseUrl;
+        // A catalog is authoritative only for the node that served it.
         if (pinned) {
           setRoutstrNodeBaseUrl(pinned);
           set({
@@ -924,11 +919,13 @@ export const useRoutstrStore = create<RoutstrStore>()(
             serverLineupAt: now,
             lastKnownLineup: { derivedAt: now, lineup, nodeBaseUrl: pinned },
           });
-          return;
+          return true;
         }
         // nagg's own node is remembered as a discovery seed, never adopted as
         // the request target: the user picks who gets paid, and this app does
         // not get to recommend one on their behalf.
+        const previous = get();
+        const moving = nodeBaseUrl !== previous.nodeBaseUrl;
         set({
           lineup,
           serverLineupAt: now,
@@ -936,7 +933,22 @@ export const useRoutstrStore = create<RoutstrStore>()(
           authMode: authMode ?? (nodeBaseUrl === get().nodeBaseUrl ? get().authMode : 'bearer'),
           modelsCache: nodeBaseUrl === get().nodeBaseUrl ? get().modelsCache : null,
           lastKnownLineup: { derivedAt: now, lineup, nodeBaseUrl },
+          ...(moving
+            ? {
+                apiKey: null,
+                balance: null,
+                legacyAccounts: previous.apiKey
+                  ? withArchivedAccount(
+                      previous.legacyAccounts,
+                      previous.nodeBaseUrl,
+                      previous.apiKey,
+                      previous.balance
+                    )
+                  : previous.legacyAccounts,
+              }
+            : {}),
         });
+        return true;
       },
 
       beginPayment: (id, payment) => {
@@ -982,9 +994,11 @@ export const useRoutstrStore = create<RoutstrStore>()(
       },
 
       setUserNode: (nodeBaseUrl) => {
-        const next = nodeBaseUrl?.trim().replace(/\/+$/, '') || null;
+        const next = nodeBaseUrl ? normalizeNodeUrl(nodeBaseUrl) || null : null;
         storeLog.info('store.routstr.user_node_set', { pinned: next != null });
         setRoutstrNodeBaseUrl(next);
+        const previous = get();
+        const moving = next !== null && next !== previous.nodeBaseUrl;
         set({
           userNodeBaseUrl: next,
           // The model menu is per node. Clearing the server lineup and the
@@ -993,7 +1007,23 @@ export const useRoutstrStore = create<RoutstrStore>()(
           lineup: null,
           serverLineupAt: null,
           modelsCache: null,
+          lastKnownLineup:
+            get().lastKnownLineup?.nodeBaseUrl === next ? get().lastKnownLineup : null,
           ...(next != null ? { nodeBaseUrl: next } : {}),
+          ...(moving
+            ? {
+                apiKey: null,
+                balance: null,
+                legacyAccounts: previous.apiKey
+                  ? withArchivedAccount(
+                      previous.legacyAccounts,
+                      previous.nodeBaseUrl,
+                      previous.apiKey,
+                      previous.balance
+                    )
+                  : previous.legacyAccounts,
+              }
+            : {}),
         });
       },
 
@@ -1062,7 +1092,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
     }),
     persistConfig({
       name: 'routstr-store',
-      storage: createProfileScopedStorage(),
+      storage: createRoutstrPersistence(),
       schema: PersistedRoutstrStore,
       partialize: (state) => ({
         apiKey: state.apiKey,
@@ -1084,7 +1114,9 @@ export const useRoutstrStore = create<RoutstrStore>()(
         legacyAccounts: boundedAccounts(state.legacyAccounts),
         knownProviders: boundedProviders(state.knownProviders),
         userNodeBaseUrl: state.userNodeBaseUrl,
-        pendingPayments: boundedPendingPayments(state.pendingPayments),
+        // Age is not evidence of settlement. Keep the only recovery token
+        // until the receive/refund path explicitly completes this payment.
+        pendingPayments: state.pendingPayments,
         confirmSpend: state.confirmSpend,
       }),
       afterHydrate: (state) => {
@@ -1096,6 +1128,15 @@ export const useRoutstrStore = create<RoutstrStore>()(
         // the point of pinning is that a background refresh cannot move the
         // user off it, and a relaunch is not an exception.
         setRoutstrNodeBaseUrl(state.userNodeBaseUrl);
+        if (
+          state.userNodeBaseUrl &&
+          state.lastKnownLineup &&
+          normalizeNodeUrl(state.lastKnownLineup.nodeBaseUrl ?? '') !==
+            normalizeNodeUrl(state.userNodeBaseUrl)
+        ) {
+          state.lastKnownLineup = null;
+          state.serverLineupAt = null;
+        }
         // Record the live credential in the archive on the way in, so it is
         // already recoverable before anything this session can clear it. A
         // blob written before `legacyAccounts` existed has no other way to
@@ -1105,15 +1146,12 @@ export const useRoutstrStore = create<RoutstrStore>()(
         state.legacyAccounts ??= {};
         const liveKey = state.apiKey;
         if (liveKey) {
-          const node = state.nodeBaseUrl ?? 'unknown';
-          if (state.legacyAccounts[node]?.apiKey !== liveKey) {
-            state.legacyAccounts[node] = {
-              apiKey: liveKey,
-              lastKnownBalanceMsats: state.balance ?? null,
-              archivedAt: Date.now(),
-              reclaimedAt: null,
-            };
-          }
+          state.legacyAccounts = withArchivedAccount(
+            state.legacyAccounts,
+            state.nodeBaseUrl,
+            liveKey,
+            state.balance
+          );
         }
         // Drop transient `pending: true` flags — any user message marked
         // pending at persist time (e.g. app killed mid-send) resolves to

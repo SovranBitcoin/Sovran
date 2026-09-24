@@ -11,6 +11,8 @@ import {
 } from '@routstr/sdk/browser';
 
 import { fetchNodeInfo } from './providers';
+import { selectPayingMint } from './payingMint';
+import { createRequestDeadline, type RequestDeadline } from './requestDeadline';
 import {
   acceptedMintsForProvider,
   getRoutstrClient,
@@ -39,6 +41,8 @@ const TINFOIL_MODEL_PREFIX = 'tinfoil-';
  * state keeps request origins stable while the store applies lineup/hydration changes.
  */
 let routstrBaseUrlOverride: string | null = null;
+let metadataReady: { origin: string; ownsScope: () => boolean; promise: Promise<void> } | null =
+  null;
 
 /** Set (or clear with null) the Routstr node base URL, e.g.
  *  "https://api.routstr.com". The `/v1` path segment is appended here so the
@@ -112,29 +116,15 @@ function selectedMintUrl(): string | undefined {
  * against a node that only takes Minibits.
  */
 async function payingMintUrl(origin: string): Promise<string> {
+  const pending = metadataReady;
+  if (pending?.origin === origin && pending.ownsScope()) await pending.promise;
   const selected = selectedMintUrl();
   const accepted = await acceptedMintsForProvider(origin);
-  if (!accepted) {
-    if (selected) return selected;
-    const noMint: RoutstrError = {
-      status: 0,
-      error: { message: 'No mint selected', type: 'no_mint' },
-    };
-    throw noMint;
-  }
-  const acceptable = new Set(accepted);
-  if (selected && acceptable.has(selected)) return selected;
-
   const { cocoWalletAdapter } =
     require('./sdk/walletAdapter') as typeof import('./sdk/walletAdapter');
-  const balances = await cocoWalletAdapter.getBalances().catch(() => ({}));
-  const fallback = Object.entries(balances)
-    .filter(([mintUrl, sats]) => acceptable.has(mintUrl) && sats > 0)
-    .sort(([, a], [, b]) => b - a)[0]?.[0];
-  if (fallback) {
-    apiLog.info('routstr.payment.mint_substituted', { accepted: accepted.length });
-    return fallback;
-  }
+  const balances = await cocoWalletAdapter.getBalances();
+  const paying = selectPayingMint({ selectedMint: selected, acceptedMints: accepted, balances });
+  if (paying) return paying.mintUrl;
 
   // Nothing the node takes. Said plainly, because the user can act on it —
   // switch mint, or switch provider — and every other phrasing of this ends up
@@ -608,6 +598,12 @@ async function throwResponseError(
 /** Wrap a caught unknown into a RoutstrError (re-throws if already one). */
 function toRoutstrError(error: unknown): never {
   if (error && typeof error === 'object' && 'status' in error) throw error;
+  if (error instanceof Error && error.name === 'TimeoutError') {
+    throw {
+      status: 0,
+      error: { message: error.message, type: 'timeout', code: 'timeout' },
+    } satisfies RoutstrError;
+  }
   if (isAbortError(error)) {
     throw {
       status: 0,
@@ -708,28 +704,42 @@ async function readRoutstrEnvelope<TSpine extends z.ZodType>(
  * minted anywhere else is refused. Absent or empty means the node does not
  * say, which the SDK reads as "any mint".
  */
-async function seedFromNode(origin: string, models: Model[]): Promise<void> {
-  try {
-    const info = await fetchNodeInfo(origin);
-    await seedProviderCatalog(origin, models, info?.mints);
-    // Whether this provider can answer without reading the prompt is only
-    // knowable from its catalog, and its catalog is three quarters of a
-    // megabyte — far too heavy to probe every row of a picker with. Recording
-    // it here means the one provider we DID read is marked, and the picker
-    // fills in as providers are used.
-    routstrStoreState().rememberProviders({
-      [origin]: {
-        name: info?.name || undefined,
-        description: info?.description ?? null,
-        version: info?.version ?? null,
-        mints: info?.mints,
-        e2ee: models.some((model) => model.id.startsWith(TINFOIL_MODEL_PREFIX)),
-      },
-    });
-  } catch {
-    // Already logged inside. A stale catalog is the SDK's next 402, not a
-    // reason to fail the model list the picker is waiting on.
-  }
+async function seedFromNode(
+  origin: string,
+  models: Model[],
+  ownsScope: () => boolean
+): Promise<void> {
+  const known = routstrStoreState().knownProviders[origin];
+  await seedProviderCatalog(origin, models, known?.mints);
+  if (!ownsScope()) return;
+  // Whether this provider can answer without reading the prompt is only
+  // knowable from its catalog, and its catalog is three quarters of a
+  // megabyte — far too heavy to probe every row of a picker with. Recording
+  // it here means the one provider we DID read is marked, and the picker
+  // fills in as providers are used.
+  routstrStoreState().rememberProviders({
+    [origin]: {
+      e2ee: models.some((model) => model.id.startsWith(TINFOIL_MODEL_PREFIX)),
+    },
+  });
+  // The catalog can be used as soon as its prices are seeded. Metadata from
+  // an optional endpoint must not hold the model picker open for its timeout.
+  const promise = fetchNodeInfo(origin)
+    .then(async (info) => {
+      if (!info || !ownsScope()) return;
+      await seedProviderCatalog(origin, models, info.mints);
+      if (!ownsScope()) return;
+      routstrStoreState().rememberProviders({
+        [origin]: {
+          name: info.name,
+          description: info.description ?? null,
+          version: info.version ?? null,
+          mints: info.mints,
+        },
+      });
+    })
+    .catch(() => apiLog.warn('routstr.sdk.metadata_seed_failed'));
+  metadataReady = { origin, ownsScope, promise };
 }
 
 export async function getModels(controls: RequestControls = {}): Promise<RoutstrModel[]> {
@@ -760,7 +770,7 @@ export async function getModels(controls: RequestControls = {}): Promise<Routstr
     // time over Nostr. Without the pricing the SDK funds each request at one
     // sat; without the mint list it pays from whichever mint holds the most,
     // which this node then refuses.
-    if (ownsScope()) void seedFromNode(routstrOrigin(), enabled as unknown as Model[]);
+    if (ownsScope()) await seedFromNode(routstrOrigin(), enabled as unknown as Model[], ownsScope);
     return enabled;
   } catch (error) {
     // Resolve lazily to avoid api → refresh → store → api initialisation cycles.
@@ -887,19 +897,22 @@ export async function topUpBalance(
  * Parse SSE stream manually for React Native compatibility.
  * Uses ReadableStream when available, falls back to full-text parsing.
  */
-async function* parseSSEStream(response: Response): AsyncGenerator<ChatCompletionChunk> {
+async function* parseSSEStream(
+  response: Response,
+  deadline: RequestDeadline
+): AsyncGenerator<ChatCompletionChunk> {
   const hasReadableStream = response.body && typeof response.body.getReader === 'function';
   apiLog.debug('routstr.sse.start', {
     hasReadableStream,
     contentType: response.headers.get('content-type'),
   });
   if (hasReadableStream) {
-    yield* parseSSEFromReadableStream(response.body!);
+    yield* parseSSEFromReadableStream(response.body!, deadline);
     return;
   }
 
   apiLog.warn('routstr.sse.no_readable_stream', { fallback: 'full_text_parse' });
-  const text = await response.text();
+  const text = await deadline.wait(response.text());
   let chunks = 0;
   for (const chunk of parseSSEFromText(text)) {
     chunks++;
@@ -914,7 +927,6 @@ async function* parseSSEStream(response: Response): AsyncGenerator<ChatCompletio
     // prompt coming back.
     apiLog.error('routstr.sse.empty_text', {
       length: text.length,
-      head: text.slice(0, 120),
       contentType: response.headers.get('content-type'),
     });
   }
@@ -947,7 +959,8 @@ function tryParseSSELine(line: string): ChatCompletionChunk | 'done' | null {
 }
 
 async function* parseSSEFromReadableStream(
-  body: ReadableStream<Uint8Array>
+  body: ReadableStream<Uint8Array>,
+  deadline: RequestDeadline
 ): AsyncGenerator<ChatCompletionChunk> {
   const reader = body.getReader();
   const decoder = new TextDecoder('utf-8');
@@ -957,7 +970,8 @@ async function* parseSSEFromReadableStream(
 
   try {
     while (true) {
-      const { done, value } = await reader.read();
+      const { done, value } = await deadline.wait(reader.read());
+      deadline.touch(60_000);
 
       if (done) {
         for (const line of buffer.split('\n')) {
@@ -1179,7 +1193,7 @@ export async function sendMessage(
     signal?: AbortSignal;
   }
 ): Promise<{ stream: AsyncIterable<ChatCompletionChunk>; cost: Promise<number> }> {
-  const { model, payment: context, temperature = 0.7, max_tokens, signal } = options;
+  const { model, payment: context, temperature = 0.7, max_tokens } = options;
   const { textChars, imageParts } = measureMessageContent(messages);
   apiLog.info('api.routstr.chat.start', {
     model,
@@ -1193,33 +1207,45 @@ export async function sendMessage(
   const ownsScope = captureRequestScope();
   if (!hasRoutstrProvider()) throw noProviderChosen();
   const origin = routstrOrigin();
-  const mintUrl = await payingMintUrl(origin);
-
+  const deadline = createRequestDeadline(options.signal);
+  const signal = deadline.signal;
+  let mintUrl: string | undefined;
   let response: RoutedResponse;
+  let finishPayment = async () => {};
   try {
-    const client = await getRoutstrClient();
-    response = (await withPaymentScope(context, () =>
-      client.routeRequest({
-        path: '/v1/chat/completions',
-        method: 'POST',
-        baseUrl: origin,
-        mintUrl,
-        // The catalog id, not the upstream one: the SDK maps a `tinfoil-`
-        // model to its enclave name and carries the catalog id separately in
-        // `X-Routstr-Model`, which is what the node bills and routes on when
-        // it can no longer read the body.
-        modelId: model,
-        body: {
-          model,
-          messages,
-          temperature,
-          ...(max_tokens != null && { max_tokens }),
-          stream: true,
-        },
-        signal,
-      })
+    mintUrl = await deadline.wait(payingMintUrl(origin));
+    const bound = await deadline.wait(
+      getRoutstrClient(origin, () => ownsScope() && !signal.aborted)
+    );
+    finishPayment = bound.finish;
+    if (!ownsScope() || signal?.aborted) throw new Error('Request cancelled before payment');
+    const payingMint = mintUrl;
+    response = (await deadline.wait(
+      withPaymentScope(context, () =>
+        bound.client.routeRequest({
+          path: '/v1/chat/completions',
+          method: 'POST',
+          baseUrl: bound.baseUrl,
+          mintUrl: payingMint,
+          // The catalog id, not the upstream one: the SDK maps a `tinfoil-`
+          // model to its enclave name and carries the catalog id separately in
+          // `X-Routstr-Model`, which is what the node bills and routes on when
+          // it can no longer read the body.
+          modelId: model,
+          body: {
+            model,
+            messages,
+            temperature,
+            ...(max_tokens != null && { max_tokens }),
+            stream: true,
+          },
+          signal,
+        })
+      )
     )) as RoutedResponse;
+    deadline.touch(60_000);
   } catch (error) {
+    deadline.dispose();
     const translated = fromSdkError(error);
     apiLog.error('api.routstr.chat.failed', {
       model,
@@ -1231,7 +1257,7 @@ export async function sendMessage(
     if (translated) throw translated;
     // Anything still in flight is money the node may or may not have taken;
     // only the node can say, and the sweep is how it is asked.
-    void sweepUnsettledPayments(mintUrl);
+    if (ownsScope()) void sweepUnsettledPayments();
     toRoutstrError(error);
   }
 
@@ -1246,8 +1272,9 @@ export async function sendMessage(
     // The change, if the node returned any, is already home: a non-streaming
     // response is finalized inside `routeRequest` before it comes back.
     try {
-      await throwResponseError(response, undefined, undefined, ownsScope);
+      await deadline.wait(throwResponseError(response, undefined, undefined, ownsScope));
     } catch (error) {
+      deadline.dispose();
       apiLog.error('api.routstr.chat.failed', {
         model,
         status: response.status,
@@ -1267,13 +1294,21 @@ export async function sendMessage(
 
   // Started here rather than awaited: the SDK banks the change as soon as the
   // stream ends, and reading the figure must not hold up the first chunk.
-  const cost = (async () => {
-    const sats = response.finalize
-      ? await withPaymentScope(context, () => response.finalize!())
-      : (response.satsSpent ?? 0);
-    apiLog.info('routstr.payment.settled', { model, costSats: sats });
-    return sats;
-  })();
+  const cost = deadline
+    .wait(
+      (async () => {
+        const sats = response.finalize
+          ? await withPaymentScope(context, () => response.finalize!())
+          : (response.satsSpent ?? 0);
+        await finishPayment();
+        apiLog.info('routstr.payment.settled', { model, costSats: sats });
+        return sats;
+      })()
+    )
+    .finally(deadline.dispose);
+  // A stream error can make the caller exit before awaiting its cost.
+  // Keep the rejection observable to awaiters without an unhandled promise.
+  void cost.catch(() => {});
 
-  return { stream: parseSSEStream(response), cost };
+  return { stream: parseSSEStream(response, deadline), cost };
 }

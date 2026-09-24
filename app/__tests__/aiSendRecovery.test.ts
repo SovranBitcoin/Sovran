@@ -5,6 +5,9 @@ import { emptyLineup, type LineupEntry } from '@/shared/lib/routstr/lineup';
 import { sendMessage, checkBalance } from '@/shared/lib/routstr/api';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
 import { staticPopup } from '@/shared/lib/popup';
+import { confirmSpend } from '@/features/ai/lib/spendConfirm';
+
+jest.mock('@/features/ai/lib/spendConfirm', () => ({ confirmSpend: jest.fn() }));
 
 jest.mock('@/shared/lib/routstr/api', () => ({
   ...jest.requireActual('@/shared/lib/routstr/api'),
@@ -14,6 +17,10 @@ jest.mock('@/shared/lib/routstr/api', () => ({
 jest.mock('@/shared/lib/routstr/refreshLineup', () => ({ refreshRoutstrLineup: jest.fn() }));
 jest.mock('@/shared/stores/global/profileStore', () => ({
   useProfileStore: { getState: () => ({ activeAccountIndex: 0 }) },
+}));
+jest.mock('@/shared/lib/routstr/securePersistence', () => ({
+  createRoutstrPersistence: () =>
+    jest.requireMock('@/shared/lib/cashu/profileScopedStorage').createProfileScopedStorage(),
 }));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   createProfileScopedStorage: () => ({
@@ -61,7 +68,9 @@ jest.mock('@cashu/coco-react', () => ({
   // The gate prices against the wallet now; a funded mint keeps the
   // affordability snapshot realistic without booting a wallet.
   useBalanceContext: () => ({
-    balances: { byMint: { 'https://mint.example': { total: 100_000 } } },
+    balances: {
+      byMint: { 'https://mint.example': { total: 100_000, spendable: 100_000, unit: 'sat' } },
+    },
   }),
 }));
 
@@ -108,6 +117,17 @@ async function send() {
 }
 
 describe('AI send lineup recovery', () => {
+  it('does not spend when the selected model changes during cost confirmation', async () => {
+    useRoutstrStore.setState({ confirmSpend: true });
+    jest.mocked(confirmSpend).mockImplementationOnce(async () => {
+      useRoutstrStore.setState({ selectedProvider: 'claude' });
+      return true;
+    });
+    const hook = await send();
+    expect(sendMock).not.toHaveBeenCalled();
+    expect(staticPopup).toHaveBeenCalledWith('ai-payment-options-changed');
+    hook.unmount();
+  });
   beforeEach(async () => {
     jest.clearAllMocks();
     await useRoutstrStore.persist.rehydrate();

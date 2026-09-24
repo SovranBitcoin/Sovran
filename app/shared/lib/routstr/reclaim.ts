@@ -4,6 +4,7 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import { buildAbortSignal } from '@/shared/lib/http/requestSignal';
 import { apiLog } from '@/shared/lib/logger';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
 import type { RequestControls } from 'wallet/safeFetch';
 
 /**
@@ -14,27 +15,11 @@ import type { RequestControls } from 'wallet/safeFetch';
  * can no longer reach through the UI. `POST /v1/balance/refund` hands them back
  * as a Cashu token, which goes straight into Coco.
  *
- * Two properties make a blind sweep safe, both from routstr-core's
- * `routstr/balance.py`:
- *
- *   - `_lookup_key_no_create` deliberately does NOT create a key, so asking a
- *     node that never issued this credential costs nothing and answers
- *     `401 key_not_found`. We therefore do not need to know which node a key
- *     belongs to — which is just as well, because a repoint can move
- *     `nodeBaseUrl` out from under a credential before anything records it.
- *   - The endpoint is idempotent: a zero-balance key with no open claim
- *     replays its last paid refund rather than erroring, so a lost response can
- *     simply be re-asked.
+ * A credential is sent only to its recorded issuing provider. Trying other
+ * providers would disclose bearer authority over that balance. Unknown-owner
+ * records stay recoverable until their provider can be established.
+ * The endpoint replays its last paid refund, so a lost response can be re-asked.
  */
-
-/**
- * Nodes to ask, beyond whatever the archive believes. These are the two the app
- * has actually pointed at: `api.routstr.com` was the built-in default (its
- * `/v1/models` and `/v1/info` 404 today, but its refund route answers), and
- * `ai.redsh1ft.com` was first in nagg's compiled fallback ladder. Most existing
- * deposits are on one of them.
- */
-const HISTORICAL_NODES = ['https://api.routstr.com', 'https://ai.redsh1ft.com'] as const;
 
 /** Refund payloads are string-encoded amounts, and the unit field depends on
  *  the key's unit (`sats` for sat-denominated keys, `msats` otherwise). */
@@ -43,20 +28,6 @@ const RefundSpine = z.looseObject({
   sats: z.string().max(32).optional(),
   msats: z.string().max(32).optional(),
 });
-
-/** Whether asking this node again later could produce a different answer.
- *  Mapped from `routstr/balance.py` + `routstr/refund.py`; the distinction is
- *  the whole point, because retrying a terminal state burns requests and
- *  retrying nothing loses money. */
-function isRetryable(status: number): boolean {
-  // 425 refund pending (carries Retry-After), 409 a claim is already settling,
-  // 500 payout failed before dispatch (balance restored), 503 mint unreachable.
-  if (status === 425 || status === 409 || status === 500 || status === 503) return true;
-  // 410 swept, 502 dispatched-but-unconfirmed (retrying risks a double spend —
-  // routstr reconciles it in the background), 400 dust or no balance,
-  // 401 this node never issued the key.
-  return false;
-}
 
 function refundUrl(base: string): string {
   const trimmed = base.trim().replace(/\/+$/, '').replace(/\/v1$/, '');
@@ -88,15 +59,16 @@ async function askNode(
 
   if (!response.ok) {
     apiLog.info('routstr.reclaim.declined', { status: response.status });
-    return isRetryable(response.status) ? 'retry' : null;
+    // Only a swept refund is final. In particular, 400 also means ongoing
+    // requests and 502 can be a payout still being reconciled by the node.
+    return response.status === 410 ? null : 'retry';
   }
 
   const parsed = RefundSpine.safeParse(await response.json().catch(() => null));
   if (!parsed.success || !parsed.data.token) {
-    // A 200 with no token is a refund that settled to a lightning address, or
-    // a shape we do not know. Either way there is nothing to receive here.
+    // An unfamiliar success body is not evidence that the money was received.
     apiLog.warn('routstr.reclaim.no_token');
-    return null;
+    return 'retry';
   }
   return parsed.data.token;
 }
@@ -120,6 +92,11 @@ async function askNode(
 export async function recoverPendingPayments(controls: RequestControls = {}): Promise<number> {
   const manager = CocoManager.peekInstance();
   if (!manager) return 0;
+  const owner = useProfileStore.getState().activeAccountIndex;
+  const ownsScope = () =>
+    !controls.signal?.aborted &&
+    useProfileStore.getState().activeAccountIndex === owner &&
+    CocoManager.peekInstance() === manager;
 
   const store = useRoutstrStore.getState();
   const pending = Object.entries(store.pendingPayments);
@@ -127,6 +104,7 @@ export async function recoverPendingPayments(controls: RequestControls = {}): Pr
 
   let recovered = 0;
   for (const [id, payment] of pending) {
+    if (!ownsScope()) break;
     let response: Response;
     try {
       // An arbitrary node base, and the reply is a bearer token rather than a
@@ -141,12 +119,14 @@ export async function recoverPendingPayments(controls: RequestControls = {}): Pr
     } catch {
       continue; // offline; the row survives for the next sweep
     }
+    if (!ownsScope()) break;
 
     if (response.status === 404) {
       // The node has no record of this token, so it was never redeemed. The
       // proofs are still ours — give them back to the wallet.
       try {
         await manager.ops.send.reclaim(payment.operationId);
+        if (!ownsScope()) break;
         useRoutstrStore.getState().settlePayment(id);
         apiLog.info('routstr.payment.recovered_unspent', { operationId: payment.operationId });
       } catch (error) {
@@ -164,10 +144,13 @@ export async function recoverPendingPayments(controls: RequestControls = {}): Pr
     if (!response.ok) continue; // 425 and anything else: try again later
 
     const parsed = RefundSpine.safeParse(await response.json().catch(() => null));
+    if (!ownsScope()) break;
     if (!parsed.success || !parsed.data.token) continue;
     try {
       const prepared = await manager.ops.receive.prepare({ token: parsed.data.token });
+      if (!ownsScope()) break;
       await manager.ops.receive.execute(prepared);
+      if (!ownsScope()) break;
       useRoutstrStore.getState().settlePayment(id);
       recovered += 1;
       apiLog.info('routstr.payment.change_recovered', { startedAt: payment.startedAt });
@@ -205,6 +188,11 @@ export async function reclaimRoutstrBalances(
 ): Promise<ReclaimOutcome> {
   const manager = CocoManager.peekInstance();
   if (!manager) return { attempted: 0, reclaimed: 0, deferred: 0 };
+  const owner = useProfileStore.getState().activeAccountIndex;
+  const ownsScope = () =>
+    !controls.signal?.aborted &&
+    useProfileStore.getState().activeAccountIndex === owner &&
+    CocoManager.peekInstance() === manager;
 
   const state = useRoutstrStore.getState();
   const pending = Object.entries(state.legacyAccounts).filter(
@@ -215,55 +203,36 @@ export async function reclaimRoutstrBalances(
   const outcome: ReclaimOutcome = { attempted: pending.length, reclaimed: 0, deferred: 0 };
 
   for (const [nodeKey, account] of pending) {
-    // The archive's node key is a hint. Ask it first, then everywhere else we
-    // know of — a key only exists on the node that redeemed it, and asking the
-    // others is free.
-    const bases = Array.from(
-      new Set(
-        [nodeKey, state.nodeBaseUrl, ...HISTORICAL_NODES].filter(
-          (b): b is string => typeof b === 'string' && b.startsWith('http')
-        )
-      )
-    );
-
-    let collected = false;
-    let deferred = false;
-    for (const base of bases) {
-      const result = await askNode(base, account.apiKey, controls);
-      if (result === 'retry') {
-        deferred = true;
-        continue;
-      }
-      if (result == null) continue;
-      try {
-        // Same two-step the receive flow uses (`sovranPaymentConfig.ts:334`).
-        // The offline-DLEQ guard that sits between them there does not apply:
-        // it exists because Sovran can accept a stranger's token while offline,
-        // and this token arrived over TLS from a node we just chose, on a path
-        // that cannot run offline at all.
-        const prepared = await manager.ops.receive.prepare({ token: result });
-        await manager.ops.receive.execute(prepared);
-        collected = true;
-        apiLog.info('routstr.reclaim.collected', { node: base });
-        break;
-      } catch (error) {
-        // The token is real and unredeemed; leaving the row unreclaimed means
-        // the next sweep re-asks, and routstr replays the same refund.
-        apiLog.error('routstr.reclaim.receive_failed', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-        deferred = true;
-      }
+    if (!ownsScope()) break;
+    const node = account.nodeBaseUrl ?? nodeKey;
+    if (!z.httpUrl().safeParse(node).success) {
+      outcome.deferred += 1;
+      continue;
     }
 
-    if (collected) {
+    const result = await askNode(node, account.apiKey, controls);
+    if (!ownsScope()) break;
+    if (result === 'retry') {
+      outcome.deferred += 1;
+      continue;
+    }
+    if (result === null) {
+      // The issuing node reports a terminal result. Retain the credential.
+      useRoutstrStore.getState().markAccountReclaimed(nodeKey);
+      continue;
+    }
+    try {
+      const prepared = await manager.ops.receive.prepare({ token: result });
+      if (!ownsScope()) break;
+      await manager.ops.receive.execute(prepared);
+      if (!ownsScope()) break;
       useRoutstrStore.getState().markAccountReclaimed(nodeKey);
       outcome.reclaimed += 1;
-    } else if (deferred) {
+      apiLog.info('routstr.reclaim.collected', { node });
+    } catch {
+      // The provider can replay the refund on the next pass.
+      apiLog.error('routstr.reclaim.receive_failed');
       outcome.deferred += 1;
-    } else {
-      // Every node we know of says this credential holds nothing. Stop asking.
-      useRoutstrStore.getState().markAccountReclaimed(nodeKey);
     }
   }
 

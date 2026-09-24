@@ -33,6 +33,7 @@ import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
+import { useRoutstrFunds } from '@/features/ai/hooks/useRoutstrFunds';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import type { AiProviderId, LineupEntry } from '@/shared/lib/routstr/lineup';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -184,7 +185,7 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
   const selectedTier = useRoutstrStore((s) => s.selectedTier);
   const selectedProvider = useRoutstrStore((s) => s.selectedProvider);
   const setSelectedSlot = useRoutstrStore((s) => s.setSelectedSlot);
-  const balanceMsats = useRoutstrStore((s) => s.balance);
+  const funds = useRoutstrFunds();
   // Live-derived lineup when a catalog fetch has landed this session,
   // else the persisted last-known snapshot, else null (true first-run
   // offline → "models loading" rows).
@@ -207,7 +208,7 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
     pickerLog
   );
 
-  const balanceSats = balanceMsats != null ? Math.floor(balanceMsats / 1000) : 0;
+  const balanceSats = funds?.balanceSats ?? 0;
   // Tabs come from the lineup, not from a list compiled into the app: the
   // catalog decides which vendors a node actually serves, and pinning the
   // menu to four of them hid most of what the user was paying for.

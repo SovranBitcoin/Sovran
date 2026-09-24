@@ -96,14 +96,39 @@ export class InsufficientBalanceError extends Error {
  *  model. Tests that assert on the minted amount set the catalog instead. */
 const DEFAULT_REQUIRED_SATS = 10;
 
-type CacheRecord = Record<string, unknown>;
-
-export const createSdkStore = () => {
-  const state: CacheRecord = {};
-  return { store: state as never, hydrate: Promise.resolve() };
+interface StubStore {
+  tokens: Record<string, { token: string; baseUrl: string }[]>;
+  driver: {
+    getItem<T>(key: string, fallback: T): Promise<T>;
+    setItem<T>(key: string, value: T): Promise<void>;
+  };
+}
+export const createSdkStore = ({ driver }: Pick<StubStore, 'driver'>) => {
+  const store: StubStore = { tokens: {}, driver };
+  const hydrate = driver.getItem<StubStore['tokens']>('xcashu_tokens', {}).then((tokens) => {
+    store.tokens = tokens;
+  });
+  return { store, hydrate };
 };
 
-export const createStorageAdapterFromStore = () => ({});
+export const createStorageAdapterFromStore = (store: StubStore) => ({
+  getXcashuTokens: () => store.tokens,
+  getXcashuTokensForBaseUrl: (baseUrl: string) => store.tokens[baseUrl] ?? [],
+  removeXcashuToken: (baseUrl: string, token: string) => {
+    store.tokens = {
+      ...store.tokens,
+      [baseUrl]: (store.tokens[baseUrl] ?? []).filter((entry) => entry.token !== token),
+    };
+    void store.driver.setItem('xcashu_tokens', store.tokens);
+  },
+  addXcashuToken: (baseUrl: string, token: string) => {
+    store.tokens = {
+      ...store.tokens,
+      [baseUrl]: [...(store.tokens[baseUrl] ?? []), { baseUrl, token }],
+    };
+    void store.driver.setItem('xcashu_tokens', store.tokens);
+  },
+});
 
 export type DiscoveryAdapter = ReturnType<typeof createDiscoveryAdapterFromStore>;
 
@@ -132,10 +157,16 @@ interface RoutedResponse extends Response {
   finalize?: () => Promise<number>;
 }
 
+function sdkFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  // Raw fetch stands in for the SDK transport, including streaming responses.
+  // eslint-disable-next-line no-restricted-globals -- tests stub this SDK transport seam
+  return fetch(input, init);
+}
+
 export class RoutstrClient {
   constructor(
     private wallet: WalletAdapter,
-    _storage: unknown,
+    private storage: ReturnType<typeof createStorageAdapterFromStore>,
     private discovery: ReturnType<typeof createDiscoveryAdapterFromStore>,
     _alertLevel: 'max' | 'min',
     _mode?: 'xcashu' | 'apikeys'
@@ -143,6 +174,20 @@ export class RoutstrClient {
 
   getCashuSpender() {
     return { refundXcashuTokens: async () => [] };
+  }
+
+  getBalanceManager() {
+    return {
+      fetchRefundToken: async (baseUrl: string, token: string, _xcashu: boolean) => {
+        const response = await sdkFetch(`${baseUrl.replace(/\/$/, '')}/v1/wallet/refund`, {
+          method: 'POST',
+          headers: { 'X-Cashu': token },
+        });
+        if (!response.ok) return { success: false, status: response.status, token: undefined };
+        const body: { token?: string } = await response.json();
+        return { success: true, token: body.token, status: response.status };
+      },
+    };
   }
 
   private requiredSats(baseUrl: string, modelId?: string): number {
@@ -166,10 +211,7 @@ export class RoutstrClient {
     if (total <= 0) throw new InsufficientBalanceError(required, total);
 
     const token = await this.wallet.sendToken(params.mintUrl, required);
-    // Raw fetch on purpose: this stands in for the SDK's own transport, which
-    // streams, and the tests around it stub this exact call.
-    // eslint-disable-next-line no-restricted-globals -- see above
-    const response = (await fetch(`${params.baseUrl}${params.path}`, {
+    const response = (await sdkFetch(`${params.baseUrl.replace(/\/$/, '')}${params.path}`, {
       method: params.method,
       headers: { 'X-Cashu': token, 'Content-Type': 'application/json' },
       body: JSON.stringify(params.body),
@@ -180,6 +222,8 @@ export class RoutstrClient {
       const change = response.headers.get('x-cashu');
       if (!change) return required;
       const received = await this.wallet.receiveToken(change);
+      // Exercise the adapter against an SDK removal even when receipt failed.
+      this.storage.removeXcashuToken(params.baseUrl, token);
       return Math.max(0, required - (received.success ? received.amount : 0));
     };
 

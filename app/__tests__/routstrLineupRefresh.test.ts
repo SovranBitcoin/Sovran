@@ -9,9 +9,25 @@ jest.mock('@/shared/lib/apiClient', () => ({
   getAiLineup: (...args: unknown[]) => mockGetAiLineup(...args),
 }));
 jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: { getState: () => ({ activeAccountIndex: mockProfile }) },
+  useProfileStore: {
+    getState: () => ({
+      activeAccountIndex: mockProfile,
+      profiles: [
+        { accountIndex: 0, pubkey: 'a'.repeat(64) },
+        { accountIndex: 1, pubkey: 'b'.repeat(64) },
+      ],
+    }),
+  },
+}));
+jest.mock('@/shared/lib/routstr/securePersistence', () => ({
+  createRoutstrPersistence: () =>
+    jest.requireMock('@/shared/lib/cashu/profileScopedStorage').createProfileScopedStorage(),
+}));
+jest.mock('@/shared/lib/routstr/secureVault', () => ({
+  createSecureVault: () => ({ read: async () => null, write: async () => {} }),
 }));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
+  captureProfileStorageOwner: async () => (mockProfile === 0 ? 'a' : 'b').repeat(64),
   createProfileScopedStorage: () => ({
     getItem: async () => null,
     setItem: async () => {},
@@ -82,6 +98,8 @@ async function load() {
 // this adapter, so stubbing it here is what keeps these tests about the
 // classification above it rather than about Coco.
 jest.mock('@/shared/lib/routstr/sdk/walletAdapter', () => ({
+  createCocoWalletAdapter: () =>
+    jest.requireMock('@/shared/lib/routstr/sdk/walletAdapter').cocoWalletAdapter,
   cocoWalletAdapter: {
     getBalances: jest.fn(async () => ({ 'https://mint.example': 1000 })),
     getMintUnits: () => ({ 'https://mint.example': 'sat' }),
@@ -129,6 +147,22 @@ describe('Routstr lineup refresh policy', () => {
     expect(await refresh()).toBe(true);
     expect(await refresh()).toBe(false);
     expect(mockGetAiLineup).toHaveBeenCalledTimes(1);
+  });
+
+  it('archives the old credential before an unpinned server catalog changes nodes', async () => {
+    const { store, mapped } = await load();
+    store.setState({
+      userNodeBaseUrl: null,
+      nodeBaseUrl: 'https://old.example',
+      apiKey: 'sk-old',
+      balance: 1000,
+      legacyAccounts: {},
+    });
+    store.getState().setServerLineup({ ...mapped, lineup: mapped.lineup! });
+    expect(store.getState().apiKey).toBeNull();
+    expect(store.getState().legacyAccounts['https://old.example']).toMatchObject({
+      apiKey: 'sk-old',
+    });
   });
 
   it.each([6, 8])(

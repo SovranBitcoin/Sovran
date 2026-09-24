@@ -14,6 +14,11 @@ import type { LineupEntry } from '@/shared/lib/routstr/lineup';
 
 const mockMemory: Record<string, string> = {};
 
+jest.mock('@/shared/lib/routstr/securePersistence', () => ({
+  createRoutstrPersistence: () =>
+    jest.requireMock('@/shared/lib/cashu/profileScopedStorage').createProfileScopedStorage(),
+}));
+
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   createProfileScopedStorage: () => ({
     getItem: async (k: string) => mockMemory[k] ?? null,

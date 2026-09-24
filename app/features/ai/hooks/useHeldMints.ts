@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
 import { useBalanceContext } from '@cashu/coco-react';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { routstrMintKey, spendableMintBalances } from '@/shared/lib/routstr/payingMint';
 
 /**
  * The mints this wallet actually holds something in, canonicalised.
@@ -17,9 +17,9 @@ export function useHeldMints(): Set<string> {
   return useMemo(
     () =>
       new Set(
-        Object.entries(balances.byMint)
-          .filter(([, snapshot]) => amountToNumber(snapshot?.total) > 0)
-          .map(([url]) => url.trim().replace(/\/+$/, '').toLowerCase())
+        Object.keys(spendableMintBalances(balances.byMint))
+          .map(routstrMintKey)
+          .filter((url) => url !== null)
       ),
     [balances]
   );

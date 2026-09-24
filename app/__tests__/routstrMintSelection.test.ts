@@ -19,12 +19,21 @@ const CUBA = 'https://mint.cubabitcoin.org';
 let mockSelectedMint: string | undefined = MINIBITS;
 let mockBalances: Record<string, number> = { [SOVRAN]: 9000, [MINIBITS]: 1200 };
 let mockNodeMints: string[] | undefined;
+let mockNodeInfoPending: Promise<{ mints: string[] } | null> | undefined;
 
 // A profile that has already chosen a provider. Nothing is sent until one is
 // chosen, and the store applies the choice on hydrate — so a test about paying
 // has to start from a hydrated choice rather than poking module state, which
 // hydration would then clear.
+jest.mock('@/shared/lib/routstr/securePersistence', () => ({
+  createRoutstrPersistence: () =>
+    jest.requireMock('@/shared/lib/cashu/profileScopedStorage').createProfileScopedStorage(),
+}));
+jest.mock('@/shared/lib/routstr/secureVault', () => ({
+  createSecureVault: () => ({ read: async () => null, write: async () => {} }),
+}));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
+  captureProfileStorageOwner: async () => 'a'.repeat(64),
   createProfileScopedStorage: () => ({
     getItem: async (key: string) =>
       key.includes('routstr-store')
@@ -53,7 +62,12 @@ jest.mock('@/shared/lib/http/requestSignal', () => ({
 }));
 
 jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: { getState: () => ({ activeAccountIndex: 0 }) },
+  useProfileStore: {
+    getState: () => ({
+      activeAccountIndex: 0,
+      profiles: [{ accountIndex: 0, pubkey: 'a'.repeat(64) }],
+    }),
+  },
 }));
 
 jest.mock('@/shared/stores/profile/mintStore', () => ({
@@ -61,6 +75,8 @@ jest.mock('@/shared/stores/profile/mintStore', () => ({
 }));
 
 jest.mock('@/shared/lib/routstr/sdk/walletAdapter', () => ({
+  createCocoWalletAdapter: () =>
+    jest.requireMock('@/shared/lib/routstr/sdk/walletAdapter').cocoWalletAdapter,
   cocoWalletAdapter: {
     getBalances: async () => mockBalances,
     getMintUnits: () => ({}),
@@ -72,11 +88,16 @@ jest.mock('@/shared/lib/routstr/sdk/walletAdapter', () => ({
 
 jest.mock('@/shared/lib/routstr/providers', () => ({
   normalizeNodeUrl: (u: string) => u.replace(/\/+$/, '').replace(/\/v1$/, ''),
-  fetchNodeInfo: async () => (mockNodeMints ? { mints: mockNodeMints } : null),
+  fetchNodeInfo: async () =>
+    mockNodeInfoPending ?? (mockNodeMints ? { mints: mockNodeMints } : null),
 }));
 
 import { getModels, sendMessage, setRoutstrNodeBaseUrl } from '@/shared/lib/routstr/api';
-import { resetRoutstrClient } from '@/shared/lib/routstr/sdk/client';
+import {
+  acceptedMintsForProvider,
+  resetRoutstrClient,
+  seedProviderCatalog,
+} from '@/shared/lib/routstr/sdk/client';
 
 const wallet = (
   jest.requireMock('@/shared/lib/routstr/sdk/walletAdapter') as {
@@ -102,8 +123,6 @@ async function seedThenSend() {
         })
   ) as unknown as typeof fetch;
   await getModels();
-  // `getModels` seeds in the background so the picker is not held up.
-  await new Promise((resolve) => setImmediate(resolve));
   return sendMessage([{ role: 'user', content: 'hi' }], { model: 'm' });
 }
 
@@ -114,6 +133,28 @@ describe('paying mint selection', () => {
     mockSelectedMint = MINIBITS;
     mockBalances = { [SOVRAN]: 9000, [MINIBITS]: 1200 };
     mockNodeMints = undefined;
+    mockNodeInfoPending = undefined;
+  });
+
+  it('shows models before optional metadata resolves but waits for it before paying', async () => {
+    let resolveInfo!: (info: { mints: string[] }) => void;
+    mockNodeInfoPending = new Promise((resolve) => {
+      resolveInfo = resolve;
+    });
+    const send = seedThenSend();
+    const models = await getModels();
+    expect(models.map((model) => model.id)).toContain('m');
+    expect(wallet.sendToken).not.toHaveBeenCalled();
+    resolveInfo({ mints: [CUBA] });
+    await expect(send).rejects.toMatchObject({ error: { code: 'mint_not_accepted' } });
+    expect(wallet.sendToken).not.toHaveBeenCalled();
+  });
+
+  it('replaces a previously published mint restriction when the provider removes it', async () => {
+    await seedProviderCatalog('https://node.example', [], [CUBA]);
+    expect(await acceptedMintsForProvider('https://node.example')).toEqual([CUBA]);
+    await seedProviderCatalog('https://node.example', [], []);
+    expect(await acceptedMintsForProvider('https://node.example')).toBeNull();
   });
 
   it('pays from the selected mint when the node accepts it', async () => {

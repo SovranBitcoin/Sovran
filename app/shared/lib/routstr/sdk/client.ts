@@ -7,20 +7,24 @@ import {
   createDiscoveryAdapterFromStore,
   createSdkStore,
   createStorageAdapterFromStore,
+  noopLogger,
   type DiscoveryAdapter,
   type Model,
 } from '@routstr/sdk/browser';
 
 import { apiLog } from '@/shared/lib/logger';
+import { captureProfileStorageOwner } from '@/shared/lib/cashu/profileScopedStorage';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { routstrMintKey } from '../payingMint';
 
-import { sdkStorageDriver } from './driver';
+import { createSdkStorageDriver } from './driver';
 
 /**
- * The single `RoutstrClient` for this profile.
+ * Profile-owned catalog and recovery storage, with a node-bound request client.
  *
- * Built lazily and once: the SDK's store hydrates from disk, and its provider
- * manager tracks failures across requests, so handing out fresh clients would
- * throw that away every send and re-fetch the same catalogs.
+ * Hydrate once per profile. Each request gets a fixed provider view and its
+ * own settlement result, so neither a provider switch nor another request's
+ * failed refund can change the meaning of an in-flight payment.
  *
  * Mode is `xcashu` — pay per request, change back in the response header. The
  * alternative, `apikeys`, is the hosted-account model that stranded balances on
@@ -28,11 +32,14 @@ import { sdkStorageDriver } from './driver';
  */
 
 interface Built {
-  client: RoutstrClient;
+  owner: string;
+  storage: ReturnType<typeof createStorageAdapterFromStore>;
+  driver: ReturnType<typeof createSdkStorageDriver>;
   discovery: DiscoveryAdapter;
 }
 
 let built: Promise<Built> | null = null;
+let builtOwner: string | null = null;
 
 /** The SDK keys every provider cache by a trailing-slash URL, but its setters
  *  store what they are given. Seeding has to match the lookup or the catalog
@@ -49,44 +56,124 @@ const providerKey = (baseUrl: string) => (baseUrl.endsWith('/') ? baseUrl : `${b
  * the lazy store access in `api.ts`: Metro handles both spellings, Jest's CJS
  * VM only executes this one.
  */
-function walletAdapter() {
-  const { cocoWalletAdapter } = require('./walletAdapter') as typeof import('./walletAdapter');
-  return cocoWalletAdapter;
+function walletAdapter(assertOwner: () => void = () => {}) {
+  const { createCocoWalletAdapter } =
+    require('./walletAdapter') as typeof import('./walletAdapter');
+  return createCocoWalletAdapter(assertOwner);
 }
 
-async function build(): Promise<Built> {
-  const { store, hydrate } = createSdkStore({ driver: sdkStorageDriver });
+async function build(owner: string): Promise<Built> {
+  const driver = createSdkStorageDriver(owner);
+  const { store, hydrate } = createSdkStore({ driver });
   await hydrate;
   const storageAdapter = createStorageAdapterFromStore(store);
   const discovery = createDiscoveryAdapterFromStore(store);
   apiLog.info('routstr.sdk.client_ready');
   return {
+    owner,
+    storage: storageAdapter,
+    driver,
     discovery,
-    client: new RoutstrClient(
-      walletAdapter(),
-      storageAdapter,
-      discovery,
-      // `min` keeps the SDK's own user-facing alerting out of the way: this app
-      // routes every failure through its own error catalog, and two voices
-      // describing one failure is worse than either alone.
-      'min',
-      'xcashu'
-    ),
   };
 }
 
-function ensure(): Promise<Built> {
-  built ??= build().catch((error) => {
+async function ensure(): Promise<Built> {
+  const owner = await captureProfileStorageOwner();
+  if (builtOwner !== owner) {
+    built = null;
+    builtOwner = owner;
+  }
+  built ??= build(owner).catch((error) => {
     // Never cache a failed build: a transient storage error at boot would
     // otherwise disable AI for the whole session.
-    built = null;
+    if (builtOwner === owner) built = null;
     throw error;
   });
   return built;
 }
 
-export async function getRoutstrClient(): Promise<RoutstrClient> {
-  return (await ensure()).client;
+export async function getRoutstrClient(baseUrl: string, canDispatch: () => boolean = () => true) {
+  const built = await ensure();
+  const key = providerKey(baseUrl);
+  const assertOwner = () => {
+    const profile = useProfileStore.getState();
+    if (
+      profile.profiles.find((p) => p.accountIndex === profile.activeAccountIndex)?.pubkey !==
+      built.owner
+    ) {
+      throw new Error('Payment belongs to another profile');
+    }
+  };
+  const assertDispatch = () => {
+    assertOwner();
+    if (!canDispatch()) throw new Error('Payment request was cancelled');
+  };
+  const wallet = walletAdapter(assertOwner);
+  let receiveFailed = false;
+  let originalToken: string | null = null;
+  let received = false;
+  const storage = {
+    ...built.storage,
+    removeXcashuToken(node: string, token: string) {
+      if (node === key && token === originalToken && received) {
+        built.storage.removeXcashuToken(node, token);
+      }
+    },
+    clearXcashuTokensForBaseUrl(node: string) {
+      if (node === key && originalToken && received) {
+        built.storage.removeXcashuToken(node, originalToken);
+      }
+    },
+    addXcashuToken(node: string, token: string) {
+      if (!built.storage.getXcashuTokensForBaseUrl(node).some((entry) => entry.token === token)) {
+        built.storage.addXcashuToken(node, token);
+      }
+    },
+  };
+  const client = new RoutstrClient(
+    {
+      ...wallet,
+      async sendToken(mintUrl, amount) {
+        assertDispatch();
+        await built.driver.flush();
+        const token = await wallet.sendToken(mintUrl, amount);
+        originalToken = token;
+        received = false;
+        storage.addXcashuToken(key, token);
+        await built.driver.flush();
+        assertDispatch();
+        return token;
+      },
+      async receiveToken(token) {
+        received = false;
+        const result = await wallet.receiveToken(token);
+        received = result.success;
+        if (!result.success) receiveFailed = true;
+        return result;
+      },
+    },
+    storage,
+    {
+      ...built.discovery,
+      getCachedModels: () => {
+        const models = built.discovery.getCachedModels()[key];
+        return models ? { [key]: models } : {};
+      },
+    },
+    'min',
+    'xcashu',
+    // SDK diagnostics include raw refund bodies and token-bearing messages.
+    // Sovran emits structured request/recovery events at its own boundaries.
+    { logger: noopLogger }
+  );
+  return {
+    client,
+    baseUrl: key,
+    async finish() {
+      await built.driver.flush();
+      if (receiveFailed) throw new Error('Payment change is awaiting recovery');
+    },
+  };
 }
 
 /**
@@ -110,7 +197,7 @@ export async function seedProviderCatalog(
   const { discovery } = await ensure();
   const key = providerKey(baseUrl);
   discovery.setCachedModels({ ...discovery.getCachedModels(), [key]: models });
-  if (mints?.length) {
+  if (mints !== undefined) {
     discovery.setCachedMints({
       ...discovery.getCachedMints(),
       [key]: await inWalletSpelling(mints),
@@ -120,7 +207,7 @@ export async function seedProviderCatalog(
   apiLog.info('routstr.sdk.catalog_seeded', { models: models.length, mints: mints?.length ?? 0 });
 }
 
-const canonicalMint = (url: string) => url.trim().replace(/\/+$/, '').toLowerCase();
+const canonicalMint = (url: string) => routstrMintKey(url) ?? url;
 
 /**
  * Re-spell the node's accepted mints the way the wallet spells them.
@@ -164,13 +251,44 @@ export async function acceptedMintsForProvider(baseUrl: string): Promise<string[
  * the node never took it. Safe to call repeatedly; it is the question a local
  * reclaim cannot answer.
  */
-export async function sweepUnsettledPayments(mintUrl: string): Promise<void> {
+export async function sweepUnsettledPayments(): Promise<void> {
   try {
-    const { client } = await ensure();
-    const results = await client.getCashuSpender().refundXcashuTokens(mintUrl);
-    const recovered = results.filter((r) => r.success).length;
-    if (results.length) {
-      apiLog.info('routstr.sdk.sweep', { attempted: results.length, recovered });
+    const built = await ensure();
+    const assertOwner = () => {
+      const profile = useProfileStore.getState();
+      if (
+        profile.profiles.find((p) => p.accountIndex === profile.activeAccountIndex)?.pubkey !==
+        built.owner
+      ) {
+        throw new Error('Payment belongs to another profile');
+      }
+    };
+    const wallet = walletAdapter(assertOwner);
+    let attempted = 0;
+    let recovered = 0;
+    for (const [node, tokens] of Object.entries(built.storage.getXcashuTokens())) {
+      assertOwner();
+      const bound = await getRoutstrClient(node);
+      for (const { token } of tokens) {
+        assertOwner();
+        attempted += 1;
+        const refund = await bound.client.getBalanceManager().fetchRefundToken(node, token, true);
+        assertOwner();
+        // No SDK retry timer and no age/retry-count eviction. A 404 may be
+        // recovered directly from the mint, which remains the spend authority.
+        const returned =
+          refund.success && refund.token ? refund.token : refund.status === 404 ? token : null;
+        if (!returned) continue;
+        const result = await wallet.receiveToken(returned);
+        assertOwner();
+        if (!result.success) continue;
+        built.storage.removeXcashuToken(node, token);
+        await built.driver.flush();
+        recovered += 1;
+      }
+    }
+    if (attempted) {
+      apiLog.info('routstr.sdk.sweep', { attempted, recovered });
     }
   } catch (error) {
     apiLog.warn('routstr.sdk.sweep_failed', {
@@ -183,4 +301,5 @@ export async function sweepUnsettledPayments(mintUrl: string): Promise<void> {
  *  the store, the wallet and the provider list all belong to someone else. */
 export function resetRoutstrClient(): void {
   built = null;
+  builtOwner = null;
 }

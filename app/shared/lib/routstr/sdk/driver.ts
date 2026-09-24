@@ -1,5 +1,5 @@
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { apiLog } from '@/shared/lib/logger';
+import { createSecureVault } from '../secureVault';
 
 /**
  * Key-value storage for `@routstr/sdk`, on the app's profile-scoped backing.
@@ -12,39 +12,64 @@ import { apiLog } from '@/shared/lib/logger';
  */
 
 const NAMESPACE = 'routstr-sdk';
-const storage = createProfileScopedStorage();
-
 const scoped = (key: string) => `${NAMESPACE}:${key}`;
+const SENSITIVE_KEYS = new Set([
+  'api_keys',
+  'child_keys',
+  'xcashu_tokens',
+  'cached_receive_tokens',
+]);
 
-export const sdkStorageDriver = {
-  async getItem<T>(key: string, defaultValue: T): Promise<T> {
-    try {
-      const raw = await storage.getItem(scoped(key));
-      return raw == null ? defaultValue : (JSON.parse(raw) as T);
-    } catch {
-      // A malformed value is a cache miss, never a crash: everything the SDK
-      // keeps here is re-fetchable, and refusing to start over one bad row
-      // would be worse than re-fetching.
-      return defaultValue;
-    }
-  },
-
-  async setItem<T>(key: string, value: T): Promise<void> {
-    try {
-      await storage.setItem(scoped(key), JSON.stringify(value));
-    } catch (error) {
-      apiLog.warn('routstr.sdk.storage_write_failed', {
-        key,
-        error: error instanceof Error ? error.message : String(error),
+export function createSdkStorageDriver(ownerPubkey: string) {
+  const storage = createProfileScopedStorage(ownerPubkey);
+  let pending = Promise.resolve();
+  let failed = false;
+  const enqueue = (write: () => Promise<void>) => {
+    pending = pending
+      .then(async () => {
+        if (!failed) await write();
+      })
+      .catch(() => {
+        failed = true;
       });
-    }
-  },
-
-  async removeItem(key: string): Promise<void> {
-    try {
-      await storage.removeItem(scoped(key));
-    } catch {
-      // Nothing to do: the next read treats it as a miss either way.
-    }
-  },
-};
+    // The SDK voids writes. Capture failures here and report them through
+    // flush at the awaited wallet boundary, without an unhandled rejection.
+    return pending;
+  };
+  return {
+    async getItem<T>(key: string, defaultValue: T): Promise<T> {
+      const legacy = await storage.getItem(scoped(key));
+      if (!SENSITIVE_KEYS.has(key)) return legacy == null ? defaultValue : JSON.parse(legacy);
+      const vault = createSecureVault(ownerPubkey, scoped(key));
+      let raw = await vault.read();
+      if (legacy !== null) {
+        JSON.parse(legacy);
+        if (raw !== null && raw !== legacy) throw new Error('Conflicting payment recovery records');
+        if (raw === null) {
+          await vault.write(legacy);
+          raw = legacy;
+        }
+        await storage.removeItem(scoped(key));
+      }
+      return raw === null ? defaultValue : JSON.parse(raw);
+    },
+    setItem<T>(key: string, value: T): Promise<void> {
+      const raw = JSON.stringify(value);
+      return enqueue(async () => {
+        if (SENSITIVE_KEYS.has(key)) await createSecureVault(ownerPubkey, scoped(key)).write(raw);
+        else await storage.setItem(scoped(key), raw);
+      });
+    },
+    removeItem(key: string): Promise<void> {
+      return enqueue(async () => {
+        if (SENSITIVE_KEYS.has(key))
+          await createSecureVault(ownerPubkey, scoped(key)).write('null');
+        else await storage.removeItem(scoped(key));
+      });
+    },
+    async flush(): Promise<void> {
+      await pending;
+      if (failed) throw new Error('Payment recovery could not be saved');
+    },
+  };
+}
