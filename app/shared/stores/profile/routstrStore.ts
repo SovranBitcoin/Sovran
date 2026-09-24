@@ -145,6 +145,20 @@ interface PendingPayment {
   startedAt: number;
 }
 
+/** What a Routstr provider published about itself, as last seen. */
+export interface KnownProvider {
+  name: string;
+  description: string | null;
+  version: string | null;
+  /** Mints this provider redeems payment tokens from. Empty = publishes none,
+   *  which the payment path reads as "any mint". */
+  mints: string[];
+  /** Whether its catalog carries end-to-end encrypted (Tinfoil) models.
+   *  `null` until a catalog has been read for it. */
+  e2ee: boolean | null;
+  seenAt: number;
+}
+
 interface RoutstrState {
   /** Cashu token or persistent wallet key */
   apiKey: string | null;
@@ -161,6 +175,19 @@ interface RoutstrState {
    * never issued it is free and answers `401 key_not_found`.
    */
   legacyAccounts: Record<string, RoutstrAccount>;
+  /**
+   * Every Routstr provider this profile has seen, with what it published.
+   *
+   * Discovery is a live fetch from one node's `/v1/providers/`, and that node
+   * is sometimes unreachable — which is how a picker that listed 28 providers
+   * came back showing two. Remembering them makes the list a floor rather
+   * than a snapshot: a failed refresh loses freshness, never the menu.
+   *
+   * `mints` is the field that matters most. A node redeems tokens only from
+   * the mints it publishes, so this is what says whether the user can pay a
+   * provider at all — before they pick it and watch a send fail.
+   */
+  knownProviders: Record<string, KnownProvider>;
   /**
    * A provider the USER chose, which outranks nagg's pick.
    *
@@ -320,6 +347,10 @@ interface RoutstrActions {
   /** Pin the app to a provider, or pass `null` to follow nagg again. Drops the
    *  server lineup and model cache so the menu re-derives from the new node's
    *  own catalog rather than showing another node's models. */
+  /** Merge what a discovery pass (or a direct `/v1/info` read) learned about a
+   *  provider. Additive per field: a pass that does not know `e2ee` must not
+   *  erase an earlier answer. */
+  rememberProviders: (providers: Record<string, Partial<KnownProvider>>) => void;
   setUserNode: (nodeBaseUrl: string | null) => void;
   setConfirmSpend: (confirmSpend: boolean) => void;
   /** Record a payment before it leaves, so its change stays recoverable. */
@@ -471,6 +502,21 @@ function boundedPendingPayments(
  * unreclaimed the record is left over its ceiling — an oversized blob is
  * recoverable; a deleted key is not.
  */
+/**
+ * Keep the directory bounded, dropping the least recently seen first.
+ *
+ * Plain recency is right here in a way it is not for `legacyAccounts`: a
+ * provider row holds no money, so losing the stalest one costs a menu entry
+ * that the next discovery pass restores.
+ */
+function boundedProviders(providers: Record<string, KnownProvider>): Record<string, KnownProvider> {
+  const entries = Object.entries(providers);
+  if (entries.length <= MAX_KNOWN_PROVIDERS) return providers;
+  return Object.fromEntries(
+    entries.sort(([, a], [, b]) => b.seenAt - a.seenAt).slice(0, MAX_KNOWN_PROVIDERS)
+  );
+}
+
 function boundedAccounts(accounts: Record<string, RoutstrAccount>): Record<string, RoutstrAccount> {
   const entries = Object.entries(accounts);
   if (entries.length <= MAX_ARCHIVED_ACCOUNTS) return accounts;
@@ -559,6 +605,25 @@ const PersistedRoutstrSession = z.looseObject({
  * candidates. A pure LRU here would delete the one string that can reach a
  * user's money, which is the failure this whole record exists to prevent.
  */
+/** Capped at roughly four times what a healthy directory returns today (42),
+ *  so a hostile or runaway directory cannot grow the blob without bound while
+ *  a real network still fits comfortably. */
+const MAX_KNOWN_PROVIDERS = 160;
+
+const PersistedKnownProvider = z.looseObject({
+  name: z.string().max(200).default('').catch(''),
+  description: z.string().max(2000).nullable().default(null).catch(null),
+  version: z.string().max(64).nullable().default(null).catch(null),
+  /** Mints this provider redeems payment tokens from. Empty means it does not
+   *  publish a list, which reads as "any mint". */
+  mints: tolerantArray(z.string().max(512), 32).default([]).catch([]),
+  /** True when its catalog carried at least one `tinfoil-` model, so the
+   *  picker can say which providers can answer without reading the prompt.
+   *  `null` until a catalog has been read for it — absence of evidence. */
+  e2ee: z.boolean().nullable().default(null).catch(null),
+  seenAt: z.number().int().nonnegative().default(0).catch(0),
+});
+
 const MAX_ARCHIVED_ACCOUNTS = 32;
 
 const PersistedRoutstrAccount = z.looseObject({
@@ -602,6 +667,9 @@ const PersistedRoutstrStore = z.object({
   // Additive + tolerant: a malformed value parses to null, which simply means
   // "follow nagg" — the default.
   userNodeBaseUrl: z.string().max(512).nullable().default(null).catch(null),
+  // Additive + tolerant, same reasoning as `legacyAccounts`: one malformed
+  // provider row must cost that row, not the directory.
+  knownProviders: tolerantRecord(z.string().max(512), PersistedKnownProvider),
   pendingPayments: tolerantRecord(z.string().max(128), PersistedPendingPayment),
   // Additive, and defaulting to ON: spending is the kind of thing that should
   // have to be turned off deliberately, never left off by a parse failure.
@@ -625,6 +693,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
       serverLineupAt: null,
       nodeBaseUrl: null,
       userNodeBaseUrl: null,
+      knownProviders: {},
       pendingPayments: {},
       confirmSpend: true,
       legacyAccounts: {},
@@ -874,6 +943,29 @@ export const useRoutstrStore = create<RoutstrStore>()(
         set({ confirmSpend });
       },
 
+      rememberProviders: (providers) => {
+        const entries = Object.entries(providers);
+        if (entries.length === 0) return;
+        set((state) => {
+          const next = { ...state.knownProviders };
+          for (const [baseUrl, patch] of entries) {
+            const existing = next[baseUrl];
+            next[baseUrl] = {
+              name: patch.name || existing?.name || baseUrl.replace(/^https:\/\//, ''),
+              description: patch.description ?? existing?.description ?? null,
+              version: patch.version ?? existing?.version ?? null,
+              mints: patch.mints ?? existing?.mints ?? [],
+              // Only a catalog read can answer this, so a discovery pass that
+              // does not know must leave the last answer alone.
+              e2ee: patch.e2ee ?? existing?.e2ee ?? null,
+              seenAt: Date.now(),
+            };
+          }
+          storeLog.debug('store.routstr.providers_remembered', { count: entries.length });
+          return { knownProviders: boundedProviders(next) };
+        });
+      },
+
       setUserNode: (nodeBaseUrl) => {
         const next = nodeBaseUrl?.trim().replace(/\/+$/, '') || null;
         storeLog.info('store.routstr.user_node_set', { pinned: next != null });
@@ -975,6 +1067,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
         lastKnownLineup: state.lastKnownLineup,
         nodeBaseUrl: state.nodeBaseUrl,
         legacyAccounts: boundedAccounts(state.legacyAccounts),
+        knownProviders: boundedProviders(state.knownProviders),
         userNodeBaseUrl: state.userNodeBaseUrl,
         pendingPayments: boundedPendingPayments(state.pendingPayments),
         confirmSpend: state.confirmSpend,

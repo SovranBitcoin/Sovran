@@ -22,17 +22,24 @@ const ProviderRowSpine = z.looseObject({
   description: z.string().max(2000).optional(),
   pubkey: z.string().max(128).optional(),
   version: z.string().max(64).optional(),
+  // The mints this provider redeems payment tokens from. Published here as
+  // well as on `/v1/info`, which means a directory pass can answer "can I pay
+  // this one" for every row without forty extra round trips.
+  mint_urls: z.array(z.string().max(512)).max(32).optional(),
 });
 
 const DirectorySpine = z.looseObject({
   providers: z.array(ProviderRowSpine).max(128).default([]),
 });
 
-export interface RoutstrProvider {
+interface RoutstrProvider {
   baseUrl: string;
   name: string;
   description?: string;
   version?: string;
+  /** Mints this provider accepts payment from. Empty when it publishes none,
+   *  which reads as "any mint". */
+  mints: string[];
 }
 
 /** Trailing slashes and a trailing `/v1` are noise — two spellings of one node
@@ -79,6 +86,7 @@ export async function fetchProviderDirectory(
         name: row.name?.trim() || baseUrl.replace(/^https:\/\//, ''),
         description: row.description?.trim() || undefined,
         version: row.version,
+        mints: row.mint_urls ?? [],
       });
     }
     apiLog.info('routstr.providers.discovered', { count: out.length });
@@ -140,6 +148,53 @@ export async function fetchNodeInfo(
       npub: info.npub,
       mints: info.mints ?? [],
       onionUrl: info.onion_url ?? undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+const ModelSummarySpine = z.looseObject({
+  data: z
+    .array(z.looseObject({ id: z.string().max(256).optional(), enabled: z.boolean().optional() }))
+    .max(4096),
+});
+
+export interface ProviderModelSummary {
+  /** Models this provider currently serves. */
+  count: number;
+  /** At least one of them runs in a Tinfoil enclave, so a request to it can be
+   *  sealed end to end. The `tinfoil-` prefix is the only honest signal: the
+   *  catalog lists `glm-5-3` and `tinfoil-glm-5-3` under the identical display
+   *  name and only the prefixed one is encrypted. */
+  e2ee: boolean;
+}
+
+/**
+ * Summarise a provider's catalog.
+ *
+ * Deliberately not called from the picker. `/v1/models` is three quarters of a
+ * megabyte and a directory holds forty providers, so this runs only where the
+ * user has asked about one specific provider — and what it learns is recorded,
+ * so the picker can show it afterwards without ever paying for it itself.
+ */
+export async function fetchProviderModelSummary(
+  nodeBaseUrl: string,
+  controls: RequestControls = {}
+): Promise<ProviderModelSummary | null> {
+  try {
+    // An arbitrary node base, not the configured one.
+    // eslint-disable-next-line no-restricted-globals -- see the note above
+    const response = await fetch(`${normalizeNodeUrl(nodeBaseUrl)}/v1/models`, {
+      signal: buildAbortSignal({ timeoutMs: 30_000, ...controls }),
+    });
+    if (!response.ok) return null;
+    const parsed = ModelSummarySpine.safeParse(await response.json());
+    if (!parsed.success) return null;
+    const enabled = parsed.data.data.filter((model) => model.enabled !== false);
+    return {
+      count: enabled.length,
+      e2ee: enabled.some((model) => model.id?.startsWith('tinfoil-') === true),
     };
   } catch {
     return null;

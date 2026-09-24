@@ -11,7 +11,17 @@ import { aiLog } from '@/shared/lib/logger';
 import { paramPopup, staticPopup } from '@/shared/lib/popup';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { reclaimRoutstrBalances } from '@/shared/lib/routstr/reclaim';
-import { fetchNodeInfo, normalizeNodeUrl, type NodeInfo } from '@/shared/lib/routstr/providers';
+import {
+  fetchNodeInfo,
+  fetchProviderModelSummary,
+  normalizeNodeUrl,
+  type NodeInfo,
+  type ProviderModelSummary,
+} from '@/shared/lib/routstr/providers';
+import { cachedProbe, probeProviders } from '@/shared/lib/routstr/providerHealth';
+import { useBalanceContext } from '@cashu/coco-react';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { ProviderAvatar } from '../components/ProviderAvatar';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -71,6 +81,19 @@ export function ProviderInfoScreen() {
 
   const [info, setInfo] = useState<NodeInfo | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'empty'>('loading');
+  const [catalog, setCatalog] = useState<ProviderModelSummary | null>(null);
+  const [status, setStatus] = useState(() =>
+    nodeBaseUrl ? (cachedProbe(nodeBaseUrl)?.status ?? 'unknown') : ('unknown' as const)
+  );
+
+  // Mints the wallet actually holds, so the accepted list can say which of
+  // them are yours rather than listing URLs you cannot act on.
+  const { balances } = useBalanceContext();
+  const heldMints = new Set(
+    Object.entries(balances.byMint)
+      .filter(([, snapshot]) => amountToNumber(snapshot?.total) > 0)
+      .map(([url]) => url.trim().replace(/\/+$/, '').toLowerCase())
+  );
 
   useEffect(() => {
     if (!nodeBaseUrl) return;
@@ -92,6 +115,31 @@ export function ProviderInfoScreen() {
     };
   }, [nodeBaseUrl]);
 
+  // The catalog costs three quarters of a megabyte, which is why the picker
+  // never fetches it. Here the user has asked about this one provider, so it
+  // is fair — and what it learns is recorded, so the picker can show "end-to-
+  // end encrypted" afterwards without ever paying for it itself.
+  useEffect(() => {
+    if (!nodeBaseUrl) return;
+    let cancelled = false;
+    void fetchProviderModelSummary(nodeBaseUrl).then((summary) => {
+      if (cancelled || !summary) return;
+      setCatalog(summary);
+      useRoutstrStore.getState().rememberProviders({ [nodeBaseUrl]: { e2ee: summary.e2ee } });
+    });
+    const controller = new AbortController();
+    void probeProviders([nodeBaseUrl], {
+      signal: controller.signal,
+      onResult: (probe) => {
+        if (!controller.signal.aborted) setStatus(probe.status);
+      },
+    });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [nodeBaseUrl]);
+
   const onCopy = useCallback(() => {
     if (!nodeBaseUrl) return;
     // Same as the mint address row: the copy itself is the feedback.
@@ -104,6 +152,11 @@ export function ProviderInfoScreen() {
     paramPopup('ai-provider-switched', { providerName: info?.name ?? nodeBaseUrl });
     router.back();
   }, [nodeBaseUrl, info?.name]);
+
+  const onUseRecommended = useCallback(() => {
+    useRoutstrStore.getState().setUserNode(null);
+    router.back();
+  }, []);
 
   const onReclaim = useCallback(async () => {
     const outcome = await reclaimRoutstrBalances();
@@ -143,7 +196,17 @@ export function ProviderInfoScreen() {
                 testID: 'ai-provider-info-close',
               },
               ...(isActive
-                ? []
+                ? [
+                    // The picker has no "Automatic" row — a list of providers
+                    // should be providers. Handing the choice back belongs
+                    // here, on the one that currently holds it.
+                    {
+                      text: 'Use the recommended provider',
+                      variant: 'secondary' as const,
+                      onPress: onUseRecommended,
+                      testID: 'ai-provider-info-auto',
+                    },
+                  ]
                 : [
                     {
                       text: 'Use this provider',
@@ -159,7 +222,7 @@ export function ProviderInfoScreen() {
       <Stack.Screen options={{ title: 'Provider details' }} />
 
       <VStack className="items-center py-4">
-        <Icon name="humbleicons:url" size={36} color={foreground} />
+        <ProviderAvatar name={displayName} baseUrl={nodeBaseUrl} status={status} size={56} />
         <Spacer size={8} />
         <Text bold size={22} testID="ai-provider-info-name">
           {displayName}
@@ -203,14 +266,56 @@ export function ProviderInfoScreen() {
 
       {info?.mints.length ? (
         <Section title="Accepted mints">
+          {info.mints.every(
+            (mint) => !heldMints.has(mint.trim().replace(/\/+$/, '').toLowerCase())
+          ) ? (
+            <>
+              <Notice
+                status="warning"
+                title="You cannot pay this provider yet"
+                description="It redeems payment only from the mints below, and your wallet holds none of them."
+              />
+              <Spacer size={8} />
+            </>
+          ) : null}
           <ListGroup variant="secondary">
-            {info.mints.map((mint) => (
-              <ListGroup.Item key={mint} disabled>
-                <ListGroup.ItemContent>
-                  <ListGroup.ItemTitle>{mint.replace(/^https:\/\//, '')}</ListGroup.ItemTitle>
-                </ListGroup.ItemContent>
-              </ListGroup.Item>
-            ))}
+            {info.mints.map((mint) => {
+              const held = heldMints.has(mint.trim().replace(/\/+$/, '').toLowerCase());
+              return (
+                <ListGroup.Item key={mint} disabled>
+                  <ListGroup.ItemContent>
+                    <ListGroup.ItemTitle>{mint.replace(/^https:\/\//, '')}</ListGroup.ItemTitle>
+                    <ListGroup.ItemDescription>
+                      {held ? 'In your wallet' : 'Not in your wallet'}
+                    </ListGroup.ItemDescription>
+                  </ListGroup.ItemContent>
+                  {held ? <Icon name="mdi:check-circle" size={18} color={foreground} /> : null}
+                </ListGroup.Item>
+              );
+            })}
+          </ListGroup>
+        </Section>
+      ) : null}
+
+      {catalog ? (
+        <Section title="Models">
+          <ListGroup variant="secondary">
+            <ListGroup.Item disabled>
+              <ListGroup.ItemContent>
+                <ListGroup.ItemTitle>{catalog.count.toLocaleString()} models</ListGroup.ItemTitle>
+              </ListGroup.ItemContent>
+            </ListGroup.Item>
+            <ListGroup.Item disabled>
+              <ListGroup.ItemContent>
+                <ListGroup.ItemTitle>End-to-end encrypted</ListGroup.ItemTitle>
+                <ListGroup.ItemDescription>
+                  {catalog.e2ee
+                    ? 'Some models run in an enclave this provider cannot read into.'
+                    : 'This provider can read every request it forwards.'}
+                </ListGroup.ItemDescription>
+              </ListGroup.ItemContent>
+              {catalog.e2ee ? <Icon name="mdi:shield-check" size={18} color={foreground} /> : null}
+            </ListGroup.Item>
           </ListGroup>
         </Section>
       ) : null}

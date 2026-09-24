@@ -52,6 +52,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/ai/components/AiHeaderTitle.tsx",
     "features/ai/components/AiMessageBubble.tsx",
     "features/ai/components/ModelChip.tsx",
+    "features/ai/components/ProviderAvatar.tsx",
     "features/bitchat/components/BluetoothNotice.tsx",
     "features/contacts/components/ScreenContainer.tsx",
     "features/contacts/components/SearchPostsList.tsx",
@@ -265,6 +266,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 259,
+  "total": 260,
 }
 `;

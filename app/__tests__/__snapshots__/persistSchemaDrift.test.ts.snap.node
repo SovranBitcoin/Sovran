@@ -4133,6 +4133,84 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
           ],
           "default": null,
         },
+        "knownProviders": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "properties": {
+              "description": {
+                "anyOf": [
+                  {
+                    "maxLength": 2000,
+                    "type": "string",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+                "default": null,
+              },
+              "e2ee": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+                "default": null,
+              },
+              "mints": {
+                "default": [],
+                "items": {
+                  "maxLength": 512,
+                  "type": "string",
+                },
+                "maxItems": 32,
+                "type": "array",
+              },
+              "name": {
+                "default": "",
+                "maxLength": 200,
+                "type": "string",
+              },
+              "seenAt": {
+                "default": 0,
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "version": {
+                "anyOf": [
+                  {
+                    "maxLength": 64,
+                    "type": "string",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+                "default": null,
+              },
+            },
+            "type": "object",
+          },
+          "default": {},
+          "propertyNames": {
+            "type": "string",
+          },
+          "tolerantKey": {
+            "input": {
+              "maxLength": 512,
+              "type": "string",
+            },
+            "output": {
+              "maxLength": 512,
+              "type": "string",
+            },
+          },
+          "type": "object",
+        },
         "lastKnownLineup": {
           "anyOf": [
             {
@@ -6104,6 +6182,7 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
           ],
           "default": null,
         },
+        "knownProviders": {},
         "lastKnownLineup": {
           "anyOf": [
             {
@@ -8006,6 +8085,7 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
         "nodeBaseUrl",
         "legacyAccounts",
         "userNodeBaseUrl",
+        "knownProviders",
         "pendingPayments",
         "confirmSpend",
       ],

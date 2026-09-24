@@ -25,6 +25,12 @@ import { isAbortError, type RequestControls } from 'wallet/safeFetch';
 
 const ROUTSTR_DEFAULT_BASE_URL = 'https://api.routstr.com/v1';
 
+/** A model served from a Tinfoil enclave, which `@routstr/sdk` seals the
+ *  request body for. The prefix is the catalog's namespace, and it is the only
+ *  honest signal: the live catalog lists `glm-5-3` and `tinfoil-glm-5-3` under
+ *  the identical display name, and only the prefixed one is encrypted. */
+const TINFOIL_MODEL_PREFIX = 'tinfoil-';
+
 /**
  * Node override served by nagg's `/app/ai-lineup` (and re-applied from the
  * persisted `routstrStore.nodeBaseUrl` on hydrate). Lets a nagg deploy
@@ -681,6 +687,20 @@ async function seedFromNode(origin: string, models: Model[]): Promise<void> {
   try {
     const info = await fetchNodeInfo(origin);
     await seedProviderCatalog(origin, models, info?.mints);
+    // Whether this provider can answer without reading the prompt is only
+    // knowable from its catalog, and its catalog is three quarters of a
+    // megabyte — far too heavy to probe every row of a picker with. Recording
+    // it here means the one provider we DID read is marked, and the picker
+    // fills in as providers are used.
+    routstrStoreState().rememberProviders({
+      [origin]: {
+        name: info?.name || undefined,
+        description: info?.description ?? null,
+        version: info?.version ?? null,
+        mints: info?.mints,
+        e2ee: models.some((model) => model.id.startsWith(TINFOIL_MODEL_PREFIX)),
+      },
+    });
   } catch {
     // Already logged inside. A stale catalog is the SDK's next 402, not a
     // reason to fail the model list the picker is waiting on.
