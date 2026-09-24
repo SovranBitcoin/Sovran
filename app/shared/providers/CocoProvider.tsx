@@ -2,6 +2,7 @@ import { createContext, useEffect, useState, ReactNode, useRef } from 'react';
 import { CocoCashuProvider } from '@cashu/coco-react';
 import { Manager } from '@cashu/coco-core';
 import { CocoManager } from '@/shared/lib/cashu/manager';
+import { reclaimRoutstrBalances } from '@/shared/lib/routstr/reclaim';
 import { reportCocoApiFailure } from '@/shared/lib/cashu/cocoFeedback';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
@@ -161,6 +162,15 @@ async function runCocoPhase2({ bgStage, chainManager, isLive }: CocoPhase2Args):
         chainManager.recoverPendingPaymentRequestReceiveAttempts()
       );
       log.info('coco.recovery.payment_request_receive.done');
+      if (!isLive()) return;
+      // Sats parked on a Routstr node the app has since been repointed away
+      // from. It belongs beside the other recovery sweeps for the same reason
+      // they are here: money that is ours but not yet in the wallet, swept
+      // once the wallet is ready. Non-fatal — the catch below covers it, and
+      // the sweep is idempotent, so a failed pass simply retries next launch.
+      log.info('coco.recovery.routstr_reclaim.start');
+      await initPhase('Coco-bg.routstrReclaim', () => reclaimRoutstrBalances());
+      log.info('coco.recovery.routstr_reclaim.done');
     } catch (recoveryErr) {
       initLog('Coco-bg', `recovery failed (non-fatal): ${recoveryErr}`);
       log.warn('coco.recovery.failed', {
