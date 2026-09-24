@@ -4174,6 +4174,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                 "maxLength": 200,
                 "type": "string",
               },
+              "pubkey": {
+                "anyOf": [
+                  {
+                    "maxLength": 128,
+                    "type": "string",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+                "default": null,
+              },
               "seenAt": {
                 "default": 0,
                 "maximum": 9007199254740991,

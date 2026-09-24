@@ -26,8 +26,10 @@ export interface HeaderIdentity {
   name: string;
   seed: string;
   picture?: string | null;
-  /** A mint draws `MintIcon`, so a missing or failed icon is the mint placeholder, not a seeded avatar. */
-  kind?: 'person' | 'mint';
+  /** A mint draws `MintIcon`, so a missing or failed icon is the mint
+   *  placeholder, not a seeded avatar. A provider draws the same seeded clay
+   *  avatar a person does, as a machine — it publishes no icon of its own. */
+  kind?: 'person' | 'mint' | 'provider';
   /** The picture is still resolving; draws the loading placeholder instead of a fallback. */
   isLoading?: boolean;
 }
@@ -50,6 +52,7 @@ function IdentityIcon({
   ) : (
     <Avatar
       state={isLoading ? 'loading' : picture ? 'image' : 'fallback'}
+      fallbackKind={kind === 'provider' ? 'robot' : 'person'}
       picture={picture ?? undefined}
       seed={seed}
       size={size}

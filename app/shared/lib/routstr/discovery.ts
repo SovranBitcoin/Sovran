@@ -38,6 +38,8 @@ interface AnnouncedProvider {
   name?: string;
   description?: string;
   mints?: string[];
+  /** Who signed the announcement, or whom the directory row names. */
+  pubkey?: string;
   /** When the announcement was published. A provider nobody has re-announced
    *  in a long time is still listed, but it is worth knowing. */
   announcedAt?: number;
@@ -80,7 +82,8 @@ function readAnnouncement(event: RelayEvent): AnnouncedProvider[] {
     .filter((url): url is string => url != null);
   if (fromTags.length > 0) {
     const name = asString(tagValues(event, 'name')[0]);
-    return fromTags.map((baseUrl) => ({ baseUrl, name, announcedAt }));
+    const pubkey = asString(event.pubkey);
+    return fromTags.map((baseUrl) => ({ baseUrl, name, pubkey, announcedAt }));
   }
 
   let parsed: unknown;
@@ -108,6 +111,9 @@ function readAnnouncement(event: RelayEvent): AnnouncedProvider[] {
       baseUrl,
       name: asString(entry.name),
       description: asString(entry.description),
+      // The row's own key when it carries one; otherwise the signer's, which
+      // is the relationship an announcement asserts anyway.
+      pubkey: asString(entry.pubkey) ?? asString(event.pubkey),
       mints: Array.isArray(entry.mint_urls)
         ? entry.mint_urls.filter((m): m is string => typeof m === 'string')
         : undefined,
@@ -139,6 +145,8 @@ interface DiscoveredProvider {
   name: string;
   description?: string;
   version?: string;
+  /** The operator's Nostr pubkey, hex. */
+  pubkey?: string;
   /** Mints this provider redeems payment tokens from. Empty when it publishes
    *  none, which the payment path reads as "any mint". */
   mints: string[];
@@ -167,6 +175,7 @@ export async function discoverProviders(
       description: row.description ?? existing?.description,
       version: existing?.version,
       mints: row.mints?.length ? row.mints : (existing?.mints ?? []),
+      pubkey: row.pubkey ?? existing?.pubkey,
       announcedAt: row.announcedAt ?? existing?.announcedAt,
     });
   };

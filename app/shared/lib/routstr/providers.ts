@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { buildAbortSignal } from '@/shared/lib/http/requestSignal';
 import { apiLog } from '@/shared/lib/logger';
+import { npubToPubkey } from '@/shared/lib/nostr/client';
 import type { RequestControls } from 'wallet/safeFetch';
 
 /**
@@ -116,6 +117,9 @@ export interface NodeInfo {
    *  else is refused, so this is the one field that decides whether the user
    *  can pay this provider at all. */
   mints: string[];
+  /** The operator's Nostr pubkey, hex, decoded from the node's own `npub`.
+   *  Hex because that is what every profile read in this app takes. */
+  pubkey?: string;
   onionUrl?: string;
 }
 
@@ -146,6 +150,7 @@ export async function fetchNodeInfo(
       description: info.description?.trim() || undefined,
       version: info.version,
       npub: info.npub,
+      pubkey: info.npub ? npubToPubkey(info.npub) || undefined : undefined,
       mints: info.mints ?? [],
       onionUrl: info.onion_url ?? undefined,
     };

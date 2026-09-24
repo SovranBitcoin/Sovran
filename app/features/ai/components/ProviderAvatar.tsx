@@ -62,7 +62,13 @@ export function ProviderAvatar({
 
   return (
     <View className="relative" accessibilityLabel={`${name || baseUrl} provider`}>
-      <Avatar state="fallback" seed={baseUrl} size={size} alt={name || baseUrl} />
+      <Avatar
+        state="fallback"
+        fallbackKind="robot"
+        seed={baseUrl}
+        size={size}
+        alt={name || baseUrl}
+      />
       {dotStyle ? <View className={DOT_CLASS} style={dotStyle} /> : null}
     </View>
   );

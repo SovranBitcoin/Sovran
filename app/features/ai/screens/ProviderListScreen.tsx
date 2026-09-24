@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { View } from 'react-native';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -6,13 +7,9 @@ import { aiLog } from '@/shared/lib/logger';
 import { buildProviderInfoHref } from '@/shared/lib/nav/providerInfoRoutes';
 import { paramPopup } from '@/shared/lib/popup';
 import { discoverProviders } from '@/shared/lib/routstr/discovery';
-import {
-  cachedProbe,
-  probeProviders,
-  type ProviderStatus,
-} from '@/shared/lib/routstr/providerHealth';
+import { probeProviders, type ProviderStatus } from '@/shared/lib/routstr/providerHealth';
 import { normalizeNodeUrl } from '@/shared/lib/routstr/providers';
-import { useRoutstrStore, type KnownProvider } from '@/shared/stores/profile/routstrStore';
+import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
@@ -22,7 +19,10 @@ import { Screen } from '@/shared/ui/composed/Screen';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 
-import { useHeldMints } from '../hooks/useHeldMints';
+import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
+import { nostrIdentity } from '@/shared/ui/composed/ContactRow';
+
+import { describeProvider, useProviderRows, type ProviderRow } from '../hooks/useProviderRows';
 
 /**
  * Choose which Routstr provider to pay.
@@ -51,74 +51,77 @@ import { useHeldMints } from '../hooks/useHeldMints';
  * paid for AI is not this app's decision to make on the user's behalf.
  */
 
-interface Row {
-  baseUrl: string;
-  name: string;
-  description: string | null;
-  mints: string[];
-  e2ee: boolean | null;
-  status: ProviderStatus;
+const keyExtractor = (row: ProviderRow) => row.baseUrl;
+
+/**
+ * One provider.
+ *
+ * Its own component because each row reads the operator's Nostr profile, and
+ * a hook cannot be called inside a list's `renderItem`. The profile is what
+ * turns a hostname into a counterparty: the same reputation score and follower
+ * count the mint rows carry, from the same cache, so "who is this" is answered
+ * the same way everywhere in the app.
+ */
+function ProviderListRow({
+  row,
+  selected,
+  onChoose,
+  onInspect,
+}: {
+  row: ProviderRow;
+  selected: boolean;
+  onChoose: (row: ProviderRow) => void;
+  onInspect: (row: ProviderRow) => void;
+}) {
+  const { data: profile } = useNostrProfile(row.pubkey);
+
+  return (
+    <ContactRow
+      identity={[
+        providerIdentity({
+          baseUrl: row.baseUrl,
+          displayName: row.name,
+          spendableSats: row.spendableSats,
+          e2ee: row.e2ee === true,
+        }),
+        // Composite, exactly as a mint row pairs its mint with its operator:
+        // the provider supplies the face and the name, the operator supplies
+        // the reputation.
+        ...(row.pubkey ? [nostrIdentity(row.pubkey, profile ?? undefined)] : []),
+      ]}
+      title={row.name}
+      subtitle={row.blockedReason ?? describeProvider(row)}
+      disabled={row.blockedReason != null}
+      disabledReason={row.blockedReason ?? undefined}
+      selected={selected}
+      accentPosition="below"
+      trailing={
+        <CircleActionButton
+          icon="tabler:dots"
+          systemIcon="ellipsis"
+          onPress={() => onInspect(row)}
+          testID={`ai-provider-inspect:${row.baseUrl}`}
+          accessibilityLabel="Open provider page"
+        />
+      }
+      trailingInteractive
+      onPress={() => onChoose(row)}
+      testID={`contact-row:provider:${row.baseUrl}`}
+    />
+  );
 }
-
-const host = (baseUrl: string) => baseUrl.replace(/^https:\/\//, '');
-
-const canonicalMint = (url: string) => url.trim().replace(/\/+$/, '').toLowerCase();
-
-/** Why a row cannot be chosen, or `null` when it can. Ordered by what the user
- *  can do about it: a mint they could add, then a provider that is simply down. */
-function blockedReason(row: Row, heldMints: Set<string>): string | null {
-  if (row.mints.length > 0 && !row.mints.some((mint) => heldMints.has(canonicalMint(mint)))) {
-    return `Redeems ecash only from ${row.mints.length === 1 ? 'a mint' : 'mints'} you do not hold`;
-  }
-  if (row.status === 'offline') return 'Not answering right now';
-  return null;
-}
-
-/** What to say under a usable provider's name — ordered by what changes a
- *  decision: that your money works there, then whether it can answer privately. */
-function describeRow(row: Row): string {
-  const parts: string[] = [];
-  if (row.mints.length > 0) parts.push('Accepts your mint');
-  if (row.e2ee) parts.push('End-to-end encrypted models');
-  if (parts.length === 0 && row.description) parts.push(row.description);
-  if (parts.length === 0) parts.push(host(row.baseUrl));
-  return parts.join(' · ');
-}
-
-function rowsFromStore(known: Record<string, KnownProvider>): Row[] {
-  return Object.entries(known).map(([baseUrl, provider]) => ({
-    baseUrl,
-    name: provider.name || host(baseUrl),
-    description: provider.description,
-    mints: provider.mints,
-    e2ee: provider.e2ee,
-    status: cachedProbe(baseUrl)?.status ?? 'unknown',
-  }));
-}
-
-const keyExtractor = (row: Row) => row.baseUrl;
 
 export function ProviderListScreen() {
   const background = useThemeColor('background');
   const chosen = useRoutstrStore((s) => s.userNodeBaseUrl);
-  const knownProviders = useRoutstrStore((s) => s.knownProviders);
   const nodeBaseUrl = useRoutstrStore((s) => s.nodeBaseUrl);
-  const heldMints = useHeldMints();
 
   const [probed, setProbed] = useState<Record<string, ProviderStatus>>({});
+  // The native header floats over the list, so the first rows sit under it
+  // unless the list reserves its height. Same spacer the mint list uses.
+  const [headerHeight, setHeaderHeight] = useState(0);
 
-  const rows = useMemo(() => {
-    const base = rowsFromStore(knownProviders).map((row) => ({
-      ...row,
-      status: probed[row.baseUrl] ?? row.status,
-    }));
-    // Usable first, then answering, then by name. Sorting rather than
-    // filtering: a dimmed row's details page is where the user learns which
-    // mint to add.
-    const rank = (row: Row) =>
-      (blockedReason(row, heldMints) ? 2 : 0) + (row.status === 'online' ? 0 : 1);
-    return base.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
-  }, [knownProviders, probed, heldMints]);
+  const rows = useProviderRows(probed);
 
   // Discovery and probing both refine a list that is already on screen.
   useEffect(() => {
@@ -141,6 +144,7 @@ export function ProviderListScreen() {
                 description: provider.description ?? null,
                 version: provider.version ?? null,
                 mints: provider.mints,
+                pubkey: provider.pubkey ?? null,
               },
             ])
           )
@@ -160,6 +164,7 @@ export function ProviderListScreen() {
                 description: probe.info.description ?? null,
                 version: probe.info.version ?? null,
                 mints: probe.info.mints,
+                pubkey: probe.info.pubkey ?? null,
               },
             });
           }
@@ -172,49 +177,39 @@ export function ProviderListScreen() {
     };
   }, [chosen, nodeBaseUrl]);
 
-  const onChoose = useCallback((row: Row) => {
+  const onChoose = useCallback((row: ProviderRow) => {
     useRoutstrStore.getState().setUserNode(row.baseUrl);
-    aiLog.info('ai.provider.chosen', { status: row.status, mints: row.mints.length });
+    aiLog.info('ai.provider.chosen', {
+      status: row.status,
+      mints: row.mints.length,
+      e2ee: row.e2ee === true,
+      spendableSats: row.spendableSats,
+    });
     paramPopup('ai-provider-switched', { providerName: row.name });
     router.back();
   }, []);
 
-  const onInspect = useCallback((row: Row) => {
+  const onInspect = useCallback((row: ProviderRow) => {
     router.navigate(buildProviderInfoHref(row.baseUrl, { seedName: row.name }));
   }, []);
 
   const activeUrl = normalizeNodeUrl(chosen ?? '');
 
-  const renderItem = ({ item }: { item: Row }) => {
-    const blocked = blockedReason(item, heldMints);
-    return (
-      <ContactRow
-        identity={providerIdentity({ baseUrl: item.baseUrl, displayName: item.name })}
-        subtitle={blocked ?? describeRow(item)}
-        disabled={blocked != null}
-        disabledReason={blocked ?? undefined}
-        selected={item.baseUrl === activeUrl}
-        trailing={
-          <CircleActionButton
-            icon="tabler:dots"
-            systemIcon="ellipsis"
-            onPress={() => onInspect(item)}
-            testID={`ai-provider-inspect:${item.baseUrl}`}
-            accessibilityLabel="Open provider page"
-          />
-        }
-        trailingInteractive
-        onPress={() => onChoose(item)}
-        testID={`contact-row:provider:${item.baseUrl}`}
-      />
-    );
-  };
+  const renderItem = ({ item }: { item: ProviderRow }) => (
+    <ProviderListRow
+      row={item}
+      selected={item.baseUrl === activeUrl}
+      onChoose={onChoose}
+      onInspect={onInspect}
+    />
+  );
 
   return (
     <Screen
       name="ProviderListScreen"
       scroll="custom"
       bgColor={background}
+      onHeaderHeightChange={setHeaderHeight}
       footer={
         <BottomButtons>
           <ButtonHandler
@@ -234,7 +229,14 @@ export function ProviderListScreen() {
         data={rows}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
-        contentContainerClassName="pt-3"
+        extraData={activeUrl}
+        // FlashList v2 inserts its scroll anchor before the header component,
+        // so a tall spacer over a short list mis-anchors the initial offset.
+        // This is a plain top-anchored list; opt out and let the spacer be the
+        // sole inset authority.
+        maintainVisibleContentPosition={{ disabled: true }}
+        contentInsetAdjustmentBehavior="never"
+        ListHeaderComponent={<View style={{ height: headerHeight }} />}
         ListEmptyComponent={
           <VStack className="items-center px-8 pt-12">
             <Text className="text-center" color="muted">

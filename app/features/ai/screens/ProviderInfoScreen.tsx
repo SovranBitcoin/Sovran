@@ -23,6 +23,9 @@ import { cachedProbe, probeProviders } from '@/shared/lib/routstr/providerHealth
 import { useBalanceContext } from '@cashu/coco-react';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { useIdentityHeader } from '@/shared/ui/composed/IdentityHeader';
+import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
+import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
+import { ContactRow, nostrIdentity } from '@/shared/ui/composed/ContactRow';
 import { ProviderAvatar } from '../components/ProviderAvatar';
 import { ProviderMintRow } from '../components/ProviderMintRow';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
@@ -48,6 +51,10 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
  * anywhere else is refused, so that list, not the model catalog, decides
  * whether the user can pay this provider at all.
  */
+
+/** Reputation then reach, the same order and the same pills a mint's operator
+ *  row uses. */
+const OPERATOR_STATS = ['reputation', 'followers'] as const;
 
 const ParamsSchema = z.object({
   providerInfoEntry: z.string().min(1).max(8192).optional(),
@@ -85,6 +92,15 @@ export function ProviderInfoScreen() {
   const [info, setInfo] = useState<NodeInfo | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'empty'>('loading');
   const [catalog, setCatalog] = useState<ProviderModelSummary | null>(null);
+
+  // Who runs this node. `/v1/info` publishes an npub; discovery records the
+  // key that signed the announcement. Either way the profile read is the same
+  // one every other identity in this app goes through.
+  const knownProvider = useRoutstrStore((s) =>
+    nodeBaseUrl ? s.knownProviders[nodeBaseUrl] : undefined
+  );
+  const operatorPubkey = info?.pubkey ?? knownProvider?.pubkey ?? null;
+  const { data: operatorProfile, isLoading: operatorLoading } = useNostrProfile(operatorPubkey);
   const [status, setStatus] = useState(() =>
     nodeBaseUrl ? (cachedProbe(nodeBaseUrl)?.status ?? 'unknown') : ('unknown' as const)
   );
@@ -92,6 +108,15 @@ export function ProviderInfoScreen() {
   // Mints the wallet actually holds, so the accepted list can say which of
   // them are yours rather than listing URLs you cannot act on.
   const { balances } = useBalanceContext();
+  // What the wallet can actually spend HERE — the sum across the mints this
+  // provider redeems, not the wallet total, which says nothing about whether
+  // this particular provider can be paid.
+  const spendableSats = (info?.mints ?? []).reduce(
+    (sum, mint) =>
+      sum + amountToNumber(balances.byMint[mint.trim().replace(/\/+$/, '')]?.total ?? undefined),
+    0
+  );
+
   const heldMints = new Set(
     Object.entries(balances.byMint)
       .filter(([, snapshot]) => amountToNumber(snapshot?.total) > 0)
@@ -275,7 +300,7 @@ export function ProviderInfoScreen() {
       </Section>
 
       {info?.mints.length ? (
-        <Section title="Accepted mints">
+        <Section title={`Accepted mints · ${spendableSats.toLocaleString()} sat spendable`}>
           {info.mints.every(
             (mint) => !heldMints.has(mint.trim().replace(/\/+$/, '').toLowerCase())
           ) ? (
@@ -330,15 +355,24 @@ export function ProviderInfoScreen() {
                 </ListGroup.ItemContent>
               </ListGroup.Item>
             ) : null}
-            {info.npub ? (
-              <ListGroup.Item disabled>
-                <ListGroup.ItemContent>
-                  <ListGroup.ItemTitle>Operator</ListGroup.ItemTitle>
-                  <ListGroup.ItemDescription>{info.npub}</ListGroup.ItemDescription>
-                </ListGroup.ItemContent>
-              </ListGroup.Item>
-            ) : null}
           </ListGroup>
+        </Section>
+      ) : null}
+
+      {operatorPubkey ? (
+        <Section title="Operator">
+          {/* The same row the mint page gives a mint's operator: a face, a
+              name, their reputation and reach, and a way through to the
+              profile. An npub string is an identifier, not an identity — it
+              tells the user nothing about who they are about to pay. */}
+          <ContactRow
+            identity={nostrIdentity(operatorPubkey, operatorProfile ?? undefined)}
+            loading={operatorLoading}
+            stats={OPERATOR_STATS}
+            accentPosition="below"
+            onPress={() => router.push(buildModalProfileHref({ pubkey: operatorPubkey }))}
+            testID="ai-provider-info-operator"
+          />
         </Section>
       ) : null}
 

@@ -147,7 +147,7 @@ interface PendingPayment {
 }
 
 /** What a Routstr provider published about itself, as last seen. */
-export interface KnownProvider {
+interface KnownProvider {
   name: string;
   description: string | null;
   version: string | null;
@@ -157,6 +157,10 @@ export interface KnownProvider {
   /** Whether its catalog carries end-to-end encrypted (Tinfoil) models.
    *  `null` until a catalog has been read for it. */
   e2ee: boolean | null;
+  /** The operator's Nostr pubkey, hex. A provider is a counterparty, and this
+   *  is what turns it from a hostname into somebody with a reputation — the
+   *  same thing a mint's operator npub does on the mint page. */
+  pubkey: string | null;
   seenAt: number;
 }
 
@@ -622,6 +626,7 @@ const PersistedKnownProvider = z.looseObject({
    *  picker can say which providers can answer without reading the prompt.
    *  `null` until a catalog has been read for it — absence of evidence. */
   e2ee: z.boolean().nullable().default(null).catch(null),
+  pubkey: z.string().max(128).nullable().default(null).catch(null),
   seenAt: z.number().int().nonnegative().default(0).catch(0),
 });
 
@@ -967,6 +972,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
               // Only a catalog read can answer this, so a discovery pass that
               // does not know must leave the last answer alone.
               e2ee: patch.e2ee ?? existing?.e2ee ?? null,
+              pubkey: patch.pubkey ?? existing?.pubkey ?? null,
               seenAt: Date.now(),
             };
           }

@@ -156,6 +156,12 @@ interface ProviderIdentity {
   kind: 'provider';
   baseUrl: string;
   displayName?: string;
+  /** Sats the wallet holds across the mints this provider redeems. Not the
+   *  wallet total: what matters is what can actually be spent HERE. */
+  spendableSats?: number;
+  /** Its catalog carries models running in an enclave, so the prompts it
+   *  forwards are ones it cannot read. */
+  e2ee?: boolean;
 }
 
 interface SelfIdentity {
@@ -171,7 +177,15 @@ export type Identity =
   NostrIdentity | MintIdentity | ProviderIdentity | BleIdentity | GeohashIdentity | SelfIdentity;
 
 type StatKey =
-  'balance' | 'units' | 'score' | 'audit' | 'reputation' | 'followers' | 'offline' | 'connection';
+  | 'balance'
+  | 'units'
+  | 'score'
+  | 'audit'
+  | 'reputation'
+  | 'followers'
+  | 'offline'
+  | 'connection'
+  | 'encrypted';
 
 // ---------------------------------------------------------------------------
 // Factories — keep call sites from re-typing `kind:` + field plumbing.
@@ -203,6 +217,8 @@ export function nostrIdentity(
 export function providerIdentity(input: {
   baseUrl: string;
   displayName?: string;
+  spendableSats?: number;
+  e2ee?: boolean;
 }): ProviderIdentity {
   return { kind: 'provider', ...input };
 }
@@ -403,9 +419,10 @@ const DEFAULT_STATS_BY_KIND: Record<Identity['kind'], readonly StatKey[]> = {
   // row where a second "people" number alongside followers doesn't earn its
   // space. UserProfileScreen still shows it on the full profile header.
   nostr: ['reputation', 'followers'],
-  // A provider's usefulness is its mints and its liveness, and both are said
-  // in the subtitle. Nothing here is a number worth a pill.
-  provider: [],
+  // What is spendable there, whether it can answer without reading the
+  // prompt, and who the operator is to the network. Reputation before
+  // followers, same order the mint rows use.
+  provider: ['balance', 'encrypted', 'reputation', 'followers'],
   mint: ['units', 'score', 'audit', 'reputation', 'followers', 'offline'],
   ble: [],
   geohash: [],
@@ -527,6 +544,7 @@ function buildStats(
   tints: { warning: string; success: string }
 ): RowStat[] {
   const mintStats = find(ids, 'mint')?.stats;
+  const provider = find(ids, 'provider');
   const nostr = find(ids, 'nostr');
   const ble = find(ids, 'ble');
 
@@ -534,12 +552,28 @@ function buildStats(
 
   for (const key of keys) {
     switch (key) {
-      case 'balance':
-        if (typeof mintStats?.balance === 'number' && mintStats.balance > 0) {
+      case 'balance': {
+        const sats = mintStats?.balance ?? provider?.spendableSats;
+        if (typeof sats === 'number' && sats > 0) {
           out.push({
             icon: 'solar:wallet-bold',
-            value: formatCompact(mintStats.balance),
+            value: formatCompact(sats),
             color: STAT_COLOR_SOCIAL,
+            accessibilityLabel: provider ? `${sats} sats spendable here` : undefined,
+          });
+        }
+        break;
+      }
+      case 'encrypted':
+        // Only the affirmative. A provider that can read your prompts is the
+        // norm, and a pill on every other row would make the one that cannot
+        // harder to spot, not easier.
+        if (provider?.e2ee === true) {
+          out.push({
+            icon: 'mdi:shield-check',
+            value: 'E2EE',
+            color: tints.success,
+            accessibilityLabel: 'Offers end-to-end encrypted models',
           });
         }
         break;
@@ -720,6 +754,8 @@ export function ContactRow({
   let avatarProp: ListRowAvatar | undefined;
   let iconCircleProp: ListRowIconCircle | undefined;
 
+  const provider = find(identities, 'provider');
+
   if (mint) {
     leadingNode = (
       <MintIcon iconUrl={mint.iconUrl} name={name} size={AVATAR_SIZE} isLoading={resolvedLoading} />
@@ -737,6 +773,17 @@ export function ContactRow({
         size={AVATAR_SIZE}
       />
     );
+  } else if (provider) {
+    // A machine, drawn as one. Same clay and same seeded hues as every person
+    // fallback, because a provider belongs in the same visual family — but a
+    // node is not somebody, and a person silhouette said it was.
+    avatarProp = {
+      seed,
+      name,
+      size: AVATAR_SIZE,
+      state: avatarState,
+      fallbackKind: 'robot',
+    };
   } else if (nostr || self || ble || picture) {
     avatarProp = { picture, seed, name, size: AVATAR_SIZE, state: avatarState };
   } else if (geohash) {

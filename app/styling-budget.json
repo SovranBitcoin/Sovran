@@ -25,6 +25,9 @@
     "inline-style": 8,
     "content-container-style": 3
   },
+  "features/ai/screens/ProviderListScreen.tsx": {
+    "inline-style": 1
+  },
   "features/bitchat/screens/GeohashChatScreen.tsx": {
     "inline-style": 7,
     "stack-layout-props": 2

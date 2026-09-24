@@ -14,12 +14,12 @@ import { MintIcon } from '@/shared/ui/composed/MintIcon';
  *
  * A bare URL is not an answer to "can I pay this provider" — the user knows
  * their mints by name and icon, and by what is in them. So the row is the same
- * shape the wallet's own mint rows are: icon, name, and the balance held
- * there, with the URL demoted to a subtitle only when the name is the URL.
+ * shape the wallet's own mint rows are: icon, name, and the balance held there.
  *
- * The balance is what makes the row actionable. Zero held, or absent
- * altogether, is the difference between "switch to this provider" and "add
- * this mint first".
+ * The balance sits on the row's second line rather than trailing it. As a
+ * trailing amount it rendered at the balance-display scale this app uses for
+ * headline figures, which made a four-sat holding shout across the page; on
+ * the description line it is a fact about the mint, sized like one.
  */
 export function ProviderMintRow({ mintUrl }: { mintUrl: string }) {
   const foreground = useThemeColor('foreground');
@@ -34,14 +34,14 @@ export function ProviderMintRow({ mintUrl }: { mintUrl: string }) {
       <ListGroup.ItemContent>
         <ListGroup.ItemTitle>{name}</ListGroup.ItemTitle>
         <ListGroup.ItemDescription>
-          {sats > 0 ? 'In your wallet' : 'Not in your wallet'}
+          {sats > 0 ? (
+            <AmountFormatter amount={sats} unit="sat" size={13} color={foreground} />
+          ) : (
+            'Not in your wallet'
+          )}
         </ListGroup.ItemDescription>
       </ListGroup.ItemContent>
-      {sats > 0 ? (
-        <AmountFormatter amount={sats} unit="sat" />
-      ) : (
-        <Icon name="mdi:circle-outline" size={16} color={foreground} />
-      )}
+      {sats > 0 ? <Icon name="mdi:check-circle" size={18} color={foreground} /> : null}
     </ListGroup.Item>
   );
 }
