@@ -1,0 +1,95 @@
+/**
+ * Every way an AI send can fail to start has a name.
+ *
+ * The wallet's own flows put their preconditions in a machine; this send had
+ * them scattered through a long handler, so a missing provider, a mint the
+ * provider refuses and a declined confirmation all looked the same from
+ * outside — nothing happened, with nothing said. These pin the order too,
+ * because the order is what decides whether the advice is actionable: "add
+ * funds" is the wrong answer when the real problem is that nobody has been
+ * picked to pay.
+ */
+
+import { evaluateSendGate, type SendGateInput } from '@/features/ai/lib/sendGate';
+import type { LineupEntry } from '@/shared/lib/routstr/lineup';
+
+const MINIBITS = 'https://mint.minibits.cash/Bitcoin';
+const SOVRAN = 'https://mint.sovran.money';
+
+/** `completion` drives the reserve: the node holds `max_tokens` worth of it up
+ *  front, which is the figure the gate has to clear. */
+const entry = (completion: number): LineupEntry => ({
+  modelId: 'gpt-oss-20b',
+  displayName: 'GPT-OSS 20B',
+  contextLength: 128_000,
+  created: 1_750_000_000,
+  visionInput: false,
+  satsPricing: { prompt: 1e-6, completion, request: 0, image: null, max_cost: completion * 4096 },
+  maxCompletionTokens: null,
+});
+
+const base = (overrides: Partial<SendGateInput> = {}): SendGateInput => ({
+  text: 'hello',
+  providerBaseUrl: 'https://node.example',
+  providerMints: [MINIBITS],
+  heldMints: new Set([MINIBITS.toLowerCase()]),
+  walletSats: 10_000,
+  entry: entry(4e-6),
+  imageCount: 0,
+  confirmSpend: false,
+  ...overrides,
+});
+
+describe('AI send gate', () => {
+  it('does nothing for an empty message', () => {
+    expect(evaluateSendGate(base({ text: '   ' })).state).toBe('empty');
+  });
+
+  it('refuses before a provider is chosen, ahead of every other check', () => {
+    // Deliberately also unaffordable and mint-less: no provider outranks both,
+    // because there is nobody to pay and no mints to compare against.
+    const outcome = evaluateSendGate(
+      base({ providerBaseUrl: null, walletSats: 0, heldMints: new Set() })
+    );
+    expect(outcome.state).toBe('no-provider');
+  });
+
+  it('names a mint the provider will not take, rather than calling it a shortfall', () => {
+    const outcome = evaluateSendGate(
+      base({ heldMints: new Set([SOVRAN.toLowerCase()]), walletSats: 10_000 })
+    );
+    expect(outcome).toMatchObject({ state: 'mint-not-accepted', providerMints: [MINIBITS] });
+  });
+
+  it('matches an accepted mint across a trailing slash and case', () => {
+    const outcome = evaluateSendGate(
+      base({
+        providerMints: [`${MINIBITS.toUpperCase()}/`],
+        heldMints: new Set([MINIBITS.toLowerCase()]),
+      })
+    );
+    expect(outcome.state).not.toBe('mint-not-accepted');
+  });
+
+  it('treats a provider that publishes no mints as taking any', () => {
+    const outcome = evaluateSendGate(base({ providerMints: [], heldMints: new Set() }));
+    expect(outcome.state).toBe('ready');
+  });
+
+  it('gates on what the node reserves, not what the turn is expected to cost', () => {
+    // A frontier model reserves its ceiling up front and returns the rest as
+    // change; gating on the estimate lets a send through that the node refuses.
+    const outcome = evaluateSendGate(base({ entry: entry(0.05), walletSats: 100 }));
+    expect(outcome).toMatchObject({ state: 'insufficient-funds', haveSats: 100 });
+    expect((outcome as { needSats: number }).needSats).toBeGreaterThan(100);
+  });
+
+  it('asks before spending when the user wants to be asked', () => {
+    const outcome = evaluateSendGate(base({ confirmSpend: true }));
+    expect(outcome).toMatchObject({ state: 'confirm', modelName: 'GPT-OSS 20B' });
+  });
+
+  it('goes straight through once the user has turned the prompt off', () => {
+    expect(evaluateSendGate(base()).state).toBe('ready');
+  });
+});

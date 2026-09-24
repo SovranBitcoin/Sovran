@@ -125,6 +125,9 @@ describe('AI send lineup recovery', () => {
       lineup,
       lastKnownLineup: null,
       nodeBaseUrl: 'https://old.example',
+      // A provider the user picked. Nothing is sent until one is, and these
+      // tests are about what happens after the send leaves.
+      userNodeBaseUrl: 'https://old.example',
       selectedProvider: 'openai',
       selectedTier: 'pro',
       conversationHistory: [],

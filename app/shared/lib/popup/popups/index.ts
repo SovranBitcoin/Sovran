@@ -272,6 +272,18 @@ const STATIC_POPUPS = {
     icon: 'icon:fluent:wallet-20-filled',
     type: 'success',
   },
+  'ai-no-provider': {
+    message: 'Choose an AI provider',
+    text: 'Nothing is sent until you pick who gets paid.',
+    icon: 'icon:mdi:robot',
+    type: 'info',
+  },
+  'ai-mint-not-accepted': {
+    message: 'This provider does not take your mints',
+    text: 'It redeems ecash only from mints you do not hold. Open its details to see which, or choose another provider.',
+    icon: 'icon:mingcute:bank-fill',
+    type: 'error',
+  },
   'routstr-reclaim-empty': {
     message: 'Nothing left to reclaim',
     icon: 'icon:fluent:wallet-20-filled',

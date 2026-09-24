@@ -137,6 +137,21 @@ const TIER_BY_ID = new Map<AiTierId, AiTier>(AI_TIERS.map((t) => [t.id, t] as co
 export const AFFORD_BUFFER = 1.1;
 
 /**
+ * What one message could cost, before it costs it.
+ *
+ * Paying per request means handing the node a token worth its admission gate
+ * and taking the unspent remainder back. The gate — not the expected cost — is
+ * what leaves the wallet, and on a frontier model that is thousands of sats
+ * against a message that will actually cost a fraction of one. The number is
+ * only briefly out of the user's hands, but it is their number, so it is shown
+ * before it goes rather than reported afterwards.
+ */
+export function maxSpendSats(entry: LineupEntry | null, imageCount = 0): number {
+  const reserve = requiredReserveSatsFromPricing(entry?.satsPricing ?? null, imageCount);
+  return Math.max(1, Math.ceil((reserve ?? 1) * AFFORD_BUFFER));
+}
+
+/**
  * Typical chat-turn input size used to estimate cost from per-token
  * pricing. Chat messages and surrounding context together rarely exceed
  * ~8k prompt tokens; bumping this up just makes the affordability gate

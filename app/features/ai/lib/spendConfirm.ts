@@ -1,24 +1,6 @@
 import { actionMenuPopup } from '@/shared/lib/popup';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
-import { AFFORD_BUFFER, requiredReserveSatsFromPricing } from './format';
-import type { LineupEntry } from '@/shared/lib/routstr/lineup';
-
-/**
- * What one message could cost, before it costs it.
- *
- * Paying per request means handing the node a token worth its admission gate
- * and taking the unspent remainder back. The gate — not the expected cost — is
- * what leaves the wallet, and on a frontier model that is thousands of sats
- * against a message that will actually cost a fraction of one. The number is
- * only briefly out of the user's hands, but it is their number, so it is shown
- * before it goes rather than reported afterwards.
- */
-export function maxSpendSats(entry: LineupEntry | null, imageCount = 0): number {
-  const reserve = requiredReserveSatsFromPricing(entry?.satsPricing ?? null, imageCount);
-  return Math.max(1, Math.ceil((reserve ?? 1) * AFFORD_BUFFER));
-}
-
 /**
  * Resolve to `true` when the send may proceed.
  *

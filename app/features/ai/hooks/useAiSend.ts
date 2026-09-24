@@ -32,7 +32,9 @@ import {
   resolveCandidateEntries,
   resolveSelectedEntry,
 } from '../lib/format';
-import { confirmSpend, maxSpendSats } from '../lib/spendConfirm';
+import { confirmSpend } from '../lib/spendConfirm';
+import { evaluateSendGate } from '../lib/sendGate';
+import { useHeldMints } from './useHeldMints';
 import { assembleApiMessages, stripImageParts } from '../lib/assembleApiMessages';
 import { encodeChatImage } from '../lib/attachments';
 import { deriveActivePath, getAncestorsExclusive } from '../lib/branching';
@@ -132,6 +134,7 @@ export function useAiSend() {
   const { balances: liveBalances } = useBalanceContext();
   const selectedMint = useMintStore((s) => s.selectedMint);
   const walletSats = selectedMint ? amountToNumber(liveBalances.byMint[selectedMint]?.total) : 0;
+  const heldMints = useHeldMints();
 
   useEffect(
     () => () => {
@@ -735,23 +738,58 @@ export function useAiSend() {
 
   const sendInner = useCallback(
     async (userMessage: string, attachments?: ChatAttachment[]) => {
+      // Every precondition in one place, decided before the optimistic bubbles
+      // go in: declining after them would leave a user message with no answer
+      // and nothing to retry. The gate is pure and exhaustive, so each way a
+      // send can fail to start has a name and its own thing to say — a missing
+      // provider, a mint the provider refuses and a declined confirmation used
+      // to be indistinguishable from outside.
       const trimmed = userMessage.trim();
-      if (!trimmed) return;
-
-      // Ask BEFORE the optimistic bubbles go in: declining after them would
-      // leave a user message with no answer and nothing to retry.
       const storeNow = useRoutstrStore.getState();
+      const activeProvider = storeNow.userNodeBaseUrl;
       const plannedEntry = resolveSelectedEntry(
         getProviderById(storeNow.selectedProvider).id,
         getTierById(storeNow.selectedTier).id,
         walletSats,
         storeNow.lineup ?? storeNow.lastKnownLineup?.lineup ?? null
       );
-      const allowed = await confirmSpend({
-        modelName: plannedEntry?.displayName ?? getTierById(storeNow.selectedTier).label,
-        maxSats: maxSpendSats(plannedEntry, attachments?.length ?? 0),
+      const gate = evaluateSendGate({
+        text: trimmed,
+        providerBaseUrl: activeProvider,
+        providerMints: activeProvider ? (storeNow.knownProviders[activeProvider]?.mints ?? []) : [],
+        heldMints,
+        walletSats,
+        entry: plannedEntry,
+        imageCount: attachments?.length ?? 0,
+        confirmSpend: storeNow.confirmSpend,
       });
-      if (!allowed) return;
+
+      aiLog.info('ai.send.gate', { state: gate.state });
+      switch (gate.state) {
+        case 'empty':
+          return;
+        case 'no-provider':
+          // The one refusal with somewhere to go: the list is the answer.
+          staticPopup('ai-no-provider');
+          router.navigate('/(ai-flow)/providers');
+          return;
+        case 'mint-not-accepted':
+          staticPopup('ai-mint-not-accepted');
+          return;
+        case 'insufficient-funds':
+          navigateToAddFunds();
+          return;
+        case 'confirm': {
+          const allowed = await confirmSpend({
+            modelName: gate.modelName,
+            maxSats: gate.maxSats,
+          });
+          if (!allowed) return;
+          break;
+        }
+        case 'ready':
+          break;
+      }
 
       if (!isAnonymous && !currentSessionId) {
         createSession();

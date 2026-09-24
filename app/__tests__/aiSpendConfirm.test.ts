@@ -7,7 +7,8 @@
  * they should see the figure before it goes.
  */
 
-import { confirmSpend, maxSpendSats } from '@/features/ai/lib/spendConfirm';
+import { confirmSpend } from '@/features/ai/lib/spendConfirm';
+import { maxSpendSats } from '@/features/ai/lib/format';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import type { LineupEntry } from '@/shared/lib/routstr/lineup';
 
