@@ -48,6 +48,26 @@ export function useScreenInsets() {
   };
 }
 
+/**
+ * The bottom inset a `Screen safeArea` frame applies as `paddingBottom`.
+ *
+ * For an ABSOLUTELY-POSITIONED child of that frame, which Yoga lays out against
+ * the parent's border box, so the frame's padding never reaches it — see the
+ * fileoverview of `shared/ui/composed/search/SearchOverlay.tsx`, which hit the
+ * same thing on the top edge.
+ *
+ * Deliberately not `useScreenInsets().bottom`: that also returns 0 when a frame
+ * has *consumed* the inset, which is the right answer for a child laid out
+ * inside the padding and the wrong one for a child laid out outside it. The
+ * docked term stays, because a docked navigator genuinely shortens the viewport
+ * rather than padding it.
+ */
+export function useFrameBottomInset() {
+  const insets = useSafeAreaInsets();
+  const tabs = useContext(TabBarInsetsContext);
+  return tabs?.mode === 'docked' ? 0 : insets.bottom;
+}
+
 /** For a manually inset page scroller. Use contentInsetAdjustmentBehavior="never". */
 export function useScreenBottomPadding(extra: number = spacing.lg) {
   const { bottom } = useScreenInsets();
