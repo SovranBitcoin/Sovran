@@ -84,10 +84,28 @@ const AI_PROVIDERS: readonly AiProvider[] = [
  * choosing it; the label and the padlock say what the tab is FOR, which is the
  * only reason to pick it.
  */
+/**
+ * The padlock, and what it is when spoken.
+ *
+ * Encryption is a property of a MODEL, not of the node serving it or of the
+ * vendor that trained it: a node's catalog lists `glm-5-3` beside
+ * `tinfoil-glm-5-3` under one display name at one price, and only the second
+ * is sealed. So every surface that draws this lock has to decide per row with
+ * `isE2eeModelId`, and a lock on a provider would put it on the plaintext twin
+ * in the next row.
+ *
+ * The glyph alone says "locked" to a screen reader — which is equally what a
+ * disabled row and a passcode field look like — so the badge carries a
+ * sentence saying which of those it means. Both live here so the picker row,
+ * the chip and the encrypted vendor's own tab cannot drift apart.
+ */
+export const E2EE_BADGE_ICON = 'mdi:lock-outline';
+export const E2EE_BADGE_LABEL = 'End-to-end encrypted';
+
 const E2EE_PROVIDER: AiProvider = {
   id: E2EE_PROVIDER_ID,
   label: 'Private (E2EE)',
-  icon: 'mdi:lock-outline',
+  icon: E2EE_BADGE_ICON,
 };
 
 /** Catalog slugs are lowercase and hyphenated (`mistralai`, `bytedance-seed`,

@@ -1,4 +1,5 @@
 import { apiLog } from '@/shared/lib/logger';
+import type { RequestControls } from 'wallet/safeFetch';
 
 import { fetchNodeStatus, normalizeNodeUrl, type NodeInfo } from './providers';
 
@@ -41,12 +42,53 @@ export function cachedProbe(baseUrl: string): ProviderProbe | undefined {
   return entry && Date.now() - entry.at <= PROBE_TTL_MS ? entry.probe : undefined;
 }
 
-async function probeOne(baseUrl: string, signal?: AbortSignal): Promise<ProviderProbe> {
+async function probeOne(baseUrl: string, controls: RequestControls = {}): Promise<ProviderProbe> {
   const url = normalizeNodeUrl(baseUrl);
-  const result = await fetchNodeStatus(url, { signal });
+  const result = await fetchNodeStatus(url, controls);
   const probe: ProviderProbe = { baseUrl: url, ...result };
-  if (!signal?.aborted) cache.set(url, { at: Date.now(), probe });
+  if (!controls.signal?.aborted) cache.set(url, { at: Date.now(), probe });
   return probe;
+}
+
+/**
+ * Check one provider, now, because the user just reached for it.
+ *
+ * The sweep that fills the list is best-effort and wide; this is narrow and
+ * on the critical path of a choice, so it takes its own (shorter) budget. A
+ * still-fresh answer is reused rather than re-asked — the point is to have
+ * checked, not to check twice.
+ */
+export function probeProvider(
+  baseUrl: string,
+  controls: RequestControls = {}
+): Promise<ProviderProbe> {
+  const cached = cachedProbe(baseUrl);
+  return cached ? Promise.resolve(cached) : probeOne(baseUrl, controls);
+}
+
+/**
+ * One provider, two opinions: what nagg cached and what this phone has seen.
+ *
+ * First-hand evidence wins. nagg probes from a data centre on a schedule, so
+ * its `online` can be minutes old, and its `offline` can be a network path
+ * that fails for the server and works here. When this device has actually
+ * reached a provider — or actually failed to — that observation is the
+ * answer, and the server's claim is discarded rather than averaged with it.
+ *
+ * `unknown` is not evidence in either direction. A local probe that came back
+ * `unknown` (an older node that does not serve `/v1/info`, a non-JSON reply)
+ * says nothing about reachability, so the server's opinion still stands; and
+ * the server's own `unknown` means it has not checked, which never overrides
+ * anything. Only when neither side has looked does the row read `unknown` —
+ * a real third state, and emphatically not a polite word for offline.
+ */
+export function resolveProviderStatus(
+  local: ProviderStatus | undefined,
+  server: ProviderStatus | undefined
+): ProviderStatus {
+  if (local === 'online' || local === 'offline') return local;
+  if (server === 'online' || server === 'offline') return server;
+  return 'unknown';
 }
 
 /**
@@ -75,7 +117,7 @@ export async function probeProviders(
       if (options.signal?.aborted) return;
       const baseUrl = pending[cursor++];
       try {
-        const probe = await probeOne(baseUrl, options.signal);
+        const probe = await probeOne(baseUrl, { signal: options.signal });
         if (!options.signal?.aborted) options.onResult(probe);
       } catch {
         // A thrown probe is the same news as a failed one, and the row simply

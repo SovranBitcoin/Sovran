@@ -1,8 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useBalanceContext } from '@cashu/coco-react';
 import { routstrMintKey, spendableMintBalances } from '@/shared/lib/routstr/payingMint';
-import { cachedProbe, type ProviderStatus } from '@/shared/lib/routstr/providerHealth';
+import {
+  cachedProbe,
+  resolveProviderStatus,
+  type ProviderStatus,
+} from '@/shared/lib/routstr/providerHealth';
+import type { ServerProvider } from '@/shared/lib/routstr/providers';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
 /**
@@ -11,12 +16,21 @@ import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
  * Two derived figures do the work. **Spendable** is the sum of what the wallet
  * holds across the mints this provider will actually redeem — not the wallet
  * total, which says nothing about whether a given provider can be paid. And
- * **E2EE**, which is the one capability worth promoting: a provider running
- * models in an enclave cannot read the prompts it forwards, and that is a
- * different product from one that can.
+ * **encrypted models**, which is a count and not a property: a provider whose
+ * catalog holds sealed models is worth finding, but on the one node that
+ * badges itself end-to-end encrypted, 9 models of 582 are actually sealed —
+ * so "this provider is E2EE" is a claim the evidence does not support.
  *
- * The ranking follows from that. E2EE first, then by spendable balance, then
- * by name. Health updates never move a row under the user's finger.
+ * Who ranks the list has changed. nagg discovers and probes the whole network
+ * continuously and serves it best-first; re-deriving that order here from the
+ * same fields would be a second opinion on the same evidence, so the server's
+ * order is rendered as given. What this hook still decides is what the server
+ * cannot know: whether the wallet can pay a provider at all, and what this
+ * device has seen for itself since the server last looked. Providers nagg
+ * never heard of — one the user typed in, one only a relay announced — fall
+ * back to the local ranking and sort after the directory.
+ *
+ * Health updates never move a row under the user's finger.
  */
 
 export interface ProviderRow {
@@ -28,6 +42,15 @@ export interface ProviderRow {
   e2ee: boolean | null;
   pubkey: string | null;
   status: ProviderStatus;
+  /** How many of this provider's models are sealed to an enclave, per nagg's
+   *  catalog read. `null` when nobody has counted. Never a provider-level
+   *  "is encrypted" flag — see the note above. */
+  encryptedModelCount: number | null;
+  /** Models the provider serves, per nagg. `null` when unknown. */
+  modelCount: number | null;
+  /** The operator's follower count as nagg aggregated it — a stand-in until
+   *  the row's own Nostr profile loads, so the pill isn't blank on first paint. */
+  followers: number | null;
   /** Sats the wallet holds across the mints this provider accepts. A provider
    *  that publishes no mint list accepts any, so it gets the wallet total. */
   spendableSats: number;
@@ -37,19 +60,15 @@ export interface ProviderRow {
 
 const host = (baseUrl: string) => baseUrl.replace(/^https:\/\//, '');
 
-/** What to say under a usable provider's name — ordered by what changes a
- *  decision: that your money works there, then whether it can answer
- *  privately. */
-export function describeProvider(row: ProviderRow): string {
-  const parts: string[] = [];
-  if (row.e2ee) parts.push('End-to-end encrypted');
-  if (row.spendableSats > 0) parts.push(`${row.spendableSats.toLocaleString()} sat spendable`);
-  if (parts.length === 0 && row.description) parts.push(row.description);
-  if (parts.length === 0) parts.push(host(row.baseUrl));
-  return parts.join(' · ');
-}
+/** Reachable first, not-yet-checked next, down last — the same three-way split
+ *  nagg sorts by, recomputed here from the RESOLVED status so a row this
+ *  device has just contradicted lands where its real state belongs. */
+const STATUS_RANK: Record<ProviderStatus, number> = { online: 0, unknown: 1, offline: 2 };
 
-export function useProviderRows(probed: Record<string, ProviderStatus> = {}): ProviderRow[] {
+export function useProviderRows(
+  probed: Record<string, ProviderStatus> = {},
+  directory: readonly ServerProvider[] = []
+): ProviderRow[] {
   const knownProviders = useRoutstrStore((s) => s.knownProviders);
   const { balances } = useBalanceContext();
 
@@ -67,9 +86,21 @@ export function useProviderRows(probed: Record<string, ProviderStatus> = {}): Pr
     [byMint]
   );
 
+  const server = useMemo(
+    () => new Map(directory.map((row, index) => [row.baseUrl, { row, rank: index }])),
+    [directory]
+  );
+
   const ranked = useMemo(() => {
     const rows: ProviderRow[] = Object.entries(knownProviders).map(([baseUrl, provider]) => {
-      const status = probed[baseUrl] ?? cachedProbe(baseUrl)?.status ?? 'unknown';
+      const fromServer = server.get(baseUrl);
+      // First-hand evidence — this viewing's probe, or a still-fresh one from
+      // earlier — beats the directory's cached claim. `resolveProviderStatus`
+      // is the single place that rule lives.
+      const status = resolveProviderStatus(
+        probed[baseUrl] ?? cachedProbe(baseUrl)?.status,
+        fromServer?.row.status
+      );
       const accepted = new Set(provider.mints.map(routstrMintKey).filter((url) => url !== null));
       // No published list means no restriction, so every sat is spendable
       // there. An empty intersection means none of it is.
@@ -91,32 +122,55 @@ export function useProviderRows(probed: Record<string, ProviderStatus> = {}): Pr
         e2ee: provider.e2ee,
         pubkey: provider.pubkey,
         status,
+        encryptedModelCount: fromServer?.row.encryptedModelCount ?? null,
+        modelCount: fromServer?.row.modelCount ?? null,
+        followers: fromServer?.row.followers ?? null,
         spendableSats,
         blockedReason,
       };
     });
 
-    // Health updates change the badge, never the row's position under a finger.
     return rows.sort((a, b) => {
+      // A provider the wallet cannot pay is not a candidate, whatever the
+      // server thinks of it. This is local evidence the directory never had.
       const blocked = Number(a.spendableSats <= 0) - Number(b.spendableSats <= 0);
       if (blocked !== 0) return blocked;
+      const reachable = STATUS_RANK[a.status] - STATUS_RANK[b.status];
+      if (reachable !== 0) return reachable;
+      const aRank = server.get(a.baseUrl)?.rank;
+      const bRank = server.get(b.baseUrl)?.rank;
+      // Inside a status band, keep nagg's order verbatim — it already broke
+      // ties by encrypted models and by followers.
+      if (aRank !== undefined && bRank !== undefined) return aRank - bRank;
+      if (aRank !== undefined) return -1;
+      if (bRank !== undefined) return 1;
       const e2ee = Number(b.e2ee === true) - Number(a.e2ee === true);
       if (e2ee !== 0) return e2ee;
       if (b.spendableSats !== a.spendableSats) return b.spendableSats - a.spendableSats;
       return a.name.localeCompare(b.name) || a.baseUrl.localeCompare(b.baseUrl);
     });
-  }, [knownProviders, byMint, walletTotal, probed]);
+  }, [knownProviders, byMint, walletTotal, probed, server]);
 
   // Rank on entry. Discovery may append providers, but asynchronous metadata
-  // must not move an existing choice while the user is reaching for it.
+  // must not move an existing choice while the user is reaching for it. The
+  // one exception is the directory's first arrival: it lands within a few
+  // hundred milliseconds of the screen opening and it is the ordering the
+  // list is supposed to show, so it re-seats rows once rather than leaving a
+  // stale local ranking pinned for the whole session.
   const [order, setOrder] = useState(() => ranked.map((row) => row.baseUrl));
+  const seatedFromServer = useRef(false);
   useEffect(() => {
+    if (server.size > 0 && !seatedFromServer.current) {
+      seatedFromServer.current = true;
+      setOrder(ranked.map((row) => row.baseUrl));
+      return;
+    }
     setOrder((previous) => {
       const seen = new Set(previous);
       const additions = ranked.filter((row) => !seen.has(row.baseUrl)).map((row) => row.baseUrl);
       return additions.length ? [...previous, ...additions] : previous;
     });
-  }, [ranked]);
+  }, [ranked, server]);
   const positions = new Map(order.map((url, index) => [url, index]));
   return [...ranked].sort(
     (a, b) =>

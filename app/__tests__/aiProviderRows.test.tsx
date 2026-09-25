@@ -1,15 +1,22 @@
 /**
  * How providers are ranked, and what "balance" means for one.
  *
- * Two derived figures carry the whole list. **Spendable** is what the wallet
- * holds across the mints a provider will actually redeem — the wallet total
- * says nothing about whether a given provider can be paid, and showing it
- * would promise money that cannot move. **E2EE** is the one capability worth
- * promoting: a provider running models in an enclave cannot read the prompts
- * it forwards, which is a different product from one that can.
+ * **Spendable** is what the wallet holds across the mints a provider will
+ * actually redeem — the wallet total says nothing about whether a given
+ * provider can be paid, and showing it would promise money that cannot move.
+ *
+ * Ordering has two authorities and they do not overlap. nagg discovers and
+ * probes the network continuously and serves it best-first, so its order is
+ * rendered as given. What the phone decides is what nagg cannot know: whether
+ * this wallet can pay a provider, and what this device has seen for itself
+ * since nagg last looked. With no directory — nagg down, or a provider it
+ * never heard of — the local ranking is still there and still ranks.
  */
 
 import { renderHook } from '@testing-library/react-native';
+
+import { useProviderRows } from '@/features/ai/hooks/useProviderRows';
+import type { ServerProvider } from '@/shared/lib/routstr/providers';
 
 const MINIBITS = 'https://mint.minibits.cash/Bitcoin';
 const SOVRAN = 'https://mint.sovran.money';
@@ -27,7 +34,12 @@ jest.mock('@cashu/coco-react', () => ({
   useBalanceContext: () => ({ balances: mockBalances }),
 }));
 
+jest.mock('@/shared/lib/nostr/client', () => ({ npubToPubkey: () => null }));
+
+// `resolveProviderStatus` is the rule under test wherever a probe and the
+// server disagree, so it is the REAL one; only the probe cache is stubbed.
 jest.mock('@/shared/lib/routstr/providerHealth', () => ({
+  ...jest.requireActual('@/shared/lib/routstr/providerHealth'),
   cachedProbe: () => undefined,
 }));
 
@@ -35,8 +47,6 @@ jest.mock('@/shared/stores/profile/routstrStore', () => ({
   useRoutstrStore: (selector: (s: unknown) => unknown) =>
     selector({ knownProviders: mockProviders }),
 }));
-
-import { useProviderRows } from '@/features/ai/hooks/useProviderRows';
 
 const provider = (over: Record<string, unknown> = {}) => ({
   name: 'p',
@@ -50,6 +60,13 @@ const provider = (over: Record<string, unknown> = {}) => ({
 });
 
 const rows = () => renderHook(() => useProviderRows()).result.current;
+
+const served = (baseUrl: string, over: Partial<ServerProvider> = {}): ServerProvider => ({
+  baseUrl,
+  mints: [],
+  status: 'online',
+  ...over,
+});
 
 describe('provider rows', () => {
   it('keeps rows in place as live health results arrive', () => {
@@ -135,6 +152,79 @@ describe('provider rows', () => {
       'https://big.example': provider({ name: 'Big', mints: [SOVRAN] }),
     };
     expect(rows().map((r) => r.name)).toEqual(['Big', 'Small']);
+  });
+
+  it("renders nagg's order rather than re-deriving one from the same fields", () => {
+    mockProviders = {
+      'https://third.example': provider({ name: 'Third' }),
+      'https://first.example': provider({ name: 'First' }),
+      'https://second.example': provider({ name: 'Second', e2ee: true }),
+    };
+    // Alphabetical order, insertion order and the local E2EE-first ranking all
+    // disagree with this; the server's does not get a vote from any of them.
+    const directory = [
+      served('https://first.example'),
+      served('https://second.example'),
+      served('https://third.example'),
+    ];
+    const { result } = renderHook(() => useProviderRows({}, directory));
+    expect(result.current.map((row) => row.name)).toEqual(['First', 'Second', 'Third']);
+  });
+
+  it('lets a local probe overrule the status nagg cached, and re-seats the row', () => {
+    mockProviders = {
+      'https://stale.example': provider({ name: 'Stale' }),
+      'https://revived.example': provider({ name: 'Revived' }),
+    };
+    const directory = [
+      served('https://stale.example', { status: 'online' }),
+      served('https://revived.example', { status: 'offline' }),
+    ];
+    const { result } = renderHook(() =>
+      useProviderRows(
+        // We just reached one and failed to reach the other. First-hand beats
+        // a data centre's cached opinion, in both directions.
+        { 'https://stale.example': 'offline', 'https://revived.example': 'online' },
+        directory
+      )
+    );
+    expect(result.current.map((row) => [row.name, row.status])).toEqual([
+      ['Revived', 'online'],
+      ['Stale', 'offline'],
+    ]);
+    expect(result.current[1].blockedReason).toBe('Not answering right now');
+  });
+
+  it('leaves a row nobody has checked as unknown rather than calling it offline', () => {
+    mockProviders = { 'https://quiet.example': provider({ name: 'Quiet' }) };
+    const { result } = renderHook(() =>
+      useProviderRows({}, [served('https://quiet.example', { status: 'unknown' })])
+    );
+    expect(result.current[0].status).toBe('unknown');
+    expect(result.current[0].blockedReason).toBeNull();
+  });
+
+  it('keeps the local ranking for providers the directory never mentioned', () => {
+    mockProviders = {
+      'https://served.example': provider({ name: 'Served' }),
+      'https://rich.example': provider({ name: 'Rich', mints: [SOVRAN] }),
+      'https://poor.example': provider({ name: 'Poor', mints: [MINIBITS] }),
+    };
+    const { result } = renderHook(() => useProviderRows({}, [served('https://served.example')]));
+    // The served row leads its band; the two nagg never saw fall back to the
+    // local ranking (deeper spendable balance first) behind it.
+    expect(result.current.map((row) => row.name)).toEqual(['Served', 'Rich', 'Poor']);
+  });
+
+  it('carries the encrypted-model COUNT, never a provider-level claim', () => {
+    mockProviders = { 'https://sealed.example': provider({ name: 'Sealed' }) };
+    const { result } = renderHook(() =>
+      useProviderRows({}, [
+        served('https://sealed.example', { encryptedModelCount: 9, modelCount: 582 }),
+      ])
+    );
+    // 9 of 582. A lock on the row would promise the other 573 are sealed too.
+    expect(result.current[0]).toMatchObject({ encryptedModelCount: 9, modelCount: 582 });
   });
 
   it('sorts every blocked provider last, and keeps them', () => {

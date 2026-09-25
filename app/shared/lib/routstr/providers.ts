@@ -219,3 +219,98 @@ export async function fetchProviderModelSummary(
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// nagg's provider directory — the list, already discovered and already probed.
+// ---------------------------------------------------------------------------
+
+/**
+ * What nagg has already found out about the provider network.
+ *
+ * Discovery from the phone is a Nostr relay sweep plus a fan-out of HTTP
+ * directory reads: correct, and slow enough that the picker opened empty and
+ * filled in over several seconds. nagg runs that same sweep continuously from
+ * a server, so one call returns the whole list with the health probe already
+ * done. That is the first paint.
+ *
+ * It is a CACHE, not an oracle: `status` is what nagg saw at `checkedAt`, and
+ * a provider can go down in between. `resolveProviderStatus` is where that
+ * claim loses to anything this device has seen for itself.
+ */
+const NaggAiProviderRowSchema = z.looseObject({
+  baseUrl: z.string().max(512),
+  name: z.string().max(200).optional().catch(undefined),
+  /** The operator's Nostr key, hex. Absent for a provider that announced
+   *  itself only over HTTP. */
+  pubkey: z.string().max(128).optional().catch(undefined),
+  followers: z.number().int().nonnegative().optional().catch(undefined),
+  modelCount: z.number().int().nonnegative().optional().catch(undefined),
+  /** How many of those models are sealed to an enclave. A COUNT, deliberately:
+   *  on the one provider that badges itself E2EE, 9 models of 582 are sealed. */
+  encryptedModelCount: z.number().int().nonnegative().optional().catch(undefined),
+  mints: z.array(z.string().max(512)).max(64).optional().catch(undefined),
+  status: z.enum(['online', 'offline', 'unknown']).catch('unknown'),
+  checkedAt: z.string().max(64).optional().catch(undefined),
+  latencyMs: z.number().nonnegative().optional().catch(undefined),
+});
+
+export const NaggAiProvidersSchema = z.object({
+  providers: z
+    .array(NaggAiProviderRowSchema)
+    .max(256)
+    .catch(() => []),
+  checkedAt: z.string().max(64).optional().catch(undefined),
+  ttlSeconds: z.number().int().nonnegative().optional().catch(undefined),
+});
+
+/** One directory row, normalized onto the keys the rest of the app uses. */
+export interface ServerProvider {
+  baseUrl: string;
+  name?: string;
+  pubkey?: string;
+  followers?: number;
+  modelCount?: number;
+  encryptedModelCount?: number;
+  mints: string[];
+  status: 'online' | 'offline' | 'unknown';
+  latencyMs?: number;
+}
+
+/**
+ * Normalize nagg's rows into the app's spelling of a provider.
+ *
+ * The URL normalization is load-bearing, not cosmetic: nagg publishes
+ * `https://ai.example.com/` and every local key — the probe cache, the store,
+ * the chosen node — is `https://ai.example.com`. Without this the server's
+ * row and the device's own evidence about the same provider never meet, and
+ * the list renders each of them once.
+ *
+ * Order is preserved. nagg sorts best-first (reachable before unknown before
+ * down, then by encrypted models, then by followers) and re-deriving that on
+ * the phone from the same fields would only be a second opinion on the same
+ * evidence.
+ */
+export function serverProviders(payload: {
+  providers: readonly z.infer<typeof NaggAiProviderRowSchema>[];
+}): ServerProvider[] {
+  const seen = new Set<string>();
+  const out: ServerProvider[] = [];
+  for (const row of payload.providers) {
+    if (!row.baseUrl.startsWith('https://')) continue;
+    const baseUrl = normalizeNodeUrl(row.baseUrl);
+    if (!baseUrl || seen.has(baseUrl)) continue;
+    seen.add(baseUrl);
+    out.push({
+      baseUrl,
+      name: row.name?.trim() || undefined,
+      pubkey: row.pubkey?.trim() || undefined,
+      followers: row.followers,
+      modelCount: row.modelCount,
+      encryptedModelCount: row.encryptedModelCount,
+      mints: row.mints ?? [],
+      status: row.status,
+      latencyMs: row.latencyMs,
+    });
+  }
+  return out;
+}

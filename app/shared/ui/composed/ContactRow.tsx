@@ -159,9 +159,16 @@ interface ProviderIdentity {
   /** Sats the wallet holds across the mints this provider redeems. Not the
    *  wallet total: what matters is what can actually be spent HERE. */
   spendableSats?: number;
-  /** Its catalog carries models running in an enclave, so the prompts it
-   *  forwards are ones it cannot read. */
-  e2ee?: boolean;
+  /**
+   * How many of its models run in an enclave — a count, never a flag.
+   *
+   * "This provider is end-to-end encrypted" is not a property a provider has:
+   * on the node that badges itself E2EE, 9 of 582 models are sealed and 8 of
+   * those 9 have an identically-named plaintext twin. A lock on the row would
+   * therefore promise an encryption most of its catalog cannot deliver, so
+   * the pill states the count and leaves the claim to the model picker.
+   */
+  encryptedModelCount?: number;
   status?: 'online' | 'offline' | 'unknown';
 }
 
@@ -220,7 +227,7 @@ export function providerIdentity(input: {
   baseUrl: string;
   displayName?: string;
   spendableSats?: number;
-  e2ee?: boolean;
+  encryptedModelCount?: number;
   status?: ProviderIdentity['status'];
 }): ProviderIdentity {
   return { kind: 'provider', ...input };
@@ -422,10 +429,12 @@ const DEFAULT_STATS_BY_KIND: Record<Identity['kind'], readonly StatKey[]> = {
   // row where a second "people" number alongside followers doesn't earn its
   // space. UserProfileScreen still shows it on the full profile header.
   nostr: ['reputation', 'followers'],
-  // What is spendable there, whether it can answer without reading the
-  // prompt, and who the operator is to the network. Reputation before
-  // followers, same order the mint rows use.
-  provider: ['balance', 'providerStatus', 'encrypted', 'reputation', 'followers'],
+  // Whether it is answering at all, what is spendable there, how much of its
+  // catalog can answer without reading the prompt, and who the operator is to
+  // the network. Status leads because it is the one that decides whether the
+  // rest of the row matters; reputation before followers, same order the mint
+  // rows use.
+  provider: ['providerStatus', 'balance', 'encrypted', 'reputation', 'followers'],
   mint: ['units', 'score', 'audit', 'reputation', 'followers', 'offline'],
   ble: [],
   geohash: [],
@@ -557,16 +566,30 @@ function buildStats(
     switch (key) {
       case 'providerStatus':
         if (provider?.status) {
+          // The word, not just the colour. A bare heartbeat glyph made the
+          // reader decide what green meant, and a red/green-only signal is
+          // unreadable to anyone who cannot tell them apart. `unknown` keeps
+          // the glyph and stays wordless on purpose: it means nobody has
+          // checked yet, and printing "Offline" there would libel a provider
+          // that is up.
           out.push({
             icon: 'lucide:activity',
-            value: '',
+            value:
+              provider.status === 'online'
+                ? 'Online'
+                : provider.status === 'offline'
+                  ? 'Offline'
+                  : '',
             color:
               provider.status === 'online'
                 ? tints.success
                 : provider.status === 'offline'
                   ? STAT_COLOR_ERROR
                   : STAT_COLOR_SOCIAL,
-            accessibilityLabel: `Provider ${provider.status}`,
+            accessibilityLabel:
+              provider.status === 'unknown'
+                ? 'Provider status not checked yet'
+                : `Provider ${provider.status}`,
           });
         }
         break;
@@ -582,19 +605,22 @@ function buildStats(
         }
         break;
       }
-      case 'encrypted':
-        // Only the affirmative. A provider that can read your prompts is the
-        // norm, and a pill on every other row would make the one that cannot
-        // harder to spot, not easier.
-        if (provider?.e2ee === true) {
+      case 'encrypted': {
+        // A count of sealed models, not a verdict on the provider. Only the
+        // affirmative is shown: a provider that can read your prompts is the
+        // norm, and a pill on every other row would make the one that offers
+        // an alternative harder to spot, not easier.
+        const sealed = provider?.encryptedModelCount;
+        if (typeof sealed === 'number' && sealed > 0) {
           out.push({
             icon: 'mdi:shield-check',
-            value: 'E2EE',
+            value: formatCompact(sealed),
             color: tints.success,
-            accessibilityLabel: 'Offers end-to-end encrypted models',
+            accessibilityLabel: `${sealed} end-to-end encrypted models available`,
           });
         }
         break;
+      }
       case 'units': {
         // Only multi-currency mints get the badge — "BTC" on every row of an
         // all-sat list is noise. Keyset-backed, so an advertised-but-keyless

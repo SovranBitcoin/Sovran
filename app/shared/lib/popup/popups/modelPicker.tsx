@@ -35,6 +35,7 @@ import Icon from 'assets/icons';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import {
+  isE2eeModelId,
   lineupHasEntries,
   type AiLineup,
   type AiProviderId,
@@ -47,6 +48,8 @@ import { log, useMountLog } from '@/shared/lib/logger';
 
 import {
   AI_TIERS,
+  E2EE_BADGE_ICON,
+  E2EE_BADGE_LABEL,
   type AiProvider,
   type AiTier,
   canAffordPricing,
@@ -137,6 +140,14 @@ function TierRow({ tier, provider, entry, balanceSats, isCurrent, onPress }: Tie
   // behaviour as the Select Profile rows.
   const disabled = isCurrent || !affordable;
 
+  // Per MODEL, never per node and never per vendor. A node badged E2EE serves
+  // 9 sealed models out of 582, and 8 of those 9 have an identically-named,
+  // identically-priced plaintext twin in the same catalog (`glm-5-3` beside
+  // `tinfoil-glm-5-3`). Sealing is request routing to an enclave, decided by
+  // the model id — so a lock drawn from the provider would tell the user their
+  // `glm-5-3` turn is encrypted when the encrypted one is the row next to it.
+  const sealed = isE2eeModelId(entry.modelId);
+
   return (
     <Menu.Item
       testID={`ai-model-${provider.id}-${tier.id}`}
@@ -148,6 +159,18 @@ function TierRow({ tier, provider, entry, balanceSats, isCurrent, onPress }: Tie
         description={descriptionText}
         trailing={
           <>
+            {sealed ? (
+              // Sits inside the Menu.Item's accessibility container, so the
+              // row is announced as "Max, GLM 5.3 · ~4 sats / msg, End-to-end
+              // encrypted" rather than as a padlock nobody can name.
+              <View
+                testID={`ai-model-${provider.id}-${tier.id}-e2ee`}
+                accessible
+                accessibilityRole="image"
+                accessibilityLabel={E2EE_BADGE_LABEL}>
+                <Icon name={E2EE_BADGE_ICON} size={14} />
+              </View>
+            ) : null}
             {entry.visionInput ? (
               // Image-input capability marker — the user-facing signal for
               // "you can attach photos with this model".
@@ -316,6 +339,16 @@ export function ModelPickerContent({ close, balanceSats }: ModelPickerContentPro
               <Pressable
                 key={p.id}
                 testID={`model-tab-${p.id}`}
+                // Which vendor is active is carried only by a background
+                // colour, so without this the tab strip is unreadable to a
+                // screen reader and unassertable by the native harness — a
+                // device capture shows these pills shipping with no role and
+                // no selected state, which is how a tab that stops responding
+                // reaches a user before it reaches a test. Same three props
+                // the identical pills in `SectionAnchorList` already carry.
+                accessibilityRole="tab"
+                accessibilityLabel={p.label}
+                accessibilityState={{ selected: isSelected }}
                 onPress={() => {
                   pickerLog.info('modelPicker.tab.switch', { tab: p.id });
                   setActiveProviderTab(p.id);

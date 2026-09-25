@@ -4,6 +4,7 @@ import { useModelCatalog } from '../hooks/useModelCatalog';
 import { Keyboard } from 'react-native';
 import Icon from 'assets/icons';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
+import { isE2eeModelId } from '@/shared/lib/routstr/lineup';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
 import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
 import { modelPickerPopup } from '@/shared/lib/popup';
@@ -11,9 +12,12 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { View } from '@/shared/ui/primitives/View/View';
 import {
   AFFORD_BUFFER,
   AI_TIERS,
+  E2EE_BADGE_ICON,
+  E2EE_BADGE_LABEL,
   canAffordPricing,
   entryForSlot,
   providersForLineup,
@@ -118,6 +122,14 @@ export function ModelChip() {
   // chip never reads like a dev string.
   const chipLabel = `${currentTier.label} · ${resolvedEntry?.displayName ?? currentTier.label}`;
 
+  // The chip names the model a turn will actually be sent to, so the padlock
+  // belongs to THAT model and nothing else. The display name cannot carry it:
+  // a node serves `glm-5-3` and `tinfoil-glm-5-3` under one name at one price
+  // and only the second is sealed, so the id is the only honest signal — and
+  // the send path's own fallback can swap the resolved entry, which is exactly
+  // when the user needs the lock to disappear.
+  const sealed = isE2eeModelId(resolvedEntry?.modelId);
+
   const onPress = useCallback(() => {
     // Picker has no in-sheet inputs, so gorhom can't lift over an
     // externally owned keyboard (the composer). Dismiss it so the sheet
@@ -136,7 +148,9 @@ export function ModelChip() {
   return (
     <Button
       testID="ai-model-chip"
-      accessibilityLabel={`Model: ${chipLabel}`}
+      // The button flattens its children into one accessibility node, so the
+      // badge cannot speak for itself here — it has to be said in the label.
+      accessibilityLabel={`Model: ${chipLabel}${sealed ? `, ${E2EE_BADGE_LABEL}` : ''}`}
       accessibilityHint="Opens the model picker"
       variant="primary"
       size="compact"
@@ -144,6 +158,11 @@ export function ModelChip() {
       icon={<Icon name={currentProvider.icon} size={16} color={background} />}
       text={
         <HStack align="center" gap={4}>
+          {sealed ? (
+            <View testID="ai-model-chip-e2ee">
+              <Icon name={E2EE_BADGE_ICON} size={12} color={background} />
+            </View>
+          ) : null}
           <Text size={13} bold color={background}>
             {chipLabel}
           </Text>
