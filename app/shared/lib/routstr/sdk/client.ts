@@ -7,7 +7,6 @@ import {
   createDiscoveryAdapterFromStore,
   createSdkStore,
   createStorageAdapterFromStore,
-  noopLogger,
   type DiscoveryAdapter,
   type Model,
 } from '@routstr/sdk/browser';
@@ -18,6 +17,7 @@ import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { routstrMintKey } from '../payingMint';
 
 import { createSdkStorageDriver } from './driver';
+import { createSdkLogger } from './sdkLogger';
 
 /**
  * Profile-owned catalog and recovery storage, with a node-bound request client.
@@ -169,9 +169,11 @@ export async function getRoutstrClient(baseUrl: string, canDispatch: () => boole
     },
     'min',
     'xcashu',
-    // SDK diagnostics include raw refund bodies and token-bearing messages.
-    // Sovran emits structured request/recovery events at its own boundaries.
-    { logger: noopLogger }
+    // WARN and ERROR only — see `createSdkLogger`. The SDK's DEBUG lane prints
+    // raw refund bodies and whole tokens and stays dropped; its warnings carry
+    // the upstream status and failover decision, which is the one account of a
+    // provider failure the app cannot reconstruct for itself.
+    { logger: createSdkLogger() }
   );
   return {
     client,

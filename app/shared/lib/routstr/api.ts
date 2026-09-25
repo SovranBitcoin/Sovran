@@ -11,6 +11,7 @@ import {
 } from '@routstr/sdk/browser';
 
 import { fetchNodeInfo } from './providers';
+import { isE2eeModelId } from './lineup';
 import { selectPayingMint } from './payingMint';
 import { createRequestDeadline, type RequestDeadline } from './requestDeadline';
 import {
@@ -26,12 +27,6 @@ import { buildAbortSignal } from '@/shared/lib/http/requestSignal';
 import { isAbortError, type RequestControls } from 'wallet/safeFetch';
 
 const ROUTSTR_DEFAULT_BASE_URL = 'https://api.routstr.com/v1';
-
-/** A model served from a Tinfoil enclave, which `@routstr/sdk` seals the
- *  request body for. The prefix is the catalog's namespace, and it is the only
- *  honest signal: the live catalog lists `glm-5-3` and `tinfoil-glm-5-3` under
- *  the identical display name, and only the prefixed one is encrypted. */
-const TINFOIL_MODEL_PREFIX = 'tinfoil-';
 
 /**
  * Node override served by nagg's `/app/ai-lineup` (and re-applied from the
@@ -719,7 +714,7 @@ async function seedFromNode(
   // fills in as providers are used.
   routstrStoreState().rememberProviders({
     [origin]: {
-      e2ee: models.some((model) => model.id.startsWith(TINFOIL_MODEL_PREFIX)),
+      e2ee: models.some((model) => isE2eeModelId(model.id)),
     },
   });
   // The catalog can be used as soon as its prices are seeded. Metadata from
@@ -894,6 +889,12 @@ export async function topUpBalance(
 }
 
 /**
+ * What a `Response` that cannot carry a stream stores instead of the body —
+ * `whatwg-fetch`'s final `_initBody` branch, `Object.prototype.toString`.
+ */
+const STRINGIFIED_STREAM = '[object ReadableStream]';
+
+/**
  * Parse SSE stream manually for React Native compatibility.
  * Uses ReadableStream when available, falls back to full-text parsing.
  */
@@ -901,7 +902,10 @@ async function* parseSSEStream(
   response: Response,
   deadline: RequestDeadline
 ): AsyncGenerator<ChatCompletionChunk> {
-  const hasReadableStream = response.body && typeof response.body.getReader === 'function';
+  // Boolean, not the `&&` chain it came from: an `undefined` here is dropped
+  // by the log serializer, and the missing key read as "not recorded" during
+  // the investigation that produced `stringified_stream_body` below.
+  const hasReadableStream = !!response.body && typeof response.body.getReader === 'function';
   apiLog.debug('routstr.sse.start', {
     hasReadableStream,
     contentType: response.headers.get('content-type'),
@@ -920,15 +924,25 @@ async function* parseSSEStream(
   }
   if (chunks === 0) {
     // A 200 that yields nothing is indistinguishable on screen from a hang,
-    // and the three causes need different fixes: an empty body, a body that is
-    // not SSE at all, or a stream object stringified by a `Response` polyfill
-    // with no stream support (`"[object ReadableStream]"`). The head says
-    // which. Bounded and shape-only — an SSE frame's payload is the user's own
-    // prompt coming back.
-    apiLog.error('routstr.sse.empty_text', {
-      length: text.length,
-      contentType: response.headers.get('content-type'),
-    });
+    // and the causes need different fixes: an empty body, a body that is not
+    // SSE at all, or a stream stringified by a `Response` that cannot hold one.
+    // That last one is named outright rather than left as a byte count: it cost
+    // a paid turn and a long investigation to recognise 23 characters as
+    // `Object.prototype.toString.call(stream)`. `installStreamCapableResponse`
+    // is what stops it; this fires if that shim is ever lost or bypassed.
+    if (text === STRINGIFIED_STREAM) {
+      apiLog.error('routstr.sse.stringified_stream_body', {
+        contentType: response.headers.get('content-type'),
+        fix: 'installStreamCapableResponse',
+      });
+    } else {
+      // Bounded and shape-only — an SSE frame's payload is the user's own
+      // prompt coming back.
+      apiLog.error('routstr.sse.empty_text', {
+        length: text.length,
+        contentType: response.headers.get('content-type'),
+      });
+    }
   }
 }
 
@@ -1142,6 +1156,26 @@ function fromSdkError(error: unknown): RoutstrError | null {
         details: undefined,
       },
     };
+  }
+  // A `FailoverError` says the SDK's provider walk ended. Sovran pins the one
+  // provider the user chose and never switches on their behalf (see
+  // `hasRoutstrProvider`), so that walk is one node long and "all providers
+  // failed" is a claim about a population of one. Reporting it as
+  // `no_providers` sent a real 404 from a chosen node out as advice about
+  // provider availability, and cost a long investigation to see through.
+  if (error instanceof FailoverError) {
+    const tried = error.failedProviders?.length ?? 0;
+    if (tried <= 1) {
+      return {
+        status: 502,
+        error: {
+          message: error.message,
+          code: 'provider_refused',
+          type: 'provider_error',
+          details: undefined,
+        },
+      };
+    }
   }
   if (error instanceof NoProvidersAvailableError || error instanceof FailoverError) {
     return {

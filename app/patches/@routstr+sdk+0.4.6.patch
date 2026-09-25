@@ -1,0 +1,140 @@
+diff --git a/dist/browser.js b/dist/browser.js
+index 4a84339a7902ab723b876dc6cd022b9e72641ac7..eca68bfe0a4dc43c2817f67ec9bb102bc8b1e501 100644
+--- a/dist/browser.js
++++ b/dist/browser.js
+@@ -3087,7 +3087,8 @@ var BalanceManager = class _BalanceManager {
+ var TOR_ONION_SUFFIX = ".onion";
+ var isTorContext = () => {
+   if (typeof window === "undefined") return false;
+-  const hostname = window.location.hostname.toLowerCase();
++  const hostname = window.location?.hostname?.toLowerCase();
++  if (!hostname) return false;
+   return hostname.endsWith(TOR_ONION_SUFFIX);
+ };
+ var isOnionUrl = (url) => {
+diff --git a/dist/browser.mjs b/dist/browser.mjs
+index 3ab09ccda43af12ae2259eae01d2a5120f441bbd..66c3bdce4ded9cc2942a3649a6b859047b0763c5 100644
+--- a/dist/browser.mjs
++++ b/dist/browser.mjs
+@@ -3085,7 +3085,8 @@ var BalanceManager = class _BalanceManager {
+ var TOR_ONION_SUFFIX = ".onion";
+ var isTorContext = () => {
+   if (typeof window === "undefined") return false;
+-  const hostname = window.location.hostname.toLowerCase();
++  const hostname = window.location?.hostname?.toLowerCase();
++  if (!hostname) return false;
+   return hostname.endsWith(TOR_ONION_SUFFIX);
+ };
+ var isOnionUrl = (url) => {
+diff --git a/dist/bun.js b/dist/bun.js
+index be62e2a4c56969398b9ac07fe04836aeef6d79af..2d5b3d2ca66dbe568f9f91cb1e953b7dd287c79d 100644
+--- a/dist/bun.js
++++ b/dist/bun.js
+@@ -3087,7 +3087,8 @@ var BalanceManager = class _BalanceManager {
+ var TOR_ONION_SUFFIX = ".onion";
+ var isTorContext = () => {
+   if (typeof window === "undefined") return false;
+-  const hostname = window.location.hostname.toLowerCase();
++  const hostname = window.location?.hostname?.toLowerCase();
++  if (!hostname) return false;
+   return hostname.endsWith(TOR_ONION_SUFFIX);
+ };
+ var isOnionUrl = (url) => {
+diff --git a/dist/bun.mjs b/dist/bun.mjs
+index adb8878427def5fc4a659cf7f8cc75c6213f1f68..1f6c14f70a1aabea8178eeae7fb0a77c92c30a32 100644
+--- a/dist/bun.mjs
++++ b/dist/bun.mjs
+@@ -3085,7 +3085,8 @@ var BalanceManager = class _BalanceManager {
+ var TOR_ONION_SUFFIX = ".onion";
+ var isTorContext = () => {
+   if (typeof window === "undefined") return false;
+-  const hostname = window.location.hostname.toLowerCase();
++  const hostname = window.location?.hostname?.toLowerCase();
++  if (!hostname) return false;
+   return hostname.endsWith(TOR_ONION_SUFFIX);
+ };
+ var isOnionUrl = (url) => {
+diff --git a/dist/client/index.js b/dist/client/index.js
+index 9f4ff54c85ee702ad423146481c2ec6289316cd1..6cdc93ad538ff0049d571a0440217a652ea0fa17 100644
+--- a/dist/client/index.js
++++ b/dist/client/index.js
+@@ -1872,7 +1872,8 @@ var BalanceManager = class _BalanceManager {
+ var TOR_ONION_SUFFIX = ".onion";
+ var isTorContext = () => {
+   if (typeof window === "undefined") return false;
+-  const hostname = window.location.hostname.toLowerCase();
++  const hostname = window.location?.hostname?.toLowerCase();
++  if (!hostname) return false;
+   return hostname.endsWith(TOR_ONION_SUFFIX);
+ };
+ var isOnionUrl = (url) => {
+diff --git a/dist/client/index.mjs b/dist/client/index.mjs
+index 98093e9535a3d23c5dff6022f157e6e980284dc5..254f5350465e59e661182c8725fbc476aa760104 100644
+--- a/dist/client/index.mjs
++++ b/dist/client/index.mjs
+@@ -1870,7 +1870,8 @@ var BalanceManager = class _BalanceManager {
+ var TOR_ONION_SUFFIX = ".onion";
+ var isTorContext = () => {
+   if (typeof window === "undefined") return false;
+-  const hostname = window.location.hostname.toLowerCase();
++  const hostname = window.location?.hostname?.toLowerCase();
++  if (!hostname) return false;
+   return hostname.endsWith(TOR_ONION_SUFFIX);
+ };
+ var isOnionUrl = (url) => {
+diff --git a/dist/index.js b/dist/index.js
+index 092ac1fb0b042a4d1b0bc65cca46aae86654dc38..831951f31c4ba575944f2c3a6e34f54d8c750caa 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -3087,7 +3087,8 @@ var BalanceManager = class _BalanceManager {
+ var TOR_ONION_SUFFIX = ".onion";
+ var isTorContext = () => {
+   if (typeof window === "undefined") return false;
+-  const hostname = window.location.hostname.toLowerCase();
++  const hostname = window.location?.hostname?.toLowerCase();
++  if (!hostname) return false;
+   return hostname.endsWith(TOR_ONION_SUFFIX);
+ };
+ var isOnionUrl = (url) => {
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 08c55b1d070150346e17631c48bcbcdae668af3f..27c75d43b54905f58697fd7871cf2d29799ac45c 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -3085,7 +3085,8 @@ var BalanceManager = class _BalanceManager {
+ var TOR_ONION_SUFFIX = ".onion";
+ var isTorContext = () => {
+   if (typeof window === "undefined") return false;
+-  const hostname = window.location.hostname.toLowerCase();
++  const hostname = window.location?.hostname?.toLowerCase();
++  if (!hostname) return false;
+   return hostname.endsWith(TOR_ONION_SUFFIX);
+ };
+ var isOnionUrl = (url) => {
+diff --git a/dist/node.js b/dist/node.js
+index 70eed4e307ac0555f346ace53009fc78814ee61a..a96306f984b617bf58eeaea5f9922accf9add7a9 100644
+--- a/dist/node.js
++++ b/dist/node.js
+@@ -3087,7 +3087,8 @@ var BalanceManager = class _BalanceManager {
+ var TOR_ONION_SUFFIX = ".onion";
+ var isTorContext = () => {
+   if (typeof window === "undefined") return false;
+-  const hostname = window.location.hostname.toLowerCase();
++  const hostname = window.location?.hostname?.toLowerCase();
++  if (!hostname) return false;
+   return hostname.endsWith(TOR_ONION_SUFFIX);
+ };
+ var isOnionUrl = (url) => {
+diff --git a/dist/node.mjs b/dist/node.mjs
+index 0f4f42dff1ba3bfdbbfd9e63a91f7f1eec28066b..dc07af50c33f10ce1c346dbc3bc37f3360e375c1 100644
+--- a/dist/node.mjs
++++ b/dist/node.mjs
+@@ -3085,7 +3085,8 @@ var BalanceManager = class _BalanceManager {
+ var TOR_ONION_SUFFIX = ".onion";
+ var isTorContext = () => {
+   if (typeof window === "undefined") return false;
+-  const hostname = window.location.hostname.toLowerCase();
++  const hostname = window.location?.hostname?.toLowerCase();
++  if (!hostname) return false;
+   return hostname.endsWith(TOR_ONION_SUFFIX);
+ };
+ var isOnionUrl = (url) => {

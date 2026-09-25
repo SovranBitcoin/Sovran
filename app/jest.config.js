@@ -10,6 +10,7 @@ module.exports = {
   setupFiles: [
     ...(expoNodePreset.setupFiles || []),
     require.resolve('@react-native/jest-preset/jest/setup.js'),
+    '<rootDir>/jest.webGlobals.js',
     '<rootDir>/jest.staticAssets.js',
   ],
   moduleNameMapper: {

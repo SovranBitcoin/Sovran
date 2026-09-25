@@ -32,6 +32,12 @@ const SOURCE_TYPES: Partial<Record<ErrorService, TypeRules>> = {
   // or provider" where the generic copy would say "try again" forever.
   routstr: [
     ['no_provider', 'routstr.no_provider'],
+    // Our own exhaustion marker (`NoProvidersAvailableError` / `FailoverError`
+    // → code `no_providers`), carried on a synthesized 503. Without this rule
+    // the 5xx fallback below called it an unreachable provider, which is a
+    // claim about someone else's node that we never actually made.
+    ['provider_refused', 'routstr.provider_refused'],
+    ['no_providers', 'routstr.no_providers'],
     ['mint_not_accepted', 'routstr.mint_not_accepted'],
     ['mint_error', 'routstr.mint_refused'],
   ],
@@ -58,6 +64,7 @@ const SOURCE_HTTP: Partial<Record<ErrorService, Readonly<Partial<Record<number, 
     // wallet shortfall from an upstream passthrough. See `balanceId` below.
     404: 'routstr.not_found',
     408: 'routstr.timeout',
+    502: 'routstr.upstream_failed',
     504: 'routstr.timeout',
   },
   cashu: { 401: 'cashu.auth', 408: 'cashu.timeout', 504: 'cashu.timeout' },

@@ -9,8 +9,38 @@ export const ERROR_COPY = {
   'routstr.provider_declined':
     'The AI provider declined this request. Try another model, or try again in a minute.',
   'routstr.unavailable': 'The AI provider is unreachable right now. Try again in a minute.',
+  // Distinct from `routstr.unavailable` on purpose. This one is OUR verdict
+  // after walking every candidate, not one node's answer — saying "the
+  // provider is unreachable" sent people chasing a provider that was fine, and
+  // hid that the shortlist itself (model, mint, filters) was the thing to
+  // change.
+  // One chosen provider, and it refused. Naming the provider (not "providers")
+  // is what points at the one action that helps.
+  'routstr.provider_refused':
+    'Your AI provider refused this request. Try another model, or switch provider in AI settings.',
+  'routstr.no_providers':
+    'No AI provider could take this request. Try a different model, or check your AI provider settings.',
+  // 502 is the node telling us its own upstream model service failed. The node
+  // answered, so "unreachable" is wrong, and retrying the same model usually
+  // repeats it.
+  'routstr.upstream_failed':
+    'The AI provider could not reach the model it routes to. Try another model, or try again in a minute.',
   'routstr.no_provider':
     'Choose an AI provider first. Tap the pill at the top of the AI tab to see who is available.',
+  // Not an answer from anyone — we never got as far as a request. The model
+  // catalogue has not landed this session and no snapshot survived, so there
+  // is no model id to send. Distinct from `routstr.unavailable`, which is a
+  // claim about a node we actually tried.
+  'routstr.catalog_unavailable':
+    'The AI model list has not loaded yet. Check your connection and try again in a moment.',
+  // Nothing was sent. The user chose the end-to-end encrypted vendor and this
+  // node is serving no sealed model, so every model we could have reached
+  // would have read the prompt in the clear. Falling back to one of those
+  // quietly is the defect this id exists to make impossible: the promise is
+  // the selection, so breaking it has to be something the user is told about
+  // and chooses, not something the send path decides on their behalf.
+  'routstr.e2ee_unavailable':
+    'No end-to-end encrypted model is available from this AI provider, so nothing was sent. Choose another provider, or pick an unencrypted model.',
   'routstr.mint_not_accepted':
     'This AI provider does not accept any of your mints. Choose another provider, or add one of the mints it accepts.',
   'routstr.mint_refused':

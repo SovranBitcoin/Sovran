@@ -72,6 +72,7 @@ const NOT_SWEPT: Record<string, string> = {
   'expo-env.d.ts': 'type declarations only',
   'jest.config.js': 'build config',
   'jest.staticAssets.js': 'test asset setup, never bundled',
+  'jest.webGlobals.js': 'test environment polyfill, never bundled',
   'metro.config.js': 'build config',
   'prettier.config.js': 'build config',
   'uniwind-types.d.ts': 'type declarations only',

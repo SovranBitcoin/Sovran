@@ -14,6 +14,7 @@ the fix is upstream and whether the import still reaches the patched file.
 | `expo-router@56.2.11` | Exposes drawer overlay styling in Router's navigation fork. | Upstream exposes it |
 | `react-native-screens@4.25.2` | Adjusts Android form-sheet dimming. | Upstream fixes the dimming |
 | `heroui-native@1.0.9` | (1) `mountIndex` forwards to gorhom's `index` so sheets open after layout (gorhom #2690, #2719). (2) `useDirectView`/`useScrollableContainer` keep a nested `BottomSheetScrollView` scrollable. (3) Hides the toast measurement clone inline. Guarded by `app/__tests__/herouiNativePatch.test.ts`. | Each hunk: upstream forwards `index`, adopts the container flags, or fixes the clone |
+| `@routstr/sdk@0.4.6` | `isTorContext` reads `window.location.hostname` behind a `typeof window` guard. React Native defines `window` but not `location`, so the guard passes and the read throws inside `findNextBestProvider` — its `catch` returns null, and the SDK gives up after ONE provider. A node answering 404 for a model it does not serve ended the whole request with eleven candidates untried. Guarded by `app/__tests__/routstrSdkPatch.test.ts`. | The SDK's browser build stops assuming `window` implies `window.location` |
 | `expo-modules-jsi@56.0.12` | Replaces `weak let` declarations unsupported by the older Swift toolchain. | Xcode 26.4+ is the minimum |
 
 A successful install doesn't prove a patch landed: inspect the patched files in
