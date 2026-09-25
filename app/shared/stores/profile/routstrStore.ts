@@ -59,6 +59,16 @@ const DEFAULT_PROVIDER: RoutstrProviderId = 'openai';
  *     and moving them quietly onto a plaintext vendor is precisely the silent
  *     downgrade the sealed candidate chain exists to prevent. The send path's
  *     `routstr.e2ee_unavailable` is the honest answer there.
+ *
+ *     That rule holds the promise; it must not also strand the user. Staying
+ *     put on a node that serves nothing sealed is a selection nothing can
+ *     resolve, so the state has to be legible and reversible BY THE USER
+ *     rather than by this function: the chip says so in words
+ *     (`UNSERVED_SELECTION_LABEL`) instead of printing a model it cannot
+ *     name, the picker opens on a vendor the node actually serves so a
+ *     deliberate swap is one tap, and the failed turn's pill offers Change
+ *     Provider / Change Model. Every one of those routes is a choice the user
+ *     makes; none of them is this store choosing plaintext for them.
  *   - Prefer a plaintext vendor, and only land ON `E2EE_PROVIDER_ID` when the
  *     lineup offers nothing else. Enclave rows are the dearest in a catalogue,
  *     so this is a last resort — but it is a visible one: the chip renders the
@@ -80,22 +90,66 @@ function reselectProviderForLineup(
   return preferred ?? null;
 }
 
-/** `reselectProviderForLineup` as a partial state patch, so the repoint lands
- *  in the same `set` as the lineup that caused it — the two can never be
- *  observed apart, and a send started between them cannot read a selection the
- *  lineup does not answer. */
+/**
+ * Keep the selected TIER naming a rung this vendor actually fills.
+ *
+ * The other half of the same contract. A selection is a (provider, tier) PAIR
+ * and it has to name a real cell, but only the vendor half was ever
+ * reconsidered — so a repoint moved the provider and left the tier behind. It
+ * is not a harmless leftover, because a tier is not a global constant either:
+ * `pickTiers` fills partial ladders deterministically (2 qualifying models →
+ * Auto + Max, 1 → Auto only), and both the encrypted vendor and the four named
+ * ones are exempt from the ladder minimum, so a thin vendor with a hole in its
+ * ladder is the ordinary case rather than the odd one.
+ *
+ * Land on Auto first: `AI_TIER_IDS` is ordered cheapest-to-dearest, and a pair
+ * the app repaired on the user's behalf must not quietly cost them more than
+ * the one they set.
+ *
+ * Returns `null` when the pair already resolves, or when there is nothing to
+ * check it against — an absent vendor block is a placeholder, not a verdict,
+ * exactly as an empty lineup is for the vendor half. That absence is also the
+ * stranded sealed selection (`E2EE_PROVIDER_ID` pinned on a node serving
+ * nothing sealed): there is no rung to move to, the privacy rule forbids
+ * moving vendor, and the honest answer is the chip's own — see
+ * `UNSERVED_SELECTION_LABEL` in `features/ai/lib/format.ts`.
+ */
+function reselectTierForProvider(
+  provider: RoutstrProviderId,
+  tier: RoutstrTierId,
+  lineup: AiLineup | null
+): RoutstrTierId | null {
+  const vendor = lineup?.[provider];
+  if (!vendor || vendor[tier] != null) return null;
+  return TIER_IDS.find((candidate) => vendor[candidate] != null) ?? null;
+}
+
+/** `reselectProviderForLineup` and `reselectTierForProvider` as one partial
+ *  state patch, so the repoint lands in the same `set` as the lineup that
+ *  caused it — the two can never be observed apart, and a send started between
+ *  them cannot read a selection the lineup does not answer. Both halves move
+ *  together for the same reason: a patch that carried the new vendor without
+ *  its tier would itself be a selection the lineup cannot answer. */
 function repointSelection(
   selected: RoutstrProviderId,
+  selectedTier: RoutstrTierId,
   lineup: AiLineup | null
-): { selectedProvider: RoutstrProviderId } | Record<string, never> {
-  const next = reselectProviderForLineup(selected, lineup);
-  if (next == null) return {};
+): Partial<Pick<RoutstrState, 'selectedProvider' | 'selectedTier'>> {
+  const nextProvider = reselectProviderForLineup(selected, lineup);
+  const provider = nextProvider ?? selected;
+  const nextTier = reselectTierForProvider(provider, selectedTier, lineup);
+  if (nextProvider == null && nextTier == null) return {};
   storeLog.info('store.routstr.provider_repointed', {
     from: selected,
-    to: next,
+    to: provider,
+    fromTier: selectedTier,
+    toTier: nextTier ?? selectedTier,
     offered: lineupProviderIds(lineup),
   });
-  return { selectedProvider: next };
+  return {
+    ...(nextProvider != null ? { selectedProvider: nextProvider } : {}),
+    ...(nextTier != null ? { selectedTier: nextTier } : {}),
+  };
 }
 
 /**
@@ -913,7 +967,14 @@ export const useRoutstrStore = create<RoutstrStore>()(
         const lineup = get().lineup ?? get().lastKnownLineup?.lineup ?? null;
         const offered = new Set<string>([...PROVIDER_IDS, ...lineupProviderIds(lineup)]);
         const safeProvider = offered.has(slot.provider) ? slot.provider : DEFAULT_PROVIDER;
-        const safeTier = TIER_IDS.includes(slot.tier) ? slot.tier : DEFAULT_TIER;
+        // `TIER_IDS` is the global list of tier NAMES, so it can only say that
+        // `pro` is spelled like a tier — never that THIS vendor has a Pro rung.
+        // The vendor half is checked against the vendors this lineup offers;
+        // the tier half is held to the same standard, against the tiers this
+        // vendor fills. When no lineup can answer yet, that check has nothing
+        // real to run against and the user's own choice stands.
+        const namedTier = TIER_IDS.includes(slot.tier) ? slot.tier : DEFAULT_TIER;
+        const safeTier = reselectTierForProvider(safeProvider, namedTier, lineup) ?? namedTier;
         storeLog.info('store.routstr.set_slot', {
           provider: safeProvider,
           tier: safeTier,
@@ -967,7 +1028,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
         const adopted = filled || !lineupHasEntries(held) ? merged : held;
         set({
           modelsCache: { data: models, timestamp: now },
-          ...repointSelection(get().selectedProvider, adopted),
+          ...repointSelection(get().selectedProvider, get().selectedTier, adopted),
           // A catalog that qualifies nothing is not an upgrade on a menu that
           // works. Node catalogs swing hard within one session (582 models one
           // read, 10 the next), and an empty derivation is truthy — it would
@@ -1006,7 +1067,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
           set({
             lineup,
             serverLineupAt: now,
-            ...repointSelection(get().selectedProvider, lineup),
+            ...repointSelection(get().selectedProvider, get().selectedTier, lineup),
             lastKnownLineup: { derivedAt: now, lineup, nodeBaseUrl: pinned },
           });
           return true;
@@ -1019,7 +1080,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
         set({
           lineup,
           serverLineupAt: now,
-          ...repointSelection(previous.selectedProvider, lineup),
+          ...repointSelection(previous.selectedProvider, previous.selectedTier, lineup),
           nodeBaseUrl,
           authMode: authMode ?? (nodeBaseUrl === get().nodeBaseUrl ? get().authMode : 'bearer'),
           modelsCache: nodeBaseUrl === get().nodeBaseUrl ? get().modelsCache : null,
@@ -1270,12 +1331,16 @@ export const useRoutstrStore = create<RoutstrStore>()(
         // relaunch against a node serving neither `openai` nor any other named
         // vendor, that pairing is the same dead send as a mid-session node
         // swap — just with no catalogue in memory to make the contradiction
-        // visible in the log. Same rule, applied to the snapshot.
-        const hydratedProvider = reselectProviderForLineup(
+        // visible in the log. Same rule, applied to the snapshot — and to the
+        // whole pair, because `auto` is no more guaranteed to exist on the
+        // snapshot's vendors than `openai` is.
+        const hydrated = repointSelection(
           state.selectedProvider,
+          state.selectedTier,
           state.lastKnownLineup?.lineup ?? null
         );
-        if (hydratedProvider != null) state.selectedProvider = hydratedProvider;
+        if (hydrated.selectedProvider != null) state.selectedProvider = hydrated.selectedProvider;
+        if (hydrated.selectedTier != null) state.selectedTier = hydrated.selectedTier;
       },
     })
   )

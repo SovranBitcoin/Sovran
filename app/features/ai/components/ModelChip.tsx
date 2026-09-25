@@ -24,7 +24,9 @@ import {
   estimateTurnCostSatsFromPricing,
   getProviderById,
   getTierById,
+  isSelectionServed,
   resolveSelectedEntry,
+  UNSERVED_SELECTION_LABEL,
 } from '../lib/format';
 import { aiLog } from '@/shared/lib/logger';
 import { withAlpha } from '@/shared/lib/color';
@@ -81,6 +83,15 @@ export function ModelChip() {
     balanceSats,
     lineup
   );
+  // Nothing resolved, and the node HAS answered: this selection names a vendor
+  // or a rung the node in front of us does not serve. The sealed selection is
+  // the case that reaches a user — `routstrStore` deliberately refuses to move
+  // one onto a plaintext vendor, because moving it is the silent downgrade, so
+  // a node swap onto a node with no `tinfoil-` row legitimately leaves the
+  // selection unresolvable. Saying so is the honest half of that bargain; the
+  // chip used to repeat the tier instead and render "Auto · Auto", which reads
+  // like a working selection and let a failed send be the first sign.
+  const served = isSelectionServed(currentProvider.id, currentTier.id, balanceSats, lineup);
 
   // Diagnostic snapshot — fires once per (balance, lineup, slot) change.
   // Captures every filled cell of the (provider, tier) matrix the chip's
@@ -115,15 +126,22 @@ export function ModelChip() {
       selectedTier,
       selectedProvider,
       buffer: AFFORD_BUFFER,
+      // The mismatch this event was already carrying, stated rather than
+      // inferred. `selectedProvider: "tinfoil"` over cells whose every
+      // `providerId` is a plaintext vendor IS the stranded selection, and it
+      // took reading both fields against each other to see it.
+      selectionServed: served,
       lineupSource,
       catalogSize: models.length,
       cells: cellSnapshots,
     });
-  }, [balanceSats, models.length, lineup, lineupSource, selectedTier, selectedProvider]);
+  }, [balanceSats, models.length, lineup, lineupSource, selectedTier, selectedProvider, served]);
 
   // No lineup yet (first run, fetch pending) → show the tier label so the
   // chip never reads like a dev string.
-  const chipLabel = `${currentTier.label} · ${resolvedEntry?.displayName ?? currentTier.label}`;
+  const chipLabel = served
+    ? `${currentTier.label} · ${resolvedEntry?.displayName ?? currentTier.label}`
+    : `${currentProvider.label} · ${UNSERVED_SELECTION_LABEL}`;
 
   // The chip names the model a turn will actually be sent to, so the padlock
   // belongs to THAT model and nothing else. The display name cannot carry it:

@@ -4,6 +4,7 @@ import {
   AI_TIER_IDS,
   E2EE_PROVIDER_ID,
   isE2eeModelId,
+  lineupHasEntries,
   lineupProviderIds,
   type AiLineup,
   type AiProviderId,
@@ -684,6 +685,44 @@ export function resolveSelectedEntry(
   lineup: AiLineup | null
 ): LineupEntry | null {
   return selectFromChain(resolveCandidateEntries(provider, tier, lineup), balanceSats);
+}
+
+/**
+ * What the chip says instead of a model name when the node has answered and
+ * the selection still resolves to nothing.
+ *
+ * `resolveSelectedEntry` returns `null` for two different reasons and only one
+ * of them is "not loaded yet": against a lineup that HAS entries, `null` means
+ * this node serves nothing the selection can reach. In practice that is the
+ * sealed selection on a node with no `tinfoil-` row — the one case the store
+ * deliberately refuses to repair by moving the user, because moving them is
+ * the silent downgrade. The chip previously fell back to repeating the tier
+ * label, so that state rendered as "Auto · Auto": a selection that reads like
+ * it works, on the one surface whose entire job is naming what a turn will be
+ * sent to. The first sign of trouble was a failed send.
+ *
+ * It names the vendor rather than the tier because the vendor is what has to
+ * change, and it names no model at all — a chip showing a model this node
+ * cannot supply is its own bug, whether the model is a sealed one that is not
+ * here or a plaintext one the user never chose.
+ */
+export const UNSERVED_SELECTION_LABEL = 'Not on this node';
+
+/**
+ * Whether the node currently in front of the app can answer this selection.
+ *
+ * `false` only when a lineup with entries — a node that has answered —
+ * resolves the pair to nothing. An absent or empty lineup is "no answer yet",
+ * which is a different state with different copy.
+ */
+export function isSelectionServed(
+  provider: AiProviderId,
+  tier: AiTierId,
+  balanceSats: number,
+  lineup: AiLineup | null
+): boolean {
+  if (!lineupHasEntries(lineup)) return true;
+  return resolveSelectedEntry(provider, tier, balanceSats, lineup) != null;
 }
 
 /** Worst-case cost in whole sats for a given model id, or null if unknown.

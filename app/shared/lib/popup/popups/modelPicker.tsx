@@ -385,7 +385,16 @@ export function ModelPickerContent({ close, balanceSats }: ModelPickerContentPro
           contentContainerStyle={[styles.anchorBarContent, { paddingHorizontal: 24 }]}
           style={styles.anchorBarWrapper}>
           {providers.map((p) => {
-            const isSelected = activeProviderTab === p.id;
+            // Against `activeProvider`, not against `activeProviderTab`. The
+            // tab opens on the current selection, and a selection can name a
+            // vendor this node does not serve — a sealed pick after a node
+            // swap, which the store deliberately does not move. The row list
+            // already falls through to the first real vendor in that case, so
+            // comparing the raw tab id left every pill reading unselected
+            // while another vendor's rows were the ones on offer, and the one
+            // surface that exists to change vendor did not say which vendor
+            // was showing.
+            const isSelected = activeProvider.id === p.id;
             return (
               <Pressable
                 key={p.id}
