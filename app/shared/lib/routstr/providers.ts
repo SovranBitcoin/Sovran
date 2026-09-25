@@ -5,6 +5,8 @@ import { apiLog } from '@/shared/lib/logger';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
 import type { RequestControls } from 'wallet/safeFetch';
 
+import { isE2eeModelId } from './lineup';
+
 /**
  * The providers a user can choose between.
  *
@@ -180,9 +182,10 @@ export interface ProviderModelSummary {
   /** Models this provider currently serves. */
   count: number;
   /** At least one of them runs in a Tinfoil enclave, so a request to it can be
-   *  sealed end to end. The `tinfoil-` prefix is the only honest signal: the
-   *  catalog lists `glm-5-3` and `tinfoil-glm-5-3` under the identical display
-   *  name and only the prefixed one is encrypted. */
+   *  sealed end to end. `isE2eeModelId` is the one spelling of that rule, and
+   *  the lineup groups the same rows under `E2EE_PROVIDER_ID` — the badge and
+   *  the menu have to answer from the same test, or the badge promises an
+   *  encryption the app cannot offer. */
   e2ee: boolean;
 }
 
@@ -210,7 +213,7 @@ export async function fetchProviderModelSummary(
     const enabled = parsed.data.data.filter((model) => model.enabled !== false);
     return {
       count: enabled.length,
-      e2ee: enabled.some((model) => model.id?.startsWith('tinfoil-') === true),
+      e2ee: enabled.some((model) => isE2eeModelId(model.id)),
     };
   } catch {
     return null;

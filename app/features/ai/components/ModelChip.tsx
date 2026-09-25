@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useRoutstrFunds } from '../hooks/useRoutstrFunds';
+import { useModelCatalog } from '../hooks/useModelCatalog';
 import { Keyboard } from 'react-native';
 import Icon from 'assets/icons';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
-import { getModels, type RoutstrModel } from '@/shared/lib/routstr/api';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
 import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
 import { modelPickerPopup } from '@/shared/lib/popup';
@@ -46,9 +46,10 @@ import { withAlpha } from '@/shared/lib/color';
  *   - Rows whose underlying model exceeds the user's balance render
  *     half-faded with the gap shown as the row description.
  *
- * This chip's mount effect is the app's SOLE catalog fetcher: a
- * successful `getModels()` lands in `setCachedModels`, which derives the
- * lineup and persists the compact last-known snapshot.
+ * The app's SOLE catalog fetch hangs off this chip, but it is no longer this
+ * chip's business: `useModelCatalog` owns it, including the retry ladder a
+ * failed first fetch needs. A successful read lands in `setCachedModels`,
+ * which derives the lineup and persists the compact last-known snapshot.
  */
 export function ModelChip() {
   const background = useThemeColor('background');
@@ -56,40 +57,16 @@ export function ModelChip() {
   const selectedTier = useRoutstrStore((s) => s.selectedTier);
   const selectedProvider = useRoutstrStore((s) => s.selectedProvider);
   const funds = useRoutstrFunds();
-  const nodeBaseUrl = useRoutstrStore((s) => s.nodeBaseUrl);
-  const cachedModels = useRoutstrStore((s) => s.modelsCache?.data ?? null);
-  const setCachedModels = useRoutstrStore((s) => s.setCachedModels);
-  const isCacheStale = useRoutstrStore((s) => s.isCacheStale);
   const sessionLineup = useRoutstrStore((s) => s.lineup);
   const lastKnownLineup = useRoutstrStore((s) => s.lastKnownLineup);
   const lineup = sessionLineup ?? lastKnownLineup?.lineup ?? null;
   const lineupSource = sessionLineup ? 'live' : lastKnownLineup ? 'persisted' : 'empty';
 
-  const [models, setModels] = useState<RoutstrModel[]>(cachedModels ?? []);
+  const models = useModelCatalog();
 
   useVisualActivityEffect(() => {
     void refreshRoutstrLineup();
   });
-
-  useEffect(() => {
-    if (cachedModels && !isCacheStale()) {
-      setModels(cachedModels);
-      return;
-    }
-    let cancelled = false;
-    getModels()
-      .then((next) => {
-        if (cancelled || useRoutstrStore.getState().nodeBaseUrl !== nodeBaseUrl) return;
-        setCachedModels(next);
-        setModels(next);
-      })
-      .catch(() => {
-        // Silent — the chip still renders the tier label.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [cachedModels, isCacheStale, nodeBaseUrl, setCachedModels]);
 
   const balanceSats = funds?.balanceSats ?? 0;
   const currentTier = getTierById(selectedTier);

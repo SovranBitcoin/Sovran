@@ -864,7 +864,18 @@ export const useRoutstrStore = create<RoutstrStore>()(
         // A nagg-served lineup outranks derivation until invalidated by
         // model rejection or a failed refresh after seven days. Keep the raw catalog (pricing lookups,
         // vision flags, display names) but leave `lineup` untouched.
-        if (get().serverLineupAt != null) {
+        //
+        // The timestamp alone is NOT enough to claim that precedence.
+        // `serverLineupAt` is persisted and `lineup` is session-only, so after
+        // a cold start the app can hold a day-fresh timestamp and no lineup at
+        // all — and `refreshRoutstrLineup('foreground')` skips a
+        // `serverLineupAt` that young. Deferring to an absent lineup in that
+        // state vetoes the only other source of a menu for a full day, which
+        // is one of the ways the picker got stuck on "Models loading" with a
+        // full catalog already in `modelsCache`. Defer to a server lineup that
+        // is actually in memory; otherwise derive.
+        const held = get().lineup;
+        if (get().serverLineupAt != null && lineupHasEntries(held)) {
           aiLog.debug('ai.lineup.derive_skipped_server_lineup');
           set({ modelsCache: { data: models, timestamp: Date.now() } });
           return;
@@ -873,6 +884,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
         const snapshot = get().lastKnownLineup;
         const previous = snapshot?.nodeBaseUrl === get().nodeBaseUrl ? snapshot : null;
         const merged = mergeLineupWithLastKnown(derived, previous?.lineup ?? null);
+        const filled = lineupHasEntries(merged);
         aiLog.info('ai.lineup.derived', {
           catalogSize: models.length,
           totalQualifying: stats.totalQualifying,
@@ -881,12 +893,19 @@ export const useRoutstrStore = create<RoutstrStore>()(
             (p) => merged[p] !== derived[p] // mergeLineupWithLastKnown replaces the block reference
           ),
           allProvidersEmpty: !lineupHasEntries(derived),
+          keptPreviousLineup: !filled && lineupHasEntries(held),
         });
         const now = Date.now();
         set({
           modelsCache: { data: models, timestamp: now },
-          lineup: merged,
-          lastKnownLineup: lineupHasEntries(merged)
+          // A catalog that qualifies nothing is not an upgrade on a menu that
+          // works. Node catalogs swing hard within one session (582 models one
+          // read, 10 the next), and an empty derivation is truthy — it would
+          // replace a working lineup AND shadow the `lastKnownLineup` fallback
+          // that every reader falls through to, leaving a menu that cannot
+          // recover until something else happens to refetch.
+          lineup: filled || !lineupHasEntries(held) ? merged : held,
+          lastKnownLineup: filled
             ? { derivedAt: now, lineup: merged, nodeBaseUrl: get().nodeBaseUrl }
             : previous,
         });

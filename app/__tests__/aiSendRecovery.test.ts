@@ -6,6 +6,9 @@ import { sendMessage, checkBalance } from '@/shared/lib/routstr/api';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
 import { staticPopup } from '@/shared/lib/popup';
 import { confirmSpend } from '@/features/ai/lib/spendConfirm';
+import { getTurnError, resetTurnErrors } from '@/features/ai/lib/turnErrors';
+import { chatErrorActions } from '@/features/ai/lib/chatErrorActions';
+import { ERROR_COPY } from '@/shared/lib/errors/catalog';
 
 jest.mock('@/features/ai/lib/spendConfirm', () => ({ confirmSpend: jest.fn() }));
 
@@ -130,6 +133,7 @@ describe('AI send lineup recovery', () => {
   });
   beforeEach(async () => {
     jest.clearAllMocks();
+    resetTurnErrors();
     await useRoutstrStore.persist.rehydrate();
     const lineup = emptyLineup();
     lineup.openai.auto = entry('old-auto');
@@ -272,17 +276,46 @@ describe('AI send lineup recovery', () => {
     expect(refreshMock).toHaveBeenCalledWith('failure');
   });
 
-  it('stops on an unchanged failed node and removes the assistant placeholder', async () => {
+  it('stops on an unchanged failed node and leaves the failure in the conversation', async () => {
     const error = failure(404, 'Not found');
     sendMock.mockRejectedValueOnce(error);
     await send();
     expect(sendMock).toHaveBeenCalledTimes(1);
-    expect(staticPopup).toHaveBeenCalledWith('send-message-failed', {
-      failure: { service: 'routstr', error },
+    // No toast. The turn it failed stays where it was, and carries the reason
+    // and its recovery — the assistant bubble renders `AiTurnErrorPill` for it.
+    expect(staticPopup).not.toHaveBeenCalled();
+    const history = useRoutstrStore.getState().conversationHistory;
+    expect(history).toEqual([
+      expect.objectContaining({ role: 'user', pending: false }),
+      expect.objectContaining({ role: 'assistant', content: '' }),
+    ]);
+    const assistant = history[1];
+    expect(getTurnError(assistant.id)).toEqual({
+      id: 'routstr.not_found',
+      text: ERROR_COPY['routstr.not_found'],
     });
+    expect(chatErrorActions('routstr.not_found')).toContain('retry');
+  });
+
+  it('keeps an aborted turn out of the conversation — it did not fail', async () => {
+    const abort = Object.assign(new Error('Aborted'), { name: 'AbortError' });
+    sendMock.mockRejectedValueOnce(abort);
+    await send();
     expect(useRoutstrStore.getState().conversationHistory).toEqual([
       expect.objectContaining({ role: 'user', pending: false }),
     ]);
+  });
+
+  it('carries the exact shortfall on a wallet 402 rather than a bare top-up prompt', async () => {
+    sendMock.mockRejectedValueOnce(walletBalanceFailure());
+    await send();
+    const history = useRoutstrStore.getState().conversationHistory;
+    const recorded = getTurnError(history[1].id);
+    expect(recorded?.id).toBe('routstr.balance');
+    // Our own arithmetic over the 402's structured details — never its prose.
+    expect(recorded?.detail).toContain('Add at least 86 sats');
+    expect(recorded?.detail).not.toContain('Insufficient balance: 85577 mSats');
+    expect(chatErrorActions('routstr.balance')).toEqual(['top-up', 'change-model']);
   });
 
   it('does not retry a second failure after repointing', async () => {
@@ -308,5 +341,107 @@ describe('AI send lineup recovery', () => {
     await send();
     expect(sendMock).toHaveBeenCalledTimes(1);
     expect(refreshMock).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The encryption promise, at the one place it is kept or broken.
+   *
+   * `@routstr/sdk` seals a request on `modelId.startsWith('tinfoil-')`, so
+   * every one of these cases asks the same question of the wire: which model
+   * ids actually went out. The candidate walk used to answer a sealed
+   * selection with an OpenAI model whenever the sealed one refused, was
+   * retired, or simply cost more than the wallet held — no toast, no pill,
+   * nothing in the conversation to say the prompt had been read in the clear.
+   */
+  describe('an encrypted selection', () => {
+    const sentModels = () => sendMock.mock.calls.map((call) => call[1].model);
+
+    beforeEach(() => {
+      const lineup = emptyLineup();
+      lineup.tinfoil = {
+        auto: entry('tinfoil-glm-5-3'),
+        pro: entry('tinfoil-qwen3-coder'),
+        max: entry('tinfoil-deepseek-r1'),
+      };
+      // The plaintext ladder the old walk fell onto, still present and still
+      // cheaper — which is exactly why it kept winning.
+      lineup.openai.auto = entry('gpt-5.4-nano');
+      lineup.openai.pro = entry('gpt-5.4-mini');
+      lineup.claude.auto = entry('claude-haiku-4.5');
+      useRoutstrStore.setState({ lineup, selectedProvider: 'tinfoil', selectedTier: 'pro' });
+    });
+
+    it('walks only encrypted models when an upstream declines with a bare 402', async () => {
+      sendMock
+        .mockRejectedValueOnce(failure(402, 'Payment Required'))
+        .mockResolvedValueOnce(success());
+      await send();
+      expect(sentModels()).toEqual(['tinfoil-qwen3-coder', 'tinfoil-glm-5-3']);
+    });
+
+    it('walks only encrypted models when the chosen one is retired', async () => {
+      sendMock
+        .mockRejectedValueOnce(failure(400, 'Unknown model tinfoil-qwen3-coder'))
+        .mockResolvedValueOnce(success());
+      await send();
+      expect(sentModels()).toEqual(['tinfoil-qwen3-coder', 'tinfoil-glm-5-3']);
+    });
+
+    it('gives up rather than retry a repoint onto the new node\u2019s plaintext Auto model', async () => {
+      sendMock.mockRejectedValue(failure(503, 'Unavailable'));
+      refreshMock.mockImplementationOnce(async () => {
+        // The node nagg repoints us to serves no enclave at all.
+        const lineup = emptyLineup();
+        lineup.openai.auto = entry('new-auto');
+        useRoutstrStore.setState({ lineup, nodeBaseUrl: 'https://new.example' });
+        return true;
+      });
+      await send();
+      // One attempt, and it was the sealed one. The recovery retry is the
+      // subtlest crossing of the boundary: it resolves against a lineup that
+      // has just been replaced wholesale.
+      expect(sentModels()).toEqual(['tinfoil-qwen3-coder']);
+    });
+
+    it('refuses the send with an honest reason when the node serves nothing encrypted', async () => {
+      const lineup = emptyLineup();
+      lineup.openai.auto = entry('gpt-5.4-nano');
+      lineup.openai.pro = entry('gpt-5.4-mini');
+      useRoutstrStore.setState({ lineup });
+
+      await send();
+
+      expect(sendMock).not.toHaveBeenCalled();
+      const history = useRoutstrStore.getState().conversationHistory;
+      const recorded = getTurnError(history[1].id);
+      // NOT `catalog_unavailable`: the catalogue landed, and telling the user
+      // to check their connection would send them after the wrong thing.
+      expect(recorded).toEqual({
+        id: 'routstr.e2ee_unavailable',
+        text: ERROR_COPY['routstr.e2ee_unavailable'],
+      });
+      expect(chatErrorActions('routstr.e2ee_unavailable')).toEqual([
+        'change-provider',
+        'change-model',
+      ]);
+    });
+
+    it('asks for funds instead of answering an unaffordable sealed pick in the clear', async () => {
+      const dear: LineupEntry = {
+        ...entry('tinfoil-deepseek-r1'),
+        satsPricing: { prompt: 0, completion: 0, request: 500_000, image: 0, max_cost: 500_000 },
+      };
+      const lineup = emptyLineup();
+      lineup.tinfoil = { auto: dear, pro: dear, max: dear };
+      // Affordable, plaintext, and one step down the old chain.
+      lineup.openai.pro = entry('gpt-5.4-mini');
+      useRoutstrStore.setState({ lineup });
+
+      await send();
+
+      // "Cannot afford the encrypted model" is a wallet problem with a wallet
+      // answer. It was never a reason to change who reads the prompt.
+      expect(sendMock).not.toHaveBeenCalled();
+    });
   });
 });

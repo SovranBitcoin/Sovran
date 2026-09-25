@@ -8,7 +8,18 @@ import { useProfileStore } from '@/shared/stores/global/profileStore';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FAILURE_REFRESH_MS = 5 * 60 * 1000;
 let inFlight: { profile: number; promise: Promise<boolean> } | null = null;
-let lastAttempt: { profile: number; at: number; forcedAt: number | null } | null = null;
+/**
+ * The last attempt's window. `answered` records whether nagg came back with a
+ * lineup we could read — NOT whether the store adopted it, because a pinned
+ * provider legitimately refuses a lineup served for another node and that is a
+ * successful round trip, not a reason to ask again in five minutes.
+ */
+let lastAttempt: {
+  profile: number;
+  at: number;
+  forcedAt: number | null;
+  answered: boolean;
+} | null = null;
 
 /** One refresh owner for mount/foreground and failed-node recovery. Returns
  * whether a usable server lineup landed; never rejects or logs upstream text. */
@@ -23,15 +34,25 @@ export function refreshRoutstrLineup(
   if (reason === 'foreground') {
     if (state.serverLineupAt != null && now - state.serverLineupAt <= DAY_MS)
       return Promise.resolve(false);
-    if (previous && now - previous.at <= DAY_MS) return Promise.resolve(false);
+    // The daily budget is spent by an attempt that ANSWERED. The window is
+    // written before the request so overlapping mounts cannot storm the
+    // endpoint, which means a request that then fails — offline, 5xx, or a
+    // payload carrying no usable lineup — would otherwise bank a full day of
+    // silence on a failure. It is the app's only lineup refresh, so that left
+    // a cold start with no lineup nothing to recover with until tomorrow.
+    // A failure buys the same five minutes a forced retry does.
+    const backoff = previous?.answered ? DAY_MS : FAILURE_REFRESH_MS;
+    if (previous && now - previous.at <= backoff) return Promise.resolve(false);
   } else if (previous?.forcedAt != null && now - previous.forcedAt < FAILURE_REFRESH_MS) {
     return Promise.resolve(false);
   }
-  lastAttempt = {
+  const attempt = {
     profile,
     at: now,
     forcedAt: reason === 'failure' ? now : (previous?.forcedAt ?? null),
+    answered: false,
   };
+  lastAttempt = attempt;
   const node = state.nodeBaseUrl;
   const serverLineupAt = state.serverLineupAt;
   const ownsRequest = () =>
@@ -49,6 +70,7 @@ export function refreshRoutstrLineup(
     if (result.isOk() && result.value.isOk()) {
       const mapped = lineupFromNaggPayload(result.value.value);
       if (mapped.lineup) {
+        attempt.answered = true;
         return useRoutstrStore.getState().setServerLineup({ ...mapped, lineup: mapped.lineup });
       }
     }

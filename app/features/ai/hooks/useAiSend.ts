@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRoutstrStore, type ChatAttachment } from '@/shared/stores/profile/routstrStore';
 import { useRoutstrFunds } from './useRoutstrFunds';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import {
   sendMessage,
@@ -13,17 +12,19 @@ import {
   type RoutstrChatMessage,
 } from '@/shared/lib/routstr/api';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
+import { lineupHasEntries, type LineupEntry } from '@/shared/lib/routstr/lineup';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { isAbortError } from 'wallet/safeFetch';
 import { pickFinalizeMessage } from '../lib/finalize';
-import { actionMenuPopup, staticPopup, paramPopup } from '@/shared/lib/popup';
+import { staticPopup } from '@/shared/lib/popup';
+import { describeError } from '@/shared/lib/errors';
+import { ERROR_COPY } from '@/shared/lib/errors/catalog';
 import { aiLog } from '@/shared/lib/logger';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import {
   AFFORD_BUFFER,
-  AUTO_ICON,
   estimateTurnCostSats,
   getAffordabilityDetails,
   getModelDisplayName,
@@ -31,6 +32,7 @@ import {
   getTierById,
   resolveCandidateEntries,
   resolveSelectedEntry,
+  selectFromChain,
 } from '../lib/format';
 import { confirmSpend } from '../lib/spendConfirm';
 import { evaluateSendGate } from '../lib/sendGate';
@@ -38,6 +40,8 @@ import { useHeldMints } from './useHeldMints';
 import { assembleApiMessages, stripImageParts } from '../lib/assembleApiMessages';
 import { encodeChatImage } from '../lib/attachments';
 import { deriveActivePath, getAncestorsExclusive } from '../lib/branching';
+import { navigateToAddFunds } from '../lib/navigateToAddFunds';
+import { clearTurnError, recordTurnError } from '../lib/turnErrors';
 import {
   clearStreaming,
   setStreamingReasoning,
@@ -120,7 +124,6 @@ export function useAiSend() {
   const removeMessages = useRoutstrStore((s) => s.removeMessages);
   const finalizeAssistantMessage = useRoutstrStore((s) => s.finalizeAssistantMessage);
   const setActiveBranch = useRoutstrStore((s) => s.setActiveBranch);
-  const setSelectedSlot = useRoutstrStore((s) => s.setSelectedSlot);
   const updateCurrentSessionTitle = useRoutstrStore((s) => s.updateCurrentSessionTitle);
 
   // Each `streamIntoPlaceholder` aborts the prior stream, so backgrounding
@@ -139,22 +142,6 @@ export function useAiSend() {
     },
     []
   );
-
-  // Funding is the wallet's job now: there is no Routstr account to top up,
-  // so this goes to the wallet's own receive flow rather than the send flow
-  // that used to mint a deposit token for a node.
-  const navigateToAddFunds = useCallback(() => {
-    router.navigate({
-      pathname: '/(receive-flow)/amount',
-      params: {
-        amountEntry: JSON.stringify({
-          destination: 'mintQuote',
-          unit: 'sat',
-          selectedMintUrl: useMintStore.getState().selectedMint ?? '',
-        }),
-      },
-    });
-  }, []);
 
   /**
    * Drives a single placeholder assistant message to completion: walks the
@@ -188,13 +175,30 @@ export function useAiSend() {
       // deliberately no hardcoded id to guess at anymore, so surface it
       // instead of burning a round-trip on a dead model.
       const lineup = storeState.lineup ?? storeState.lastKnownLineup?.lineup ?? null;
-      const primaryEntry = resolveSelectedEntry(provider.id, tier.id, balanceSats, lineup);
+      // ONE chain, built once and never widened. Its `sealed` tag carries the
+      // user's encryption choice through every later narrowing below — the
+      // vision filter and the post-repoint recovery both derive from it, and
+      // neither can reach a vendor the chain did not already contain.
+      const chain = resolveCandidateEntries(provider.id, tier.id, lineup);
+      const primaryEntry = selectFromChain(chain, balanceSats);
       if (!primaryEntry) {
-        aiLog.warn('ai.send.no_lineup', { flowId, hasCatalog: cachedModels.length > 0 });
-        removeMessages(new Set([assistantMessageId]));
-        staticPopup('send-message-failed', {
-          text: 'Models are still loading — check your connection and try again.',
+        // Two different absences wearing one shape. An empty plaintext chain
+        // means the catalogue never landed. An empty SEALED chain means it
+        // did, and this node serves nothing encrypted — the models we could
+        // reach are all plaintext, and the user asked for the opposite. Saying
+        // "the model list has not loaded" there would send them to retry a
+        // connection that is fine.
+        const sealedGap = chain.sealed && lineupHasEntries(lineup);
+        const id = sealedGap ? 'routstr.e2ee_unavailable' : 'routstr.catalog_unavailable';
+        aiLog.warn('ai.send.no_lineup', {
+          flowId,
+          hasCatalog: cachedModels.length > 0,
+          sealedSelection: chain.sealed,
+          errorId: id,
         });
+        // Same contract as a failed request: the turn stays in the
+        // conversation and says, in place, why it could not run.
+        recordTurnError(assistantMessageId, { id, text: ERROR_COPY[id] });
         return;
       }
 
@@ -203,13 +207,16 @@ export function useAiSend() {
       streamControllerRef.current = controller;
 
       // Same-tier chain across the other providers as runtime fallback for
-      // connect-time failures. When the request carries image parts the
-      // chain is filtered to vision-capable models — failing over an image
-      // send onto a text-only model would 400 (non-retryable) and hard-fail
-      // the send instead of walking the chain.
-      const allEntries = resolveCandidateEntries(provider.id, tier.id, lineup);
+      // connect-time failures — or, on a sealed selection, the encrypted
+      // vendor's own ladder and nothing else (see `resolveCandidateEntries`).
+      // When the request carries image parts the chain is filtered to
+      // vision-capable models — failing over an image send onto a text-only
+      // model would 400 (non-retryable) and hard-fail the send instead of
+      // walking the chain.
+      const allEntries = chain.entries;
       const primaryIdx = allEntries.findIndex((e) => e.modelId === primaryEntry.modelId);
-      let candidateEntries = primaryIdx >= 0 ? allEntries.slice(primaryIdx) : [primaryEntry];
+      let candidateEntries: readonly LineupEntry[] =
+        primaryIdx >= 0 ? allEntries.slice(primaryIdx) : [primaryEntry];
       if (imageCount > 0) {
         const visionOnly = candidateEntries.filter((e) => e.visionInput);
         if (visionOnly.length > 0) {
@@ -232,6 +239,9 @@ export function useAiSend() {
       // counter rendered by the bubble. Resets text + reasoning channels
       // so a previous stream's tail can't leak into this one.
       startStreaming(assistantMessageId);
+      // A placeholder that is streaming is not a failed one. Ids are fresh per
+      // send and per retry, so this only ever matters if one is re-driven.
+      clearTurnError(assistantMessageId);
 
       // Hoisted so the catch block (402 popup) can reference whichever
       // candidate we were last attempting when the request failed.
@@ -423,11 +433,13 @@ export function useAiSend() {
             const current = useRoutstrStore.getState();
             const nodeChanged = current.nodeBaseUrl !== requestNode;
             if (!recoveryRetried && (nodeChanged || (modelRejected && refreshed))) {
-              const entry = resolveSelectedEntry(
-                provider.id,
-                'auto',
-                Math.floor((current.balance ?? 0) / 1000),
-                current.lineup
+              // Rebuilt through the same constructor rather than reaching into
+              // the refreshed lineup directly: a repoint is exactly where a
+              // sealed selection would otherwise be handed the new node's
+              // cheapest plaintext Auto model and never told.
+              const entry = selectFromChain(
+                resolveCandidateEntries(provider.id, 'auto', current.lineup),
+                Math.floor((current.balance ?? 0) / 1000)
               );
               if (entry && (imageCount === 0 || entry.visionInput)) {
                 recoveryRetried = true;
@@ -656,16 +668,24 @@ export function useAiSend() {
           type: err?.error?.type,
         });
         span.end({ outcome: 'error', status: err?.status });
-        // Drop the placeholder on failure so the chat list doesn't show an
-        // empty bubble. The active path re-derives to the previous leaf.
-        removeMessages(new Set([assistantMessageId]));
+
+        // The placeholder STAYS. A failed turn used to be deleted and
+        // announced by a toast somewhere else on screen, which left the user
+        // looking at their own question with nothing to press and no record
+        // of what happened. Its bubble now renders an error pill in place of
+        // the answer, carrying the actions this particular failure admits —
+        // see `chatErrorActions`.
+        const presentation = describeError(err, 'routstr');
 
         // A 402 is only OUR problem when routstr raised it about this key's
         // balance. The node forwards an upstream provider's error body verbatim
         // under the provider's status, so an upstream 402 is indistinguishable
         // by status alone — and sending the user to top up a wallet that is
-        // already funded cannot clear it. Everything else goes through the
-        // shared error catalog.
+        // already funded cannot clear it. `describeError` makes that same
+        // distinction (`routstr.balance` vs `routstr.provider_declined`); what
+        // the markers add here is the exact shortfall, which no catalogue copy
+        // can carry.
+        let detail: string | undefined;
         if (isWalletBalanceError(err)) {
           const requiredMsats = err?.error?.details?.required as number | undefined;
           const availableMsats = err?.error?.details?.available as number | undefined;
@@ -675,63 +695,32 @@ export function useAiSend() {
           // Exact shortfall straight from the server's 402 details (msats):
           // the one number guaranteed to unlock this model, vs. re-deriving
           // it from pricing that may have drifted since the catalog fetch.
+          // Our own arithmetic over structured fields — never their prose.
           const shortfallSats =
             requiredMsats != null && availableMsats != null
               ? Math.max(1, Math.ceil((requiredMsats - availableMsats) / 1000))
               : null;
-          const detail =
+          detail =
             requiredSats != null && availableSats != null
               ? `${friendlyName} reserves ${requiredSats} sats per request; ${availableSats} available. Add at least ${shortfallSats} sats.`
               : `${friendlyName} reserves more per request than your wallet holds.`;
-          actionMenuPopup({
-            title: 'Insufficient balance',
-            buttons: [
-              {
-                testID: 'ai-insufficient-balance-auto',
-                text: 'Switch to Auto',
-                description: detail,
-                icon: AUTO_ICON,
-                onPress: (close) => {
-                  // Drop to the cheapest tier on the user's currently
-                  // selected provider — we keep their provider choice so
-                  // a Claude user doesn't unexpectedly land on OpenAI just
-                  // because the request 402'd.
-                  setSelectedSlot({
-                    provider: provider.id,
-                    tier: 'auto',
-                  });
-                  paramPopup('model-switched', { modelName: `${provider.label} Auto` });
-                  close();
-                },
-              },
-              {
-                testID: 'ai-insufficient-balance-topup',
-                text: 'Add funds',
-                icon: 'fluent:wallet-20-filled',
-                onPress: (close) => {
-                  close();
-                  navigateToAddFunds();
-                },
-              },
-            ],
-          });
-        } else {
-          staticPopup('send-message-failed', { failure: { service: 'routstr', error: err } });
         }
+        recordTurnError(assistantMessageId, {
+          id: presentation.id,
+          text: presentation.text,
+          ...(detail != null ? { detail } : {}),
+        });
+        aiLog.info('ai.turn_error.shown', {
+          flowId,
+          messageId: assistantMessageId,
+          errorId: presentation.id,
+        });
       } finally {
         clearStreaming();
         setStatus({ isSending: false, streamingMessageId: null });
       }
     },
-    [
-      isAnonymous,
-      removeMessages,
-      finalizeAssistantMessage,
-      setSelectedSlot,
-      updateCurrentSessionTitle,
-      navigateToAddFunds,
-      walletSats,
-    ]
+    [isAnonymous, removeMessages, finalizeAssistantMessage, updateCurrentSessionTitle, walletSats]
   );
 
   const sendInner = useCallback(
@@ -863,8 +852,8 @@ export function useAiSend() {
       } finally {
         // The user message's optimistic spinner clears the moment the
         // streaming round-trip resolves — success or error, the request
-        // left our hands. Errors surface via the assistant placeholder /
-        // popup, not the user bubble's check.
+        // left our hands. Errors surface as a pill on the assistant
+        // placeholder, not on the user bubble's check.
         setMessagePending(userMessageId, false);
       }
     },
@@ -878,7 +867,6 @@ export function useAiSend() {
       walletSats,
       heldMints,
       latestFunds,
-      navigateToAddFunds,
     ]
   );
 

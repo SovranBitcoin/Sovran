@@ -177,11 +177,15 @@ describe('vision-aware candidate resolution (format.ts over the derived lineup)'
 
   it('falls back across providers in the same tier before other tiers', () => {
     const chain = resolveCandidateEntries('claude', 'max', lineup);
-    expect(chain[0]?.modelId).toBe(entryForSlot(lineup, 'claude', 'max')?.modelId);
+    // An ordinary vendor's selection carries no encryption promise, so the
+    // wide fallback is the right answer for it and stays untouched.
+    expect(chain.sealed).toBe(false);
+    const entries = chain.entries;
+    expect(entries[0]?.modelId).toBe(entryForSlot(lineup, 'claude', 'max')?.modelId);
     // Next candidates are the other providers' max cells, in provider order.
-    expect(chain[1]?.modelId).toBe(entryForSlot(lineup, 'openai', 'max')?.modelId);
-    expect(chain.length).toBe(12); // every filled cell exactly once
-    expect(new Set(chain.map((e) => e.modelId)).size).toBe(12);
+    expect(entries[1]?.modelId).toBe(entryForSlot(lineup, 'openai', 'max')?.modelId);
+    expect(entries.length).toBe(12); // every filled cell exactly once
+    expect(new Set(entries.map((e) => e.modelId)).size).toBe(12);
   });
 
   it('prefers the first affordable candidate, else the primary at any cost', () => {
@@ -198,9 +202,9 @@ describe('vision-aware candidate resolution (format.ts over the derived lineup)'
   });
 
   it('every selected entry carries visionInput so the send path can filter a chain with images', () => {
-    const chain = resolveCandidateEntries('google', 'max', lineup);
-    expect(chain.every((e) => typeof e.visionInput === 'boolean')).toBe(true);
-    expect(chain.filter((e) => e.visionInput).length).toBeGreaterThan(0);
+    const { entries } = resolveCandidateEntries('google', 'max', lineup);
+    expect(entries.every((e) => typeof e.visionInput === 'boolean')).toBe(true);
+    expect(entries.filter((e) => e.visionInput).length).toBeGreaterThan(0);
   });
 
   it('adds per-image fees into the turn estimate (Gemini undercount fix)', () => {

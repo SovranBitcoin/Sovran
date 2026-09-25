@@ -2,6 +2,8 @@ import { ROUTSTR_MAX_COMPLETION_TOKENS, type RoutstrModel } from '@/shared/lib/r
 import {
   AI_PROVIDER_IDS,
   AI_TIER_IDS,
+  E2EE_PROVIDER_ID,
+  isE2eeModelId,
   lineupProviderIds,
   type AiLineup,
   type AiProviderId,
@@ -69,6 +71,25 @@ const AI_PROVIDERS: readonly AiProvider[] = [
   { id: 'google', label: 'Google', icon: 'ri:google-fill' },
 ] as const;
 
+/**
+ * The encrypted vendor's tab.
+ *
+ * Deliberately not in `AI_PROVIDERS`: that list doubles as the menu's floor
+ * when no lineup has landed, and offering an encrypted tab a node may not
+ * serve would promise a privacy the app cannot deliver. This entry only ever
+ * reaches the user through `getProviderById`, i.e. after the lineup has
+ * actually grouped sealed models under it.
+ *
+ * "Tinfoil" is the enclave operator's name and says nothing to the person
+ * choosing it; the label and the padlock say what the tab is FOR, which is the
+ * only reason to pick it.
+ */
+const E2EE_PROVIDER: AiProvider = {
+  id: E2EE_PROVIDER_ID,
+  label: 'Private (E2EE)',
+  icon: 'mdi:lock-outline',
+};
+
 /** Catalog slugs are lowercase and hyphenated (`mistralai`, `bytedance-seed`,
  *  `z-ai`); this is the smallest rule that turns one into something readable
  *  without a table nobody will maintain. */
@@ -115,16 +136,11 @@ const DEFAULT_PROVIDER_ID: AiProviderId = 'openai';
  *  tier) pair somehow names an id we don't recognise. */
 const DEFAULT_TIER_ID: AiTierId = 'auto';
 
-/** Generic glyph used wherever we want to mean "Auto" outside the tier
- *  ladder (e.g. the 402 "Switch to Auto" button). Distinct from the Auto
- *  tier's own icon so the chip's fallback doesn't mimic a tier glyph. */
-export const AUTO_ICON = 'mdi:brain';
-
 /** Stand-in glyph for a vendor the app ships no logo for. */
 const GENERIC_PROVIDER_ICON = 'fluent:apps-16-filled';
 
 const PROVIDER_BY_ID = new Map<AiProviderId, AiProvider>(
-  AI_PROVIDERS.map((p) => [p.id, p] as const)
+  [...AI_PROVIDERS, E2EE_PROVIDER].map((p) => [p.id, p] as const)
 );
 const TIER_BY_ID = new Map<AiTierId, AiTier>(AI_TIERS.map((t) => [t.id, t] as const));
 
@@ -391,6 +407,56 @@ export function entryForSlot(
 }
 
 /**
+ * A lineup entry whose model id carries the end-to-end-encryption prefix.
+ *
+ * The brand is not decoration. `@routstr/sdk` switches its sealed transport on
+ * `modelId.startsWith('tinfoil-')` and nothing else, so the id IS the
+ * encryption switch — which makes "this entry is encrypted" a fact about a
+ * value, not about the variable holding it. Branding it means a plaintext
+ * `LineupEntry` is not assignable where a sealed one is required, so a
+ * downgrade has to be written as an explicit cast rather than as an ordinary
+ * `push`, a `concat` or a widened fallback list.
+ *
+ * The brand symbol is module-private and `sealEntry` below is its only
+ * producer, so every sealed value in the app has been through `isE2eeModelId`.
+ */
+declare const SEALED_BRAND: unique symbol;
+type SealedLineupEntry = LineupEntry & { readonly [SEALED_BRAND]: true };
+
+/**
+ * The ordered models one send may attempt, tagged with whether the user's
+ * selection promised encryption.
+ *
+ * Tagged rather than a bare array because the two chains obey different rules
+ * and the difference is a privacy promise, not a preference. A plaintext
+ * selection wants the widest possible fallback — the user asked for a working
+ * chat. A sealed selection wants the narrowest: every attempt must stay inside
+ * `E2EE_PROVIDER_ID`, and running out is a failure the user must be told
+ * about, because the alternative is answering a prompt they chose to encrypt
+ * on a model that reads it in the clear.
+ *
+ * Making `entries` a `SealedLineupEntry[]` on the sealed branch is what stops
+ * that being reintroduced by accident: the generic-vendor fallback the
+ * plaintext branch builds simply does not type-check into it.
+ */
+type CandidateChain =
+  | { readonly sealed: true; readonly entries: readonly SealedLineupEntry[] }
+  | { readonly sealed: false; readonly entries: readonly LineupEntry[] };
+
+/**
+ * The one place a `SealedLineupEntry` comes into existence, and the one cast
+ * in this module.
+ *
+ * `null` for an entry filed under the encrypted vendor whose id lost the
+ * prefix — a catalogue that renames a row, or a lineup snapshot persisted
+ * before the grouping existed. Dropping it costs that model; trusting the
+ * grouping over the id would send a sealed-labelled prompt in the clear.
+ */
+function sealEntry(entry: LineupEntry): SealedLineupEntry | null {
+  return isE2eeModelId(entry.modelId) ? (entry as SealedLineupEntry) : null;
+}
+
+/**
  * Ordered candidate entries to try at send time for a (provider, tier)
  * pair. The user's selected cell goes first; the same tier from the other
  * providers follows in `AI_PROVIDER_IDS` order (transparent fallback when
@@ -404,14 +470,29 @@ export function entryForSlot(
  * Ordering rationale: the user picked their provider explicitly, so
  * honour it. Falling back across providers in the same tier is way better
  * than hard-failing — the user just wants a working chat.
+ *
+ * EXCEPT when the selected vendor is `E2EE_PROVIDER_ID`. That fallback used
+ * to apply there too, so a sealed pick that was merely unaffordable — or a
+ * node that answered 402 for it once — was answered by an OpenAI model with
+ * no signal that anything had changed. The badge said end-to-end encrypted
+ * and the bytes went out in the clear. A sealed selection therefore walks
+ * only the encrypted vendor's own tier ladder, and an empty result is the
+ * honest answer rather than the start of a search elsewhere.
+ *
+ * This is the chain's ONLY constructor, which is why the rule lives here and
+ * not at the send site: a future caller cannot widen a sealed chain without
+ * coming through `sealEntry`.
  */
 export function resolveCandidateEntries(
   provider: AiProviderId,
   tier: AiTierId,
   lineup: AiLineup | null
-): LineupEntry[] {
-  if (!lineup) return [];
+): CandidateChain {
   const tierOrder: AiTierId[] = [tier, ...AI_TIER_IDS.filter((t) => t !== tier)];
+  if (provider === E2EE_PROVIDER_ID) {
+    return { sealed: true, entries: sealedEntries(tierOrder, lineup) };
+  }
+  if (!lineup) return { sealed: false, entries: [] };
   const providerOrder: AiProviderId[] = [
     provider,
     ...AI_PROVIDER_IDS.filter((p) => p !== provider),
@@ -426,18 +507,59 @@ export function resolveCandidateEntries(
       out.push(entry);
     }
   }
+  return { sealed: false, entries: out };
+}
+
+/** The encrypted vendor's own tier ladder, sealed-checked id by id. No other
+ *  vendor is reachable from here — that is the whole point of the branch. */
+function sealedEntries(
+  tierOrder: readonly AiTierId[],
+  lineup: AiLineup | null
+): SealedLineupEntry[] {
+  const vendor = lineup?.[E2EE_PROVIDER_ID];
+  if (!vendor) return [];
+  const seen = new Set<string>();
+  const out: SealedLineupEntry[] = [];
+  for (const t of tierOrder) {
+    const entry = vendor[t];
+    if (!entry || seen.has(entry.modelId)) continue;
+    const sealed = sealEntry(entry);
+    if (!sealed) continue;
+    seen.add(entry.modelId);
+    out.push(sealed);
+  }
   return out;
+}
+
+/**
+ * The entry a chain would actually be sent to right now: the first affordable
+ * candidate, else the first candidate at any cost, else `null`.
+ *
+ * Note what "else the first candidate at any cost" means on each branch. On a
+ * plaintext chain it is a cheaper vendor's model, which is the fallback the
+ * user wants. On a sealed chain every member is encrypted, so the worst case
+ * is an encrypted model the wallet cannot yet fund — which the send gate
+ * turns into "top up", not into a silent plaintext send. The affordability
+ * search can no longer be the thing that breaks the promise.
+ */
+export function selectFromChain(chain: CandidateChain, balanceSats: number): LineupEntry | null {
+  const { entries } = chain;
+  if (entries.length === 0) return null;
+  for (const entry of entries) {
+    if (canAffordPricing(entry.satsPricing, balanceSats)) return entry;
+  }
+  return entries[0];
 }
 
 /**
  * Resolve a (provider, tier) pair to the lineup entry we'd actually send
  * to right now: the first affordable candidate, else the first candidate
  * at any cost, else `null` — which only happens on a true first-run-offline
- * (no live catalog AND no persisted lineup). Callers must handle `null` by
- * rendering a "models loading" state instead of sending to a guessed id;
- * the old TIER_MATRIX guarantee of "always a defined string" is deliberately
- * relaxed here because a guessed hardcoded id is exactly the rot this
- * change removes.
+ * (no live catalog AND no persisted lineup), or on an encrypted selection a
+ * node serves no sealed model for. Callers must handle `null` by rendering a
+ * "models loading" state instead of sending to a guessed id; the old
+ * TIER_MATRIX guarantee of "always a defined string" is deliberately relaxed
+ * here because a guessed hardcoded id is exactly the rot this change removes.
  */
 export function resolveSelectedEntry(
   provider: AiProviderId,
@@ -445,12 +567,7 @@ export function resolveSelectedEntry(
   balanceSats: number,
   lineup: AiLineup | null
 ): LineupEntry | null {
-  const chain = resolveCandidateEntries(provider, tier, lineup);
-  if (chain.length === 0) return null;
-  for (const entry of chain) {
-    if (canAffordPricing(entry.satsPricing, balanceSats)) return entry;
-  }
-  return chain[0];
+  return selectFromChain(resolveCandidateEntries(provider, tier, lineup), balanceSats);
 }
 
 /** Worst-case cost in whole sats for a given model id, or null if unknown.

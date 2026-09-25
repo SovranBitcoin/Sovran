@@ -38,6 +38,38 @@ import type { RoutstrModel } from './api';
 export const AI_PROVIDER_IDS = ['openai', 'claude', 'grok', 'google'] as const;
 
 /**
+ * The catalog namespace for a model served from a Tinfoil enclave, which
+ * `@routstr/sdk` seals the request body for.
+ *
+ * The prefix is the ONLY honest signal. A node's catalog lists `glm-5-3` and
+ * `tinfoil-glm-5-3` under the identical display name `Private (E2EE) GLM 5.3`,
+ * and only the prefixed one is encrypted — so anything that reads the name,
+ * the slug or the upstream id instead will happily offer the plaintext twin
+ * under an E2EE label.
+ */
+export const E2EE_MODEL_PREFIX = 'tinfoil-';
+
+/**
+ * The vendor id encrypted models are offered under.
+ *
+ * They get a vendor of their own rather than being folded into the vendor
+ * that trained them, because a tier ladder mixing sealed and plaintext models
+ * cannot promise either one: the tier picks are price-ordered and the sealed
+ * rows are the dearer ones, so a mixed ladder would resolve to a plaintext
+ * model at every tier and the "end-to-end encrypted" badge would never be
+ * kept. One vendor whose every model is sealed is the only shape where
+ * choosing it means what it says.
+ */
+export const E2EE_PROVIDER_ID = 'tinfoil';
+
+/** Whether a catalog id names a model whose request body is sealed to an
+ *  enclave. The single spelling of the rule — the provider badge, the lineup
+ *  grouping and the SDK's own `isTinfoilModel` must agree, or the app promises
+ *  an encryption it does not send. */
+export const isE2eeModelId = (id: string | undefined): boolean =>
+  id?.startsWith(E2EE_MODEL_PREFIX) === true;
+
+/**
  * A vendor id. A string, not a union: the set comes from the catalog, and a
  * union would mean a Sovran release every time a vendor appeared on a node.
  * `AI_PROVIDER_IDS` remains the known-and-named subset.
@@ -205,8 +237,18 @@ export function lineupProviderIds(lineup: AiLineup | null | undefined): AiProvid
   return Object.keys(lineup).filter((provider) => providerHasEntries(lineup[provider]));
 }
 
-/** True when at least one cell anywhere in the lineup is filled. */
-export function lineupHasEntries(lineup: AiLineup): boolean {
+/**
+ * True when at least one cell anywhere in the lineup is filled.
+ *
+ * Null-tolerant on purpose: "no lineup at all" and "a lineup whose every cell
+ * is empty" are the same answer to every caller that asks this, and the two
+ * states are one keystroke apart in a store where `lineup` is nullable. The
+ * empty object is the one that hides — it is truthy, so a `??` fallback chain
+ * stops at it — which is exactly the confusion that left the model picker
+ * showing "Models loading" over a catalog that had already landed.
+ */
+export function lineupHasEntries(lineup: AiLineup | null | undefined): boolean {
+  if (!lineup) return false;
   return Object.values(lineup).some(providerHasEntries);
 }
 
@@ -259,6 +301,13 @@ const NAME_PREFIX_TO_PROVIDER: [string, AiProviderId][] = [
  * silently discarded most of the catalog before it could be ranked.
  */
 export function providerIdForModel(model: RoutstrModel): AiProviderId | null {
+  // Before anything else: an enclave row carries no slug and a display name
+  // with no vendor prefix and no colon ("Private (E2EE) GLM 5.3", "kimi-k3"),
+  // so every signal below returns null for it and the whole encrypted half of
+  // the catalog used to be dropped here — which is why a provider could be
+  // badged end-to-end encrypted while not one of its sealed models was ever
+  // offered, let alone sent.
+  if (isE2eeModelId(model.id)) return E2EE_PROVIDER_ID;
   const slug = typeof model.canonical_slug === 'string' ? model.canonical_slug : '';
   if (slug) {
     // '~' marks a rolling alias slug ('~anthropic/claude-fable-latest').
@@ -466,7 +515,8 @@ export function deriveLineup(
  * Choose which vendors get a tab, and in what order.
  *
  * The four the app knows by name lead, when the catalog has enough of them to
- * fill a ladder; the rest follow by how many CURRENT models they qualify.
+ * fill a ladder; the encrypted vendor follows them whenever the node serves
+ * one; the rest follow by how many CURRENT models they qualify.
  * Freshness rather than raw count on purpose: a vendor with forty retired
  * listings is a worse tab than one with six models from this year, and the
  * tier picks themselves already run inside the same freshness window.
@@ -488,7 +538,17 @@ function rankProviders(
   const known = AI_PROVIDER_IDS.filter(
     (provider) => (byProvider.get(provider)?.length ?? 0) > 0
   ) as AiProviderId[];
-  const knownSet = new Set<AiProviderId>(known);
+  // The encrypted vendor is pinned rather than ranked, and is exempt from the
+  // ladder minimum and the tab-strip cap.
+  //
+  // Both rules are audience rules — they exist so a long catalog does not turn
+  // the menu into a directory — and neither can be allowed to decide whether
+  // an encryption the provider badge already promised is reachable. A node
+  // that serves two sealed models gets a two-rung ladder (the documented
+  // partial fill), which is honest; dropping it would leave the badge
+  // advertising something the app cannot send.
+  const pinned = (byProvider.get(E2EE_PROVIDER_ID)?.length ?? 0) > 0 ? [E2EE_PROVIDER_ID] : [];
+  const knownSet = new Set<AiProviderId>([...known, ...pinned]);
   const rest = [...byProvider.keys()]
     .filter(
       (provider) =>
@@ -502,7 +562,11 @@ function rankProviders(
       return diff !== 0 ? diff : a.localeCompare(b);
     });
 
-  return [...known, ...rest].slice(0, MAX_PROVIDERS);
+  return [
+    ...known,
+    ...pinned,
+    ...rest.slice(0, Math.max(0, MAX_PROVIDERS - known.length - pinned.length)),
+  ];
 }
 
 /**

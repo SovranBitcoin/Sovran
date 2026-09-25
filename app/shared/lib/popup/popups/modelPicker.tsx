@@ -33,9 +33,13 @@ import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
-import { useRoutstrFunds } from '@/features/ai/hooks/useRoutstrFunds';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
-import type { AiProviderId, LineupEntry } from '@/shared/lib/routstr/lineup';
+import {
+  lineupHasEntries,
+  type AiLineup,
+  type AiProviderId,
+  type LineupEntry,
+} from '@/shared/lib/routstr/lineup';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Text } from '@/shared/ui/primitives/Text';
 import { SheetMenuRowContent } from './sheetMenuRow';
@@ -163,8 +167,49 @@ function TierRow({ tier, provider, entry, balanceSats, isCurrent, onPress }: Tie
   );
 }
 
+/**
+ * What a tab with no rows can honestly say.
+ *
+ * "Models loading" is a promise that something is coming, and it is only true
+ * before a catalog has come back. Once one has, an empty tab is an ANSWER —
+ * this node serves nothing this tab can offer — and the user can act on it by
+ * switching tab or switching provider. Showing the spinner copy over a catalog
+ * that already landed is what left the picker saying "Models loading" forever:
+ * a node whose catalog qualified zero models (a real, repeated event — 582
+ * models one read, 10 the next) produced an empty lineup and nothing in the
+ * app ever re-fetched it.
+ *
+ * `catalogSize` is `null` only while no catalog read has come back for the
+ * current node, which is the one fact that separates the two states.
+ */
+function emptyTabCopy(
+  lineup: AiLineup | null,
+  catalogSize: number | null
+): { title: string; description: string } {
+  if (lineupHasEntries(lineup)) {
+    return {
+      title: 'No models here',
+      description: 'This provider has nothing to offer on this node — try another tab',
+    };
+  }
+  if (catalogSize == null) {
+    return {
+      title: 'Models loading',
+      description: 'Connect to the internet to load the model list',
+    };
+  }
+  return {
+    title: 'No models available',
+    description: `This node answered with ${catalogSize.toLocaleString()} model${
+      catalogSize === 1 ? '' : 's'
+    }, none of them usable here — choose a different provider`,
+  };
+}
+
 interface ModelPickerContentProps extends CustomSheetSharedProps {
   payload: ActionSheetPayloads['model-picker'];
+  /** Live wallet value captured above the native portal's context boundary. */
+  balanceSats: number;
 }
 
 /**
@@ -174,7 +219,7 @@ interface ModelPickerContentProps extends CustomSheetSharedProps {
  * NOT mounted, by design (this is the user-facing difference from the
  * profile / emoji pickers, which scroll between sections).
  */
-export function ModelPickerContent({ close }: ModelPickerContentProps) {
+export function ModelPickerContent({ close, balanceSats }: ModelPickerContentProps) {
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
 
   // Keyed on the live openSeq: the snapPoints sheet mounts its content while
@@ -185,14 +230,28 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
   const selectedTier = useRoutstrStore((s) => s.selectedTier);
   const selectedProvider = useRoutstrStore((s) => s.selectedProvider);
   const setSelectedSlot = useRoutstrStore((s) => s.setSelectedSlot);
-  const funds = useRoutstrFunds();
   // Live-derived lineup when a catalog fetch has landed this session,
   // else the persisted last-known snapshot, else null (true first-run
   // offline → "models loading" rows).
+  //
+  // The fall-through tests for ENTRIES, not for presence. A derivation that
+  // qualified nothing is an empty object, which is truthy — under `??` it
+  // shadowed a perfectly good last-known snapshot and turned a working menu
+  // into a permanent "Models loading".
   const sessionLineup = useRoutstrStore((s) => s.lineup);
   const lastKnownLineup = useRoutstrStore((s) => s.lastKnownLineup);
-  const lineup = sessionLineup ?? lastKnownLineup?.lineup ?? null;
-  const lineupSource = sessionLineup ? 'live' : lastKnownLineup ? 'persisted' : 'empty';
+  // Size of the catalog this node answered with, or `null` when no read has
+  // come back yet. Session-only and cleared on every node change, so it can
+  // only ever mean "the node currently in play has answered".
+  const catalogSize = useRoutstrStore((s) => s.modelsCache?.data.length ?? null);
+  const lineup = lineupHasEntries(sessionLineup)
+    ? sessionLineup
+    : (lastKnownLineup?.lineup ?? sessionLineup ?? null);
+  const lineupSource = lineupHasEntries(sessionLineup)
+    ? 'live'
+    : lineupHasEntries(lastKnownLineup?.lineup)
+      ? 'persisted'
+      : 'empty';
 
   // Open onto the user's currently-selected provider tab — they almost
   // always come here to swap *tier*, not provider, so the active tab
@@ -208,7 +267,6 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
     pickerLog
   );
 
-  const balanceSats = funds?.balanceSats ?? 0;
   // Tabs come from the lineup, not from a list compiled into the app: the
   // catalog decides which vendors a node actually serves, and pinning the
   // menu to four of them hid most of what the user was paying for.
@@ -303,16 +361,13 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
               entry: entryForSlot(lineup, activeProvider.id, tier.id),
             })).filter((r) => r.entry != null);
             if (rows.length === 0) {
+              const { title, description } = emptyTabCopy(lineup, catalogSize);
               return (
-                <Menu.Item isDisabled onPress={() => {}}>
+                <Menu.Item testID="ai-model-empty" isDisabled onPress={() => {}}>
                   <SheetMenuRowContent
                     icon={<Icon name="mdi:cloud-off-outline" size={20} />}
-                    title="Models loading"
-                    description={
-                      lineupSource === 'empty'
-                        ? 'Connect to the internet to load the model list'
-                        : 'No models available for this provider right now'
-                    }
+                    title={title}
+                    description={description}
                   />
                 </Menu.Item>
               );

@@ -18,7 +18,13 @@ import {
   useStreamingReasoning,
   useStreamingStartedAt,
 } from '../lib/streamingBuffer';
+import { useTurnError } from '../lib/turnErrors';
+import { AiTurnErrorPill } from './AiTurnErrorPill';
 import { withAlpha } from '@/shared/lib/color';
+import { ERROR_COPY } from '@/shared/lib/errors/catalog';
+
+/** What a failed turn says when nothing remembers which failure it was. */
+const UNKNOWN_TURN_COPY = ERROR_COPY['routstr.unknown'];
 
 /** Active-branch widget data for one assistant message. Provided by the
  *  screen, which owns the conversation tree and the `setActiveBranch`
@@ -326,6 +332,8 @@ function AssistantBubble({ message, isStreaming, onRetry, branchNav }: AiMessage
   const isLive = isStreaming === true && liveStartedAt != null;
   const elapsedSeconds = useElapsedSeconds(isLive ? liveStartedAt : null);
 
+  const turnError = useTurnError(message.id);
+
   const displayedContent = liveContent ?? message.content;
   // Persisted reasoning is the source of truth once the stream ends. Mid-
   // stream we prefer the live channel so reasoning tokens render as they
@@ -381,6 +389,24 @@ function AssistantBubble({ message, isStreaming, onRetry, branchNav }: AiMessage
   }, [onRetry, message.id]);
 
   const showActions = hasContent && !isStreaming;
+
+  // A settled assistant turn with nothing in it is a failed one: the send flow
+  // leaves the placeholder standing and records why, and an empty bubble is
+  // the one thing this surface must never render. The fallback covers a
+  // placeholder that outlived its record — persisted across a relaunch, or
+  // aged out of the bounded buffer — which is still a failure, just one we can
+  // only describe generically.
+  const failed = !isStreaming && !hasContent && !hasReasoning;
+  const error =
+    turnError ?? (failed ? { id: 'routstr.unknown' as const, text: UNKNOWN_TURN_COPY } : null);
+
+  if (failed && error) {
+    return (
+      <View className="my-2 self-stretch px-1">
+        <AiTurnErrorPill messageId={message.id} error={error} onRetry={onRetry} />
+      </View>
+    );
+  }
 
   return (
     <View style={{ alignSelf: 'stretch', marginVertical: 8, paddingHorizontal: 4 }}>
