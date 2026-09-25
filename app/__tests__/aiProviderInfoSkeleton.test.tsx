@@ -185,7 +185,7 @@ beforeEach(() => {
 });
 
 describe('the provider details page while it is still asking', () => {
-  it('reserves the stats grid, the accepted-mint list, the privacy row and the description', async () => {
+  it('reserves the stats grid, the privacy notice, the mint list and the description', async () => {
     // Neither read ever answers, so this is the page at its emptiest.
     jest.mocked(fetchNodeInfo).mockReturnValue(new Promise(() => {}));
     jest.mocked(fetchProviderModelSummary).mockReturnValue(new Promise(() => {}));
@@ -198,7 +198,10 @@ describe('the provider details page while it is still asking', () => {
     expect(hasTestID(renderer, 'ai-provider-info-stats')).toBe(1);
     expect(countOf(renderer, 'ProviderMintRow', true)).toBe(2);
     expect(hasTestID(renderer, 'ai-provider-info-description-skeleton')).toBe(1);
-    expect(hasTestID(renderer, 'ai-provider-model-e2ee-skeleton')).toBe(1);
+    // The privacy verdict is the loudest thing on the page and the one most
+    // likely to be read under a thumb, so its slot is held rather than the
+    // notice arriving and pushing the grid down.
+    expect(hasTestID(renderer, 'ai-provider-info-privacy')).toBe(1);
     act(() => renderer.unmount());
   });
 
@@ -217,9 +220,9 @@ describe('the provider details page while it is still asking', () => {
     expect(countOf(renderer, 'ProviderMintRow', true)).toBe(0);
     expect(countOf(renderer, 'ProviderMintRow', false)).toBe(2);
     expect(hasTestID(renderer, 'ai-provider-info-description-skeleton')).toBe(0);
-    expect(hasTestID(renderer, 'ai-provider-model-e2ee-skeleton')).toBe(0);
-    // Same slot, all the way through — never unmounted, never remounted.
+    // Same slots, all the way through — never unmounted, never remounted.
     expect(hasTestID(renderer, 'ai-provider-info-stats')).toBe(1);
+    expect(hasTestID(renderer, 'ai-provider-info-privacy')).toBe(1);
     act(() => renderer.unmount());
   });
 
@@ -230,11 +233,78 @@ describe('the provider details page while it is still asking', () => {
 
     const renderer = await open();
 
-    expect(hasTestID(renderer, 'ai-provider-model-e2ee-skeleton')).toBe(0);
     expect(countOf(renderer, 'ProviderMintRow', true)).toBe(0);
     // The grid stays, and says so in dashes: a read that will never answer is
     // "nobody counted", which is not the same claim as a zero.
     expect(hasTestID(renderer, 'ai-provider-info-stats')).toBe(1);
     act(() => renderer.unmount());
+  });
+});
+
+/**
+ * Who can read what the user is about to type.
+ *
+ * Four answers, and the difference between them is the reason the page
+ * exists. A shield with a count next to it cannot carry any of this: "9
+ * sealed" reads as reassurance on a node where 573 models are in the clear,
+ * which is the easiest state on this page to misread and the one with the
+ * most at stake.
+ */
+describe('the privacy verdict', () => {
+  const notices = (renderer: TestRenderer.ReactTestRenderer) =>
+    renderer.root
+      .findAll((node) => (node as unknown as Node).type === 'Notice', { deep: true })
+      .map((node) => ({
+        status: node.props.status as string,
+        title: node.props.title as string | undefined,
+      }));
+
+  const verdict = async (catalog: { count: number; encrypted: number; e2ee: boolean } | null) => {
+    jest.mocked(fetchNodeInfo).mockResolvedValue({ name: 'redsh1ft', mints: [] });
+    jest.mocked(fetchProviderModelSummary).mockResolvedValue(catalog);
+    const renderer = await open();
+    const found = notices(renderer).find(
+      (notice) =>
+        notice.title?.includes('read your messages') ||
+        notice.title?.includes('read most of') ||
+        notice.title === 'Privacy not known'
+    );
+    act(() => renderer.unmount());
+    return found;
+  };
+
+  it('warns plainly when nothing is sealed', async () => {
+    expect(await verdict({ count: 582, encrypted: 0, e2ee: false })).toEqual({
+      status: 'warning',
+      title: 'This provider can read your messages',
+    });
+  });
+
+  it('adapts the warning when only some models are sealed', async () => {
+    // Still a warning. Nine sealed models do not make the other 573 private,
+    // and this is the state a green shield flatters.
+    expect(await verdict({ count: 582, encrypted: 9, e2ee: true })).toEqual({
+      status: 'warning',
+      title: 'This provider can read most of your messages',
+    });
+  });
+
+  it('says so positively when every model is sealed', async () => {
+    expect(await verdict({ count: 9, encrypted: 9, e2ee: true })).toEqual({
+      status: 'info',
+      title: 'This provider cannot read your messages',
+    });
+  });
+
+  it('claims nothing when the catalog never answered', async () => {
+    // The loudest wrong answer available here is a reassuring one.
+    expect(await verdict(null)).toEqual({ status: 'info', title: 'Privacy not known' });
+  });
+
+  it('claims nothing for a provider serving no models at all', async () => {
+    expect(await verdict({ count: 0, encrypted: 0, e2ee: false })).toEqual({
+      status: 'info',
+      title: 'Privacy not known',
+    });
   });
 });

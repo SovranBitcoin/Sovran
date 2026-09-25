@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import { z } from 'zod';
 
-import Icon from '@/assets/icons';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { aiLog } from '@/shared/lib/logger';
@@ -75,7 +74,6 @@ function parseEntry(raw: string | undefined): { nodeBaseUrl: string; seedName?: 
 }
 
 export function ProviderInfoScreen() {
-  const foreground = useThemeColor('foreground');
   const background = useThemeColor('background');
   const muted = useThemeColor('muted');
   const params = useRouteParams(ParamsSchema, { where: 'ai-flow.provider' });
@@ -168,21 +166,68 @@ export function ProviderInfoScreen() {
       accent: true,
     },
     {
+      // Kept apart from `Models` on purpose. A node serving hundreds of models
+      // with nine sealed ones is a different proposition from one where every
+      // model is sealed, and a single merged figure cannot tell them apart.
       label: 'Encrypted',
       description: 'Sealed inside an enclave',
       value: catalog ? catalog.encrypted.toLocaleString() : UNKNOWN_STAT,
       placeholder: '582',
     },
     {
-      label: 'Accepted mints',
-      // An empty published list is not "none" — it is "no restriction", and
-      // the row below says so rather than printing a zero that reads as a
-      // provider you cannot pay.
-      description: info?.mints.length ? 'Ecash it will redeem' : 'No published restriction',
-      value: !info ? UNKNOWN_STAT : info.mints.length ? String(info.mints.length) : 'Any',
-      placeholder: '12',
+      label: 'Version',
+      description: 'Node software it runs',
+      value: info?.version ?? UNKNOWN_STAT,
+      placeholder: '0.1.3',
     },
   ];
+
+  // Who can read what the user is about to type, said at the top of the page
+  // in words rather than left to a count in a tile.
+  //
+  // Four answers, and the difference between them is the reason this page
+  // exists. A provider that serves no sealed models can read everything; one
+  // that serves some can read everything sent to the rest, which is the
+  // easiest state to misread off a green shield; one whose whole catalog is
+  // sealed genuinely cannot, and deserves to be told apart from the other two.
+  // A catalog that never answered supports none of those claims, so it makes
+  // none — the loudest wrong answer here would be a reassuring one.
+  const privacy = ((): {
+    status: 'info' | 'warning';
+    icon?: string;
+    title: string;
+    body: string;
+  } => {
+    if (!catalog || catalog.count === 0) {
+      return {
+        // Default info glyph. A question mark would need a registry entry of
+        // its own to say what "not known" already says in the title.
+        status: 'info',
+        title: 'Privacy not known',
+        body: 'This provider did not list its models, so whether any of them can answer without reading your messages could not be checked.',
+      };
+    }
+    if (catalog.encrypted === 0) {
+      return {
+        status: 'warning',
+        title: 'This provider can read your messages',
+        body: 'Everything you send is visible to whoever runs this node. None of its models run in an enclave.',
+      };
+    }
+    if (catalog.encrypted < catalog.count) {
+      return {
+        status: 'warning',
+        title: 'This provider can read most of your messages',
+        body: `${catalog.encrypted.toLocaleString()} of its ${catalog.count.toLocaleString()} models run in an enclave it cannot read into. Everything you send to the rest is visible to whoever runs this node.`,
+      };
+    }
+    return {
+      status: 'info',
+      icon: 'mdi:shield-check',
+      title: 'This provider cannot read your messages',
+      body: 'Every model it serves runs in an enclave. Requests are sealed end to end.',
+    };
+  })();
 
   const heldMints = new Set(
     Object.entries(balances.byMint)
@@ -278,7 +323,10 @@ export function ProviderInfoScreen() {
   // node publishes no icon — the seeded avatar IS its face, and it is the same
   // one the picker draws.
   const morph = useIdentityHeader({
-    identity: { kind: 'person', name: displayName, seed: nodeBaseUrl ?? '' },
+    // A machine, and the header has to say so. `person` drew the silhouette
+    // placeholder while the band three lines below it drew the clay robot, so
+    // the same provider had two different faces depending on scroll position.
+    identity: { kind: 'provider', name: displayName, seed: nodeBaseUrl ?? '' },
     title: 'Provider details',
     collapseAt: 110,
   });
@@ -365,14 +413,6 @@ export function ProviderInfoScreen() {
             </Text>
           </>
         ) : null}
-
-        <StatsGrid
-          stats={providerStats}
-          loading={state === 'loading' || catalogState === 'loading'}
-          visualKey="provider-info-stats"
-          visualSurface="provider-info"
-          testID="ai-provider-info-stats"
-        />
       </VStack>
 
       {state === 'empty' ? (
@@ -384,6 +424,101 @@ export function ProviderInfoScreen() {
           />
           <Spacer size={12} />
         </>
+      ) : null}
+
+      {/* Above the numbers, because it is the question the numbers are FOR.
+          The slot is held while the catalog is out — a warning about who can
+          read your messages arriving late, under the reader's thumb, is the
+          one thing on this page that must never appear from nowhere. */}
+      <SkeletonContentCrossfade
+        loading={catalogState === 'loading'}
+        visualKey="provider-info-privacy"
+        visualSurface="provider-info"
+        testID="ai-provider-info-privacy"
+        renderSkeleton={() => (
+          <Notice
+            status="info"
+            description={
+              <Text
+                loading
+                size={14}
+                placeholder="Everything you send is visible to whoever runs this node."
+              />
+            }
+          />
+        )}
+        renderContent={() => (
+          <Notice
+            status={privacy.status}
+            icon={privacy.icon}
+            title={privacy.title}
+            description={privacy.body}
+          />
+        )}
+      />
+
+      <StatsGrid
+        stats={providerStats}
+        loading={state === 'loading' || catalogState === 'loading'}
+        visualKey="provider-info-stats"
+        visualSurface="provider-info"
+        testID="ai-provider-info-stats"
+      />
+
+      {/* Directly under the grid. A node is a machine and somebody operates
+          it; who that is belongs beside what it costs and what it serves, not
+          at the bottom of the page after the plumbing. */}
+      {operatorPubkey ? (
+        <Section title="Operator">
+          {/* Built exactly like the mint page's operator row — a face, a name
+              and a way through to the profile, inside the same grouped card
+              every other section on this page uses. It used to be a bare
+              `ContactRow`, which carried its own chrome and so read as a
+              floating fragment between two grouped lists.
+
+              An npub string is an identifier, not an identity: it tells the
+              user nothing about who they are about to pay. So the avatar and
+              the name lead, and the reach goes underneath when somebody has
+              measured it — a number that is absent and a number that is zero
+              are different facts, and only one of them is a reason to think
+              twice. */}
+          <ListGroup variant="secondary">
+            <PressableFeedback
+              animation={false}
+              accessibilityRole="button"
+              accessibilityLabel="Open operator profile"
+              testID="ai-provider-info-operator"
+              onPress={() => router.push(buildModalProfileHref({ pubkey: operatorPubkey }))}>
+              <PressableFeedback.Scale>
+                <ListGroup.Item disabled>
+                  <ListGroup.ItemPrefix>
+                    <Avatar
+                      state={
+                        operatorLoading
+                          ? 'loading'
+                          : operatorProfile?.picture
+                            ? 'image'
+                            : 'fallback'
+                      }
+                      picture={operatorProfile?.picture}
+                      seed={operatorPubkey}
+                      name={operatorName}
+                      size={32}
+                    />
+                  </ListGroup.ItemPrefix>
+                  <ListGroup.ItemContent>
+                    <ListGroup.ItemTitle>{operatorName}</ListGroup.ItemTitle>
+                    {operatorReach ? (
+                      <ListGroup.ItemDescription>{operatorReach}</ListGroup.ItemDescription>
+                    ) : null}
+                  </ListGroup.ItemContent>
+                  <ListGroup.ItemSuffix />
+                </ListGroup.Item>
+              </PressableFeedback.Scale>
+              <PressableFeedback.Ripple />
+            </PressableFeedback>
+          </ListGroup>
+        </Section>
       ) : null}
 
       <Section title="Provider address">
@@ -444,126 +579,6 @@ export function ProviderInfoScreen() {
           ) : null
         }
       />
-
-      {/* One row, and what it says is not a number: the grid above already
-          counts the sealed models, and a count does not tell the reader what
-          the count MEANS. This is the sentence — whether the provider can
-          read the prompts it forwards — and it is the reason the page is
-          worth opening before paying one. */}
-      <SkeletonContentCrossfade
-        loading={catalogState === 'loading'}
-        visualKey="provider-info-models"
-        visualSurface="provider-info"
-        testID="ai-provider-info-models"
-        renderSkeleton={() => (
-          <Section title="Privacy">
-            <ListGroup variant="secondary">
-              <ListGroup.Item disabled testID="ai-provider-model-e2ee-skeleton">
-                <ListGroup.ItemContent>
-                  <Text loading medium size={16} placeholder="End-to-end encrypted" />
-                  <Text
-                    loading
-                    size={14}
-                    color={muted}
-                    placeholder="This provider can read every request it forwards."
-                  />
-                </ListGroup.ItemContent>
-              </ListGroup.Item>
-            </ListGroup>
-          </Section>
-        )}
-        renderContent={() =>
-          catalog ? (
-            <Section title="Privacy">
-              <ListGroup variant="secondary">
-                <ListGroup.Item disabled>
-                  <ListGroup.ItemContent>
-                    <ListGroup.ItemTitle>
-                      {catalog.e2ee ? 'End-to-end encrypted' : 'Not encrypted'}
-                    </ListGroup.ItemTitle>
-                    <ListGroup.ItemDescription>
-                      {catalog.e2ee
-                        ? `${catalog.encrypted.toLocaleString()} of its models run in an enclave this provider cannot read into. The rest it can.`
-                        : 'This provider can read every request it forwards.'}
-                    </ListGroup.ItemDescription>
-                  </ListGroup.ItemContent>
-                  {catalog.e2ee ? (
-                    <Icon name="mdi:shield-check" size={18} color={foreground} />
-                  ) : null}
-                </ListGroup.Item>
-              </ListGroup>
-            </Section>
-          ) : null
-        }
-      />
-
-      {info?.version || info?.npub ? (
-        <Section title="Identity">
-          <ListGroup variant="secondary">
-            {info.version ? (
-              <ListGroup.Item disabled>
-                <ListGroup.ItemContent>
-                  <ListGroup.ItemTitle>Version</ListGroup.ItemTitle>
-                  <ListGroup.ItemDescription>{info.version}</ListGroup.ItemDescription>
-                </ListGroup.ItemContent>
-              </ListGroup.Item>
-            ) : null}
-          </ListGroup>
-        </Section>
-      ) : null}
-
-      {operatorPubkey ? (
-        <Section title="Operator">
-          {/* Built exactly like the mint page's operator row — a face, a name
-              and a way through to the profile, inside the same grouped card
-              every other section on this page uses. It used to be a bare
-              `ContactRow`, which carried its own chrome and so read as a
-              floating fragment between two grouped lists.
-
-              An npub string is an identifier, not an identity: it tells the
-              user nothing about who they are about to pay. So the avatar and
-              the name lead, and the reach goes underneath when somebody has
-              measured it — a number that is absent and a number that is zero
-              are different facts, and only one of them is a reason to think
-              twice. */}
-          <ListGroup variant="secondary">
-            <PressableFeedback
-              animation={false}
-              accessibilityRole="button"
-              accessibilityLabel="Open operator profile"
-              testID="ai-provider-info-operator"
-              onPress={() => router.push(buildModalProfileHref({ pubkey: operatorPubkey }))}>
-              <PressableFeedback.Scale>
-                <ListGroup.Item disabled>
-                  <ListGroup.ItemPrefix>
-                    <Avatar
-                      state={
-                        operatorLoading
-                          ? 'loading'
-                          : operatorProfile?.picture
-                            ? 'image'
-                            : 'fallback'
-                      }
-                      picture={operatorProfile?.picture}
-                      seed={operatorPubkey}
-                      name={operatorName}
-                      size={32}
-                    />
-                  </ListGroup.ItemPrefix>
-                  <ListGroup.ItemContent>
-                    <ListGroup.ItemTitle>{operatorName}</ListGroup.ItemTitle>
-                    {operatorReach ? (
-                      <ListGroup.ItemDescription>{operatorReach}</ListGroup.ItemDescription>
-                    ) : null}
-                  </ListGroup.ItemContent>
-                  <ListGroup.ItemSuffix />
-                </ListGroup.Item>
-              </PressableFeedback.Scale>
-              <PressableFeedback.Ripple />
-            </PressableFeedback>
-          </ListGroup>
-        </Section>
-      ) : null}
 
       {holdsBalance ? (
         <Section title="Balance held here">

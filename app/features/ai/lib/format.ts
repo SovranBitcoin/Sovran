@@ -125,7 +125,20 @@ function labelForVendor(id: string): string {
 export function providersForLineup(lineup: AiLineup | null | undefined): AiProvider[] {
   const ids = lineupProviderIds(lineup);
   if (ids.length === 0) return [...AI_PROVIDERS];
-  return ids.map((id) => getProviderById(id));
+  // Sealed first. A node serving hundreds of models offers a handful that can
+  // answer without reading the prompt, and buried at whatever position the
+  // catalog walk happened to produce they were the hardest thing in the menu
+  // to find — which is backwards, because they are the only reason to prefer
+  // one node over another on anything but price.
+  //
+  // Ordering ONLY here. `lineupProviderIds` also feeds the send path's
+  // fallback chain, and the order a request walks vendors in is a different
+  // question from the order a menu lists them in — one that deliberately
+  // excludes the sealed vendor (see `plaintextFallbackOrder`).
+  const ordered = [...ids].sort(
+    (a, b) => Number(b === E2EE_PROVIDER_ID) - Number(a === E2EE_PROVIDER_ID)
+  );
+  return ordered.map((id) => getProviderById(id));
 }
 
 export const AI_TIERS: readonly AiTier[] = [
