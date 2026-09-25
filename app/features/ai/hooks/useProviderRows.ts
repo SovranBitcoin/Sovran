@@ -139,8 +139,12 @@ export function useProviderRows(
             : null;
       return {
         baseUrl,
-        name: provider.name || host(baseUrl),
-        nameIsHost: !provider.name || provider.name === host(baseUrl),
+        // The hostname is produced HERE and nowhere earlier. A provider that
+        // published no name resolves to `null`, and every layer between the
+        // network and this line is required to keep it that way — the moment a
+        // guess is stored it outranks nothing and is shown anyway.
+        name: provider.name ?? host(baseUrl),
+        nameIsHost: provider.name == null,
         description: provider.description,
         version: provider.version,
         mints: provider.mints,
@@ -208,9 +212,15 @@ export function useProviderRows(
     }
   }
   const order = seated.order;
-  const positions = new Map(order.map((url, index) => [url, index]));
-  return [...ranked].sort(
-    (a, b) =>
-      (positions.get(a.baseUrl) ?? order.length) - (positions.get(b.baseUrl) ?? order.length)
-  );
+  // Memoized, because the ARRAY is a prop. `List` re-renders every row when
+  // `data` changes identity, so a hook that sorted into a fresh array on every
+  // render guaranteed a full repaint for any reason at all — including ones
+  // that had nothing to do with providers.
+  return useMemo(() => {
+    const positions = new Map(order.map((url, index) => [url, index]));
+    return [...ranked].sort(
+      (a, b) =>
+        (positions.get(a.baseUrl) ?? order.length) - (positions.get(b.baseUrl) ?? order.length)
+    );
+  }, [ranked, order]);
 }

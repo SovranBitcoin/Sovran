@@ -32,7 +32,7 @@ import { useAiProviderDirectoryStore } from '@/shared/stores/profile/aiProviderD
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mockSetUserNode = jest.fn();
-const mockRememberProviders = jest.fn();
+const mockObserveProviders = jest.fn();
 
 jest.mock('@/shared/stores/profile/routstrStore', () => ({
   useRoutstrStore: Object.assign(
@@ -41,7 +41,7 @@ jest.mock('@/shared/stores/profile/routstrStore', () => ({
     {
       getState: () => ({
         knownProviders: {},
-        rememberProviders: mockRememberProviders,
+        observeProviders: mockObserveProviders,
         setUserNode: mockSetUserNode,
       }),
     }
@@ -50,7 +50,9 @@ jest.mock('@/shared/stores/profile/routstrStore', () => ({
 
 jest.mock('@/features/ai/hooks/useProviderRows', () => ({ useProviderRows: jest.fn(() => []) }));
 jest.mock('@/shared/lib/apiClient', () => ({ getAiProviders: jest.fn() }));
-jest.mock('@/shared/lib/routstr/discovery', () => ({ discoverProviders: jest.fn(async () => []) }));
+jest.mock('@/shared/lib/routstr/discovery', () => ({
+  discoverProviders: jest.fn(async () => ({ announced: [], peers: [] })),
+}));
 jest.mock('@/shared/lib/routstr/providerHealth', () => ({
   probeProvider: jest.fn(),
   probeProviders: jest.fn(async () => {}),
@@ -162,6 +164,20 @@ async function openList() {
   return renderer;
 }
 
+/**
+ * Let a pooled probe result reach the rows.
+ *
+ * Probe answers are committed in batches, not one render per answer — a sweep
+ * of forty otherwise re-renders every row forty times. The verdict is
+ * therefore correct a beat after the probe resolves, and a test that asserts
+ * in the same tick is asserting on the pool rather than on the list.
+ */
+async function settleProbeCommit() {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  });
+}
+
 /** The arguments the screen most recently handed the row builder. */
 const lastRowsCall = () => jest.mocked(useProviderRows).mock.calls.at(-1)!;
 
@@ -170,7 +186,7 @@ beforeEach(() => {
   useAiProviderDirectoryStore.setState({ providers: [], fetchedAt: null });
   jest.mocked(useProviderRows).mockReturnValue([]);
   jest.mocked(getAiProviders).mockResolvedValue(ok([]));
-  jest.mocked(discoverProviders).mockResolvedValue([]);
+  jest.mocked(discoverProviders).mockResolvedValue({ announced: [], peers: [] });
   jest.mocked(probeProviders).mockResolvedValue(undefined);
   jest.mocked(probeProvider).mockResolvedValue({ baseUrl: REDSHIFT, status: 'online', info: null });
 });
@@ -191,10 +207,14 @@ describe('the provider directory', () => {
     expect(lastRowsCall()[1]).toEqual(directory);
     // …and it is kept, so the NEXT open does not have to ask again.
     expect(useAiProviderDirectoryStore.getState().providers).toEqual(directory);
-    expect(mockRememberProviders).toHaveBeenCalledWith({
-      [`${REDSHIFT}/`]: { name: 'redsh1ft' },
-      'https://b.example': {},
-      'https://c.example': {},
+    // Attributed to nagg, and passed through verbatim. The screen used to
+    // hand-write "only include `name` if there is one" here; that judgement
+    // belongs to the claim ladder, which applies it to every source rather
+    // than the ones a call site remembered.
+    expect(mockObserveProviders).toHaveBeenCalledWith('aggregator', {
+      [`${REDSHIFT}/`]: { name: 'redsh1ft', mints: [], pubkey: undefined },
+      'https://b.example': { name: undefined, mints: [], pubkey: undefined },
+      'https://c.example': { name: undefined, mints: [], pubkey: undefined },
     });
     act(() => renderer.unmount());
   });
@@ -252,14 +272,23 @@ describe('the provider directory', () => {
     act(() => renderer.unmount());
   });
 
-  it('never turns a restricted provider into an unrestricted one', async () => {
-    jest
-      .mocked(getAiProviders)
-      .mockResolvedValue(ok([served(REDSHIFT, { name: 'redsh1ft', mints: [] })]));
+  it('records the announcement and the peer directories as separate sources', async () => {
+    jest.mocked(getAiProviders).mockResolvedValue(ok([]));
+    jest.mocked(discoverProviders).mockResolvedValue({
+      announced: [{ baseUrl: REDSHIFT, name: 'redsh1ft', pubkey: 'a'.repeat(64) }],
+      peers: [{ baseUrl: REDSHIFT, name: 'somebody elses idea', mints: ['https://mint.example'] }],
+    });
     const renderer = await openList();
-    // An absent mint list locally means "accepts any mint", so a directory row
-    // that simply did not carry one must not overwrite what we know.
-    expect(mockRememberProviders).toHaveBeenCalledWith({ [REDSHIFT]: { name: 'redsh1ft' } });
+
+    // Two parties, two observations. Merging them here is what let a peer
+    // node's opinion overwrite an operator's own name on fourteen rows.
+    const sources = mockObserveProviders.mock.calls.map(([source]) => source);
+    expect(sources).toContain('announcement');
+    expect(sources).toContain('peer');
+    const peerCall = mockObserveProviders.mock.calls.find(([source]) => source === 'peer');
+    // A peer directory is hearsay about a third party and is never given the
+    // chance to say who runs it.
+    expect(peerCall?.[1][REDSHIFT]).not.toHaveProperty('pubkey');
     act(() => renderer.unmount());
   });
 
@@ -327,6 +356,7 @@ describe('choosing a provider', () => {
     // nagg said online; we just failed to reach it. Nothing is paid to a
     // provider that is not there.
     expect(mockSetUserNode).not.toHaveBeenCalled();
+    await settleProbeCommit();
     expect(lastRowsCall()[0]).toEqual({ [REDSHIFT]: 'offline' });
     act(() => renderer.unmount());
   });

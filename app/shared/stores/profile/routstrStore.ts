@@ -23,6 +23,15 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { tolerantRecord, tolerantArray } from '@/shared/lib/persist/tolerant';
 import { restoreActiveSessionView } from '@/shared/stores/profile/restoreActiveSessionView';
 import { normalizeNodeUrl } from '@/shared/lib/routstr/providers';
+import {
+  contestedPubkeySources,
+  resolveProviders,
+  withClaim,
+  type ProviderClaim,
+  type ProviderRecord,
+  type ProviderSource,
+  type ResolvedProvider,
+} from '@/shared/lib/routstr/providerClaims';
 
 // AI tab tier + provider ids — imported from the shared lineup module,
 // which is the single source of truth for both this store's selection
@@ -289,24 +298,6 @@ interface PendingPayment {
   startedAt: number;
 }
 
-/** What a Routstr provider published about itself, as last seen. */
-interface KnownProvider {
-  name: string;
-  description: string | null;
-  version: string | null;
-  /** Mints this provider redeems payment tokens from. Empty = publishes none,
-   *  which the payment path reads as "any mint". */
-  mints: string[];
-  /** Whether its catalog carries end-to-end encrypted (Tinfoil) models.
-   *  `null` until a catalog has been read for it. */
-  e2ee: boolean | null;
-  /** The operator's Nostr pubkey, hex. A provider is a counterparty, and this
-   *  is what turns it from a hostname into somebody with a reputation — the
-   *  same thing a mint's operator npub does on the mint page. */
-  pubkey: string | null;
-  seenAt: number;
-}
-
 interface RoutstrState {
   /** Cashu token or persistent wallet key */
   apiKey: string | null;
@@ -324,18 +315,42 @@ interface RoutstrState {
    */
   legacyAccounts: Record<string, RoutstrAccount>;
   /**
-   * Every Routstr provider this profile has seen, with what it published.
+   * Every Routstr provider this profile has seen, as the app should show it.
    *
-   * Discovery is a live fetch from one node's `/v1/providers/`, and that node
-   * is sometimes unreachable — which is how a picker that listed 28 providers
-   * came back showing two. Remembering them makes the list a floor rather
-   * than a snapshot: a failed refresh loses freshness, never the menu.
+   * Derived from `providerClaims` below and never persisted: what is durable
+   * is what each party SAID, and which of them wins is a rule in code that a
+   * later build is allowed to change its mind about.
+   *
+   * Remembering providers at all makes the list a floor rather than a
+   * snapshot — discovery is a live fetch and the node serving it is sometimes
+   * the one that is down, which is how a picker that listed 28 came back
+   * showing two. A failed refresh loses freshness, never the menu.
    *
    * `mints` is the field that matters most. A node redeems tokens only from
    * the mints it publishes, so this is what says whether the user can pay a
-   * provider at all — before they pick it and watch a send fail.
+   * provider at all — before they pick it and watch a send fail. `name` is
+   * `null` when nobody has published one: the hostname shown in its place is
+   * produced by the row that renders it, never stored here.
    */
-  knownProviders: Record<string, KnownProvider>;
+  knownProviders: Record<string, ResolvedProvider>;
+  /**
+   * What each party said, kept apart by who said it.
+   *
+   * The durable half of the pair: `knownProviders` above is derived from this
+   * and never persisted, because a resolution is only as good as the ranking
+   * that produced it and that ranking is code, not data.
+   */
+  providerClaims: Record<string, ProviderRecord>;
+  /**
+   * When each provider was last heard from at all, for eviction only.
+   *
+   * Deliberately NOT a field on the record. Every observation refreshes it and
+   * almost none of them carry news, so keeping it inside the thing the list
+   * renders meant a silent probe sweep published 38 new objects and re-rendered
+   * every row. Housekeeping and facts have different lifetimes; they get
+   * different homes.
+   */
+  providerSeenAt: Record<string, number>;
   /**
    * A provider the USER chose, which outranks nagg's pick.
    *
@@ -502,10 +517,15 @@ interface RoutstrActions {
   /** Pin the app to a provider, or pass `null` to follow nagg again. Drops the
    *  server lineup and model cache so the menu re-derives from the new node's
    *  own catalog rather than showing another node's models. */
-  /** Merge what a discovery pass (or a direct `/v1/info` read) learned about a
-   *  provider. Additive per field: a pass that does not know `e2ee` must not
-   *  erase an earlier answer. */
-  rememberProviders: (providers: Record<string, Partial<KnownProvider>>) => void;
+  /**
+   * Record what ONE party said about some providers.
+   *
+   * `source` is not bookkeeping: it decides whether the claim is shown. A
+   * peer node repeating a name the provider itself published changes nothing,
+   * and a peer asserting who runs a node changes nothing ever. See
+   * `providerClaims.ts` for the ladder.
+   */
+  observeProviders: (source: ProviderSource, providers: Record<string, ProviderClaim>) => void;
   setUserNode: (nodeBaseUrl: string | null) => void;
   /** Record a payment before it leaves, so its change stays recoverable. */
   beginPayment: (id: string, payment: PendingPayment) => void;
@@ -646,21 +666,23 @@ const PersistedRoutstrMessages = tolerantArray(
  * provider row holds no money, so losing the stalest one costs a menu entry
  * that the next discovery pass restores.
  */
-function boundedProviders(providers: Record<string, KnownProvider>): Record<string, KnownProvider> {
-  const entries = Object.entries(providers);
-  if (entries.length <= MAX_KNOWN_PROVIDERS) return providers;
-  // Eviction is by `seenAt`, and every remembered write stamps it — so the
-  // bound is not a quiet high-water mark. A directory larger than the bound
-  // evicts rows that are still on screen, and a provider re-added later
-  // arrives with no name and is displayed as its own hostname. Said out loud
-  // because the effect surfaces as a name changing, nowhere near here.
+/** Keep the most recently heard-from providers, and say so when any are
+ *  dropped. Eviction is silent data loss otherwise: the row simply stops
+ *  existing, and re-discovery brings it back stripped of everything only one
+ *  party ever said about it. */
+function boundedClaims(
+  claims: Record<string, ProviderRecord>,
+  seenAt: Record<string, number>
+): Record<string, ProviderRecord> {
+  const entries = Object.entries(claims);
+  if (entries.length <= MAX_KNOWN_PROVIDERS) return claims;
   storeLog.info('store.routstr.providers_evicted', {
     held: entries.length,
     bound: MAX_KNOWN_PROVIDERS,
     evicted: entries.length - MAX_KNOWN_PROVIDERS,
   });
   return Object.fromEntries(
-    entries.sort(([, a], [, b]) => b.seenAt - a.seenAt).slice(0, MAX_KNOWN_PROVIDERS)
+    entries.sort(([a], [b]) => (seenAt[b] ?? 0) - (seenAt[a] ?? 0)).slice(0, MAX_KNOWN_PROVIDERS)
   );
 }
 
@@ -752,24 +774,38 @@ const PersistedRoutstrSession = z.looseObject({
  * candidates. A pure LRU here would delete the one string that can reach a
  * user's money, which is the failure this whole record exists to prevent.
  */
-/** Capped at roughly four times what a healthy directory returns today (42),
- *  so a hostile or runaway directory cannot grow the blob without bound while
- *  a real network still fits comfortably. */
-const MAX_KNOWN_PROVIDERS = 160;
+// nagg caps its own payload at 256 rows. Holding fewer than that meant a
+// healthy network evicted rows the user could still see — and because
+// eviction refreshes on every observation, WHICH rows was close to arbitrary.
+// A record is a few hundred bytes; the bound is there to stop unbounded
+// growth, not to be reached.
+const MAX_KNOWN_PROVIDERS = 256;
 
-const PersistedKnownProvider = z.looseObject({
-  name: z.string().max(200).default('').catch(''),
-  description: z.string().max(2000).nullable().default(null).catch(null),
-  version: z.string().max(64).nullable().default(null).catch(null),
-  /** Mints this provider redeems payment tokens from. Empty means it does not
-   *  publish a list, which reads as "any mint". */
-  mints: tolerantArray(z.string().max(512), 32).default([]).catch([]),
-  /** True when its catalog carried at least one `tinfoil-` model, so the
-   *  picker can say which providers can answer without reading the prompt.
-   *  `null` until a catalog has been read for it — absence of evidence. */
-  e2ee: z.boolean().nullable().default(null).catch(null),
-  pubkey: z.string().max(128).nullable().default(null).catch(null),
-  seenAt: z.number().int().nonnegative().default(0).catch(0),
+/** One party's statement. Every field optional and tolerant: a source that
+ *  starts sending a shape we did not expect costs that field, not the row. */
+const PersistedProviderClaim = z.looseObject({
+  name: z.string().max(200).optional().catch(undefined),
+  description: z.string().max(2000).optional().catch(undefined),
+  version: z.string().max(64).optional().catch(undefined),
+  pubkey: z.string().max(128).optional().catch(undefined),
+  /** Empty means it publishes no list, which reads as "any mint". */
+  mints: tolerantArray(z.string().max(512), 32).optional().catch(undefined),
+  /** True when its catalog carried at least one `tinfoil-` model. Absent until
+   *  a catalog has been read for it — absence of evidence. */
+  e2ee: z.boolean().optional().catch(undefined),
+});
+
+/** A source this build no longer knows is dropped rather than kept as an
+ *  unranked claim: the ladder is the whole contract, and a claim outside it
+ *  would have no standing to be shown by. */
+const PersistedProviderRecord = z.looseObject({
+  claims: z
+    .partialRecord(
+      z.enum(['self', 'announcement', 'aggregator', 'peer', 'catalog', 'legacy']),
+      PersistedProviderClaim
+    )
+    .default({})
+    .catch(() => ({})),
 });
 
 const MAX_ARCHIVED_ACCOUNTS = 32;
@@ -813,7 +849,8 @@ const PersistedRoutstrStore = z.object({
   userNodeBaseUrl: z.string().max(512).nullable().default(null).catch(null),
   // Additive + tolerant, same reasoning as `legacyAccounts`: one malformed
   // provider row must cost that row, not the directory.
-  knownProviders: tolerantRecord(z.string().max(512), PersistedKnownProvider),
+  providerClaims: tolerantRecord(z.string().max(512), PersistedProviderRecord),
+  providerSeenAt: tolerantRecord(z.string().max(512), z.number().int().nonnegative()),
   pendingPayments: tolerantRecord(z.string().max(128), PersistedPendingPayment),
   // Additive, and defaulting to ON: spending is the kind of thing that should
   // have to be turned off deliberately, never left off by a parse failure.
@@ -838,6 +875,8 @@ export const useRoutstrStore = create<RoutstrStore>()(
       nodeBaseUrl: null,
       userNodeBaseUrl: null,
       knownProviders: {},
+      providerClaims: {},
+      providerSeenAt: {},
       pendingPayments: {},
       confirmSpend: true,
       legacyAccounts: {},
@@ -1126,48 +1165,46 @@ export const useRoutstrStore = create<RoutstrStore>()(
         });
       },
 
-      rememberProviders: (providers) => {
+      observeProviders: (source, providers) => {
         const entries = Object.entries(providers);
         if (entries.length === 0) return;
         set((state) => {
-          const next = { ...state.knownProviders };
-          // How many of these writes changed anything a row can see. `seenAt`
-          // moves on every write and a fresh object is published regardless,
-          // so a pass that learned nothing still re-renders every consumer —
-          // `changed: 0` with a non-zero `count` is exactly that pass.
+          const now = Date.now();
+          const seenAt = { ...state.providerSeenAt };
+          // Copied only once something actually changes, so a sweep that
+          // learned nothing leaves every reference the list holds untouched.
+          let claims = state.providerClaims;
           let changed = 0;
-          let named = 0;
-          for (const [baseUrl, patch] of entries) {
-            const existing = next[baseUrl];
-            if (
-              !existing ||
-              (patch.name && patch.name !== existing.name) ||
-              (patch.mints && patch.mints.join() !== existing.mints.join()) ||
-              (patch.pubkey && patch.pubkey !== existing.pubkey)
-            ) {
-              changed++;
-            }
-            if (!patch.name && !existing?.name) named++;
-            next[baseUrl] = {
-              name: patch.name || existing?.name || baseUrl.replace(/^https:\/\//, ''),
-              description: patch.description ?? existing?.description ?? null,
-              version: patch.version ?? existing?.version ?? null,
-              mints: patch.mints ?? existing?.mints ?? [],
-              // Only a catalog read can answer this, so a discovery pass that
-              // does not know must leave the last answer alone.
-              e2ee: patch.e2ee ?? existing?.e2ee ?? null,
-              pubkey: patch.pubkey ?? existing?.pubkey ?? null,
-              seenAt: Date.now(),
-            };
+          let contested = 0;
+          for (const [baseUrl, claim] of entries) {
+            seenAt[baseUrl] = now;
+            const before = claims[baseUrl];
+            const after = withClaim(before, source, claim);
+            if (after === before) continue;
+            if (claims === state.providerClaims) claims = { ...claims };
+            claims[baseUrl] = after;
+            changed++;
+            if (contestedPubkeySources(after).length > 0) contested++;
           }
-          storeLog.debug('store.routstr.providers_remembered', {
+          if (changed === 0) {
+            // `seenAt` alone. Nothing rendered reads it, so nothing re-renders.
+            return { providerSeenAt: seenAt };
+          }
+          const bounded = boundedClaims(claims, seenAt);
+          const knownProviders = resolveProviders(bounded, state.knownProviders);
+          storeLog.debug('store.routstr.providers_observed', {
+            source,
             count: entries.length,
+            // Claims this source changed, and — separately — whether any of
+            // that reached the rows. A source below the one that already
+            // answered teaches the record something and the user nothing.
             changed,
-            // Providers this write could only name after their own hostname,
-            // because neither the patch nor the stored row carried a name.
-            hostnamed: named,
+            repainted: knownProviders !== state.knownProviders,
+            // Two parties naming different operators for one endpoint: a
+            // stale announcement, or somebody rebranding another node.
+            contested,
           });
-          return { knownProviders: boundedProviders(next) };
+          return { providerClaims: bounded, providerSeenAt: seenAt, knownProviders };
         });
       },
 
@@ -1281,10 +1318,49 @@ export const useRoutstrStore = create<RoutstrStore>()(
       // — permanently unprompted before every spend, which is the opposite of
       // what removing it is for. The field is kept (not dropped) so the blob's
       // shape is unchanged and nothing else in it is at risk.
-      version: 2,
+      //
+      // v3: split the single mutable provider record into per-source claims.
+      //
+      // Everything the old record held is folded into one `legacy` claim,
+      // ranked below every real source so the first word from any of them
+      // replaces it. A stored name equal to the provider's own hostname is
+      // dropped on the way through: that is the fabrication this version
+      // exists to stop, it is indistinguishable from a real name once stored,
+      // and carrying it forward would let it outrank nothing while still
+      // being shown. `seenAt` moves out to its own map — it is housekeeping,
+      // and the row must not re-render because a probe said hello.
+      version: 3,
       migrate: (state, version) => {
         const blob: Record<string, unknown> = { ...(state as Record<string, unknown> | null) };
         if (version < 2) blob.confirmSpend = true;
+        if (version < 3) {
+          const legacy = (blob.knownProviders ?? {}) as Record<string, Record<string, unknown>>;
+          const claims: Record<string, unknown> = {};
+          const seenAt: Record<string, number> = {};
+          for (const [baseUrl, provider] of Object.entries(legacy)) {
+            if (!provider || typeof provider !== 'object') continue;
+            const host = baseUrl.replace(/^https?:\/\//, '');
+            const name = typeof provider.name === 'string' ? provider.name : undefined;
+            claims[baseUrl] = {
+              claims: {
+                legacy: {
+                  ...(name && name !== host ? { name } : {}),
+                  ...(typeof provider.description === 'string'
+                    ? { description: provider.description }
+                    : {}),
+                  ...(typeof provider.version === 'string' ? { version: provider.version } : {}),
+                  ...(typeof provider.pubkey === 'string' ? { pubkey: provider.pubkey } : {}),
+                  ...(Array.isArray(provider.mints) ? { mints: provider.mints } : {}),
+                  ...(typeof provider.e2ee === 'boolean' ? { e2ee: provider.e2ee } : {}),
+                },
+              },
+            };
+            seenAt[baseUrl] = typeof provider.seenAt === 'number' ? provider.seenAt : 0;
+          }
+          blob.providerClaims = claims;
+          blob.providerSeenAt = seenAt;
+          delete blob.knownProviders;
+        }
         return blob;
       },
       partialize: (state) => ({
@@ -1305,7 +1381,8 @@ export const useRoutstrStore = create<RoutstrStore>()(
         lastKnownLineup: state.lastKnownLineup,
         nodeBaseUrl: state.nodeBaseUrl,
         legacyAccounts: boundedAccounts(state.legacyAccounts),
-        knownProviders: boundedProviders(state.knownProviders),
+        providerClaims: boundedClaims(state.providerClaims, state.providerSeenAt),
+        providerSeenAt: state.providerSeenAt,
         userNodeBaseUrl: state.userNodeBaseUrl,
         // Age is not evidence of settlement. Keep the only recovery token
         // until the receive/refund path explicitly completes this payment.
@@ -1314,6 +1391,11 @@ export const useRoutstrStore = create<RoutstrStore>()(
       }),
       afterHydrate: (state) => {
         if (!state) return;
+        // `knownProviders` is derived and never persisted, so a rehydrated
+        // store has claims and no rows until this runs. Done here rather than
+        // lazily in a selector because every reader expects a plain record,
+        // and a lazy derivation would hand each of them a different one.
+        state.knownProviders = resolveProviders(state.providerClaims, {});
         // Re-apply the nagg-served node override before any Routstr call
         // this session — a repointed node must survive offline relaunches.
         state.nodeBaseUrl = state.nodeBaseUrl ?? state.lastKnownLineup?.nodeBaseUrl ?? null;

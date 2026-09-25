@@ -35,9 +35,13 @@ const DirectorySpine = z.looseObject({
   providers: z.array(ProviderRowSpine).max(128).default([]),
 });
 
-interface RoutstrProvider {
+export interface RoutstrProvider {
   baseUrl: string;
-  name: string;
+  /** What this directory calls the provider, when it calls it anything.
+   *  Absent is a real answer and used to be replaced by the hostname here —
+   *  which turned one node's silence about a peer into a name that outranked
+   *  the peer's own. The hostname belongs to the row that renders it. */
+  name?: string;
   description?: string;
   version?: string;
   /** Mints this provider accepts payment from. Empty when it publishes none,
@@ -86,7 +90,7 @@ export async function fetchProviderDirectory(
       seen.add(baseUrl);
       out.push({
         baseUrl,
-        name: row.name?.trim() || baseUrl.replace(/^https:\/\//, ''),
+        name: row.name?.trim() || undefined,
         description: row.description?.trim() || undefined,
         version: row.version,
         mints: row.mint_urls ?? [],

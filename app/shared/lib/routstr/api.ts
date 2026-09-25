@@ -782,7 +782,8 @@ async function seedFromNode(
   // megabyte — far too heavy to probe every row of a picker with. Recording
   // it here means the one provider we DID read is marked, and the picker
   // fills in as providers are used.
-  routstrStoreState().rememberProviders({
+  // Only a catalog read can answer this, and this app is the one that read it.
+  routstrStoreState().observeProviders('catalog', {
     [origin]: {
       e2ee: models.some((model) => isE2eeModelId(model.id)),
     },
@@ -794,12 +795,13 @@ async function seedFromNode(
       if (!info || !ownsScope()) return;
       await seedProviderCatalog(origin, models, info.mints);
       if (!ownsScope()) return;
-      routstrStoreState().rememberProviders({
+      routstrStoreState().observeProviders('self', {
         [origin]: {
           name: info.name,
-          description: info.description ?? null,
-          version: info.version ?? null,
+          description: info.description,
+          version: info.version,
           mints: info.mints,
+          pubkey: info.pubkey,
         },
       });
     })

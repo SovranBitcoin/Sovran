@@ -3,7 +3,7 @@ import { facade } from 'nostr';
 import { apiLog } from '@/shared/lib/logger';
 import type { RequestControls } from 'wallet/safeFetch';
 
-import { fetchProviderDirectory, normalizeNodeUrl } from './providers';
+import { fetchProviderDirectory, normalizeNodeUrl, type RoutstrProvider } from './providers';
 
 /**
  * Find Routstr providers the way Routstr's own clients do.
@@ -38,7 +38,14 @@ interface AnnouncedProvider {
   name?: string;
   description?: string;
   mints?: string[];
-  /** Who signed the announcement, or whom the directory row names. */
+  /**
+   * Who SIGNED the announcement — never a pubkey the content merely names.
+   *
+   * An announcement can only speak for the key that signed it. Kind 38421 is
+   * a public kind with no ownership of the endpoints it lists, so honouring a
+   * `pubkey` field inside the content let anyone publish an event naming
+   * another operator's node and take over the "Run by" line on their row.
+   */
   pubkey?: string;
   /** When the announcement was published. A provider nobody has re-announced
    *  in a long time is still listed, but it is worth knowing. */
@@ -111,9 +118,7 @@ function readAnnouncement(event: RelayEvent): AnnouncedProvider[] {
       baseUrl,
       name: asString(entry.name),
       description: asString(entry.description),
-      // The row's own key when it carries one; otherwise the signer's, which
-      // is the relationship an announcement asserts anyway.
-      pubkey: asString(entry.pubkey) ?? asString(event.pubkey),
+      pubkey: asString(event.pubkey),
       mints: Array.isArray(entry.mint_urls)
         ? entry.mint_urls.filter((m): m is string => typeof m === 'string')
         : undefined,
@@ -140,62 +145,49 @@ async function fromNostr(controls: RequestControls = {}): Promise<AnnouncedProvi
   return out;
 }
 
-interface DiscoveredProvider {
-  baseUrl: string;
-  name: string;
-  description?: string;
-  version?: string;
-  /** The operator's Nostr pubkey, hex. */
-  pubkey?: string;
-  /** Mints this provider redeems payment tokens from. Empty when it publishes
-   *  none, which the payment path reads as "any mint". */
-  mints: string[];
-  /** When it last announced itself on Nostr, when that is where it was found. */
-  announcedAt?: number;
+/**
+ * Everything the network says, kept apart by who said it.
+ *
+ * It used to be merged here into one row per provider, last writer winning —
+ * and because the HTTP directories were absorbed after the announcements, a
+ * peer node's opinion overwrote the operator's own. Two sweeps 13ms apart
+ * merged 50 and 45 announcements into 38 and 37 rows, so the same list came
+ * out differently on each open.
+ *
+ * Nothing is merged now. The store ranks these by authority per field
+ * (`providerClaims.ts`), which is the question the merge was failing to ask.
+ */
+interface Discovery {
+  /** Self-signed, so this is where operator identity comes from. */
+  announced: AnnouncedProvider[];
+  /** Other nodes describing their peers. Hearsay — useful for accepted-mint
+   *  lists, which announcements often omit, and for nothing about identity. */
+  peers: RoutstrProvider[];
 }
 
-/**
- * Every provider this app can find, merged from Nostr and from the HTTP
- * directories of the nodes it already knows.
- *
- * Later sources fill gaps rather than overwrite: an announcement usually has
- * the name, a directory usually has the accepted mints, and neither is a
- * complete record on its own.
- */
 export async function discoverProviders(
   knownNodes: string[],
   controls: RequestControls = {}
-): Promise<DiscoveredProvider[]> {
-  const merged = new Map<string, DiscoveredProvider>();
-  const absorb = (row: AnnouncedProvider) => {
-    const existing = merged.get(row.baseUrl);
-    merged.set(row.baseUrl, {
-      baseUrl: row.baseUrl,
-      name: row.name || existing?.name || row.baseUrl.replace(/^https:\/\//, ''),
-      description: row.description ?? existing?.description,
-      version: existing?.version,
-      mints: row.mints?.length ? row.mints : (existing?.mints ?? []),
-      pubkey: row.pubkey ?? existing?.pubkey,
-      announcedAt: row.announcedAt ?? existing?.announcedAt,
-    });
-  };
-
-  const directories = await Promise.all(
-    // Every node we know is asked, not just the one in use: directories differ,
-    // and the node in use is exactly the one that might be down.
-    [...new Set(knownNodes.map(normalizeNodeUrl))]
-      .filter(Boolean)
-      .slice(0, 8)
-      .map((node) => fetchProviderDirectory(node, controls))
-  );
-  const [announced, ...rest] = [await fromNostr(controls), ...directories];
-  for (const row of announced) absorb(row);
-  for (const directory of rest) for (const row of directory) absorb(row);
-
-  const out = [...merged.values()];
+): Promise<Discovery> {
+  // Side by side. The relay sweep used to be queued behind the whole HTTP
+  // fan-out, which added its 12-second ceiling to theirs for no reason: they
+  // answer different questions and neither needs the other's result.
+  const [announced, directories] = await Promise.all([
+    fromNostr(controls),
+    Promise.all(
+      // Every node we know is asked, not just the one in use: directories
+      // differ, and the node in use is exactly the one that might be down.
+      [...new Set(knownNodes.map(normalizeNodeUrl))]
+        .filter(Boolean)
+        .slice(0, 8)
+        .map((node) => fetchProviderDirectory(node, controls))
+    ),
+  ]);
+  const peers = directories.flat();
   apiLog.info('routstr.discovery.merged', {
-    providers: out.length,
+    announced: announced.length,
+    peers: peers.length,
     directories: directories.length,
   });
-  return out;
+  return { announced, peers };
 }

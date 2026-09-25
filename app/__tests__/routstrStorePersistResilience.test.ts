@@ -509,3 +509,111 @@ describe('the confirmSpend v2 migration', () => {
     expect(store.getState().apiKey).toBe('sk-key');
   });
 });
+
+/**
+ * v3: the single mutable provider record becomes per-source claims.
+ *
+ * The blob it migrates is contaminated by the model it replaces. Two
+ * discovery readers substituted a provider's hostname for a missing name, and
+ * `rememberProviders` treated any non-empty name as authoritative — so a peer
+ * node's guess overwrote the provider's own, and on one device 14 of 15
+ * visible rows turned into URLs in a single write. A stored name is therefore
+ * only carried forward when it is NOT the hostname: once stored, a guess is
+ * indistinguishable from a real name, and the whole point of the new model is
+ * that it would go on outranking the real one.
+ */
+describe('the provider-claims v3 migration', () => {
+  beforeEach(() => {
+    jest.resetModules();
+    for (const k of Object.keys(mockMemory)) delete mockMemory[k];
+  });
+
+  const preloadAt = (version: number, state: Record<string, unknown>) => {
+    mockMemory[STORAGE_KEY] = JSON.stringify({ state, version });
+  };
+
+  const NAMED = 'https://ai.example.com';
+  const HOSTNAMED = 'https://llm402.ai';
+
+  const legacyBlob = {
+    apiKey: 'sk-key',
+    knownProviders: {
+      [NAMED]: {
+        name: 'Example Node',
+        description: 'a node',
+        version: '0.1.3',
+        mints: ['https://mint.example'],
+        e2ee: true,
+        pubkey: 'a'.repeat(64),
+        seenAt: 1700000000000,
+      },
+      [HOSTNAMED]: {
+        name: 'llm402.ai',
+        description: null,
+        version: null,
+        mints: [],
+        e2ee: null,
+        pubkey: null,
+        seenAt: 1700000000001,
+      },
+    },
+  };
+
+  it('folds the old record into one legacy claim and still shows it', async () => {
+    preloadAt(2, legacyBlob);
+
+    const store = await loadStore();
+
+    expect(store.getState().knownProviders[NAMED]).toEqual({
+      baseUrl: NAMED,
+      name: 'Example Node',
+      description: 'a node',
+      version: '0.1.3',
+      pubkey: 'a'.repeat(64),
+      mints: ['https://mint.example'],
+      e2ee: true,
+    });
+    expect(store.getState().apiKey).toBe('sk-key');
+  });
+
+  it('drops a stored name that is only the provider’s hostname', async () => {
+    preloadAt(2, legacyBlob);
+
+    const store = await loadStore();
+
+    // `null`, not `'llm402.ai'`. The row still renders the hostname — that is
+    // the row's job — but nothing outranks the real name when it arrives.
+    expect(store.getState().knownProviders[HOSTNAMED]?.name).toBeNull();
+  });
+
+  it('moves seenAt out of the record, into housekeeping', async () => {
+    preloadAt(2, legacyBlob);
+
+    const store = await loadStore();
+
+    expect(store.getState().providerSeenAt[NAMED]).toBe(1700000000000);
+    expect(store.getState().knownProviders[NAMED]).not.toHaveProperty('seenAt');
+  });
+
+  it('lets any real source replace what the legacy claim held', async () => {
+    preloadAt(2, legacyBlob);
+
+    const store = await loadStore();
+    store.getState().observeProviders('self', { [HOSTNAMED]: { name: 'Project Ellen' } });
+
+    expect(store.getState().knownProviders[HOSTNAMED]?.name).toBe('Project Ellen');
+  });
+
+  it('does not re-render the rows when an observation teaches nothing', async () => {
+    preloadAt(2, legacyBlob);
+
+    const store = await loadStore();
+    const before = store.getState().knownProviders;
+    // A peer repeating what the provider already told us. This is the write
+    // that used to publish a fresh map on every probe result.
+    store.getState().observeProviders('peer', { [NAMED]: { name: 'Example Node' } });
+
+    expect(store.getState().knownProviders).toBe(before);
+    expect(store.getState().providerSeenAt[NAMED]).not.toBe(1700000000000);
+  });
+});

@@ -43,7 +43,7 @@ export function AiHeaderTitle() {
   const knownProviders = useRoutstrStore((s) => s.knownProviders);
   const activeUrl = normalizeNodeUrl(userNodeBaseUrl ?? '');
   const providerName = activeUrl
-    ? knownProviders[activeUrl]?.name || activeUrl.replace(/^https:\/\//, '')
+    ? (knownProviders[activeUrl]?.name ?? activeUrl.replace(/^https:\/\//, ''))
     : 'Choose provider';
 
   const [status, setStatus] = useState<ProviderStatus>(

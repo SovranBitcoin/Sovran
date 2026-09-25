@@ -166,7 +166,9 @@ export function ProviderInfoScreen() {
         }
         setCatalog(summary);
         setCatalogState('ready');
-        useRoutstrStore.getState().rememberProviders({ [nodeBaseUrl]: { e2ee: summary.e2ee } });
+        useRoutstrStore
+          .getState()
+          .observeProviders('catalog', { [nodeBaseUrl]: { e2ee: summary.e2ee } });
       })
       .catch(() => {
         if (!cancelled) setCatalogState('empty');
