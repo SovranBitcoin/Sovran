@@ -33,6 +33,12 @@ export const ERROR_COPY = {
   // claim about a node we actually tried.
   'routstr.catalog_unavailable':
     'The AI model list has not loaded yet. Check your connection and try again in a moment.',
+  // The list DID load, and this provider serves nothing this wallet can use —
+  // a node answering with no priced chat models, or none our filters keep.
+  // Telling that user to check their connection sends them to retry something
+  // that is working.
+  'routstr.no_usable_models':
+    'This AI provider is serving no models you can use. Choose another provider.',
   // Nothing was sent. The user chose the end-to-end encrypted vendor and this
   // node is serving no sealed model, so every model we could have reached
   // would have read the prompt in the clear. Falling back to one of those

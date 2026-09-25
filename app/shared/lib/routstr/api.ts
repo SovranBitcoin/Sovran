@@ -1313,7 +1313,15 @@ export async function sendMessage(
     signal?: AbortSignal;
   }
 ): Promise<{ stream: AsyncIterable<ChatCompletionChunk>; cost: Promise<number> }> {
-  const { model, payment: context, temperature = 0.7, max_tokens } = options;
+  // No default. A sampling temperature is a claim about what the model
+  // accepts, and nothing in the catalogue supports one — `RoutstrModel`
+  // carries `max_completion_tokens` and no temperature capability at all.
+  // Both reference clients (routstr-chat, the SDK's own fetch path) send the
+  // field only when a caller asks for it, and a reasoning model rejects a
+  // non-default value outright. A destructuring default would fire on
+  // `undefined` and put it back on the wire, which is why the caller cannot
+  // drop it alone.
+  const { model, payment: context, temperature, max_tokens } = options;
   const { textChars, imageParts } = measureMessageContent(messages);
   // `useAiSend` passes its `flowId` as the payment group id, so every line
   // below joins the `ai.send.*` timeline the UI already writes rather than
@@ -1395,7 +1403,7 @@ export async function sendMessage(
           body: {
             model,
             messages,
-            temperature,
+            ...(temperature != null && { temperature }),
             ...(max_tokens != null && { max_tokens }),
             stream: true,
           },

@@ -8,6 +8,7 @@ import { RoutstrModel, setRoutstrNodeBaseUrl } from '@/shared/lib/routstr/api';
 import {
   AI_PROVIDER_IDS,
   AI_TIER_IDS,
+  E2EE_PROVIDER_ID,
   PersistedLineupSchema,
   deriveLineup,
   lineupHasEntries,
@@ -35,6 +36,67 @@ const DEFAULT_TIER: RoutstrTierId = 'auto';
 type RoutstrProviderId = AiProviderId;
 const PROVIDER_IDS = AI_PROVIDER_IDS;
 const DEFAULT_PROVIDER: RoutstrProviderId = 'openai';
+
+/**
+ * Keep the selected vendor pointing at something the new lineup can answer.
+ *
+ * The selection is sticky and the lineup is not. A node swap replaces the
+ * whole vendor set — a pinned node whose catalogue is ten `tinfoil-` rows
+ * derives a lineup containing exactly one vendor — while `selectedProvider`
+ * keeps naming the vendor from the node before it. Every cell lookup then
+ * misses, and the send path refuses with "the model list has not loaded" over
+ * a lineup it is holding. That is the `ai.send.no_lineup` / `hasCatalog: true`
+ * contradiction in the logs, five in a row as the user retried.
+ *
+ * `setSelectedSlot` already validates the vendor the USER picks against the
+ * lineup; this is the other half, for when the lineup moves underneath a
+ * selection that was valid when it was made.
+ *
+ * Two rules the replacement must obey:
+ *
+ *   - Never re-point AWAY from `E2EE_PROVIDER_ID`. A node that serves no
+ *     sealed model is a node that cannot keep the promise the user selected,
+ *     and moving them quietly onto a plaintext vendor is precisely the silent
+ *     downgrade the sealed candidate chain exists to prevent. The send path's
+ *     `routstr.e2ee_unavailable` is the honest answer there.
+ *   - Prefer a plaintext vendor, and only land ON `E2EE_PROVIDER_ID` when the
+ *     lineup offers nothing else. Enclave rows are the dearest in a catalogue,
+ *     so this is a last resort — but it is a visible one: the chip renders the
+ *     resolved model's padlock and name, and the spend confirmation states the
+ *     reservation before anything leaves.
+ *
+ * Returns `null` when the selection still resolves, or when there is nothing
+ * to move it to — an empty lineup is a placeholder, not a verdict.
+ */
+function reselectProviderForLineup(
+  selected: RoutstrProviderId,
+  lineup: AiLineup | null
+): RoutstrProviderId | null {
+  if (selected === E2EE_PROVIDER_ID) return null;
+  const offered = lineupProviderIds(lineup);
+  if (offered.length === 0 || offered.includes(selected)) return null;
+  const plaintext = offered.filter((id) => id !== E2EE_PROVIDER_ID);
+  const preferred = PROVIDER_IDS.find((id) => plaintext.includes(id)) ?? plaintext[0] ?? offered[0];
+  return preferred ?? null;
+}
+
+/** `reselectProviderForLineup` as a partial state patch, so the repoint lands
+ *  in the same `set` as the lineup that caused it — the two can never be
+ *  observed apart, and a send started between them cannot read a selection the
+ *  lineup does not answer. */
+function repointSelection(
+  selected: RoutstrProviderId,
+  lineup: AiLineup | null
+): { selectedProvider: RoutstrProviderId } | Record<string, never> {
+  const next = reselectProviderForLineup(selected, lineup);
+  if (next == null) return {};
+  storeLog.info('store.routstr.provider_repointed', {
+    from: selected,
+    to: next,
+    offered: lineupProviderIds(lineup),
+  });
+  return { selectedProvider: next };
+}
 
 /**
  * Image attached to a chat message. Bounded local-URI metadata ONLY —
@@ -902,15 +964,17 @@ export const useRoutstrStore = create<RoutstrStore>()(
           keptPreviousLineup: !filled && lineupHasEntries(held),
         });
         const now = Date.now();
+        const adopted = filled || !lineupHasEntries(held) ? merged : held;
         set({
           modelsCache: { data: models, timestamp: now },
+          ...repointSelection(get().selectedProvider, adopted),
           // A catalog that qualifies nothing is not an upgrade on a menu that
           // works. Node catalogs swing hard within one session (582 models one
           // read, 10 the next), and an empty derivation is truthy — it would
           // replace a working lineup AND shadow the `lastKnownLineup` fallback
           // that every reader falls through to, leaving a menu that cannot
           // recover until something else happens to refetch.
-          lineup: filled || !lineupHasEntries(held) ? merged : held,
+          lineup: adopted,
           lastKnownLineup: filled
             ? { derivedAt: now, lineup: merged, nodeBaseUrl: get().nodeBaseUrl }
             : previous,
@@ -942,6 +1006,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
           set({
             lineup,
             serverLineupAt: now,
+            ...repointSelection(get().selectedProvider, lineup),
             lastKnownLineup: { derivedAt: now, lineup, nodeBaseUrl: pinned },
           });
           return true;
@@ -954,6 +1019,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
         set({
           lineup,
           serverLineupAt: now,
+          ...repointSelection(previous.selectedProvider, lineup),
           nodeBaseUrl,
           authMode: authMode ?? (nodeBaseUrl === get().nodeBaseUrl ? get().authMode : 'bearer'),
           modelsCache: nodeBaseUrl === get().nodeBaseUrl ? get().modelsCache : null,
@@ -1198,6 +1264,18 @@ export const useRoutstrStore = create<RoutstrStore>()(
           }
         }
         restoreActiveSessionView(state);
+        // The persisted last-known lineup is what every reader falls through
+        // to until this session's catalogue lands, and `selectedProvider` boots
+        // to `openai` regardless of which node that snapshot came from. On a
+        // relaunch against a node serving neither `openai` nor any other named
+        // vendor, that pairing is the same dead send as a mid-session node
+        // swap — just with no catalogue in memory to make the contradiction
+        // visible in the log. Same rule, applied to the snapshot.
+        const hydratedProvider = reselectProviderForLineup(
+          state.selectedProvider,
+          state.lastKnownLineup?.lineup ?? null
+        );
+        if (hydratedProvider != null) state.selectedProvider = hydratedProvider;
       },
     })
   )

@@ -8,11 +8,10 @@ import {
   isRoutstrNodeFailure,
   isWalletBalanceError,
   measureMessageContent,
-  ROUTSTR_MAX_COMPLETION_TOKENS,
   type RoutstrChatMessage,
 } from '@/shared/lib/routstr/api';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
-import { lineupHasEntries, type LineupEntry } from '@/shared/lib/routstr/lineup';
+import { lineupHasEntries, lineupProviderIds, type LineupEntry } from '@/shared/lib/routstr/lineup';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { isAbortError } from 'wallet/safeFetch';
 import { pickFinalizeMessage } from '../lib/finalize';
@@ -33,6 +32,7 @@ import {
   resolveCandidateEntries,
   resolveSelectedEntry,
   selectFromChain,
+  sendMaxTokens,
 } from '../lib/format';
 import { confirmSpend } from '../lib/spendConfirm';
 import { evaluateSendGate } from '../lib/sendGate';
@@ -188,11 +188,33 @@ export function useAiSend() {
         // reach are all plaintext, and the user asked for the opposite. Saying
         // "the model list has not loaded" there would send them to retry a
         // connection that is fine.
-        const sealedGap = chain.sealed && lineupHasEntries(lineup);
-        const id = sealedGap ? 'routstr.e2ee_unavailable' : 'routstr.catalog_unavailable';
+        // Three absences wearing one shape, not two. A sealed chain that is
+        // empty against a real lineup means the node serves nothing encrypted.
+        // A PLAINTEXT chain empty against a real lineup means the catalogue
+        // landed and nothing in it is usable here — "the model list has not
+        // loaded" is false for both, and sends the user to retry a connection
+        // that is fine. Only a genuinely absent lineup is a loading problem.
+        const haveLineup = lineupHasEntries(lineup);
+        const id = chain.sealed
+          ? haveLineup
+            ? 'routstr.e2ee_unavailable'
+            : 'routstr.catalog_unavailable'
+          : haveLineup
+            ? 'routstr.no_usable_models'
+            : 'routstr.catalog_unavailable';
+        // `hasCatalog` alone read as a contradiction in the logs — a refusal
+        // to send while holding 582 catalogue rows. It was never lying: the
+        // catalogue is not the lineup, and the lineup is not the lineup THIS
+        // selection can reach. Say all three, so the next occurrence names its
+        // own cause instead of needing the surrounding events to explain it.
         aiLog.warn('ai.send.no_lineup', {
           flowId,
           hasCatalog: cachedModels.length > 0,
+          catalogSize: cachedModels.length,
+          hasLineup: lineupHasEntries(lineup),
+          lineupProviders: lineupProviderIds(lineup),
+          selectedProvider: provider.id,
+          selectedTier: tier.id,
           sealedSelection: chain.sealed,
           errorId: id,
         });
@@ -332,11 +354,10 @@ export function useAiSend() {
           // max_completion_cost (~1,500 sats on frontier models) and 402
           // balances that cover the real turn cost many times over. Clamped
           // under the model's own completion ceiling when the lineup knows it.
-          const candidateCeiling = candidateEntries[i]?.maxCompletionTokens;
-          const maxTokens =
-            candidateCeiling != null && candidateCeiling > 0
-              ? Math.min(ROUTSTR_MAX_COMPLETION_TOKENS, candidateCeiling)
-              : ROUTSTR_MAX_COMPLETION_TOKENS;
+          // `sendMaxTokens` is the one spelling of that clamp; the
+          // affordability gate prices the same call, so the reservation the
+          // user was shown is the one the node charges.
+          const maxTokens = sendMaxTokens(candidateEntries[i]?.maxCompletionTokens);
           try {
             // The token attached to the request has to clear the node's
             // admission gate — not the expected cost — and `@routstr/sdk`
@@ -353,7 +374,14 @@ export function useAiSend() {
                 messageId: assistantMessageId,
                 model: candidate,
               },
-              temperature: 0.7,
+              // No `temperature`. The reference clients send none
+              // (routstr-chat `useChatActions`, `@routstr/sdk`
+              // `fetchAIResponse`), and — unlike `max_tokens`, which the
+              // catalogue justifies per model through
+              // `top_provider.max_completion_tokens` — `RoutstrModel` carries
+              // no field saying which models accept a sampling temperature.
+              // Reasoning models reject a non-default one outright, so a
+              // blanket 0.7 is a guess that can only lose.
               max_tokens: maxTokens,
               signal: controller.signal,
             });

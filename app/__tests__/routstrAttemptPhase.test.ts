@@ -23,7 +23,10 @@
 import { apiLog } from '@/shared/lib/logger';
 import { sendMessage, setRoutstrNodeBaseUrl } from '@/shared/lib/routstr/api';
 
-const mockRoute = jest.fn<Promise<Response>, [{ signal?: AbortSignal }]>();
+const mockRoute = jest.fn<
+  Promise<Response>,
+  [{ signal?: AbortSignal; body?: Record<string, unknown> }]
+>();
 const mockPayment = jest.fn(() => ({
   mintedSats: null as number | null,
   mintedFromHost: undefined as string | undefined,
@@ -216,5 +219,41 @@ describe('Routstr attempt diagnostics', () => {
       changeReceived: false,
       changeFailed: true,
     });
+  });
+});
+
+// The wire body, pinned here rather than at the caller. `sendMessage` used to
+// declare `temperature = 0.7` as a destructuring default, which fires on
+// `undefined` — so a caller omitting the field could not remove it from the
+// request, and a test asserting only what the caller passes would have gone on
+// passing while the node kept receiving it.
+describe('the request body sent to the node', () => {
+  async function bodyOf(options: Record<string, unknown> = {}) {
+    // Reset per call: a test that asserts two shapes must not read the first
+    // one twice.
+    mockRoute.mockReset();
+    mockRoute.mockResolvedValue(
+      new Response('', { status: 200, headers: { 'content-type': 'text/event-stream' } })
+    );
+    await sendMessage([{ role: 'user', content: 'hi' }], { model: 'gpt-oss-20b', ...options });
+    return mockRoute.mock.calls.at(-1)?.[0]?.body ?? {};
+  }
+
+  it('omits temperature when the caller names none', async () => {
+    const body = await bodyOf();
+    expect(Object.prototype.hasOwnProperty.call(body, 'temperature')).toBe(false);
+  });
+
+  it('still sends one a caller asks for', async () => {
+    expect(await bodyOf({ temperature: 0 })).toMatchObject({ temperature: 0 });
+  });
+
+  it('omits max_tokens when the caller names none, and sends one when it does', async () => {
+    expect(Object.prototype.hasOwnProperty.call(await bodyOf(), 'max_tokens')).toBe(false);
+    expect(await bodyOf({ max_tokens: 1024 })).toMatchObject({ max_tokens: 1024 });
+  });
+
+  it('always names the model and streams', async () => {
+    expect(await bodyOf()).toMatchObject({ model: 'gpt-oss-20b', stream: true });
   });
 });

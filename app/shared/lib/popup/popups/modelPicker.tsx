@@ -104,9 +104,15 @@ function TierRow({ tier, provider, entry, balanceSats, isCurrent, onPress }: Tie
   const pricing = entry.satsPricing;
   const reservationCeiling = pricing.max_cost;
   const typicalCost = estimateTurnCostSatsFromPricing(pricing);
-  const affordable = canAffordPricing(pricing, balanceSats);
-  const messagesLeft = estimateMessagesRemainingFromPricing(balanceSats, pricing);
-  const deficit = !affordable ? topUpDeficitSatsFromPricing(pricing, balanceSats) : null;
+  // The same completion budget the send will actually ask for. Pricing the
+  // unclamped default here made the row quote a threshold the request never
+  // meets — four times too much on a model whose catalogue ceiling is 1024 —
+  // so "Top up N sats" and "N messages left" disagreed with the gate that
+  // decides them.
+  const maxTokens = entry.maxCompletionTokens;
+  const affordable = canAffordPricing(pricing, balanceSats, maxTokens);
+  const messagesLeft = estimateMessagesRemainingFromPricing(balanceSats, pricing, maxTokens);
+  const deficit = !affordable ? topUpDeficitSatsFromPricing(pricing, balanceSats, maxTokens) : null;
 
   const friendlyModelName = entry.displayName || tier.label;
 
@@ -322,7 +328,7 @@ export function ModelPickerContent({ close, balanceSats }: ModelPickerContentPro
   useEffect(() => {
     const pressable = rows.filter(
       (r) =>
-        canAffordPricing(r.entry.satsPricing, balanceSats) &&
+        canAffordPricing(r.entry.satsPricing, balanceSats, r.entry.maxCompletionTokens) &&
         !(selectedProvider === activeProvider.id && selectedTier === r.tier.id)
     ).length;
     pickerLog.info('modelPicker.rows', {

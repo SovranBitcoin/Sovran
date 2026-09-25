@@ -100,7 +100,10 @@ export function ModelChip() {
           lastKnown: entry.lastKnown ?? false,
           visionInput: entry.visionInput,
           estimatedTurnCostSats: estimateTurnCostSatsFromPricing(entry.satsPricing),
-          affordable: canAffordPricing(entry.satsPricing, balanceSats),
+          // Priced at the `max_tokens` a send to this cell would carry, so the
+          // snapshot answers the same question the send path asks.
+          affordable: canAffordPricing(entry.satsPricing, balanceSats, entry.maxCompletionTokens),
+          maxCompletionTokens: entry.maxCompletionTokens ?? null,
           catalog_max_cost_sats: entry.satsPricing.max_cost,
           catalog_image_fee_sats: entry.satsPricing.image,
           contextLength: entry.contextLength,

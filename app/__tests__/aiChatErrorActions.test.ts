@@ -94,3 +94,30 @@ describe('chatErrorActions', () => {
     expect(chatErrorActions('routstr.timeout')).toEqual(chatErrorActions('routstr.timeout'));
   });
 });
+
+// "The model list has not loaded yet. Check your connection" is false when the
+// list DID load and this node simply serves nothing usable — and it sends the
+// user to retry a connection that is working. The two absences look identical
+// at the call site, so they are separated by whether a lineup exists.
+describe('a catalogue that landed and offers nothing', () => {
+  // Like `routstr.e2ee_unavailable`, this id is raised by the send path
+  // itself rather than classified off a wire code, so the copy is what there
+  // is to assert.
+  it('does not tell the user to check a connection that is fine', () => {
+    const text = ERROR_COPY['routstr.no_usable_models'];
+    expect(text).not.toContain('connection');
+    expect(text).toContain('Choose another provider');
+    expect(ERROR_COPY['routstr.catalog_unavailable']).toContain('connection');
+  });
+
+  it('offers no retry, because the same node answers the same', () => {
+    expect(chatErrorActions('routstr.no_usable_models')).toEqual([
+      'change-provider',
+      'change-model',
+    ]);
+  });
+
+  it('keeps retry for a list that genuinely has not loaded', () => {
+    expect(chatErrorActions('routstr.catalog_unavailable')).toContain('retry');
+  });
+});

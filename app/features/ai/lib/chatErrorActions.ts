@@ -70,6 +70,8 @@ const CHAT_ERROR_ACTIONS: Readonly<Record<ChatErrorId, readonly ChatErrorActionI
   // The catalogue never arrived, so there was no model id to send. A retry
   // re-resolves it once the fetch lands; another provider serves its own.
   'routstr.catalog_unavailable': ['retry', 'change-provider'],
+  // No retry: the same node answers the same. Only the shortlist can change.
+  'routstr.no_usable_models': ['change-provider', 'change-model'],
   // This node serves no encrypted model. Both offers are a deliberate choice
   // the user has to make: another provider may run an enclave, and the model
   // picker is where they would knowingly drop to an unencrypted model.

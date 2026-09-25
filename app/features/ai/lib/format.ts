@@ -171,6 +171,32 @@ const TIER_BY_ID = new Map<AiTierId, AiTier>(AI_TIERS.map((t) => [t.id, t] as co
 export const AFFORD_BUFFER = 1.1;
 
 /**
+ * The `max_tokens` one request to this model actually carries — and therefore
+ * the completion budget the node's admission gate charges for it.
+ *
+ * There is exactly one number here and it has to be spelled once. The send
+ * path clamps `ROUTSTR_MAX_COMPLETION_TOKENS` under the model's own ceiling
+ * (`top_provider.max_completion_tokens`, carried into the lineup as
+ * `maxCompletionTokens`) so the request cannot ask a model for more than it
+ * will produce; routstr-core's `calculate_discounted_max_cost` then prices the
+ * completion side at exactly that figure. If the gate below kept using the
+ * flat 4096 while the wire sent 1024, the two would disagree by 4× on every
+ * short-ceiling model — always in the direction of demanding funds the node
+ * was never going to reserve.
+ *
+ * `temperature` gets no equivalent because the catalogue carries no equivalent
+ * field: `RoutstrModel` has `top_provider.max_completion_tokens` and nothing
+ * that says which models accept a sampling temperature. A parameter we cannot
+ * defend per model from catalogue data is one we do not send (see
+ * `useAiSend`).
+ */
+export function sendMaxTokens(maxCompletionTokens: number | null | undefined): number {
+  return maxCompletionTokens != null && maxCompletionTokens > 0
+    ? Math.min(ROUTSTR_MAX_COMPLETION_TOKENS, maxCompletionTokens)
+    : ROUTSTR_MAX_COMPLETION_TOKENS;
+}
+
+/**
  * What one message could cost, before it costs it.
  *
  * Paying per request means handing the node a token worth its admission gate
@@ -181,7 +207,11 @@ export const AFFORD_BUFFER = 1.1;
  * before it goes rather than reported afterwards.
  */
 export function maxSpendSats(entry: LineupEntry | null, imageCount = 0): number {
-  const reserve = requiredReserveSatsFromPricing(entry?.satsPricing ?? null, imageCount);
+  const reserve = requiredReserveSatsFromPricing(
+    entry?.satsPricing ?? null,
+    imageCount,
+    entry?.maxCompletionTokens
+  );
   return Math.max(1, Math.ceil((reserve ?? 1) * AFFORD_BUFFER));
 }
 
@@ -201,6 +231,14 @@ const TYPICAL_PROMPT_TOKENS = 8000;
  * gives us the data to retune this if we see drift.
  */
 const TYPICAL_COMPLETION_TOKENS = 2000;
+
+/** The catalogue row's own completion ceiling, read the same way
+ *  `toLineupEntry` reads it — so a gate keyed by raw model id charges the
+ *  same `max_tokens` a gate keyed by lineup entry does. */
+function maxCompletionTokensForModel(modelId: string, models: RoutstrModel[]): number | null {
+  const raw = models.find((m) => m.id === modelId)?.top_provider?.max_completion_tokens;
+  return typeof raw === 'number' && raw > 0 ? Math.floor(raw) : null;
+}
 
 function pricingForModel(modelId: string, models: RoutstrModel[]): LineupPricing | null {
   const model = models.find((m) => m.id === modelId);
@@ -290,8 +328,8 @@ export function estimateTurnCostSats(
  * Routstr admits a request when the balance covers the DISCOUNTED max cost
  * (routstr-core `calculate_discounted_max_cost`): the prompt side shrinks
  * to the actual prompt size automatically, and the completion side shrinks
- * to `max_tokens × completion` because `useAiSend` sends
- * `ROUTSTR_MAX_COMPLETION_TOKENS` with every request. So the requirement is
+ * to `max_tokens × completion` because `useAiSend` sends `sendMaxTokens` with
+ * every request. So the requirement is
  *
  *   `request + TYPICAL_PROMPT_TOKENS × prompt + max_tokens × completion`
  *
@@ -300,15 +338,24 @@ export function estimateTurnCostSats(
  * balance" on balances that funded hundreds of real turns. The reservation
  * is refunded down to actual usage after the stream completes.
  *
+ * `maxCompletionTokens` is the model's own ceiling from the catalogue
+ * (`LineupEntry.maxCompletionTokens`, i.e. `top_provider.max_completion_tokens`).
+ * The send path clamps `max_tokens` under it, so the gate has to price the
+ * clamped figure or it demands funds for a completion budget the request never
+ * asked for — four times too much on a 1k-ceiling model. Omitting it prices
+ * the unclamped default, which is what a caller holding only a pricing record
+ * can honestly say.
+ *
  * Falls back to `max_cost` when per-token pricing is missing (the server
  * can't discount what it can't price either) and `null` when pricing is
  * unknown entirely.
  */
 export function requiredReserveSatsFromPricing(
   pricing: LineupPricing | null,
-  imageCount = 0
+  imageCount = 0,
+  maxCompletionTokens?: number | null
 ): number | null {
-  return satsFromPricing(pricing, imageCount, ROUTSTR_MAX_COMPLETION_TOKENS, 1);
+  return satsFromPricing(pricing, imageCount, sendMaxTokens(maxCompletionTokens), 1);
 }
 
 /**
@@ -329,9 +376,10 @@ export function requiredReserveSatsFromPricing(
  */
 export function estimateMessagesRemainingFromPricing(
   balanceSats: number,
-  pricing: LineupPricing | null
+  pricing: LineupPricing | null,
+  maxCompletionTokens?: number | null
 ): number | null {
-  const reserve = requiredReserveSatsFromPricing(pricing);
+  const reserve = requiredReserveSatsFromPricing(pricing, 0, maxCompletionTokens);
   const typical = estimateTurnCostSatsFromPricing(pricing);
   if (reserve == null || typical == null || typical <= 0) return null;
   if (balanceSats < reserve) return 0;
@@ -358,6 +406,10 @@ export function getAffordabilityDetails(
   estimatedTurnCostSats: number | null;
   bufferedThresholdSats: number | null;
   maxCostSats: number | null;
+  /** The `max_tokens` the request will carry, which is what the node's
+   *  admission gate charges the completion side at. Logged so a threshold
+   *  that disagrees with the wire is one field rather than an inference. */
+  sentMaxTokens: number;
   balanceSats: number;
   affordable: boolean;
   deficitSats: number;
@@ -365,7 +417,10 @@ export function getAffordabilityDetails(
 } {
   const pricing = pricingForModel(modelId, models);
   const estimated = estimateTurnCostSatsFromPricing(pricing);
-  const reserve = requiredReserveSatsFromPricing(pricing);
+  // The same clamped `max_tokens` the request will carry — read straight off
+  // the catalogue row, so this snapshot and the wire cannot disagree.
+  const ceiling = maxCompletionTokensForModel(modelId, models);
+  const reserve = requiredReserveSatsFromPricing(pricing, 0, ceiling);
   if (reserve == null) {
     return {
       modelId,
@@ -373,6 +428,7 @@ export function getAffordabilityDetails(
       estimatedTurnCostSats: estimated,
       bufferedThresholdSats: null,
       maxCostSats: maxCostSats(modelId, models),
+      sentMaxTokens: sendMaxTokens(ceiling),
       balanceSats,
       affordable: true,
       deficitSats: 0,
@@ -387,6 +443,7 @@ export function getAffordabilityDetails(
     estimatedTurnCostSats: estimated,
     bufferedThresholdSats: threshold,
     maxCostSats: maxCostSats(modelId, models),
+    sentMaxTokens: sendMaxTokens(ceiling),
     balanceSats,
     affordable,
     deficitSats: affordable ? 0 : Math.max(1, threshold - balanceSats),
@@ -477,13 +534,17 @@ function sealEntry(entry: LineupEntry): SealedLineupEntry | null {
 /**
  * Ordered candidate entries to try at send time for a (provider, tier)
  * pair. The user's selected cell goes first; the same tier from the other
- * providers follows in `AI_PROVIDER_IDS` order (transparent fallback when
+ * vendors follows in `plaintextFallbackOrder` (transparent fallback when
  * the primary's round-trip fails with 5xx/network); then, only if the
  * whole tier row is empty, the selected provider's other tiers and finally
  * everything else — so the send path always has *something* to attempt as
  * long as one lineup cell anywhere is filled. Unfilled cells drop out;
  * duplicates (impossible within a provider, defensive across the merge
  * path) dedup by model id.
+ *
+ * "The other vendors" means the ones this LINEUP offers, not the four the app
+ * happens to ship a logo for — see `plaintextFallbackOrder` for why that
+ * distinction was a dead send button.
  *
  * Ordering rationale: the user picked their provider explicitly, so
  * honour it. Falling back across providers in the same tier is way better
@@ -511,10 +572,7 @@ export function resolveCandidateEntries(
     return { sealed: true, entries: sealedEntries(tierOrder, lineup) };
   }
   if (!lineup) return { sealed: false, entries: [] };
-  const providerOrder: AiProviderId[] = [
-    provider,
-    ...AI_PROVIDER_IDS.filter((p) => p !== provider),
-  ];
+  const providerOrder = plaintextFallbackOrder(provider, lineup);
   const seen = new Set<string>();
   const out: LineupEntry[] = [];
   for (const t of tierOrder) {
@@ -526,6 +584,44 @@ export function resolveCandidateEntries(
     }
   }
   return { sealed: false, entries: out };
+}
+
+/**
+ * The vendors a plaintext chain may walk, in the order it walks them: the
+ * user's pick, then the four `AI_PROVIDER_IDS` names, then every other vendor
+ * this lineup actually offers.
+ *
+ * The tail is the repair. `AI_PROVIDER_IDS` is the known-and-NAMED subset —
+ * its own doc says so — while a lineup's vendors come from the node's
+ * catalogue, and `deriveLineup` has offered up to twelve of them since the
+ * hardcoded four were retired. Walking the four alone meant a node serving
+ * `qwen`, `deepseek` and `z-ai` and nothing else produced a chain of zero from
+ * a lineup that was full, and the send refused with "the model list has not
+ * loaded" while holding the catalogue it had just derived that lineup from.
+ * The picker was already fixed to iterate the lineup's own vendors
+ * (`providersForLineup`); the send path was not, and that divergence is the
+ * bug.
+ *
+ * The named four still lead, so an ordinary catalogue walks exactly the order
+ * it always did — this only ever appends.
+ *
+ * `E2EE_PROVIDER_ID` is deliberately NOT here. A plaintext chain that could
+ * reach a sealed model would spend enclave prices without being asked, and the
+ * encrypted vendor is reached by selecting it (`routstrStore` re-points a
+ * selection the lineup cannot answer, including onto this vendor when it is
+ * the only one a node serves) — never by drifting into it mid-fallback.
+ */
+function plaintextFallbackOrder(provider: AiProviderId, lineup: AiLineup): AiProviderId[] {
+  const order: AiProviderId[] = [provider];
+  const seen = new Set<AiProviderId>(order);
+  const push = (id: AiProviderId) => {
+    if (seen.has(id) || id === E2EE_PROVIDER_ID) return;
+    seen.add(id);
+    order.push(id);
+  };
+  for (const id of AI_PROVIDER_IDS) push(id);
+  for (const id of lineupProviderIds(lineup)) push(id);
+  return order;
 }
 
 /** The encrypted vendor's own tier ladder, sealed-checked id by id. No other
@@ -564,7 +660,9 @@ export function selectFromChain(chain: CandidateChain, balanceSats: number): Lin
   const { entries } = chain;
   if (entries.length === 0) return null;
   for (const entry of entries) {
-    if (canAffordPricing(entry.satsPricing, balanceSats)) return entry;
+    // Priced at the `max_tokens` this entry's request will actually carry —
+    // the chain must not skip a model the node would have admitted.
+    if (canAffordPricing(entry.satsPricing, balanceSats, entry.maxCompletionTokens)) return entry;
   }
   return entries[0];
 }
@@ -607,8 +705,12 @@ function maxCostSats(modelId: string, models: RoutstrModel[]): number | null {
  * Falls back to `true` when cost data is unavailable (cache not populated)
  * so the picker isn't entirely blank on first paint.
  */
-export function canAffordPricing(pricing: LineupPricing | null, balanceSats: number): boolean {
-  const reserve = requiredReserveSatsFromPricing(pricing);
+export function canAffordPricing(
+  pricing: LineupPricing | null,
+  balanceSats: number,
+  maxCompletionTokens?: number | null
+): boolean {
+  const reserve = requiredReserveSatsFromPricing(pricing, 0, maxCompletionTokens);
   if (reserve == null) return true;
   return balanceSats >= reserve * AFFORD_BUFFER;
 }
@@ -623,9 +725,10 @@ export function canAffordPricing(pricing: LineupPricing | null, balanceSats: num
  */
 export function topUpDeficitSatsFromPricing(
   pricing: LineupPricing | null,
-  balanceSats: number
+  balanceSats: number,
+  maxCompletionTokens?: number | null
 ): number | null {
-  const reserve = requiredReserveSatsFromPricing(pricing);
+  const reserve = requiredReserveSatsFromPricing(pricing, 0, maxCompletionTokens);
   if (reserve == null) return null;
   const required = Math.ceil(reserve * AFFORD_BUFFER);
   if (balanceSats >= required) return null;
