@@ -5,13 +5,12 @@
  *
  * The row had four lines: the name, a subtitle restating the balance and the
  * encryption, the stats pills, and — when the provider could not be chosen —
- * the reason. The subtitle was the one carrying nothing the stats line did not
- * already carry, so it went; what took its place is the one thing the row was
- * missing, which is WHO RUNS THIS. A node is a machine and somebody operates
- * it, and that somebody is who the user is trusting with their prompts — so it
- * reads as an attribution under the name rather than as a labelled field on a
- * details page. The row is name / run by / stats, plus the reason when it
- * cannot be chosen.
+ * the reason. The subtitle went, briefly replaced by "Run by <operator>", and
+ * that went too: it was the one line on the row that could not be drawn
+ * without waiting on a network read, so every row changed under the reader a
+ * second after it appeared. The row is name / stats, plus the reason when it
+ * cannot be chosen. Who runs the node is still answered — by the reputation
+ * and follower pills, and in full on the provider's own page.
  *
  * The operator's two stats travel together. Reputation and reach are the same
  * person's, read in the same pass, and a shield with no follower count beside
@@ -260,18 +259,28 @@ beforeEach(() => {
 });
 
 describe('AI provider row', () => {
-  it('is three lines: who it is, who runs it, and what the network makes of them', () => {
+  it('is two lines: who it is, and what the network makes of the operator', () => {
     const rendered = renderProviderRow(
       row({ disabled: true, disabledReason: 'Not answering right now' })
     );
     // 1. the name (or the URL, when a provider publishes no name)
     expect(rendered.title).toBe('redsh1ft');
-    // 2. the operator, as an attribution and not a labelled field
-    expect(spoken(rendered.subtitle)).toBe('Run by gudnuf');
-    // 3. the stats — and NOT a fourth line repeating them in prose
+    // 2. the stats — and NOT a line repeating them in prose
     expect(rendered.stats.length).toBeGreaterThan(0);
     // and the reason, once, when there is one
     expect(rendered.note).toBe('Not answering right now');
+  });
+
+  it('names no operator, even when it knows one', () => {
+    // The row used to read "Run by gudnuf" here. Every row waited on its
+    // operator's Nostr profile for that name and changed under the reader
+    // when it landed — the deterministic word pair first, the real name a
+    // beat later. The operator's standing survives as pills; the name and
+    // the wait for it do not.
+    const rendered = renderProviderRow(row());
+    expect(rendered.subtitle).toBeUndefined();
+    expect(spoken(rendered.subtitle)).toBe('');
+    expect(rendered.stats.some((stat) => stat.icon === 'followers')).toBe(true);
   });
 
   it('carries no reason line when the provider is choosable', () => {

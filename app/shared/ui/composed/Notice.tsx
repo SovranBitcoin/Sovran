@@ -6,8 +6,14 @@
  *   a memo, a mint's description or a bio. It may carry a custom `icon`.
  * - `warning` and `danger` are for consequences the user must not miss: money
  *   that won't be credited, an action that can't be undone.
+ * - `success` is the rarer twin of those two, and exists for the same reason:
+ *   where a warning and its absence would be read as "bad" and "nothing said",
+ *   a positive statement is sometimes the whole answer — a provider that
+ *   cannot read your messages is not merely one with no warning against it.
+ *   Reach for it only where the good outcome is a claim worth making, never
+ *   as decoration on a completed step.
  *
- * `tone` sets how loudly a warning or danger reads. `solid` (amber/red fill,
+ * `tone` sets how loudly a warning, danger or success reads. `solid` (amber/red fill,
  * invariant ink) interrupts; `soft` (tinted surface, themed ink) sits inside a
  * sheet or card next to other content without shouting over it. `info` looks
  * the same either way — it is already the quiet end of the scale.
@@ -31,28 +37,33 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
 
-type NoticeStatus = 'info' | 'warning' | 'danger';
+type NoticeStatus = 'info' | 'warning' | 'danger' | 'success';
 type NoticeTone = 'solid' | 'soft';
 type NoticeSize = 'default' | 'compact';
 
 /** Distinct shapes, not just colours: triangle = caution, circle-bang =
- *  error, circle-i = information. */
+ *  error, circle-i = information, circle-tick = confirmed. Green and amber are
+ *  the pair most often indistinguishable to a reader who cannot separate them,
+ *  so the difference cannot live in the fill alone. */
 const STATUS_ICON: Record<NoticeStatus, string> = {
   info: 'ri:information-fill',
   warning: 'ri:alert-fill',
   danger: 'ri:error-warning-fill',
+  success: 'mdi:check-circle',
 };
 
 const SOLID_ROOT: Record<NoticeStatus, string> = {
   info: 'bg-surface-secondary',
   warning: 'bg-warning',
   danger: 'bg-danger',
+  success: 'bg-success',
 };
 
 const SOFT_ROOT: Record<NoticeStatus, string> = {
   info: 'bg-surface-secondary',
   warning: 'bg-warning-soft',
   danger: 'bg-danger-soft',
+  success: 'bg-success-soft',
 };
 
 /** Icon and type scale per size. `compact` matches the chat status strips. */
@@ -71,7 +82,8 @@ interface NoticeProps {
    *  sentence needs its own emphasis. Rich content owns its own colour. */
   description?: ReactNode;
   /** Icon registry name replacing the status icon (info notices only need
-   *  this — warnings and errors keep their shape so they read at a glance). */
+   *  this — warnings, errors and confirmations keep their shape so they read
+   *  at a glance). */
   icon?: string;
   /** Trailing recovery affordance, e.g. a compact "Open Settings" button. */
   action?: ReactNode;
@@ -90,20 +102,26 @@ export function Notice({
   className,
   testID,
 }: NoticeProps) {
-  const [foreground, muted, warning, danger, warningSoftFg, dangerSoftFg] = useThemeColor([
-    'foreground',
-    'muted',
-    'warning',
-    'danger',
-    'warning-soft-foreground',
-    'danger-soft-foreground',
-  ] as const);
+  const [foreground, muted, warning, danger, success, warningSoftFg, dangerSoftFg, successSoftFg] =
+    useThemeColor([
+      'foreground',
+      'muted',
+      'warning',
+      'danger',
+      'success',
+      'warning-soft-foreground',
+      'danger-soft-foreground',
+      'success-soft-foreground',
+    ] as const);
   const soft = tone === 'soft';
   const statusInk = (
     {
       info: { solid: foreground, soft: foreground, softGlyph: muted },
       warning: { solid: INVARIANT_BLACK, soft: warningSoftFg, softGlyph: warning },
       danger: { solid: INVARIANT_WHITE, soft: dangerSoftFg, softGlyph: danger },
+      // Black, like amber and unlike red: Apple System Green is a light fill,
+      // and white on it lands around 1.9:1.
+      success: { solid: INVARIANT_BLACK, soft: successSoftFg, softGlyph: success },
     } satisfies Record<NoticeStatus, { solid: string; soft: string; softGlyph: string }>
   )[status];
   const ink = soft ? statusInk.soft : statusInk.solid;

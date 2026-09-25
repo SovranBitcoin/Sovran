@@ -75,9 +75,14 @@ jest.mock('@/shared/lib/color', () => ({
   ...jest.requireActual('@/shared/lib/color'),
   withAlpha: jest.fn(() => 'rgba(0,0,0,0.12)'),
 }));
-jest.mock('@/shared/lib/logger', () => ({
-  aiLog: { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() },
-}));
+// `storeLog` as well as `aiLog`: this screen's import graph reaches
+// `routstrStore`, and zustand's rehydrate lands asynchronously — so a mock
+// with only the logger the screen itself uses crashes in persist's teardown,
+// at whatever moment the rehydrate happens to resolve.
+jest.mock('@/shared/lib/logger', () => {
+  const logger = { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() };
+  return { aiLog: logger, storeLog: logger, redactError: (error: unknown) => error };
+});
 jest.mock('@/shared/lib/popup', () => ({ paramPopup: jest.fn(), staticPopup: jest.fn() }));
 jest.mock('@/shared/lib/nav/useRouteParams', () => ({
   useRouteParams: () => ({ providerInfoEntry: JSON.stringify({ nodeBaseUrl: NODE }) }),
@@ -289,9 +294,11 @@ describe('the privacy verdict', () => {
     });
   });
 
-  it('says so positively when every model is sealed', async () => {
+  it('says so positively, in green, when every model is sealed', async () => {
+    // `success`, not `info`. The absence of a warning is not the same claim
+    // as "it cannot read them", and a quiet notice says the first.
     expect(await verdict({ count: 9, encrypted: 9, e2ee: true })).toEqual({
-      status: 'info',
+      status: 'success',
       title: 'This provider cannot read your messages',
     });
   });

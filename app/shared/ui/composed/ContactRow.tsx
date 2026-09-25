@@ -934,6 +934,12 @@ export function ContactRow({
 
   // ---- Subtitle ---------------------------------------------------------
 
+  // A provider deliberately has no subtitle. It used to read "Run by <name>",
+  // which meant every row waited on its operator's Nostr profile and changed
+  // under the reader when it landed — the deterministic word pair first, the
+  // real name a second or two later. The operator's standing is still on the
+  // row as the reputation and follower pills; only the name, and the wait for
+  // it, are gone.
   let subtitleNode: string | ReactNode | undefined;
   if (subtitleOverride === null) {
     subtitleNode = undefined;
@@ -948,21 +954,6 @@ export function ContactRow({
         weight="heavy"
         color={foreground}
       />
-    );
-  } else if (provider && nostr) {
-    // Attribution, not a field. A Routstr node is a machine; somebody runs it,
-    // and that somebody — not the hostname — is who the user is trusting with
-    // their prompts and their sats. So it reads as a sentence on the line
-    // directly under the name, where a person's own name would be, instead of
-    // as a labelled "Operator" row further down a details page. The name
-    // carries the weight; "Run by" is the connective and stays quiet.
-    subtitleNode = (
-      <Text size={13} numberOfLines={1} color={withAlpha(foreground, 0.45)}>
-        {'Run by '}
-        <Text size={13} bold color={withAlpha(foreground, 0.8)}>
-          {resolveIdentityName({ nostrProfile: nostr.profile, pubkey: nostr.pubkey })}
-        </Text>
-      </Text>
     );
   } else if (ble) {
     const reachability = resolveBleReachability(ble);

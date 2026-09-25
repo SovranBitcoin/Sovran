@@ -192,16 +192,9 @@ export function ProviderInfoScreen() {
   // sealed genuinely cannot, and deserves to be told apart from the other two.
   // A catalog that never answered supports none of those claims, so it makes
   // none — the loudest wrong answer here would be a reassuring one.
-  const privacy = ((): {
-    status: 'info' | 'warning';
-    icon?: string;
-    title: string;
-    body: string;
-  } => {
+  const privacy = ((): { status: 'info' | 'warning' | 'success'; title: string; body: string } => {
     if (!catalog || catalog.count === 0) {
       return {
-        // Default info glyph. A question mark would need a registry entry of
-        // its own to say what "not known" already says in the title.
         status: 'info',
         title: 'Privacy not known',
         body: 'This provider did not list its models, so whether any of them can answer without reading your messages could not be checked.',
@@ -221,9 +214,11 @@ export function ProviderInfoScreen() {
         body: `${catalog.encrypted.toLocaleString()} of its ${catalog.count.toLocaleString()} models run in an enclave it cannot read into. Everything you send to the rest is visible to whoever runs this node.`,
       };
     }
+    // Green, and stated rather than implied. The absence of a warning is not
+    // the same claim as "it cannot read them" — and this is the one provider
+    // shape where the second is true.
     return {
-      status: 'info',
-      icon: 'mdi:shield-check',
+      status: 'success',
       title: 'This provider cannot read your messages',
       body: 'Every model it serves runs in an enclave. Requests are sealed end to end.',
     };
@@ -448,12 +443,7 @@ export function ProviderInfoScreen() {
           />
         )}
         renderContent={() => (
-          <Notice
-            status={privacy.status}
-            icon={privacy.icon}
-            title={privacy.title}
-            description={privacy.body}
-          />
+          <Notice status={privacy.status} title={privacy.title} description={privacy.body} />
         )}
       />
 

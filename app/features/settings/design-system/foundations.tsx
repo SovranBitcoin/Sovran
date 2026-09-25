@@ -211,6 +211,17 @@ export const FOUNDATION_SCENARIOS = [
           title="This can't be undone"
           description="Deleting the wallet erases its ecash from this device."
         />
+        <Notice
+          status="success"
+          title="This provider cannot read your messages"
+          description="The rarer twin of warning and danger, for when the good outcome is a claim worth making rather than the absence of a bad one."
+        />
+        <Notice
+          status="success"
+          tone="soft"
+          title="Soft success"
+          description="Same circle-tick, at a volume that sits beside other content."
+        />
         <Notice status="warning" title="Title-only notice" />
         <Notice status="info" description="Description-only notice." />
         <Notice

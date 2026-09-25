@@ -31,7 +31,6 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 
 import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
-import { resolveIdentityName } from '@/shared/lib/identity';
 
 import { useProviderRows, type ProviderRow } from '../hooks/useProviderRows';
 import {
@@ -109,7 +108,7 @@ function ProviderListRow({
   onChoose: (row: ProviderRow) => void;
   onInspect: (row: ProviderRow) => void;
 }) {
-  const { data: profile, isLoading: profileLoading } = useNostrProfile(row.pubkey);
+  const { data: profile } = useNostrProfile(row.pubkey);
 
   // nagg's follower count stands in until the row's own profile arrives, and
   // the identity below is built from whichever is present — so this is the
@@ -123,12 +122,6 @@ function ProviderListRow({
     baseUrl: row.baseUrl,
     title: row.name,
     titleIsHost: row.nameIsHost,
-    // The nagg stand-in carries a follower count and no name, so the name the
-    // row shows is the profile's or the pubkey's word pair — which is the same
-    // resolution `ContactRow` runs on the identity below.
-    runBy: row.pubkey ? resolveIdentityName({ nostrProfile: profile, pubkey: row.pubkey }) : null,
-    runByFromProfile: Boolean(profile?.displayName?.trim() || profile?.name?.trim()),
-    profileLoading,
     status: row.status,
     statusSource: row.statusSource,
     followers: profile?.followers ?? row.followers ?? null,
@@ -151,25 +144,24 @@ function ProviderListRow({
         }),
         // Composite, exactly as a mint row pairs its mint with its operator:
         // the provider supplies the face and the name, the operator supplies
-        // the reputation. nagg's follower count stands in until the profile
-        // itself arrives, so the pill doesn't appear late.
+        // the reputation. Their NAME is no longer read off this — see the
+        // subtitle note in `ContactRow` — but their standing still is, and
+        // nagg's follower count stands in until the profile arrives so the
+        // pill doesn't appear late.
         ...(row.pubkey ? [nostrIdentity(row.pubkey, operatorProfile)] : []),
       ]}
       title={row.name}
-      // Three lines, and no more: who this is, who runs it, and what the
-      // network makes of them — plus, only when it cannot be chosen, why. The
-      // subtitle is left to `ContactRow` to derive from the operator identity
-      // (`Run by …`); it used to restate the balance and the encryption that
-      // the stats line already carries, which is how the row grew a fourth
-      // line saying nothing new.
+      // Two lines: who this is, and what the network makes of the operator —
+      // plus, only when it cannot be chosen, why. There is no "Run by" line;
+      // it arrived late and changed under the reader, and the pills say what
+      // it was really there to say.
       disabled={row.blockedReason != null}
       disabledReason={row.blockedReason ?? undefined}
       selected={selected}
       // Inline, NOT `below`. With the stats on their own band the row is
       // taller than the band the avatar is centred in, so a 44px face sat
-      // visibly above the middle of its own row. Inline puts the three lines
-      // in one column that the avatar and the three-dot button both centre
-      // against.
+      // visibly above the middle of its own row. Inline puts the lines in one
+      // column that the avatar and the three-dot button both centre against.
       trailing={
         checking ? (
           <Spinner size={20} />

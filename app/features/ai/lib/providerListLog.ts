@@ -61,12 +61,6 @@ interface RowPaint {
    *  published. The store manufactures a hostname when it has no name, so this
    *  cannot be recovered downstream by testing the title for emptiness. */
   titleIsHost: boolean;
-  /** The operator name under "Run by", or `null` when the row has no pubkey. */
-  runBy: string | null;
-  /** True when `runBy` came from a loaded profile rather than the deterministic
-   *  word pair every pubkey has before its profile lands. */
-  runByFromProfile: boolean;
-  profileLoading: boolean;
   status: 'online' | 'offline' | 'unknown';
   statusSource: StatusSource;
   followers: number | null;
@@ -165,14 +159,6 @@ function rowLine(paint: RowPaint): string {
     cap(host(paint.baseUrl), 30),
     cap(paint.title, 22),
     paint.titleIsHost ? 'host' : 'name',
-    paint.runBy == null ? '-' : cap(paint.runBy, 18),
-    paint.runBy == null
-      ? '-'
-      : paint.runByFromProfile
-        ? 'prof'
-        : paint.profileLoading
-          ? '…'
-          : 'npub',
     paint.status === 'online' ? 'up' : paint.status === 'offline' ? 'down' : '?',
     paint.statusSource,
     num(paint.followers),
@@ -185,8 +171,9 @@ function rowLine(paint: RowPaint): string {
   return line.length <= MAX_LINE ? line : `${line.slice(0, MAX_LINE - 1)}…`;
 }
 
-const FMT =
-  'host|title|tSrc|by|bySrc|status|stSrc|followers|folSrc|models|sealed|spendable|blocked';
+// No operator name: the row stopped rendering one, and a column describing
+// something nobody can see is a column that will be read as if they could.
+const FMT = 'host|title|tSrc|status|stSrc|followers|folSrc|models|sealed|spendable|blocked';
 
 /** Record one row's painted state. Called from the row's render. */
 export function recordRowPaint(paint: RowPaint): void {
