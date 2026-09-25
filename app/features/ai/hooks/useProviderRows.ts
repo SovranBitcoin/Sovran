@@ -8,6 +8,7 @@ import {
   type ProviderStatus,
 } from '@/shared/lib/routstr/providerHealth';
 import type { ServerProvider } from '@/shared/lib/routstr/providers';
+import type { StatusSource } from '../lib/providerListLog';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
 /**
@@ -42,6 +43,15 @@ export interface ProviderRow {
   e2ee: boolean | null;
   pubkey: string | null;
   status: ProviderStatus;
+  /** Which of the three answers about reachability `status` came from. The
+   *  row hook asks them in a fixed order and only it knows which one replied,
+   *  so a status that looks wrong on screen can be traced to its author. */
+  statusSource: StatusSource;
+  /** True when `name` is this provider's hostname rather than a name it
+   *  published. Not recoverable downstream: the store manufactures a hostname
+   *  when it has none, so a nameless provider and one named after its host are
+   *  the same string by the time a row reads it. */
+  nameIsHost: boolean;
   /** How many of this provider's models are sealed to an enclave, per nagg's
    *  catalog read. `null` when nobody has counted. Never a provider-level
    *  "is encrypted" flag — see the note above. */
@@ -97,10 +107,17 @@ export function useProviderRows(
       // First-hand evidence — this viewing's probe, or a still-fresh one from
       // earlier — beats the directory's cached claim. `resolveProviderStatus`
       // is the single place that rule lives.
-      const status = resolveProviderStatus(
-        probed[baseUrl] ?? cachedProbe(baseUrl)?.status,
-        fromServer?.row.status
-      );
+      const local = probed[baseUrl] ?? cachedProbe(baseUrl)?.status;
+      const status = resolveProviderStatus(local, fromServer?.row.status);
+      const decided = (value: ProviderStatus | undefined) =>
+        value === 'online' || value === 'offline';
+      const statusSource: StatusSource = decided(probed[baseUrl])
+        ? 'probe'
+        : decided(local)
+          ? 'cache'
+          : decided(fromServer?.row.status)
+            ? 'directory'
+            : 'none';
       const accepted = new Set(provider.mints.map(routstrMintKey).filter((url) => url !== null));
       // No published list means no restriction, so every sat is spendable
       // there. An empty intersection means none of it is.
@@ -123,12 +140,14 @@ export function useProviderRows(
       return {
         baseUrl,
         name: provider.name || host(baseUrl),
+        nameIsHost: !provider.name || provider.name === host(baseUrl),
         description: provider.description,
         version: provider.version,
         mints: provider.mints,
         e2ee: provider.e2ee,
         pubkey: provider.pubkey,
         status,
+        statusSource,
         encryptedModelCount: fromServer?.row.encryptedModelCount ?? null,
         modelCount: fromServer?.row.modelCount ?? null,
         followers: fromServer?.row.followers ?? null,

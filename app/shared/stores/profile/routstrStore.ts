@@ -649,6 +649,16 @@ const PersistedRoutstrMessages = tolerantArray(
 function boundedProviders(providers: Record<string, KnownProvider>): Record<string, KnownProvider> {
   const entries = Object.entries(providers);
   if (entries.length <= MAX_KNOWN_PROVIDERS) return providers;
+  // Eviction is by `seenAt`, and every remembered write stamps it — so the
+  // bound is not a quiet high-water mark. A directory larger than the bound
+  // evicts rows that are still on screen, and a provider re-added later
+  // arrives with no name and is displayed as its own hostname. Said out loud
+  // because the effect surfaces as a name changing, nowhere near here.
+  storeLog.info('store.routstr.providers_evicted', {
+    held: entries.length,
+    bound: MAX_KNOWN_PROVIDERS,
+    evicted: entries.length - MAX_KNOWN_PROVIDERS,
+  });
   return Object.fromEntries(
     entries.sort(([, a], [, b]) => b.seenAt - a.seenAt).slice(0, MAX_KNOWN_PROVIDERS)
   );
@@ -1121,8 +1131,23 @@ export const useRoutstrStore = create<RoutstrStore>()(
         if (entries.length === 0) return;
         set((state) => {
           const next = { ...state.knownProviders };
+          // How many of these writes changed anything a row can see. `seenAt`
+          // moves on every write and a fresh object is published regardless,
+          // so a pass that learned nothing still re-renders every consumer —
+          // `changed: 0` with a non-zero `count` is exactly that pass.
+          let changed = 0;
+          let named = 0;
           for (const [baseUrl, patch] of entries) {
             const existing = next[baseUrl];
+            if (
+              !existing ||
+              (patch.name && patch.name !== existing.name) ||
+              (patch.mints && patch.mints.join() !== existing.mints.join()) ||
+              (patch.pubkey && patch.pubkey !== existing.pubkey)
+            ) {
+              changed++;
+            }
+            if (!patch.name && !existing?.name) named++;
             next[baseUrl] = {
               name: patch.name || existing?.name || baseUrl.replace(/^https:\/\//, ''),
               description: patch.description ?? existing?.description ?? null,
@@ -1135,7 +1160,13 @@ export const useRoutstrStore = create<RoutstrStore>()(
               seenAt: Date.now(),
             };
           }
-          storeLog.debug('store.routstr.providers_remembered', { count: entries.length });
+          storeLog.debug('store.routstr.providers_remembered', {
+            count: entries.length,
+            changed,
+            // Providers this write could only name after their own hostname,
+            // because neither the patch nor the stored row carried a name.
+            hostnamed: named,
+          });
           return { knownProviders: boundedProviders(next) };
         });
       },

@@ -64,7 +64,16 @@ jest.mock('@/shared/hooks/useGuardedRouter', () => ({
 jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => 'theme' }));
 jest.mock('@/shared/hooks/useNostrProfile', () => ({ useNostrProfile: () => ({ data: null }) }));
 jest.mock('@/shared/lib/logger', () => ({
-  aiLog: { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() },
+  // `isLevelEnabled` is the gate the list-paint recorder asks before it builds
+  // a single string, so a mock without it is a logger the diagnostics cannot
+  // use. Enabled here, so the recorder runs the same path it runs on device.
+  aiLog: {
+    info: jest.fn(),
+    debug: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    isLevelEnabled: () => true,
+  },
   // The saved-directory store is REAL here (a mocked one cannot re-render the
   // screen when it is written), so persist's own logging has to exist.
   storeLog: { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() },
@@ -132,6 +141,8 @@ const localRow = (over: Record<string, unknown> = {}) => ({
   e2ee: null,
   pubkey: null,
   status: 'unknown' as const,
+  statusSource: 'none' as const,
+  nameIsHost: false,
   encryptedModelCount: null,
   modelCount: null,
   followers: null,

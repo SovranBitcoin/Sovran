@@ -31,8 +31,15 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 
 import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
+import { resolveIdentityName } from '@/shared/lib/identity';
 
 import { useProviderRows, type ProviderRow } from '../hooks/useProviderRows';
+import {
+  closeProviderListLog,
+  openProviderListLog,
+  recordListRender,
+  recordRowPaint,
+} from '../lib/providerListLog';
 
 /**
  * Choose which Routstr provider to pay.
@@ -97,7 +104,35 @@ function ProviderListRow({
   onChoose: (row: ProviderRow) => void;
   onInspect: (row: ProviderRow) => void;
 }) {
-  const { data: profile } = useNostrProfile(row.pubkey);
+  const { data: profile, isLoading: profileLoading } = useNostrProfile(row.pubkey);
+
+  // nagg's follower count stands in until the row's own profile arrives, and
+  // the identity below is built from whichever is present — so this is the
+  // same expression, read once, rather than a second guess at it.
+  const operatorProfile =
+    profile ?? (row.followers != null ? { followers: row.followers } : undefined);
+  // Recorded during render, deliberately: this is a statement about what THIS
+  // render put on screen, and an effect would report the value the row settled
+  // on rather than each value it showed on the way there.
+  recordRowPaint({
+    baseUrl: row.baseUrl,
+    title: row.name,
+    titleIsHost: row.nameIsHost,
+    // The nagg stand-in carries a follower count and no name, so the name the
+    // row shows is the profile's or the pubkey's word pair — which is the same
+    // resolution `ContactRow` runs on the identity below.
+    runBy: row.pubkey ? resolveIdentityName({ nostrProfile: profile, pubkey: row.pubkey }) : null,
+    runByFromProfile: Boolean(profile?.displayName?.trim() || profile?.name?.trim()),
+    profileLoading,
+    status: row.status,
+    statusSource: row.statusSource,
+    followers: profile?.followers ?? row.followers ?? null,
+    followersFromProfile: typeof profile?.followers === 'number',
+    modelCount: row.modelCount,
+    encryptedModelCount: row.encryptedModelCount,
+    spendableSats: row.spendableSats,
+    blocked: row.blockedReason,
+  });
 
   return (
     <ContactRow
@@ -113,14 +148,7 @@ function ProviderListRow({
         // the provider supplies the face and the name, the operator supplies
         // the reputation. nagg's follower count stands in until the profile
         // itself arrives, so the pill doesn't appear late.
-        ...(row.pubkey
-          ? [
-              nostrIdentity(
-                row.pubkey,
-                profile ?? (row.followers != null ? { followers: row.followers } : undefined)
-              ),
-            ]
-          : []),
+        ...(row.pubkey ? [nostrIdentity(row.pubkey, operatorProfile)] : []),
       ]}
       title={row.name}
       // Three lines, and no more: who this is, who runs it, and what the
@@ -166,7 +194,14 @@ export function ProviderListScreen() {
   // One clock reading for the whole viewing. Freshness of the saved directory
   // must not change under the user mid-scroll, and a selector that reads the
   // clock itself never re-runs anyway.
-  const [openedAt] = useState(() => Date.now());
+  // Opened in the initializer, not an effect: the first render is the one that
+  // decides whether the list paints the persisted directory or a blank slate,
+  // and an effect runs too late to have recorded it.
+  const [openedAt] = useState(() => {
+    openProviderListLog();
+    return Date.now();
+  });
+  useEffect(() => closeProviderListLog, []);
   const directory = useAiProviderDirectory(openedAt);
   const [checking, setChecking] = useState<string | null>(null);
   // The native header floats over the list, so the first rows sit under it
@@ -174,6 +209,25 @@ export function ProviderListScreen() {
   const [headerHeight, setHeaderHeight] = useState(0);
 
   const rows = useProviderRows(probed, directory);
+
+  // Every input this render read, by reference. `cause` in the log is the set
+  // of these that changed IDENTITY since the previous render — the question
+  // being whether a store handed back a new object for a fact that did not
+  // change, which costs every row a render and shows the user nothing.
+  const knownProviders = useRoutstrStore((s) => s.knownProviders);
+  recordListRender({
+    order: rows.map((row) => row.baseUrl),
+    inputs: {
+      directory,
+      knownProviders,
+      probed,
+      rows,
+      checking,
+      headerHeight,
+      chosen,
+      nodeBaseUrl,
+    },
+  });
 
   // Which providers this viewing has actually checked. Read synchronously by
   // the tap handler, which cannot wait for a render to learn what the
@@ -223,10 +277,19 @@ export function ProviderListScreen() {
       aiLog.info('ai.provider.directory', {
         providers: providers.length,
         online: providers.filter((provider) => provider.status === 'online').length,
+        // Rows nagg could not name. Each of these is displayed as its own
+        // hostname until this device's probe reaches it, which is the other
+        // half of the "a name turned into a URL" report — here the name was
+        // never there, rather than having been lost.
+        unnamed: providers.filter((provider) => !provider.name).length,
+        withPubkey: providers.filter((provider) => provider.pubkey).length,
+        withFollowers: providers.filter((provider) => provider.followers != null).length,
+        // How long the user was already looking at the list when this landed.
+        sinceOpenMs: Date.now() - openedAt,
       });
     })();
     return () => controller.abort();
-  }, []);
+  }, [openedAt]);
 
   /**
    * Discovery and probing both refine a list that is already on screen.
