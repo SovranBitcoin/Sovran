@@ -14,6 +14,11 @@
  * The catalog read is the one with a third outcome. A provider that refuses
  * `/v1/models` never sends a summary, and a placeholder that waits forever is
  * worse than none at all, so the skeleton ends on the failure too.
+ *
+ * The 2x2 stats grid is the strictest case: it is the block that decides the
+ * page, it is fed by BOTH reads, and it is mounted in every state — loading,
+ * answered and never-answering — so that nothing under it moves. Its slot is
+ * asserted in all three.
  */
 
 import React from 'react';
@@ -62,6 +67,13 @@ jest.mock('@/shared/hooks/useGuardedRouter', () => ({
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (tokens: string | readonly string[]) =>
     Array.isArray(tokens) ? tokens.map((token) => `theme-${token}`) : 'theme',
+}));
+// The stats grid tints its own labels, and `withAlpha` validates the hex it is
+// handed — which a `theme-*` sentinel is not. Colour arithmetic is not what
+// this file asserts, so it is stubbed rather than fed real hex.
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: jest.fn(() => 'rgba(0,0,0,0.12)'),
 }));
 jest.mock('@/shared/lib/logger', () => ({
   aiLog: { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() },
@@ -146,11 +158,19 @@ const countOf = (renderer: TestRenderer.ReactTestRenderer, type: string, loading
     { deep: true }
   ).length;
 
-const hasTestID = (renderer: TestRenderer.ReactTestRenderer, testID: string) =>
-  renderer.root.findAll(
-    (node) => typeof (node as unknown as Node).type === 'string' && node.props?.testID === testID,
-    { deep: true }
-  ).length;
+/**
+ * How many ELEMENTS carry this testID — not how many nodes do.
+ *
+ * A component and the host it renders both carry the same props, so the naive
+ * walk double-counts. Filtering to host nodes was the old fix and it silently
+ * excluded React Native's own `View`, which is a forwardRef object rendering a
+ * host of its own — so a slot built from one read as absent. Keeping only the
+ * innermost match of each pair counts either shape exactly once.
+ */
+const hasTestID = (renderer: TestRenderer.ReactTestRenderer, testID: string) => {
+  const matches = renderer.root.findAll((node) => node.props?.testID === testID, { deep: true });
+  return matches.filter((node) => !matches.some((other) => other.parent === node)).length;
+};
 
 async function open() {
   let renderer!: TestRenderer.ReactTestRenderer;
@@ -165,16 +185,19 @@ beforeEach(() => {
 });
 
 describe('the provider details page while it is still asking', () => {
-  it('reserves the accepted-mint list, the model rows and the description line', async () => {
+  it('reserves the stats grid, the accepted-mint list, the privacy row and the description', async () => {
     // Neither read ever answers, so this is the page at its emptiest.
     jest.mocked(fetchNodeInfo).mockReturnValue(new Promise(() => {}));
     jest.mocked(fetchProviderModelSummary).mockReturnValue(new Promise(() => {}));
 
     const renderer = await open();
 
+    // The grid's slot is mounted whatever either read is doing — it holds the
+    // four facts that decide the page, so it is the block that must not
+    // arrive from nowhere and shove everything under it down.
+    expect(hasTestID(renderer, 'ai-provider-info-stats')).toBe(1);
     expect(countOf(renderer, 'ProviderMintRow', true)).toBe(2);
     expect(hasTestID(renderer, 'ai-provider-info-description-skeleton')).toBe(1);
-    expect(hasTestID(renderer, 'ai-provider-model-count-skeleton')).toBe(1);
     expect(hasTestID(renderer, 'ai-provider-model-e2ee-skeleton')).toBe(1);
     act(() => renderer.unmount());
   });
@@ -185,14 +208,18 @@ describe('the provider details page while it is still asking', () => {
       description: 'A node serving frontier models',
       mints: ['https://mint.minibits.cash/Bitcoin', 'https://mint.sovran.money'],
     });
-    jest.mocked(fetchProviderModelSummary).mockResolvedValue({ count: 582, e2ee: true });
+    jest
+      .mocked(fetchProviderModelSummary)
+      .mockResolvedValue({ count: 582, encrypted: 9, e2ee: true });
 
     const renderer = await open();
 
     expect(countOf(renderer, 'ProviderMintRow', true)).toBe(0);
     expect(countOf(renderer, 'ProviderMintRow', false)).toBe(2);
     expect(hasTestID(renderer, 'ai-provider-info-description-skeleton')).toBe(0);
-    expect(hasTestID(renderer, 'ai-provider-model-count-skeleton')).toBe(0);
+    expect(hasTestID(renderer, 'ai-provider-model-e2ee-skeleton')).toBe(0);
+    // Same slot, all the way through — never unmounted, never remounted.
+    expect(hasTestID(renderer, 'ai-provider-info-stats')).toBe(1);
     act(() => renderer.unmount());
   });
 
@@ -203,8 +230,11 @@ describe('the provider details page while it is still asking', () => {
 
     const renderer = await open();
 
-    expect(hasTestID(renderer, 'ai-provider-model-count-skeleton')).toBe(0);
+    expect(hasTestID(renderer, 'ai-provider-model-e2ee-skeleton')).toBe(0);
     expect(countOf(renderer, 'ProviderMintRow', true)).toBe(0);
+    // The grid stays, and says so in dashes: a read that will never answer is
+    // "nobody counted", which is not the same claim as a zero.
+    expect(hasTestID(renderer, 'ai-provider-info-stats')).toBe(1);
     act(() => renderer.unmount());
   });
 });

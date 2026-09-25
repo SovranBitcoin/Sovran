@@ -26,7 +26,11 @@ import { withGlassHeaderItems } from '@/navigation/headerItems';
 import Icon from '@/assets/icons';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { RatingBarChart } from '@/features/mint/components/RatingBarChart';
-import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
+import {
+  StatsGrid as StatsGridBlock,
+  UNKNOWN_STAT,
+  type GridStat,
+} from '@/shared/ui/composed/StatsGrid';
 import { Avatar, AvatarStatusDot } from '@/shared/ui/primitives/Avatar';
 import * as Clipboard from 'expo-clipboard';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -163,9 +167,6 @@ function AnimatedAvatar({
   );
 }
 
-/** Unknown counts render as a dash, never as a zero that reads as measured (hunch rule ui/unknown-values). */
-const UNKNOWN = '—';
-
 function StatsGrid({
   status,
   onRetry,
@@ -177,112 +178,57 @@ function StatsGrid({
   /** The same `selectMintAudit` reading the mint rows show, so the two agree. */
   audit?: MintAuditSummary;
 }) {
-  const [foreground, surfaceSecondary, surfaceTertiary] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-    'surface-tertiary',
-  ] as const);
-
   const { successRate, avgLatencyMs, mints, melts } = audit ?? {};
-  const displayValues = {
-    successRate: successRate !== undefined ? `${(successRate * 100).toFixed(1)}%` : UNKNOWN,
-    avgTimeMs: avgLatencyMs !== undefined ? `${Math.round(avgLatencyMs)} ms` : UNKNOWN,
-    totalMints: mints !== undefined ? Math.round(mints).toString() : UNKNOWN,
-    totalMelts: melts !== undefined ? Math.round(melts).toString() : UNKNOWN,
-  };
 
-  const stats = [
+  const stats: GridStat[] = [
     {
       label: 'Success rate',
       description: 'Of mint and melt operations',
-      value: displayValues.successRate,
+      value: successRate !== undefined ? `${(successRate * 100).toFixed(1)}%` : UNKNOWN_STAT,
+      placeholder: '100%',
       accent: true,
     },
     {
       label: 'Average time',
       // ucash reports its own probe latency; the retired audit API timed swaps.
       description: audit?.source === 'ucash' ? 'Measured by the auditor' : 'For successful swaps',
-      value: displayValues.avgTimeMs,
+      value: avgLatencyMs !== undefined ? `${Math.round(avgLatencyMs)} ms` : UNKNOWN_STAT,
+      placeholder: '420 ms',
       accent: true,
     },
     {
       label: 'Total mints',
       description: 'Total mint operations',
-      value: displayValues.totalMints,
-      accent: false,
+      value: mints !== undefined ? Math.round(mints).toString() : UNKNOWN_STAT,
+      placeholder: '12,345',
     },
     {
       label: 'Total melts',
       description: 'Total melt operations',
-      value: displayValues.totalMelts,
-      accent: false,
+      value: melts !== undefined ? Math.round(melts).toString() : UNKNOWN_STAT,
+      placeholder: '12,345',
     },
   ];
-
-  const showSkeleton = status === 'loading';
-
-  // Same grid chrome for both branches (only the `loading` bars differ), so the
-  // crossfade swaps content under a fading skeleton with zero shift.
-  const renderGrid = (loading: boolean) => (
-    <View style={styles.statsGrid}>
-      {[0, 2].map((rowStart) => (
-        <View key={rowStart} style={styles.statsRow}>
-          {stats.slice(rowStart, rowStart + 2).map((stat) => {
-            return (
-              <View key={stat.label} style={styles.statItem}>
-                <View
-                  style={[
-                    styles.statCard,
-                    styles.statCardStretch,
-                    {
-                      backgroundColor: surfaceSecondary,
-                      borderColor: surfaceTertiary,
-                    },
-                  ]}>
-                  <Text
-                    loading={loading}
-                    placeholder="SUCCESS RATE"
-                    bold
-                    size={12}
-                    style={{ color: withAlpha(foreground, 0.66), marginBottom: 4 }}>
-                    {stat.label.toUpperCase()}
-                  </Text>
-                  <Text
-                    loading={loading}
-                    placeholder="100%"
-                    bold
-                    size={stat.accent ? 24 : 20}
-                    style={{ color: foreground, marginBottom: 2 }}>
-                    {stat.value}
-                  </Text>
-                  <Text
-                    loading={loading}
-                    placeholder="Completion rate"
-                    bold
-                    size={12}
-                    style={{ color: withAlpha(foreground, 0.5), opacity: 0.8 }}>
-                    {stat.description}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      ))}
-    </View>
-  );
 
   // One slot for every state so the block never unmounts (no layout shift
   // when audit lands, is missing, or fails): skeleton → values, or an inline
   // notice of the same width in place of the grid.
-  return (
-    <View
-      style={styles.statsSlot}
-      testID="mint-info-audit-status"
-      accessibilityLabel={`Audit ${status}`}>
-      {status === 'empty' ? (
+  if (status === 'empty') {
+    return (
+      <View
+        style={styles.statsSlot}
+        testID="mint-info-audit-status"
+        accessibilityLabel="Audit empty">
         <Notice status="info" description="No audit data for this mint yet." />
-      ) : status === 'error' ? (
+      </View>
+    );
+  }
+  if (status === 'error') {
+    return (
+      <View
+        style={styles.statsSlot}
+        testID="mint-info-audit-status"
+        accessibilityLabel="Audit error">
         <VStack className="w-full items-center gap-3">
           <Notice
             status="warning"
@@ -297,17 +243,18 @@ function StatsGrid({
             onPress={onRetry}
           />
         </VStack>
-      ) : (
-        <SkeletonContentCrossfade
-          loading={showSkeleton}
-          surfaceColor={surfaceSecondary}
-          visualKey="mint-info-stats"
-          visualSurface="mint-info"
-          renderSkeleton={() => renderGrid(true)}
-          renderContent={() => renderGrid(false)}
-        />
-      )}
-    </View>
+      </View>
+    );
+  }
+  return (
+    <StatsGridBlock
+      stats={stats}
+      loading={status === 'loading'}
+      visualKey="mint-info-stats"
+      visualSurface="mint-info"
+      testID="mint-info-audit-status"
+      accessibilityLabel={`Audit ${status}`}
+    />
   );
 }
 
@@ -805,26 +752,5 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'stretch',
     marginTop: 16,
-  },
-  statsGrid: {
-    width: '100%',
-    alignSelf: 'stretch',
-    marginHorizontal: -6,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    width: '100%',
-  },
-  statItem: {
-    flex: 1,
-    padding: 6,
-  },
-  statCard: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  statCardStretch: {
-    flex: 1,
   },
 });

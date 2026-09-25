@@ -185,11 +185,20 @@ const ModelSummarySpine = z.looseObject({
 export interface ProviderModelSummary {
   /** Models this provider currently serves. */
   count: number;
-  /** At least one of them runs in a Tinfoil enclave, so a request to it can be
-   *  sealed end to end. `isE2eeModelId` is the one spelling of that rule, and
-   *  the lineup groups the same rows under `E2EE_PROVIDER_ID` — the badge and
-   *  the menu have to answer from the same test, or the badge promises an
-   *  encryption the app cannot offer. */
+  /**
+   * How many of them run in a Tinfoil enclave.
+   *
+   * A count, not a verdict. On the node that badges itself end-to-end
+   * encrypted, 9 of 582 models are actually sealed and 8 of those 9 have an
+   * identically-named plaintext twin — so "this provider is E2EE" overstates
+   * 573 of them, and the number is the only honest thing to show.
+   */
+  encrypted: number;
+  /** Whether ANY of them is sealed — `encrypted > 0`, kept as its own field
+   *  because that is the question the model picker asks. `isE2eeModelId` is
+   *  the one spelling of the rule, and the lineup groups the same rows under
+   *  `E2EE_PROVIDER_ID` — the badge and the menu have to answer from the same
+   *  test, or the badge promises an encryption the app cannot offer. */
   e2ee: boolean;
 }
 
@@ -215,9 +224,11 @@ export async function fetchProviderModelSummary(
     const parsed = ModelSummarySpine.safeParse(await response.json());
     if (!parsed.success) return null;
     const enabled = parsed.data.data.filter((model) => model.enabled !== false);
+    const encrypted = enabled.filter((model) => isE2eeModelId(model.id)).length;
     return {
       count: enabled.length,
-      e2ee: enabled.some((model) => isE2eeModelId(model.id)),
+      encrypted,
+      e2ee: encrypted > 0,
     };
   } catch {
     return null;

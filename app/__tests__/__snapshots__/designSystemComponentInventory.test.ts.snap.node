@@ -246,6 +246,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/composed/SectionAnchorList.tsx",
     "shared/ui/composed/SlideToConfirm.tsx",
     "shared/ui/composed/SpriteView.tsx",
+    "shared/ui/composed/StatsGrid.tsx",
     "shared/ui/composed/TierBadge.tsx",
     "shared/ui/composed/UnderlineTabs.tsx",
     "shared/ui/composed/VisualLayoutProbe.tsx",
@@ -272,6 +273,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 266,
+  "total": 267,
 }
 `;

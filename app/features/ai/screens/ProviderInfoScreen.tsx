@@ -25,7 +25,9 @@ import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { useIdentityHeader } from '@/shared/ui/composed/IdentityHeader';
 import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
 import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
-import { ContactRow, nostrIdentity } from '@/shared/ui/composed/ContactRow';
+import { resolveIdentityName } from '@/shared/lib/identity';
+import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { StatsGrid, UNKNOWN_STAT, type GridStat } from '@/shared/ui/composed/StatsGrid';
 import { ProviderAvatar } from '../components/ProviderAvatar';
 import { ProviderMintRow } from '../components/ProviderMintRow';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
@@ -52,10 +54,6 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
  * anywhere else is refused, so that list, not the model catalog, decides
  * whether the user can pay this provider at all.
  */
-
-/** Reputation then reach, the same order and the same pills a mint's operator
- *  row uses. */
-const OPERATOR_STATS = ['reputation', 'followers'] as const;
 
 const ParamsSchema = z.object({
   providerInfoEntry: z.string().min(1).max(8192).optional(),
@@ -107,6 +105,19 @@ export function ProviderInfoScreen() {
   );
   const operatorPubkey = info?.pubkey ?? knownProvider?.pubkey ?? null;
   const { data: operatorProfile, isLoading: operatorLoading } = useNostrProfile(operatorPubkey);
+  // The same resolution every other identity in this app goes through, so an
+  // operator reads the same here as on the row the user tapped to get here.
+  const operatorName = operatorPubkey
+    ? resolveIdentityName({ nostrProfile: operatorProfile, pubkey: operatorPubkey })
+    : '';
+  const operatorReach = [
+    typeof operatorProfile?.followers === 'number'
+      ? `${operatorProfile.followers.toLocaleString()} followers`
+      : null,
+    typeof operatorProfile?.score === 'number' ? `${operatorProfile.score} reputation` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const [status, setStatus] = useState(() =>
     nodeBaseUrl ? (cachedProbe(nodeBaseUrl)?.status ?? 'unknown') : ('unknown' as const)
   );
@@ -114,14 +125,64 @@ export function ProviderInfoScreen() {
   // Mints the wallet actually holds, so the accepted list can say which of
   // them are yours rather than listing URLs you cannot act on.
   const { balances } = useBalanceContext();
-  // What the wallet can actually spend HERE — the sum across the mints this
-  // provider redeems, not the wallet total, which says nothing about whether
-  // this particular provider can be paid.
-  const spendableSats = (info?.mints ?? []).reduce(
-    (sum, mint) =>
-      sum + amountToNumber(balances.byMint[mint.trim().replace(/\/+$/, '')]?.total ?? undefined),
+  const walletTotal = Object.values(balances.byMint).reduce(
+    (sum, snapshot) => sum + amountToNumber(snapshot?.total ?? undefined),
     0
   );
+  // What the wallet can actually spend HERE — the sum across the mints this
+  // provider redeems, not the wallet total, which says nothing about whether
+  // this particular provider can be paid. A provider that publishes NO list
+  // restricts nothing, which the payment path reads as "any mint", so there
+  // every sat is spendable.
+  const spendableSats = !info?.mints.length
+    ? walletTotal
+    : info.mints.reduce(
+        (sum, mint) =>
+          sum +
+          amountToNumber(balances.byMint[mint.trim().replace(/\/+$/, '')]?.total ?? undefined),
+        0
+      );
+
+  // The four facts that decide this page, two by two — the same block the
+  // mint page uses, because the two surfaces answer the same question about
+  // different counterparties. The top pair is bigger on purpose: whether you
+  // can pay a provider and how much it serves are the decision; the sealed
+  // count and the mint list qualify it.
+  //
+  // Both pairs come from reads that can fail, and a failed read is a dash and
+  // never a zero — "nobody counted" and "there are none" are different claims
+  // and only one of them is an argument against using this provider.
+  const providerStats: GridStat[] = [
+    {
+      label: 'Spendable',
+      description: info?.mints.length ? 'Across the mints it takes' : 'It accepts any mint',
+      value: info ? spendableSats.toLocaleString() : UNKNOWN_STAT,
+      placeholder: '10,122',
+      accent: true,
+    },
+    {
+      label: 'Models',
+      description: 'Served by this provider',
+      value: catalog ? catalog.count.toLocaleString() : UNKNOWN_STAT,
+      placeholder: '582',
+      accent: true,
+    },
+    {
+      label: 'Encrypted',
+      description: 'Sealed inside an enclave',
+      value: catalog ? catalog.encrypted.toLocaleString() : UNKNOWN_STAT,
+      placeholder: '582',
+    },
+    {
+      label: 'Accepted mints',
+      // An empty published list is not "none" — it is "no restriction", and
+      // the row below says so rather than printing a zero that reads as a
+      // provider you cannot pay.
+      description: info?.mints.length ? 'Ecash it will redeem' : 'No published restriction',
+      value: !info ? UNKNOWN_STAT : info.mints.length ? String(info.mints.length) : 'Any',
+      placeholder: '12',
+    },
+  ];
 
   const heldMints = new Set(
     Object.entries(balances.byMint)
@@ -304,6 +365,14 @@ export function ProviderInfoScreen() {
             </Text>
           </>
         ) : null}
+
+        <StatsGrid
+          stats={providerStats}
+          loading={state === 'loading' || catalogState === 'loading'}
+          visualKey="provider-info-stats"
+          visualSurface="provider-info"
+          testID="ai-provider-info-stats"
+        />
       </VStack>
 
       {state === 'empty' ? (
@@ -376,22 +445,19 @@ export function ProviderInfoScreen() {
         }
       />
 
-      {/* Models: always exactly two rows — a count, and the encryption answer
-          — so the skeleton is the same two rows and the section never changes
-          height when the catalog lands. */}
+      {/* One row, and what it says is not a number: the grid above already
+          counts the sealed models, and a count does not tell the reader what
+          the count MEANS. This is the sentence — whether the provider can
+          read the prompts it forwards — and it is the reason the page is
+          worth opening before paying one. */}
       <SkeletonContentCrossfade
         loading={catalogState === 'loading'}
         visualKey="provider-info-models"
         visualSurface="provider-info"
         testID="ai-provider-info-models"
         renderSkeleton={() => (
-          <Section title="Models">
+          <Section title="Privacy">
             <ListGroup variant="secondary">
-              <ListGroup.Item disabled testID="ai-provider-model-count-skeleton">
-                <ListGroup.ItemContent>
-                  <Text loading medium size={16} placeholder="582 models" />
-                </ListGroup.ItemContent>
-              </ListGroup.Item>
               <ListGroup.Item disabled testID="ai-provider-model-e2ee-skeleton">
                 <ListGroup.ItemContent>
                   <Text loading medium size={16} placeholder="End-to-end encrypted" />
@@ -408,21 +474,16 @@ export function ProviderInfoScreen() {
         )}
         renderContent={() =>
           catalog ? (
-            <Section title="Models">
+            <Section title="Privacy">
               <ListGroup variant="secondary">
                 <ListGroup.Item disabled>
                   <ListGroup.ItemContent>
                     <ListGroup.ItemTitle>
-                      {catalog.count.toLocaleString()} models
+                      {catalog.e2ee ? 'End-to-end encrypted' : 'Not encrypted'}
                     </ListGroup.ItemTitle>
-                  </ListGroup.ItemContent>
-                </ListGroup.Item>
-                <ListGroup.Item disabled>
-                  <ListGroup.ItemContent>
-                    <ListGroup.ItemTitle>End-to-end encrypted</ListGroup.ItemTitle>
                     <ListGroup.ItemDescription>
                       {catalog.e2ee
-                        ? 'Some models run in an enclave this provider cannot read into.'
+                        ? `${catalog.encrypted.toLocaleString()} of its models run in an enclave this provider cannot read into. The rest it can.`
                         : 'This provider can read every request it forwards.'}
                     </ListGroup.ItemDescription>
                   </ListGroup.ItemContent>
@@ -453,18 +514,54 @@ export function ProviderInfoScreen() {
 
       {operatorPubkey ? (
         <Section title="Operator">
-          {/* The same row the mint page gives a mint's operator: a face, a
-              name, their reputation and reach, and a way through to the
-              profile. An npub string is an identifier, not an identity — it
-              tells the user nothing about who they are about to pay. */}
-          <ContactRow
-            identity={nostrIdentity(operatorPubkey, operatorProfile ?? undefined)}
-            loading={operatorLoading}
-            stats={OPERATOR_STATS}
-            accentPosition="below"
-            onPress={() => router.push(buildModalProfileHref({ pubkey: operatorPubkey }))}
-            testID="ai-provider-info-operator"
-          />
+          {/* Built exactly like the mint page's operator row — a face, a name
+              and a way through to the profile, inside the same grouped card
+              every other section on this page uses. It used to be a bare
+              `ContactRow`, which carried its own chrome and so read as a
+              floating fragment between two grouped lists.
+
+              An npub string is an identifier, not an identity: it tells the
+              user nothing about who they are about to pay. So the avatar and
+              the name lead, and the reach goes underneath when somebody has
+              measured it — a number that is absent and a number that is zero
+              are different facts, and only one of them is a reason to think
+              twice. */}
+          <ListGroup variant="secondary">
+            <PressableFeedback
+              animation={false}
+              accessibilityRole="button"
+              accessibilityLabel="Open operator profile"
+              testID="ai-provider-info-operator"
+              onPress={() => router.push(buildModalProfileHref({ pubkey: operatorPubkey }))}>
+              <PressableFeedback.Scale>
+                <ListGroup.Item disabled>
+                  <ListGroup.ItemPrefix>
+                    <Avatar
+                      state={
+                        operatorLoading
+                          ? 'loading'
+                          : operatorProfile?.picture
+                            ? 'image'
+                            : 'fallback'
+                      }
+                      picture={operatorProfile?.picture}
+                      seed={operatorPubkey}
+                      name={operatorName}
+                      size={32}
+                    />
+                  </ListGroup.ItemPrefix>
+                  <ListGroup.ItemContent>
+                    <ListGroup.ItemTitle>{operatorName}</ListGroup.ItemTitle>
+                    {operatorReach ? (
+                      <ListGroup.ItemDescription>{operatorReach}</ListGroup.ItemDescription>
+                    ) : null}
+                  </ListGroup.ItemContent>
+                  <ListGroup.ItemSuffix />
+                </ListGroup.Item>
+              </PressableFeedback.Scale>
+              <PressableFeedback.Ripple />
+            </PressableFeedback>
+          </ListGroup>
         </Section>
       ) : null}
 

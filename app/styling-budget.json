@@ -232,7 +232,7 @@
   },
   "features/mint/screens/MintInfoScreen.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 5,
+    "inline-style": 2,
     "stack-layout-props": 1
   },
   "features/mint/screens/MintListScreen.tsx": {

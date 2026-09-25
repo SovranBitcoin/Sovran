@@ -39,8 +39,11 @@ describe('mint info screen source', () => {
     expect(source).toContain('testID="mint-info-audit-status"');
     expect(source).toContain('testID="mint-info-audit-retry"');
     expect(source).toContain('status={detail.audit}');
-    // Unknown counts never render as zero.
-    expect(source).toContain("const UNKNOWN = '—';");
+    // Unknown counts never render as zero. The dash now belongs to the shared
+    // grid, so both counterparty pages spell "nobody measured this" the same
+    // way rather than each declaring their own.
+    expect(source).toContain('UNKNOWN_STAT');
+    expect(source).toContain("from '@/shared/ui/composed/StatsGrid'");
     expect(source).not.toContain(": '0.0'");
   });
 
