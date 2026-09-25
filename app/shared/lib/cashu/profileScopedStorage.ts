@@ -124,6 +124,7 @@ export const PROFILE_SCOPED_STORE_KEYS = [
   'mint-distribution-store',
   'npc-mint-store',
   'routstr-store',
+  'ai-provider-directory-store',
   'scan-history-store',
   'search-history-store',
   'recent-people-store',

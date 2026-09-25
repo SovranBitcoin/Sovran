@@ -183,7 +183,27 @@ export class RoutstrClient {
           method: 'POST',
           headers: { 'X-Cashu': token },
         });
-        if (!response.ok) return { success: false, status: response.status, token: undefined };
+        if (!response.ok) {
+          // Mirrors the real `BalanceManager.fetchRefundToken`: the refusal
+          // text is the only thing that tells a pending refund apart from a
+          // dead one, and the recovery sweep logs it.
+          const raw = await response.text().catch(() => '');
+          let detail: string | undefined;
+          try {
+            const parsed: unknown = JSON.parse(raw);
+            const record = (parsed ?? {}) as { detail?: unknown; error?: { message?: unknown } };
+            if (typeof record.detail === 'string') detail = record.detail;
+            else if (typeof record.error?.message === 'string') detail = record.error.message;
+          } catch {
+            detail = undefined;
+          }
+          return {
+            success: false,
+            status: response.status,
+            token: undefined,
+            error: `API key refund failed: ${detail ?? `${response.status} ${response.statusText}`}`,
+          };
+        }
         const body: { token?: string } = await response.json();
         return { success: true, token: body.token, status: response.status };
       },

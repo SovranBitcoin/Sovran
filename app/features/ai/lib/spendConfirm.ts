@@ -5,8 +5,15 @@ import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
  * Resolve to `true` when the send may proceed.
  *
  * Dismissing the sheet is a decline: a spend must be chosen, never defaulted
- * into by tapping away. "Always allow" turns the prompt off for good — it is
- * an explicit choice, which is exactly the bar for skipping it in future.
+ * into by tapping away.
+ *
+ * There is deliberately no "always allow" escape hatch. It existed, and it was
+ * a one-way door: the only thing that could set `confirmSpend` back to `true`
+ * was a settings toggle that was never built, so a single tap silently opted
+ * the user out of every future spend prompt with no way back. Until that
+ * setting exists, the prompt is unconditional — see the `confirmSpend`
+ * migration in `routstrStore` for how the users who already tapped it are
+ * brought back.
  */
 export function confirmSpend(params: { modelName: string; maxSats: number }): Promise<boolean> {
   if (!useRoutstrStore.getState().confirmSpend) return Promise.resolve(true);
@@ -30,17 +37,6 @@ export function confirmSpend(params: { modelName: string; maxSats: number }): Pr
           icon: 'fluent:wallet-20-filled',
           testID: 'ai-spend-confirm',
           onPress: (close: () => void) => {
-            settle(true);
-            close();
-          },
-        },
-        {
-          text: 'Always allow',
-          description: 'Stop asking before each message. You can turn this back on in settings.',
-          icon: 'mdi:check',
-          testID: 'ai-spend-always',
-          onPress: (close: () => void) => {
-            useRoutstrStore.getState().setConfirmSpend(false);
             settle(true);
             close();
           },

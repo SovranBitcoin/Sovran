@@ -20,7 +20,7 @@ import { fetchNodeStatus, normalizeNodeUrl, type NodeInfo } from './providers';
 
 export type ProviderStatus = 'online' | 'offline' | 'unknown';
 
-interface ProviderProbe {
+export interface ProviderProbe {
   baseUrl: string;
   status: ProviderStatus;
   info: NodeInfo | null;
@@ -30,9 +30,22 @@ interface ProviderProbe {
  *  within a session, long enough that reopening the picker is instant. */
 const PROBE_TTL_MS = 2 * 60 * 1000;
 
-/** Directories return dozens of rows. Four at a time keeps a sheet open on a
- *  phone radio responsive without serialising forty round trips. */
-const CONCURRENCY = 4;
+/** Directories return dozens of rows. Eight at a time keeps a list responsive
+ *  on a phone radio without serialising forty round trips — and the whole
+ *  point of the sweep is a verdict the user does not outwait. */
+const CONCURRENCY = 8;
+
+/**
+ * How long one row of a sweep may hang before it counts as not answering.
+ *
+ * The transport default is 20 seconds, which is a sane budget for a request
+ * whose ANSWER the user is waiting on. Nobody is waiting on this one: it is a
+ * liveness mark on a list of forty, and at 20s the last rows were still
+ * undecided a minute after the list appeared. A provider that has not said
+ * hello in six seconds is not one this phone can chat with, and the row says
+ * so now rather than eventually.
+ */
+const SWEEP_TIMEOUT_MS = 6_000;
 
 const cache = new Map<string, { at: number; probe: ProviderProbe }>();
 
@@ -100,7 +113,12 @@ export function resolveProviderStatus(
  */
 export async function probeProviders(
   baseUrls: string[],
-  options: { onResult: (probe: ProviderProbe) => void; signal?: AbortSignal }
+  options: {
+    onResult: (probe: ProviderProbe) => void;
+    signal?: AbortSignal;
+    /** Override the per-row budget. Defaults to `SWEEP_TIMEOUT_MS`. */
+    timeoutMs?: number;
+  }
 ): Promise<void> {
   const pending: string[] = [];
   for (const baseUrl of baseUrls) {
@@ -117,7 +135,10 @@ export async function probeProviders(
       if (options.signal?.aborted) return;
       const baseUrl = pending[cursor++];
       try {
-        const probe = await probeOne(baseUrl, { signal: options.signal });
+        const probe = await probeOne(baseUrl, {
+          timeoutMs: options.timeoutMs ?? SWEEP_TIMEOUT_MS,
+          signal: options.signal,
+        });
         if (!options.signal?.aborted) options.onResult(probe);
       } catch {
         // A thrown probe is the same news as a failed one, and the row simply

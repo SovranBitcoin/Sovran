@@ -1,5 +1,131 @@
 // Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
+exports[`persisted schema drift ai-provider-directory-store schema matches the golden snapshot for its version: ai-provider-directory-store 1`] = `
+{
+  "name": "ai-provider-directory-store",
+  "shape": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "fetchedAt": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
+        "providers": {
+          "items": {
+            "additionalProperties": {},
+            "properties": {
+              "baseUrl": {
+                "maxLength": 512,
+                "minLength": 1,
+                "type": "string",
+              },
+              "encryptedModelCount": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "followers": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "followersSource": {
+                "enum": [
+                  "graph",
+                  "vertex",
+                  "relays",
+                ],
+                "type": "string",
+              },
+              "latencyMs": {
+                "minimum": 0,
+                "type": "number",
+              },
+              "mints": {
+                "default": [],
+                "items": {
+                  "maxLength": 512,
+                  "type": "string",
+                },
+                "maxItems": 64,
+                "type": "array",
+              },
+              "modelCount": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "name": {
+                "maxLength": 200,
+                "type": "string",
+              },
+              "pubkey": {
+                "maxLength": 128,
+                "type": "string",
+              },
+              "status": {
+                "default": "unknown",
+                "enum": [
+                  "online",
+                  "offline",
+                  "unknown",
+                ],
+                "type": "string",
+              },
+            },
+            "required": [
+              "baseUrl",
+            ],
+            "type": "object",
+          },
+          "maxItems": 256,
+          "type": "array",
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "fetchedAt": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
+        "providers": {
+          "default": [],
+        },
+      },
+      "required": [
+        "providers",
+        "fetchedAt",
+      ],
+      "type": "object",
+    },
+  },
+  "version": 1,
+}
+`;
+
 exports[`persisted schema drift bitchat-dm-messages-store schema matches the golden snapshot for its version: bitchat-dm-messages-store 1`] = `
 {
   "name": "bitchat-dm-messages-store",
@@ -5175,7 +5301,7 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
       "type": "object",
     },
   },
-  "version": 1,
+  "version": 2,
 }
 `;
 

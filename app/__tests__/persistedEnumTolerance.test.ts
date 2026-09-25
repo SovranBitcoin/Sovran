@@ -68,6 +68,7 @@ import '@/shared/stores/profile/ownProfileMetadataStore';
 import '@/shared/stores/profile/ownedMediaStore';
 import '@/shared/stores/profile/recentPeopleStore';
 import '@/shared/stores/profile/routstrStore';
+import '@/shared/stores/profile/aiProviderDirectoryStore';
 import '@/shared/stores/profile/scanHistoryStore';
 import '@/shared/stores/profile/searchHistoryStore';
 import '@/shared/stores/profile/sendReachabilityStore';

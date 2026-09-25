@@ -11,9 +11,14 @@ import { discoverProviders } from '@/shared/lib/routstr/discovery';
 import {
   probeProvider,
   probeProviders,
+  type ProviderProbe,
   type ProviderStatus,
 } from '@/shared/lib/routstr/providerHealth';
-import { normalizeNodeUrl, type ServerProvider } from '@/shared/lib/routstr/providers';
+import { normalizeNodeUrl } from '@/shared/lib/routstr/providers';
+import {
+  useAiProviderDirectory,
+  useAiProviderDirectoryStore,
+} from '@/shared/stores/profile/aiProviderDirectoryStore';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -43,9 +48,11 @@ import { useProviderRows, type ProviderRow } from '../hooks/useProviderRows';
  *
  *  - **It is the whole network, immediately.** nagg runs the discovery sweep
  *    continuously and serves the result from `/app/ai-providers`, so the list
- *    paints at once instead of filling in over a Nostr round trip. The app's
- *    own discovery still runs behind it: nagg is a cache, and a cache is
- *    allowed to be wrong.
+ *    paints at once instead of filling in over a Nostr round trip. That answer
+ *    is kept between openings (`aiProviderDirectoryStore`), so the second open
+ *    starts in the order the first one finished in rather than ranking the
+ *    same rows again in front of the reader. The app's own discovery still
+ *    runs behind it: nagg is a cache, and a cache is allowed to be wrong.
  *  - **The dot is a real answer.** Each row is probed against `/v1/info`,
  *    streaming in, and what this phone sees overrules what nagg cached — a
  *    provider nagg calls online that we have just failed to reach reads
@@ -116,15 +123,20 @@ function ProviderListRow({
           : []),
       ]}
       title={row.name}
-      // Three lines, and no more: who this is, the stats, and — only when it
-      // cannot be chosen — why. The subtitle used to restate the balance and
-      // the encryption that the stats line already carries, which is how the
-      // row grew a fourth line saying nothing new.
-      subtitle={null}
+      // Three lines, and no more: who this is, who runs it, and what the
+      // network makes of them — plus, only when it cannot be chosen, why. The
+      // subtitle is left to `ContactRow` to derive from the operator identity
+      // (`Run by …`); it used to restate the balance and the encryption that
+      // the stats line already carries, which is how the row grew a fourth
+      // line saying nothing new.
       disabled={row.blockedReason != null}
       disabledReason={row.blockedReason ?? undefined}
       selected={selected}
-      accentPosition="below"
+      // Inline, NOT `below`. With the stats on their own band the row is
+      // taller than the band the avatar is centred in, so a 44px face sat
+      // visibly above the middle of its own row. Inline puts the three lines
+      // in one column that the avatar and the three-dot button both centre
+      // against.
       trailing={
         checking ? (
           <Spinner size={20} />
@@ -151,7 +163,11 @@ export function ProviderListScreen() {
   const nodeBaseUrl = useRoutstrStore((s) => s.nodeBaseUrl);
 
   const [probed, setProbed] = useState<Record<string, ProviderStatus>>({});
-  const [directory, setDirectory] = useState<readonly ServerProvider[]>([]);
+  // One clock reading for the whole viewing. Freshness of the saved directory
+  // must not change under the user mid-scroll, and a selector that reads the
+  // clock itself never re-runs anyway.
+  const [openedAt] = useState(() => Date.now());
+  const directory = useAiProviderDirectory(openedAt);
   const [checking, setChecking] = useState<string | null>(null);
   // The native header floats over the list, so the first rows sit under it
   // unless the list reserves its height. Same spacer the mint list uses.
@@ -169,9 +185,10 @@ export function ProviderListScreen() {
   }, []);
 
   // nagg first: it has already done the sweep and the probing, so this is what
-  // fills the list. Its failure costs the first paint and nothing else — the
-  // discovery below is unchanged and still produces the same list it always
-  // did, a few seconds later.
+  // fills the list. Its failure now costs NOTHING on a repeat open — the saved
+  // directory is already on screen — and on a first ever open it costs the
+  // first paint and nothing else, because the discovery below still produces
+  // the same list it always did, a few seconds later.
   useEffect(() => {
     const controller = new AbortController();
     void (async () => {
@@ -202,7 +219,7 @@ export function ProviderListScreen() {
           ])
         )
       );
-      setDirectory(providers);
+      useAiProviderDirectoryStore.getState().rememberDirectory(providers);
       aiLog.info('ai.provider.directory', {
         providers: providers.length,
         online: providers.filter((provider) => provider.status === 'online').length,
@@ -211,13 +228,47 @@ export function ProviderListScreen() {
     return () => controller.abort();
   }, []);
 
-  // Discovery and probing both refine a list that is already on screen.
+  /**
+   * Discovery and probing both refine a list that is already on screen.
+   *
+   * They run SIDE BY SIDE, which they did not used to. Probing was sequenced
+   * behind `discoverProviders` — a relay sweep plus a fan-out of HTTP
+   * directory reads — so "is this one answering", and therefore whether a row
+   * is usable at all, could not be decided until discovery finished finding
+   * rows nobody had asked about. A provider is unusable for exactly two
+   * reasons: no mint we can pay it from, which `useProviderRows` answers from
+   * the wallet with no network at all, and it is not answering, which is this
+   * sweep. Neither of them has any business waiting on discovery.
+   */
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
+
+    const onResult = (probe: ProviderProbe) => {
+      if (cancelled) return;
+      record(probe.baseUrl, probe.status);
+      // Persist what the probe learned so the next open starts warm, and
+      // so accepted mints survive an announcement that omits them.
+      if (probe.info) {
+        useRoutstrStore.getState().rememberProviders({
+          [probe.baseUrl]: {
+            name: probe.info.name,
+            description: probe.info.description ?? null,
+            version: probe.info.version ?? null,
+            mints: probe.info.mints,
+            pubkey: probe.info.pubkey ?? null,
+          },
+        });
+      }
+    };
+
     void (async () => {
       const state = useRoutstrStore.getState();
-      const seeds = [nodeBaseUrl, chosen, ...Object.keys(state.knownProviders)].filter(
+      const known = Object.keys(state.knownProviders);
+      // Pass one, immediately: every row the user can already see.
+      const sweeping = probeProviders(known, { signal: controller.signal, onResult });
+
+      const seeds = [nodeBaseUrl, chosen, ...known].filter(
         (url): url is string => typeof url === 'string' && url.length > 0
       );
       const discovered = await discoverProviders(seeds);
@@ -241,26 +292,17 @@ export function ProviderListScreen() {
           )
         );
       }
-      await probeProviders(Object.keys(useRoutstrStore.getState().knownProviders), {
-        signal: controller.signal,
-        onResult: (probe) => {
-          if (cancelled) return;
-          record(probe.baseUrl, probe.status);
-          // Persist what the probe learned so the next open starts warm, and
-          // so accepted mints survive an announcement that omits them.
-          if (probe.info) {
-            useRoutstrStore.getState().rememberProviders({
-              [probe.baseUrl]: {
-                name: probe.info.name,
-                description: probe.info.description ?? null,
-                version: probe.info.version ?? null,
-                mints: probe.info.mints,
-                pubkey: probe.info.pubkey ?? null,
-              },
-            });
-          }
-        },
-      });
+      // Pass two: whatever discovery (or the directory read) added while pass
+      // one was running. Queued behind it rather than alongside, so the sweep
+      // keeps one concurrency budget instead of two.
+      await sweeping;
+      if (cancelled) return;
+      const seen = new Set(known);
+      const added = Object.keys(useRoutstrStore.getState().knownProviders).filter(
+        (baseUrl) => !seen.has(baseUrl)
+      );
+      if (added.length === 0) return;
+      await probeProviders(added, { signal: controller.signal, onResult });
     })();
     return () => {
       cancelled = true;

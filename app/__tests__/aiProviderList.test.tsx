@@ -27,6 +27,7 @@ import { getAiProviders } from '@/shared/lib/apiClient';
 import { probeProvider, probeProviders } from '@/shared/lib/routstr/providerHealth';
 import { discoverProviders } from '@/shared/lib/routstr/discovery';
 import type { ServerProvider } from '@/shared/lib/routstr/providers';
+import { useAiProviderDirectoryStore } from '@/shared/stores/profile/aiProviderDirectoryStore';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -64,6 +65,17 @@ jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: () => 'theme' 
 jest.mock('@/shared/hooks/useNostrProfile', () => ({ useNostrProfile: () => ({ data: null }) }));
 jest.mock('@/shared/lib/logger', () => ({
   aiLog: { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() },
+  // The saved-directory store is REAL here (a mocked one cannot re-render the
+  // screen when it is written), so persist's own logging has to exist.
+  storeLog: { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() },
+  redactError: (error: unknown) => error,
+}));
+jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
+  createProfileScopedStorage: () => ({
+    getItem: async () => null,
+    setItem: async () => {},
+    removeItem: async () => {},
+  }),
 }));
 jest.mock('@/shared/lib/nav/providerInfoRoutes', () => ({ buildProviderInfoHref: () => '/x' }));
 jest.mock('@/shared/lib/popup', () => ({ paramPopup: jest.fn() }));
@@ -144,6 +156,7 @@ const lastRowsCall = () => jest.mocked(useProviderRows).mock.calls.at(-1)!;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  useAiProviderDirectoryStore.setState({ providers: [], fetchedAt: null });
   jest.mocked(useProviderRows).mockReturnValue([]);
   jest.mocked(getAiProviders).mockResolvedValue(ok([]));
   jest.mocked(discoverProviders).mockResolvedValue([]);
@@ -165,11 +178,66 @@ describe('the provider directory', () => {
 
     const renderer = await openList();
     expect(lastRowsCall()[1]).toEqual(directory);
+    // …and it is kept, so the NEXT open does not have to ask again.
+    expect(useAiProviderDirectoryStore.getState().providers).toEqual(directory);
     expect(mockRememberProviders).toHaveBeenCalledWith({
       [`${REDSHIFT}/`]: { name: 'redsh1ft' },
       'https://b.example': {},
       'https://c.example': {},
     });
+    act(() => renderer.unmount());
+  });
+
+  it('paints the saved directory in the first frame, before anything answers', async () => {
+    // This is the flicker the list was reported for: it used to paint from
+    // whatever `knownProviders` happened to hold and then re-seat every row
+    // when nagg replied a moment later. The saved directory means the order
+    // and the statuses are already there when the screen mounts.
+    const saved = [
+      served(REDSHIFT, { name: 'redsh1ft', encryptedModelCount: 9 }),
+      served('https://b.example', { status: 'offline' }),
+    ];
+    useAiProviderDirectoryStore.setState({ providers: saved, fetchedAt: Date.now() });
+    // Neither the network nor discovery ever answers in this test.
+    jest.mocked(getAiProviders).mockReturnValue(new Promise(() => {}) as never);
+    jest.mocked(discoverProviders).mockReturnValue(new Promise(() => {}));
+
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(React.createElement(ProviderListScreen));
+    });
+    // The FIRST render, not an eventual one: no await has run.
+    expect(jest.mocked(useProviderRows).mock.calls[0][1]).toEqual(saved);
+    act(() => renderer.unmount());
+  });
+
+  it('will not paint a day-old snapshot of who was reachable', async () => {
+    useAiProviderDirectoryStore.setState({
+      providers: [served(REDSHIFT, { name: 'redsh1ft' })],
+      fetchedAt: Date.now() - 48 * 60 * 60 * 1000,
+    });
+    jest.mocked(getAiProviders).mockReturnValue(new Promise(() => {}) as never);
+    jest.mocked(discoverProviders).mockReturnValue(new Promise(() => {}));
+
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(React.createElement(ProviderListScreen));
+    });
+    expect(jest.mocked(useProviderRows).mock.calls[0][1]).toEqual([]);
+    act(() => renderer.unmount());
+  });
+
+  it('probes what it already knows without waiting for discovery to finish', async () => {
+    // Reachability is one of the only two reasons a provider is unusable, and
+    // it used to be sequenced BEHIND a relay sweep plus a fan-out of HTTP
+    // directory reads — so a dead row stayed choosable until discovery, which
+    // is not about reachability at all, happened to finish.
+    jest.mocked(getAiProviders).mockReturnValue(new Promise(() => {}) as never);
+    jest.mocked(discoverProviders).mockReturnValue(new Promise(() => {}));
+
+    const renderer = await openList();
+    expect(probeProviders).toHaveBeenCalledTimes(1);
+    expect(discoverProviders).toHaveBeenCalled();
     act(() => renderer.unmount());
   });
 

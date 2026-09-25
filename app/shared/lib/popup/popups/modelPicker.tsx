@@ -25,7 +25,7 @@
  *   modelPickerPopup({});
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BottomSheet, Menu } from 'heroui-native';
@@ -299,6 +299,51 @@ export function ModelPickerContent({ close, balanceSats }: ModelPickerContentPro
     [activeProviderTab, providers]
   );
 
+  // Partial-lineup rendering is explicit: only filled tier cells get rows (a
+  // provider with 2 qualifying models shows 2 rows — never duplicated entries,
+  // and the tab itself never hides). A provider with no entries at all renders
+  // one neutral loading/empty row instead of a dangling-id lookup.
+  const rows = useMemo(
+    () =>
+      AI_TIERS.map((tier) => ({
+        tier,
+        entry: entryForSlot(lineup, activeProvider.id, tier.id),
+      })).filter((r): r is { tier: AiTier; entry: LineupEntry } => r.entry != null),
+    [lineup, activeProvider.id]
+  );
+
+  // What the open sheet actually offers, per tab.
+  //
+  // A row is inert when it is the current selection or the balance cannot
+  // cover its reservation, and `Menu.Item` renders both the same way. So a tab
+  // whose every row is inert looks exactly like a tab whose rows stopped
+  // responding — which is the report this event exists to tell apart. Counts
+  // and ids only; no balance figure and no model pricing.
+  useEffect(() => {
+    const pressable = rows.filter(
+      (r) =>
+        canAffordPricing(r.entry.satsPricing, balanceSats) &&
+        !(selectedProvider === activeProvider.id && selectedTier === r.tier.id)
+    ).length;
+    pickerLog.info('modelPicker.rows', {
+      tab: activeProvider.id,
+      rows: rows.length,
+      pressable,
+      providers: providers.length,
+      selectedProvider,
+      selectedTier,
+      lineupSource,
+    });
+  }, [
+    rows,
+    balanceSats,
+    activeProvider.id,
+    providers.length,
+    selectedProvider,
+    selectedTier,
+    lineupSource,
+  ]);
+
   const handleSelect = useCallback(
     (tier: AiTier) => {
       pickerLog.info('modelPicker.select', {
@@ -384,15 +429,6 @@ export function ModelPickerContent({ close, balanceSats }: ModelPickerContentPro
       <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 24 }}>
         <Menu>
           {(() => {
-            // Partial-lineup rendering is explicit: only filled tier cells
-            // get rows (a provider with 2 qualifying models shows 2 rows —
-            // never duplicated entries, and the tab itself never hides).
-            // A provider with no entries at all renders one neutral
-            // loading/empty row instead of a dangling-id lookup.
-            const rows = AI_TIERS.map((tier) => ({
-              tier,
-              entry: entryForSlot(lineup, activeProvider.id, tier.id),
-            })).filter((r) => r.entry != null);
             if (rows.length === 0) {
               const { title, description } = emptyTabCopy(lineup, catalogSize);
               return (
@@ -410,7 +446,7 @@ export function ModelPickerContent({ close, balanceSats }: ModelPickerContentPro
                 key={`${activeProvider.id}-${tier.id}`}
                 tier={tier}
                 provider={activeProvider}
-                entry={entry!}
+                entry={entry}
                 balanceSats={balanceSats}
                 isCurrent={selectedProvider === activeProvider.id && selectedTier === tier.id}
                 onPress={() => handleSelect(tier)}

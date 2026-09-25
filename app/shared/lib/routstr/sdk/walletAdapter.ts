@@ -133,4 +133,23 @@ export function createCocoWalletAdapter(assertOwner: () => void = () => {}) {
   };
 }
 
+/**
+ * The sats a cashu token carries, read from its proofs.
+ *
+ * `null` when the string will not decode. Used where a token is being talked
+ * ABOUT rather than moved — the recovery sweep, which has to be able to say
+ * how much is stranded on a node without banking anything.
+ */
+export function tokenAmountSats(token: string): number | null {
+  try {
+    const metadata = getTokenMetadata(token);
+    const amount = metadata.amount.toNumber();
+    if (metadata.unit === 'msat') return amount / 1000;
+    if (metadata.unit !== 'sat') return null;
+    return amount;
+  } catch {
+    return null;
+  }
+}
+
 export const cocoWalletAdapter = createCocoWalletAdapter();

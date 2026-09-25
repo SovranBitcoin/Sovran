@@ -547,6 +547,40 @@ function resolveSubtitle(ids: Identity[]): string | undefined {
   return self?.subtitle;
 }
 
+/** What a value that nobody has counted shows instead of a number. Never `0`:
+ *  "nobody followed them" and "nobody looked" are different facts. */
+const UNMEASURED = '—';
+
+/**
+ * The operator's two stats, as one thing.
+ *
+ * Reputation and reach describe the SAME person and are read in the same pass,
+ * so they have to appear and disappear together — a row showing the shield and
+ * no follower count made the reader decide whether the missing pill meant zero
+ * or meant nobody had looked, and they cannot tell. Both were gated on a
+ * truthy value, which dropped a measured zero exactly as if it were unknown.
+ *
+ * So: the pair is present whenever EITHER half has been measured, a measured
+ * zero prints as `0`, and a half nobody resolved prints `—` beside its own
+ * icon. nagg distinguishes `null` (it could not resolve the operator's reach)
+ * from `0` (it counted, and the answer was none), and this is where that
+ * distinction earns its keep.
+ */
+function operatorStats(
+  nostr: NostrIdentity | undefined,
+  mintStats: MintStatFields | undefined
+): { known: boolean; reputation: number | undefined; followers: number | undefined } {
+  const raw = (value: number | undefined) =>
+    typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  const reputation = raw(nostr?.score) ?? raw(mintStats?.contactReputation);
+  const followers = raw(nostr?.followerCount) ?? raw(mintStats?.contactFollowers);
+  return {
+    known: reputation !== undefined || followers !== undefined,
+    reputation,
+    followers,
+  };
+}
+
 /** Compose the accent pill list. Missing values drop out; in a mint+nostr
  *  composite, nostr fields take precedence over mint fallbacks (contactReputation,
  *  contactFollowers) for reputation / followers. */
@@ -559,6 +593,7 @@ function buildStats(
   const provider = find(ids, 'provider');
   const nostr = find(ids, 'nostr');
   const ble = find(ids, 'ble');
+  const operator = operatorStats(nostr, mintStats);
 
   const out: RowStat[] = [];
 
@@ -672,27 +707,43 @@ function buildStats(
         }
         break;
       case 'reputation': {
-        const r = nostr?.score ?? mintStats?.contactReputation;
-        if (typeof r === 'number' && r > 0) {
-          out.push({
-            icon: STAT_ICONS.reputation,
-            value: `${Math.round(r)}`,
-            color: STAT_COLOR_SOCIAL,
-            accessibilityLabel: `Reputation score ${Math.round(r)}`,
-          });
-        }
+        if (!operator.known) break;
+        const r = operator.reputation;
+        out.push(
+          r === undefined
+            ? {
+                icon: STAT_ICONS.reputation,
+                value: UNMEASURED,
+                color: STAT_COLOR_SOCIAL,
+                accessibilityLabel: 'Reputation not measured',
+              }
+            : {
+                icon: STAT_ICONS.reputation,
+                value: `${Math.round(r)}`,
+                color: STAT_COLOR_SOCIAL,
+                accessibilityLabel: `Reputation score ${Math.round(r)}`,
+              }
+        );
         break;
       }
       case 'followers': {
-        const f = nostr?.followerCount ?? mintStats?.contactFollowers;
-        if (typeof f === 'number' && f > 0) {
-          out.push({
-            icon: STAT_ICONS.followers,
-            value: formatCompact(f),
-            color: STAT_COLOR_SOCIAL,
-            accessibilityLabel: `${f} followers`,
-          });
-        }
+        if (!operator.known) break;
+        const f = operator.followers;
+        out.push(
+          f === undefined
+            ? {
+                icon: STAT_ICONS.followers,
+                value: UNMEASURED,
+                color: STAT_COLOR_SOCIAL,
+                accessibilityLabel: 'Follower count not measured',
+              }
+            : {
+                icon: STAT_ICONS.followers,
+                value: formatCompact(f),
+                color: STAT_COLOR_SOCIAL,
+                accessibilityLabel: f === 1 ? '1 follower' : `${f} followers`,
+              }
+        );
         break;
       }
       case 'offline':
@@ -906,6 +957,21 @@ export function ContactRow({
         weight="heavy"
         color={foreground}
       />
+    );
+  } else if (provider && nostr) {
+    // Attribution, not a field. A Routstr node is a machine; somebody runs it,
+    // and that somebody — not the hostname — is who the user is trusting with
+    // their prompts and their sats. So it reads as a sentence on the line
+    // directly under the name, where a person's own name would be, instead of
+    // as a labelled "Operator" row further down a details page. The name
+    // carries the weight; "Run by" is the connective and stays quiet.
+    subtitleNode = (
+      <Text size={13} numberOfLines={1} color={withAlpha(foreground, 0.45)}>
+        {'Run by '}
+        <Text size={13} bold color={withAlpha(foreground, 0.8)}>
+          {resolveIdentityName({ nostrProfile: nostr.profile, pubkey: nostr.pubkey })}
+        </Text>
+      </Text>
     );
   } else if (ble) {
     const reachability = resolveBleReachability(ble);

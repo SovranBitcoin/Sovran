@@ -31,6 +31,7 @@ import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
 import { useOwnProfileMetadataStore } from '@/shared/stores/profile/ownProfileMetadataStore';
+import { useAiProviderDirectoryStore } from '@/shared/stores/profile/aiProviderDirectoryStore';
 import { useOwnContentStore } from '@/shared/stores/profile/ownContentStore';
 import { useOwnedMediaStore } from '@/shared/stores/profile/ownedMediaStore';
 import { useRecentPeopleStore } from '@/shared/stores/profile/recentPeopleStore';
@@ -87,6 +88,7 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'profile/nutDropRedeemQueueStore': useNutDropRedeemQueueStore,
   'profile/ownProfileMetadataStore': useOwnProfileMetadataStore,
   'profile/ownContentStore': useOwnContentStore,
+  'profile/aiProviderDirectoryStore': useAiProviderDirectoryStore,
   'profile/dmLastMessageStore': useDmLastMessageStore,
   'profile/ownedMediaStore': useOwnedMediaStore,
   'profile/recentPeopleStore': useRecentPeopleStore,

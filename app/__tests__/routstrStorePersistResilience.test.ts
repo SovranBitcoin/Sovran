@@ -459,3 +459,53 @@ describe('archived credentials survive a bad blob', () => {
     });
   });
 });
+
+/**
+ * The spend prompt is not something a past tap can switch off for good.
+ *
+ * `confirmSpend: false` could only ever be written by the "Always allow"
+ * button, whose own copy promised a settings toggle that was never built.
+ * Removing the button on its own would have left precisely the users who had
+ * pressed it spending without a prompt forever, so the v2 migration hands the
+ * prompt back.
+ */
+describe('the confirmSpend v2 migration', () => {
+  beforeEach(() => {
+    jest.resetModules();
+    for (const k of Object.keys(mockMemory)) delete mockMemory[k];
+  });
+
+  const preloadAt = (version: number, state: Record<string, unknown>) => {
+    mockMemory[STORAGE_KEY] = JSON.stringify({ state, version });
+  };
+
+  it('re-arms the prompt for a blob that had turned it off', async () => {
+    preloadAt(1, { apiKey: 'sk-key', balance: 5, confirmSpend: false });
+
+    const store = await loadStore();
+
+    expect(store.getState().confirmSpend).toBe(true);
+    // And the migration is a repair, not a reset: everything else in the blob
+    // comes through untouched.
+    expect(store.getState().apiKey).toBe('sk-key');
+    expect(store.getState().balance).toBe(5);
+  });
+
+  it('leaves a blob that never turned it off alone', async () => {
+    preloadAt(1, { apiKey: 'sk-key', balance: 5, confirmSpend: true });
+
+    const store = await loadStore();
+
+    expect(store.getState().confirmSpend).toBe(true);
+    expect(store.getState().apiKey).toBe('sk-key');
+  });
+
+  it('rehydrates a v2 blob without a migration pass', async () => {
+    preloadAt(2, { apiKey: 'sk-key', balance: 5, confirmSpend: true });
+
+    const store = await loadStore();
+
+    expect(store.getState().confirmSpend).toBe(true);
+    expect(store.getState().apiKey).toBe('sk-key');
+  });
+});

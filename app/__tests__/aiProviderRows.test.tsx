@@ -227,6 +227,62 @@ describe('provider rows', () => {
     expect(result.current[0]).toMatchObject({ encryptedModelCount: 9, modelCount: 582 });
   });
 
+  it('decides "you have no mint for this" with no network answer at all', () => {
+    // One of the only two reasons a provider is unusable, and the only one
+    // this device can settle by itself: it is two lists compared. nagg says
+    // this row is up and nothing has been probed, and the verdict is still
+    // there in the first render rather than after a sweep.
+    mockProviders = { 'https://a.example': provider({ name: 'A', mints: [CUBA] }) };
+    const { result } = renderHook(() =>
+      useProviderRows({}, [served('https://a.example', { status: 'online' })])
+    );
+    expect(result.current[0].blockedReason).toMatch(/do not hold/);
+    // And it is NOT the reachability answer wearing the mint's clothes.
+    expect(result.current[0].status).toBe('online');
+  });
+
+  it('never blames reachability for a wallet that cannot pay', () => {
+    // Both are true at once. The one the user can act on — hold a mint this
+    // provider redeems — is the one the row states.
+    mockProviders = { 'https://a.example': provider({ name: 'A', mints: [CUBA] }) };
+    const { result } = renderHook(() => useProviderRows({ 'https://a.example': 'offline' }, []));
+    expect(result.current[0].blockedReason).toMatch(/do not hold/);
+  });
+
+  it("re-seats onto nagg's order without a frame of the old one", () => {
+    mockProviders = {
+      'https://third.example': provider({ name: 'Third' }),
+      'https://first.example': provider({ name: 'First' }),
+      'https://second.example': provider({ name: 'Second', e2ee: true }),
+    };
+    const seen: string[][] = [];
+    const { rerender } = renderHook(
+      ({ directory }: { directory: ServerProvider[] }) => {
+        const result = useProviderRows({}, directory);
+        seen.push(result.map((row) => row.name));
+        return result;
+      },
+      { initialProps: { directory: [] as ServerProvider[] } }
+    );
+    // Local ranking first: encryption leads, then alphabetical.
+    expect(seen.at(-1)).toEqual(['Second', 'First', 'Third']);
+
+    seen.length = 0;
+    rerender({
+      directory: [
+        served('https://first.example'),
+        served('https://second.example'),
+        served('https://third.example'),
+      ],
+    });
+    // Every value this pass produced is ALREADY the server's order. The
+    // re-seat used to run in an effect, which committed one frame pairing the
+    // new directory with the old order — the visible shuffle the list was
+    // reported for.
+    expect(seen).not.toHaveLength(0);
+    for (const order of seen) expect(order).toEqual(['First', 'Second', 'Third']);
+  });
+
   it('sorts every blocked provider last, and keeps them', () => {
     mockProviders = {
       'https://blocked.example': provider({ name: 'Blocked', mints: [CUBA], e2ee: true }),

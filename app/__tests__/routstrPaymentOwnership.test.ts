@@ -1,3 +1,9 @@
+import {
+  getRoutstrClient,
+  resetRoutstrClient,
+  sweepUnsettledPayments,
+} from '@/shared/lib/routstr/sdk/client';
+
 let mockAccount = 0;
 const mockWrites: { owner: string; value: string }[] = [];
 const mockWrite = jest.fn(async () => {});
@@ -40,14 +46,11 @@ jest.mock('@/shared/lib/routstr/sdk/walletAdapter', () => ({
     sendToken: mockSend,
     receiveToken: mockReceive,
   }),
+  // The sweep reports how many sats each stuck token holds; fixture tokens do
+  // not decode, and a sweep must not depend on being able to read them.
+  tokenAmountSats: () => null,
 }));
 jest.mock('@/shared/lib/logger', () => ({ apiLog: { info: jest.fn(), warn: jest.fn() } }));
-
-import {
-  getRoutstrClient,
-  resetRoutstrClient,
-  sweepUnsettledPayments,
-} from '@/shared/lib/routstr/sdk/client';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;

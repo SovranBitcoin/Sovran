@@ -252,6 +252,13 @@ interface RoutstrState {
    * call, and on a frontier model that is thousands of sats even when the
    * message itself costs a fraction of one. The user should see that number
    * before it leaves, not discover it in the history.
+   *
+   * Nothing in the app sets this to `false` any more: the "Always allow"
+   * button that did was removed because it was a one-way door (no settings
+   * toggle was ever built to undo it). It stays a persisted boolean rather
+   * than a constant so re-introducing the setting is a UI change, not a
+   * schema change — and `migrate` at version 2 repairs the blobs that already
+   * hold `false`.
    */
   confirmSpend: boolean;
   /**
@@ -384,7 +391,6 @@ interface RoutstrActions {
    *  erase an earlier answer. */
   rememberProviders: (providers: Record<string, Partial<KnownProvider>>) => void;
   setUserNode: (nodeBaseUrl: string | null) => void;
-  setConfirmSpend: (confirmSpend: boolean) => void;
   /** Record a payment before it leaves, so its change stays recoverable. */
   beginPayment: (id: string, payment: PendingPayment) => void;
   /** Forget a payment whose change is home, or which was never taken. */
@@ -983,11 +989,6 @@ export const useRoutstrStore = create<RoutstrStore>()(
         });
       },
 
-      setConfirmSpend: (confirmSpend) => {
-        storeLog.info('store.routstr.confirm_spend', { confirmSpend });
-        set({ confirmSpend });
-      },
-
       rememberProviders: (providers) => {
         const entries = Object.entries(providers);
         if (entries.length === 0) return;
@@ -1113,6 +1114,21 @@ export const useRoutstrStore = create<RoutstrStore>()(
       name: 'routstr-store',
       storage: createRoutstrPersistence(),
       schema: PersistedRoutstrStore,
+      // v2: bring back the spend prompt for everyone who had turned it off.
+      //
+      // `confirmSpend: false` could only ever be written by the "Always allow"
+      // button, and the settings toggle its own copy promised ("you can turn
+      // this back on in settings") was never built. Removing the button
+      // without this would leave exactly those users — the ones who opted out
+      // — permanently unprompted before every spend, which is the opposite of
+      // what removing it is for. The field is kept (not dropped) so the blob's
+      // shape is unchanged and nothing else in it is at risk.
+      version: 2,
+      migrate: (state, version) => {
+        const blob: Record<string, unknown> = { ...(state as Record<string, unknown> | null) };
+        if (version < 2) blob.confirmSpend = true;
+        return blob;
+      },
       partialize: (state) => ({
         apiKey: state.apiKey,
         authMode: state.authMode,

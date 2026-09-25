@@ -92,7 +92,18 @@ export function AiHeaderTitle() {
       balance={sats}
       unit="sat"
       ctaLabel={ctaLabel}
-      iconNode={<ProviderPillIcon status={status} size={20} />}
+      // 24 in a 24 box. The default box is 32 and the glyph was 20, so eight
+      // points of the pill's width went to empty margin around a picture — on
+      // the one control in this header that has a long hostname to fit.
+      iconNode={
+        <ProviderPillIcon
+          baseUrl={activeUrl || undefined}
+          name={activeUrl ? providerName : undefined}
+          status={status}
+          size={24}
+        />
+      }
+      iconBoxSize={24}
       loadingTitlePlaceholder="AI provider"
       onPress={onPress}
     />

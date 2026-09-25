@@ -36,6 +36,9 @@ import '@/shared/stores/profile/mintStore';
 // AI chat: apiKey + sessions (now incl. message attachments) + the
 // last-known model lineup — none cheaply refetchable.
 import '@/shared/stores/profile/routstrStore';
+// nagg's provider directory: the list the AI picker paints from before the
+// network answers, so a schema drop here is a visible re-shuffle on open.
+import '@/shared/stores/profile/aiProviderDirectoryStore';
 import '@/shared/stores/global/profileStore';
 import '@/shared/stores/global/walletLifecycleStore';
 import '@/shared/stores/global/ctaStore';

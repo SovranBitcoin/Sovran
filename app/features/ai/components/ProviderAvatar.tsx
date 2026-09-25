@@ -74,13 +74,29 @@ export function ProviderAvatar({
   );
 }
 
-/** The same badge on the tab header's pill, where the provider is a glyph
- *  rather than a generated face — the pill mirrors the mint selector, and the
- *  mint's icon comes from the mint, not from its name. */
+/**
+ * The same face and the same badge on the AI tab header's pill.
+ *
+ * It used to be a flat `mdi:robot` glyph — one stock robot, identical for
+ * every provider on earth, so the pill and the row the user picked it from did
+ * not look like the same thing. The seeded avatar IS this app's placeholder
+ * for an identity with no picture of its own, and a provider always has a URL
+ * to seed it with, so the pill now shows exactly the face the picker showed.
+ *
+ * The glyph survives for one case only: no provider chosen yet. There is
+ * nothing to seed, and a generated face would invent a counterparty the user
+ * has not picked.
+ */
 export function ProviderPillIcon({
+  baseUrl,
+  name,
   status = 'unknown',
   size = 32,
 }: {
+  /** The chosen provider's node URL — the avatar's seed. Absent when the user
+   *  has not chosen one. */
+  baseUrl?: string;
+  name?: string;
   status?: ProviderStatus;
   size?: number;
 }) {
@@ -88,8 +104,20 @@ export function ProviderPillIcon({
   const dotStyle = useStatusDotStyle(status, size);
 
   return (
-    <View className="relative">
-      <Icon name="mdi:robot" size={size} color={accent} />
+    <View
+      className="relative"
+      accessibilityLabel={baseUrl ? `${name || baseUrl} provider` : undefined}>
+      {baseUrl ? (
+        <Avatar
+          state="fallback"
+          fallbackKind="robot"
+          seed={baseUrl}
+          size={size}
+          alt={name || baseUrl}
+        />
+      ) : (
+        <Icon name="mdi:robot" size={size} color={accent} />
+      )}
       {dotStyle ? <View className={DOT_CLASS} style={dotStyle} /> : null}
     </View>
   );

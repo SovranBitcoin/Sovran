@@ -102,18 +102,22 @@ describe('confirmSpend', () => {
     await expect(decision).resolves.toBe(false);
   });
 
-  it('only stops asking when the user chooses that explicitly', async () => {
+  it('offers no way to turn itself off', async () => {
+    // "Always allow" was a one-way door: it set `confirmSpend: false` and the
+    // settings toggle its own copy promised was never built, so one tap opted
+    // the user out of every future spend prompt for good. Consenting to one
+    // send must never be consent to all of them.
     const decision = confirmSpend({ modelName: 'Model', maxSats: 42 });
-    lastPayload()
-      .buttons.find((b) => b.testID === 'ai-spend-always')!
-      .onPress(() => {});
+    const payload = lastPayload();
+    expect(payload.buttons.map((b) => b.testID)).toEqual(['ai-spend-confirm']);
 
+    payload.buttons[0].onPress(() => {});
     await expect(decision).resolves.toBe(true);
-    expect(useRoutstrStore.getState().confirmSpend).toBe(false);
-    // And from then on it does not prompt at all.
+    // Saying yes once leaves the prompt armed for the next send.
+    expect(useRoutstrStore.getState().confirmSpend).toBe(true);
     actionMenuPopup.mockClear();
-    await expect(confirmSpend({ modelName: 'Model', maxSats: 42 })).resolves.toBe(true);
-    expect(actionMenuPopup).not.toHaveBeenCalled();
+    void confirmSpend({ modelName: 'Model', maxSats: 42 });
+    expect(actionMenuPopup).toHaveBeenCalled();
   });
 
   it('settles once even if the sheet reports twice', async () => {

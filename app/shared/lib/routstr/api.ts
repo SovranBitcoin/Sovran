@@ -110,7 +110,7 @@ function selectedMintUrl(): string | undefined {
  * second, which is how a request came to be paid from `mint.sovran.money`
  * against a node that only takes Minibits.
  */
-async function payingMintUrl(origin: string): Promise<string> {
+async function payingMintUrl(origin: string): Promise<PayingMintDecision> {
   const pending = metadataReady;
   if (pending?.origin === origin && pending.ownsScope()) await pending.promise;
   const selected = selectedMintUrl();
@@ -119,7 +119,17 @@ async function payingMintUrl(origin: string): Promise<string> {
     require('./sdk/walletAdapter') as typeof import('./sdk/walletAdapter');
   const balances = await cocoWalletAdapter.getBalances();
   const paying = selectPayingMint({ selectedMint: selected, acceptedMints: accepted, balances });
-  if (paying) return paying.mintUrl;
+  if (paying)
+    return {
+      mintUrl: paying.mintUrl,
+      // Which mint paid, and whether it was the user's own choice, is the
+      // first thing a failed attempt has to say: a node that only takes
+      // Minibits and a wallet whose Minibits is down produce the same
+      // "provider unavailable" as a node that is genuinely gone.
+      matchedSelection: selected != null && paying.mintUrl === selected,
+      acceptedMints: accepted?.length ?? 0,
+      walletMints: Object.keys(balances).length,
+    };
 
   // Nothing the node takes. Said plainly, because the user can act on it —
   // switch mint, or switch provider — and every other phrasing of this ends up
@@ -134,6 +144,48 @@ async function payingMintUrl(origin: string): Promise<string> {
     },
   };
   throw refusal;
+}
+
+/** Which mint paid, and what the choice was made from. */
+interface PayingMintDecision {
+  mintUrl: string;
+  matchedSelection: boolean;
+  acceptedMints: number;
+  walletMints: number;
+}
+
+/** The host of a URL, without leaning on React Native's partial `URL`. */
+function hostOf(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  return /^[a-z]+:\/\/([^/?#]+)/i.exec(value)?.[1];
+}
+
+/**
+ * The upstream account a model is billed to (`openrouter`, `ppqai`, `tinfoil`,
+ * `generic`…), read from the lineup the app already holds.
+ *
+ * A node whose OpenRouter credit has run out still serves a complete catalog
+ * and still takes payment, then forwards the upstream's 404 — so "this node is
+ * broken" and "this node's account with one upstream is broken" produce the
+ * same refusal. Carrying the id on the attempt is what lets a run across many
+ * providers be grouped by the thing they actually share.
+ *
+ * Best-effort: a missing store or a model the lineup does not carry is a
+ * missing field, never a failed request.
+ */
+function upstreamIdForModel(model: string): string | undefined {
+  try {
+    const { lineup } = routstrStoreState();
+    if (!lineup) return undefined;
+    for (const vendor of Object.values(lineup)) {
+      for (const entry of [vendor?.auto, vendor?.pro, vendor?.max]) {
+        if (entry?.modelId === model) return entry.upstreamId ?? undefined;
+      }
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
 }
 
 /**
@@ -1183,7 +1235,41 @@ function fromSdkError(error: unknown): RoutstrError | null {
       error: { message: error.message, code: 'no_providers', type: 'provider_error' },
     };
   }
+  // The wallet could not mint the token, and said so in a plain `Error` the
+  // SDK re-threw untyped. Left unclassified it became `status: 0,
+  // network_error` — which the catalogue reads as "the AI provider is
+  // unreachable". On 2026-09-25 that sent a user through dozens of providers
+  // while `mint.minibits.cash/Bitcoin/v1/info` answered 502 to every one of
+  // them; the log's only trace was `createProviderToken: … failed: Failed to
+  // fetch mint …` from the SDK, arriving after the app had already blamed the
+  // node. No provider change can fix a mint, so this has to say "mint".
+  if (isMintFailureMessage(error)) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      status: 0,
+      error: { message, code: 'mint_unreachable', type: 'mint_error', details: undefined },
+    };
+  }
   return null;
+}
+
+/**
+ * Whether a plain error is the wallet failing to reach or use a mint.
+ *
+ * Matched on the message because that is all there is: `@cashu/coco-core`
+ * throws `Failed to fetch mint <url>` and `@routstr/sdk` wraps a mint network
+ * failure as `Your mint <url> is unreachable or is blocking your IP`, neither
+ * of which crosses the SDK boundary as a typed `MintUnreachableError`.
+ */
+function isMintFailureMessage(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+  if (!message) return false;
+  return (
+    /failed to fetch mint/i.test(message) ||
+    /unreachable or is blocking your ip/i.test(message) ||
+    /all candidate mints/i.test(message) ||
+    /mint .*(is )?unreachable/i.test(message)
+  );
 }
 
 /**
@@ -1229,8 +1315,16 @@ export async function sendMessage(
 ): Promise<{ stream: AsyncIterable<ChatCompletionChunk>; cost: Promise<number> }> {
   const { model, payment: context, temperature = 0.7, max_tokens } = options;
   const { textChars, imageParts } = measureMessageContent(messages);
+  // `useAiSend` passes its `flowId` as the payment group id, so every line
+  // below joins the `ai.send.*` timeline the UI already writes rather than
+  // starting a second one the reader has to correlate by timestamp.
+  const flowId = context?.groupId;
+  const nodeHost = hostOf(hasRoutstrProvider() ? routstrOrigin() : undefined);
   apiLog.info('api.routstr.chat.start', {
+    flowId,
+    nodeHost,
     model,
+    upstreamId: upstreamIdForModel(model),
     messageCount: messages.length,
     totalInputChars: textChars,
     imageParts,
@@ -1246,20 +1340,52 @@ export async function sendMessage(
   let mintUrl: string | undefined;
   let response: RoutedResponse;
   let finishPayment = async () => {};
+  let bound: Awaited<ReturnType<typeof getRoutstrClient>> | undefined;
+  // How far this attempt got, in the order it gets there. Reported on every
+  // failure so "it never reached the ecash part" is one field rather than an
+  // inference from which events are missing.
+  let phase: 'mint_selection' | 'client' | 'payment' | 'headers' | 'stream' = 'mint_selection';
+  const elapsed = () => Math.round(performance.now() - start);
   try {
-    mintUrl = await deadline.wait(payingMintUrl(origin));
-    const bound = await deadline.wait(
+    const paying = await deadline.wait(payingMintUrl(origin));
+    mintUrl = paying.mintUrl;
+    phase = 'client';
+    apiLog.info('api.routstr.chat.mint_selected', {
+      flowId,
+      nodeHost,
+      mintHost: hostOf(paying.mintUrl),
+      matchedSelection: paying.matchedSelection,
+      acceptedMints: paying.acceptedMints,
+      walletMints: paying.walletMints,
+      duration_ms: elapsed(),
+    });
+    const client = await deadline.wait(
       getRoutstrClient(origin, () => ownsScope() && !signal.aborted)
     );
-    finishPayment = bound.finish;
+    bound = client;
+    finishPayment = client.finish;
     if (!ownsScope() || signal?.aborted) throw new Error('Request cancelled before payment');
     const payingMint = mintUrl;
+    phase = 'payment';
+    // Everything local is done; from here the SDK prices the request, mints a
+    // token for it and dispatches. `routstr.sdk.sent` is the next marker, and
+    // its absence after this line is the whole "never reached ecash" class.
+    apiLog.info('api.routstr.chat.dispatch', {
+      flowId,
+      nodeHost,
+      mintHost: hostOf(payingMint),
+      model,
+      upstreamId: upstreamIdForModel(model),
+      temperature,
+      max_tokens,
+      duration_ms: elapsed(),
+    });
     response = (await deadline.wait(
       withPaymentScope(context, () =>
-        bound.client.routeRequest({
+        client.client.routeRequest({
           path: '/v1/chat/completions',
           method: 'POST',
-          baseUrl: bound.baseUrl,
+          baseUrl: client.baseUrl,
           mintUrl: payingMint,
           // The catalog id, not the upstream one: the SDK maps a `tinfoil-`
           // model to its enclave name and carries the catalog id separately in
@@ -1281,12 +1407,32 @@ export async function sendMessage(
   } catch (error) {
     deadline.dispose();
     const translated = fromSdkError(error);
+    const raw = error instanceof Error ? error : undefined;
+    const paid = bound?.payment();
     apiLog.error('api.routstr.chat.failed', {
+      flowId,
+      nodeHost,
+      mintHost: paid?.mintedFromHost ?? hostOf(mintUrl),
       model,
+      upstreamId: upstreamIdForModel(model),
+      phase,
+      // The three questions a failed attempt has to answer before anyone can
+      // act on it: did the token ever get minted, did the change come home,
+      // and was it us or the node that gave up.
+      tokenMinted: paid?.mintedSats != null,
+      mintedSats: paid?.mintedSats ?? undefined,
+      changeSats: paid?.changeSats ?? undefined,
+      changeReceived: paid?.changeReceived,
+      changeFailed: paid?.changeFailed,
+      timedOut: signal.aborted && raw?.name === 'TimeoutError',
+      cancelled: signal.aborted && raw?.name !== 'TimeoutError',
       status: translated?.status ?? 0,
       code: translated?.error.code,
-      message: translated?.error.message.slice(0, 200),
-      duration_ms: Math.round(performance.now() - start),
+      errorName: raw?.name,
+      // The untranslated text, which is the only place a mint outage, an
+      // Expo fetch failure and a node refusal look different from each other.
+      reason: (translated?.error.message ?? raw?.message ?? String(error)).slice(0, 200),
+      duration_ms: elapsed(),
     });
     if (translated) throw translated;
     // Anything still in flight is money the node may or may not have taken;
@@ -1295,11 +1441,24 @@ export async function sendMessage(
     toRoutstrError(error);
   }
 
+  phase = 'headers';
   const requestId = response.headers.get('x-routstr-request-id') || response.requestId || undefined;
-  apiLog.debug('api.routstr.chat.response_received', {
+  const paidFor = bound?.payment();
+  // Promoted from `debug`: this is the line that separates "the node never
+  // answered" from "the node answered and refused", and the debug lane is off
+  // in the builds where that question gets asked.
+  apiLog.info('api.routstr.chat.response_received', {
+    flowId,
+    nodeHost,
     status: response.status,
     requestId,
-    duration_ms: Math.round(performance.now() - start),
+    contentType: response.headers.get('content-type') ?? undefined,
+    // The node returns change in this header. Its absence on a refusal means
+    // the sats are still on the node and only the refund endpoint can get
+    // them back.
+    hasChangeHeader: response.headers.get('x-cashu') != null,
+    mintedSats: paidFor?.mintedSats ?? undefined,
+    ttfb_ms: elapsed(),
   });
 
   if (!response.ok) {
@@ -1309,10 +1468,25 @@ export async function sendMessage(
       await deadline.wait(throwResponseError(response, undefined, undefined, ownsScope));
     } catch (error) {
       deadline.dispose();
+      const refused = bound?.payment();
       apiLog.error('api.routstr.chat.failed', {
+        flowId,
+        nodeHost,
         model,
+        upstreamId: upstreamIdForModel(model),
+        phase,
         status: response.status,
-        duration_ms: Math.round(performance.now() - start),
+        requestId,
+        tokenMinted: refused?.mintedSats != null,
+        mintedSats: refused?.mintedSats ?? undefined,
+        changeSats: refused?.changeSats ?? undefined,
+        changeReceived: refused?.changeReceived,
+        changeFailed: refused?.changeFailed,
+        reason:
+          error && typeof error === 'object' && 'error' in error
+            ? String((error as RoutstrError).error.message).slice(0, 200)
+            : undefined,
+        duration_ms: elapsed(),
       });
       if (ownsScope() && isModelRejectedError(error, model))
         routstrStoreState().invalidateServerLineup();
@@ -1320,10 +1494,13 @@ export async function sendMessage(
     }
   }
 
+  phase = 'stream';
   apiLog.info('api.routstr.chat.stream_started', {
+    flowId,
+    nodeHost,
     model,
     requestId,
-    ttfb_ms: Math.round(performance.now() - start),
+    ttfb_ms: elapsed(),
   });
 
   // Started here rather than awaited: the SDK banks the change as soon as the
@@ -1339,8 +1516,17 @@ export async function sendMessage(
         const sats = response.finalize
           ? await withPaymentScope(context, () => response.finalize!())
           : (response.satsSpent ?? 0);
+        const settled = bound?.payment();
         await finishPayment();
-        apiLog.info('routstr.payment.settled', { model, costSats: sats });
+        apiLog.info('routstr.payment.settled', {
+          flowId,
+          nodeHost,
+          model,
+          costSats: sats,
+          mintedSats: settled?.mintedSats ?? undefined,
+          changeSats: settled?.changeSats ?? undefined,
+          duration_ms: elapsed(),
+        });
         return sats;
       })()
     )

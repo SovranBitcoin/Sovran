@@ -6,7 +6,17 @@
  * The row had four lines: the name, a subtitle restating the balance and the
  * encryption, the stats pills, and — when the provider could not be chosen —
  * the reason. The subtitle was the one carrying nothing the stats line did not
- * already carry, so it is gone and the row is name / stats / reason.
+ * already carry, so it went; what took its place is the one thing the row was
+ * missing, which is WHO RUNS THIS. A node is a machine and somebody operates
+ * it, and that somebody is who the user is trusting with their prompts — so it
+ * reads as an attribution under the name rather than as a labelled field on a
+ * details page. The row is name / run by / stats, plus the reason when it
+ * cannot be chosen.
+ *
+ * The operator's two stats travel together. Reputation and reach are the same
+ * person's, read in the same pass, and a shield with no follower count beside
+ * it left the reader guessing whether the missing pill meant nobody follows
+ * them or nobody looked.
  *
  * The status pill is the other half. It used to be a bare heartbeat glyph
  * whose only content was its colour, which is unreadable to a screen reader
@@ -192,6 +202,15 @@ function renderProviderRow(props: Parameters<typeof ContactRow>[0]) {
   };
 }
 
+/** Flatten a rendered subtitle node down to the words it puts on screen. */
+function spoken(node: unknown): string {
+  if (node == null || typeof node === 'boolean') return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(spoken).join('');
+  const element = node as { props?: { children?: unknown } };
+  return element.props ? spoken(element.props.children) : '';
+}
+
 const row = (over: Record<string, unknown> = {}) => ({
   identity: [
     providerIdentity({
@@ -201,11 +220,12 @@ const row = (over: Record<string, unknown> = {}) => ({
       encryptedModelCount: 9,
       status: 'online' as const,
     }),
-    nostrIdentity('a'.repeat(64), { followers: 1_234 }),
+    nostrIdentity('a'.repeat(64), { name: 'gudnuf', followers: 1_234, score: 62 }),
   ],
   title: 'redsh1ft',
-  subtitle: null,
-  accentPosition: 'below' as const,
+  // Inline, as the screen mounts it: with the stats on a band of their own the
+  // row is taller than the band the 44px avatar is centred in, so the face sat
+  // visibly above the middle of its own row.
   onPress: () => {},
   testID: 'contact-row:provider:https://ai.redsh1ft.com',
   ...over,
@@ -216,23 +236,83 @@ beforeEach(() => {
 });
 
 describe('AI provider row', () => {
-  it('is three lines: who it is, the stats, and why it cannot be chosen', () => {
+  it('is three lines: who it is, who runs it, and what the network makes of them', () => {
     const rendered = renderProviderRow(
       row({ disabled: true, disabledReason: 'Not answering right now' })
     );
     // 1. the name (or the URL, when a provider publishes no name)
     expect(rendered.title).toBe('redsh1ft');
-    // 2. the stats — and NOT a second line repeating them in prose
-    expect(rendered.subtitle).toBeUndefined();
+    // 2. the operator, as an attribution and not a labelled field
+    expect(spoken(rendered.subtitle)).toBe('Run by gudnuf');
+    // 3. the stats — and NOT a fourth line repeating them in prose
     expect(rendered.stats.length).toBeGreaterThan(0);
-    // 3. the reason, once
+    // and the reason, once, when there is one
     expect(rendered.note).toBe('Not answering right now');
   });
 
-  it('drops to two lines when the provider is choosable', () => {
+  it('carries no reason line when the provider is choosable', () => {
     const rendered = renderProviderRow(row());
-    expect(rendered.subtitle).toBeUndefined();
     expect(rendered.note).toBeUndefined();
+  });
+
+  it('says nothing about an operator a provider does not publish', () => {
+    const rendered = renderProviderRow(
+      row({
+        identity: [providerIdentity({ baseUrl: 'https://ai.redsh1ft.com', status: 'online' })],
+      })
+    );
+    expect(rendered.subtitle).toBeUndefined();
+  });
+
+  it('shows reach and reputation together, or not at all', () => {
+    const rendered = renderProviderRow(row());
+    expect(rendered.stats.find((stat) => stat.icon === 'reputation')?.value).toBe('62');
+    expect(rendered.stats.find((stat) => stat.icon === 'followers')?.value).toBe('1.2k');
+  });
+
+  it('prints a counted zero rather than dropping the pill', () => {
+    const rendered = renderProviderRow(
+      row({
+        identity: [
+          providerIdentity({ baseUrl: 'https://ai.redsh1ft.com', status: 'online' }),
+          nostrIdentity('a'.repeat(64), { name: 'gudnuf', followers: 0, score: 62 }),
+        ],
+      })
+    );
+    // Nobody follows them is a fact, and it is not the same fact as nobody
+    // having looked. It used to drop out, leaving a lone shield.
+    expect(rendered.stats.find((stat) => stat.icon === 'followers')?.value).toBe('0');
+    expect(rendered.stats.find((stat) => stat.icon === 'reputation')?.value).toBe('62');
+  });
+
+  it('keeps the follower pill, unmeasured, when nobody resolved the count', () => {
+    const rendered = renderProviderRow(
+      row({
+        identity: [
+          providerIdentity({ baseUrl: 'https://ai.redsh1ft.com', status: 'online' }),
+          // nagg returns `null` for a reach it could not resolve — a third
+          // state, and emphatically not zero.
+          nostrIdentity('a'.repeat(64), { name: 'gudnuf', followers: null, score: 62 }),
+        ],
+      })
+    );
+    const followers = rendered.stats.find((stat) => stat.icon === 'followers');
+    expect(followers?.value).toBe('—');
+    expect(followers?.accessibilityLabel).toBe('Follower count not measured');
+    expect(rendered.stats.find((stat) => stat.icon === 'reputation')?.value).toBe('62');
+  });
+
+  it('shows neither when the operator has been read and has no numbers at all', () => {
+    const rendered = renderProviderRow(
+      row({
+        identity: [
+          providerIdentity({ baseUrl: 'https://ai.redsh1ft.com', status: 'online' }),
+          nostrIdentity('a'.repeat(64), { name: 'gudnuf' }),
+        ],
+      })
+    );
+    expect(rendered.stats.some((stat) => stat.icon === 'reputation')).toBe(false);
+    expect(rendered.stats.some((stat) => stat.icon === 'followers')).toBe(false);
   });
 
   it.each([

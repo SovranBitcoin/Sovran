@@ -34,6 +34,7 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { Notice } from '@/shared/ui/composed/Notice';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Section } from '@/shared/ui/composed/Section';
+import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -92,6 +93,11 @@ export function ProviderInfoScreen() {
   const [info, setInfo] = useState<NodeInfo | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'empty'>('loading');
   const [catalog, setCatalog] = useState<ProviderModelSummary | null>(null);
+  // Tracked separately from `catalog` because a failed or refused catalog read
+  // has to END the skeleton. A null catalog alone cannot say whether the
+  // answer is still coming or never arrived, and a placeholder that waits
+  // forever is worse than no placeholder at all.
+  const [catalogState, setCatalogState] = useState<'loading' | 'ready' | 'empty'>('loading');
 
   // Who runs this node. `/v1/info` publishes an npub; discovery records the
   // key that signed the announcement. Either way the profile read is the same
@@ -150,11 +156,21 @@ export function ProviderInfoScreen() {
   useEffect(() => {
     if (!nodeBaseUrl) return;
     let cancelled = false;
-    void fetchProviderModelSummary(nodeBaseUrl).then((summary) => {
-      if (cancelled || !summary) return;
-      setCatalog(summary);
-      useRoutstrStore.getState().rememberProviders({ [nodeBaseUrl]: { e2ee: summary.e2ee } });
-    });
+    setCatalogState('loading');
+    void fetchProviderModelSummary(nodeBaseUrl)
+      .then((summary) => {
+        if (cancelled) return;
+        if (!summary) {
+          setCatalogState('empty');
+          return;
+        }
+        setCatalog(summary);
+        setCatalogState('ready');
+        useRoutstrStore.getState().rememberProviders({ [nodeBaseUrl]: { e2ee: summary.e2ee } });
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogState('empty');
+      });
     const controller = new AbortController();
     void probeProviders([nodeBaseUrl], {
       signal: controller.signal,
@@ -262,7 +278,23 @@ export function ProviderInfoScreen() {
             {displayName}
           </Text>
         </Animated.View>
-        {info?.description ? (
+        {/* The face and the name are already right: the avatar is seeded from
+            the URL and the name comes in on the link, so neither has a loading
+            state to draw. The description is the one thing on this band that
+            arrives over the wire, so it — and only it — reserves a line. */}
+        {state === 'loading' ? (
+          <>
+            <Spacer size={4} />
+            <Text
+              loading
+              size={14}
+              color={muted}
+              className="text-center"
+              placeholder="A node serving frontier models, paid in ecash"
+              testID="ai-provider-info-description-skeleton"
+            />
+          </>
+        ) : info?.description ? (
           <>
             <Spacer size={4} />
             <Text size={14} color={muted} className="text-center">
@@ -299,50 +331,108 @@ export function ProviderInfoScreen() {
         </ListGroup>
       </Section>
 
-      {info?.mints.length ? (
-        <Section title={`Accepted mints · ${spendableSats.toLocaleString()} sat spendable`}>
-          {info.mints.every(
-            (mint) => !heldMints.has(mint.trim().replace(/\/+$/, '').toLowerCase())
-          ) ? (
-            <>
-              <Notice
-                status="warning"
-                title="You cannot pay this provider yet"
-                description="It redeems payment only from the mints below, and your wallet holds none of them."
-              />
-              <Spacer size={8} />
-            </>
-          ) : null}
-          <ListGroup variant="secondary">
-            {info.mints.map((mint) => (
-              <ProviderMintRow key={mint} mintUrl={mint} />
-            ))}
-          </ListGroup>
-        </Section>
-      ) : null}
+      {/* Accepted mints — the section that decides whether this page is
+          actionable at all, so it is the one that must not appear from
+          nowhere. Two rows while the read is out: enough to establish that a
+          list is coming and where it starts, without pretending to know how
+          long it is. */}
+      <SkeletonContentCrossfade
+        loading={state === 'loading'}
+        visualKey="provider-info-mints"
+        visualSurface="provider-info"
+        testID="ai-provider-info-mints"
+        renderSkeleton={() => (
+          <Section title="Accepted mints">
+            <ListGroup variant="secondary">
+              <ProviderMintRow mintUrl="" loading />
+              <ProviderMintRow mintUrl="" loading />
+            </ListGroup>
+          </Section>
+        )}
+        renderContent={() =>
+          info?.mints.length ? (
+            <Section title={`Accepted mints · ${spendableSats.toLocaleString()} sat spendable`}>
+              {info.mints.every(
+                (mint) => !heldMints.has(mint.trim().replace(/\/+$/, '').toLowerCase())
+              ) ? (
+                <>
+                  <Notice
+                    status="warning"
+                    title="You cannot pay this provider yet"
+                    description="It redeems payment only from the mints below, and your wallet holds none of them."
+                  />
+                  <Spacer size={8} />
+                </>
+              ) : null}
+              <ListGroup variant="secondary">
+                {info.mints.map((mint) => (
+                  <ProviderMintRow key={mint} mintUrl={mint} />
+                ))}
+              </ListGroup>
+            </Section>
+          ) : null
+        }
+      />
 
-      {catalog ? (
-        <Section title="Models">
-          <ListGroup variant="secondary">
-            <ListGroup.Item disabled>
-              <ListGroup.ItemContent>
-                <ListGroup.ItemTitle>{catalog.count.toLocaleString()} models</ListGroup.ItemTitle>
-              </ListGroup.ItemContent>
-            </ListGroup.Item>
-            <ListGroup.Item disabled>
-              <ListGroup.ItemContent>
-                <ListGroup.ItemTitle>End-to-end encrypted</ListGroup.ItemTitle>
-                <ListGroup.ItemDescription>
-                  {catalog.e2ee
-                    ? 'Some models run in an enclave this provider cannot read into.'
-                    : 'This provider can read every request it forwards.'}
-                </ListGroup.ItemDescription>
-              </ListGroup.ItemContent>
-              {catalog.e2ee ? <Icon name="mdi:shield-check" size={18} color={foreground} /> : null}
-            </ListGroup.Item>
-          </ListGroup>
-        </Section>
-      ) : null}
+      {/* Models: always exactly two rows — a count, and the encryption answer
+          — so the skeleton is the same two rows and the section never changes
+          height when the catalog lands. */}
+      <SkeletonContentCrossfade
+        loading={catalogState === 'loading'}
+        visualKey="provider-info-models"
+        visualSurface="provider-info"
+        testID="ai-provider-info-models"
+        renderSkeleton={() => (
+          <Section title="Models">
+            <ListGroup variant="secondary">
+              <ListGroup.Item disabled testID="ai-provider-model-count-skeleton">
+                <ListGroup.ItemContent>
+                  <Text loading medium size={16} placeholder="582 models" />
+                </ListGroup.ItemContent>
+              </ListGroup.Item>
+              <ListGroup.Item disabled testID="ai-provider-model-e2ee-skeleton">
+                <ListGroup.ItemContent>
+                  <Text loading medium size={16} placeholder="End-to-end encrypted" />
+                  <Text
+                    loading
+                    size={14}
+                    color={muted}
+                    placeholder="This provider can read every request it forwards."
+                  />
+                </ListGroup.ItemContent>
+              </ListGroup.Item>
+            </ListGroup>
+          </Section>
+        )}
+        renderContent={() =>
+          catalog ? (
+            <Section title="Models">
+              <ListGroup variant="secondary">
+                <ListGroup.Item disabled>
+                  <ListGroup.ItemContent>
+                    <ListGroup.ItemTitle>
+                      {catalog.count.toLocaleString()} models
+                    </ListGroup.ItemTitle>
+                  </ListGroup.ItemContent>
+                </ListGroup.Item>
+                <ListGroup.Item disabled>
+                  <ListGroup.ItemContent>
+                    <ListGroup.ItemTitle>End-to-end encrypted</ListGroup.ItemTitle>
+                    <ListGroup.ItemDescription>
+                      {catalog.e2ee
+                        ? 'Some models run in an enclave this provider cannot read into.'
+                        : 'This provider can read every request it forwards.'}
+                    </ListGroup.ItemDescription>
+                  </ListGroup.ItemContent>
+                  {catalog.e2ee ? (
+                    <Icon name="mdi:shield-check" size={18} color={foreground} />
+                  ) : null}
+                </ListGroup.Item>
+              </ListGroup>
+            </Section>
+          ) : null
+        }
+      />
 
       {info?.version || info?.npub ? (
         <Section title="Identity">

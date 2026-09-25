@@ -596,6 +596,18 @@ function SheetPopup() {
       const reviveClosingInstance = previous.seq !== openSeq && !previous.isOpen && reusable;
       if (mountedSeq === null || (mountedSeq !== openSeq && !reviveClosingInstance)) {
         setMountedSeq(openSeq);
+      } else if (reviveClosingInstance) {
+        // The one branch that serves an open() from a gorhom instance it did
+        // not mount. It exists because swapping instances mid-exit brought up
+        // a second iOS FullWindowOverlay whose JS touch responder was dead —
+        // a sheet that looks present and ignores every tap. Nothing else in
+        // the host records that this path was taken, so a report of "the
+        // sheet opened but nothing in it responds" has no way to name it.
+        popupHostLog.info('popupHost.revive', {
+          openSeq,
+          mountedSeq,
+          sheetId: isCustomSheetPayload(incoming) ? incoming.sheetId : 'standard',
+        });
       }
       setPresentAttempt(0);
       setPresented(false);
@@ -908,7 +920,18 @@ function SheetPopup() {
             // animates it up once its layout is calculated.
             mountIndex={0}
             onAnimate={(_from, to) => {
-              if (to >= 0) setPresented(true);
+              if (to < 0 || presented) return;
+              // The positive counterpart of `popupHost.open_stalled`: without
+              // it a session that never selected anything is ambiguous between
+              // "the sheet never came up" and "it came up and ate every tap".
+              // Only the first report per open is logged.
+              popupHostLog.info('popupHost.presented', {
+                openSeq,
+                mountedSeq,
+                attempt: presentAttempt,
+                sheetId: isCustom && customRootSheetId ? customRootSheetId : 'standard',
+              });
+              setPresented(true);
             }}
             onChange={handleNativeSheetChange}
             onClose={handleNativeSheetClose}

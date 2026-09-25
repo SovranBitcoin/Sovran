@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { useBalanceContext } from '@cashu/coco-react';
 import { routstrMintKey, spendableMintBalances } from '@/shared/lib/routstr/payingMint';
@@ -107,6 +107,13 @@ export function useProviderRows(
       const spendableSats = provider.mints.length
         ? [...accepted].reduce((sum, mint) => sum + (byMint.get(mint) ?? 0), 0)
         : walletTotal;
+      // A provider is unusable for exactly two reasons, and they are asked in
+      // that order deliberately. The first — "there is no mint here I can pay
+      // it from" — is a comparison between two lists this device already
+      // holds, so it is decided in the first frame and never waits on a
+      // probe. Only if the wallet CAN pay does reachability get to have an
+      // opinion, and `unknown` is not one: a row nobody has reached yet stays
+      // choosable rather than being accused of being down.
       const blockedReason =
         provider.mints.length > 0 && spendableSats <= 0
           ? `Redeems ecash only from ${accepted.size === 1 ? 'a mint' : 'mints'} you do not hold`
@@ -153,24 +160,35 @@ export function useProviderRows(
 
   // Rank on entry. Discovery may append providers, but asynchronous metadata
   // must not move an existing choice while the user is reaching for it. The
-  // one exception is the directory's first arrival: it lands within a few
-  // hundred milliseconds of the screen opening and it is the ordering the
+  // one exception is the directory's first arrival: it is the ordering the
   // list is supposed to show, so it re-seats rows once rather than leaving a
   // stale local ranking pinned for the whole session.
-  const [order, setOrder] = useState(() => ranked.map((row) => row.baseUrl));
-  const seatedFromServer = useRef(false);
-  useEffect(() => {
-    if (server.size > 0 && !seatedFromServer.current) {
-      seatedFromServer.current = true;
-      setOrder(ranked.map((row) => row.baseUrl));
-      return;
+  //
+  // The seat is adjusted DURING RENDER, not in an effect. An effect commits a
+  // frame in which the new directory is paired with the previous order and
+  // then immediately replaces it — which is precisely the "it shows something,
+  // then the content changes" the list was reported for. React re-runs this
+  // component before painting instead, so the re-seat is never on screen.
+  // With the directory persisted, the common case does not reach it at all:
+  // `server` is already populated on the first render and the initial seat is
+  // the server's order.
+  const [seat, setSeat] = useState(() => ({
+    fromServer: server.size > 0,
+    order: ranked.map((row) => row.baseUrl),
+  }));
+  let seated = seat;
+  if (server.size > 0 && !seat.fromServer) {
+    seated = { fromServer: true, order: ranked.map((row) => row.baseUrl) };
+    setSeat(seated);
+  } else {
+    const seen = new Set(seat.order);
+    const additions = ranked.filter((row) => !seen.has(row.baseUrl)).map((row) => row.baseUrl);
+    if (additions.length > 0) {
+      seated = { fromServer: seat.fromServer, order: [...seat.order, ...additions] };
+      setSeat(seated);
     }
-    setOrder((previous) => {
-      const seen = new Set(previous);
-      const additions = ranked.filter((row) => !seen.has(row.baseUrl)).map((row) => row.baseUrl);
-      return additions.length ? [...previous, ...additions] : previous;
-    });
-  }, [ranked, server]);
+  }
+  const order = seated.order;
   const positions = new Map(order.map((url, index) => [url, index]));
   return [...ranked].sort(
     (a, b) =>

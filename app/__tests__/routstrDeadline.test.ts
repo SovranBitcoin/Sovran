@@ -1,8 +1,17 @@
+import { sendMessage, setRoutstrNodeBaseUrl } from '@/shared/lib/routstr/api';
+
 const mockRoute = jest.fn<Promise<Response>, [{ signal?: AbortSignal }]>();
 jest.mock('@/shared/lib/routstr/sdk/client', () => ({
   getRoutstrClient: async () => ({
     client: { routeRequest: mockRoute },
     baseUrl: 'https://node.example/',
+    payment: () => ({
+      mintedSats: null,
+      mintedFromHost: undefined,
+      changeSats: null,
+      changeReceived: false,
+      changeFailed: false,
+    }),
     finish: async () => {},
   }),
   acceptedMintsForProvider: async () => null,
@@ -21,8 +30,6 @@ jest.mock('@/shared/lib/logger', () => {
   const log = { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() };
   return { apiLog: log, aiLog: log, storeLog: log, log, applyFileLogging: jest.fn() };
 });
-
-import { sendMessage, setRoutstrNodeBaseUrl } from '@/shared/lib/routstr/api';
 
 describe('Routstr response deadlines', () => {
   beforeEach(() => {

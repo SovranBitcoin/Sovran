@@ -1,8 +1,18 @@
 diff --git a/dist/browser.js b/dist/browser.js
-index 4a84339a7902ab723b876dc6cd022b9e72641ac7..eca68bfe0a4dc43c2817f67ec9bb102bc8b1e501 100644
+index 4a84339a7902ab723b876dc6cd022b9e72641ac7..ac010f8b69cf9da5505b75db883b3a324fce2313 100644
 --- a/dist/browser.js
 +++ b/dist/browser.js
-@@ -3087,7 +3087,8 @@ var BalanceManager = class _BalanceManager {
+@@ -1538,7 +1538,8 @@ var MintDiscovery = class {
+ 
+ // wallet/tokenUtils.ts
+ function isNetworkErrorMessage(message) {
+-  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
++  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // React Native / Expo (Hermes + expo/fetch) connection failures. RN never emits any browser or Bun spelling, so without these every mobile network fault bypassed refund and failover.
++  message.includes("Network request failed") || message.includes("The network connection was lost") || message.includes("The request timed out") || message.includes("Could not connect to the server") || message.includes("A server with the specified hostname could not be found") || message.includes("cannot parse response") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
+   message.includes("Unable to connect") || message.includes("Was there a typo in the url or port") || message.includes("ERR_TLS_CERT_ALTNAME_INVALID") || message.includes("ERR_TLS_CERT_NOT_YET_VALID") || message.includes("ERR_TLS_CERT_EXPIRED") || message.includes("UNABLE_TO_VERIFY_LEAF_SIGNATURE") || message.includes("SELF_SIGNED_CERT_IN_CHAIN");
+ }
+ function getBalanceInSats(balance, unit) {
+@@ -3087,7 +3088,8 @@ var BalanceManager = class _BalanceManager {
  var TOR_ONION_SUFFIX = ".onion";
  var isTorContext = () => {
    if (typeof window === "undefined") return false;
@@ -13,10 +23,20 @@ index 4a84339a7902ab723b876dc6cd022b9e72641ac7..eca68bfe0a4dc43c2817f67ec9bb102b
  };
  var isOnionUrl = (url) => {
 diff --git a/dist/browser.mjs b/dist/browser.mjs
-index 3ab09ccda43af12ae2259eae01d2a5120f441bbd..66c3bdce4ded9cc2942a3649a6b859047b0763c5 100644
+index 3ab09ccda43af12ae2259eae01d2a5120f441bbd..7e6d901bb72da1773fd3dc78358858a8d1771a43 100644
 --- a/dist/browser.mjs
 +++ b/dist/browser.mjs
-@@ -3085,7 +3085,8 @@ var BalanceManager = class _BalanceManager {
+@@ -1536,7 +1536,8 @@ var MintDiscovery = class {
+ 
+ // wallet/tokenUtils.ts
+ function isNetworkErrorMessage(message) {
+-  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
++  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // React Native / Expo (Hermes + expo/fetch) connection failures. RN never emits any browser or Bun spelling, so without these every mobile network fault bypassed refund and failover.
++  message.includes("Network request failed") || message.includes("The network connection was lost") || message.includes("The request timed out") || message.includes("Could not connect to the server") || message.includes("A server with the specified hostname could not be found") || message.includes("cannot parse response") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
+   message.includes("Unable to connect") || message.includes("Was there a typo in the url or port") || message.includes("ERR_TLS_CERT_ALTNAME_INVALID") || message.includes("ERR_TLS_CERT_NOT_YET_VALID") || message.includes("ERR_TLS_CERT_EXPIRED") || message.includes("UNABLE_TO_VERIFY_LEAF_SIGNATURE") || message.includes("SELF_SIGNED_CERT_IN_CHAIN");
+ }
+ function getBalanceInSats(balance, unit) {
+@@ -3085,7 +3086,8 @@ var BalanceManager = class _BalanceManager {
  var TOR_ONION_SUFFIX = ".onion";
  var isTorContext = () => {
    if (typeof window === "undefined") return false;
@@ -27,10 +47,20 @@ index 3ab09ccda43af12ae2259eae01d2a5120f441bbd..66c3bdce4ded9cc2942a3649a6b85904
  };
  var isOnionUrl = (url) => {
 diff --git a/dist/bun.js b/dist/bun.js
-index be62e2a4c56969398b9ac07fe04836aeef6d79af..2d5b3d2ca66dbe568f9f91cb1e953b7dd287c79d 100644
+index be62e2a4c56969398b9ac07fe04836aeef6d79af..0d04fe9ad0bea1319f688d7f5f40c67ac3a435d8 100644
 --- a/dist/bun.js
 +++ b/dist/bun.js
-@@ -3087,7 +3087,8 @@ var BalanceManager = class _BalanceManager {
+@@ -1538,7 +1538,8 @@ var MintDiscovery = class {
+ 
+ // wallet/tokenUtils.ts
+ function isNetworkErrorMessage(message) {
+-  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
++  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // React Native / Expo (Hermes + expo/fetch) connection failures. RN never emits any browser or Bun spelling, so without these every mobile network fault bypassed refund and failover.
++  message.includes("Network request failed") || message.includes("The network connection was lost") || message.includes("The request timed out") || message.includes("Could not connect to the server") || message.includes("A server with the specified hostname could not be found") || message.includes("cannot parse response") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
+   message.includes("Unable to connect") || message.includes("Was there a typo in the url or port") || message.includes("ERR_TLS_CERT_ALTNAME_INVALID") || message.includes("ERR_TLS_CERT_NOT_YET_VALID") || message.includes("ERR_TLS_CERT_EXPIRED") || message.includes("UNABLE_TO_VERIFY_LEAF_SIGNATURE") || message.includes("SELF_SIGNED_CERT_IN_CHAIN");
+ }
+ function getBalanceInSats(balance, unit) {
+@@ -3087,7 +3088,8 @@ var BalanceManager = class _BalanceManager {
  var TOR_ONION_SUFFIX = ".onion";
  var isTorContext = () => {
    if (typeof window === "undefined") return false;
@@ -41,10 +71,20 @@ index be62e2a4c56969398b9ac07fe04836aeef6d79af..2d5b3d2ca66dbe568f9f91cb1e953b7d
  };
  var isOnionUrl = (url) => {
 diff --git a/dist/bun.mjs b/dist/bun.mjs
-index adb8878427def5fc4a659cf7f8cc75c6213f1f68..1f6c14f70a1aabea8178eeae7fb0a77c92c30a32 100644
+index adb8878427def5fc4a659cf7f8cc75c6213f1f68..e63144577ba1d8995d3ccd0e095740ae943e837f 100644
 --- a/dist/bun.mjs
 +++ b/dist/bun.mjs
-@@ -3085,7 +3085,8 @@ var BalanceManager = class _BalanceManager {
+@@ -1536,7 +1536,8 @@ var MintDiscovery = class {
+ 
+ // wallet/tokenUtils.ts
+ function isNetworkErrorMessage(message) {
+-  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
++  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // React Native / Expo (Hermes + expo/fetch) connection failures. RN never emits any browser or Bun spelling, so without these every mobile network fault bypassed refund and failover.
++  message.includes("Network request failed") || message.includes("The network connection was lost") || message.includes("The request timed out") || message.includes("Could not connect to the server") || message.includes("A server with the specified hostname could not be found") || message.includes("cannot parse response") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
+   message.includes("Unable to connect") || message.includes("Was there a typo in the url or port") || message.includes("ERR_TLS_CERT_ALTNAME_INVALID") || message.includes("ERR_TLS_CERT_NOT_YET_VALID") || message.includes("ERR_TLS_CERT_EXPIRED") || message.includes("UNABLE_TO_VERIFY_LEAF_SIGNATURE") || message.includes("SELF_SIGNED_CERT_IN_CHAIN");
+ }
+ function getBalanceInSats(balance, unit) {
+@@ -3085,7 +3086,8 @@ var BalanceManager = class _BalanceManager {
  var TOR_ONION_SUFFIX = ".onion";
  var isTorContext = () => {
    if (typeof window === "undefined") return false;
@@ -55,10 +95,20 @@ index adb8878427def5fc4a659cf7f8cc75c6213f1f68..1f6c14f70a1aabea8178eeae7fb0a77c
  };
  var isOnionUrl = (url) => {
 diff --git a/dist/client/index.js b/dist/client/index.js
-index 9f4ff54c85ee702ad423146481c2ec6289316cd1..6cdc93ad538ff0049d571a0440217a652ea0fa17 100644
+index 9f4ff54c85ee702ad423146481c2ec6289316cd1..1b74c3fe714723234dd96d0dac4e329cb24326b3 100644
 --- a/dist/client/index.js
 +++ b/dist/client/index.js
-@@ -1872,7 +1872,8 @@ var BalanceManager = class _BalanceManager {
+@@ -323,7 +323,8 @@ function summarizeCoreError(parsed) {
+ 
+ // wallet/tokenUtils.ts
+ function isNetworkErrorMessage(message) {
+-  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
++  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // React Native / Expo (Hermes + expo/fetch) connection failures. RN never emits any browser or Bun spelling, so without these every mobile network fault bypassed refund and failover.
++  message.includes("Network request failed") || message.includes("The network connection was lost") || message.includes("The request timed out") || message.includes("Could not connect to the server") || message.includes("A server with the specified hostname could not be found") || message.includes("cannot parse response") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
+   message.includes("Unable to connect") || message.includes("Was there a typo in the url or port") || message.includes("ERR_TLS_CERT_ALTNAME_INVALID") || message.includes("ERR_TLS_CERT_NOT_YET_VALID") || message.includes("ERR_TLS_CERT_EXPIRED") || message.includes("UNABLE_TO_VERIFY_LEAF_SIGNATURE") || message.includes("SELF_SIGNED_CERT_IN_CHAIN");
+ }
+ function getBalanceInSats(balance, unit) {
+@@ -1872,7 +1873,8 @@ var BalanceManager = class _BalanceManager {
  var TOR_ONION_SUFFIX = ".onion";
  var isTorContext = () => {
    if (typeof window === "undefined") return false;
@@ -69,10 +119,20 @@ index 9f4ff54c85ee702ad423146481c2ec6289316cd1..6cdc93ad538ff0049d571a0440217a65
  };
  var isOnionUrl = (url) => {
 diff --git a/dist/client/index.mjs b/dist/client/index.mjs
-index 98093e9535a3d23c5dff6022f157e6e980284dc5..254f5350465e59e661182c8725fbc476aa760104 100644
+index 98093e9535a3d23c5dff6022f157e6e980284dc5..ce121a2ef706852181923129e99b28d2531aad8b 100644
 --- a/dist/client/index.mjs
 +++ b/dist/client/index.mjs
-@@ -1870,7 +1870,8 @@ var BalanceManager = class _BalanceManager {
+@@ -321,7 +321,8 @@ function summarizeCoreError(parsed) {
+ 
+ // wallet/tokenUtils.ts
+ function isNetworkErrorMessage(message) {
+-  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
++  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // React Native / Expo (Hermes + expo/fetch) connection failures. RN never emits any browser or Bun spelling, so without these every mobile network fault bypassed refund and failover.
++  message.includes("Network request failed") || message.includes("The network connection was lost") || message.includes("The request timed out") || message.includes("Could not connect to the server") || message.includes("A server with the specified hostname could not be found") || message.includes("cannot parse response") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
+   message.includes("Unable to connect") || message.includes("Was there a typo in the url or port") || message.includes("ERR_TLS_CERT_ALTNAME_INVALID") || message.includes("ERR_TLS_CERT_NOT_YET_VALID") || message.includes("ERR_TLS_CERT_EXPIRED") || message.includes("UNABLE_TO_VERIFY_LEAF_SIGNATURE") || message.includes("SELF_SIGNED_CERT_IN_CHAIN");
+ }
+ function getBalanceInSats(balance, unit) {
+@@ -1870,7 +1871,8 @@ var BalanceManager = class _BalanceManager {
  var TOR_ONION_SUFFIX = ".onion";
  var isTorContext = () => {
    if (typeof window === "undefined") return false;
@@ -83,10 +143,20 @@ index 98093e9535a3d23c5dff6022f157e6e980284dc5..254f5350465e59e661182c8725fbc476
  };
  var isOnionUrl = (url) => {
 diff --git a/dist/index.js b/dist/index.js
-index 092ac1fb0b042a4d1b0bc65cca46aae86654dc38..831951f31c4ba575944f2c3a6e34f54d8c750caa 100644
+index 092ac1fb0b042a4d1b0bc65cca46aae86654dc38..93e878772eef080dc8cd967c14ea981dafb3e8c0 100644
 --- a/dist/index.js
 +++ b/dist/index.js
-@@ -3087,7 +3087,8 @@ var BalanceManager = class _BalanceManager {
+@@ -1538,7 +1538,8 @@ var MintDiscovery = class {
+ 
+ // wallet/tokenUtils.ts
+ function isNetworkErrorMessage(message) {
+-  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
++  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // React Native / Expo (Hermes + expo/fetch) connection failures. RN never emits any browser or Bun spelling, so without these every mobile network fault bypassed refund and failover.
++  message.includes("Network request failed") || message.includes("The network connection was lost") || message.includes("The request timed out") || message.includes("Could not connect to the server") || message.includes("A server with the specified hostname could not be found") || message.includes("cannot parse response") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
+   message.includes("Unable to connect") || message.includes("Was there a typo in the url or port") || message.includes("ERR_TLS_CERT_ALTNAME_INVALID") || message.includes("ERR_TLS_CERT_NOT_YET_VALID") || message.includes("ERR_TLS_CERT_EXPIRED") || message.includes("UNABLE_TO_VERIFY_LEAF_SIGNATURE") || message.includes("SELF_SIGNED_CERT_IN_CHAIN");
+ }
+ function getBalanceInSats(balance, unit) {
+@@ -3087,7 +3088,8 @@ var BalanceManager = class _BalanceManager {
  var TOR_ONION_SUFFIX = ".onion";
  var isTorContext = () => {
    if (typeof window === "undefined") return false;
@@ -97,10 +167,20 @@ index 092ac1fb0b042a4d1b0bc65cca46aae86654dc38..831951f31c4ba575944f2c3a6e34f54d
  };
  var isOnionUrl = (url) => {
 diff --git a/dist/index.mjs b/dist/index.mjs
-index 08c55b1d070150346e17631c48bcbcdae668af3f..27c75d43b54905f58697fd7871cf2d29799ac45c 100644
+index 08c55b1d070150346e17631c48bcbcdae668af3f..4cf35074319b4820b0bf3de7a6d94be9fa59b0a0 100644
 --- a/dist/index.mjs
 +++ b/dist/index.mjs
-@@ -3085,7 +3085,8 @@ var BalanceManager = class _BalanceManager {
+@@ -1536,7 +1536,8 @@ var MintDiscovery = class {
+ 
+ // wallet/tokenUtils.ts
+ function isNetworkErrorMessage(message) {
+-  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
++  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // React Native / Expo (Hermes + expo/fetch) connection failures. RN never emits any browser or Bun spelling, so without these every mobile network fault bypassed refund and failover.
++  message.includes("Network request failed") || message.includes("The network connection was lost") || message.includes("The request timed out") || message.includes("Could not connect to the server") || message.includes("A server with the specified hostname could not be found") || message.includes("cannot parse response") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
+   message.includes("Unable to connect") || message.includes("Was there a typo in the url or port") || message.includes("ERR_TLS_CERT_ALTNAME_INVALID") || message.includes("ERR_TLS_CERT_NOT_YET_VALID") || message.includes("ERR_TLS_CERT_EXPIRED") || message.includes("UNABLE_TO_VERIFY_LEAF_SIGNATURE") || message.includes("SELF_SIGNED_CERT_IN_CHAIN");
+ }
+ function getBalanceInSats(balance, unit) {
+@@ -3085,7 +3086,8 @@ var BalanceManager = class _BalanceManager {
  var TOR_ONION_SUFFIX = ".onion";
  var isTorContext = () => {
    if (typeof window === "undefined") return false;
@@ -111,10 +191,20 @@ index 08c55b1d070150346e17631c48bcbcdae668af3f..27c75d43b54905f58697fd7871cf2d29
  };
  var isOnionUrl = (url) => {
 diff --git a/dist/node.js b/dist/node.js
-index 70eed4e307ac0555f346ace53009fc78814ee61a..a96306f984b617bf58eeaea5f9922accf9add7a9 100644
+index 70eed4e307ac0555f346ace53009fc78814ee61a..3d6596b2570a9048dce0a52261b13228b8573bca 100644
 --- a/dist/node.js
 +++ b/dist/node.js
-@@ -3087,7 +3087,8 @@ var BalanceManager = class _BalanceManager {
+@@ -1538,7 +1538,8 @@ var MintDiscovery = class {
+ 
+ // wallet/tokenUtils.ts
+ function isNetworkErrorMessage(message) {
+-  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
++  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // React Native / Expo (Hermes + expo/fetch) connection failures. RN never emits any browser or Bun spelling, so without these every mobile network fault bypassed refund and failover.
++  message.includes("Network request failed") || message.includes("The network connection was lost") || message.includes("The request timed out") || message.includes("Could not connect to the server") || message.includes("A server with the specified hostname could not be found") || message.includes("cannot parse response") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
+   message.includes("Unable to connect") || message.includes("Was there a typo in the url or port") || message.includes("ERR_TLS_CERT_ALTNAME_INVALID") || message.includes("ERR_TLS_CERT_NOT_YET_VALID") || message.includes("ERR_TLS_CERT_EXPIRED") || message.includes("UNABLE_TO_VERIFY_LEAF_SIGNATURE") || message.includes("SELF_SIGNED_CERT_IN_CHAIN");
+ }
+ function getBalanceInSats(balance, unit) {
+@@ -3087,7 +3088,8 @@ var BalanceManager = class _BalanceManager {
  var TOR_ONION_SUFFIX = ".onion";
  var isTorContext = () => {
    if (typeof window === "undefined") return false;
@@ -125,10 +215,20 @@ index 70eed4e307ac0555f346ace53009fc78814ee61a..a96306f984b617bf58eeaea5f9922acc
  };
  var isOnionUrl = (url) => {
 diff --git a/dist/node.mjs b/dist/node.mjs
-index 0f4f42dff1ba3bfdbbfd9e63a91f7f1eec28066b..dc07af50c33f10ce1c346dbc3bc37f3360e375c1 100644
+index 0f4f42dff1ba3bfdbbfd9e63a91f7f1eec28066b..01847efe0804d122b6ca204b49dcdb216e5fd5a1 100644
 --- a/dist/node.mjs
 +++ b/dist/node.mjs
-@@ -3085,7 +3085,8 @@ var BalanceManager = class _BalanceManager {
+@@ -1536,7 +1536,8 @@ var MintDiscovery = class {
+ 
+ // wallet/tokenUtils.ts
+ function isNetworkErrorMessage(message) {
+-  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
++  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // React Native / Expo (Hermes + expo/fetch) connection failures. RN never emits any browser or Bun spelling, so without these every mobile network fault bypassed refund and failover.
++  message.includes("Network request failed") || message.includes("The network connection was lost") || message.includes("The request timed out") || message.includes("Could not connect to the server") || message.includes("A server with the specified hostname could not be found") || message.includes("cannot parse response") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
+   message.includes("Unable to connect") || message.includes("Was there a typo in the url or port") || message.includes("ERR_TLS_CERT_ALTNAME_INVALID") || message.includes("ERR_TLS_CERT_NOT_YET_VALID") || message.includes("ERR_TLS_CERT_EXPIRED") || message.includes("UNABLE_TO_VERIFY_LEAF_SIGNATURE") || message.includes("SELF_SIGNED_CERT_IN_CHAIN");
+ }
+ function getBalanceInSats(balance, unit) {
+@@ -3085,7 +3086,8 @@ var BalanceManager = class _BalanceManager {
  var TOR_ONION_SUFFIX = ".onion";
  var isTorContext = () => {
    if (typeof window === "undefined") return false;
@@ -138,3 +238,31 @@ index 0f4f42dff1ba3bfdbbfd9e63a91f7f1eec28066b..dc07af50c33f10ce1c346dbc3bc37f33
    return hostname.endsWith(TOR_ONION_SUFFIX);
  };
  var isOnionUrl = (url) => {
+diff --git a/dist/wallet/index.js b/dist/wallet/index.js
+index 953f12bd6d6fa69d6a53f2aa9de6f6de63b0ae48..336e297e187d76f073f8669e9b6234f8701e0a81 100644
+--- a/dist/wallet/index.js
++++ b/dist/wallet/index.js
+@@ -144,7 +144,8 @@ function shouldFailoverToAnotherMint(parsed) {
+ 
+ // wallet/tokenUtils.ts
+ function isNetworkErrorMessage(message) {
+-  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
++  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // React Native / Expo (Hermes + expo/fetch) connection failures. RN never emits any browser or Bun spelling, so without these every mobile network fault bypassed refund and failover.
++  message.includes("Network request failed") || message.includes("The network connection was lost") || message.includes("The request timed out") || message.includes("Could not connect to the server") || message.includes("A server with the specified hostname could not be found") || message.includes("cannot parse response") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
+   message.includes("Unable to connect") || message.includes("Was there a typo in the url or port") || message.includes("ERR_TLS_CERT_ALTNAME_INVALID") || message.includes("ERR_TLS_CERT_NOT_YET_VALID") || message.includes("ERR_TLS_CERT_EXPIRED") || message.includes("UNABLE_TO_VERIFY_LEAF_SIGNATURE") || message.includes("SELF_SIGNED_CERT_IN_CHAIN");
+ }
+ function getBalanceInSats(balance, unit) {
+diff --git a/dist/wallet/index.mjs b/dist/wallet/index.mjs
+index db64a307d967404130148fa2f7e144f086366ec3..edff9cda94a88a7439a9886ee6876c831cb3c57c 100644
+--- a/dist/wallet/index.mjs
++++ b/dist/wallet/index.mjs
+@@ -142,7 +142,8 @@ function shouldFailoverToAnotherMint(parsed) {
+ 
+ // wallet/tokenUtils.ts
+ function isNetworkErrorMessage(message) {
+-  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
++  return message.includes("NetworkError when attempting to fetch resource") || message.includes("Failed to fetch") || message.includes("Load failed") || // React Native / Expo (Hermes + expo/fetch) connection failures. RN never emits any browser or Bun spelling, so without these every mobile network fault bypassed refund and failover.
++  message.includes("Network request failed") || message.includes("The network connection was lost") || message.includes("The request timed out") || message.includes("Could not connect to the server") || message.includes("A server with the specified hostname could not be found") || message.includes("cannot parse response") || // Bun runtime connection failures (host down, refused, DNS, bad host/port)
+   message.includes("Unable to connect") || message.includes("Was there a typo in the url or port") || message.includes("ERR_TLS_CERT_ALTNAME_INVALID") || message.includes("ERR_TLS_CERT_NOT_YET_VALID") || message.includes("ERR_TLS_CERT_EXPIRED") || message.includes("UNABLE_TO_VERIFY_LEAF_SIGNATURE") || message.includes("SELF_SIGNED_CERT_IN_CHAIN");
+ }
+ function getBalanceInSats(balance, unit) {
