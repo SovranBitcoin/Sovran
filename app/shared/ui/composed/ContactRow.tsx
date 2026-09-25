@@ -47,6 +47,7 @@ import { formatCompact } from '@/shared/lib/number';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { formatRelative } from '@/shared/lib/date';
 import { BLUETOOTH_ACCENT, CONNECTED_ACCENT } from '@/shared/lib/brandColors';
+import { PresenceDot } from '@/shared/ui/primitives/PresenceDot';
 import { paymentLog } from '@/shared/lib/logger';
 
 // ---------------------------------------------------------------------------
@@ -186,7 +187,6 @@ export type Identity =
 
 type StatKey =
   | 'balance'
-  | 'providerStatus'
   | 'units'
   | 'score'
   | 'audit'
@@ -434,7 +434,11 @@ const DEFAULT_STATS_BY_KIND: Record<Identity['kind'], readonly StatKey[]> = {
   // the network. Status leads because it is the one that decides whether the
   // rest of the row matters; reputation before followers, same order the mint
   // rows use.
-  provider: ['providerStatus', 'balance', 'encrypted', 'reputation', 'followers'],
+  // Reachability is NOT here: it is the dot on the provider's own face. It
+  // led this list when it was a word, because it decides whether the rest of
+  // the row matters — which is exactly the argument for moving it somewhere
+  // the eye reaches first and nothing has to make room for it.
+  provider: ['balance', 'encrypted', 'reputation', 'followers'],
   mint: ['units', 'score', 'audit', 'reputation', 'followers', 'offline'],
   ble: [],
   geohash: [],
@@ -599,35 +603,6 @@ function buildStats(
 
   for (const key of keys) {
     switch (key) {
-      case 'providerStatus':
-        if (provider?.status) {
-          // The word, not just the colour. A bare heartbeat glyph made the
-          // reader decide what green meant, and a red/green-only signal is
-          // unreadable to anyone who cannot tell them apart. `unknown` keeps
-          // the glyph and stays wordless on purpose: it means nobody has
-          // checked yet, and printing "Offline" there would libel a provider
-          // that is up.
-          out.push({
-            icon: 'lucide:activity',
-            value:
-              provider.status === 'online'
-                ? 'Online'
-                : provider.status === 'offline'
-                  ? 'Offline'
-                  : '',
-            color:
-              provider.status === 'online'
-                ? tints.success
-                : provider.status === 'offline'
-                  ? STAT_COLOR_ERROR
-                  : STAT_COLOR_SOCIAL,
-            accessibilityLabel:
-              provider.status === 'unknown'
-                ? 'Provider status not checked yet'
-                : `Provider ${provider.status}`,
-          });
-        }
-        break;
       case 'balance': {
         const sats = mintStats?.balance ?? provider?.spendableSats;
         if (typeof sats === 'number' && sats > 0) {
@@ -872,13 +847,29 @@ export function ContactRow({
     // A machine, drawn as one. Same clay and same seeded hues as every person
     // fallback, because a provider belongs in the same visual family — but a
     // node is not somebody, and a person silhouette said it was.
-    avatarProp = {
-      seed,
-      name,
-      size: AVATAR_SIZE,
-      state: avatarState,
-      fallbackKind: 'robot',
-    };
+    //
+    // Routed through `leading` rather than the `avatar` slot so the face can
+    // carry its own reachability dot. Whether a provider is answering is the
+    // fact that decides whether the rest of the row matters, and it used to
+    // live at the far end of a stats line as a heartbeat glyph plus the word
+    // "Online" — four rows deep, competing with the balance and the follower
+    // count. On the face it is the first thing read and costs no width, which
+    // is what the stats line was short of.
+    leadingNode = (
+      <View className="relative">
+        <Avatar
+          state={avatarState}
+          seed={seed}
+          name={name}
+          size={AVATAR_SIZE}
+          fallbackKind="robot"
+        />
+        <PresenceDot
+          presence={provider.status === 'unknown' ? null : provider.status}
+          size={AVATAR_SIZE}
+        />
+      </View>
+    );
   } else if (nostr || self || ble || picture) {
     avatarProp = { picture, seed, name, size: AVATAR_SIZE, state: avatarState };
   } else if (geohash) {

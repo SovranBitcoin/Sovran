@@ -18,11 +18,13 @@
  * it left the reader guessing whether the missing pill meant nobody follows
  * them or nobody looked.
  *
- * The status pill is the other half. It used to be a bare heartbeat glyph
- * whose only content was its colour, which is unreadable to a screen reader
- * and to anyone who cannot separate red from green. It now says the word — and
- * says nothing at all for `unknown`, which means "not checked yet" and must
- * never be dressed up as "Offline".
+ * Reachability is not on that line at all. It is a dot on the provider's own
+ * face, where the eye lands first and nothing has to make room for it — the
+ * word "Online" was competing for width with the balance, the sealed-model
+ * count and the operator's reach, four items deep, to say the one thing that
+ * decides whether any of the rest matters. `unknown` draws NOTHING: "nobody
+ * has checked" is a different claim from "this is down", and a grey dot is
+ * still a mark in the place a verdict goes.
  */
 
 import React from 'react';
@@ -30,6 +32,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 
 import { ContactRow, providerIdentity, nostrIdentity } from '@/shared/ui/composed/ContactRow';
 import { ListRow } from '@/shared/ui/composed/ListRow';
+import { PresenceDot } from '@/shared/ui/primitives/PresenceDot';
 import type { RowStat } from '@/shared/ui/composed/RowStatsAccent';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -197,9 +200,30 @@ function renderProviderRow(props: Parameters<typeof ContactRow>[0]) {
   return {
     title: listRowProps?.title,
     subtitle: listRowProps?.subtitle,
+    // Unrendered: `ListRow` is mocked and takes this as a prop, so what comes
+    // back is the element tree ContactRow built rather than its output.
+    leading: listRowProps?.leading,
     stats: accent?.props.stats ?? [],
     note: accent?.props.note,
   };
+}
+
+/** The first element of this type anywhere in an unrendered tree. */
+function findByType<P>(
+  node: unknown,
+  type: (props: P) => unknown
+): React.ReactElement<P> | undefined {
+  if (node == null || typeof node !== 'object') return undefined;
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const hit = findByType(child, type);
+      if (hit) return hit;
+    }
+    return undefined;
+  }
+  const element = node as React.ReactElement<{ children?: unknown }>;
+  if (element.type === type) return element as unknown as React.ReactElement<P>;
+  return findByType(element.props?.children, type);
 }
 
 /** Flatten a rendered subtitle node down to the words it puts on screen. */
@@ -315,36 +339,53 @@ describe('AI provider row', () => {
     expect(rendered.stats.some((stat) => stat.icon === 'followers')).toBe(false);
   });
 
-  it.each([
-    ['online', 'Online', 'Provider online'],
-    ['offline', 'Offline', 'Provider offline'],
-  ])('names the %s status in words beside the heartbeat', (status, word, label) => {
-    const rendered = renderProviderRow(
-      row({
-        identity: [
-          providerIdentity({
-            baseUrl: 'https://ai.redsh1ft.com',
-            status: status as 'online' | 'offline',
-          }),
-        ],
-      })
-    );
-    const heartbeat = rendered.stats.find((stat) => stat.icon === 'lucide:activity');
-    expect(heartbeat?.value).toBe(word);
-    // Reachable by a screen reader, not conveyed by the tint alone.
-    expect(heartbeat?.accessibilityLabel).toBe(label);
-  });
+  it.each([['online'], ['offline']] as const)(
+    'marks %s on the provider’s own face, and nowhere on the stats line',
+    (status) => {
+      const rendered = renderProviderRow(
+        row({ identity: [providerIdentity({ baseUrl: 'https://ai.redsh1ft.com', status })] })
+      );
+      expect(rendered.stats.some((stat) => stat.icon === 'lucide:activity')).toBe(false);
+      expect(findByType(rendered.leading, PresenceDot)?.props.presence).toBe(status);
+    }
+  );
 
-  it('says neither Online nor Offline for a provider nobody has checked', () => {
+  it('draws no dot at all for a provider nobody has checked', () => {
     const rendered = renderProviderRow(
       row({
         identity: [providerIdentity({ baseUrl: 'https://ai.redsh1ft.com', status: 'unknown' })],
       })
     );
-    const heartbeat = rendered.stats.find((stat) => stat.icon === 'lucide:activity');
-    expect(heartbeat).toBeDefined();
-    expect(heartbeat?.value).toBe('');
-    expect(heartbeat?.accessibilityLabel).toBe('Provider status not checked yet');
+    // `null`, not a grey dot. A mark in the place a verdict goes says one has
+    // been reached, and none has.
+    expect(findByType(rendered.leading, PresenceDot)?.props.presence).toBeNull();
+  });
+
+  it.each([
+    ['online', 'Online'],
+    ['offline', 'Offline'],
+  ] as const)('says %s in words for a screen reader', (presence, label) => {
+    // The colour is the entire signal for a sighted reader, so losing the
+    // word from the row cannot mean losing it from the accessibility tree.
+    // The sighted redundancy moved to the disabled reason, which still reads
+    // "Not answering right now" under every offline row.
+    let renderer: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(React.createElement(PresenceDot, { presence, size: 44 }));
+    });
+    expect(renderer!.root.findByProps({ accessibilityLabel: label })).toBeTruthy();
+    act(() => renderer.unmount());
+  });
+
+  it('renders nothing for an unchecked provider', () => {
+    let renderer: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        React.createElement(PresenceDot, { presence: null, size: 44 })
+      );
+    });
+    expect(renderer!.toJSON()).toBeNull();
+    act(() => renderer.unmount());
   });
 
   it('states how many models are encrypted instead of badging the provider', () => {

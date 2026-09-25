@@ -1,9 +1,9 @@
-import { useMemo } from 'react';
 import { View } from 'react-native';
 
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { PresenceDot } from '@/shared/ui/primitives/PresenceDot';
 
 import type { ProviderStatus } from '@/shared/lib/routstr/providerHealth';
 
@@ -16,10 +16,9 @@ import type { ProviderStatus } from '@/shared/lib/routstr/providerHealth';
  * construction: the same provider looks the same on every launch and every
  * device, which is what makes a list of near-identical URLs scannable.
  *
- * The dot is the structural twin of an avatar's presence badge: bottom-right,
- * ringed in the surface colour so it reads as sitting on top rather than
- * punched through. `unknown` shows nothing rather than a colour, because an
- * unprobed provider is not the same claim as a working one.
+ * The dot is the shared `PresenceDot` — the same one the provider list draws
+ * on each row's face, so the page the user lands on and the row they tapped
+ * make the same mark mean the same thing.
  */
 
 interface ProviderAvatarProps {
@@ -29,28 +28,8 @@ interface ProviderAvatarProps {
   size?: number;
 }
 
-/** Size, hue and the status colour are all runtime values, so they travel as a
- *  style object; everything static is a class. */
-function useStatusDotStyle(status: ProviderStatus, size: number) {
-  const [background, success, danger] = useThemeColor(['background', 'success', 'danger'] as const);
-  const dotSize = Math.max(9, Math.round(size * 0.3));
-  const color = status === 'online' ? success : status === 'offline' ? danger : null;
-  return useMemo(
-    () =>
-      color
-        ? {
-            width: dotSize,
-            height: dotSize,
-            borderRadius: dotSize / 2,
-            backgroundColor: color,
-            borderColor: background,
-          }
-        : null,
-    [background, color, dotSize]
-  );
-}
-
-const DOT_CLASS = 'absolute -right-px -bottom-px border-2';
+/** `unknown` is not a state the dot draws — see `PresenceDot`. */
+const presenceOf = (status: ProviderStatus) => (status === 'unknown' ? null : status);
 
 export function ProviderAvatar({
   name,
@@ -58,8 +37,6 @@ export function ProviderAvatar({
   status = 'unknown',
   size = 36,
 }: ProviderAvatarProps) {
-  const dotStyle = useStatusDotStyle(status, size);
-
   return (
     <View className="relative" accessibilityLabel={`${name || baseUrl} provider`}>
       <Avatar
@@ -69,7 +46,7 @@ export function ProviderAvatar({
         size={size}
         alt={name || baseUrl}
       />
-      {dotStyle ? <View className={DOT_CLASS} style={dotStyle} /> : null}
+      <PresenceDot presence={presenceOf(status)} size={size} />
     </View>
   );
 }
@@ -101,7 +78,6 @@ export function ProviderPillIcon({
   size?: number;
 }) {
   const accent = useThemeColor('accent');
-  const dotStyle = useStatusDotStyle(status, size);
 
   return (
     <View
@@ -118,7 +94,7 @@ export function ProviderPillIcon({
       ) : (
         <Icon name="mdi:robot" size={size} color={accent} />
       )}
-      {dotStyle ? <View className={DOT_CLASS} style={dotStyle} /> : null}
+      <PresenceDot presence={presenceOf(status)} size={size} />
     </View>
   );
 }
