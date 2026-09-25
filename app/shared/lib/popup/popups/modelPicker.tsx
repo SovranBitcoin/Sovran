@@ -59,8 +59,8 @@ import {
   entryForSlot,
   providersForLineup,
   estimateTurnCostSatsFromPricing,
-  requiredReserveSatsFromPricing,
 } from '@/features/ai/lib/format';
+import { affordableForEntry, reservedSatsTypical } from '@/features/ai/lib/reserve';
 
 import { showActionSheet } from './bridge';
 import { E2EActionMenuRenderMarker, E2EActionMenuTargetMarker } from '../E2EActionMenuProbe';
@@ -102,28 +102,21 @@ const formatTypicalCost = (sats: number | null): string => {
  * sealed test (never the raw id prefix — sealing is per model, not per node).
  */
 function reserveSatsForEntry(entry: LineupEntry): number | null {
-  const discounted = requiredReserveSatsFromPricing(
-    entry.satsPricing,
-    0,
-    entry.maxCompletionTokens
-  );
-  if (!isE2eeModelId(entry.modelId)) return discounted;
-  const ceiling = entry.satsPricing.max_cost;
-  if (ceiling == null) return discounted;
-  return Math.max(discounted ?? 0, Math.ceil(ceiling));
+  // Delegates to the SDK mirror the spend sheet prices with, so a row and the
+  // sheet it leads to cannot quote two different numbers for the same model.
+  // It carries the sealed rule too: a `tinfoil-` id gets no completion
+  // discount, because the node cannot read the body to verify the bound.
+  return reservedSatsTypical(entry);
 }
 
 /**
- * Whether `balanceSats` clears that reservation with the shared headroom
- * buffer. Mirrors `canAffordPricing` exactly apart from the sealed floor, and
- * is the ONE verdict the picker uses — the `modelPicker.rows` log counts
- * pressable rows with it too, so the event can never disagree with the rows
- * the user is looking at.
+ * Whether `balanceSats` clears that reservation. Delegates to the one verdict
+ * the chip and the spend sheet also read, and is the ONE the picker uses — the
+ * `modelPicker.rows` log counts pressable rows with it too, so the event can
+ * never disagree with the rows the user is looking at.
  */
 function isEntryAffordable(entry: LineupEntry, balanceSats: number): boolean {
-  const reserve = reserveSatsForEntry(entry);
-  if (reserve == null) return true;
-  return balanceSats >= reserve * AFFORD_BUFFER;
+  return affordableForEntry(entry, balanceSats);
 }
 
 interface TierRowProps {

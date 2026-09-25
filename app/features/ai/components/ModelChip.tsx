@@ -13,12 +13,12 @@ import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
+import { affordableForEntry } from '@/features/ai/lib/reserve';
 import {
   AFFORD_BUFFER,
   AI_TIERS,
   E2EE_BADGE_ICON,
   E2EE_BADGE_LABEL,
-  canAffordPricing,
   entryForSlot,
   providersForLineup,
   estimateTurnCostSatsFromPricing,
@@ -111,9 +111,12 @@ export function ModelChip() {
           lastKnown: entry.lastKnown ?? false,
           visionInput: entry.visionInput,
           estimatedTurnCostSats: estimateTurnCostSatsFromPricing(entry.satsPricing),
-          // Priced at the `max_tokens` a send to this cell would carry, so the
-          // snapshot answers the same question the send path asks.
-          affordable: canAffordPricing(entry.satsPricing, balanceSats, entry.maxCompletionTokens),
+          // Priced through the same SDK mirror the picker row and the spend
+          // sheet use, so all three answer the same question. `canAffordPricing`
+          // called a sealed model affordable at roughly a tenth of what the
+          // node demands, because it applies a completion discount the node
+          // refuses on a body it cannot read.
+          affordable: affordableForEntry(entry, balanceSats),
           maxCompletionTokens: entry.maxCompletionTokens ?? null,
           catalog_max_cost_sats: entry.satsPricing.max_cost,
           catalog_image_fee_sats: entry.satsPricing.image,

@@ -42,6 +42,27 @@ jest.mock('@/shared/stores/global/profileStore', () => ({
 jest.mock('@/shared/lib/routstr/api', () => ({
   setRoutstrNodeBaseUrl: jest.fn(),
   ROUTSTR_MAX_COMPLETION_TOKENS: 2000,
+  // The reserve mirror walks the request body character by character, exactly
+  // as the node's gate does, so a stub that merely returns *an* object would
+  // price a different request than the one this row leads to. This is the
+  // real builder's shape, kept in step with `api.ts`.
+  routstrChatRequestBody: ({
+    model,
+    messages,
+    temperature,
+    max_tokens,
+  }: {
+    model: string;
+    messages: readonly unknown[];
+    temperature?: number;
+    max_tokens?: number;
+  }) => ({
+    model,
+    messages,
+    ...(temperature != null && { temperature }),
+    ...(max_tokens != null && { max_tokens }),
+    stream: true,
+  }),
 }));
 jest.mock('@/shared/lib/routstr/securePersistence', () => ({
   createRoutstrPersistence: () => ({

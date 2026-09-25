@@ -47,6 +47,7 @@ import {
   type RoutstrModel,
 } from '@/shared/lib/routstr/api';
 import type { LineupEntry } from '@/shared/lib/routstr/lineup';
+import { AFFORD_BUFFER, sendMaxTokens, TYPICAL_PROMPT_TOKENS } from './format';
 
 /**
  * The pricing fields the reservation needs. A superset of `LineupPricing`:
@@ -312,6 +313,59 @@ export function reservePricingFromEntry(
     max_completion_cost:
       pricing.completion != null && ceiling != null ? pricing.completion * ceiling : null,
   };
+}
+
+/**
+ * What a row in a menu should say it reserves, before there is a message to
+ * price.
+ *
+ * `reservedSatsShown` needs the real prompt and falls back to
+ * `UNKNOWN_PROMPT_TOKENS` without one, which over-quotes a browsing surface
+ * badly. A menu is answering a different question — "what would a typical turn
+ * on this model hold?" — so it is priced against `TYPICAL_PROMPT_TOKENS`, the
+ * same constant the affordability estimates have always used.
+ *
+ * It exists so the chip, the picker row and the spend sheet share ONE
+ * arithmetic. They disagreed before: the chip and the row called a sealed
+ * model affordable at roughly a tenth of what the node would demand, while the
+ * row's own "needs N reserved" line beside it was already right.
+ */
+export function reservedSatsTypical(entry: LineupEntry | null | undefined): number | null {
+  if (!entry) return null;
+  const pricing = reservePricingFromEntry(entry);
+  if (!pricing) return null;
+  return reservedSatsShown({
+    modelId: entry.modelId,
+    pricing,
+    contextLength: entry.contextLength ?? null,
+    maxCompletionTokens: entry.maxCompletionTokens ?? null,
+    // One synthetic turn of the documented typical size. The estimator reads
+    // characters, so the tokens are spelled back out as characters here rather
+    // than a token count being passed to something that does not take one.
+    messages: [
+      {
+        role: 'user',
+        content: 'x'.repeat(Math.round(TYPICAL_PROMPT_TOKENS * SDK_CHARS_PER_TOKEN)),
+      },
+    ],
+    maxTokens: sendMaxTokens(entry.maxCompletionTokens),
+  });
+}
+
+/**
+ * Whether a balance clears that reservation with the shared headroom buffer.
+ *
+ * The ONE affordability verdict — the chip's snapshot, the picker row and its
+ * pressable count all read it, so they cannot disagree about the same model
+ * on the same screen.
+ */
+export function affordableForEntry(
+  entry: LineupEntry | null | undefined,
+  balanceSats: number
+): boolean {
+  const reserve = reservedSatsTypical(entry);
+  if (reserve == null) return true;
+  return balanceSats >= reserve * AFFORD_BUFFER;
 }
 
 /**

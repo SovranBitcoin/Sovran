@@ -229,7 +229,7 @@ export function maxSpendSats(entry: LineupEntry | null, imageCount = 0): number 
  * artificially tight for short conversations (which are the overwhelming
  * majority of usage).
  */
-const TYPICAL_PROMPT_TOKENS = 8000;
+export const TYPICAL_PROMPT_TOKENS = 8000;
 
 /**
  * Typical chat-turn output size — "the assistant writes a couple of
