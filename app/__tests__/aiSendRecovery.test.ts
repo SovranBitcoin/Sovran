@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react-native';
 import { useAiSend } from '@/features/ai/hooks/useAiSend';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { emptyLineup, type LineupEntry } from '@/shared/lib/routstr/lineup';
-import { sendMessage, checkBalance } from '@/shared/lib/routstr/api';
+import { sendMessage, checkBalance, ROUTSTR_MAX_COMPLETION_TOKENS } from '@/shared/lib/routstr/api';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
 import { staticPopup } from '@/shared/lib/popup';
 import { confirmSpend } from '@/features/ai/lib/spendConfirm';
@@ -186,7 +186,7 @@ describe('AI send lineup recovery', () => {
       // change cost the user nothing.
       expect(sendMock.mock.calls[1][1]).toMatchObject({
         model: 'new-auto',
-        max_tokens: 4096,
+        max_tokens: ROUTSTR_MAX_COMPLETION_TOKENS,
       });
       expect(refreshMock).toHaveBeenCalledWith('failure');
       expect(staticPopup).not.toHaveBeenCalled();

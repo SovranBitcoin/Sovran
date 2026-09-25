@@ -668,7 +668,7 @@
   },
   "shared/lib/popup/popups/modelPicker.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 4,
+    "inline-style": 2,
     "content-container-style": 1
   },
   "shared/lib/popup/popups/nfcTapSheet.tsx": {

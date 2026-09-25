@@ -330,6 +330,29 @@ describe('PopupHost presentation', () => {
     ).toHaveLength(0);
   });
 
+  // The model picker is a `contentHeight` sheet, like every other sheet in
+  // this host whose rows have a demonstrated tap record. It used to ask for a
+  // fixed `snapPoints` detent, which swapped gorhom's self-sizing
+  // `BottomSheetView` for a plain `View` whose height came from an animated
+  // parent — and on device neither its rows nor its tab pills took a tap
+  // (six opens, no `modelPicker.select`, no `modelPicker.tab.switch`). Pinning
+  // the lane here: no layout gate in the path, body up on the first commit.
+  it('mounts the model picker body immediately, with no snapPoints gate', () => {
+    act(() => {
+      renderer = TestRenderer.create(<PopupHost />);
+      usePopupStore.getState().open({ sheetId: 'model-picker', payload: {} });
+    });
+    expect(renderer!.root.findAllByProps({ testID: 'model-picker-content' })).not.toHaveLength(0);
+    expect(
+      renderer!.root.findAll((node) => node.props.testID === 'popup-snap-content-gate')
+    ).toHaveLength(0);
+    expect(content(renderer!).props.enableDynamicSizing).toBe(true);
+    // `useDirectView` is the snapPoints-only flag that replaces
+    // `BottomSheetView`; the picker has no nested gorhom scrollable and must
+    // not carry it.
+    expect(content(renderer!).props.contentContainerProps).toBeUndefined();
+  });
+
   // The model picker renders inside a FullWindowOverlay portal, which sits
   // outside the wallet providers mounted on the route tree — reading the
   // balance from a hook *inside* the body threw "BalanceProvider is missing".
@@ -339,7 +362,6 @@ describe('PopupHost presentation', () => {
       renderer = TestRenderer.create(<PopupHost />);
       usePopupStore.getState().open({ sheetId: 'model-picker', payload: {} });
     });
-    layoutGate(renderer!, 400);
     const picker = () => renderer!.root.findByProps({ testID: 'model-picker-content' });
     expect(picker().props.balanceSats).toBe(10);
 

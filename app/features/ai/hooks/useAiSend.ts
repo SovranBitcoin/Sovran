@@ -14,7 +14,7 @@ import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
 import { lineupHasEntries, lineupProviderIds, type LineupEntry } from '@/shared/lib/routstr/lineup';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { isAbortError } from 'wallet/safeFetch';
-import { pickFinalizeMessage } from '../lib/finalize';
+import { isBudgetTruncation, pickFinalizeMessage } from '../lib/finalize';
 import { staticPopup } from '@/shared/lib/popup';
 import { describeError } from '@/shared/lib/errors';
 import { ERROR_COPY } from '@/shared/lib/errors/catalog';
@@ -36,6 +36,8 @@ import {
 } from '../lib/format';
 import { confirmSpend } from '../lib/spendConfirm';
 import { evaluateSendGate } from '../lib/sendGate';
+import { reservedSatsForSend } from '../lib/reserve';
+import { clearTurnTruncation, recordTurnTruncation } from '../lib/turnTruncation';
 import { useHeldMints } from './useHeldMints';
 import { assembleApiMessages, stripImageParts } from '../lib/assembleApiMessages';
 import { encodeChatImage } from '../lib/attachments';
@@ -158,8 +160,13 @@ export function useAiSend() {
       imageCount: number;
       flowId: string;
       retriedFromMessageId?: string;
+      /** The figure the spend sheet put in front of the user, so the log can
+       *  hold the promise and the outcome on one line. `null` when no sheet
+       *  ran (a retry) or the model could not be priced. */
+      shownSats?: number | null;
     }) => {
       const { assistantMessageId, flowId } = params;
+      const shownSats = params.shownSats ?? null;
       let { apiMessages, imageCount } = params;
 
       const profile = useProfileStore.getState().activeAccountIndex;
@@ -264,6 +271,7 @@ export function useAiSend() {
       // A placeholder that is streaming is not a failed one. Ids are fresh per
       // send and per retry, so this only ever matters if one is re-driven.
       clearTurnError(assistantMessageId);
+      clearTurnTruncation(assistantMessageId);
 
       // Hoisted so the catch block (402 popup) can reference whichever
       // candidate we were last attempting when the request failed.
@@ -334,6 +342,9 @@ export function useAiSend() {
         });
 
         let stream: AsyncIterable<any> | undefined;
+        // The budget the winning candidate's request actually carried. Needed
+        // after the stream to say what ran out, and by how much.
+        let sentMaxTokens = 0;
         // Resolved after the stream ends: the exact figure is the token we
         // spent minus the change the node returned, and the change is only
         // banked once the response is complete.
@@ -388,6 +399,7 @@ export function useAiSend() {
             stream = result.stream;
             costPromise = result.cost;
             modelToUse = candidate;
+            sentMaxTokens = maxTokens;
             if (i > 0) {
               aiLog.warn('ai.send.fallback_used', {
                 flowId,
@@ -514,6 +526,11 @@ export function useAiSend() {
         let firstReasoningAt = 0;
         let maxGap = 0;
         let stallCount = 0;
+        // Rides on the last chunk of an OpenAI-compatible stream. The chunk
+        // spine has always validated it; until now nothing read it, so an
+        // answer cut off at the completion budget was indistinguishable from
+        // one that simply finished.
+        let finishReason: string | null = null;
 
         for await (const chunk of stream) {
           chunkCount++;
@@ -539,7 +556,9 @@ export function useAiSend() {
             });
           }
 
-          const delta = chunk.choices?.[0]?.delta;
+          const choice = chunk.choices?.[0];
+          if (typeof choice?.finish_reason === 'string') finishReason = choice.finish_reason;
+          const delta = choice?.delta;
           const content =
             delta?.content || (delta as any)?.message?.content || (delta as any)?.text || null;
           const reasoning = (delta as any)?.reasoning_content || (delta as any)?.reasoning || null;
@@ -600,6 +619,12 @@ export function useAiSend() {
         }
 
         const streamEnd = performance.now();
+        // An answer that stopped because the budget ran out is one the user
+        // paid for and did not get all of. It renders as a note under its own
+        // content rather than as a failure — the content is real — and the
+        // bubble offers to carry on from there.
+        const truncated = isBudgetTruncation(finishReason);
+        if (truncated) recordTurnTruncation(assistantMessageId, { budgetTokens: sentMaxTokens });
         const totalMs = streamEnd - sendStart;
         const streamMs = firstChunkAt > 0 ? streamEnd - firstChunkAt : 0;
         aiLog.info('ai.stream.complete', {
@@ -610,6 +635,14 @@ export function useAiSend() {
           chunksWithReasoning,
           chars: fullContent.length,
           reasoningChars: fullReasoning.length,
+          // The three fields that make `ROUTSTR_MAX_COMPLETION_TOKENS`
+          // retunable from a log instead of from a guess: what we asked for,
+          // what the model said about stopping, and roughly what it wrote at
+          // the SDK's own 2.84 chars-per-token.
+          maxTokens: sentMaxTokens,
+          finishReason,
+          approxCompletionTokens: Math.ceil((fullContent.length + fullReasoning.length) / 2.84),
+          truncated,
           ttfc_ms: firstChunkAt > 0 ? r2(firstChunkAt - sendStart) : null,
           ttft_ms: firstContentAt > 0 ? r2(firstContentAt - sendStart) : null,
           ttfr_ms: firstReasoningAt > 0 ? r2(firstReasoningAt - sendStart) : null,
@@ -667,6 +700,11 @@ export function useAiSend() {
           tier: tier.id,
           provider: provider.id,
           actualCostSats: costSats ?? 0,
+          // What the sheet promised, beside what it cost. Before this, the
+          // figure the user approved existed nowhere but on screen, which is
+          // why a 30x overstatement took a device report to find rather than
+          // a log read.
+          shownSats,
           predicted_estimated_turn_sats: predicted.estimatedTurnCostSats,
           predicted_max_cost_sats: predicted.maxCostSats,
           predicted_buffered_threshold_sats: predictedCeilingSats,
@@ -770,6 +808,61 @@ export function useAiSend() {
         walletSats,
         storeNow.lineup ?? storeNow.lastKnownLineup?.lineup ?? null
       );
+      const timestamp = Date.now();
+      const userMessageId = `msg-${timestamp}-u`;
+      const assistantMessageId = `msg-${timestamp + 1}-a`;
+      const flowId = `ai-send-${timestamp}`;
+
+      // Assembled BEFORE the gate, because the gate's whole job is now to
+      // quote the node's reservation and the node computes that from this
+      // exact body — messages, images and all. Quoting a typical turn and
+      // sending a real one is how the sheet came to offer "up to 10 sats" for
+      // a send that minted 307. Nothing here spends anything: it is the same
+      // encode the send would have done a moment later, moved in front of the
+      // question it answers.
+      //
+      // `createSession` clears `conversationHistory`, so a send that will
+      // start one has no ancestry — mirrored here rather than run early,
+      // because a declined send must not leave an empty session behind.
+      const willStartNewSession = !isAnonymous && !currentSessionId;
+      const activePath = willStartNewSession
+        ? []
+        : deriveActivePath(storeNow.conversationHistory, storeNow.activeChildren);
+      const parentForUser: string | null = activePath[activePath.length - 1]?.id ?? null;
+      const pendingUserMessage = {
+        id: userMessageId,
+        parentId: parentForUser,
+        role: 'user' as const,
+        content: trimmed,
+        timestamp,
+        ...(attachments && attachments.length > 0 ? { attachments } : {}),
+      };
+      // Assembly (incl. the inline-image window and per-attachment encoding)
+      // is shared with retry via `assembleApiMessages` so the two flows can't
+      // diverge — and now also shared with the quote, so the priced request
+      // and the sent request are the same object.
+      //
+      // Nothing typed is nothing to price, and the encode is the one expensive
+      // step on this path — so a blank send skips it and lets the gate name
+      // the situation it was always going to name.
+      const { messages: apiMessages, imageCount } = trimmed
+        ? await assembleApiMessages([...activePath, pendingUserMessage], encodeChatImage)
+        : { messages: [], imageCount: 0 };
+
+      // The node's admission gate for this body, computed the way the node
+      // computes it. `null` when the model carries no usable pricing, which
+      // the gate turns back into the typical-case estimate and the sheet
+      // labels as one.
+      const plannedMaxTokens = sendMaxTokens(plannedEntry?.maxCompletionTokens);
+      const reservedSats = trimmed
+        ? reservedSatsForSend({
+            entry: plannedEntry,
+            models: storeNow.modelsCache?.data ?? [],
+            messages: apiMessages,
+            maxTokens: plannedMaxTokens,
+          })
+        : null;
+
       const gate = evaluateSendGate({
         text: trimmed,
         providerBaseUrl: activeProvider,
@@ -779,9 +872,26 @@ export function useAiSend() {
         entry: plannedEntry,
         imageCount: attachments?.length ?? 0,
         confirmSpend: storeNow.confirmSpend,
+        reservedSats,
       });
 
-      aiLog.info('ai.send.gate', { state: gate.state });
+      // The figure the user is about to be shown, recorded under the same
+      // flowId as the money that follows it. It used to live only on screen,
+      // which is why a 30x overstatement could only be found by someone
+      // watching their own balance.
+      const shownSats =
+        gate.state === 'confirm' || gate.state === 'ready' ? gate.reserveSats : null;
+      aiLog.info('ai.send.gate', {
+        flowId,
+        state: gate.state,
+        shownSats,
+        reserveKnown: gate.state === 'confirm' || gate.state === 'ready' ? gate.reserveKnown : null,
+        model: plannedEntry?.modelId ?? null,
+        maxTokens: plannedMaxTokens,
+        promptMessages: apiMessages.length,
+        imageParts: imageCount,
+        walletSats,
+      });
       switch (gate.state) {
         case 'empty':
           return;
@@ -799,7 +909,8 @@ export function useAiSend() {
         case 'confirm': {
           const allowed = await confirmSpend({
             modelName: gate.modelName,
-            maxSats: gate.maxSats,
+            reserveSats: gate.reserveSats,
+            reserveKnown: gate.reserveKnown,
           });
           if (!allowed) return;
           const current = useRoutstrStore.getState();
@@ -810,6 +921,11 @@ export function useAiSend() {
             current.selectedProvider !== storeNow.selectedProvider ||
             current.selectedTier !== storeNow.selectedTier ||
             current.lineup !== storeNow.lineup ||
+            // The conversation itself is now part of the quote: the sheet
+            // priced this tree, so a tree that moved while it was open is a
+            // different request at a different price.
+            current.conversationHistory !== storeNow.conversationHistory ||
+            current.activeChildren !== storeNow.activeChildren ||
             currentFunds?.mintUrl !== quotedFunds?.mintUrl ||
             currentFunds?.balanceSats !== quotedFunds?.balanceSats
           ) {
@@ -822,31 +938,11 @@ export function useAiSend() {
           break;
       }
 
-      if (!isAnonymous && !currentSessionId) {
+      if (willStartNewSession) {
         createSession();
       }
 
-      // Active path determines the parent of the new user message — we
-      // append under whatever branch is currently visible to the user.
-      const stateNow = useRoutstrStore.getState();
-      const activePath = deriveActivePath(stateNow.conversationHistory, stateNow.activeChildren);
-      const tail = activePath[activePath.length - 1];
-      const parentForUser: string | null = tail?.id ?? null;
-
-      const timestamp = Date.now();
-      const userMessageId = `msg-${timestamp}-u`;
-      const assistantMessageId = `msg-${timestamp + 1}-a`;
-      const flowId = `ai-send-${timestamp}`;
-
-      addMessage({
-        id: userMessageId,
-        parentId: parentForUser,
-        role: 'user',
-        content: trimmed,
-        timestamp,
-        pending: true,
-        ...(attachments && attachments.length > 0 ? { attachments } : {}),
-      });
+      addMessage({ ...pendingUserMessage, pending: true });
       addMessage({
         id: assistantMessageId,
         parentId: userMessageId,
@@ -855,27 +951,13 @@ export function useAiSend() {
         timestamp: timestamp + 1,
       });
 
-      // Build context = active path + just-added user message. We read the
-      // freshly-added messages via the active path because the store has
-      // already absorbed them. Assembly (incl. the inline-image window and
-      // per-attachment encoding) is shared with retry via
-      // `assembleApiMessages` so the two flows can't diverge.
-      const stateAfter = useRoutstrStore.getState();
-      const path = deriveActivePath(
-        stateAfter.conversationHistory,
-        stateAfter.activeChildren
-      ).filter((m) => m.id !== assistantMessageId);
-      const { messages: apiMessages, imageCount } = await assembleApiMessages(
-        path,
-        encodeChatImage
-      );
-
       try {
         await streamIntoPlaceholder({
           assistantMessageId,
           apiMessages,
           imageCount,
           flowId,
+          shownSats,
         });
       } finally {
         // The user message's optimistic spinner clears the moment the

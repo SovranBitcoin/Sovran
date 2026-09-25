@@ -116,6 +116,7 @@ jest.mock('assets/icons', () => ({ __esModule: true, default: () => null }));
 jest.mock('@/shared/lib/popup/E2EToastProbe', () => ({ E2EStaticToastRenderMarker: () => null }));
 jest.mock('@/shared/lib/popup/E2EActionMenuProbe', () => ({
   E2EActionMenuRenderMarker: () => null,
+  E2EActionMenuTargetMarker: () => null,
   markE2EActionMenuPresented: jest.fn(),
 }));
 jest.mock('@/shared/lib/popup/CompactToast', () => ({ CompactToast: () => null }));

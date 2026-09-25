@@ -189,18 +189,36 @@ function upstreamIdForModel(model: string): string | undefined {
 }
 
 /**
- * `max_tokens` sent with every chat completion, and the completion-side
- * token count the affordability gate prices in (`format.ts`). Routstr
- * admits a request only when the balance covers its DISCOUNTED max cost:
- * the prompt side auto-discounts to the actual prompt size, but the
- * completion side only discounts when the request carries `max_tokens` —
- * without it the node reserves the model's ENTIRE `max_completion_cost`
- * (~1,500 sats for a frontier model), which is what produced "insufficient
- * balance" 402s against balances that covered the real turn cost many
- * times over. 4096 tokens is ample for chat answers while keeping the
- * upfront reservation ~30× smaller.
+ * `max_tokens` sent with every chat completion — the completion budget one
+ * answer may spend, and therefore the completion side of the reservation the
+ * node holds for it.
+ *
+ * Sending it at all is not optional: `@routstr/sdk`'s `getRequiredSatsForModel`
+ * (and routstr-core's `calculate_discounted_max_cost` behind it) discounts the
+ * completion side of the reservation ONLY when the request bounds it. Omit it
+ * and the node reserves the model's entire `max_completion_cost`. So this
+ * number is the lever that makes the reservation smaller, never larger.
+ *
+ * It is 2000 because that is what this app already says a chat turn writes:
+ * `TYPICAL_COMPLETION_TOKENS` in `features/ai/lib/format.ts` is defined to be
+ * this same constant, deliberately. Two different figures were the bug — the
+ * cost column priced 2000 completion tokens while the wire asked for 4096, so
+ * every sat figure the user saw was derived from a request we were not making.
+ * One constant, one meaning: what a turn is expected to write is what we
+ * reserve for it.
+ *
+ * Being wrong low is now recoverable and visible: a stream that ends on
+ * `finish_reason: 'length'` is recorded (`features/ai/lib/turnTruncation.ts`)
+ * and the bubble says so and offers to continue. Being wrong high is not — it
+ * is the user's money locked for the duration, and every refund race and stuck
+ * token scales with it. Retune it against `ai.stream.complete`, which records
+ * `maxTokens`, `finishReason` and `approxCompletionTokens` on every answer for
+ * exactly this purpose.
+ *
+ * The send path clamps it under the model's own ceiling
+ * (`top_provider.max_completion_tokens`) via `sendMaxTokens`.
  */
-export const ROUTSTR_MAX_COMPLETION_TOKENS = 4096;
+export const ROUTSTR_MAX_COMPLETION_TOKENS = 2000;
 
 /**
  * Per-request budget for routstr endpoints. The chat APIs can take longer
@@ -1302,6 +1320,33 @@ interface RoutedResponse extends Response {
  * exists — spent minus returned. It settles whether or not the caller consumes
  * the stream, so the change never depends on the UI finishing.
  */
+/**
+ * The exact JSON body one chat completion goes out as.
+ *
+ * Spelled once because two things have to agree on it to the character: the
+ * request `sendMessage` dispatches, and the reservation
+ * `features/ai/lib/reserve.ts` quotes the user before it does. The SDK sizes
+ * the ecash token from the body it is handed — including a raw
+ * `sumStringChars` walk over it — so a body the pricing path did not see is a
+ * figure the user was shown that is not the one that leaves their wallet.
+ * That gap is what this export closes.
+ */
+export function routstrChatRequestBody(options: {
+  model: string;
+  messages: readonly RoutstrChatMessage[];
+  temperature?: number;
+  max_tokens?: number;
+}): Record<string, unknown> {
+  const { model, messages, temperature, max_tokens } = options;
+  return {
+    model,
+    messages,
+    ...(temperature != null && { temperature }),
+    ...(max_tokens != null && { max_tokens }),
+    stream: true,
+  };
+}
+
 export async function sendMessage(
   messages: RoutstrChatMessage[],
   options: {
@@ -1400,13 +1445,9 @@ export async function sendMessage(
           // `X-Routstr-Model`, which is what the node bills and routes on when
           // it can no longer read the body.
           modelId: model,
-          body: {
-            model,
-            messages,
-            ...(temperature != null && { temperature }),
-            ...(max_tokens != null && { max_tokens }),
-            stream: true,
-          },
+          // One spelling of the wire shape, shared with the reservation quote
+          // the user approved — see `routstrChatRequestBody`.
+          body: routstrChatRequestBody({ model, messages, temperature, max_tokens }),
           signal,
         })
       )

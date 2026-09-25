@@ -44,6 +44,11 @@ const SURFACE = 'ai';
 // padding of their own). Stable module ref so recycled cells don't re-create it.
 const MESSAGE_ROW_STYLE = { paddingHorizontal: 16 } as const;
 
+/** What "Continue" sends when an answer stopped at its completion budget.
+ *  A plain next turn in the user's own transcript, so the reservation it
+ *  costs is one they were asked about and can see. */
+const CONTINUE_PROMPT = 'Continue from where you stopped.';
+
 /** Visual gap between the composer's outer bottom edge and the keyboard top
  *  when focused. Matches the shared ChatScreen — 0pt reads as "the composer
  *  is sitting on the keyboard" instead of floating mid-air. */
@@ -204,6 +209,16 @@ export function AiChatScreen() {
     if (!mockMode) void retry(messageId);
   };
 
+  // Asking for the rest of a truncated answer is an ordinary next turn, not a
+  // hidden re-run: it goes through the same gate, the same spend sheet and the
+  // same reservation as anything else the user types, and it appears in the
+  // transcript as what it is. Continuing must never be the one way to spend
+  // money without being asked.
+  const handleContinue = (messageId: string) => {
+    aiLog.info('ai.continue.dispatch', { messageId });
+    if (!mockMode) void send(CONTINUE_PROMPT);
+  };
+
   // Composer state (draft + pending image attachments + measured height
   // for list bottom padding). Attachments accumulate via repeated single
   // picks (PostComposer's maxMedia pattern) and clear on successful
@@ -352,6 +367,7 @@ export function AiChatScreen() {
         message={item}
         isStreaming={item.id === streamingMessageId}
         onRetry={isSending ? undefined : handleRetry}
+        onContinue={isSending ? undefined : handleContinue}
         branchNav={branchNavById.get(item.id)}
       />
     </RNView>

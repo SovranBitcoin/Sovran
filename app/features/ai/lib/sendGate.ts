@@ -1,7 +1,7 @@
 import type { LineupEntry } from '@/shared/lib/routstr/lineup';
 import { routstrMintKey } from '@/shared/lib/routstr/payingMint';
 
-import { maxSpendSats } from './format';
+import { AFFORD_BUFFER, maxSpendSats } from './format';
 
 /**
  * Everything that has to be true before an AI message leaves, decided in one
@@ -40,6 +40,17 @@ export interface SendGateInput {
   imageCount: number;
   /** Whether the user has asked to be shown the cost before each send. */
   confirmSpend: boolean;
+  /**
+   * What the node will actually reserve for THIS request, in whole sats —
+   * `reservedSatsForSend` over the assembled messages. `null` when the model
+   * cannot be priced, which is the only case where the typical-case estimate
+   * has to stand in.
+   *
+   * It is an input rather than something this function computes because it
+   * needs the real message bodies, images encoded and all, and a pure gate has
+   * no business doing IO to find them.
+   */
+  reservedSats: number | null;
 }
 
 type SendGateOutcome =
@@ -51,10 +62,10 @@ type SendGateOutcome =
   | { state: 'mint-not-accepted'; providerMints: readonly string[] }
   /** The wallet cannot cover what this provider will reserve up front. */
   | { state: 'insufficient-funds'; needSats: number; haveSats: number }
-  /** Ready, and the user has asked to see the ceiling first. */
-  | { state: 'confirm'; maxSats: number; modelName: string }
+  /** Ready, and the user has asked to see what leaves the wallet first. */
+  | { state: 'confirm'; reserveSats: number; modelName: string; reserveKnown: boolean }
   /** Ready to send. */
-  | { state: 'ready'; maxSats: number };
+  | { state: 'ready'; reserveSats: number; reserveKnown: boolean };
 
 /**
  * The order is the point.
@@ -76,21 +87,36 @@ export function evaluateSendGate(input: SendGateInput): SendGateOutcome {
     return { state: 'mint-not-accepted', providerMints: input.providerMints };
   }
 
-  const maxSats = maxSpendSats(input.entry, input.imageCount);
-  // The figure that has to be funded is the node's admission gate, not the
-  // expected cost: it reserves the ceiling up front and returns the rest as
-  // change. Gating on the estimate would let a send through that the node then
-  // refuses, which is the 402 loop this replaced.
-  if (maxSats > 0 && input.walletSats < maxSats) {
-    return { state: 'insufficient-funds', needSats: maxSats, haveSats: input.walletSats };
+  // Two different numbers, doing two different jobs, and conflating them is
+  // what put a figure on the sheet that was not the one that left the wallet.
+  //
+  //   `reserveSats` is the truth: the node's admission gate for this exact
+  //   body, computed the way the node computes it. It is what the user is
+  //   asked to approve, unrounded by any safety margin of ours — padding a
+  //   number presented as "this is what goes" makes it a different number.
+  //
+  //   `threshold` is the floor the wallet has to clear. It carries
+  //   `AFFORD_BUFFER` because our catalogue snapshot and the SDK's can drift
+  //   between refreshes, and a balance that only just covers the quote loses
+  //   the race. A buffer belongs where being wrong costs a retry, not where
+  //   being wrong is a lie.
+  const reserveKnown = input.reservedSats != null;
+  const reserveSats = input.reservedSats ?? maxSpendSats(input.entry, input.imageCount);
+  const threshold = reserveKnown
+    ? Math.ceil(reserveSats * AFFORD_BUFFER)
+    : // The typical-case fallback already has the buffer baked in.
+      reserveSats;
+  if (threshold > 0 && input.walletSats < threshold) {
+    return { state: 'insufficient-funds', needSats: threshold, haveSats: input.walletSats };
   }
 
   if (input.confirmSpend) {
     return {
       state: 'confirm',
-      maxSats,
+      reserveSats,
+      reserveKnown,
       modelName: input.entry?.displayName ?? 'this model',
     };
   }
-  return { state: 'ready', maxSats };
+  return { state: 'ready', reserveSats, reserveKnown };
 }

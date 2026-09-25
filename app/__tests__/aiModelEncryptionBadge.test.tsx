@@ -113,6 +113,7 @@ jest.mock('@/shared/lib/popup/popups/bridge', () => ({ showActionSheet: jest.fn(
 jest.mock('@/shared/lib/popup/popups', () => ({ paramPopup: jest.fn() }));
 jest.mock('@/shared/lib/popup/E2EActionMenuProbe', () => ({
   E2EActionMenuRenderMarker: () => null,
+  E2EActionMenuTargetMarker: () => null,
 }));
 
 // ModelChip-only stand-ins.

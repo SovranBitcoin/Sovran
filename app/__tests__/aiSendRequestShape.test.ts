@@ -125,7 +125,11 @@ const success = () => ({
 const sendMock = jest.mocked(sendMessage);
 
 /** Boot the store onto `lineup` with `provider` selected, then send once. */
-async function sendWith(lineup: AiLineup, provider = 'openai') {
+async function sendWith(
+  lineup: AiLineup,
+  provider = 'openai',
+  extra: Partial<Parameters<typeof useRoutstrStore.setState>[0]> = {}
+) {
   useRoutstrStore.setState({
     apiKey: 'cashuA-key',
     authMode: 'bearer',
@@ -141,6 +145,7 @@ async function sendWith(lineup: AiLineup, provider = 'openai') {
     sessions: [],
     currentSessionId: null,
     isAnonymousMode: true,
+    ...extra,
   });
   const hook = renderHook(useAiSend);
   await act(async () => {
@@ -259,8 +264,9 @@ describe('a send against a lineup of vendors the app ships no logo for', () => {
     await sendWith(unnamedVendorLineup());
     expect(sendMock).toHaveBeenCalledTimes(1);
     expect(sendMock.mock.calls[0][1].model).toBe('qwen3-next-80b');
-    // And the clamp still comes from this entry's own catalogue ceiling.
-    expect(sendMock.mock.calls[0][1].max_tokens).toBe(2048);
+    // This entry's catalogue ceiling is 2048, above the budget we ask for, so
+    // the budget wins — the clamp only ever bites downwards.
+    expect(sendMock.mock.calls[0][1].max_tokens).toBe(ROUTSTR_MAX_COMPLETION_TOKENS);
   });
 
   it('still leads with the named vendors when the node serves them', () => {
@@ -272,5 +278,96 @@ describe('a send against a lineup of vendors the app ships no logo for', () => {
     // four in their own order, and only then the rest of the lineup.
     expect(ids.slice(0, 2)).toEqual(['gpt-oss-20b', 'claude-haiku-4.5']);
     expect(ids).toContain('qwen3-next-80b');
+  });
+});
+
+/**
+ * The sheet said "up to 10 sats" and 307 left the wallet.
+ *
+ * `maxSpendSats` priced a hypothetical average turn — 8000 prompt tokens, the
+ * blanket completion budget, a flat 10% buffer — and the node priced the
+ * request. Two calculations, no reason for them to agree, and on a sealed
+ * model they disagreed by a factor of thirty. Both figures below come from one
+ * send in `app/log.txt`: `ai.send.gate` showing the estimate, `routstr.sdk.sent
+ * { amount: 307 }` a few seconds later.
+ */
+describe('what the spend sheet is told', () => {
+  /** `tinfoil-gemma4-31b` as the node published it at 10:12:09. */
+  const GEMMA_PRICING = {
+    prompt: 0.0004783842264879333,
+    completion: 0.001195960566219833,
+    request: 0.001,
+    image: 0,
+    max_cost: 306.16590495227723,
+    max_prompt_cost: 122.46636198091092,
+    max_completion_cost: 306.16590495227723,
+  };
+
+  const gemmaCatalogRow = {
+    id: 'tinfoil-gemma4-31b',
+    name: 'Gemma 4 31B',
+    context_length: 256_000,
+    sats_pricing: GEMMA_PRICING,
+    top_provider: { context_length: 256_000, max_completion_tokens: 256_000 },
+  };
+
+  /** `sendWith`'s store overrides for this case. The catalogue row is a
+   *  partial `RoutstrModel` — the pricing path reads five fields off it and
+   *  tolerates the rest being absent, which is what the live spine does too. */
+  const withCatalog = {
+    confirmSpend: true,
+    modelsCache: { data: [gemmaCatalogRow], timestamp: 1 },
+  } as unknown as Partial<Parameters<typeof useRoutstrStore.setState>[0]>;
+
+  const gemmaEntry: LineupEntry = {
+    modelId: 'tinfoil-gemma4-31b',
+    displayName: 'Gemma 4 31B',
+    contextLength: 256_000,
+    created: 1,
+    visionInput: false,
+    maxCompletionTokens: 256_000,
+    satsPricing: {
+      prompt: GEMMA_PRICING.prompt,
+      completion: GEMMA_PRICING.completion,
+      request: GEMMA_PRICING.request,
+      image: 0,
+      max_cost: GEMMA_PRICING.max_cost,
+    },
+  };
+
+  it('quotes the 307 sats the node actually took, not the 10 the estimate guessed', async () => {
+    const { confirmSpend } = jest.requireMock('@/features/ai/lib/spendConfirm') as {
+      confirmSpend: jest.Mock;
+    };
+    confirmSpend.mockResolvedValue(true);
+
+    const lineup = emptyLineup();
+    lineup.openai.auto = gemmaEntry;
+    await sendWith(lineup, 'openai', withCatalog);
+
+    // What the old sheet would have said, still computed the old way.
+    expect(maxSpendSats(gemmaEntry)).toBeLessThan(20);
+    // What it says now.
+    expect(confirmSpend).toHaveBeenCalledWith(
+      expect.objectContaining({ reserveSats: 307, reserveKnown: true })
+    );
+    expect(sendMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('declining the real figure sends nothing', async () => {
+    const { confirmSpend } = jest.requireMock('@/features/ai/lib/spendConfirm') as {
+      confirmSpend: jest.Mock;
+    };
+    confirmSpend.mockResolvedValue(false);
+
+    const lineup = emptyLineup();
+    lineup.openai.auto = gemmaEntry;
+    await sendWith(lineup, 'openai', withCatalog);
+
+    expect(confirmSpend).toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
+    // And the transcript is untouched — a declined send leaves no orphan
+    // question with no answer under it.
+    expect(useRoutstrStore.getState().conversationHistory).toHaveLength(0);
   });
 });

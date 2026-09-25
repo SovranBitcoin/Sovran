@@ -19,6 +19,7 @@ import {
   useStreamingStartedAt,
 } from '../lib/streamingBuffer';
 import { useTurnError } from '../lib/turnErrors';
+import { useTurnTruncation } from '../lib/turnTruncation';
 import { AiTurnErrorPill } from './AiTurnErrorPill';
 import { withAlpha } from '@/shared/lib/color';
 import { ERROR_COPY } from '@/shared/lib/errors/catalog';
@@ -46,6 +47,9 @@ interface AiMessageBubbleProps {
   /** Invoked with the message id when the user taps Retry. Omit to hide the
    *  Retry action (e.g. while another message is mid-stream). */
   onRetry?: (messageId: string) => void;
+  /** Invoked with the message id when the user taps Continue on an answer
+   *  that ran out of completion budget. Omit to hide the action. */
+  onContinue?: (messageId: string) => void;
   /** When set, render the `←  N / M  →` branch navigator on this bubble. */
   branchNav?: BranchNav;
 }
@@ -313,7 +317,13 @@ function BranchNavView({ index, total, onPrev, onNext, color, testIdPrefix }: Br
   );
 }
 
-function AssistantBubble({ message, isStreaming, onRetry, branchNav }: AiMessageBubbleProps) {
+function AssistantBubble({
+  message,
+  isStreaming,
+  onRetry,
+  onContinue,
+  branchNav,
+}: AiMessageBubbleProps) {
   const [foreground, shade400] = useThemeColor(['foreground', 'shade-400'] as const);
 
   // While streaming, the bubble for the in-flight assistant message reads
@@ -333,6 +343,10 @@ function AssistantBubble({ message, isStreaming, onRetry, branchNav }: AiMessage
   const elapsedSeconds = useElapsedSeconds(isLive ? liveStartedAt : null);
 
   const turnError = useTurnError(message.id);
+  // An answer that stopped because its completion budget ran out. Not an
+  // error — there is real content above it that the user paid for — but not
+  // a finished answer either, and the difference is invisible without this.
+  const truncation = useTurnTruncation(message.id);
 
   const displayedContent = liveContent ?? message.content;
   // Persisted reasoning is the source of truth once the stream ends. Mid-
@@ -388,6 +402,11 @@ function AssistantBubble({ message, isStreaming, onRetry, branchNav }: AiMessage
     onRetry(message.id);
   }, [onRetry, message.id]);
 
+  const handleContinue = useCallback(() => {
+    if (!onContinue) return;
+    onContinue(message.id);
+  }, [onContinue, message.id]);
+
   const showActions = hasContent && !isStreaming;
 
   // A settled assistant turn with nothing in it is a failed one: the send flow
@@ -433,6 +452,34 @@ function AssistantBubble({ message, isStreaming, onRetry, branchNav }: AiMessage
               </Text>
             ) : null}
           </Text>
+        ) : null}
+
+        {/* The budget ran out mid-answer. Said plainly, with the number that
+            ran out, and with the one action that recovers it — asking for the
+            rest costs another reservation, so it is the user's call and not
+            something to do for them. A cap on `max_tokens` is only a fair
+            trade for holding less of their money if the case where it bites
+            is visible; silently truncating a paid answer would be worse than
+            over-reserving. */}
+        {truncation && !isStreaming ? (
+          <HStack className="mt-0.5 shrink items-center gap-1.5">
+            <Icon name="mdi:alert-circle-outline" size={14} color={shade400} />
+            <Text size={12} className="text-foreground/60 shrink">
+              {`Stopped at the ${truncation.budgetTokens}-token answer limit.`}
+            </Text>
+            {onContinue ? (
+              <Pressable
+                onPress={handleContinue}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Ask for the rest of the answer"
+                testID={`ai-message-continue-${message.id}`}>
+                <Text size={12} bold className="text-foreground">
+                  Continue
+                </Text>
+              </Pressable>
+            ) : null}
+          </HStack>
         ) : null}
 
         {/* Action row: Copy + Retry on the left, branch nav pinned to the

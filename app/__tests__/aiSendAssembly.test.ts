@@ -239,10 +239,12 @@ describe('reserve-based affordability gate (format.ts)', () => {
 
   it('requires the discounted reserve, not max_cost', () => {
     const reserve = requiredReserveSatsFromPricing(frontier)!;
-    // request + 8000×prompt + 4096×completion ≈ 68 sats — two orders of
-    // magnitude under the 3,607-sat max_cost ceiling.
-    expect(reserve).toBeGreaterThan(50);
-    expect(reserve).toBeLessThan(100);
+    // request + 8000×prompt + 2000×completion ≈ 43 sats — two orders of
+    // magnitude under the 3,607-sat max_cost ceiling, and now half what it
+    // was, because the completion budget we ask for is the one this app
+    // already said a turn writes rather than a blanket 4096.
+    expect(reserve).toBeGreaterThan(30);
+    expect(reserve).toBeLessThan(60);
     expect(canAffordPricing(frontier, 100)).toBe(true); // old gate said no until 3,607
     expect(canAffordPricing(frontier, 10)).toBe(false);
   });

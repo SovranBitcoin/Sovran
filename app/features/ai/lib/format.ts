@@ -198,14 +198,20 @@ export function sendMaxTokens(maxCompletionTokens: number | null | undefined): n
 }
 
 /**
- * What one message could cost, before it costs it.
+ * The typical-case reservation, for callers that cannot see the real request.
  *
- * Paying per request means handing the node a token worth its admission gate
- * and taking the unspent remainder back. The gate — not the expected cost — is
- * what leaves the wallet, and on a frontier model that is thousands of sats
- * against a message that will actually cost a fraction of one. The number is
- * only briefly out of the user's hands, but it is their number, so it is shown
- * before it goes rather than reported afterwards.
+ * NOT what the spend sheet quotes any more. The node sizes its admission gate
+ * from the actual body — `features/ai/lib/reserve.ts` mirrors that arithmetic
+ * and is what the user now approves. This function prices a hypothetical
+ * average turn (`TYPICAL_PROMPT_TOKENS` of prompt) and was being shown as
+ * though it were the real figure: a device log has it quoting 10 sats while
+ * 307 left the wallet, because the model was sealed and the node would not
+ * discount its completion side at all.
+ *
+ * What it is still good for is the affordability floor before a message
+ * exists — a balance that cannot cover an average turn cannot cover this one
+ * either, and saying so early is cheaper than assembling a request to find
+ * out. `evaluateSendGate` uses it exactly there, and nowhere else.
  */
 export function maxSpendSats(entry: LineupEntry | null, imageCount = 0): number {
   const reserve = requiredReserveSatsFromPricing(
@@ -226,12 +232,23 @@ export function maxSpendSats(entry: LineupEntry | null, imageCount = 0): number 
 const TYPICAL_PROMPT_TOKENS = 8000;
 
 /**
- * Typical chat-turn output size. We default to "the assistant writes a
- * couple of paragraphs". Models that yield long-form output (code, deep
- * reasoning) can burn more, but the post-stream `actualCostSats` log
- * gives us the data to retune this if we see drift.
+ * Typical chat-turn output size — "the assistant writes a couple of
+ * paragraphs".
+ *
+ * Deliberately the SAME number as `ROUTSTR_MAX_COMPLETION_TOKENS`, not a
+ * coincidence and not to be forked back apart. They were different (2000 here,
+ * 4096 on the wire) and that disagreement was load-bearing in the wrong
+ * direction: every cost figure the user read was derived from a completion
+ * budget the request was not asking for. What a turn is expected to write is
+ * what we ask the node to reserve for it, and both readings of that sentence
+ * resolve to one constant.
+ *
+ * Retune it against `ai.stream.complete`, which now records `maxTokens`,
+ * `finishReason` and `approxCompletionTokens` on every answer — and, when the
+ * budget is what ended the stream, says so to the user rather than silently
+ * cutting the answer off.
  */
-const TYPICAL_COMPLETION_TOKENS = 2000;
+const TYPICAL_COMPLETION_TOKENS = ROUTSTR_MAX_COMPLETION_TOKENS;
 
 /** The catalogue row's own completion ceiling, read the same way
  *  `toLineupEntry` reads it — so a gate keyed by raw model id charges the
@@ -357,34 +374,6 @@ export function requiredReserveSatsFromPricing(
   maxCompletionTokens?: number | null
 ): number | null {
   return satsFromPricing(pricing, imageCount, sendMaxTokens(maxCompletionTokens), 1);
-}
-
-/**
- * Approximate count of additional turns the user could send against this
- * pricing before Routstr's `max_cost` reservation gate starts rejecting.
- * Two limits are at play:
- *
- *   1. Each turn drops the balance by the estimated per-turn spend.
- *   2. Each request requires `balance >= max_cost` upfront — once the
- *      balance drifts below that ceiling, the next send fails with 402
- *      regardless of how cheap the typical turn is.
- *
- * The formula bakes both in: `floor((balance − max_cost) / typical) + 1`
- * is the number of consecutive sends you could queue starting from
- * `balanceSats` before the reservation gate trips. Returns `null` when
- * cost data is unavailable, and `0` when balance is already below the
- * reservation floor.
- */
-export function estimateMessagesRemainingFromPricing(
-  balanceSats: number,
-  pricing: LineupPricing | null,
-  maxCompletionTokens?: number | null
-): number | null {
-  const reserve = requiredReserveSatsFromPricing(pricing, 0, maxCompletionTokens);
-  const typical = estimateTurnCostSatsFromPricing(pricing);
-  if (reserve == null || typical == null || typical <= 0) return null;
-  if (balanceSats < reserve) return 0;
-  return Math.floor((balanceSats - reserve) / typical) + 1;
 }
 
 /**
@@ -752,26 +741,6 @@ export function canAffordPricing(
   const reserve = requiredReserveSatsFromPricing(pricing, 0, maxCompletionTokens);
   if (reserve == null) return true;
   return balanceSats >= reserve * AFFORD_BUFFER;
-}
-
-/**
- * Whole-sat shortfall to unlock this pricing's tier — the mirror of
- * `canAffordPricing`. Mirrors Routstr's reservation requirement
- * (`max_cost`) so the "Top up X sats" copy reflects what the API will
- * actually accept. Returns `null` when cost data is unknown or already
- * covered. Clamps the result to ≥ 1 sat so we never render "Top up 0 more
- * sats" after rounding.
- */
-export function topUpDeficitSatsFromPricing(
-  pricing: LineupPricing | null,
-  balanceSats: number,
-  maxCompletionTokens?: number | null
-): number | null {
-  const reserve = requiredReserveSatsFromPricing(pricing, 0, maxCompletionTokens);
-  if (reserve == null) return null;
-  const required = Math.ceil(reserve * AFFORD_BUFFER);
-  if (balanceSats >= required) return null;
-  return Math.max(1, required - balanceSats);
 }
 
 /**

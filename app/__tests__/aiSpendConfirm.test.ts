@@ -9,6 +9,7 @@
 
 import { confirmSpend } from '@/features/ai/lib/spendConfirm';
 import { maxSpendSats } from '@/features/ai/lib/format';
+import { ROUTSTR_MAX_COMPLETION_TOKENS } from '@/shared/lib/routstr/api';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import type { LineupEntry } from '@/shared/lib/routstr/lineup';
 
@@ -54,7 +55,12 @@ const { actionMenuPopup } = jest.requireMock('@/shared/lib/popup') as {
 };
 
 type Payload = {
-  buttons: { testID: string; text: string; onPress: (close: () => void) => void }[];
+  buttons: {
+    testID: string;
+    text: string;
+    description?: string;
+    onPress: (close: () => void) => void;
+  }[];
   onDismiss?: () => void;
 };
 const lastPayload = () => actionMenuPopup.mock.calls.at(-1)?.[0] as Payload;
@@ -69,9 +75,14 @@ const entry = (prompt: number, completion: number): LineupEntry => ({
 });
 
 describe('maxSpendSats', () => {
-  it('quotes the gate the node will hold, not the expected cost', () => {
-    // request + 8000 prompt tokens + 4096 completion tokens, buffered.
-    expect(maxSpendSats(entry(0.001, 0.01))).toBe(Math.ceil((0.001 + 8 + 40.96) * 1.1));
+  it('still prices the typical turn it is named for', () => {
+    // The last-resort estimate, for a model the catalogue cannot price:
+    // request + 8000 prompt tokens + the completion budget the request will
+    // carry, buffered. NOT what the spend sheet quotes any more — that comes
+    // from `reservedSatsForSend` over the real body.
+    expect(maxSpendSats(entry(0.001, 0.01))).toBe(
+      Math.ceil((0.001 + 8 + 0.01 * ROUTSTR_MAX_COMPLETION_TOKENS) * 1.1)
+    );
   });
 
   it('never quotes zero, because a zero token cannot clear any gate', () => {
@@ -87,17 +98,26 @@ describe('confirmSpend', () => {
   });
 
   it('proceeds only once the user says so', async () => {
-    const decision = confirmSpend({ modelName: 'Model', maxSats: 42 });
+    const decision = confirmSpend({ modelName: 'Model', reserveSats: 42, reserveKnown: true });
     lastPayload()
       .buttons.find((b) => b.testID === 'ai-spend-confirm')!
       .onPress(() => {});
     await expect(decision).resolves.toBe(true);
-    expect(lastPayload().buttons[0].text).toContain('42 sats');
+    // No hedge. 42 is what leaves the wallet, so 42 is what the button says —
+    // "up to 10 sats" was on screen while 307 went, because the figure came
+    // from a typical-turn estimate rather than from this request.
+    expect(lastPayload().buttons[0].text).toBe('Send · 42 sats');
+  });
+
+  it('marks an unpriced model as an estimate instead of stating a figure', async () => {
+    void confirmSpend({ modelName: 'Model', reserveSats: 9, reserveKnown: false });
+    expect(lastPayload().buttons[0].text).toBe('Send · roughly 9 sats');
+    expect(lastPayload().buttons[0].description).toContain('could hold more');
   });
 
   it('treats dismissal as a decline', async () => {
     // Tapping away must never be read as consent to spend.
-    const decision = confirmSpend({ modelName: 'Model', maxSats: 42 });
+    const decision = confirmSpend({ modelName: 'Model', reserveSats: 42, reserveKnown: true });
     lastPayload().onDismiss?.();
     await expect(decision).resolves.toBe(false);
   });
@@ -107,7 +127,7 @@ describe('confirmSpend', () => {
     // settings toggle its own copy promised was never built, so one tap opted
     // the user out of every future spend prompt for good. Consenting to one
     // send must never be consent to all of them.
-    const decision = confirmSpend({ modelName: 'Model', maxSats: 42 });
+    const decision = confirmSpend({ modelName: 'Model', reserveSats: 42, reserveKnown: true });
     const payload = lastPayload();
     expect(payload.buttons.map((b) => b.testID)).toEqual(['ai-spend-confirm']);
 
@@ -116,12 +136,12 @@ describe('confirmSpend', () => {
     // Saying yes once leaves the prompt armed for the next send.
     expect(useRoutstrStore.getState().confirmSpend).toBe(true);
     actionMenuPopup.mockClear();
-    void confirmSpend({ modelName: 'Model', maxSats: 42 });
+    void confirmSpend({ modelName: 'Model', reserveSats: 42, reserveKnown: true });
     expect(actionMenuPopup).toHaveBeenCalled();
   });
 
   it('settles once even if the sheet reports twice', async () => {
-    const decision = confirmSpend({ modelName: 'Model', maxSats: 42 });
+    const decision = confirmSpend({ modelName: 'Model', reserveSats: 42, reserveKnown: true });
     const payload = lastPayload();
     payload.buttons[0].onPress(() => {});
     payload.onDismiss?.();

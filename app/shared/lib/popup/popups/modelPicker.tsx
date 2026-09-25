@@ -15,10 +15,13 @@
  *   keeps its own `activeProviderTab` state and re-derives the rows on
  *   each tab switch.
  *
- * Structurally this lives in the same lane as `emojiPickerPopup` —
- * heroui standalone `<BottomSheet>` via `PopupHost`'s
- * `CUSTOM_SHEET_CONTENT` registry — so we get FullWindowOverlay support
- * "for free" if the picker is ever invoked from inside a route modal.
+ * Structurally this is a `PopupHost` custom sheet — heroui standalone
+ * `<BottomSheet>` via the `CUSTOM_SHEET_CONTENT` registry — so we get
+ * FullWindowOverlay support "for free" if the picker is ever invoked from
+ * inside a route modal. It sizes itself, like `actionMenuSheet` and
+ * `paymentOptionsSheet`; it deliberately does NOT share `emojiPickerPopup`'s
+ * fixed-detent layout, which is what left its rows and tabs unable to take a
+ * tap (see `sheets/sheetLayoutConfig.ts`).
  *
  * Usage:
  *   import { modelPickerPopup } from '@/shared/lib/popup';
@@ -47,21 +50,20 @@ import { SheetMenuRowContent } from './sheetMenuRow';
 import { log, useMountLog } from '@/shared/lib/logger';
 
 import {
+  AFFORD_BUFFER,
   AI_TIERS,
   E2EE_BADGE_ICON,
   E2EE_BADGE_LABEL,
   type AiProvider,
   type AiTier,
-  canAffordPricing,
   entryForSlot,
   providersForLineup,
-  estimateMessagesRemainingFromPricing,
   estimateTurnCostSatsFromPricing,
-  topUpDeficitSatsFromPricing,
+  requiredReserveSatsFromPricing,
 } from '@/features/ai/lib/format';
 
 import { showActionSheet } from './bridge';
-import { E2EActionMenuRenderMarker } from '../E2EActionMenuProbe';
+import { E2EActionMenuRenderMarker, E2EActionMenuTargetMarker } from '../E2EActionMenuProbe';
 import { paramPopup } from './';
 import type { ActionSheetPayloads } from '../actionSheetTypes';
 import type { CustomSheetSharedProps } from '../sheets/types';
@@ -77,6 +79,52 @@ const formatTypicalCost = (sats: number | null): string => {
   if (sats >= 0.01) return `~${sats.toFixed(2)} sats / msg`;
   return '< 1 sat / msg';
 };
+
+/**
+ * Sats Routstr will actually hold to admit one turn on this entry.
+ *
+ * `requiredReserveSatsFromPricing` prices the node's *discounted* admission
+ * path: send a `max_tokens` bound and the node reserves prompt +
+ * max_tokens×completion instead of the raw `max_cost` ceiling. A node cannot
+ * read a sealed request body, so it cannot verify that bound — the SDK skips
+ * both completion discounts for an end-to-end-encrypted model and reserves the
+ * flat ceiling, and every sealed catalogue row prices
+ * `max_completion_cost === max_cost`, so no `max_tokens` moves it.
+ *
+ * Without the floor the picker quoted ~10 sats against a node that demanded
+ * 307 (the reservations in the 2026-09-25 device log were 307, 896 and 1): a
+ * 50-sat wallet was told "affordable · ~40 messages left" and refused at send,
+ * while the very same row's "needs 307 sats reserved" line — which reads
+ * `max_cost` directly — was right. One row, two contradictory numbers.
+ *
+ * The rule belongs beside the send gate in `features/ai`; it lives here until
+ * that module exports it, and `isE2eeModelId` is the single spelling of the
+ * sealed test (never the raw id prefix — sealing is per model, not per node).
+ */
+function reserveSatsForEntry(entry: LineupEntry): number | null {
+  const discounted = requiredReserveSatsFromPricing(
+    entry.satsPricing,
+    0,
+    entry.maxCompletionTokens
+  );
+  if (!isE2eeModelId(entry.modelId)) return discounted;
+  const ceiling = entry.satsPricing.max_cost;
+  if (ceiling == null) return discounted;
+  return Math.max(discounted ?? 0, Math.ceil(ceiling));
+}
+
+/**
+ * Whether `balanceSats` clears that reservation with the shared headroom
+ * buffer. Mirrors `canAffordPricing` exactly apart from the sealed floor, and
+ * is the ONE verdict the picker uses — the `modelPicker.rows` log counts
+ * pressable rows with it too, so the event can never disagree with the rows
+ * the user is looking at.
+ */
+function isEntryAffordable(entry: LineupEntry, balanceSats: number): boolean {
+  const reserve = reserveSatsForEntry(entry);
+  if (reserve == null) return true;
+  return balanceSats >= reserve * AFFORD_BUFFER;
+}
 
 interface TierRowProps {
   tier: AiTier;
@@ -96,23 +144,45 @@ interface TierRowProps {
  * the context Menu.Item reads via `useMenu()` / `useMenuItemAnimation`;
  * neither Trigger, Portal, nor Content is required because Menu.Root
  * just renders its children inline through a context Provider.
+ *
+ * The bare `<Menu>` was the prime suspect when the picker stopped taking
+ * taps, on the theory that an item in a menu that was never opened treats
+ * presses as no-ops. It does not. heroui's press path
+ * (`primitives/menu/menu.tsx`, `Item`) reads the root context only for
+ * `onOpenChange` / `setTriggerPosition` / `setContentLayout` when closing
+ * after a select; there is no `isOpen` guard anywhere in it, and
+ * `components/menu/menu.tsx`'s `Menu.Item` adds press-feedback animation
+ * and nothing else. `isOpen` gates `Menu.Content` and `Menu.Overlay`,
+ * neither of which is in this tree. Rendering the real component outside a
+ * `Menu.Content` and firing the rendered Pressable delivers `onPress`.
+ * Don't re-suspect this; the fault was the sheet's container shape (see
+ * `sheets/sheetLayoutConfig.ts`).
  */
 function TierRow({ tier, provider, entry, balanceSats, isCurrent, onPress }: TierRowProps) {
   // Every figure comes from the lineup entry's compact pricing — identical
   // math against a live catalog row or the persisted offline snapshot, so
   // the picker keeps real prices across an offline relaunch.
   const pricing = entry.satsPricing;
-  const reservationCeiling = pricing.max_cost;
   const typicalCost = estimateTurnCostSatsFromPricing(pricing);
-  // The same completion budget the send will actually ask for. Pricing the
-  // unclamped default here made the row quote a threshold the request never
-  // meets — four times too much on a model whose catalogue ceiling is 1024 —
-  // so "Top up N sats" and "N messages left" disagreed with the gate that
-  // decides them.
-  const maxTokens = entry.maxCompletionTokens;
-  const affordable = canAffordPricing(pricing, balanceSats, maxTokens);
-  const messagesLeft = estimateMessagesRemainingFromPricing(balanceSats, pricing, maxTokens);
-  const deficit = !affordable ? topUpDeficitSatsFromPricing(pricing, balanceSats, maxTokens) : null;
+  // One reservation figure drives every number on the row — the verdict, the
+  // "needs N reserved" line, the top-up shortfall and the messages-left count.
+  // They used to come from three different calls and could contradict each
+  // other: the ceiling line read `max_cost` while the verdict priced the
+  // discounted path, so a sealed row said "affordable" beside "needs 307 sats
+  // reserved". See `reserveSatsForEntry` for why sealed models don't discount.
+  const reserve = reserveSatsForEntry(entry);
+  const affordable = isEntryAffordable(entry, balanceSats);
+  // `floor((balance − reserve) / typical) + 1` — the same shape as
+  // `estimateMessagesRemainingFromPricing`, re-derived here so it counts
+  // against the reservation the node will really take.
+  const messagesLeft =
+    reserve == null || typicalCost == null || typicalCost <= 0
+      ? null
+      : balanceSats < reserve
+        ? 0
+        : Math.floor((balanceSats - reserve) / typicalCost) + 1;
+  const required = reserve != null ? Math.ceil(reserve * AFFORD_BUFFER) : null;
+  const deficit = !affordable && required != null ? Math.max(1, required - balanceSats) : null;
 
   const friendlyModelName = entry.displayName || tier.label;
 
@@ -127,7 +197,7 @@ function TierRow({ tier, provider, entry, balanceSats, isCurrent, onPress }: Tie
   // the API, and the send-path candidate chain absorbs that.
   const costCopy = affordable
     ? formatTypicalCost(typicalCost)
-    : `needs ${reservationCeiling != null ? Math.ceil(reservationCeiling).toLocaleString() : '?'} sats reserved`;
+    : `needs ${reserve != null ? Math.ceil(reserve).toLocaleString() : '?'} sats reserved`;
   const description = `${friendlyModelName} · ${costCopy}${entry.lastKnown ? ' · last known' : ''}`;
 
   const labelText =
@@ -159,6 +229,14 @@ function TierRow({ tier, provider, entry, balanceSats, isCurrent, onPress }: Tie
       testID={`ai-model-${provider.id}-${tier.id}`}
       isDisabled={disabled}
       onPress={onPress}>
+      {/* Publishes this row's measured centre so the iOS harness can issue a
+          real physical tap on it. Without it the picker's rows are
+          unaddressable inside the FullWindowOverlay and no scenario can press
+          one — same marker `actionMenuSheet` rows carry. */}
+      <E2EActionMenuTargetMarker
+        actionId={`ai-model-${provider.id}-${tier.id}`}
+        disabled={disabled}
+      />
       <SheetMenuRowContent
         icon={<Icon name={tier.icon} size={20} />}
         title={labelText}
@@ -328,7 +406,7 @@ export function ModelPickerContent({ close, balanceSats }: ModelPickerContentPro
   useEffect(() => {
     const pressable = rows.filter(
       (r) =>
-        canAffordPricing(r.entry.satsPricing, balanceSats, r.entry.maxCompletionTokens) &&
+        isEntryAffordable(r.entry, balanceSats) &&
         !(selectedProvider === activeProvider.id && selectedTier === r.tier.id)
     ).length;
     pickerLog.info('modelPicker.rows', {
@@ -364,15 +442,21 @@ export function ModelPickerContent({ close, balanceSats }: ModelPickerContentPro
   );
 
   return (
-    <View style={{ flex: 1 }}>
+    // No `flex: 1`. The picker is a `contentHeight` sheet, so gorhom measures
+    // this subtree to derive the sheet's own height — the container above it
+    // has no height yet when that measurement is taken, and `flex: 1` against
+    // an indefinite parent collapses to zero in Yoga (the same trap
+    // `SheetItemTitle` defends `Menu.ItemTitle` from). Self-sizing is what the
+    // other `contentHeight` bodies do.
+    <View>
       <E2EActionMenuRenderMarker presentationKey={popupOpenSeq} />
       {/* Title — same typographic position as `<Menu.Label>` in
-          ActionMenuHost so the surface reads as a menu sibling. */}
-      <View style={{ paddingHorizontal: 12, paddingTop: 8 }}>
-        <BottomSheet.Title className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
-          Model
-        </BottomSheet.Title>
-      </View>
+          ActionMenuHost so the surface reads as a menu sibling. No wrapper
+          inset: `contentHeight` sheets get heroui's `px-3` from
+          `PopupHost`, exactly like `actionMenuSheet`'s title. */}
+      <BottomSheet.Title className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
+        Model
+      </BottomSheet.Title>
 
       {/* Tab strip — anchor pill style copied from `SectionAnchorList`'s
           anchor bar so visually identical to Select Profile's tabs.
@@ -441,7 +525,7 @@ export function ModelPickerContent({ close, balanceSats }: ModelPickerContentPro
           `<View>` with a `RootContext.Provider` around it — no popover
           anchoring, no portal mount. That gives us the *real* heroui
           row chrome inside our own BottomSheet host. */}
-      <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 24 }}>
+      <View style={{ paddingTop: 8 }}>
         <Menu>
           {(() => {
             if (rows.length === 0) {
@@ -496,7 +580,10 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   anchorBarWrapper: {
-    marginHorizontal: -18,
+    // Cancels exactly the `px-3` heroui puts on a `contentHeight` sheet's
+    // content container, so the strip still bleeds to the sheet's own edge
+    // while its first pill lines up with the rows below.
+    marginHorizontal: -12,
     flexGrow: 0,
   },
   anchorBarContent: {
