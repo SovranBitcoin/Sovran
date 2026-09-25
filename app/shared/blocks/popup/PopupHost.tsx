@@ -50,6 +50,7 @@ import { OPEN_WATCHDOG_MS } from '@/shared/lib/popup/openWatchdog';
 import { E2EStaticToastRenderMarker } from '@/shared/lib/popup/E2EToastProbe';
 import { EmojiPickerContent } from '@/shared/lib/popup/popups/emojiPicker';
 import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
+import { useRoutstrFunds } from '@/features/ai/hooks/useRoutstrFunds';
 import { PaymentOptionsContent } from '@/shared/lib/popup/popups/paymentOptionsSheet';
 import { NfcTapContent } from '@/shared/lib/popup/popups/nfcTapSheet';
 import { ProofSelectorContent } from '@/shared/lib/popup/popups/proofSelectorSheet';
@@ -244,6 +245,7 @@ function SubmessageRenderer({
 
 /** Props every custom-sheet renderer receives; `payload` is typed per sheet id. */
 type CustomSheetContentProps<P = unknown> = {
+  balanceSats: number;
   payload: P;
   close: () => void;
   pushCustomPage: <K extends keyof ActionSheetPayloads>(
@@ -311,6 +313,7 @@ function SnapPointsContentGate({ children }: { children: React.ReactNode }) {
 }
 
 function SheetContent({
+  balanceSats,
   payload,
   activeCustomPage,
   close,
@@ -323,6 +326,7 @@ function SheetContent({
   canPopCustomPage,
   onCustomFooterConfigChange,
 }: {
+  balanceSats: number;
   payload: ReturnType<typeof usePopupStore.getState>['current'];
   activeCustomPage: CustomSheetPage | null;
   close: () => void;
@@ -368,6 +372,7 @@ function SheetContent({
       customNavDirection === 'forward' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220);
     const customContent = (
       <ContentComponent
+        balanceSats={balanceSats}
         payload={activeCustomPage.payload}
         close={close}
         pushCustomPage={pushCustomPage}
@@ -481,6 +486,7 @@ function SheetActionButton({
 const popupHostLog = log.child({ module: 'popupHost' });
 
 function SheetPopup() {
+  const funds = useRoutstrFunds();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   // Captured here (inside the account-scoped providers) and re-provided
@@ -984,6 +990,7 @@ function SheetPopup() {
             // signer sheets' expandable sections need this).
             contentContainerProps={patchedContentContainerProps as never}>
             <SheetContent
+              balanceSats={funds?.balanceSats ?? 0}
               payload={payload}
               activeCustomPage={activeCustomPage}
               close={scopedClose}

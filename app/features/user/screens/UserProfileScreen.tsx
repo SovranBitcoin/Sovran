@@ -54,6 +54,7 @@ import { SkeletonLoadingShimmer } from '@/shared/ui/composed/SkeletonExitShimmer
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { LightningAddress } from '@sovranbitcoin/schemas';
 import { getNpcAddress } from '@/shared/lib/cashu/npc';
+import { prefetchNutzapProfile } from '@/shared/lib/nostr/nutzapProfileDiscovery';
 import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { usePaymentFlowMachine } from 'wallet/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
@@ -1196,6 +1197,9 @@ export function UserProfileScreen() {
       return;
     }
     clearPaymentContext('user.profile.send_money');
+    // Start the lock-target lookup now, so the amount screen's "Lock Ecash"
+    // option is decided before the user gets there.
+    prefetchNutzapProfile(pubkey);
     paymentLog.info('user.profile.send_money.start', {
       recipientPubkeyLength: pubkey.length,
       meltTargetLength: meltTarget.length,

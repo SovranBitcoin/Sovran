@@ -100,6 +100,7 @@ function buildPaymentCopyGroups(text: PaymentCopyText) {
       },
       rolledBack: {
         label: text("timeline.send.rolledBack.label"),
+        reclaimedLabel: text("timeline.send.rolledBack.reclaimedLabel"),
         info: text("timeline.send.rolledBack.info"),
       },
       locked: {
@@ -108,6 +109,7 @@ function buildPaymentCopyGroups(text: PaymentCopyText) {
       },
       unlock: {
         label: text("timeline.send.unlock.label"),
+        reachedLabel: text("timeline.send.unlock.reachedLabel"),
         infoUpcoming: text("timeline.send.unlock.infoUpcoming"),
         infoRefund: text("timeline.send.unlock.infoRefund"),
         infoPublic: text("timeline.send.unlock.infoPublic"),

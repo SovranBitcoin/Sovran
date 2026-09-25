@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { InteractionManager, Dimensions } from 'react-native';
+import { InteractionManager, Dimensions, Keyboard } from 'react-native';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { QRCodeFrame } from '@/shared/ui/composed/QRCodeFrame';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -18,8 +18,8 @@ const mockInnerContent = {};
 let mockReducedMotion = false;
 const mockAfterInteractions: (() => void)[] = [];
 const mockNavigateToProfile = jest.fn();
-jest.mock('@/features/contacts/lib/navigateToProfile', () => ({
-  navigateToProfile: (...args: unknown[]) => mockNavigateToProfile(...args),
+jest.mock('@/shared/hooks/useGuardedRouter', () => ({
+  guardedRouter: { push: (...args: unknown[]) => mockNavigateToProfile(...args) },
 }));
 jest.mock('@/shared/hooks/useNostrProfileMetadata', () => ({
   useNostrProfileMetadata: () => ({ metadata: null, isResolving: false }),
@@ -178,6 +178,7 @@ describe('TransactionDetailShell device probe', () => {
   beforeAll(() => jest.useFakeTimers());
   afterAll(() => jest.useRealTimers());
   beforeEach(() => {
+    jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => {});
     mockCounterparty = null;
     mockAfterInteractions.length = 0;
     Dimensions.set({
@@ -277,7 +278,10 @@ describe('TransactionDetailShell device probe', () => {
     act(() => {
       renderer.root.findByProps({ testID: 'transaction-counterparty-profile' }).props.onPress();
     });
-    expect(mockNavigateToProfile).toHaveBeenCalledWith('fixture-counterparty');
+    expect(mockNavigateToProfile).toHaveBeenCalledWith({
+      pathname: '/(profile-flow)/profile',
+      params: { pubkey: 'fixture-counterparty' },
+    });
     const frame = renderer.root.findByType(QRCodeFrame);
     // First child is the placeholder's QR layer, sized to the live QR square.
     expect(frame.props.children[0].props.style).toMatchObject({ width: 329, height: 329 });

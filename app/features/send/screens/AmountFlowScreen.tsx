@@ -452,6 +452,7 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
                 }
               : undefined
           }
+          arrivedLocked={arrivedLocked}
           suppressNextVariants={!!nearPayRecipient}
         />
       </View>

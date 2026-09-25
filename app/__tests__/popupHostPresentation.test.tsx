@@ -21,6 +21,10 @@ import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mockWarn = jest.fn();
+let mockBalanceSats = 10;
+jest.mock('@/features/ai/hooks/useRoutstrFunds', () => ({
+  useRoutstrFunds: () => ({ balanceSats: mockBalanceSats }),
+}));
 
 jest.mock('@/shared/lib/logger', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
@@ -65,7 +69,13 @@ jest.mock('@/shared/lib/popup/popups/emojiPicker', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   return { EmojiPickerContent: () => ReactActual.createElement('EmojiPickerContent') };
 });
-jest.mock('@/shared/lib/popup/popups/modelPicker', () => ({ ModelPickerContent: () => null }));
+jest.mock('@/shared/lib/popup/popups/modelPicker', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  return {
+    ModelPickerContent: ({ balanceSats }: { balanceSats: number }) =>
+      ReactActual.createElement('View', { testID: 'model-picker-content', balanceSats }),
+  };
+});
 jest.mock('@/shared/lib/popup/popups/nfcTapSheet', () => ({ NfcTapContent: () => null }));
 jest.mock('@/shared/lib/popup/popups/paymentOptionsSheet', () => ({
   PaymentOptionsContent: () => null,
@@ -167,6 +177,7 @@ describe('PopupHost presentation', () => {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
 
   beforeEach(() => {
+    mockBalanceSats = 10;
     jest.useFakeTimers();
     mockWarn.mockClear();
     usePopupStore.setState({ current: null, isOpen: false, destroyed: false });
@@ -317,6 +328,24 @@ describe('PopupHost presentation', () => {
     expect(
       renderer!.root.findAll((node) => node.props.testID === 'popup-snap-content-gate')
     ).toHaveLength(0);
+  });
+
+  // The model picker renders inside a FullWindowOverlay portal, which sits
+  // outside the wallet providers mounted on the route tree — reading the
+  // balance from a hook *inside* the body threw "BalanceProvider is missing".
+  // The host reads it on the provider side of that boundary and passes it in.
+  it('passes live wallet funds across the model-picker portal', () => {
+    act(() => {
+      renderer = TestRenderer.create(<PopupHost />);
+      usePopupStore.getState().open({ sheetId: 'model-picker', payload: {} });
+    });
+    layoutGate(renderer!, 400);
+    const picker = () => renderer!.root.findByProps({ testID: 'model-picker-content' });
+    expect(picker().props.balanceSats).toBe(10);
+
+    mockBalanceSats = 25;
+    act(() => renderer!.update(<PopupHost />));
+    expect(picker().props.balanceSats).toBe(25);
   });
 
   it('treats a native close reported before layout as a real dismissal', () => {

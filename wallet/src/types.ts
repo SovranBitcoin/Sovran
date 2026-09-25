@@ -263,6 +263,7 @@ export type DestinationKind =
   | 'lightningAddress' // lnurlp endpoint paid via Lightning (NOT an identity)
   | 'onchain' // bitcoin address
   | 'person' // payable Nostr identity (npub / nprofile / lightning address)
+  | 'lockKey' // a wallet's compressed P2PK receive key — lock ecash to it
   | 'mint' // mint URL
   | 'unsupported'; // empty / unknown / UR fragment / parse errors
 
@@ -283,6 +284,7 @@ export type DestinationAction =
   | 'meltLnurl' // pay an lnurlp endpoint
   | 'meltOnchain' // pay a btc address
   | 'startContactSend' // person: app resolves profile, then contact send
+  | 'lockEcash' // lock-key: straight to amount entry with a required lock
   | 'chooseOption' // multi-option: defer to the existing chooser
   | 'openMint' // open mint info
   | 'none'; // unsupported / empty

@@ -128,6 +128,11 @@ function handleExecute(
         };
       }
       ctx.paymentRequest = intent.option.value;
+      // A NUT-10 P2PK condition makes this a LOCKED payment; the amount
+      // screen must not offer it as a plain bearer-token send.
+      if (intent.info.lockP2pkPubkey) {
+        ctx.paymentRequestLockPubkey = intent.info.lockP2pkPubkey;
+      }
       ctx.supportedMintUrls =
         !intent.info.mintsPreferred && intent.info.mints.length > 0
           ? intent.info.mints

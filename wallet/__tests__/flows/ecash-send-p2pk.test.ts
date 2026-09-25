@@ -35,6 +35,47 @@ const LOCKTIME_SEC = 1_800_003_600;
 afterEach(() => setLogger(null));
 
 describe('ecash send — P2PK locked', () => {
+  // A raw compressed key is what cashu.me / Macadamia / Minibits publish for
+  // receiving locked ecash. It is NOT a nostr identity, so it must never stop
+  // at a profile or ask "send how?" — locking is the only thing it affords.
+  it.each(['02', '03'])(
+    'scanning a %s Cashu key starts a required locked send',
+    async (prefix) => {
+      const key = `${prefix}79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798`;
+      const tm = createTestMachine();
+
+      await tm.machine.execute(key);
+
+      tm.assertStep('enterAmount');
+      tm.assertContext({ destination: 'sendEcash', p2pkLockPubkey: key });
+      // Parity is part of the lock target: the derived x-only hex must not
+      // stand in for it, and the npub identity must not be adopted.
+      expect(tm.machine.getContext().p2pkLock).toEqual({ pubkey: key });
+      expect(tm.machine.getContext().recipientPubkey).toBeUndefined();
+      expect(tm.machine.getContext().recipientProfile).toBeUndefined();
+      // The openProfile intent must not survive, or the next event resolves
+      // through it again instead of completing the send.
+      expect(tm.machine.getContext().intent).toBeUndefined();
+
+      await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
+
+      tm.assertStep('sendComplete');
+      expect(tm.operationCalls.find((call) => call.name === 'executeSend')?.args).toEqual([
+        MINT1,
+        100,
+        undefined,
+        { p2pkLockPubkey: key, p2pkLock: { pubkey: key } },
+      ]);
+    }
+  );
+
+  it('still opens the profile for an npub, which affords more than locking', async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(
+      'npub1zuuajd7u3sx8xu92yav9jwxpr839cs0kc3q6t56vd5u9q033xmhsk6c2uc'
+    );
+    tm.assertStep('openProfile');
+  });
   it('passes the lock target to executeSend and surfaces it in sendComplete', async () => {
     const tm = createTestMachine();
     await tm.machine.startSendEcash({ p2pkLockPubkey: LOCK_PUBKEY });

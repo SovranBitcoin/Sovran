@@ -46,6 +46,13 @@ interface CacheEntry {
 const cache = new Map<string, CacheEntry>();
 
 /**
+ * Lookups still out, keyed by pubkey. Without this a prefetch and the amount
+ * screen's own resolve open two relay pools for the same question, and the
+ * prefetch buys nothing — the screen still waits on its own round trip.
+ */
+const inflight = new Map<string, Promise<NutzapProfile>>();
+
+/**
  * Drop everything we know about where people want ecash locked.
  *
  * Called when the payment context is cleared — most importantly on a profile
@@ -56,6 +63,7 @@ export function clearNutzapProfileCache(): void {
   if (cache.size === 0) return;
   nostrLog.info('nostr.nutzapProfile.cacheCleared', { entries: cache.size });
   cache.clear();
+  inflight.clear();
 }
 
 function readCache(pubkey: string, now: number): NutzapProfile | null {
@@ -91,10 +99,7 @@ export function createNutzapProfileResolver(deps: {
   now?: () => number;
 }): (pubkeyHex: string) => Promise<NutzapProfile> {
   const clock = deps.now ?? (() => Date.now());
-  return async function resolveNutzapProfile(pubkeyHex) {
-    const cached = readCache(pubkeyHex, clock());
-    if (cached) return cached;
-
+  async function lookup(pubkeyHex: string): Promise<NutzapProfile> {
     const pool = deps.openPool();
     let profile: NutzapProfile;
     try {
@@ -122,6 +127,21 @@ export function createNutzapProfileResolver(deps: {
     }
     writeCache(pubkeyHex, profile, clock());
     return profile;
+  }
+
+  return function resolveNutzapProfile(pubkeyHex) {
+    const cached = readCache(pubkeyHex, clock());
+    if (cached) return Promise.resolve(cached);
+    const pending = inflight.get(pubkeyHex);
+    if (pending) return pending;
+    // `lookup` never rejects (absence, malformed events and relay failures all
+    // resolve to the identity fallback), so the entry is cleared on settle
+    // purely to bound the map.
+    const started = lookup(pubkeyHex).finally(() => {
+      inflight.delete(pubkeyHex);
+    });
+    inflight.set(pubkeyHex, started);
+    return started;
   };
 }
 
@@ -133,3 +153,16 @@ export const resolveNutzapProfile = createNutzapProfileResolver({
   openPool: () => new SimplePool(),
   discoveryRelays: PAYMENT_RELAYS,
 });
+
+/**
+ * Start the `kind:10019` lookup as soon as a recipient is known, so the amount
+ * screen's lock option is already decided when it renders. Fire-and-forget: the
+ * answer lands in the cache, and the screen's own resolve either finds it or
+ * joins the in-flight request. Never throws.
+ */
+export function prefetchNutzapProfile(pubkeyHex: string | undefined | null): void {
+  if (!pubkeyHex) return;
+  void resolveNutzapProfile(pubkeyHex).catch(() => {
+    /* resolveNutzapProfile degrades rather than rejects; this is belt-and-braces */
+  });
+}

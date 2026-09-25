@@ -184,6 +184,8 @@ export interface StepDataMap {
       p2pkLockPubkey?: string;
       /** See `FlowContext.p2pkLock` — the terms, so the screen can show them. */
       p2pkLock?: P2pkLockSpec;
+      /** See `FlowContext.paymentRequestLockPubkey`. */
+      paymentRequestLockPubkey?: string;
       methodContext?: AmountEntryConstraints["methodContext"];
       /** See `SendEntrySource` — how the flow was entered. */
       entrySource?: SendEntrySource;
@@ -392,6 +394,14 @@ export interface FlowContext {
    * `normalizeP2pkLock`.
    */
   p2pkLock?: P2pkLockSpec;
+  /**
+   * The NUT-10 P2PK key a scanned payment request locks its payment to, when
+   * it carries one. Presence-only evidence for the UI: the send screen must
+   * say "as Locked Ecash (payment request)" rather than promising a bearer
+   * token it will not produce. The lock itself is applied by the request
+   * execution, not from this field.
+   */
+  paymentRequestLockPubkey?: string;
   amountEntryDisplay?: AmountEntryDisplayMetadata;
   /**
    * True after the user accepts a locally composable proof suggestion. The

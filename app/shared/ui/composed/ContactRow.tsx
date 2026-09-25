@@ -162,6 +162,7 @@ interface ProviderIdentity {
   /** Its catalog carries models running in an enclave, so the prompts it
    *  forwards are ones it cannot read. */
   e2ee?: boolean;
+  status?: 'online' | 'offline' | 'unknown';
 }
 
 interface SelfIdentity {
@@ -178,6 +179,7 @@ export type Identity =
 
 type StatKey =
   | 'balance'
+  | 'providerStatus'
   | 'units'
   | 'score'
   | 'audit'
@@ -219,6 +221,7 @@ export function providerIdentity(input: {
   displayName?: string;
   spendableSats?: number;
   e2ee?: boolean;
+  status?: ProviderIdentity['status'];
 }): ProviderIdentity {
   return { kind: 'provider', ...input };
 }
@@ -422,7 +425,7 @@ const DEFAULT_STATS_BY_KIND: Record<Identity['kind'], readonly StatKey[]> = {
   // What is spendable there, whether it can answer without reading the
   // prompt, and who the operator is to the network. Reputation before
   // followers, same order the mint rows use.
-  provider: ['balance', 'encrypted', 'reputation', 'followers'],
+  provider: ['balance', 'providerStatus', 'encrypted', 'reputation', 'followers'],
   mint: ['units', 'score', 'audit', 'reputation', 'followers', 'offline'],
   ble: [],
   geohash: [],
@@ -552,6 +555,21 @@ function buildStats(
 
   for (const key of keys) {
     switch (key) {
+      case 'providerStatus':
+        if (provider?.status) {
+          out.push({
+            icon: 'lucide:activity',
+            value: '',
+            color:
+              provider.status === 'online'
+                ? tints.success
+                : provider.status === 'offline'
+                  ? STAT_COLOR_ERROR
+                  : STAT_COLOR_SOCIAL,
+            accessibilityLabel: `Provider ${provider.status}`,
+          });
+        }
+        break;
       case 'balance': {
         const sats = mintStats?.balance ?? provider?.spendableSats;
         if (typeof sats === 'number' && sats > 0) {

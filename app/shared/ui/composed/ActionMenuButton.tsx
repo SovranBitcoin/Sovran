@@ -35,7 +35,7 @@
  * description, matching the pattern used by availability.ts in colada.
  */
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Platform, StyleProp, ViewStyle } from 'react-native';
 import { Menu, type MenuTriggerRef } from 'heroui-native';
 
@@ -46,8 +46,14 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { SheetMenuRowContent } from '@/shared/lib/popup/popups/sheetMenuRow';
 import Icon from 'assets/icons';
 import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
-import { actionMenuPopup, type ActionMenuItem } from '@/shared/lib/popup/popups/actionMenu';
+import {
+  actionMenuPopup,
+  getActionMenuSnapshot,
+  replaceActionMenuPopup,
+  type ActionMenuItem,
+} from '@/shared/lib/popup/popups/actionMenu';
 import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
+import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { log } from '@/shared/lib/logger';
 
 export interface ActionMenuVariant {
@@ -175,6 +181,18 @@ export function ActionMenuButton({
   // open it imperatively via ref. The bottom-sheet path skips the inline Menu
   // entirely and dispatches to the global actionMenuPopup host.
   const menuTriggerRef = useRef<MenuTriggerRef>(null);
+  const openPresentation = useRef<{ kind: 'sheet' | 'menu'; seq: number } | null>(null);
+  useEffect(() => {
+    const owner = openPresentation.current;
+    if (!owner) return;
+    const payload = { title: menuTitle, buttons: variants.map((v) => toActionMenuItem(v, testID)) };
+    if (owner.kind === 'sheet') {
+      usePopupStore.getState().updateActionMenu(owner.seq, payload);
+    } else {
+      const current = getActionMenuSnapshot();
+      if (current.payload && current.seq === owner.seq) replaceActionMenuPopup(payload);
+    }
+  }, [variants, menuTitle, testID]);
   const openMenu = useCallback(() => {
     if (useFwoSheet) {
       // FWO lane — stacks above route modals (the amount-screen Next chooser
@@ -183,6 +201,7 @@ export function ActionMenuButton({
         title: menuTitle,
         buttons: variants.map((v) => toActionMenuItem(v, testID)),
       });
+      openPresentation.current = { kind: 'sheet', seq: usePopupStore.getState().openSeq };
       return;
     }
     if (isBottomSheet) {
@@ -190,6 +209,7 @@ export function ActionMenuButton({
         title: menuTitle,
         buttons: variants.map((v) => toActionMenuItem(v, testID)),
       });
+      openPresentation.current = { kind: 'menu', seq: getActionMenuSnapshot().seq };
       return;
     }
     // Defer to the next tick so the Button's press animation doesn't race

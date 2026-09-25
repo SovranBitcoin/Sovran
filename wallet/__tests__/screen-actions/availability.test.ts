@@ -1316,3 +1316,114 @@ describe("sendTokenAvailability — cancelling a locked send", () => {
     expect(cancelFor(lockedEntry([], "prepared")).available).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// amountEntry — a lock the flow was SEEDED with is a requirement
+// ---------------------------------------------------------------------------
+
+describe("amountEntryAvailability — required locks", () => {
+  const LOCK_KEY = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+  const lockedEntry = (over: Record<string, unknown> = {}) => ({
+    destination: "sendEcash",
+    numericValue: 100,
+    effectiveAmount: { value: 100, unit: "sat" },
+    ...over,
+  });
+
+  it("offers only Lock Ecash when the flow arrived with a lock key", () => {
+    const actions = getAvailableActions(
+      "amountEntry",
+      lockedEntry({ p2pkLockPubkey: LOCK_KEY })
+    );
+    expect(actions.next.variants?.map((v) => v.id)).toEqual(["locked-ecash"]);
+    expect(actions.next.variants?.[0]).toMatchObject({
+      label: "Lock Ecash",
+      available: true,
+    });
+  });
+
+  it("reads the seeded terms as well as the bare key", () => {
+    const actions = getAvailableActions(
+      "amountEntry",
+      lockedEntry({ p2pkLock: { pubkey: LOCK_KEY } })
+    );
+    expect(actions.next.variants?.map((v) => v.id)).toEqual(["locked-ecash"]);
+  });
+
+  // Without a seeded lock the screen still owns the choice, so every rail
+  // stays listed — locking is a preference there, not a requirement.
+  it("keeps the full menu for an ordinary ecash send", () => {
+    const actions = getAvailableActions("amountEntry", lockedEntry());
+    expect(actions.next.variants?.map((v) => v.id)).toEqual([
+      "ecash",
+      "locked-ecash",
+      "lightning",
+    ]);
+  });
+
+  // A NUT-10 condition means the payment IS locked; calling it plain ecash
+  // would promise a bearer token the execution will not produce.
+  it("names a NUT-10 payment request as locked ecash", () => {
+    const actions = getAvailableActions("amountEntry", {
+      destination: "paymentRequest",
+      numericValue: 100,
+      effectiveAmount: { value: 100, unit: "sat" },
+      paymentRequestLockPubkey: LOCK_KEY,
+    });
+    const ecash = actions.next.variants?.find((v) => v.id === "ecash");
+    expect(ecash?.label).toBe("as Locked Ecash (payment request)");
+  });
+
+  it("names a plain payment request as plain ecash", () => {
+    const actions = getAvailableActions("amountEntry", {
+      destination: "paymentRequest",
+      numericValue: 100,
+      effectiveAmount: { value: 100, unit: "sat" },
+    });
+    const ecash = actions.next.variants?.find((v) => v.id === "ecash");
+    expect(ecash?.label).toBe("as Ecash (payment request)");
+  });
+});
+
+describe("amountEntryAvailability — npub.cash fallback", () => {
+  const NPUB = "npub1" + "q".repeat(58);
+  const npcEntry = {
+    destination: "sendEcash",
+    numericValue: 100,
+    effectiveAmount: { value: 100, unit: "sat" },
+    meltTarget: `${NPUB}@npub.cash`,
+    methodContext: {
+      mintBalances: { [MINT1]: 1000 },
+      capabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+        { mintUrl: MINT1, mintInfo: { nuts: { "5": { methods: [{ method: "bolt11", unit: "sat" }] } } } },
+      ]),
+    },
+  };
+
+  it("names the destination and truncates the npub so the caveat fits", () => {
+    const actions = getAvailableActions("amountEntry", npcEntry);
+    const lightning = actions.next.variants?.find((v) => v.id === "lightning");
+    expect(lightning?.label).toBe("to npub.cash");
+    // The bech32 is middle-truncated; the domain — the part that carries the
+    // meaning — stays whole.
+    expect(lightning?.description).toContain("…");
+    expect(lightning?.description).not.toContain(NPUB);
+    expect(lightning?.description).toContain("@npub.cash");
+  });
+
+  it("warns that npub.cash was our choice, not theirs", () => {
+    const actions = getAvailableActions("amountEntry", npcEntry);
+    const lightning = actions.next.variants?.find((v) => v.id === "lightning");
+    expect(lightning?.description).toContain("check they use it first");
+  });
+
+  it("leaves an advertised Lightning address unwarned", () => {
+    const actions = getAvailableActions("amountEntry", {
+      ...npcEntry,
+      meltTarget: "calle@getalby.com",
+    });
+    const lightning = actions.next.variants?.find((v) => v.id === "lightning");
+    expect(lightning?.label).toBe("as Lightning");
+    expect(lightning?.description).toBe("Pay calle@getalby.com over Lightning");
+  });
+});

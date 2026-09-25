@@ -55,6 +55,7 @@ import {
 } from '@/shared/lib/nostr/memoMentions';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { useSpendingConditions } from '../hooks/useSpendingConditions';
+import { spendingConditionDetailItems } from '../components/SpendingConditionsCard';
 
 interface SendTokenScreenProps {
   sendHistoryEntry?: SendHistoryEntry | string;
@@ -341,6 +342,7 @@ export function SendTokenScreen({
       }>
       <DetailsSection
         items={[
+          ...spendingConditionDetailItems(spendingConditions),
           paymentRequest && { title: 'Type', value: 'Payment Request' },
           paymentRequest?.requestId && {
             title: 'Request ID',

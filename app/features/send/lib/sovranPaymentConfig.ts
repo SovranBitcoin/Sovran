@@ -1888,6 +1888,13 @@ export function createSovranHandlers({
         ...(constraints.recipientPubkey ? { recipientPubkey: constraints.recipientPubkey } : {}),
         ...(constraints.recipientProfile ? { recipientProfile: constraints.recipientProfile } : {}),
         ...(constraints.p2pkLockPubkey ? { p2pkLockPubkey: constraints.p2pkLockPubkey } : {}),
+        // The seeded TERMS, not just the key: a locktime and refund keys are
+        // time-sensitive and must survive route serialization rather than be
+        // reconstructed (differently) on the far side.
+        ...(constraints.p2pkLock ? { p2pkLock: constraints.p2pkLock } : {}),
+        ...(constraints.paymentRequestLockPubkey
+          ? { paymentRequestLockPubkey: constraints.paymentRequestLockPubkey }
+          : {}),
         // Entry-method marker (Create Ecash / scan / paste / contact) — the
         // amount screen keys its action chrome off this, e.g. a single
         // "Create ecash" button instead of Next + Paste + Scan.

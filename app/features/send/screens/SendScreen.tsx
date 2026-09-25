@@ -58,6 +58,8 @@ import { CONTACT_SEARCH_MIN_LENGTH } from '@/shared/lib/contactSearch';
 import { useOverlaidContactSearch } from '@/features/contacts/hooks/useOverlaidContactSearch';
 import { useQuickPayPeople, type QuickPayPerson } from '@/features/send/hooks/useQuickPayPeople';
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
+import { npcAddressForPubkey } from '@/shared/lib/cashu/npc';
+import { prefetchNutzapProfile } from '@/shared/lib/nostr/nutzapProfileDiscovery';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
 import type { NostrPubkeyHex } from '@/shared/lib/protocolIds';
@@ -310,6 +312,15 @@ export function SendScreen({ unit }: { unit: string }) {
       lud16: string | null;
     }) => {
       const { pubkey, displayName, picture, nip05, lud16 } = target;
+      // The lock option's kind:10019 lookup is the slowest thing on the amount
+      // screen. Start it here, where the recipient first becomes known, so the
+      // answer is usually already cached by the time the menu asks.
+      prefetchNutzapProfile(pubkey);
+      // No advertised Lightning address → npub.cash, which can receive for any
+      // Nostr key. It is a fallback we chose, not one they published, so the
+      // Lightning option carries that caveat (see `availability.ts`).
+      const npcFallback = npcAddressForPubkey(pubkey);
+      const lightningTarget = lud16 ?? npcFallback;
       useContactSendStore.getState().start({
         pubkey,
         delivery: 'nip17',
@@ -321,7 +332,7 @@ export function SendScreen({ unit }: { unit: string }) {
       void machine.startSendEcash({
         recipientPubkey: pubkey,
         recipientProfile: { displayName: displayName ?? '', avatarUrl: picture, nip05 },
-        ...(lud16 ? { meltTarget: lud16 } : {}),
+        ...(lightningTarget ? { meltTarget: lightningTarget } : {}),
       });
     },
     [machine]

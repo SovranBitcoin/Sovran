@@ -477,6 +477,16 @@ const onchainMeltFlow: FlowDef = {
 const sendKnown = (ctx: TimelineContext) =>
   ctx.state === "prepared" || ctx.state === "pending" || ctx.state === "finalized";
 
+const lockedUnlockReached = (ctx: TimelineContext) =>
+  ctx.lock?.reclaim.kind === "now" ||
+  (ctx.lock?.reclaim.kind !== "at" && ctx.lock?.unlockAt != null &&
+    ctx.currentTime >= ctx.lock.unlockAt);
+
+function reclaimedAfterUnlock(ctx: TimelineContext): boolean {
+  return ctx.lock?.unlockAt != null && "updatedAt" in ctx.entry &&
+    typeof ctx.entry.updatedAt === "number" && ctx.entry.updatedAt >= ctx.lock.unlockAt;
+}
+
 /**
  * A send that is locked to somebody.
  *
@@ -500,11 +510,18 @@ const lockedSendFlow: FlowDef = {
           stepType: "complete",
           timestamp: ctx.createdAt,
         },
+        ...(reclaimedAfterUnlock(ctx) ? [{
+          slot: "unlock",
+          state: "pending",
+          label: ctx.copy.SEND_COPY.unlock.reachedLabel,
+          stepType: "complete" as const,
+          timestamp: ctx.lock?.unlockAt ?? undefined,
+        }] : []),
         {
-          slot: "locked",
+          slot: "reclaimed",
           id: "rolled-back",
           state: "rolledBack",
-          label: ctx.copy.SEND_COPY.rolledBack.label,
+          label: reclaimedAfterUnlock(ctx) ? ctx.copy.SEND_COPY.rolledBack.reclaimedLabel : ctx.copy.SEND_COPY.rolledBack.label,
           stepType: "rolled-back",
           info: ctx.copy.SEND_COPY.rolledBack.info,
         },
@@ -558,6 +575,7 @@ const lockedSendFlow: FlowDef = {
     },
     {
       id: "locked",
+      included: (ctx) => !lockedUnlockReached(ctx),
       reached: (ctx) => ctx.state === "pending" || ctx.state === "finalized",
       activeStyle: () => "next-pending",
       upcomingStyle: () => "next-pending",
@@ -572,17 +590,14 @@ const lockedSendFlow: FlowDef = {
       included: (ctx) => ctx.lock?.unlockAt != null,
       // Monotone in time, which is what the engine requires: once the clock
       // passes the locktime it never goes back.
-      reached: (ctx) =>
-        ctx.lock?.reclaim.kind === "now" ||
-        (ctx.lock?.reclaim.kind !== "at" &&
-          ctx.lock?.unlockAt != null &&
-          ctx.currentTime >= ctx.lock.unlockAt),
+      reached: lockedUnlockReached,
+      activeStyle: () => "current",
       copy: (ctx) => {
         const { SEND_COPY } = ctx.copy;
         const unlockAt = ctx.lock?.unlockAt ?? null;
         const reclaim = ctx.lock?.reclaim;
         const label =
-          reclaim?.kind === "at" || reclaim?.kind === "now"
+          lockedUnlockReached(ctx) ? SEND_COPY.unlock.reachedLabel : reclaim?.kind === "at"
             ? SEND_COPY.unlock.label
             : "Unlocks";
         if (reclaim?.kind === "now") {

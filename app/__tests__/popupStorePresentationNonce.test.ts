@@ -11,6 +11,7 @@
  * is up.
  */
 
+import type { ActionSheetPayloads } from '@/shared/lib/popup/actionSheetTypes';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 
 jest.mock('@/shared/lib/logger', () => {
@@ -39,6 +40,26 @@ function resetStore() {
 
 describe('popupStore presentation nonce', () => {
   beforeEach(resetStore);
+
+  it('refreshes the open chooser without reopening or replacing a successor', () => {
+    const lockItem = { text: 'Lock Ecash', testID: 'send-lock-ecash' } as const;
+    const pending = {
+      title: 'Next',
+      buttons: [{ ...lockItem, disabled: true, reason: 'Checking…' }],
+    } satisfies ActionSheetPayloads['action-menu'];
+    usePopupStore.getState().open({ sheetId: 'action-menu', payload: pending });
+    const seq = usePopupStore.getState().openSeq;
+    const ready = {
+      title: 'Next',
+      buttons: [{ ...lockItem, disabled: false }],
+    } satisfies ActionSheetPayloads['action-menu'];
+    usePopupStore.getState().updateActionMenu(seq, ready);
+    expect(usePopupStore.getState().current).toEqual({ sheetId: 'action-menu', payload: ready });
+    expect(usePopupStore.getState().openSeq).toBe(seq);
+    usePopupStore.getState().open({ message: 'Choose duration' });
+    usePopupStore.getState().updateActionMenu(seq, pending);
+    expect(usePopupStore.getState().current).toEqual({ message: 'Choose duration' });
+  });
 
   it('bumps openSeq on every open(), even when isOpen is stuck true', () => {
     const seq0 = usePopupStore.getState().openSeq;

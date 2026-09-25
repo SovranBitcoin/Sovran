@@ -78,41 +78,54 @@ function buildNextVariants(
   nextAction: AmountEntryActions['next'],
   nextExecuteParams: NextExecuteParams,
   suppress: boolean,
-  lockOption?: { reason?: string; choose: () => Promise<P2pkLockSpec | null> }
+  lockOption?: { reason?: string; choose: () => Promise<P2pkLockSpec | null> },
+  arrivedLocked = false
 ): ActionMenuVariant[] | undefined {
   if (suppress) return undefined;
   const raw = nextAction.variants as ActionVariant[] | undefined;
   if (!raw || raw.length === 0) return undefined;
-  return raw
-    .filter((v) => v.id !== 'locked-ecash' || lockOption)
-    .map((v) => ({
-      id: v.id,
-      label: v.label,
-      description: v.description,
-      icon: v.icon,
-      isDisabled: !v.available || (v.id === 'locked-ecash' && !!lockOption?.reason),
-      reason: v.id === 'locked-ecash' ? (lockOption?.reason ?? v.reason) : v.reason,
-      isDestructive: v.isDestructive,
-      onPress: async () => {
-        walletLog.info('amount.next.variant', {
-          variantId: v.id,
-          recipientPubkeyPresent: nextExecuteParams.recipientPubkey !== undefined,
-          recipientProfilePresent: nextExecuteParams.recipientProfile !== undefined,
-          recipientDisplayName: nextExecuteParams.recipientProfile?.displayName ?? null,
-        });
-        if (v.id === 'locked-ecash') {
-          const lock = await lockOption?.choose();
-          if (!lock) return;
-          await nextAction.execute({ ...nextExecuteParams, variantId: v.id, p2pkLock: lock });
-        } else {
-          await nextAction.execute({
-            ...nextExecuteParams,
+  return (
+    raw
+      // "Lock Ecash" needs terms. Either the screen owns the choice
+      // (`lockOption` opens the duration picker) or the flow arrived with
+      // already-validated terms — in which case the row executes them directly,
+      // with no picker and nothing for the user to re-decide.
+      .filter((v) => v.id !== 'locked-ecash' || lockOption || arrivedLocked)
+      .map((v) => ({
+        id: v.id,
+        label: v.label,
+        description: v.description,
+        icon: v.icon,
+        isDisabled: !v.available || (v.id === 'locked-ecash' && !!lockOption?.reason),
+        reason: v.id === 'locked-ecash' ? (lockOption?.reason ?? v.reason) : v.reason,
+        isDestructive: v.isDestructive,
+        onPress: async () => {
+          walletLog.info('amount.next.variant', {
             variantId: v.id,
-            ...(lockOption ? { p2pkLock: null } : {}),
+            recipientPubkeyPresent: nextExecuteParams.recipientPubkey !== undefined,
+            recipientProfilePresent: nextExecuteParams.recipientProfile !== undefined,
+            recipientDisplayName: nextExecuteParams.recipientProfile?.displayName ?? null,
           });
-        }
-      },
-    }));
+          if (v.id === 'locked-ecash') {
+            if (!lockOption) {
+              // Seeded terms: say nothing about the lock so the machine's own
+              // (already validated) terms stand.
+              await nextAction.execute({ ...nextExecuteParams, variantId: v.id });
+              return;
+            }
+            const lock = await lockOption.choose();
+            if (!lock) return;
+            await nextAction.execute({ ...nextExecuteParams, variantId: v.id, p2pkLock: lock });
+          } else {
+            await nextAction.execute({
+              ...nextExecuteParams,
+              variantId: v.id,
+              ...(lockOption ? { p2pkLock: null } : {}),
+            });
+          }
+        },
+      }))
+  );
 }
 
 function buildExtraButtons(
@@ -190,6 +203,12 @@ interface AmountSelectorProps {
   /** Short line under the amount when the lock is worth a caveat. */
   lockWarning?: string | null;
   lockOption?: { reason?: string; choose: () => Promise<P2pkLockSpec | null> };
+  /**
+   * True when the flow was seeded with a required lock (a scanned wallet
+   * receive key, a Nut Drop). The lock row then executes the seeded terms
+   * instead of opening the duration picker.
+   */
+  arrivedLocked?: boolean;
   /** Hide variant menu when the caller owns delivery after ecash creation. */
   suppressNextVariants?: boolean;
 }
@@ -208,6 +227,7 @@ export function AmountSelector({
   lockChoice,
   lockWarning = null,
   lockOption,
+  arrivedLocked = false,
   suppressNextVariants = false,
 }: AmountSelectorProps) {
   useLifecycleLogger('AmountSelector', walletLog);
@@ -286,7 +306,8 @@ export function AmountSelector({
     actions.next,
     nextExecuteParams,
     suppressNextVariants || isCreateEcashEntry,
-    lockOption
+    lockOption,
+    arrivedLocked
   );
 
   // The AI-credit top-up flow lands on this screen via a hand-rolled

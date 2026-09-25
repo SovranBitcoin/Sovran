@@ -13,15 +13,13 @@ import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
-import { ContactRow, providerIdentity } from '@/shared/ui/composed/ContactRow';
+import { ContactRow, providerIdentity, nostrIdentity } from '@/shared/ui/composed/ContactRow';
 import { List } from '@/shared/ui/composed/List';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Text } from '@/shared/ui/primitives/Text';
-import { Badge } from '@/shared/ui/primitives/Badge';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 
 import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
-import { nostrIdentity } from '@/shared/ui/composed/ContactRow';
 
 import { describeProvider, useProviderRows, type ProviderRow } from '../hooks/useProviderRows';
 
@@ -84,6 +82,7 @@ function ProviderListRow({
           displayName: row.name,
           spendableSats: row.spendableSats,
           e2ee: row.e2ee === true,
+          status: row.status,
         }),
         // Composite, exactly as a mint row pairs its mint with its operator:
         // the provider supplies the face and the name, the operator supplies
@@ -91,14 +90,6 @@ function ProviderListRow({
         ...(row.pubkey ? [nostrIdentity(row.pubkey, profile ?? undefined)] : []),
       ]}
       title={row.name}
-      titleTrailing={
-        <Badge
-          variant={
-            row.status === 'online' ? 'success' : row.status === 'offline' ? 'error' : 'secondary'
-          }>
-          {row.status === 'online' ? 'Online' : row.status === 'offline' ? 'Offline' : 'Unknown'}
-        </Badge>
-      }
       subtitle={row.blockedReason ?? describeProvider(row)}
       disabled={row.blockedReason != null}
       disabledReason={row.blockedReason ?? undefined}

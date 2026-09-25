@@ -450,7 +450,7 @@ describe('history timeline — a send that is locked until a date', () => {
   const LOCKTIME_SEC = Math.floor(CREATED_AT / 1000) + 3600;
   const UNLOCK_AT = LOCKTIME_SEC * 1000;
 
-  const lockedSend = (tags: string[][], state = 'pending') =>
+  const lockedSend = (tags: string[][], state = 'pending', updatedAt = CREATED_AT) =>
     ({
       id: 'send-locked-1',
       type: 'send',
@@ -459,7 +459,7 @@ describe('history timeline — a send that is locked until a date', () => {
       amount: 21,
       unit: 'sat',
       createdAt: CREATED_AT,
-      updatedAt: CREATED_AT,
+      updatedAt,
       operationId: 'op-locked-1',
       token: {
         proofs: [
@@ -490,8 +490,8 @@ describe('history timeline — a send that is locked until a date', () => {
       currentTime: UNLOCK_AT + 60_001,
       ourPubkeys: [THEIR_KEY],
     });
-    expect(timeline[2].displayLabel).toBe('Unlocks');
-    expect(timeline[2].info).not.toBe('You can take this back');
+    expect(timeline[1].displayLabel).toBe('Unlocked');
+    expect(timeline[1].info).not.toBe('You can take this back');
   });
 
   it('shows when it unlocks, as a date rather than a countdown', () => {
@@ -516,7 +516,8 @@ describe('history timeline — a send that is locked until a date', () => {
       currentTime: UNLOCK_AT + 60_001,
       ourPubkeys: [OUR_KEY],
     });
-    expect(mine[2]).toMatchObject({ info: 'You can take this back' });
+    expect(mine.map((step) => step.displayLabel)).toEqual(['Created', 'Unlocked']);
+    expect(mine[1]).toMatchObject({ info: 'You can take this back', stepType: 'current' });
 
     // No refund tag: it opens to whoever holds the token, not to us.
     const anyones = buildTimeline({
@@ -524,9 +525,29 @@ describe('history timeline — a send that is locked until a date', () => {
       currentTime: UNLOCK_AT + 60_001,
       ourPubkeys: [OUR_KEY],
     });
-    expect(anyones[2]).toMatchObject({
+    expect(anyones[1]).toMatchObject({
       info: 'Anyone with the token can redeem it',
+      stepType: 'current',
     });
+  });
+
+  it.each(['rolledBack', 'rolled_back'])('retains unlocked history after %s', (state) => {
+    const timeline = buildTimeline({
+      historyEntry: lockedSend(refundTags, state, UNLOCK_AT + 60_001),
+      currentTime: UNLOCK_AT + 120_000,
+      ourPubkeys: [OUR_KEY],
+    });
+    expect(timeline.map((step) => step.displayLabel)).toEqual(['Created', 'Unlocked', 'Reclaimed']);
+    expect(timeline[2].stepType).toBe('rolled-back');
+  });
+
+  it('does not invent an unlock for an early cancellation viewed later', () => {
+    const timeline = buildTimeline({
+      historyEntry: lockedSend(refundTags, 'rolledBack'),
+      currentTime: UNLOCK_AT + 120_000,
+      ourPubkeys: [OUR_KEY],
+    });
+    expect(timeline.map((step) => step.displayLabel)).toEqual(['Created', 'Cancelled']);
   });
 
   it('never draws a checkmark on a moment that did not happen', () => {

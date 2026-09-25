@@ -17,6 +17,11 @@ const mockActionMenuSheet = jest.fn();
 
 jest.mock('@/shared/lib/popup/popups/actionMenu', () => ({
   actionMenuPopup: (...args: unknown[]) => mockActionMenuPopup(...args),
+  // The button re-reads the snapshot to keep an OPEN menu in sync with late
+  // availability (see ActionMenuButton). Nothing here opens twice, so a
+  // stable empty snapshot is enough.
+  getActionMenuSnapshot: () => ({ payload: null, seq: 0 }),
+  replaceActionMenuPopup: jest.fn(),
 }));
 
 jest.mock('@/shared/lib/popup/popups/actionMenuSheet', () => ({

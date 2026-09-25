@@ -8,7 +8,8 @@ import { transactionHeaderTitle, type SpendingConditions } from 'wallet';
 import { useDeferredMount } from '@/shared/hooks/useDeferredMount';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { ContactRow, nostrIdentity } from '@/shared/ui/composed/ContactRow';
-import { navigateToProfile } from '@/features/contacts/lib/navigateToProfile';
+import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
+import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
 import { Screen, useScreenOptions } from '@/shared/ui/composed/Screen';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -251,7 +252,9 @@ export function TransactionDetailShell({
                 hideMetadata
                 trailingVariant="chevron"
                 testID="transaction-counterparty-profile"
-                onPress={() => navigateToProfile(counterpartyPubkey)}
+                onPress={() =>
+                  guardedRouter.push(buildModalProfileHref({ pubkey: counterpartyPubkey }))
+                }
               />
               <DeferredCounterpartyTransactions pubkey={counterpartyPubkey} excludeId={entry.id} />
             </>

@@ -125,15 +125,18 @@ describe('describeDestination', () => {
     });
   });
 
-  it('P2PK key → the same payable person, with the key as the lock target', () => {
+  // A wallet's P2PK receive key is not an identity: no profile stands behind
+  // it, so it gets its own kind rather than borrowing the person row's name
+  // and avatar for someone who never claimed that npub.
+  it('P2PK key → a lock target, not a person', () => {
     const d = describeInput('p2pkKey');
-    expect(d.kind).toBe('person');
-    expect(d.action).toBe('startContactSend');
-    // Identity display still goes through the npub ref, so the app's existing
-    // kind-0 hydration is unchanged.
+    expect(d.kind).toBe('lockKey');
+    expect(d.action).toBe('lockEcash');
+    expect(d.label).toBe('Lock ecash to');
     expect(d.recipient).toEqual({
-      ref: { type: 'npub', value: INPUTS.npub },
-      pending: true,
+      // Parity is preserved: a 03 key locks to itself, never to our 02 lift.
+      ref: { type: 'pubkey', value: INPUTS.p2pkKey },
+      pending: false,
       lockKey: INPUTS.p2pkKey,
     });
   });

@@ -847,6 +847,11 @@ export function createDefaultScreenActionHandlers(
               | null
               | undefined)
           : undefined;
+        // A lock the flow was SEEDED with (a scanned wallet receive key, a Nut
+        // Drop) is already on the machine context and is not the screen's to
+        // restate. The screen stays silent about it, so "Lock Ecash" must read
+        // the seeded terms here rather than reject the send for saying nothing.
+        const seededLock = getString(entry, "p2pkLockPubkey");
 
         let destination: Destination = entryDestination;
         let mintQuoteMethod: MintQuoteMethod | undefined;
@@ -885,7 +890,7 @@ export function createDefaultScreenActionHandlers(
             return;
           }
         } else if (variantId === "ecash" || variantId === "locked-ecash") {
-          if (variantId === "locked-ecash" && !requestedLock) {
+          if (variantId === "locked-ecash" && !requestedLock && !seededLock) {
             throw new Error("Locked ecash requires spending conditions");
           }
           if (entryDestination === "mintQuote") {

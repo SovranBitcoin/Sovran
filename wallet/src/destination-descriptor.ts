@@ -254,23 +254,41 @@ export function describeDestination(
       break;
 
     case "openProfile":
-      described = {
-        kind: "person",
-        label: copy.text("send.destination.pay"),
-        amount: null,
-        icon: "person",
-        action: "startContactSend",
-        hasAlternatives: false,
-        // The ref stays an npub whatever was scanned, so the app's existing
-        // kind-0 hydration works unchanged; a scanned key rides alongside as
-        // the lock target.
-        recipient: {
-          ref: { type: "npub", value: intent.npub },
-          pending: true,
-          ...(intent.p2pkPubkey ? { lockKey: intent.p2pkPubkey } : {}),
-        },
-        raw,
-      };
+      // A raw compressed key is a wallet's P2PK *receive* key (cashu.me,
+      // Macadamia, Minibits publish it for exactly this). Its npub decodes,
+      // but there is no profile behind it and no inbox to message — the one
+      // thing it affords is locking ecash to it. So it is its own kind, with
+      // no identity hydration and no "send how?" chooser.
+      described = intent.p2pkPubkey
+        ? {
+            kind: "lockKey",
+            label: copy.text("send.destination.lockEcash"),
+            amount: null,
+            icon: "ecash",
+            action: "lockEcash",
+            hasAlternatives: false,
+            recipient: {
+              // The ref IS the key, parity included: an npub here would invite
+              // a display name for an identity nobody claimed.
+              ref: { type: "pubkey", value: intent.p2pkPubkey },
+              pending: false,
+              lockKey: intent.p2pkPubkey,
+            },
+            raw,
+          }
+        : {
+            kind: "person",
+            label: copy.text("send.destination.pay"),
+            amount: null,
+            icon: "person",
+            action: "startContactSend",
+            hasAlternatives: false,
+            recipient: {
+              ref: { type: "npub", value: intent.npub },
+              pending: true,
+            },
+            raw,
+          };
       break;
 
     case "chooseOption": {
