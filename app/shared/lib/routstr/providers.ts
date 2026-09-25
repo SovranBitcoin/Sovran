@@ -243,7 +243,15 @@ const NaggAiProviderRowSchema = z.looseObject({
   /** The operator's Nostr key, hex. Absent for a provider that announced
    *  itself only over HTTP. */
   pubkey: z.string().max(128).optional().catch(undefined),
-  followers: z.number().int().nonnegative().optional().catch(undefined),
+  /** Null when nagg could not resolve the operator's reach, which is NOT the
+   *  same as nobody following them — the row sorts differently for each. A
+   *  bare `.optional()` here would let `.catch` launder that null into the
+   *  same `undefined` an absent field produces. */
+  followers: z.number().int().nonnegative().nullish().catch(undefined),
+  /** Where that count came from. `relays` is a LOWER BOUND — relays cap
+   *  results and our relay set is partial; nagg measured one operator at 2982
+   *  through Vertex where the same relay scan found 174. */
+  followersSource: z.enum(['graph', 'vertex', 'relays']).optional().catch(undefined),
   modelCount: z.number().int().nonnegative().optional().catch(undefined),
   /** How many of those models are sealed to an enclave. A COUNT, deliberately:
    *  on the one provider that badges itself E2EE, 9 models of 582 are sealed. */
@@ -268,7 +276,10 @@ export interface ServerProvider {
   baseUrl: string;
   name?: string;
   pubkey?: string;
+  /** Undefined when unresolved; 0 means nobody to count. */
   followers?: number;
+  /** See `followersSource` on the row schema — `relays` counts are a floor. */
+  followersSource?: 'graph' | 'vertex' | 'relays';
   modelCount?: number;
   encryptedModelCount?: number;
   mints: string[];
@@ -304,7 +315,8 @@ export function serverProviders(payload: {
       baseUrl,
       name: row.name?.trim() || undefined,
       pubkey: row.pubkey?.trim() || undefined,
-      followers: row.followers,
+      followers: row.followers ?? undefined,
+      followersSource: row.followersSource,
       modelCount: row.modelCount,
       encryptedModelCount: row.encryptedModelCount,
       mints: row.mints ?? [],
