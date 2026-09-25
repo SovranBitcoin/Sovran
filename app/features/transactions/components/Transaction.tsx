@@ -102,14 +102,17 @@ const useBip321Options = (transactionId: string): string[] | null => {
  * that one parses route params and subscribes to Colada's bus; this
  * one bundles row-display state + the navigate handler).
  */
-const useTransactionRow = (historyEntry: HistoryEntry) => {
+const useTransactionRow = (historyEntry: HistoryEntry, amountOverride?: number) => {
   const isSend = isOutgoingTransaction(historyEntry);
   const isReceive = !isSend;
 
   const isRolledBack = historyEntry.type === 'send' && isSendTokenCancelled(historyEntry);
 
   const fiatAmount = formatAmount(
-    { amount: Math.abs(amountToNumber(historyEntry.amount)), unit: historyEntry.unit },
+    {
+      amount: Math.abs(amountOverride ?? amountToNumber(historyEntry.amount)),
+      unit: historyEntry.unit,
+    },
     { displayAs: 'usd' }
   );
 
@@ -133,6 +136,20 @@ interface TransactionProps {
   /** Optional custom press handler - if provided, overrides default navigation */
   onPress?: (historyEntry: HistoryEntry) => void;
   /**
+   * The money came back. A settled send that was refunded in full reads the
+   * same as a cancelled one — dimmed, with the cancel glyph — because to the
+   * person holding the wallet the outcome is identical: they have their sats.
+   * The difference (a refund happened; a rollback did not) belongs on the
+   * detail screen, not in a list the eye is scanning for direction.
+   */
+  returned?: boolean;
+  /**
+   * Show this instead of the entry's own amount. Used by a grouped request,
+   * whose real cost is the payment minus the change and therefore lives on no
+   * single leg.
+   */
+  amountOverride?: number;
+  /**
    * Optional swipe-to-cancel handler. When provided AND the entry is a
    * cancellable pending ecash send, the row reveals a red Cancel track on
    * left-swipe and calls this on commit. Otherwise the row is a plain tap
@@ -146,7 +163,8 @@ const CANCEL_PENDING_SEND_ACTIONS = [
   { name: CANCEL_PENDING_SEND_ACTION, label: 'Cancel pending send' },
 ];
 
-export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: TransactionProps) => {
+export const Transaction = React.memo((props: TransactionProps) => {
+  const { historyEntry, onPress, onCancel, returned = false, amountOverride } = props;
   const [foreground, danger, success] = useThemeColor(['foreground', 'danger', 'success'] as const);
 
   const {
@@ -156,7 +174,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
     fiatAmount,
     handlePress: defaultHandlePress,
     displayLabel,
-  } = useTransactionRow(historyEntry);
+  } = useTransactionRow(historyEntry, amountOverride);
 
   const handlePress = onPress ? () => onPress(historyEntry) : defaultHandlePress;
 
@@ -193,6 +211,10 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
   // the FlashList sections below reflow as the list re-measures.
   const collapsedStyle = isCollapsing ? { height: 0, opacity: 0 } : null;
 
+  // A refund and a rollback leave the wallet in the same place, so they read
+  // the same here.
+  const settledWithoutSpending = isRolledBack || returned;
+
   // Swipe-to-cancel has no screen-reader equivalent, so the same commit is
   // offered as a custom accessibility action while the swipe is enabled.
   const cancelActionEnabled = swipeable && !isReclaiming && !isCollapsing;
@@ -207,12 +229,16 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
       key={historyEntry?.id}
       testID={testID}
       className="flex-row items-center justify-between px-4 py-5"
-      style={isRolledBack ? { opacity: 0.33 } : undefined}
+      style={settledWithoutSpending ? { opacity: 0.33 } : undefined}
       onPress={handlePress}
       accessibilityActions={cancelActionEnabled ? CANCEL_PENDING_SEND_ACTIONS : undefined}
       onAccessibilityAction={cancelActionEnabled ? handleAccessibilityAction : undefined}>
       <HStack gap={12} flex={1}>
-        <TransactionIcon historyEntry={historyEntry} isLoading={isReclaiming} />
+        <TransactionIcon
+          historyEntry={historyEntry}
+          isLoading={isReclaiming}
+          cancelled={settledWithoutSpending}
+        />
 
         <VStack gap={0} flex={1}>
           <HStack justify="space-between" align="flex-end">
@@ -220,7 +246,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
               {displayLabel}
             </UntranslatedText>
             <AmountFormatter
-              amount={historyEntry.amount}
+              amount={amountOverride ?? historyEntry.amount}
               unit={historyEntry.unit}
               size={16}
               weight="heavy"

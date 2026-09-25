@@ -51,6 +51,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/ai/components/AiEmptyState.tsx",
     "features/ai/components/AiHeaderTitle.tsx",
     "features/ai/components/AiMessageBubble.tsx",
+    "features/ai/components/AiTurnErrorPill.tsx",
     "features/ai/components/ModelChip.tsx",
     "features/ai/components/ProviderAvatar.tsx",
     "features/ai/components/ProviderMintRow.tsx",
@@ -141,6 +142,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/transactions/components/Transactions.tsx",
     "features/transactions/components/TransactionsFilterContext.tsx",
     "features/transactions/components/detail/AccelerateSection.tsx",
+    "features/transactions/components/detail/AiConversationSection.tsx",
     "features/transactions/components/detail/HistoryEntryHeader.tsx",
     "features/transactions/components/detail/HistoryEntryRefresh.tsx",
     "features/transactions/components/detail/TransactionDetailShell.tsx",
@@ -269,6 +271,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 263,
+  "total": 265,
 }
 `;

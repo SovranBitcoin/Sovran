@@ -1,3 +1,4 @@
+import { encodeAnnotation } from 'wallet';
 import { FIAT_UNITS, SWITCHABLE_UNITS, type FiatUnit } from 'wallet/units';
 import { Asset } from 'expo-asset';
 import { PUBLIC_DEMO_METADATA } from './mockPublicProfile';
@@ -44,7 +45,11 @@ type DemoRow =
   | { type: 'receive'; amount: number; badge?: ScanSource }
   | { type: 'send'; amount: number; badge?: ScanSource }
   | { type: 'send-cancelled'; amount: number; badge?: ScanSource }
-  | { type: 'swap'; amount: number };
+  | { type: 'swap'; amount: number }
+  // A pay-per-request AI call whose request failed: the token went out and the
+  // node handed all of it back. Two legs, one group — the case the list
+  // collapses into a single row and the AI-request screen pulls apart.
+  | { type: 'ai-refunded'; amount: number };
 
 const DEMO_ROWS: DemoRow[] = [
   { type: 'melt', amount: 1_430, badge: 'paste' },
@@ -53,6 +58,7 @@ const DEMO_ROWS: DemoRow[] = [
   { type: 'receive', amount: 8_400, badge: 'deeplink' },
   { type: 'send', amount: 21_000, badge: 'nfc' },
   { type: 'swap', amount: 32_768 },
+  { type: 'ai-refunded', amount: 240 },
 ];
 
 // Staggered offsets so transactions look naturally spread across the day
@@ -63,6 +69,7 @@ const TIME_OFFSETS_MS = [
   5.1 * 3_600_000, // ~5 h ago
   11 * 3_600_000, // ~11 h ago
   23 * 3_600_000, // ~23 h ago
+  26 * 3_600_000, // ~26 h ago
 ];
 
 // ---------------------------------------------------------------------------
@@ -144,6 +151,34 @@ function buildMockData() {
           type: 'send',
           operationId: `${id}-op`,
           state: 'pending' as const,
+        })
+      );
+    } else if (row.type === 'ai-refunded') {
+      const groupId = `${id}-group`;
+      const ai = (role: 'payment' | 'change') => ({
+        metadata: encodeAnnotation({
+          ai: { groupId, role, model: 'claude-opus-5', messageId: `${id}-msg` },
+        }),
+      });
+      history.push(
+        asHistoryEntry({
+          ...base,
+          ...ai('payment'),
+          type: 'send',
+          operationId: `${id}-op`,
+          state: 'finalized' as const,
+        })
+      );
+      history.push(
+        asHistoryEntry({
+          ...base,
+          ...ai('change'),
+          id: `${id}-change`,
+          legacyHistoryId: `${id}-change`,
+          createdAt: createdAt + 2_000,
+          updatedAt: createdAt + 2_000,
+          type: 'receive',
+          state: 'finalized' as const,
         })
       );
     } else if (row.type === 'send-cancelled') {

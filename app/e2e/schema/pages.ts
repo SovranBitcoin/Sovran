@@ -65,6 +65,7 @@ export const CANONICAL_PAGES = [
   'balance-split', // per-mint distribution sliders (MintDistributionScreen)
   'rebalance-plan', // rebalance transfer plan + run progress (MintRebalancePlanScreen)
   'swap', // swap-group detail screen (SwapTransactionScreen)
+  'ai-request', // grouped AI request detail screen (AiRequestScreen)
   'restore-gate', // recovery gate with slide-to-confirm
   'recovery-complete', // recovery success state with Continue
   'map', // bitcoin merchant map (MapScreen, screen-map)

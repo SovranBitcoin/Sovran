@@ -1,6 +1,7 @@
 // transactions feature barrel
 
 export { TransactionsScreen } from './screens/TransactionsScreen';
+export { AiRequestScreen } from './screens/AiRequestScreen';
 export { SwapTransactionScreen } from './screens/SwapTransactionScreen';
 export { FiltersScreen } from './screens/FiltersScreen';
 export { Transactions } from './components/Transactions';

@@ -199,3 +199,14 @@ export function navigateToTransactionDetail(entry: HistoryEntry, source: string)
     }
   }
 }
+
+/**
+ * Open the detail view for one grouped AI request.
+ *
+ * Keyed by the group, not by a leg: the payment and the change it came back as
+ * are the two halves of one thing, and either alone answers the wrong question.
+ */
+export function navigateToAiRequest(groupId: string): void {
+  cashuLog.info('transactions.detail_route.aiRequest', { groupIdLength: groupId.length });
+  router.navigate({ pathname: '/aiRequest', params: { groupId } });
+}

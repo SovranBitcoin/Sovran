@@ -16,18 +16,26 @@ interface TransactionIconProps {
   historyEntry: HistoryEntry;
   /** Show a loading spinner instead of the icon */
   isLoading?: boolean;
+  /**
+   * Force the cancel glyph for a send the entry itself does not know came to
+   * nothing — a refunded request, whose payment leg is a perfectly ordinary
+   * settled send until you look at the change beside it.
+   */
+  cancelled?: boolean;
 }
 
 export default function TransactionIcon({
   historyEntry,
   isLoading,
+  cancelled = false,
 }: TransactionIconProps): React.ReactNode {
   const [foreground, surface, surfaceSecondary] = useThemeColor([
     'foreground',
     'surface',
     'surface-secondary',
   ] as const);
-  const cancelledSend = historyEntry.type === 'send' && isSendTokenCancelled(historyEntry);
+  const cancelledSend =
+    cancelled || (historyEntry.type === 'send' && isSendTokenCancelled(historyEntry));
 
   // Counterparty nostr identity (Nut Drop send/receive). When known, the avatar
   // replaces the center arrow, so the direction moves to the corner badge.

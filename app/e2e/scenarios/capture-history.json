@@ -40,6 +40,13 @@
     {"action":"waitFor","selector":{"id":"swap-row-demo-swap-5"},"timeoutMs":30000},
     {"action":"tapUntil","sequence":[{"tap":{"id":"swap-row-demo-swap-5"}}],"until":{"id":"swap-id-demo-swap-5"},"attempts":4,"settleMs":6000},
     {"action":"screenshot","name":"swap"},
+    {"action":"goHome"},
+    {"action":"openUrl","url":"sovran://transactions"},
+    {"action":"waitFor","selector":{"id":"transactions-filter-open"},"timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"id":"transaction-send-demo-ai-refunded-6"},"attempts":6,"settleMs":2500},
+    {"action":"waitFor","selector":{"id":"transaction-send-demo-ai-refunded-6"},"timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"transaction-send-demo-ai-refunded-6"}}],"until":{"id":"ai-request-id-demo-ai-refunded-6-group"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"ai-request"},
     {"action":"goHome"}
   ],
   "verify": [

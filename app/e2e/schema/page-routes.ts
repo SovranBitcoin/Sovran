@@ -123,6 +123,7 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
   gallery: ['(theme-flow)/gallery.tsx'],
   'theme-preview': ['(theme-flow)/preview.tsx'],
   swap: ['(transactions-flow)/swap.tsx'],
+  'ai-request': ['(transactions-flow)/aiRequest.tsx'],
   transactions: ['(transactions-flow)/transactions.tsx'],
   'geohash-chat': ['(user-flow)/geohashChat.tsx'],
   'not-found': ['+not-found.tsx'],
