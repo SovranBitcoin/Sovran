@@ -3,128 +3,124 @@
     "context": "ai",
     "page": "ai",
     "file": "source/screenshots/android/ai.png",
-    "run": "run-2026-09-15T17-06-40-715Z-b6eb40f2",
-    "sha256": "2fd26499a228624c65447363afbc4b3a5be0fd9a4589572cedfe82b8b5f8fed6",
-    "capturedAt": "2026-09-15T17:06:40.716Z",
+    "run": "run-2026-09-25T22-12-08-332Z-7bb4809d",
+    "sha256": "6b48a4800c4287d50832aa69334aa90f41bbed897df617fbe2ac92f4c7bb5d96",
+    "capturedAt": "2026-09-25T22:12:08.333Z",
     "capture": {
       "width": 1080,
-      "height": 1920
+      "height": 2400
     },
     "nativeBuild": {
-      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "fingerprint": "d198aaf3d64cb7a9790d5cef343f308cf8501ad8",
       "appVersion": "0.1.3",
       "buildNumber": "2",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
-      "builtAt": "2026-09-15T15:43:24.983Z"
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
+      "builtAt": "2026-09-25T15:36:53.758Z",
+      "artifactSha256": "c627deb2b6267c9887893ecd7155e35957464e3faa2dd972916a31ea43e83f25"
     },
     "appSource": {
-      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
-    },
-    "availability": "unavailable",
-    "unavailableReason": "captured on the 1080x1920 store-delivery emulator, not the library-v1 1080x2400 profile; recapture before it is framed beside other Android pages"
+    }
   },
   "android/contacts": {
     "context": "contacts",
     "page": "contacts",
     "file": "source/screenshots/android/contacts.png",
-    "run": "run-2026-09-15T17-06-40-715Z-b6eb40f2",
-    "sha256": "1984e3750ceed7a44096c6d12fd1bed084f31573f338962915730fa04e6be910",
-    "capturedAt": "2026-09-15T17:06:40.716Z",
+    "run": "run-2026-09-25T22-12-08-332Z-7bb4809d",
+    "sha256": "991b21c87ecbd24c2de4f532c30aef5dbdeeb629fc7570dca00ec67c46ebc9bb",
+    "capturedAt": "2026-09-25T22:12:08.333Z",
     "capture": {
       "width": 1080,
-      "height": 1920
+      "height": 2400
     },
     "nativeBuild": {
-      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "fingerprint": "d198aaf3d64cb7a9790d5cef343f308cf8501ad8",
       "appVersion": "0.1.3",
       "buildNumber": "2",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
-      "builtAt": "2026-09-15T15:43:24.983Z"
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
+      "builtAt": "2026-09-25T15:36:53.758Z",
+      "artifactSha256": "c627deb2b6267c9887893ecd7155e35957464e3faa2dd972916a31ea43e83f25"
     },
     "appSource": {
-      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
-    },
-    "availability": "unavailable",
-    "unavailableReason": "captured on the 1080x1920 store-delivery emulator, not the library-v1 1080x2400 profile; recapture before it is framed beside other Android pages"
+    }
   },
   "android/lightning-receive": {
     "context": "lightning-receive",
     "page": "lightning-receive",
     "file": "source/screenshots/android/lightning-receive.png",
-    "run": "run-2026-09-15T17-06-40-715Z-b6eb40f2",
-    "sha256": "bd83635d25bd5d51e011f434bf80552eccf27418c87d0a69577697e3125879ec",
-    "capturedAt": "2026-09-15T17:06:40.716Z",
+    "run": "run-2026-09-25T22-12-08-332Z-7bb4809d",
+    "sha256": "37b6eab7ec10e9051264e02a0e1ad3e1a0cdeb357f1d435b2f341a8227453c01",
+    "capturedAt": "2026-09-25T22:12:08.333Z",
     "capture": {
       "width": 1080,
-      "height": 1920
+      "height": 2400
     },
     "nativeBuild": {
-      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "fingerprint": "d198aaf3d64cb7a9790d5cef343f308cf8501ad8",
       "appVersion": "0.1.3",
       "buildNumber": "2",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
-      "builtAt": "2026-09-15T15:43:24.983Z"
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
+      "builtAt": "2026-09-25T15:36:53.758Z",
+      "artifactSha256": "c627deb2b6267c9887893ecd7155e35957464e3faa2dd972916a31ea43e83f25"
     },
     "appSource": {
-      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
-    },
-    "availability": "unavailable",
-    "unavailableReason": "captured on the 1080x1920 store-delivery emulator, not the library-v1 1080x2400 profile; recapture before it is framed beside other Android pages"
+    }
   },
   "android/wallet": {
     "context": "wallet",
     "page": "wallet",
     "file": "source/screenshots/android/wallet.png",
-    "run": "run-2026-09-15T17-06-40-715Z-b6eb40f2",
-    "sha256": "74e3610374002d09d10efce071fa900c4a1ceb6a1cdc547ee781930f2ac762a4",
-    "capturedAt": "2026-09-15T17:06:40.716Z",
+    "run": "run-2026-09-25T22-12-08-332Z-7bb4809d",
+    "sha256": "dcef190a0f647f7f8d69aa549325939f460f3eccec61bf9557d0cc4fd8ebbec6",
+    "capturedAt": "2026-09-25T22:12:08.333Z",
     "capture": {
       "width": 1080,
-      "height": 1920
+      "height": 2400
     },
     "nativeBuild": {
-      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "fingerprint": "d198aaf3d64cb7a9790d5cef343f308cf8501ad8",
       "appVersion": "0.1.3",
       "buildNumber": "2",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
-      "builtAt": "2026-09-15T15:43:24.983Z"
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
+      "builtAt": "2026-09-25T15:36:53.758Z",
+      "artifactSha256": "c627deb2b6267c9887893ecd7155e35957464e3faa2dd972916a31ea43e83f25"
     },
     "appSource": {
-      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
-    },
-    "availability": "unavailable",
-    "unavailableReason": "captured on the 1080x1920 store-delivery emulator, not the library-v1 1080x2400 profile; recapture before it is framed beside other Android pages"
+    }
   },
   "ios/ai": {
     "context": "ai",
     "page": "ai",
     "file": "source/screenshots/ios/ai.png",
-    "run": "run-2026-09-16T20-47-08-002Z-17419f37",
-    "sha256": "dacab3290e1f2a31501733f77ec7fb56bf99e379dd4db464f48a219ff70f07ff",
-    "capturedAt": "2026-09-16T20:47:08.005Z",
+    "run": "run-2026-09-25T15-27-08-329Z-971c09a2",
+    "sha256": "604e2bf9be2a4092bfcf6b8e38ff25cb428fba85d33bcbd55b6a8f4417b87ce4",
+    "capturedAt": "2026-09-25T15:27:08.331Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
       "gitDirty": true
     }
   },
@@ -132,24 +128,24 @@
     "context": "contacts",
     "page": "contacts",
     "file": "source/screenshots/ios/contacts.png",
-    "run": "run-2026-09-16T20-47-08-002Z-17419f37",
-    "sha256": "57946e3f4042708fa099e6120c9da0c97937660e34b2ce999262127a8de5e5ad",
-    "capturedAt": "2026-09-16T20:47:08.005Z",
+    "run": "run-2026-09-25T15-27-08-329Z-971c09a2",
+    "sha256": "5f22f6d63037f1a21b688c4a8f6dbcaf53db09eb55ec4986c40e9d932d947d16",
+    "capturedAt": "2026-09-25T15:27:08.331Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
       "gitDirty": true
     }
   },
@@ -157,24 +153,24 @@
     "context": "lightning-receive",
     "page": "lightning-receive",
     "file": "source/screenshots/ios/lightning-receive.png",
-    "run": "run-2026-09-16T20-47-08-002Z-17419f37",
-    "sha256": "06c083db8cd6e6f51f394a4a79a056c1829633d2a339716beeac5fe9c0537aec",
-    "capturedAt": "2026-09-16T20:47:08.005Z",
+    "run": "run-2026-09-25T15-27-08-329Z-971c09a2",
+    "sha256": "23b40a075c80ae477eaa8697b294db8e30f2a89f3f3e6d6cebc7512bdbfbaa13",
+    "capturedAt": "2026-09-25T15:27:08.331Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
       "gitDirty": true
     }
   },
@@ -182,24 +178,24 @@
     "context": "wallet",
     "page": "wallet",
     "file": "source/screenshots/ios/wallet.png",
-    "run": "run-2026-09-16T20-47-08-002Z-17419f37",
-    "sha256": "20bbb337e0287d4d630b9f31253728ddb8f11dc1fe048afc7e8ee46c41ac1049",
-    "capturedAt": "2026-09-16T20:47:08.005Z",
+    "run": "run-2026-09-25T15-27-08-329Z-971c09a2",
+    "sha256": "e1a455602b35d1334787472e340c72840fc9d26925dc7dec3055c297b3d5d3cd",
+    "capturedAt": "2026-09-25T15:27:08.331Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
       "gitDirty": true
     }
   },
@@ -207,24 +203,24 @@
     "context": "feed",
     "page": "feed",
     "file": "source/screenshots/ios/feed.png",
-    "run": "run-2026-09-16T20-57-32-489Z-df256961",
-    "sha256": "717f7a43f5c6d685ec3a41529aa6b6985745c5a34286fd4bbb1d76ac91566491",
-    "capturedAt": "2026-09-16T20:57:32.494Z",
+    "run": "run-2026-09-25T22-41-50-980Z-50222993",
+    "sha256": "6ba6a8b8d39740bd1a71bc103e5d69795df972384ba0594277a795b9f7ed9697",
+    "capturedAt": "2026-09-25T22:41:50.982Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -232,24 +228,24 @@
     "context": "thread",
     "page": "thread",
     "file": "source/screenshots/ios/thread.png",
-    "run": "run-2026-09-16T21-17-59-280Z-871711f7",
-    "sha256": "e185818c985cfd810f1dafaddf405357a42db39554e6c0f6a249ba70b5a113be",
-    "capturedAt": "2026-09-16T21:17:59.282Z",
+    "run": "run-2026-09-25T23-46-10-646Z-ca8db309",
+    "sha256": "73f63e9d1f5048cb8a4727da650a62ad362cde6619327b00bc99412d07e0c666",
+    "capturedAt": "2026-09-25T23:46:10.647Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -257,24 +253,24 @@
     "context": "dm-chat",
     "page": "dm-chat",
     "file": "source/screenshots/ios/dm-chat.png",
-    "run": "run-2026-09-16T20-57-32-489Z-df256961",
-    "sha256": "6b86b3d8bf8e60fc873ecde700645e0cab3cac6e7e8a32da844a41b06536de0d",
-    "capturedAt": "2026-09-16T20:57:32.494Z",
+    "run": "run-2026-09-25T22-41-50-980Z-50222993",
+    "sha256": "01048904d807a7648edd396f5c01c25e76c697f145f1216f869c548119fde82a",
+    "capturedAt": "2026-09-25T22:41:50.982Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -282,24 +278,24 @@
     "context": "receive-qr",
     "page": "receive-qr",
     "file": "source/screenshots/ios/receive-qr.png",
-    "run": "run-2026-09-16T20-57-32-489Z-df256961",
-    "sha256": "33b92a64720ef10dcd2414ce1b55fa5bf3d3450c86c444a4aecf50dfde4e37c4",
-    "capturedAt": "2026-09-16T20:57:32.494Z",
+    "run": "run-2026-09-25T22-41-50-980Z-50222993",
+    "sha256": "2b46d10072051de259c31bea7c1d1e4d2263fd805140a52d1a41ca9ae77801ed",
+    "capturedAt": "2026-09-25T22:41:50.982Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -307,24 +303,24 @@
     "context": "send",
     "page": "send",
     "file": "source/screenshots/ios/send.png",
-    "run": "run-2026-09-16T20-57-32-489Z-df256961",
-    "sha256": "a6d82cb973221908d24c069fa2d9988912a465001c56e3205ebb96323cc3dbc8",
-    "capturedAt": "2026-09-16T20:57:32.494Z",
+    "run": "run-2026-09-25T22-41-50-980Z-50222993",
+    "sha256": "ceca215c2322aa4fa9053c80f601e8716fd9cc28d4cd71b08212002670185d27",
+    "capturedAt": "2026-09-25T22:41:50.982Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -332,24 +328,24 @@
     "context": "mint-select",
     "page": "mint-select",
     "file": "source/screenshots/ios/mint-select.png",
-    "run": "run-2026-09-16T20-57-32-489Z-df256961",
-    "sha256": "be71490c6a7788a9058e06ac779a8881e92759c097beaa13b224f4cb746f1ed1",
-    "capturedAt": "2026-09-16T20:57:32.494Z",
+    "run": "run-2026-09-25T22-41-50-980Z-50222993",
+    "sha256": "d9ed04f007679fd8e6e7cb8dba47fad8a6a8f39f848578447e24914b4a313bd7",
+    "capturedAt": "2026-09-25T22:41:50.982Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -357,24 +353,24 @@
     "context": "mint-info",
     "page": "mint-info",
     "file": "source/screenshots/ios/mint-info.png",
-    "run": "run-2026-09-16T20-57-32-489Z-df256961",
-    "sha256": "33c15d5f2361e4ccdbaf999612e87e897b12257ad0a9924eaa90722cdb13872c",
-    "capturedAt": "2026-09-16T20:57:32.494Z",
+    "run": "run-2026-09-25T22-41-50-980Z-50222993",
+    "sha256": "7415599aaaa4e59ceb18b133f8c179e6cf0dad1da53d5c30e415b1427fe07f9a",
+    "capturedAt": "2026-09-25T22:41:50.982Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -382,24 +378,24 @@
     "context": "notification-mint-changes",
     "page": "notification-mint-changes",
     "file": "source/screenshots/ios/notification-mint-changes.png",
-    "run": "run-2026-09-16T22-00-47-270Z-f4b8cb36",
-    "sha256": "1a7e93c3e5204f3e2910a0b237656b442b37e6f4aa25005c7cde50d629776ac3",
-    "capturedAt": "2026-09-16T22:00:47.272Z",
+    "run": "run-2026-09-25T23-57-45-358Z-10f077da",
+    "sha256": "acb2f95f60dfe0767ae7719223d60077c4d61ee863996a8a35e6c87316dd4e38",
+    "capturedAt": "2026-09-25T23:57:45.359Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -407,24 +403,24 @@
     "context": "mint-reviews",
     "page": "mint-reviews",
     "file": "source/screenshots/ios/mint-reviews.png",
-    "run": "run-2026-09-16T22-00-47-270Z-f4b8cb36",
-    "sha256": "0013667fe9ad2f52154aa4a3d04d153cefd02b518ff9c647a35ab1e98ac089af",
-    "capturedAt": "2026-09-16T22:00:47.272Z",
+    "run": "run-2026-09-25T23-57-45-358Z-10f077da",
+    "sha256": "0c197d2749875e95e6125c6d915e2f77d0e79fa5351493c71fed4642beb9bed0",
+    "capturedAt": "2026-09-25T23:57:45.359Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -432,24 +428,24 @@
     "context": "notifications",
     "page": "notifications",
     "file": "source/screenshots/ios/notifications.png",
-    "run": "run-2026-09-16T20-57-32-489Z-df256961",
-    "sha256": "7798f2afe35a545582417bcccb5092953eb23c548f873468c1b98b2ffd63dd86",
-    "capturedAt": "2026-09-16T20:57:32.494Z",
+    "run": "run-2026-09-25T22-41-50-980Z-50222993",
+    "sha256": "d692041ceebd74d2076ba30f1886bae110d418f12728a10eecfde187186bcf08",
+    "capturedAt": "2026-09-25T22:41:50.982Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -457,24 +453,24 @@
     "context": "settings",
     "page": "settings",
     "file": "source/screenshots/ios/settings.png",
-    "run": "run-2026-09-16T20-57-32-489Z-df256961",
-    "sha256": "bf365f4857f64a62697d02b7d880bbf1a2877152df8bf351470c284451902a24",
-    "capturedAt": "2026-09-16T20:57:32.494Z",
+    "run": "run-2026-09-25T22-41-50-980Z-50222993",
+    "sha256": "037584e389ab058ee2ec3ef6714566c2a983cda53cc48afe5b91cd793cdeb88a",
+    "capturedAt": "2026-09-25T22:41:50.982Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -482,24 +478,24 @@
     "context": "theme-preview",
     "page": "theme-preview",
     "file": "source/screenshots/ios/theme-preview.png",
-    "run": "run-2026-09-16T21-08-22-070Z-499c1265",
-    "sha256": "d32ecb2ee45d06d3a4218a48af686b5876be0490ca43e8cae72169ce8cb2d4bc",
-    "capturedAt": "2026-09-16T21:08:22.071Z",
+    "run": "run-2026-09-25T23-05-19-465Z-86f34e48",
+    "sha256": "ec88ae9c94f2a62121689989eadff45847405bc8b0d52cd62a16297512ac74ec",
+    "capturedAt": "2026-09-25T23:05:19.466Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -507,24 +503,24 @@
     "context": "gallery",
     "page": "gallery",
     "file": "source/screenshots/ios/gallery.png",
-    "run": "run-2026-09-16T21-08-22-070Z-499c1265",
-    "sha256": "cd78d0b923fc2a9efe6a6b6422c63bde377dbb488c0dd00c604dca8355869a36",
-    "capturedAt": "2026-09-16T21:08:22.071Z",
+    "run": "run-2026-09-25T23-05-19-465Z-86f34e48",
+    "sha256": "3db9861a065dacef6975c7a18ec90626850044051d5bdbf37dfb27f968d296b0",
+    "capturedAt": "2026-09-25T23:05:19.466Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -532,24 +528,24 @@
     "context": "stories",
     "page": "stories",
     "file": "source/screenshots/ios/stories.png",
-    "run": "run-2026-09-16T21-17-59-280Z-871711f7",
-    "sha256": "cc8dace7604e3afba86a7a82858412c0f63eb861bb88312333973b185c1defa7",
-    "capturedAt": "2026-09-16T21:17:59.282Z",
+    "run": "run-2026-09-25T23-46-10-646Z-ca8db309",
+    "sha256": "f2a528545dcff25d8c2b9c53d637e35f1959e6e79d66ddb8b1ff52ab14b41b9a",
+    "capturedAt": "2026-09-25T23:46:10.647Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -557,24 +553,24 @@
     "context": "image-viewer",
     "page": "image-viewer",
     "file": "source/screenshots/ios/image-viewer.png",
-    "run": "run-2026-09-16T21-17-59-280Z-871711f7",
-    "sha256": "02097c63e4fb279766a774a7b5dba998c7eb81ad0ce75a7373998441d62cfac2",
-    "capturedAt": "2026-09-16T21:17:59.282Z",
+    "run": "run-2026-09-25T23-46-10-646Z-ca8db309",
+    "sha256": "2a1fc4804378d9cd103de0aa42657dcd2ad4e45a08eaff6afefdc30e6860e781",
+    "capturedAt": "2026-09-25T23:46:10.647Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -582,24 +578,24 @@
     "context": "ai-model-picker",
     "page": "ai",
     "file": "source/screenshots/ios/ai-model-picker.png",
-    "run": "run-2026-09-16T20-57-32-489Z-df256961",
-    "sha256": "32e56ac883776cfde53a2d0d1e050bc0ce4be62ecd1f7331f0df37daa329c4ee",
-    "capturedAt": "2026-09-16T20:57:32.494Z",
+    "run": "run-2026-09-25T22-41-50-980Z-50222993",
+    "sha256": "4d9a96a371549b068928528755d83580293870d5ff48d44361a0427891353bf7",
+    "capturedAt": "2026-09-25T22:41:50.982Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -608,24 +604,24 @@
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-navy.png",
     "wallpaperId": "navy",
-    "run": "run-2026-09-16T21-08-22-070Z-499c1265",
-    "sha256": "80ff639c1c3df66c9b085601a2d38317ed96d81380d4d2522d780f1f33b9a9d4",
-    "capturedAt": "2026-09-16T21:08:22.071Z",
+    "run": "run-2026-09-25T23-05-19-465Z-86f34e48",
+    "sha256": "3532eb13f7695a12a913756b72ba41c35a6e155a34ffea879142e71efeda085f",
+    "capturedAt": "2026-09-25T23:05:19.466Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -634,24 +630,24 @@
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-sunset.png",
     "wallpaperId": "sunset",
-    "run": "run-2026-09-16T21-08-22-070Z-499c1265",
-    "sha256": "cf3e2f49616e7884703ff3db009590ed23b51fee61221f06916a8175a53ab032",
-    "capturedAt": "2026-09-16T21:08:22.071Z",
+    "run": "run-2026-09-25T23-05-19-465Z-86f34e48",
+    "sha256": "ac15dbd77473263a3129d49587c83909651ed2e5904ba8795cba4c7d77c24d1e",
+    "capturedAt": "2026-09-25T23:05:19.466Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -660,24 +656,24 @@
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-beige.png",
     "wallpaperId": "beige",
-    "run": "run-2026-09-16T21-08-22-070Z-499c1265",
-    "sha256": "023e04d3f2c6f80a0984342efd9f89ad74a28d06051f5e49f14ba5e86c6cfe68",
-    "capturedAt": "2026-09-16T21:08:22.071Z",
+    "run": "run-2026-09-25T23-05-19-465Z-86f34e48",
+    "sha256": "b68e39f10cf1f438043734bd6f2a292fca39b049154eb1e504c8f20a32539dad",
+    "capturedAt": "2026-09-25T23:05:19.466Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -685,23 +681,24 @@
     "context": "feed",
     "page": "feed",
     "file": "source/screenshots/android/feed.png",
-    "run": "run-2026-09-15T17-21-23-742Z-552fa03d",
-    "sha256": "36d422e7144766d587c21bfbfe8d0bc4c89c4e19a96cf3f448b8820390766c52",
-    "capturedAt": "2026-09-15T17:21:23.744Z",
+    "run": "run-2026-09-25T22-50-29-570Z-64e94426",
+    "sha256": "a104210b4f105f566568d38fe0a9d3b52f217d3311ebcdb2389f429447d95ad1",
+    "capturedAt": "2026-09-25T22:50:29.571Z",
     "capture": {
       "width": 1080,
       "height": 2400
     },
     "nativeBuild": {
-      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "fingerprint": "d198aaf3d64cb7a9790d5cef343f308cf8501ad8",
       "appVersion": "0.1.3",
       "buildNumber": "2",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
-      "builtAt": "2026-09-15T15:43:24.983Z"
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
+      "builtAt": "2026-09-25T15:36:53.758Z",
+      "artifactSha256": "c627deb2b6267c9887893ecd7155e35957464e3faa2dd972916a31ea43e83f25"
     },
     "appSource": {
-      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -709,24 +706,24 @@
     "context": "thread",
     "page": "thread",
     "file": "source/screenshots/android/thread.png",
-    "run": "run-2026-09-16T21-24-23-342Z-e1212146",
-    "sha256": "028c01aabf3720bc66e168b88b8dd9f140be9c875b2e081a3fb6970459c8144c",
-    "capturedAt": "2026-09-16T21:24:23.343Z",
+    "run": "run-2026-09-25T23-51-05-343Z-002da871",
+    "sha256": "fb6b96c2785205b08c363e12642fe1fe9e95a1ba3f972ceed8d33b6cf68eb7cb",
+    "capturedAt": "2026-09-25T23:51:05.344Z",
     "capture": {
       "width": 1080,
       "height": 2400
     },
     "nativeBuild": {
-      "fingerprint": "6a1036af8caeffdc2b04adf763a92e316720c758",
+      "fingerprint": "d198aaf3d64cb7a9790d5cef343f308cf8501ad8",
       "appVersion": "0.1.3",
       "buildNumber": "2",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:37:51.554Z",
-      "artifactSha256": "ded9eb32e2b7223fe5198fd546b203fd2ec942d65190d38f0ba04782d3cb615c"
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
+      "builtAt": "2026-09-25T15:36:53.758Z",
+      "artifactSha256": "c627deb2b6267c9887893ecd7155e35957464e3faa2dd972916a31ea43e83f25"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -734,23 +731,24 @@
     "context": "dm-chat",
     "page": "dm-chat",
     "file": "source/screenshots/android/dm-chat.png",
-    "run": "run-2026-09-15T17-21-23-742Z-552fa03d",
-    "sha256": "1a87c472f052ee8a1d760a4ff7bed11a054c38900a826a296cd260d8927cb496",
-    "capturedAt": "2026-09-15T17:21:23.744Z",
+    "run": "run-2026-09-25T22-50-29-570Z-64e94426",
+    "sha256": "157c612abd0f0efb90f1f6e29ccc942239fe8f110c195dd98ff57102b713639f",
+    "capturedAt": "2026-09-25T22:50:29.571Z",
     "capture": {
       "width": 1080,
       "height": 2400
     },
     "nativeBuild": {
-      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "fingerprint": "d198aaf3d64cb7a9790d5cef343f308cf8501ad8",
       "appVersion": "0.1.3",
       "buildNumber": "2",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
-      "builtAt": "2026-09-15T15:43:24.983Z"
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
+      "builtAt": "2026-09-25T15:36:53.758Z",
+      "artifactSha256": "c627deb2b6267c9887893ecd7155e35957464e3faa2dd972916a31ea43e83f25"
     },
     "appSource": {
-      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -758,23 +756,24 @@
     "context": "receive-qr",
     "page": "receive-qr",
     "file": "source/screenshots/android/receive-qr.png",
-    "run": "run-2026-09-15T17-21-23-742Z-552fa03d",
-    "sha256": "5b69f14a14ac13891593b0ff9c9b9ae6e53101d60a02b8e22ff03eeb94343500",
-    "capturedAt": "2026-09-15T17:21:23.744Z",
+    "run": "run-2026-09-25T22-50-29-570Z-64e94426",
+    "sha256": "656f2ca16b8ad35898749e1e6e4f7a6113dcab58f785050f856ac610b1c2321d",
+    "capturedAt": "2026-09-25T22:50:29.571Z",
     "capture": {
       "width": 1080,
       "height": 2400
     },
     "nativeBuild": {
-      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "fingerprint": "d198aaf3d64cb7a9790d5cef343f308cf8501ad8",
       "appVersion": "0.1.3",
       "buildNumber": "2",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
-      "builtAt": "2026-09-15T15:43:24.983Z"
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
+      "builtAt": "2026-09-25T15:36:53.758Z",
+      "artifactSha256": "c627deb2b6267c9887893ecd7155e35957464e3faa2dd972916a31ea43e83f25"
     },
     "appSource": {
-      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -782,23 +781,24 @@
     "context": "send",
     "page": "send",
     "file": "source/screenshots/android/send.png",
-    "run": "run-2026-09-15T17-21-23-742Z-552fa03d",
-    "sha256": "ecd5d1555daa5af678fffdd73f362505a0cee80d39cbfcf99b4c5de6202730da",
-    "capturedAt": "2026-09-15T17:21:23.744Z",
+    "run": "run-2026-09-25T22-50-29-570Z-64e94426",
+    "sha256": "b517aa41be068cb799a2ad47c4540b515771b5bd63f7c2c5e19e0d7b323b958d",
+    "capturedAt": "2026-09-25T22:50:29.571Z",
     "capture": {
       "width": 1080,
       "height": 2400
     },
     "nativeBuild": {
-      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "fingerprint": "d198aaf3d64cb7a9790d5cef343f308cf8501ad8",
       "appVersion": "0.1.3",
       "buildNumber": "2",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
-      "builtAt": "2026-09-15T15:43:24.983Z"
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
+      "builtAt": "2026-09-25T15:36:53.758Z",
+      "artifactSha256": "c627deb2b6267c9887893ecd7155e35957464e3faa2dd972916a31ea43e83f25"
     },
     "appSource": {
-      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -806,23 +806,24 @@
     "context": "mint-select",
     "page": "mint-select",
     "file": "source/screenshots/android/mint-select.png",
-    "run": "run-2026-09-15T17-21-23-742Z-552fa03d",
-    "sha256": "4d02ade162596567ffd8eb81674cb69976d1d15cccd39a25784e6402d8748ed9",
-    "capturedAt": "2026-09-15T17:21:23.744Z",
+    "run": "run-2026-09-25T22-50-29-570Z-64e94426",
+    "sha256": "2daa2f9f8f207b71dfbd8a9a69cb832e4bd5c008e5642e817f8e4c0b397a2eb4",
+    "capturedAt": "2026-09-25T22:50:29.571Z",
     "capture": {
       "width": 1080,
       "height": 2400
     },
     "nativeBuild": {
-      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "fingerprint": "d198aaf3d64cb7a9790d5cef343f308cf8501ad8",
       "appVersion": "0.1.3",
       "buildNumber": "2",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
-      "builtAt": "2026-09-15T15:43:24.983Z"
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
+      "builtAt": "2026-09-25T15:36:53.758Z",
+      "artifactSha256": "c627deb2b6267c9887893ecd7155e35957464e3faa2dd972916a31ea43e83f25"
     },
     "appSource": {
-      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -830,23 +831,24 @@
     "context": "mint-info",
     "page": "mint-info",
     "file": "source/screenshots/android/mint-info.png",
-    "run": "run-2026-09-15T17-21-23-742Z-552fa03d",
-    "sha256": "5d8569313b9babfcad2df351da90aa34a43254636e4c09332e809a72e187430b",
-    "capturedAt": "2026-09-15T17:21:23.744Z",
+    "run": "run-2026-09-25T22-50-29-570Z-64e94426",
+    "sha256": "8df5f2de8239e9bfccc328274c650766abc38ce3c85d78b3cc77fca1cb754efa",
+    "capturedAt": "2026-09-25T22:50:29.571Z",
     "capture": {
       "width": 1080,
       "height": 2400
     },
     "nativeBuild": {
-      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "fingerprint": "d198aaf3d64cb7a9790d5cef343f308cf8501ad8",
       "appVersion": "0.1.3",
       "buildNumber": "2",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
-      "builtAt": "2026-09-15T15:43:24.983Z"
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
+      "builtAt": "2026-09-25T15:36:53.758Z",
+      "artifactSha256": "c627deb2b6267c9887893ecd7155e35957464e3faa2dd972916a31ea43e83f25"
     },
     "appSource": {
-      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -902,23 +904,24 @@
     "context": "notifications",
     "page": "notifications",
     "file": "source/screenshots/android/notifications.png",
-    "run": "run-2026-09-15T17-21-23-742Z-552fa03d",
-    "sha256": "e366b965b6d9c47e3c76928a077d96821d89fdc7ff473b727aead83cc50f84d3",
-    "capturedAt": "2026-09-15T17:21:23.744Z",
+    "run": "run-2026-09-25T22-50-29-570Z-64e94426",
+    "sha256": "f0940693a4ad9514e9af2b81bd4f0b98f24c767a22e9f418e851d3a80d46f4dc",
+    "capturedAt": "2026-09-25T22:50:29.571Z",
     "capture": {
       "width": 1080,
       "height": 2400
     },
     "nativeBuild": {
-      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "fingerprint": "d198aaf3d64cb7a9790d5cef343f308cf8501ad8",
       "appVersion": "0.1.3",
       "buildNumber": "2",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
-      "builtAt": "2026-09-15T15:43:24.983Z"
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
+      "builtAt": "2026-09-25T15:36:53.758Z",
+      "artifactSha256": "c627deb2b6267c9887893ecd7155e35957464e3faa2dd972916a31ea43e83f25"
     },
     "appSource": {
-      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -926,23 +929,24 @@
     "context": "settings",
     "page": "settings",
     "file": "source/screenshots/android/settings.png",
-    "run": "run-2026-09-15T17-21-23-742Z-552fa03d",
-    "sha256": "e0498223d9b9edc35658941c4345d8174703b474e3c0c3b4d8db286b344ad004",
-    "capturedAt": "2026-09-15T17:21:23.744Z",
+    "run": "run-2026-09-25T22-50-29-570Z-64e94426",
+    "sha256": "4385e6f7e89f4c3a0b2755c34b8c5da0037ae5fdddefbde69287baf0ded21f83",
+    "capturedAt": "2026-09-25T22:50:29.571Z",
     "capture": {
       "width": 1080,
       "height": 2400
     },
     "nativeBuild": {
-      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "fingerprint": "d198aaf3d64cb7a9790d5cef343f308cf8501ad8",
       "appVersion": "0.1.3",
       "buildNumber": "2",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
-      "builtAt": "2026-09-15T15:43:24.983Z"
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
+      "builtAt": "2026-09-25T15:36:53.758Z",
+      "artifactSha256": "c627deb2b6267c9887893ecd7155e35957464e3faa2dd972916a31ea43e83f25"
     },
     "appSource": {
-      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -972,24 +976,24 @@
     "context": "stories",
     "page": "stories",
     "file": "source/screenshots/android/stories.png",
-    "run": "run-2026-09-16T21-24-23-342Z-e1212146",
-    "sha256": "79c7d3c552880b6c28325e4e82c0c9bec09c9003bacba7731dfc99af3b21923b",
-    "capturedAt": "2026-09-16T21:24:23.343Z",
+    "run": "run-2026-09-25T23-51-05-343Z-002da871",
+    "sha256": "c16a190f0809f5bab471f694f571b01ace179aa90fc39d22c57de69d9563ef39",
+    "capturedAt": "2026-09-25T23:51:05.344Z",
     "capture": {
       "width": 1080,
       "height": 2400
     },
     "nativeBuild": {
-      "fingerprint": "6a1036af8caeffdc2b04adf763a92e316720c758",
+      "fingerprint": "d198aaf3d64cb7a9790d5cef343f308cf8501ad8",
       "appVersion": "0.1.3",
       "buildNumber": "2",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:37:51.554Z",
-      "artifactSha256": "ded9eb32e2b7223fe5198fd546b203fd2ec942d65190d38f0ba04782d3cb615c"
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
+      "builtAt": "2026-09-25T15:36:53.758Z",
+      "artifactSha256": "c627deb2b6267c9887893ecd7155e35957464e3faa2dd972916a31ea43e83f25"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -997,24 +1001,24 @@
     "context": "image-viewer",
     "page": "image-viewer",
     "file": "source/screenshots/android/image-viewer.png",
-    "run": "run-2026-09-16T21-24-23-342Z-e1212146",
-    "sha256": "c42244b8e8ca28353af4fcbcdd239d93d2485aa02f942c046eadcd069c81ba7f",
-    "capturedAt": "2026-09-16T21:24:23.343Z",
+    "run": "run-2026-09-25T23-51-05-343Z-002da871",
+    "sha256": "535e1be9643a8207d679a2bb8bcd528dc485fb41389c3b249a9b4a6f4721265b",
+    "capturedAt": "2026-09-25T23:51:05.344Z",
     "capture": {
       "width": 1080,
       "height": 2400
     },
     "nativeBuild": {
-      "fingerprint": "6a1036af8caeffdc2b04adf763a92e316720c758",
+      "fingerprint": "d198aaf3d64cb7a9790d5cef343f308cf8501ad8",
       "appVersion": "0.1.3",
       "buildNumber": "2",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:37:51.554Z",
-      "artifactSha256": "ded9eb32e2b7223fe5198fd546b203fd2ec942d65190d38f0ba04782d3cb615c"
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
+      "builtAt": "2026-09-25T15:36:53.758Z",
+      "artifactSha256": "c627deb2b6267c9887893ecd7155e35957464e3faa2dd972916a31ea43e83f25"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -1022,23 +1026,24 @@
     "context": "ai-model-picker",
     "page": "ai",
     "file": "source/screenshots/android/ai-model-picker.png",
-    "run": "run-2026-09-15T17-21-23-742Z-552fa03d",
-    "sha256": "56a5010cfa001f4ce82daeb43ae103912ee0d28f2f570a5515d43426ed5d8817",
-    "capturedAt": "2026-09-15T17:21:23.744Z",
+    "run": "run-2026-09-25T22-50-29-570Z-64e94426",
+    "sha256": "aefe6c191eedb0f30d4fdda023f7a98fd19a89244acf15d958fa92bf6a3c1e4b",
+    "capturedAt": "2026-09-25T22:50:29.571Z",
     "capture": {
       "width": 1080,
       "height": 2400
     },
     "nativeBuild": {
-      "fingerprint": "6084f5daaa3fdeb18c1b907902afc9d0dbf54376",
+      "fingerprint": "d198aaf3d64cb7a9790d5cef343f308cf8501ad8",
       "appVersion": "0.1.3",
       "buildNumber": "2",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
-      "builtAt": "2026-09-15T15:43:24.983Z"
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
+      "builtAt": "2026-09-25T15:36:53.758Z",
+      "artifactSha256": "c627deb2b6267c9887893ecd7155e35957464e3faa2dd972916a31ea43e83f25"
     },
     "appSource": {
-      "fingerprint": "79fad997b72cb06358b957497e1ae93bc69d56d91e1deb6ea7c4b17cba1ad06f",
-      "gitSha": "fc597d4a23cf64be27e31e32a4480ba3d3c63c94",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -1083,24 +1088,24 @@
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-in-eclipse.png",
     "wallpaperId": "in-eclipse",
-    "run": "run-2026-09-16T21-08-22-070Z-499c1265",
-    "sha256": "7e1e0561988246a1a00e9a6d2d4b9e47abef5ac7d1b5d345624c586a379b86c8",
-    "capturedAt": "2026-09-16T21:08:22.071Z",
+    "run": "run-2026-09-25T23-05-19-465Z-86f34e48",
+    "sha256": "64d46e9f5dd2e802291aceac7d1ee94cd8a36e80ac380de2a971e36ce2d72b20",
+    "capturedAt": "2026-09-25T23:05:19.466Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -1109,24 +1114,24 @@
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-looking-back-at-earth.png",
     "wallpaperId": "looking-back-at-earth",
-    "run": "run-2026-09-16T21-08-22-070Z-499c1265",
-    "sha256": "ddbc8e21cab87ad1bd4fc78913bad1678ef2c189bedfe32b82a56e83711fca2b",
-    "capturedAt": "2026-09-16T21:08:22.071Z",
+    "run": "run-2026-09-25T23-05-19-465Z-86f34e48",
+    "sha256": "2deb5eca4e8eb1d78b179a5ce1b4f9e4148c3bebefa86fe477b68ad55f2f26dd",
+    "capturedAt": "2026-09-25T23:05:19.466Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -1135,24 +1140,24 @@
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-edge-of-lunar-day.png",
     "wallpaperId": "edge-of-lunar-day",
-    "run": "run-2026-09-16T21-08-22-070Z-499c1265",
-    "sha256": "127db9a8b4362a5904cfe7be47f595c79a1b33bb70a32e91b08b9655151f8429",
-    "capturedAt": "2026-09-16T21:08:22.071Z",
+    "run": "run-2026-09-25T23-05-19-465Z-86f34e48",
+    "sha256": "84b61c9fd0820f98982706cb18df84cfa7317c57684a2ce4a2bd4aa55357c188",
+    "capturedAt": "2026-09-25T23:05:19.466Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -1161,24 +1166,24 @@
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-setting-earth.png",
     "wallpaperId": "setting-earth",
-    "run": "run-2026-09-16T21-08-22-070Z-499c1265",
-    "sha256": "2b8230e36db7104f67a0160f3b7362aae16eb2e764a83cdb6bc9dc4872a9d590",
-    "capturedAt": "2026-09-16T21:08:22.071Z",
+    "run": "run-2026-09-25T23-05-19-465Z-86f34e48",
+    "sha256": "fcdaa0d9a4edc68218d4251f0908a44860e69b06658be19e387adedf00df3174",
+    "capturedAt": "2026-09-25T23:05:19.466Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -1186,24 +1191,24 @@
     "context": "backup-words",
     "page": "backup-words",
     "file": "source/screenshots/ios/backup-words.png",
-    "run": "run-2026-09-16T21-43-50-501Z-403974e4",
-    "sha256": "8e24661fdbf1204bc303f6ca492173ada41a798acbdd45405a0dce865ed72f81",
-    "capturedAt": "2026-09-16T21:43:50.502Z",
+    "run": "run-2026-09-26T00-32-45-075Z-8831b600",
+    "sha256": "341a8925f3f048ee855c0fbc1deb8ac3f4b949a714b830af10b1309d3bf50ee4",
+    "capturedAt": "2026-09-26T00:32:45.076Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -1259,24 +1264,24 @@
     "context": "backup-words",
     "page": "backup-words",
     "file": "source/screenshots/android/backup-words.png",
-    "run": "run-2026-09-16T22-08-46-240Z-1f832d03",
-    "sha256": "904d52316b1efce0134a6d579b5f1c57fc04be5486520e018bbddf1748241527",
-    "capturedAt": "2026-09-16T22:08:46.242Z",
+    "run": "run-2026-09-26T00-37-34-662Z-33e0d13f",
+    "sha256": "a7fbd4d784bd09ab7e7720ee3274e3ee3968123ff381c4aefc82d1182645c685",
+    "capturedAt": "2026-09-26T00:37:34.663Z",
     "capture": {
       "width": 1080,
       "height": 2400
     },
     "nativeBuild": {
-      "fingerprint": "6a1036af8caeffdc2b04adf763a92e316720c758",
+      "fingerprint": "d198aaf3d64cb7a9790d5cef343f308cf8501ad8",
       "appVersion": "0.1.3",
       "buildNumber": "2",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:37:51.554Z",
-      "artifactSha256": "ded9eb32e2b7223fe5198fd546b203fd2ec942d65190d38f0ba04782d3cb615c"
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
+      "builtAt": "2026-09-25T15:36:53.758Z",
+      "artifactSha256": "c627deb2b6267c9887893ecd7155e35957464e3faa2dd972916a31ea43e83f25"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },
@@ -1285,24 +1290,24 @@
     "page": "wallet",
     "file": "source/screenshots/ios/wallet-new-moon.png",
     "wallpaperId": "new-moon",
-    "run": "run-2026-09-16T21-08-22-070Z-499c1265",
-    "sha256": "f9229590c5a4820ea27292763eef34166a9e943750508983d2701a02abb6b0bc",
-    "capturedAt": "2026-09-16T21:08:22.071Z",
+    "run": "run-2026-09-25T23-05-19-465Z-86f34e48",
+    "sha256": "628ce8ee5cbe102d53041cc3e1440b50cde14174230c3a81401622bdc440702b",
+    "capturedAt": "2026-09-25T23:05:19.466Z",
     "capture": {
       "width": 1320,
       "height": 2868
     },
     "nativeBuild": {
-      "fingerprint": "61c720343c28ec0033bcd42eae13773580f603f5",
+      "fingerprint": "a3dcad6abfc5a4f75ceb7130c179b5fd1cddb2de",
       "appVersion": "0.1.3",
       "buildNumber": "1",
-      "gitSha": "93be3662733c876ed58933ce0a1fb1cb730d5a90",
-      "builtAt": "2026-09-16T00:24:55.709Z",
-      "artifactSha256": "8b713c2a3752c3ed35c08990ce58a6b0c4083fc82216a65bad7f3e812a7f7c9b"
+      "gitSha": "33f4b22ce94132344c48737f2789b10f7f6ce0e0",
+      "builtAt": "2026-09-25T15:26:45.855Z",
+      "artifactSha256": "7f07c3b2d3a79eff831bcfe991da1bc07ccaf6dcf210e9ae12e36c9c0f9c787c"
     },
     "appSource": {
-      "fingerprint": "b4d1d84ba053b269dc99037af3d6c1cf83e426bb0361fd247638a00bf963e553",
-      "gitSha": "4388dfc60ff0c98ffc5176b7aab6f95f2a413a83",
+      "fingerprint": "edad7bd220ea0f9fbeba68b88040b55cb8baa70b5a1787b5bcf6add635af618f",
+      "gitSha": "805fd8c867d9b505d05ae1856bfebad8d92b3094",
       "gitDirty": true
     }
   },

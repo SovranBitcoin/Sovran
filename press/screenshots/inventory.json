@@ -3,6 +3,31 @@
   "targets": [
     {
       "platform": "android",
+      "page": "settings-design-system-headers",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (settings-flow)/design-system-headers.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(settings-flow)/design-system-headers.tsx"
+      ]
+    },
+    {
+      "platform": "android",
       "page": "secure-locked",
       "state": "default",
       "baseline": true,
@@ -97,11 +122,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-17T06:45:10.848Z",
+        "at": "2026-09-25T20:03:15.175Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T06-45-19-499Z-a410f0e2"
+          "run-2026-09-25T20-03-19-999Z-f4dc6f19"
         ]
       }
     },
@@ -132,11 +157,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-17T06:45:10.848Z",
+        "at": "2026-09-25T20:03:15.175Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T06-45-19-499Z-a410f0e2"
+          "run-2026-09-25T20-03-19-999Z-f4dc6f19"
         ]
       }
     },
@@ -167,11 +192,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-17T06:45:10.848Z",
+        "at": "2026-09-25T20:03:15.175Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T06-45-19-499Z-a410f0e2"
+          "run-2026-09-25T20-03-19-999Z-f4dc6f19"
         ]
       }
     },
@@ -202,11 +227,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-17T06:45:10.848Z",
+        "at": "2026-09-25T20:03:15.175Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T06-45-19-499Z-a410f0e2"
+          "run-2026-09-25T20-03-19-999Z-f4dc6f19"
         ]
       }
     },
@@ -237,11 +262,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-17T06:45:10.848Z",
+        "at": "2026-09-25T20:03:15.175Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T06-45-19-499Z-a410f0e2"
+          "run-2026-09-25T20-03-19-999Z-f4dc6f19"
         ]
       }
     },
@@ -272,11 +297,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-17T06:45:10.848Z",
+        "at": "2026-09-25T20:03:15.175Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T06-45-19-499Z-a410f0e2"
+          "run-2026-09-25T20-03-19-999Z-f4dc6f19"
         ]
       }
     },
@@ -307,11 +332,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-17T06:45:10.848Z",
+        "at": "2026-09-25T20:03:15.175Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T06-45-19-499Z-a410f0e2"
+          "run-2026-09-25T20-03-19-999Z-f4dc6f19"
         ]
       }
     },
@@ -328,7 +353,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T31",
-      "status": "skipped",
+      "status": "failed",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -344,10 +369,14 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots.wallpapers",
-        "runs": []
+        "at": "2026-09-25T23:29:22.861Z",
+        "status": "failed",
+        "attempts": 2,
+        "reason": "Step T63 failed; inspect the local run evidence",
+        "runs": [
+          "run-2026-09-25T23-13-36-487Z-329ae19f",
+          "run-2026-09-25T23-29-28-054Z-37aaab17"
+        ]
       }
     },
     {
@@ -363,7 +392,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T01",
-      "status": "skipped",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -379,10 +408,12 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/store.screenshots",
-        "runs": []
+        "at": "2026-09-25T22:12:03.886Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-12-08-332Z-7bb4809d"
+        ]
       }
     },
     {
@@ -398,7 +429,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T64",
-      "status": "skipped",
+      "status": "failed",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -414,10 +445,14 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots.wallpapers",
-        "runs": []
+        "at": "2026-09-25T23:29:22.861Z",
+        "status": "failed",
+        "attempts": 2,
+        "reason": "Step T63 failed; inspect the local run evidence",
+        "runs": [
+          "run-2026-09-25T23-13-36-487Z-329ae19f",
+          "run-2026-09-25T23-29-28-054Z-37aaab17"
+        ]
       }
     },
     {
@@ -433,7 +468,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T37",
-      "status": "skipped",
+      "status": "failed",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -449,10 +484,14 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots.wallpapers",
-        "runs": []
+        "at": "2026-09-25T23:29:22.861Z",
+        "status": "failed",
+        "attempts": 2,
+        "reason": "Step T63 failed; inspect the local run evidence",
+        "runs": [
+          "run-2026-09-25T23-13-36-487Z-329ae19f",
+          "run-2026-09-25T23-29-28-054Z-37aaab17"
+        ]
       }
     },
     {
@@ -468,7 +507,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T79",
-      "status": "skipped",
+      "status": "failed",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -484,10 +523,14 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots.wallpapers",
-        "runs": []
+        "at": "2026-09-25T23:29:22.861Z",
+        "status": "failed",
+        "attempts": 2,
+        "reason": "Step T63 failed; inspect the local run evidence",
+        "runs": [
+          "run-2026-09-25T23-13-36-487Z-329ae19f",
+          "run-2026-09-25T23-29-28-054Z-37aaab17"
+        ]
       }
     },
     {
@@ -503,7 +546,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T17",
-      "status": "skipped",
+      "status": "failed",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -519,10 +562,14 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots.wallpapers",
-        "runs": []
+        "at": "2026-09-25T23:29:22.861Z",
+        "status": "failed",
+        "attempts": 2,
+        "reason": "Step T63 failed; inspect the local run evidence",
+        "runs": [
+          "run-2026-09-25T23-13-36-487Z-329ae19f",
+          "run-2026-09-25T23-29-28-054Z-37aaab17"
+        ]
       }
     },
     {
@@ -538,7 +585,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T70",
-      "status": "skipped",
+      "status": "failed",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -554,10 +601,14 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots.wallpapers",
-        "runs": []
+        "at": "2026-09-25T23:29:22.861Z",
+        "status": "failed",
+        "attempts": 2,
+        "reason": "Step T63 failed; inspect the local run evidence",
+        "runs": [
+          "run-2026-09-25T23-13-36-487Z-329ae19f",
+          "run-2026-09-25T23-29-28-054Z-37aaab17"
+        ]
       }
     },
     {
@@ -573,7 +624,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T67",
-      "status": "skipped",
+      "status": "failed",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -589,10 +640,14 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots.wallpapers",
-        "runs": []
+        "at": "2026-09-25T23:29:22.861Z",
+        "status": "failed",
+        "attempts": 2,
+        "reason": "Step T63 failed; inspect the local run evidence",
+        "runs": [
+          "run-2026-09-25T23-13-36-487Z-329ae19f",
+          "run-2026-09-25T23-29-28-054Z-37aaab17"
+        ]
       }
     },
     {
@@ -608,7 +663,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T24",
-      "status": "skipped",
+      "status": "failed",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -624,10 +679,14 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots.wallpapers",
-        "runs": []
+        "at": "2026-09-25T23:29:22.861Z",
+        "status": "failed",
+        "attempts": 2,
+        "reason": "Step T63 failed; inspect the local run evidence",
+        "runs": [
+          "run-2026-09-25T23-13-36-487Z-329ae19f",
+          "run-2026-09-25T23-29-28-054Z-37aaab17"
+        ]
       }
     },
     {
@@ -643,7 +702,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T39",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -659,9 +718,12 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T22:00:30.856Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-00-35-534Z-e779f768"
+        ]
       }
     },
     {
@@ -677,7 +739,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T46",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -693,9 +755,12 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T22:00:30.856Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-00-35-534Z-e779f768"
+        ]
       }
     },
     {
@@ -711,7 +776,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T11",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -727,9 +792,12 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T22:00:30.856Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-00-35-534Z-e779f768"
+        ]
       }
     },
     {
@@ -745,7 +813,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T18",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -761,9 +829,12 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T22:00:30.856Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-00-35-534Z-e779f768"
+        ]
       }
     },
     {
@@ -779,7 +850,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T25",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -795,9 +866,12 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T22:00:30.856Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-00-35-534Z-e779f768"
+        ]
       }
     },
     {
@@ -813,7 +887,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T32",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -829,9 +903,12 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T22:00:30.856Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-00-35-534Z-e779f768"
+        ]
       }
     },
     {
@@ -847,7 +924,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T53",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -863,9 +940,12 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T22:00:30.856Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-00-35-534Z-e779f768"
+        ]
       }
     },
     {
@@ -881,7 +961,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T60",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -897,9 +977,12 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T22:00:30.856Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-00-35-534Z-e779f768"
+        ]
       }
     },
     {
@@ -929,11 +1012,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-16T22:58:36.456Z",
+        "at": "2026-09-25T18:41:32.689Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T22-58-44-949Z-32976988"
+          "run-2026-09-25T18-41-37-813Z-e1cf2d9a"
         ]
       }
     },
@@ -950,7 +1033,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T07",
-      "status": "captured",
+      "status": "failed",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -964,11 +1047,13 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-17T08:22:03.507Z",
-        "status": "captured",
-        "attempts": 1,
+        "at": "2026-09-26T01:22:43.324Z",
+        "status": "failed",
+        "attempts": 2,
+        "reason": "Step T04 failed; inspect the local run evidence",
         "runs": [
-          "run-2026-09-17T08-22-12-496Z-c6862cb7"
+          "run-2026-09-26T01-19-02-694Z-7d94b709",
+          "run-2026-09-26T01-22-48-543Z-c6722677"
         ]
       }
     },
@@ -985,7 +1070,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T46",
-      "status": "skipped",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -1001,10 +1086,12 @@
         "(receive-flow)/receive.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/store.screenshots",
-        "runs": []
+        "at": "2026-09-25T22:12:03.886Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-12-08-332Z-7bb4809d"
+        ]
       }
     },
     {
@@ -1020,7 +1107,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T10",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -1036,9 +1123,12 @@
         "(receive-flow)/qrDisplay.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:27:24.771Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-27-29-585Z-0a5c64f1"
+        ]
       }
     },
     {
@@ -1054,7 +1144,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T16",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -1070,9 +1160,12 @@
         "(receive-flow)/qrDisplay.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:27:24.771Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-27-29-585Z-0a5c64f1"
+        ]
       }
     },
     {
@@ -1088,7 +1181,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T15",
-      "status": "skipped",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -1104,10 +1197,12 @@
         "(receive-flow)/qrDisplay.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots",
-        "runs": []
+        "at": "2026-09-25T22:50:24.882Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-50-29-570Z-64e94426"
+        ]
       }
     },
     {
@@ -1123,7 +1218,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T07",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -1139,9 +1234,12 @@
         "(receive-flow)/qrDisplay.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:27:24.771Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-27-29-585Z-0a5c64f1"
+        ]
       }
     },
     {
@@ -1157,7 +1255,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T13",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -1173,9 +1271,12 @@
         "(receive-flow)/qrDisplay.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:27:24.771Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-27-29-585Z-0a5c64f1"
+        ]
       }
     },
     {
@@ -1191,7 +1292,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T04",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -1207,9 +1308,12 @@
         "(receive-flow)/qrDisplay.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:27:24.771Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-27-29-585Z-0a5c64f1"
+        ]
       }
     },
     {
@@ -1241,11 +1345,11 @@
         "(receive-flow)/amount.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T07:01:31.258Z",
+        "at": "2026-09-25T20:10:06.318Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T07-01-39-947Z-47330f36"
+          "run-2026-09-25T20-10-11-345Z-3644ea1b"
         ]
       }
     },
@@ -1262,7 +1366,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T13",
-      "status": "skipped",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -1280,10 +1384,12 @@
         "lightningReceive.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/store.screenshots",
-        "runs": []
+        "at": "2026-09-25T22:12:03.886Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-12-08-332Z-7bb4809d"
+        ]
       }
     },
     {
@@ -1299,9 +1405,9 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T22",
-      "status": "skipped",
-      "blocker": null,
-      "publicationEligibility": "eligible-after-verification",
+      "status": "blocked",
+      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
+      "publicationEligibility": "blocked",
       "platformProfile": {
         "driver": "android",
         "orientation": "portrait",
@@ -1336,7 +1442,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T19",
-      "status": "skipped",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -1352,10 +1458,12 @@
         "(send-flow)/send.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots",
-        "runs": []
+        "at": "2026-09-25T22:50:24.882Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-50-29-570Z-64e94426"
+        ]
       }
     },
     {
@@ -1396,9 +1504,9 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T15",
-      "status": "skipped",
-      "blocker": null,
-      "publicationEligibility": "eligible-after-verification",
+      "status": "blocked",
+      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
+      "publicationEligibility": "blocked",
       "platformProfile": {
         "driver": "android",
         "orientation": "portrait",
@@ -1433,9 +1541,9 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T10",
-      "status": "skipped",
-      "blocker": null,
-      "publicationEligibility": "eligible-after-verification",
+      "status": "blocked",
+      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
+      "publicationEligibility": "blocked",
       "platformProfile": {
         "driver": "android",
         "orientation": "portrait",
@@ -1486,12 +1594,12 @@
         "(prompt-flow)/cta.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T22:46:43.276Z",
+        "at": "2026-09-26T00:51:19.766Z",
         "status": "captured",
         "attempts": 2,
         "runs": [
-          "run-2026-09-16T22-45-27-188Z-903e3f22",
-          "run-2026-09-16T22-46-51-638Z-8fde7020"
+          "run-2026-09-26T00-47-23-112Z-33afc585",
+          "run-2026-09-26T00-51-24-982Z-626b076b"
         ]
       }
     },
@@ -1524,11 +1632,11 @@
         "(prompt-flow)/backup-intro.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T22:08:37.971Z",
+        "at": "2026-09-26T00:37:30.000Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T22-08-46-240Z-1f832d03"
+          "run-2026-09-26T00-37-34-662Z-33e0d13f"
         ]
       }
     },
@@ -1561,11 +1669,11 @@
         "(prompt-flow)/backup-words.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T22:08:37.971Z",
+        "at": "2026-09-26T00:37:30.000Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T22-08-46-240Z-1f832d03"
+          "run-2026-09-26T00-37-34-662Z-33e0d13f"
         ]
       }
     },
@@ -1598,11 +1706,11 @@
         "(prompt-flow)/backup-verify.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T22:08:37.971Z",
+        "at": "2026-09-26T00:37:30.000Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T22-08-46-240Z-1f832d03"
+          "run-2026-09-26T00-37-34-662Z-33e0d13f"
         ]
       }
     },
@@ -1635,11 +1743,11 @@
         "(prompt-flow)/backup-done.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T22:08:37.971Z",
+        "at": "2026-09-26T00:37:30.000Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T22-08-46-240Z-1f832d03"
+          "run-2026-09-26T00-37-34-662Z-33e0d13f"
         ]
       }
     },
@@ -1656,7 +1764,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T03",
-      "status": "skipped",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -1673,10 +1781,12 @@
         "(send-flow)/mintSelect.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots",
-        "runs": []
+        "at": "2026-09-25T22:50:24.882Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-50-29-570Z-64e94426"
+        ]
       }
     },
     {
@@ -1692,7 +1802,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T08",
-      "status": "skipped",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -1708,10 +1818,13 @@
         "(mint-flow)/add.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip mint.add.cancel",
-        "runs": []
+        "at": "2026-09-25T19:29:20.650Z",
+        "status": "captured",
+        "attempts": 2,
+        "runs": [
+          "run-2026-09-25T19-25-39-935Z-343b6f9b",
+          "run-2026-09-25T19-29-25-952Z-a6dc2090"
+        ]
       }
     },
     {
@@ -1727,7 +1840,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T27",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -1743,9 +1856,12 @@
         "(mint-flow)/info.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:36:56.847Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-37-01-596Z-e7a7e345"
+        ]
       }
     },
     {
@@ -1761,7 +1877,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T37",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -1777,9 +1893,12 @@
         "(mint-flow)/info.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:36:56.847Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-37-01-596Z-e7a7e345"
+        ]
       }
     },
     {
@@ -1795,7 +1914,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T06",
-      "status": "skipped",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -1811,10 +1930,12 @@
         "(mint-flow)/info.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots",
-        "runs": []
+        "at": "2026-09-25T22:50:24.882Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-50-29-570Z-64e94426"
+        ]
       }
     },
     {
@@ -1830,7 +1951,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T17",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -1846,9 +1967,12 @@
         "(mint-flow)/info.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:36:56.847Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-37-01-596Z-e7a7e345"
+        ]
       }
     },
     {
@@ -1864,7 +1988,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T07",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -1880,10 +2004,63 @@
         "(mint-flow)/info.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:36:56.847Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-37-01-596Z-e7a7e345"
+        ]
       }
+    },
+    {
+      "platform": "android",
+      "page": "ai-provider-select",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (ai-flow)/providers.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(ai-flow)/providers.tsx"
+      ]
+    },
+    {
+      "platform": "android",
+      "page": "ai-provider-info",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (ai-flow)/provider.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(ai-flow)/provider.tsx"
+      ]
     },
     {
       "scenario": "capture.mint-details",
@@ -1898,7 +2075,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T30",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -1914,9 +2091,12 @@
         "(mint-flow)/reviews.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:36:56.847Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-37-01-596Z-e7a7e345"
+        ]
       }
     },
     {
@@ -1932,7 +2112,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T40",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -1948,9 +2128,12 @@
         "(mint-flow)/reviews.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:36:56.847Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-37-01-596Z-e7a7e345"
+        ]
       }
     },
     {
@@ -1966,7 +2149,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T07",
-      "status": "skipped",
+      "status": "failed",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -1982,10 +2165,14 @@
         "(mint-flow)/reviews.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots.mints",
-        "runs": []
+        "at": "2026-09-26T00:16:48.130Z",
+        "status": "failed",
+        "attempts": 2,
+        "reason": "Blank or fully redacted frame is not page evidence",
+        "runs": [
+          "run-2026-09-26T00-02-59-788Z-d462b4d5",
+          "run-2026-09-26T00-16-53-370Z-b44f4712"
+        ]
       }
     },
     {
@@ -2001,7 +2188,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T20",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -2017,9 +2204,12 @@
         "(mint-flow)/reviews.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:36:56.847Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-37-01-596Z-e7a7e345"
+        ]
       }
     },
     {
@@ -2035,7 +2225,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T10",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -2051,9 +2241,12 @@
         "(mint-flow)/reviews.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:36:56.847Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-37-01-596Z-e7a7e345"
+        ]
       }
     },
     {
@@ -2086,11 +2279,11 @@
         "(user-flow)/profile.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T22:58:36.456Z",
+        "at": "2026-09-25T18:41:32.689Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T22-58-44-949Z-32976988"
+          "run-2026-09-25T18-41-37-813Z-e1cf2d9a"
         ]
       }
     },
@@ -2107,7 +2300,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T27",
-      "status": "skipped",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -2126,10 +2319,12 @@
         "userMessages.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots",
-        "runs": []
+        "at": "2026-09-25T22:50:24.882Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-50-29-570Z-64e94426"
+        ]
       }
     },
     {
@@ -2163,11 +2358,11 @@
         "camera.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T07:01:31.258Z",
+        "at": "2026-09-25T20:10:06.318Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T07-01-39-947Z-47330f36"
+          "run-2026-09-25T20-10-11-345Z-3644ea1b"
         ]
       }
     },
@@ -2198,11 +2393,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-17T07:41:23.926Z",
+        "at": "2026-09-25T20:18:20.199Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T07-41-32-311Z-901810e5"
+          "run-2026-09-25T20-18-25-126Z-08e3a0e4"
         ]
       }
     },
@@ -2219,7 +2414,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T50",
-      "status": "skipped",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -2235,10 +2430,12 @@
         "(settings-flow)/index.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots",
-        "runs": []
+        "at": "2026-09-25T22:50:24.882Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-50-29-570Z-64e94426"
+        ]
       }
     },
     {
@@ -2254,7 +2451,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T32",
-      "status": "skipped",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -2270,10 +2467,12 @@
         "(drawer)/(tabs)/feed/index.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots",
-        "runs": []
+        "at": "2026-09-25T22:50:24.882Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-50-29-570Z-64e94426"
+        ]
       }
     },
     {
@@ -2303,11 +2502,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-16T21:24:14.609Z",
+        "at": "2026-09-25T23:51:00.661Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-24-23-342Z-e1212146"
+          "run-2026-09-25T23-51-05-343Z-002da871"
         ]
       }
     },
@@ -2342,11 +2541,11 @@
         "(user-flow)/thread.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T21:24:14.609Z",
+        "at": "2026-09-25T23:51:00.661Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-24-23-342Z-e1212146"
+          "run-2026-09-25T23-51-05-343Z-002da871"
         ]
       }
     },
@@ -2363,7 +2562,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T35",
-      "status": "skipped",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -2379,10 +2578,12 @@
         "(drawer)/(tabs)/contacts/index.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/store.screenshots",
-        "runs": []
+        "at": "2026-09-25T22:12:03.886Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-12-08-332Z-7bb4809d"
+        ]
       }
     },
     {
@@ -2398,7 +2599,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T37",
-      "status": "skipped",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -2414,10 +2615,12 @@
         "(drawer)/(tabs)/notifications/index.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots",
-        "runs": []
+        "at": "2026-09-25T22:50:24.882Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-50-29-570Z-64e94426"
+        ]
       }
     },
     {
@@ -2433,7 +2636,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T06",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -2449,9 +2652,13 @@
         "(drawer)/(tabs)/notifications/index.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:51:12.449Z",
+        "status": "captured",
+        "attempts": 2,
+        "runs": [
+          "run-2026-09-25T21-47-05-551Z-0bcc8104",
+          "run-2026-09-25T21-51-17-653Z-1d2bd480"
+        ]
       }
     },
     {
@@ -2467,7 +2674,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T29",
-      "status": "skipped",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -2483,10 +2690,12 @@
         "(drawer)/(tabs)/ai/index.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/store.screenshots",
-        "runs": []
+        "at": "2026-09-25T22:12:03.886Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-12-08-332Z-7bb4809d"
+        ]
       }
     },
     {
@@ -2502,7 +2711,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T44",
-      "status": "skipped",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -2518,10 +2727,12 @@
         "(drawer)/(tabs)/ai/index.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots",
-        "runs": []
+        "at": "2026-09-25T22:50:24.882Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-50-29-570Z-64e94426"
+        ]
       }
     },
     {
@@ -2553,11 +2764,11 @@
         "(signer-flow)/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T07:01:31.258Z",
+        "at": "2026-09-25T20:10:06.318Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T07-01-39-947Z-47330f36"
+          "run-2026-09-25T20-10-11-345Z-3644ea1b"
         ]
       }
     },
@@ -2574,7 +2785,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T04",
-      "status": "skipped",
+      "status": "failed",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -2590,10 +2801,14 @@
         "(theme-flow)/preview.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots.wallpapers",
-        "runs": []
+        "at": "2026-09-25T23:29:22.861Z",
+        "status": "failed",
+        "attempts": 2,
+        "reason": "Step T63 failed; inspect the local run evidence",
+        "runs": [
+          "run-2026-09-25T23-13-36-487Z-329ae19f",
+          "run-2026-09-25T23-29-28-054Z-37aaab17"
+        ]
       }
     },
     {
@@ -2609,7 +2824,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T07",
-      "status": "skipped",
+      "status": "failed",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -2625,10 +2840,14 @@
         "(theme-flow)/gallery.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots.wallpapers",
-        "runs": []
+        "at": "2026-09-25T23:29:22.861Z",
+        "status": "failed",
+        "attempts": 2,
+        "reason": "Step T63 failed; inspect the local run evidence",
+        "runs": [
+          "run-2026-09-25T23-13-36-487Z-329ae19f",
+          "run-2026-09-25T23-29-28-054Z-37aaab17"
+        ]
       }
     },
     {
@@ -2644,7 +2863,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T11",
-      "status": "skipped",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -2660,10 +2879,12 @@
         "(transactions-flow)/transactions.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/store.screenshots",
-        "runs": []
+        "at": "2026-09-25T22:12:03.886Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-12-08-332Z-7bb4809d"
+        ]
       }
     },
     {
@@ -2679,7 +2900,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T42",
-      "status": "skipped",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -2695,10 +2916,12 @@
         "(mint-flow)/distribution.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/store.screenshots",
-        "runs": []
+        "at": "2026-09-25T22:12:03.886Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-12-08-332Z-7bb4809d"
+        ]
       }
     },
     {
@@ -2739,9 +2962,9 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T29",
-      "status": "skipped",
-      "blocker": null,
-      "publicationEligibility": "eligible-after-verification",
+      "status": "blocked",
+      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
+      "publicationEligibility": "blocked",
       "platformProfile": {
         "driver": "android",
         "orientation": "portrait",
@@ -2760,6 +2983,31 @@
         "reason": "Skipped by operator: --skip android/capture.history",
         "runs": []
       }
+    },
+    {
+      "platform": "android",
+      "page": "ai-request",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (transactions-flow)/aiRequest.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "android",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(transactions-flow)/aiRequest.tsx"
+      ]
     },
     {
       "platform": "android",
@@ -2913,11 +3161,11 @@
         "claimUsername.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T08:36:36.443Z",
+        "at": "2026-09-25T20:37:47.142Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T08-36-45-289Z-d610a450"
+          "run-2026-09-25T20-37-52-384Z-3cb1403f"
         ]
       }
     },
@@ -2934,9 +3182,9 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T09",
-      "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.composer, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "status": "captured",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "android",
         "orientation": "portrait",
@@ -2950,13 +3198,11 @@
         "composer.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T12:21:15.979Z",
-        "status": "failed",
-        "attempts": 2,
-        "reason": "Run interrupted before completion",
+        "at": "2026-09-25T20:46:24.643Z",
+        "status": "captured",
+        "attempts": 1,
         "runs": [
-          "run-2026-09-17T12-13-34-181Z-3b29614d",
-          "run-2026-09-17T12-21-24-702Z-da007f05"
+          "run-2026-09-25T20-46-29-448Z-24458dc4"
         ]
       }
     },
@@ -3089,11 +3335,11 @@
         "+not-found.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T07:01:31.258Z",
+        "at": "2026-09-25T20:10:06.318Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T07-01-39-947Z-47330f36"
+          "run-2026-09-25T20-10-11-345Z-3644ea1b"
         ]
       }
     },
@@ -3110,7 +3356,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T04",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -3126,9 +3372,12 @@
         "(drawer)/(tabs)/notifications/followers.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:08:02.075Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-08-06-925Z-44a325f3"
+        ]
       }
     },
     {
@@ -3144,7 +3393,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T18",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -3160,9 +3409,13 @@
         "(drawer)/(tabs)/notifications/mint-changes.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:51:12.449Z",
+        "status": "captured",
+        "attempts": 2,
+        "runs": [
+          "run-2026-09-25T21-47-05-551Z-0bcc8104",
+          "run-2026-09-25T21-51-17-653Z-1d2bd480"
+        ]
       }
     },
     {
@@ -3178,7 +3431,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T22",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -3194,9 +3447,13 @@
         "(drawer)/(tabs)/notifications/mint-changes.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:51:12.449Z",
+        "status": "captured",
+        "attempts": 2,
+        "runs": [
+          "run-2026-09-25T21-47-05-551Z-0bcc8104",
+          "run-2026-09-25T21-51-17-653Z-1d2bd480"
+        ]
       }
     },
     {
@@ -3212,7 +3469,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T13",
-      "status": "skipped",
+      "status": "failed",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -3228,10 +3485,14 @@
         "(drawer)/(tabs)/notifications/mint-changes.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots.mints",
-        "runs": []
+        "at": "2026-09-26T00:16:48.130Z",
+        "status": "failed",
+        "attempts": 2,
+        "reason": "Blank or fully redacted frame is not page evidence",
+        "runs": [
+          "run-2026-09-26T00-02-59-788Z-d462b4d5",
+          "run-2026-09-26T00-16-53-370Z-b44f4712"
+        ]
       }
     },
     {
@@ -3247,7 +3508,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T14",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -3263,9 +3524,13 @@
         "(drawer)/(tabs)/notifications/mint-changes.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:51:12.449Z",
+        "status": "captured",
+        "attempts": 2,
+        "runs": [
+          "run-2026-09-25T21-47-05-551Z-0bcc8104",
+          "run-2026-09-25T21-51-17-653Z-1d2bd480"
+        ]
       }
     },
     {
@@ -3281,7 +3546,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T10",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -3297,9 +3562,13 @@
         "(drawer)/(tabs)/notifications/mint-changes.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:51:12.449Z",
+        "status": "captured",
+        "attempts": 2,
+        "runs": [
+          "run-2026-09-25T21-47-05-551Z-0bcc8104",
+          "run-2026-09-25T21-51-17-653Z-1d2bd480"
+        ]
       }
     },
     {
@@ -3414,11 +3683,11 @@
         "share.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T08:36:36.443Z",
+        "at": "2026-09-25T20:37:47.142Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T08-36-45-289Z-d610a450"
+          "run-2026-09-25T20-37-52-384Z-3cb1403f"
         ]
       }
     },
@@ -3435,7 +3704,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T14",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -3451,9 +3720,12 @@
         "(receive-flow)/railList.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:01:28.926Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-01-33-769Z-a325e236"
+        ]
       }
     },
     {
@@ -3469,7 +3741,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T04",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -3485,9 +3757,12 @@
         "(receive-flow)/railList.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:01:28.926Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-01-33-769Z-a325e236"
+        ]
       }
     },
     {
@@ -3503,7 +3778,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T09",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -3519,9 +3794,12 @@
         "(receive-flow)/railList.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:01:28.926Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-01-33-769Z-a325e236"
+        ]
       }
     },
     {
@@ -3553,11 +3831,11 @@
         "(settings-flow)/delete.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T01:15:31.499Z",
+        "at": "2026-09-25T19:39:19.864Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T01-15-40-482Z-0d996ded"
+          "run-2026-09-25T19-39-24-864Z-7ad5fd56"
         ]
       }
     },
@@ -3590,12 +3868,11 @@
         "(settings-flow)/design-system.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T03:03:26.431Z",
+        "at": "2026-09-26T01:13:20.869Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-17T02-50-02-750Z-08de8d33",
-          "run-2026-09-17T03-03-53-283Z-af0f7c0f"
+          "run-2026-09-26T01-13-25-657Z-3756ab2c"
         ]
       }
     },
@@ -3628,12 +3905,11 @@
         "(settings-flow)/design-system-empty-states.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T03:03:26.431Z",
+        "at": "2026-09-26T01:13:20.869Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-17T02-50-02-750Z-08de8d33",
-          "run-2026-09-17T03-03-53-283Z-af0f7c0f"
+          "run-2026-09-26T01-13-25-657Z-3756ab2c"
         ]
       }
     },
@@ -3666,12 +3942,11 @@
         "(settings-flow)/design-system-fade-stress.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T03:03:26.431Z",
+        "at": "2026-09-26T01:13:20.869Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-17T02-50-02-750Z-08de8d33",
-          "run-2026-09-17T03-03-53-283Z-af0f7c0f"
+          "run-2026-09-26T01-13-25-657Z-3756ab2c"
         ]
       }
     },
@@ -3704,12 +3979,11 @@
         "(settings-flow)/design-system-foundations.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T03:03:26.431Z",
+        "at": "2026-09-26T01:13:20.869Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-17T02-50-02-750Z-08de8d33",
-          "run-2026-09-17T03-03-53-283Z-af0f7c0f"
+          "run-2026-09-26T01-13-25-657Z-3756ab2c"
         ]
       }
     },
@@ -3742,12 +4016,11 @@
         "(settings-flow)/design-system-loading.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T03:03:26.431Z",
+        "at": "2026-09-26T01:13:20.869Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-17T02-50-02-750Z-08de8d33",
-          "run-2026-09-17T03-03-53-283Z-af0f7c0f"
+          "run-2026-09-26T01-13-25-657Z-3756ab2c"
         ]
       }
     },
@@ -3780,12 +4053,11 @@
         "(settings-flow)/design-system-posts.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T03:03:26.431Z",
+        "at": "2026-09-26T01:13:20.869Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-17T02-50-02-750Z-08de8d33",
-          "run-2026-09-17T03-03-53-283Z-af0f7c0f"
+          "run-2026-09-26T01-13-25-657Z-3756ab2c"
         ]
       }
     },
@@ -3802,28 +4074,25 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T13",
-      "status": "captured",
-      "blocker": null,
-      "publicationEligibility": "eligible-after-verification",
+      "status": "blocked",
+      "blocker": "Add mandatory readiness wait for Pause immediately before T13",
+      "publicationEligibility": "blocked",
       "platformProfile": {
         "driver": "android",
         "orientation": "portrait",
         "identity": "disposable",
         "effects": "navigation-only"
       },
-      "readinessStepIds": [
-        "T12"
-      ],
+      "readinessStepIds": [],
       "routes": [
         "(settings-flow)/design-system-segmented.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T03:03:26.431Z",
+        "at": "2026-09-26T01:13:20.869Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-17T02-50-02-750Z-08de8d33",
-          "run-2026-09-17T03-03-53-283Z-af0f7c0f"
+          "run-2026-09-26T01-13-25-657Z-3756ab2c"
         ]
       }
     },
@@ -3856,12 +4125,11 @@
         "(settings-flow)/design-system-skeleton-crossfade.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T03:03:26.431Z",
+        "at": "2026-09-26T01:13:20.869Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-17T02-50-02-750Z-08de8d33",
-          "run-2026-09-17T03-03-53-283Z-af0f7c0f"
+          "run-2026-09-26T01-13-25-657Z-3756ab2c"
         ]
       }
     },
@@ -3878,27 +4146,25 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T18",
-      "status": "captured",
-      "blocker": null,
-      "publicationEligibility": "eligible-after-verification",
+      "status": "blocked",
+      "blocker": "Add mandatory readiness wait for Play immediately before T18",
+      "publicationEligibility": "blocked",
       "platformProfile": {
         "driver": "android",
         "orientation": "portrait",
         "identity": "disposable",
         "effects": "navigation-only"
       },
-      "readinessStepIds": [
-        "T17"
-      ],
+      "readinessStepIds": [],
       "routes": [
         "(settings-flow)/design-system-timeline.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T23:29:49.318Z",
+        "at": "2026-09-26T01:04:14.070Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T23-29-57-529Z-c8f048d3"
+          "run-2026-09-26T01-04-18-771Z-d143a38c"
         ]
       }
     },
@@ -3931,11 +4197,11 @@
         "(settings-flow)/design-system-wallet-controls.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T23:29:49.318Z",
+        "at": "2026-09-26T01:04:14.070Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T23-29-57-529Z-c8f048d3"
+          "run-2026-09-26T01-04-18-771Z-d143a38c"
         ]
       }
     },
@@ -3968,11 +4234,11 @@
         "(settings-flow)/keyring.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T08:36:36.443Z",
+        "at": "2026-09-25T20:37:47.142Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T08-36-45-289Z-d610a450"
+          "run-2026-09-25T20-37-52-384Z-3cb1403f"
         ]
       }
     },
@@ -4005,11 +4271,11 @@
         "(settings-flow)/media.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T01:15:31.499Z",
+        "at": "2026-09-25T19:39:19.864Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T01-15-40-482Z-0d996ded"
+          "run-2026-09-25T19-39-24-864Z-7ad5fd56"
         ]
       }
     },
@@ -4042,11 +4308,11 @@
         "(settings-flow)/moderation.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T01:15:31.499Z",
+        "at": "2026-09-25T19:39:19.864Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T01-15-40-482Z-0d996ded"
+          "run-2026-09-25T19-39-24-864Z-7ad5fd56"
         ]
       }
     },
@@ -4079,11 +4345,11 @@
         "(settings-flow)/network.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T01:15:31.499Z",
+        "at": "2026-09-25T19:39:19.864Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T01-15-40-482Z-0d996ded"
+          "run-2026-09-25T19-39-24-864Z-7ad5fd56"
         ]
       }
     },
@@ -4116,11 +4382,11 @@
         "(settings-flow)/notification-policy.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T23:18:12.711Z",
+        "at": "2026-09-25T18:55:22.429Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T23-18-21-172Z-3e772947"
+          "run-2026-09-25T18-55-27-284Z-27db2070"
         ]
       }
     },
@@ -4153,11 +4419,11 @@
         "(settings-flow)/notification-policy.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T23:18:12.711Z",
+        "at": "2026-09-25T18:55:22.429Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T23-18-21-172Z-3e772947"
+          "run-2026-09-25T18-55-27-284Z-27db2070"
         ]
       }
     },
@@ -4174,7 +4440,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T14",
-      "status": "skipped",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -4190,10 +4456,13 @@
         "(settings-flow)/privacy.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip settings.legal.navigate",
-        "runs": []
+        "at": "2026-09-25T19:05:08.593Z",
+        "status": "captured",
+        "attempts": 2,
+        "runs": [
+          "run-2026-09-25T19-04-23-472Z-d89d9bc5",
+          "run-2026-09-25T19-05-13-863Z-3d3b95f4"
+        ]
       }
     },
     {
@@ -4250,11 +4519,11 @@
         "(settings-flow)/edit-profile.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T01:15:31.499Z",
+        "at": "2026-09-25T19:39:19.864Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T01-15-40-482Z-0d996ded"
+          "run-2026-09-25T19-39-24-864Z-7ad5fd56"
         ]
       }
     },
@@ -4287,11 +4556,11 @@
         "(settings-flow)/recovery.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T08:36:36.443Z",
+        "at": "2026-09-25T20:37:47.142Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T08-36-45-289Z-d610a450"
+          "run-2026-09-25T20-37-52-384Z-3cb1403f"
         ]
       }
     },
@@ -4324,11 +4593,11 @@
         "(settings-flow)/routing.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T23:08:23.621Z",
+        "at": "2026-09-25T18:48:16.792Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T23-08-32-156Z-1824269a"
+          "run-2026-09-25T18-48-21-744Z-4e1b995f"
         ]
       }
     },
@@ -4345,7 +4614,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T03",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -4361,9 +4630,12 @@
         "(settings-flow)/storage.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:20:18.864Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-20-23-684Z-d8d3796a"
+        ]
       }
     },
     {
@@ -4379,7 +4651,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T07",
-      "status": "skipped",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -4395,10 +4667,13 @@
         "(settings-flow)/terms.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip settings.legal.navigate",
-        "runs": []
+        "at": "2026-09-25T19:05:08.593Z",
+        "status": "captured",
+        "attempts": 2,
+        "runs": [
+          "run-2026-09-25T19-04-23-472Z-d89d9bc5",
+          "run-2026-09-25T19-05-13-863Z-3d3b95f4"
+        ]
       }
     },
     {
@@ -4414,7 +4689,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T09",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -4430,9 +4705,12 @@
         "(signer-flow)/activity.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T20:54:11.295Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T20-54-16-365Z-a615d199"
+        ]
       }
     },
     {
@@ -4573,7 +4851,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T15",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -4589,9 +4867,12 @@
         "(signer-flow)/requests.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T20:54:11.295Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T20-54-16-365Z-a615d199"
+        ]
       }
     },
     {
@@ -4648,11 +4929,11 @@
         "(stories-flow)/stories.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T21:24:14.609Z",
+        "at": "2026-09-25T23:51:00.661Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-24-23-342Z-e1212146"
+          "run-2026-09-25T23-51-05-343Z-002da871"
         ]
       }
     },
@@ -4669,7 +4950,7 @@
       "platform": "android",
       "baseline": false,
       "stepId": "T06",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -4685,9 +4966,12 @@
         "(theme-flow)/background.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T22:00:30.856Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T22-00-35-534Z-e779f768"
+        ]
       }
     },
     {
@@ -4703,7 +4987,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T12",
-      "status": "skipped",
+      "status": "failed",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -4719,10 +5003,14 @@
         "(theme-flow)/background.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip android/marketing.screenshots.wallpapers",
-        "runs": []
+        "at": "2026-09-25T23:29:22.861Z",
+        "status": "failed",
+        "attempts": 2,
+        "reason": "Step T63 failed; inspect the local run evidence",
+        "runs": [
+          "run-2026-09-25T23-13-36-487Z-329ae19f",
+          "run-2026-09-25T23-29-28-054Z-37aaab17"
+        ]
       }
     },
     {
@@ -4738,9 +5026,9 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T06",
-      "status": "skipped",
-      "blocker": null,
-      "publicationEligibility": "eligible-after-verification",
+      "status": "blocked",
+      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
+      "publicationEligibility": "blocked",
       "platformProfile": {
         "driver": "android",
         "orientation": "portrait",
@@ -4799,7 +5087,7 @@
       "platform": "android",
       "baseline": true,
       "stepId": "T04",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -4816,10 +5104,38 @@
         "(user-flow)/whitenoiseSetup.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:13:51.500Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-13-56-337Z-f060b93e"
+        ]
       }
+    },
+    {
+      "platform": "ios",
+      "page": "settings-design-system-headers",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (settings-flow)/design-system-headers.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(settings-flow)/design-system-headers.tsx"
+      ]
     },
     {
       "platform": "ios",
@@ -4917,11 +5233,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-17T04:14:59.469Z",
+        "at": "2026-09-25T20:00:56.294Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T04-15-10-689Z-1fb6fbda"
+          "run-2026-09-25T20-01-01-836Z-649d9764"
         ]
       }
     },
@@ -4952,11 +5268,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-17T04:14:59.469Z",
+        "at": "2026-09-25T20:00:56.294Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T04-15-10-689Z-1fb6fbda"
+          "run-2026-09-25T20-01-01-836Z-649d9764"
         ]
       }
     },
@@ -4987,11 +5303,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-17T04:14:59.469Z",
+        "at": "2026-09-25T20:00:56.294Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T04-15-10-689Z-1fb6fbda"
+          "run-2026-09-25T20-01-01-836Z-649d9764"
         ]
       }
     },
@@ -5022,11 +5338,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-17T04:14:59.469Z",
+        "at": "2026-09-25T20:00:56.294Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T04-15-10-689Z-1fb6fbda"
+          "run-2026-09-25T20-01-01-836Z-649d9764"
         ]
       }
     },
@@ -5057,11 +5373,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-17T04:14:59.469Z",
+        "at": "2026-09-25T20:00:56.294Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T04-15-10-689Z-1fb6fbda"
+          "run-2026-09-25T20-01-01-836Z-649d9764"
         ]
       }
     },
@@ -5092,11 +5408,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-17T04:14:59.469Z",
+        "at": "2026-09-25T20:00:56.294Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T04-15-10-689Z-1fb6fbda"
+          "run-2026-09-25T20-01-01-836Z-649d9764"
         ]
       }
     },
@@ -5127,11 +5443,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-17T04:14:59.469Z",
+        "at": "2026-09-25T20:00:56.294Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T04-15-10-689Z-1fb6fbda"
+          "run-2026-09-25T20-01-01-836Z-649d9764"
         ]
       }
     },
@@ -5164,11 +5480,11 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T21:08:10.905Z",
+        "at": "2026-09-25T23:05:13.928Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-08-22-070Z-499c1265"
+          "run-2026-09-25T23-05-19-465Z-86f34e48"
         ]
       }
     },
@@ -5201,12 +5517,11 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T20:46:56.768Z",
+        "at": "2026-09-25T15:26:53.140Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-16T20-43-04-370Z-e2f3f58c",
-          "run-2026-09-16T20-47-08-002Z-17419f37"
+          "run-2026-09-25T15-27-08-329Z-971c09a2"
         ]
       }
     },
@@ -5239,11 +5554,11 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T21:08:10.905Z",
+        "at": "2026-09-25T23:05:13.928Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-08-22-070Z-499c1265"
+          "run-2026-09-25T23-05-19-465Z-86f34e48"
         ]
       }
     },
@@ -5276,11 +5591,11 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T21:08:10.905Z",
+        "at": "2026-09-25T23:05:13.928Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-08-22-070Z-499c1265"
+          "run-2026-09-25T23-05-19-465Z-86f34e48"
         ]
       }
     },
@@ -5313,11 +5628,11 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T21:08:10.905Z",
+        "at": "2026-09-25T23:05:13.928Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-08-22-070Z-499c1265"
+          "run-2026-09-25T23-05-19-465Z-86f34e48"
         ]
       }
     },
@@ -5350,11 +5665,11 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T21:08:10.905Z",
+        "at": "2026-09-25T23:05:13.928Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-08-22-070Z-499c1265"
+          "run-2026-09-25T23-05-19-465Z-86f34e48"
         ]
       }
     },
@@ -5387,11 +5702,11 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T21:08:10.905Z",
+        "at": "2026-09-25T23:05:13.928Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-08-22-070Z-499c1265"
+          "run-2026-09-25T23-05-19-465Z-86f34e48"
         ]
       }
     },
@@ -5424,11 +5739,11 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T21:08:10.905Z",
+        "at": "2026-09-25T23:05:13.928Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-08-22-070Z-499c1265"
+          "run-2026-09-25T23-05-19-465Z-86f34e48"
         ]
       }
     },
@@ -5461,11 +5776,11 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T21:08:10.905Z",
+        "at": "2026-09-25T23:05:13.928Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-08-22-070Z-499c1265"
+          "run-2026-09-25T23-05-19-465Z-86f34e48"
         ]
       }
     },
@@ -5482,7 +5797,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T39",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -5498,9 +5813,12 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:55:24.321Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-55-29-842Z-127c69fd"
+        ]
       }
     },
     {
@@ -5516,7 +5834,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T46",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -5532,9 +5850,12 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:55:24.321Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-55-29-842Z-127c69fd"
+        ]
       }
     },
     {
@@ -5550,7 +5871,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T11",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -5566,9 +5887,12 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:55:24.321Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-55-29-842Z-127c69fd"
+        ]
       }
     },
     {
@@ -5584,7 +5908,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T18",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -5600,9 +5924,12 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:55:24.321Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-55-29-842Z-127c69fd"
+        ]
       }
     },
     {
@@ -5618,7 +5945,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T25",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -5634,9 +5961,12 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:55:24.321Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-55-29-842Z-127c69fd"
+        ]
       }
     },
     {
@@ -5652,7 +5982,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T32",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -5668,9 +5998,12 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:55:24.321Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-55-29-842Z-127c69fd"
+        ]
       }
     },
     {
@@ -5686,7 +6019,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T53",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -5702,9 +6035,12 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:55:24.321Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-55-29-842Z-127c69fd"
+        ]
       }
     },
     {
@@ -5720,7 +6056,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T60",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -5736,9 +6072,12 @@
         "(drawer)/(tabs)/index/index.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:55:24.321Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-55-29-842Z-127c69fd"
+        ]
       }
     },
     {
@@ -5768,11 +6107,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-16T22:54:23.725Z",
+        "at": "2026-09-25T18:38:35.205Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T22-54-33-918Z-3d1049b7"
+          "run-2026-09-25T18-38-40-872Z-17b3edd2"
         ]
       }
     },
@@ -5803,11 +6142,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-17T07:50:12.442Z",
+        "at": "2026-09-25T20:21:59.983Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T07-50-23-622Z-7405e857"
+          "run-2026-09-25T20-22-05-657Z-741c649a"
         ]
       }
     },
@@ -5840,12 +6179,11 @@
         "(receive-flow)/receive.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T20:46:56.768Z",
+        "at": "2026-09-25T15:26:53.140Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-16T20-43-04-370Z-e2f3f58c",
-          "run-2026-09-16T20-47-08-002Z-17419f37"
+          "run-2026-09-25T15-27-08-329Z-971c09a2"
         ]
       }
     },
@@ -5862,7 +6200,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T10",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -5878,9 +6216,12 @@
         "(receive-flow)/qrDisplay.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:24:16.940Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-24-22-727Z-10690d1d"
+        ]
       }
     },
     {
@@ -5896,7 +6237,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T16",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -5912,9 +6253,12 @@
         "(receive-flow)/qrDisplay.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:24:16.940Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-24-22-727Z-10690d1d"
+        ]
       }
     },
     {
@@ -5946,11 +6290,11 @@
         "(receive-flow)/qrDisplay.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T20:57:23.096Z",
+        "at": "2026-09-25T22:41:45.561Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T20-57-32-489Z-df256961"
+          "run-2026-09-25T22-41-50-980Z-50222993"
         ]
       }
     },
@@ -5967,7 +6311,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T07",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -5983,9 +6327,12 @@
         "(receive-flow)/qrDisplay.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:24:16.940Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-24-22-727Z-10690d1d"
+        ]
       }
     },
     {
@@ -6001,7 +6348,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T13",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6017,9 +6364,12 @@
         "(receive-flow)/qrDisplay.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:24:16.940Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-24-22-727Z-10690d1d"
+        ]
       }
     },
     {
@@ -6035,7 +6385,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T04",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6051,9 +6401,12 @@
         "(receive-flow)/qrDisplay.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:24:16.940Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-24-22-727Z-10690d1d"
+        ]
       }
     },
     {
@@ -6085,12 +6438,11 @@
         "(receive-flow)/amount.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T06:55:15.311Z",
+        "at": "2026-09-25T20:06:18.608Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-17T06-51-15-289Z-11422f65",
-          "run-2026-09-17T06-55-29-792Z-e27bb0af"
+          "run-2026-09-25T20-06-24-236Z-0e02a073"
         ]
       }
     },
@@ -6125,12 +6477,11 @@
         "lightningReceive.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T20:46:56.768Z",
+        "at": "2026-09-25T15:26:53.140Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-16T20-43-04-370Z-e2f3f58c",
-          "run-2026-09-16T20-47-08-002Z-17419f37"
+          "run-2026-09-25T15-27-08-329Z-971c09a2"
         ]
       }
     },
@@ -6147,9 +6498,9 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T22",
-      "status": "captured",
-      "blocker": null,
-      "publicationEligibility": "eligible-after-verification",
+      "status": "blocked",
+      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
+      "publicationEligibility": "blocked",
       "platformProfile": {
         "driver": "sim",
         "orientation": "portrait",
@@ -6202,11 +6553,11 @@
         "(send-flow)/send.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T20:57:23.096Z",
+        "at": "2026-09-25T22:41:45.561Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T20-57-32-489Z-df256961"
+          "run-2026-09-25T22-41-50-980Z-50222993"
         ]
       }
     },
@@ -6248,9 +6599,9 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T15",
-      "status": "captured",
-      "blocker": null,
-      "publicationEligibility": "eligible-after-verification",
+      "status": "blocked",
+      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
+      "publicationEligibility": "blocked",
       "platformProfile": {
         "driver": "sim",
         "orientation": "portrait",
@@ -6287,9 +6638,9 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T10",
-      "status": "captured",
-      "blocker": null,
-      "publicationEligibility": "eligible-after-verification",
+      "status": "blocked",
+      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
+      "publicationEligibility": "blocked",
       "platformProfile": {
         "driver": "sim",
         "orientation": "portrait",
@@ -6342,11 +6693,11 @@
         "(prompt-flow)/cta.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T22:40:41.557Z",
+        "at": "2026-09-26T00:43:49.204Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T22-40-52-133Z-c499115f"
+          "run-2026-09-26T00-43-54-735Z-e9f069fb"
         ]
       }
     },
@@ -6379,11 +6730,11 @@
         "(prompt-flow)/backup-intro.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T21:43:40.354Z",
+        "at": "2026-09-26T00:32:39.533Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-43-50-501Z-403974e4"
+          "run-2026-09-26T00-32-45-075Z-8831b600"
         ]
       }
     },
@@ -6416,11 +6767,11 @@
         "(prompt-flow)/backup-words.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T21:43:40.354Z",
+        "at": "2026-09-26T00:32:39.533Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-43-50-501Z-403974e4"
+          "run-2026-09-26T00-32-45-075Z-8831b600"
         ]
       }
     },
@@ -6453,11 +6804,11 @@
         "(prompt-flow)/backup-verify.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T21:43:40.354Z",
+        "at": "2026-09-26T00:32:39.533Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-43-50-501Z-403974e4"
+          "run-2026-09-26T00-32-45-075Z-8831b600"
         ]
       }
     },
@@ -6490,11 +6841,11 @@
         "(prompt-flow)/backup-done.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T21:43:40.354Z",
+        "at": "2026-09-26T00:32:39.533Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-43-50-501Z-403974e4"
+          "run-2026-09-26T00-32-45-075Z-8831b600"
         ]
       }
     },
@@ -6528,11 +6879,11 @@
         "(send-flow)/mintSelect.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T20:57:23.096Z",
+        "at": "2026-09-25T22:41:45.561Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T20-57-32-489Z-df256961"
+          "run-2026-09-25T22-41-50-980Z-50222993"
         ]
       }
     },
@@ -6549,7 +6900,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T08",
-      "status": "skipped",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6565,10 +6916,12 @@
         "(mint-flow)/add.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip mint.add.cancel",
-        "runs": []
+        "at": "2026-09-25T19:22:27.156Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T19-22-32-806Z-4b3e321c"
+        ]
       }
     },
     {
@@ -6584,7 +6937,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T27",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6600,9 +6953,12 @@
         "(mint-flow)/info.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:31:17.661Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-31-23-369Z-8b4d491f"
+        ]
       }
     },
     {
@@ -6618,7 +6974,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T37",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6634,9 +6990,12 @@
         "(mint-flow)/info.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:31:17.661Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-31-23-369Z-8b4d491f"
+        ]
       }
     },
     {
@@ -6668,11 +7027,11 @@
         "(mint-flow)/info.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T20:57:23.096Z",
+        "at": "2026-09-25T22:41:45.561Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T20-57-32-489Z-df256961"
+          "run-2026-09-25T22-41-50-980Z-50222993"
         ]
       }
     },
@@ -6689,7 +7048,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T17",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6705,9 +7064,12 @@
         "(mint-flow)/info.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:31:17.661Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-31-23-369Z-8b4d491f"
+        ]
       }
     },
     {
@@ -6723,7 +7085,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T07",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6739,10 +7101,63 @@
         "(mint-flow)/info.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:31:17.661Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-31-23-369Z-8b4d491f"
+        ]
       }
+    },
+    {
+      "platform": "ios",
+      "page": "ai-provider-select",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (ai-flow)/providers.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(ai-flow)/providers.tsx"
+      ]
+    },
+    {
+      "platform": "ios",
+      "page": "ai-provider-info",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (ai-flow)/provider.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(ai-flow)/provider.tsx"
+      ]
     },
     {
       "scenario": "capture.mint-details",
@@ -6757,7 +7172,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T30",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6773,9 +7188,12 @@
         "(mint-flow)/reviews.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:31:17.661Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-31-23-369Z-8b4d491f"
+        ]
       }
     },
     {
@@ -6791,7 +7209,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T40",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6807,9 +7225,12 @@
         "(mint-flow)/reviews.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:31:17.661Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-31-23-369Z-8b4d491f"
+        ]
       }
     },
     {
@@ -6841,11 +7262,11 @@
         "(mint-flow)/reviews.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T22:00:37.159Z",
+        "at": "2026-09-25T23:57:39.831Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T22-00-47-270Z-f4b8cb36"
+          "run-2026-09-25T23-57-45-358Z-10f077da"
         ]
       }
     },
@@ -6862,7 +7283,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T20",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6878,9 +7299,12 @@
         "(mint-flow)/reviews.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:31:17.661Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-31-23-369Z-8b4d491f"
+        ]
       }
     },
     {
@@ -6896,7 +7320,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T10",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -6912,9 +7336,12 @@
         "(mint-flow)/reviews.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:31:17.661Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-31-23-369Z-8b4d491f"
+        ]
       }
     },
     {
@@ -6947,11 +7374,11 @@
         "(user-flow)/profile.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T22:54:23.725Z",
+        "at": "2026-09-25T18:38:35.205Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T22-54-33-918Z-3d1049b7"
+          "run-2026-09-25T18-38-40-872Z-17b3edd2"
         ]
       }
     },
@@ -6987,11 +7414,11 @@
         "userMessages.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T20:57:23.096Z",
+        "at": "2026-09-25T22:41:45.561Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T20-57-32-489Z-df256961"
+          "run-2026-09-25T22-41-50-980Z-50222993"
         ]
       }
     },
@@ -7026,12 +7453,11 @@
         "camera.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T06:55:15.311Z",
+        "at": "2026-09-25T20:06:18.608Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-17T06-51-15-289Z-11422f65",
-          "run-2026-09-17T06-55-29-792Z-e27bb0af"
+          "run-2026-09-25T20-06-24-236Z-0e02a073"
         ]
       }
     },
@@ -7062,11 +7488,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-17T07:12:25.306Z",
+        "at": "2026-09-25T20:15:14.638Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T07-12-35-845Z-4e5d7a19"
+          "run-2026-09-25T20-15-20-219Z-bc3230a1"
         ]
       }
     },
@@ -7099,11 +7525,11 @@
         "(settings-flow)/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T20:57:23.096Z",
+        "at": "2026-09-25T22:41:45.561Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T20-57-32-489Z-df256961"
+          "run-2026-09-25T22-41-50-980Z-50222993"
         ]
       }
     },
@@ -7136,11 +7562,11 @@
         "(drawer)/(tabs)/feed/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T20:57:23.096Z",
+        "at": "2026-09-25T22:41:45.561Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T20-57-32-489Z-df256961"
+          "run-2026-09-25T22-41-50-980Z-50222993"
         ]
       }
     },
@@ -7171,11 +7597,11 @@
       ],
       "routes": [],
       "latestAttempt": {
-        "at": "2026-09-16T21:17:52.249Z",
+        "at": "2026-09-25T23:46:04.615Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-17-59-280Z-871711f7"
+          "run-2026-09-25T23-46-10-646Z-ca8db309"
         ]
       }
     },
@@ -7210,11 +7636,11 @@
         "(user-flow)/thread.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T21:17:52.249Z",
+        "at": "2026-09-25T23:46:04.615Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-17-59-280Z-871711f7"
+          "run-2026-09-25T23-46-10-646Z-ca8db309"
         ]
       }
     },
@@ -7247,12 +7673,11 @@
         "(drawer)/(tabs)/contacts/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T20:46:56.768Z",
+        "at": "2026-09-25T15:26:53.140Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-16T20-43-04-370Z-e2f3f58c",
-          "run-2026-09-16T20-47-08-002Z-17419f37"
+          "run-2026-09-25T15-27-08-329Z-971c09a2"
         ]
       }
     },
@@ -7285,11 +7710,11 @@
         "(drawer)/(tabs)/notifications/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T20:57:23.096Z",
+        "at": "2026-09-25T22:41:45.561Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T20-57-32-489Z-df256961"
+          "run-2026-09-25T22-41-50-980Z-50222993"
         ]
       }
     },
@@ -7306,7 +7731,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T06",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -7322,9 +7747,12 @@
         "(drawer)/(tabs)/notifications/index.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:43:27.837Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-43-33-377Z-1f5df35b"
+        ]
       }
     },
     {
@@ -7356,12 +7784,11 @@
         "(drawer)/(tabs)/ai/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T20:46:56.768Z",
+        "at": "2026-09-25T15:26:53.140Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-16T20-43-04-370Z-e2f3f58c",
-          "run-2026-09-16T20-47-08-002Z-17419f37"
+          "run-2026-09-25T15-27-08-329Z-971c09a2"
         ]
       }
     },
@@ -7394,11 +7821,11 @@
         "(drawer)/(tabs)/ai/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T20:57:23.096Z",
+        "at": "2026-09-25T22:41:45.561Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T20-57-32-489Z-df256961"
+          "run-2026-09-25T22-41-50-980Z-50222993"
         ]
       }
     },
@@ -7431,12 +7858,11 @@
         "(signer-flow)/index.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T06:55:15.311Z",
+        "at": "2026-09-25T20:06:18.608Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-17T06-51-15-289Z-11422f65",
-          "run-2026-09-17T06-55-29-792Z-e27bb0af"
+          "run-2026-09-25T20-06-24-236Z-0e02a073"
         ]
       }
     },
@@ -7469,11 +7895,11 @@
         "(theme-flow)/preview.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T21:08:10.905Z",
+        "at": "2026-09-25T23:05:13.928Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-08-22-070Z-499c1265"
+          "run-2026-09-25T23-05-19-465Z-86f34e48"
         ]
       }
     },
@@ -7506,11 +7932,11 @@
         "(theme-flow)/gallery.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T21:08:10.905Z",
+        "at": "2026-09-25T23:05:13.928Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-08-22-070Z-499c1265"
+          "run-2026-09-25T23-05-19-465Z-86f34e48"
         ]
       }
     },
@@ -7543,12 +7969,11 @@
         "(transactions-flow)/transactions.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T20:46:56.768Z",
+        "at": "2026-09-25T15:26:53.140Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-16T20-43-04-370Z-e2f3f58c",
-          "run-2026-09-16T20-47-08-002Z-17419f37"
+          "run-2026-09-25T15-27-08-329Z-971c09a2"
         ]
       }
     },
@@ -7581,12 +8006,11 @@
         "(mint-flow)/distribution.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T20:46:56.768Z",
+        "at": "2026-09-25T15:26:53.140Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-16T20-43-04-370Z-e2f3f58c",
-          "run-2026-09-16T20-47-08-002Z-17419f37"
+          "run-2026-09-25T15-27-08-329Z-971c09a2"
         ]
       }
     },
@@ -7628,9 +8052,9 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T29",
-      "status": "captured",
-      "blocker": null,
-      "publicationEligibility": "eligible-after-verification",
+      "status": "blocked",
+      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
+      "publicationEligibility": "blocked",
       "platformProfile": {
         "driver": "sim",
         "orientation": "portrait",
@@ -7651,6 +8075,31 @@
           "run-2026-09-17T03-38-49-246Z-85821d4c"
         ]
       }
+    },
+    {
+      "platform": "ios",
+      "page": "ai-request",
+      "state": "default",
+      "baseline": true,
+      "scenario": null,
+      "occurrence": null,
+      "stepId": null,
+      "evidenceClass": "unavailable",
+      "privacy": "blocked",
+      "publicationEligibility": "blocked",
+      "status": "blocked",
+      "blocker": "Review (transactions-flow)/aiRequest.tsx and add an effect-reviewed recipe with page-specific readiness; no recipe is approved for this canonical page.",
+      "platformProfile": {
+        "driver": "sim",
+        "orientation": "portrait",
+        "identity": "disposable",
+        "effects": "navigation-only"
+      },
+      "readiness": [],
+      "readinessStepIds": [],
+      "routes": [
+        "(transactions-flow)/aiRequest.tsx"
+      ]
     },
     {
       "platform": "ios",
@@ -7804,11 +8253,11 @@
         "claimUsername.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T08:30:32.308Z",
+        "at": "2026-09-25T20:33:25.919Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T08-30-44-205Z-b7de0181"
+          "run-2026-09-25T20-33-32-332Z-967dc3c3"
         ]
       }
     },
@@ -7825,9 +8274,9 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T09",
-      "status": "blocked",
-      "blocker": "Re-review effects/privacy for changed recipe capture.composer, including expanded fixtures, then update REVIEWED_STEPS.",
-      "publicationEligibility": "blocked",
+      "status": "captured",
+      "blocker": null,
+      "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
         "driver": "sim",
         "orientation": "portrait",
@@ -7841,13 +8290,11 @@
         "composer.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T12:09:01.005Z",
-        "status": "failed",
-        "attempts": 2,
-        "reason": "Step T11 failed; inspect the local run evidence",
+        "at": "2026-09-25T20:43:19.380Z",
+        "status": "captured",
+        "attempts": 1,
         "runs": [
-          "run-2026-09-17T12-04-43-269Z-37958d17",
-          "run-2026-09-17T12-09-12-146Z-3fae0757"
+          "run-2026-09-25T20-43-25-283Z-0a945651"
         ]
       }
     },
@@ -7980,12 +8427,11 @@
         "+not-found.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T06:55:15.311Z",
+        "at": "2026-09-25T20:06:18.608Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-17T06-51-15-289Z-11422f65",
-          "run-2026-09-17T06-55-29-792Z-e27bb0af"
+          "run-2026-09-25T20-06-24-236Z-0e02a073"
         ]
       }
     },
@@ -8002,7 +8448,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T04",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -8018,9 +8464,12 @@
         "(drawer)/(tabs)/notifications/followers.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:05:25.943Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-05-31-715Z-f4a5d99f"
+        ]
       }
     },
     {
@@ -8036,7 +8485,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T18",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -8052,9 +8501,12 @@
         "(drawer)/(tabs)/notifications/mint-changes.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:43:27.837Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-43-33-377Z-1f5df35b"
+        ]
       }
     },
     {
@@ -8070,7 +8522,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T22",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -8086,9 +8538,12 @@
         "(drawer)/(tabs)/notifications/mint-changes.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:43:27.837Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-43-33-377Z-1f5df35b"
+        ]
       }
     },
     {
@@ -8120,11 +8575,11 @@
         "(drawer)/(tabs)/notifications/mint-changes.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T22:00:37.159Z",
+        "at": "2026-09-25T23:57:39.831Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T22-00-47-270Z-f4b8cb36"
+          "run-2026-09-25T23-57-45-358Z-10f077da"
         ]
       }
     },
@@ -8141,7 +8596,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T14",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -8157,9 +8612,12 @@
         "(drawer)/(tabs)/notifications/mint-changes.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:43:27.837Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-43-33-377Z-1f5df35b"
+        ]
       }
     },
     {
@@ -8175,7 +8633,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T10",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -8191,9 +8649,12 @@
         "(drawer)/(tabs)/notifications/mint-changes.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:43:27.837Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-43-33-377Z-1f5df35b"
+        ]
       }
     },
     {
@@ -8308,11 +8769,11 @@
         "share.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T08:30:32.308Z",
+        "at": "2026-09-25T20:33:25.919Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T08-30-44-205Z-b7de0181"
+          "run-2026-09-25T20-33-32-332Z-967dc3c3"
         ]
       }
     },
@@ -8329,7 +8790,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T14",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -8345,9 +8806,12 @@
         "(receive-flow)/railList.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T20:58:07.491Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T20-58-13-288Z-ec048aa0"
+        ]
       }
     },
     {
@@ -8363,7 +8827,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T04",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -8379,9 +8843,12 @@
         "(receive-flow)/railList.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T20:58:07.491Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T20-58-13-288Z-ec048aa0"
+        ]
       }
     },
     {
@@ -8397,7 +8864,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T09",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -8413,9 +8880,12 @@
         "(receive-flow)/railList.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T20:58:07.491Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T20-58-13-288Z-ec048aa0"
+        ]
       }
     },
     {
@@ -8447,12 +8917,11 @@
         "(settings-flow)/delete.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T01:08:07.652Z",
+        "at": "2026-09-25T19:33:37.212Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-17T01-06-36-983Z-b77c1b5a",
-          "run-2026-09-17T01-08-20-291Z-c96e0e5b"
+          "run-2026-09-25T19-33-42-855Z-47e8995d"
         ]
       }
     },
@@ -8485,11 +8954,11 @@
         "(settings-flow)/design-system.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T02:35:27.365Z",
+        "at": "2026-09-26T01:08:26.407Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T02-35-38-404Z-a60a264b"
+          "run-2026-09-26T01-08-31-971Z-8c3c5077"
         ]
       }
     },
@@ -8522,11 +8991,11 @@
         "(settings-flow)/design-system-empty-states.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T02:35:27.365Z",
+        "at": "2026-09-26T01:08:26.407Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T02-35-38-404Z-a60a264b"
+          "run-2026-09-26T01-08-31-971Z-8c3c5077"
         ]
       }
     },
@@ -8559,11 +9028,11 @@
         "(settings-flow)/design-system-fade-stress.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T02:35:27.365Z",
+        "at": "2026-09-26T01:08:26.407Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T02-35-38-404Z-a60a264b"
+          "run-2026-09-26T01-08-31-971Z-8c3c5077"
         ]
       }
     },
@@ -8596,11 +9065,11 @@
         "(settings-flow)/design-system-foundations.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T02:35:27.365Z",
+        "at": "2026-09-26T01:08:26.407Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T02-35-38-404Z-a60a264b"
+          "run-2026-09-26T01-08-31-971Z-8c3c5077"
         ]
       }
     },
@@ -8633,11 +9102,11 @@
         "(settings-flow)/design-system-loading.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T02:35:27.365Z",
+        "at": "2026-09-26T01:08:26.407Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T02-35-38-404Z-a60a264b"
+          "run-2026-09-26T01-08-31-971Z-8c3c5077"
         ]
       }
     },
@@ -8670,11 +9139,11 @@
         "(settings-flow)/design-system-posts.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T02:35:27.365Z",
+        "at": "2026-09-26T01:08:26.407Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T02-35-38-404Z-a60a264b"
+          "run-2026-09-26T01-08-31-971Z-8c3c5077"
         ]
       }
     },
@@ -8691,27 +9160,25 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T13",
-      "status": "captured",
-      "blocker": null,
-      "publicationEligibility": "eligible-after-verification",
+      "status": "blocked",
+      "blocker": "Add mandatory readiness wait for Pause immediately before T13",
+      "publicationEligibility": "blocked",
       "platformProfile": {
         "driver": "sim",
         "orientation": "portrait",
         "identity": "disposable",
         "effects": "navigation-only"
       },
-      "readinessStepIds": [
-        "T12"
-      ],
+      "readinessStepIds": [],
       "routes": [
         "(settings-flow)/design-system-segmented.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T02:35:27.365Z",
+        "at": "2026-09-26T01:08:26.407Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T02-35-38-404Z-a60a264b"
+          "run-2026-09-26T01-08-31-971Z-8c3c5077"
         ]
       }
     },
@@ -8744,11 +9211,11 @@
         "(settings-flow)/design-system-skeleton-crossfade.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T02:35:27.365Z",
+        "at": "2026-09-26T01:08:26.407Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T02-35-38-404Z-a60a264b"
+          "run-2026-09-26T01-08-31-971Z-8c3c5077"
         ]
       }
     },
@@ -8765,27 +9232,25 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T18",
-      "status": "captured",
-      "blocker": null,
-      "publicationEligibility": "eligible-after-verification",
+      "status": "blocked",
+      "blocker": "Add mandatory readiness wait for Play immediately before T18",
+      "publicationEligibility": "blocked",
       "platformProfile": {
         "driver": "sim",
         "orientation": "portrait",
         "identity": "disposable",
         "effects": "navigation-only"
       },
-      "readinessStepIds": [
-        "T17"
-      ],
+      "readinessStepIds": [],
       "routes": [
         "(settings-flow)/design-system-timeline.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T23:24:47.788Z",
+        "at": "2026-09-26T01:00:37.192Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T23-24-57-750Z-96374769"
+          "run-2026-09-26T01-00-43-540Z-f2b836a5"
         ]
       }
     },
@@ -8818,11 +9283,11 @@
         "(settings-flow)/design-system-wallet-controls.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T23:24:47.788Z",
+        "at": "2026-09-26T01:00:37.192Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T23-24-57-750Z-96374769"
+          "run-2026-09-26T01-00-43-540Z-f2b836a5"
         ]
       }
     },
@@ -8855,11 +9320,11 @@
         "(settings-flow)/keyring.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T08:30:32.308Z",
+        "at": "2026-09-25T20:33:25.919Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T08-30-44-205Z-b7de0181"
+          "run-2026-09-25T20-33-32-332Z-967dc3c3"
         ]
       }
     },
@@ -8892,12 +9357,11 @@
         "(settings-flow)/media.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T01:08:07.652Z",
+        "at": "2026-09-25T19:33:37.212Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-17T01-06-36-983Z-b77c1b5a",
-          "run-2026-09-17T01-08-20-291Z-c96e0e5b"
+          "run-2026-09-25T19-33-42-855Z-47e8995d"
         ]
       }
     },
@@ -8930,12 +9394,11 @@
         "(settings-flow)/moderation.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T01:08:07.652Z",
+        "at": "2026-09-25T19:33:37.212Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-17T01-06-36-983Z-b77c1b5a",
-          "run-2026-09-17T01-08-20-291Z-c96e0e5b"
+          "run-2026-09-25T19-33-42-855Z-47e8995d"
         ]
       }
     },
@@ -8968,12 +9431,11 @@
         "(settings-flow)/network.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T01:08:07.652Z",
+        "at": "2026-09-25T19:33:37.212Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-17T01-06-36-983Z-b77c1b5a",
-          "run-2026-09-17T01-08-20-291Z-c96e0e5b"
+          "run-2026-09-25T19-33-42-855Z-47e8995d"
         ]
       }
     },
@@ -9006,11 +9468,11 @@
         "(settings-flow)/notification-policy.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T23:13:55.146Z",
+        "at": "2026-09-25T18:52:16.441Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T23-14-05-500Z-79b4c0f6"
+          "run-2026-09-25T18-52-22-134Z-00b95ee4"
         ]
       }
     },
@@ -9043,11 +9505,11 @@
         "(settings-flow)/notification-policy.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T23:13:55.146Z",
+        "at": "2026-09-25T18:52:16.441Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T23-14-05-500Z-79b4c0f6"
+          "run-2026-09-25T18-52-22-134Z-00b95ee4"
         ]
       }
     },
@@ -9064,7 +9526,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T14",
-      "status": "skipped",
+      "status": "failed",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -9080,10 +9542,14 @@
         "(settings-flow)/privacy.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip settings.legal.navigate",
-        "runs": []
+        "at": "2026-09-26T00:58:07.267Z",
+        "status": "failed",
+        "attempts": 2,
+        "reason": "Step T06 failed; inspect the local run evidence",
+        "runs": [
+          "run-2026-09-26T00-55-45-918Z-16de8470",
+          "run-2026-09-26T00-58-13-877Z-ec5b5215"
+        ]
       }
     },
     {
@@ -9140,12 +9606,11 @@
         "(settings-flow)/edit-profile.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T01:08:07.652Z",
+        "at": "2026-09-25T19:33:37.212Z",
         "status": "captured",
-        "attempts": 2,
+        "attempts": 1,
         "runs": [
-          "run-2026-09-17T01-06-36-983Z-b77c1b5a",
-          "run-2026-09-17T01-08-20-291Z-c96e0e5b"
+          "run-2026-09-25T19-33-42-855Z-47e8995d"
         ]
       }
     },
@@ -9178,11 +9643,11 @@
         "(settings-flow)/recovery.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-17T08:30:32.308Z",
+        "at": "2026-09-25T20:33:25.919Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-17T08-30-44-205Z-b7de0181"
+          "run-2026-09-25T20-33-32-332Z-967dc3c3"
         ]
       }
     },
@@ -9215,11 +9680,11 @@
         "(settings-flow)/routing.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T23:04:16.868Z",
+        "at": "2026-09-25T18:45:24.167Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T23-04-27-461Z-e353ead2"
+          "run-2026-09-25T18-45-29-784Z-ab977ff4"
         ]
       }
     },
@@ -9236,7 +9701,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T03",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -9252,9 +9717,12 @@
         "(settings-flow)/storage.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:16:48.830Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-16-54-646Z-9cd5df63"
+        ]
       }
     },
     {
@@ -9270,7 +9738,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T07",
-      "status": "skipped",
+      "status": "failed",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -9286,10 +9754,14 @@
         "(settings-flow)/terms.tsx"
       ],
       "latestAttempt": {
-        "status": "skipped",
-        "attempts": 0,
-        "reason": "Skipped by operator: --skip settings.legal.navigate",
-        "runs": []
+        "at": "2026-09-26T00:58:07.267Z",
+        "status": "failed",
+        "attempts": 2,
+        "reason": "Step T06 failed; inspect the local run evidence",
+        "runs": [
+          "run-2026-09-26T00-55-45-918Z-16de8470",
+          "run-2026-09-26T00-58-13-877Z-ec5b5215"
+        ]
       }
     },
     {
@@ -9305,7 +9777,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T09",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -9321,9 +9793,12 @@
         "(signer-flow)/activity.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T20:50:41.373Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T20-50-47-297Z-c6b2ad75"
+        ]
       }
     },
     {
@@ -9464,7 +9939,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T15",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -9480,9 +9955,12 @@
         "(signer-flow)/requests.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T20:50:41.373Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T20-50-47-297Z-c6b2ad75"
+        ]
       }
     },
     {
@@ -9539,11 +10017,11 @@
         "(stories-flow)/stories.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T21:17:52.249Z",
+        "at": "2026-09-25T23:46:04.615Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-17-59-280Z-871711f7"
+          "run-2026-09-25T23-46-10-646Z-ca8db309"
         ]
       }
     },
@@ -9560,7 +10038,7 @@
       "platform": "ios",
       "baseline": false,
       "stepId": "T06",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -9576,9 +10054,12 @@
         "(theme-flow)/background.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:55:24.321Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-55-29-842Z-127c69fd"
+        ]
       }
     },
     {
@@ -9610,11 +10091,11 @@
         "(theme-flow)/background.tsx"
       ],
       "latestAttempt": {
-        "at": "2026-09-16T21:08:10.905Z",
+        "at": "2026-09-25T23:05:13.928Z",
         "status": "captured",
         "attempts": 1,
         "runs": [
-          "run-2026-09-16T21-08-22-070Z-499c1265"
+          "run-2026-09-25T23-05-19-465Z-86f34e48"
         ]
       }
     },
@@ -9631,9 +10112,9 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T06",
-      "status": "captured",
-      "blocker": null,
-      "publicationEligibility": "eligible-after-verification",
+      "status": "blocked",
+      "blocker": "Re-review effects/privacy for changed recipe capture.history, including expanded fixtures, then update REVIEWED_STEPS.",
+      "publicationEligibility": "blocked",
       "platformProfile": {
         "driver": "sim",
         "orientation": "portrait",
@@ -9694,7 +10175,7 @@
       "platform": "ios",
       "baseline": true,
       "stepId": "T04",
-      "status": "notattempted",
+      "status": "captured",
       "blocker": null,
       "publicationEligibility": "eligible-after-verification",
       "platformProfile": {
@@ -9711,9 +10192,12 @@
         "(user-flow)/whitenoiseSetup.tsx"
       ],
       "latestAttempt": {
-        "status": "notattempted",
-        "attempts": 0,
-        "runs": []
+        "at": "2026-09-25T21:11:11.239Z",
+        "status": "captured",
+        "attempts": 1,
+        "runs": [
+          "run-2026-09-25T21-11-17-060Z-75712863"
+        ]
       }
     },
     {
@@ -9768,7 +10252,7 @@
     }
   ],
   "campaign": {
-    "startedAt": "2026-09-17T12:04:09.477Z",
-    "interrupted": true
+    "startedAt": "2026-09-25T22:41:37.208Z",
+    "interrupted": false
   }
 }
