@@ -29,6 +29,7 @@ export const PAGE_ROUTES: Partial<Record<(typeof CANONICAL_PAGES)[number], reado
   'ai-provider-info': ['(ai-flow)/provider.tsx'],
   'rebalance-plan': ['(mint-flow)/rebalancePlan.tsx'],
   'mint-reviews': ['(mint-flow)/reviews.tsx'],
+  'mint-history': ['(mint-flow)/history.tsx'],
   'dm-chat': [
     '(mint-flow)/userMessages.tsx',
     '(profile-flow)/userMessages.tsx',

@@ -53,3 +53,11 @@ export function buildMintInfoHref(mintUrl: string, seed?: MintInfoSeed): MintInf
     },
   };
 }
+
+/** The mint's NUT-06 update history, filtered to one mint (MintChangesScreen). */
+export function buildMintHistoryHref(mintUrl: string): {
+  pathname: '/(mint-flow)/history';
+  params: { mintUrl: string };
+} {
+  return { pathname: '/(mint-flow)/history', params: { mintUrl } };
+}

@@ -159,6 +159,7 @@ recipe('marketing.screenshots.mints', 'native-navigation', [
   ['mint-reviews', 'mint-reviews-profile-'],
   ['notification-mint-changes', 'mint-changes-populated'],
 ]);
+recipe('mint.info.history', 'native-navigation', [['mint-history', 'mint-changes-detail']]);
 recipe('marketing.screenshots.wallpapers', 'native-fixture', [
   ['theme-preview', 'theme-preview-theme-button'],
   ['gallery', 'album-card-artemis-ii-collection'],

@@ -47,6 +47,7 @@ export const CANONICAL_PAGES = [
   'ai-provider-select', // Routstr provider list, the AI pill's destination (ProviderListScreen)
   'ai-provider-info', // Routstr provider details + reclaim (ProviderInfoScreen)
   'mint-reviews', // mint KYM reviews list (MintReviewsScreen)
+  'mint-history', // one mint's NUT-06 update history from its details page (MintChangesScreen)
   'profile', // nostr user profile (UserProfileScreen)
   'dm-chat', // 1:1 DM conversation (UserMessagesScreen, dm-chat-probe)
   'camera', // QR scan camera screen (CameraScreen, incl. its permission-required state)

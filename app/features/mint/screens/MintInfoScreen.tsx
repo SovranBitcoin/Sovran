@@ -22,7 +22,9 @@ import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Notice } from '@/shared/ui/composed/Notice';
 import { Section } from '@/shared/ui/composed/Section';
 import { OperatorRunsSection } from '@/shared/blocks/OperatorRunsSection';
-import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
+import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { buildMintHistoryHref } from '@/shared/lib/nav/mintInfoRoutes';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import Icon from '@/assets/icons';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
@@ -262,11 +264,7 @@ function StatsGrid({
 export function MintInfoScreen() {
   useLifecycleLogger('MintInfoScreen');
   const [foreground, background] = useThemeColor(['foreground', 'surface'] as const);
-  const [danger, success, starColor] = useThemeColor([
-    'danger',
-    'green-300',
-    'yellow-300',
-  ] as const);
+  const [danger, success] = useThemeColor(['danger', 'green-300'] as const);
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.info' });
   const { entry, actions } = useScreenActions('mintInfo', params?.mintInfoEntry);
 
@@ -302,7 +300,7 @@ export function MintInfoScreen() {
   // The inspect paths seed mintInfoEntry with only { mintUrl }, so KYM review
   // data never arrives via the entry on that route. Fall back to the same
   // review cache the mint list rows read,
-  // otherwise the reviews header action and rating chart silently vanish.
+  // otherwise the reviews action and rating chart silently vanish.
   // Installed-or-not, answered from the in-memory trusted list on the FIRST
   // render. The bridge's async `isTrusted` still arrives on the entry and is
   // taken as confirmation, but nothing waits for it: gating on the entry alone
@@ -512,18 +510,6 @@ export function MintInfoScreen() {
         options={withGlassHeaderItems({
           title: entry?.fromAccepter ? 'Verify Mint' : 'Mint Details',
           headerTitle: morph.headerTitle,
-          headerRight:
-            entry?.fromAccepter || !(typeof kymScore === 'number' && kymScore >= 0)
-              ? undefined
-              : () => (
-                  <ScreenHeaderAction
-                    onPress={() => router.navigate({ pathname: '/reviews', params: { mintUrl } })}
-                    icon="ic:round-star"
-                    color={starColor}
-                    testID="mint-info-reviews"
-                    accessibilityLabel="View mint reviews"
-                  />
-                ),
         })}
       />
 
@@ -549,6 +535,32 @@ export function MintInfoScreen() {
               {displayName}
             </Text>
           </Animated.View>
+
+          {/* The two things a reader does with a mint page besides trusting it,
+              as the same labelled circles the profile page uses for Send Money /
+              Message / QR. Always both, whatever the reviews read says: the
+              reviews screen shows "no reviews yet" honestly, and a row that
+              appeared only once a score was known moved the chart under it.
+              The reviews star used to be a header action, invisible to the
+              accepter flow and to anyone who did not know to look up there. */}
+          <HStack justify="center" gap={28} style={{ marginTop: 16 }}>
+            <CircleActionButton
+              icon="ic:round-star"
+              systemIcon="star"
+              label="Reviews"
+              testID="mint-info-reviews"
+              accessibilityLabel="View mint reviews"
+              onPress={() => router.navigate({ pathname: '/reviews', params: { mintUrl } })}
+            />
+            <CircleActionButton
+              icon="mdi:history"
+              systemIcon="clock.arrow.circlepath"
+              label="History"
+              testID="mint-info-history"
+              accessibilityLabel="View mint update history"
+              onPress={() => mintUrl && router.navigate(buildMintHistoryHref(mintUrl))}
+            />
+          </HStack>
 
           <Spacer size={16} />
 

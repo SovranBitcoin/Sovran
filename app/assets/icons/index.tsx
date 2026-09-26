@@ -208,6 +208,7 @@ export const icons: string[] = [
 
   // Pending Ecash icons
   'mdi:clock-outline',
+  'mdi:history',
   'mdi:clock-alert-outline',
   'mdi:broom',
   'mdi:check-circle-outline',
