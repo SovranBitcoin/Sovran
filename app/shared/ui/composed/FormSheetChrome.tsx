@@ -29,7 +29,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { SheetGrabber } from '@/shared/ui/composed/SheetGrabber';
-import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
+import { AndroidSheetRoot, SheetPageLayer } from '@/shared/ui/composed/AndroidSheetRoot';
 import { HeaderGradient } from '@/shared/ui/composed/HeaderGradient';
 import { FLOW_SHEET_HEADER_HEIGHT, SCRIM_TOTAL_HEIGHT } from '@/shared/ui/composed/FlowSheetHeader';
 
@@ -49,7 +49,7 @@ function AndroidFormSheetChrome({ title, children, scrimColor }: FormSheetChrome
     // chrome height so composed Screens inset + scroll under the fade.
     <AndroidSheetRoot headerHeight={FLOW_SHEET_HEADER_HEIGHT}>
       <View style={styles.container}>
-        {children}
+        <SheetPageLayer>{children}</SheetPageLayer>
         <View style={styles.chrome} pointerEvents="box-none">
           <View style={styles.scrimLayer} pointerEvents="none">
             <HeaderGradient
