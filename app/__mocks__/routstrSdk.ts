@@ -92,6 +92,53 @@ export class InsufficientBalanceError extends Error {
   }
 }
 
+/** The SDK's typed redemption failures — the node's own `type`/`code` for a
+ *  token it could not use, as `core/errors.ts` classes them. */
+class CoreRedemptionError extends Error {
+  constructor(
+    message: string,
+    public recoveryAttempted = false,
+    public recoverySucceeded = false
+  ) {
+    super(message);
+  }
+}
+
+export class InvalidTokenError extends CoreRedemptionError {
+  constructor(message = 'Invalid Cashu token') {
+    super(message);
+    this.name = 'InvalidTokenError';
+  }
+}
+
+export class CashuRedemptionError extends CoreRedemptionError {
+  constructor(message = 'Failed to redeem Cashu token') {
+    super(message);
+    this.name = 'CashuRedemptionError';
+  }
+}
+
+export class TokenConsumedError extends CoreRedemptionError {
+  constructor(message = 'Token was consumed but not credited') {
+    super(message);
+    this.name = 'TokenConsumedError';
+  }
+}
+
+export class CoreInternalError extends CoreRedemptionError {
+  constructor(message = 'Internal error during token redemption') {
+    super(message);
+    this.name = 'CoreInternalError';
+  }
+}
+
+export class TokenAlreadySpentError extends Error {
+  constructor(message = 'Token already spent') {
+    super(message);
+    this.name = 'TokenAlreadySpentError';
+  }
+}
+
 /** The gate amount the stub funds when the seeded catalog does not price the
  *  model. Tests that assert on the minted amount set the catalog instead. */
 const DEFAULT_REQUIRED_SATS = 10;

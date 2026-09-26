@@ -23,9 +23,9 @@ import type { ProviderModelSummary } from '@/shared/lib/routstr/providers';
  * stats grid down under the reader's thumb.
  */
 
-export type ProviderPrivacyStatus = 'info' | 'warning' | 'success';
+type ProviderPrivacyStatus = 'info' | 'warning' | 'success';
 
-export interface ProviderPrivacyNotice {
+interface ProviderPrivacyNotice {
   status: ProviderPrivacyStatus;
   title: string;
   body: string;

@@ -8,6 +8,7 @@ import { staticPopup } from '@/shared/lib/popup';
 import { confirmSpend } from '@/features/ai/lib/spendConfirm';
 import { getTurnError, resetTurnErrors } from '@/features/ai/lib/turnErrors';
 import { chatErrorActions } from '@/features/ai/lib/chatErrorActions';
+import { resetModelAvailability } from '@/features/ai/lib/modelAvailability';
 import { ERROR_COPY } from '@/shared/lib/errors/catalog';
 
 jest.mock('@/features/ai/lib/spendConfirm', () => ({ confirmSpend: jest.fn() }));
@@ -134,6 +135,7 @@ describe('AI send lineup recovery', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     resetTurnErrors();
+    resetModelAvailability();
     await useRoutstrStore.persist.rehydrate();
     const lineup = emptyLineup();
     lineup.openai.auto = entry('old-auto');
@@ -274,6 +276,97 @@ describe('AI send lineup recovery', () => {
     // nothing else would, and a node with a dead upstream serves a healthy
     // catalog indefinitely.
     expect(refreshMock).toHaveBeenCalledWith('failure');
+  });
+
+  // The commonest failure in the 2026-09-26 log, six of eight: the node took
+  // the token, its upstream answered 404 for a model the catalog lists, and
+  // the whole token came back. The node's payment layer is fine; the model is
+  // not. The sibling on the same node worked minutes later and was never
+  // tried.
+  const upstreamRefusal = (status: number, refunded = true) => ({
+    status,
+    error: {
+      message: 'Error forwarding EHBP request to upstream',
+      type: 'upstream_error',
+      code: String(status),
+      details: { refunded },
+    },
+  });
+
+  it('tries the next model on the same node when its upstream refuses one', async () => {
+    sendMock.mockRejectedValueOnce(upstreamRefusal(404)).mockResolvedValueOnce(success());
+    await send();
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(sendMock.mock.calls[0][1].model).toBe('old-pro');
+    expect(sendMock.mock.calls[1][1].model).toBe('old-auto');
+    // The node answered and refunded: nothing about it is stale.
+    expect(refreshMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps siblings behind the same upstream when the refusal is about the model', async () => {
+    // Both sealed models sit behind the one enclave upstream, and the enclave
+    // serves one of them. A 404 is about the model, not the account, so the
+    // sibling is exactly what to try next.
+    const lineup = emptyLineup();
+    lineup.openai.pro = entry('v4-flash', 'tinfoil');
+    lineup.openai.auto = entry('v4-1-flash', 'tinfoil');
+    useRoutstrStore.setState({ lineup });
+    sendMock.mockRejectedValueOnce(upstreamRefusal(404)).mockResolvedValueOnce(success());
+    await send();
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(sendMock.mock.calls[1][1].model).toBe('v4-1-flash');
+  });
+
+  it('still skips the rest of an upstream that is out of credit or down', async () => {
+    const lineup = emptyLineup();
+    lineup.openai.pro = entry('old-pro', 'openrouter');
+    lineup.openai.auto = entry('old-auto', 'openrouter');
+    lineup.claude.auto = entry('other-auto', 'tinfoil');
+    useRoutstrStore.setState({ lineup });
+    sendMock.mockRejectedValueOnce(upstreamRefusal(502)).mockResolvedValueOnce(success());
+    await send();
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(sendMock.mock.calls[1][1].model).toBe('other-auto');
+  });
+
+  it('starts the next send from a model the node has not just refused', async () => {
+    sendMock.mockRejectedValueOnce(upstreamRefusal(404)).mockResolvedValue(success());
+    await send();
+    sendMock.mockClear();
+    await send();
+    // Remembered per node and model for the session: the refused model is
+    // demoted, not dropped, so the second send goes straight to the sibling.
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(sendMock.mock.calls[0][1].model).toBe('old-auto');
+  });
+
+  it('reads an unlabelled refusal with a full refund the same way', async () => {
+    // A node older than v0.4.5 forwards the upstream body as it was, with no
+    // `upstream_error` type. The refund is what says the node itself works.
+    sendMock
+      .mockRejectedValueOnce({
+        status: 404,
+        error: { message: 'No endpoints found', type: 'server_error', details: { refunded: true } },
+      })
+      .mockResolvedValueOnce(success());
+    await send();
+    expect(sendMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not pay the same node again when it could not use the token', async () => {
+    // "Keyset 01fc0ec0e59cd6fa not known", "Internal error during token
+    // redemption": the payment failed, and no other model changes that.
+    sendMock.mockRejectedValueOnce({
+      status: 400,
+      error: {
+        message: 'CASHU token processing failed: Keyset 01fc0ec0e59cd6fa not known',
+        type: 'cashu_error',
+        code: 'cashu_token_redemption_failed',
+        details: { refunded: true },
+      },
+    });
+    await send();
+    expect(sendMock).toHaveBeenCalledTimes(1);
   });
 
   it('stops on an unchanged failed node and leaves the failure in the conversation', async () => {

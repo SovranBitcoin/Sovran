@@ -37,6 +37,11 @@ const SOURCE_TYPES: Partial<Record<ErrorService, TypeRules>> = {
     // the 5xx fallback below called it an unreachable provider, which is a
     // claim about someone else's node that we never actually made.
     ['provider_refused', 'routstr.provider_refused'],
+    // The node took the payment, its upstream refused the MODEL, and it
+    // refunded. Under the upstream's own status (404, most often) the HTTP
+    // rule below would call the provider unreachable; the honest copy is the
+    // upstream one, whose actions are "change model" and "retry".
+    ['upstream_error', 'routstr.upstream_failed'],
     ['no_providers', 'routstr.no_providers'],
     ['mint_not_accepted', 'routstr.mint_not_accepted'],
     ['mint_error', 'routstr.mint_refused'],

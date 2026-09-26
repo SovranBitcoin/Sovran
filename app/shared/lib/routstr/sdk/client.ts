@@ -17,7 +17,7 @@ import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { routstrMintKey } from '../payingMint';
 
 import { createSdkStorageDriver } from './driver';
-import { createSdkLogger } from './sdkLogger';
+import { createSdkLogger, type SdkRefusal } from './sdkLogger';
 
 /**
  * Profile-owned catalog and recovery storage, with a node-bound request client.
@@ -118,6 +118,11 @@ export async function getRoutstrClient(baseUrl: string, canDispatch: () => boole
   let mintedSats: number | null = null;
   let mintedFromHost: string | undefined;
   let changeSats: number | null = null;
+  // The last non-OK answer the node gave THIS request, as the SDK logged it.
+  // `FailoverError` carries none of it, and the candidate walk needs the
+  // status and the node's `type`/`code` to tell "this model's upstream is
+  // gone" from "this node is broken".
+  let lastRefusal: SdkRefusal | null = null;
   const storage = {
     ...built.storage,
     removeXcashuToken(node: string, token: string) {
@@ -182,11 +187,36 @@ export async function getRoutstrClient(baseUrl: string, canDispatch: () => boole
     // raw refund bodies and whole tokens and stays dropped; its warnings carry
     // the upstream status and failover decision, which is the one account of a
     // provider failure the app cannot reconstruct for itself.
-    { logger: createSdkLogger() }
+    {
+      logger: createSdkLogger(undefined, '', (refusal) => {
+        lastRefusal = refusal;
+      }),
+    }
   );
   return {
     client,
     baseUrl: key,
+    /** The node's last refusal of this request, or `null` if it never refused. */
+    refusal() {
+      return lastRefusal;
+    },
+    /**
+     * Forget the request token: the node consumed all of it.
+     *
+     * The SDK clears a token only when change comes home, and a node sends
+     * change only when there is some. A 1-sat token against a sub-sat turn
+     * rounds to a cost of 1 sat and no `X-Cashu` header — the request settled
+     * in full, and the SDK went on treating it as money in flight. Every
+     * launch then asked the node to refund it, and the node, holding a payment
+     * row with no change row, answered 425 "pending" forever. Fourteen such
+     * tokens were being chased on every sweep in the 2026-09-26 log, 78 sats
+     * of "stranded" money none of which was owed.
+     */
+    settleWithoutChange() {
+      if (originalToken == null) return;
+      built.storage.removeXcashuToken(key, originalToken);
+      received = true;
+    },
     /**
      * A snapshot of this request's money, for logging only.
      *
@@ -291,6 +321,19 @@ const REFUND_RETRY_DELAYS_MS = [2_000, 4_000];
 const REFUND_RETRY_BUDGET_MS = 12_000;
 
 /**
+ * Tokens a node has called "pending" already this session.
+ *
+ * A 425 means the node holds the payment and has not written its change row.
+ * That changes when the node's upstream call ends — minutes, or never, if the
+ * node's process died mid-request — and not because this app asked again
+ * thirty seconds later. The sweep runs on every failed send, so without this
+ * one stuck token cost every later failure a refund round-trip and two
+ * waits; the log shows the same fourteen tokens asked three times in eight
+ * minutes. Each is asked once per session, and again on the next launch.
+ */
+const pendingThisSession = new Set<string>();
+
+/**
  * Chase every request payment the node has not yet accounted for.
  *
  * The SDK records each `X-Cashu` token before it leaves and clears it when the
@@ -331,8 +374,13 @@ export async function sweepUnsettledPayments(): Promise<void> {
       const host = hostOf(node);
       for (const { token } of tokens) {
         assertOwner();
-        attempted += 1;
         const sats = tokenAmountSats(token) ?? undefined;
+        if (pendingThisSession.has(token)) {
+          pending += 1;
+          if (sats != null) strandedSats += sats;
+          continue;
+        }
+        attempted += 1;
         let attempts = 0;
         let refund = await bound.client.getBalanceManager().fetchRefundToken(node, token, true);
         attempts += 1;
@@ -359,7 +407,10 @@ export async function sweepUnsettledPayments(): Promise<void> {
         const returned =
           refund.success && refund.token ? refund.token : refund.status === 404 ? token : null;
         if (!returned) {
-          if (refund.status === 425) pending += 1;
+          if (refund.status === 425) {
+            pending += 1;
+            pendingThisSession.add(token);
+          }
           if (sats != null) strandedSats += sats;
           apiLog.warn('routstr.sweep.token', {
             host,
@@ -406,7 +457,7 @@ export async function sweepUnsettledPayments(): Promise<void> {
         });
       }
     }
-    if (attempted) {
+    if (attempted || pending) {
       apiLog.info('routstr.sdk.sweep', {
         attempted,
         recovered,
@@ -427,4 +478,5 @@ export async function sweepUnsettledPayments(): Promise<void> {
 export function resetRoutstrClient(): void {
   built = null;
   builtOwner = null;
+  pendingThisSession.clear();
 }

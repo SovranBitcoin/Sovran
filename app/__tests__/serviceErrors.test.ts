@@ -200,6 +200,12 @@ it('names our own exhausted shortlist instead of blaming a provider', () => {
 
 it('separates a node whose upstream failed from a node we could not reach', () => {
   expect(describeError({ status: 502, error: {} }, 'routstr').id).toBe('routstr.upstream_failed');
+  // A node forwarding its upstream's refusal under the upstream's own status:
+  // the node answered, the model did not, and the copy has to send the user
+  // to another model rather than call the provider unreachable.
+  expect(
+    describeError({ status: 404, error: { type: 'upstream_error', code: '404' } }, 'routstr').id
+  ).toBe('routstr.upstream_failed');
   expect(describeError({ status: 503, error: {} }, 'routstr').id).toBe('routstr.unavailable');
 });
 

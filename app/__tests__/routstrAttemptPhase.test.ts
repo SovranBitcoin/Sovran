@@ -21,6 +21,8 @@
  */
 
 import { apiLog } from '@/shared/lib/logger';
+import { FailoverError } from '@routstr/sdk/browser';
+
 import { sendMessage, setRoutstrNodeBaseUrl } from '@/shared/lib/routstr/api';
 
 const mockRoute = jest.fn<
@@ -34,12 +36,18 @@ const mockPayment = jest.fn(() => ({
   changeReceived: false,
   changeFailed: false,
 }));
+const mockRefusal = jest.fn<
+  { status: number; type?: string; code?: string | number; message?: string } | null,
+  []
+>(() => null);
 jest.mock('@/shared/lib/routstr/sdk/client', () => ({
   getRoutstrClient: async () => ({
     client: { routeRequest: mockRoute },
     baseUrl: 'https://node.example/',
     payment: mockPayment,
     finish: async () => {},
+    refusal: mockRefusal,
+    settleWithoutChange: jest.fn(),
   }),
   acceptedMintsForProvider: async () => ['https://mint.example'],
   sweepUnsettledPayments: jest.fn(async () => {}),
@@ -63,6 +71,9 @@ jest.mock('@/shared/stores/profile/routstrStore', () => ({
           max: null,
         },
       },
+      knownProviders: {
+        'https://node.example': { version: '0.4.7' },
+      },
       invalidateServerLineup: jest.fn(),
     }),
   },
@@ -85,6 +96,7 @@ const payment = { groupId: 'ai-send-1790321451384', model: 'gpt-oss-20b' };
 describe('Routstr attempt diagnostics', () => {
   beforeEach(() => {
     mockRoute.mockReset();
+    mockRefusal.mockReset().mockReturnValue(null);
     mockPayment.mockReset().mockReturnValue({
       mintedSats: null,
       mintedFromHost: undefined,
@@ -192,6 +204,68 @@ describe('Routstr attempt diagnostics', () => {
       changeReceived: true,
       reason: expect.stringContaining('Error forwarding request'),
     });
+  });
+
+  // What the SDK throws when its one-node walk ends carries no status, no body
+  // and no request id. The node's real answer is the one it logged a moment
+  // earlier; that is put back, so the send path can tell a model's upstream
+  // saying 404 from the node being down.
+  it('gives a refusal back its status, type and refund when the SDK threw it away', async () => {
+    mockPayment.mockReturnValue({
+      mintedSats: 901,
+      mintedFromHost: 'mint.example',
+      changeSats: 901,
+      changeReceived: true,
+      changeFailed: false,
+    });
+    mockRefusal.mockReturnValue({
+      status: 404,
+      type: 'upstream_error',
+      code: 404,
+      message: 'Error forwarding EHBP request to upstream',
+    });
+    mockRoute.mockRejectedValue(
+      new FailoverError('https://node.example/', ['https://node.example/'])
+    );
+
+    await expect(
+      sendMessage([{ role: 'user', content: 'hi' }], { model: 'm', payment })
+    ).rejects.toEqual({
+      status: 404,
+      error: {
+        message: 'Error forwarding EHBP request to upstream',
+        type: 'upstream_error',
+        code: '404',
+        details: { refunded: true },
+      },
+    });
+    expect(logged('api.routstr.chat.failed')).toMatchObject({
+      status: 404,
+      nodeVersion: '0.4.7',
+      upstreamStatus: 404,
+      upstreamType: 'upstream_error',
+      upstreamCode: 404,
+      refunded: true,
+      tokenMinted: true,
+      mintedSats: 901,
+      changeSats: 901,
+    });
+  });
+
+  it('keeps the old 502 when the node never said anything the SDK logged', async () => {
+    mockPayment.mockReturnValue({
+      mintedSats: 1,
+      mintedFromHost: 'mint.example',
+      changeSats: 1,
+      changeReceived: true,
+      changeFailed: false,
+    });
+    mockRoute.mockRejectedValue(
+      new FailoverError('https://node.example/', ['https://node.example/'])
+    );
+    await expect(
+      sendMessage([{ role: 'user', content: 'hi' }], { model: 'm', payment })
+    ).rejects.toMatchObject({ status: 502, error: { code: 'provider_refused' } });
   });
 
   it('records that the change never came home, which is the only line that costs sats', async () => {

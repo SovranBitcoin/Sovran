@@ -164,6 +164,51 @@ describe('Routstr refund sweep', () => {
     });
   });
 
+  // A node holding a payment row with no change row says "pending" until its
+  // upstream call ends, which no amount of asking hurries. Every failed send
+  // runs a sweep; a stuck token was costing each of them three refund calls.
+  it('asks a node about a pending token once per session', async () => {
+    await journalOneToken();
+    mockFetch.mockImplementation(async () => pending());
+
+    let sweeping = sweepUnsettledPayments();
+    await jest.advanceTimersByTimeAsync(10_000);
+    await sweeping;
+    expect(refundCalls()).toHaveLength(3);
+
+    sweeping = sweepUnsettledPayments();
+    await jest.advanceTimersByTimeAsync(10_000);
+    await sweeping;
+    // No new calls, and the summary still counts it as stranded.
+    expect(refundCalls()).toHaveLength(3);
+    expect(sweepEvents('routstr.sdk.sweep')[1][1]).toMatchObject({
+      attempted: 0,
+      pending: 1,
+      strandedSats: 3,
+    });
+  });
+
+  // A 1-sat token against a sub-sat turn: cost rounds to the whole token, the
+  // node sends no change, and the SDK keeps chasing money that is not owed.
+  it('forgets a token the node consumed in full', async () => {
+    const bound = await getRoutstrClient('https://node.example');
+    await bound.client.routeRequest({
+      path: '/v1/chat/completions',
+      method: 'POST',
+      baseUrl: bound.baseUrl,
+      mintUrl: 'https://mint.example',
+      body: { model: 'm' },
+      modelId: 'm',
+    });
+    bound.settleWithoutChange();
+
+    const sweeping = sweepUnsettledPayments();
+    await jest.advanceTimersByTimeAsync(10_000);
+    await sweeping;
+    expect(refundCalls()).toHaveLength(0);
+    expect(sweepEvents('routstr.sdk.sweep')).toHaveLength(0);
+  });
+
   // A 404 means the node never recorded the payment, so the mint — not the
   // node — is still the spend authority for the original token.
   it('does not wait out a backoff for a status that will not change', async () => {

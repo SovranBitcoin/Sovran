@@ -12,7 +12,7 @@
  * `createProviderToken: …` errors truncated exactly before the word that says
  * why. These tests pin the bounding and the flattening that fixed that.
  */
-import { createSdkLogger } from '@/shared/lib/routstr/sdk/sdkLogger';
+import { createSdkLogger, type SdkRefusal } from '@/shared/lib/routstr/sdk/sdkLogger';
 
 function sink() {
   return { warn: jest.fn(), error: jest.fn() };
@@ -105,6 +105,7 @@ describe('createSdkLogger', () => {
       bodyLen: 84,
       reason: 'Error forwarding request to upstream provider',
       reasonParsed: true,
+      errorCode: 404,
     });
   });
 
@@ -140,6 +141,50 @@ describe('createSdkLogger', () => {
       expect.objectContaining({
         reasonParsed: false,
         reason: expect.stringContaining('Bad Gateway'),
+      })
+    );
+  });
+
+  // The SDK's `FailoverError` carries none of the node's answer; this line
+  // is where the answer survives, so the logger is also the channel back.
+  it("hands the node's refusal to whoever asked for it", () => {
+    const calls = sink();
+    const refusals: SdkRefusal[] = [];
+    const logger = createSdkLogger(calls, '', (refusal) => refusals.push(refusal));
+    logger.child('RoutstrClient').error('[RoutstrClient] Upstream error response', {
+      baseUrl: 'https://privateprovider.xyz/',
+      path: '/v1/chat/completions',
+      status: 404,
+      statusText: 'not found',
+      requestId: 'req-9',
+      body: '{"error":{"message":"Error forwarding EHBP request to upstream","type":"upstream_error","code":404,"refund_token":"cashuBo2Ft"}}',
+    });
+    // A refund line is not a refusal of the request.
+    logger.error('Upstream wallet refund error response', { status: 425, body: '{"detail":"x"}' });
+    expect(refusals).toEqual([
+      {
+        status: 404,
+        requestId: 'req-9',
+        path: '/v1/chat/completions',
+        message: 'Error forwarding EHBP request to upstream',
+        type: 'upstream_error',
+        code: 404,
+      },
+    ]);
+  });
+
+  it("reads the node's own classification out of a FastAPI detail envelope", () => {
+    const calls = sink();
+    createSdkLogger(calls).error('[RoutstrClient] Upstream error response', {
+      status: 400,
+      body: '{"detail":{"error":{"message":"Failed to redeem Cashu token","type":"cashu_error","code":"cashu_token_redemption_failed"}}}',
+    });
+    expect(calls.error).toHaveBeenCalledWith(
+      'routstr.sdk.error',
+      expect.objectContaining({
+        reason: 'Failed to redeem Cashu token',
+        errorType: 'cashu_error',
+        errorCode: 'cashu_token_redemption_failed',
       })
     );
   });

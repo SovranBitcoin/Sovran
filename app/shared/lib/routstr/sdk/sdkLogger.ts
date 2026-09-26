@@ -92,32 +92,81 @@ const SCALAR_KEYS = [
 ] as const;
 
 /**
- * The upstream's own sentence, dug out of the body the node returned.
+ * What the node's error body says, in the three fields that decide anything.
  *
  * routstr-core answers with either an OpenAI-shaped `{"error":{"message":…}}`
  * (usually forwarded verbatim from whoever it called) or FastAPI's
  * `{"detail":…}`. Both are the difference between "this node is down" and
  * "this node's OpenRouter credit is exhausted", which is the whole question
  * when a perfectly healthy catalog still answers 404.
+ *
+ * `type` and `code` matter as much as the sentence. An X-Cashu node that
+ * forwards an upstream failure discards the upstream body and answers
+ * `{"type":"upstream_error","code":<upstream status>}` under that status,
+ * with the full refund in the header — which is a fact about ONE MODEL's
+ * upstream, and the only thing that separates it from the node's own 404 or
+ * 500. The candidate walk reads these to decide whether to try the next
+ * model on the same node or to stop.
  */
-function upstreamReason(body: string): string | undefined {
+interface SdkErrorEnvelope {
+  message?: string;
+  type?: string;
+  code?: string | number;
+}
+
+function upstreamEnvelope(body: string): SdkErrorEnvelope {
   try {
     const parsed: unknown = JSON.parse(body);
-    if (!parsed || typeof parsed !== 'object') return undefined;
+    if (!parsed || typeof parsed !== 'object') return {};
     const record = parsed as { error?: unknown; detail?: unknown; message?: unknown };
-    const error = record.error;
-    if (typeof error === 'string') return error;
+    // FastAPI's `detail` may itself wrap an `error` object (nodes ≥ v0.4.5
+    // copy it to the top level too; older ones do not).
+    const detail = record.detail;
+    const error =
+      record.error ??
+      (detail && typeof detail === 'object' ? (detail as { error?: unknown }).error : undefined) ??
+      (detail && typeof detail === 'object' ? detail : undefined);
+    if (typeof error === 'string') return { message: error };
     if (error && typeof error === 'object') {
-      const message = (error as { message?: unknown }).message;
-      if (typeof message === 'string') return message;
+      const { message, type, code } = error as {
+        message?: unknown;
+        type?: unknown;
+        code?: unknown;
+      };
+      return {
+        ...(typeof message === 'string' ? { message } : {}),
+        ...(typeof type === 'string' ? { type } : {}),
+        ...(typeof code === 'string' || typeof code === 'number' ? { code } : {}),
+      };
     }
-    if (typeof record.detail === 'string') return record.detail;
-    if (typeof record.message === 'string') return record.message;
-    return undefined;
+    if (typeof detail === 'string') return { message: detail };
+    if (typeof record.message === 'string') return { message: record.message };
+    return {};
   } catch {
-    return undefined;
+    return {};
   }
 }
+
+/**
+ * One refusal the SDK saw on the wire, handed to whoever built the logger.
+ *
+ * The SDK folds every non-OK response into its provider failover and, when
+ * that walk is one node long, throws `FailoverError` — which carries no
+ * status, no body and no request id. The one place the real answer survives
+ * is this log line. So the logger is also the channel: a caller that passes
+ * `onRefusal` gets the status the node actually returned and can put it back
+ * on the error the SDK threw away.
+ */
+export interface SdkRefusal {
+  status: number;
+  requestId?: string;
+  path?: string;
+  message?: string;
+  type?: string;
+  code?: string | number;
+}
+
+const UPSTREAM_ERROR_MESSAGE = 'Upstream error response';
 
 /**
  * Flatten the SDK's first detail argument onto `params`.
@@ -153,12 +202,34 @@ function flatten(params: Record<string, unknown>, detail: unknown): boolean {
   const body = record.body;
   if (typeof body === 'string') {
     params.bodyLen = body.length;
-    const reason = upstreamReason(body);
-    putBounded(params, 'reason', reason ?? body);
-    params.reasonParsed = reason != null;
+    const envelope = upstreamEnvelope(body);
+    putBounded(params, 'reason', envelope.message ?? body);
+    params.reasonParsed = envelope.message != null;
+    // The node's own classification, when it gave one. `errorType` and
+    // `errorCode` are the names the SDK's own structured warnings use for the
+    // same two facts, so a reader greps once.
+    if (envelope.type != null && params.errorType == null) params.errorType = envelope.type;
+    if (envelope.code != null && params.errorCode == null) params.errorCode = envelope.code;
     lifted = true;
   }
   return lifted;
+}
+
+/** The refusal a flattened "Upstream error response" line describes. */
+function refusalFrom(params: Record<string, unknown>): SdkRefusal | null {
+  if (typeof params.status !== 'number') return null;
+  return {
+    status: params.status,
+    ...(typeof params.requestId === 'string' ? { requestId: params.requestId } : {}),
+    ...(typeof params.path === 'string' ? { path: params.path } : {}),
+    ...(typeof params.reason === 'string' && params.reasonParsed === true
+      ? { message: params.reason }
+      : {}),
+    ...(typeof params.errorType === 'string' ? { type: params.errorType } : {}),
+    ...(typeof params.errorCode === 'string' || typeof params.errorCode === 'number'
+      ? { code: params.errorCode }
+      : {}),
+  };
 }
 
 /**
@@ -169,7 +240,8 @@ function flatten(params: Record<string, unknown>, detail: unknown): boolean {
  */
 export function createSdkLogger(
   sink: Pick<typeof apiLog, 'warn' | 'error'> = apiLog,
-  scope: string = ''
+  scope: string = '',
+  onRefusal?: (refusal: SdkRefusal) => void
 ): SdkLogger {
   const emit =
     (level: 'warn' | 'error') =>
@@ -183,6 +255,10 @@ export function createSdkLogger(
       // evidence.
       if (detail.length > 0 && (!lifted || detail.length > 1)) params.detail = detail;
       sink[level](`routstr.sdk.${level}`, params);
+      if (onRefusal && message.includes(UPSTREAM_ERROR_MESSAGE)) {
+        const refusal = refusalFrom(params);
+        if (refusal) onRefusal(refusal);
+      }
     };
 
   return {
@@ -191,6 +267,7 @@ export function createSdkLogger(
     debug: () => {},
     warn: emit('warn'),
     error: emit('error'),
-    child: (prefix: string) => createSdkLogger(sink, scope ? `${scope}:${prefix}` : prefix),
+    child: (prefix: string) =>
+      createSdkLogger(sink, scope ? `${scope}:${prefix}` : prefix, onRefusal),
   };
 }

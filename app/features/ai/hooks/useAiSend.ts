@@ -5,11 +5,14 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import {
   sendMessage,
   isModelRejectedError,
+  isPaymentLayerFailure,
   isRoutstrNodeFailure,
+  isUpstreamRefusal,
   isWalletBalanceError,
   measureMessageContent,
   type RoutstrChatMessage,
 } from '@/shared/lib/routstr/api';
+import { markModelUnavailable, orderByAvailability } from '../lib/modelAvailability';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
 import { lineupHasEntries, lineupProviderIds, type LineupEntry } from '@/shared/lib/routstr/lineup';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
@@ -260,6 +263,22 @@ export function useAiSend() {
           imageCount = 0;
         }
       }
+      // Models this node refused recently go to the back of the chain. The
+      // catalog said it serves them; its upstream said otherwise a moment
+      // ago, and paying to hear it a third time is what the 2026-09-26 log
+      // shows. They are demoted, not dropped — still tried if nothing else
+      // works — and the memory expires with the node's outage.
+      const chainNode = useRoutstrStore.getState().nodeBaseUrl;
+      const orderedEntries = orderByAvailability(chainNode, candidateEntries);
+      if (orderedEntries[0] !== candidateEntries[0]) {
+        aiLog.info('ai.send.primary_demoted', {
+          flowId,
+          nodeBaseUrl: chainNode,
+          demoted: candidateEntries[0]?.modelId,
+          promoted: orderedEntries[0]?.modelId,
+        });
+      }
+      candidateEntries = orderedEntries;
       const primaryModel = primaryEntry.modelId;
       let candidateChain = candidateEntries.map((e) => e.modelId);
 
@@ -415,21 +434,45 @@ export function useAiSend() {
             lastConnectErr = err;
             if (isAbortError(err) || controller.signal.aborted) throw err;
             const status = (err as { status?: number })?.status;
+            // The node could not USE the token — a keyset it does not know, a
+            // mint it does not trust, a spent proof, its own wallet falling
+            // over. Nothing about the model is in question and nothing about
+            // the next model changes the payment, so paying the same node
+            // again is paying to be refused again.
+            if (isPaymentLayerFailure(err)) throw err;
             // An upstream decline: the node is healthy, the catalog is current
             // and the user's credit is fine — the AI provider behind THIS model
-            // refused. Another candidate usually sits behind a different
-            // upstream, so advance without refreshing the lineup (there is
+            // refused. Two shapes. A bare 402 the node forwarded from its
+            // upstream, and — the commoner one — the node's own
+            // `upstream_error` under the upstream's status with the whole
+            // token refunded: the enclave or OpenRouter saying 404 to a model
+            // the node's catalog still lists. Another candidate usually sits
+            // behind a different upstream, or is simply a model the upstream
+            // does serve, so advance without refreshing the lineup (there is
             // nothing stale to refresh) and without touching the balance.
-            if (status === 402 && !isWalletBalanceError(err)) {
+            const upstreamDeclined =
+              (status === 402 && !isWalletBalanceError(err)) || isUpstreamRefusal(err);
+            if (upstreamDeclined) {
               declinedAttempts += 1;
+              const code = (err as { error?: { code?: string } })?.error?.code;
+              // Remembered per node and model, so the NEXT send starts from a
+              // candidate that has not just failed here.
+              markModelUnavailable(requestNode, candidate, { status: status ?? 0, code });
               // Skip every remaining candidate behind the upstream that just
-              // refused. A node fronts several upstream accounts and they fail
-              // independently — when one runs out of credit, every model
-              // behind it answers 402 identically, so trying a sibling is
-              // paying to be refused again. Observed: three candidates, three
-              // 402s, all `openrouter`. Only narrows when the node reports
-              // upstreams; otherwise the walk is exactly as before.
-              const declinedUpstream = candidateEntries[i]?.upstreamId ?? null;
+              // refused — when the refusal is about the ACCOUNT. A node
+              // fronts several upstream accounts and they fail independently:
+              // when one runs out of credit (402), is rate-limited (429) or
+              // is down (5xx), every model behind it answers identically, so
+              // trying a sibling is paying to be refused again. Observed:
+              // three candidates, three 402s, all `openrouter`. A 404 or 400
+              // is about the MODEL — the same enclave served the sibling
+              // minutes later — so siblings stay in the walk. Only narrows
+              // when the node reports upstreams; otherwise the walk is
+              // exactly as before.
+              const accountScoped = status === 402 || status === 429 || (status ?? 0) >= 500;
+              const declinedUpstream = accountScoped
+                ? (candidateEntries[i]?.upstreamId ?? null)
+                : null;
               let next = i + 1;
               if (declinedUpstream) {
                 while (
@@ -456,6 +499,8 @@ export function useAiSend() {
                 tier: tier.id,
                 provider: provider.id,
                 candidate,
+                status,
+                code,
                 declinedUpstream,
                 skippedSameUpstream: next - i - 1,
                 attempt: declinedAttempts,

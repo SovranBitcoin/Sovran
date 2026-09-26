@@ -1,19 +1,29 @@
 import { z } from 'zod';
 
 import {
+  CashuRedemptionError,
+  CoreInternalError,
   FailoverError,
   InsufficientBalanceError,
+  InvalidTokenError,
   MintError,
   MintUnreachableError,
   NoProvidersAvailableError,
   ProviderError,
+  TokenAlreadySpentError,
+  TokenConsumedError,
   type Model,
 } from '@routstr/sdk/browser';
 
 import { fetchNodeInfo } from './providers';
 import { isE2eeModelId } from './lineup';
 import { selectPayingMint } from './payingMint';
-import { createRequestDeadline, type RequestDeadline } from './requestDeadline';
+import {
+  createRequestDeadline,
+  RESPONSE_IDLE_DEADLINE_MS,
+  type RequestDeadline,
+} from './requestDeadline';
+import type { SdkRefusal } from './sdk/sdkLogger';
 import {
   acceptedMintsForProvider,
   getRoutstrClient,
@@ -339,6 +349,13 @@ interface RoutstrError {
       required?: number;
       available?: number;
       retry_after?: number;
+      /**
+       * Whether the node handed the request's whole token back with this
+       * refusal. `true` is the node saying "my payment layer is fine, it was
+       * the request" — the one fact that makes another model on the same node
+       * worth paying for. Absent when nothing was ever paid.
+       */
+      refunded?: boolean;
     };
   };
 }
@@ -577,6 +594,82 @@ export function isRoutstrNodeFailure(error: unknown): boolean {
     status === 404 ||
     (status >= 500 && status < 600)
   );
+}
+
+const RefusalEvidenceSchema = z.object({
+  status: z.number(),
+  error: z
+    .object({
+      type: z.string().optional(),
+      code: z.string().optional(),
+      details: z.object({ refunded: z.boolean().optional() }).optional(),
+    })
+    .optional(),
+});
+
+/**
+ * The node's own vocabulary for "your payment did not work", across every
+ * routstr-core release (`routstr/wallet.py` `classify_redemption_error`, plus
+ * the X-Cashu preflight's `minimum_balance_required` and the untrusted-mint
+ * refusal). None of these is about the model, so none of them is a reason to
+ * pay the same node again for a different one.
+ */
+const PAYMENT_LAYER_TYPES = new Set([
+  'invalid_token',
+  'cashu_error',
+  'mint_error',
+  'mint_unreachable',
+  'mint_timeout',
+  'mint_rate_limited',
+  'token_already_spent',
+  'token_consumed',
+  'untrusted_mint',
+  'minimum_balance_required',
+  'insufficient_quota',
+  'api_error',
+  'mint_not_accepted',
+]);
+
+/**
+ * Whether the node refused because of the payment rather than the request.
+ *
+ * Decided from the node's `type`, and — when the SDK's typed error carried no
+ * body — from the classification `fromSdkError` gave its redemption classes.
+ */
+export function isPaymentLayerFailure(error: unknown): boolean {
+  const parsed = RefusalEvidenceSchema.safeParse(error);
+  if (!parsed.success) return false;
+  const type = parsed.data.error?.type;
+  return type != null && PAYMENT_LAYER_TYPES.has(type);
+}
+
+/**
+ * Whether the node took the payment, asked its upstream for THIS model, was
+ * refused, and refunded — which says the node works and the model does not.
+ *
+ * Two signals, either sufficient. A node from v0.4.5 on labels it: any
+ * non-200 from the upstream in X-Cashu mode comes back as
+ * `{"type":"upstream_error","code":<upstream status>}` under that status with
+ * the whole token in `X-Cashu`. An older node forwards the upstream body as it
+ * was, unlabelled — so a refusal under a 4xx/5xx that is not one of the
+ * node's own payment-layer types, and that came with the full refund, is read
+ * the same way. The refund is the load-bearing fact: a node that gave the
+ * money back has a working wallet, a working mint connection and a working
+ * database, and what failed was the one thing left.
+ *
+ * On 2026-09-26 six of eight failed sends were this — `privateprovider.xyz`
+ * and `ai.redsh1ft.com` answering the enclave's 404 for a model their catalog
+ * listed, while a sibling model on the same node worked minutes later. None
+ * of the six tried the sibling.
+ */
+export function isUpstreamRefusal(error: unknown): boolean {
+  const parsed = RefusalEvidenceSchema.safeParse(error);
+  if (!parsed.success) return false;
+  const { status, error: detail } = parsed.data;
+  if (status < 400) return false;
+  if (detail?.type === 'upstream_error') return true;
+  if (isPaymentLayerFailure(error)) return false;
+  return detail?.details?.refunded === true;
 }
 
 /**
@@ -1057,7 +1150,7 @@ async function* parseSSEFromReadableStream(
   try {
     while (true) {
       const { done, value } = await deadline.wait(reader.read());
-      deadline.touch(60_000);
+      deadline.touch(RESPONSE_IDLE_DEADLINE_MS);
 
       if (done) {
         for (const line of buffer.split('\n')) {
@@ -1180,7 +1273,13 @@ export function measureMessageContent(messages: RoutstrChatMessage[]): {
  * Returns `null` for anything unrecognised, which `toRoutstrError` then handles
  * as the transport failure it probably is.
  */
-function fromSdkError(error: unknown): RoutstrError | null {
+function fromSdkError(
+  error: unknown,
+  /** What the node actually answered, from the SDK's own log of it. */
+  refusal: SdkRefusal | null = null,
+  /** Whether the whole token came back with that answer. */
+  refunded: boolean | undefined = undefined
+): RoutstrError | null {
   // The wallet could not fund the gate. Said in the node's own vocabulary so
   // the send path treats it as a balance problem — which it is — instead of a
   // transport failure it would pointlessly fail over. The node speaks in
@@ -1229,22 +1328,87 @@ function fromSdkError(error: unknown): RoutstrError | null {
       },
     };
   }
+  // The node redeemed — or tried to redeem — the token and said what went
+  // wrong with it. The SDK types these four from the node's own `type`/`code`
+  // (`routstr/wallet.py` `classify_redemption_error`) and then, when its
+  // provider walk is one node long, re-throws them untyped through
+  // `FailoverError` — except `CoreInternalError`, which it throws directly
+  // and which this app used to read as `status: 0, network_error`: a 500 from
+  // a node's wallet reported as "the provider is unreachable". The statuses
+  // here are the ones the node sent. Every one of them is about the payment,
+  // not the model, which the send path reads through `isPaymentLayerFailure`.
+  if (error instanceof CoreInternalError) {
+    return {
+      status: 500,
+      error: { message: error.message, code: 'internal_error', type: 'api_error' },
+    };
+  }
+  if (error instanceof TokenConsumedError) {
+    return {
+      status: 500,
+      error: { message: error.message, code: 'cashu_token_consumed', type: 'token_consumed' },
+    };
+  }
+  if (error instanceof TokenAlreadySpentError) {
+    return {
+      status: 400,
+      error: {
+        message: error.message,
+        code: 'cashu_token_already_spent',
+        type: 'token_already_spent',
+      },
+    };
+  }
+  if (error instanceof InvalidTokenError) {
+    return {
+      status: 400,
+      error: { message: error.message, code: 'invalid_cashu_token', type: 'invalid_token' },
+    };
+  }
+  if (error instanceof CashuRedemptionError) {
+    return {
+      status: 400,
+      error: {
+        message: error.message,
+        code: 'cashu_token_redemption_failed',
+        type: 'cashu_error',
+      },
+    };
+  }
   // A `FailoverError` says the SDK's provider walk ended. Sovran pins the one
   // provider the user chose and never switches on their behalf (see
   // `hasRoutstrProvider`), so that walk is one node long and "all providers
   // failed" is a claim about a population of one. Reporting it as
   // `no_providers` sent a real 404 from a chosen node out as advice about
   // provider availability, and cost a long investigation to see through.
+  //
+  // The error carries no status, no body and no request id — the SDK reads
+  // the response, logs it, and throws this. So the answer the node actually
+  // gave is put back from that log (`SdkRefusal`): its status, its `type`,
+  // its `code`, its sentence. Without it every refusal was a 502
+  // `provider_refused`, and the walk — which stops on 5xx — never learned
+  // that a 404 from one model's upstream is not a broken node.
   if (error instanceof FailoverError) {
     const tried = error.failedProviders?.length ?? 0;
     if (tried <= 1) {
+      if (refusal) {
+        return {
+          status: refusal.status,
+          error: {
+            message: refusal.message ?? error.message,
+            code: refusal.code != null ? String(refusal.code) : 'provider_refused',
+            type: refusal.type ?? 'provider_error',
+            details: refunded != null ? { refunded } : undefined,
+          },
+        };
+      }
       return {
         status: 502,
         error: {
           message: error.message,
           code: 'provider_refused',
           type: 'provider_error',
-          details: undefined,
+          details: refunded != null ? { refunded } : undefined,
         },
       };
     }
@@ -1454,19 +1618,39 @@ export async function sendMessage(
         })
       )
     )) as RoutedResponse;
-    deadline.touch(60_000);
+    deadline.touch(RESPONSE_IDLE_DEADLINE_MS);
   } catch (error) {
     deadline.dispose();
-    const translated = fromSdkError(error);
-    const raw = error instanceof Error ? error : undefined;
     const paid = bound?.payment();
+    const refusal = bound?.refusal() ?? null;
+    // Refunded means the whole token came home with the refusal — the node's
+    // way of saying the request, not the payment, was the problem.
+    const refunded =
+      paid?.mintedSats != null
+        ? paid.changeReceived && paid.changeSats != null && paid.changeSats >= paid.mintedSats
+        : undefined;
+    const translated = fromSdkError(error, refusal, refunded);
+    const raw = error instanceof Error ? error : undefined;
     apiLog.error('api.routstr.chat.failed', {
       flowId,
       nodeHost,
+      // The node's software version, when the directory knows it. Two of the
+      // eight failures on 2026-09-26 were the two nodes older than v0.4.5,
+      // and it took a `/v1/info` per node by hand to see that.
+      nodeVersion: routstrStoreState().knownProviders[origin]?.version,
       mintHost: paid?.mintedFromHost ?? hostOf(mintUrl),
       model,
       upstreamId: upstreamIdForModel(model),
       phase,
+      // What the node said, as opposed to what the SDK threw. `upstreamStatus`
+      // is the status the node returned; `upstreamType`/`upstreamCode` are
+      // its own classification of why — `upstream_error` + the upstream's
+      // status for a model its upstream would not serve, a payment-layer type
+      // for a token it could not use.
+      upstreamStatus: refusal?.status,
+      upstreamType: refusal?.type,
+      upstreamCode: refusal?.code,
+      refunded,
       // The three questions a failed attempt has to answer before anyone can
       // act on it: did the token ever get minted, did the change come home,
       // and was it us or the node that gave up.
@@ -1568,6 +1752,30 @@ export async function sendMessage(
           ? await withPaymentScope(context, () => response.finalize!())
           : (response.satsSpent ?? 0);
         const settled = bound?.payment();
+        // No change came back. Either there was none — the node consumed the
+        // whole token, which its cost header confirms — or the node failed to
+        // mint it, in which case the token stays journalled for the sweep.
+        // The SDK cannot tell these apart and keeps the token either way, so
+        // the sweep chased fully-spent 1-sat tokens with 425s for days.
+        const changeHeader = response.headers.get('x-cashu') != null;
+        const costMsats = Number(response.headers.get('x-routstr-cost-msats'));
+        let consumedInFull: boolean | undefined;
+        if (!changeHeader && settled?.mintedSats != null && bound) {
+          consumedInFull =
+            Number.isFinite(costMsats) &&
+            costMsats > 0 &&
+            Math.ceil(costMsats / 1000) >= settled.mintedSats;
+          if (consumedInFull) bound.settleWithoutChange();
+          else if (settled.changeSats == null) {
+            apiLog.warn('routstr.payment.change_missing', {
+              flowId,
+              nodeHost,
+              model,
+              mintedSats: settled.mintedSats,
+              costMsats: Number.isFinite(costMsats) ? costMsats : undefined,
+            });
+          }
+        }
         await finishPayment();
         apiLog.info('routstr.payment.settled', {
           flowId,
@@ -1576,6 +1784,7 @@ export async function sendMessage(
           costSats: sats,
           mintedSats: settled?.mintedSats ?? undefined,
           changeSats: settled?.changeSats ?? undefined,
+          consumedInFull,
           duration_ms: elapsed(),
         });
         return sats;

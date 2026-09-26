@@ -1,4 +1,8 @@
 import { sendMessage, setRoutstrNodeBaseUrl } from '@/shared/lib/routstr/api';
+import {
+  RESPONSE_IDLE_DEADLINE_MS,
+  RESPONSE_START_DEADLINE_MS,
+} from '@/shared/lib/routstr/requestDeadline';
 
 const mockRoute = jest.fn<Promise<Response>, [{ signal?: AbortSignal }]>();
 jest.mock('@/shared/lib/routstr/sdk/client', () => ({
@@ -13,6 +17,8 @@ jest.mock('@/shared/lib/routstr/sdk/client', () => ({
       changeFailed: false,
     }),
     finish: async () => {},
+    refusal: () => null,
+    settleWithoutChange: jest.fn(),
   }),
   acceptedMintsForProvider: async () => null,
   sweepUnsettledPayments: jest.fn(async () => {}),
@@ -49,7 +55,7 @@ describe('Routstr response deadlines', () => {
         failure = error;
       }
     );
-    await jest.advanceTimersByTimeAsync(30_001);
+    await jest.advanceTimersByTimeAsync(RESPONSE_START_DEADLINE_MS + 1);
     expect(failure).toMatchObject({ error: { code: 'timeout' } });
     expect(mockRoute.mock.calls[0][0].signal?.aborted).toBe(true);
     await pending;
@@ -76,7 +82,7 @@ describe('Routstr response deadlines', () => {
     const costing = cost.catch((error) => {
       costError = error;
     });
-    await jest.advanceTimersByTimeAsync(60_001);
+    await jest.advanceTimersByTimeAsync(RESPONSE_IDLE_DEADLINE_MS + 1);
     expect(streamError).toMatchObject({ name: 'TimeoutError' });
     expect(costError).toMatchObject({ name: 'TimeoutError' });
     expect(mockRoute.mock.calls[0][0].signal?.aborted).toBe(true);
@@ -138,7 +144,7 @@ describe('Routstr response deadlines', () => {
       .catch((error) => {
         failure = error;
       });
-    await jest.advanceTimersByTimeAsync(60_001);
+    await jest.advanceTimersByTimeAsync(RESPONSE_IDLE_DEADLINE_MS + 1);
     expect(failure).toMatchObject({ name: 'TimeoutError' });
     await reading;
     expect(jest.getTimerCount()).toBe(0);
