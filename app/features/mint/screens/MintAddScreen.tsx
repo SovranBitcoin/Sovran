@@ -15,7 +15,8 @@ import { useDebouncedMintValidation } from '@/features/mint/hooks/useDebouncedMi
 import { useMintSearch } from '@/features/mint/hooks/useMintSearch';
 import { selectMintAudit, type MintAuditSummary } from '@/features/mint/lib/auditInfo';
 import { extractAvailableCurrencies } from '@/features/mint/lib/availableCurrencies';
-import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
+import { EmptyState } from '@/shared/ui/composed/EmptyState';
+import { Button } from '@/shared/ui/primitives/Button';
 import type { MintSearchResult } from '@/shared/lib/apiClient';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { useMintProfiles } from '@/features/mint/hooks/useMintProfiles';
@@ -616,32 +617,43 @@ export function MintAddScreen() {
     matchCountByUnit.SAT > 0;
 
   const discoveryFailed = searchStatus === 'error' && searchResults.length === 0;
+  const emptyTitle = searchQuery.trim()
+    ? 'No mints found matching your search'
+    : methodFilter
+      ? selectedCurrency !== 'ALL' && hasUnitMatches
+        ? `No known mints support ${methodLabel} for ${unitLabel} yet`
+        : `No known mints support ${methodLabel} yet`
+      : selectedCurrency === 'ALL'
+        ? 'No mints available'
+        : `No mints available for ${accountUnitLabel(selectedCurrency)}`;
   const emptyComponent = discoveryFailed ? (
-    <View className="items-center gap-3 pt-5">
-      <Text className="text-foreground text-center">Couldn&apos;t load mints right now.</Text>
-      <CapsuleButton testID="mint-add-retry" label="Try again" onPress={retrySearch} />
-    </View>
-  ) : (
-    <View className="items-center gap-3 pt-5">
-      <Text className="text-foreground text-center">
-        {searchQuery.trim()
-          ? 'No mints found matching your search'
-          : methodFilter
-            ? selectedCurrency !== 'ALL' && hasUnitMatches
-              ? `No known mints support ${methodLabel} for ${unitLabel} yet`
-              : `No known mints support ${methodLabel} yet`
-            : selectedCurrency === 'ALL'
-              ? 'No mints available'
-              : `No mints available for ${accountUnitLabel(selectedCurrency)}`}
-      </Text>
-      {showBtcMints && (
-        <CapsuleButton
-          testID="mint-add-empty-switch-unit"
-          label={`Show BTC ${methodLabel} mints (${matchCountByUnit.SAT})`}
-          onPress={() => setSelectedCurrency('SAT')}
+    <EmptyState
+      icon="mdi:cloud-off-outline"
+      title="Couldn't load mints right now"
+      action={
+        <Button
+          testID="mint-add-retry"
+          text="Try again"
+          variant="secondary"
+          onPress={retrySearch}
         />
-      )}
-    </View>
+      }
+    />
+  ) : (
+    <EmptyState
+      icon={searchQuery.trim() ? 'mdi:magnify' : 'mingcute:bank-fill'}
+      title={emptyTitle}
+      action={
+        showBtcMints ? (
+          <Button
+            testID="mint-add-empty-switch-unit"
+            text={`Show BTC ${methodLabel} mints (${matchCountByUnit.SAT})`}
+            variant="secondary"
+            onPress={() => setSelectedCurrency('SAT')}
+          />
+        ) : undefined
+      }
+    />
   );
 
   const renderResultList = (data: SearchableMint[]) => (

@@ -30,6 +30,7 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import { ContactRow, providerIdentity, nostrIdentity } from '@/shared/ui/composed/ContactRow';
+import { E2EE_BADGE_ICON } from '@/features/ai/lib/format';
 import { ListRow } from '@/shared/ui/composed/ListRow';
 import { PresenceDot } from '@/shared/ui/primitives/PresenceDot';
 import type { RowStat } from '@/shared/ui/composed/RowStatsAccent';
@@ -399,7 +400,7 @@ describe('AI provider row', () => {
 
   it('states how many models are encrypted instead of badging the provider', () => {
     const rendered = renderProviderRow(row());
-    const sealed = rendered.stats.find((stat) => stat.icon === 'mdi:shield-check');
+    const sealed = rendered.stats.find((stat) => stat.icon === E2EE_BADGE_ICON);
     // 9 of 582 models on this node are actually sealed, so "E2EE" as a
     // property of the provider would overstate 573 of them.
     expect(sealed?.value).toBe('9');
@@ -412,6 +413,6 @@ describe('AI provider row', () => {
         identity: [providerIdentity({ baseUrl: 'https://ai.redsh1ft.com', status: 'online' })],
       })
     );
-    expect(rendered.stats.some((stat) => stat.icon === 'mdi:shield-check')).toBe(false);
+    expect(rendered.stats.some((stat) => stat.icon === E2EE_BADGE_ICON)).toBe(false);
   });
 });

@@ -49,6 +49,7 @@ import { formatRelative } from '@/shared/lib/date';
 import { BLUETOOTH_ACCENT, CONNECTED_ACCENT } from '@/shared/lib/brandColors';
 import { PresenceDot } from '@/shared/ui/primitives/PresenceDot';
 import { paymentLog } from '@/shared/lib/logger';
+import { E2EE_BADGE_ICON } from '@/features/ai/lib/format';
 
 // ---------------------------------------------------------------------------
 // Identity types
@@ -623,7 +624,7 @@ function buildStats(
         const sealed = provider?.encryptedModelCount;
         if (typeof sealed === 'number' && sealed > 0) {
           out.push({
-            icon: 'mdi:shield-check',
+            icon: E2EE_BADGE_ICON,
             value: formatCompact(sealed),
             color: tints.success,
             accessibilityLabel: `${sealed} end-to-end encrypted models available`,
