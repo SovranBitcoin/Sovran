@@ -64,6 +64,10 @@ export type MintReviewsResponse = {
   mintUrl: string;
   score: number | null;
   recommendations: MintRecommendation[];
+  /** The source's own review total. nagg aggregates server-side over every
+   *  review it has indexed; a relay answer carries only what its bounded scan
+   *  returned, so `recommendations.length` alone under-counts there. */
+  reviewCount?: number;
   lastUpdated: number | null;
   fromCache: boolean;
   /** Which tier answered; `degraded` when a fallback tier served it without
@@ -111,6 +115,12 @@ const DiscoverMint = z.looseObject({
   // nagg's unpaid-quote probe saw the mint mark a never-paid quote as paid: a
   // fake payment backend. The row's units are then testnut account units.
   testnut: z.boolean().optional().catch(undefined),
+  /** nagg's own `/v1/info` probe, on the provider directory's terms: `unknown`
+   *  when never probed or older than its max age, `checkedAt` omitted while
+   *  unknown, `latencyMs` from the last successful probe. Feedback, not a gate. */
+  status: z.enum(['online', 'offline', 'unknown']).optional().catch(undefined),
+  checkedAt: z.string().max(64).optional().catch(undefined),
+  latencyMs: z.number().nonnegative().optional().catch(undefined),
 });
 export type DiscoverMint = z.infer<typeof DiscoverMint>;
 // nagg's per-mint info for the wallet's OWN mints (which discovery's roster

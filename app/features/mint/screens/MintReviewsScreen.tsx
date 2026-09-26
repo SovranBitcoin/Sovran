@@ -13,7 +13,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import type { MintRecommendation, MintReviewsResponse } from '@/shared/lib/apiClient';
-import { fetchMintReviews } from '@/shared/lib/nostr/fetchMintReviews';
+import { fetchMintReviews, reviewAggregateOf } from '@/shared/lib/nostr/fetchMintReviews';
 import {
   useCachedMintMetadata,
   useMintMetadataStore,
@@ -195,15 +195,19 @@ export function MintReviewsScreen() {
       const result = await fetchMintReviews({ mintUrl: mintUrl ?? '', signal, readId });
       if (result.isErr()) throw result.error;
       if (signal?.aborted) return { data: result.value };
-      // Always overwrite the aggregate with the fresh successful result (even
-      // a null score / empty list) so a stale aggregate can't outlive the source.
-      useMintMetadataStore
-        .getState()
-        .setReviewsAggregate(
-          mintUrl ?? '',
-          result.value.score,
-          result.value.recommendations.length
-        );
+      // Always overwrite the aggregate with a fresh AUTHORITATIVE result (even
+      // a null score / empty list) so a stale aggregate can't outlive the
+      // source; a fallback tier's partial list only fills a mint nothing has
+      // counted yet (`reviewAggregateOf`).
+      const aggregate = reviewAggregateOf(
+        result.value,
+        useMintMetadataStore.getState().getCached(mintUrl ?? '')?.reviewCount
+      );
+      if (aggregate.authoritative) {
+        useMintMetadataStore
+          .getState()
+          .setReviewsAggregate(mintUrl ?? '', aggregate.score, aggregate.reviewCount);
+      }
       return { data: result.value };
     },
   });
