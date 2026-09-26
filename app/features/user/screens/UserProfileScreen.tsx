@@ -350,12 +350,7 @@ function ProfileStatsGrid({
           <Text bold size={12} style={{ color: withAlpha(foreground, 0.66), marginBottom: 4 }}>
             {stat.label.toUpperCase()}
           </Text>
-          <Text
-            loading={stat.valueLoading}
-            placeholder="1,234"
-            bold
-            size={20}
-            style={{ color: foreground, marginBottom: 2 }}>
+          <Text bold size={20} style={{ color: foreground, marginBottom: 2 }}>
             {stat.value}
           </Text>
           <Text bold size={12} style={{ color: withAlpha(foreground, 0.5), opacity: 0.8 }}>
@@ -373,8 +368,12 @@ function ProfileStatsGrid({
   // Reputation is not a number here any more — it is the tier ring around the
   // avatar. One row in both branches (SkeletonContentCrossfade): the skeleton
   // is the same two placeholder pills, so the swap to content shifts nothing.
+  // A pill whose count is still being completed is a whole skeleton pill, not
+  // a card with a bar where the number goes.
   const renderRow = (loading: boolean) => (
-    <View style={styles.statsRow}>{stats.map((stat) => renderStatCard(stat, loading))}</View>
+    <View style={styles.statsRow}>
+      {stats.map((stat) => renderStatCard(stat, loading || stat.valueLoading))}
+    </View>
   );
   return (
     <VisualLayoutProbe

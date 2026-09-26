@@ -402,13 +402,24 @@ function TextLoadingPlaceholder({
     () => [textProps.style, hiddenTextStyle],
     [textProps.style]
   );
+  // The bar hugs the hidden glyph run, so it must sit where the text would:
+  // a centred caption's bar was pinned to the left edge because the wrapper
+  // always shrank to the start. Follow the text's own alignment.
+  const wrapperStyle = React.useMemo<StyleProp<ViewStyle>>(() => {
+    const textAlign = (textProps.style as TextStyle | undefined)?.textAlign;
+    return textAlign === 'center'
+      ? [loadingWrapperStyle, { alignSelf: 'center' as const }]
+      : textAlign === 'right'
+        ? [loadingWrapperStyle, { alignSelf: 'flex-end' as const }]
+        : loadingWrapperStyle;
+  }, [textProps.style]);
 
   return (
     <View
       ref={attachLayoutNode}
       collapsable={false}
       pointerEvents="none"
-      style={loadingWrapperStyle}
+      style={wrapperStyle}
       onLayout={reportLayout}>
       <View style={loadingBarStyle} />
       <UntranslatedText size={size} italic={italic} {...textProps} style={hiddenTextCompositeStyle}>

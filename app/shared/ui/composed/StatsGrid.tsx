@@ -19,11 +19,15 @@ import { Text } from '@/shared/ui/primitives/Text';
  * same question — "who is this, and can I use them?" — should not be assembled
  * out of different parts.
  *
- * The grid is ALWAYS the same chrome, loading or not: only the text inside the
- * cards swaps for skeleton bars, under a crossfade. A block that unmounts
- * while it waits is a block that shoves everything below it down the moment it
- * arrives.
+ * The grid is ALWAYS the same chrome, loading or not: while it waits each card
+ * is one low-contrast block at its finished size (its text drawn invisibly
+ * inside so the heights cannot drift), swapped under a crossfade. A block that
+ * unmounts while it waits is a block that shoves everything below it down the
+ * moment it arrives.
  */
+
+/** The low-contrast fill every whole-block skeleton in the app uses. */
+const SKELETON_FILL_ALPHA = 0.07;
 
 /** Unknown counts render as a dash, never as a zero that reads as measured
  *  (hunch rule ui/unknown-values). */
@@ -73,34 +77,28 @@ export function StatsGrid({
         <View key={rowStart} className="w-full flex-row">
           {stats.slice(rowStart, rowStart + 2).map((stat) => (
             <View key={stat.label} className="flex-1 p-1.5">
-              <View className="bg-surface-secondary border-surface-tertiary flex-1 rounded-xl border p-4">
-                <Text
-                  loading={skeleton}
-                  placeholder={stat.label.toUpperCase()}
-                  bold
-                  size={12}
-                  color={withAlpha(foreground, 0.66)}
-                  className="mb-1">
-                  {stat.label.toUpperCase()}
-                </Text>
-                <Text
-                  loading={skeleton}
-                  placeholder={stat.placeholder}
-                  bold
-                  size={stat.accent ? 24 : 20}
-                  color={foreground}
-                  className="mb-0.5">
-                  {stat.value}
-                </Text>
-                <Text
-                  loading={skeleton}
-                  placeholder={stat.description}
-                  bold
-                  size={12}
-                  color={withAlpha(foreground, 0.5)}
-                  className="opacity-80">
-                  {stat.description}
-                </Text>
+              <View
+                className={
+                  skeleton
+                    ? 'flex-1 rounded-xl border border-transparent p-4'
+                    : 'bg-surface-secondary border-surface-tertiary flex-1 rounded-xl border p-4'
+                }
+                style={
+                  skeleton
+                    ? { backgroundColor: withAlpha(foreground, SKELETON_FILL_ALPHA) }
+                    : undefined
+                }>
+                <View style={skeleton ? { opacity: 0 } : undefined}>
+                  <Text bold size={12} color={withAlpha(foreground, 0.66)} className="mb-1">
+                    {stat.label.toUpperCase()}
+                  </Text>
+                  <Text bold size={stat.accent ? 24 : 20} color={foreground} className="mb-0.5">
+                    {skeleton ? stat.placeholder : stat.value}
+                  </Text>
+                  <Text bold size={12} color={withAlpha(foreground, 0.5)} className="opacity-80">
+                    {stat.description}
+                  </Text>
+                </View>
               </View>
             </View>
           ))}

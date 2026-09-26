@@ -1,6 +1,6 @@
 /**
  * `Notice` as a fixed-height slot for supporting copy: `reserveLines` holds
- * the body's height before the copy exists, `loading` fills it with bars, and
+ * the body's height before the copy exists, `loading` draws the card as one block, and
  * `collapseLines` clamps longer copy behind a "Show more" toggle that only
  * appears once the text has measured longer than the clamp. Together they are
  * what stops a bio or a mint description from moving the page when it lands.
@@ -46,15 +46,26 @@ test('reserveLines holds the body height, with or without copy', () => {
   ).toBe(true);
 });
 
-test('loading draws placeholder bars in the reserved lines, one per line', () => {
+test('loading is one block at the finished height, not bars where the text goes', () => {
   const tree = render(<Notice status="info" reserveLines={3} loading testID="about" />);
-  expect(byTestID(tree, 'about-loading')).toHaveLength(1);
-  const bars = tree.root.findAll(
-    (node) => String(node.type) === 'Text' && (node.props as Props).loading === true
+  const block = byTestID(tree, 'about-loading');
+  expect(block).toHaveLength(1);
+  // No text skeletons inside: the card itself is the skeleton.
+  expect(
+    tree.root.findAll(
+      (node) => String(node.type) === 'Text' && (node.props as Props).loading === true
+    )
+  ).toHaveLength(0);
+  // The finished card's body slot is drawn (invisibly) at three lines, so the
+  // block is exactly as tall as the card it stands in for.
+  const holder = tree.root.findAll(
+    (node) => String(node.type) === 'View' && (node.props as Props).style !== undefined
   );
-  expect(bars).toHaveLength(3);
-  // A loading card has a reader-visible child, so it never collapses to a label.
-  expect((byTestID(tree, 'about')[0].props as Props).accessible).toBe(false);
+  expect(
+    holder.some((node) => (node.props as { style: { minHeight?: number } }).style.minHeight === 57)
+  ).toBe(true);
+  // A skeleton is not something a screen reader should stop on.
+  expect((block[0].props as Props).accessible).toBe(false);
 });
 
 test('collapseLines clamps only once the copy measures longer than the clamp', () => {

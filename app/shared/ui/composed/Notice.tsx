@@ -26,7 +26,7 @@
  * used to jump: the card landed late at whatever height the text needed.
  * Three props make the card's height a decision the caller takes up front:
  * `reserveLines` holds room for that many body lines whether or not copy has
- * arrived, `loading` fills those lines with placeholder bars, and
+ * arrived, `loading` draws the whole card as one skeleton block at that height, and
  * `collapseLines` clamps longer copy to that many lines with a "Show more"
  * toggle (the feed's pattern), so a two-line card stays a two-line card.
  *
@@ -82,13 +82,8 @@ const SIZE = {
   compact: { icon: 16, title: 13, body: 12, bodyLineHeight: 16, gap: 'gap-2' },
 } as const;
 
-/** Placeholder widths for the loading bars, longest first, so a two-line
- *  skeleton reads as a paragraph that ends short rather than two full bars. */
-const LOADING_PLACEHOLDERS = [
-  'A short paragraph of supporting copy that runs the width of the card',
-  'and ends partway along the next line.',
-  'A third line, when three are reserved.',
-];
+/** The low-contrast fill every whole-block skeleton in the app uses. */
+const SKELETON_FILL_ALPHA = 0.07;
 
 interface NoticeProps {
   status: NoticeStatus;
@@ -215,6 +210,30 @@ export function Notice({
   const reservedHeight =
     reserveLines !== undefined ? { minHeight: scale.bodyLineHeight * reserveLines } : undefined;
 
+  if (loading) {
+    // The whole card is the skeleton — one low-contrast block at the height
+    // the finished card will have (padding + title line + reserved body
+    // lines), not an icon beside a stack of text bars. The finished card's
+    // own chrome is drawn invisibly inside so the two heights cannot drift.
+    return (
+      <View
+        accessible={false}
+        testID={testID ? `${testID}-loading` : undefined}
+        className={cn('flex-row rounded-2xl px-4 py-3', scale.gap, 'items-start', className)}
+        style={{ backgroundColor: withAlpha(foreground, SKELETON_FILL_ALPHA) }}>
+        <View style={{ width: scale.icon, height: scale.icon }} />
+        <View className="min-w-0 flex-1 gap-0.5" style={{ opacity: 0 }}>
+          {title ? (
+            <Text size={scale.title} bold>
+              {title}
+            </Text>
+          ) : null}
+          <View style={{ minHeight: scale.bodyLineHeight * Math.max(1, reserveLines ?? 2) }} />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View
       accessible={collapsible}
@@ -238,19 +257,7 @@ export function Notice({
             {title}
           </Text>
         ) : null}
-        {loading ? (
-          <View style={reservedHeight} testID={testID ? `${testID}-loading` : undefined}>
-            {LOADING_PLACEHOLDERS.slice(0, Math.max(1, reserveLines ?? 2)).map((placeholder) => (
-              <Text
-                key={placeholder}
-                loading
-                size={scale.body}
-                style={bodyStyle}
-                placeholder={placeholder}
-              />
-            ))}
-          </View>
-        ) : typeof description === 'string' ? (
+        {typeof description === 'string' ? (
           <View style={reservedHeight}>
             {collapseLines !== undefined ? (
               // The measuring twin: same type, same width, never seen.
