@@ -17,6 +17,11 @@ interface ProviderInfoSeed {
   seedMints?: readonly string[];
   /** nagg's follower count for the operator. */
   seedFollowers?: number;
+  /** nagg's catalog counts for the row. Together they decide the privacy
+   *  verdict, so the notice paints on the first frame instead of after the
+   *  catalog read. */
+  seedModelCount?: number;
+  seedEncryptedModelCount?: number;
 }
 
 export function buildProviderInfoHref(

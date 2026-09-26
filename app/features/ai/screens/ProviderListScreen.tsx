@@ -482,6 +482,8 @@ export function ProviderListScreen() {
         seedPubkey: row.pubkey ?? undefined,
         seedMints: row.mints,
         seedFollowers: row.followers ?? undefined,
+        seedModelCount: row.modelCount ?? undefined,
+        seedEncryptedModelCount: row.encryptedModelCount ?? undefined,
       })
     );
   }, []);

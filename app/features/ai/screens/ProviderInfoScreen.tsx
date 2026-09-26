@@ -67,6 +67,8 @@ const EntrySchema = z.object({
   seedPubkey: z.string().max(128).optional(),
   seedMints: z.array(z.string().max(512)).max(64).optional(),
   seedFollowers: z.number().int().nonnegative().optional(),
+  seedModelCount: z.number().int().nonnegative().optional(),
+  seedEncryptedModelCount: z.number().int().nonnegative().optional(),
 });
 
 function parseEntry(raw: string | undefined): z.infer<typeof EntrySchema> | null {
@@ -93,6 +95,13 @@ export function ProviderInfoScreen() {
 
   const [info, setInfo] = useState<NodeInfo | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'empty'>('loading');
+  // nagg counted the catalog for the row that opened this page, and those two
+  // numbers ARE the privacy verdict — so the notice is known before the
+  // catalog read, which then only confirms it.
+  const seededCatalog =
+    entry?.seedModelCount !== undefined && entry.seedEncryptedModelCount !== undefined
+      ? { count: entry.seedModelCount, encrypted: entry.seedEncryptedModelCount }
+      : null;
   const [catalog, setCatalog] = useState<ProviderModelSummary | null>(null);
   // Tracked separately from `catalog` because a failed or refused catalog read
   // has to END the skeleton. A null catalog alone cannot say whether the
@@ -196,7 +205,8 @@ export function ProviderInfoScreen() {
   // in words rather than left to a count in a tile. Every variant is written
   // to the same one-line title and two-line body so the skeleton below can
   // hold exactly the height the verdict will need — see `providerPrivacy.ts`.
-  const privacy = providerPrivacyNotice(catalog);
+  const privacy = providerPrivacyNotice(catalog ?? seededCatalog);
+  const privacyLoading = catalogState === 'loading' && seededCatalog === null;
 
   const heldMints = new Set(
     Object.entries(balances.byMint)
@@ -403,26 +413,22 @@ export function ProviderInfoScreen() {
           read your messages arriving late, under the reader's thumb, is the
           one thing on this page that must never appear from nowhere. */}
       <SkeletonContentCrossfade
-        loading={catalogState === 'loading'}
+        loading={privacyLoading}
         visualKey="provider-info-privacy"
         visualSurface="provider-info"
         testID="ai-provider-info-privacy"
         renderSkeleton={() => (
-          // The same chrome as the real notice — a bold title line over a body
-          // — sized by one of the four verdicts verbatim. All four are written
-          // to that shape, so whichever lands, nothing under it moves.
-          <Notice
-            status="info"
-            description={
-              <VStack gap={2}>
-                <Text loading size={15} bold placeholder={PROVIDER_PRIVACY_SKELETON.title} />
-                <Text loading size={14} placeholder={PROVIDER_PRIVACY_SKELETON.body} />
-              </VStack>
-            }
-          />
+          // The whole card as one block, at exactly the finished card's height:
+          // a title line plus the two body lines every verdict is written to.
+          <Notice status="info" loading title={PROVIDER_PRIVACY_SKELETON.title} reserveLines={2} />
         )}
         renderContent={() => (
-          <Notice status={privacy.status} title={privacy.title} description={privacy.body} />
+          <Notice
+            status={privacy.status}
+            title={privacy.title}
+            description={privacy.body}
+            reserveLines={2}
+          />
         )}
       />
 
