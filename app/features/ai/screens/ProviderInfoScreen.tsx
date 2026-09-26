@@ -182,7 +182,9 @@ export function ProviderInfoScreen() {
   const providerStats: GridStat[] = [
     {
       label: 'Spendable',
-      description: info?.mints.length ? 'Across the mints it takes' : 'It accepts any mint',
+      // From the seeded list too, so the caption the skeleton sizes itself by
+      // is the one that lands — the two wrap to different line counts.
+      description: acceptedMints?.length ? 'Across the mints it takes' : 'It accepts any mint',
       value: info ? spendableSats.toLocaleString() : UNKNOWN_STAT,
       placeholder: '10,122',
       accent: true,

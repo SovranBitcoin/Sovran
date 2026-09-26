@@ -276,22 +276,37 @@ export function Notice({
               size={scale.body}
               color={title ? bodyInk : ink}
               style={bodyStyle}
-              numberOfLines={collapsing && !expanded ? collapseLines : undefined}>
+              // Clamped until measured too: drawing the full copy for the frame
+              // before the twin reports would grow the card and then snap it
+              // back, moving everything under it.
+              numberOfLines={
+                (collapsing || (collapseLines !== undefined && fullLineCount === null)) && !expanded
+                  ? collapseLines
+                  : undefined
+              }>
               {description}
             </Text>
             {collapsing ? (
-              <Text
-                size={scale.body}
-                bold
-                color={status === 'info' ? accent : ink}
-                style={bodyStyle}
-                accessibilityRole="button"
-                accessibilityLabel={expanded ? 'Show less' : 'Show more'}
-                accessibilityState={{ expanded }}
-                testID={testID ? `${testID}-toggle` : undefined}
-                onPress={() => setExpanded((value) => !value)}>
-                {expanded ? 'Show less' : 'Show more'}
-              </Text>
+              // Collapsed, the toggle sits ON the last clamped line, over the
+              // tail, instead of adding a line: measuring only finishes after
+              // the copy is drawn, so a toggle that took its own row grew the
+              // card a frame after it appeared. Expanding is the reader's own
+              // act, so "Show less" can take a row of its own.
+              <View
+                className={cn(!expanded && root, !expanded && 'absolute bottom-0 right-0 pl-1')}>
+                <Text
+                  size={scale.body}
+                  bold
+                  color={status === 'info' ? accent : ink}
+                  style={bodyStyle}
+                  accessibilityRole="button"
+                  accessibilityLabel={expanded ? 'Show less' : 'Show more'}
+                  accessibilityState={{ expanded }}
+                  testID={testID ? `${testID}-toggle` : undefined}
+                  onPress={() => setExpanded((value) => !value)}>
+                  {expanded ? 'Show less' : '… Show more'}
+                </Text>
+              </View>
             ) : null}
           </View>
         ) : (

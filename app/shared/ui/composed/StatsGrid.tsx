@@ -56,7 +56,7 @@ export function StatsGrid({
   testID,
   accessibilityLabel,
 }: {
-  /** Four of them. Rendered two per row, in order. */
+  /** Four (2x2) or two (2x1). Rendered two per row, in order. */
   stats: readonly GridStat[];
   loading: boolean;
   visualKey: string;
@@ -64,16 +64,18 @@ export function StatsGrid({
   testID?: string;
   accessibilityLabel?: string;
 }) {
-  // The surface colour is passed to the crossfade as a value, and the two
-  // label tints are alpha over the foreground — neither is expressible as a
+  // The label tints are alpha over the foreground — not expressible as a
   // class, and every other dimension here is.
-  const [foreground, surfaceSecondary] = useThemeColor(['foreground', 'surface-secondary']);
+  const foreground = useThemeColor('foreground');
+
+  // Two per row, however many there are: four is 2x2, two is a single 2x1 row.
+  const rowStarts = stats.flatMap((_, index) => (index % 2 === 0 ? [index] : []));
 
   const renderGrid = (skeleton: boolean) => (
     // Negative gutter so the cards' own padding produces the gap between them
     // without the outer edges inheriting it.
     <View className="-mx-1.5 w-full self-stretch">
-      {[0, 2].map((rowStart) => (
+      {rowStarts.map((rowStart) => (
         <View key={rowStart} className="w-full flex-row">
           {stats.slice(rowStart, rowStart + 2).map((stat) => (
             <View key={stat.label} className="flex-1 p-1.5">
@@ -92,7 +94,17 @@ export function StatsGrid({
                   <Text bold size={12} color={withAlpha(foreground, 0.66)} className="mb-1">
                     {stat.label.toUpperCase()}
                   </Text>
-                  <Text bold size={stat.accent ? 24 : 20} color={foreground} className="mb-0.5">
+                  {/* One line, shrunk to fit: a long value (a pre-release version
+                      string) wrapped to a second line the placeholder never had,
+                      growing the card by a line when the data landed. */}
+                  <Text
+                    bold
+                    size={stat.accent ? 24 : 20}
+                    color={foreground}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.6}
+                    className="mb-0.5">
                     {skeleton ? stat.placeholder : stat.value}
                   </Text>
                   <Text bold size={12} color={withAlpha(foreground, 0.5)} className="opacity-80">
@@ -112,9 +124,11 @@ export function StatsGrid({
       className="mt-4 w-full self-stretch"
       testID={testID}
       accessibilityLabel={accessibilityLabel}>
+      {/* No `surfaceColor`: the tiles sit on the page, not on a card, so the
+          wave must be the page colour. Painted in the card colour it filled
+          the gutters and corners as it swept, and the tiles read as one slab. */}
       <SkeletonContentCrossfade
         loading={loading}
-        surfaceColor={surfaceSecondary}
         visualKey={visualKey}
         visualSurface={visualSurface}
         renderSkeleton={() => renderGrid(true)}
