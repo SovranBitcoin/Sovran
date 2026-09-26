@@ -1,4 +1,4 @@
-import { getEncodedToken, getTokenMetadata } from '@cashu/cashu-ts';
+import { getTokenMetadata } from '@cashu/cashu-ts';
 
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { apiLog } from '@/shared/lib/logger';
@@ -6,6 +6,7 @@ import { useMintStore } from '@/shared/stores/profile/mintStore';
 
 import { annotatePaymentLeg } from './paymentScope';
 import { spendableMintBalances } from '../payingMint';
+import { encodeTokenForNode, keysetIdsOf, toWalletToken, wireTokenAmount } from '../tokenWire';
 
 /**
  * `@routstr/sdk`'s wallet seam, pointed at Coco.
@@ -84,14 +85,30 @@ export function createCocoWalletAdapter(assertOwner: () => void = () => {}) {
       } catch {
         // The originating owner's journal still receives the token below.
       }
-      apiLog.info('routstr.sdk.sent', { amount, operationId: operation.id });
-      return getEncodedToken(token);
+      // Spelled for the node, not for the wallet: a version-1 keyset id goes
+      // out whole, because nodes older than v0.4.5 cannot expand the short
+      // form V4 would carry. See `tokenWire.ts`.
+      const { encoded, wire } = encodeTokenForNode(token);
+      const keysets = keysetIdsOf(token).length;
+      apiLog.info('routstr.sdk.sent', { amount, operationId: operation.id, wire, keysets });
+      if (keysets > 1) {
+        // Every routstr-core release up to v0.4.7 refuses a token whose
+        // proofs span more than one keyset ("Multiple keysets per token
+        // currently not supported", 400). The wallet chose these proofs, and
+        // this adapter cannot choose for it — but the refusal that follows
+        // should be readable as this, not as a mystery.
+        apiLog.warn('routstr.sdk.token_multi_keyset', { amount, keysets });
+      }
+      return encoded;
     },
 
     async receiveToken(
-      token: string
+      wireToken: string
     ): Promise<{ success: boolean; amount: number; unit: 'sat' | 'msat'; message?: string }> {
       assertOwner();
+      // Change from a node is V4; a journalled request token the sweep hands
+      // back may be the V3 this adapter itself sent. The wallet reads only V4.
+      const token = toWalletToken(wireToken);
       let amount: number;
       let unit: 'sat' | 'msat';
       try {
@@ -141,15 +158,11 @@ export function createCocoWalletAdapter(assertOwner: () => void = () => {}) {
  * how much is stranded on a node without banking anything.
  */
 export function tokenAmountSats(token: string): number | null {
-  try {
-    const metadata = getTokenMetadata(token);
-    const amount = metadata.amount.toNumber();
-    if (metadata.unit === 'msat') return amount / 1000;
-    if (metadata.unit !== 'sat') return null;
-    return amount;
-  } catch {
-    return null;
-  }
+  const decoded = wireTokenAmount(token);
+  if (!decoded) return null;
+  if (decoded.unit === 'msat') return decoded.amount / 1000;
+  if (decoded.unit !== 'sat') return null;
+  return decoded.amount;
 }
 
 export const cocoWalletAdapter = createCocoWalletAdapter();

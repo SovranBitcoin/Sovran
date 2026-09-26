@@ -43,7 +43,10 @@ jest.mock('@/shared/lib/cashu/manager', () => {
     ops: {
       send: {
         prepare: async () => ({}),
-        execute: async () => ({ operation: { id: 'op-send' }, token: {} }),
+        execute: async () => ({
+          operation: { id: 'op-send' },
+          token: { mint: 'https://mint.example', unit: 'sat', proofs: [] },
+        }),
       },
       receive: {
         prepare: async () => ({}),
