@@ -45,6 +45,7 @@ const SOURCE_TYPES: Partial<Record<ErrorService, TypeRules>> = {
     // The transport died after the node redeemed the token; the change is
     // parked on the node and the sweep will collect it.
     ['change_pending', 'routstr.change_pending'],
+    ['over_budget', 'routstr.over_budget'],
     ['no_providers', 'routstr.no_providers'],
     ['mint_not_accepted', 'routstr.mint_not_accepted'],
     ['mint_error', 'routstr.mint_refused'],

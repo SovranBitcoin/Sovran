@@ -33,7 +33,6 @@ import {
   getProviderById,
   getTierById,
   resolveCandidateEntries,
-  resolveSelectedEntry,
   selectFromChain,
   sendMaxTokens,
 } from '../lib/format';
@@ -85,6 +84,38 @@ const STREAM_STALL_THRESHOLD_MS = 500;
  * upstream is down would otherwise fan out across all twelve lineup cells.
  */
 const MAX_DECLINED_ATTEMPTS = 3;
+
+/**
+ * The candidate chain for a selection, with models this node refused recently
+ * moved behind the rest.
+ *
+ * Used by BOTH the quote and the send, so the sheet names the model that will
+ * actually be tried first. The catalog said the node serves them; its upstream
+ * said otherwise a moment ago, and paying to hear it a third time is what the
+ * 2026-09-26 log shows. Demoted, never dropped — still tried if nothing else
+ * works — and the memory expires with the node's outage.
+ */
+function availableChain(
+  provider: string,
+  tier: Parameters<typeof resolveCandidateEntries>[1],
+  lineup: Parameters<typeof resolveCandidateEntries>[2],
+  nodeBaseUrl: string | null
+): ReturnType<typeof resolveCandidateEntries> {
+  const chain = resolveCandidateEntries(provider, tier, lineup);
+  // Branched so each side keeps its own entry type: the sealed brand is what
+  // stops a plaintext entry being pushed into a sealed chain by a widening.
+  const ordered = chain.sealed
+    ? { sealed: true as const, entries: orderByAvailability(nodeBaseUrl, chain.entries) }
+    : { sealed: false as const, entries: orderByAvailability(nodeBaseUrl, chain.entries) };
+  if (ordered.entries[0] !== chain.entries[0]) {
+    aiLog.info('ai.send.primary_demoted', {
+      nodeBaseUrl,
+      demoted: chain.entries[0]?.modelId,
+      promoted: ordered.entries[0]?.modelId,
+    });
+  }
+  return ordered;
+}
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -189,7 +220,7 @@ export function useAiSend() {
       // user's encryption choice through every later narrowing below — the
       // vision filter and the post-repoint recovery both derive from it, and
       // neither can reach a vendor the chain did not already contain.
-      const chain = resolveCandidateEntries(provider.id, tier.id, lineup);
+      const chain = availableChain(provider.id, tier.id, lineup, storeState.nodeBaseUrl);
       const primaryEntry = selectFromChain(chain, balanceSats);
       if (!primaryEntry) {
         // Two different absences wearing one shape. An empty plaintext chain
@@ -263,23 +294,21 @@ export function useAiSend() {
           imageCount = 0;
         }
       }
-      // Models this node refused recently go to the back of the chain. The
-      // catalog said it serves them; its upstream said otherwise a moment
-      // ago, and paying to hear it a third time is what the 2026-09-26 log
-      // shows. They are demoted, not dropped — still tried if nothing else
-      // works — and the memory expires with the node's outage.
-      const chainNode = useRoutstrStore.getState().nodeBaseUrl;
-      const orderedEntries = orderByAvailability(chainNode, candidateEntries);
-      if (orderedEntries[0] !== candidateEntries[0]) {
-        aiLog.info('ai.send.primary_demoted', {
-          flowId,
-          nodeBaseUrl: chainNode,
-          demoted: candidateEntries[0]?.modelId,
-          promoted: orderedEntries[0]?.modelId,
-        });
-      }
-      candidateEntries = orderedEntries;
       const primaryModel = primaryEntry.modelId;
+      // What the user approved, or — on a retry, which shows no sheet — what
+      // the model they picked would have reserved. No candidate may reserve
+      // more than this. On 2026-09-26 the sheet said 899 sats for the Auto
+      // model, its upstream refused, and the walk paid 1,862 for the Max
+      // sibling without asking; refunded, but a figure the user never saw
+      // left their wallet under one they had.
+      const budgetSats =
+        shownSats ??
+        reservedSatsForSend({
+          entry: primaryEntry,
+          models: cachedModels,
+          messages: apiMessages,
+          maxTokens: sendMaxTokens(primaryEntry.maxCompletionTokens),
+        });
       let candidateChain = candidateEntries.map((e) => e.modelId);
 
       setStatus({ isSending: true, streamingMessageId: assistantMessageId });
@@ -376,6 +405,34 @@ export function useAiSend() {
           if (useProfileStore.getState().activeAccountIndex !== profile) return;
           if (controller.signal.aborted) throw { status: 0, error: { type: 'aborted' } };
           const candidate = candidateChain[i];
+          const candidateReserve = reservedSatsForSend({
+            entry: candidateEntries[i] ?? null,
+            models: cachedModels,
+            messages: apiMessages,
+            maxTokens: sendMaxTokens(candidateEntries[i]?.maxCompletionTokens),
+          });
+          if (budgetSats != null && candidateReserve != null && candidateReserve > budgetSats) {
+            aiLog.warn('ai.send.candidate_over_budget', {
+              flowId,
+              candidate,
+              candidateReserveSats: candidateReserve,
+              budgetSats,
+              attempt: i,
+            });
+            if (i === candidateChain.length - 1) {
+              throw (
+                lastConnectErr ?? {
+                  status: 0,
+                  error: {
+                    message: 'The only model left reserves more than was approved',
+                    type: 'over_budget',
+                    code: 'over_budget',
+                  },
+                }
+              );
+            }
+            continue;
+          }
           modelToUse = candidate;
           const requestNode = useRoutstrStore.getState().nodeBaseUrl;
           // Always send max_tokens: Routstr only discounts the completion
@@ -860,11 +917,16 @@ export function useAiSend() {
       const owner = useProfileStore.getState().activeAccountIndex;
       const quotedFunds = latestFunds.current;
       const activeProvider = storeNow.userNodeBaseUrl;
-      const plannedEntry = resolveSelectedEntry(
-        getProviderById(storeNow.selectedProvider).id,
-        getTierById(storeNow.selectedTier).id,
-        walletSats,
-        storeNow.lineup ?? storeNow.lastKnownLineup?.lineup ?? null
+      // Quoted from the same chain the send will walk, refused models last, so
+      // the sheet names the model — and the figure — that actually goes first.
+      const plannedEntry = selectFromChain(
+        availableChain(
+          getProviderById(storeNow.selectedProvider).id,
+          getTierById(storeNow.selectedTier).id,
+          storeNow.lineup ?? storeNow.lastKnownLineup?.lineup ?? null,
+          storeNow.nodeBaseUrl
+        ),
+        walletSats
       );
       const timestamp = Date.now();
       const userMessageId = `msg-${timestamp}-u`;

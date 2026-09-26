@@ -19,6 +19,11 @@ export const ERROR_COPY = {
   // the sweep collects whatever it did not spend.
   'routstr.interrupted':
     'This answer never arrived — the app closed or the connection dropped before the provider finished. Any unspent sats are returned automatically.',
+  // The model the user approved was refused and every alternative on this
+  // node reserves more than the figure they saw. Nothing was spent beyond
+  // the refunded attempt; sending again quotes the alternative.
+  'routstr.over_budget':
+    'The model you approved was refused, and the alternatives cost more than the amount you saw. Send again to see the new amount, or change model.',
   'routstr.change_pending':
     'The connection dropped while the AI provider was still answering. Your sats are held by the provider and will be returned automatically once it finishes.',
   // Distinct from `routstr.unavailable` on purpose. This one is OUR verdict

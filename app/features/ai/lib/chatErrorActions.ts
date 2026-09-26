@@ -95,6 +95,8 @@ const CHAT_ERROR_ACTIONS: Readonly<Record<ChatErrorId, readonly ChatErrorActionI
   // The node kept working after the connection dropped and holds the change.
   // Nothing here needs changing; the same request can simply be sent again.
   'routstr.change_pending': ['retry'],
+  // A retry re-quotes from the model that is now first in line.
+  'routstr.over_budget': ['retry', 'change-model'],
   // Same shape from the other side of a relaunch: the turn is intact and can
   // simply be sent again.
   'routstr.interrupted': ['retry'],

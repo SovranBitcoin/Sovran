@@ -365,6 +365,42 @@ describe('AI send lineup recovery', () => {
     expect(sendMock.mock.calls[1][1].model).toBe('other-auto');
   });
 
+  // The sheet said 899 sats for the Auto model; its upstream refused; the walk
+  // paid 1,862 for the Max sibling without asking. Refunded — but a figure the
+  // user never saw left their wallet under one they had approved.
+  it('never pays more for a fallback than the figure the user approved', async () => {
+    const lineup = emptyLineup();
+    lineup.openai.pro = entry('cheap', 'tinfoil');
+    lineup.openai.auto = {
+      ...entry('dear', 'tinfoil'),
+      satsPricing: { prompt: 0.001, completion: 1, request: 0, image: 0, max_cost: 5000 },
+    };
+    useRoutstrStore.setState({ lineup });
+    // Only the refusal is queued: a success left queued here would be consumed
+    // by the next test's first send.
+    sendMock.mockRejectedValueOnce(upstreamRefusal(404));
+    await send();
+    // One paid attempt: the dear sibling was skipped, not tried.
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(sendMock.mock.calls[0][1].model).toBe('cheap');
+    const history = useRoutstrStore.getState().conversationHistory;
+    expect(getTurnError(history[1].id)?.id).toBe('routstr.upstream_failed');
+  });
+
+  it('quotes the model that will actually go first on the next send', async () => {
+    sendMock.mockRejectedValueOnce(upstreamRefusal(404)).mockResolvedValue(success());
+    await send();
+    const { aiLog } = jest.requireMock('@/shared/lib/logger') as { aiLog: { info: jest.Mock } };
+    aiLog.info.mockClear();
+    sendMock.mockClear();
+    await send();
+    // The refused model is demoted before the sheet is built, so the figure
+    // the user approves belongs to the model that is sent.
+    const gate = aiLog.info.mock.calls.find(([event]) => event === 'ai.send.gate');
+    expect(gate?.[1]).toMatchObject({ model: 'old-auto' });
+    expect(sendMock.mock.calls[0][1].model).toBe('old-auto');
+  });
+
   it('starts the next send from a model the node has not just refused', async () => {
     sendMock.mockRejectedValueOnce(upstreamRefusal(404)).mockResolvedValue(success());
     await send();
