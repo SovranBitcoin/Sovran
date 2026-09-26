@@ -3,6 +3,7 @@ import {
   RESPONSE_IDLE_DEADLINE_MS,
   RESPONSE_START_DEADLINE_MS,
 } from '@/shared/lib/routstr/requestDeadline';
+import { IOS_REQUEST_IDLE_TIMEOUT_SECONDS } from '../modules/network-timeouts';
 
 const mockRoute = jest.fn<Promise<Response>, [{ signal?: AbortSignal }]>();
 jest.mock('@/shared/lib/routstr/sdk/client', () => ({
@@ -22,6 +23,7 @@ jest.mock('@/shared/lib/routstr/sdk/client', () => ({
   }),
   acceptedMintsForProvider: async () => null,
   sweepUnsettledPayments: jest.fn(async () => {}),
+  scheduleRecoverySweeps: jest.fn(),
 }));
 jest.mock('@/shared/lib/routstr/sdk/walletAdapter', () => ({
   cocoWalletAdapter: { getBalances: async () => ({ 'https://mint.example': 100 }) },
@@ -35,6 +37,16 @@ jest.mock('@/shared/stores/global/profileStore', () => ({
 jest.mock('@/shared/lib/logger', () => {
   const log = { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() };
   return { apiLog: log, aiLog: log, storeLog: log, log, applyFileLogging: jest.fn() };
+});
+
+// iOS abandons a request after `timeoutIntervalForRequest` of silence, and the
+// SDK then cannot reclaim a token the node has already redeemed. So the OS must
+// never be the one to decide: these deadlines fire first.
+describe('the JavaScript deadlines sit under the native one', () => {
+  it('gives up before iOS would', () => {
+    expect(RESPONSE_START_DEADLINE_MS).toBeLessThan(IOS_REQUEST_IDLE_TIMEOUT_SECONDS * 1000);
+    expect(RESPONSE_IDLE_DEADLINE_MS).toBeLessThan(IOS_REQUEST_IDLE_TIMEOUT_SECONDS * 1000);
+  });
 });
 
 describe('Routstr response deadlines', () => {

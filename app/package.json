@@ -153,6 +153,7 @@
     "heroui-native": "1.0.9",
     "liquid-glass-menu": "file:./modules/liquid-glass-menu",
     "liquid-glass-text": "file:./modules/liquid-glass-text",
+    "network-timeouts": "file:./modules/network-timeouts",
     "neverthrow": "^8.2.0",
     "nostr": "workspace:*",
     "nostr-tools": "^2.10.4",
