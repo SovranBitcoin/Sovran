@@ -75,9 +75,18 @@ const host = (baseUrl: string) => baseUrl.replace(/^https:\/\//, '');
  *  device has just contradicted lands where its real state belongs. */
 const STATUS_RANK: Record<ProviderStatus, number> = { online: 0, unknown: 1, offline: 2 };
 
+/** Nothing at all, shared, so an un-ready list is not a new array per render. */
+const NO_ROWS: ProviderRow[] = [];
+
 export function useProviderRows(
   probed: Record<string, ProviderStatus> = {},
-  directory: readonly ServerProvider[] = []
+  directory: readonly ServerProvider[] = [],
+  /**
+   * False while the persisted directory is still hydrating. The list paints
+   * nothing until then — the first order painted must be the final one, and
+   * the directory is what decides it.
+   */
+  ready = true
 ): ProviderRow[] {
   const knownProviders = useRoutstrStore((s) => s.knownProviders);
   const { balances } = useBalanceContext();
@@ -192,15 +201,20 @@ export function useProviderRows(
   // then immediately replaces it — which is precisely the "it shows something,
   // then the content changes" the list was reported for. React re-runs this
   // component before painting instead, so the re-seat is never on screen.
-  // With the directory persisted, the common case does not reach it at all:
-  // `server` is already populated on the first render and the initial seat is
-  // the server's order.
-  const [seat, setSeat] = useState(() => ({
-    fromServer: server.size > 0,
-    order: ranked.map((row) => row.baseUrl),
-  }));
+  // The persisted directory used to hydrate AFTER the first paint (its store
+  // module is first evaluated by this very hook, and the read is async), so
+  // "server is already populated on the first render" was only true within one
+  // render: the local order had already been on screen. The seat is therefore
+  // taken only once `ready` says the directory has hydrated — the first order
+  // painted is the directory's.
+  const [seat, setSeat] = useState<{ fromServer: boolean; order: string[] } | null>(null);
   let seated = seat;
-  if (server.size > 0 && !seat.fromServer) {
+  if (!ready) {
+    seated = null;
+  } else if (seat === null) {
+    seated = { fromServer: server.size > 0, order: ranked.map((row) => row.baseUrl) };
+    setSeat(seated);
+  } else if (server.size > 0 && !seat.fromServer) {
     seated = { fromServer: true, order: ranked.map((row) => row.baseUrl) };
     setSeat(seated);
   } else {
@@ -211,12 +225,13 @@ export function useProviderRows(
       setSeat(seated);
     }
   }
-  const order = seated.order;
+  const order = seated?.order;
   // Memoized, because the ARRAY is a prop. `List` re-renders every row when
   // `data` changes identity, so a hook that sorted into a fresh array on every
   // render guaranteed a full repaint for any reason at all — including ones
   // that had nothing to do with providers.
   return useMemo(() => {
+    if (!order) return NO_ROWS;
     const positions = new Map(order.map((url, index) => [url, index]));
     return [...ranked].sort(
       (a, b) =>

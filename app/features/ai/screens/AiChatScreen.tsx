@@ -2,6 +2,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { DEMO_AI_MESSAGES } from '@/shared/stores/runtime/mockPresentationData';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useAiProviderDirectoryStore } from '@/shared/stores/profile/aiProviderDirectoryStore';
 import { Keyboard, ScrollView, View as RNView } from 'react-native';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useScreenInsets } from '@/shared/hooks/useScreenInsets';
@@ -99,6 +100,11 @@ function buildBranchNavById(
  * separate virtualization sidesteps it cleanly.
  */
 export function AiChatScreen() {
+  // Reference the persisted provider directory so its hydration starts here,
+  // not when the picker first renders: the picker gates its first paint on it.
+  useEffect(() => {
+    useAiProviderDirectoryStore.persist.hasHydrated();
+  }, []);
   useLifecycleLogger('AiChatScreen');
   const mockMode = useSettingsStore((state) => state.mockMode);
   const [demoMessages, setDemoMessages] = useState(DEMO_AI_MESSAGES);
