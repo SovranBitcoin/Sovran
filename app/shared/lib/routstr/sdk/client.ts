@@ -334,6 +334,44 @@ const REFUND_RETRY_BUDGET_MS = 12_000;
 const pendingThisSession = new Set<string>();
 
 /**
+ * How old a token must be before a 425 stops it being asked about again this
+ * session. A token from a request that failed a moment ago is exactly the one
+ * whose node is about to write its refund row — the connection dropped while
+ * the node was still generating — and it has to be asked again in a minute,
+ * not on the next launch.
+ */
+export const PENDING_DEDUPE_AFTER_MS = 10 * 60 * 1000;
+
+/**
+ * When to ask again after a request left a redeemed token behind.
+ *
+ * The node finishes the upstream call it was in the middle of, computes the
+ * cost, mints the change and writes the refund row — seconds to a couple of
+ * minutes after the client gave up. Each of these is one sweep; a sweep that
+ * finds nothing left to ask about costs one storage read.
+ */
+const RECOVERY_SWEEP_DELAYS_MS = [20_000, 60_000, 180_000, 600_000];
+let recoveryTimers: ReturnType<typeof setTimeout>[] = [];
+
+/**
+ * Chase a payment the node kept, on a schedule matched to when it can answer.
+ *
+ * Called when a request ends with the token minted and no change received:
+ * the transport died, the SDK tried to re-receive the original token, and the
+ * mint said it was already spent — so the node has it. Idempotent; a second
+ * call while a schedule is running restarts it from the top.
+ */
+export function scheduleRecoverySweeps(): void {
+  for (const timer of recoveryTimers) clearTimeout(timer);
+  recoveryTimers = RECOVERY_SWEEP_DELAYS_MS.map((delay) =>
+    setTimeout(() => {
+      void sweepUnsettledPayments();
+    }, delay)
+  );
+  apiLog.info('routstr.sdk.recovery_scheduled', { delaysMs: RECOVERY_SWEEP_DELAYS_MS });
+}
+
+/**
  * Chase every request payment the node has not yet accounted for.
  *
  * The SDK records each `X-Cashu` token before it leaves and clears it when the
@@ -372,10 +410,11 @@ export async function sweepUnsettledPayments(): Promise<void> {
       assertOwner();
       const bound = await getRoutstrClient(node);
       const host = hostOf(node);
-      for (const { token } of tokens) {
+      for (const { token, createdAt } of tokens) {
         assertOwner();
         const sats = tokenAmountSats(token) ?? undefined;
-        if (pendingThisSession.has(token)) {
+        const fresh = Date.now() - (createdAt ?? 0) < PENDING_DEDUPE_AFTER_MS;
+        if (pendingThisSession.has(token) && !fresh) {
           pending += 1;
           if (sats != null) strandedSats += sats;
           continue;
@@ -479,4 +518,6 @@ export function resetRoutstrClient(): void {
   built = null;
   builtOwner = null;
   pendingThisSession.clear();
+  for (const timer of recoveryTimers) clearTimeout(timer);
+  recoveryTimers = [];
 }

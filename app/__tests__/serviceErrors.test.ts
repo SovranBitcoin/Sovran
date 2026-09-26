@@ -206,6 +206,12 @@ it('separates a node whose upstream failed from a node we could not reach', () =
   expect(
     describeError({ status: 404, error: { type: 'upstream_error', code: '404' } }, 'routstr').id
   ).toBe('routstr.upstream_failed');
+  expect(
+    describeError(
+      { status: 0, error: { type: 'network_error', code: 'change_pending' } },
+      'routstr'
+    ).id
+  ).toBe('routstr.change_pending');
   expect(describeError({ status: 503, error: {} }, 'routstr').id).toBe('routstr.unavailable');
 });
 

@@ -199,6 +199,17 @@ function flatten(params: Record<string, unknown>, detail: unknown): boolean {
     else continue;
     lifted = true;
   }
+  // A transport failure's own words ("The request timed out", "The network
+  // connection was lost"). The SDK puts them under `error`, not `body`, and
+  // they went unlifted: the one send in the 2026-09-26 log that died at the
+  // 60-second mark logged `Network error fetching from provider` and nothing
+  // about why.
+  const transport = record.error;
+  if (typeof transport === 'string' && params.reason == null) {
+    putBounded(params, 'reason', transport);
+    params.reasonParsed = true;
+    lifted = true;
+  }
   const body = record.body;
   if (typeof body === 'string') {
     params.bodyLen = body.length;

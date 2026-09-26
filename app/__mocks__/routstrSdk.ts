@@ -144,7 +144,10 @@ export class TokenAlreadySpentError extends Error {
 const DEFAULT_REQUIRED_SATS = 10;
 
 interface StubStore {
-  tokens: Record<string, { token: string; baseUrl: string }[]>;
+  tokens: Record<
+    string,
+    { token: string; baseUrl: string; createdAt?: number; tryCount?: number }[]
+  >;
   driver: {
     getItem<T>(key: string, fallback: T): Promise<T>;
     setItem<T>(key: string, value: T): Promise<void>;
@@ -171,7 +174,10 @@ export const createStorageAdapterFromStore = (store: StubStore) => ({
   addXcashuToken: (baseUrl: string, token: string) => {
     store.tokens = {
       ...store.tokens,
-      [baseUrl]: [...(store.tokens[baseUrl] ?? []), { baseUrl, token }],
+      [baseUrl]: [
+        ...(store.tokens[baseUrl] ?? []),
+        { baseUrl, token, createdAt: Date.now(), tryCount: 0 },
+      ],
     };
     void store.driver.setItem('xcashu_tokens', store.tokens);
   },

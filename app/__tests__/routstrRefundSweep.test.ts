@@ -17,6 +17,7 @@
 import { apiLog } from '@/shared/lib/logger';
 import {
   getRoutstrClient,
+  PENDING_DEDUPE_AFTER_MS,
   resetRoutstrClient,
   sweepUnsettledPayments,
 } from '@/shared/lib/routstr/sdk/client';
@@ -167,8 +168,11 @@ describe('Routstr refund sweep', () => {
   // A node holding a payment row with no change row says "pending" until its
   // upstream call ends, which no amount of asking hurries. Every failed send
   // runs a sweep; a stuck token was costing each of them three refund calls.
-  it('asks a node about a pending token once per session', async () => {
+  it('asks a node about a stale pending token once per session', async () => {
     await journalOneToken();
+    // Stale: journalled longer ago than the dedupe window. A fresh one keeps
+    // being asked about (next case).
+    jest.advanceTimersByTime(PENDING_DEDUPE_AFTER_MS + 1);
     mockFetch.mockImplementation(async () => pending());
 
     let sweeping = sweepUnsettledPayments();
@@ -186,6 +190,29 @@ describe('Routstr refund sweep', () => {
       pending: 1,
       strandedSats: 3,
     });
+  });
+
+  // The token from a request that failed a moment ago is the one whose node is
+  // about to write its refund row. Once-per-session is for the stale ones.
+  it('keeps asking about a token that was journalled minutes ago', async () => {
+    await journalOneToken();
+    mockFetch.mockImplementation(async () => pending());
+
+    let sweeping = sweepUnsettledPayments();
+    await jest.advanceTimersByTimeAsync(10_000);
+    await sweeping;
+    expect(refundCalls()).toHaveLength(3);
+
+    // Fresh — journalled inside the dedupe window — so the second sweep asks
+    // again, and this time the node has finished.
+    mockFetch.mockImplementation(
+      async () => new Response(JSON.stringify({ token: 'cashuB-refund' }))
+    );
+    sweeping = sweepUnsettledPayments();
+    await jest.advanceTimersByTimeAsync(10_000);
+    await sweeping;
+    expect(refundCalls()).toHaveLength(4);
+    expect(mockReceive).toHaveBeenCalledWith('cashuB-refund');
   });
 
   // A 1-sat token against a sub-sat turn: cost rounds to the whole token, the

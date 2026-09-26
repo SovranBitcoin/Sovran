@@ -92,6 +92,9 @@ const CHAT_ERROR_ACTIONS: Readonly<Record<ChatErrorId, readonly ChatErrorActionI
   'routstr.unavailable': ['retry', 'change-provider'],
   // Slow, not broken.
   'routstr.timeout': ['retry'],
+  // The node kept working after the connection dropped and holds the change.
+  // Nothing here needs changing; the same request can simply be sent again.
+  'routstr.change_pending': ['retry'],
   // Unclassified. Retry is the only honest offer — anything else would claim
   // we know which knob is wrong.
   'routstr.unknown': ['retry'],

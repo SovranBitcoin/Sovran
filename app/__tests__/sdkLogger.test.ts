@@ -189,6 +189,27 @@ describe('createSdkLogger', () => {
     );
   });
 
+  // The one send in the 2026-09-26 log that died at the 60-second mark logged
+  // "Network error fetching from provider" and not one word of why: the SDK
+  // puts the transport's own message under `error`, which was not lifted.
+  it("keeps the transport's own words on a network failure", () => {
+    const calls = sink();
+    createSdkLogger(calls).error('[RoutstrClient] Network error fetching from provider', {
+      baseUrl: 'https://privateprovider.xyz/',
+      url: 'https://privateprovider.xyz/v1/chat/completions',
+      path: '/v1/chat/completions',
+      error: 'The request timed out.',
+    });
+    expect(calls.error).toHaveBeenCalledWith(
+      'routstr.sdk.error',
+      expect.objectContaining({
+        host: 'privateprovider.xyz',
+        path: '/v1/chat/completions',
+        reason: 'The request timed out.',
+      })
+    );
+  });
+
   it('never lets a token reach a field, whole or sliced', () => {
     const calls = sink();
     const token = `cashuB${'o2Fte'.repeat(60)}`;

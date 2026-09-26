@@ -42,6 +42,9 @@ const SOURCE_TYPES: Partial<Record<ErrorService, TypeRules>> = {
     // rule below would call the provider unreachable; the honest copy is the
     // upstream one, whose actions are "change model" and "retry".
     ['upstream_error', 'routstr.upstream_failed'],
+    // The transport died after the node redeemed the token; the change is
+    // parked on the node and the sweep will collect it.
+    ['change_pending', 'routstr.change_pending'],
     ['no_providers', 'routstr.no_providers'],
     ['mint_not_accepted', 'routstr.mint_not_accepted'],
     ['mint_error', 'routstr.mint_refused'],

@@ -9,6 +9,12 @@ export const ERROR_COPY = {
   'routstr.provider_declined':
     'The AI provider declined this request. Try another model, or try again in a minute.',
   'routstr.unavailable': 'The AI provider is unreachable right now. Try again in a minute.',
+  // The connection dropped while the node was still generating. The node had
+  // already redeemed the token, so the sats are in its refund row, not lost —
+  // and the sweep collects them once the node finishes. Said so, because the
+  // balance has visibly dropped and "try again" alone reads as "gone".
+  'routstr.change_pending':
+    'The connection dropped while the AI provider was still answering. Your sats are held by the provider and will be returned automatically once it finishes.',
   // Distinct from `routstr.unavailable` on purpose. This one is OUR verdict
   // after walking every candidate, not one node's answer — saying "the
   // provider is unreachable" sent people chasing a provider that was fine, and

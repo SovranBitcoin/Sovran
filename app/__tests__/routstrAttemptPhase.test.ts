@@ -21,7 +21,7 @@
  */
 
 import { apiLog } from '@/shared/lib/logger';
-import { FailoverError } from '@routstr/sdk/browser';
+import { FailoverError, ProviderError } from '@routstr/sdk/browser';
 
 import { sendMessage, setRoutstrNodeBaseUrl } from '@/shared/lib/routstr/api';
 
@@ -51,6 +51,7 @@ jest.mock('@/shared/lib/routstr/sdk/client', () => ({
   }),
   acceptedMintsForProvider: async () => ['https://mint.example'],
   sweepUnsettledPayments: jest.fn(async () => {}),
+  scheduleRecoverySweeps: jest.fn(),
 }));
 jest.mock('@/shared/lib/routstr/sdk/walletAdapter', () => ({
   cocoWalletAdapter: { getBalances: async () => ({ 'https://mint.example': 100 }) },
@@ -249,6 +250,43 @@ describe('Routstr attempt diagnostics', () => {
       tokenMinted: true,
       mintedSats: 901,
       changeSats: 901,
+    });
+  });
+
+  // The 1,864-sat send of 2026-09-26 08:17: the connection died 60 seconds
+  // after the token went out, the SDK tried to take the token back and the
+  // mint said it was already spent — the node has it, and will write its
+  // refund row when it finishes. That is neither a provider refusal nor a
+  // network blip to retry into; it is change that is pending.
+  it('names a token the node kept after the connection dropped as pending change', async () => {
+    mockPayment.mockReturnValue({
+      mintedSats: 1864,
+      mintedFromHost: 'mint.example',
+      changeSats: null,
+      changeReceived: false,
+      changeFailed: true,
+    });
+    mockRoute.mockRejectedValue(
+      new ProviderError(
+        'https://node.example/',
+        -1,
+        'Provider https://node.example/ returned -1: [xcashu] Failed to receive refund token'
+      )
+    );
+
+    await expect(
+      sendMessage([{ role: 'user', content: 'hi' }], { model: 'm', payment })
+    ).rejects.toMatchObject({
+      status: 0,
+      error: { type: 'network_error', code: 'change_pending', details: { refunded: false } },
+    });
+    expect(logged('api.routstr.chat.failed')).toMatchObject({
+      status: 0,
+      code: 'change_pending',
+      tokenMinted: true,
+      mintedSats: 1864,
+      changeReceived: false,
+      changeFailed: true,
     });
   });
 

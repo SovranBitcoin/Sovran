@@ -27,6 +27,7 @@ import type { SdkRefusal } from './sdk/sdkLogger';
 import {
   acceptedMintsForProvider,
   getRoutstrClient,
+  scheduleRecoverySweeps,
   seedProviderCatalog,
   sweepUnsettledPayments,
 } from './sdk/client';
@@ -1318,13 +1319,33 @@ function fromSdkError(
   // which is the difference between "this model is out of credit" and "this
   // node is down" — a distinction the whole candidate walk is built on.
   if (error instanceof ProviderError) {
+    // `statusCode` is -1 for a transport failure the SDK routed through its
+    // error path — the request died before any status, and the SDK then
+    // failed to reclaim the token because the node had already redeemed it
+    // ("[xcashu] Failed to receive refund token"). That is not the provider
+    // answering badly; it is the connection dropping while the node was
+    // still working, with the sats parked in the node's refund row until the
+    // sweep collects them. Said as that, so the copy can be honest about
+    // where the money is.
+    if (error.statusCode <= 0) {
+      const changePending = /refund token/i.test(error.message);
+      return {
+        status: 0,
+        error: {
+          message: error.message,
+          code: changePending ? 'change_pending' : 'network_error',
+          type: 'network_error',
+          details: refunded != null ? { refunded } : undefined,
+        },
+      };
+    }
     return {
-      status: error.statusCode || 0,
+      status: error.statusCode,
       error: {
         message: error.message,
         code: 'provider_error',
         type: 'provider_error',
-        details: undefined,
+        details: refunded != null ? { refunded } : undefined,
       },
     };
   }
@@ -1669,10 +1690,18 @@ export async function sendMessage(
       reason: (translated?.error.message ?? raw?.message ?? String(error)).slice(0, 200),
       duration_ms: elapsed(),
     });
-    if (translated) throw translated;
     // Anything still in flight is money the node may or may not have taken;
-    // only the node can say, and the sweep is how it is asked.
-    if (ownsScope()) void sweepUnsettledPayments();
+    // only the node can say, and the sweep is how it is asked. A token the
+    // node redeemed but never returned change for is the case that costs
+    // real sats — the connection dropped while the node was still generating
+    // — and the node writes its refund row only when that work ends, so the
+    // asking is spread over the next minutes rather than done once now.
+    if (ownsScope() && paid?.mintedSats != null && !paid.changeReceived) {
+      scheduleRecoverySweeps();
+    } else if (ownsScope() && !translated) {
+      void sweepUnsettledPayments();
+    }
+    if (translated) throw translated;
     toRoutstrError(error);
   }
 
