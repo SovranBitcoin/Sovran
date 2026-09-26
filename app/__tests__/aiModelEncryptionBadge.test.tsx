@@ -29,7 +29,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import type { RoutstrModel } from '@/shared/lib/routstr/api';
 
 import { ModelChip } from '@/features/ai/components/ModelChip';
-import { E2EE_BADGE_LABEL } from '@/features/ai/lib/format';
+import { E2EE_BADGE_ICON, E2EE_BADGE_LABEL } from '@/features/ai/lib/format';
 import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
@@ -356,6 +356,21 @@ describe('the chip badges the model a turn would actually be sent to', () => {
     const tree = renderChip();
     expect(has(tree, 'ai-model-chip-e2ee')).toBe(true);
     expect(chipLabel(tree)).toContain(E2EE_BADGE_LABEL);
+    act(() => tree.unmount());
+  });
+
+  it('draws exactly one padlock, never a vendor lock beside a model lock', () => {
+    // The encrypted vendor's own glyph IS the padlock, so a per-model badge
+    // drawn next to it put two locks on every sealed selection. One glyph in
+    // the leading slot says it once.
+    act(() => {
+      useRoutstrStore.getState().setSelectedSlot({ provider: 'tinfoil', tier: 'max' });
+    });
+    const tree = renderChip();
+    const locks = tree.root.findAll(
+      (node) => typeof node.type !== 'string' && node.props.name === E2EE_BADGE_ICON
+    );
+    expect(locks).toHaveLength(1);
     act(() => tree.unmount());
   });
 

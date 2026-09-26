@@ -4,7 +4,7 @@ import { useModelCatalog } from '../hooks/useModelCatalog';
 import { Keyboard } from 'react-native';
 import Icon from 'assets/icons';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
-import { isE2eeModelId } from '@/shared/lib/routstr/lineup';
+import { isE2eeModelId, lineupProviderIds } from '@/shared/lib/routstr/lineup';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
 import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
 import { modelPickerPopup } from '@/shared/lib/popup';
@@ -154,6 +154,52 @@ export function ModelChip() {
   // when the user needs the lock to disappear.
   const sealed = isE2eeModelId(resolvedEntry?.modelId);
 
+  // ONE glyph in the leading slot. The encrypted vendor's own icon is the
+  // padlock, so drawing the vendor glyph AND a per-model padlock badge put two
+  // locks on the chip for every sealed selection — the lock said the same
+  // thing twice and the user read it as a bug. The padlock is the more
+  // important of the two signals (it is a fact about the request, the vendor
+  // glyph is decoration), so when the resolved model is sealed the lock takes
+  // the slot and the vendor glyph yields it.
+  const leadingIcon = sealed ? E2EE_BADGE_ICON : currentProvider.icon;
+
+  // One line naming every state the selection can be in, emitted only when
+  // one of them changes. `ai.tier.affordability_snapshot` below carries the
+  // whole matrix and re-fires on every balance tick, which is the wrong
+  // signal-to-noise for the question "why did the chip say THAT after I
+  // switched provider" — that needs the node, the pin, the pair, what it
+  // resolved to, whether the node serves it, and which lineup answered, on one
+  // line, with nothing else.
+  const nodeBaseUrl = useRoutstrStore((s) => s.nodeBaseUrl);
+  const userNodeBaseUrl = useRoutstrStore((s) => s.userNodeBaseUrl);
+  const resolvedModelId = resolvedEntry?.modelId ?? null;
+  const catalogSize = models.length;
+  useEffect(() => {
+    aiLog.info('ai.selection.state', {
+      nodeBaseUrl,
+      pinned: userNodeBaseUrl != null,
+      selectedProvider,
+      selectedTier,
+      resolvedModelId,
+      sealed,
+      served,
+      lineupSource,
+      lineupProviders: lineupProviderIds(lineup),
+      catalogSize,
+    });
+  }, [
+    nodeBaseUrl,
+    userNodeBaseUrl,
+    selectedProvider,
+    selectedTier,
+    resolvedModelId,
+    sealed,
+    served,
+    lineupSource,
+    lineup,
+    catalogSize,
+  ]);
+
   const onPress = useCallback(() => {
     // Picker has no in-sheet inputs, so gorhom can't lift over an
     // externally owned keyboard (the composer). Dismiss it so the sheet
@@ -179,14 +225,15 @@ export function ModelChip() {
       variant="primary"
       size="compact"
       onPress={onPress}
-      icon={<Icon name={currentProvider.icon} size={16} color={background} />}
+      icon={
+        // The test id rides on the slot only while it holds the lock, so a
+        // test can still ask "is this chip badged" without a second glyph.
+        <View testID={sealed ? 'ai-model-chip-e2ee' : undefined}>
+          <Icon name={leadingIcon} size={16} color={background} />
+        </View>
+      }
       text={
         <HStack align="center" gap={4}>
-          {sealed ? (
-            <View testID="ai-model-chip-e2ee">
-              <Icon name={E2EE_BADGE_ICON} size={12} color={background} />
-            </View>
-          ) : null}
           <Text size={13} bold color={background}>
             {chipLabel}
           </Text>
