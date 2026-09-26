@@ -4247,6 +4247,60 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
           "default": true,
           "type": "boolean",
         },
+        "curatedModels": {
+          "anyOf": [
+            {
+              "properties": {
+                "blacklistedNodes": {
+                  "default": [],
+                  "items": {
+                    "maxLength": 512,
+                    "type": "string",
+                  },
+                  "maxItems": 256,
+                  "type": "array",
+                },
+                "fetchedAt": {
+                  "default": 0,
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "ids": {
+                  "items": {
+                    "maxLength": 128,
+                    "type": "string",
+                  },
+                  "maxItems": 512,
+                  "type": "array",
+                },
+                "updatedAt": {
+                  "default": 0,
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "whitelistedNodes": {
+                  "default": [],
+                  "items": {
+                    "maxLength": 512,
+                    "type": "string",
+                  },
+                  "maxItems": 256,
+                  "type": "array",
+                },
+              },
+              "required": [
+                "ids",
+              ],
+              "type": "object",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
         "currentSessionId": {
           "anyOf": [
             {
@@ -5141,6 +5195,65 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
           "default": true,
           "type": "boolean",
         },
+        "curatedModels": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "blacklistedNodes": {
+                  "default": [],
+                  "items": {
+                    "maxLength": 512,
+                    "type": "string",
+                  },
+                  "maxItems": 256,
+                  "type": "array",
+                },
+                "fetchedAt": {
+                  "default": 0,
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "ids": {
+                  "items": {
+                    "maxLength": 128,
+                    "type": "string",
+                  },
+                  "maxItems": 512,
+                  "type": "array",
+                },
+                "updatedAt": {
+                  "default": 0,
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "whitelistedNodes": {
+                  "default": [],
+                  "items": {
+                    "maxLength": 512,
+                    "type": "string",
+                  },
+                  "maxItems": 256,
+                  "type": "array",
+                },
+              },
+              "required": [
+                "ids",
+                "blacklistedNodes",
+                "whitelistedNodes",
+                "updatedAt",
+                "fetchedAt",
+              ],
+              "type": "object",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
         "currentSessionId": {
           "anyOf": [
             {
@@ -5302,6 +5415,7 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
         "providerSeenAt",
         "pendingPayments",
         "confirmSpend",
+        "curatedModels",
       ],
       "type": "object",
     },

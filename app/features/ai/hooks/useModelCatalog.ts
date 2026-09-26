@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 
 import { getModels, type RoutstrModel } from '@/shared/lib/routstr/api';
+import { refreshCuratedModels } from '@/shared/lib/routstr/curatedModels';
 import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
 import { aiLog, redactError } from '@/shared/lib/logger';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
@@ -56,6 +58,15 @@ export function useModelCatalog(): RoutstrModel[] {
   const isCacheStale = useRoutstrStore((s) => s.isCacheStale);
 
   const [models, setModels] = useState<RoutstrModel[]>(cachedModels ?? []);
+
+  // Routstr's curated list rides beside the catalog read: the catalog says
+  // what the node serves, the list says what the network still stands behind,
+  // and the lineup is derived from both. Throttled by the store's own TTL, so
+  // this is one relay round-trip every few hours, not one per mount.
+  const { ndk } = useNDK();
+  useEffect(() => {
+    if (ndk) void refreshCuratedModels(ndk);
+  }, [ndk]);
   /**
    * Bumped to start a fresh ladder. The effect below re-runs on it, which is
    * the one way a new attempt happens after the ladder has run out — and it

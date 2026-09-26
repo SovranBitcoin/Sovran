@@ -93,6 +93,25 @@ const MIN_MODELS_PER_PROVIDER = 3;
 
 const KNOWN_PROVIDER_IDS = new Set<AiProviderId>(AI_PROVIDER_IDS);
 
+/**
+ * One spelling for a model id, so a node's catalog and Routstr's curated list
+ * can disagree about dots, case and vendor prefixes without disagreeing about
+ * the model: the list says `deepseek-v4.1-flash`, a node may say
+ * `deepseek-v4-1-flash` or `deepseek/deepseek-v4.1-flash`. Suffixes such as
+ * `:free` or `:batch` are kept — they name a different offering.
+ */
+export function normalizeModelId(id: string): string {
+  const bare = id.includes('/') ? id.slice(id.lastIndexOf('/') + 1) : id;
+  return bare.trim().toLowerCase().replace(/\./g, '-');
+}
+
+/** The curated list as the set a derivation checks candidates against, or
+ *  `null` when there is no list to check against. */
+export function curatedIdSet(ids: readonly string[] | null | undefined): Set<string> | null {
+  if (!ids || ids.length === 0) return null;
+  return new Set(ids.map(normalizeModelId));
+}
+
 export const AI_TIER_IDS = ['auto', 'pro', 'max'] as const;
 export type AiTierId = (typeof AI_TIER_IDS)[number];
 
@@ -203,6 +222,9 @@ export type PersistedLineup = z.infer<typeof PersistedLineupSchema>;
 interface LineupProviderStats {
   qualifying: number;
   aliasDropped: number;
+  /** Qualifying models that are also on Routstr's curated list. When above
+   *  zero the vendor's ladder was built from those alone. */
+  curated?: number;
 }
 
 interface LineupStats {
@@ -475,7 +497,17 @@ function pickTiers(candidates: RoutstrModel[], nowSeconds: number): ProviderLine
  */
 export function deriveLineup(
   models: RoutstrModel[],
-  nowSeconds: number = Math.floor(Date.now() / 1000)
+  nowSeconds: number = Math.floor(Date.now() / 1000),
+  /**
+   * Routstr's curated model list (`curatedIdSet`), or `null` for none. A
+   * vendor with at least one listed qualifying model builds its ladder from
+   * listed models only; a vendor with none keeps its full qualifying set. The
+   * catalog is the node's claim about what it serves; the list is the
+   * network's claim about what is worth serving — and a model on the first
+   * but not the second is how `tinfoil-deepseek-v4-flash` stayed a node's
+   * cheapest sealed pick for weeks after its enclave stopped answering.
+   */
+  curated: ReadonlySet<string> | null = null
 ): { lineup: AiLineup; stats: LineupStats } {
   const lineup = emptyLineup();
   const stats: LineupStats = { perProvider: {}, totalQualifying: 0 };
@@ -505,7 +537,11 @@ export function deriveLineup(
     const candidates = byProvider.get(provider) ?? [];
     statsFor(provider).qualifying = candidates.length;
     stats.totalQualifying += candidates.length;
-    lineup[provider] = pickTiers(candidates, nowSeconds);
+    const listed = curated
+      ? candidates.filter((model) => curated.has(normalizeModelId(model.id)))
+      : [];
+    if (curated) statsFor(provider).curated = listed.length;
+    lineup[provider] = pickTiers(listed.length > 0 ? listed : candidates, nowSeconds);
   }
 
   return { lineup, stats };

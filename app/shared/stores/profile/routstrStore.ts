@@ -10,6 +10,7 @@ import {
   AI_TIER_IDS,
   E2EE_PROVIDER_ID,
   PersistedLineupSchema,
+  curatedIdSet,
   deriveLineup,
   lineupHasEntries,
   lineupProviderIds,
@@ -500,6 +501,14 @@ interface RoutstrState {
    */
   lastKnownLineup: PersistedLineup | null;
   /**
+   * Routstr's curated model list (Nostr kind 38423, `routstr-21-models`), as
+   * last fetched. Persisted, so a cold start derives against the same list the
+   * previous session did rather than against nothing until the relays answer.
+   * `null` until the first successful fetch. See `shared/lib/routstr/
+   * curatedModels.ts` for what it is and `deriveLineup` for how it is used.
+   */
+  curatedModels: CuratedModelsState | null;
+  /**
    * Timestamp of the last applied nagg-served lineup (`/app/ai-lineup`).
    * Persisted, including invalidation. While set, setCachedModels refreshes the raw
    * catalog cache (pricing lookups, vision flags) but no longer overwrites
@@ -519,7 +528,21 @@ interface RoutstrState {
   isAnonymousMode: boolean;
 }
 
+interface CuratedModelsState {
+  ids: string[];
+  blacklistedNodes: string[];
+  whitelistedNodes: string[];
+  /** The event's `created_at`, in ms. */
+  updatedAt: number;
+  /** When this device fetched it, for the refresh TTL. */
+  fetchedAt: number;
+}
+
 interface RoutstrActions {
+  /** Adopt a freshly fetched curated list and re-derive the lineup from the
+   *  catalog in hand, so a list that arrives after the catalog still shapes
+   *  the menu this session. */
+  setCuratedModels: (curated: CuratedModelsState) => void;
   setApiKey: (apiKey: string) => void;
   clearApiKey: () => void;
   /** Move a credential into `legacyAccounts` so its balance stays reachable.
@@ -914,6 +937,19 @@ const PersistedRoutstrStore = z.object({
   // Additive, and defaulting to ON: spending is the kind of thing that should
   // have to be turned off deliberately, never left off by a parse failure.
   confirmSpend: z.boolean().default(true).catch(true),
+  // Additive + tolerant: a malformed list parses to null and the lineup derives
+  // against the whole catalog until the relays answer again.
+  curatedModels: z
+    .object({
+      ids: z.array(z.string().max(128)).max(512),
+      blacklistedNodes: z.array(z.string().max(512)).max(256).default([]),
+      whitelistedNodes: z.array(z.string().max(512)).max(256).default([]),
+      updatedAt: z.number().int().nonnegative().default(0),
+      fetchedAt: z.number().int().nonnegative().default(0),
+    })
+    .nullable()
+    .default(null)
+    .catch(null),
 });
 
 export const useRoutstrStore = create<RoutstrStore>()(
@@ -931,6 +967,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
       modelsCache: null,
       lineup: null,
       lastKnownLineup: null,
+      curatedModels: null,
       serverLineupAt: null,
       nodeBaseUrl: null,
       userNodeBaseUrl: null,
@@ -943,6 +980,25 @@ export const useRoutstrStore = create<RoutstrStore>()(
       sessions: [],
       currentSessionId: null,
       isAnonymousMode: false,
+
+      setCuratedModels: (curated) => {
+        const before = get().curatedModels;
+        set({ curatedModels: curated });
+        const same =
+          before != null &&
+          before.ids.length === curated.ids.length &&
+          before.ids.every((id, index) => id === curated.ids[index]);
+        storeLog.info('store.routstr.curated_models_set', {
+          models: curated.ids.length,
+          changed: !same,
+        });
+        // The list shapes the derivation, and the derivation may already have
+        // happened this session against no list or an older one. Re-run it
+        // from the catalog in hand; `setCachedModels` keeps its own rule about
+        // a nagg-served lineup outranking the derivation.
+        const cached = get().modelsCache;
+        if (!same && cached) get().setCachedModels(cached.data);
+      },
 
       setApiKey: (apiKey: string) => {
         storeLog.info('store.routstr.set_api_key');
@@ -1118,7 +1174,11 @@ export const useRoutstrStore = create<RoutstrStore>()(
           set({ modelsCache: { data: models, timestamp: Date.now() } });
           return;
         }
-        const { lineup: derived, stats } = deriveLineup(models);
+        const { lineup: derived, stats } = deriveLineup(
+          models,
+          undefined,
+          curatedIdSet(get().curatedModels?.ids)
+        );
         const snapshot = get().lastKnownLineup;
         const previous = snapshot?.nodeBaseUrl === get().nodeBaseUrl ? snapshot : null;
         const merged = mergeLineupWithLastKnown(derived, previous?.lineup ?? null);
@@ -1483,6 +1543,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
         // until the receive/refund path explicitly completes this payment.
         pendingPayments: state.pendingPayments,
         confirmSpend: state.confirmSpend,
+        curatedModels: state.curatedModels,
       }),
       afterHydrate: (state) => {
         if (!state) return;
