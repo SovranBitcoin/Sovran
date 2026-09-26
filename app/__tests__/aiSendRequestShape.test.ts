@@ -85,6 +85,11 @@ jest.mock('@/shared/ui/primitives/Haptics', () => ({
   EnhancedHaptics: { navigateHaptic: jest.fn() },
 }));
 jest.mock('@/features/ai/lib/attachments', () => ({ encodeChatImage: jest.fn() }));
+// Persisted, and this file's logger mock is partial; no mint here is a testnut.
+jest.mock('@/shared/stores/global/mintTestnutStore', () => ({
+  isTestnutMint: () => false,
+  useIsTestnutMint: () => () => false,
+}));
 jest.mock('@/shared/lib/logger', () => {
   const log = {
     info: jest.fn(),

@@ -20,7 +20,8 @@ import {
 } from '@/shared/lib/routstr/providers';
 import { cachedProbe, probeProviders } from '@/shared/lib/routstr/providerHealth';
 import { useBalanceContext } from '@cashu/coco-react';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { routstrMintKey, spendableMintBalances } from '@/shared/lib/routstr/payingMint';
+import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { useIdentityHeader } from '@/shared/ui/composed/IdentityHeader';
 import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
 import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
@@ -142,10 +143,17 @@ export function ProviderInfoScreen() {
   // Mints the wallet actually holds, so the accepted list can say which of
   // them are yours rather than listing URLs you cannot act on.
   const { balances } = useBalanceContext();
-  const walletTotal = Object.values(balances.byMint).reduce(
-    (sum, snapshot) => sum + amountToNumber(snapshot?.total ?? undefined),
-    0
+  const isTestnut = useIsTestnutMint();
+  // Only what can pay a provider: spendable sats, on a sat keyset, on a mint
+  // that is not a testnut — the same filter the payment path applies, keyed by
+  // the canonical spelling nodes and wallets disagree about.
+  const spendableByMint = new Map(
+    Object.entries(spendableMintBalances(balances.byMint, isTestnut)).flatMap(([url, sats]) => {
+      const key = routstrMintKey(url);
+      return key ? [[key, sats] as const] : [];
+    })
   );
+  const walletTotal = [...spendableByMint.values()].reduce((sum, sats) => sum + sats, 0);
   // What the wallet can actually spend HERE — the sum across the mints this
   // provider redeems, not the wallet total, which says nothing about whether
   // this particular provider can be paid. A provider that publishes NO list
@@ -154,11 +162,13 @@ export function ProviderInfoScreen() {
   const spendableSats = !info?.mints.length
     ? walletTotal
     : info.mints.reduce(
-        (sum, mint) =>
-          sum +
-          amountToNumber(balances.byMint[mint.trim().replace(/\/+$/, '')]?.total ?? undefined),
+        (sum, mint) => sum + (spendableByMint.get(routstrMintKey(mint) ?? '') ?? 0),
         0
       );
+
+  // The description and the mint list can both come in on the link. When they
+  // do, the page shows them at once and the read only confirms them.
+  const acceptedMints = info?.mints ?? entry?.seedMints;
 
   // The four facts that decide this page, two by two — the same block the
   // mint page uses, because the two surfaces answer the same question about
@@ -207,12 +217,6 @@ export function ProviderInfoScreen() {
   // hold exactly the height the verdict will need — see `providerPrivacy.ts`.
   const privacy = providerPrivacyNotice(catalog ?? seededCatalog);
   const privacyLoading = catalogState === 'loading' && seededCatalog === null;
-
-  const heldMints = new Set(
-    Object.entries(balances.byMint)
-      .filter(([, snapshot]) => amountToNumber(snapshot?.total) > 0)
-      .map(([url]) => url.trim().replace(/\/+$/, '').toLowerCase())
-  );
 
   useEffect(() => {
     if (!nodeBaseUrl) return;
@@ -294,10 +298,7 @@ export function ProviderInfoScreen() {
 
   const displayName =
     info?.name ?? entry?.seedName ?? (nodeBaseUrl ?? '').replace(/^https:\/\//, '');
-  // The description and the mint list can both come in on the link. When they
-  // do, the page shows them at once and the read only confirms them.
   const description = info?.description ?? entry?.seedDescription;
-  const acceptedMints = info?.mints ?? entry?.seedMints;
   const descriptionLoading = state === 'loading' && !description;
   const mintsLoading = state === 'loading' && !acceptedMints;
 

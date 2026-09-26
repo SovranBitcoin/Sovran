@@ -5,6 +5,7 @@ import { apiLog } from '@/shared/lib/logger';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 
 import { annotatePaymentLeg } from './paymentScope';
+import { isTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { spendableMintBalances } from '../payingMint';
 import { encodeTokenForNode, keysetIdsOf, toWalletToken, wireTokenAmount } from '../tokenWire';
 
@@ -37,6 +38,14 @@ function manager() {
   return instance;
 }
 
+/** The wallet's selected mint, unless it is a testnut: its balance is excluded
+ *  from `getBalances`, and naming it here would still invite the SDK to pay
+ *  from it. */
+function payableSelectedMint(): string | null {
+  const selected = useMintStore.getState().selectedMint;
+  return selected && !isTestnutMint(selected) ? selected : null;
+}
+
 export function createCocoWalletAdapter(assertOwner: () => void = () => {}) {
   let unitsByMint: Record<string, 'sat' | 'msat'> = {};
   const ownedManager = () => {
@@ -61,7 +70,7 @@ export function createCocoWalletAdapter(assertOwner: () => void = () => {}) {
 
     getMintUnits(): Record<string, 'sat' | 'msat'> {
       assertOwner();
-      const selected = useMintStore.getState().selectedMint;
+      const selected = payableSelectedMint();
       // The selected mint is always answerable, even before the first balance
       // read, because it is the one the caller asked to pay from.
       return selected ? { [selected]: 'sat', ...unitsByMint } : unitsByMint;
@@ -69,7 +78,7 @@ export function createCocoWalletAdapter(assertOwner: () => void = () => {}) {
 
     getActiveMintUrl(): string | null {
       assertOwner();
-      return useMintStore.getState().selectedMint ?? null;
+      return payableSelectedMint();
     },
 
     async sendToken(mintUrl: string, amount: number): Promise<string> {

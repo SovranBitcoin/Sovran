@@ -61,6 +61,11 @@ jest.mock('@/shared/lib/routstr/sdk/walletAdapter', () => ({
   }),
   tokenAmountSats: () => 3,
 }));
+// Persisted, and this file's logger mock is partial; no mint here is a testnut.
+jest.mock('@/shared/stores/global/mintTestnutStore', () => ({
+  isTestnutMint: () => false,
+  useIsTestnutMint: () => () => false,
+}));
 jest.mock('@/shared/lib/logger', () => ({
   apiLog: { info: jest.fn(), warn: jest.fn() },
 }));

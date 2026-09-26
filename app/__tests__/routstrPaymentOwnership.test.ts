@@ -50,6 +50,11 @@ jest.mock('@/shared/lib/routstr/sdk/walletAdapter', () => ({
   // not decode, and a sweep must not depend on being able to read them.
   tokenAmountSats: () => null,
 }));
+// Persisted, and this file's logger mock is partial; no mint here is a testnut.
+jest.mock('@/shared/stores/global/mintTestnutStore', () => ({
+  isTestnutMint: () => false,
+  useIsTestnutMint: () => () => false,
+}));
 jest.mock('@/shared/lib/logger', () => ({ apiLog: { info: jest.fn(), warn: jest.fn() } }));
 
 function deferred<T>() {

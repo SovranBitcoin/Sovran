@@ -9,6 +9,7 @@ import {
 } from '@/shared/lib/routstr/providerHealth';
 import type { ServerProvider } from '@/shared/lib/routstr/providers';
 import type { StatusSource } from '../lib/providerListLog';
+import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
 /**
@@ -87,15 +88,16 @@ export function useProviderRows(
 ): ProviderRow[] {
   const knownProviders = useRoutstrStore((s) => s.knownProviders);
   const { balances } = useBalanceContext();
+  const isTestnut = useIsTestnutMint();
 
   const byMint = useMemo(() => {
     const out = new Map<string, number>();
-    for (const [url, sats] of Object.entries(spendableMintBalances(balances.byMint))) {
+    for (const [url, sats] of Object.entries(spendableMintBalances(balances.byMint, isTestnut))) {
       const key = routstrMintKey(url);
       if (key && sats > 0) out.set(key, sats);
     }
     return out;
-  }, [balances]);
+  }, [balances, isTestnut]);
 
   const walletTotal = useMemo(
     () => [...byMint.values()].reduce((sum, sats) => sum + sats, 0),

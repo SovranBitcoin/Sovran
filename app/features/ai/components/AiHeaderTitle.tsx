@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { useBalanceContext } from '@cashu/coco-react';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
 import {
   cachedProbe,
   probeProviders,
@@ -14,6 +12,7 @@ import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import BalancePill from '@/shared/ui/composed/BalancePill';
 
+import { useRoutstrFunds } from '../hooks/useRoutstrFunds';
 import { ProviderPillIcon } from './ProviderAvatar';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
@@ -22,17 +21,18 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
  * now its behavioural twin too.
  *
  * The mint pill names the mint you are spending from and shows what is in it.
- * This one names the PROVIDER you are paying and shows the same wallet
- * balance, because since requests are paid per call there is no second
- * balance: the wallet is the only pot, and it cannot go stale the way the
- * old per-node figure did (the header showed 250 sats against a node that had
- * never seen them).
+ * This one names the PROVIDER you are paying and shows the wallet balance
+ * that can pay it, because since requests are paid per call there is no
+ * second balance: the wallet is the only pot, and it cannot go stale the way
+ * the old per-node figure did (the header showed 250 sats against a node that
+ * had never seen them). "Can pay it" is the one mint the next request draws
+ * on — never a testnut's sats, which no provider can redeem.
  *
  * The provider's liveness rides on the icon as a corner dot, so the answer to
  * "is my AI working" is on screen before anything is typed.
  */
 export function AiHeaderTitle() {
-  const { balances: liveBalances } = useBalanceContext();
+  const funds = useRoutstrFunds();
   const mintUrl = useMintStore((s) => s.selectedMint);
   const mockMode = useSettingsStore((s) => s.mockMode);
 
@@ -71,13 +71,15 @@ export function AiHeaderTitle() {
     router.navigate('/(ai-flow)/providers');
   }, []);
 
-  // Read exactly as the wallet header reads it (`useMintSelector`), so the two
-  // pills cannot disagree about the same pot.
-  const sats = mintUrl
-    ? mockMode
+  // What will actually pay the next request: the mint the payment path picks
+  // (`useRoutstrFunds`), not the wallet's selected mint's raw total. Those
+  // differ exactly when it matters — a selected testnut mint, whose sats a
+  // provider cannot redeem, or one the provider does not accept.
+  const sats = mockMode
+    ? mintUrl
       ? getMockMintBalance(mintUrl, 'sat')
-      : amountToNumber(liveBalances.byMint[mintUrl]?.total)
-    : 0;
+      : 0
+    : (funds?.balanceSats ?? 0);
 
   // No skeleton: this is local wallet state, not a request in flight. Empty
   // means the wallet is empty, and the CTA points at funding the wallet rather

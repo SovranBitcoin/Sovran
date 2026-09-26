@@ -2,6 +2,7 @@ import { normalizeMintUrl, type BalanceSnapshot } from '@cashu/coco-core';
 import { z } from 'zod';
 
 import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { isTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 
 const MintUrl = z.httpUrl();
 
@@ -10,14 +11,23 @@ export function routstrMintKey(value: string): string | null {
   return parsed.success ? normalizeMintUrl(parsed.data) : null;
 }
 
-/** Only spendable sats can fund a request; reserved proofs and other units cannot. */
+/**
+ * Only spendable sats can fund a request; reserved proofs, other units and
+ * testnut mints cannot. A testnut's sats are backed by a fake Lightning
+ * backend: they sit in their own account everywhere else in the wallet, and a
+ * provider paid with them is paid nothing. React callers pass the reactive
+ * predicate (`useIsTestnutMint`) so a verdict landing later re-derives them.
+ */
 export function spendableMintBalances(
-  snapshots: Readonly<Record<string, Pick<BalanceSnapshot, 'spendable' | 'unit'>>>
+  snapshots: Readonly<Record<string, Pick<BalanceSnapshot, 'spendable' | 'unit'>>>,
+  isTestnut: (mintUrl: string) => boolean = isTestnutMint
 ): Record<string, number> {
   return Object.fromEntries(
     Object.entries(snapshots).flatMap(([url, snapshot]) => {
       const sats = amountToNumber(snapshot.spendable);
-      return snapshot.unit === 'sat' && Number.isSafeInteger(sats) && sats > 0 ? [[url, sats]] : [];
+      return snapshot.unit === 'sat' && Number.isSafeInteger(sats) && sats > 0 && !isTestnut(url)
+        ? [[url, sats]]
+        : [];
     })
   );
 }

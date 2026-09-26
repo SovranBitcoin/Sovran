@@ -79,6 +79,11 @@ jest.mock('@/shared/stores/profile/routstrStore', () => ({
     }),
   },
 }));
+// Persisted, and this file's logger mock is partial; no mint here is a testnut.
+jest.mock('@/shared/stores/global/mintTestnutStore', () => ({
+  isTestnutMint: () => false,
+  useIsTestnutMint: () => () => false,
+}));
 jest.mock('@/shared/lib/logger', () => {
   const log = { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() };
   return { apiLog: log, aiLog: log, storeLog: log, log, applyFileLogging: jest.fn() };

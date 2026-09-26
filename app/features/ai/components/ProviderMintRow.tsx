@@ -2,9 +2,10 @@ import { ListGroup } from 'heroui-native';
 
 import { useBalanceContext } from '@cashu/coco-react';
 import Icon from 'assets/icons';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { routstrMintKey, spendableMintBalances } from '@/shared/lib/routstr/payingMint';
 import { getMintDisplayName } from '@/shared/lib/url';
+import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
@@ -36,6 +37,7 @@ export function ProviderMintRow({
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
   const meta = useCachedMintMetadata(mintUrl);
   const { balances } = useBalanceContext();
+  const isTestnut = useIsTestnutMint();
 
   // Before the name is resolved, so a placeholder row does not ask the URL
   // helpers what an empty string is called.
@@ -54,7 +56,14 @@ export function ProviderMintRow({
     );
   }
 
-  const sats = amountToNumber(balances.byMint[mintUrl]?.total);
+  // What can pay THIS provider from this mint — spendable sats, never a
+  // testnut's — matched on the canonical spelling, because the node and the
+  // wallet disagree about trailing slashes and case.
+  const key = routstrMintKey(mintUrl);
+  const sats =
+    Object.entries(spendableMintBalances(balances.byMint, isTestnut)).find(
+      ([url]) => key !== null && routstrMintKey(url) === key
+    )?.[1] ?? 0;
   const name = getMintDisplayName(mintUrl, { name: meta?.displayName });
 
   return (
@@ -65,6 +74,8 @@ export function ProviderMintRow({
         <ListGroup.ItemDescription>
           {sats > 0 ? (
             <AmountFormatter amount={sats} unit="sat" size={13} color={foreground} />
+          ) : isTestnut(mintUrl) ? (
+            'Test funds only'
           ) : (
             'Not in your wallet'
           )}

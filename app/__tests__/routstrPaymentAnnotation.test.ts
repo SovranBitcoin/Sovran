@@ -24,6 +24,11 @@ jest.mock('@/shared/stores/profile/transactionAnnotationStore', () => ({
   },
 }));
 
+// Persisted, and this file's logger mock is partial; no mint here is a testnut.
+jest.mock('@/shared/stores/global/mintTestnutStore', () => ({
+  isTestnutMint: () => false,
+  useIsTestnutMint: () => () => false,
+}));
 jest.mock('@/shared/lib/logger', () => {
   const noop = { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() };
   return { apiLog: noop, aiLog: noop, storeLog: noop, log: noop, applyFileLogging: jest.fn() };
