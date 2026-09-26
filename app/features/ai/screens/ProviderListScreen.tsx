@@ -475,7 +475,15 @@ export function ProviderListScreen() {
   );
 
   const onInspect = useCallback((row: ProviderRow) => {
-    router.navigate(buildProviderInfoHref(row.baseUrl, { seedName: row.name }));
+    router.navigate(
+      buildProviderInfoHref(row.baseUrl, {
+        seedName: row.name,
+        seedDescription: row.description ?? undefined,
+        seedPubkey: row.pubkey ?? undefined,
+        seedMints: row.mints,
+        seedFollowers: row.followers ?? undefined,
+      })
+    );
   }, []);
 
   const activeUrl = normalizeNodeUrl(chosen ?? '');

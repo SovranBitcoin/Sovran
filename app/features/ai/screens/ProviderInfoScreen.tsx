@@ -63,9 +63,13 @@ const ParamsSchema = z.object({
 const EntrySchema = z.object({
   nodeBaseUrl: z.string().max(512),
   seedName: z.string().max(200).optional(),
+  seedDescription: z.string().max(4096).optional(),
+  seedPubkey: z.string().max(128).optional(),
+  seedMints: z.array(z.string().max(512)).max(64).optional(),
+  seedFollowers: z.number().int().nonnegative().optional(),
 });
 
-function parseEntry(raw: string | undefined): { nodeBaseUrl: string; seedName?: string } | null {
+function parseEntry(raw: string | undefined): z.infer<typeof EntrySchema> | null {
   if (!raw) return null;
   try {
     const parsed = EntrySchema.safeParse(JSON.parse(raw));
@@ -77,7 +81,6 @@ function parseEntry(raw: string | undefined): { nodeBaseUrl: string; seedName?: 
 
 export function ProviderInfoScreen() {
   const background = useThemeColor('background');
-  const muted = useThemeColor('muted');
   const params = useRouteParams(ParamsSchema, { where: 'ai-flow.provider' });
   const entry = parseEntry(params?.providerInfoEntry);
   const nodeBaseUrl = entry ? normalizeNodeUrl(entry.nodeBaseUrl) : null;
@@ -103,18 +106,23 @@ export function ProviderInfoScreen() {
   const knownProvider = useRoutstrStore((s) =>
     nodeBaseUrl ? s.knownProviders[nodeBaseUrl] : undefined
   );
-  const operatorPubkey = info?.pubkey ?? knownProvider?.pubkey ?? null;
+  // The row that opened this page already knew the operator, so the section
+  // mounts on the first frame instead of appearing when `/v1/info` lands.
+  const operatorPubkey = info?.pubkey ?? knownProvider?.pubkey ?? entry?.seedPubkey ?? null;
   const { data: operatorProfile, isLoading: operatorLoading } = useNostrProfile(operatorPubkey);
   // The same resolution every other identity in this app goes through, so an
   // operator reads the same here as on the row the user tapped to get here.
   const operatorName = operatorPubkey
     ? resolveIdentityName({ nostrProfile: operatorProfile, pubkey: operatorPubkey })
     : '';
+  const operatorFollowers = operatorProfile?.followers ?? entry?.seedFollowers;
   const operatorReach = [
-    typeof operatorProfile?.followers === 'number'
-      ? `${operatorProfile.followers.toLocaleString()} followers`
+    typeof operatorFollowers === 'number'
+      ? `${operatorFollowers.toLocaleString()} followers`
       : null,
-    typeof operatorProfile?.score === 'number' ? `${operatorProfile.score} reputation` : null,
+    typeof operatorProfile?.score === 'number'
+      ? `${Math.round(operatorProfile.score)} reputation`
+      : null,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -276,6 +284,12 @@ export function ProviderInfoScreen() {
 
   const displayName =
     info?.name ?? entry?.seedName ?? (nodeBaseUrl ?? '').replace(/^https:\/\//, '');
+  // The description and the mint list can both come in on the link. When they
+  // do, the page shows them at once and the read only confirms them.
+  const description = info?.description ?? entry?.seedDescription;
+  const acceptedMints = info?.mints ?? entry?.seedMints;
+  const descriptionLoading = state === 'loading' && !description;
+  const mintsLoading = state === 'loading' && !acceptedMints;
 
   // The same scroll handoff the mint details page uses: the identity rides in
   // the navigation bar once the name band scrolls away, so a provider page and
@@ -352,40 +366,37 @@ export function ProviderInfoScreen() {
         </Animated.View>
         {/* The face and the name are already right: the avatar is seeded from
             the URL and the name comes in on the link, so neither has a loading
-            state to draw. The description is the one thing on this band that
-            arrives over the wire, so it — and only it — reserves a line. */}
-        {state === 'loading' ? (
-          <>
-            <Spacer size={4} />
-            <Text
-              loading
-              size={14}
-              color={muted}
-              className="text-center"
-              placeholder="A node serving frontier models, paid in ecash"
-              testID="ai-provider-info-description-skeleton"
-            />
-          </>
-        ) : info?.description ? (
-          <>
-            <Spacer size={4} />
-            <Text size={14} color={muted} className="text-center">
-              {info.description}
-            </Text>
-          </>
-        ) : null}
+            state to draw. */}
       </VStack>
 
-      {state === 'empty' ? (
-        <>
-          <Notice
-            status="info"
-            title="This provider does not describe itself"
-            description="Older nodes do not serve an info endpoint. It can still be used."
-          />
-          <Spacer size={12} />
-        </>
-      ) : null}
+      {/* One slot for what the provider says about itself, the same card the
+          mint and profile pages use for theirs, held at two lines whether the
+          copy is still coming, came in on the link, or does not exist — so
+          nothing under it moves when the read lands. Longer copy folds behind
+          "Show more" instead of growing the card. */}
+      {state === 'empty' && !description ? (
+        <Notice
+          status="info"
+          title="This provider does not describe itself"
+          description="Older nodes do not serve an info endpoint. It can still be used."
+          testID="ai-provider-info-description"
+        />
+      ) : (
+        <Notice
+          status="info"
+          icon="ri:file-text-line"
+          loading={descriptionLoading}
+          reserveLines={2}
+          collapseLines={2}
+          description={description ?? 'This provider has not published a description.'}
+          testID={
+            descriptionLoading
+              ? 'ai-provider-info-description-skeleton'
+              : 'ai-provider-info-description'
+          }
+        />
+      )}
+      <Spacer size={12} />
 
       {/* Above the numbers, because it is the question the numbers are FOR.
           The slot is held while the catalog is out — a warning about who can
@@ -508,7 +519,7 @@ export function ProviderInfoScreen() {
           list is coming and where it starts, without pretending to know how
           long it is. */}
       <SkeletonContentCrossfade
-        loading={state === 'loading'}
+        loading={mintsLoading}
         visualKey="provider-info-mints"
         visualSurface="provider-info"
         testID="ai-provider-info-mints"
@@ -521,9 +532,9 @@ export function ProviderInfoScreen() {
           </Section>
         )}
         renderContent={() =>
-          info?.mints.length ? (
+          acceptedMints?.length ? (
             <Section title={`Accepted mints · ${spendableSats.toLocaleString()} sat spendable`}>
-              {info.mints.every(
+              {acceptedMints.every(
                 (mint) => !heldMints.has(mint.trim().replace(/\/+$/, '').toLowerCase())
               ) ? (
                 <>
@@ -536,7 +547,7 @@ export function ProviderInfoScreen() {
                 </>
               ) : null}
               <ListGroup variant="secondary">
-                {info.mints.map((mint) => (
+                {acceptedMints.map((mint) => (
                   <ProviderMintRow key={mint} mintUrl={mint} />
                 ))}
               </ListGroup>

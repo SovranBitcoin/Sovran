@@ -2646,16 +2646,26 @@ exports[`Design System exact structural snapshots renders foundations/notices: n
             },
             {
               "children": [
-                "A quiet note that supports the page.",
+                {
+                  "children": [
+                    "A quiet note that supports the page.",
+                  ],
+                  "props": {
+                    "className": "css-text-146c3p1",
+                    "dir": "auto",
+                    "style": {
+                      "color": "rgba(96,96,96,1.00)",
+                      "fontFamily": "OxygenRegular",
+                      "fontSize": "14px",
+                      "lineHeight": "19px",
+                    },
+                  },
+                  "type": "div",
+                },
               ],
               "props": {
-                "className": "css-text-146c3p1",
-                "dir": "auto",
-                "style": {
-                  "color": "rgba(96,96,96,1.00)",
-                  "fontFamily": "OxygenRegular",
-                  "fontSize": "14px",
-                },
+                "className": "css-view-g5y9jx",
+                "dir": null,
               },
               "type": "div",
             },
@@ -2714,16 +2724,26 @@ exports[`Design System exact structural snapshots renders foundations/notices: n
             },
             {
               "children": [
-                "Info notices can carry their own icon.",
+                {
+                  "children": [
+                    "Info notices can carry their own icon.",
+                  ],
+                  "props": {
+                    "className": "css-text-146c3p1",
+                    "dir": "auto",
+                    "style": {
+                      "color": "rgba(96,96,96,1.00)",
+                      "fontFamily": "OxygenRegular",
+                      "fontSize": "14px",
+                      "lineHeight": "19px",
+                    },
+                  },
+                  "type": "div",
+                },
               ],
               "props": {
-                "className": "css-text-146c3p1",
-                "dir": "auto",
-                "style": {
-                  "color": "rgba(96,96,96,1.00)",
-                  "fontFamily": "OxygenRegular",
-                  "fontSize": "14px",
-                },
+                "className": "css-view-g5y9jx",
+                "dir": null,
               },
               "type": "div",
             },
@@ -2782,16 +2802,26 @@ exports[`Design System exact structural snapshots renders foundations/notices: n
             },
             {
               "children": [
-                "Send between 10,000 and 5,000,000 sats. Deposits outside this range won't be credited and could be lost.",
+                {
+                  "children": [
+                    "Send between 10,000 and 5,000,000 sats. Deposits outside this range won't be credited and could be lost.",
+                  ],
+                  "props": {
+                    "className": "css-text-146c3p1",
+                    "dir": "auto",
+                    "style": {
+                      "color": "rgba(16,16,16,0.82)",
+                      "fontFamily": "OxygenRegular",
+                      "fontSize": "14px",
+                      "lineHeight": "19px",
+                    },
+                  },
+                  "type": "div",
+                },
               ],
               "props": {
-                "className": "css-text-146c3p1",
-                "dir": "auto",
-                "style": {
-                  "color": "rgba(16,16,16,0.82)",
-                  "fontFamily": "OxygenRegular",
-                  "fontSize": "14px",
-                },
+                "className": "css-view-g5y9jx",
+                "dir": null,
               },
               "type": "div",
             },
@@ -2851,16 +2881,26 @@ exports[`Design System exact structural snapshots renders foundations/notices: n
             },
             {
               "children": [
-                "Deleting the wallet erases its ecash from this device.",
+                {
+                  "children": [
+                    "Deleting the wallet erases its ecash from this device.",
+                  ],
+                  "props": {
+                    "className": "css-text-146c3p1",
+                    "dir": "auto",
+                    "style": {
+                      "color": "rgba(16,16,16,0.82)",
+                      "fontFamily": "OxygenRegular",
+                      "fontSize": "14px",
+                      "lineHeight": "19px",
+                    },
+                  },
+                  "type": "div",
+                },
               ],
               "props": {
-                "className": "css-text-146c3p1",
-                "dir": "auto",
-                "style": {
-                  "color": "rgba(16,16,16,0.82)",
-                  "fontFamily": "OxygenRegular",
-                  "fontSize": "14px",
-                },
+                "className": "css-view-g5y9jx",
+                "dir": null,
               },
               "type": "div",
             },
@@ -2920,16 +2960,26 @@ exports[`Design System exact structural snapshots renders foundations/notices: n
             },
             {
               "children": [
-                "The rarer twin of warning and danger, for when the good outcome is a claim worth making rather than the absence of a bad one.",
+                {
+                  "children": [
+                    "The rarer twin of warning and danger, for when the good outcome is a claim worth making rather than the absence of a bad one.",
+                  ],
+                  "props": {
+                    "className": "css-text-146c3p1",
+                    "dir": "auto",
+                    "style": {
+                      "color": "rgba(16,16,16,0.82)",
+                      "fontFamily": "OxygenRegular",
+                      "fontSize": "14px",
+                      "lineHeight": "19px",
+                    },
+                  },
+                  "type": "div",
+                },
               ],
               "props": {
-                "className": "css-text-146c3p1",
-                "dir": "auto",
-                "style": {
-                  "color": "rgba(16,16,16,0.82)",
-                  "fontFamily": "OxygenRegular",
-                  "fontSize": "14px",
-                },
+                "className": "css-view-g5y9jx",
+                "dir": null,
               },
               "type": "div",
             },
@@ -2989,16 +3039,26 @@ exports[`Design System exact structural snapshots renders foundations/notices: n
             },
             {
               "children": [
-                "Same circle-tick, at a volume that sits beside other content.",
+                {
+                  "children": [
+                    "Same circle-tick, at a volume that sits beside other content.",
+                  ],
+                  "props": {
+                    "className": "css-text-146c3p1",
+                    "dir": "auto",
+                    "style": {
+                      "color": "rgba(16,16,16,1.00)",
+                      "fontFamily": "OxygenRegular",
+                      "fontSize": "14px",
+                      "lineHeight": "19px",
+                    },
+                  },
+                  "type": "div",
+                },
               ],
               "props": {
-                "className": "css-text-146c3p1",
-                "dir": "auto",
-                "style": {
-                  "color": "rgba(16,16,16,1.00)",
-                  "fontFamily": "OxygenRegular",
-                  "fontSize": "14px",
-                },
+                "className": "css-view-g5y9jx",
+                "dir": null,
               },
               "type": "div",
             },
@@ -3056,6 +3116,14 @@ exports[`Design System exact structural snapshots renders foundations/notices: n
               },
               "type": "div",
             },
+            {
+              "children": null,
+              "props": {
+                "className": "css-view-g5y9jx",
+                "dir": null,
+              },
+              "type": "div",
+            },
           ],
           "props": {
             "className": "css-view-g5y9jx",
@@ -3097,16 +3165,26 @@ exports[`Design System exact structural snapshots renders foundations/notices: n
           "children": [
             {
               "children": [
-                "Description-only notice.",
+                {
+                  "children": [
+                    "Description-only notice.",
+                  ],
+                  "props": {
+                    "className": "css-text-146c3p1",
+                    "dir": "auto",
+                    "style": {
+                      "color": "rgba(16,16,16,1.00)",
+                      "fontFamily": "OxygenRegular",
+                      "fontSize": "14px",
+                      "lineHeight": "19px",
+                    },
+                  },
+                  "type": "div",
+                },
               ],
               "props": {
-                "className": "css-text-146c3p1",
-                "dir": "auto",
-                "style": {
-                  "color": "rgba(16,16,16,1.00)",
-                  "fontFamily": "OxygenRegular",
-                  "fontSize": "14px",
-                },
+                "className": "css-view-g5y9jx",
+                "dir": null,
               },
               "type": "div",
             },
@@ -3165,16 +3243,26 @@ exports[`Design System exact structural snapshots renders foundations/notices: n
             },
             {
               "children": [
-                "Sits inside a sheet or card beside other content. The glyph keeps full amber; only the copy steps down.",
+                {
+                  "children": [
+                    "Sits inside a sheet or card beside other content. The glyph keeps full amber; only the copy steps down.",
+                  ],
+                  "props": {
+                    "className": "css-text-146c3p1",
+                    "dir": "auto",
+                    "style": {
+                      "color": "rgba(16,16,16,1.00)",
+                      "fontFamily": "OxygenRegular",
+                      "fontSize": "14px",
+                      "lineHeight": "19px",
+                    },
+                  },
+                  "type": "div",
+                },
               ],
               "props": {
-                "className": "css-text-146c3p1",
-                "dir": "auto",
-                "style": {
-                  "color": "rgba(16,16,16,1.00)",
-                  "fontFamily": "OxygenRegular",
-                  "fontSize": "14px",
-                },
+                "className": "css-view-g5y9jx",
+                "dir": null,
               },
               "type": "div",
             },
@@ -3234,16 +3322,26 @@ exports[`Design System exact structural snapshots renders foundations/notices: n
             },
             {
               "children": [
-                "Same shape as the solid red, at a volume that doesn't shout over the page around it.",
+                {
+                  "children": [
+                    "Same shape as the solid red, at a volume that doesn't shout over the page around it.",
+                  ],
+                  "props": {
+                    "className": "css-text-146c3p1",
+                    "dir": "auto",
+                    "style": {
+                      "color": "rgba(16,16,16,1.00)",
+                      "fontFamily": "OxygenRegular",
+                      "fontSize": "14px",
+                      "lineHeight": "19px",
+                    },
+                  },
+                  "type": "div",
+                },
               ],
               "props": {
-                "className": "css-text-146c3p1",
-                "dir": "auto",
-                "style": {
-                  "color": "rgba(16,16,16,1.00)",
-                  "fontFamily": "OxygenRegular",
-                  "fontSize": "14px",
-                },
+                "className": "css-view-g5y9jx",
+                "dir": null,
               },
               "type": "div",
             },
@@ -3288,16 +3386,26 @@ exports[`Design System exact structural snapshots renders foundations/notices: n
           "children": [
             {
               "children": [
-                "Compact: the smaller icon and type used inside dense sheets and above a chat composer.",
+                {
+                  "children": [
+                    "Compact: the smaller icon and type used inside dense sheets and above a chat composer.",
+                  ],
+                  "props": {
+                    "className": "css-text-146c3p1",
+                    "dir": "auto",
+                    "style": {
+                      "color": "rgba(16,16,16,1.00)",
+                      "fontFamily": "OxygenRegular",
+                      "fontSize": "12px",
+                      "lineHeight": "16px",
+                    },
+                  },
+                  "type": "div",
+                },
               ],
               "props": {
-                "className": "css-text-146c3p1",
-                "dir": "auto",
-                "style": {
-                  "color": "rgba(16,16,16,1.00)",
-                  "fontFamily": "OxygenRegular",
-                  "fontSize": "12px",
-                },
+                "className": "css-view-g5y9jx",
+                "dir": null,
               },
               "type": "div",
             },
@@ -34808,16 +34916,26 @@ exports[`Design System exact structural snapshots renders wallet-controls/transf
           "children": [
             {
               "children": [
-                "The mint rejected these proofs. Nothing was spent.",
+                {
+                  "children": [
+                    "The mint rejected these proofs. Nothing was spent.",
+                  ],
+                  "props": {
+                    "className": "css-text-146c3p1",
+                    "dir": "auto",
+                    "style": {
+                      "color": "rgba(16,16,16,1.00)",
+                      "fontFamily": "OxygenRegular",
+                      "fontSize": "12px",
+                      "lineHeight": "16px",
+                    },
+                  },
+                  "type": "div",
+                },
               ],
               "props": {
-                "className": "css-text-146c3p1",
-                "dir": "auto",
-                "style": {
-                  "color": "rgba(16,16,16,1.00)",
-                  "fontFamily": "OxygenRegular",
-                  "fontSize": "12px",
-                },
+                "className": "css-view-g5y9jx",
+                "dir": null,
               },
               "type": "div",
             },

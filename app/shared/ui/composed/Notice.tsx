@@ -22,13 +22,22 @@
  * inside a dense sheet: smaller icon and type. The caller still owns the
  * outer spacing and the corners, via `className`.
  *
+ * Long supporting copy — a bio, a mint's description — is where an info page
+ * used to jump: the card landed late at whatever height the text needed.
+ * Three props make the card's height a decision the caller takes up front:
+ * `reserveLines` holds room for that many body lines whether or not copy has
+ * arrived, `loading` fills those lines with placeholder bars, and
+ * `collapseLines` clamps longer copy to that many lines with a "Show more"
+ * toggle (the feed's pattern), so a two-line card stays a two-line card.
+ *
  * A plain View with the app's own `Text`. The first version sat on HeroUI's
  * Alert, whose title and description render through HeroUI's text component;
  * on device that notice clipped its last line and left extra bottom padding.
  * Outer spacing belongs to the caller — pass it through `className`.
  */
 
-import type { ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
+import type { NativeSyntheticEvent, TextLayoutEventData } from 'react-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { cn } from '@/shared/lib/classNames';
@@ -66,11 +75,20 @@ const SOFT_ROOT: Record<NoticeStatus, string> = {
   success: 'bg-success-soft',
 };
 
-/** Icon and type scale per size. `compact` matches the chat status strips. */
+/** Icon and type scale per size. `compact` matches the chat status strips.
+ *  `bodyLineHeight` is explicit so a reserved line count is an exact height. */
 const SIZE = {
-  default: { icon: 20, title: 15, body: 14, gap: 'gap-3' },
-  compact: { icon: 16, title: 13, body: 12, gap: 'gap-2' },
+  default: { icon: 20, title: 15, body: 14, bodyLineHeight: 19, gap: 'gap-3' },
+  compact: { icon: 16, title: 13, body: 12, bodyLineHeight: 16, gap: 'gap-2' },
 } as const;
+
+/** Placeholder widths for the loading bars, longest first, so a two-line
+ *  skeleton reads as a paragraph that ends short rather than two full bars. */
+const LOADING_PLACEHOLDERS = [
+  'A short paragraph of supporting copy that runs the width of the card',
+  'and ends partway along the next line.',
+  'A third line, when three are reserved.',
+];
 
 interface NoticeProps {
   status: NoticeStatus;
@@ -87,6 +105,20 @@ interface NoticeProps {
   icon?: string;
   /** Trailing recovery affordance, e.g. a compact "Open Settings" button. */
   action?: ReactNode;
+  /**
+   * Hold room for this many body lines even when `description` is shorter or
+   * absent, so the card's height does not depend on what arrives. With
+   * `loading`, the same lines show placeholder bars.
+   */
+  reserveLines?: number;
+  /** Copy is still on its way: placeholder bars in the reserved lines. */
+  loading?: boolean;
+  /**
+   * Clamp a string `description` to this many lines and offer "Show more" when
+   * it is longer. The toggle only appears once the text has measured longer
+   * than the clamp, so short copy shows no control.
+   */
+  collapseLines?: number;
   className?: string;
   testID?: string;
 }
@@ -99,20 +131,46 @@ export function Notice({
   description,
   icon,
   action,
+  reserveLines,
+  loading = false,
+  collapseLines,
   className,
   testID,
 }: NoticeProps) {
-  const [foreground, muted, warning, danger, success, warningSoftFg, dangerSoftFg, successSoftFg] =
-    useThemeColor([
-      'foreground',
-      'muted',
-      'warning',
-      'danger',
-      'success',
-      'warning-soft-foreground',
-      'danger-soft-foreground',
-      'success-soft-foreground',
-    ] as const);
+  const [
+    foreground,
+    muted,
+    accent,
+    warning,
+    danger,
+    success,
+    warningSoftFg,
+    dangerSoftFg,
+    successSoftFg,
+  ] = useThemeColor([
+    'foreground',
+    'muted',
+    'accent',
+    'warning',
+    'danger',
+    'success',
+    'warning-soft-foreground',
+    'danger-soft-foreground',
+    'success-soft-foreground',
+  ] as const);
+  const [expanded, setExpanded] = useState(false);
+  // Measured off an unclamped, invisible twin of the copy: iOS reports only
+  // the visible lines of a clamped Text, so the clamped one cannot say
+  // whether there was more.
+  const [fullLineCount, setFullLineCount] = useState<number | null>(null);
+  const measureFull = useCallback((event: NativeSyntheticEvent<TextLayoutEventData>) => {
+    setFullLineCount(event.nativeEvent.lines.length);
+  }, []);
+  const collapsing =
+    typeof description === 'string' &&
+    collapseLines !== undefined &&
+    fullLineCount !== null &&
+    fullLineCount > collapseLines;
   const soft = tone === 'soft';
   const statusInk = (
     {
@@ -149,8 +207,13 @@ export function Notice({
   // Collapsing to one accessible node needs a label to read. A rich
   // `description` (SegmentedText, a custom row) contributes nothing to `label`,
   // so the notice stays uncollapsed and the screen reader walks the children —
-  // collapsing it would announce the title alone, or nothing at all.
-  const collapsible = label.length > 0 && action === undefined;
+  // collapsing it would announce the title alone, or nothing at all. A "Show
+  // more" toggle is a child the reader must be able to reach, so it too keeps
+  // the notice uncollapsed.
+  const collapsible = label.length > 0 && action === undefined && !collapsing && !loading;
+  const bodyStyle = { lineHeight: scale.bodyLineHeight };
+  const reservedHeight =
+    reserveLines !== undefined ? { minHeight: scale.bodyLineHeight * reserveLines } : undefined;
 
   return (
     <View
@@ -175,12 +238,57 @@ export function Notice({
             {title}
           </Text>
         ) : null}
-        {typeof description === 'string' ? (
-          <Text size={scale.body} color={title ? bodyInk : ink}>
-            {description}
-          </Text>
+        {loading ? (
+          <View style={reservedHeight} testID={testID ? `${testID}-loading` : undefined}>
+            {LOADING_PLACEHOLDERS.slice(0, Math.max(1, reserveLines ?? 2)).map((placeholder) => (
+              <Text
+                key={placeholder}
+                loading
+                size={scale.body}
+                style={bodyStyle}
+                placeholder={placeholder}
+              />
+            ))}
+          </View>
+        ) : typeof description === 'string' ? (
+          <View style={reservedHeight}>
+            {collapseLines !== undefined ? (
+              // The measuring twin: same type, same width, never seen.
+              <Text
+                size={scale.body}
+                style={[bodyStyle, { position: 'absolute', left: 0, right: 0, top: 0, opacity: 0 }]}
+                pointerEvents="none"
+                accessible={false}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                onTextLayout={measureFull}>
+                {description}
+              </Text>
+            ) : null}
+            <Text
+              size={scale.body}
+              color={title ? bodyInk : ink}
+              style={bodyStyle}
+              numberOfLines={collapsing && !expanded ? collapseLines : undefined}>
+              {description}
+            </Text>
+            {collapsing ? (
+              <Text
+                size={scale.body}
+                bold
+                color={status === 'info' ? accent : ink}
+                style={bodyStyle}
+                accessibilityRole="button"
+                accessibilityLabel={expanded ? 'Show less' : 'Show more'}
+                accessibilityState={{ expanded }}
+                testID={testID ? `${testID}-toggle` : undefined}
+                onPress={() => setExpanded((value) => !value)}>
+                {expanded ? 'Show less' : 'Show more'}
+              </Text>
+            ) : null}
+          </View>
         ) : (
-          description
+          <View style={reservedHeight}>{description}</View>
         )}
       </View>
       {action}

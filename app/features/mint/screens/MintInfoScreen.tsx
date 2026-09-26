@@ -552,11 +552,17 @@ export function MintInfoScreen() {
 
           <Spacer size={16} />
 
-          {typeof kymScore === 'number' && kymScore >= 0 && (
+          {(typeof kymScore === 'number' && kymScore >= 0) || detail.reviews === 'loading' ? (
             // Keyed by mintUrl so a screen reused for a different mint remounts
             // the chart (fresh roll-in) instead of rolling the prior mint's score.
-            <RatingBarChart key={mintUrl} score={kymScore} />
-          )}
+            // Mounted while the reviews read is out too: the chart draws its own
+            // skeleton at the finished height, so the score lands in place
+            // instead of pushing the grid down when it arrives.
+            <RatingBarChart
+              key={mintUrl}
+              score={typeof kymScore === 'number' && kymScore >= 0 ? kymScore : -1}
+            />
+          ) : null}
 
           <StatsGrid status={detail.audit} onRetry={detail.retry} audit={audit} />
         </VStack>
@@ -577,31 +583,29 @@ export function MintInfoScreen() {
           </>
         )}
 
-        {typeof entry?.description === 'string' && (
-          <>
-            <Notice status="info" title="About this mint" description={entry.description} />
-            <Spacer size={12} />
-          </>
-        )}
-
-        {typeof entry?.longDescription === 'string' && (
+        {/* One two-line slot for the mint's own words, mounted before the
+            NUT-06 read answers so the card fills in place instead of landing
+            under the grid at whatever height the copy needs. Longer copy folds
+            behind "Show more". Skipped only when the identity read failed —
+            the retry notice above already owns that space. */}
+        {!identityError ? (
           <>
             <Notice
               status="info"
-              icon="ri:file-text-line"
-              title="Details"
-              description={entry.longDescription}
+              title="About this mint"
+              loading={detail.identity === 'loading'}
+              reserveLines={2}
+              collapseLines={3}
+              description={
+                typeof entry?.description === 'string' && entry.description.trim()
+                  ? entry.description
+                  : 'This mint has not published a description.'
+              }
+              testID="mint-info-about"
             />
             <Spacer size={12} />
           </>
-        )}
-
-        {typeof entry?.motd === 'string' && (
-          <>
-            <Notice status="warning" title="Message from the mint" description={entry.motd} />
-            <Spacer size={12} />
-          </>
-        )}
+        ) : null}
 
         {mintUrl && (
           <Section title="Mint address">
@@ -630,6 +634,33 @@ export function MintInfoScreen() {
               </PressableFeedback>
             </ListGroup>
           </Section>
+        )}
+
+        {typeof entry?.longDescription === 'string' && (
+          <>
+            <Notice
+              status="info"
+              icon="ri:file-text-line"
+              title="Details"
+              collapseLines={4}
+              description={entry.longDescription}
+              testID="mint-info-details"
+            />
+            <Spacer size={12} />
+          </>
+        )}
+
+        {typeof entry?.motd === 'string' && (
+          <>
+            <Notice
+              status="warning"
+              title="Message from the mint"
+              collapseLines={4}
+              description={entry.motd}
+              testID="mint-info-motd"
+            />
+            <Spacer size={12} />
+          </>
         )}
 
         {contactRows.length > 0 && (

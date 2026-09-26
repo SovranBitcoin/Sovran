@@ -8,6 +8,15 @@
  */
 interface ProviderInfoSeed {
   seedName?: string;
+  /** What the row already knew, so the page paints it on the first frame
+   *  instead of skeletoning a fact the user can see on the row behind it. */
+  seedDescription?: string;
+  /** The operator's hex pubkey. The Operator section mounts at once. */
+  seedPubkey?: string;
+  /** Accepted mints, so the list reserves the right number of rows. */
+  seedMints?: readonly string[];
+  /** nagg's follower count for the operator. */
+  seedFollowers?: number;
 }
 
 export function buildProviderInfoHref(

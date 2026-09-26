@@ -366,10 +366,9 @@ function ProfileStatsGrid({
     </View>
   );
 
-  // Settled with nothing reliable to show — relay-only mode can't fetch
-  // follower/following counts (a reverse index relays don't have) or the
-  // joined date. Render no grid rather than misleading "0 / 0".
-  if (!isLoading && !hasValidData) return null;
+  // Settled with nothing reliable to show (relay-only mode has no reverse
+  // index for followers and no joined date): the grid stays, its values are
+  // dashes. Unmounting it here moved everything below by a hundred points.
 
   // Reputation is not a number here any more — it is the tier ring around the
   // avatar. One row in both branches (SkeletonContentCrossfade): the skeleton
@@ -860,6 +859,7 @@ function BannerWithAvatar({
                 placeholder="Display Name"
                 bold
                 size={22}
+                numberOfLines={1}
                 style={{
                   color: foreground,
                   includeFontPadding: false,
@@ -902,20 +902,33 @@ function BannerWithAvatar({
                 testID="profile-follow-button"
               />
             ))}
-          {onEditProfile && !isLoading && (
-            <CapsuleButton
-              label="Edit profile"
-              icon="mdi:pencil"
-              systemIcon="pencil"
-              onPress={onEditProfile}
-              fitContent
-              height={34}
-              iconSize={15}
-              textSize={13}
-              style={styles.followCapsule}
-              testID="profile-edit-button"
-            />
-          )}
+          {onEditProfile &&
+            (isLoading ? (
+              // Same box as the follow skeleton: the button lands in place
+              // instead of appearing under the name once the profile loads.
+              <View
+                style={[
+                  styles.followButton,
+                  {
+                    backgroundColor: withAlpha(foreground, SKELETON_FILL_ALPHA),
+                    borderColor: 'transparent',
+                  },
+                ]}
+              />
+            ) : (
+              <CapsuleButton
+                label="Edit profile"
+                icon="mdi:pencil"
+                systemIcon="pencil"
+                onPress={onEditProfile}
+                fitContent
+                height={34}
+                iconSize={15}
+                textSize={13}
+                style={styles.followCapsule}
+                testID="profile-edit-button"
+              />
+            ))}
           {isLoading && <SkeletonLoadingShimmer active />}
         </View>
 
@@ -1580,19 +1593,33 @@ export function UserProfileScreen() {
 
               <Spacer size={16} />
 
+              {/* The bio, in a two-line card that is there from the first
+                  frame: placeholder bars while the kind-0 is out, the text
+                  once it lands, a quiet line when there is none. Longer bios
+                  fold behind "Show more" so the card never grows. It sits
+                  above the follower grid because the grid is the one block on
+                  this header whose height depends on what comes back. */}
+              <View style={{ paddingHorizontal: 16 }}>
+                <Notice
+                  status="info"
+                  icon="ri:user-3-line"
+                  loading={isMetadataLoading && !cachedProfile}
+                  reserveLines={2}
+                  collapseLines={2}
+                  description={
+                    cachedProfile?.about?.trim() ? cachedProfile.about : 'Has not written a bio.'
+                  }
+                  testID="profile-about"
+                />
+                <Spacer size={16} />
+              </View>
+
               {/* Top Followers */}
               <TopFollowers
                 topFollowers={profileData?.topFollowers || []}
                 isLoading={isProfileApiLoading}
                 visualScope={profileHeaderVisualScope}
               />
-
-              {cachedProfile?.about && (
-                <View style={{ paddingHorizontal: 16 }}>
-                  <Notice status="info" icon="ri:user-3-line" description={cachedProfile.about} />
-                  <Spacer size={16} />
-                </View>
-              )}
 
               {/* Profile Info Section */}
               <View style={{ paddingHorizontal: 16 }}>
