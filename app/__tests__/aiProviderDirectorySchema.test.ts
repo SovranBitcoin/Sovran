@@ -5,7 +5,7 @@
  * nullable when it gained a real resolver — null means "we could not look",
  * which must not reach the sort as "nobody follows them".
  */
-import { NaggAiProvidersSchema } from '@/shared/lib/routstr/providers';
+import { NaggAiProvidersSchema, serverProviders } from '@/shared/lib/routstr/providers';
 
 describe('NaggAiProvidersSchema — an unresolved follower count', () => {
   const row = (over: Record<string, unknown>) => ({
@@ -41,5 +41,25 @@ describe('NaggAiProvidersSchema — an unresolved follower count', () => {
       providers: [row({ followers: 5, followersSource: 'telepathy' })],
     });
     expect(parsed.providers[0]).toMatchObject({ followers: 5, followersSource: undefined });
+  });
+});
+
+describe('NaggAiProvidersSchema — the cheapest message', () => {
+  const row = (over: Record<string, unknown>) => ({
+    baseUrl: 'https://p.example',
+    status: 'online' as const,
+    ...over,
+  });
+
+  it('carries it through serverProviders, and drops a nonsense value rather than the row', () => {
+    const parsed = NaggAiProvidersSchema.parse({
+      providers: [
+        row({ minMessageSats: 94 }),
+        row({ baseUrl: 'https://q.example', minMessageSats: -3 }),
+      ],
+    });
+    const [priced, garbled] = serverProviders(parsed);
+    expect(priced.minMessageSats).toBe(94);
+    expect(garbled).toMatchObject({ baseUrl: 'https://q.example', minMessageSats: undefined });
   });
 });

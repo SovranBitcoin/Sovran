@@ -60,6 +60,7 @@ const PersistedServerProvider = z.looseObject({
   followersSource: z.enum(['graph', 'vertex', 'relays']).optional().catch(undefined),
   modelCount: z.number().int().nonnegative().optional().catch(undefined),
   encryptedModelCount: z.number().int().nonnegative().optional().catch(undefined),
+  minMessageSats: z.number().int().positive().optional().catch(undefined),
   mints: z
     .array(z.string().max(512))
     .max(64)

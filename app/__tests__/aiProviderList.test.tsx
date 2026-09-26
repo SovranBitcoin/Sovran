@@ -155,6 +155,7 @@ const localRow = (over: Record<string, unknown> = {}) => ({
   nameIsHost: false,
   encryptedModelCount: null,
   modelCount: null,
+  minMessageSats: null,
   followers: null,
   spendableSats: 10,
   blockedReason: null,

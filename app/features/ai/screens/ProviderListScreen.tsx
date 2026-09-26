@@ -155,6 +155,7 @@ function ProviderListRow({
           baseUrl: row.baseUrl,
           displayName: row.name,
           spendableSats: row.spendableSats,
+          minMessageSats: row.minMessageSats ?? undefined,
           encryptedModelCount: row.encryptedModelCount ?? undefined,
           status: row.status,
         }),

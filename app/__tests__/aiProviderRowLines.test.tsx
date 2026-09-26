@@ -415,4 +415,34 @@ describe('AI provider row', () => {
     );
     expect(rendered.stats.some((stat) => stat.icon === E2EE_BADGE_ICON)).toBe(false);
   });
+
+  describe('the balance, held against the cheapest message', () => {
+    const balance = (minMessageSats?: number) =>
+      renderProviderRow(
+        row({
+          identity: [
+            providerIdentity({
+              baseUrl: 'https://ai.redsh1ft.com',
+              spendableSats: 1_200,
+              minMessageSats,
+              status: 'online',
+            }),
+          ],
+        })
+      ).stats.find((stat) => stat.icon === 'solar:wallet-bold');
+
+    it('is green when it pays for at least one message', () => {
+      expect(balance(1_200)?.color).toBe('theme-green-300');
+    });
+
+    it('is red when it pays for none, and says so', () => {
+      const stat = balance(1_201);
+      expect(stat?.color).toBe('error');
+      expect(stat?.accessibilityLabel).toMatch(/not enough for one message/);
+    });
+
+    it('stays neutral while nobody has priced the catalog', () => {
+      expect(balance(undefined)?.color).toBe('social');
+    });
+  });
 });

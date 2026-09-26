@@ -170,6 +170,10 @@ interface ProviderIdentity {
   /** Sats the wallet holds across the mints this provider redeems. Not the
    *  wallet total: what matters is what can actually be spent HERE. */
   spendableSats?: number;
+  /** The cheapest one-message reservation here. Tints the balance: green when
+   *  `spendableSats` covers at least one message, red when it covers none.
+   *  Absent leaves the balance its neutral colour — no price, no verdict. */
+  minMessageSats?: number;
   /**
    * How many of its models run in an enclave — a count, never a flag.
    *
@@ -237,6 +241,7 @@ export function providerIdentity(input: {
   baseUrl: string;
   displayName?: string;
   spendableSats?: number;
+  minMessageSats?: number;
   encryptedModelCount?: number;
   status?: ProviderIdentity['status'];
 }): ProviderIdentity {
@@ -629,11 +634,24 @@ function buildStats(
       case 'balance': {
         const sats = mintStats?.balance ?? provider?.spendableSats;
         if (typeof sats === 'number' && sats > 0) {
+          // Only a provider row has a price to hold the balance against, and
+          // only once nagg has priced its catalog.
+          const floor = mintStats ? undefined : provider?.minMessageSats;
+          const affords = floor === undefined ? undefined : sats >= floor;
           out.push({
             icon: 'solar:wallet-bold',
             value: formatCompact(sats),
-            color: STAT_COLOR_SOCIAL,
-            accessibilityLabel: provider ? `${sats} sats spendable here` : undefined,
+            color:
+              affords === undefined
+                ? STAT_COLOR_SOCIAL
+                : affords
+                  ? tints.success
+                  : STAT_COLOR_ERROR,
+            accessibilityLabel: provider
+              ? affords === false
+                ? `${sats} sats spendable here, not enough for one message`
+                : `${sats} sats spendable here`
+              : undefined,
           });
         }
         break;

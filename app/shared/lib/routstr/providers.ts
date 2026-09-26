@@ -272,6 +272,11 @@ const NaggAiProviderRowSchema = z.looseObject({
   /** How many of those models are sealed to an enclave. A COUNT, deliberately:
    *  on the one provider that badges itself E2EE, 9 models of 582 are sealed. */
   encryptedModelCount: z.number().int().nonnegative().optional().catch(undefined),
+  /** The cheapest reservation one chat message needs here, in sats, priced
+   *  with the send gate's arithmetic. nagg folds the provider's whole catalog
+   *  into this one number so the list never downloads a catalog per row.
+   *  Absent until nagg has read a catalog with a priced chat model. */
+  minMessageSats: z.number().int().positive().optional().catch(undefined),
   mints: z.array(z.string().max(512)).max(64).optional().catch(undefined),
   status: z.enum(['online', 'offline', 'unknown']).catch('unknown'),
   checkedAt: z.string().max(64).optional().catch(undefined),
@@ -301,6 +306,7 @@ export interface ServerProvider {
   followersSource?: 'graph' | 'vertex' | 'relays';
   modelCount?: number;
   encryptedModelCount?: number;
+  minMessageSats?: number;
   mints: string[];
   status: 'online' | 'offline' | 'unknown';
   latencyMs?: number;
@@ -338,6 +344,7 @@ export function serverProviders(payload: {
       followersSource: row.followersSource,
       modelCount: row.modelCount,
       encryptedModelCount: row.encryptedModelCount,
+      minMessageSats: row.minMessageSats,
       mints: row.mints ?? [],
       status: row.status,
       latencyMs: row.latencyMs,

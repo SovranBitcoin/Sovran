@@ -59,6 +59,9 @@ export interface ProviderRow {
   encryptedModelCount: number | null;
   /** Models the provider serves, per nagg. `null` when unknown. */
   modelCount: number | null;
+  /** The cheapest one-message reservation across this provider's models, per
+   *  nagg. `null` when unknown — which says nothing about affordability. */
+  minMessageSats: number | null;
   /** The operator's follower count as nagg aggregated it — a stand-in until
    *  the row's own Nostr profile loads, so the pill isn't blank on first paint. */
   followers: number | null;
@@ -162,6 +165,7 @@ export function useProviderRows(
         statusSource,
         encryptedModelCount: fromServer?.row.encryptedModelCount ?? null,
         modelCount: fromServer?.row.modelCount ?? null,
+        minMessageSats: fromServer?.row.minMessageSats ?? null,
         followers: fromServer?.row.followers ?? null,
         spendableSats,
         blockedReason,
