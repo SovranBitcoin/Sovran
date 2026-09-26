@@ -50,6 +50,14 @@ const FlowHeaderButton = memo(function FlowHeaderButton({
 });
 
 /**
+ * The native title in the type a page's own `headerTitle` draws (`Text size={16}
+ * bold`). Pages that set a custom title do it from inside the screen, so the
+ * native one shows for the first frames of every push; in the system font it
+ * read as the title changing its letters when the custom one took over.
+ */
+const NATIVE_TITLE_FONT = { fontFamily: 'OxygenBold', fontSize: 16 } as const;
+
+/**
  * Get the base screen options for flow layouts (used inside modal stacks).
  * These options ensure consistent styling across all flow layouts.
  */
@@ -59,6 +67,7 @@ const getBaseFlowScreenOptions = (colors: FlowColors): NativeStackNavigationOpti
   headerTitleAlign: 'center',
   headerTitleStyle: {
     color: colors.foreground,
+    ...NATIVE_TITLE_FONT,
   },
   headerTintColor: colors.foreground,
   // Hide any back title that might show parent route names
@@ -152,6 +161,7 @@ export const getBaseModalHeaderOptions = (foreground: string): NativeStackNaviga
   headerTitleAlign: 'center',
   headerTitleStyle: {
     color: foreground,
+    ...NATIVE_TITLE_FONT,
   },
   headerTintColor: foreground,
   headerBackTitleStyle: {

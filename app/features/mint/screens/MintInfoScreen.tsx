@@ -446,39 +446,31 @@ export function MintInfoScreen() {
   };
 
   return (
-    <Screen
-      name="MintInfoScreen"
-      scroll="animated"
-      scrollY={morph.scrollY}
-      headerBand={morph.headerBand}
-      bgColor={background}
-      footer={
-        <BottomButtons>
-          <ButtonHandler
-            buttons={
-              entry?.fromAccepter
-                ? [
-                    {
-                      testID: 'mint-info-close',
-                      text: 'Reject',
-                      variant: 'secondary',
-                      onPress: async () => {
-                        await actions.back.execute();
-                      },
-                    },
-                    {
-                      testID: 'mint-info-trust',
-                      text: actions.trust.loading ? 'Accepting...' : 'Accept',
-                      variant: 'primary',
-                      disabled: !actions.trust.available || actions.trust.loading,
-                      onPress: () => actions.trust.execute(),
-                    },
-                  ]
-                : mintUrl && (entry?.fromScan || !isTrusted)
+    <>
+      {/* Outside the Screen: its content mounts after the push animation, and a
+          title declared in there left the native one showing for the whole
+          slide before this one swapped in. */}
+      <Stack.Screen
+        options={withGlassHeaderItems({
+          title: entry?.fromAccepter ? 'Verify Mint' : 'Mint Details',
+          headerTitle: morph.headerTitle,
+        })}
+      />
+      <Screen
+        name="MintInfoScreen"
+        scroll="animated"
+        scrollY={morph.scrollY}
+        headerBand={morph.headerBand}
+        bgColor={background}
+        footer={
+          <BottomButtons>
+            <ButtonHandler
+              buttons={
+                entry?.fromAccepter
                   ? [
                       {
                         testID: 'mint-info-close',
-                        text: 'Close',
+                        text: 'Reject',
                         variant: 'secondary',
                         onPress: async () => {
                           await actions.back.execute();
@@ -486,311 +478,323 @@ export function MintInfoScreen() {
                       },
                       {
                         testID: 'mint-info-trust',
-                        text: actions.trust.loading ? 'Adding...' : 'Add mint',
+                        text: actions.trust.loading ? 'Accepting...' : 'Accept',
                         variant: 'primary',
                         disabled: !actions.trust.available || actions.trust.loading,
                         onPress: () => actions.trust.execute(),
                       },
                     ]
-                  : [
-                      {
-                        testID: 'mint-info-close',
-                        text: 'Close',
-                        variant: 'secondary',
-                        onPress: async () => {
-                          await actions.back.execute();
+                  : mintUrl && (entry?.fromScan || !isTrusted)
+                    ? [
+                        {
+                          testID: 'mint-info-close',
+                          text: 'Close',
+                          variant: 'secondary',
+                          onPress: async () => {
+                            await actions.back.execute();
+                          },
                         },
-                      },
-                    ]
-            }
-          />
-        </BottomButtons>
-      }>
-      <Stack.Screen
-        options={withGlassHeaderItems({
-          title: entry?.fromAccepter ? 'Verify Mint' : 'Mint Details',
-          headerTitle: morph.headerTitle,
-        })}
-      />
+                        {
+                          testID: 'mint-info-trust',
+                          text: actions.trust.loading ? 'Adding...' : 'Add mint',
+                          variant: 'primary',
+                          disabled: !actions.trust.available || actions.trust.loading,
+                          onPress: () => actions.trust.execute(),
+                        },
+                      ]
+                    : [
+                        {
+                          testID: 'mint-info-close',
+                          text: 'Close',
+                          variant: 'secondary',
+                          onPress: async () => {
+                            await actions.back.execute();
+                          },
+                        },
+                      ]
+              }
+            />
+          </BottomButtons>
+        }>
+        {morph.probe}
+        <View className="pt-4">
+          <VStack align="center" className="w-full pb-8 pt-6">
+            <Animated.View className="items-center" style={morph.contentStyle}>
+              <ProgressRing
+                size={84}
+                progress={ringProgress}
+                successColor={success}
+                errorColor={danger}>
+                <AnimatedAvatar
+                  picture={iconUrl}
+                  name={displayName}
+                  alt={`${displayName} icon`}
+                  status={audit?.state}
+                  size={70}
+                  isLoading={detail.identity === 'loading'}
+                />
+              </ProgressRing>
+              <Text bold size={22} numberOfLines={2} className="mt-3 text-center">
+                {displayName}
+              </Text>
+            </Animated.View>
 
-      {morph.probe}
-      <View className="pt-4">
-        <VStack align="center" className="w-full pb-8 pt-6">
-          <Animated.View className="items-center" style={morph.contentStyle}>
-            <ProgressRing
-              size={84}
-              progress={ringProgress}
-              successColor={success}
-              errorColor={danger}>
-              <AnimatedAvatar
-                picture={iconUrl}
-                name={displayName}
-                alt={`${displayName} icon`}
-                status={audit?.state}
-                size={70}
-                isLoading={detail.identity === 'loading'}
-              />
-            </ProgressRing>
-            <Text bold size={22} numberOfLines={2} className="mt-3 text-center">
-              {displayName}
-            </Text>
-          </Animated.View>
-
-          {/* The two things a reader does with a mint page besides trusting it,
+            {/* The two things a reader does with a mint page besides trusting it,
               as the same labelled circles the profile page uses for Send Money /
               Message / QR. Always both, whatever the reviews read says: the
               reviews screen shows "no reviews yet" honestly, and a row that
               appeared only once a score was known moved the chart under it.
               The reviews star used to be a header action, invisible to the
               accepter flow and to anyone who did not know to look up there. */}
-          <HStack justify="center" gap={28} style={{ marginTop: 16 }}>
-            <CircleActionButton
-              icon="ic:round-star"
-              systemIcon="star"
-              label="Reviews"
-              testID="mint-info-reviews"
-              accessibilityLabel="View mint reviews"
-              onPress={() => router.navigate({ pathname: '/reviews', params: { mintUrl } })}
-            />
-            <CircleActionButton
-              icon="mdi:history"
-              systemIcon="clock.arrow.circlepath"
-              label="History"
-              testID="mint-info-history"
-              accessibilityLabel="View mint update history"
-              onPress={() => mintUrl && router.navigate(buildMintHistoryHref(mintUrl))}
-            />
-          </HStack>
-
-          <Spacer size={16} />
-
-          {(typeof kymScore === 'number' && kymScore >= 0) || detail.reviews === 'loading' ? (
-            // Keyed by mintUrl so a screen reused for a different mint remounts
-            // the chart (fresh roll-in) instead of rolling the prior mint's score.
-            // Mounted while the reviews read is out too: the chart draws its own
-            // skeleton at the finished height, so the score lands in place
-            // instead of pushing the grid down when it arrives.
-            <RatingBarChart
-              key={mintUrl}
-              score={typeof kymScore === 'number' && kymScore >= 0 ? kymScore : -1}
-            />
-          ) : null}
-
-          <StatsGrid status={detail.audit} onRetry={detail.retry} audit={audit} />
-        </VStack>
-
-        {identityError && (
-          <>
-            <Notice status="warning" description={identityError} />
-            <VStack className="w-full items-center pb-3">
-              <Button
-                testID="mint-info-retry"
-                text="Try again"
-                variant="secondary"
-                size="compact"
-                onPress={detail.retry}
+            <HStack justify="center" gap={28} style={{ marginTop: 16 }}>
+              <CircleActionButton
+                icon="ic:round-star"
+                systemIcon="star"
+                label="Reviews"
+                testID="mint-info-reviews"
+                accessibilityLabel="View mint reviews"
+                onPress={() => router.navigate({ pathname: '/reviews', params: { mintUrl } })}
               />
-            </VStack>
-            <Spacer size={12} />
-          </>
-        )}
+              <CircleActionButton
+                icon="mdi:history"
+                systemIcon="clock.arrow.circlepath"
+                label="History"
+                testID="mint-info-history"
+                accessibilityLabel="View mint update history"
+                onPress={() => mintUrl && router.navigate(buildMintHistoryHref(mintUrl))}
+              />
+            </HStack>
 
-        {/* One two-line slot for the mint's own words, mounted before the
+            <Spacer size={16} />
+
+            {(typeof kymScore === 'number' && kymScore >= 0) || detail.reviews === 'loading' ? (
+              // Keyed by mintUrl so a screen reused for a different mint remounts
+              // the chart (fresh roll-in) instead of rolling the prior mint's score.
+              // Mounted while the reviews read is out too: the chart draws its own
+              // skeleton at the finished height, so the score lands in place
+              // instead of pushing the grid down when it arrives.
+              <RatingBarChart
+                key={mintUrl}
+                score={typeof kymScore === 'number' && kymScore >= 0 ? kymScore : -1}
+              />
+            ) : null}
+
+            <StatsGrid status={detail.audit} onRetry={detail.retry} audit={audit} />
+          </VStack>
+
+          {identityError && (
+            <>
+              <Notice status="warning" description={identityError} />
+              <VStack className="w-full items-center pb-3">
+                <Button
+                  testID="mint-info-retry"
+                  text="Try again"
+                  variant="secondary"
+                  size="compact"
+                  onPress={detail.retry}
+                />
+              </VStack>
+              <Spacer size={12} />
+            </>
+          )}
+
+          {/* One two-line slot for the mint's own words, mounted before the
             NUT-06 read answers so the card fills in place instead of landing
             under the grid at whatever height the copy needs. Longer copy folds
             behind "Show more". Skipped only when the identity read failed —
             the retry notice above already owns that space. */}
-        {!identityError ? (
-          <>
-            <Notice
-              status="info"
-              title="About this mint"
-              loading={detail.identity === 'loading'}
-              reserveLines={2}
-              collapseLines={3}
-              description={
-                typeof entry?.description === 'string' && entry.description.trim()
-                  ? entry.description
-                  : 'This mint has not published a description.'
-              }
-              testID="mint-info-about"
-            />
-            <Spacer size={12} />
-          </>
-        ) : null}
+          {!identityError ? (
+            <>
+              <Notice
+                status="info"
+                title="About this mint"
+                loading={detail.identity === 'loading'}
+                reserveLines={2}
+                collapseLines={3}
+                description={
+                  typeof entry?.description === 'string' && entry.description.trim()
+                    ? entry.description
+                    : 'This mint has not published a description.'
+                }
+                testID="mint-info-about"
+              />
+              <Spacer size={12} />
+            </>
+          ) : null}
 
-        {mintUrl && (
-          <Section title="Mint address">
-            <ListGroup variant="secondary">
-              <PressableFeedback
-                animation={false}
-                accessibilityRole="button"
-                accessibilityLabel={`Copy mint address, ${mintUrl}`}
-                testID="mint-info-url-copy"
-                onPress={handleMintUrlPress}>
-                <PressableFeedback.Scale>
-                  <ListGroup.Item disabled>
-                    <ListGroup.ItemPrefix>
-                      <Icon name="humbleicons:url" size={20} color={withAlpha(foreground, 0.4)} />
-                    </ListGroup.ItemPrefix>
-                    <ListGroup.ItemContent>
-                      <ListGroup.ItemTitle numberOfLines={3}>{mintUrl}</ListGroup.ItemTitle>
-                      <ListGroup.ItemDescription>Tap to copy</ListGroup.ItemDescription>
-                    </ListGroup.ItemContent>
-                    <ListGroup.ItemSuffix>
-                      <Icon name="lets-icons:copy" size={18} color={withAlpha(foreground, 0.4)} />
-                    </ListGroup.ItemSuffix>
-                  </ListGroup.Item>
-                </PressableFeedback.Scale>
-                <PressableFeedback.Ripple />
-              </PressableFeedback>
-            </ListGroup>
-          </Section>
-        )}
+          {mintUrl && (
+            <Section title="Mint address">
+              <ListGroup variant="secondary">
+                <PressableFeedback
+                  animation={false}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Copy mint address, ${mintUrl}`}
+                  testID="mint-info-url-copy"
+                  onPress={handleMintUrlPress}>
+                  <PressableFeedback.Scale>
+                    <ListGroup.Item disabled>
+                      <ListGroup.ItemPrefix>
+                        <Icon name="humbleicons:url" size={20} color={withAlpha(foreground, 0.4)} />
+                      </ListGroup.ItemPrefix>
+                      <ListGroup.ItemContent>
+                        <ListGroup.ItemTitle numberOfLines={3}>{mintUrl}</ListGroup.ItemTitle>
+                        <ListGroup.ItemDescription>Tap to copy</ListGroup.ItemDescription>
+                      </ListGroup.ItemContent>
+                      <ListGroup.ItemSuffix>
+                        <Icon name="lets-icons:copy" size={18} color={withAlpha(foreground, 0.4)} />
+                      </ListGroup.ItemSuffix>
+                    </ListGroup.Item>
+                  </PressableFeedback.Scale>
+                  <PressableFeedback.Ripple />
+                </PressableFeedback>
+              </ListGroup>
+            </Section>
+          )}
 
-        {typeof entry?.longDescription === 'string' && (
-          <>
-            <Notice
-              status="info"
-              icon="ri:file-text-line"
-              title="Details"
-              collapseLines={4}
-              description={entry.longDescription}
-              testID="mint-info-details"
-            />
-            <Spacer size={12} />
-          </>
-        )}
+          {typeof entry?.longDescription === 'string' && (
+            <>
+              <Notice
+                status="info"
+                icon="ri:file-text-line"
+                title="Details"
+                collapseLines={4}
+                description={entry.longDescription}
+                testID="mint-info-details"
+              />
+              <Spacer size={12} />
+            </>
+          )}
 
-        {typeof entry?.motd === 'string' && (
-          <>
-            <Notice
-              status="warning"
-              title="Message from the mint"
-              collapseLines={4}
-              description={entry.motd}
-              testID="mint-info-motd"
-            />
-            <Spacer size={12} />
-          </>
-        )}
+          {typeof entry?.motd === 'string' && (
+            <>
+              <Notice
+                status="warning"
+                title="Message from the mint"
+                collapseLines={4}
+                description={entry.motd}
+                testID="mint-info-motd"
+              />
+              <Spacer size={12} />
+            </>
+          )}
 
-        {contactRows.length > 0 && (
-          <Section title="Contact">
-            <ListGroup variant="secondary">
-              {contactRows.map((c) => {
-                const rowNostrPubkey = c.isNostr
-                  ? resolveMintInfoNostrContactPubkey([c], cachedMeta?.operatorPubkey)
-                  : undefined;
-                const rowProfile =
-                  rowNostrPubkey && rowNostrPubkey === nostrContactPubkey
-                    ? nostrContactProfile
-                    : null;
-                const rowPicture =
-                  rowNostrPubkey && rowNostrPubkey === nostrContactPubkey
-                    ? nostrContactPicture
+          {contactRows.length > 0 && (
+            <Section title="Contact">
+              <ListGroup variant="secondary">
+                {contactRows.map((c) => {
+                  const rowNostrPubkey = c.isNostr
+                    ? resolveMintInfoNostrContactPubkey([c], cachedMeta?.operatorPubkey)
                     : undefined;
-                const fallbackNpub = c.isNostr
-                  ? formatMintInfoNostrFallback(c.info, rowNostrPubkey)
-                  : undefined;
-                const title = c.isNostr
-                  ? getMintInfoNostrDisplayName(rowProfile, fallbackNpub ?? c.info)
-                  : c.info;
-                return (
-                  <PressableFeedback
-                    key={`${c.method}:${c.info}:${c.originalIndex}`}
-                    animation={false}
-                    // Stable id for device tests: the row's visible label is a
-                    // resolved display name (data-bearing, flaky to select on).
-                    testID={
-                      c.isNostr
-                        ? 'mint-info-contact-nostr'
-                        : `mint-info-contact-${c.method.toLowerCase()}`
-                    }
-                    accessibilityRole={c.isNostr ? 'button' : 'link'}
-                    accessibilityLabel={
-                      c.isNostr ? 'Open Nostr contact profile' : `${c.method}, ${c.info}`
-                    }
-                    onPress={() => handleContactPress(c.method, c.info, rowNostrPubkey)}>
-                    <PressableFeedback.Scale>
-                      <ListGroup.Item disabled>
-                        <ListGroup.ItemPrefix>
-                          {c.isNostr ? (
-                            <Avatar
-                              state={
-                                nostrContactLoading && rowNostrPubkey === nostrContactPubkey
-                                  ? 'loading'
-                                  : rowPicture
-                                    ? 'image'
-                                    : 'fallback'
-                              }
-                              picture={rowPicture}
-                              seed={rowNostrPubkey ?? c.info}
-                              name={title}
-                              size={32}
-                            />
-                          ) : ['X', 'TWITTER'].includes(c.method.toUpperCase()) ? (
-                            <Icon
-                              name="hugeicons:new-twitter"
-                              size={20}
-                              color={withAlpha(foreground, 0.4)}
-                            />
-                          ) : c.method.toUpperCase() === 'EMAIL' ? (
-                            <Icon name="mdi:at" size={20} color={withAlpha(foreground, 0.4)} />
-                          ) : undefined}
-                        </ListGroup.ItemPrefix>
-                        <ListGroup.ItemContent>
-                          <ListGroup.ItemTitle>{title}</ListGroup.ItemTitle>
-                        </ListGroup.ItemContent>
-                        <ListGroup.ItemSuffix />
-                      </ListGroup.Item>
-                    </PressableFeedback.Scale>
-                    <PressableFeedback.Ripple />
-                  </PressableFeedback>
-                );
-              })}
-            </ListGroup>
-          </Section>
-        )}
+                  const rowProfile =
+                    rowNostrPubkey && rowNostrPubkey === nostrContactPubkey
+                      ? nostrContactProfile
+                      : null;
+                  const rowPicture =
+                    rowNostrPubkey && rowNostrPubkey === nostrContactPubkey
+                      ? nostrContactPicture
+                      : undefined;
+                  const fallbackNpub = c.isNostr
+                    ? formatMintInfoNostrFallback(c.info, rowNostrPubkey)
+                    : undefined;
+                  const title = c.isNostr
+                    ? getMintInfoNostrDisplayName(rowProfile, fallbackNpub ?? c.info)
+                    : c.info;
+                  return (
+                    <PressableFeedback
+                      key={`${c.method}:${c.info}:${c.originalIndex}`}
+                      animation={false}
+                      // Stable id for device tests: the row's visible label is a
+                      // resolved display name (data-bearing, flaky to select on).
+                      testID={
+                        c.isNostr
+                          ? 'mint-info-contact-nostr'
+                          : `mint-info-contact-${c.method.toLowerCase()}`
+                      }
+                      accessibilityRole={c.isNostr ? 'button' : 'link'}
+                      accessibilityLabel={
+                        c.isNostr ? 'Open Nostr contact profile' : `${c.method}, ${c.info}`
+                      }
+                      onPress={() => handleContactPress(c.method, c.info, rowNostrPubkey)}>
+                      <PressableFeedback.Scale>
+                        <ListGroup.Item disabled>
+                          <ListGroup.ItemPrefix>
+                            {c.isNostr ? (
+                              <Avatar
+                                state={
+                                  nostrContactLoading && rowNostrPubkey === nostrContactPubkey
+                                    ? 'loading'
+                                    : rowPicture
+                                      ? 'image'
+                                      : 'fallback'
+                                }
+                                picture={rowPicture}
+                                seed={rowNostrPubkey ?? c.info}
+                                name={title}
+                                size={32}
+                              />
+                            ) : ['X', 'TWITTER'].includes(c.method.toUpperCase()) ? (
+                              <Icon
+                                name="hugeicons:new-twitter"
+                                size={20}
+                                color={withAlpha(foreground, 0.4)}
+                              />
+                            ) : c.method.toUpperCase() === 'EMAIL' ? (
+                              <Icon name="mdi:at" size={20} color={withAlpha(foreground, 0.4)} />
+                            ) : undefined}
+                          </ListGroup.ItemPrefix>
+                          <ListGroup.ItemContent>
+                            <ListGroup.ItemTitle>{title}</ListGroup.ItemTitle>
+                          </ListGroup.ItemContent>
+                          <ListGroup.ItemSuffix />
+                        </ListGroup.Item>
+                      </PressableFeedback.Scale>
+                      <PressableFeedback.Ripple />
+                    </PressableFeedback>
+                  );
+                })}
+              </ListGroup>
+            </Section>
+          )}
 
-        <OperatorRunsSection
-          pubkey={nostrContactPubkey}
-          excludeMintUrl={mintUrl}
-          title="Operator also runs"
-          testID="mint-info-operator-runs"
-        />
+          <OperatorRunsSection
+            pubkey={nostrContactPubkey}
+            excludeMintUrl={mintUrl}
+            title="Operator also runs"
+            testID="mint-info-operator-runs"
+          />
 
-        {isTrusted && !entry?.fromAccepter && (
-          <Section title="Settings">
-            <ListGroup variant="secondary">
-              <PressableFeedback
-                animation={false}
-                accessibilityRole="button"
-                accessibilityLabel="Balance split"
-                testID="mint-info-balance-split"
-                onPress={() => router.navigate('/distribution')}>
-                <PressableFeedback.Scale>
-                  <ListGroup.Item disabled>
-                    <ListGroup.ItemPrefix>
-                      <Icon
-                        name="fluent:split-vertical-24-filled"
-                        size={20}
-                        color={withAlpha(foreground, 0.4)}
-                      />
-                    </ListGroup.ItemPrefix>
-                    <ListGroup.ItemContent>
-                      <ListGroup.ItemTitle>Balance split</ListGroup.ItemTitle>
-                    </ListGroup.ItemContent>
-                    <ListGroup.ItemSuffix />
-                  </ListGroup.Item>
-                </PressableFeedback.Scale>
-                <PressableFeedback.Ripple />
-              </PressableFeedback>
-            </ListGroup>
-          </Section>
-        )}
-      </View>
-    </Screen>
+          {isTrusted && !entry?.fromAccepter && (
+            <Section title="Settings">
+              <ListGroup variant="secondary">
+                <PressableFeedback
+                  animation={false}
+                  accessibilityRole="button"
+                  accessibilityLabel="Balance split"
+                  testID="mint-info-balance-split"
+                  onPress={() => router.navigate('/distribution')}>
+                  <PressableFeedback.Scale>
+                    <ListGroup.Item disabled>
+                      <ListGroup.ItemPrefix>
+                        <Icon
+                          name="fluent:split-vertical-24-filled"
+                          size={20}
+                          color={withAlpha(foreground, 0.4)}
+                        />
+                      </ListGroup.ItemPrefix>
+                      <ListGroup.ItemContent>
+                        <ListGroup.ItemTitle>Balance split</ListGroup.ItemTitle>
+                      </ListGroup.ItemContent>
+                      <ListGroup.ItemSuffix />
+                    </ListGroup.Item>
+                  </PressableFeedback.Scale>
+                  <PressableFeedback.Ripple />
+                </PressableFeedback>
+              </ListGroup>
+            </Section>
+          )}
+        </View>
+      </Screen>
+    </>
   );
 }
 

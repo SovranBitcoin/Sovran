@@ -330,123 +330,131 @@ export function ProviderInfoScreen() {
   }
 
   return (
-    <Screen
-      name="ProviderInfoScreen"
-      scroll="animated"
-      scrollY={morph.scrollY}
-      headerBand={morph.headerBand}
-      bgColor={background}
-      footer={
-        <BottomButtons>
-          <ButtonHandler
-            buttons={[
-              {
-                text: 'Close',
-                variant: 'secondary',
-                onPress: () => router.back(),
-                testID: 'ai-provider-info-close',
-              },
-              ...(isActive
-                ? []
-                : [
-                    {
-                      text: 'Use this provider',
-                      variant: 'primary' as const,
-                      onPress: onUse,
-                      testID: 'ai-provider-info-use',
-                    },
-                  ]),
-            ]}
-          />
-        </BottomButtons>
-      }>
+    <>
+      {/* Outside the Screen: its content mounts after the push animation, and a
+          title declared in there left the native one showing for the whole
+          slide before this one swapped in. */}
       <Stack.Screen options={{ title: 'Provider details', headerTitle: morph.headerTitle }} />
-
-      {morph.probe}
-      <VStack className="w-full items-center pb-4 pt-6">
-        <Animated.View className="items-center" style={morph.contentStyle}>
-          <ProviderAvatar name={displayName} baseUrl={nodeBaseUrl} status={status} size={70} />
-          <Text
-            bold
-            size={22}
-            numberOfLines={2}
-            className="mt-3 text-center"
-            testID="ai-provider-info-name">
-            {displayName}
-          </Text>
-        </Animated.View>
-        {/* The face and the name are already right: the avatar is seeded from
+      <Screen
+        name="ProviderInfoScreen"
+        scroll="animated"
+        scrollY={morph.scrollY}
+        headerBand={morph.headerBand}
+        bgColor={background}
+        footer={
+          <BottomButtons>
+            <ButtonHandler
+              buttons={[
+                {
+                  text: 'Close',
+                  variant: 'secondary',
+                  onPress: () => router.back(),
+                  testID: 'ai-provider-info-close',
+                },
+                ...(isActive
+                  ? []
+                  : [
+                      {
+                        text: 'Use this provider',
+                        variant: 'primary' as const,
+                        onPress: onUse,
+                        testID: 'ai-provider-info-use',
+                      },
+                    ]),
+              ]}
+            />
+          </BottomButtons>
+        }>
+        {morph.probe}
+        <VStack className="w-full items-center pb-4 pt-6">
+          <Animated.View className="items-center" style={morph.contentStyle}>
+            <ProviderAvatar name={displayName} baseUrl={nodeBaseUrl} status={status} size={70} />
+            <Text
+              bold
+              size={22}
+              numberOfLines={2}
+              className="mt-3 text-center"
+              testID="ai-provider-info-name">
+              {displayName}
+            </Text>
+          </Animated.View>
+          {/* The face and the name are already right: the avatar is seeded from
             the URL and the name comes in on the link, so neither has a loading
             state to draw. */}
-      </VStack>
+        </VStack>
 
-      {/* One slot for what the provider says about itself, the same card the
+        {/* One slot for what the provider says about itself, the same card the
           mint and profile pages use for theirs, held at two lines whether the
           copy is still coming, came in on the link, or does not exist — so
           nothing under it moves when the read lands. Longer copy folds behind
           "Show more" instead of growing the card. */}
-      {state === 'empty' && !description ? (
-        <Notice
-          status="info"
-          title="This provider does not describe itself"
-          description="Older nodes do not serve an info endpoint. It can still be used."
-          testID="ai-provider-info-description"
-        />
-      ) : (
-        <Notice
-          status="info"
-          icon="ri:file-text-line"
-          loading={descriptionLoading}
-          reserveLines={2}
-          collapseLines={2}
-          description={description ?? 'This provider has not published a description.'}
-          testID={
-            descriptionLoading
-              ? 'ai-provider-info-description-skeleton'
-              : 'ai-provider-info-description'
-          }
-        />
-      )}
-      <Spacer size={12} />
+        {state === 'empty' && !description ? (
+          <Notice
+            status="info"
+            title="This provider does not describe itself"
+            description="Older nodes do not serve an info endpoint. It can still be used."
+            testID="ai-provider-info-description"
+          />
+        ) : (
+          <Notice
+            status="info"
+            icon="ri:file-text-line"
+            loading={descriptionLoading}
+            reserveLines={2}
+            collapseLines={2}
+            description={description ?? 'This provider has not published a description.'}
+            testID={
+              descriptionLoading
+                ? 'ai-provider-info-description-skeleton'
+                : 'ai-provider-info-description'
+            }
+          />
+        )}
+        <Spacer size={12} />
 
-      {/* Above the numbers, because it is the question the numbers are FOR.
+        {/* Above the numbers, because it is the question the numbers are FOR.
           The slot is held while the catalog is out — a warning about who can
           read your messages arriving late, under the reader's thumb, is the
           one thing on this page that must never appear from nowhere. */}
-      <SkeletonContentCrossfade
-        loading={privacyLoading}
-        visualKey="provider-info-privacy"
-        visualSurface="provider-info"
-        testID="ai-provider-info-privacy"
-        renderSkeleton={() => (
-          // The whole card as one block, at exactly the finished card's height:
-          // a title line plus the two body lines every verdict is written to.
-          <Notice status="info" loading title={PROVIDER_PRIVACY_SKELETON.title} reserveLines={2} />
-        )}
-        renderContent={() => (
-          <Notice
-            status={privacy.status}
-            title={privacy.title}
-            description={privacy.body}
-            reserveLines={2}
-          />
-        )}
-      />
+        <SkeletonContentCrossfade
+          loading={privacyLoading}
+          visualKey="provider-info-privacy"
+          visualSurface="provider-info"
+          testID="ai-provider-info-privacy"
+          renderSkeleton={() => (
+            // The whole card as one block, at exactly the finished card's height:
+            // a title line plus the two body lines every verdict is written to.
+            <Notice
+              status="info"
+              loading
+              title={PROVIDER_PRIVACY_SKELETON.title}
+              reserveLines={2}
+            />
+          )}
+          renderContent={() => (
+            <Notice
+              status={privacy.status}
+              title={privacy.title}
+              description={privacy.body}
+              reserveLines={2}
+            />
+          )}
+        />
 
-      <StatsGrid
-        stats={providerStats}
-        loading={state === 'loading' || catalogState === 'loading'}
-        visualKey="provider-info-stats"
-        visualSurface="provider-info"
-        testID="ai-provider-info-stats"
-      />
+        <StatsGrid
+          stats={providerStats}
+          loading={state === 'loading' || catalogState === 'loading'}
+          visualKey="provider-info-stats"
+          visualSurface="provider-info"
+          testID="ai-provider-info-stats"
+        />
 
-      {/* Directly under the grid. A node is a machine and somebody operates
+        {/* Directly under the grid. A node is a machine and somebody operates
           it; who that is belongs beside what it costs and what it serves, not
           at the bottom of the page after the plumbing. */}
-      {operatorPubkey ? (
-        <Section title="Operator">
-          {/* Built exactly like the mint page's operator row — a face, a name
+        {operatorPubkey ? (
+          <Section title="Operator">
+            {/* Built exactly like the mint page's operator row — a face, a name
               and a way through to the profile, inside the same grouped card
               every other section on this page uses. It used to be a bare
               `ContactRow`, which carried its own chrome and so read as a
@@ -458,133 +466,132 @@ export function ProviderInfoScreen() {
               measured it — a number that is absent and a number that is zero
               are different facts, and only one of them is a reason to think
               twice. */}
+            <ListGroup variant="secondary">
+              <PressableFeedback
+                animation={false}
+                accessibilityRole="button"
+                accessibilityLabel="Open operator profile"
+                testID="ai-provider-info-operator"
+                onPress={() => router.push(buildModalProfileHref({ pubkey: operatorPubkey }))}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemPrefix>
+                      <Avatar
+                        state={
+                          operatorLoading
+                            ? 'loading'
+                            : operatorProfile?.picture
+                              ? 'image'
+                              : 'fallback'
+                        }
+                        picture={operatorProfile?.picture}
+                        seed={operatorPubkey}
+                        name={operatorName}
+                        size={32}
+                      />
+                    </ListGroup.ItemPrefix>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>{operatorName}</ListGroup.ItemTitle>
+                      {operatorReach ? (
+                        <ListGroup.ItemDescription>{operatorReach}</ListGroup.ItemDescription>
+                      ) : null}
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix />
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+            </ListGroup>
+          </Section>
+        ) : null}
+
+        <OperatorRunsSection
+          pubkey={operatorPubkey}
+          excludeProviderUrl={nodeBaseUrl}
+          title="Operator also runs"
+          testID="ai-provider-info-operator-runs"
+        />
+
+        <Section title="Provider address">
           <ListGroup variant="secondary">
-            <PressableFeedback
-              animation={false}
-              accessibilityRole="button"
-              accessibilityLabel="Open operator profile"
-              testID="ai-provider-info-operator"
-              onPress={() => router.push(buildModalProfileHref({ pubkey: operatorPubkey }))}>
+            <PressableFeedback onPress={onCopy} testID="ai-provider-info-url-copy">
               <PressableFeedback.Scale>
                 <ListGroup.Item disabled>
-                  <ListGroup.ItemPrefix>
-                    <Avatar
-                      state={
-                        operatorLoading
-                          ? 'loading'
-                          : operatorProfile?.picture
-                            ? 'image'
-                            : 'fallback'
-                      }
-                      picture={operatorProfile?.picture}
-                      seed={operatorPubkey}
-                      name={operatorName}
-                      size={32}
-                    />
-                  </ListGroup.ItemPrefix>
                   <ListGroup.ItemContent>
-                    <ListGroup.ItemTitle>{operatorName}</ListGroup.ItemTitle>
-                    {operatorReach ? (
-                      <ListGroup.ItemDescription>{operatorReach}</ListGroup.ItemDescription>
-                    ) : null}
+                    <ListGroup.ItemTitle>{nodeBaseUrl}</ListGroup.ItemTitle>
+                    <ListGroup.ItemDescription>Tap to copy</ListGroup.ItemDescription>
                   </ListGroup.ItemContent>
-                  <ListGroup.ItemSuffix />
                 </ListGroup.Item>
               </PressableFeedback.Scale>
               <PressableFeedback.Ripple />
             </PressableFeedback>
           </ListGroup>
         </Section>
-      ) : null}
 
-      <OperatorRunsSection
-        pubkey={operatorPubkey}
-        excludeProviderUrl={nodeBaseUrl}
-        title="Operator also runs"
-        testID="ai-provider-info-operator-runs"
-      />
-
-      <Section title="Provider address">
-        <ListGroup variant="secondary">
-          <PressableFeedback onPress={onCopy} testID="ai-provider-info-url-copy">
-            <PressableFeedback.Scale>
-              <ListGroup.Item disabled>
-                <ListGroup.ItemContent>
-                  <ListGroup.ItemTitle>{nodeBaseUrl}</ListGroup.ItemTitle>
-                  <ListGroup.ItemDescription>Tap to copy</ListGroup.ItemDescription>
-                </ListGroup.ItemContent>
-              </ListGroup.Item>
-            </PressableFeedback.Scale>
-            <PressableFeedback.Ripple />
-          </PressableFeedback>
-        </ListGroup>
-      </Section>
-
-      {/* Accepted mints — the section that decides whether this page is
+        {/* Accepted mints — the section that decides whether this page is
           actionable at all, so it is the one that must not appear from
           nowhere. Two rows while the read is out: enough to establish that a
           list is coming and where it starts, without pretending to know how
           long it is. */}
-      <SkeletonContentCrossfade
-        loading={mintsLoading}
-        visualKey="provider-info-mints"
-        visualSurface="provider-info"
-        testID="ai-provider-info-mints"
-        renderSkeleton={() => (
-          <Section title="Accepted mints">
-            <ListGroup variant="secondary">
-              <ProviderMintRow mintUrl="" loading />
-              <ProviderMintRow mintUrl="" loading />
-            </ListGroup>
-          </Section>
-        )}
-        renderContent={() =>
-          acceptedMints?.length ? (
-            <Section title={`Accepted mints · ${spendableSats.toLocaleString()} sat spendable`}>
-              {acceptedMints.every(
-                (mint) => !heldMints.has(mint.trim().replace(/\/+$/, '').toLowerCase())
-              ) ? (
-                <>
-                  <Notice
-                    status="warning"
-                    title="You cannot pay this provider yet"
-                    description="It redeems payment only from the mints below, and your wallet holds none of them."
-                  />
-                  <Spacer size={8} />
-                </>
-              ) : null}
+        <SkeletonContentCrossfade
+          loading={mintsLoading}
+          visualKey="provider-info-mints"
+          visualSurface="provider-info"
+          testID="ai-provider-info-mints"
+          renderSkeleton={() => (
+            <Section title="Accepted mints">
               <ListGroup variant="secondary">
-                {acceptedMints.map((mint) => (
-                  <ProviderMintRow key={mint} mintUrl={mint} />
-                ))}
+                <ProviderMintRow mintUrl="" loading />
+                <ProviderMintRow mintUrl="" loading />
               </ListGroup>
             </Section>
-          ) : null
-        }
-      />
+          )}
+          renderContent={() =>
+            acceptedMints?.length ? (
+              <Section title={`Accepted mints · ${spendableSats.toLocaleString()} sat spendable`}>
+                {acceptedMints.every((mint) => !spendableByMint.has(routstrMintKey(mint) ?? '')) ? (
+                  <>
+                    <Notice
+                      status="warning"
+                      title="You cannot pay this provider yet"
+                      description="It redeems payment only from the mints below, and your wallet holds none of them."
+                    />
+                    <Spacer size={8} />
+                  </>
+                ) : null}
+                <ListGroup variant="secondary">
+                  {acceptedMints.map((mint) => (
+                    <ProviderMintRow key={mint} mintUrl={mint} />
+                  ))}
+                </ListGroup>
+              </Section>
+            ) : null
+          }
+        />
 
-      {holdsBalance ? (
-        <Section title="Balance held here">
-          <Notice
-            status="warning"
-            title="This provider is holding a balance"
-            description="Sovran now pays per request, so nothing needs to sit here. Reclaim moves it back into your wallet."
-          />
-          <Spacer size={8} />
-          <ButtonHandler
-            buttons={[
-              {
-                text: 'Reclaim to wallet',
-                variant: 'primary',
-                onPress: onReclaim,
-                testID: 'ai-provider-info-reclaim',
-              },
-            ]}
-          />
-        </Section>
-      ) : null}
+        {holdsBalance ? (
+          <Section title="Balance held here">
+            <Notice
+              status="warning"
+              title="This provider is holding a balance"
+              description="Sovran now pays per request, so nothing needs to sit here. Reclaim moves it back into your wallet."
+            />
+            <Spacer size={8} />
+            <ButtonHandler
+              buttons={[
+                {
+                  text: 'Reclaim to wallet',
+                  variant: 'primary',
+                  onPress: onReclaim,
+                  testID: 'ai-provider-info-reclaim',
+                },
+              ]}
+            />
+          </Section>
+        ) : null}
 
-      <Spacer size={24} />
-    </Screen>
+        <Spacer size={24} />
+      </Screen>
+    </>
   );
 }
