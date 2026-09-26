@@ -30,7 +30,8 @@ import type { MintCatalogEntry } from 'wallet';
 
 import { projectMintMeta } from '@/features/mint/lib/auditInfo';
 import { fetchNostrProfile } from '@/shared/lib/apiClient';
-import { fetchMintReviews, reviewAggregateOf } from '@/shared/lib/nostr/fetchMintReviews';
+import { fetchMintReviews } from '@/shared/lib/nostr/fetchMintReviews';
+import { reviewAggregateOf } from '@/shared/lib/nostr/reviewAggregate';
 import { getDiscoveredMintMetadata } from '@/shared/lib/getDiscoveredMintMetadata';
 import { log, mintUrlLogFields, monotonicNow } from '@/shared/lib/logger';
 import { newReadId, readErrorType, readEvents, readKeyHash } from '@/shared/lib/read/readLog';

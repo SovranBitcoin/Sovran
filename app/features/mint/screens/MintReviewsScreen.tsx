@@ -13,7 +13,8 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import type { MintRecommendation, MintReviewsResponse } from '@/shared/lib/apiClient';
-import { fetchMintReviews, reviewAggregateOf } from '@/shared/lib/nostr/fetchMintReviews';
+import { fetchMintReviews } from '@/shared/lib/nostr/fetchMintReviews';
+import { reviewAggregateOf } from '@/shared/lib/nostr/reviewAggregate';
 import {
   useCachedMintMetadata,
   useMintMetadataStore,

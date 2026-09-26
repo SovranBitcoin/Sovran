@@ -19,7 +19,8 @@ import { projectMintMeta } from '@/features/mint/lib/auditInfo';
 import { retryMintInfoFetch } from '@/features/send/lib/createSovranScreenActionsBridge';
 import { isSupersededError } from '@/shared/lib/cache/createQueryCacheStore';
 import { getDiscoveredMintMetadata } from '@/shared/lib/getDiscoveredMintMetadata';
-import { fetchMintReviews, reviewAggregateOf } from '@/shared/lib/nostr/fetchMintReviews';
+import { fetchMintReviews } from '@/shared/lib/nostr/fetchMintReviews';
+import { reviewAggregateOf } from '@/shared/lib/nostr/reviewAggregate';
 import { extractMintNostrPubkey } from '@/shared/lib/nostr/extractMintNostrPubkey';
 import { newReadId, readErrorType, readEvents, readKeyHash } from '@/shared/lib/read/readLog';
 import {
