@@ -1699,7 +1699,7 @@ export async function sendMessage(
     if (ownsScope() && paid?.mintedSats != null && !paid.changeReceived) {
       scheduleRecoverySweeps();
     } else if (ownsScope() && !translated) {
-      void sweepUnsettledPayments();
+      void sweepUnsettledPayments('failure');
     }
     if (translated) throw translated;
     toRoutstrError(error);

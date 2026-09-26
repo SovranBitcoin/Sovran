@@ -365,7 +365,7 @@ export function scheduleRecoverySweeps(): void {
   for (const timer of recoveryTimers) clearTimeout(timer);
   recoveryTimers = RECOVERY_SWEEP_DELAYS_MS.map((delay) =>
     setTimeout(() => {
-      void sweepUnsettledPayments();
+      void sweepUnsettledPayments('scheduled');
     }, delay)
   );
   apiLog.info('routstr.sdk.recovery_scheduled', { delaysMs: RECOVERY_SWEEP_DELAYS_MS });
@@ -381,7 +381,14 @@ export function scheduleRecoverySweeps(): void {
  * the node never took it. Safe to call repeatedly; it is the question a local
  * reclaim cannot answer.
  */
-export async function sweepUnsettledPayments(): Promise<void> {
+export async function sweepUnsettledPayments(
+  /**
+   * What prompted the sweep. A `scheduled` one is itself the follow-up and
+   * must not schedule another, or a token the node never settles would keep
+   * the wallet asking forever.
+   */
+  reason: 'launch' | 'failure' | 'scheduled' = 'launch'
+): Promise<void> {
   try {
     const built = await ensure();
     const assertOwner = () => {
@@ -400,6 +407,10 @@ export async function sweepUnsettledPayments(): Promise<void> {
     let recoveredSats = 0;
     let pending = 0;
     let strandedSats = 0;
+    // A pending token from the last few minutes is one whose node is still
+    // finishing the request it belongs to — the app was closed or the
+    // connection dropped mid-answer — and it will have change shortly.
+    let freshPending = 0;
     // Shared across the whole sweep, not per token: the app calls this the
     // moment a request fails, and eight tokens each waiting out their own
     // backoff would keep the wallet busy for a minute after the user has
@@ -449,6 +460,7 @@ export async function sweepUnsettledPayments(): Promise<void> {
           if (refund.status === 425) {
             pending += 1;
             pendingThisSession.add(token);
+            if (fresh) freshPending += 1;
           }
           if (sats != null) strandedSats += sats;
           apiLog.warn('routstr.sweep.token', {
@@ -498,13 +510,19 @@ export async function sweepUnsettledPayments(): Promise<void> {
     }
     if (attempted || pending) {
       apiLog.info('routstr.sdk.sweep', {
+        reason,
         attempted,
         recovered,
         recoveredSats,
         pending,
+        freshPending,
         strandedSats,
       });
     }
+    // The launch sweep used to be the only one: a request the app was closed
+    // on came back as 425 once and was then not asked about again until the
+    // next launch, however long that took.
+    if (freshPending > 0 && reason !== 'scheduled') scheduleRecoverySweeps();
   } catch (error) {
     apiLog.warn('routstr.sdk.sweep_failed', {
       error: error instanceof Error ? error.message : String(error),

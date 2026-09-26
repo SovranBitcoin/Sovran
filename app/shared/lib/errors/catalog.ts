@@ -13,6 +13,12 @@ export const ERROR_COPY = {
   // already redeemed the token, so the sats are in its refund row, not lost —
   // and the sweep collects them once the node finishes. Said so, because the
   // balance has visibly dropped and "try again" alone reads as "gone".
+  // A placeholder that outlived its session: the app was closed, or the
+  // connection dropped, before the provider finished. There is no answer to
+  // fetch later — a node keeps nothing — but the payment is journalled and
+  // the sweep collects whatever it did not spend.
+  'routstr.interrupted':
+    'This answer never arrived — the app closed or the connection dropped before the provider finished. Any unspent sats are returned automatically.',
   'routstr.change_pending':
     'The connection dropped while the AI provider was still answering. Your sats are held by the provider and will be returned automatically once it finishes.',
   // Distinct from `routstr.unavailable` on purpose. This one is OUR verdict

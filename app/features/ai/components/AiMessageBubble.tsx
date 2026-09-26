@@ -25,7 +25,7 @@ import { withAlpha } from '@/shared/lib/color';
 import { ERROR_COPY } from '@/shared/lib/errors/catalog';
 
 /** What a failed turn says when nothing remembers which failure it was. */
-const UNKNOWN_TURN_COPY = ERROR_COPY['routstr.unknown'];
+const INTERRUPTED_TURN_COPY = ERROR_COPY['routstr.interrupted'];
 
 /** Active-branch widget data for one assistant message. Provided by the
  *  screen, which owns the conversation tree and the `setActiveBranch`
@@ -413,11 +413,15 @@ function AssistantBubble({
   // leaves the placeholder standing and records why, and an empty bubble is
   // the one thing this surface must never render. The fallback covers a
   // placeholder that outlived its record — persisted across a relaunch, or
-  // aged out of the bounded buffer — which is still a failure, just one we can
-  // only describe generically.
+  // aged out of the bounded buffer. In practice that is a request the app was
+  // closed on, or whose connection dropped, before the node finished: the
+  // answer is gone, and the sats the node did not spend are being recovered.
+  // Said as that, rather than as an unexplained failure over a balance that
+  // visibly dropped.
   const failed = !isStreaming && !hasContent && !hasReasoning;
   const error =
-    turnError ?? (failed ? { id: 'routstr.unknown' as const, text: UNKNOWN_TURN_COPY } : null);
+    turnError ??
+    (failed ? { id: 'routstr.interrupted' as const, text: INTERRUPTED_TURN_COPY } : null);
 
   if (failed && error) {
     return (

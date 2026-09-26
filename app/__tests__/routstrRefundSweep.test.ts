@@ -215,6 +215,25 @@ describe('Routstr refund sweep', () => {
     expect(mockReceive).toHaveBeenCalledWith('cashuB-refund');
   });
 
+  // The app was closed mid-answer and relaunched: the launch sweep meets a
+  // 425 for a token minted minutes ago. The node is still finishing; asking
+  // again in a minute is how the change comes home without another launch.
+  it('schedules follow-up sweeps when a fresh token is still pending', async () => {
+    await journalOneToken();
+    mockFetch.mockImplementation(async () => pending());
+
+    const sweeping = sweepUnsettledPayments('launch');
+    await jest.advanceTimersByTimeAsync(10_000);
+    await sweeping;
+    expect(sweepEvents('routstr.sdk.recovery_scheduled')).toHaveLength(1);
+
+    // A scheduled sweep that still finds it pending does not schedule more.
+    const followUp = sweepUnsettledPayments('scheduled');
+    await jest.advanceTimersByTimeAsync(10_000);
+    await followUp;
+    expect(sweepEvents('routstr.sdk.recovery_scheduled')).toHaveLength(1);
+  });
+
   // A 1-sat token against a sub-sat turn: cost rounds to the whole token, the
   // node sends no change, and the SDK keeps chasing money that is not owed.
   it('forgets a token the node consumed in full', async () => {
