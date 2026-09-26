@@ -63,23 +63,23 @@ const rules: Rule[] = [];
 // reviewed scenario must not silently inherit permission to publish or spend.
 const REVIEWED_STEPS: Record<string, string> = {
   'store.screenshots': 'd2e38759030f9a1cb138be51408417a204de7ba46cfb3f18199600350a363f85',
-  'marketing.screenshots': 'a062201a45ce4592ff7cfdff752a26f87f4ed2d1f0ed19a60486c1c6c3c1ac35',
+  'marketing.screenshots': '838d6f48785b5288c800d6effe292c98d277be2ad7e7e5de9932ad800121eec2',
   'marketing.screenshots.wallpapers':
-    '33cec78241e1fc43c7b5b79c19ea753121e95bc99e19b7b2cebac658dd77d976',
-  'marketing.screenshots.media': '3dacc9199412110912142124d01882b760a7a7ad28ce157b42d5c4f62f44cdcf',
-  'marketing.screenshots.mints': '45648d36d90336f529d29e8eec9f75743ce7fa732eacb0d02c49eb91678bce0a',
-  'backup.flow': 'a1d6109df846af127939d86170507872a82a99cfeb259d6d76ba7f7223edabe8',
-  'cta.preview': 'efc6208d16c153c786cb6cbccc57953e1ddf4cc0ac511626e16d173682554601',
+    '85fc77e9ef516ac20b132458cdcf6b8bc84352d910cc96c19888670934584547',
+  'marketing.screenshots.media': '1c6cec7d151c0c3d7be5454444011c78116aaf270d8b09592dc48ddd5ea24999',
+  'marketing.screenshots.mints': 'f3d5541ff800ca4c3d79dbe3eabf857f7d80f9ab903aa4afad4b2c2a0ee32c48',
+  'backup.flow': '089bd78e061b6fd390e885bffdd9c36b8abd356b571c4b3894a50cf5aed3baf5',
+  'cta.preview': 'a8dca6e1dd687913ed392fdf6d60de4bee7bf812d919e4b1be318954c989b2c0',
   'profile.own.view': 'de1cd02ff2ba9c2a92f6eedc3ec8e1e27152435e47e56cba6985e0c5e82e3d96',
   'settings.routing.navigate': 'c908361b3002f4282c35d1582719ccd8dfa1c8665a29f7fcc7e9eb61a7c1dd1a',
   'settings.notification-policy':
     '23d5b4826309381372452c236adca32ba65c6afee166fdfc2b6f047372b1b21a',
   'settings.legal.navigate': '03db104b6da7d9a1ea2afebadb9ab80bcdb0bd8acfa3823919b2d1cdeefcb244',
   'settings.design-system.showcase':
-    'b42e35e1b31a6d1ac5082da96cd5545f80edc5773f07b7b791efad215d87b4f9',
+    '96682a15fb47ec92ed65669b1218bfd926ffab9c9ce5e5b3430052ccad407cbd',
   'mint.add.cancel': 'a0c21c962af6b1e92e2765d389bf233cf59e9f8f0b6b585bb7819c60485ec759',
   'capture.settings': '4c8d1c63037eea7b3a245d40c3659448435d9e1f18eb0ae22cb0be8ea8091f8b',
-  'capture.design-system': '463e40299eb9be49362a4a3070bd7494375d43ad507baac555475789da5dae70',
+  'capture.design-system': '999f147518d0a94a7dddeeb676007007b1e4e033c449e9800ad1c187e4699f96',
   'capture.history': '184660bdc7b8780e1156fd9699ac3a3b0213e03aa344fd735ff7a4e1e875262c',
   'capture.onboarding': 'd1c01ff942735e67fd68c40f51441b96cb87e930f3ae4b3430bb63070113b6b1',
   'capture.local-navigation': '07fbd4bcd34445b8c49d9842fc989969c657975756b0a14daf7932f8062c0bad',

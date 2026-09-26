@@ -23,7 +23,7 @@
     {"action":"screenshot","name":"settings-design-system-loading"},
     {"action":"tapUntil","sequence":[{"tap":{"id":"flow-header-back"}}],"until":{"id":"design-system-family-segmented-progress"},"attempts":4,"settleMs":6000},
     {"action":"tap","selector":{"id":"design-system-family-segmented-progress"}},
-    {"action":"waitFor","selector":{"label":"Pause"},"timeoutMs":30000},
+    {"action":"waitFor","selector":{"id":"design-system-segmented-auto"},"value":"1","timeoutMs":30000},
     {"action":"screenshot","name":"settings-design-system-segmented"},
     {"action":"tapUntil","sequence":[{"tap":{"id":"flow-header-back"}}],"until":{"id":"design-system-family-empty-states"},"attempts":4,"settleMs":6000},
     {"action":"tap","selector":{"id":"design-system-family-empty-states"}},
