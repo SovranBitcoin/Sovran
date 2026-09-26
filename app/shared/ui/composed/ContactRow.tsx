@@ -105,6 +105,14 @@ interface MintStatFields {
   /** Units the mint can actually issue (keyset-backed). Badge renders only
    *  when the mint issues more than sat — an all-sat list stays clean. */
   supportedUnits?: string[];
+  /**
+   * Is the mint answering `/v1/info` right now — the dot on its icon, as on a
+   * provider's face. Feedback while scrolling, never a gate: `status` above
+   * is what decides whether the row can be picked, and an offline mint stays
+   * pickable (a token sent to it is redeemed when it returns). `unknown` and
+   * absent both draw nothing.
+   */
+  presence?: 'online' | 'offline' | 'unknown';
 }
 
 interface MintIdentity {
@@ -236,7 +244,9 @@ export function providerIdentity(input: {
 }
 
 /** Overload: accept either a full `MintListItem` or a minimal shape. */
-export function mintIdentity(item: MintListItem): MintIdentity;
+export function mintIdentity(
+  item: MintListItem & { presence?: MintStatFields['presence'] }
+): MintIdentity;
 export function mintIdentity(input: {
   mintUrl: string;
   displayName: string;
@@ -245,7 +255,7 @@ export function mintIdentity(input: {
 }): MintIdentity;
 export function mintIdentity(
   input:
-    | MintListItem
+    | (MintListItem & { presence?: MintStatFields['presence'] })
     | { mintUrl: string; displayName: string; iconUrl?: string; stats?: MintStatFields }
 ): MintIdentity {
   if ('balance' in input) {
@@ -265,6 +275,7 @@ export function mintIdentity(
       contactFollowers,
       contactReputation,
       supportedUnits,
+      presence,
     } = input;
     return {
       kind: 'mint',
@@ -284,6 +295,7 @@ export function mintIdentity(
         contactFollowers,
         contactReputation,
         supportedUnits,
+        presence,
       },
     };
   }
@@ -839,8 +851,24 @@ export function ContactRow({
   const provider = find(identities, 'provider');
 
   if (mint) {
+    // The same construction as the provider face below: the reachability dot
+    // rides on the icon, where it is read first and costs no width.
+    const presence = mint.stats?.presence;
     leadingNode = (
-      <MintIcon iconUrl={mint.iconUrl} name={name} size={AVATAR_SIZE} isLoading={resolvedLoading} />
+      <View className="relative">
+        <MintIcon
+          iconUrl={mint.iconUrl}
+          name={name}
+          size={AVATAR_SIZE}
+          isLoading={resolvedLoading}
+        />
+        {!resolvedLoading ? (
+          <PresenceDot
+            presence={presence === 'online' || presence === 'offline' ? presence : null}
+            size={AVATAR_SIZE}
+          />
+        ) : null}
+      </View>
     );
   } else if (nostr?.verified) {
     // Routes through `leading` so Avatar's `status` prop survives — ListRow's

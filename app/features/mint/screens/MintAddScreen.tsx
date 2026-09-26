@@ -1,5 +1,6 @@
 import { accountUnitLabel } from 'wallet';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import type { ViewToken } from 'react-native';
 import { Platform, TextInput, useWindowDimensions } from 'react-native';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { Stack, useLocalSearchParams } from 'expo-router';
@@ -17,7 +18,9 @@ import { selectMintAudit, type MintAuditSummary } from '@/features/mint/lib/audi
 import { extractAvailableCurrencies } from '@/features/mint/lib/availableCurrencies';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import { Button } from '@/shared/ui/primitives/Button';
-import type { MintSearchResult } from '@/shared/lib/apiClient';
+import type { MintSearchRow } from '@/features/mint/lib/mintDiscoveryRows';
+import { resolveMintStatus, type MintStatus } from '@/shared/lib/cashu/mintHealth';
+import { useMintPresence } from '@/features/mint/hooks/useMintPresence';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { useMintProfiles } from '@/features/mint/hooks/useMintProfiles';
 import {
@@ -69,6 +72,10 @@ interface SkeletonMint {
 
 const noop = () => {};
 
+/** Stable across renders (RN warns on a changing viewabilityConfig). A row
+ *  counts as visible once a sliver shows, so the dot is there as it arrives. */
+const PRESENCE_VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 10 };
+
 const keyExtractor = (item: SearchableMint) => item.url;
 const getItemType = (item: SearchableMint) => ('isSkeleton' in item ? 'skeleton' : 'mint');
 
@@ -97,11 +104,13 @@ interface DisplayMint {
   reviewScore?: number | null;
   /** Number of KYM reviews */
   reviewCount?: number;
+  /** nagg's liveness verdict, seeded before this phone has probed the row. */
+  serverStatus?: MintStatus;
 }
 
 type SearchableMint = DisplayMint | PseudoMint | SkeletonMint;
 
-function adaptSearchResult(result: MintSearchResult): DisplayMint {
+function adaptSearchResult(result: MintSearchRow): DisplayMint {
   const profile = useMintMetadataStore.getState().getCached(result.url);
   const info = (result.info ?? {}) as {
     icon_url?: string | null;
@@ -136,6 +145,7 @@ function adaptSearchResult(result: MintSearchResult): DisplayMint {
       }),
     reviewScore: result.review_score,
     reviewCount: result.review_count,
+    ...(result.liveness ? { serverStatus: result.liveness } : {}),
   };
 }
 
@@ -236,16 +246,24 @@ function MintItem({
   onToggle,
   globalLoading,
   loading,
+  presence,
 }: {
   mint: SearchableMint;
   selected: boolean;
   onToggle: (url: string) => void;
   globalLoading: boolean;
   loading?: boolean;
+  /** This phone's probe verdict for the row, when it has one. */
+  presence?: MintStatus;
 }) {
   const mintInfo = 'mintInfo' in mint ? mint.mintInfo : undefined;
   const displayName = getMintDisplayName(mint.url, mintInfo);
   const audit = 'audit' in mint ? mint.audit : undefined;
+  // First-hand evidence beats nagg's; neither is a reason to grey the row.
+  const liveness = resolveMintStatus(
+    presence,
+    'serverStatus' in mint ? mint.serverStatus : undefined
+  );
 
   return (
     <ContactRow
@@ -268,6 +286,7 @@ function MintItem({
           auditTotalOps: audit?.totalOps,
           contactReputation: 'contactReputation' in mint ? mint.contactReputation : undefined,
           contactFollowers: 'contactFollowers' in mint ? mint.contactFollowers : undefined,
+          presence: liveness,
         },
       })}
       subtitle={extractDomain(mint.url)}
@@ -478,6 +497,25 @@ export function MintAddScreen() {
   // shows them: a stale-cache revalidate keeps the rows it has (hunch rule ui/read-states).
   const isInitialLoading = searchLoading && displayMints.length === 0;
 
+  // Probe only the rows on screen: the discovery list can hold two hundred
+  // mints and a sweep of all of them is radio time nobody asked for. Visible
+  // rows are tracked through FlashList's viewability callback (a ref, so the
+  // handler keeps one identity — see SectionAnchorList for why that matters)
+  // and the presence hook re-sweeps as the window moves; probed rows answer
+  // from the cache when they scroll back in.
+  const [visibleMintUrls, setVisibleMintUrls] = useState<string[]>([]);
+  const handleViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken<SearchableMint>[] }) => {
+      const urls = viewableItems
+        .map((token) => token.item?.url)
+        .filter((url): url is string => typeof url === 'string' && url.startsWith('https://'));
+      setVisibleMintUrls((prev) =>
+        prev.length === urls.length && prev.every((url, i) => url === urls[i]) ? prev : urls
+      );
+    }
+  ).current;
+  const presence = useMintPresence(visibleMintUrls);
+
   const renderItem = ({ item }: { item: SearchableMint }) =>
     'isSkeleton' in item ? (
       <MintItem mint={item} selected={false} onToggle={noop} globalLoading loading />
@@ -487,6 +525,7 @@ export function MintAddScreen() {
         selected={selectedMints.has(item.url)}
         onToggle={handleToggleMint}
         globalLoading={isAdding}
+        presence={presence[normalizeMintUrlKey(item.url)]}
       />
     );
 
@@ -677,6 +716,8 @@ export function MintAddScreen() {
       ListEmptyComponent={isInitialLoading ? undefined : emptyComponent}
       onScroll={handleScroll}
       scrollEventThrottle={16}
+      onViewableItemsChanged={handleViewableItemsChanged}
+      viewabilityConfig={PRESENCE_VIEWABILITY_CONFIG}
     />
   );
 

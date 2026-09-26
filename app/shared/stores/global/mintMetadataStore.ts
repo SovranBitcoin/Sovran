@@ -41,6 +41,8 @@ import { evictLruOverCap } from '@/shared/lib/cache/evictLruOverCap';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
+import { recordMintReachability } from '@/shared/lib/cashu/mintHealth';
+import { isAbortError } from 'wallet/safeFetch';
 
 const MAX_ENTRIES = 200;
 
@@ -426,12 +428,16 @@ function fetchAndCache(
     try {
       const info = await fetcher(mintUrl);
       useMintMetadataStore.getState().setIdentity(mintUrl, info);
+      // The selector's identity refresh already paid for this round trip; let
+      // it stand as the liveness mark too, so the sweep skips this mint.
+      recordMintReachability(mintUrl, true);
       storeLog.info('store.mint_metadata.info.fetch_success', {
         key,
         hasName: typeof info.name === 'string' && info.name.length > 0,
       });
       return info;
     } catch (err) {
+      if (!isAbortError(err)) recordMintReachability(mintUrl, false);
       storeLog.warn('store.mint_metadata.info.fetch_failed', {
         key,
         error: err instanceof Error ? err : new Error(String(err)),
