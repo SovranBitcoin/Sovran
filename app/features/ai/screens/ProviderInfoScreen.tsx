@@ -36,6 +36,7 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { Notice } from '@/shared/ui/composed/Notice';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Section } from '@/shared/ui/composed/Section';
+import { OperatorRunsSection } from '@/shared/blocks/OperatorRunsSection';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -477,6 +478,13 @@ export function ProviderInfoScreen() {
           </ListGroup>
         </Section>
       ) : null}
+
+      <OperatorRunsSection
+        pubkey={operatorPubkey}
+        excludeProviderUrl={nodeBaseUrl}
+        title="Operator also runs"
+        testID="ai-provider-info-operator-runs"
+      />
 
       <Section title="Provider address">
         <ListGroup variant="secondary">

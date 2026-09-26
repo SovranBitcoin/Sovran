@@ -43,6 +43,7 @@ import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { publishEvent } from '@/shared/lib/nostr/publish';
 import { Notice } from '@/shared/ui/composed/Notice';
 import { Section } from '@/shared/ui/composed/Section';
+import { OperatorRunsSection } from '@/shared/blocks/OperatorRunsSection';
 import Icon, { CurrencyIcon } from '@/assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { truncateMiddle } from '@/shared/lib/strings';
@@ -1621,6 +1622,7 @@ export function UserProfileScreen() {
                     ))}
                   </ListGroup>
                 </Section>
+                <OperatorRunsSection pubkey={pubkey} title="Runs" testID="profile-operator-runs" />
               </View>
 
               <Spacer size={8} />

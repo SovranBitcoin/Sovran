@@ -21,6 +21,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Notice } from '@/shared/ui/composed/Notice';
 import { Section } from '@/shared/ui/composed/Section';
+import { OperatorRunsSection } from '@/shared/blocks/OperatorRunsSection';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import Icon from '@/assets/icons';
@@ -708,6 +709,13 @@ export function MintInfoScreen() {
             </ListGroup>
           </Section>
         )}
+
+        <OperatorRunsSection
+          pubkey={nostrContactPubkey}
+          excludeMintUrl={mintUrl}
+          title="Operator also runs"
+          testID="mint-info-operator-runs"
+        />
 
         {isTrusted && !entry?.fromAccepter && (
           <Section title="Settings">

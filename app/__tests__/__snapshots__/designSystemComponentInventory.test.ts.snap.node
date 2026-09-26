@@ -181,6 +181,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/blocks/LegalDocumentScreen.tsx",
     "shared/blocks/NativeSplashLayoutGate.tsx",
     "shared/blocks/NotFoundScreen.tsx",
+    "shared/blocks/OperatorRunsSection.tsx",
     "shared/blocks/PaymentInfo.tsx",
     "shared/blocks/PullToAiRefreshControl.tsx",
     "shared/blocks/SovranTabBar.tsx",
@@ -273,6 +274,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 267,
+  "total": 268,
 }
 `;
