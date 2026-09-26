@@ -20,6 +20,7 @@ import {
   getMeltQuoteTimeUntilExpiry,
   mintHistoryEntryExpired,
   getMintHistoryEntryTimeUntilExpiry,
+  getTimeUntilUnlock,
 } from '@/shared/lib/utils';
 import { paymentLog } from '@/shared/lib/logger';
 
@@ -31,8 +32,16 @@ export function getExpiryBadgeText(
   historyEntry: HistoryEntry,
   meltQuote: MeltQuoteBolt11Response | undefined,
   isOnchainMint: boolean,
-  currentTime: number
+  currentTime: number,
+  /** A P2PK lock's opening moment, when this send has one. */
+  unlockAtMs?: number | null
 ): string | null {
+  // A lock opening is the same shape of fact as a quote expiring — a moment
+  // the user is waiting for — so it rides the badge that already ticks,
+  // rather than adding a second one.
+  if (historyEntry.type === 'send') {
+    return getTimeUntilUnlock(unlockAtMs, currentTime);
+  }
   if (historyEntry.type === 'melt' && meltQuote && !meltQuoteExpired(meltQuote, currentTime)) {
     const expiryInfo = getMeltQuoteTimeUntilExpiry(meltQuote, currentTime);
     if (expiryInfo) return expiryInfo;
@@ -59,6 +68,8 @@ interface ExpiryCountdownProps {
   color: string;
   /** Diagnostics context for the tx.history_timeline.* taxonomy. */
   entryId: string;
+  /** A P2PK lock's opening moment, when this send has one. */
+  unlockAtMs?: number | null;
 }
 
 export function ExpiryCountdown({
@@ -67,17 +78,25 @@ export function ExpiryCountdown({
   isOnchainMint,
   color,
   entryId,
+  unlockAtMs,
 }: ExpiryCountdownProps) {
   const [currentTime, setCurrentTime] = useState(() => Date.now());
 
   const meltExpirySec = meltQuote?.expiry;
   const mintState = historyEntry.type === 'mint' ? historyEntry.state : null;
 
-  const expiryBadge = getExpiryBadgeText(historyEntry, meltQuote, isOnchainMint, currentTime);
+  const expiryBadge = getExpiryBadgeText(
+    historyEntry,
+    meltQuote,
+    isOnchainMint,
+    currentTime,
+    unlockAtMs
+  );
 
   const shouldUpdate =
     (historyEntry.type === 'melt' && !!meltExpirySec) ||
-    (historyEntry.type === 'mint' && !isOnchainMint && mintState === MintQuoteState.UNPAID);
+    (historyEntry.type === 'mint' && !isOnchainMint && mintState === MintQuoteState.UNPAID) ||
+    (historyEntry.type === 'send' && !!unlockAtMs);
 
   // The 1s tick keeps uiautomator from ever reaching idle, blinding every AX
   // dump on unpaid-quote screens — same class as the QRCode/LoadingIndicator/

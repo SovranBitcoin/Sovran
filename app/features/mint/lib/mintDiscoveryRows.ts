@@ -17,6 +17,9 @@ export type MintSearchRow = MintSearchResult & {
   /** NUT-04 (method, unit) pairs (lowercased) — the discovery filter matches the
    *  rail's exact pair, e.g. (bolt12, sat), not the method alone. */
   supported_method_units: { method: string; unit: string }[];
+  /** nagg's `/v1/info` probe verdict for the row; this phone's own probe wins
+   *  over it (`resolveMintStatus`). Absent from an older nagg. */
+  liveness?: 'online' | 'offline' | 'unknown';
 };
 
 /**
@@ -45,6 +48,7 @@ export function discoverMintToSearchResult(m: DiscoverMint): MintSearchRow {
       unit: toAccountUnit(pair.unit, testnut),
     })),
     state: m.state ?? 'unknown',
+    ...(m.status ? { liveness: m.status } : {}),
     n_mints: m.nMints ?? 0,
     n_melts: m.nMelts ?? 0,
     n_errors: m.nErrors ?? 0,

@@ -30,6 +30,20 @@ export type ProfileStats = {
   noteCount?: number;
   /** Unix seconds of the profile's earliest known event (Primal `time_joined`). */
   joinedAtSec?: number;
+  /**
+   * Vertex web-of-trust reputation (0–100). nagg-only: search hits, discovery
+   * rows and the REST profile carry it; Primal and relays never do. Undefined
+   * is "nobody has measured it", which the app renders as a dash, never 0.
+   */
+  score?: number;
+  /** Vertex pagerank; the raw figure `score` is a saturating transform of. */
+  rank?: number;
+  /** Unix seconds the Vertex figures were fetched, so a refresh can judge staleness. */
+  vertexFetchedAt?: number;
+  /** Mint URLs this pubkey operates (NUT-06 nostr contact), per nagg identities. */
+  operatesMints?: readonly string[];
+  /** AI provider base URLs this pubkey operates, per nagg identities. */
+  operatesAiProviders?: readonly string[];
 };
 
 export type ProfileStatsBundle = ProfileStats;
@@ -49,6 +63,7 @@ export function profileStatsIsEmpty(bundle: ProfileStats): boolean {
     bundle.followersCount === undefined &&
     bundle.followingCount === undefined &&
     bundle.noteCount === undefined &&
-    bundle.joinedAtSec === undefined
+    bundle.joinedAtSec === undefined &&
+    bundle.score === undefined
   );
 }

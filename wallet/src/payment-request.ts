@@ -10,12 +10,13 @@
 import { decodePaymentRequest } from "@cashu/cashu-ts";
 
 import { amountToNumberOrUndefined } from "./amount";
+import { P2PK_PUBKEY_RE, p2pkXOnly } from "./p2pk";
 import { logger } from "./logger";
 import type { PaymentRequestInfo, PaymentRequestTransport } from "./types";
 
 const CREQ_PREFIX = /^creq[ab]/i;
 const CREQB_PREFIX = /^creqb1/i;
-const P2PK_PUBKEY_RE = /^02[0-9a-f]{64}$/i;
+
 
 const tryDecode = <T>(fn: () => T): T | null => {
   try {
@@ -96,9 +97,10 @@ export function decodePaymentRequestInfo(
 }
 
 /**
- * A request is lockable to `nostrPubkeyHex` iff its `nut10` P2PK key equals
- * `02` + that 32-byte x-only hex key. Returns the accepted mints when lockable,
- * else null (no request, undecodable, or lock mismatch).
+ * A request is lockable to `nostrPubkeyHex` iff its `nut10` P2PK key shares
+ * that 32-byte x coordinate, whatever its `02`/`03` parity prefix. Returns the
+ * accepted mints when lockable, else null (no request, undecodable, or lock
+ * mismatch).
  */
 export function lockableMintsFromRequest(
   value: string | undefined,
@@ -107,8 +109,11 @@ export function lockableMintsFromRequest(
   if (!value || !nostrPubkeyHex) return null;
   const info = decodePaymentRequestInfo(value);
   if (!info) return null;
-  const expected = `02${nostrPubkeyHex}`.toLowerCase();
-  if (!info.lockP2pkPubkey || info.lockP2pkPubkey.toLowerCase() !== expected) {
+  // Compare x coordinates, not whole keys: NUT-11 treats `02<x>` and `03<x>`
+  // as the same key, and only the x coordinate is carried by NIP-01.
+  const expected = nostrPubkeyHex.toLowerCase();
+  const actual = p2pkXOnly(info.lockP2pkPubkey);
+  if (!actual || actual !== expected) {
     logger.debug("paymentRequest.lockable.mismatch", {
       mintCount: info.mints.length,
       hasLock: !!info.lockP2pkPubkey,

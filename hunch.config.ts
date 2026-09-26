@@ -79,6 +79,8 @@ export default defineConfig({
     // nip17 + nip59: the DM envelope, thread history and the NUT-18 nostr
     //   transport unwrap gift wraps and seals themselves.
     //   `seal-pubkey-matches-rumor` is the impersonation check.
+    //   Incoming recipients can include a group even without a group composer;
+    //   one-recipient outgoing wraps do not justify merging those rooms.
     // nip60 + nip61: the Cashu wallet and nutzap kinds are this app's own
     //   integration of the two protocols, not something coco or nostr-tools
     //   decides — which mint, which lock key, what stays unencrypted.
@@ -112,8 +114,8 @@ export default defineConfig({
       "nip04/leaks-metadata",
       "nip06/derivation-path",
       "nip17/seal-pubkey-matches-rumor",
-      "nip17/chat-content-plain-text",
       "nip17/room-identity",
+      "nip17/chat-content-plain-text",
       "nip17/subject-latest-wins",
       "nip17/publish-to-recipient-dm-relays",
       "nip17/dm-relay-list-shape",
@@ -174,8 +176,13 @@ export default defineConfig({
     //   choose the lock key, its `02` prefix and its locktime. The SIG_ALL
     //   message construction and threshold counting stay with cashu-ts.
     // nut06: `mintNuts.ts` reads what a mint supports before relying on it.
-    // errors: AGENTS.md already forbids publishing raw error bodies; this is
-    //   the same rule asked of mint responses.
+    // errors/*: dropped. Both rules are mint-side — `no-raw-error-leakage`
+    //   says "answer false if hunk does not build mint error responses", and
+    //   `codes-used-as-specified` is about emitting the NUT-00 numeric codes.
+    //   A wallet consumes those, it never emits them, so neither can fire here
+    //   and both failed the selection principle above. The wallet-side concern
+    //   they were kept for — raw upstream text reaching a user — is asked
+    //   directly by `errors/raw-error-to-ui` below.
     { pack: "nuts-spec", rules: [
       "nut06/nuts-settings-consulted",
       "nut06/feature-setting-shape",
@@ -209,8 +216,6 @@ export default defineConfig({
       "nut18/nostr-transport",
       "nut18/payment-payload-shape",
       "nut18/single-use-honoured",
-      "errors/no-raw-error-leakage",
-      "errors/codes-used-as-specified",
     ] },
   ],
   // Vetted against the installed library versions and the contributor
@@ -324,6 +329,38 @@ export default defineConfig({
     "skill/typescript-best-practices/brand-shape-convention": "off",
     "skill/typescript-best-practices/type-guard-naming": "off",
 
+    // ── Compiled AGENTS.md rules switched off ─────────────────────────────
+    // `app-alias-imports` compiled AGENTS.md:43 ("App imports use `@/…`") into
+    // "any `../` in app/ is a violation", and asked it of every file. On the
+    // 2026-09-23 sweep that produced 208 findings — 78 in `app/features`, 76 in
+    // `app/e2e`, 36 in `app/shared` — including files with no relative import at
+    // all (`AiMessageBubble.tsx`, `ModelChip.tsx`), which is the tell.
+    //
+    // Three reasons it is off rather than retuned. The sentence's own named
+    // violation is `../../wallet/src`, a cross-package traversal, and that is
+    // already asked by `cross-package-subpath-imports`. What it actually flags
+    // is intra-feature sibling imports (`../lib/finalize` inside
+    // `features/ai/`), which 123 of 1,128 app source files use and which
+    // `no-restricted-imports` in `app/eslint.config.js` deliberately does not
+    // restrict — it names packages, never path shapes. And an import path is a
+    // string pattern: `import/no-relative-parent-imports` decides it exactly,
+    // where a semantic model guesses.
+    //
+    // If the intent is that intra-feature relatives are banned too, that is a
+    // lint rule and a codemod, not a review question. AGENTS.md:43-44 is worth
+    // rewording either way, so the next `install` does not recompile this.
+    "agents-md/root/app-alias-imports": "off",
+
+    "ui/modal-menu-layering": ["warn", choice({
+      instructions: "Does an action opened from a native modal or Expo modal route render its menu in a host below that modal, making the action obscured or unreachable? Trace the opener's presentation and the menu host's native window together on the affected platform. A root menu host without full-window overlay support cannot present above an iOS native modal; use a modal-safe sheet lane or a host inside the active modal. A component name or the word modal alone is not evidence. Android and iOS must be judged separately.",
+      criteria: { concern: "The changed opener and host demonstrably put the requested menu below the active native modal.", ...outcomes },
+      files: ["**/*.{ts,tsx,js,jsx}"],
+      report: ["concern"],
+      abstain: ["insufficient-context"],
+      reference: "docs/review/modal-menu-contract.md",
+      message: "An action menu may be obscured by the native modal that opened it.",
+    })],
+
     "ui/header-continuity": ["warn", choice({
       instructions: "Does this change visibly break the shared header contract: a page identity is duplicated or lost during its scroll handoff, header actions or content are obscured by incorrect inset ownership, a section selector becomes unreachable while scrolling its content, a fixed inset around a scrolling viewport prevents content from ever entering its gradient header, an opaque strip defeats the combined header/tab gradient, or identity handoff activates before the measured identity section clears navigation? Judge the visible layout and scroll ownership together, on iOS and Android; an isolated use of a header API without evidence of a broken behavior is unrelated.",
       criteria: { concern: "The changed layout or scroll wiring visibly causes one of these continuity or reachability failures.", ...outcomes },
@@ -355,7 +392,7 @@ export default defineConfig({
       message: "A secure-storage failure may replace existing recovery material.",
     })],
     "secrets/disclosure": ["warn", choice({
-      instructions: "Given a visible secret/private value and sink, does this change expose secret or bearer wallet material or decrypted private messages to a visible unauthorized recipient, log, analytics sink, public payload or unencrypted persistent store? Exclude deliberate authorized backup/export and correctly encrypted storage or recipient transfer. A status-only change with no secret-bearing value or changed payload/storage path is unrelated.",
+      instructions: "Does this change carry secret or bearer wallet material, or decrypted private message content, into a visible sink that should not hold it: an unauthorized recipient, a log or analytics call, a public payload, or an unencrypted persistent store such as AsyncStorage or a persisted Zustand blob? Name both halves before answering yes — the value, and the line that writes it somewhere. Without a sink in the window there is no finding, however sensitive the vocabulary. Writing the value into a store, cache or state container that is persisted IS a sink, even when the persistence is configured in another file and this window shows only the setter — `setApiKey(token)` on a persisted store counts, and so does `cache.put` on a cache with a storage prefix. These are NOT sinks and are unrelated: rendering a value in JSX to the user it already belongs to, or copying it to their clipboard; parsing, normalizing, encoding or validating it; passing it to a function that only transforms it; holding it in a local variable or in component state that is never persisted; sending it to the service that is its intended recipient, over the transport it is a credential for. Also unrelated: a test, fixture or e2e harness that handles real key material by design, and an operator CLI script whose stated purpose is printing a key it just generated. Logging a length, a count, a boolean, a hash or a short prefix is redaction working, not disclosure. Exclude deliberate authorized backup/export and correctly encrypted storage or recipient transfer.",
       criteria: { concern: "The supplied change and context visibly demonstrate this concern.", ...outcomes },
       when: /mnemonic|seed|Seed|nsec|privateKey|privkey|secretKey|signingKey|proof|Proof|token|Token|decrypt|plaintext|nip44|nip04|console\.|log|Log|logger|analytics|captureException|setItem|publish|fetch\(|body|payload/,
       report: ["concern"],
@@ -449,6 +486,37 @@ export default defineConfig({
       reference: "docs/review/contracts.md",
       message: "A persisted schema change may reset existing user data.",
     })],
+    // `state/persisted-compatibility` asks whether a *change* breaks stored
+    // data, so on a whole-file conformance sweep (`check --all`) it has nothing
+    // to judge and stays silent. This asks the standing question instead: does
+    // the decoder already in the tree throw the whole blob away when one field
+    // fails? That is the shape behind the Balance-split enum rename wiping
+    // `settingsStore`, and `createMergeWithSchema` still returns `current` on
+    // any `safeParse` failure for 16 call sites. Keep both: one guards a diff,
+    // this one guards the code that is already there.
+    // Replaces the two mint-side `errors/*` pack rules that were dropped above.
+    // They could never fire in a wallet, while the concern they were kept for —
+    // F04 in docs/architecture/follow-ups.md, raw exception text reaching a
+    // user — was live in the tree the whole time and unflagged.
+    "errors/raw-error-to-ui": ["warn", choice({
+      instructions: "Does this put raw upstream error text in front of a user? The shape is an `Error.message`, `String(error)`, a caught value, a response body, `err.detail`, or a JSON-serialized error reaching an `Alert`, a toast, a popup, a sheet, or rendered text. This repository routes such text through `describeError(error, service)` (`app/shared/lib/errors`) or the payment copy catalog, which map a failure onto wording chosen for a user; passing an error to one of those, or to a logger, is correct and is unrelated. Also unrelated: showing a message the app itself authored, a validation message written for this form, an error surfaced only in a developer-only or `__DEV__` screen, and anything in a test. The concern is upstream prose the user cannot act on — a stack trace, an HTTP body, a mint or relay's own words, a library's internal message — presented as if it were app copy.",
+      criteria: { concern: "Raw error text from an exception, a response body or a library reaches a user-visible surface without going through the app's error-presentation layer.", ...outcomes },
+      files: ["**/*.{ts,tsx,js,jsx}"],
+      when: /Alert\.|alert\(|toast|Toast|popup|Popup|message|Message|error|Error|catch|detail|describeError|setError|errorText/,
+      report: ["concern"],
+      abstain: ["insufficient-context"],
+      reference: "docs/review/contracts.md",
+      message: "Raw upstream error text may reach the user instead of app copy.",
+    })],
+    "state/all-or-nothing-rehydrate": ["warn", choice({
+      instructions: "Does this code discard a whole persisted blob, or reset a store to its defaults, because part of it failed to decode? The shape is a rehydrate, `merge`, `migrate` or storage read whose failure branch returns the initial/current state, `{}`, `null` or a default object for the entire store rather than salvaging the fields that did parse. A per-field `.catch()`, `.default()`, a tolerant array or record that drops only bad entries, a `version` bump with a `migrate` that maps old data forward, or a failure branch that refuses and surfaces an error instead of substituting defaults, are all the correct shapes — answer no. Judge what happens to the user's *other* fields when one is bad: losing unrelated settings, acceptance flags, keys or balances is the concern. A decoder for network or clipboard input is unrelated; this is about data already on the device. An in-memory or ephemeral cache is unrelated.",
+      criteria: { concern: "A decode failure in one part of persisted state discards or resets state the user would otherwise keep.", ...outcomes },
+      when: /persist|rehydrate|merge|migrate|partialize|safeParse|\.parse\(|getItem|setItem|storage|Storage|createJSONStorage|initialState|default/,
+      report: ["concern"],
+      abstain: ["insufficient-context"],
+      reference: "docs/review/contracts.md",
+      message: "A partial decode failure may reset the whole persisted store.",
+    })],
     "state/authority-read-failure": ["warn", choice({
       instructions: "Does this change treat a failed or invalid durable wallet-authority read as an empty first-run store, allowing existing authority to be replaced? Exclude ephemeral cache defaults. Writes without a changed read-failure or initialization path are unrelated.",
       criteria: { concern: "The supplied change and context visibly demonstrate this concern.", ...outcomes },
@@ -491,7 +559,7 @@ export default defineConfig({
     // shape. It is asked of every `.tsx`/`.jsx` chunk, with no `when` prefilter,
     // so a notice built from an unforeseen tint is still seen.
     "ui/status-notice": ["warn", choice({
-      instructions: "Require changed JSX that renders a status notice: a short warning, error, caution or informational message next to a status icon, on its own tinted or bordered surface, within a page, card or sheet. Does this change build that surface out of primitives — a View, Card, HStack, Icon and Text, or a status tint such as `bg-warning-soft`, `bg-danger-soft`, `bg-danger/[0.08]`, `withAlpha(dangerColor, …)` or a literal amber or red hex — where the shared `Notice` in `app/shared/ui/composed/Notice.tsx` would render it? Judge the rendered shape, not the vocabulary. A full-screen error or empty state, a screen-wide chrome banner, an interactive call-to-action card, a badge or pill carrying no status sentence, per-field validation text under an input, and bare tinted copy with no surface of its own are different shapes, not notices. A small named component whose body is a `Notice` at one surface's geometry is the intended pattern; so are `Notice`'s own implementation and the design-system catalogue screens under `app/features/settings`.",
+      instructions: "Find JSX that hand-builds a status notice: a short warning, error, caution or informational sentence, beside a status icon, sitting on its OWN tinted or bordered surface, inline within a page, card or sheet — where the shared `Notice` in `app/shared/ui/composed/Notice.tsx` would render it. All three parts must be visible in the code before answering yes: (1) a container that draws its own surface — a status tint such as `bg-warning-soft`, `bg-danger-soft`, `bg-danger/[0.08]`, `withAlpha(dangerColor, …)`, a literal amber or red hex, or an explicit border — (2) a status icon, and (3) a sentence telling the user what happened. An icon beside text with no surface of its own is NOT this, however muted or helpful the text; say no. Judge the rendered shape, not the vocabulary. These are different shapes, not notices: a transient toast or overlay from the toast manager, including this app's `StatusToast`, `ToastSlab`, `CompactToast`, `PaymentStatusToast` and `SwapStatusToast` and anything that spreads `toastProps` or auto-hides; a tint laid over an existing row, item or menu entry to mark that one row's state, rather than a surface introduced to carry a message; a full-screen error or empty state; a screen-wide chrome banner; an interactive call-to-action card; a badge or pill carrying no status sentence; per-field validation text under an input; and bare tinted copy with no surface of its own. A small named component whose body is a `Notice` at one surface's geometry is the intended pattern; so are `Notice`'s own implementation, any chunk that already renders `Notice`, and the design-system catalogue screens under `app/features/settings`.",
       criteria: { concern: "The changed JSX hand-builds a status notice that `Notice` — with its `status`, `tone`, `size`, `icon` and `action` props — already renders.", ...outcomes },
       files: ["**/*.{tsx,jsx}"],
       report: ["concern"],

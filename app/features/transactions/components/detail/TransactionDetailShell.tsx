@@ -3,9 +3,13 @@ import { StyleSheet, type ScrollView, type View as NativeView } from 'react-nati
 import { useReducedMotion } from 'react-native-reanimated';
 
 import { useIdentityHeader, type HeaderIdentity } from '@/shared/ui/composed/IdentityHeader';
-import { getCounterparty, transactionHeaderTitle } from 'wallet';
+import { transactionHeaderTitle, type SpendingConditions } from 'wallet';
 
 import { useDeferredMount } from '@/shared/hooks/useDeferredMount';
+import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
+import { ContactRow, nostrIdentity } from '@/shared/ui/composed/ContactRow';
+import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
+import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
 import { Screen, useScreenOptions } from '@/shared/ui/composed/Screen';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -44,6 +48,10 @@ interface TransactionDetailShellProps {
   source?: string | null;
   /** Whether the header shows the recipient avatar (sends with a recipient). */
   showRecipientAvatar?: boolean;
+  /** See `HistoryEntryHeader.badge` — what the avatar's corner disc says. */
+  headerBadge?: 'direction' | 'lock' | 'none';
+  /** The send's spending conditions, surfaced to the device harness as enums. */
+  conditions?: SpendingConditions | null;
   /** Footer (bottom buttons). */
   footer: React.ReactNode;
   /**
@@ -114,6 +122,8 @@ export function TransactionDetailShell({
   mintInfo,
   source,
   showRecipientAvatar = false,
+  headerBadge = 'direction',
+  conditions = null,
   footer,
   headerIdentity,
   headerTitle,
@@ -165,7 +175,8 @@ export function TransactionDetailShell({
   }, []);
   // Other transactions with the same nostr counterparty (Nut Drop / lightning-
   // address-to-nostr). Rendered before technical details as a mini relationship view.
-  const counterpartyPubkey = entry ? getCounterparty(entry)?.pubkey : undefined;
+  const counterpartyPubkey = transactionIdentitySnapshot(entry)?.pubkey;
+  const { metadata: counterpartyProfile } = useNostrProfileMetadata(counterpartyPubkey);
   // The scroll mode picks its container, so it must not flip once mounted: it
   // follows the pubkey the entry carries (known synchronously), not the name
   // the profile fetch resolves later.
@@ -201,10 +212,16 @@ export function TransactionDetailShell({
         <VStack gap={12}>
           {entry ? (
             <>
-              <TransactionProbe entry={entry} source={source} transactionId={entry.id} />
+              <TransactionProbe
+                entry={entry}
+                source={source}
+                transactionId={entry.id}
+                conditions={conditions}
+              />
               <HistoryEntryHeader
                 historyEntry={entry}
                 showRecipientAvatar={showRecipientAvatar}
+                badge={headerBadge}
                 identity={headerIdentity}
                 identityStyle={morph.contentStyle}
               />
@@ -228,7 +245,19 @@ export function TransactionDetailShell({
             </View>
           )}
           {entry && counterpartyPubkey ? (
-            <DeferredCounterpartyTransactions pubkey={counterpartyPubkey} excludeId={entry.id} />
+            <>
+              <ContactRow
+                identity={nostrIdentity(counterpartyPubkey, counterpartyProfile ?? undefined)}
+                subtitle="View this person’s profile"
+                hideMetadata
+                trailingVariant="chevron"
+                testID="transaction-counterparty-profile"
+                onPress={() =>
+                  guardedRouter.push(buildModalProfileHref({ pubkey: counterpartyPubkey }))
+                }
+              />
+              <DeferredCounterpartyTransactions pubkey={counterpartyPubkey} excludeId={entry.id} />
+            </>
           ) : null}
           {children}
         </VStack>

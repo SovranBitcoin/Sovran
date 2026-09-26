@@ -6,7 +6,12 @@
 // into `metadata` (see `mergeAnnotationsIntoEntry`). The app never hand-parses
 // flat keys — it calls these.
 
-import { proofsHaveP2PK } from "../p2pk";
+import {
+  describeRecordedLock,
+  describeSpendingConditions,
+  proofsHaveP2PK,
+  type SpendingConditions,
+} from "../p2pk";
 import {
   decodeAnnotation,
   type AnnotationRecord,
@@ -108,4 +113,35 @@ function entryProofs(entry: EntryWithToken): Array<{ secret: string }> {
 export function isP2PKLocked(entry: EntryWithToken): boolean {
   if (getAnnotation(entry).lock?.type === "p2pk") return true;
   return proofsHaveP2PK(entryProofs(entry));
+}
+
+/**
+ * What this transaction's ecash can and cannot do — read from the token's own
+ * proofs while it still has them, and from what we recorded at send time once
+ * it does not.
+ *
+ * Proofs win: they are the thing the mint will actually judge. The record is
+ * the memory of it, and only the record survives the hand-over.
+ */
+export function describeSendLock(
+  entry: EntryWithToken,
+  opts: {
+    now: number;
+    /** Public keys this wallet can sign for; omit when unknown. */
+    ourPubkeys?: readonly string[];
+    skewMs?: number;
+  },
+): SpendingConditions | null {
+  const proofs = entryProofs(entry);
+  if (proofs.length > 0) {
+    const fromProofs = describeSpendingConditions({ proofs, ...opts });
+    if (fromProofs.kind !== "unlocked") return fromProofs;
+  }
+  const lock = getAnnotation(entry).lock;
+  if (!lock || lock.type !== "p2pk") {
+    return proofs.length > 0
+      ? describeSpendingConditions({ proofs, ...opts })
+      : null;
+  }
+  return describeRecordedLock({ lock, ...opts });
 }

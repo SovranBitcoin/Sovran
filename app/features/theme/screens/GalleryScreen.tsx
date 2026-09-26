@@ -21,6 +21,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
+import { isSafeImageUrl } from '@/shared/lib/imageCache';
 import { Image } from '@/shared/ui/primitives/Image';
 import Icon from 'assets/icons';
 import { Screen } from '@/shared/ui/composed/Screen';
@@ -147,7 +148,7 @@ function SectionHeader({
       className="mb-3 items-center justify-between"
       style={{ paddingHorizontal: SECTION_PADDING }}>
       <HStack style={{ alignItems: 'center', gap: 10, flex: 1 }}>
-        {author?.picture ? (
+        {author?.picture && isSafeImageUrl(author.picture) ? (
           <PressableFeedback
             onPress={openProfile}
             animation={false}

@@ -4,6 +4,7 @@ import { isMintOfflineError } from '../errors';
 import { t } from '../formatting/locales';
 import { errField, logger, mintUrlFields } from '../logger';
 import { parseHistoryEntryOnce } from '../operations/historyEntry';
+import { isLockedSend, type P2pkLockSpec } from '../p2pk';
 import { buildChooseProofsData, buildProofSuggestions } from './amountFallback';
 import type {
   FlowContext,
@@ -395,8 +396,8 @@ function summarizeContext(context: FlowContext): Record<string, unknown> {
     meltTargetLength: context.meltTarget?.length ?? 0,
     hasRecipientPubkey: !!context.recipientPubkey,
     hasRecipientProfile: !!context.recipientProfile,
-    hasP2pkLockPubkey: !!context.p2pkLockPubkey,
-    p2pkLockPubkeyLength: context.p2pkLockPubkey?.length ?? 0,
+    hasP2pkLockPubkey: isLockedSend(context),
+    hasLocktime: !!context.p2pkLock?.locktimeSec,
     hasMemo: !!context.memo,
     rawInputLength: context.rawInput?.length ?? 0,
     source: context.source ?? null,
@@ -866,6 +867,9 @@ function buildSendCompleteResult(args: {
       ...(effectiveContext.p2pkLockPubkey
         ? { p2pkLockPubkey: effectiveContext.p2pkLockPubkey }
         : {}),
+      ...(effectiveContext.p2pkLock
+        ? { p2pkLock: effectiveContext.p2pkLock }
+        : {}),
     },
     ...(args.contextPatch ? { context: args.contextPatch } : {}),
     notifications,
@@ -875,7 +879,7 @@ function buildSendCompleteResult(args: {
 function executeSendOperation(
   operation: SendOperation,
   data: StepDataMap['confirmSend'],
-  options?: { p2pkLockPubkey?: string },
+  options?: { p2pkLockPubkey?: string; p2pkLock?: P2pkLockSpec },
   path: ConfirmSendEffectPath | 'forcedLocalProbe' = 'online',
 ): ResultAsync<SendOperationResult, unknown> {
   logger.info('effects.sendOperation.start', {
@@ -883,13 +887,13 @@ function executeSendOperation(
     ...mintUrlFields(data.mintUrl),
     amount: data.amount,
     hasMemo: !!data.memo,
-    p2pkLocked: !!options?.p2pkLockPubkey,
-    p2pkLockPubkeyLength: options?.p2pkLockPubkey?.length ?? 0,
+    p2pkLocked: isLockedSend(options ?? {}),
+    hasLocktime: !!options?.p2pkLock?.locktimeSec,
   });
 
   return ResultAsync.fromThrowable(
     () =>
-      options?.p2pkLockPubkey
+      isLockedSend(options ?? {})
         ? operation(data.mintUrl, data.amount, data.memo, options)
         : data.memo
           ? operation(data.mintUrl, data.amount, data.memo)
@@ -899,7 +903,7 @@ function executeSendOperation(
         path,
         ...mintUrlFields(data.mintUrl),
         amount: data.amount,
-        p2pkLocked: !!options?.p2pkLockPubkey,
+        p2pkLocked: isLockedSend(options ?? {}),
         error: errField(cause),
       });
       return cause;
@@ -982,7 +986,7 @@ function handleConfirmSendFailure(args: {
     forceLocalSend: args.forceLocalSend,
     shouldCreateLocalTokenFirst: args.shouldCreateLocalTokenFirst,
     proofCount: config.proofAmounts.length,
-    p2pkLocked: !!config.context.p2pkLockPubkey,
+    p2pkLocked: isLockedSend(config.context),
     mintUnreachable: isMintOfflineError(args.cause),
     error: errField(args.cause),
   });
@@ -1002,7 +1006,7 @@ function handleConfirmSendFailure(args: {
 
   // A locked send has no offline fallback and no local-proof rerouting —
   // both would produce a bearer token. Surface the original failure.
-  if (config.context.p2pkLockPubkey) {
+  if (isLockedSend(config.context)) {
     logger.warn('effects.confirmSend.failure.p2pkLockedNoFallback', {
       ...mintUrlFields(config.data.mintUrl),
       amount: config.data.amount,
@@ -1915,7 +1919,7 @@ export function runConfirmSendEffect({
   // P2PK-locked sends require a mint swap (P2pkSendHandler always swaps) —
   // every local/offline token path would silently produce a bearer token
   // instead of a locked one, so all of them are disabled for locked sends.
-  const p2pkLocked = !!context.p2pkLockPubkey;
+  const p2pkLocked = isLockedSend(context);
   const localProofs = buildProofSuggestions(proofAmounts, data.amount);
   const hasExactLocalProofs = proofAmounts.length > 0 && localProofs.exactMatch;
   const shouldCreateLocalTokenFirst =
@@ -2026,7 +2030,14 @@ export function runConfirmSendEffect({
   return executeSendOperation(
     operations.executeSend,
     data,
-    p2pkLocked ? { p2pkLockPubkey: context.p2pkLockPubkey } : undefined,
+    p2pkLocked
+      ? {
+          ...(context.p2pkLockPubkey
+            ? { p2pkLockPubkey: context.p2pkLockPubkey }
+            : {}),
+          ...(context.p2pkLock ? { p2pkLock: context.p2pkLock } : {}),
+        }
+      : undefined,
     'online',
   )
     .andThen((result) => {

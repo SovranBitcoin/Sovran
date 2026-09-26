@@ -6,6 +6,7 @@ import { DEMO_PROFILES } from '@/shared/stores/runtime/mockPresentationData';
 
 import type { NoteMetrics, ProfileInfo } from '@/features/feed/components/nostr/feedTypes';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
+import { peekNostrDataLayer } from '@/shared/lib/nostr/dataLayerRegistry';
 import {
   NOSTR_METADATA_STALE_TTL_MS,
   cachedProfileToMetadata,
@@ -88,6 +89,20 @@ export function useProfile(pubkey: string | undefined): {
 function useProfileRecord(pubkey: string | undefined): facade.CachedProfile | undefined {
   const cache = buildNostrDataLayer()?.cache;
   return useCachedRecord(cache?.profiles, pubkey);
+}
+
+/**
+ * The cached profile header (counts, joined date, Vertex reputation, what the
+ * pubkey operates) read reactively from the single owner. A row that was handed
+ * a profile without a score reads the score another surface fetched from here,
+ * so the figure never depends on which list the person was found in.
+ */
+export function useCachedProfileStats(
+  pubkey: string | undefined
+): facade.CachedProfileStats | undefined {
+  // Peek, never build: this runs in every list row.
+  const cache = peekNostrDataLayer()?.cache;
+  return useCachedRecord(cache?.profileStats, pubkey);
 }
 
 /**

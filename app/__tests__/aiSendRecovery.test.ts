@@ -2,9 +2,16 @@ import { act, renderHook } from '@testing-library/react-native';
 import { useAiSend } from '@/features/ai/hooks/useAiSend';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { emptyLineup, type LineupEntry } from '@/shared/lib/routstr/lineup';
-import { sendMessage, checkBalance } from '@/shared/lib/routstr/api';
+import { sendMessage, checkBalance, ROUTSTR_MAX_COMPLETION_TOKENS } from '@/shared/lib/routstr/api';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
 import { staticPopup } from '@/shared/lib/popup';
+import { confirmSpend } from '@/features/ai/lib/spendConfirm';
+import { getTurnError, resetTurnErrors } from '@/features/ai/lib/turnErrors';
+import { chatErrorActions } from '@/features/ai/lib/chatErrorActions';
+import { resetModelAvailability } from '@/features/ai/lib/modelAvailability';
+import { ERROR_COPY } from '@/shared/lib/errors/catalog';
+
+jest.mock('@/features/ai/lib/spendConfirm', () => ({ confirmSpend: jest.fn() }));
 
 jest.mock('@/shared/lib/routstr/api', () => ({
   ...jest.requireActual('@/shared/lib/routstr/api'),
@@ -14,6 +21,10 @@ jest.mock('@/shared/lib/routstr/api', () => ({
 jest.mock('@/shared/lib/routstr/refreshLineup', () => ({ refreshRoutstrLineup: jest.fn() }));
 jest.mock('@/shared/stores/global/profileStore', () => ({
   useProfileStore: { getState: () => ({ activeAccountIndex: 0 }) },
+}));
+jest.mock('@/shared/lib/routstr/securePersistence', () => ({
+  createRoutstrPersistence: () =>
+    jest.requireMock('@/shared/lib/cashu/profileScopedStorage').createProfileScopedStorage(),
 }));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   createProfileScopedStorage: () => ({
@@ -25,7 +36,14 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
 jest.mock('@/shared/stores/runtime/routstrTopUpStore', () => ({
   useRoutstrTopUpStore: { getState: jest.fn() },
 }));
-jest.mock('@/shared/stores/profile/mintStore', () => ({ useMintStore: { getState: jest.fn() } }));
+jest.mock('@/shared/stores/profile/mintStore', () => {
+  const useMintStore = Object.assign(
+    (selector: (s: { selectedMint: string }) => unknown) =>
+      selector({ selectedMint: 'https://mint.example' }),
+    { getState: () => ({ selectedMint: 'https://mint.example' }) }
+  );
+  return { useMintStore };
+});
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({
   useNostrKeysContext: () => ({ keys: null }),
 }));
@@ -39,6 +57,11 @@ jest.mock('@/shared/ui/primitives/Haptics', () => ({
   EnhancedHaptics: { navigateHaptic: jest.fn() },
 }));
 jest.mock('@/features/ai/lib/attachments', () => ({ encodeChatImage: jest.fn() }));
+// Persisted, and this file's logger mock is partial; no mint here is a testnut.
+jest.mock('@/shared/stores/global/mintTestnutStore', () => ({
+  isTestnutMint: () => false,
+  useIsTestnutMint: () => () => false,
+}));
 jest.mock('@/shared/lib/logger', () => {
   const log = {
     info: jest.fn(),
@@ -50,8 +73,19 @@ jest.mock('@/shared/lib/logger', () => {
   return { apiLog: log, aiLog: log, storeLog: log, log, applyFileLogging: jest.fn() };
 });
 
-const entry = (modelId: string): LineupEntry => ({
+jest.mock('@cashu/coco-react', () => ({
+  // The gate prices against the wallet now; a funded mint keeps the
+  // affordability snapshot realistic without booting a wallet.
+  useBalanceContext: () => ({
+    balances: {
+      byMint: { 'https://mint.example': { total: 100_000, spendable: 100_000, unit: 'sat' } },
+    },
+  }),
+}));
+
+const entry = (modelId: string, upstreamId?: string): LineupEntry => ({
   modelId,
+  ...(upstreamId != null ? { upstreamId } : {}),
   displayName: modelId,
   contextLength: 100000,
   created: 1,
@@ -62,7 +96,20 @@ const failure = (status: number, message: string) => ({
   status,
   error: { message, type: status === 0 ? 'network_error' : 'server_error' },
 });
-const success = () => ({
+/** A 402 routstr raised about this key's own balance — carries the markers
+ *  `isWalletBalanceError` looks for. Distinct from a 402 the node forwarded
+ *  verbatim from the AI provider, which has none of them. */
+const walletBalanceFailure = () => ({
+  status: 402,
+  error: {
+    message: 'Insufficient balance: 85577 mSats required. 216 available.',
+    type: 'insufficient_quota',
+    code: 'insufficient_balance',
+    details: { required: 85577, available: 216 },
+  },
+});
+const success = (costSats = 3) => ({
+  cost: Promise.resolve(costSats),
   stream: (async function* () {
     yield { choices: [{ delta: { content: 'reply' } }] };
   })(),
@@ -79,8 +126,21 @@ async function send() {
 }
 
 describe('AI send lineup recovery', () => {
+  it('does not spend when the selected model changes during cost confirmation', async () => {
+    useRoutstrStore.setState({ confirmSpend: true });
+    jest.mocked(confirmSpend).mockImplementationOnce(async () => {
+      useRoutstrStore.setState({ selectedProvider: 'claude' });
+      return true;
+    });
+    const hook = await send();
+    expect(sendMock).not.toHaveBeenCalled();
+    expect(staticPopup).toHaveBeenCalledWith('ai-payment-options-changed');
+    hook.unmount();
+  });
   beforeEach(async () => {
     jest.clearAllMocks();
+    resetTurnErrors();
+    resetModelAvailability();
     await useRoutstrStore.persist.rehydrate();
     const lineup = emptyLineup();
     lineup.openai.auto = entry('old-auto');
@@ -89,10 +149,16 @@ describe('AI send lineup recovery', () => {
     useRoutstrStore.setState({
       apiKey: 'cashuA-original',
       authMode: 'bearer',
+      // These tests are about recovery, not the spend prompt; the prompt has
+      // its own suite.
+      confirmSpend: false,
       balance: 100000,
       lineup,
       lastKnownLineup: null,
       nodeBaseUrl: 'https://old.example',
+      // A provider the user picked. Nothing is sent until one is, and these
+      // tests are about what happens after the send leaves.
+      userNodeBaseUrl: 'https://old.example',
       selectedProvider: 'openai',
       selectedTier: 'pro',
       conversationHistory: [],
@@ -105,7 +171,7 @@ describe('AI send lineup recovery', () => {
   });
 
   it.each([404, 503, 0])(
-    'refreshes after node failure %s and retries once on the changed node with its Auto model and current token',
+    'refreshes after node failure %s and retries once on the changed node with its Auto model',
     async (status) => {
       sendMock
         .mockRejectedValueOnce(failure(status, 'Unavailable'))
@@ -122,11 +188,15 @@ describe('AI send lineup recovery', () => {
       });
       await send();
       expect(sendMock).toHaveBeenCalledTimes(2);
-      expect(sendMock.mock.calls[1][0]).toBe('cashuB-change');
-      expect(sendMock.mock.calls[1][2]).toMatchObject({ model: 'new-auto', max_tokens: 4096 });
+      // There is no credential to carry across the repoint any more: the retry
+      // mints its own payment from the wallet, which is what makes a node
+      // change cost the user nothing.
+      expect(sendMock.mock.calls[1][1]).toMatchObject({
+        model: 'new-auto',
+        max_tokens: ROUTSTR_MAX_COMPLETION_TOKENS,
+      });
       expect(refreshMock).toHaveBeenCalledWith('failure');
       expect(staticPopup).not.toHaveBeenCalled();
-      expect(jest.mocked(checkBalance).mock.calls[0][0]).toBe('cashuB-change');
     }
   );
 
@@ -139,30 +209,283 @@ describe('AI send lineup recovery', () => {
       return true;
     });
     await send();
-    expect(sendMock.mock.calls[1][2].model).toBe('replacement');
+    expect(sendMock.mock.calls[1][1].model).toBe('replacement');
   });
 
-  it.each([401, 402, 429])(
-    'never retries or refreshes auth/payment/rate failures (%s)',
-    async (status) => {
-      sendMock.mockRejectedValueOnce(failure(status, 'Rejected'));
-      await send();
-      expect(sendMock).toHaveBeenCalledTimes(1);
-      expect(refreshMock).not.toHaveBeenCalled();
-    }
-  );
+  it.each([401, 429])('never retries or refreshes auth/rate failures (%s)', async (status) => {
+    sendMock.mockRejectedValueOnce(failure(status, 'Rejected'));
+    await send();
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(refreshMock).not.toHaveBeenCalled();
+  });
 
-  it('stops on an unchanged failed node and removes the assistant placeholder', async () => {
+  it('never retries or refreshes a wallet 402 — more attempts cannot fund it', async () => {
+    sendMock.mockRejectedValueOnce(walletBalanceFailure());
+    await send();
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(refreshMock).not.toHaveBeenCalled();
+  });
+
+  it('advances to the next candidate when the upstream declines with a bare 402', async () => {
+    // The node forwards the AI provider's own error body under the provider's
+    // status, so this 402 says nothing about the node or the user's credit.
+    // The next candidate usually sits behind a different upstream.
+    sendMock
+      .mockRejectedValueOnce(failure(402, 'Payment Required'))
+      .mockResolvedValueOnce(success());
+    await send();
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(sendMock.mock.calls[1][1].model).not.toBe(sendMock.mock.calls[0][1].model);
+    // The node is reachable and the catalog is current — nothing to refresh.
+    expect(refreshMock).not.toHaveBeenCalled();
+  });
+
+  it('skips the rest of the upstream that just declined', async () => {
+    // The chain is old-pro, old-auto, other-auto. The first two sit behind one
+    // upstream account; a 402 from it means every model behind it refuses
+    // identically, so the walk must jump straight to the other upstream rather
+    // than pay to be refused again.
+    const lineup = emptyLineup();
+    lineup.openai.pro = entry('old-pro', 'openrouter');
+    lineup.openai.auto = entry('old-auto', 'openrouter');
+    lineup.claude.auto = entry('other-auto', 'tinfoil');
+    useRoutstrStore.setState({ lineup });
+
+    sendMock
+      .mockRejectedValueOnce(failure(402, 'Payment Required'))
+      .mockResolvedValueOnce(success());
+    await send();
+
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(sendMock.mock.calls[0][1].model).toBe('old-pro');
+    expect(sendMock.mock.calls[1][1].model).toBe('other-auto');
+  });
+
+  it('does not narrow the walk when the node reports no upstreams', async () => {
+    // Older nodes omit `upstream_provider_id`; the walk must then behave
+    // exactly as it did before, one candidate at a time.
+    sendMock
+      .mockRejectedValueOnce(failure(402, 'Payment Required'))
+      .mockResolvedValueOnce(success());
+    await send();
+
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(sendMock.mock.calls[1][1].model).toBe('old-auto');
+  });
+
+  it('stops declining after the attempt cap rather than fanning out the lineup', async () => {
+    sendMock.mockRejectedValue(failure(402, 'Payment Required'));
+    await send();
+    expect(sendMock).toHaveBeenCalledTimes(3);
+    // Once the walk is exhausted, re-ask nagg: a 402 is not a node failure, so
+    // nothing else would, and a node with a dead upstream serves a healthy
+    // catalog indefinitely.
+    expect(refreshMock).toHaveBeenCalledWith('failure');
+  });
+
+  // The commonest failure in the 2026-09-26 log, six of eight: the node took
+  // the token, its upstream answered 404 for a model the catalog lists, and
+  // the whole token came back. The node's payment layer is fine; the model is
+  // not. The sibling on the same node worked minutes later and was never
+  // tried.
+  const upstreamRefusal = (status: number, refunded = true) => ({
+    status,
+    error: {
+      message: 'Error forwarding EHBP request to upstream',
+      type: 'upstream_error',
+      code: String(status),
+      details: { refunded },
+    },
+  });
+
+  it('tries the next model on the same node when its upstream refuses one', async () => {
+    sendMock.mockRejectedValueOnce(upstreamRefusal(404)).mockResolvedValueOnce(success());
+    await send();
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(sendMock.mock.calls[0][1].model).toBe('old-pro');
+    expect(sendMock.mock.calls[1][1].model).toBe('old-auto');
+    // The node answered and refunded: nothing about it is stale.
+    expect(refreshMock).not.toHaveBeenCalled();
+  });
+
+  it('books each paid attempt as its own AI request in history', async () => {
+    // 900 out and 900 back for the first model, 1,864 out for the second: two
+    // payments with two outcomes. Under one group id they showed as three legs
+    // netting to a figure that was neither the refund nor the cost.
+    sendMock.mockRejectedValueOnce(upstreamRefusal(404)).mockResolvedValueOnce(success());
+    await send();
+    const [first, second] = sendMock.mock.calls.map(([, options]) => options.payment);
+    expect(first?.groupId).toBeTruthy();
+    expect(second?.groupId).toBe(`${first?.groupId}#2`);
+    // Still the same exchange: the conversation section looks the message up
+    // by these, not by the group.
+    expect(second?.messageId).toBe(first?.messageId);
+  });
+
+  it('keeps siblings behind the same upstream when the refusal is about the model', async () => {
+    // Both sealed models sit behind the one enclave upstream, and the enclave
+    // serves one of them. A 404 is about the model, not the account, so the
+    // sibling is exactly what to try next.
+    const lineup = emptyLineup();
+    lineup.openai.pro = entry('v4-flash', 'tinfoil');
+    lineup.openai.auto = entry('v4-1-flash', 'tinfoil');
+    useRoutstrStore.setState({ lineup });
+    sendMock.mockRejectedValueOnce(upstreamRefusal(404)).mockResolvedValueOnce(success());
+    await send();
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(sendMock.mock.calls[1][1].model).toBe('v4-1-flash');
+  });
+
+  it('still skips the rest of an upstream that is out of credit or down', async () => {
+    const lineup = emptyLineup();
+    lineup.openai.pro = entry('old-pro', 'openrouter');
+    lineup.openai.auto = entry('old-auto', 'openrouter');
+    lineup.claude.auto = entry('other-auto', 'tinfoil');
+    useRoutstrStore.setState({ lineup });
+    sendMock.mockRejectedValueOnce(upstreamRefusal(502)).mockResolvedValueOnce(success());
+    await send();
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(sendMock.mock.calls[1][1].model).toBe('other-auto');
+  });
+
+  it('treats a 424 as the whole upstream being down, as nodes after 0.4.7 mean it', async () => {
+    const lineup = emptyLineup();
+    lineup.openai.pro = entry('old-pro', 'openrouter');
+    lineup.openai.auto = entry('old-auto', 'openrouter');
+    lineup.claude.auto = entry('other-auto', 'tinfoil');
+    useRoutstrStore.setState({ lineup });
+    sendMock
+      .mockRejectedValueOnce({
+        status: 424,
+        error: {
+          message: 'Upstream unavailable',
+          type: 'upstream_error',
+          code: 'UPSTREAM_UNAVAILABLE',
+          details: { refunded: true },
+        },
+      })
+      .mockResolvedValueOnce(success());
+    await send();
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(sendMock.mock.calls[1][1].model).toBe('other-auto');
+  });
+
+  // The sheet said 899 sats for the Auto model; its upstream refused; the walk
+  // paid 1,862 for the Max sibling without asking. Refunded — but a figure the
+  // user never saw left their wallet under one they had approved.
+  it('never pays more for a fallback than the figure the user approved', async () => {
+    const lineup = emptyLineup();
+    lineup.openai.pro = entry('cheap', 'tinfoil');
+    lineup.openai.auto = {
+      ...entry('dear', 'tinfoil'),
+      satsPricing: { prompt: 0.001, completion: 1, request: 0, image: 0, max_cost: 5000 },
+    };
+    useRoutstrStore.setState({ lineup });
+    // Only the refusal is queued: a success left queued here would be consumed
+    // by the next test's first send.
+    sendMock.mockRejectedValueOnce(upstreamRefusal(404));
+    await send();
+    // One paid attempt: the dear sibling was skipped, not tried.
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(sendMock.mock.calls[0][1].model).toBe('cheap');
+    const history = useRoutstrStore.getState().conversationHistory;
+    expect(getTurnError(history[1].id)?.id).toBe('routstr.upstream_failed');
+  });
+
+  it('quotes the model that will actually go first on the next send', async () => {
+    sendMock.mockRejectedValueOnce(upstreamRefusal(404)).mockResolvedValue(success());
+    await send();
+    const { aiLog } = jest.requireMock('@/shared/lib/logger') as { aiLog: { info: jest.Mock } };
+    aiLog.info.mockClear();
+    sendMock.mockClear();
+    await send();
+    // The refused model is demoted before the sheet is built, so the figure
+    // the user approves belongs to the model that is sent.
+    const gate = aiLog.info.mock.calls.find(([event]) => event === 'ai.send.gate');
+    expect(gate?.[1]).toMatchObject({ model: 'old-auto' });
+    expect(sendMock.mock.calls[0][1].model).toBe('old-auto');
+  });
+
+  it('starts the next send from a model the node has not just refused', async () => {
+    sendMock.mockRejectedValueOnce(upstreamRefusal(404)).mockResolvedValue(success());
+    await send();
+    sendMock.mockClear();
+    await send();
+    // Remembered per node and model for the session: the refused model is
+    // demoted, not dropped, so the second send goes straight to the sibling.
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(sendMock.mock.calls[0][1].model).toBe('old-auto');
+  });
+
+  it('reads an unlabelled refusal with a full refund the same way', async () => {
+    // A node older than v0.4.5 forwards the upstream body as it was, with no
+    // `upstream_error` type. The refund is what says the node itself works.
+    sendMock
+      .mockRejectedValueOnce({
+        status: 404,
+        error: { message: 'No endpoints found', type: 'server_error', details: { refunded: true } },
+      })
+      .mockResolvedValueOnce(success());
+    await send();
+    expect(sendMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not pay the same node again when it could not use the token', async () => {
+    // "Keyset 01fc0ec0e59cd6fa not known", "Internal error during token
+    // redemption": the payment failed, and no other model changes that.
+    sendMock.mockRejectedValueOnce({
+      status: 400,
+      error: {
+        message: 'CASHU token processing failed: Keyset 01fc0ec0e59cd6fa not known',
+        type: 'cashu_error',
+        code: 'cashu_token_redemption_failed',
+        details: { refunded: true },
+      },
+    });
+    await send();
+    expect(sendMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops on an unchanged failed node and leaves the failure in the conversation', async () => {
     const error = failure(404, 'Not found');
     sendMock.mockRejectedValueOnce(error);
     await send();
     expect(sendMock).toHaveBeenCalledTimes(1);
-    expect(staticPopup).toHaveBeenCalledWith('send-message-failed', {
-      failure: { service: 'routstr', error },
+    // No toast. The turn it failed stays where it was, and carries the reason
+    // and its recovery — the assistant bubble renders `AiTurnErrorPill` for it.
+    expect(staticPopup).not.toHaveBeenCalled();
+    const history = useRoutstrStore.getState().conversationHistory;
+    expect(history).toEqual([
+      expect.objectContaining({ role: 'user', pending: false }),
+      expect.objectContaining({ role: 'assistant', content: '' }),
+    ]);
+    const assistant = history[1];
+    expect(getTurnError(assistant.id)).toEqual({
+      id: 'routstr.not_found',
+      text: ERROR_COPY['routstr.not_found'],
     });
+    expect(chatErrorActions('routstr.not_found')).toContain('retry');
+  });
+
+  it('keeps an aborted turn out of the conversation — it did not fail', async () => {
+    const abort = Object.assign(new Error('Aborted'), { name: 'AbortError' });
+    sendMock.mockRejectedValueOnce(abort);
+    await send();
     expect(useRoutstrStore.getState().conversationHistory).toEqual([
       expect.objectContaining({ role: 'user', pending: false }),
     ]);
+  });
+
+  it('carries the exact shortfall on a wallet 402 rather than a bare top-up prompt', async () => {
+    sendMock.mockRejectedValueOnce(walletBalanceFailure());
+    await send();
+    const history = useRoutstrStore.getState().conversationHistory;
+    const recorded = getTurnError(history[1].id);
+    expect(recorded?.id).toBe('routstr.balance');
+    // Our own arithmetic over the 402's structured details — never its prose.
+    expect(recorded?.detail).toContain('Add at least 86 sats');
+    expect(recorded?.detail).not.toContain('Insufficient balance: 85577 mSats');
+    expect(chatErrorActions('routstr.balance')).toEqual(['top-up', 'change-model']);
   });
 
   it('does not retry a second failure after repointing', async () => {
@@ -179,6 +502,7 @@ describe('AI send lineup recovery', () => {
 
   it('never retries after a stream has started', async () => {
     sendMock.mockResolvedValueOnce({
+      cost: Promise.resolve(3),
       stream: (async function* () {
         yield { choices: [{ delta: { content: 'partial' } }] };
         throw new Error('disconnected');
@@ -187,5 +511,107 @@ describe('AI send lineup recovery', () => {
     await send();
     expect(sendMock).toHaveBeenCalledTimes(1);
     expect(refreshMock).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The encryption promise, at the one place it is kept or broken.
+   *
+   * `@routstr/sdk` seals a request on `modelId.startsWith('tinfoil-')`, so
+   * every one of these cases asks the same question of the wire: which model
+   * ids actually went out. The candidate walk used to answer a sealed
+   * selection with an OpenAI model whenever the sealed one refused, was
+   * retired, or simply cost more than the wallet held — no toast, no pill,
+   * nothing in the conversation to say the prompt had been read in the clear.
+   */
+  describe('an encrypted selection', () => {
+    const sentModels = () => sendMock.mock.calls.map((call) => call[1].model);
+
+    beforeEach(() => {
+      const lineup = emptyLineup();
+      lineup.tinfoil = {
+        auto: entry('tinfoil-glm-5-3'),
+        pro: entry('tinfoil-qwen3-coder'),
+        max: entry('tinfoil-deepseek-r1'),
+      };
+      // The plaintext ladder the old walk fell onto, still present and still
+      // cheaper — which is exactly why it kept winning.
+      lineup.openai.auto = entry('gpt-5.4-nano');
+      lineup.openai.pro = entry('gpt-5.4-mini');
+      lineup.claude.auto = entry('claude-haiku-4.5');
+      useRoutstrStore.setState({ lineup, selectedProvider: 'tinfoil', selectedTier: 'pro' });
+    });
+
+    it('walks only encrypted models when an upstream declines with a bare 402', async () => {
+      sendMock
+        .mockRejectedValueOnce(failure(402, 'Payment Required'))
+        .mockResolvedValueOnce(success());
+      await send();
+      expect(sentModels()).toEqual(['tinfoil-qwen3-coder', 'tinfoil-glm-5-3']);
+    });
+
+    it('walks only encrypted models when the chosen one is retired', async () => {
+      sendMock
+        .mockRejectedValueOnce(failure(400, 'Unknown model tinfoil-qwen3-coder'))
+        .mockResolvedValueOnce(success());
+      await send();
+      expect(sentModels()).toEqual(['tinfoil-qwen3-coder', 'tinfoil-glm-5-3']);
+    });
+
+    it('gives up rather than retry a repoint onto the new node\u2019s plaintext Auto model', async () => {
+      sendMock.mockRejectedValue(failure(503, 'Unavailable'));
+      refreshMock.mockImplementationOnce(async () => {
+        // The node nagg repoints us to serves no enclave at all.
+        const lineup = emptyLineup();
+        lineup.openai.auto = entry('new-auto');
+        useRoutstrStore.setState({ lineup, nodeBaseUrl: 'https://new.example' });
+        return true;
+      });
+      await send();
+      // One attempt, and it was the sealed one. The recovery retry is the
+      // subtlest crossing of the boundary: it resolves against a lineup that
+      // has just been replaced wholesale.
+      expect(sentModels()).toEqual(['tinfoil-qwen3-coder']);
+    });
+
+    it('refuses the send with an honest reason when the node serves nothing encrypted', async () => {
+      const lineup = emptyLineup();
+      lineup.openai.auto = entry('gpt-5.4-nano');
+      lineup.openai.pro = entry('gpt-5.4-mini');
+      useRoutstrStore.setState({ lineup });
+
+      await send();
+
+      expect(sendMock).not.toHaveBeenCalled();
+      const history = useRoutstrStore.getState().conversationHistory;
+      const recorded = getTurnError(history[1].id);
+      // NOT `catalog_unavailable`: the catalogue landed, and telling the user
+      // to check their connection would send them after the wrong thing.
+      expect(recorded).toEqual({
+        id: 'routstr.e2ee_unavailable',
+        text: ERROR_COPY['routstr.e2ee_unavailable'],
+      });
+      expect(chatErrorActions('routstr.e2ee_unavailable')).toEqual([
+        'change-provider',
+        'change-model',
+      ]);
+    });
+
+    it('asks for funds instead of answering an unaffordable sealed pick in the clear', async () => {
+      const dear: LineupEntry = {
+        ...entry('tinfoil-deepseek-r1'),
+        satsPricing: { prompt: 0, completion: 0, request: 500_000, image: 0, max_cost: 500_000 },
+      };
+      const lineup = emptyLineup();
+      lineup.tinfoil = { auto: dear, pro: dear, max: dear };
+      // Affordable, plaintext, and one step down the old chain.
+      lineup.openai.pro = entry('gpt-5.4-mini');
+      useRoutstrStore.setState({ lineup });
+
+      await send();
+
+      // "Cannot afford the encrypted model" is a wallet problem with a wallet
+      // answer. It was never a reason to change who reads the prompt.
+      expect(sendMock).not.toHaveBeenCalled();
+    });
   });
 });

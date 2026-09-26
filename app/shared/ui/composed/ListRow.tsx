@@ -26,7 +26,7 @@ import { withAlpha } from '@/shared/lib/color';
 
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 
-import { Avatar, AvatarState } from '@/shared/ui/primitives/Avatar';
+import { Avatar, AvatarState, type AvatarFallbackKind } from '@/shared/ui/primitives/Avatar';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -43,6 +43,9 @@ export interface ListRowAvatar {
   seed?: string;
   name?: string;
   size?: 40 | 44 | 52;
+  /** Which silhouette the seeded fallback draws. `'robot'` for a service with
+   *  no picture of its own, so the fallback does not claim to be somebody. */
+  fallbackKind?: AvatarFallbackKind;
 }
 
 export interface ListRowIconCircle {
@@ -229,6 +232,7 @@ export function ListRow({
         seed={avatar.seed}
         name={avatar.name}
         size={avatar.size ?? DEFAULT_AVATAR_SIZE}
+        fallbackKind={avatar.fallbackKind}
       />
     );
   }

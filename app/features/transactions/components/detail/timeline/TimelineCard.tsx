@@ -15,6 +15,9 @@ import { MintQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 import {
   buildTimelineModel,
   decodeBolt11Invoice,
+  describeSendLock,
+  getCounterparty,
+  LOCK_CLOCK_SKEW_MS,
   getCardLabel,
   getStatusColorType,
   getStatusHeader,
@@ -22,6 +25,9 @@ import {
   type TimelineStep,
 } from 'wallet';
 import { withAlpha } from '@/shared/lib/color';
+import { useOurP2pkPubkeys } from '@/shared/hooks/useOurP2pkPubkeys';
+import { useBoundaryClock } from '@/shared/hooks/useBoundaryClock';
+import { SpendingConditionsCard } from '@/features/send/components/SpendingConditionsCard';
 
 import type { HistoryEntry } from '@cashu/coco-core';
 
@@ -53,40 +59,6 @@ interface HistoryEntryTimelineProps {
   /** For onchain SEND (melt) - true when the mint settled PAID internally (no
    *  outpoint / on-chain tx), so the terminal copy must not claim "on-chain". */
   onchainSettledInternally?: boolean;
-}
-
-// Both expiry predicates compare at second granularity (strictly greater), so
-// flip the clock one second PAST the boundary to guarantee the rebuilt model
-// lands on the expired side — the old per-second ticker also only noticed
-// expiry on its next 1s tick.
-const EXPIRY_FLIP_SLACK_MS = 1000;
-// setTimeout clamps to a 32-bit signed ms range; a boundary further out than
-// ~24.8 days can't be scheduled (and no quote countdown ever runs that long).
-const MAX_TIMEOUT_MS = 0x7fffffff;
-
-/** One-shot expiry clock: a timestamp that flips exactly ONCE when
- *  `expiresAt` passes (via a single boundary setTimeout — never a 1s
- *  interval), invalidating the model memo so the engine re-evaluates its
- *  expired outcomes. Undefined boundary = the clock stays at mount time. */
-function useExpiry(expiresAt: number | undefined): number {
-  const [currentTime, setCurrentTime] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (expiresAt === undefined) return;
-    const flipAt = expiresAt + EXPIRY_FLIP_SLACK_MS;
-    const delayMs = flipAt - Date.now();
-    if (delayMs <= 0) {
-      // Boundary already passed (e.g. the entry prop swapped to a long-expired
-      // quote after mount): flip once so the model rebuilds as expired.
-      setCurrentTime((prev) => (prev < flipAt ? Date.now() : prev));
-      return;
-    }
-    if (delayMs > MAX_TIMEOUT_MS) return;
-    const timeout = setTimeout(() => setCurrentTime(Date.now()), delayMs);
-    return () => clearTimeout(timeout);
-  }, [expiresAt]);
-
-  return currentTime;
 }
 
 /**
@@ -191,7 +163,36 @@ export function HistoryEntryTimeline({
     if (!info) return undefined;
     return ((info.timestampSec ?? 0) + (info.expirySec ?? 3600)) * 1000;
   }, [historyEntry, isOnchainMint]);
-  const currentTime = useExpiry(meltExpiresAt ?? mintExpiresAt);
+  // A locked send has a boundary too: the moment its locktime opens changes
+  // what the last row says. Same one-shot timeout as an expiry, derived before
+  // the model so the clock exists when it builds.
+  const ourPubkeys = useOurP2pkPubkeys();
+  const unlockAt = useMemo(() => {
+    if (historyEntry.type !== 'send') return undefined;
+    return (
+      describeSendLock(historyEntry, {
+        now: Date.now(),
+        ...(ourPubkeys ? { ourPubkeys } : {}),
+      })?.unlockAt ?? undefined
+    );
+  }, [historyEntry, ourPubkeys]);
+  const expiresAt = meltExpiresAt ?? mintExpiresAt ?? unlockAt;
+  // Quote expiry predicates compare whole seconds, so wait one full second.
+  const expiryClock = useBoundaryClock(expiresAt === undefined ? undefined : expiresAt + 1000);
+  const reclaimClock = useBoundaryClock(
+    unlockAt === undefined ? undefined : unlockAt + LOCK_CLOCK_SKEW_MS
+  );
+  const currentTime = Math.max(expiryClock, reclaimClock);
+  const conditions = useMemo(
+    () =>
+      historyEntry.type === 'send'
+        ? describeSendLock(historyEntry, {
+            now: currentTime,
+            ...(ourPubkeys ? { ourPubkeys } : {}),
+          })
+        : null,
+    [historyEntry, currentTime, ourPubkeys]
+  );
 
   const model = useMemo(
     () =>
@@ -204,8 +205,10 @@ export function HistoryEntryTimeline({
         onchainConfirmationProgress,
         onchainSettledInternally,
         paymentCopy,
+        ...(ourPubkeys ? { ourPubkeys } : {}),
       }),
     [
+      ourPubkeys,
       historyEntry,
       meltQuote,
       currentTime,
@@ -513,6 +516,7 @@ export function HistoryEntryTimeline({
             isOnchainMint={isOnchainMint}
             color={statusHeaderColor}
             entryId={entryId}
+            unlockAtMs={unlockAt}
           />
         </HStack>
 
@@ -540,6 +544,16 @@ export function HistoryEntryTimeline({
                 confirmationProgress={confirmationProgress}
                 segmentedInProgress={onchainConfirmationProgress?.hasPayment}
                 entryId={entryId}
+                detail={
+                  conditions &&
+                  ((step.id === 'unlock' && conditions.unlockAt !== null) ||
+                    (step.id === 'locked' && conditions.unlockAt === null)) ? (
+                    <SpendingConditionsCard
+                      conditions={conditions}
+                      recipientName={getCounterparty(historyEntry)?.displayName ?? null}
+                    />
+                  ) : undefined
+                }
               />
             );
           })}

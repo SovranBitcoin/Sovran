@@ -33,9 +33,21 @@ jest.mock(
   { virtual: true }
 );
 jest.mock('@/shared/ui/composed/MintIcon', () => ({ MintIcon: () => null }));
-jest.mock('@/shared/lib/logger', () => ({
-  Log: ({ children }: React.PropsWithChildren) => <>{children}</>,
-}));
+// The pill's liveness dot reads the persisted mint metadata store; this suite
+// is about the testID seam and does not stand that store up.
+jest.mock('@/features/mint/hooks/useMintLiveness', () => ({ useMintLiveness: () => 'unknown' }));
+jest.mock('@/shared/ui/primitives/PresenceDot', () => ({ PresenceDot: () => null }));
+jest.mock('@/shared/lib/logger', () => {
+  const sink = { info: jest.fn(), warn: jest.fn(), debug: jest.fn(), error: jest.fn() };
+  return {
+    Log: ({ children }: React.PropsWithChildren) => <>{children}</>,
+    // The View primitive reaches a persisted store whose rehydrate hook logs.
+    storeLog: sink,
+    cashuLog: sink,
+    log: { ...sink, child: () => sink },
+    redactError: (error: unknown) => error,
+  };
+});
 
 describe('MintSelector test seam', () => {
   it('forwards its testID to the interactive BalancePill', async () => {

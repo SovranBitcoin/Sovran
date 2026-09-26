@@ -267,6 +267,34 @@ const STATIC_POPUPS = {
   },
 
   // routstr
+  'routstr-reclaim-done': {
+    message: 'Balance returned to your wallet',
+    icon: 'icon:fluent:wallet-20-filled',
+    type: 'success',
+  },
+  'ai-no-provider': {
+    message: 'Choose an AI provider',
+    text: 'Nothing is sent until you pick who gets paid.',
+    icon: 'icon:mdi:robot',
+    type: 'info',
+  },
+  'ai-payment-options-changed': {
+    message: 'Payment options changed',
+    text: 'Review the provider, model and available funds, then send again.',
+    icon: 'icon:mdi:robot',
+    type: 'info',
+  },
+  'ai-mint-not-accepted': {
+    message: 'This provider does not take your mints',
+    text: 'It redeems ecash only from mints you do not hold. Open its details to see which, or choose another provider.',
+    icon: 'icon:mingcute:bank-fill',
+    type: 'error',
+  },
+  'routstr-reclaim-empty': {
+    message: 'Nothing left to reclaim',
+    icon: 'icon:fluent:wallet-20-filled',
+    type: 'info',
+  },
   'routstr-transaction-failed': {
     message: 'AI transaction failed',
     icon: 'icon:mdi:alert-circle',
@@ -350,6 +378,12 @@ const PARAM_POPUPS = {
   'model-switched': (p: { modelName: string }): PopupSpec => ({
     message: `Switched to ${p.modelName}`,
     icon: 'icon:mdi:robot',
+    type: 'success',
+  }),
+
+  'ai-provider-switched': (p: { providerName: string }): PopupSpec => ({
+    message: `Now using ${p.providerName}`,
+    icon: 'icon:humbleicons:url',
     type: 'success',
   }),
 

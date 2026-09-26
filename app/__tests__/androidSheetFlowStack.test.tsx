@@ -31,6 +31,7 @@ jest.mock('@/shared/ui/composed/AndroidSheetRoot', () => {
   return {
     AndroidSheetRoot: ({ children, ...props }: { children?: React.ReactNode }) =>
       ReactActual.createElement('sheet-root', props, children),
+    SheetPageLayer: jest.requireActual('@/shared/ui/composed/AndroidSheetRoot').SheetPageLayer,
   };
 });
 
@@ -85,5 +86,28 @@ describe('AndroidSheetFlowStack', () => {
       headerBackground: undefined,
     });
     expect(stack.findByType(Stack.Screen).props.name).toBe('example');
+  });
+
+  // Fabric sorts an un-isolated page's zIndex layers (ScrollEdgeFade at 50)
+  // against the header wrapper's zIndex 1, drawing the gradient over the title.
+  it('isolates each page so its layers stay under the sheet header', async () => {
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <AndroidSheetFlowStack>
+          <Stack.Screen name="example" />
+        </AndroidSheetFlowStack>
+      );
+    });
+
+    const { screenLayout } = renderer!.root.findByType(Stack).props;
+    let page: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      page = TestRenderer.create(screenLayout({ children: React.createElement('page') }));
+    });
+
+    const layer = page!.toJSON() as TestRenderer.ReactTestRendererJSON;
+    expect(layer.props.style).toMatchObject({ isolation: 'isolate' });
+    expect(page!.root.findByType('page' as never)).toBeTruthy();
   });
 });

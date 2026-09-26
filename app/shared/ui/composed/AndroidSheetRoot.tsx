@@ -59,3 +59,20 @@ export function AndroidSheetRoot({ children, headerHeight }: AndroidSheetRootPro
   if (Platform.OS !== 'android') return <>{children}</>;
   return <AndroidSheetFrame headerHeight={headerHeight}>{children}</AndroidSheetFrame>;
 }
+
+/**
+ * Keeps a sheet page's own layers below the sheet's JS header.
+ *
+ * Fabric scopes zIndex to the nearest view that forms a stacking context, and
+ * plain layout/background views don't. The page and the header are siblings
+ * (native-stack's custom-header wrapper, or FormSheetChrome's overlay), so a
+ * page layer such as ScrollEdgeFade (zIndex 50) or sticky chrome
+ * (zIndex.dropdown) was sorted against the header wrapper's zIndex 1 and drew
+ * its gradient over the title and headerLeft/headerRight. `isolation` makes the
+ * page one layer, painted in tree order beneath the header.
+ */
+export function SheetPageLayer({ children }: { children: React.ReactNode }) {
+  return <View style={SHEET_PAGE_LAYER_STYLE}>{children}</View>;
+}
+
+const SHEET_PAGE_LAYER_STYLE = { flex: 1, isolation: 'isolate' } as const;

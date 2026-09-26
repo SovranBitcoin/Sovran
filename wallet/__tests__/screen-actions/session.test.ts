@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createScreenActionSession,
@@ -6,6 +6,8 @@ import {
 } from '../../src/screen-actions';
 import { createSubscriptionBus } from '../../src/subscriptions';
 import type { ColadaSubscriptionEvent } from '../../src';
+
+afterEach(() => vi.useRealTimers());
 
 function subscribeMappedUpdates(
   bus: ReturnType<typeof createSubscriptionBus>,
@@ -23,6 +25,52 @@ function subscribeMappedUpdates(
 }
 
 describe('createScreenActionSession', () => {
+  it.each([1_000, 30 * 24 * 60 * 60 * 1000])('refreshes a locked send at its reclaim boundary after %i ms', (delayMs) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_800_000_000_000);
+    const session = createScreenActionSession({
+      screenType: 'sendToken',
+      handlers: {},
+      entrySeed: {
+        id: 'locked-send', operationId: 'locked-send', type: 'send', state: 'pending',
+        token: { proofs: [] },
+        metadata: {
+          lockType: 'p2pk', lockPubkey: `02${'ab'.repeat(32)}`,
+          lockLocktime: String((Date.now() + delayMs) / 1000),
+          lockRefundKeys: JSON.stringify([`02${'cd'.repeat(32)}`]),
+        },
+      },
+    });
+    const changed = vi.fn();
+    session.subscribe(changed);
+    expect(session.inspect().actions.cancel.available).toBe(false);
+    vi.advanceTimersByTime(delayMs + 60_001);
+    expect(session.inspect().actions.cancel.available).toBe(true);
+    expect(changed).toHaveBeenCalled();
+    session.dispose();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('cancels a pending lock boundary when disposed', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_800_000_000_000);
+    const session = createScreenActionSession({
+      screenType: 'sendToken', handlers: {},
+      entrySeed: {
+        id: 'locked-send', operationId: 'locked-send', type: 'send', state: 'pending',
+        token: { proofs: [] },
+        metadata: {
+          lockType: 'p2pk', lockPubkey: `02${'ab'.repeat(32)}`,
+          lockLocktime: '1800000100',
+          lockRefundKeys: JSON.stringify([`02${'cd'.repeat(32)}`]),
+        },
+      },
+    });
+    expect(vi.getTimerCount()).toBe(1);
+    session.dispose();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('refreshes an entry from subscription-driven updates without React', () => {
     const bus = createSubscriptionBus();
     const bridge = subscribeMappedUpdates(bus, ['history.updated'], (event) =>

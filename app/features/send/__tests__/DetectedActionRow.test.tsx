@@ -302,4 +302,40 @@ describe('DetectedActionRow', () => {
     expect(onExecute).toHaveBeenCalledTimes(1);
     expect(onStartContactSend).not.toHaveBeenCalled();
   });
+  // A wallet's P2PK receive key affords one thing: locking ecash to it. It
+  // must not borrow the person row — no avatar, no name lookup, no NIP-17
+  // contact send to an identity nobody claimed.
+  it('routes a scanned P2PK receive key straight through onExecute, never contact send', async () => {
+    mockMetadata = { displayName: 'Calle', picture: 'pic', lud16: 'calle@d.com', nip05: null };
+    const onExecute = jest.fn();
+    const onStartContactSend = jest.fn();
+    const key = '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798';
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <DetectedActionRow
+          descriptor={baseDescriptor({
+            kind: 'lockKey',
+            label: 'Lock ecash to',
+            icon: 'ecash',
+            action: 'lockEcash',
+            raw: key,
+            recipient: { ref: { type: 'pubkey', value: key }, pending: false, lockKey: key },
+          })}
+          onExecute={onExecute}
+          onStartContactSend={onStartContactSend}
+        />
+      );
+    });
+    await flush();
+    const row = findRow(renderer!);
+    expect(row.props.title).toBe('Lock ecash to');
+    expect(row.props.avatar).toBeUndefined();
+    expect(row.props.subtitle).toContain('\u2026');
+    await act(async () => {
+      row.props.onPress();
+    });
+    expect(onExecute).toHaveBeenCalledTimes(1);
+    expect(onStartContactSend).not.toHaveBeenCalled();
+  });
 });

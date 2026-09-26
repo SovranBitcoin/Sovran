@@ -4,6 +4,7 @@ import { createAmountEntryMethodContext } from "../mint-capabilities";
 import { parsePaymentInput } from "../parse";
 import { isValidSatAmount } from "../guards";
 import { normalizeNostrPubkey } from "../recipient";
+import { normalizeP2pkLock, type P2pkLockSpec } from "../p2pk";
 import type { Detectors, WalletContext } from "../types";
 import { resolveNext, type StepResult } from "./resolveNext";
 import { buildProofSuggestions } from "./amountFallback";
@@ -127,6 +128,11 @@ function handleExecute(
         };
       }
       ctx.paymentRequest = intent.option.value;
+      // A NUT-10 P2PK condition makes this a LOCKED payment; the amount
+      // screen must not offer it as a plain bearer-token send.
+      if (intent.info.lockP2pkPubkey) {
+        ctx.paymentRequestLockPubkey = intent.info.lockP2pkPubkey;
+      }
       ctx.supportedMintUrls =
         !intent.info.mintsPreferred && intent.info.mints.length > 0
           ? intent.info.mints
@@ -385,6 +391,7 @@ function handleAmountEntered(
           recipientPubkey: currentCtx.recipientPubkey,
           recipientProfile: currentCtx.recipientProfile,
           p2pkLockPubkey: currentCtx.p2pkLockPubkey,
+          ...(currentCtx.p2pkLock ? { p2pkLock: currentCtx.p2pkLock } : {}),
           methodContext: createAmountEntryMethodContext(walletCtx),
           ...(currentCtx.entrySource
             ? { entrySource: currentCtx.entrySource }
@@ -395,6 +402,19 @@ function handleAmountEntered(
   }
   const shouldResetContext =
     !!event.destination && event.destination !== currentCtx.destination;
+  const lockPatch = shouldResetContext
+    ? {}
+    : resolveLockPatch(event.p2pkLock, currentCtx);
+  if (lockPatch === null) {
+    return {
+      step: "error",
+      context: currentCtx,
+      data: {
+        code: "INVALID_P2PK_LOCK",
+        message: "Invalid P2PK lock terms for this send.",
+      },
+    };
+  }
   const ctx: FlowContext = shouldResetContext
     ? {
         unit: currentCtx.unit,
@@ -408,6 +428,10 @@ function handleAmountEntered(
         recipientPubkey: event.recipientPubkey,
         recipientProfile: event.recipientProfile,
         amountEntryDisplay: event.amountEntryDisplay,
+        // No lock here on purpose: a destination change means a different
+        // payment (a melt, say), and a melt cannot be P2PK-locked. Spreading
+        // currentCtx to "keep" it would carry a lock into a flow that cannot
+        // honour one.
         memo: undefined,
         sendMemoHandled: false,
       }
@@ -424,6 +448,7 @@ function handleAmountEntered(
         recipientProfile: event.recipientProfile ?? currentCtx.recipientProfile,
         amountEntryDisplay:
           event.amountEntryDisplay ?? currentCtx.amountEntryDisplay,
+        ...lockPatch,
         memo: undefined,
         sendMemoHandled: false,
       };
@@ -438,6 +463,48 @@ function handleAmountEntered(
     resolveNext(ctx.intent, ctx, walletCtx, enableEcashSendMemo),
     ctx,
   );
+}
+
+/**
+ * Fold an AMOUNT_ENTERED lock change into the context.
+ *
+ * `undefined` means the screen said nothing about the lock, so whatever the
+ * flow was seeded with stands (a Nut Drop's protocol-mandated lock, say).
+ * `null` is the user turning it off, and must clear BOTH fields — leaving the
+ * mirrored pubkey behind would keep every "is this locked" check true while
+ * the terms were gone.
+ */
+function resolveLockPatch(
+  requested: P2pkLockSpec | null | undefined,
+  currentCtx: FlowContext,
+): Pick<FlowContext, "p2pkLock" | "p2pkLockPubkey"> | null {
+  if (requested === undefined) {
+    return {
+      ...(currentCtx.p2pkLock ? { p2pkLock: currentCtx.p2pkLock } : {}),
+      ...(currentCtx.p2pkLockPubkey
+        ? { p2pkLockPubkey: currentCtx.p2pkLockPubkey }
+        : {}),
+    };
+  }
+  if (requested === null) {
+    logger.info("transitions.amountEntered.lockCleared");
+    return { p2pkLock: undefined, p2pkLockPubkey: undefined };
+  }
+  const lock = normalizeP2pkLock(requested);
+  if (!lock) {
+    // Refuse rather than fall back to the old lock or to none: both would
+    // send something other than what the user just chose.
+    logger.warn("transitions.amountEntered.invalidLock", {
+      hasLocktime: !!requested.locktimeSec,
+      refundKeyCount: requested.refundKeys?.length ?? 0,
+    });
+    return null;
+  }
+  logger.info("transitions.amountEntered.lockSet", {
+    hasLocktime: !!lock.locktimeSec,
+    refundKeyCount: lock.refundKeys?.length ?? 0,
+  });
+  return { p2pkLock: lock, p2pkLockPubkey: lock.pubkey };
 }
 
 function handleMintSelected(
@@ -671,7 +738,7 @@ export function transition(
         hasMeltTarget: !!event.meltTarget,
         recipientPubkeyPresent: !!event.recipientPubkey,
         recipientProfilePresent: !!event.recipientProfile,
-        p2pkLockPubkeyPresent: !!event.p2pkLockPubkey,
+        p2pkLockPubkeyPresent: !!(event.p2pkLock ?? event.p2pkLockPubkey),
       });
       return stamp(
         startSendEcashFlow(walletCtx, unit, {
@@ -683,6 +750,7 @@ export function transition(
           ...(event.recipientProfile
             ? { recipientProfile: event.recipientProfile }
             : {}),
+          ...(event.p2pkLock ? { p2pkLock: event.p2pkLock } : {}),
           ...(event.p2pkLockPubkey
             ? { p2pkLockPubkey: event.p2pkLockPubkey }
             : {}),

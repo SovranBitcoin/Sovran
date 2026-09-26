@@ -62,13 +62,22 @@ const PersistedMintStore = z.object({
   activeUnit: z.enum(ACCOUNT_UNITS).default('sat').catch('sat'),
   // Additive tolerant field: a corrupt map degrades to {} (new standing
   // quotes get created and re-recorded) instead of wiping the store.
-  standingQuotes: z.record(z.string(), z.string().max(256)).default({}).catch({}),
-  receiveMintByMethod: z.record(z.string(), z.string().max(2048)).default({}).catch({}),
+  standingQuotes: z
+    .record(z.string(), z.string().max(256))
+    .default({})
+    .catch(() => ({})),
+  receiveMintByMethod: z
+    .record(z.string(), z.string().max(2048))
+    .default({})
+    .catch(() => ({})),
   // Additive tolerant field: corrupt value degrades to false (lock off).
   creqP2pkLock: z.boolean().default(false).catch(false),
   // Additive tolerant field: a corrupt map degrades to {} (all mints
   // advertised again) instead of wiping the store.
-  creqExcludedMints: z.record(z.string().max(2048), z.boolean()).default({}).catch({}),
+  creqExcludedMints: z
+    .record(z.string().max(2048), z.boolean())
+    .default({})
+    .catch(() => ({})),
   // `bip321ExcludedRails` (Unified per-rail opt-outs) was removed with its
   // switches: the Unified request now always carries every available rail.
   // Old blobs still holding it parse fine — z.object strips the unknown key.

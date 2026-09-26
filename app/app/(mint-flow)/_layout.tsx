@@ -6,6 +6,7 @@
  * Screens within this group push horizontally:
  * - add: Entry point, discover and add new mints
  * - info: Mint details and audit info (horizontal push)
+ * - reviews / history: one mint's user reviews and NUT-06 update history
  *
  * The first screen shows a close button, subsequent screens show a back button.
  */
@@ -16,6 +17,7 @@ import { AndroidSheetFlowStack } from '../../config/flowLayoutOptions';
 const ADD_OPTIONS = { title: 'Add mints' };
 const INFO_OPTIONS = { title: 'Mint details' };
 const REVIEWS_OPTIONS = { title: 'Reviews' };
+const HISTORY_OPTIONS = { title: 'Mint updates' };
 const DISTRIBUTION_OPTIONS = { title: 'Balance split' };
 const REBALANCE_PLAN_OPTIONS = { title: 'Rebalance plan' };
 // Statically shown: DmChatHeader swaps header content only. A false→true
@@ -29,6 +31,7 @@ export default function MintFlowLayout() {
       <Stack.Screen name="add" options={ADD_OPTIONS} />
       <Stack.Screen name="info" options={INFO_OPTIONS} />
       <Stack.Screen name="reviews" options={REVIEWS_OPTIONS} />
+      <Stack.Screen name="history" options={HISTORY_OPTIONS} />
       <Stack.Screen name="distribution" options={DISTRIBUTION_OPTIONS} />
       <Stack.Screen name="rebalancePlan" options={REBALANCE_PLAN_OPTIONS} />
       <Stack.Screen name="userMessages" options={USER_MESSAGES_OPTIONS} />

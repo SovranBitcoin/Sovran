@@ -1,4 +1,5 @@
 import { storeLog } from '@/shared/lib/logger';
+import { clearNutzapProfileCache } from '@/shared/lib/nostr/nutzapProfileDiscovery';
 import { useAmountDraftStore } from './amountDraftStore';
 import { useContactSendStore } from './contactSendStore';
 import { useNearPaySessionStore } from './nearPayStore';
@@ -43,4 +44,8 @@ export function clearPaymentContext(reason: string): void {
   // An abandoned zap must never attach its 9734 to a later unrelated payment
   // that happens to target the same lightning address.
   clearPendingZaps();
+  // Where someone wants ecash locked is payment routing, not profile
+  // metadata: carrying one account's lookups into another's flow would leak
+  // payment intent across identities.
+  clearNutzapProfileCache();
 }

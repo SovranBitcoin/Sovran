@@ -1,40 +1,51 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRoutstrStore, type ChatAttachment } from '@/shared/stores/profile/routstrStore';
-import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { useRoutstrFunds } from './useRoutstrFunds';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import {
   sendMessage,
   isModelRejectedError,
+  isPaymentLayerFailure,
   isRoutstrNodeFailure,
-  checkBalance,
+  isUpstreamRefusal,
+  isWalletBalanceError,
   measureMessageContent,
-  ROUTSTR_MAX_COMPLETION_TOKENS,
   type RoutstrChatMessage,
 } from '@/shared/lib/routstr/api';
+import { markModelUnavailable, orderByAvailability } from '../lib/modelAvailability';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
+import { lineupHasEntries, lineupProviderIds, type LineupEntry } from '@/shared/lib/routstr/lineup';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { isAbortError } from 'wallet/safeFetch';
-import { pickFinalizeMessage } from '../lib/finalize';
-import { actionMenuPopup, staticPopup, paramPopup } from '@/shared/lib/popup';
+import { isBudgetTruncation, pickFinalizeMessage } from '../lib/finalize';
+import { staticPopup } from '@/shared/lib/popup';
+import { describeError } from '@/shared/lib/errors';
+import { ERROR_COPY } from '@/shared/lib/errors/catalog';
 import { aiLog } from '@/shared/lib/logger';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import {
   AFFORD_BUFFER,
-  AUTO_ICON,
   estimateTurnCostSats,
   getAffordabilityDetails,
   getModelDisplayName,
   getProviderById,
   getTierById,
   resolveCandidateEntries,
-  resolveSelectedEntry,
+  selectFromChain,
+  sendMaxTokens,
 } from '../lib/format';
+import { confirmSpend } from '../lib/spendConfirm';
+import { evaluateSendGate } from '../lib/sendGate';
+import { reservedSatsForSend } from '../lib/reserve';
+import { clearTurnTruncation, recordTurnTruncation } from '../lib/turnTruncation';
+import { useHeldMints } from './useHeldMints';
 import { assembleApiMessages, stripImageParts } from '../lib/assembleApiMessages';
 import { encodeChatImage } from '../lib/attachments';
 import { deriveActivePath, getAncestorsExclusive } from '../lib/branching';
+import { navigateToAddFunds } from '../lib/navigateToAddFunds';
+import { clearTurnError, recordTurnError } from '../lib/turnErrors';
 import {
   clearStreaming,
   setStreamingReasoning,
@@ -63,6 +74,49 @@ const STREAM_PROGRESS_INTERVAL_MS = 500;
  * stream. Tuned from iOS reanimated keyboard-controller's typical idle gap. */
 const STREAM_STALL_THRESHOLD_MS = 500;
 
+/**
+ * How many models one send may try after an upstream provider declines it.
+ *
+ * A 402 the node forwarded from the AI provider (see `isWalletBalanceError`)
+ * says nothing about the node or the user's credit, so the next candidate —
+ * which usually sits behind a different upstream — is worth one attempt. The
+ * cap exists because each attempt is a real paid round-trip: a node whose whole
+ * upstream is down would otherwise fan out across all twelve lineup cells.
+ */
+const MAX_DECLINED_ATTEMPTS = 3;
+
+/**
+ * The candidate chain for a selection, with models this node refused recently
+ * moved behind the rest.
+ *
+ * Used by BOTH the quote and the send, so the sheet names the model that will
+ * actually be tried first. The catalog said the node serves them; its upstream
+ * said otherwise a moment ago, and paying to hear it a third time is what the
+ * 2026-09-26 log shows. Demoted, never dropped — still tried if nothing else
+ * works — and the memory expires with the node's outage.
+ */
+function availableChain(
+  provider: string,
+  tier: Parameters<typeof resolveCandidateEntries>[1],
+  lineup: Parameters<typeof resolveCandidateEntries>[2],
+  nodeBaseUrl: string | null
+): ReturnType<typeof resolveCandidateEntries> {
+  const chain = resolveCandidateEntries(provider, tier, lineup);
+  // Branched so each side keeps its own entry type: the sealed brand is what
+  // stops a plaintext entry being pushed into a sealed chain by a widening.
+  const ordered = chain.sealed
+    ? { sealed: true as const, entries: orderByAvailability(nodeBaseUrl, chain.entries) }
+    : { sealed: false as const, entries: orderByAvailability(nodeBaseUrl, chain.entries) };
+  if (ordered.entries[0] !== chain.entries[0]) {
+    aiLog.info('ai.send.primary_demoted', {
+      nodeBaseUrl,
+      demoted: chain.entries[0]?.modelId,
+      promoted: ordered.entries[0]?.modelId,
+    });
+  }
+  return ordered;
+}
+
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
@@ -87,7 +141,8 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
  *   - Refresh the lineup on connect-time node/model failures, retrying
  *     once with the refreshed Auto entry. Never replay a started stream.
  *   - Snapshot balance before send, compute `costSats` from the post-stream
- *     `checkBalance()` diff, and stamp it on the message asynchronously.
+ *     exact spent-minus-change figure the send returns, and stamp it on
+ *     the message.
  *   - Cashu-token-redeem flow is intentionally out of scope (still lives in
  *     `UserMessagesScreen`).
  */
@@ -97,7 +152,6 @@ export function useAiSend() {
     streamingMessageId: null,
   });
 
-  const apiKey = useRoutstrStore((s) => s.apiKey);
   const isAnonymous = useRoutstrStore((s) => s.isAnonymousMode);
   const currentSessionId = useRoutstrStore((s) => s.currentSessionId);
   const createSession = useRoutstrStore((s) => s.createSession);
@@ -106,48 +160,23 @@ export function useAiSend() {
   const removeMessages = useRoutstrStore((s) => s.removeMessages);
   const finalizeAssistantMessage = useRoutstrStore((s) => s.finalizeAssistantMessage);
   const setActiveBranch = useRoutstrStore((s) => s.setActiveBranch);
-  const setBalance = useRoutstrStore((s) => s.setBalance);
-  const setSelectedSlot = useRoutstrStore((s) => s.setSelectedSlot);
   const updateCurrentSessionTitle = useRoutstrStore((s) => s.updateCurrentSessionTitle);
 
-  const { keys: nostrKeys } = useNostrKeysContext();
-
-  // Stream + balance lifecycle. Each `streamIntoPlaceholder` aborts the
-  // prior stream (so backgrounding mid-stream stops billing) and awaits
-  // the prior balance promise so the new flow's `balanceBeforeMsats`
-  // snapshot is fresh — without that wait, a retry-during-balance-refresh
-  // captures the same pre-send balance as the first call and double-counts
-  // the cost diff.
+  // Each `streamIntoPlaceholder` aborts the prior stream, so backgrounding
+  // mid-stream stops billing. There is no longer a balance promise to wait on:
+  // the cost of a request is returned by the request itself.
   const streamControllerRef = useRef<AbortController | null>(null);
-  const balancePromiseRef = useRef<Promise<unknown> | null>(null);
+
+  const funds = useRoutstrFunds();
+  const latestFunds = useLatestRef(funds);
+  const walletSats = funds?.balanceSats ?? 0;
+  const heldMints = useHeldMints();
 
   useEffect(
     () => () => {
       streamControllerRef.current?.abort();
     },
     []
-  );
-
-  const navigateToTopUp = useCallback(
-    (pendingMessage: string) => {
-      if (!nostrKeys?.pubkey) {
-        staticPopup('no-wallet-available');
-        return;
-      }
-      useRoutstrTopUpStore.getState().start(pendingMessage);
-      const preferredMint = useMintStore.getState().selectedMint ?? '';
-      router.navigate({
-        pathname: '/(send-flow)/amount',
-        params: {
-          amountEntry: JSON.stringify({
-            destination: 'sendEcash',
-            unit: 'sat',
-            selectedMintUrl: preferredMint,
-          }),
-        },
-      });
-    },
-    [nostrKeys?.pubkey]
   );
 
   /**
@@ -165,19 +194,18 @@ export function useAiSend() {
       imageCount: number;
       flowId: string;
       retriedFromMessageId?: string;
-      pendingUserMessageForTopUp: string;
+      /** The figure the spend sheet put in front of the user, so the log can
+       *  hold the promise and the outcome on one line. `null` when no sheet
+       *  ran (a retry) or the model could not be priced. */
+      shownSats?: number | null;
     }) => {
-      const { assistantMessageId, flowId, pendingUserMessageForTopUp } = params;
+      const { assistantMessageId, flowId } = params;
+      const shownSats = params.shownSats ?? null;
       let { apiMessages, imageCount } = params;
-      if (!apiKey) {
-        staticPopup('no-api-key');
-        return;
-      }
 
       const profile = useProfileStore.getState().activeAccountIndex;
       const storeState = useRoutstrStore.getState();
-      const balanceBeforeMsats = storeState.balance ?? 0;
-      const balanceSats = Math.floor(balanceBeforeMsats / 1000);
+      const balanceSats = walletSats;
       const tier = getTierById(storeState.selectedTier);
       const provider = getProviderById(storeState.selectedProvider);
       const cachedModels = storeState.modelsCache?.data ?? [];
@@ -188,33 +216,70 @@ export function useAiSend() {
       // deliberately no hardcoded id to guess at anymore, so surface it
       // instead of burning a round-trip on a dead model.
       const lineup = storeState.lineup ?? storeState.lastKnownLineup?.lineup ?? null;
-      const primaryEntry = resolveSelectedEntry(provider.id, tier.id, balanceSats, lineup);
+      // ONE chain, built once and never widened. Its `sealed` tag carries the
+      // user's encryption choice through every later narrowing below — the
+      // vision filter and the post-repoint recovery both derive from it, and
+      // neither can reach a vendor the chain did not already contain.
+      const chain = availableChain(provider.id, tier.id, lineup, storeState.nodeBaseUrl);
+      const primaryEntry = selectFromChain(chain, balanceSats);
       if (!primaryEntry) {
-        aiLog.warn('ai.send.no_lineup', { flowId, hasCatalog: cachedModels.length > 0 });
-        removeMessages(new Set([assistantMessageId]));
-        staticPopup('send-message-failed', {
-          text: 'Models are still loading — check your connection and try again.',
+        // Two different absences wearing one shape. An empty plaintext chain
+        // means the catalogue never landed. An empty SEALED chain means it
+        // did, and this node serves nothing encrypted — the models we could
+        // reach are all plaintext, and the user asked for the opposite. Saying
+        // "the model list has not loaded" there would send them to retry a
+        // connection that is fine.
+        // Three absences wearing one shape, not two. A sealed chain that is
+        // empty against a real lineup means the node serves nothing encrypted.
+        // A PLAINTEXT chain empty against a real lineup means the catalogue
+        // landed and nothing in it is usable here — "the model list has not
+        // loaded" is false for both, and sends the user to retry a connection
+        // that is fine. Only a genuinely absent lineup is a loading problem.
+        const haveLineup = lineupHasEntries(lineup);
+        const id = chain.sealed
+          ? haveLineup
+            ? 'routstr.e2ee_unavailable'
+            : 'routstr.catalog_unavailable'
+          : haveLineup
+            ? 'routstr.no_usable_models'
+            : 'routstr.catalog_unavailable';
+        // `hasCatalog` alone read as a contradiction in the logs — a refusal
+        // to send while holding 582 catalogue rows. It was never lying: the
+        // catalogue is not the lineup, and the lineup is not the lineup THIS
+        // selection can reach. Say all three, so the next occurrence names its
+        // own cause instead of needing the surrounding events to explain it.
+        aiLog.warn('ai.send.no_lineup', {
+          flowId,
+          hasCatalog: cachedModels.length > 0,
+          catalogSize: cachedModels.length,
+          hasLineup: lineupHasEntries(lineup),
+          lineupProviders: lineupProviderIds(lineup),
+          selectedProvider: provider.id,
+          selectedTier: tier.id,
+          sealedSelection: chain.sealed,
+          errorId: id,
         });
+        // Same contract as a failed request: the turn stays in the
+        // conversation and says, in place, why it could not run.
+        recordTurnError(assistantMessageId, { id, text: ERROR_COPY[id] });
         return;
       }
 
-      // Abort any prior in-flight stream and wait for its balance refresh
-      // to settle so this flow's snapshot reflects the prior call's debit.
       streamControllerRef.current?.abort();
-      if (balancePromiseRef.current) {
-        await balancePromiseRef.current.catch(() => {});
-      }
       const controller = new AbortController();
       streamControllerRef.current = controller;
 
       // Same-tier chain across the other providers as runtime fallback for
-      // connect-time failures. When the request carries image parts the
-      // chain is filtered to vision-capable models — failing over an image
-      // send onto a text-only model would 400 (non-retryable) and hard-fail
-      // the send instead of walking the chain.
-      const allEntries = resolveCandidateEntries(provider.id, tier.id, lineup);
+      // connect-time failures — or, on a sealed selection, the encrypted
+      // vendor's own ladder and nothing else (see `resolveCandidateEntries`).
+      // When the request carries image parts the chain is filtered to
+      // vision-capable models — failing over an image send onto a text-only
+      // model would 400 (non-retryable) and hard-fail the send instead of
+      // walking the chain.
+      const allEntries = chain.entries;
       const primaryIdx = allEntries.findIndex((e) => e.modelId === primaryEntry.modelId);
-      let candidateEntries = primaryIdx >= 0 ? allEntries.slice(primaryIdx) : [primaryEntry];
+      let candidateEntries: readonly LineupEntry[] =
+        primaryIdx >= 0 ? allEntries.slice(primaryIdx) : [primaryEntry];
       if (imageCount > 0) {
         const visionOnly = candidateEntries.filter((e) => e.visionInput);
         if (visionOnly.length > 0) {
@@ -230,6 +295,20 @@ export function useAiSend() {
         }
       }
       const primaryModel = primaryEntry.modelId;
+      // What the user approved, or — on a retry, which shows no sheet — what
+      // the model they picked would have reserved. No candidate may reserve
+      // more than this. On 2026-09-26 the sheet said 899 sats for the Auto
+      // model, its upstream refused, and the walk paid 1,862 for the Max
+      // sibling without asking; refunded, but a figure the user never saw
+      // left their wallet under one they had.
+      const budgetSats =
+        shownSats ??
+        reservedSatsForSend({
+          entry: primaryEntry,
+          models: cachedModels,
+          messages: apiMessages,
+          maxTokens: sendMaxTokens(primaryEntry.maxCompletionTokens),
+        });
       let candidateChain = candidateEntries.map((e) => e.modelId);
 
       setStatus({ isSending: true, streamingMessageId: assistantMessageId });
@@ -237,6 +316,10 @@ export function useAiSend() {
       // counter rendered by the bubble. Resets text + reasoning channels
       // so a previous stream's tail can't leak into this one.
       startStreaming(assistantMessageId);
+      // A placeholder that is streaming is not a failed one. Ids are fresh per
+      // send and per retry, so this only ever matters if one is re-driven.
+      clearTurnError(assistantMessageId);
+      clearTurnTruncation(assistantMessageId);
 
       // Hoisted so the catch block (402 popup) can reference whichever
       // candidate we were last attempting when the request failed.
@@ -293,7 +376,6 @@ export function useAiSend() {
         });
         aiLog.info('ai.send.affordability_check', {
           flowId,
-          balanceMsats: balanceBeforeMsats,
           balanceSats,
           selectedTier: tier.id,
           selectedProvider: provider.id,
@@ -308,12 +390,49 @@ export function useAiSend() {
         });
 
         let stream: AsyncIterable<any> | undefined;
+        // The budget the winning candidate's request actually carried. Needed
+        // after the stream to say what ran out, and by how much.
+        let sentMaxTokens = 0;
+        // Resolved after the stream ends: the exact figure is the token we
+        // spent minus the change the node returned, and the change is only
+        // banked once the response is complete.
+        let costPromise: Promise<number> | undefined;
+        let costSats: number | undefined;
         let lastConnectErr: unknown = null;
         let recoveryRetried = false;
+        let declinedAttempts = 0;
         for (let i = 0; i < candidateChain.length; i++) {
           if (useProfileStore.getState().activeAccountIndex !== profile) return;
           if (controller.signal.aborted) throw { status: 0, error: { type: 'aborted' } };
           const candidate = candidateChain[i];
+          const candidateReserve = reservedSatsForSend({
+            entry: candidateEntries[i] ?? null,
+            models: cachedModels,
+            messages: apiMessages,
+            maxTokens: sendMaxTokens(candidateEntries[i]?.maxCompletionTokens),
+          });
+          if (budgetSats != null && candidateReserve != null && candidateReserve > budgetSats) {
+            aiLog.warn('ai.send.candidate_over_budget', {
+              flowId,
+              candidate,
+              candidateReserveSats: candidateReserve,
+              budgetSats,
+              attempt: i,
+            });
+            if (i === candidateChain.length - 1) {
+              throw (
+                lastConnectErr ?? {
+                  status: 0,
+                  error: {
+                    message: 'The only model left reserves more than was approved',
+                    type: 'over_budget',
+                    code: 'over_budget',
+                  },
+                }
+              );
+            }
+            continue;
+          }
           modelToUse = candidate;
           const requestNode = useRoutstrStore.getState().nodeBaseUrl;
           // Always send max_tokens: Routstr only discounts the completion
@@ -322,22 +441,48 @@ export function useAiSend() {
           // max_completion_cost (~1,500 sats on frontier models) and 402
           // balances that cover the real turn cost many times over. Clamped
           // under the model's own completion ceiling when the lineup knows it.
-          const candidateCeiling = candidateEntries[i]?.maxCompletionTokens;
-          const maxTokens =
-            candidateCeiling != null && candidateCeiling > 0
-              ? Math.min(ROUTSTR_MAX_COMPLETION_TOKENS, candidateCeiling)
-              : ROUTSTR_MAX_COMPLETION_TOKENS;
+          // `sendMaxTokens` is the one spelling of that clamp; the
+          // affordability gate prices the same call, so the reservation the
+          // user was shown is the one the node charges.
+          const maxTokens = sendMaxTokens(candidateEntries[i]?.maxCompletionTokens);
           try {
-            const currentKey = useRoutstrStore.getState().apiKey;
-            if (!currentKey) throw { status: 401, error: { message: 'Missing key', type: 'auth' } };
-            const result = await sendMessage(currentKey, apiMessages, {
+            // The token attached to the request has to clear the node's
+            // admission gate — not the expected cost — and `@routstr/sdk`
+            // sizes it the same way the node does, from the catalog pricing
+            // the lineup already seeded. Anything unspent comes straight back
+            // as change, so over-funding costs nothing but a swap.
+            const result = await sendMessage(apiMessages, {
               model: candidate,
-              temperature: 0.7,
+              // Both money legs point back at the exchange they bought, so a
+              // cost in history can be traced to the answer it produced.
+              //
+              // One group per ATTEMPT, not per send. A walk that pays model A,
+              // gets it all back, and then pays model B is two payments with
+              // two outcomes — "refunded, the request failed" and whatever B
+              // does — and under one id they rendered as three legs summing
+              // to a figure that was neither. The message id still ties every
+              // attempt to the same exchange.
+              payment: {
+                groupId: i === 0 ? flowId : `${flowId}#${i + 1}`,
+                sessionId: useRoutstrStore.getState().currentSessionId ?? undefined,
+                messageId: assistantMessageId,
+                model: candidate,
+              },
+              // No `temperature`. The reference clients send none
+              // (routstr-chat `useChatActions`, `@routstr/sdk`
+              // `fetchAIResponse`), and — unlike `max_tokens`, which the
+              // catalogue justifies per model through
+              // `top_provider.max_completion_tokens` — `RoutstrModel` carries
+              // no field saying which models accept a sampling temperature.
+              // Reasoning models reject a non-default one outright, so a
+              // blanket 0.7 is a guess that can only lose.
               max_tokens: maxTokens,
               signal: controller.signal,
             });
             stream = result.stream;
+            costPromise = result.cost;
             modelToUse = candidate;
+            sentMaxTokens = maxTokens;
             if (i > 0) {
               aiLog.warn('ai.send.fallback_used', {
                 flowId,
@@ -352,6 +497,88 @@ export function useAiSend() {
           } catch (err) {
             lastConnectErr = err;
             if (isAbortError(err) || controller.signal.aborted) throw err;
+            const status = (err as { status?: number })?.status;
+            // The node could not USE the token — a keyset it does not know, a
+            // mint it does not trust, a spent proof, its own wallet falling
+            // over. Nothing about the model is in question and nothing about
+            // the next model changes the payment, so paying the same node
+            // again is paying to be refused again.
+            if (isPaymentLayerFailure(err)) throw err;
+            // An upstream decline: the node is healthy, the catalog is current
+            // and the user's credit is fine — the AI provider behind THIS model
+            // refused. Two shapes. A bare 402 the node forwarded from its
+            // upstream, and — the commoner one — the node's own
+            // `upstream_error` under the upstream's status with the whole
+            // token refunded: the enclave or OpenRouter saying 404 to a model
+            // the node's catalog still lists. Another candidate usually sits
+            // behind a different upstream, or is simply a model the upstream
+            // does serve, so advance without refreshing the lineup (there is
+            // nothing stale to refresh) and without touching the balance.
+            const upstreamDeclined =
+              (status === 402 && !isWalletBalanceError(err)) || isUpstreamRefusal(err);
+            if (upstreamDeclined) {
+              declinedAttempts += 1;
+              const code = (err as { error?: { code?: string } })?.error?.code;
+              // Remembered per node and model, so the NEXT send starts from a
+              // candidate that has not just failed here.
+              markModelUnavailable(requestNode, candidate, { status: status ?? 0, code });
+              // Skip every remaining candidate behind the upstream that just
+              // refused — when the refusal is about the ACCOUNT. A node
+              // fronts several upstream accounts and they fail independently:
+              // when one runs out of credit (402), is rate-limited (429) or
+              // is down (5xx), every model behind it answers identically, so
+              // trying a sibling is paying to be refused again. Observed:
+              // three candidates, three 402s, all `openrouter`. A 404 or 400
+              // is about the MODEL — the same enclave served the sibling
+              // minutes later — so siblings stay in the walk. Only narrows
+              // when the node reports upstreams; otherwise the walk is
+              // exactly as before.
+              //
+              // 424 is what nodes after v0.4.7 send for an upstream that is
+              // down or timed out (`UPSTREAM_UNAVAILABLE`, `UPSTREAM_TIMEOUT`,
+              // routstr-core #771) instead of the 5xx that read as the node
+              // itself being down. Same scope as a 5xx: the whole upstream.
+              const accountScoped =
+                status === 402 || status === 424 || status === 429 || (status ?? 0) >= 500;
+              const declinedUpstream = accountScoped
+                ? (candidateEntries[i]?.upstreamId ?? null)
+                : null;
+              let next = i + 1;
+              if (declinedUpstream) {
+                while (
+                  next < candidateChain.length &&
+                  candidateEntries[next]?.upstreamId === declinedUpstream
+                ) {
+                  next++;
+                }
+              }
+              if (declinedAttempts >= MAX_DECLINED_ATTEMPTS || next >= candidateChain.length) {
+                // Every candidate we were willing to try refused. A 402 is not
+                // an `isRoutstrNodeFailure`, so nothing else on this path ever
+                // re-asks nagg — and a node whose upstream credit has run out
+                // serves a perfect catalog forever, so the foreground refresh's
+                // 24-hour freshness rule keeps the app pinned to it. Ask once
+                // (throttled to 5 minutes) so the NEXT send can land on a node
+                // nagg has since repointed to. Not retried here: a repoint also
+                // invalidates the key, so this send is over either way.
+                void refreshRoutstrLineup('failure');
+                throw err;
+              }
+              aiLog.warn('ai.send.provider_declined', {
+                flowId,
+                tier: tier.id,
+                provider: provider.id,
+                candidate,
+                status,
+                code,
+                declinedUpstream,
+                skippedSameUpstream: next - i - 1,
+                attempt: declinedAttempts,
+                nextCandidate: candidateChain[next],
+              });
+              i = next - 1; // the loop's i++ lands on `next`
+              continue;
+            }
             const modelRejected = isModelRejectedError(err, candidate);
             const nodeFailed = isRoutstrNodeFailure(err);
             if (!modelRejected && !nodeFailed) throw err;
@@ -361,11 +588,13 @@ export function useAiSend() {
             const current = useRoutstrStore.getState();
             const nodeChanged = current.nodeBaseUrl !== requestNode;
             if (!recoveryRetried && (nodeChanged || (modelRejected && refreshed))) {
-              const entry = resolveSelectedEntry(
-                provider.id,
-                'auto',
-                Math.floor((current.balance ?? 0) / 1000),
-                current.lineup
+              // Rebuilt through the same constructor rather than reaching into
+              // the refreshed lineup directly: a repoint is exactly where a
+              // sealed selection would otherwise be handed the new node's
+              // cheapest plaintext Auto model and never told.
+              const entry = selectFromChain(
+                resolveCandidateEntries(provider.id, 'auto', current.lineup),
+                Math.floor((current.balance ?? 0) / 1000)
               );
               if (entry && (imageCount === 0 || entry.visionInput)) {
                 recoveryRetried = true;
@@ -412,6 +641,11 @@ export function useAiSend() {
         let firstReasoningAt = 0;
         let maxGap = 0;
         let stallCount = 0;
+        // Rides on the last chunk of an OpenAI-compatible stream. The chunk
+        // spine has always validated it; until now nothing read it, so an
+        // answer cut off at the completion budget was indistinguishable from
+        // one that simply finished.
+        let finishReason: string | null = null;
 
         for await (const chunk of stream) {
           chunkCount++;
@@ -437,7 +671,9 @@ export function useAiSend() {
             });
           }
 
-          const delta = chunk.choices?.[0]?.delta;
+          const choice = chunk.choices?.[0];
+          if (typeof choice?.finish_reason === 'string') finishReason = choice.finish_reason;
+          const delta = choice?.delta;
           const content =
             delta?.content || (delta as any)?.message?.content || (delta as any)?.text || null;
           const reasoning = (delta as any)?.reasoning_content || (delta as any)?.reasoning || null;
@@ -498,6 +734,12 @@ export function useAiSend() {
         }
 
         const streamEnd = performance.now();
+        // An answer that stopped because the budget ran out is one the user
+        // paid for and did not get all of. It renders as a note under its own
+        // content rather than as a failure — the content is real — and the
+        // bubble offers to carry on from there.
+        const truncated = isBudgetTruncation(finishReason);
+        if (truncated) recordTurnTruncation(assistantMessageId, { budgetTokens: sentMaxTokens });
         const totalMs = streamEnd - sendStart;
         const streamMs = firstChunkAt > 0 ? streamEnd - firstChunkAt : 0;
         aiLog.info('ai.stream.complete', {
@@ -508,6 +750,14 @@ export function useAiSend() {
           chunksWithReasoning,
           chars: fullContent.length,
           reasoningChars: fullReasoning.length,
+          // The three fields that make `ROUTSTR_MAX_COMPLETION_TOKENS`
+          // retunable from a log instead of from a guess: what we asked for,
+          // what the model said about stopping, and roughly what it wrote at
+          // the SDK's own 2.84 chars-per-token.
+          maxTokens: sentMaxTokens,
+          finishReason,
+          approxCompletionTokens: Math.ceil((fullContent.length + fullReasoning.length) / 2.84),
+          truncated,
           ttfc_ms: firstChunkAt > 0 ? r2(firstChunkAt - sendStart) : null,
           ttft_ms: firstContentAt > 0 ? r2(firstContentAt - sendStart) : null,
           ttfr_ms: firstReasoningAt > 0 ? r2(firstReasoningAt - sendStart) : null,
@@ -528,10 +778,22 @@ export function useAiSend() {
           fullReasoning,
           chunkCount,
         });
+        // The change is home by now, so the figure is final. A failure here
+        // is a missing cost label, never a lost message: the send already
+        // happened and the sweep chases anything the node still holds.
+        costSats = await costPromise?.catch(() => undefined);
+
         if (finalizePayload) {
+          // One atomic write, cost included. The cost is exact and already
+          // known — `sendMessage` returns what the node took (the token we
+          // minted minus the change it returned), and the change header
+          // arrives before the first chunk — so there is nothing to stamp on
+          // afterwards. That second write was only ever needed because the old
+          // figure came from a balance re-read that had to wait for the stream.
           finalizeAssistantMessage(assistantMessageId, {
             ...finalizePayload,
             thinkingDurationSec: thinkingSec,
+            ...(costSats != null && costSats > 0 ? { costSats } : {}),
           });
         }
         aiLog.info('ai.send.assistant_finalized', {
@@ -542,82 +804,35 @@ export function useAiSend() {
 
         if (!isAnonymous) updateCurrentSessionTitle();
 
-        // Balance refresh runs detached. We use the diff (before − after) to
-        // stamp `costSats` on the just-finalised message — works for both
-        // the initial send and retries because each retry has its own
-        // pre-call balance snapshot.
-        const balanceStart = performance.now();
         // Snapshot what the affordability gate predicted for the model we
-        // actually used, so the post-stream log can quote both numbers.
+        // actually used, so this log can quote both numbers.
         const predicted = getAffordabilityDetails(modelToUse, balanceSats, cachedModels);
         const usedModelCatalogEntry = cachedModels.find((m) => m.id === modelToUse) ?? null;
-        // Track this flow's balance promise so the next streamIntoPlaceholder
-        // call awaits it before snapshotting balanceBeforeMsats — without that
-        // a retry tap during balance refresh re-uses the stale store balance
-        // and double-counts the cost diff.
-        const balanceKey = useRoutstrStore.getState().apiKey;
-        if (!balanceKey) return;
-        const balancePromise = checkBalance(balanceKey, { signal: controller.signal })
-          .then((data) => {
-            if (useProfileStore.getState().activeAccountIndex !== profile) return;
-            if (controller.signal.aborted) return;
-            setBalance(data.balance);
-            const costMsats = balanceBeforeMsats - data.balance;
-            const costSats = costMsats > 0 ? Math.ceil(costMsats / 1000) : undefined;
-            if (costSats != null && finalizePayload) {
-              finalizeAssistantMessage(assistantMessageId, {
-                ...finalizePayload,
-                thinkingDurationSec: thinkingSec,
-                costSats,
-              });
-            }
-            aiLog.info('ai.balance.refresh', {
-              flowId,
-              duration_ms: r2(performance.now() - balanceStart),
-              balance_msats: data.balance,
-              balance_sats: Math.floor(data.balance / 1000),
-              costSats: costSats ?? null,
-            });
-            // Predicted-vs-actual reconciliation. This is the log that
-            // proves the "Top up X sats" indicator is over-conservative
-            // when actual cost is much lower than the buffered threshold.
-            const predictedCeilingSats = predicted.bufferedThresholdSats;
-            const ratio =
-              predictedCeilingSats != null && costSats != null && costSats > 0
-                ? r2(predictedCeilingSats / costSats)
-                : null;
-            aiLog.info('ai.send.actual_cost', {
-              flowId,
-              modelUsed: modelToUse,
-              tier: tier.id,
-              provider: provider.id,
-              actualCostMsats: costMsats,
-              actualCostSats: costSats ?? 0,
-              // New realistic estimate (what `canAffordModel` now gates on).
-              predicted_estimated_turn_sats: predicted.estimatedTurnCostSats,
-              // Raw catalog ceiling, kept so we can keep watching the
-              // estimate-vs-worst-case spread over time.
-              predicted_max_cost_sats: predicted.maxCostSats,
-              predicted_buffered_threshold_sats: predictedCeilingSats,
-              predicted_affordable: predicted.affordable,
-              predicted_deficit_sats: predicted.deficitSats,
-              balance_before_msats: balanceBeforeMsats,
-              balance_before_sats: Math.floor(balanceBeforeMsats / 1000),
-              balance_after_msats: data.balance,
-              balance_after_sats: Math.floor(data.balance / 1000),
-              // ratio = how many times larger the buffered threshold is
-              // than reality. We want this near 1; the previous max_cost
-              // gate was producing 100× ratios for chat turns.
-              predicted_to_actual_ratio: ratio,
-              catalog_sats_pricing: usedModelCatalogEntry?.sats_pricing ?? null,
-              catalog_context_length: usedModelCatalogEntry?.context_length ?? null,
-            });
-          })
-          .catch((err) => {
-            if (isAbortError(err)) return;
-            aiLog.warn('ai.send.balance_refresh_failed', { flowId });
-          });
-        balancePromiseRef.current = balancePromise;
+        const predictedCeilingSats = predicted.bufferedThresholdSats;
+        aiLog.info('ai.send.actual_cost', {
+          flowId,
+          modelUsed: modelToUse,
+          tier: tier.id,
+          provider: provider.id,
+          actualCostSats: costSats ?? 0,
+          // What the sheet promised, beside what it cost. Before this, the
+          // figure the user approved existed nowhere but on screen, which is
+          // why a 30x overstatement took a device report to find rather than
+          // a log read.
+          shownSats,
+          predicted_estimated_turn_sats: predicted.estimatedTurnCostSats,
+          predicted_max_cost_sats: predicted.maxCostSats,
+          predicted_buffered_threshold_sats: predictedCeilingSats,
+          // ratio = how many times larger the gate is than reality. Now that
+          // the gate is what we actually LOCK for the request, a large ratio
+          // is money held needlessly, not just a pessimistic label.
+          predicted_to_actual_ratio:
+            predictedCeilingSats != null && costSats != null && costSats > 0
+              ? r2(predictedCeilingSats / costSats)
+              : null,
+          catalog_sats_pricing: usedModelCatalogEntry?.sats_pricing ?? null,
+          catalog_context_length: usedModelCatalogEntry?.context_length ?? null,
+        });
 
         span.end({ outcome: 'ok', chunks: chunkCount, chars: fullContent.length });
       } catch (err: any) {
@@ -634,11 +849,25 @@ export function useAiSend() {
           type: err?.error?.type,
         });
         span.end({ outcome: 'error', status: err?.status });
-        // Drop the placeholder on failure so the chat list doesn't show an
-        // empty bubble. The active path re-derives to the previous leaf.
-        removeMessages(new Set([assistantMessageId]));
 
-        if (err?.status === 402) {
+        // The placeholder STAYS. A failed turn used to be deleted and
+        // announced by a toast somewhere else on screen, which left the user
+        // looking at their own question with nothing to press and no record
+        // of what happened. Its bubble now renders an error pill in place of
+        // the answer, carrying the actions this particular failure admits —
+        // see `chatErrorActions`.
+        const presentation = describeError(err, 'routstr');
+
+        // A 402 is only OUR problem when routstr raised it about this key's
+        // balance. The node forwards an upstream provider's error body verbatim
+        // under the provider's status, so an upstream 402 is indistinguishable
+        // by status alone — and sending the user to top up a wallet that is
+        // already funded cannot clear it. `describeError` makes that same
+        // distinction (`routstr.balance` vs `routstr.provider_declined`); what
+        // the markers add here is the exact shortfall, which no catalogue copy
+        // can carry.
+        let detail: string | undefined;
+        if (isWalletBalanceError(err)) {
           const requiredMsats = err?.error?.details?.required as number | undefined;
           const availableMsats = err?.error?.details?.available as number | undefined;
           const requiredSats = requiredMsats != null ? Math.ceil(requiredMsats / 1000) : null;
@@ -647,101 +876,193 @@ export function useAiSend() {
           // Exact shortfall straight from the server's 402 details (msats):
           // the one number guaranteed to unlock this model, vs. re-deriving
           // it from pricing that may have drifted since the catalog fetch.
+          // Our own arithmetic over structured fields — never their prose.
           const shortfallSats =
             requiredMsats != null && availableMsats != null
               ? Math.max(1, Math.ceil((requiredMsats - availableMsats) / 1000))
               : null;
-          const detail =
+          detail =
             requiredSats != null && availableSats != null
-              ? `${friendlyName} needs ${requiredSats} sats reserved; you have ${availableSats}. Top up at least ${shortfallSats} sats.`
-              : `${friendlyName} costs more than your current balance.`;
-          actionMenuPopup({
-            title: 'Insufficient balance',
-            buttons: [
-              {
-                testID: 'ai-insufficient-balance-auto',
-                text: 'Switch to Auto',
-                description: detail,
-                icon: AUTO_ICON,
-                onPress: (close) => {
-                  // Drop to the cheapest tier on the user's currently
-                  // selected provider — we keep their provider choice so
-                  // a Claude user doesn't unexpectedly land on OpenAI just
-                  // because the request 402'd.
-                  setSelectedSlot({
-                    provider: provider.id,
-                    tier: 'auto',
-                  });
-                  paramPopup('model-switched', { modelName: `${provider.label} Auto` });
-                  close();
-                },
-              },
-              {
-                testID: 'ai-insufficient-balance-topup',
-                text: 'Top up',
-                icon: 'fluent:wallet-20-filled',
-                onPress: (close) => {
-                  close();
-                  navigateToTopUp(pendingUserMessageForTopUp);
-                },
-              },
-            ],
-          });
-        } else {
-          staticPopup('send-message-failed', { failure: { service: 'routstr', error: err } });
+              ? `${friendlyName} reserves ${requiredSats} sats per request; ${availableSats} available. Add at least ${shortfallSats} sats.`
+              : `${friendlyName} reserves more per request than your wallet holds.`;
         }
+        recordTurnError(assistantMessageId, {
+          id: presentation.id,
+          text: presentation.text,
+          ...(detail != null ? { detail } : {}),
+        });
+        aiLog.info('ai.turn_error.shown', {
+          flowId,
+          messageId: assistantMessageId,
+          errorId: presentation.id,
+        });
       } finally {
         clearStreaming();
         setStatus({ isSending: false, streamingMessageId: null });
       }
     },
-    [
-      apiKey,
-      isAnonymous,
-      removeMessages,
-      finalizeAssistantMessage,
-      setBalance,
-      setSelectedSlot,
-      updateCurrentSessionTitle,
-      navigateToTopUp,
-    ]
+    [isAnonymous, removeMessages, finalizeAssistantMessage, updateCurrentSessionTitle, walletSats]
   );
 
   const sendInner = useCallback(
     async (userMessage: string, attachments?: ChatAttachment[]) => {
+      // Every precondition in one place, decided before the optimistic bubbles
+      // go in: declining after them would leave a user message with no answer
+      // and nothing to retry. The gate is pure and exhaustive, so each way a
+      // send can fail to start has a name and its own thing to say — a missing
+      // provider, a mint the provider refuses and a declined confirmation used
+      // to be indistinguishable from outside.
       const trimmed = userMessage.trim();
-      if (!trimmed) return;
-
-      if (!apiKey) {
-        staticPopup('no-api-key');
-        return;
-      }
-
-      if (!isAnonymous && !currentSessionId) {
-        createSession();
-      }
-
-      // Active path determines the parent of the new user message — we
-      // append under whatever branch is currently visible to the user.
-      const stateNow = useRoutstrStore.getState();
-      const activePath = deriveActivePath(stateNow.conversationHistory, stateNow.activeChildren);
-      const tail = activePath[activePath.length - 1];
-      const parentForUser: string | null = tail?.id ?? null;
-
+      const storeNow = useRoutstrStore.getState();
+      const owner = useProfileStore.getState().activeAccountIndex;
+      const quotedFunds = latestFunds.current;
+      const activeProvider = storeNow.userNodeBaseUrl;
+      // Quoted from the same chain the send will walk, refused models last, so
+      // the sheet names the model — and the figure — that actually goes first.
+      const plannedEntry = selectFromChain(
+        availableChain(
+          getProviderById(storeNow.selectedProvider).id,
+          getTierById(storeNow.selectedTier).id,
+          storeNow.lineup ?? storeNow.lastKnownLineup?.lineup ?? null,
+          storeNow.nodeBaseUrl
+        ),
+        walletSats
+      );
       const timestamp = Date.now();
       const userMessageId = `msg-${timestamp}-u`;
       const assistantMessageId = `msg-${timestamp + 1}-a`;
       const flowId = `ai-send-${timestamp}`;
 
-      addMessage({
+      // Assembled BEFORE the gate, because the gate's whole job is now to
+      // quote the node's reservation and the node computes that from this
+      // exact body — messages, images and all. Quoting a typical turn and
+      // sending a real one is how the sheet came to offer "up to 10 sats" for
+      // a send that minted 307. Nothing here spends anything: it is the same
+      // encode the send would have done a moment later, moved in front of the
+      // question it answers.
+      //
+      // `createSession` clears `conversationHistory`, so a send that will
+      // start one has no ancestry — mirrored here rather than run early,
+      // because a declined send must not leave an empty session behind.
+      const willStartNewSession = !isAnonymous && !currentSessionId;
+      const activePath = willStartNewSession
+        ? []
+        : deriveActivePath(storeNow.conversationHistory, storeNow.activeChildren);
+      const parentForUser: string | null = activePath[activePath.length - 1]?.id ?? null;
+      const pendingUserMessage = {
         id: userMessageId,
         parentId: parentForUser,
-        role: 'user',
+        role: 'user' as const,
         content: trimmed,
         timestamp,
-        pending: true,
         ...(attachments && attachments.length > 0 ? { attachments } : {}),
+      };
+      // Assembly (incl. the inline-image window and per-attachment encoding)
+      // is shared with retry via `assembleApiMessages` so the two flows can't
+      // diverge — and now also shared with the quote, so the priced request
+      // and the sent request are the same object.
+      //
+      // Nothing typed is nothing to price, and the encode is the one expensive
+      // step on this path — so a blank send skips it and lets the gate name
+      // the situation it was always going to name.
+      const { messages: apiMessages, imageCount } = trimmed
+        ? await assembleApiMessages([...activePath, pendingUserMessage], encodeChatImage)
+        : { messages: [], imageCount: 0 };
+
+      // The node's admission gate for this body, computed the way the node
+      // computes it. `null` when the model carries no usable pricing, which
+      // the gate turns back into the typical-case estimate and the sheet
+      // labels as one.
+      const plannedMaxTokens = sendMaxTokens(plannedEntry?.maxCompletionTokens);
+      const reservedSats = trimmed
+        ? reservedSatsForSend({
+            entry: plannedEntry,
+            models: storeNow.modelsCache?.data ?? [],
+            messages: apiMessages,
+            maxTokens: plannedMaxTokens,
+          })
+        : null;
+
+      const gate = evaluateSendGate({
+        text: trimmed,
+        providerBaseUrl: activeProvider,
+        providerMints: activeProvider ? (storeNow.knownProviders[activeProvider]?.mints ?? []) : [],
+        heldMints,
+        walletSats,
+        entry: plannedEntry,
+        imageCount: attachments?.length ?? 0,
+        confirmSpend: storeNow.confirmSpend,
+        reservedSats,
       });
+
+      // The figure the user is about to be shown, recorded under the same
+      // flowId as the money that follows it. It used to live only on screen,
+      // which is why a 30x overstatement could only be found by someone
+      // watching their own balance.
+      const shownSats =
+        gate.state === 'confirm' || gate.state === 'ready' ? gate.reserveSats : null;
+      aiLog.info('ai.send.gate', {
+        flowId,
+        state: gate.state,
+        shownSats,
+        reserveKnown: gate.state === 'confirm' || gate.state === 'ready' ? gate.reserveKnown : null,
+        model: plannedEntry?.modelId ?? null,
+        maxTokens: plannedMaxTokens,
+        promptMessages: apiMessages.length,
+        imageParts: imageCount,
+        walletSats,
+      });
+      switch (gate.state) {
+        case 'empty':
+          return;
+        case 'no-provider':
+          // The one refusal with somewhere to go: the list is the answer.
+          staticPopup('ai-no-provider');
+          router.navigate('/(ai-flow)/providers');
+          return;
+        case 'mint-not-accepted':
+          staticPopup('ai-mint-not-accepted');
+          return;
+        case 'insufficient-funds':
+          navigateToAddFunds();
+          return;
+        case 'confirm': {
+          const allowed = await confirmSpend({
+            modelName: gate.modelName,
+            reserveSats: gate.reserveSats,
+            reserveKnown: gate.reserveKnown,
+          });
+          if (!allowed) return;
+          const current = useRoutstrStore.getState();
+          const currentFunds = latestFunds.current;
+          if (
+            useProfileStore.getState().activeAccountIndex !== owner ||
+            current.userNodeBaseUrl !== activeProvider ||
+            current.selectedProvider !== storeNow.selectedProvider ||
+            current.selectedTier !== storeNow.selectedTier ||
+            current.lineup !== storeNow.lineup ||
+            // The conversation itself is now part of the quote: the sheet
+            // priced this tree, so a tree that moved while it was open is a
+            // different request at a different price.
+            current.conversationHistory !== storeNow.conversationHistory ||
+            current.activeChildren !== storeNow.activeChildren ||
+            currentFunds?.mintUrl !== quotedFunds?.mintUrl ||
+            currentFunds?.balanceSats !== quotedFunds?.balanceSats
+          ) {
+            staticPopup('ai-payment-options-changed');
+            return;
+          }
+          break;
+        }
+        case 'ready':
+          break;
+      }
+
+      if (willStartNewSession) {
+        createSession();
+      }
+
+      addMessage({ ...pendingUserMessage, pending: true });
       addMessage({
         id: assistantMessageId,
         parentId: userMessageId,
@@ -750,45 +1071,32 @@ export function useAiSend() {
         timestamp: timestamp + 1,
       });
 
-      // Build context = active path + just-added user message. We read the
-      // freshly-added messages via the active path because the store has
-      // already absorbed them. Assembly (incl. the inline-image window and
-      // per-attachment encoding) is shared with retry via
-      // `assembleApiMessages` so the two flows can't diverge.
-      const stateAfter = useRoutstrStore.getState();
-      const path = deriveActivePath(
-        stateAfter.conversationHistory,
-        stateAfter.activeChildren
-      ).filter((m) => m.id !== assistantMessageId);
-      const { messages: apiMessages, imageCount } = await assembleApiMessages(
-        path,
-        encodeChatImage
-      );
-
       try {
         await streamIntoPlaceholder({
           assistantMessageId,
           apiMessages,
           imageCount,
           flowId,
-          pendingUserMessageForTopUp: trimmed,
+          shownSats,
         });
       } finally {
         // The user message's optimistic spinner clears the moment the
         // streaming round-trip resolves — success or error, the request
-        // left our hands. Errors surface via the assistant placeholder /
-        // popup, not the user bubble's check.
+        // left our hands. Errors surface as a pill on the assistant
+        // placeholder, not on the user bubble's check.
         setMessagePending(userMessageId, false);
       }
     },
     [
-      apiKey,
       isAnonymous,
       currentSessionId,
       createSession,
       addMessage,
       setMessagePending,
       streamIntoPlaceholder,
+      walletSats,
+      heldMints,
+      latestFunds,
     ]
   );
 
@@ -808,10 +1116,6 @@ export function useAiSend() {
    */
   const retryInner = useCallback(
     async (messageId: string) => {
-      if (!apiKey) {
-        staticPopup('no-api-key');
-        return;
-      }
       const stateNow = useRoutstrStore.getState();
       const original = stateNow.conversationHistory.find((m) => m.id === messageId);
       if (!original || original.role !== 'assistant') {
@@ -852,20 +1156,15 @@ export function useAiSend() {
         setActiveBranch(parentId, newAssistantId);
       }
 
-      // The user message that prompted this exchange — used as the "pending
-      // message" if the retry hits a 402 and we need to surface a top-up.
-      const lastUserContent = ancestors.filter((m) => m.role === 'user').pop()?.content ?? '';
-
       await streamIntoPlaceholder({
         assistantMessageId: newAssistantId,
         apiMessages,
         imageCount,
         flowId,
         retriedFromMessageId: messageId,
-        pendingUserMessageForTopUp: lastUserContent,
       });
     },
-    [apiKey, addMessage, setActiveBranch, streamIntoPlaceholder]
+    [addMessage, setActiveBranch, streamIntoPlaceholder]
   );
 
   // Retry shares the double-tap exposure with `send`: a rapid tap on the

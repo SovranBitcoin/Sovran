@@ -76,6 +76,7 @@ type PopupStore = {
   /** Like close(), but also sets `destroyed` so PopupHost unmounts the BottomSheet (and its FullWindowOverlay). */
   destroySheet: () => void;
   update: (partial: Partial<StandardSheetPayload>) => void;
+  updateActionMenu: (expectedSeq: number, payload: ActionSheetPayloads['action-menu']) => void;
 };
 
 export const usePopupStore = create<PopupStore>((set, get) => {
@@ -113,6 +114,17 @@ export const usePopupStore = create<PopupStore>((set, get) => {
       if (!current || isCustomSheetPayload(current)) return;
       storeLog.debug('store.popup.update');
       set({ current: { ...current, ...partial } });
+    },
+    updateActionMenu: (expectedSeq, payload) => {
+      const { current, openSeq, isOpen } = get();
+      if (
+        !isOpen ||
+        openSeq !== expectedSeq ||
+        !isCustomSheetPayload(current) ||
+        current.sheetId !== 'action-menu'
+      )
+        return;
+      set({ current: { sheetId: 'action-menu', payload } });
     },
     close: (expectedSeq?: number) => {
       if (expectedSeq != null && expectedSeq !== get().openSeq) {

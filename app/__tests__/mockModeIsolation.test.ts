@@ -202,7 +202,14 @@ const mockDmReader = jest.fn((..._args: unknown[]) => ({
 jest.mock('@/features/payments/hooks/useDmConversations', () => ({
   useDmConversations: (...args: unknown[]) => mockDmReader(...args),
 }));
-jest.mock('wallet', () => ({ getCounterparty: () => null }));
+jest.mock('wallet', () => ({
+  getCounterparty: () => null,
+  // The fixtures annotate a grouped AI request. Nothing in THIS file reads
+  // that annotation back — it is about mock-mode isolation of contacts and
+  // profiles — so the encoder only has to exist. `annotations` owns its wire
+  // format and its own tests.
+  encodeAnnotation: () => ({}),
+}));
 const mockRecentEntries = [{ pubkey: 'cd'.repeat(32), reason: 'search', lastOpenedAt: 100 }];
 jest.mock('@/shared/stores/profile/recentPeopleStore', () => ({
   useRecentPeopleStore: (selector: (s: unknown) => unknown) =>

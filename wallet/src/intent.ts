@@ -186,7 +186,15 @@ export function resolveIntent(
   }
 
   if (parsed.type === "npub" && parsed.npub) {
-    const intent: ResolvedIntent = { type: "openProfile", npub: parsed.npub };
+    // `parsed.nostr` is set by every path that produces an npub; fall back to
+    // the bech32 alone so an older caller's ParsedPaymentInput still resolves.
+    const identity = parsed.nostr;
+    const intent: ResolvedIntent = {
+      type: "openProfile",
+      npub: parsed.npub,
+      pubkeyHex: identity?.pubkeyHex ?? "",
+      ...(identity?.p2pkPubkey ? { p2pkPubkey: identity.p2pkPubkey } : {}),
+    };
     logger.info("intent.resolve.result", {
       intentType: intent.type,
       ...summarizeIntent(intent),

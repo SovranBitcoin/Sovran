@@ -1,0 +1,317 @@
+/**
+ * @jest-environment node
+ *
+ * What the provider details page shows before it knows anything.
+ *
+ * It used to show nothing: the accepted-mint list and the model summary are
+ * both network reads, and both sections were gated on their own data, so the
+ * page opened as a name and an address and then grew two whole sections under
+ * the reader's thumb. A placeholder is only worth having if it is the same
+ * shape as what replaces it, so these assert the counts and the slots — two
+ * mint rows, the two model rows the section always has, and one description
+ * line — rather than the fact that "a skeleton rendered".
+ *
+ * The catalog read is the one with a third outcome. A provider that refuses
+ * `/v1/models` never sends a summary, and a placeholder that waits forever is
+ * worse than none at all, so the skeleton ends on the failure too.
+ *
+ * The 2x2 stats grid is the strictest case: it is the block that decides the
+ * page, it is fed by BOTH reads, and it is mounted in every state — loading,
+ * answered and never-answering — so that nothing under it moves. Its slot is
+ * asserted in all three.
+ */
+
+import React from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
+
+import { ProviderInfoScreen } from '@/features/ai/screens/ProviderInfoScreen';
+import { fetchNodeInfo, fetchProviderModelSummary } from '@/shared/lib/routstr/providers';
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const NODE = 'https://ai.redsh1ft.com';
+
+jest.mock('expo-router', () => ({ Stack: { Screen: 'StackScreen' } }));
+jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(async () => true) }));
+jest.mock('react-native-reanimated', () => ({
+  __esModule: true,
+  default: { View: 'AnimatedView' },
+}));
+jest.mock('heroui-native', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  // A string cannot carry the compound statics (`Object.assign('x', …)` boxes
+  // it), so each slot is a component that renders a host node of its own name.
+  const host = (name: string) => {
+    const Host = (props: Record<string, unknown>) => ReactActual.createElement(name, props);
+    Host.displayName = name;
+    return Host;
+  };
+  return {
+    ListGroup: Object.assign(host('ListGroup'), {
+      Item: host('ListGroupItem'),
+      ItemContent: host('ListGroupItemContent'),
+      ItemTitle: host('ListGroupItemTitle'),
+      ItemDescription: host('ListGroupItemDescription'),
+    }),
+    PressableFeedback: Object.assign(host('PressableFeedback'), {
+      Scale: host('PressableFeedbackScale'),
+      Ripple: host('PressableFeedbackRipple'),
+    }),
+  };
+});
+
+jest.mock('@/assets/icons', () => ({ __esModule: true, default: 'Icon' }), { virtual: true });
+jest.mock('@/shared/hooks/useGuardedRouter', () => ({
+  guardedRouter: { back: jest.fn(), push: jest.fn(), navigate: jest.fn() },
+}));
+jest.mock('@/shared/hooks/useThemeColor', () => ({
+  useThemeColor: (tokens: string | readonly string[]) =>
+    Array.isArray(tokens) ? tokens.map((token) => `theme-${token}`) : 'theme',
+}));
+// The stats grid tints its own labels, and `withAlpha` validates the hex it is
+// handed — which a `theme-*` sentinel is not. Colour arithmetic is not what
+// this file asserts, so it is stubbed rather than fed real hex.
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: jest.fn(() => 'rgba(0,0,0,0.12)'),
+}));
+// `storeLog` as well as `aiLog`: this screen's import graph reaches
+// `routstrStore`, and zustand's rehydrate lands asynchronously — so a mock
+// with only the logger the screen itself uses crashes in persist's teardown,
+// at whatever moment the rehydrate happens to resolve.
+jest.mock('@/shared/lib/logger', () => {
+  const logger = { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() };
+  return { aiLog: logger, storeLog: logger, redactError: (error: unknown) => error };
+});
+jest.mock('@/shared/lib/popup', () => ({ paramPopup: jest.fn(), staticPopup: jest.fn() }));
+jest.mock('@/shared/lib/nav/useRouteParams', () => ({
+  useRouteParams: () => ({ providerInfoEntry: JSON.stringify({ nodeBaseUrl: NODE }) }),
+}));
+jest.mock('@/shared/lib/nav/profileRoutes', () => ({ buildModalProfileHref: () => '/profile' }));
+jest.mock('@/shared/lib/routstr/reclaim', () => ({ reclaimRoutstrBalances: jest.fn() }));
+jest.mock('@/shared/lib/routstr/providers', () => ({
+  fetchNodeInfo: jest.fn(),
+  fetchProviderModelSummary: jest.fn(),
+  normalizeNodeUrl: (url: string) => url.trim().replace(/\/+$/, ''),
+}));
+jest.mock('@/shared/lib/routstr/providerHealth', () => ({
+  cachedProbe: () => undefined,
+  probeProviders: jest.fn(async () => {}),
+}));
+jest.mock('@cashu/coco-react', () => ({ useBalanceContext: () => ({ balances: { byMint: {} } }) }));
+jest.mock('@/shared/lib/cashu/amount', () => ({ amountToNumber: () => 0 }));
+jest.mock('@/shared/ui/composed/IdentityHeader', () => ({
+  useIdentityHeader: () => ({
+    scrollY: { value: 0 },
+    headerBand: null,
+    headerTitle: () => null,
+    contentStyle: {},
+    probe: null,
+  }),
+}));
+jest.mock('@/shared/hooks/useNostrProfile', () => ({
+  useNostrProfile: () => ({ data: null, isLoading: false }),
+}));
+jest.mock('@/shared/ui/composed/ContactRow', () => ({
+  ContactRow: 'ContactRow',
+  nostrIdentity: (pubkey: string) => ({ pubkey }),
+}));
+jest.mock('@/features/ai/components/ProviderAvatar', () => ({ ProviderAvatar: 'ProviderAvatar' }));
+jest.mock('@/features/ai/components/ProviderMintRow', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  return {
+    ProviderMintRow: (props: { mintUrl: string; loading?: boolean }) =>
+      ReactActual.createElement('ProviderMintRow', props),
+  };
+});
+jest.mock('@/shared/stores/profile/routstrStore', () => ({
+  useRoutstrStore: Object.assign(
+    (selector: (s: Record<string, unknown>) => unknown) =>
+      selector({ userNodeBaseUrl: null, legacyAccounts: {}, knownProviders: {} }),
+    { getState: () => ({ rememberProviders: jest.fn(), setUserNode: jest.fn() }) }
+  ),
+}));
+jest.mock('@/shared/ui/composed/BottomButtons', () => ({ BottomButtons: 'BottomButtons' }));
+jest.mock('@/shared/ui/composed/ButtonHandler', () => ({ ButtonHandler: 'ButtonHandler' }));
+jest.mock('@/shared/ui/composed/Notice', () => ({ Notice: 'Notice' }));
+jest.mock('@/shared/ui/composed/Screen', () => ({ Screen: 'Screen' }));
+jest.mock('@/shared/ui/composed/Section', () => ({ Section: 'Section' }));
+jest.mock('@/shared/ui/primitives/View/Spacer', () => ({ Spacer: 'Spacer' }));
+jest.mock('@/shared/ui/primitives/View/VStack', () => ({ VStack: 'VStack' }));
+jest.mock('@/shared/ui/primitives/Text', () => ({ Text: 'Text' }));
+// The crossfade's whole contract here is which branch it renders; the fade
+// itself is Reanimated's business and has its own tests.
+jest.mock('@/shared/ui/composed/SkeletonContentCrossfade', () => ({
+  SkeletonContentCrossfade: ({
+    loading,
+    renderSkeleton,
+    renderContent,
+  }: {
+    loading: boolean;
+    renderSkeleton: () => React.ReactNode;
+    renderContent: () => React.ReactNode;
+  }) => (loading ? renderSkeleton() : renderContent()),
+}));
+
+type Node = { type: unknown; props: Record<string, unknown> };
+
+/** Host nodes only: a mocked component and the host it renders both carry the
+ *  same props, and counting both would double every row. */
+const countOf = (renderer: TestRenderer.ReactTestRenderer, type: string, loading: boolean) =>
+  renderer.root.findAll(
+    (node) => (node as unknown as Node).type === type && (node.props.loading === true) === loading,
+    { deep: true }
+  ).length;
+
+/**
+ * How many ELEMENTS carry this testID — not how many nodes do.
+ *
+ * A component and the host it renders both carry the same props, so the naive
+ * walk double-counts. Filtering to host nodes was the old fix and it silently
+ * excluded React Native's own `View`, which is a forwardRef object rendering a
+ * host of its own — so a slot built from one read as absent. Keeping only the
+ * innermost match of each pair counts either shape exactly once.
+ */
+const hasTestID = (renderer: TestRenderer.ReactTestRenderer, testID: string) => {
+  const matches = renderer.root.findAll((node) => node.props?.testID === testID, { deep: true });
+  return matches.filter((node) => !matches.some((other) => other.parent === node)).length;
+};
+
+async function open() {
+  let renderer!: TestRenderer.ReactTestRenderer;
+  await act(async () => {
+    renderer = TestRenderer.create(React.createElement(ProviderInfoScreen));
+  });
+  return renderer;
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+
+describe('the provider details page while it is still asking', () => {
+  it('reserves the stats grid, the privacy notice, the mint list and the description', async () => {
+    // Neither read ever answers, so this is the page at its emptiest.
+    jest.mocked(fetchNodeInfo).mockReturnValue(new Promise(() => {}));
+    jest.mocked(fetchProviderModelSummary).mockReturnValue(new Promise(() => {}));
+
+    const renderer = await open();
+
+    // The grid's slot is mounted whatever either read is doing — it holds the
+    // four facts that decide the page, so it is the block that must not
+    // arrive from nowhere and shove everything under it down.
+    expect(hasTestID(renderer, 'ai-provider-info-stats')).toBe(1);
+    expect(countOf(renderer, 'ProviderMintRow', true)).toBe(2);
+    expect(hasTestID(renderer, 'ai-provider-info-description-skeleton')).toBe(1);
+    // The privacy verdict is the loudest thing on the page and the one most
+    // likely to be read under a thumb, so its slot is held rather than the
+    // notice arriving and pushing the grid down.
+    expect(hasTestID(renderer, 'ai-provider-info-privacy')).toBe(1);
+    act(() => renderer.unmount());
+  });
+
+  it('swaps the placeholder rows for the real ones, one for one', async () => {
+    jest.mocked(fetchNodeInfo).mockResolvedValue({
+      name: 'redsh1ft',
+      description: 'A node serving frontier models',
+      mints: ['https://mint.minibits.cash/Bitcoin', 'https://mint.sovran.money'],
+    });
+    jest
+      .mocked(fetchProviderModelSummary)
+      .mockResolvedValue({ count: 582, encrypted: 9, e2ee: true });
+
+    const renderer = await open();
+
+    expect(countOf(renderer, 'ProviderMintRow', true)).toBe(0);
+    expect(countOf(renderer, 'ProviderMintRow', false)).toBe(2);
+    expect(hasTestID(renderer, 'ai-provider-info-description-skeleton')).toBe(0);
+    // Same slots, all the way through — never unmounted, never remounted.
+    expect(hasTestID(renderer, 'ai-provider-info-stats')).toBe(1);
+    expect(hasTestID(renderer, 'ai-provider-info-privacy')).toBe(1);
+    act(() => renderer.unmount());
+  });
+
+  it('stops waiting when the catalog is never going to answer', async () => {
+    jest.mocked(fetchNodeInfo).mockResolvedValue(null);
+    // An older node that does not serve `/v1/models` at all.
+    jest.mocked(fetchProviderModelSummary).mockResolvedValue(null);
+
+    const renderer = await open();
+
+    expect(countOf(renderer, 'ProviderMintRow', true)).toBe(0);
+    // The grid stays, and says so in dashes: a read that will never answer is
+    // "nobody counted", which is not the same claim as a zero.
+    expect(hasTestID(renderer, 'ai-provider-info-stats')).toBe(1);
+    act(() => renderer.unmount());
+  });
+});
+
+/**
+ * Who can read what the user is about to type.
+ *
+ * Four answers, and the difference between them is the reason the page
+ * exists. A shield with a count next to it cannot carry any of this: "9
+ * sealed" reads as reassurance on a node where 573 models are in the clear,
+ * which is the easiest state on this page to misread and the one with the
+ * most at stake.
+ */
+describe('the privacy verdict', () => {
+  const notices = (renderer: TestRenderer.ReactTestRenderer) =>
+    renderer.root
+      .findAll((node) => (node as unknown as Node).type === 'Notice', { deep: true })
+      .map((node) => ({
+        status: node.props.status as string,
+        title: node.props.title as string | undefined,
+      }));
+
+  const verdict = async (catalog: { count: number; encrypted: number; e2ee: boolean } | null) => {
+    jest.mocked(fetchNodeInfo).mockResolvedValue({ name: 'redsh1ft', mints: [] });
+    jest.mocked(fetchProviderModelSummary).mockResolvedValue(catalog);
+    const renderer = await open();
+    const found = notices(renderer).find(
+      (notice) =>
+        notice.title?.includes('read your messages') ||
+        notice.title?.includes('read some messages') ||
+        notice.title === 'Privacy not known'
+    );
+    act(() => renderer.unmount());
+    return found;
+  };
+
+  it('warns plainly when nothing is sealed', async () => {
+    expect(await verdict({ count: 582, encrypted: 0, e2ee: false })).toEqual({
+      status: 'warning',
+      title: 'This provider can read your messages',
+    });
+  });
+
+  it('adapts the warning when only some models are sealed', async () => {
+    // Still a warning. Nine sealed models do not make the other 573 private,
+    // and this is the state a green shield flatters.
+    expect(await verdict({ count: 582, encrypted: 9, e2ee: true })).toEqual({
+      status: 'warning',
+      title: 'This provider can read some messages',
+    });
+  });
+
+  it('says so positively, in green, when every model is sealed', async () => {
+    // `success`, not `info`. The absence of a warning is not the same claim
+    // as "it cannot read them", and a quiet notice says the first.
+    expect(await verdict({ count: 9, encrypted: 9, e2ee: true })).toEqual({
+      status: 'success',
+      title: 'This provider cannot read your messages',
+    });
+  });
+
+  it('claims nothing when the catalog never answered', async () => {
+    // The loudest wrong answer available here is a reassuring one.
+    expect(await verdict(null)).toEqual({ status: 'info', title: 'Privacy not known' });
+  });
+
+  it('claims nothing for a provider serving no models at all', async () => {
+    expect(await verdict({ count: 0, encrypted: 0, e2ee: false })).toEqual({
+      status: 'info',
+      title: 'Privacy not known',
+    });
+  });
+});

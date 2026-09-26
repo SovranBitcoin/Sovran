@@ -43,6 +43,7 @@ import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { publishEvent } from '@/shared/lib/nostr/publish';
 import { Notice } from '@/shared/ui/composed/Notice';
 import { Section } from '@/shared/ui/composed/Section';
+import { OperatorRunsSection } from '@/shared/blocks/OperatorRunsSection';
 import Icon, { CurrencyIcon } from '@/assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { truncateMiddle } from '@/shared/lib/strings';
@@ -54,6 +55,7 @@ import { SkeletonLoadingShimmer } from '@/shared/ui/composed/SkeletonExitShimmer
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { LightningAddress } from '@sovranbitcoin/schemas';
 import { getNpcAddress } from '@/shared/lib/cashu/npc';
+import { prefetchNutzapProfile } from '@/shared/lib/nostr/nutzapProfileDiscovery';
 import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { usePaymentFlowMachine } from 'wallet/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
@@ -348,12 +350,7 @@ function ProfileStatsGrid({
           <Text bold size={12} style={{ color: withAlpha(foreground, 0.66), marginBottom: 4 }}>
             {stat.label.toUpperCase()}
           </Text>
-          <Text
-            loading={stat.valueLoading}
-            placeholder="1,234"
-            bold
-            size={20}
-            style={{ color: foreground, marginBottom: 2 }}>
+          <Text bold size={20} style={{ color: foreground, marginBottom: 2 }}>
             {stat.value}
           </Text>
           <Text bold size={12} style={{ color: withAlpha(foreground, 0.5), opacity: 0.8 }}>
@@ -364,16 +361,19 @@ function ProfileStatsGrid({
     </View>
   );
 
-  // Settled with nothing reliable to show — relay-only mode can't fetch
-  // follower/following counts (a reverse index relays don't have) or the
-  // joined date. Render no grid rather than misleading "0 / 0".
-  if (!isLoading && !hasValidData) return null;
+  // Settled with nothing reliable to show (relay-only mode has no reverse
+  // index for followers and no joined date): the grid stays, its values are
+  // dashes. Unmounting it here moved everything below by a hundred points.
 
   // Reputation is not a number here any more — it is the tier ring around the
   // avatar. One row in both branches (SkeletonContentCrossfade): the skeleton
   // is the same two placeholder pills, so the swap to content shifts nothing.
+  // A pill whose count is still being completed is a whole skeleton pill, not
+  // a card with a bar where the number goes.
   const renderRow = (loading: boolean) => (
-    <View style={styles.statsRow}>{stats.map((stat) => renderStatCard(stat, loading))}</View>
+    <View style={styles.statsRow}>
+      {stats.map((stat) => renderStatCard(stat, loading || stat.valueLoading))}
+    </View>
   );
   return (
     <VisualLayoutProbe
@@ -858,6 +858,7 @@ function BannerWithAvatar({
                 placeholder="Display Name"
                 bold
                 size={22}
+                numberOfLines={1}
                 style={{
                   color: foreground,
                   includeFontPadding: false,
@@ -900,20 +901,33 @@ function BannerWithAvatar({
                 testID="profile-follow-button"
               />
             ))}
-          {onEditProfile && !isLoading && (
-            <CapsuleButton
-              label="Edit profile"
-              icon="mdi:pencil"
-              systemIcon="pencil"
-              onPress={onEditProfile}
-              fitContent
-              height={34}
-              iconSize={15}
-              textSize={13}
-              style={styles.followCapsule}
-              testID="profile-edit-button"
-            />
-          )}
+          {onEditProfile &&
+            (isLoading ? (
+              // Same box as the follow skeleton: the button lands in place
+              // instead of appearing under the name once the profile loads.
+              <View
+                style={[
+                  styles.followButton,
+                  {
+                    backgroundColor: withAlpha(foreground, SKELETON_FILL_ALPHA),
+                    borderColor: 'transparent',
+                  },
+                ]}
+              />
+            ) : (
+              <CapsuleButton
+                label="Edit profile"
+                icon="mdi:pencil"
+                systemIcon="pencil"
+                onPress={onEditProfile}
+                fitContent
+                height={34}
+                iconSize={15}
+                textSize={13}
+                style={styles.followCapsule}
+                testID="profile-edit-button"
+              />
+            ))}
           {isLoading && <SkeletonLoadingShimmer active />}
         </View>
 
@@ -1196,6 +1210,9 @@ export function UserProfileScreen() {
       return;
     }
     clearPaymentContext('user.profile.send_money');
+    // Start the lock-target lookup now, so the amount screen's "Lock Ecash"
+    // option is decided before the user gets there.
+    prefetchNutzapProfile(pubkey);
     paymentLog.info('user.profile.send_money.start', {
       recipientPubkeyLength: pubkey.length,
       meltTargetLength: meltTarget.length,
@@ -1575,19 +1592,33 @@ export function UserProfileScreen() {
 
               <Spacer size={16} />
 
+              {/* The bio, in a two-line card that is there from the first
+                  frame: placeholder bars while the kind-0 is out, the text
+                  once it lands, a quiet line when there is none. Longer bios
+                  fold behind "Show more" so the card never grows. It sits
+                  above the follower grid because the grid is the one block on
+                  this header whose height depends on what comes back. */}
+              <View style={{ paddingHorizontal: 16 }}>
+                <Notice
+                  status="info"
+                  icon="ri:user-3-line"
+                  loading={isMetadataLoading && !cachedProfile}
+                  reserveLines={2}
+                  collapseLines={2}
+                  description={
+                    cachedProfile?.about?.trim() ? cachedProfile.about : 'Has not written a bio.'
+                  }
+                  testID="profile-about"
+                />
+                <Spacer size={16} />
+              </View>
+
               {/* Top Followers */}
               <TopFollowers
                 topFollowers={profileData?.topFollowers || []}
                 isLoading={isProfileApiLoading}
                 visualScope={profileHeaderVisualScope}
               />
-
-              {cachedProfile?.about && (
-                <View style={{ paddingHorizontal: 16 }}>
-                  <Notice status="info" icon="ri:user-3-line" description={cachedProfile.about} />
-                  <Spacer size={16} />
-                </View>
-              )}
 
               {/* Profile Info Section */}
               <View style={{ paddingHorizontal: 16 }}>
@@ -1617,6 +1648,7 @@ export function UserProfileScreen() {
                     ))}
                   </ListGroup>
                 </Section>
+                <OperatorRunsSection pubkey={pubkey} title="Runs" testID="profile-operator-runs" />
               </View>
 
               <Spacer size={8} />

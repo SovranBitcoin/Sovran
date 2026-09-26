@@ -6,7 +6,7 @@ describe('backend config', () => {
       nostrAppViewBaseUrl: 'https://nagg.up.railway.app',
       scoreApiBaseUrl: 'https://nagg.up.railway.app',
       nostrGraphqlEndpoint: 'https://nagg.up.railway.app/graphql',
-      primalCacheUrl: 'wss://cache2.primal.net/v1',
+      primalCacheUrls: ['wss://cache1.primal.net/v1', 'wss://cache2.primal.net/v1'],
     });
   });
 
@@ -21,7 +21,7 @@ describe('backend config', () => {
       nostrAppViewBaseUrl: 'http://localhost:8080',
       scoreApiBaseUrl: 'http://localhost:8080',
       nostrGraphqlEndpoint: 'http://localhost:8081/graphql',
-      primalCacheUrl: 'wss://cache2.primal.net/v1',
+      primalCacheUrls: ['wss://cache1.primal.net/v1', 'wss://cache2.primal.net/v1'],
     });
   });
 
@@ -44,12 +44,25 @@ describe('backend config', () => {
     ).toBe('https://nostr-index.example.test');
   });
 
-  it('defaults the Primal cache URL and honors an override', () => {
-    expect(parseBackendConfig({}).primalCacheUrl).toBe('wss://cache2.primal.net/v1');
+  it('defaults the Primal cache URLs and honors an override', () => {
+    // A list, tried in order: cache1 first because cache2 was the host that went
+    // down on 2026-09-24 while cache1 kept serving.
+    expect(parseBackendConfig({}).primalCacheUrls).toEqual([
+      'wss://cache1.primal.net/v1',
+      'wss://cache2.primal.net/v1',
+    ]);
     expect(
       parseBackendConfig({ EXPO_PUBLIC_PRIMAL_CACHE_URL: 'wss://my-cache.example/v1' })
-        .primalCacheUrl
-    ).toBe('wss://my-cache.example/v1');
+        .primalCacheUrls
+    ).toEqual(['wss://my-cache.example/v1']);
+  });
+
+  it('splits a comma-separated Primal override into an ordered list', () => {
+    expect(
+      parseBackendConfig({
+        EXPO_PUBLIC_PRIMAL_CACHE_URL: 'wss://a.example/v1, wss://b.example/v1 ,',
+      }).primalCacheUrls
+    ).toEqual(['wss://a.example/v1', 'wss://b.example/v1']);
   });
 
   it('rejects invalid Nostr app-view URLs', () => {

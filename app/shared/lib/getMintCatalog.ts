@@ -31,6 +31,7 @@ import type { MintCatalogEntry } from 'wallet';
 import { projectMintMeta } from '@/features/mint/lib/auditInfo';
 import { fetchNostrProfile } from '@/shared/lib/apiClient';
 import { fetchMintReviews } from '@/shared/lib/nostr/fetchMintReviews';
+import { reviewAggregateOf } from '@/shared/lib/nostr/reviewAggregate';
 import { getDiscoveredMintMetadata } from '@/shared/lib/getDiscoveredMintMetadata';
 import { log, mintUrlLogFields, monotonicNow } from '@/shared/lib/logger';
 import { newReadId, readErrorType, readEvents, readKeyHash } from '@/shared/lib/read/readLog';
@@ -87,10 +88,13 @@ async function resolveNostrProfile(
   mintUrl: string,
   pubkey: string,
   signal?: AbortSignal
-): Promise<{ followers: number; reputation: number | null } | undefined> {
+): Promise<{ followers: number | undefined; reputation: number | null } | undefined> {
   const store = useMintMetadataStore.getState();
   const cached = store.getCached(mintUrl);
-  if (cached?.contactFollowers != null && !store.isStale(mintUrl, 'social')) {
+  if (
+    (cached?.contactFollowers != null || typeof cached?.contactReputation === 'number') &&
+    !store.isStale(mintUrl, 'social')
+  ) {
     log.debug('mint.catalog.profile.cache_hit', { ...mintUrlLogFields(mintUrl) });
     return { followers: cached.contactFollowers, reputation: cached.contactReputation ?? null };
   }
@@ -105,7 +109,13 @@ async function resolveNostrProfile(
     });
     return null;
   });
-  if (profile && profile.isOk() && profile.value.followers !== undefined) {
+  // nagg omits a zero follower aggregate and has none for a pubkey outside
+  // its kind-3 corpus; that is no reason to throw away the score it did have.
+  if (
+    profile &&
+    profile.isOk() &&
+    (profile.value.followers !== undefined || typeof profile.value.score === 'number')
+  ) {
     const { followers, score } = profile.value;
     useMintMetadataStore.getState().setSocial(mintUrl, followers, score);
     log.info('mint.catalog.profile.fetch_success', {
@@ -227,24 +237,30 @@ async function fetchEntry(
 
   if (reviewRes && reviewRes.isOk()) {
     const review = reviewRes.value;
-    if (review.score !== null) entry.kymScore = review.score;
-    else delete entry.kymScore;
-    // `recommendations` is the authoritative source for the count regardless
-    // of whether `score` was computable — keep it visible either way.
-    entry.reviewCount = review.recommendations.length;
-    // ALWAYS overwrite the persisted aggregate with the fresh successful result —
-    // including a null score / empty list. The old `score !== null` guard let a
-    // stale snapshot outlive the source: once a mint's live score went null, the
-    // cache was never overwritten, so a populated device kept showing the old
-    // count while a fresh device showed the live (empty/null) state. (audit F3)
-    // Only the aggregate (score + count) is persisted — never the raw rows.
-    useMintMetadataStore
-      .getState()
-      .setReviewsAggregate(mintUrl, review.score, review.recommendations.length);
+    const stored = useMintMetadataStore.getState().getCached(mintUrl);
+    const aggregate = reviewAggregateOf(review, stored?.reviewCount);
+    if (aggregate.authoritative) {
+      if (review.score !== null) entry.kymScore = review.score;
+      else delete entry.kymScore;
+      entry.reviewCount = aggregate.reviewCount;
+      // ALWAYS overwrite the persisted aggregate with a fresh AUTHORITATIVE
+      // result — including a null score / empty list. The old `score !== null`
+      // guard let a stale snapshot outlive the source (audit F3). A fallback
+      // tier's partial answer is not authoritative: see `reviewAggregateOf`.
+      // Only the aggregate (score + count) is persisted — never the raw rows.
+      useMintMetadataStore
+        .getState()
+        .setReviewsAggregate(mintUrl, aggregate.score, aggregate.reviewCount);
+    } else if (stored) {
+      if (typeof stored.averageScore === 'number') entry.kymScore = stored.averageScore;
+      if (stored.reviewCount !== undefined) entry.reviewCount = stored.reviewCount;
+    }
     log.info('mint.catalog.entry.review_ok', {
       ...mintUrlLogFields(mintUrl),
       hasScore: review.score !== null,
-      reviewCount: review.recommendations.length,
+      tier: review.tier ?? null,
+      persisted: aggregate.authoritative,
+      reviewCount: aggregate.reviewCount,
     });
   } else {
     log.debug('mint.catalog.entry.review_unavailable', { ...mintUrlLogFields(mintUrl) });
@@ -254,7 +270,7 @@ async function fetchEntry(
   if (pubkey) {
     const profile = await resolveNostrProfile(mintUrl, pubkey, signal);
     if (profile) {
-      entry.contactFollowers = profile.followers;
+      if (profile.followers !== undefined) entry.contactFollowers = profile.followers;
       if (typeof profile.reputation === 'number') {
         entry.contactReputation = Math.round(profile.reputation);
       }

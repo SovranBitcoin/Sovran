@@ -1,4 +1,5 @@
-import { facade } from 'nostr';
+import { facade, NaggIdentitiesSchema, type NaggIdentity } from 'nostr';
+import { cacheIdentities } from '@/shared/lib/nostr/identityCache';
 import { GetInfoResponse } from '@cashu/cashu-ts';
 import {
   combineSignals,
@@ -28,6 +29,7 @@ import {
 import { backendConfig } from '@/shared/config/backend';
 import { DEFAULT_TIMEOUT_MS } from '@/shared/lib/http/requestSignal';
 import { NaggAiLineupSchema } from '@/shared/lib/routstr/lineup';
+import { NaggAiProvidersSchema, serverProviders } from '@/shared/lib/routstr/providers';
 
 // Local compatibility while the shared package release catches up to the
 // live `/nostr/profile` wire shape. Vertex can return `null` when pagerank,
@@ -62,6 +64,10 @@ export type MintReviewsResponse = {
   mintUrl: string;
   score: number | null;
   recommendations: MintRecommendation[];
+  /** The source's own review total. nagg aggregates server-side over every
+   *  review it has indexed; a relay answer carries only what its bounded scan
+   *  returned, so `recommendations.length` alone under-counts there. */
+  reviewCount?: number;
   lastUpdated: number | null;
   fromCache: boolean;
   /** Which tier answered; `degraded` when a fallback tier served it without
@@ -109,6 +115,12 @@ const DiscoverMint = z.looseObject({
   // nagg's unpaid-quote probe saw the mint mark a never-paid quote as paid: a
   // fake payment backend. The row's units are then testnut account units.
   testnut: z.boolean().optional().catch(undefined),
+  /** nagg's own `/v1/info` probe, on the provider directory's terms: `unknown`
+   *  when never probed or older than its max age, `checkedAt` omitted while
+   *  unknown, `latencyMs` from the last successful probe. Feedback, not a gate. */
+  status: z.enum(['online', 'offline', 'unknown']).optional().catch(undefined),
+  checkedAt: z.string().max(64).optional().catch(undefined),
+  latencyMs: z.number().nonnegative().optional().catch(undefined),
 });
 export type DiscoverMint = z.infer<typeof DiscoverMint>;
 // nagg's per-mint info for the wallet's OWN mints (which discovery's roster
@@ -119,8 +131,13 @@ const MintInfoRow = z.looseObject({
   known: z.boolean().optional().catch(undefined),
   testnut: z.boolean(),
   probedAt: z.number().int().nonnegative().optional().catch(undefined),
+  /** The NUT-06 nostr contact as nagg resolved it, hex. */
+  operatorPubkey: z.string().max(128).optional().catch(undefined),
 });
-const MintInfoResponse = z.looseObject({ mints: z.array(MintInfoRow).max(64) });
+const MintInfoResponse = z.looseObject({
+  mints: z.array(MintInfoRow).max(64),
+  identities: NaggIdentitiesSchema.optional(),
+});
 export type MintInfoRow = z.infer<typeof MintInfoRow>;
 // nagg's mint-info changelog: every tracked mint's NUT-06 revisions, newest
 // first, each carrying the RFC-6902 patch that produced it. Lenient like
@@ -155,6 +172,8 @@ const ReviewerProfileInfo = z.looseObject({
 export const DiscoverMintsResponse = z.object({
   mints: z.array(DiscoverMint).max(10_000),
   profiles: z.record(z.string(), ReviewerProfileInfo).optional(),
+  /** Operator identity groups, keyed by hex pubkey — see `cacheIdentities`. */
+  identities: NaggIdentitiesSchema.optional(),
 });
 export type DiscoverMintsResponse = z.infer<typeof DiscoverMintsResponse>;
 
@@ -323,6 +342,7 @@ const ProfileEnvelope = z.object({
     .record(z.string(), z.record(z.string(), z.record(z.string(), z.number())))
     .default({}),
   providers: z.record(z.string(), z.record(z.string(), z.unknown())).default({}),
+  identities: NaggIdentitiesSchema.optional(),
   fromCache: z.boolean().optional(),
 });
 
@@ -357,21 +377,39 @@ function metadataFields(content: string): Record<string, string> {
   }
 }
 
-export const parseNostrProfileFor =
+/**
+ * The profile envelope parsed into the app-facing profile PLUS the identity
+ * groups it carried (the subject and its top followers), so the fetcher can
+ * hand those to the single owner. `parseNostrProfileFor` below is this minus
+ * the identities, for callers that only re-parse a Vertex refresh.
+ */
+const parseProfileEnvelopeFor =
   (pubkey: string) =>
-  (input: unknown): Result<NostrProfileFullType, ParseError> => {
+  (
+    input: unknown
+  ): Result<
+    { profile: NostrProfileFullType; identities: Record<string, NaggIdentity> },
+    ParseError
+  > => {
     const env = ProfileEnvelope.safeParse(input);
     if (!env.success) {
       return err({ type: 'schema/zod', where: 'nostr/profile', issues: env.error.issues });
     }
-    const { events, aggregates, providers, fromCache } = env.data;
+    const { events, aggregates, providers, identities, fromCache } = env.data;
 
     // Latest kind-0 per author (envelope hydration is just more events).
     const k0ByPubkey = new Map<string, (typeof events)[number]>();
     for (const e of events) {
       if (e.kind !== 0) continue;
       const prev = k0ByPubkey.get(e.pubkey);
-      if (!prev || e.created_at > prev.created_at) k0ByPubkey.set(e.pubkey, e);
+      // NIP-01: on equal created_at the replaceable event with the lowest id wins.
+      if (
+        !prev ||
+        e.created_at > prev.created_at ||
+        (e.created_at === prev.created_at && e.id < prev.id)
+      ) {
+        k0ByPubkey.set(e.pubkey, e);
+      }
     }
 
     const prov = (pk: string, ns: string): Record<string, unknown> =>
@@ -396,8 +434,11 @@ export const parseNostrProfileFor =
 
     const agg = (rule: string, metric: string): number | undefined =>
       aggregates[pubkey]?.[rule]?.[metric];
-    const followers = agg('k3_p_latest', 'actors');
-    const follows = agg('k3_author_latest', 'sources');
+    // Aggregates omit a zero and are absent without nagg's nostr module; the
+    // identity's reach (the shared resolver, null when unresolved) fills in.
+    const reach = identities?.[pubkey]?.reach;
+    const followers = agg('k3_p_latest', 'actors') ?? num(reach?.followers);
+    const follows = agg('k3_author_latest', 'sources') ?? num(reach?.follows);
     const nip05Valid = prov(pubkey, 'nip05').valid;
     const k0 = k0ByPubkey.get(pubkey);
 
@@ -421,8 +462,13 @@ export const parseNostrProfileFor =
     if (!parsed.success) {
       return err({ type: 'schema/zod', where: 'nostr/profile', issues: parsed.error.issues });
     }
-    return ok(parsed.data);
+    return ok({ profile: parsed.data, identities: identities ?? {} });
   };
+
+export const parseNostrProfileFor =
+  (pubkey: string) =>
+  (input: unknown): Result<NostrProfileFullType, ParseError> =>
+    parseProfileEnvelopeFor(pubkey)(input).map((r) => r.profile);
 // nagg also returns minVersion, which @sovranbitcoin/schemas 2.2.0 strips.
 // Remove this extension after the shared schema includes it and the app upgrades.
 const NaggLatestVersionResponse = LatestVersionResponse.extend({
@@ -450,6 +496,7 @@ export const fetchBtcRates = (controls: RequestControls = {}) =>
   fetchJson(`${SCORE_API_BASE_URL}/app/rates`, parseRates, 'app/rates', undefined, controls);
 
 const parseAiLineup = parseWith(NaggAiLineupSchema, 'app/ai-lineup');
+const parseAiProviders = parseWith(NaggAiProvidersSchema, 'app/ai-providers');
 const parseDiscoverMints = parseWith(DiscoverMintsResponse, 'nostr/mint/discover');
 const parseMintChanges = parseWith(MintChangesResponse, 'nostr/mint/changes');
 const parseMintInfos = parseWith(MintInfoResponse, 'nostr/mint/info');
@@ -498,7 +545,15 @@ export const discoverMints = ({ limit, signal }: { limit?: number; signal?: Abor
     'nostr/mint/discover',
     undefined,
     { signal }
-  );
+  ).then((result) => result.map(withIdentitiesCached));
+
+/** Hand a response's `identities` to the single owner and pass it on unchanged. */
+function withIdentitiesCached<T extends { identities?: Record<string, NaggIdentity> }>(
+  response: T
+): T {
+  cacheIdentities(response.identities);
+  return response;
+}
 
 /**
  * nagg mint-info changelog: what every tracked mint changed about its own NUT-06
@@ -536,7 +591,7 @@ export const fetchMintInfos = (mintUrls: readonly string[], controls?: RequestCo
     'nostr/mint/info',
     undefined,
     controls
-  ).then((result) => result.map(({ mints }) => mints));
+  ).then((result) => result.map(withIdentitiesCached).map(({ mints }) => mints));
 
 /** A normalized single-mint lookup; unknown mints return no row. */
 export const discoverMint = async (mintUrl: string, controls?: RequestControls) =>
@@ -548,7 +603,9 @@ export const discoverMint = async (mintUrl: string, controls?: RequestControls) 
       undefined,
       controls
     )
-  ).map(({ mints }) => mints[0]);
+  )
+    .map(withIdentitiesCached)
+    .map(({ mints }) => mints[0]);
 
 /**
  * Reviews for one mint from nagg's REST app-view. Screens read through
@@ -602,20 +659,44 @@ export const getAiLineup = (controls: RequestControls = {}) =>
     controls
   );
 
+/**
+ * nagg's provider directory: every AI provider it has discovered, with the
+ * accepted mints, the operator's key and a health probe it has already run.
+ *
+ * The picker's first paint. The app's own discovery (Nostr sweep + per-node
+ * directory reads + `/v1/info` probes) still runs behind it and corrects it —
+ * see `resolveProviderStatus` — but it no longer decides whether the list is
+ * empty for the first few seconds. Same budget as every other nagg call: a
+ * directory that has not answered inside `DEFAULT_TIMEOUT_MS` is a directory
+ * the user is not waiting for.
+ */
+export const getAiProviders = async (controls: RequestControls = {}) =>
+  (
+    await fetchJson(
+      `${SCORE_API_BASE_URL}/app/ai-providers`,
+      parseAiProviders,
+      'app/ai-providers',
+      undefined,
+      controls
+    )
+  )
+    .map(withIdentitiesCached)
+    .map(serverProviders);
+
 export const fetchNostrProfile = (
   pubkey: string,
   controls: RequestControls & { signedVertexRequest?: facade.SignedVertexRequest } = {}
 ) =>
   fetchJson(
     `${SCORE_API_BASE_URL}/nostr/profile?pubkey=${encodeURIComponent(pubkey)}${controls.signedVertexRequest ? `&svr=${facade.encodeSignedVertexRequest(controls.signedVertexRequest)}` : ''}`,
-    parseNostrProfileFor(pubkey),
+    parseProfileEnvelopeFor(pubkey),
     'nostr/profile',
     controls.signedVertexRequest ? { cache: 'no-store' } : undefined,
     {
       ...controls,
       timeoutMs: controls.timeoutMs ?? (controls.signedVertexRequest ? 20_000 : DEFAULT_TIMEOUT_MS),
     }
-  );
+  ).then((result) => result.map(withIdentitiesCached).map(({ profile }) => profile));
 
 /**
  * Fetches nagg's app-module wallpaper catalog using the shared Zod schema.

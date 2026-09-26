@@ -50,6 +50,7 @@ jest.mock('@/shared/lib/date', () => ({}));
 jest.mock('@/shared/providers/NostrKeysProvider', () => ({}));
 jest.mock('@/shared/lib/nav/profileRoutes', () => ({}));
 jest.mock('@/shared/lib/nav/mintInfoRoutes', () => ({}));
+jest.mock('@/shared/blocks/OperatorRunsSection', () => ({ OperatorRunsSection: () => null }));
 jest.mock('@/shared/stores/profile/nostrSocialStore', () => ({}));
 jest.mock('@/shared/stores/profile/recentPeopleStore', () => ({}));
 jest.mock('@/shared/lib/colorExtraction', () => ({}));

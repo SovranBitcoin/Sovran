@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "id": "mint.info.history",
+  "name": "Open a mint's update history",
+  "description": "Opens the details page for one of the wallet's mints and taps through to its update history. The history screen opens and lists what the mint changed about itself.",
+  "details": "From the Cuba Bitcoin mint page (opened via the mint selector's 3-dots inspect button — an AX-collapsed suffix, so the tap is by coordinate), prove the History circle action is present from the first frame and opens the mint's NUT-06 changelog on the mint-flow stack; ends on wallet.",
+  "lane": "simulator",
+  "tags": ["flow:mint"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-mint-selector"}}],"until":{"id":"mint-select-add"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"contact-row:mint:https://mint.cubabitcoin.org"},"timeoutMs":45000},
+    {"action":"screenshot","name":"mint-select"},
+    {"action":"tapUntil","sequence":[{"tapAt":{"x":0.884,"y":0.605}}],"until":{"id":"mint-info-close"},"attempts":4,"settleMs":8000},
+    {"action":"screenshot","name":"mint-info"},
+    {"action":"waitFor","selector":{"id":"mint-info-history"},"timeoutMs":60000},
+    {"action":"tap","selector":{"id":"mint-info-history"}},
+    {"action":"waitFor","selector":{"id":"mint-changes-detail"},"timeoutMs":45000},
+    {"action":"screenshot","name":"mint-history"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

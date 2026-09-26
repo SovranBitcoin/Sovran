@@ -17,6 +17,7 @@ import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 
 import { amountToNumber } from "../amount";
 import { hasDuplicateProofSecrets } from "../ecash";
+import { samePubkey } from "../p2pk";
 import { logger, mintUrlFields } from "../logger";
 
 /**
@@ -141,10 +142,11 @@ export function classifyMeshToken(
       p2pkCount += 1;
       try {
         if (getP2PKRequiredSigs(secret) > 1) continue; // multisig — never "mine"
-        const expected = getP2PKExpectedWitnessPubkeys(secret).map((k) =>
-          k.toLowerCase(),
-        );
-        if (expected.length === 1 && expected[0] === myKey) {
+        // NUT-11 compares by x coordinate: a sender may lock to `03<x>` for
+        // the same key we hold as `02<x>`, and whole-string equality would
+        // read that as somebody else's token and silently drop it.
+        const expected = getP2PKExpectedWitnessPubkeys(secret);
+        if (expected.length === 1 && samePubkey(expected[0], myKey)) {
           lockedToMeCount += 1;
         }
       } catch {

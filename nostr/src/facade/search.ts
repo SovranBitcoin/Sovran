@@ -36,6 +36,9 @@ export type ProfileSearchHit = {
   score?: number | null;
   followers?: number | null;
   follows?: number | null;
+  /** What the pubkey operates, per nagg identities (absent on lower tiers). */
+  operatesMints?: string[];
+  operatesAiProviders?: string[];
 };
 
 export type SearchRequest = RequestControls & {
@@ -76,17 +79,24 @@ export function searchHitsFromEnvelope(envelope: NaggProfilesEnvelope): ProfileS
       : rankedPubkeysFromOrder(envelope);
   return ranked.map((pubkey) => {
     const vertex = envelope.providers[pubkey]?.vertex;
-    const rank = typeof vertex?.rank === 'number' ? vertex.rank : null;
-    const score = typeof vertex?.score === 'number' ? vertex.score : null;
+    // Optional at runtime: callers that assemble an envelope by hand (tests,
+    // the Vertex refresh path) may not carry the map.
+    const identity = envelope.identities?.[pubkey];
+    const rank = typeof vertex?.rank === 'number' ? vertex.rank : (identity?.vertex.rank ?? null);
+    const score = typeof vertex?.score === 'number' ? vertex.score : (identity?.vertex.score ?? null);
+    // Aggregates omit zero and are absent on a deployment without the nostr
+    // module; the identity's reach answers there (and says null, not 0, when
+    // nagg could not resolve the person).
     return {
       pubkey,
       metadata: metadataByPubkey[pubkey] ?? {},
-      vertexFetchedAt: typeof vertex?.vertexFetchedAt === 'number' ? vertex.vertexFetchedAt : typeof vertex?.fetchedAt === 'number' ? vertex.fetchedAt : null,
+      vertexFetchedAt: typeof vertex?.vertexFetchedAt === 'number' ? vertex.vertexFetchedAt : typeof vertex?.fetchedAt === 'number' ? vertex.fetchedAt : (identity?.vertex.fetchedAt ?? null),
       vertexFresh: envelope.vertexFresh,
       rank,
       score,
-      followers: aggregateValue(envelope.aggregates, pubkey, 'followers') ?? null,
-      follows: aggregateValue(envelope.aggregates, pubkey, 'following') ?? null,
+      followers: aggregateValue(envelope.aggregates, pubkey, 'followers') ?? identity?.reach.followers ?? null,
+      follows: aggregateValue(envelope.aggregates, pubkey, 'following') ?? identity?.reach.follows ?? null,
+      ...(identity ? { operatesMints: identity.operates.mints, operatesAiProviders: identity.operates.aiProviders } : {}),
     };
   });
 }

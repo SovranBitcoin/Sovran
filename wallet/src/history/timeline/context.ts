@@ -19,6 +19,7 @@ import {
   type PaymentCopyResolver,
 } from "../../copy";
 import { logger } from "../../logger";
+import { describeSendLock } from "../../annotations";
 import { normalizeTimelineMintState, normalizeTimelineMeltState } from "../states";
 import type {
   BuildTimelineInput,
@@ -279,6 +280,16 @@ export function getMintTimelineState(
  *  switch so the debug-log sequence is unchanged. */
 export function createTimelineContext(input: BuildTimelineInput): TimelineContext {
   const entry = input.historyEntry;
+  // Read once, here: the flow, the outcome rows and the boundary all have to
+  // agree about when this unlocks, and a second read at a different `now`
+  // would let them disagree mid-render.
+  const lock =
+    entry.type === "send"
+      ? describeSendLock(entry as Parameters<typeof describeSendLock>[0], {
+          now: input.currentTime,
+          ...(input.ourPubkeys ? { ourPubkeys: input.ourPubkeys } : {}),
+        })
+      : null;
   const paymentCopy = input.paymentCopy ?? DEFAULT_PAYMENT_COPY;
   // Resolve copy groups FIRST — the old switch did this at the top of
   // buildTimelineItems, so the copy.groups.* debug logs precede the
@@ -311,10 +322,14 @@ export function createTimelineContext(input: BuildTimelineInput): TimelineContex
       break;
     }
     case "send": {
+      // A payment-request send keeps its own flow even when locked: its lock
+      // shows in the conditions card, while its timeline is about delivery.
       variant =
         input.tokenCreated !== undefined || input.nostrSent
           ? "payment-request-send"
-          : "send";
+          : lock && lock.kind !== "unlocked"
+            ? "locked-send"
+            : "send";
       break;
     }
     case "receive": {
@@ -352,5 +367,6 @@ export function createTimelineContext(input: BuildTimelineInput): TimelineContex
     mintState,
     meltState,
     prPendingFlag,
+    lock,
   };
 }

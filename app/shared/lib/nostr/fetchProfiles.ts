@@ -101,17 +101,70 @@ export function readCachedProfileStats(pubkey: string): facade.CachedProfileStat
  */
 export function cacheProfileStats(
   pubkey: string,
-  stats: { followers?: number; follows?: number; joinedAtSec?: number | null }
+  stats: {
+    followers?: number | null;
+    follows?: number | null;
+    joinedAtSec?: number | null;
+    /** Vertex reputation 0–100; `null` is "not measured" and writes nothing. */
+    score?: number | null;
+    rank?: number | null;
+    vertexFetchedAt?: number | null;
+    operatesMints?: readonly string[];
+    operatesAiProviders?: readonly string[];
+  }
 ): void {
   const cache = buildNostrDataLayer()?.cache;
   if (!cache) return;
-  const existing = cache.getProfileStats(pubkey);
+  // The store's merge is field-level and undefined-preserving, so a figure this
+  // source lacks leaves the one another source wrote. `null` means the source
+  // looked and could not measure — also not a reason to forget a number.
+  const num = (value: number | null | undefined) =>
+    typeof value === 'number' && Number.isFinite(value) ? value : undefined;
   cache.ingestProfileStats({
     pubkey,
-    metadata: existing?.metadata,
-    followersCount: stats.followers ?? existing?.followersCount,
-    followingCount: stats.follows ?? existing?.followingCount,
-    noteCount: existing?.noteCount,
-    joinedAtSec: stats.joinedAtSec ?? existing?.joinedAtSec,
+    followersCount: num(stats.followers),
+    followingCount: num(stats.follows),
+    joinedAtSec: num(stats.joinedAtSec),
+    score: num(stats.score),
+    rank: num(stats.rank),
+    vertexFetchedAt: num(stats.vertexFetchedAt),
+    operatesMints: stats.operatesMints,
+    operatesAiProviders: stats.operatesAiProviders,
   });
+}
+
+/**
+ * The operator figures a nagg discovery row or AI-provider row carries, written
+ * to the single owner so a mint row, a provider row, a search hit and the
+ * profile page all show one number for one person. Rows without an operator
+ * are skipped; a row with an operator but no figures still records the link
+ * from the person to what they run.
+ */
+export function cacheOperatorStats(
+  rows: readonly {
+    pubkey?: string;
+    followers?: number | null;
+    follows?: number | null;
+    score?: number | null;
+    rank?: number | null;
+    operatesMint?: string;
+    operatesAiProvider?: string;
+  }[]
+): void {
+  const cache = buildNostrDataLayer()?.cache;
+  if (!cache) return;
+  for (const row of rows) {
+    if (!row.pubkey) continue;
+    const existing = cache.getProfileStats(row.pubkey);
+    const union = (prev: readonly string[] | undefined, next: string | undefined) =>
+      next && !(prev ?? []).includes(next) ? [...(prev ?? []), next] : undefined;
+    cacheProfileStats(row.pubkey, {
+      followers: row.followers,
+      follows: row.follows,
+      score: row.score,
+      rank: row.rank,
+      operatesMints: union(existing?.operatesMints, row.operatesMint),
+      operatesAiProviders: union(existing?.operatesAiProviders, row.operatesAiProvider),
+    });
+  }
 }

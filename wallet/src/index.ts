@@ -16,6 +16,15 @@ export {
 // Re-export Manager type so consumers don't need to import coco-cashu-core
 export type { Manager } from "@cashu/coco-core";
 
+// P2PK locks — the terms a send applies, and what a token's conditions say.
+export {
+  describeSpendingConditions,
+  isLockedSend,
+  LOCK_CLOCK_SKEW_MS,
+  normalizeP2pkLock,
+} from "./p2pk";
+export type { P2pkLockSpec, SpendingConditions } from "./p2pk";
+
 // Wallet seed helpers
 export {
   CashuSeedError,
@@ -114,7 +123,10 @@ export {
   getHistoryEntryOnchainMintAddress,
   getStatusColorType,
   getStatusHeader,
+  getAiPayment,
+  groupAiRequests,
   groupTimeline,
+  isAiRequestLeg,
   isSettledStepType,
   inFlightReceiveToHistoryEntry,
   isPendingPaymentRequestEntry,
@@ -134,6 +146,7 @@ export {
   normalizeTimelineMintState,
   resolveEntryState,
   isCancellablePendingEcash,
+  isReservedPendingEcash,
   railHeaderTitle,
   transactionHeaderPhase,
   transactionHeaderRail,
@@ -158,6 +171,8 @@ export {
 export type {
   TransactionHeaderPhase,
   TransactionHeaderRail,
+  AiRequestGroup,
+  AiRequestState,
   BuildTimelineInput,
   ColadaTimelineItem,
   OnchainConfirmationProgress,
@@ -200,6 +215,7 @@ export {
   getScanSource,
   getSwap,
   getZap,
+  describeSendLock,
   isP2PKLocked,
   mergeAnnotationRecords,
   mergeAnnotationsIntoEntry,
@@ -559,7 +575,7 @@ export {
 
 // Recipient identity resolution (Lightning Address → Nostr hex pubkey)
 export { fetchNip05Pubkey } from "./nip05";
-export { resolveRecipientPubkey } from "./recipient";
+export { normalizeNostrPubkey, resolveRecipientPubkey } from "./recipient";
 
 // Cancellable-fetch primitives (timeout + AbortSignal). Hermes lacks
 // `DOMException`, so callers must duck-type aborts via `isAbortError`

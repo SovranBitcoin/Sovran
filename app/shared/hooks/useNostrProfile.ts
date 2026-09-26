@@ -28,9 +28,10 @@ export type TopFollower = NostrProfileFull['topFollowers'][number];
 
 /**
  * Synthesize the screen's `NostrProfileFull` shape from a facade profile-stats
- * result (Primal `user_profile` / relay floor). Reputation (`score`) and
- * `topFollowers` have no Primal/relay equivalent, so they're left empty —
- * counts, joined date, and name/picture map across.
+ * result (Primal `user_profile` / relay floor / the cache). Reputation comes
+ * only from the cache — a nagg search hit, discovery row or an earlier open of
+ * this profile wrote it there — so a score seen anywhere paints on the first
+ * frame here. `topFollowers` has no equivalent and stays empty.
  */
 function profileFullFromStats(
   pubkey: string,
@@ -40,8 +41,9 @@ function profileFullFromStats(
   return {
     pubkey,
     npub: tryNpubEncode(pubkey),
-    rank: 0,
-    score: null,
+    rank: stats.rank ?? 0,
+    score: stats.score ?? null,
+    ...(stats.vertexFetchedAt !== undefined ? { vertexFetchedAt: stats.vertexFetchedAt } : {}),
     ...(stats.followersCount !== undefined ? { followers: stats.followersCount } : {}),
     ...(stats.followingCount !== undefined ? { follows: stats.followingCount } : {}),
     created_at: stats.joinedAtSec ?? null,
@@ -58,11 +60,13 @@ function profileFullFromStats(
   };
 }
 
-type ProfileCounts = Pick<NostrProfileFull, 'followers' | 'follows'>;
+type ProfileCounts = Pick<NostrProfileFull, 'followers' | 'follows'> &
+  Partial<Pick<NostrProfileFull, 'score'>>;
 
 /** Newer profile data with any count it lacks carried over from the previous
  *  snapshot, so a Vertex-refreshed nagg envelope (no aggregates) cannot erase
- *  counts already completed from Primal or the contact list. */
+ *  counts already completed from Primal or the contact list — and, the other
+ *  way round, an answer without a score cannot erase one already shown. */
 function keepCounts<T extends ProfileCounts>(next: T, previous: ProfileCounts | null): T {
   return {
     ...next,
@@ -71,6 +75,9 @@ function keepCounts<T extends ProfileCounts>(next: T, previous: ProfileCounts | 
       : {}),
     ...(next.follows === undefined && previous?.follows !== undefined
       ? { follows: previous.follows }
+      : {}),
+    ...(typeof next.score !== 'number' && typeof previous?.score === 'number'
+      ? { score: previous.score }
       : {}),
   };
 }
@@ -297,6 +304,9 @@ export function useNostrProfile(
           followers: result.value.followers,
           follows: result.value.follows,
           joinedAtSec: result.value.created_at,
+          score: result.value.score,
+          rank: result.value.rank,
+          vertexFetchedAt: result.value.vertexFetchedAt,
         });
         // nagg without the nostr module answers a valid envelope with no
         // aggregates; the other sources fill the counts in parallel with the
@@ -311,7 +321,14 @@ export function useNostrProfile(
         });
         if (!signal.aborted && refreshed) {
           const parsed = parseNostrProfileFor(pubkey)(refreshed);
-          if (parsed.isOk()) settle(parsed.value);
+          if (parsed.isOk()) {
+            settle(parsed.value);
+            cacheProfileStats(pubkey, {
+              score: parsed.value.score,
+              rank: parsed.value.rank,
+              vertexFetchedAt: parsed.value.vertexFetchedAt,
+            });
+          }
         }
         await counting;
         return;

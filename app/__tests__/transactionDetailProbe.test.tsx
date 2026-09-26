@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { InteractionManager, Dimensions } from 'react-native';
+import { InteractionManager, Dimensions, Keyboard } from 'react-native';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { QRCodeFrame } from '@/shared/ui/composed/QRCodeFrame';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -17,6 +17,20 @@ const mockScrollTo = jest.fn();
 const mockInnerContent = {};
 let mockReducedMotion = false;
 const mockAfterInteractions: (() => void)[] = [];
+const mockNavigateToProfile = jest.fn();
+jest.mock('@/shared/hooks/useGuardedRouter', () => ({
+  guardedRouter: { push: (...args: unknown[]) => mockNavigateToProfile(...args) },
+}));
+jest.mock('@/shared/hooks/useNostrProfileMetadata', () => ({
+  useNostrProfileMetadata: () => ({ metadata: null, isResolving: false }),
+}));
+jest.mock('@/shared/ui/composed/ContactRow', () => ({
+  nostrIdentity: (pubkey: string) => ({ pubkey }),
+  ContactRow: (props: { testID?: string; onPress?: () => void }) => {
+    const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+    return <View {...props} />;
+  },
+}));
 // The QR placeholder cycles pre-encoded junk frames from a Reanimated frame
 // callback; this node probe only needs the hooks to exist.
 jest.mock('react-native-reanimated', () => {
@@ -57,7 +71,7 @@ jest.mock('wallet', () => ({
 // The shared identity resolver reaches the whole nostr data layer; this probe
 // only cares about the scroll/timeline spine, so it stands in for the answer.
 jest.mock('@/features/transactions/lib/transactionIdentity', () => ({
-  transactionIdentitySnapshot: () => undefined,
+  transactionIdentitySnapshot: () => mockCounterparty ?? undefined,
   useTransactionIdentity: () => undefined,
 }));
 jest.mock('expo-router', () => ({ useNavigation: () => ({ setOptions: jest.fn() }) }));
@@ -164,6 +178,7 @@ describe('TransactionDetailShell device probe', () => {
   beforeAll(() => jest.useFakeTimers());
   afterAll(() => jest.useRealTimers());
   beforeEach(() => {
+    jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => {});
     mockCounterparty = null;
     mockAfterInteractions.length = 0;
     Dimensions.set({
@@ -260,6 +275,13 @@ describe('TransactionDetailShell device probe', () => {
       renderer.root.find((node) => node.type === 'view' && node.props.testID === 'known-detail')
     ).toBeTruthy();
     expect(renderer.root.findByProps({ 'data-testid': 'known-details' })).toBeTruthy();
+    act(() => {
+      renderer.root.findByProps({ testID: 'transaction-counterparty-profile' }).props.onPress();
+    });
+    expect(mockNavigateToProfile).toHaveBeenCalledWith({
+      pathname: '/(profile-flow)/profile',
+      params: { pubkey: 'fixture-counterparty' },
+    });
     const frame = renderer.root.findByType(QRCodeFrame);
     // First child is the placeholder's QR layer, sized to the live QR square.
     expect(frame.props.children[0].props.style).toMatchObject({ width: 329, height: 329 });
@@ -323,6 +345,8 @@ describe('TransactionDetailShell device probe', () => {
       mintHost: 'mint.sovran.money',
       status: 'finalized',
       source: 'paste',
+      lock: 'none',
+      reclaim: 'none',
     });
     expect(probe.props.accessibilityValue.text).not.toContain('cashuB');
   });

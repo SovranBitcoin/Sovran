@@ -125,6 +125,22 @@ describe('describeDestination', () => {
     });
   });
 
+  // A wallet's P2PK receive key is not an identity: no profile stands behind
+  // it, so it gets its own kind rather than borrowing the person row's name
+  // and avatar for someone who never claimed that npub.
+  it('P2PK key → a lock target, not a person', () => {
+    const d = describeInput('p2pkKey');
+    expect(d.kind).toBe('lockKey');
+    expect(d.action).toBe('lockEcash');
+    expect(d.label).toBe('Lock ecash to');
+    expect(d.recipient).toEqual({
+      // Parity is preserved: a 03 key locks to itself, never to our 02 lift.
+      ref: { type: 'pubkey', value: INPUTS.p2pkKey },
+      pending: false,
+      lockKey: INPUTS.p2pkKey,
+    });
+  });
+
   it('mint URL → open mint', () => {
     const d = describeInput('mintUrl');
     expect(d.kind).toBe('mint');

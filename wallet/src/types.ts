@@ -23,6 +23,32 @@ export interface Detectors {
   getBolt12Amount(offer: string): number | null;
   getPaymentRequestInfo(value: string): PaymentRequestInfo | null;
   parseNpub(value: string): string | null;
+  /**
+   * A bare 33-byte compressed secp256k1 key (`02`/`03` + 32 bytes of x) — the
+   * Cashu P2PK form of a nostr identity, as cashu.me and macadamia display it.
+   * Returns it lowercased, or null.
+   */
+  parseP2pkPubkey(value: string): string | null;
+}
+
+/**
+ * A nostr identity resolved from input, whatever form it was written in. An
+ * npub and a compressed P2PK key denote the SAME identity — they share the x
+ * coordinate — so both parse to this.
+ */
+export interface ParsedNostrIdentity {
+  /** bech32 npub — the canonical display and route form. */
+  npub: string;
+  /** 32-byte x-only hex (NIP-01). */
+  pubkeyHex: string;
+  source: 'npub' | 'nprofile' | 'hex' | 'p2pkKey';
+  /**
+   * The 33-byte compressed key EXACTLY as written, when the input WAS one,
+   * parity included. A `03` key from another wallet is a different point than
+   * our `02` lift of the same x (NUT-11 compares by x, but the holder signs
+   * for the key they published), so a lock must target what was scanned.
+   */
+  p2pkPubkey?: string;
 }
 
 export interface PaymentRequestInfo {
@@ -171,6 +197,11 @@ export interface ParsedPaymentInput {
   bip321?: Bip321Container;
   mintUrl?: string;
   npub?: string;
+  /**
+   * The identity behind `npub`, with the form it arrived in. Set whenever
+   * `type === 'npub'`; `npub` stays for callers that only need the bech32.
+   */
+  nostr?: ParsedNostrIdentity;
   warnings: string[];
   errors: string[];
 }
@@ -200,7 +231,17 @@ export type ResolvedIntent =
   | { type: 'meltLnurlp'; option: PaymentOption }
   | { type: 'meltOnchainAddress'; option: PaymentOption }
   | { type: 'openMint'; url: string }
-  | { type: 'openProfile'; npub: string }
+  | {
+      type: 'openProfile';
+      npub: string;
+      /** 32-byte x-only hex for the same identity. */
+      pubkeyHex: string;
+      /**
+       * The compressed key the input carried, when it WAS one — the exact
+       * lock target, parity included. Absent for an npub/nprofile/hex input.
+       */
+      p2pkPubkey?: string;
+    }
   | { type: 'chooseOption'; options: AnnotatedOption[] }
   | { type: 'ignore'; reason: import('./formatting/locales').LocalizedReason };
 
@@ -222,6 +263,7 @@ export type DestinationKind =
   | 'lightningAddress' // lnurlp endpoint paid via Lightning (NOT an identity)
   | 'onchain' // bitcoin address
   | 'person' // payable Nostr identity (npub / nprofile / lightning address)
+  | 'lockKey' // a wallet's compressed P2PK receive key — lock ecash to it
   | 'mint' // mint URL
   | 'unsupported'; // empty / unknown / UR fragment / parse errors
 
@@ -242,6 +284,7 @@ export type DestinationAction =
   | 'meltLnurl' // pay an lnurlp endpoint
   | 'meltOnchain' // pay a btc address
   | 'startContactSend' // person: app resolves profile, then contact send
+  | 'lockEcash' // lock-key: straight to amount entry with a required lock
   | 'chooseOption' // multi-option: defer to the existing chooser
   | 'openMint' // open mint info
   | 'none'; // unsupported / empty
@@ -261,6 +304,12 @@ export interface DestinationRecipient {
   ref: DestinationRecipientRef;
   /** True until the app resolves a display name / avatar for `ref`. */
   pending: boolean;
+  /**
+   * The compressed P2PK key the input literally carried, when it was one.
+   * Identity display still goes through `ref`; this is the lock target only,
+   * so a `03` key locks to itself rather than to our `02` lift of it.
+   */
+  lockKey?: string;
 }
 
 export interface DestinationDescriptor {

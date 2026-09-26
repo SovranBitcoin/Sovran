@@ -215,6 +215,16 @@ describe('upsertFromDiscover stamps a group fresh only when it carried data', ()
     useMintMetadataStore.getState().upsertFromDiscover([discoverRow({ vertexScore: null })]);
     expect(useMintMetadataStore.getState().getCached(MINT)?.contactReputation).toBe(88);
   });
+
+  it('setSocial records null only while nothing better is known', () => {
+    useMintMetadataStore.getState().setSocial(MINT, 10, null);
+    expect(useMintMetadataStore.getState().getCached(MINT)?.contactReputation).toBeNull();
+    useMintMetadataStore.getState().setSocial(MINT, 10, 88);
+    useMintMetadataStore.getState().setSocial(MINT, 12, null);
+    const entry = useMintMetadataStore.getState().getCached(MINT);
+    expect(entry?.contactReputation).toBe(88);
+    expect(entry?.contactFollowers).toBe(12);
+  });
 });
 
 describe('discovery audit metrics', () => {

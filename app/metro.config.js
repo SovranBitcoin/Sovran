@@ -15,6 +15,7 @@ const config = getDefaultConfig(__dirname);
 // libs (react, react-native, zod, neverthrow, @cashu/coco-*) to a single realm
 // so we never bundle duplicate copies (which would break hooks identity and
 // cross-package `instanceof ZodError` / Result identity).
+const zlibShimPath = path.resolve(__dirname, 'shared/lib/routstr/sdk/zlibShim.ts');
 const appNodeModules = path.resolve(__dirname, 'node_modules');
 const workspaceRoot = path.resolve(__dirname, '..');
 const rootNodeModules = path.resolve(workspaceRoot, 'node_modules');
@@ -219,6 +220,27 @@ const appResolveRequest = (context, moduleName, platform) => {
       moduleName,
       platform
     );
+  }
+  // `@routstr/sdk` persists Tinfoil's prompt-cache secret to a home directory
+  // when it detects a Node-like runtime. The branch is guarded by
+  // `isNodeLikeRuntime()` and can never run here, but Metro resolves dynamic
+  // `import()` statically, so the dead branch still has to resolve. Empty
+  // modules are the honest answer: there is no filesystem to reach.
+  if (moduleName === 'os' || moduleName === 'fs' || moduleName === 'path') {
+    return { type: 'empty' };
+  }
+  // Node stream primitives the SDK's SSE parsing genuinely uses at runtime, so
+  // these get real pure-JS implementations rather than empties.
+  if (moduleName === 'stream') {
+    return context.resolveRequest(context, 'readable-stream', platform);
+  }
+  // `@tinfoilsh/verifier` gunzips the SEV-SNP attestation report, reaching for
+  // `DecompressionStream` and falling back to Node's `zlib`. Hermes has
+  // neither, so point the bare specifier at the one-function pako shim. Kept
+  // narrow on purpose: any other consumer of `zlib` should fail to resolve
+  // rather than quietly receive a module that implements almost none of it.
+  if (moduleName === 'zlib' || moduleName === 'node:zlib') {
+    return { type: 'sourceFile', filePath: zlibShimPath };
   }
   if (appReactEntryPaths[moduleName]) {
     return { type: 'sourceFile', filePath: appReactEntryPaths[moduleName] };

@@ -20,6 +20,7 @@ import { retryMintInfoFetch } from '@/features/send/lib/createSovranScreenAction
 import { isSupersededError } from '@/shared/lib/cache/createQueryCacheStore';
 import { getDiscoveredMintMetadata } from '@/shared/lib/getDiscoveredMintMetadata';
 import { fetchMintReviews } from '@/shared/lib/nostr/fetchMintReviews';
+import { reviewAggregateOf } from '@/shared/lib/nostr/reviewAggregate';
 import { extractMintNostrPubkey } from '@/shared/lib/nostr/extractMintNostrPubkey';
 import { newReadId, readErrorType, readEvents, readKeyHash } from '@/shared/lib/read/readLog';
 import {
@@ -87,9 +88,15 @@ async function runReviewsRead(mintUrl: string, signal: AbortSignal): Promise<boo
         const result = await fetchMintReviews({ mintUrl, signal: ctx.signal, readId: ctx.readId });
         if (result.isErr()) throw result.error;
         if (ctx.signal?.aborted) return { data: result.value };
-        useMintMetadataStore
-          .getState()
-          .setReviewsAggregate(mintUrl, result.value.score, result.value.recommendations.length);
+        const aggregate = reviewAggregateOf(
+          result.value,
+          useMintMetadataStore.getState().getCached(mintUrl)?.reviewCount
+        );
+        if (aggregate.authoritative) {
+          useMintMetadataStore
+            .getState()
+            .setReviewsAggregate(mintUrl, aggregate.score, aggregate.reviewCount);
+        }
         return { data: result.value };
       },
       '',

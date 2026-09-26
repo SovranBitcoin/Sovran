@@ -10,6 +10,7 @@ import type {
   StepDataMap,
 } from '../types';
 import { logger, mintUrlFields } from '../../logger';
+import { normalizeP2pkLock, type P2pkLockSpec } from '../../p2pk';
 
 type SendFlowState =
   | {
@@ -40,8 +41,10 @@ interface StartSendEcashOptions {
   meltTarget?: string;
   recipientPubkey?: string;
   recipientProfile?: RecipientProfile;
-  /** See `FlowContext.p2pkLockPubkey` — 33-byte compressed hex, `02`-prefixed. */
+  /** See `FlowContext.p2pkLockPubkey` — a bare key, kept for the Nut Drop callers. */
   p2pkLockPubkey?: string;
+  /** See `FlowContext.p2pkLock` — supersedes `p2pkLockPubkey` when set. */
+  p2pkLock?: P2pkLockSpec;
   /** See `SendEntrySource` — how this flow was entered (Create Ecash / scan / paste / contact). */
   entrySource?: SendEntrySource;
   /**
@@ -51,9 +54,6 @@ interface StartSendEcashOptions {
    */
   allowedMints?: string[];
 }
-
-/** 33-byte compressed secp256k1 pubkey, `02`-prefixed per the Cashu↔Nostr convention. */
-const P2PK_LOCK_PUBKEY_PATTERN = /^02[0-9a-f]{64}$/i;
 
 interface SendFlowDefinition {
   initial: SendFlowState;
@@ -88,6 +88,10 @@ export function startSendEcashFlow(
   unit: string,
   opts: StartSendEcashOptions = {},
 ): SendFlowTransitionResult {
+  // The spec wins when both are given; the bare key is what the Nut Drop
+  // callers still pass.
+  const requestedLock = opts.p2pkLock ?? opts.p2pkLockPubkey;
+  const lock = normalizeP2pkLock(requestedLock);
   logger.info('flow.sendEcash.start', {
     unit,
     offline: opts.offline === true,
@@ -96,8 +100,9 @@ export function startSendEcashFlow(
     hasRecipientPubkey: !!opts.recipientPubkey,
     recipientPubkeyLength: opts.recipientPubkey?.length ?? 0,
     hasRecipientProfile: !!opts.recipientProfile,
-    p2pkLocked: !!opts.p2pkLockPubkey,
-    p2pkLockPubkeyLength: opts.p2pkLockPubkey?.length ?? 0,
+    p2pkLocked: !!lock,
+    hasLocktime: !!lock?.locktimeSec,
+    refundKeyCount: lock?.refundKeys?.length ?? 0,
     allowedMintCount: opts.allowedMints?.length ?? 0,
     trustedMintCount: walletCtx.trustedMintUrls.length,
     balanceMintCount: Object.keys(walletCtx.mintBalances).length,
@@ -111,9 +116,7 @@ export function startSendEcashFlow(
     ...(opts.recipientProfile
       ? { recipientProfile: opts.recipientProfile }
       : {}),
-    ...(opts.p2pkLockPubkey
-      ? { p2pkLockPubkey: opts.p2pkLockPubkey.toLowerCase() }
-      : {}),
+    ...(lock ? { p2pkLock: lock, p2pkLockPubkey: lock.pubkey } : {}),
     ...(opts.entrySource ? { entrySource: opts.entrySource } : {}),
     // The recipient's accepted mints bind the WHOLE flow, not just the first
     // auto-pick: a later mint change (the amount screen's mint pill) must not
@@ -123,14 +126,11 @@ export function startSendEcashFlow(
       ? { supportedMintUrls: opts.allowedMints }
       : {}),
   };
-  // A malformed lock key must abort the flow — silently dropping it would
+  // A malformed lock must abort the flow — silently dropping it would
   // downgrade the send to a bearer token on whatever surface requested a lock.
-  if (
-    opts.p2pkLockPubkey &&
-    !P2PK_LOCK_PUBKEY_PATTERN.test(opts.p2pkLockPubkey)
-  ) {
+  if (requestedLock && !lock) {
     logger.warn('flow.sendEcash.invalidP2pkLock', {
-      p2pkLockPubkeyLength: opts.p2pkLockPubkey.length,
+      hasLocktime: typeof requestedLock !== 'string' && !!requestedLock.locktimeSec,
       allowedMintCount: opts.allowedMints?.length ?? 0,
     });
     return {
@@ -156,7 +156,7 @@ export function startSendEcashFlow(
         unit,
         ...mintUrlFields(selection.mintUrl),
         offline: opts.offline === true,
-        p2pkLocked: !!opts.p2pkLockPubkey,
+        p2pkLocked: !!lock,
         allowedMintCount: opts.allowedMints?.length ?? 0,
       });
       return {
@@ -175,8 +175,11 @@ export function startSendEcashFlow(
             ...(opts.recipientProfile
               ? { recipientProfile: opts.recipientProfile }
               : {}),
-            ...(context.p2pkLockPubkey
-              ? { p2pkLockPubkey: context.p2pkLockPubkey }
+            ...(context.p2pkLock
+              ? {
+                  p2pkLock: context.p2pkLock,
+                  p2pkLockPubkey: context.p2pkLock.pubkey,
+                }
               : {}),
             ...(opts.entrySource ? { entrySource: opts.entrySource } : {}),
           },
@@ -187,7 +190,7 @@ export function startSendEcashFlow(
         unit,
         candidateCount: selection.validMints.length,
         offline: opts.offline === true,
-        p2pkLocked: !!opts.p2pkLockPubkey,
+        p2pkLocked: !!lock,
         allowedMintCount: opts.allowedMints?.length ?? 0,
       });
       return {
@@ -215,7 +218,7 @@ export function startSendEcashFlow(
         reasonCode: selection.reason.code,
         reasonMessage: selection.reason.message,
         offline: opts.offline === true,
-        p2pkLocked: !!opts.p2pkLockPubkey,
+        p2pkLocked: !!lock,
         allowedMintCount: opts.allowedMints?.length ?? 0,
       });
       return {

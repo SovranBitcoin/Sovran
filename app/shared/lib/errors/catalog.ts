@@ -6,7 +6,68 @@ export const ERROR_COPY = {
   'routstr.model_unavailable': 'This AI model is unavailable. Choose another model and try again.',
   'routstr.auth': 'The AI service did not accept your credit key. Check your AI credit settings.',
   'routstr.balance': 'Your AI credit cannot cover this request. Choose a cheaper model or top up.',
+  'routstr.provider_declined':
+    'The AI provider declined this request. Try another model, or try again in a minute.',
   'routstr.unavailable': 'The AI provider is unreachable right now. Try again in a minute.',
+  // The connection dropped while the node was still generating. The node had
+  // already redeemed the token, so the sats are in its refund row, not lost —
+  // and the sweep collects them once the node finishes. Said so, because the
+  // balance has visibly dropped and "try again" alone reads as "gone".
+  // A placeholder that outlived its session: the app was closed, or the
+  // connection dropped, before the provider finished. There is no answer to
+  // fetch later — a node keeps nothing — but the payment is journalled and
+  // the sweep collects whatever it did not spend.
+  'routstr.interrupted':
+    'This answer never arrived — the app closed or the connection dropped before the provider finished. Any unspent sats are returned automatically.',
+  // The model the user approved was refused and every alternative on this
+  // node reserves more than the figure they saw. Nothing was spent beyond
+  // the refunded attempt; sending again quotes the alternative.
+  'routstr.over_budget':
+    'The model you approved was refused, and the alternatives cost more than the amount you saw. Send again to see the new amount, or change model.',
+  'routstr.change_pending':
+    'The connection dropped while the AI provider was still answering. Your sats are held by the provider and will be returned automatically once it finishes.',
+  // Distinct from `routstr.unavailable` on purpose. This one is OUR verdict
+  // after walking every candidate, not one node's answer — saying "the
+  // provider is unreachable" sent people chasing a provider that was fine, and
+  // hid that the shortlist itself (model, mint, filters) was the thing to
+  // change.
+  // One chosen provider, and it refused. Naming the provider (not "providers")
+  // is what points at the one action that helps.
+  'routstr.provider_refused':
+    'Your AI provider refused this request. Try another model, or switch provider in AI settings.',
+  'routstr.no_providers':
+    'No AI provider could take this request. Try a different model, or check your AI provider settings.',
+  // 502 is the node telling us its own upstream model service failed. The node
+  // answered, so "unreachable" is wrong, and retrying the same model usually
+  // repeats it.
+  'routstr.upstream_failed':
+    'The AI provider could not reach the model it routes to. Try another model, or try again in a minute.',
+  'routstr.no_provider':
+    'Choose an AI provider first. Tap the pill at the top of the AI tab to see who is available.',
+  // Not an answer from anyone — we never got as far as a request. The model
+  // catalogue has not landed this session and no snapshot survived, so there
+  // is no model id to send. Distinct from `routstr.unavailable`, which is a
+  // claim about a node we actually tried.
+  'routstr.catalog_unavailable':
+    'The AI model list has not loaded yet. Check your connection and try again in a moment.',
+  // The list DID load, and this provider serves nothing this wallet can use —
+  // a node answering with no priced chat models, or none our filters keep.
+  // Telling that user to check their connection sends them to retry something
+  // that is working.
+  'routstr.no_usable_models':
+    'This AI provider is serving no models you can use. Choose another provider.',
+  // Nothing was sent. The user chose the end-to-end encrypted vendor and this
+  // node is serving no sealed model, so every model we could have reached
+  // would have read the prompt in the clear. Falling back to one of those
+  // quietly is the defect this id exists to make impossible: the promise is
+  // the selection, so breaking it has to be something the user is told about
+  // and chooses, not something the send path decides on their behalf.
+  'routstr.e2ee_unavailable':
+    'No end-to-end encrypted model is available from this AI provider, so nothing was sent. Choose another provider, or pick an unencrypted model.',
+  'routstr.mint_not_accepted':
+    'This AI provider does not accept any of your mints. Choose another provider, or add one of the mints it accepts.',
+  'routstr.mint_refused':
+    'Your mint could not complete the payment for this request. Try another mint, or a provider that accepts one.',
   'routstr.timeout': 'The AI service took too long to respond. Try again later.',
   'routstr.invalid_request':
     'The AI service could not accept this message. Check the message and attachments, or choose another model.',

@@ -153,8 +153,8 @@ export function SearchPostsList({ pubkeys }: { pubkeys: string[] }) {
   );
 }
 
-const EMPTY_QUOTED: FeedParseResult['quotedEventsMap'] = new Map();
-const EMPTY_PROFILES: FeedParseResult['profilesMap'] = new Map();
+const EMPTY_QUOTED: Readonly<FeedParseResult['quotedEventsMap']> = new Map();
+const EMPTY_PROFILES: Readonly<FeedParseResult['profilesMap']> = new Map();
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },

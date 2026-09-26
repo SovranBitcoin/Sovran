@@ -27,6 +27,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { HeaderHeightContext } from 'expo-router/react-navigation';
 import { SheetHeaderHeightContext } from '@/shared/ui/composed/AndroidSheetRoot';
+import { useSettledHeaderHeight } from '@/shared/ui/composed/settledHeaderHeight';
 
 import { ScrollEdgeFade } from './ScrollEdgeFade';
 import { FLOW_SHEET_SCRIM_OVERHANG } from './FlowSheetHeader';
@@ -180,8 +181,10 @@ export function ModalLayoutWrapper({
   // Inside an Android formSheet, the sheet's KNOWN fixed header height wins —
   // the navigator context starts at a default (~80dp) and only settles to the
   // measured value a frame later, shifting content (see AndroidSheetRoot).
+  // iOS stacks have the same late correction; `useSettledHeaderHeight` starts
+  // a page at the height its stack settled to last time.
   const sheetHeaderHeight = useContext(SheetHeaderHeightContext);
-  const navigatorHeaderHeight = useContext(HeaderHeightContext) ?? 0;
+  const navigatorHeaderHeight = useSettledHeaderHeight(useContext(HeaderHeightContext) ?? 0);
   const headerHeight = sheetHeaderHeight ?? navigatorHeaderHeight;
   // Inside an Android formSheet the JS FlowSheetHeader paints a scrim whose
   // ~32dp eased fade tail deliberately overhangs below the measured bar — and

@@ -67,6 +67,23 @@ describe("classifyMeshToken", () => {
     ).toBe("locked-to-me");
   });
 
+  // NUT-11 keys are compressed points: `02<x>` and `03<x>` are the SAME key.
+  // A sender using a true SEC1-compressed key can lock to the 03 parity, and
+  // whole-string equality would drop a drop that is genuinely ours.
+  it("matches a lock that uses the 03 parity for the same x coordinate", () => {
+    const token = encode([proof(p2pkSecret(`03${MY_PUBKEY.slice(2)}`))]);
+    expect(classifyMeshToken(token, MY_PUBKEY).classification).toBe(
+      "locked-to-me",
+    );
+  });
+
+  it("still rejects a 03 lock whose x coordinate is someone else", () => {
+    const token = encode([proof(p2pkSecret(`03${"cd".repeat(32)}`))]);
+    expect(classifyMeshToken(token, MY_PUBKEY).classification).toBe(
+      "locked-to-other",
+    );
+  });
+
   it("never classifies the sender's own broadcast echo as locked-to-me", () => {
     const senderEcho = encode([proof(p2pkSecret(OTHER_PUBKEY), 21)]);
     expect(classifyMeshToken(senderEcho, MY_PUBKEY).classification).toBe(

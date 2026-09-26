@@ -114,6 +114,13 @@ export interface ActionAvailability {
    */
   reasonCode?: string;
   /**
+   * When an unavailable action becomes available, as a ms epoch. Set for a
+   * P2PK-locked send that can be reclaimed once its locktime passes. The
+   * wallet does not format it: the date belongs to the user's locale, which
+   * only the app knows.
+   */
+  availableAt?: number;
+  /**
    * Optional alternate forms of this action. When present, the UI can surface a
    * split-button menu and pass `{ variantId }` to `execute`.
    */

@@ -27,6 +27,29 @@ const SOURCE_TYPES: Partial<Record<ErrorService, TypeRules>> = {
     ['missing_data', 'nagg.invalid_response'],
     ['graphql', 'nagg.unknown'],
   ],
+  // Which mint paid is not a transport detail: a Routstr node redeems tokens
+  // from a published list and refuses the rest, so these two say "change mint
+  // or provider" where the generic copy would say "try again" forever.
+  routstr: [
+    ['no_provider', 'routstr.no_provider'],
+    // Our own exhaustion marker (`NoProvidersAvailableError` / `FailoverError`
+    // → code `no_providers`), carried on a synthesized 503. Without this rule
+    // the 5xx fallback below called it an unreachable provider, which is a
+    // claim about someone else's node that we never actually made.
+    ['provider_refused', 'routstr.provider_refused'],
+    // The node took the payment, its upstream refused the MODEL, and it
+    // refunded. Under the upstream's own status (404, most often) the HTTP
+    // rule below would call the provider unreachable; the honest copy is the
+    // upstream one, whose actions are "change model" and "retry".
+    ['upstream_error', 'routstr.upstream_failed'],
+    // The transport died after the node redeemed the token; the change is
+    // parked on the node and the sweep will collect it.
+    ['change_pending', 'routstr.change_pending'],
+    ['over_budget', 'routstr.over_budget'],
+    ['no_providers', 'routstr.no_providers'],
+    ['mint_not_accepted', 'routstr.mint_not_accepted'],
+    ['mint_error', 'routstr.mint_refused'],
+  ],
 };
 const CASHU_TYPES: TypeRules = [
   ['OperationInProgressError', 'cashu.operation_pending'],
@@ -46,9 +69,11 @@ const SOURCE_HTTP: Partial<Record<ErrorService, Readonly<Partial<Record<number, 
   routstr: {
     400: 'routstr.invalid_request',
     401: 'routstr.auth',
-    402: 'routstr.balance',
+    // 402 is deliberately absent: it needs the error's own markers to tell a
+    // wallet shortfall from an upstream passthrough. See `balanceId` below.
     404: 'routstr.not_found',
     408: 'routstr.timeout',
+    502: 'routstr.upstream_failed',
     504: 'routstr.timeout',
   },
   cashu: { 401: 'cashu.auth', 408: 'cashu.timeout', 504: 'cashu.timeout' },
@@ -118,6 +143,20 @@ export function describeError(error: unknown, service: ErrorService): ErrorPrese
           ['invalid_model', 'routstr.model_unavailable'],
         ])
       : undefined;
+  // A routstr 402 is ambiguous by status alone: the node hands back the AI
+  // provider's own error body verbatim under the provider's status, so an
+  // upstream decline looks identical to a wallet shortfall. Only routstr's own
+  // markers mean the user's AI credit is actually short; anything else is the
+  // provider refusing, and telling the user to top up is both wrong and
+  // unfixable by topping up.
+  const balanceId: ErrorId | undefined =
+    service === 'routstr' && status === 402
+      ? (typeMatch([
+          ['insufficient_balance', 'routstr.balance'],
+          ['insufficient_quota', 'routstr.balance'],
+          ['minimum_balance_required', 'routstr.balance'],
+        ]) ?? 'routstr.provider_declined')
+      : undefined;
   const httpId =
     status == null
       ? undefined
@@ -151,6 +190,7 @@ export function describeError(error: unknown, service: ErrorService): ErrorPrese
     protocolId ??
     sourceId ??
     modelId ??
+    balanceId ??
     httpId ??
     transportId ??
     sdkId ??

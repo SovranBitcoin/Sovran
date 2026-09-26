@@ -47,7 +47,10 @@ import { formatCompact } from '@/shared/lib/number';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { formatRelative } from '@/shared/lib/date';
 import { BLUETOOTH_ACCENT, CONNECTED_ACCENT } from '@/shared/lib/brandColors';
+import { PresenceDot } from '@/shared/ui/primitives/PresenceDot';
 import { paymentLog } from '@/shared/lib/logger';
+import { E2EE_BADGE_ICON } from '@/features/ai/lib/format';
+import { useCachedProfileStats } from '@/shared/lib/nostr/useEntityCache';
 
 // ---------------------------------------------------------------------------
 // Identity types
@@ -102,6 +105,14 @@ interface MintStatFields {
   /** Units the mint can actually issue (keyset-backed). Badge renders only
    *  when the mint issues more than sat — an all-sat list stays clean. */
   supportedUnits?: string[];
+  /**
+   * Is the mint answering `/v1/info` right now — the dot on its icon, as on a
+   * provider's face. Feedback while scrolling, never a gate: `status` above
+   * is what decides whether the row can be picked, and an offline mint stays
+   * pickable (a token sent to it is redeemed when it returns). `unknown` and
+   * absent both draw nothing.
+   */
+  presence?: 'online' | 'offline' | 'unknown';
 }
 
 interface MintIdentity {
@@ -144,6 +155,38 @@ interface GeohashIdentity {
   icon?: string;
 }
 
+/**
+ * A Routstr AI provider.
+ *
+ * Providers publish a name and no icon, so the row's face is the seeded avatar
+ * every identity without a picture gets, keyed on the node URL. Deliberately
+ * its own kind rather than borrowed from `mint`: a mint row falls back to a
+ * bank glyph and carries mint statistics, neither of which is true here.
+ */
+interface ProviderIdentity {
+  kind: 'provider';
+  baseUrl: string;
+  displayName?: string;
+  /** Sats the wallet holds across the mints this provider redeems. Not the
+   *  wallet total: what matters is what can actually be spent HERE. */
+  spendableSats?: number;
+  /** The cheapest one-message reservation here. Tints the balance: green when
+   *  `spendableSats` covers at least one message, red when it covers none.
+   *  Absent leaves the balance its neutral colour — no price, no verdict. */
+  minMessageSats?: number;
+  /**
+   * How many of its models run in an enclave — a count, never a flag.
+   *
+   * "This provider is end-to-end encrypted" is not a property a provider has:
+   * on the node that badges itself E2EE, 9 of 582 models are sealed and 8 of
+   * those 9 have an identically-named plaintext twin. A lock on the row would
+   * therefore promise an encryption most of its catalog cannot deliver, so
+   * the pill states the count and leaves the claim to the model picker.
+   */
+  encryptedModelCount?: number;
+  status?: 'online' | 'offline' | 'unknown';
+}
+
 interface SelfIdentity {
   kind: 'self';
   pubkey: string;
@@ -153,10 +196,19 @@ interface SelfIdentity {
   subtitle?: string;
 }
 
-export type Identity = NostrIdentity | MintIdentity | BleIdentity | GeohashIdentity | SelfIdentity;
+export type Identity =
+  NostrIdentity | MintIdentity | ProviderIdentity | BleIdentity | GeohashIdentity | SelfIdentity;
 
 type StatKey =
-  'balance' | 'units' | 'score' | 'audit' | 'reputation' | 'followers' | 'offline' | 'connection';
+  | 'balance'
+  | 'units'
+  | 'score'
+  | 'audit'
+  | 'reputation'
+  | 'followers'
+  | 'offline'
+  | 'connection'
+  | 'encrypted';
 
 // ---------------------------------------------------------------------------
 // Factories — keep call sites from re-typing `kind:` + field plumbing.
@@ -183,8 +235,23 @@ export function nostrIdentity(
   };
 }
 
+/** A provider row's identity. The seeded avatar is its face; there is no icon
+ *  to fetch. */
+export function providerIdentity(input: {
+  baseUrl: string;
+  displayName?: string;
+  spendableSats?: number;
+  minMessageSats?: number;
+  encryptedModelCount?: number;
+  status?: ProviderIdentity['status'];
+}): ProviderIdentity {
+  return { kind: 'provider', ...input };
+}
+
 /** Overload: accept either a full `MintListItem` or a minimal shape. */
-export function mintIdentity(item: MintListItem): MintIdentity;
+export function mintIdentity(
+  item: MintListItem & { presence?: MintStatFields['presence'] }
+): MintIdentity;
 export function mintIdentity(input: {
   mintUrl: string;
   displayName: string;
@@ -193,7 +260,7 @@ export function mintIdentity(input: {
 }): MintIdentity;
 export function mintIdentity(
   input:
-    | MintListItem
+    | (MintListItem & { presence?: MintStatFields['presence'] })
     | { mintUrl: string; displayName: string; iconUrl?: string; stats?: MintStatFields }
 ): MintIdentity {
   if ('balance' in input) {
@@ -213,6 +280,7 @@ export function mintIdentity(
       contactFollowers,
       contactReputation,
       supportedUnits,
+      presence,
     } = input;
     return {
       kind: 'mint',
@@ -232,6 +300,7 @@ export function mintIdentity(
         contactFollowers,
         contactReputation,
         supportedUnits,
+        presence,
       },
     };
   }
@@ -379,6 +448,16 @@ const DEFAULT_STATS_BY_KIND: Record<Identity['kind'], readonly StatKey[]> = {
   // row where a second "people" number alongside followers doesn't earn its
   // space. UserProfileScreen still shows it on the full profile header.
   nostr: ['reputation', 'followers'],
+  // Whether it is answering at all, what is spendable there, how much of its
+  // catalog can answer without reading the prompt, and who the operator is to
+  // the network. Status leads because it is the one that decides whether the
+  // rest of the row matters; reputation before followers, same order the mint
+  // rows use.
+  // Reachability is NOT here: it is the dot on the provider's own face. It
+  // led this list when it was a word, because it decides whether the rest of
+  // the row matters — which is exactly the argument for moving it somewhere
+  // the eye reaches first and nothing has to make room for it.
+  provider: ['balance', 'encrypted', 'reputation', 'followers'],
   mint: ['units', 'score', 'audit', 'reputation', 'followers', 'offline'],
   ble: [],
   geohash: [],
@@ -409,6 +488,8 @@ function resolvePicture(ids: Identity[]): string | undefined {
 function resolveAvatarSeed(ids: Identity[]): string | undefined {
   const mint = find(ids, 'mint');
   if (mint) return mint.mintUrl;
+  const provider = find(ids, 'provider');
+  if (provider) return provider.baseUrl;
   const nostr = find(ids, 'nostr');
   if (nostr) return nostr.pubkey;
   const self = find(ids, 'self');
@@ -426,6 +507,9 @@ function resolveName(ids: Identity[]): string | undefined {
   const self = find(ids, 'self');
   const ble = find(ids, 'ble');
   const geohash = find(ids, 'geohash');
+
+  const provider = find(ids, 'provider');
+  if (provider) return provider.displayName || provider.baseUrl.replace(/^https:\/\//, '');
 
   const resolved = resolveIdentityName({
     mintName: mint?.displayName,
@@ -486,31 +570,108 @@ function resolveSubtitle(ids: Identity[]): string | undefined {
   return self?.subtitle;
 }
 
+/** What a value that nobody has counted shows instead of a number. Never `0`:
+ *  "nobody followed them" and "nobody looked" are different facts. */
+const UNMEASURED = '—';
+
+/**
+ * The operator's two stats, as one thing.
+ *
+ * Reputation and reach describe the SAME person and are read in the same pass,
+ * so they have to appear and disappear together — a row showing the shield and
+ * no follower count made the reader decide whether the missing pill meant zero
+ * or meant nobody had looked, and they cannot tell. Both were gated on a
+ * truthy value, which dropped a measured zero exactly as if it were unknown.
+ *
+ * So: the pair is present whenever EITHER half has been measured, a measured
+ * zero prints as `0`, and a half nobody resolved prints `—` beside its own
+ * icon. nagg distinguishes `null` (it could not resolve the operator's reach)
+ * from `0` (it counted, and the answer was none), and this is where that
+ * distinction earns its keep.
+ */
+function operatorStats(
+  nostr: NostrIdentity | undefined,
+  mintStats: MintStatFields | undefined,
+  cached: CachedOperatorStats | undefined
+): { known: boolean; reputation: number | undefined; followers: number | undefined } {
+  const raw = (value: number | undefined) =>
+    typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  // The row's own figures first, then the mint's cached operator figures, then
+  // the single owner — where a search, a discovery row, the provider directory
+  // or an earlier profile open may have left the number this row never got.
+  const reputation = raw(nostr?.score) ?? raw(mintStats?.contactReputation) ?? raw(cached?.score);
+  const followers =
+    raw(nostr?.followerCount) ?? raw(mintStats?.contactFollowers) ?? raw(cached?.followersCount);
+  return {
+    known: reputation !== undefined || followers !== undefined,
+    reputation,
+    followers,
+  };
+}
+
 /** Compose the accent pill list. Missing values drop out; in a mint+nostr
  *  composite, nostr fields take precedence over mint fallbacks (contactReputation,
  *  contactFollowers) for reputation / followers. */
+/** The slice of the cached profile header the row's operator pills read. */
+type CachedOperatorStats = { score?: number; followersCount?: number };
+
 function buildStats(
   ids: Identity[],
   keys: readonly StatKey[],
-  tints: { warning: string; success: string }
+  tints: { warning: string; success: string },
+  cachedOperator: CachedOperatorStats | undefined
 ): RowStat[] {
   const mintStats = find(ids, 'mint')?.stats;
+  const provider = find(ids, 'provider');
   const nostr = find(ids, 'nostr');
   const ble = find(ids, 'ble');
+  const operator = operatorStats(nostr, mintStats, cachedOperator);
 
   const out: RowStat[] = [];
 
   for (const key of keys) {
     switch (key) {
-      case 'balance':
-        if (typeof mintStats?.balance === 'number' && mintStats.balance > 0) {
+      case 'balance': {
+        const sats = mintStats?.balance ?? provider?.spendableSats;
+        if (typeof sats === 'number' && sats > 0) {
+          // Only a provider row has a price to hold the balance against, and
+          // only once nagg has priced its catalog.
+          const floor = mintStats ? undefined : provider?.minMessageSats;
+          const affords = floor === undefined ? undefined : sats >= floor;
           out.push({
             icon: 'solar:wallet-bold',
-            value: formatCompact(mintStats.balance),
-            color: STAT_COLOR_SOCIAL,
+            value: formatCompact(sats),
+            color:
+              affords === undefined
+                ? STAT_COLOR_SOCIAL
+                : affords
+                  ? tints.success
+                  : STAT_COLOR_ERROR,
+            accessibilityLabel: provider
+              ? affords === false
+                ? `${sats} sats spendable here, not enough for one message`
+                : `${sats} sats spendable here`
+              : undefined,
           });
         }
         break;
+      }
+      case 'encrypted': {
+        // A count of sealed models, not a verdict on the provider. Only the
+        // affirmative is shown: a provider that can read your prompts is the
+        // norm, and a pill on every other row would make the one that offers
+        // an alternative harder to spot, not easier.
+        const sealed = provider?.encryptedModelCount;
+        if (typeof sealed === 'number' && sealed > 0) {
+          out.push({
+            icon: E2EE_BADGE_ICON,
+            value: formatCompact(sealed),
+            color: tints.success,
+            accessibilityLabel: `${sealed} end-to-end encrypted models available`,
+          });
+        }
+        break;
+      }
       case 'units': {
         // Only multi-currency mints get the badge — "BTC" on every row of an
         // all-sat list is noise. Keyset-backed, so an advertised-but-keyless
@@ -562,27 +723,43 @@ function buildStats(
         }
         break;
       case 'reputation': {
-        const r = nostr?.score ?? mintStats?.contactReputation;
-        if (typeof r === 'number' && r > 0) {
-          out.push({
-            icon: STAT_ICONS.reputation,
-            value: `${Math.round(r)}`,
-            color: STAT_COLOR_SOCIAL,
-            accessibilityLabel: `Reputation score ${Math.round(r)}`,
-          });
-        }
+        if (!operator.known) break;
+        const r = operator.reputation;
+        out.push(
+          r === undefined
+            ? {
+                icon: STAT_ICONS.reputation,
+                value: UNMEASURED,
+                color: STAT_COLOR_SOCIAL,
+                accessibilityLabel: 'Reputation not measured',
+              }
+            : {
+                icon: STAT_ICONS.reputation,
+                value: `${Math.round(r)}`,
+                color: STAT_COLOR_SOCIAL,
+                accessibilityLabel: `Reputation score ${Math.round(r)}`,
+              }
+        );
         break;
       }
       case 'followers': {
-        const f = nostr?.followerCount ?? mintStats?.contactFollowers;
-        if (typeof f === 'number' && f > 0) {
-          out.push({
-            icon: STAT_ICONS.followers,
-            value: formatCompact(f),
-            color: STAT_COLOR_SOCIAL,
-            accessibilityLabel: `${f} followers`,
-          });
-        }
+        if (!operator.known) break;
+        const f = operator.followers;
+        out.push(
+          f === undefined
+            ? {
+                icon: STAT_ICONS.followers,
+                value: UNMEASURED,
+                color: STAT_COLOR_SOCIAL,
+                accessibilityLabel: 'Follower count not measured',
+              }
+            : {
+                icon: STAT_ICONS.followers,
+                value: formatCompact(f),
+                color: STAT_COLOR_SOCIAL,
+                accessibilityLabel: f === 1 ? '1 follower' : `${f} followers`,
+              }
+        );
         break;
       }
       case 'offline':
@@ -676,6 +853,7 @@ export function ContactRow({
   const mintBalance = hasMintBalance ? mintStats.balance : null;
 
   const resolvedLoading = loading ?? nostr?.isLoadingProfile ?? false;
+  const cachedOperator = useCachedProfileStats(nostr?.pubkey);
 
   // ---- Leading ----------------------------------------------------------
 
@@ -688,9 +866,27 @@ export function ContactRow({
   let avatarProp: ListRowAvatar | undefined;
   let iconCircleProp: ListRowIconCircle | undefined;
 
+  const provider = find(identities, 'provider');
+
   if (mint) {
+    // The same construction as the provider face below: the reachability dot
+    // rides on the icon, where it is read first and costs no width.
+    const presence = mint.stats?.presence;
     leadingNode = (
-      <MintIcon iconUrl={mint.iconUrl} name={name} size={AVATAR_SIZE} isLoading={resolvedLoading} />
+      <View className="relative">
+        <MintIcon
+          iconUrl={mint.iconUrl}
+          name={name}
+          size={AVATAR_SIZE}
+          isLoading={resolvedLoading}
+        />
+        {!resolvedLoading ? (
+          <PresenceDot
+            presence={presence === 'online' || presence === 'offline' ? presence : null}
+            size={AVATAR_SIZE}
+          />
+        ) : null}
+      </View>
     );
   } else if (nostr?.verified) {
     // Routes through `leading` so Avatar's `status` prop survives — ListRow's
@@ -704,6 +900,33 @@ export function ContactRow({
         status="VERIFIED"
         size={AVATAR_SIZE}
       />
+    );
+  } else if (provider) {
+    // A machine, drawn as one. Same clay and same seeded hues as every person
+    // fallback, because a provider belongs in the same visual family — but a
+    // node is not somebody, and a person silhouette said it was.
+    //
+    // Routed through `leading` rather than the `avatar` slot so the face can
+    // carry its own reachability dot. Whether a provider is answering is the
+    // fact that decides whether the rest of the row matters, and it used to
+    // live at the far end of a stats line as a heartbeat glyph plus the word
+    // "Online" — four rows deep, competing with the balance and the follower
+    // count. On the face it is the first thing read and costs no width, which
+    // is what the stats line was short of.
+    leadingNode = (
+      <View className="relative">
+        <Avatar
+          state={avatarState}
+          seed={seed}
+          name={name}
+          size={AVATAR_SIZE}
+          fallbackKind="robot"
+        />
+        <PresenceDot
+          presence={provider.status === 'unknown' ? null : provider.status}
+          size={AVATAR_SIZE}
+        />
+      </View>
     );
   } else if (nostr || self || ble || picture) {
     avatarProp = { picture, seed, name, size: AVATAR_SIZE, state: avatarState };
@@ -769,6 +992,12 @@ export function ContactRow({
 
   // ---- Subtitle ---------------------------------------------------------
 
+  // A provider deliberately has no subtitle. It used to read "Run by <name>",
+  // which meant every row waited on its operator's Nostr profile and changed
+  // under the reader when it landed — the deterministic word pair first, the
+  // real name a second or two later. The operator's standing is still on the
+  // row as the reputation and follower pills; only the name, and the wait for
+  // it, are gone.
   let subtitleNode: string | ReactNode | undefined;
   if (subtitleOverride === null) {
     subtitleNode = undefined;
@@ -811,7 +1040,9 @@ export function ContactRow({
   const statKeys = statsOverride ?? DEFAULT_STATS_BY_KIND[primary.kind];
   const statKeyList = statKeys.join(',');
   const statList: RowStat[] =
-    hideMetadata || resolvedLoading ? [] : buildStats(identities, statKeys, { warning, success });
+    hideMetadata || resolvedLoading
+      ? []
+      : buildStats(identities, statKeys, { warning, success }, cachedOperator);
 
   // While loading, a row that will show an inline stats accent once loaded must
   // reserve that line's height or the row grows when the pills arrive. Gate to

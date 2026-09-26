@@ -1,10 +1,13 @@
 /**
  * @fileoverview Recipient relay-list resolution + outbox composition.
  *
- * To make mentions/replies/DMs actually reach their recipients (the outbox
+ * To make mentions and replies actually reach their recipients (the outbox
  * model), a write must also target each recipient's NIP-65 read relays. This
  * fetches and caches other users' `kind:10002` lists, then composes the final
  * write set via the pure `resolveWriteRelays`.
+ *
+ * Public events only — see `resolveWriteRelays.ts` for why NIP-17 DMs do not
+ * use this path.
  */
 import type NDK from '@nostr-dev-kit/ndk-mobile';
 

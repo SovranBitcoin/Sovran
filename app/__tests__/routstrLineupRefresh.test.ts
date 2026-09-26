@@ -9,14 +9,35 @@ jest.mock('@/shared/lib/apiClient', () => ({
   getAiLineup: (...args: unknown[]) => mockGetAiLineup(...args),
 }));
 jest.mock('@/shared/stores/global/profileStore', () => ({
-  useProfileStore: { getState: () => ({ activeAccountIndex: mockProfile }) },
+  useProfileStore: {
+    getState: () => ({
+      activeAccountIndex: mockProfile,
+      profiles: [
+        { accountIndex: 0, pubkey: 'a'.repeat(64) },
+        { accountIndex: 1, pubkey: 'b'.repeat(64) },
+      ],
+    }),
+  },
+}));
+jest.mock('@/shared/lib/routstr/securePersistence', () => ({
+  createRoutstrPersistence: () =>
+    jest.requireMock('@/shared/lib/cashu/profileScopedStorage').createProfileScopedStorage(),
+}));
+jest.mock('@/shared/lib/routstr/secureVault', () => ({
+  createSecureVault: () => ({ read: async () => null, write: async () => {} }),
 }));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
+  captureProfileStorageOwner: async () => (mockProfile === 0 ? 'a' : 'b').repeat(64),
   createProfileScopedStorage: () => ({
     getItem: async () => null,
     setItem: async () => {},
     removeItem: async () => {},
   }),
+}));
+// Persisted, and this file's logger mock is partial; no mint here is a testnut.
+jest.mock('@/shared/stores/global/mintTestnutStore', () => ({
+  isTestnutMint: () => false,
+  useIsTestnutMint: () => () => false,
 }));
 jest.mock('@/shared/lib/logger', () => {
   const log = { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() };
@@ -63,6 +84,12 @@ async function load() {
     lineup: null,
     lastKnownLineup: null,
   });
+  // A provider the user picked. Nothing reaches a node until one is chosen,
+  // and `nodeBaseUrl` — nagg's own node — is a discovery seed rather than the
+  // request target, so the two are set separately.
+  const { setRoutstrNodeBaseUrl } =
+    require('@/shared/lib/routstr/api') as typeof import('@/shared/lib/routstr/api');
+  setRoutstrNodeBaseUrl('https://chosen.example');
   mockGetAiLineup.mockResolvedValue(ok(parsed));
   return {
     store: useRoutstrStore,
@@ -71,6 +98,25 @@ async function load() {
     schema: NaggAiLineupSchema,
   };
 }
+
+// The wallet half of a pay-per-request send. `@routstr/sdk` spends through
+// this adapter, so stubbing it here is what keeps these tests about the
+// classification above it rather than about Coco.
+jest.mock('@/shared/lib/routstr/sdk/walletAdapter', () => ({
+  createCocoWalletAdapter: () =>
+    jest.requireMock('@/shared/lib/routstr/sdk/walletAdapter').cocoWalletAdapter,
+  cocoWalletAdapter: {
+    getBalances: jest.fn(async () => ({ 'https://mint.example': 1000 })),
+    getMintUnits: () => ({ 'https://mint.example': 'sat' }),
+    getActiveMintUrl: () => 'https://mint.example',
+    sendToken: jest.fn(async () => 'cashuB-request-payment'),
+    receiveToken: jest.fn(async () => ({ success: true, amount: 0, unit: 'sat' })),
+  },
+}));
+
+jest.mock('@/shared/stores/profile/mintStore', () => ({
+  useMintStore: { getState: () => ({ selectedMint: 'https://mint.example' }) },
+}));
 
 describe('Routstr lineup refresh policy', () => {
   beforeEach(() => {
@@ -106,6 +152,22 @@ describe('Routstr lineup refresh policy', () => {
     expect(await refresh()).toBe(true);
     expect(await refresh()).toBe(false);
     expect(mockGetAiLineup).toHaveBeenCalledTimes(1);
+  });
+
+  it('archives the old credential before an unpinned server catalog changes nodes', async () => {
+    const { store, mapped } = await load();
+    store.setState({
+      userNodeBaseUrl: null,
+      nodeBaseUrl: 'https://old.example',
+      apiKey: 'sk-old',
+      balance: 1000,
+      legacyAccounts: {},
+    });
+    store.getState().setServerLineup({ ...mapped, lineup: mapped.lineup! });
+    expect(store.getState().apiKey).toBeNull();
+    expect(store.getState().legacyAccounts['https://old.example']).toMatchObject({
+      apiKey: 'sk-old',
+    });
   });
 
   it.each([6, 8])(
@@ -185,7 +247,7 @@ describe('Routstr lineup refresh policy', () => {
         );
       const { sendMessage } =
         require('@/shared/lib/routstr/api') as typeof import('@/shared/lib/routstr/api');
-      await expect(sendMessage('sk-test', [], { model: 'new-model' })).rejects.toMatchObject({
+      await expect(sendMessage([], { model: 'new-model' })).rejects.toMatchObject({
         status,
       });
       expect(store.getState()).toMatchObject({ serverLineupAt: null, lineup: null });

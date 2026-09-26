@@ -5,7 +5,7 @@ import { StyleSheet, type StyleProp, View, type ViewStyle } from 'react-native';
 
 import Icon from '@/assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { prefetchImage } from '@/shared/lib/imageCache';
+import { isSafeImageUrl, prefetchImage } from '@/shared/lib/imageCache';
 
 const MINT_DEFAULT_ICON = 'mingcute:bank-fill';
 
@@ -26,7 +26,11 @@ interface MintIconProps {
 
 function normalizeIconUrl(iconUrl: string | null | undefined): string | undefined {
   const trimmed = iconUrl?.trim();
-  return trimmed ? trimmed : undefined;
+  // `icon_url` is mint-supplied. `prefetchImage` already refuses a non-http(s)
+  // scheme; the render path did not, so a mint could put `file:`, `data:` or a
+  // custom scheme straight into `source={{ uri }}`. Same guard, both paths.
+  if (!trimmed || !isSafeImageUrl(trimmed)) return undefined;
+  return trimmed;
 }
 
 export function MintIcon({

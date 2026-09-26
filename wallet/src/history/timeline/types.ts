@@ -13,6 +13,7 @@ import type {
   createPaymentCopyGroups,
   PaymentCopyResolver,
 } from "../../copy";
+import type { SpendingConditions } from "../../p2pk";
 
 export interface OnchainConfirmationProgress {
   hasPayment: boolean;
@@ -67,6 +68,12 @@ export interface BuildTimelineInput {
    */
   onchainSettledInternally?: boolean;
   paymentCopy?: PaymentCopyResolver;
+  /**
+   * Public keys this wallet can sign for. Only affects whether an expired
+   * lock reads as "you can take this back" or "anyone can", so a caller that
+   * has not loaded them yet gets the cautious reading rather than a wrong one.
+   */
+  ourPubkeys?: readonly string[];
 }
 
 /** A fully-resolved timeline row: TimelineItem plus stable identity keys. */
@@ -107,6 +114,7 @@ export type TimelineFlowVariant =
   | "lightning-melt"
   | "onchain-melt"
   | "send"
+  | "locked-send"
   | "payment-request-send"
   | "receive"
   | "receive-recovery"
@@ -138,11 +146,19 @@ export interface TimelineContext {
   meltState: string | null;
   /** Receive payment-request synthetic pending row flag. */
   prPendingFlag: boolean;
+  /**
+   * The send's spending conditions, when it has any. Present for the
+   * `locked-send` variant and null everywhere else, so a flow can read the
+   * unlock date without every flow learning about locks.
+   */
+  lock: SpendingConditions | null;
 }
 
 export interface MilestoneDef {
   /** Semantic step id, stable across states. Doubles as the default rowKey. */
   id: string;
+  /** Omit a milestone that cannot occur for this flow's conditions. */
+  included?(ctx: TimelineContext): boolean;
   /** MONOTONE "the flow has arrived at (or passed) this milestone". The engine
    *  takes the max reached index as the active position. */
   reached(ctx: TimelineContext): boolean;

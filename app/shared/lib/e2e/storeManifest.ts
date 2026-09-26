@@ -31,6 +31,7 @@ import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
 import { useOwnProfileMetadataStore } from '@/shared/stores/profile/ownProfileMetadataStore';
+import { useAiProviderDirectoryStore } from '@/shared/stores/profile/aiProviderDirectoryStore';
 import { useOwnContentStore } from '@/shared/stores/profile/ownContentStore';
 import { useOwnedMediaStore } from '@/shared/stores/profile/ownedMediaStore';
 import { useRecentPeopleStore } from '@/shared/stores/profile/recentPeopleStore';
@@ -52,6 +53,7 @@ import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { useNfcTapStore } from '@/shared/stores/runtime/nfcTapStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
+import { useSendLockStore } from '@/shared/stores/runtime/sendLockStore';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
@@ -86,6 +88,7 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'profile/nutDropRedeemQueueStore': useNutDropRedeemQueueStore,
   'profile/ownProfileMetadataStore': useOwnProfileMetadataStore,
   'profile/ownContentStore': useOwnContentStore,
+  'profile/aiProviderDirectoryStore': useAiProviderDirectoryStore,
   'profile/dmLastMessageStore': useDmLastMessageStore,
   'profile/ownedMediaStore': useOwnedMediaStore,
   'profile/recentPeopleStore': useRecentPeopleStore,
@@ -100,6 +103,7 @@ export const E2E_STORE_MANIFEST: Record<string, MirrorableStore> = {
   'profile/transactionLocationStore': useTransactionLocationStore,
   'runtime/amountDraftStore': useAmountDraftStore,
   'runtime/contactSendStore': useContactSendStore,
+  'runtime/sendLockStore': useSendLockStore,
   'runtime/debugTierStore': useDebugTierStore,
   'runtime/deleteStatusStore': useDeleteStatusStore,
   'runtime/mockDataStore': useMockDataStore,

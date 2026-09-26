@@ -3,6 +3,7 @@ import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import {
   useScreenInsets,
+  useFrameBottomInset,
   useScreenBottomPadding,
   useReportTabBarHeight,
   TabBarInsetsProvider,
@@ -50,6 +51,34 @@ function render(element: React.ReactElement) {
 }
 afterEach(() => {
   act(() => trees.splice(0).forEach((tree) => tree.unmount()));
+});
+
+/**
+ * An absolutely-positioned child of a `Screen safeArea` frame is laid out
+ * against that frame's BORDER box, so its `paddingBottom` never reaches the
+ * child. `useScreenInsets().bottom` reports 0 once a frame has consumed the
+ * inset, which is right for a child inside the padding and wrong for this one.
+ */
+function FrameProbe() {
+  return <View testID="frame" accessibilityValue={{ now: useFrameBottomInset() }} />;
+}
+
+it('reports the real inset to an absolute child even after a frame consumed it', () => {
+  const tree = render(
+    <ConsumedBottomInsetContext.Provider value={true}>
+      <FrameProbe />
+    </ConsumedBottomInsetContext.Provider>
+  );
+  expect(tree.root.findByProps({ testID: 'frame' }).props.accessibilityValue.now).toBe(34);
+});
+
+it('reports 0 under docked tabs, whose navigator already shortened the viewport', () => {
+  const tree = render(
+    <TabBarInsetsProvider mode="docked">
+      <FrameProbe />
+    </TabBarInsetsProvider>
+  );
+  expect(tree.root.findByProps({ testID: 'frame' }).props.accessibilityValue.now).toBe(0);
 });
 
 it.each(['ios', 'android'] as const)(

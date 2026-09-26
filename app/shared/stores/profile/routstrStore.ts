@@ -1,16 +1,19 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
-import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
+import { createRoutstrPersistence } from '@/shared/lib/routstr/securePersistence';
 import { mintLocalId } from '@/shared/lib/id';
 import { aiLog, storeLog } from '@/shared/lib/logger';
 import { RoutstrModel, setRoutstrNodeBaseUrl } from '@/shared/lib/routstr/api';
 import {
   AI_PROVIDER_IDS,
   AI_TIER_IDS,
+  E2EE_PROVIDER_ID,
   PersistedLineupSchema,
+  curatedIdSet,
   deriveLineup,
   lineupHasEntries,
+  lineupProviderIds,
   mergeLineupWithLastKnown,
   type AiLineup,
   type AiProviderId,
@@ -18,8 +21,18 @@ import {
   type PersistedLineup,
 } from '@/shared/lib/routstr/lineup';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
-import { tolerantArray } from '@/shared/lib/persist/tolerant';
+import { tolerantRecord, tolerantArray } from '@/shared/lib/persist/tolerant';
 import { restoreActiveSessionView } from '@/shared/stores/profile/restoreActiveSessionView';
+import { normalizeNodeUrl } from '@/shared/lib/routstr/providers';
+import {
+  contestedPubkeySources,
+  resolveProviders,
+  withClaim,
+  type ProviderClaim,
+  type ProviderRecord,
+  type ProviderSource,
+  type ResolvedProvider,
+} from '@/shared/lib/routstr/providerClaims';
 
 // AI tab tier + provider ids — imported from the shared lineup module,
 // which is the single source of truth for both this store's selection
@@ -33,6 +46,166 @@ const DEFAULT_TIER: RoutstrTierId = 'auto';
 type RoutstrProviderId = AiProviderId;
 const PROVIDER_IDS = AI_PROVIDER_IDS;
 const DEFAULT_PROVIDER: RoutstrProviderId = 'openai';
+
+/** What `selectionCarriedFrom` records when the selection was made against
+ *  the built-in default node, which `nodeBaseUrl` spells as `null`. */
+const DEFAULT_NODE_KEY = 'default';
+
+/**
+ * Keep the selected vendor pointing at something the new lineup can answer.
+ *
+ * The selection is sticky and the lineup is not. A node swap replaces the
+ * whole vendor set — a pinned node whose catalogue is ten `tinfoil-` rows
+ * derives a lineup containing exactly one vendor — while `selectedProvider`
+ * keeps naming the vendor from the node before it. Every cell lookup then
+ * misses, and the send path refuses with "the model list has not loaded" over
+ * a lineup it is holding. That is the `ai.send.no_lineup` / `hasCatalog: true`
+ * contradiction in the logs, five in a row as the user retried.
+ *
+ * `setSelectedSlot` already validates the vendor the USER picks against the
+ * lineup; this is the other half, for when the lineup moves underneath a
+ * selection that was valid when it was made.
+ *
+ * Two rules the replacement must obey:
+ *
+ *   - Never re-point AWAY from `E2EE_PROVIDER_ID`. A node that serves no
+ *     sealed model is a node that cannot keep the promise the user selected,
+ *     and moving them quietly onto a plaintext vendor is precisely the silent
+ *     downgrade the sealed candidate chain exists to prevent. The send path's
+ *     `routstr.e2ee_unavailable` is the honest answer there.
+ *
+ *     That rule holds the promise; it must not also strand the user. Staying
+ *     put on a node that serves nothing sealed is a selection nothing can
+ *     resolve, so the state has to be legible and reversible BY THE USER
+ *     rather than by this function: the chip says so in words
+ *     (`UNSERVED_SELECTION_LABEL`) instead of printing a model it cannot
+ *     name, the picker opens on a vendor the node actually serves so a
+ *     deliberate swap is one tap, and the failed turn's pill offers Change
+ *     Provider / Change Model. Every one of those routes is a choice the user
+ *     makes; none of them is this store choosing plaintext for them.
+ *
+ *     The one exception is the user's own hand. When THEY pick a new provider
+ *     (`setUserNode`), the page they picked it from has just told them, at the
+ *     top and in words, whether that node can read their messages — and a
+ *     selection carried from the old node onto a new one that serves nothing
+ *     sealed is not a promise kept, it is a chip reading "Not on this node"
+ *     until the next relaunch resets it (the "sometimes it fails, but a
+ *     restart fixes it" report). So a selection carried across a user-made
+ *     switch is re-fitted like any other: kept if the new node serves it, and
+ *     moved to the best plaintext fit if not, with the move logged. Only a
+ *     lineup that changed UNDER the user — a nagg repoint, catalog drift —
+ *     keeps the never-downgrade rule.
+ *   - Prefer a plaintext vendor, and only land ON `E2EE_PROVIDER_ID` when the
+ *     lineup offers nothing else. Enclave rows are the dearest in a catalogue,
+ *     so this is a last resort — but it is a visible one: the chip renders the
+ *     resolved model's padlock and name, and the spend confirmation states the
+ *     reservation before anything leaves.
+ *
+ * Returns `null` when the selection still resolves, or when there is nothing
+ * to move it to — an empty lineup is a placeholder, not a verdict.
+ */
+function reselectProviderForLineup(
+  selected: RoutstrProviderId,
+  lineup: AiLineup | null,
+  allowLeavingSealed: boolean
+): RoutstrProviderId | null {
+  if (selected === E2EE_PROVIDER_ID && !allowLeavingSealed) return null;
+  const offered = lineupProviderIds(lineup);
+  if (offered.length === 0 || offered.includes(selected)) return null;
+  const plaintext = offered.filter((id) => id !== E2EE_PROVIDER_ID);
+  const preferred = PROVIDER_IDS.find((id) => plaintext.includes(id)) ?? plaintext[0] ?? offered[0];
+  return preferred ?? null;
+}
+
+/**
+ * Keep the selected TIER naming a rung this vendor actually fills.
+ *
+ * The other half of the same contract. A selection is a (provider, tier) PAIR
+ * and it has to name a real cell, but only the vendor half was ever
+ * reconsidered — so a repoint moved the provider and left the tier behind. It
+ * is not a harmless leftover, because a tier is not a global constant either:
+ * `pickTiers` fills partial ladders deterministically (2 qualifying models →
+ * Auto + Max, 1 → Auto only), and both the encrypted vendor and the four named
+ * ones are exempt from the ladder minimum, so a thin vendor with a hole in its
+ * ladder is the ordinary case rather than the odd one.
+ *
+ * Land on Auto first: `AI_TIER_IDS` is ordered cheapest-to-dearest, and a pair
+ * the app repaired on the user's behalf must not quietly cost them more than
+ * the one they set.
+ *
+ * Returns `null` when the pair already resolves, or when there is nothing to
+ * check it against — an absent vendor block is a placeholder, not a verdict,
+ * exactly as an empty lineup is for the vendor half. That absence is also the
+ * stranded sealed selection (`E2EE_PROVIDER_ID` pinned on a node serving
+ * nothing sealed): there is no rung to move to, the privacy rule forbids
+ * moving vendor, and the honest answer is the chip's own — see
+ * `UNSERVED_SELECTION_LABEL` in `features/ai/lib/format.ts`.
+ */
+function reselectTierForProvider(
+  provider: RoutstrProviderId,
+  tier: RoutstrTierId,
+  lineup: AiLineup | null
+): RoutstrTierId | null {
+  const vendor = lineup?.[provider];
+  if (!vendor || vendor[tier] != null) return null;
+  return TIER_IDS.find((candidate) => vendor[candidate] != null) ?? null;
+}
+
+/** `reselectProviderForLineup` and `reselectTierForProvider` as one partial
+ *  state patch, so the repoint lands in the same `set` as the lineup that
+ *  caused it — the two can never be observed apart, and a send started between
+ *  them cannot read a selection the lineup does not answer. Both halves move
+ *  together for the same reason: a patch that carried the new vendor without
+ *  its tier would itself be a selection the lineup cannot answer. */
+function repointSelection(
+  selected: RoutstrProviderId,
+  selectedTier: RoutstrTierId,
+  lineup: AiLineup | null,
+  /**
+   * Why the lineup moved. `user_switch` is a selection carried across a node
+   * the USER chose, which is the one case allowed to leave the sealed vendor;
+   * everything else is the lineup changing under them and keeps the promise.
+   */
+  reason: 'user_switch' | 'lineup_changed' | 'hydrate'
+): Partial<Pick<RoutstrState, 'selectedProvider' | 'selectedTier'>> {
+  const allowLeavingSealed = reason === 'user_switch';
+  const nextProvider = reselectProviderForLineup(selected, lineup, allowLeavingSealed);
+  const provider = nextProvider ?? selected;
+  const nextTier = reselectTierForProvider(provider, selectedTier, lineup);
+  const offered = lineupProviderIds(lineup);
+  if (nextProvider == null && nextTier == null) {
+    // Nothing moved, but that is two different facts: the selection is served,
+    // or it is stranded and the rule above chose to leave it. The second is
+    // the state every "the model did not change" report describes, so it is
+    // said in its own words rather than left to be inferred from silence.
+    if (offered.length > 0 && !offered.includes(selected)) {
+      storeLog.warn('store.routstr.selection_unserved', {
+        reason,
+        selectedProvider: selected,
+        selectedTier,
+        sealedSelection: selected === E2EE_PROVIDER_ID,
+        offered,
+      });
+    }
+    return {};
+  }
+  storeLog.info('store.routstr.provider_repointed', {
+    reason,
+    from: selected,
+    to: provider,
+    fromTier: selectedTier,
+    toTier: nextTier ?? selectedTier,
+    // The downgrade, named. A sealed selection landing on a plaintext vendor
+    // is allowed only across a user-made switch, and a log reader should be
+    // able to find every time it happened without reconstructing the pair.
+    leftSealed: selected === E2EE_PROVIDER_ID && provider !== E2EE_PROVIDER_ID,
+    offered,
+  });
+  return {
+    ...(nextProvider != null ? { selectedProvider: nextProvider } : {}),
+    ...(nextTier != null ? { selectedTier: nextTier } : {}),
+  };
+}
 
 /**
  * Image attached to a chat message. Bounded local-URI metadata ONLY —
@@ -115,12 +288,156 @@ interface ModelsCache {
   timestamp: number;
 }
 
+/**
+ * A Routstr credential this profile has held, kept so the sats behind it stay
+ * reachable.
+ *
+ * A Routstr key is `sk-<sha256(token)>` — a row in ONE node's database — and it
+ * is the only bearer instrument for whatever was deposited. Until now a 401
+ * deleted it outright, which made that balance permanently unreachable; and
+ * because a node repoint leaves the key addressed at a node that never issued
+ * it, a 401 was exactly what a repoint produced.
+ */
+interface RoutstrAccount {
+  apiKey: string;
+  /** Issuing provider; old records use their map key when this is absent. */
+  nodeBaseUrl?: string | null;
+  /** Last balance this key was observed to hold, in msats. A hint for the UI,
+   *  never a substitute for asking the node. */
+  lastKnownBalanceMsats: number | null;
+  archivedAt: number;
+  /** Set once the balance has been swept back into the wallet. */
+  reclaimedAt: number | null;
+}
+
+function withArchivedAccount(
+  accounts: Record<string, RoutstrAccount>,
+  nodeBaseUrl: string | null,
+  apiKey: string,
+  balanceMsats: number | null
+): Record<string, RoutstrAccount> {
+  const node = nodeBaseUrl ?? 'unknown';
+  const match = Object.entries(accounts).find(
+    ([key, account]) => (account.nodeBaseUrl ?? key) === node && account.apiKey === apiKey
+  );
+  const key = match?.[0] ?? (accounts[node] ? mintLocalId('routstr-account') : node);
+  const existing = accounts[key];
+  return {
+    ...accounts,
+    [key]: {
+      apiKey,
+      nodeBaseUrl,
+      lastKnownBalanceMsats: existing?.lastKnownBalanceMsats ?? balanceMsats ?? null,
+      archivedAt: existing?.archivedAt ?? Date.now(),
+      reclaimedAt: existing?.reclaimedAt ?? null,
+    },
+  };
+}
+
+/** A payment in the window between spending and being paid back. */
+interface PendingPayment {
+  /** The token as sent. It is the lookup key the node refunds against. */
+  encoded: string;
+  nodeBaseUrl: string;
+  /** Coco send operation, so a token the node never redeemed can be undone. */
+  operationId: string;
+  startedAt: number;
+}
+
 interface RoutstrState {
   /** Cashu token or persistent wallet key */
   apiKey: string | null;
   authMode: 'bearer' | 'x-cashu';
   /** Balance in msats */
   balance: number | null;
+  /**
+   * Superseded credentials, keyed by the node they are BELIEVED to belong to.
+   *
+   * The key is a hint, not a fact: a repoint can move `nodeBaseUrl` out from
+   * under a credential before anything archives it, so the pairing recorded
+   * here may be wrong. Reclaim must therefore try each archived key against
+   * every node we know of rather than trusting this key — asking a node that
+   * never issued it is free and answers `401 key_not_found`.
+   */
+  legacyAccounts: Record<string, RoutstrAccount>;
+  /**
+   * Every Routstr provider this profile has seen, as the app should show it.
+   *
+   * Derived from `providerClaims` below and never persisted: what is durable
+   * is what each party SAID, and which of them wins is a rule in code that a
+   * later build is allowed to change its mind about.
+   *
+   * Remembering providers at all makes the list a floor rather than a
+   * snapshot — discovery is a live fetch and the node serving it is sometimes
+   * the one that is down, which is how a picker that listed 28 came back
+   * showing two. A failed refresh loses freshness, never the menu.
+   *
+   * `mints` is the field that matters most. A node redeems tokens only from
+   * the mints it publishes, so this is what says whether the user can pay a
+   * provider at all — before they pick it and watch a send fail. `name` is
+   * `null` when nobody has published one: the hostname shown in its place is
+   * produced by the row that renders it, never stored here.
+   */
+  knownProviders: Record<string, ResolvedProvider>;
+  /**
+   * What each party said, kept apart by who said it.
+   *
+   * The durable half of the pair: `knownProviders` above is derived from this
+   * and never persisted, because a resolution is only as good as the ranking
+   * that produced it and that ranking is code, not data.
+   */
+  providerClaims: Record<string, ProviderRecord>;
+  /**
+   * When each provider was last heard from at all, for eviction only.
+   *
+   * Deliberately NOT a field on the record. Every observation refreshes it and
+   * almost none of them carry news, so keeping it inside the thing the list
+   * renders meant a silent probe sweep published 38 new objects and re-rendered
+   * every row. Housekeeping and facts have different lifetimes; they get
+   * different homes.
+   */
+  providerSeenAt: Record<string, number>;
+  /**
+   * A provider the USER chose, which outranks nagg's pick.
+   *
+   * nagg moves `nodeBaseUrl` on its own — its ladder switches on catalog
+   * health, and the app follows. That is right as a default and wrong as a
+   * rule: a user who deliberately picked a provider must not be moved off it
+   * by a background refresh. `null` means "whatever nagg says", which is the
+   * default everyone starts on.
+   */
+  userNodeBaseUrl: string | null;
+  /**
+   * Payments handed to a node whose change has not come home yet.
+   *
+   * Paying per request means spending a token and taking change back in the
+   * same round trip. Between those two moments the money is in the node's
+   * hands and the only record of it is a response header we have not read. If
+   * the app dies there — force quit, crash, OS reclaim — that header never
+   * arrives and the change is lost.
+   *
+   * Recording the token BEFORE sending closes that window, because routstr's
+   * refund endpoint accepts the original token and returns that specific
+   * request's change (`routstr/balance.py`, the `X-Cashu` branch). So a
+   * payment written here can always be asked about again.
+   */
+  pendingPayments: Record<string, PendingPayment>;
+  /**
+   * Ask before each message what it could cost.
+   *
+   * Paying per request LOCKS the node's admission gate for the duration of the
+   * call, and on a frontier model that is thousands of sats even when the
+   * message itself costs a fraction of one. The user should see that number
+   * before it leaves, not discover it in the history.
+   *
+   * Nothing in the app sets this to `false` any more: the "Always allow"
+   * button that did was removed because it was a one-way door (no settings
+   * toggle was ever built to undo it). It stays a persisted boolean rather
+   * than a constant so re-introducing the setting is a UI change, not a
+   * schema change — and `migrate` at version 2 repairs the blobs that already
+   * hold `false`.
+   */
+  confirmSpend: boolean;
   /**
    * Working copy of the active session's messages. The canonical home is
    * `sessions[currentSessionId].messages`; this field is rehydrated from
@@ -154,6 +471,20 @@ interface RoutstrState {
    * carry-over choice they made on a different account or session.
    */
   selectedProvider: RoutstrProviderId;
+  /**
+   * The node the current (provider, tier) pair was chosen against, when the
+   * USER has since moved to a different one and no lineup for the new node
+   * has landed yet. Session-only.
+   *
+   * `setUserNode` cannot re-fit the selection itself — the new node's lineup
+   * arrives later, from whichever of the catalog read or the nagg refresh
+   * answers first — so it leaves this note, and the first lineup adoption
+   * that reads it re-fits the pair with the user-switch rule (allowed to leave
+   * the sealed vendor, see `reselectProviderForLineup`) and clears it. `null`
+   * means the selection was made against the node in play, and a lineup that
+   * moves under it keeps the never-downgrade rule.
+   */
+  selectionCarriedFrom: string | null;
   modelsCache: ModelsCache | null;
   /**
    * Session-only lineup derived from the last successful catalog fetch
@@ -169,6 +500,14 @@ interface RoutstrState {
    * tolerant on parse so it can never take down the rest of this blob.
    */
   lastKnownLineup: PersistedLineup | null;
+  /**
+   * Routstr's curated model list (Nostr kind 38423, `routstr-21-models`), as
+   * last fetched. Persisted, so a cold start derives against the same list the
+   * previous session did rather than against nothing until the relays answer.
+   * `null` until the first successful fetch. See `shared/lib/routstr/
+   * curatedModels.ts` for what it is and `deriveLineup` for how it is used.
+   */
+  curatedModels: CuratedModelsState | null;
   /**
    * Timestamp of the last applied nagg-served lineup (`/app/ai-lineup`).
    * Persisted, including invalidation. While set, setCachedModels refreshes the raw
@@ -189,9 +528,29 @@ interface RoutstrState {
   isAnonymousMode: boolean;
 }
 
+interface CuratedModelsState {
+  ids: string[];
+  blacklistedNodes: string[];
+  whitelistedNodes: string[];
+  /** The event's `created_at`, in ms. */
+  updatedAt: number;
+  /** When this device fetched it, for the refresh TTL. */
+  fetchedAt: number;
+}
+
 interface RoutstrActions {
+  /** Adopt a freshly fetched curated list and re-derive the lineup from the
+   *  catalog in hand, so a list that arrives after the catalog still shapes
+   *  the menu this session. */
+  setCuratedModels: (curated: CuratedModelsState) => void;
   setApiKey: (apiKey: string) => void;
   clearApiKey: () => void;
+  /** Move a credential into `legacyAccounts` so its balance stays reachable.
+   *  Idempotent, and never overwrites a richer record with a poorer one. */
+  archiveAccount: (nodeBaseUrl: string | null, apiKey: string, balanceMsats: number | null) => void;
+  /** Mark an archived credential as swept. Keeps the row (the node may still
+   *  hold dust, and a refund is idempotent) but stops it being retried. */
+  markAccountReclaimed: (nodeBaseUrl: string) => void;
   applyChangeToken: (token: string) => void;
   invalidateServerLineup: () => void;
 
@@ -236,7 +595,24 @@ interface RoutstrActions {
     lineup: AiLineup;
     nodeBaseUrl: string | null;
     authMode?: 'bearer' | 'x-cashu';
-  }) => void;
+  }) => boolean;
+  /** Pin the app to a provider, or pass `null` to follow nagg again. Drops the
+   *  server lineup and model cache so the menu re-derives from the new node's
+   *  own catalog rather than showing another node's models. */
+  /**
+   * Record what ONE party said about some providers.
+   *
+   * `source` is not bookkeeping: it decides whether the claim is shown. A
+   * peer node repeating a name the provider itself published changes nothing,
+   * and a peer asserting who runs a node changes nothing ever. See
+   * `providerClaims.ts` for the ladder.
+   */
+  observeProviders: (source: ProviderSource, providers: Record<string, ProviderClaim>) => void;
+  setUserNode: (nodeBaseUrl: string | null) => void;
+  /** Record a payment before it leaves, so its change stays recoverable. */
+  beginPayment: (id: string, payment: PendingPayment) => void;
+  /** Forget a payment whose change is home, or which was never taken. */
+  settlePayment: (id: string) => void;
   isCacheStale: (nowMs?: number) => boolean;
 
   createSession: () => string;
@@ -314,7 +690,11 @@ const PersistedRoutstrMessage = z.looseObject({
   role: z.enum(['user', 'assistant']),
   content: z.string().max(65_536),
   timestamp: z.number().int().nonnegative(),
-  attachments: z.array(PersistedChatAttachment).max(4).optional().catch([]),
+  attachments: z
+    .array(PersistedChatAttachment)
+    .max(4)
+    .optional()
+    .catch(() => []),
   parentId: z.string().max(128).nullable().optional(),
   thinkingDurationSec: z.number().nonnegative().optional(),
   reasoningContent: z.string().max(65_536).optional(),
@@ -349,6 +729,57 @@ const PersistedRoutstrMessages = tolerantArray(
   PersistedRoutstrMessage,
   MAX_PERSISTED_SESSION_MESSAGES
 );
+
+/**
+ * Archived credentials, bounded to what the schema accepts.
+ *
+ * The ceiling is applied here, like `boundedSessions`, so the blob is trimmed
+ * at the one point where store state becomes persisted state rather than at
+ * each writer. Eviction is deliberately NOT least-recently-used: a row is a
+ * candidate only once it has been reclaimed, because the alternative is
+ * deleting the one string that can reach a user's money. If every row is still
+ * unreclaimed the record is left over its ceiling — an oversized blob is
+ * recoverable; a deleted key is not.
+ */
+/**
+ * Keep the directory bounded, dropping the least recently seen first.
+ *
+ * Plain recency is right here in a way it is not for `legacyAccounts`: a
+ * provider row holds no money, so losing the stalest one costs a menu entry
+ * that the next discovery pass restores.
+ */
+/** Keep the most recently heard-from providers, and say so when any are
+ *  dropped. Eviction is silent data loss otherwise: the row simply stops
+ *  existing, and re-discovery brings it back stripped of everything only one
+ *  party ever said about it. */
+function boundedClaims(
+  claims: Record<string, ProviderRecord>,
+  seenAt: Record<string, number>
+): Record<string, ProviderRecord> {
+  const entries = Object.entries(claims);
+  if (entries.length <= MAX_KNOWN_PROVIDERS) return claims;
+  storeLog.info('store.routstr.providers_evicted', {
+    held: entries.length,
+    bound: MAX_KNOWN_PROVIDERS,
+    evicted: entries.length - MAX_KNOWN_PROVIDERS,
+  });
+  return Object.fromEntries(
+    entries.sort(([a], [b]) => (seenAt[b] ?? 0) - (seenAt[a] ?? 0)).slice(0, MAX_KNOWN_PROVIDERS)
+  );
+}
+
+function boundedAccounts(accounts: Record<string, RoutstrAccount>): Record<string, RoutstrAccount> {
+  const entries = Object.entries(accounts);
+  if (entries.length <= MAX_ARCHIVED_ACCOUNTS) return accounts;
+  const reclaimed = entries
+    .filter(([, a]) => a.reclaimedAt != null)
+    .sort((a, b) => (a[1].reclaimedAt ?? 0) - (b[1].reclaimedAt ?? 0));
+  const dropCount = Math.min(entries.length - MAX_ARCHIVED_ACCOUNTS, reclaimed.length);
+  if (dropCount === 0) return accounts;
+  const dropped = new Set(reclaimed.slice(0, dropCount).map(([key]) => key));
+  storeLog.debug('store.routstr.accounts_evicted', { dropped: dropped.size });
+  return Object.fromEntries(entries.filter(([key]) => !dropped.has(key)));
+}
 
 /**
  * The session list, bounded to what the schema accepts.
@@ -419,6 +850,63 @@ const PersistedRoutstrSession = z.looseObject({
   activeChildren: z.record(z.string().max(128), z.string().max(128)).optional(),
 });
 
+/**
+ * Archived credentials never expire on a clock. Eviction is balance-aware by
+ * construction: only rows already reclaimed, or holding no key, are
+ * candidates. A pure LRU here would delete the one string that can reach a
+ * user's money, which is the failure this whole record exists to prevent.
+ */
+// nagg caps its own payload at 256 rows. Holding fewer than that meant a
+// healthy network evicted rows the user could still see — and because
+// eviction refreshes on every observation, WHICH rows was close to arbitrary.
+// A record is a few hundred bytes; the bound is there to stop unbounded
+// growth, not to be reached.
+const MAX_KNOWN_PROVIDERS = 256;
+
+/** One party's statement. Every field optional and tolerant: a source that
+ *  starts sending a shape we did not expect costs that field, not the row. */
+const PersistedProviderClaim = z.looseObject({
+  name: z.string().max(200).optional().catch(undefined),
+  description: z.string().max(2000).optional().catch(undefined),
+  version: z.string().max(64).optional().catch(undefined),
+  pubkey: z.string().max(128).optional().catch(undefined),
+  /** Empty means it publishes no list, which reads as "any mint". */
+  mints: tolerantArray(z.string().max(512), 32).optional().catch(undefined),
+  /** True when its catalog carried at least one `tinfoil-` model. Absent until
+   *  a catalog has been read for it — absence of evidence. */
+  e2ee: z.boolean().optional().catch(undefined),
+});
+
+/** A source this build no longer knows is dropped rather than kept as an
+ *  unranked claim: the ladder is the whole contract, and a claim outside it
+ *  would have no standing to be shown by. */
+const PersistedProviderRecord = z.looseObject({
+  claims: z
+    .partialRecord(
+      z.enum(['self', 'announcement', 'aggregator', 'peer', 'catalog', 'legacy']),
+      PersistedProviderClaim
+    )
+    .default({})
+    .catch(() => ({})),
+});
+
+const MAX_ARCHIVED_ACCOUNTS = 32;
+
+const PersistedRoutstrAccount = z.looseObject({
+  apiKey: z.string().max(8192),
+  nodeBaseUrl: z.string().max(512).nullable().default(null).catch(null),
+  lastKnownBalanceMsats: z.number().nullable().default(null).catch(null),
+  archivedAt: z.number().int().nonnegative().default(0).catch(0),
+  reclaimedAt: z.number().int().nonnegative().nullable().default(null).catch(null),
+});
+
+const PersistedPendingPayment = z.looseObject({
+  encoded: z.string().max(65_536),
+  nodeBaseUrl: z.string().max(512),
+  operationId: z.string().max(128),
+  startedAt: z.number().int().nonnegative().default(0).catch(0),
+});
+
 const PersistedRoutstrStore = z.object({
   authMode: z.enum(['bearer', 'x-cashu']).default('bearer').catch('bearer'),
   serverLineupAt: z.number().int().nonnegative().nullable().default(null).catch(null),
@@ -433,6 +921,35 @@ const PersistedRoutstrStore = z.object({
   // Additive + tolerant: a malformed value parses to null and the app
   // falls back to the built-in default node.
   nodeBaseUrl: z.string().max(512).nullable().default(null).catch(null),
+  // Additive, and `tolerantRecord` rather than a bare `z.record` on purpose:
+  // under `z.record` one malformed row rejects the record, and through
+  // `createMergeWithSchema` the whole blob — so a single bad entry would take
+  // every OTHER provider's key with it. Here it loses one row.
+  legacyAccounts: tolerantRecord(z.string().max(512), PersistedRoutstrAccount),
+  // Additive + tolerant: a malformed value parses to null, which simply means
+  // "follow nagg" — the default.
+  userNodeBaseUrl: z.string().max(512).nullable().default(null).catch(null),
+  // Additive + tolerant, same reasoning as `legacyAccounts`: one malformed
+  // provider row must cost that row, not the directory.
+  providerClaims: tolerantRecord(z.string().max(512), PersistedProviderRecord),
+  providerSeenAt: tolerantRecord(z.string().max(512), z.number().int().nonnegative()),
+  pendingPayments: tolerantRecord(z.string().max(128), PersistedPendingPayment),
+  // Additive, and defaulting to ON: spending is the kind of thing that should
+  // have to be turned off deliberately, never left off by a parse failure.
+  confirmSpend: z.boolean().default(true).catch(true),
+  // Additive + tolerant: a malformed list parses to null and the lineup derives
+  // against the whole catalog until the relays answer again.
+  curatedModels: z
+    .object({
+      ids: z.array(z.string().max(128)).max(512),
+      blacklistedNodes: z.array(z.string().max(512)).max(256).default([]),
+      whitelistedNodes: z.array(z.string().max(512)).max(256).default([]),
+      updatedAt: z.number().int().nonnegative().default(0),
+      fetchedAt: z.number().int().nonnegative().default(0),
+    })
+    .nullable()
+    .default(null)
+    .catch(null),
 });
 
 export const useRoutstrStore = create<RoutstrStore>()(
@@ -446,18 +963,72 @@ export const useRoutstrStore = create<RoutstrStore>()(
       selectedModel: null,
       selectedTier: DEFAULT_TIER,
       selectedProvider: DEFAULT_PROVIDER,
+      selectionCarriedFrom: null,
       modelsCache: null,
       lineup: null,
       lastKnownLineup: null,
+      curatedModels: null,
       serverLineupAt: null,
       nodeBaseUrl: null,
+      userNodeBaseUrl: null,
+      knownProviders: {},
+      providerClaims: {},
+      providerSeenAt: {},
+      pendingPayments: {},
+      confirmSpend: true,
+      legacyAccounts: {},
       sessions: [],
       currentSessionId: null,
       isAnonymousMode: false,
 
+      setCuratedModels: (curated) => {
+        const before = get().curatedModels;
+        set({ curatedModels: curated });
+        const same =
+          before != null &&
+          before.ids.length === curated.ids.length &&
+          before.ids.every((id, index) => id === curated.ids[index]);
+        storeLog.info('store.routstr.curated_models_set', {
+          models: curated.ids.length,
+          changed: !same,
+        });
+        // The list shapes the derivation, and the derivation may already have
+        // happened this session against no list or an older one. Re-run it
+        // from the catalog in hand; `setCachedModels` keeps its own rule about
+        // a nagg-served lineup outranking the derivation.
+        const cached = get().modelsCache;
+        if (!same && cached) get().setCachedModels(cached.data);
+      },
+
       setApiKey: (apiKey: string) => {
         storeLog.info('store.routstr.set_api_key');
         set({ apiKey });
+      },
+
+      archiveAccount: (nodeBaseUrl, apiKey, balanceMsats) => {
+        if (!apiKey) return;
+        set((state) => ({
+          legacyAccounts: withArchivedAccount(
+            state.legacyAccounts,
+            nodeBaseUrl,
+            apiKey,
+            balanceMsats
+          ),
+        }));
+      },
+
+      markAccountReclaimed: (nodeBaseUrl) => {
+        set((state) => {
+          const existing = state.legacyAccounts[nodeBaseUrl];
+          if (!existing) return state;
+          storeLog.info('store.routstr.account_reclaimed', { node: nodeBaseUrl });
+          return {
+            legacyAccounts: {
+              ...state.legacyAccounts,
+              [nodeBaseUrl]: { ...existing, reclaimedAt: Date.now(), lastKnownBalanceMsats: 0 },
+            },
+          };
+        });
       },
 
       applyChangeToken: (token) => {
@@ -554,10 +1125,21 @@ export const useRoutstrStore = create<RoutstrStore>()(
       },
 
       setSelectedSlot: (slot) => {
-        const safeProvider = PROVIDER_IDS.includes(slot.provider)
-          ? slot.provider
-          : DEFAULT_PROVIDER;
-        const safeTier = TIER_IDS.includes(slot.tier) ? slot.tier : DEFAULT_TIER;
+        // A vendor is valid when the live lineup offers it, not when it is one
+        // of four names compiled into the app: the menu now comes from the
+        // catalog, so its ids do too. The known-four remain acceptable so a
+        // selection survives a lineup that has not landed yet.
+        const lineup = get().lineup ?? get().lastKnownLineup?.lineup ?? null;
+        const offered = new Set<string>([...PROVIDER_IDS, ...lineupProviderIds(lineup)]);
+        const safeProvider = offered.has(slot.provider) ? slot.provider : DEFAULT_PROVIDER;
+        // `TIER_IDS` is the global list of tier NAMES, so it can only say that
+        // `pro` is spelled like a tier — never that THIS vendor has a Pro rung.
+        // The vendor half is checked against the vendors this lineup offers;
+        // the tier half is held to the same standard, against the tiers this
+        // vendor fills. When no lineup can answer yet, that check has nothing
+        // real to run against and the user's own choice stands.
+        const namedTier = TIER_IDS.includes(slot.tier) ? slot.tier : DEFAULT_TIER;
+        const safeTier = reselectTierForProvider(safeProvider, namedTier, lineup) ?? namedTier;
         storeLog.info('store.routstr.set_slot', {
           provider: safeProvider,
           tier: safeTier,
@@ -576,51 +1158,242 @@ export const useRoutstrStore = create<RoutstrStore>()(
         // A nagg-served lineup outranks derivation until invalidated by
         // model rejection or a failed refresh after seven days. Keep the raw catalog (pricing lookups,
         // vision flags, display names) but leave `lineup` untouched.
-        if (get().serverLineupAt != null) {
+        //
+        // The timestamp alone is NOT enough to claim that precedence.
+        // `serverLineupAt` is persisted and `lineup` is session-only, so after
+        // a cold start the app can hold a day-fresh timestamp and no lineup at
+        // all — and `refreshRoutstrLineup('foreground')` skips a
+        // `serverLineupAt` that young. Deferring to an absent lineup in that
+        // state vetoes the only other source of a menu for a full day, which
+        // is one of the ways the picker got stuck on "Models loading" with a
+        // full catalog already in `modelsCache`. Defer to a server lineup that
+        // is actually in memory; otherwise derive.
+        const held = get().lineup;
+        if (get().serverLineupAt != null && lineupHasEntries(held)) {
           aiLog.debug('ai.lineup.derive_skipped_server_lineup');
           set({ modelsCache: { data: models, timestamp: Date.now() } });
           return;
         }
-        const { lineup: derived, stats } = deriveLineup(models);
-        const previous = get().lastKnownLineup;
+        const { lineup: derived, stats } = deriveLineup(
+          models,
+          undefined,
+          curatedIdSet(get().curatedModels?.ids)
+        );
+        const snapshot = get().lastKnownLineup;
+        const previous = snapshot?.nodeBaseUrl === get().nodeBaseUrl ? snapshot : null;
         const merged = mergeLineupWithLastKnown(derived, previous?.lineup ?? null);
+        const filled = lineupHasEntries(merged);
         aiLog.info('ai.lineup.derived', {
           catalogSize: models.length,
           totalQualifying: stats.totalQualifying,
           perProvider: stats.perProvider,
-          substitutedProviders: PROVIDER_IDS.filter(
+          substitutedProviders: Object.keys(merged).filter(
             (p) => merged[p] !== derived[p] // mergeLineupWithLastKnown replaces the block reference
           ),
           allProvidersEmpty: !lineupHasEntries(derived),
+          keptPreviousLineup: !filled && lineupHasEntries(held),
         });
         const now = Date.now();
+        const adopted = filled || !lineupHasEntries(held) ? merged : held;
+        const carried = get().selectionCarriedFrom;
         set({
           modelsCache: { data: models, timestamp: now },
-          lineup: merged,
-          lastKnownLineup: lineupHasEntries(merged)
+          ...repointSelection(
+            get().selectedProvider,
+            get().selectedTier,
+            adopted,
+            carried != null ? 'user_switch' : 'lineup_changed'
+          ),
+          // The note is spent by the first lineup that can answer for the new
+          // node. An empty derivation is not one — it is a placeholder, and
+          // the re-fit has to wait for a lineup with entries.
+          ...(carried != null && lineupHasEntries(adopted) ? { selectionCarriedFrom: null } : {}),
+          // A catalog that qualifies nothing is not an upgrade on a menu that
+          // works. Node catalogs swing hard within one session (582 models one
+          // read, 10 the next), and an empty derivation is truthy — it would
+          // replace a working lineup AND shadow the `lastKnownLineup` fallback
+          // that every reader falls through to, leaving a menu that cannot
+          // recover until something else happens to refetch.
+          lineup: adopted,
+          lastKnownLineup: filled
             ? { derivedAt: now, lineup: merged, nodeBaseUrl: get().nodeBaseUrl }
             : previous,
         });
       },
 
       setServerLineup: ({ lineup, nodeBaseUrl, authMode }) => {
+        const pinned = get().userNodeBaseUrl;
+        if (
+          pinned &&
+          (!nodeBaseUrl || normalizeNodeUrl(pinned) !== normalizeNodeUrl(nodeBaseUrl))
+        ) {
+          return false;
+        }
         if (!lineupHasEntries(lineup)) {
           aiLog.warn('ai.lineup.server_empty');
-          return;
+          return false;
         }
         aiLog.info('ai.lineup.server_applied', {
           nodeChanged: nodeBaseUrl !== get().nodeBaseUrl,
-          providers: PROVIDER_IDS.filter((p) => TIER_IDS.some((t) => lineup[p][t] != null)),
+          providers: lineupProviderIds(lineup).filter((p) =>
+            TIER_IDS.some((t) => lineup[p]?.[t] != null)
+          ),
         });
         const now = Date.now();
-        setRoutstrNodeBaseUrl(nodeBaseUrl);
+        // `lineup` has entries (checked above), so a carried selection is
+        // re-fitted and the note spent here, whichever branch adopts it.
+        const carried = get().selectionCarriedFrom;
+        const repointReason = carried != null ? 'user_switch' : 'lineup_changed';
+        // A catalog is authoritative only for the node that served it.
+        if (pinned) {
+          setRoutstrNodeBaseUrl(pinned);
+          set({
+            lineup,
+            serverLineupAt: now,
+            ...repointSelection(get().selectedProvider, get().selectedTier, lineup, repointReason),
+            selectionCarriedFrom: null,
+            lastKnownLineup: { derivedAt: now, lineup, nodeBaseUrl: pinned },
+          });
+          return true;
+        }
+        // nagg's own node is remembered as a discovery seed, never adopted as
+        // the request target: the user picks who gets paid, and this app does
+        // not get to recommend one on their behalf.
+        const previous = get();
+        const moving = nodeBaseUrl !== previous.nodeBaseUrl;
         set({
           lineup,
           serverLineupAt: now,
+          ...repointSelection(
+            previous.selectedProvider,
+            previous.selectedTier,
+            lineup,
+            repointReason
+          ),
+          selectionCarriedFrom: null,
           nodeBaseUrl,
           authMode: authMode ?? (nodeBaseUrl === get().nodeBaseUrl ? get().authMode : 'bearer'),
           modelsCache: nodeBaseUrl === get().nodeBaseUrl ? get().modelsCache : null,
           lastKnownLineup: { derivedAt: now, lineup, nodeBaseUrl },
+          ...(moving
+            ? {
+                apiKey: null,
+                balance: null,
+                legacyAccounts: previous.apiKey
+                  ? withArchivedAccount(
+                      previous.legacyAccounts,
+                      previous.nodeBaseUrl,
+                      previous.apiKey,
+                      previous.balance
+                    )
+                  : previous.legacyAccounts,
+              }
+            : {}),
+        });
+        return true;
+      },
+
+      beginPayment: (id, payment) => {
+        set((state) => ({ pendingPayments: { ...state.pendingPayments, [id]: payment } }));
+      },
+
+      settlePayment: (id) => {
+        set((state) => {
+          if (!Object.hasOwn(state.pendingPayments, id)) return state;
+          const next = { ...state.pendingPayments };
+          delete next[id];
+          return { pendingPayments: next };
+        });
+      },
+
+      observeProviders: (source, providers) => {
+        const entries = Object.entries(providers);
+        if (entries.length === 0) return;
+        set((state) => {
+          const now = Date.now();
+          const seenAt = { ...state.providerSeenAt };
+          // Copied only once something actually changes, so a sweep that
+          // learned nothing leaves every reference the list holds untouched.
+          let claims = state.providerClaims;
+          let changed = 0;
+          let contested = 0;
+          for (const [baseUrl, claim] of entries) {
+            seenAt[baseUrl] = now;
+            const before = claims[baseUrl];
+            const after = withClaim(before, source, claim);
+            if (after === before) continue;
+            if (claims === state.providerClaims) claims = { ...claims };
+            claims[baseUrl] = after;
+            changed++;
+            if (contestedPubkeySources(after).length > 0) contested++;
+          }
+          if (changed === 0) {
+            // `seenAt` alone. Nothing rendered reads it, so nothing re-renders.
+            return { providerSeenAt: seenAt };
+          }
+          const bounded = boundedClaims(claims, seenAt);
+          const knownProviders = resolveProviders(bounded, state.knownProviders);
+          storeLog.debug('store.routstr.providers_observed', {
+            source,
+            count: entries.length,
+            // Claims this source changed, and — separately — whether any of
+            // that reached the rows. A source below the one that already
+            // answered teaches the record something and the user nothing.
+            changed,
+            repainted: knownProviders !== state.knownProviders,
+            // Two parties naming different operators for one endpoint: a
+            // stale announcement, or somebody rebranding another node.
+            contested,
+          });
+          return { providerClaims: bounded, providerSeenAt: seenAt, knownProviders };
+        });
+      },
+
+      setUserNode: (nodeBaseUrl) => {
+        const next = nodeBaseUrl ? normalizeNodeUrl(nodeBaseUrl) || null : null;
+        setRoutstrNodeBaseUrl(next);
+        const previous = get();
+        const moving = next !== null && next !== previous.nodeBaseUrl;
+        // The selection that is about to be carried, said here so the
+        // `provider_repointed` or `selection_unserved` line that follows the
+        // new node's first lineup can be read against what it started from.
+        storeLog.info('store.routstr.user_node_set', {
+          pinned: next != null,
+          from: previous.nodeBaseUrl,
+          to: next,
+          moving,
+          selectedProvider: previous.selectedProvider,
+          selectedTier: previous.selectedTier,
+          sealedSelection: previous.selectedProvider === E2EE_PROVIDER_ID,
+        });
+        set({
+          userNodeBaseUrl: next,
+          // A user-made switch, so the pair is re-fitted — sealed or not — by
+          // the first lineup that lands for the node now in play.
+          selectionCarriedFrom: previous.nodeBaseUrl ?? DEFAULT_NODE_KEY,
+          // The model menu is per node. Clearing the server lineup and the
+          // catalog forces a re-derive from whichever node is now in play,
+          // rather than offering another node's models against it.
+          lineup: null,
+          serverLineupAt: null,
+          modelsCache: null,
+          lastKnownLineup:
+            get().lastKnownLineup?.nodeBaseUrl === next ? get().lastKnownLineup : null,
+          ...(next != null ? { nodeBaseUrl: next } : {}),
+          ...(moving
+            ? {
+                apiKey: null,
+                balance: null,
+                legacyAccounts: previous.apiKey
+                  ? withArchivedAccount(
+                      previous.legacyAccounts,
+                      previous.nodeBaseUrl,
+                      previous.apiKey,
+                      previous.balance
+                    )
+                  : previous.legacyAccounts,
+              }
+            : {}),
         });
       },
 
@@ -689,8 +1462,62 @@ export const useRoutstrStore = create<RoutstrStore>()(
     }),
     persistConfig({
       name: 'routstr-store',
-      storage: createProfileScopedStorage(),
+      storage: createRoutstrPersistence(),
       schema: PersistedRoutstrStore,
+      // v2: bring back the spend prompt for everyone who had turned it off.
+      //
+      // `confirmSpend: false` could only ever be written by the "Always allow"
+      // button, and the settings toggle its own copy promised ("you can turn
+      // this back on in settings") was never built. Removing the button
+      // without this would leave exactly those users — the ones who opted out
+      // — permanently unprompted before every spend, which is the opposite of
+      // what removing it is for. The field is kept (not dropped) so the blob's
+      // shape is unchanged and nothing else in it is at risk.
+      //
+      // v3: split the single mutable provider record into per-source claims.
+      //
+      // Everything the old record held is folded into one `legacy` claim,
+      // ranked below every real source so the first word from any of them
+      // replaces it. A stored name equal to the provider's own hostname is
+      // dropped on the way through: that is the fabrication this version
+      // exists to stop, it is indistinguishable from a real name once stored,
+      // and carrying it forward would let it outrank nothing while still
+      // being shown. `seenAt` moves out to its own map — it is housekeeping,
+      // and the row must not re-render because a probe said hello.
+      version: 3,
+      migrate: (state, version) => {
+        const blob: Record<string, unknown> = { ...(state as Record<string, unknown> | null) };
+        if (version < 2) blob.confirmSpend = true;
+        if (version < 3) {
+          const legacy = (blob.knownProviders ?? {}) as Record<string, Record<string, unknown>>;
+          const claims: Record<string, unknown> = {};
+          const seenAt: Record<string, number> = {};
+          for (const [baseUrl, provider] of Object.entries(legacy)) {
+            if (!provider || typeof provider !== 'object') continue;
+            const host = baseUrl.replace(/^https?:\/\//, '');
+            const name = typeof provider.name === 'string' ? provider.name : undefined;
+            claims[baseUrl] = {
+              claims: {
+                legacy: {
+                  ...(name && name !== host ? { name } : {}),
+                  ...(typeof provider.description === 'string'
+                    ? { description: provider.description }
+                    : {}),
+                  ...(typeof provider.version === 'string' ? { version: provider.version } : {}),
+                  ...(typeof provider.pubkey === 'string' ? { pubkey: provider.pubkey } : {}),
+                  ...(Array.isArray(provider.mints) ? { mints: provider.mints } : {}),
+                  ...(typeof provider.e2ee === 'boolean' ? { e2ee: provider.e2ee } : {}),
+                },
+              },
+            };
+            seenAt[baseUrl] = typeof provider.seenAt === 'number' ? provider.seenAt : 0;
+          }
+          blob.providerClaims = claims;
+          blob.providerSeenAt = seenAt;
+          delete blob.knownProviders;
+        }
+        return blob;
+      },
       partialize: (state) => ({
         apiKey: state.apiKey,
         authMode: state.authMode,
@@ -708,13 +1535,55 @@ export const useRoutstrStore = create<RoutstrStore>()(
         currentSessionId: state.currentSessionId,
         lastKnownLineup: state.lastKnownLineup,
         nodeBaseUrl: state.nodeBaseUrl,
+        legacyAccounts: boundedAccounts(state.legacyAccounts),
+        providerClaims: boundedClaims(state.providerClaims, state.providerSeenAt),
+        providerSeenAt: state.providerSeenAt,
+        userNodeBaseUrl: state.userNodeBaseUrl,
+        // Age is not evidence of settlement. Keep the only recovery token
+        // until the receive/refund path explicitly completes this payment.
+        pendingPayments: state.pendingPayments,
+        confirmSpend: state.confirmSpend,
+        curatedModels: state.curatedModels,
       }),
       afterHydrate: (state) => {
         if (!state) return;
+        // `knownProviders` is derived and never persisted, so a rehydrated
+        // store has claims and no rows until this runs. Done here rather than
+        // lazily in a selector because every reader expects a plain record,
+        // and a lazy derivation would hand each of them a different one.
+        state.knownProviders = resolveProviders(state.providerClaims, {});
         // Re-apply the nagg-served node override before any Routstr call
         // this session — a repointed node must survive offline relaunches.
         state.nodeBaseUrl = state.nodeBaseUrl ?? state.lastKnownLineup?.nodeBaseUrl ?? null;
-        setRoutstrNodeBaseUrl(state.nodeBaseUrl);
+        // A pinned provider wins over whatever the last lineup left behind —
+        // the point of pinning is that a background refresh cannot move the
+        // user off it, and a relaunch is not an exception.
+        setRoutstrNodeBaseUrl(state.userNodeBaseUrl);
+        if (
+          state.userNodeBaseUrl &&
+          state.lastKnownLineup &&
+          normalizeNodeUrl(state.lastKnownLineup.nodeBaseUrl ?? '') !==
+            normalizeNodeUrl(state.userNodeBaseUrl)
+        ) {
+          state.lastKnownLineup = null;
+          state.serverLineupAt = null;
+        }
+        // Record the live credential in the archive on the way in, so it is
+        // already recoverable before anything this session can clear it. A
+        // blob written before `legacyAccounts` existed has no other way to
+        // learn about its own key, and that key may be the only route back to
+        // a balance sitting on a node the app has since been repointed away
+        // from. Idempotent: an existing row is left alone.
+        state.legacyAccounts ??= {};
+        const liveKey = state.apiKey;
+        if (liveKey) {
+          state.legacyAccounts = withArchivedAccount(
+            state.legacyAccounts,
+            state.nodeBaseUrl,
+            liveKey,
+            state.balance
+          );
+        }
         // Drop transient `pending: true` flags — any user message marked
         // pending at persist time (e.g. app killed mid-send) resolves to
         // "not in flight" on the next launch so the user sees a static
@@ -725,6 +1594,23 @@ export const useRoutstrStore = create<RoutstrStore>()(
           }
         }
         restoreActiveSessionView(state);
+        // The persisted last-known lineup is what every reader falls through
+        // to until this session's catalogue lands, and `selectedProvider` boots
+        // to `openai` regardless of which node that snapshot came from. On a
+        // relaunch against a node serving neither `openai` nor any other named
+        // vendor, that pairing is the same dead send as a mid-session node
+        // swap — just with no catalogue in memory to make the contradiction
+        // visible in the log. Same rule, applied to the snapshot — and to the
+        // whole pair, because `auto` is no more guaranteed to exist on the
+        // snapshot's vendors than `openai` is.
+        const hydrated = repointSelection(
+          state.selectedProvider,
+          state.selectedTier,
+          state.lastKnownLineup?.lineup ?? null,
+          'hydrate'
+        );
+        if (hydrated.selectedProvider != null) state.selectedProvider = hydrated.selectedProvider;
+        if (hydrated.selectedTier != null) state.selectedTier = hydrated.selectedTier;
       },
     })
   )

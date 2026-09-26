@@ -20,12 +20,15 @@ import {
   deriveLineup,
   emptyLineup,
   lineupFromNaggPayload,
+  PersistedLineupSchema,
   lineupHasEntries,
+  lineupProviderIds,
   mergeLineupWithLastKnown,
   providerIdForModel,
   type AiLineup,
   type LineupEntry,
 } from '@/shared/lib/routstr/lineup';
+import { getProviderById } from '@/features/ai/lib/format';
 
 const MODELS = fixture.data as unknown as RoutstrModel[];
 
@@ -387,5 +390,174 @@ describe('lineupFromNaggPayload (server-curated lineup)', () => {
     );
     expect(lineup).toBeNull();
     expect(nodeBaseUrl).toBeNull();
+  });
+});
+
+describe('upstream identity', () => {
+  it('carries upstreamId from nagg and leaves it null when the node omits it', () => {
+    const payload = NaggAiLineupSchema.parse({
+      version: 1,
+      updatedAt: 1_751_000_000,
+      node: { baseUrl: 'https://node.example' },
+      providers: [
+        {
+          id: 'claude',
+          vendor: 'anthropic',
+          models: [
+            {
+              tier: 'auto',
+              id: 'claude-haiku-4.5',
+              name: 'Claude Haiku',
+              created: 100,
+              contextLength: 200_000,
+              inputModalities: ['text'],
+              upstreamId: 'openrouter',
+              pricing: { prompt: 0.0002, completion: 0.001, request: 0.001, maxCost: 64 },
+            },
+          ],
+        },
+        {
+          // A node too old to report upstreams must still map cleanly; the
+          // send path simply cannot narrow on it.
+          id: 'openai',
+          vendor: 'openai',
+          models: [
+            {
+              tier: 'auto',
+              id: 'gpt-mini',
+              name: 'GPT mini',
+              created: 100,
+              contextLength: 200_000,
+              inputModalities: ['text'],
+              pricing: { prompt: 0.0001, completion: 0.0004, request: 0.001, maxCost: 32 },
+            },
+          ],
+        },
+      ],
+    });
+
+    const { lineup } = lineupFromNaggPayload(payload);
+    expect(lineup?.claude.auto?.upstreamId).toBe('openrouter');
+    expect(lineup?.openai.auto?.upstreamId).toBeNull();
+  });
+
+  it('accepts a persisted lineup written before upstreamId existed', () => {
+    // The `routstr-store` merge is all-or-nothing: a required new key would
+    // fail every pre-existing blob and take the apiKey and sessions with it.
+    const legacy = {
+      derivedAt: 1_751_000_000,
+      nodeBaseUrl: 'https://node.example',
+      lineup: {
+        openai: {
+          auto: {
+            modelId: 'gpt-mini',
+            displayName: 'GPT mini',
+            contextLength: 200_000,
+            created: 100,
+            visionInput: false,
+            satsPricing: {
+              prompt: 0.0001,
+              completion: 0.0004,
+              request: 0.001,
+              image: 0,
+              max_cost: 32,
+            },
+          },
+          pro: null,
+          max: null,
+        },
+        claude: { auto: null, pro: null, max: null },
+        grok: { auto: null, pro: null, max: null },
+        google: { auto: null, pro: null, max: null },
+      },
+    };
+    const parsed = PersistedLineupSchema.safeParse(legacy);
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.lineup.openai.auto?.modelId).toBe('gpt-mini');
+  });
+});
+
+describe('vendors come from the catalog', () => {
+  /**
+   * The lineup used to offer exactly four vendors, compiled into the app.
+   * The live catalog carries around fifty, of which roughly half can fill a
+   * whole tier ladder — so the rule was discarding most of what the node
+   * served, and no nagg deploy could give it back.
+   *
+   * Synthetic rather than fixture-driven: the shared fixture was trimmed to
+   * the four vendors it was written to pin, which is precisely the assumption
+   * under test.
+   */
+  const row = (slug: string, id: string, completion: number, created: number): RoutstrModel =>
+    ({
+      id,
+      name: id,
+      canonical_slug: slug,
+      enabled: true,
+      created,
+      context_length: 128_000,
+      architecture: { input_modalities: ['text'], output_modalities: ['text'] },
+      sats_pricing: { prompt: completion / 4, completion, request: 0, max_cost: completion * 4000 },
+    }) as unknown as RoutstrModel;
+
+  const vendorRows = (vendor: string, count: number, base: number): RoutstrModel[] =>
+    Array.from({ length: count }, (_, i) =>
+      row(`${vendor}/m${i}`, `${vendor}-m${i}`, base * (i + 1), FIXTURE_NOW - i * 1000)
+    );
+
+  const catalog = [
+    ...vendorRows('openai', 3, 1e-6),
+    ...vendorRows('qwen', 5, 2e-6),
+    ...vendorRows('mistralai', 3, 3e-6),
+    // Two rows only: cannot fill a ladder, so it earns no tab.
+    ...vendorRows('tinyvendor', 2, 4e-6),
+  ];
+  const { lineup } = deriveLineup(catalog, FIXTURE_NOW);
+
+  it('offers vendors beyond the four the app knows by name', () => {
+    const offered = lineupProviderIds(lineup);
+    expect(offered).toContain('qwen');
+    expect(offered).toContain('mistralai');
+    expect(offered.length).toBeGreaterThan(1);
+  });
+
+  it('keeps the known four at the front, so the boot default stays valid', () => {
+    expect(lineupProviderIds(lineup)[0]).toBe('openai');
+  });
+
+  it('refuses a tab to a vendor that cannot fill a tier ladder', () => {
+    // One model wearing three labels is worse than no tab at all.
+    expect(lineupProviderIds(lineup)).not.toContain('tinyvendor');
+  });
+
+  it('orders the rest by how many current models they qualify', () => {
+    const offered = lineupProviderIds(lineup);
+    expect(offered.indexOf('qwen')).toBeLessThan(offered.indexOf('mistralai'));
+  });
+
+  it('never offers more vendors than a tab strip can hold', () => {
+    const many = Array.from({ length: 30 }, (_, i) => vendorRows(`vendor${i}`, 4, 1e-6)).flat();
+    expect(lineupProviderIds(deriveLineup(many, FIXTURE_NOW).lineup).length).toBeLessThanOrEqual(
+      12
+    );
+  });
+
+  it('gives an unknown vendor a readable label rather than another brand', () => {
+    // Silently resolving to the default used to render a Qwen pick under
+    // OpenAI's name and logo.
+    const provider = getProviderById('bytedance-seed');
+    expect(provider.id).toBe('bytedance-seed');
+    expect(provider.label).toBe('Bytedance Seed');
+    expect(provider.icon).not.toBe(getProviderById('openai').icon);
+  });
+
+  it('reads a vendor off the catalog slug it is not hardcoded for', () => {
+    expect(providerIdForModel(row('qwen/x', 'qwen-x', 1e-6, FIXTURE_NOW))).toBe('qwen');
+  });
+
+  it('still spells the vendors the app has its own id for', () => {
+    const claude = MODELS.find((m) => (m.canonical_slug ?? '').startsWith('anthropic/'));
+    expect(claude).toBeDefined();
+    expect(providerIdForModel(claude!)).toBe('claude');
   });
 });

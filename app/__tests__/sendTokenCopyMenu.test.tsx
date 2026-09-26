@@ -18,6 +18,8 @@ jest.mock('wallet', () => ({
   getSendTokenReachabilityWarning: jest.fn(() => null),
   isSendTokenCancelled: jest.fn(() => false),
   isSendTokenComplete: jest.fn(() => false),
+  // This suite's token is unlocked, so the conditions card renders nothing.
+  describeSendLock: jest.fn(() => null),
 }));
 
 jest.mock('wallet/react', () => ({
@@ -119,6 +121,11 @@ jest.mock('@/shared/hooks/useMintInfo', () => ({ useMintInfo: jest.fn(() => null
 jest.mock('@/shared/hooks/useThemeColor', () => ({ useThemeColor: jest.fn(() => 'black') }));
 jest.mock('@/shared/lib/logger', () => ({
   log: { debug: jest.fn(), warn: jest.fn() },
+  // The spending-conditions hook reports a keyring read it could not make,
+  // and pulls in a persisted store whose rehydrate error branch needs storeLog.
+  paymentLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+  storeLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+  redactError: (error: unknown) => error,
   useLifecycleLogger: jest.fn(),
 }));
 jest.mock('@/shared/lib/currency', () => ({ formatAmount: jest.fn(() => '63 sats') }));

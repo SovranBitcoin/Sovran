@@ -69,6 +69,7 @@
     {"id":"wallet.unit.relaunch","file":"scenarios/wallet-unit-relaunch.json","order":262,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"receive.lightning.usd-dismiss","file":"scenarios/receive-lightning-usd-dismiss.json","order":270,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"mint.info.reviews","file":"scenarios/mint-info-reviews.json","order":280,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"mint.info.history","file":"scenarios/mint-info-history.json","order":282,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"mint.info.send-message","file":"scenarios/mint-info-send-message.json","order":290,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"receive.qr-display.tabs","file":"scenarios/receive-qr-display-tabs.json","order":300,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"receive.qr-display.offline","file":"scenarios/receive-qr-display-offline.json","order":302,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},

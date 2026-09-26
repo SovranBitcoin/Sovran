@@ -34,7 +34,9 @@ describe('clearPaymentContext', () => {
 
   it('clears the remote-contact ecash-DM target', () => {
     // A leftover contact target must never re-DM a later ordinary send's token.
-    useContactSendStore.getState().start({ pubkey: 'a'.repeat(64), displayName: 'Alice' });
+    useContactSendStore
+      .getState()
+      .start({ pubkey: 'a'.repeat(64), displayName: 'Alice', delivery: 'nip17' });
     expect(useContactSendStore.getState().active).not.toBeNull();
 
     clearPaymentContext('test');

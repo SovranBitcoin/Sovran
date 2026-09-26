@@ -7,6 +7,7 @@ import { reviewMint, type MintRecommendation } from '@/shared/lib/apiClient';
 import { formatRelative } from '@/shared/lib/date';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { mintReviewsCache } from '@/features/mint/data/mintReviewsCache';
+import { flushRowRenderWindows } from '@/shared/lib/loggerRender';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -167,6 +168,12 @@ beforeEach(() => {
 });
 afterEach(() => {
   act(() => renderer?.unmount());
+  // This screen's rows are counted by `useRowRenderLogger`, which aggregates
+  // over a one-second window and flushes on a timer. Unmounting does not close
+  // that window, so the flush lands a second later in whichever suite the
+  // worker is running by then — surfacing as Jest's "Cannot log after tests
+  // are done" against a file that never touched a mint review.
+  flushRowRenderWindows();
 });
 
 it('shows the shared chart and cached favourites while fresh rows are loading', async () => {

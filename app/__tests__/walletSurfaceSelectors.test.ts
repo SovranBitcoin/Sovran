@@ -43,12 +43,15 @@ describe('wallet surface e2e selectors', () => {
     expect(source).toContain('accessibilityLabel="Open mint page"');
   });
 
-  it('pins mint-info-reviews on the mint info headerRight', () => {
+  it('pins the Reviews and History circle actions on the mint info page', () => {
     const source = read('features/mint/screens/MintInfoScreen.tsx');
     expect(source).toContain('testID="mint-info-reviews"');
-    // Header actions without an accessibilityLabel are AX-invisible on
-    // liquid-glass iOS — the label is load-bearing for the e2e selector.
+    expect(source).toContain('testID="mint-info-history"');
+    // The labels are load-bearing for the e2e selectors on liquid-glass iOS.
     expect(source).toContain('accessibilityLabel="View mint reviews"');
+    expect(source).toContain('accessibilityLabel="View mint update history"');
+    // The star left the header: the row is on the page, for every flow.
+    expect(source).not.toContain('headerRight');
   });
 
   it('pins the mint-info Nostr contact row', () => {

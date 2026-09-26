@@ -48,7 +48,9 @@ function runOutcomeRows(
 }
 
 function runMilestones(flow: FlowDef, ctx: TimelineContext): TimelineStep[] {
-  const { milestones } = flow;
+  const milestones = flow.milestones.filter(
+    (milestone) => milestone.included?.(ctx) ?? true,
+  );
   let activeIndex = -1;
   milestones.forEach((milestone, index) => {
     if (milestone.reached(ctx)) activeIndex = index;

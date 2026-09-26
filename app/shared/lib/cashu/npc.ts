@@ -16,6 +16,7 @@
  * resolving for the life of the compatibility domain.
  */
 
+import * as nip19 from 'nostr-tools/nip19';
 import { JWTAuthProvider, NPCClient } from 'npubcash-sdk';
 import type { SigningFunc } from 'npubcash-sdk';
 
@@ -41,6 +42,22 @@ export function createNpcClient(signer: SigningFunc): NPCClient {
 export function getNpcAddress(username: string | undefined, npub: string): string {
   const localPart = username?.trim() || npub;
   return `${localPart}@${NPC_DOMAIN}`;
+}
+
+/**
+ * The npub.cash address for a recipient we only know by pubkey — the fallback
+ * when they advertise no Lightning address of their own.
+ *
+ * Their npub is the local part because nothing else binds them to a name at
+ * that host: a display name or NIP-05 username there would be someone else's
+ * account. Returns undefined if the pubkey will not encode.
+ */
+export function npcAddressForPubkey(pubkeyHex: string): string | undefined {
+  try {
+    return getNpcAddress(undefined, nip19.npubEncode(pubkeyHex));
+  } catch {
+    return undefined;
+  }
 }
 
 /**

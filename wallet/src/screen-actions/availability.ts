@@ -10,7 +10,9 @@ import {
   methodContextHasSupportingMint,
   type MintMethodAmountAvailability,
 } from "../mint-capabilities";
+import { describeSendLock } from "../annotations";
 import { logger } from "../logger";
+import { LOCK_CLOCK_SKEW_MS } from "../p2pk";
 import { meltMethodForTarget } from "../melt-target";
 import type {
   AmountEntryMethodContext,
@@ -220,8 +222,60 @@ function summarizeAvailabilityMap(
 // Per-screen rules
 // ---------------------------------------------------------------------------
 
+/**
+ * Whether this send can be taken back, and what to say when it cannot.
+ *
+ * A locked send that has already executed cannot be rolled back — coco throws
+ * rather than trying — so offering the button would be offering a failure. A
+ * still-`prepared` send is different: nothing was swapped, the cancel is local,
+ * and it works whatever the lock says.
+ */
+function sendTokenCancelAvailability(
+  entry: Record<string, unknown>,
+  ctx: {
+    canAct: boolean;
+    hasOperationId: boolean;
+    state: string | undefined;
+    now: number;
+  },
+): ActionAvailability {
+  if (!ctx.canAct) return { available: false };
+  if (!ctx.hasOperationId) {
+    return { available: false, reason: "Missing operation ID — cannot cancel" };
+  }
+  if (ctx.state === "prepared") return { available: true };
+
+  const lock = describeSendLock(entry, { now: ctx.now });
+  if (!lock || lock.kind === "unlocked") return { available: true };
+
+  // No refund tag and no locktime: only the recipient can ever spend it.
+  if (
+    lock.reclaim.kind === "never" ||
+    (lock.refund === null && lock.unlockAt === null)
+  ) {
+    return {
+      available: false,
+      reason: "Locked to the recipient — this cannot be taken back",
+      reasonCode: "lock-permanent",
+    };
+  }
+  if (lock.unlockAt !== null && ctx.now < lock.unlockAt + LOCK_CLOCK_SKEW_MS) {
+    return {
+      available: false,
+      reason: "You can take this back once the lock opens",
+      reasonCode: "lock-active",
+      // The token's own date, not ours: the skew margin above is this
+      // wallet's caution about mint clocks, and showing it as the lock's
+      // terms would be reporting our caution as the recipient's deadline.
+      availableAt: lock.unlockAt,
+    };
+  }
+  return { available: true };
+}
+
 function sendTokenAvailability(
   entry: Record<string, unknown>,
+  now: number = Date.now(),
 ): AvailabilityMap<"sendToken"> {
   const state = entry.state as string | undefined;
   const token = entry.token;
@@ -263,12 +317,12 @@ function sendTokenAvailability(
     checkStatus: {
       available: canAct && state === "pending",
     },
-    cancel: {
-      available: canAct && operationId != null,
-      ...(!operationId && canAct
-        ? { reason: "Missing operation ID — cannot cancel" }
-        : {}),
-    },
+    cancel: sendTokenCancelAvailability(entry, {
+      canAct,
+      hasOperationId: operationId != null,
+      state,
+      now,
+    }),
     back: { available: true },
   };
 }
@@ -372,10 +426,10 @@ function amountEntryAvailability(
   entry: Record<string, unknown>,
 ): AvailabilityMap<"amountEntry"> {
   const effectiveRaw = entry.effectiveAmount as
-    | { value?: unknown; unit?: unknown }
-    | undefined;
+    { value?: unknown; unit?: unknown } | undefined;
   const effectiveAmount =
-    typeof effectiveRaw?.value === "number" && Number.isFinite(effectiveRaw.value)
+    typeof effectiveRaw?.value === "number" &&
+    Number.isFinite(effectiveRaw.value)
       ? effectiveRaw.value
       : 0;
   const destination = entry.destination as string | undefined;
@@ -387,6 +441,24 @@ function amountEntryAvailability(
   const meltTarget =
     typeof entry.meltTarget === "string" ? entry.meltTarget : "";
   const hasMeltTarget = meltTarget.length > 0;
+  // A lock the flow was SEEDED with — a scanned wallet receive key, a Nut
+  // Drop's protocol lock — is a requirement, not a preference. It is already
+  // validated, so this screen offers no alternative rail and no duration
+  // picker; the optional "would you like to lock this?" path seeds nothing
+  // and keeps the full menu.
+  const seededLockPubkey =
+    typeof entry.p2pkLockPubkey === "string" && entry.p2pkLockPubkey.length > 0
+      ? entry.p2pkLockPubkey
+      : isRecord(entry.p2pkLock) && typeof entry.p2pkLock.pubkey === "string"
+        ? entry.p2pkLock.pubkey
+        : "";
+  const hasSeededLock = isSendEcash && seededLockPubkey.length > 0;
+  // A NUT-10 P2PK condition on a scanned request: the payment IS locked, so
+  // the menu must not call it plain ecash.
+  const paymentRequestIsLocked =
+    isPaymentRequest &&
+    typeof entry.paymentRequestLockPubkey === "string" &&
+    entry.paymentRequestLockPubkey.length > 0;
   const hasFiatToggle =
     typeof entry.fiatCurrency === "string" &&
     entry.fiatCurrency.length > 0 &&
@@ -532,8 +604,12 @@ function amountEntryAvailability(
       : "Lightning destination";
   } else if (isPaymentRequest) {
     ecashAvailable = nextCanFire;
-    ecashDescription = "Send a Cashu payment request";
-    ecashLabel = "as Ecash (payment request)";
+    ecashDescription = paymentRequestIsLocked
+      ? "Send a Cashu payment request, locked to its key"
+      : "Send a Cashu payment request";
+    ecashLabel = paymentRequestIsLocked
+      ? "as Locked Ecash (payment request)"
+      : "as Ecash (payment request)";
   } else if (isSendEcash) {
     ecashAvailable = nextCanFire;
     ecashDescription = "Send as a Cashu token";
@@ -545,11 +621,24 @@ function amountEntryAvailability(
   // When a concrete meltTarget is present, surface it in the description so
   // the user sees exactly what's about to be paid — `user@domain` for lud16 /
   // NIP-05 targets, truncated middle for bolt11 / LNURL strings.
+  const truncateMiddle = (value: string, head: number, tail: number): string =>
+    value.length <= head + tail + 1
+      ? value
+      : `${value.slice(0, head)}…${value.slice(-tail)}`;
   const formatLightningTarget = (target: string): string => {
     const trimmed = target.trim();
-    if (trimmed.includes("@")) return trimmed;
+    const at = trimmed.lastIndexOf("@");
+    if (at > 0) {
+      // `npub1…@npub.cash` is 70-odd characters of bech32 that reads as noise
+      // and leaves no room for the caveat that has to travel with it. The
+      // domain is the part that carries meaning here, so keep it whole.
+      const [local, domain] = [trimmed.slice(0, at), trimmed.slice(at + 1)];
+      return local.length > 20
+        ? `${truncateMiddle(local, 10, 6)}@${domain}`
+        : trimmed;
+    }
     if (trimmed.length <= 18) return trimmed;
-    return `${trimmed.slice(0, 9)}…${trimmed.slice(-9)}`;
+    return truncateMiddle(trimmed, 9, 9);
   };
 
   // An npub.cash melt target is the "recipient has no Lightning address"
@@ -558,6 +647,12 @@ function amountEntryAvailability(
   // "as Lightning" (npub.cash is the marketing name; npubx.cash the host).
   const meltTargetIsNpc = /@npubx?\.cash$/i.test(meltTarget.trim());
   const lightningLabel = meltTargetIsNpc ? "to npub.cash" : "as Lightning";
+  // npub.cash is a custodial service we picked on their behalf because they
+  // advertised no Lightning address. It is reachable for every pubkey, which
+  // is exactly why it can look like a confirmed destination when it is not —
+  // so the caveat travels with the option, not in a help page.
+  const NPC_CAUTION =
+    "They advertise no Lightning address. npub.cash can receive for any Nostr key, but only they can claim it — check they use it first.";
 
   let lightningAvailable = false;
   let lightningDescription: string | undefined;
@@ -578,9 +673,11 @@ function amountEntryAvailability(
       // carries the action).
     } else {
       lightningAvailable = nextCanFire && sendLightningCompatible;
-      lightningDescription = hasMeltTarget
-        ? `Pay ${formatLightningTarget(meltTarget)} over Lightning`
-        : "Pay over Lightning";
+      lightningDescription = meltTargetIsNpc
+        ? `Pay ${formatLightningTarget(meltTarget)}. ${NPC_CAUTION}`
+        : hasMeltTarget
+          ? `Pay ${formatLightningTarget(meltTarget)} over Lightning`
+          : "Pay over Lightning";
       if (!sendLightningCompatible) {
         lightningReason = methodAmountReason(
           sendLightningAvailability,
@@ -593,7 +690,9 @@ function amountEntryAvailability(
   } else if (isSendEcash) {
     if (hasMeltTarget) {
       lightningAvailable = nextCanFire && sendLightningCompatible;
-      lightningDescription = `Pay ${formatLightningTarget(meltTarget)} over Lightning`;
+      lightningDescription = meltTargetIsNpc
+        ? `Pay ${formatLightningTarget(meltTarget)}. ${NPC_CAUTION}`
+        : `Pay ${formatLightningTarget(meltTarget)} over Lightning`;
       if (!sendLightningCompatible) {
         lightningReason = methodAmountReason(
           sendLightningAvailability,
@@ -650,36 +749,66 @@ function amountEntryAvailability(
   // Base order — available entries bubble to the top via a stable sort below
   // so the user sees executable options first and disabled/"coming soon" rows
   // sink to the bottom.
-  const baseVariants = [
-    {
-      id: "ecash",
-      label: ecashLabel,
-      icon: "ph:coins",
-      available: ecashAvailable,
-      ...(ecashDescription ? { description: ecashDescription } : {}),
-      ...(ecashReason ? { reason: ecashReason } : {}),
-    },
-    {
-      id: "lightning",
-      label: lightningLabel,
-      icon: "mingcute:lightning-fill",
-      available: lightningAvailable,
-      ...(lightningDescription ? { description: lightningDescription } : {}),
-      ...(lightningReason ? { reason: lightningReason } : {}),
-    },
-    ...(showOnchainReceive || showOnchainSend
-      ? [
-          {
-            id: "onchain",
-            label: "as Onchain",
-            icon: "hugeicons:blockchain-01",
-            available: onchainAvailable,
-            ...(onchainDescription ? { description: onchainDescription } : {}),
-            ...(onchainReason ? { reason: onchainReason } : {}),
-          },
-        ]
-      : []),
-  ];
+  // A required lock collapses the menu to the one thing that can happen.
+  // Showing "as Ecash" beside it would offer a bearer token the flow cannot
+  // produce, and Lightning would silently drop the lock entirely.
+  const baseVariants = hasSeededLock
+    ? [
+        {
+          id: "locked-ecash",
+          label: "Lock Ecash",
+          icon: "mdi:lock-outline",
+          available: ecashAvailable,
+          description: "Lock a Cashu token to its recipient",
+          ...(ecashReason ? { reason: ecashReason } : {}),
+        },
+      ]
+    : [
+        {
+          id: "ecash",
+          label: ecashLabel,
+          icon: "ph:coins",
+          available: ecashAvailable,
+          ...(ecashDescription ? { description: ecashDescription } : {}),
+          ...(ecashReason ? { reason: ecashReason } : {}),
+        },
+        {
+          id: "lightning",
+          label: lightningLabel,
+          icon: "mingcute:lightning-fill",
+          available: lightningAvailable,
+          ...(lightningDescription
+            ? { description: lightningDescription }
+            : {}),
+          ...(lightningReason ? { reason: lightningReason } : {}),
+        },
+        ...(isSendEcash
+          ? [
+              {
+                id: "locked-ecash",
+                label: "Lock Ecash",
+                icon: "mdi:lock-outline",
+                available: ecashAvailable,
+                description: "Lock a Cashu token to its recipient",
+                ...(ecashReason ? { reason: ecashReason } : {}),
+              },
+            ]
+          : []),
+        ...(showOnchainReceive || showOnchainSend
+          ? [
+              {
+                id: "onchain",
+                label: "as Onchain",
+                icon: "hugeicons:blockchain-01",
+                available: onchainAvailable,
+                ...(onchainDescription
+                  ? { description: onchainDescription }
+                  : {}),
+                ...(onchainReason ? { reason: onchainReason } : {}),
+              },
+            ]
+          : []),
+      ];
   const nextVariants = baseVariants
     .map((v, i) => ({ v, i }))
     .sort((a, b) => {
@@ -995,7 +1124,10 @@ function receiveAvailability(
 // ---------------------------------------------------------------------------
 
 const AVAILABILITY_FNS: {
-  [S in ScreenType]: (entry: Record<string, unknown>) => AvailabilityMap<S>;
+  [S in ScreenType]: (
+    entry: Record<string, unknown>,
+    now?: number,
+  ) => AvailabilityMap<S>;
 } = {
   sendToken: sendTokenAvailability,
   receiveToken: receiveTokenAvailability,
@@ -1035,11 +1167,15 @@ export function isPaymentRequestPreview(
 export function getAvailableActions<S extends ScreenType>(
   screenType: S,
   entry: Record<string, unknown>,
+  // Injectable so a lock's "reclaimable from" boundary is testable without
+  // fake timers; every other screen ignores it.
+  now: number = Date.now(),
 ): Record<ScreenActionName[S], ActionAvailability> {
   const fn = AVAILABILITY_FNS[screenType] as (
     e: Record<string, unknown>,
+    n?: number,
   ) => Record<ScreenActionName[S], ActionAvailability>;
-  const availability = fn(entry);
+  const availability = fn(entry, now);
   logger.info("screenActions.availability.result", {
     screenType,
     entryType: typeof entry.type === "string" ? entry.type : null,

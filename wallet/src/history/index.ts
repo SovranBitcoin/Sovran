@@ -1,6 +1,7 @@
 export {
   bucketTransaction,
   isCancellablePendingEcash,
+  isReservedPendingEcash,
   isMeltQuotePaid,
   isMeltQuoteReadyToPay,
   isMintExpired,
@@ -68,6 +69,12 @@ export {
 } from "./timeline";
 export { groupTimeline } from "./grouping";
 export type { ColadaTimelineItem, SwapTimelineState } from "./grouping";
+export {
+  getAiPayment,
+  groupAiRequests,
+  isAiRequestLeg,
+} from "./aiRequests";
+export type { AiRequestGroup, AiRequestState } from "./aiRequests";
 export type {
   SendTokenReachabilityStatus,
   SendTokenReachabilityWarningOptions,

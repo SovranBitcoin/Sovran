@@ -181,10 +181,27 @@ availability. Current review status for each channel is deliberately explicit:
 | --------------- | --------------------------------------------------- | -------------------------------------------------------- |
 | Apple App Store | Configured app ID and review/publication controller | Not checked live; no current version or region asserted  |
 | TestFlight      | EAS submission code in [build](release/build.mjs)   | No public invite or active build verified                |
-| Google Play     | Bundle ID and production publication controller     | No live track, region or version verified                |
-| GitHub APK      | Release/asset publisher                             | No released APK or signature downloaded/verified         |
-| Zapstore        | Signed-event and APK publisher                      | No live listing/event or install verified                |
+| Google Play     | Production publisher and the ledger's 0.1.3 release | The universal APK Play generated and signed is verified; no region or listing checked |
+| GitHub APK      | Release/asset publisher                             | 0.1.3 APK downloaded and verified on 2026-09-24           |
+| Zapstore        | Signed-event and APK publisher                      | Live events and CDN APK verified; no in-app install tested |
 | Freedom Store   | Catalog/PR controller                               | No merged catalog entry or regional eligibility verified |
+
+Android is the one family where cross-channel updates are now an established
+claim. On 2026-09-24 the published 0.1.3 artifact was downloaded from
+`github.com` and from `cdn.zapstore.dev`; both are the same 247,607,844 bytes
+(`2fca9101…1ca758a941`), signed by exactly one certificate
+(`b598befc…751e59af`, RSA 4096, `CN=Android, O=Google Inc.`) with Google Play's
+source stamp, which is Play's own generated universal APK rather than an
+independently signed build. `com.sovranbitcoin` version code 24 installed onto a
+clean Android 16 emulator image and reported that same certificate. Zapstore's
+live kind 32267/30063/3063 events name the same hash, certificate, version code
+and source commit. Because every Android channel serves one artifact under one
+signing identity, an install from Play, the GitHub APK or Zapstore can be updated
+by any of the others; [release/verify.mjs](release/verify.mjs) re-checks this from
+public sources alone. Not established: no update was exercised through the Play
+Store or the Zapstore client on a device, and the Play-served split install was
+not inspected — the byte identity above is the evidence, not an observed
+store-to-store upgrade.
 
 **Follow-up:** obtain read-only channel evidence with timestamp, source URL,
 locale, version/build and region before changing an availability label. No store

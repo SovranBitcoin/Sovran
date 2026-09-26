@@ -50,6 +50,7 @@ import { OPEN_WATCHDOG_MS } from '@/shared/lib/popup/openWatchdog';
 import { E2EStaticToastRenderMarker } from '@/shared/lib/popup/E2EToastProbe';
 import { EmojiPickerContent } from '@/shared/lib/popup/popups/emojiPicker';
 import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
+import { useRoutstrFunds } from '@/features/ai/hooks/useRoutstrFunds';
 import { PaymentOptionsContent } from '@/shared/lib/popup/popups/paymentOptionsSheet';
 import { NfcTapContent } from '@/shared/lib/popup/popups/nfcTapSheet';
 import { ProofSelectorContent } from '@/shared/lib/popup/popups/proofSelectorSheet';
@@ -244,6 +245,7 @@ function SubmessageRenderer({
 
 /** Props every custom-sheet renderer receives; `payload` is typed per sheet id. */
 type CustomSheetContentProps<P = unknown> = {
+  balanceSats: number;
   payload: P;
   close: () => void;
   pushCustomPage: <K extends keyof ActionSheetPayloads>(
@@ -311,6 +313,7 @@ function SnapPointsContentGate({ children }: { children: React.ReactNode }) {
 }
 
 function SheetContent({
+  balanceSats,
   payload,
   activeCustomPage,
   close,
@@ -323,6 +326,7 @@ function SheetContent({
   canPopCustomPage,
   onCustomFooterConfigChange,
 }: {
+  balanceSats: number;
   payload: ReturnType<typeof usePopupStore.getState>['current'];
   activeCustomPage: CustomSheetPage | null;
   close: () => void;
@@ -368,6 +372,7 @@ function SheetContent({
       customNavDirection === 'forward' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220);
     const customContent = (
       <ContentComponent
+        balanceSats={balanceSats}
         payload={activeCustomPage.payload}
         close={close}
         pushCustomPage={pushCustomPage}
@@ -481,6 +486,7 @@ function SheetActionButton({
 const popupHostLog = log.child({ module: 'popupHost' });
 
 function SheetPopup() {
+  const funds = useRoutstrFunds();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   // Captured here (inside the account-scoped providers) and re-provided
@@ -590,6 +596,18 @@ function SheetPopup() {
       const reviveClosingInstance = previous.seq !== openSeq && !previous.isOpen && reusable;
       if (mountedSeq === null || (mountedSeq !== openSeq && !reviveClosingInstance)) {
         setMountedSeq(openSeq);
+      } else if (reviveClosingInstance) {
+        // The one branch that serves an open() from a gorhom instance it did
+        // not mount. It exists because swapping instances mid-exit brought up
+        // a second iOS FullWindowOverlay whose JS touch responder was dead —
+        // a sheet that looks present and ignores every tap. Nothing else in
+        // the host records that this path was taken, so a report of "the
+        // sheet opened but nothing in it responds" has no way to name it.
+        popupHostLog.info('popupHost.revive', {
+          openSeq,
+          mountedSeq,
+          sheetId: isCustomSheetPayload(incoming) ? incoming.sheetId : 'standard',
+        });
       }
       setPresentAttempt(0);
       setPresented(false);
@@ -902,7 +920,18 @@ function SheetPopup() {
             // animates it up once its layout is calculated.
             mountIndex={0}
             onAnimate={(_from, to) => {
-              if (to >= 0) setPresented(true);
+              if (to < 0 || presented) return;
+              // The positive counterpart of `popupHost.open_stalled`: without
+              // it a session that never selected anything is ambiguous between
+              // "the sheet never came up" and "it came up and ate every tap".
+              // Only the first report per open is logged.
+              popupHostLog.info('popupHost.presented', {
+                openSeq,
+                mountedSeq,
+                attempt: presentAttempt,
+                sheetId: isCustom && customRootSheetId ? customRootSheetId : 'standard',
+              });
+              setPresented(true);
             }}
             onChange={handleNativeSheetChange}
             onClose={handleNativeSheetClose}
@@ -984,6 +1013,7 @@ function SheetPopup() {
             // signer sheets' expandable sections need this).
             contentContainerProps={patchedContentContainerProps as never}>
             <SheetContent
+              balanceSats={funds?.balanceSats ?? 0}
               payload={payload}
               activeCustomPage={activeCustomPage}
               close={scopedClose}

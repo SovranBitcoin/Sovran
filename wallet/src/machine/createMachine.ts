@@ -3,6 +3,7 @@ import { parsePaymentInput } from "../parse";
 import { rankMintCandidates } from "../mint-selection";
 import { isValidSatAmount } from "../guards";
 import { defaultDetectors } from "../detectors";
+import type { P2pkLockSpec } from "../p2pk";
 import { createMintRowRules } from "../mint-list-rows";
 import { isMeltUserCancelledError, isMintOfflineError } from "../errors";
 import { t } from "../formatting/locales";
@@ -1802,6 +1803,8 @@ export function createPaymentMachine(
       meltTarget?: string;
       recipientPubkey?: string;
       recipientProfile?: RecipientProfile;
+      /** See the AMOUNT_ENTERED event — tri-state: leave, clear, or set. */
+      p2pkLock?: P2pkLockSpec | null;
       amountEntryDisplay?: AmountEntryDisplayMetadata;
     },
   ) =>
@@ -1817,6 +1820,7 @@ export function createPaymentMachine(
       meltTarget: opts?.meltTarget,
       recipientPubkey: opts?.recipientPubkey,
       recipientProfile: opts?.recipientProfile,
+      ...(opts && "p2pkLock" in opts ? { p2pkLock: opts.p2pkLock } : {}),
       amountEntryDisplay: opts?.amountEntryDisplay,
     });
 
@@ -1840,6 +1844,7 @@ export function createPaymentMachine(
     recipientPubkey?: string;
     recipientProfile?: RecipientProfile;
     p2pkLockPubkey?: string;
+    p2pkLock?: P2pkLockSpec;
     allowedMints?: string[];
     entrySource?: SendEntrySource;
   }) => {
@@ -1854,6 +1859,7 @@ export function createPaymentMachine(
         ? { recipientProfile: opts.recipientProfile }
         : {}),
       ...(opts?.p2pkLockPubkey ? { p2pkLockPubkey: opts.p2pkLockPubkey } : {}),
+      ...(opts?.p2pkLock ? { p2pkLock: opts.p2pkLock } : {}),
       ...(opts?.allowedMints ? { allowedMints: opts.allowedMints } : {}),
       ...(opts?.entrySource ? { entrySource: opts.entrySource } : {}),
     });

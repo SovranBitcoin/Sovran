@@ -1,5 +1,6 @@
 import type { LocalizedReason } from "../formatting/locales";
 import { logger } from "../logger";
+import { isLockedSend } from "../p2pk";
 import {
   buildMethodAwareMintCandidates,
   createAmountEntryMethodContext,
@@ -25,6 +26,7 @@ import {
   buildProofSuggestions,
   findFullAmountCandidates,
 } from "./amountFallback";
+import { startSendEcashFlow } from "./flows/send";
 import type {
   Destination,
   ErrorCode,
@@ -66,8 +68,8 @@ function summarizeContext(ctx: FlowContext): Record<string, unknown> {
     hasRecipientPubkey: !!ctx.recipientPubkey,
     recipientPubkeyLength: ctx.recipientPubkey?.length ?? 0,
     hasRecipientProfile: !!ctx.recipientProfile,
-    hasP2pkLockPubkey: !!ctx.p2pkLockPubkey,
-    p2pkLockPubkeyLength: ctx.p2pkLockPubkey?.length ?? 0,
+    hasP2pkLockPubkey: isLockedSend(ctx),
+    hasLocktime: !!ctx.p2pkLock?.locktimeSec,
     localProofSend: !!ctx.localProofSend,
     sendMemoHandled: !!ctx.sendMemoHandled,
     mintUnreachableConfirmed: !!ctx.mintUnreachableConfirmed,
@@ -291,14 +293,14 @@ function checkProofComposition(
   }
 
   // Locked sends never use local proofs — a P2PK lock requires a mint swap.
-  if (ctx.p2pkLockPubkey) {
+  if (isLockedSend(ctx)) {
     logger.info("resolveNext.proofComposition.skipped", {
       reason: "p2pk-lock-requires-mint-swap",
       amount,
       unit,
       hasMintUrl: !!mintUrl,
       mintUrlLength: mintUrl.length,
-      p2pkLockPubkeyLength: ctx.p2pkLockPubkey.length,
+      hasLocktime: !!ctx.p2pkLock?.locktimeSec,
     });
     return null;
   }
@@ -516,6 +518,42 @@ export function resolveNext(
     );
   }
   if (intent.type === "openProfile") {
+    // A raw compressed key (02/03…) is a Cashu *wallet* key, not an advertised
+    // Nostr identity: cashu.me, Macadamia and Minibits expose it precisely so
+    // someone can lock ecash to them. Its npub is derivable but meaningless —
+    // there is no profile, no NIP-17 inbox, and no reason to ask "send how?".
+    // So it seeds a REQUIRED locked send and goes straight to amount entry.
+    // The exact compressed key, parity included, is the lock target; the
+    // derived x-only hex must never stand in for it.
+    if (intent.p2pkPubkey) {
+      const flow = startSendEcashFlow(walletCtx, ctx.unit, {
+        offline: ctx.offline,
+        p2pkLock: { pubkey: intent.p2pkPubkey },
+        entrySource: "scan",
+      });
+      return logStepResult(
+        "resolveNext.lockedSendFromRawKey",
+        {
+          step: flow.step,
+          data: flow.data,
+          // `apply` MERGES this over the live context, so every field a
+          // previous destination left behind is cleared by name. Chief among
+          // them `intent`: leaving the openProfile intent in place would send
+          // the next AMOUNT_ENTERED back through this branch instead of
+          // completing the send.
+          contextPatch: {
+            ...flow.context,
+            intent: undefined,
+            recipientPubkey: undefined,
+            recipientProfile: undefined,
+            meltTarget: undefined,
+            meltQuoteMethod: undefined,
+            paymentRequest: undefined,
+          },
+        },
+        { intentType: intent.type, lockedFromRawKey: true },
+      );
+    }
     return logStepResult(
       "resolveNext.terminalIntent",
       { step: "openProfile", data: { npub: intent.npub } },
@@ -678,6 +716,10 @@ export function resolveNext(
             recipientPubkey: ctx.recipientPubkey,
             recipientProfile: ctx.recipientProfile,
             p2pkLockPubkey: ctx.p2pkLockPubkey,
+            ...(ctx.p2pkLock ? { p2pkLock: ctx.p2pkLock } : {}),
+            ...(ctx.paymentRequestLockPubkey
+              ? { paymentRequestLockPubkey: ctx.paymentRequestLockPubkey }
+              : {}),
           },
         },
         contextPatch: { destination },

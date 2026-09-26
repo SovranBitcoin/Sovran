@@ -16,6 +16,9 @@ jest.mock('@/shared/lib/apiClient', () => {
   return { DiscoverMintsResponse: actual.DiscoverMintsResponse, discoverMints: jest.fn() };
 });
 jest.mock('@/shared/stores/runtime/debugTierStore', () => ({ recordDebugTiers: jest.fn() }));
+// The operator write-through reaches the Nostr data layer, which this suite
+// (a row-mapping test) does not stand up.
+jest.mock('@/shared/lib/nostr/fetchProfiles', () => ({ cacheOperatorStats: jest.fn() }));
 jest.mock('@/shared/stores/global/mintMetadataStore', () => ({
   useMintMetadataStore: { getState: () => ({ upsertFromDiscover: jest.fn() }) },
 }));

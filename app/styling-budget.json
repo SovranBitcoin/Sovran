@@ -25,6 +25,9 @@
     "inline-style": 8,
     "content-container-style": 3
   },
+  "features/ai/screens/ProviderListScreen.tsx": {
+    "inline-style": 1
+  },
   "features/bitchat/screens/GeohashChatScreen.tsx": {
     "inline-style": 7,
     "stack-layout-props": 2
@@ -229,7 +232,7 @@
   },
   "features/mint/screens/MintInfoScreen.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 5,
+    "inline-style": 2,
     "stack-layout-props": 1
   },
   "features/mint/screens/MintListScreen.tsx": {
@@ -665,7 +668,7 @@
   },
   "shared/lib/popup/popups/modelPicker.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 4,
+    "inline-style": 2,
     "content-container-style": 1
   },
   "shared/lib/popup/popups/nfcTapSheet.tsx": {

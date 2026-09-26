@@ -54,7 +54,8 @@ import {
   formatMemoForDisplay,
 } from '@/shared/lib/nostr/memoMentions';
 import { resolveIdentityName } from '@/shared/lib/identity';
-import { hasP2PKLock, P2PKLockIndicator } from '../components/P2PKLockIndicator';
+import { useSpendingConditions } from '../hooks/useSpendingConditions';
+import { spendingConditionDetailItems } from '../components/SpendingConditionsCard';
 
 interface SendTokenScreenProps {
   sendHistoryEntry?: SendHistoryEntry | string;
@@ -84,6 +85,10 @@ export function SendTokenScreen({
   const muted = useThemeColor('muted');
   const transactionId = typeof entry?.id === 'string' ? entry.id : undefined;
   const reachability = useSendReachability(transactionId);
+  // What the token can and cannot do — read from its own proofs while it
+  // still has them, and from what we recorded once it does not. Above the
+  // error/loading returns below, because hook order cannot depend on them.
+  const spendingConditions = useSpendingConditions(entry);
 
   useEffect(() => {
     const shouldTrackReachability = createdOffline === true || !!reachability;
@@ -186,7 +191,6 @@ export function SendTokenScreen({
   });
   const isComplete = isSendTokenComplete(entry);
   const isCancelled = isSendTokenCancelled(entry);
-  const p2pkLocked = hasP2PKLock(entry);
   const tokenMemo =
     typeof entry.token?.memo === 'string' && entry.token.memo.trim().length > 0
       ? entry.token.memo.trim()
@@ -291,9 +295,15 @@ export function SendTokenScreen({
       mintInfo={mintInfo}
       source={source}
       footer={bottomButtons}
+      // Who it went to, with a lock over the corner when it is locked to them.
+      // The template avatar stands in when we have no picture; we never go
+      // looking for an identity behind a bare lock key.
+      showRecipientAvatar
+      headerBadge={
+        spendingConditions && spendingConditions.kind !== 'unlocked' ? 'lock' : 'direction'
+      }
       beforeStatus={
         <>
-          {p2pkLocked ? <P2PKLockIndicator /> : null}
           {reachabilityWarning && (
             <View style={styles.reachabilityWarning}>
               <Alert status="warning" className="bg-surface-secondary">
@@ -332,6 +342,7 @@ export function SendTokenScreen({
       }>
       <DetailsSection
         items={[
+          ...spendingConditionDetailItems(spendingConditions),
           paymentRequest && { title: 'Type', value: 'Payment Request' },
           paymentRequest?.requestId && {
             title: 'Request ID',

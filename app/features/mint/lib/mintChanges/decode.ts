@@ -87,8 +87,13 @@ const nutLabel = (n: string) => {
   return title ? `NUT-${num} ${title}` : `NUT-${num}`;
 };
 
-/** Pointer tokens come from the feed, so `constructor` must not reach `Object.prototype`. */
-const own = (table: Record<string, string>, key: string) =>
+/**
+ * Own-property lookup for a table keyed by untrusted text — feed pointer
+ * tokens, mint-supplied methods and NUT numbers. Without it `constructor`,
+ * `__proto__` or `toString` resolve through `Object.prototype` and return a
+ * function, which `??` does not catch because a function is not nullish.
+ */
+export const own = (table: Record<string, string>, key: string) =>
   Object.hasOwn(table, key) ? table[key] : undefined;
 
 const fieldLabel = (key: string) => own(LEAF_FIELDS, key) ?? key.replace(/_/g, ' ');

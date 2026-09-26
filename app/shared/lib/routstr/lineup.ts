@@ -1,4 +1,6 @@
 import { z } from 'zod';
+
+import { tolerantRecord } from '@/shared/lib/persist/tolerant';
 import type { RoutstrModel } from './api';
 
 /**
@@ -23,8 +25,92 @@ import type { RoutstrModel } from './api';
  * import these, which is what keeps the two ends of the (provider, tier)
  * selection contract in lockstep by construction.
  */
+/**
+ * The vendors the app knows by name, in the order they are offered.
+ *
+ * NOT the whole list. The catalog carries around fifty vendors and roughly
+ * half of them can fill a complete tier ladder, so pinning the menu to four
+ * was hand-picking dressed as a contract — and it is why the picker showed a
+ * fraction of what the node actually serves. These four lead because they are
+ * the names a user recognises and because `openai` is the boot default;
+ * everything else the catalog qualifies follows them.
+ */
 export const AI_PROVIDER_IDS = ['openai', 'claude', 'grok', 'google'] as const;
-export type AiProviderId = (typeof AI_PROVIDER_IDS)[number];
+
+/**
+ * The catalog namespace for a model served from a Tinfoil enclave, which
+ * `@routstr/sdk` seals the request body for.
+ *
+ * The prefix is the ONLY honest signal. A node's catalog lists `glm-5-3` and
+ * `tinfoil-glm-5-3` under the identical display name `Private (E2EE) GLM 5.3`,
+ * and only the prefixed one is encrypted — so anything that reads the name,
+ * the slug or the upstream id instead will happily offer the plaintext twin
+ * under an E2EE label.
+ */
+export const E2EE_MODEL_PREFIX = 'tinfoil-';
+
+/**
+ * The vendor id encrypted models are offered under.
+ *
+ * They get a vendor of their own rather than being folded into the vendor
+ * that trained them, because a tier ladder mixing sealed and plaintext models
+ * cannot promise either one: the tier picks are price-ordered and the sealed
+ * rows are the dearer ones, so a mixed ladder would resolve to a plaintext
+ * model at every tier and the "end-to-end encrypted" badge would never be
+ * kept. One vendor whose every model is sealed is the only shape where
+ * choosing it means what it says.
+ */
+export const E2EE_PROVIDER_ID = 'tinfoil';
+
+/** Whether a catalog id names a model whose request body is sealed to an
+ *  enclave. The single spelling of the rule — the provider badge, the lineup
+ *  grouping and the SDK's own `isTinfoilModel` must agree, or the app promises
+ *  an encryption it does not send. */
+export const isE2eeModelId = (id: string | undefined): boolean =>
+  id?.startsWith(E2EE_MODEL_PREFIX) === true;
+
+/**
+ * A vendor id. A string, not a union: the set comes from the catalog, and a
+ * union would mean a Sovran release every time a vendor appeared on a node.
+ * `AI_PROVIDER_IDS` remains the known-and-named subset.
+ */
+export type AiProviderId = string;
+
+/**
+ * How many vendors the picker offers.
+ *
+ * The qualification rules already exclude toys, embeddings and batch
+ * variants; what is left is real but long. Twelve is the point where the
+ * tab strip stops being a list of choices and starts being a directory.
+ */
+const MAX_PROVIDERS = 12;
+
+/**
+ * Vendors below this many qualifying models cannot fill a tier ladder, so a
+ * tab for them would be one model wearing three labels.
+ */
+const MIN_MODELS_PER_PROVIDER = 3;
+
+const KNOWN_PROVIDER_IDS = new Set<AiProviderId>(AI_PROVIDER_IDS);
+
+/**
+ * One spelling for a model id, so a node's catalog and Routstr's curated list
+ * can disagree about dots, case and vendor prefixes without disagreeing about
+ * the model: the list says `deepseek-v4.1-flash`, a node may say
+ * `deepseek-v4-1-flash` or `deepseek/deepseek-v4.1-flash`. Suffixes such as
+ * `:free` or `:batch` are kept — they name a different offering.
+ */
+export function normalizeModelId(id: string): string {
+  const bare = id.includes('/') ? id.slice(id.lastIndexOf('/') + 1) : id;
+  return bare.trim().toLowerCase().replace(/\./g, '-');
+}
+
+/** The curated list as the set a derivation checks candidates against, or
+ *  `null` when there is no list to check against. */
+export function curatedIdSet(ids: readonly string[] | null | undefined): Set<string> | null {
+  if (!ids || ids.length === 0) return null;
+  return new Set(ids.map(normalizeModelId));
+}
 
 export const AI_TIER_IDS = ['auto', 'pro', 'max'] as const;
 export type AiTierId = (typeof AI_TIER_IDS)[number];
@@ -80,6 +166,17 @@ const LineupEntrySchema = z.object({
    */
   maxCompletionTokens: z.number().int().positive().nullable().catch(null).optional(),
   /**
+   * The node's id for the upstream account serving this model
+   * (`openrouter`, `tinfoil`, …). Models sharing one are a single failure
+   * domain: a node whose credit with one upstream is exhausted answers 402
+   * for every model behind it while its catalog, wallet and other upstreams
+   * stay healthy — so retrying a sibling from the same upstream only pays to
+   * be refused again. Additive + optional: absent on lineups persisted before
+   * this field existed and on nodes too old to report it, in which case the
+   * send path simply cannot narrow and behaves as it did.
+   */
+  upstreamId: z.string().max(64).nullable().catch(null).optional(),
+  /**
    * True when this entry was substituted from the persisted last-known
    * lineup because a successful fetch returned zero qualifying models for
    * its provider. Rendered as a "last known" annotation; the id may be
@@ -96,12 +193,16 @@ const ProviderLineupSchema = z.object({
 });
 type ProviderLineup = z.infer<typeof ProviderLineupSchema>;
 
-const AiLineupSchema = z.object({
-  openai: ProviderLineupSchema,
-  claude: ProviderLineupSchema,
-  grok: ProviderLineupSchema,
-  google: ProviderLineupSchema,
-});
+/**
+ * Keyed by vendor id rather than by four fixed keys.
+ *
+ * Read-compatible with every blob written under the old fixed shape — those
+ * were `{openai, claude, grok, google}`, which is a record of exactly this
+ * value type — so this widens the schema without touching a byte of persisted
+ * data. `tolerantRecord`, so one malformed vendor costs that vendor rather
+ * than the whole `routstr-store` blob.
+ */
+const AiLineupSchema = tolerantRecord(z.string().max(64), ProviderLineupSchema);
 export type AiLineup = z.infer<typeof AiLineupSchema>;
 
 /**
@@ -121,6 +222,9 @@ export type PersistedLineup = z.infer<typeof PersistedLineupSchema>;
 interface LineupProviderStats {
   qualifying: number;
   aliasDropped: number;
+  /** Qualifying models that are also on Routstr's curated list. When above
+   *  zero the vendor's ladder was built from those alone. */
+  curated?: number;
 }
 
 interface LineupStats {
@@ -130,6 +234,13 @@ interface LineupStats {
 
 const emptyProviderLineup = (): ProviderLineup => ({ auto: null, pro: null, max: null });
 
+/**
+ * A lineup with the four known vendors present and empty.
+ *
+ * The known four are kept as a floor rather than dropped, so every existing
+ * consumer that reaches for `lineup.openai` still finds a block, and a catalog
+ * that qualifies more vendors simply adds keys beside them.
+ */
 export const emptyLineup = (): AiLineup => ({
   openai: emptyProviderLineup(),
   claude: emptyProviderLineup(),
@@ -137,9 +248,30 @@ export const emptyLineup = (): AiLineup => ({
   google: emptyProviderLineup(),
 });
 
-/** True when at least one cell anywhere in the lineup is filled. */
-export function lineupHasEntries(lineup: AiLineup): boolean {
-  return AI_PROVIDER_IDS.some((p) => providerHasEntries(lineup[p]));
+/**
+ * The vendors this lineup actually offers, in its own order.
+ *
+ * Filtered to vendors with at least one tier filled: an empty block is a
+ * placeholder, and a tab for it would open onto nothing.
+ */
+export function lineupProviderIds(lineup: AiLineup | null | undefined): AiProviderId[] {
+  if (!lineup) return [];
+  return Object.keys(lineup).filter((provider) => providerHasEntries(lineup[provider]));
+}
+
+/**
+ * True when at least one cell anywhere in the lineup is filled.
+ *
+ * Null-tolerant on purpose: "no lineup at all" and "a lineup whose every cell
+ * is empty" are the same answer to every caller that asks this, and the two
+ * states are one keystroke apart in a store where `lineup` is nullable. The
+ * empty object is the one that hides — it is truthy, so a `??` fallback chain
+ * stops at it — which is exactly the confusion that left the model picker
+ * showing "Models loading" over a catalog that had already landed.
+ */
+export function lineupHasEntries(lineup: AiLineup | null | undefined): boolean {
+  if (!lineup) return false;
+  return Object.values(lineup).some(providerHasEntries);
 }
 
 function providerHasEntries(provider: ProviderLineup): boolean {
@@ -153,12 +285,18 @@ function providerHasEntries(provider: ProviderLineup): boolean {
  * prefixes cover the rows without a slug, including the no-colon alias
  * rows ("Anthropic Claude Haiku Latest").
  */
+/**
+ * Catalog vendor slugs that are spelled differently from the id the app uses.
+ *
+ * Only aliases live here. Every other vendor keeps its own slug as its id,
+ * which is what lets a vendor appear in the menu without a Sovran release.
+ * These four are pinned because they are the ids the app already persisted
+ * and the ones its icons and labels are keyed on.
+ */
 const SLUG_PREFIX_TO_PROVIDER: Record<string, AiProviderId> = {
-  openai: 'openai',
   anthropic: 'claude',
   'x-ai': 'grok',
   xai: 'grok',
-  google: 'google',
 };
 
 const NAME_PREFIX_TO_PROVIDER: [string, AiProviderId][] = [
@@ -172,27 +310,46 @@ const NAME_PREFIX_TO_PROVIDER: [string, AiProviderId][] = [
 ];
 
 /**
- * Resolve which of our four providers a catalog row belongs to, or `null`
- * for everyone else (Qwen, Mistral, DeepSeek, …), who never enter the
- * lineup. Slug prefix wins; the display-name fallback deliberately
- * recognises alias rows so their later exclusion is an explicit dedup
- * decision, not an accidental grouping drop.
+ * Which vendor a catalog row belongs to, or `null` when it does not say.
+ *
+ * The slug prefix is the structured signal (`openai/…`, `qwen/…`,
+ * `mistralai/…`) and is used as-is unless it is one of the few spellings the
+ * app has its own id for. The display-name fallback covers rows without a
+ * slug, including the no-colon alias rows ("Anthropic Claude Haiku Latest"),
+ * so their later exclusion is an explicit dedup decision rather than an
+ * accidental grouping drop.
+ *
+ * This used to return `null` for every vendor outside a hardcoded four, which
+ * silently discarded most of the catalog before it could be ranked.
  */
 export function providerIdForModel(model: RoutstrModel): AiProviderId | null {
+  // Before anything else: an enclave row carries no slug and a display name
+  // with no vendor prefix and no colon ("Private (E2EE) GLM 5.3", "kimi-k3"),
+  // so every signal below returns null for it and the whole encrypted half of
+  // the catalog used to be dropped here — which is why a provider could be
+  // badged end-to-end encrypted while not one of its sealed models was ever
+  // offered, let alone sent.
+  if (isE2eeModelId(model.id)) return E2EE_PROVIDER_ID;
   const slug = typeof model.canonical_slug === 'string' ? model.canonical_slug : '';
   if (slug) {
     // '~' marks a rolling alias slug ('~anthropic/claude-fable-latest').
     const slashIdx = slug.indexOf('/');
     if (slashIdx > 0) {
       const prefix = slug.slice(0, slashIdx).replace(/^~/, '').toLowerCase();
-      const bySlug = SLUG_PREFIX_TO_PROVIDER[prefix];
-      if (bySlug !== undefined) return bySlug;
+      if (prefix) return SLUG_PREFIX_TO_PROVIDER[prefix] ?? prefix;
     }
   }
   const name = typeof model.name === 'string' ? model.name.toLowerCase() : '';
   if (!name) return null;
   for (const [prefix, provider] of NAME_PREFIX_TO_PROVIDER) {
     if (name.startsWith(prefix)) return provider;
+  }
+  // "Vendor: Model Name" is the catalog's own convention for a row with no
+  // slug, so the part before the colon is the vendor it is claiming.
+  const colonIdx = name.indexOf(':');
+  if (colonIdx > 0) {
+    const claimed = name.slice(0, colonIdx).trim().replace(/\s+/g, '-');
+    if (claimed) return claimed;
   }
   return null;
 }
@@ -273,6 +430,7 @@ function toLineupEntry(model: RoutstrModel): LineupEntry {
     displayName: displayNameFor(model),
     contextLength: typeof model.context_length === 'number' ? model.context_length : 0,
     created: typeof model.created === 'number' ? model.created : 0,
+    upstreamId: typeof model.upstream_provider_id === 'string' ? model.upstream_provider_id : null,
     visionInput:
       Array.isArray(model.architecture?.input_modalities) &&
       model.architecture.input_modalities.includes('image'),
@@ -339,19 +497,24 @@ function pickTiers(candidates: RoutstrModel[], nowSeconds: number): ProviderLine
  */
 export function deriveLineup(
   models: RoutstrModel[],
-  nowSeconds: number = Math.floor(Date.now() / 1000)
+  nowSeconds: number = Math.floor(Date.now() / 1000),
+  /**
+   * Routstr's curated model list (`curatedIdSet`), or `null` for none. A
+   * vendor with at least one listed qualifying model builds its ladder from
+   * listed models only; a vendor with none keeps its full qualifying set. The
+   * catalog is the node's claim about what it serves; the list is the
+   * network's claim about what is worth serving — and a model on the first
+   * but not the second is how `tinfoil-deepseek-v4-flash` stayed a node's
+   * cheapest sealed pick for weeks after its enclave stopped answering.
+   */
+  curated: ReadonlySet<string> | null = null
 ): { lineup: AiLineup; stats: LineupStats } {
   const lineup = emptyLineup();
-  const stats: LineupStats = {
-    perProvider: {
-      openai: { qualifying: 0, aliasDropped: 0 },
-      claude: { qualifying: 0, aliasDropped: 0 },
-      grok: { qualifying: 0, aliasDropped: 0 },
-      google: { qualifying: 0, aliasDropped: 0 },
-    },
-    totalQualifying: 0,
-  };
+  const stats: LineupStats = { perProvider: {}, totalQualifying: 0 };
   if (!Array.isArray(models)) return { lineup, stats };
+
+  const statsFor = (provider: AiProviderId): LineupProviderStats =>
+    (stats.perProvider[provider] ??= { qualifying: 0, aliasDropped: 0 });
 
   const byProvider = new Map<AiProviderId, RoutstrModel[]>();
   for (const model of models) {
@@ -362,7 +525,7 @@ export function deriveLineup(
     if (isRollingAlias(model)) {
       // Deliberate within-provider dedup: prefer the dated concrete
       // sibling over the rolling '-latest' alias of the same model.
-      stats.perProvider[provider].aliasDropped++;
+      statsFor(provider).aliasDropped++;
       continue;
     }
     const list = byProvider.get(provider) ?? [];
@@ -370,14 +533,76 @@ export function deriveLineup(
     byProvider.set(provider, list);
   }
 
-  for (const provider of AI_PROVIDER_IDS) {
+  for (const provider of rankProviders(byProvider, nowSeconds)) {
     const candidates = byProvider.get(provider) ?? [];
-    stats.perProvider[provider].qualifying = candidates.length;
+    statsFor(provider).qualifying = candidates.length;
     stats.totalQualifying += candidates.length;
-    lineup[provider] = pickTiers(candidates, nowSeconds);
+    const listed = curated
+      ? candidates.filter((model) => curated.has(normalizeModelId(model.id)))
+      : [];
+    if (curated) statsFor(provider).curated = listed.length;
+    lineup[provider] = pickTiers(listed.length > 0 ? listed : candidates, nowSeconds);
   }
 
   return { lineup, stats };
+}
+
+/**
+ * Choose which vendors get a tab, and in what order.
+ *
+ * The four the app knows by name lead, when the catalog has enough of them to
+ * fill a ladder; the encrypted vendor follows them whenever the node serves
+ * one; the rest follow by how many CURRENT models they qualify.
+ * Freshness rather than raw count on purpose: a vendor with forty retired
+ * listings is a worse tab than one with six models from this year, and the
+ * tier picks themselves already run inside the same freshness window.
+ *
+ * This replaces a hardcoded list of four. The catalog carries around fifty
+ * vendors and half of them can fill a ladder, so the old rule was throwing
+ * away most of what the user was paying a node to serve.
+ */
+function rankProviders(
+  byProvider: Map<AiProviderId, RoutstrModel[]>,
+  nowSeconds: number
+): AiProviderId[] {
+  const cutoff = nowSeconds - FRESH_WINDOW_SECONDS;
+  const freshCount = (provider: AiProviderId): number =>
+    (byProvider.get(provider) ?? []).filter(
+      (m) => (typeof m.created === 'number' ? m.created : 0) >= cutoff
+    ).length;
+
+  const known = AI_PROVIDER_IDS.filter(
+    (provider) => (byProvider.get(provider)?.length ?? 0) > 0
+  ) as AiProviderId[];
+  // The encrypted vendor is pinned rather than ranked, and is exempt from the
+  // ladder minimum and the tab-strip cap.
+  //
+  // Both rules are audience rules — they exist so a long catalog does not turn
+  // the menu into a directory — and neither can be allowed to decide whether
+  // an encryption the provider badge already promised is reachable. A node
+  // that serves two sealed models gets a two-rung ladder (the documented
+  // partial fill), which is honest; dropping it would leave the badge
+  // advertising something the app cannot send.
+  const pinned = (byProvider.get(E2EE_PROVIDER_ID)?.length ?? 0) > 0 ? [E2EE_PROVIDER_ID] : [];
+  const knownSet = new Set<AiProviderId>([...known, ...pinned]);
+  const rest = [...byProvider.keys()]
+    .filter(
+      (provider) =>
+        !knownSet.has(provider) &&
+        (byProvider.get(provider)?.length ?? 0) >= MIN_MODELS_PER_PROVIDER
+    )
+    .sort((a, b) => {
+      const diff = freshCount(b) - freshCount(a);
+      // Alphabetical on a tie so the menu order is stable between launches
+      // rather than following whatever order the catalog happened to list.
+      return diff !== 0 ? diff : a.localeCompare(b);
+    });
+
+  return [
+    ...known,
+    ...pinned,
+    ...rest.slice(0, Math.max(0, MAX_PROVIDERS - known.length - pinned.length)),
+  ];
 }
 
 /**
@@ -403,6 +628,7 @@ const NaggLineupModelSchema = z.object({
   created: z.number().int().nonnegative().catch(0),
   contextLength: z.number().int().nonnegative().catch(0),
   maxCompletionTokens: z.number().int().positive().nullable().catch(null).optional(),
+  upstreamId: z.string().max(64).nullable().catch(null).optional(),
   inputModalities: z
     .array(z.string().max(32))
     .max(16)
@@ -458,12 +684,15 @@ export function lineupFromNaggPayload(payload: NaggAiLineup): {
   authMode?: 'bearer' | 'x-cashu';
 } {
   const lineup = emptyLineup();
-  const knownProviders = new Set<string>(AI_PROVIDER_IDS);
   const knownTiers = new Set<string>(AI_TIER_IDS);
   let filled = 0;
-  for (const provider of payload.providers) {
-    if (!knownProviders.has(provider.id)) continue;
-    const providerId = provider.id as AiProviderId;
+  for (const provider of payload.providers.slice(0, MAX_PROVIDERS)) {
+    const providerId = provider.id.trim();
+    if (!providerId) continue;
+    // Any vendor nagg offers becomes a tab. Old builds pinned this to four
+    // ids, so a nagg deploy that widened the menu was invisible to them —
+    // the opposite of why the lineup is served from nagg at all.
+    lineup[providerId] ??= emptyProviderLineup();
     for (const model of provider.models) {
       if (!knownTiers.has(model.tier)) continue;
       const tier = model.tier as AiTierId;
@@ -481,8 +710,15 @@ export function lineupFromNaggPayload(payload: NaggAiLineup): {
           max_cost: model.pricing?.maxCost ?? null,
         },
         maxCompletionTokens: model.maxCompletionTokens ?? null,
+        upstreamId: model.upstreamId ?? null,
       };
       filled++;
+    }
+    // A vendor the app does not know by name and that carried no usable tier
+    // is not a tab. The known four stay as empty placeholders, which is what
+    // every existing consumer expects to find.
+    if (!providerHasEntries(lineup[providerId]) && !KNOWN_PROVIDER_IDS.has(providerId)) {
+      delete lineup[providerId];
     }
   }
   const nodeBaseUrl = payload.node.baseUrl.trim() || null;
@@ -503,8 +739,10 @@ export function mergeLineupWithLastKnown(
 ): AiLineup {
   if (!lastKnown) return derived;
   const merged = { ...derived };
-  for (const provider of AI_PROVIDER_IDS) {
-    if (providerHasEntries(derived[provider])) continue;
+  // Union, not the derived set: a vendor the catalog dropped this fetch still
+  // has a last-known ladder worth showing, annotated, rather than vanishing.
+  for (const provider of new Set([...Object.keys(derived), ...Object.keys(lastKnown)])) {
+    if (derived[provider] && providerHasEntries(derived[provider])) continue;
     const fallback = lastKnown[provider];
     if (!fallback || !providerHasEntries(fallback)) continue;
     const marked = emptyProviderLineup();

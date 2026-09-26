@@ -187,3 +187,48 @@ it('prefers HTTP evidence over legacy prose or a generic SDK wrapper', () => {
     'routstr.auth'
   );
 });
+
+// "The AI provider is unreachable" is a claim about someone else's node. We
+// must only make it when a node actually failed to answer — not when our own
+// candidate walk ran out, and not when the node answered with its upstream's
+// failure.
+it('names our own exhausted shortlist instead of blaming a provider', () => {
+  expect(describeError({ status: 503, error: { code: 'no_providers' } }, 'routstr').id).toBe(
+    'routstr.no_providers'
+  );
+});
+
+it('separates a node whose upstream failed from a node we could not reach', () => {
+  expect(describeError({ status: 502, error: {} }, 'routstr').id).toBe('routstr.upstream_failed');
+  // A node forwarding its upstream's refusal under the upstream's own status:
+  // the node answered, the model did not, and the copy has to send the user
+  // to another model rather than call the provider unreachable.
+  expect(
+    describeError({ status: 404, error: { type: 'upstream_error', code: '404' } }, 'routstr').id
+  ).toBe('routstr.upstream_failed');
+  expect(
+    describeError(
+      { status: 0, error: { type: 'network_error', code: 'change_pending' } },
+      'routstr'
+    ).id
+  ).toBe('routstr.change_pending');
+  expect(describeError({ status: 503, error: {} }, 'routstr').id).toBe('routstr.unavailable');
+});
+
+// Sovran pins one chosen provider and never switches on the user's behalf, so
+// the SDK's "all providers failed" is a claim about a population of one. Saying
+// `no_providers` there sent a real 404 from a chosen node out as advice about
+// provider availability.
+it('separates one chosen provider refusing from a shortlist running out', () => {
+  expect(describeError({ status: 502, error: { code: 'provider_refused' } }, 'routstr').id).toBe(
+    'routstr.provider_refused'
+  );
+  expect(describeError({ status: 503, error: { code: 'no_providers' } }, 'routstr').id).toBe(
+    'routstr.no_providers'
+  );
+});
+
+it('points a refused request at the provider, not at providers in general', () => {
+  const { text } = describeError({ status: 502, error: { code: 'provider_refused' } }, 'routstr');
+  expect(text).toContain('switch provider');
+});

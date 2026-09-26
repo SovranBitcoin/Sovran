@@ -10,6 +10,7 @@ module.exports = {
   setupFiles: [
     ...(expoNodePreset.setupFiles || []),
     require.resolve('@react-native/jest-preset/jest/setup.js'),
+    '<rootDir>/jest.webGlobals.js',
     '<rootDir>/jest.staticAssets.js',
   ],
   moduleNameMapper: {
@@ -58,6 +59,11 @@ module.exports = {
       '<rootDir>/node_modules/@cashu/coco-react/dist/index.js',
       '<rootDir>/../node_modules/@cashu/coco-react/dist/index.js',
     ],
+    // ESM-only under Jest (applesauce-relay → node:crypto). See the stub's
+    // header for what it stands in for and what it cannot prove.
+    '^@routstr/sdk/browser$': '<rootDir>/__mocks__/routstrSdk.ts',
+    // ESM-only `exports` map with a React Native build; see the stub's header.
+    '^@nostr-dev-kit/ndk-mobile$': '<rootDir>/__mocks__/ndkMobile.ts',
     '^@/shared/(.*)$': '<rootDir>/shared/$1',
     '^@/features/(.*)$': '<rootDir>/features/$1',
     '^@/sheets/(.*)$': '<rootDir>/shared/lib/popup/sheets/$1',
@@ -80,6 +86,6 @@ module.exports = {
   ],
   modulePathIgnorePatterns: ['/coco-cashu-plugin-p2pk-import/'],
   transformIgnorePatterns: [
-    'node_modules/(?!(?:\\.bun/[^/]+/node_modules/)?(?:(jest-)?react-native|@react-native(-community)?|@bacons/.*|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|@shopify/react-native-skia|nostr-tools|@scure|@noble|coco-cashu-core|@cashu/cashu-ts|@cashu/coco-core|@cashu/coco-expo-sqlite|@cashu/coco-react|@sovranbitcoin/.*|wallet|nostr|bitchat-module|standard-navigation|cborg|@shopify/flash-list))',
+    'node_modules/(?!(?:\\.bun/[^/]+/node_modules/)?(?:(jest-)?react-native|@react-native(-community)?|@bacons/.*|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|@shopify/react-native-skia|nostr-tools|@scure|@noble|coco-cashu-core|@cashu/cashu-ts|@cashu/coco-core|@cashu/coco-expo-sqlite|@cashu/coco-react|@sovranbitcoin/.*|wallet|nostr|bitchat-module|standard-navigation|cborg|@shopify/flash-list|ehbp|hpke|@panva/.*|@tinfoilsh/.*|@freedomofpress/.*))',
   ],
 };

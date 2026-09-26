@@ -22,6 +22,8 @@ import type { MintRow } from '@/features/mint/hooks/useMintRowsWithCache';
 import { Text } from '@/shared/ui/primitives/Text';
 import { withAlpha } from '@/shared/lib/color';
 import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
+import { useMintPresence } from '@/features/mint/hooks/useMintPresence';
+import { normalizeMintUrlKey } from '@/shared/lib/url';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { MINT_CURRENCY_TABS_HEIGHT } from '@/features/mint/components/MintCurrencyTabs';
@@ -131,6 +133,14 @@ export function MintListScreen({
 
   const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
   const [selectedCurrency, setSelectedCurrency] = useState<string>('ALL');
+  // Is each mint answering? A dot on the face, fed by this phone's own
+  // `/v1/info` probe (the identity refresh the selector already makes counts
+  // as one). Feedback while scrolling — an offline mint stays pickable, since
+  // ecash sent to it is redeemed when it returns.
+  const presence = useMintPresence(
+    items.map((item) => item.mintUrl),
+    !mockMode
+  );
 
   const prevRenderKey = useRef('');
   const renderKey = `${items.length}:${isExecuting}`;
@@ -302,9 +312,10 @@ export function MintListScreen({
     ) : null;
     return (
       <ContactRow
-        identity={mintIdentity(
-          mockMode ? { ...item, balance: getMockMintBalance(item.mintUrl, item.unit) } : item
-        )}
+        identity={mintIdentity({
+          ...(mockMode ? { ...item, balance: getMockMintBalance(item.mintUrl, item.unit) } : item),
+          presence: presence[normalizeMintUrlKey(item.mintUrl)],
+        })}
         stats={MINT_ROW_STATS}
         disabled={isExecuting || item.status !== 'available'}
         disabledReason={getMintDisabledReasonLabel(item.reason) ?? undefined}

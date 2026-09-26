@@ -2,6 +2,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { DEMO_AI_MESSAGES } from '@/shared/stores/runtime/mockPresentationData';
 import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useAiProviderDirectoryStore } from '@/shared/stores/profile/aiProviderDirectoryStore';
 import { Keyboard, ScrollView, View as RNView } from 'react-native';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useScreenInsets } from '@/shared/hooks/useScreenInsets';
@@ -43,6 +44,11 @@ const SURFACE = 'ai';
 // Horizontal gutter applied to every message row (FlashList rows have no
 // padding of their own). Stable module ref so recycled cells don't re-create it.
 const MESSAGE_ROW_STYLE = { paddingHorizontal: 16 } as const;
+
+/** What "Continue" sends when an answer stopped at its completion budget.
+ *  A plain next turn in the user's own transcript, so the reservation it
+ *  costs is one they were asked about and can see. */
+const CONTINUE_PROMPT = 'Continue from where you stopped.';
 
 /** Visual gap between the composer's outer bottom edge and the keyboard top
  *  when focused. Matches the shared ChatScreen — 0pt reads as "the composer
@@ -94,6 +100,11 @@ function buildBranchNavById(
  * separate virtualization sidesteps it cleanly.
  */
 export function AiChatScreen() {
+  // Reference the persisted provider directory so its hydration starts here,
+  // not when the picker first renders: the picker gates its first paint on it.
+  useEffect(() => {
+    useAiProviderDirectoryStore.persist.hasHydrated();
+  }, []);
   useLifecycleLogger('AiChatScreen');
   const mockMode = useSettingsStore((state) => state.mockMode);
   const [demoMessages, setDemoMessages] = useState(DEMO_AI_MESSAGES);
@@ -202,6 +213,16 @@ export function AiChatScreen() {
   const handleRetry = (messageId: string) => {
     aiLog.info('ai.retry.dispatch', { messageId });
     if (!mockMode) void retry(messageId);
+  };
+
+  // Asking for the rest of a truncated answer is an ordinary next turn, not a
+  // hidden re-run: it goes through the same gate, the same spend sheet and the
+  // same reservation as anything else the user types, and it appears in the
+  // transcript as what it is. Continuing must never be the one way to spend
+  // money without being asked.
+  const handleContinue = (messageId: string) => {
+    aiLog.info('ai.continue.dispatch', { messageId });
+    if (!mockMode) void send(CONTINUE_PROMPT);
   };
 
   // Composer state (draft + pending image attachments + measured height
@@ -352,6 +373,7 @@ export function AiChatScreen() {
         message={item}
         isStreaming={item.id === streamingMessageId}
         onRetry={isSending ? undefined : handleRetry}
+        onContinue={isSending ? undefined : handleContinue}
         branchNav={branchNavById.get(item.id)}
       />
     </RNView>

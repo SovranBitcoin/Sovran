@@ -69,6 +69,7 @@ const STORE_MODULES = [
   '@/shared/stores/profile/ownProfileMetadataStore',
   '@/shared/stores/profile/ownedMediaStore',
   '@/shared/stores/profile/recentPeopleStore',
+  '@/shared/stores/profile/aiProviderDirectoryStore',
   '@/shared/stores/profile/routstrStore',
   '@/shared/stores/profile/scanHistoryStore',
   '@/shared/stores/profile/searchHistoryStore',

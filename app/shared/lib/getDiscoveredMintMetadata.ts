@@ -1,6 +1,7 @@
 import type { RequestControls } from 'wallet';
 
 import { discoverMint } from '@/shared/lib/apiClient';
+import { cacheOperatorStats } from '@/shared/lib/nostr/fetchProfiles';
 import { newReadId, readErrorType, readEvents, readKeyHash } from '@/shared/lib/read/readLog';
 import { useMintTestnutStore } from '@/shared/stores/global/mintTestnutStore';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
@@ -64,6 +65,19 @@ export async function getDiscoveredMintMetadata(
   }
   if (result.isOk() && result.value) {
     useMintMetadataStore.getState().upsertFromDiscover([result.value]);
+    // The operator's reach and reputation go to the single owner as well, so
+    // the profile page and any other row for the same person agree with this
+    // list — and the person is linked to the mint they run.
+    cacheOperatorStats(
+      [result.value].map((m) => ({
+        pubkey: m.operatorPubkey,
+        followers: m.followers,
+        follows: m.follows,
+        score: m.vertexScore,
+        rank: m.vertexRank,
+        operatesMint: m.mintUrl,
+      }))
+    );
     useMintTestnutStore.getState().applyDiscover([result.value]);
     const next = useMintMetadataStore.getState().getCached(mintUrl);
     readEvents.done({

@@ -15,8 +15,17 @@
  * bound the publish with `withTimeout` so the caller always gets a definite
  * answer.
  *
- * The relay pool is injected through `createDirectMessageSender`, so tests can
- * supply a fake; `sendDirectMessageToRelays` is the app's `SimplePool` wiring.
+ * Where the wrap goes is NIP-17's decision, not ours. The nprofile's own relay
+ * hints win: in a NUT-18 request the payee named that target themselves, which
+ * is a stronger statement of "reach me here" than anything we could look up.
+ * With no hints we fall back to their `kind:10050` DM relay list, and with
+ * neither we refuse — NIP-17 makes a missing list mean "not ready to receive",
+ * and this payload carries live proofs, so guessing a relay set spends the
+ * sender's ecash into a mailbox the payee never opens.
+ *
+ * The relay pool and the DM-relay lookup are injected through
+ * `createDirectMessageSender`, so tests can supply fakes;
+ * `sendDirectMessageToRelays` is the app's `SimplePool` wiring.
  */
 
 import { SimplePool } from 'nostr-tools/pool';
@@ -25,6 +34,7 @@ import * as nip19 from 'nostr-tools/nip19';
 import { withTimeout } from 'wallet';
 
 import { nostrLog } from '@/shared/lib/logger';
+import { createDmRelayResolver } from '@/shared/lib/nostr/dmRelayDiscovery';
 
 import { buildRecipientGiftWrap } from './nip17';
 
@@ -37,8 +47,15 @@ const FALLBACK_PAYMENT_RELAYS = [
   'wss://relay.nostr.band',
 ];
 
-/** Publish/advertise relay set for payment DMs — also embedded as the relay
- *  hints in NUT-18 nostr-transport nprofiles. */
+/**
+ * The relay set we advertise as our own inbox: embedded as the relay hints in
+ * the NUT-18 nostr-transport nprofiles we hand out, and queried when we need to
+ * discover somebody else's `kind:10050`.
+ *
+ * It is deliberately not a publish target for a counterparty's DM. Our own
+ * requests always carry these as hints, so a hint-less nprofile is always
+ * somebody else's, and these relays say nothing about where *they* read.
+ */
 export const PAYMENT_RELAYS = [DEFAULT_PAYMENT_RELAY, ...FALLBACK_PAYMENT_RELAYS];
 
 /** How long to wait for the first relay OK before failing the publish. */
@@ -46,6 +63,20 @@ const DEFAULT_PUBLISH_TIMEOUT_MS = 15_000;
 
 /** The slice of nostr-tools' `SimplePool` this publisher needs. */
 export type DirectMessageRelayPool = Pick<SimplePool, 'publish' | 'close'>;
+
+/**
+ * The recipient declared no inbox: no relay hints on their nprofile and no
+ * `kind:10050` DM relay list. NIP-17 says not to send, and the caller
+ * (`executePaymentRequest`) rolls the prepared proofs back on this throw.
+ */
+export class NoDirectMessageRelaysError extends Error {
+  readonly pubkey: string;
+  constructor(pubkey: string) {
+    super("This contact hasn't published where to reach them, so the payment wasn't sent.");
+    this.name = 'NoDirectMessageRelaysError';
+    this.pubkey = pubkey;
+  }
+}
 
 interface SendDirectMessageParams {
   senderPrivateKey: Uint8Array;
@@ -60,6 +91,8 @@ interface SendDirectMessageParams {
  */
 export function createDirectMessageSender(deps: {
   openPool: () => DirectMessageRelayPool;
+  /** NIP-17 `kind:10050` lookup, used only when the nprofile carries no hints. */
+  resolveDmRelays: (pubkey: string) => Promise<string[]>;
 }): (params: SendDirectMessageParams) => Promise<void> {
   return async function sendDirectMessage(params) {
     const decoded = nip19.decode(params.nprofile);
@@ -72,16 +105,24 @@ export function createDirectMessageSender(deps: {
     }
 
     const { pubkey, relays } = decoded.data;
+    const hinted = [...new Set(relays ?? [])];
+    // No hints: ask the recipient where they read DMs. Never guess — a wrap on
+    // the wrong relay is spent ecash the payee will never see.
+    const relayUrls = hinted.length > 0 ? hinted : await deps.resolveDmRelays(pubkey);
+    const uniqueRelays = [...new Set(relayUrls)];
+
     nostrLog.info('nostr.sendDirectMessage.publish', {
       pubkeyPreview: pubkey.slice(0, 12) + '…',
-      relayCount: relays?.length ?? 0,
-      usingDefaults: !relays?.length,
+      relayCount: uniqueRelays.length,
+      source: hinted.length > 0 ? 'nprofile' : 'kind10050',
     });
-    const relayUrls =
-      relays?.length && relays.length > 0
-        ? relays
-        : [DEFAULT_PAYMENT_RELAY, ...FALLBACK_PAYMENT_RELAYS];
-    const uniqueRelays = [...new Set(relayUrls)];
+
+    if (uniqueRelays.length === 0) {
+      nostrLog.warn('nostr.sendDirectMessage.noDeclaredRelays', {
+        pubkeyPreview: pubkey.slice(0, 12) + '…',
+      });
+      throw new NoDirectMessageRelaysError(pubkey);
+    }
 
     const { recipientWrap } = buildRecipientGiftWrap({
       content: params.message,
@@ -103,7 +144,12 @@ export function createDirectMessageSender(deps: {
   };
 }
 
-/** App wiring: a short-lived nostr-tools `SimplePool` per publish. */
+/** App wiring: a short-lived nostr-tools `SimplePool` per publish, and a
+ *  `kind:10050` lookup over the relays we already keep open for payments. */
 export const sendDirectMessageToRelays = createDirectMessageSender({
   openPool: () => new SimplePool(),
+  resolveDmRelays: createDmRelayResolver({
+    openPool: () => new SimplePool(),
+    discoveryRelays: PAYMENT_RELAYS,
+  }),
 });

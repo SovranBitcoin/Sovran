@@ -12,12 +12,33 @@
  */
 
 import { describeError } from '@/shared/lib/errors';
-import { checkBalance, sendMessage } from '@/shared/lib/routstr/api';
+import {
+  checkBalance,
+  isWalletBalanceError,
+  sendMessage,
+  setRoutstrNodeBaseUrl,
+} from '@/shared/lib/routstr/api';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
 const mockMemory: Record<string, string> = {};
 
+jest.mock('@/shared/stores/global/profileStore', () => ({
+  useProfileStore: {
+    getState: () => ({
+      activeAccountIndex: 0,
+      profiles: [{ accountIndex: 0, pubkey: 'a'.repeat(64) }],
+    }),
+  },
+}));
+jest.mock('@/shared/lib/routstr/securePersistence', () => ({
+  createRoutstrPersistence: () =>
+    jest.requireMock('@/shared/lib/cashu/profileScopedStorage').createProfileScopedStorage(),
+}));
+jest.mock('@/shared/lib/routstr/secureVault', () => ({
+  createSecureVault: () => ({ read: async () => null, write: async () => {} }),
+}));
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
+  captureProfileStorageOwner: async () => 'a'.repeat(64),
   createProfileScopedStorage: () => ({
     getItem: async (k: string) => mockMemory[k] ?? null,
     setItem: async (k: string, v: string) => {
@@ -50,6 +71,25 @@ jest.mock('@/shared/lib/http/requestSignal', () => ({
   buildAbortSignal: () => undefined,
 }));
 
+// The wallet half of a pay-per-request send. `@routstr/sdk` spends through
+// this adapter, so stubbing it here is what keeps these tests about the
+// classification above it rather than about Coco.
+jest.mock('@/shared/lib/routstr/sdk/walletAdapter', () => ({
+  createCocoWalletAdapter: () =>
+    jest.requireMock('@/shared/lib/routstr/sdk/walletAdapter').cocoWalletAdapter,
+  cocoWalletAdapter: {
+    getBalances: jest.fn(async () => ({ 'https://mint.example': 1000 })),
+    getMintUnits: () => ({ 'https://mint.example': 'sat' }),
+    getActiveMintUrl: () => 'https://mint.example',
+    sendToken: jest.fn(async () => 'cashuB-request-payment'),
+    receiveToken: jest.fn(async () => ({ success: true, amount: 0, unit: 'sat' })),
+  },
+}));
+
+jest.mock('@/shared/stores/profile/mintStore', () => ({
+  useMintStore: { getState: () => ({ selectedMint: 'https://mint.example' }) },
+}));
+
 const INSUFFICIENT_BODY = {
   error: {
     message: 'Insufficient balance: 85577 mSats required for this model. 216 available.',
@@ -72,7 +112,11 @@ function stubFetch402(body: unknown) {
 }
 
 describe('402 → balance truth-sync', () => {
-  beforeEach(() => useRoutstrStore.getState().setApiKey('sk-test'));
+  beforeEach(() => {
+    useRoutstrStore.getState().setApiKey('sk-test');
+    // A provider is a precondition now: nothing is sent until one is picked.
+    setRoutstrNodeBaseUrl('https://node.example');
+  });
   // eslint-disable-next-line no-restricted-properties -- restore seam for the stub
   const realFetch = global.fetch;
   afterEach(() => {
@@ -80,13 +124,14 @@ describe('402 → balance truth-sync', () => {
     global.fetch = realFetch;
   });
 
+  // A chat completion no longer carries a hosted balance — it pays per request
+  // out of the wallet — so the balance sync now only has a credential to own
+  // on the wallet calls that still hold one. Those are what `reclaim` drains.
   it('overwrites the stale store balance with the 402 available mSats', async () => {
     useRoutstrStore.getState().setBalance(299_841); // the phantom figure
     stubFetch402(INSUFFICIENT_BODY);
 
-    await expect(
-      sendMessage('sk-test', [{ role: 'user', content: 'hi' }], { model: 'gemma-4-26b-a4b-it' })
-    ).rejects.toMatchObject({ status: 402 });
+    await expect(checkBalance('sk-test')).rejects.toMatchObject({ status: 402 });
 
     expect(useRoutstrStore.getState().balance).toBe(216);
   });
@@ -99,7 +144,7 @@ describe('402 → balance truth-sync', () => {
   ])('parses the v0.4.7 detail object without inventing a balance', async (detail, expected) => {
     useRoutstrStore.getState().setBalance(299841);
     stubFetch402({ detail });
-    await expect(sendMessage('sk-test', [], { model: 'test-model' })).rejects.toMatchObject({
+    await expect(checkBalance('sk-test')).rejects.toMatchObject({
       status: 402,
       error: { message: 'Insufficient balance', details: { required: 85577 } },
     });
@@ -108,10 +153,50 @@ describe('402 → balance truth-sync', () => {
 
   it('keeps the legacy FastAPI string balance extraction', async () => {
     stubFetch402({ detail: 'Insufficient balance: 85577 mSats required, 216 available' });
-    await expect(sendMessage('sk-test', [], { model: 'test-model' })).rejects.toMatchObject({
+    await expect(checkBalance('sk-test')).rejects.toMatchObject({
       error: { details: { required: 85577, available: 216 } },
     });
     expect(useRoutstrStore.getState().balance).toBe(216);
+  });
+
+  /**
+   * routstr-core's `forward_upstream_error_response` hands the AI provider's
+   * own JSON error body back verbatim under the provider's status. An
+   * OpenRouter-shaped 402 has no `type` and a NUMERIC `code`, so it carries
+   * none of routstr's wallet markers. Observed on device 2026-09-24: 100 sats
+   * credited, 0 reserved, `gpt-oss-20b` (max_cost 19.86 sats), four of these
+   * in a row — reported to the user as "Insufficient balance".
+   */
+  const UPSTREAM_402 = {
+    error: { message: 'Provider returned error', code: 402 },
+  };
+
+  it('does not call a forwarded upstream 402 a wallet problem', async () => {
+    useRoutstrStore.getState().setBalance(100_000);
+    stubFetch402(UPSTREAM_402);
+
+    const error = await sendMessage([{ role: 'user', content: 'hi' }], {
+      model: 'gpt-oss-20b',
+    }).catch((e: unknown) => e);
+
+    expect(isWalletBalanceError(error)).toBe(false);
+    // The numeric code must survive parsing — dropping it is what left `type`
+    // to fall through to `unknown_error` and made the two 402s look identical.
+    expect(error).toMatchObject({ status: 402, error: { code: '402' } });
+    expect(describeError(error, 'routstr').id).toBe('routstr.provider_declined');
+    // A funded wallet must not be rewritten by an error that is not about it.
+    expect(useRoutstrStore.getState().balance).toBe(100_000);
+  });
+
+  it('still calls a routstr-raised 402 a wallet problem', async () => {
+    stubFetch402(INSUFFICIENT_BODY);
+
+    const error = await sendMessage([{ role: 'user', content: 'hi' }], {
+      model: 'gpt-oss-20b',
+    }).catch((e: unknown) => e);
+
+    expect(isWalletBalanceError(error)).toBe(true);
+    expect(describeError(error, 'routstr').id).toBe('routstr.balance');
   });
 
   it('leaves the balance untouched when the 402 carries no parseable available figure', async () => {
@@ -119,7 +204,7 @@ describe('402 → balance truth-sync', () => {
     stubFetch402({ error: { message: 'Payment required', type: 'x' } });
 
     await expect(
-      sendMessage('sk-test', [{ role: 'user', content: 'hi' }], { model: 'any' })
+      sendMessage([{ role: 'user', content: 'hi' }], { model: 'any' })
     ).rejects.toMatchObject({ status: 402 });
 
     expect(useRoutstrStore.getState().balance).toBe(299_841);
@@ -181,7 +266,9 @@ describe('Routstr errors retain machine-readable evidence for shared presentatio
           headers: { 'content-type': 'application/json' },
         })
     ) as unknown as typeof fetch;
-    await sendMessage('sk-test', [{ role: 'user', content: 'hi' }], { model: 'test-model' }).then(
+    await sendMessage([{ role: 'user', content: 'hi' }], {
+      model: 'test-model',
+    }).then(
       () => {
         throw new Error('Expected request to fail');
       },
@@ -209,7 +296,7 @@ describe('Routstr errors retain machine-readable evidence for shared presentatio
       body,
     })) as unknown as typeof fetch;
 
-    const { stream } = await sendMessage('sk-test', [{ role: 'user', content: 'hi' }], {
+    const { stream } = await sendMessage([{ role: 'user', content: 'hi' }], {
       model: 'test-model',
     });
     const drain = async () => {
@@ -218,5 +305,53 @@ describe('Routstr errors retain machine-readable evidence for shared presentatio
       }
     };
     await expect(drain()).rejects.toBe(failure);
+  });
+});
+
+describe('SDK failures keep their status', () => {
+  beforeEach(() => setRoutstrNodeBaseUrl('https://node.example'));
+
+  /**
+   * `@routstr/sdk` throws typed errors carrying the upstream status, the
+   * provider and the request id. Flattening them into `status: 0` — which this
+   * app did — is why a provider refusing a model read on screen as a bare
+   * "Failed to send message", and why the candidate walk could not advance
+   * past it: that walk turns on the difference between a 402 and a 503.
+   */
+  const routeRequestThrowing = (error: unknown) => {
+    jest.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      throw error;
+    });
+  };
+
+  const send = () => sendMessage([{ role: 'user', content: 'hi' }], { model: 'any' });
+
+  it('gives a provider refusal back its upstream status', async () => {
+    const { ProviderError } = require('@routstr/sdk/browser');
+    routeRequestThrowing(new ProviderError('https://node.example', 402, 'upstream declined'));
+    await expect(send()).rejects.toMatchObject({
+      status: 402,
+      error: { code: 'provider_error' },
+    });
+  });
+
+  it('names a mint refusal as one, so the advice is to change mint', async () => {
+    const { MintError } = require('@routstr/sdk/browser');
+    routeRequestThrowing(
+      new MintError({
+        baseUrl: 'https://node.example',
+        statusCode: 422,
+        code: 'cashu_token_swap_fees_exceed_amount',
+      })
+    );
+    const rejection = await send().catch((e: unknown) => e);
+    expect(rejection).toMatchObject({ status: 422, error: { type: 'mint_error' } });
+    expect(describeError(rejection, 'routstr').id).toBe('routstr.mint_refused');
+  });
+
+  it('reports exhausted failover as unavailable, not as a network blip', async () => {
+    const { NoProvidersAvailableError } = require('@routstr/sdk/browser');
+    routeRequestThrowing(new NoProvidersAvailableError());
+    await expect(send()).rejects.toMatchObject({ status: 503, error: { code: 'no_providers' } });
   });
 });

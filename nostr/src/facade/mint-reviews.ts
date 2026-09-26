@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { NaggIdentitiesSchema, type NaggIdentity } from '../envelope';
 import type { NostrTier } from '@sovranbitcoin/schemas';
 import type { NaggFeedEvent } from '../map/feed';
 import type { RequestControls } from '../timeout';
@@ -39,6 +40,8 @@ export type MintReviewsSummary = {
   averageScore: number | null;
   reviewCount: number;
   reviews: MintReview[];
+  /** Reviewer + operator identity groups, bundled by nagg (nagg tier only). */
+  identities?: Record<string, NaggIdentity>;
 };
 
 /**
@@ -122,6 +125,7 @@ export const MintReviewsResponseSchema = z.object({
   summary: MintAggregateSchema,
   reviews: z.array(MintReviewItemSchema).optional(),
   profiles: z.record(z.string(), ProfileInfoSchema).optional(),
+  identities: NaggIdentitiesSchema,
 });
 
 // The nagg rich discovery row (per-mint card data merged from auditor + Nostr).
@@ -150,6 +154,7 @@ const DiscoverMintSchema = z.object({
 export const DiscoverMintsResponseSchema = z.object({
   mints: z.array(DiscoverMintSchema),
   profiles: z.record(z.string(), ProfileInfoSchema).optional(),
+  identities: NaggIdentitiesSchema,
 });
 
 // --- NIP-87 parsing ---------------------------------------------------------

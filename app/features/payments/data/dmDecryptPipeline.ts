@@ -68,12 +68,14 @@ export function decryptDmEnvelopes(
       if (!unwrapped) continue;
       if (!cached) giftWrapCache.cache.put(viewerPubkey, envelope.id, unwrapped);
       if (unwrapped.kind !== 14) continue;
-
-      const counterparty =
-        unwrapped.senderPubkey === viewerPubkey
-          ? unwrapped.recipientPubkeys[0]
-          : unwrapped.senderPubkey;
-      if (!counterparty) continue;
+      // NIP-17 rooms are defined by all participants. This surface supports
+      // one-to-one rooms, so a group must never be filed under its sender.
+      if (unwrapped.recipientPubkeys.length !== 1) continue;
+      const recipient = unwrapped.recipientPubkeys[0];
+      const isOwn = unwrapped.senderPubkey === viewerPubkey;
+      if (isOwn ? recipient === viewerPubkey : recipient !== viewerPubkey) continue;
+      const counterparty = isOwn ? recipient : unwrapped.senderPubkey;
+      if (!counterparty || !/^[0-9a-f]{64}$/i.test(counterparty)) continue;
 
       out.push({
         id: envelope.id,
@@ -81,7 +83,7 @@ export function decryptDmEnvelopes(
         senderPubkey: unwrapped.senderPubkey,
         content: unwrapped.content,
         createdAtSec: unwrapped.created_at,
-        isOwn: unwrapped.senderPubkey === viewerPubkey,
+        isOwn,
         protocol: 'nip17',
       });
       continue;

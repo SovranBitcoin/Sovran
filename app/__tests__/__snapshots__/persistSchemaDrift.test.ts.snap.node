@@ -1,5 +1,131 @@
 // Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
+exports[`persisted schema drift ai-provider-directory-store schema matches the golden snapshot for its version: ai-provider-directory-store 1`] = `
+{
+  "name": "ai-provider-directory-store",
+  "shape": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "fetchedAt": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
+        "providers": {
+          "items": {
+            "additionalProperties": {},
+            "properties": {
+              "baseUrl": {
+                "maxLength": 512,
+                "minLength": 1,
+                "type": "string",
+              },
+              "encryptedModelCount": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "followers": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "followersSource": {
+                "enum": [
+                  "graph",
+                  "vertex",
+                  "relays",
+                ],
+                "type": "string",
+              },
+              "latencyMs": {
+                "minimum": 0,
+                "type": "number",
+              },
+              "mints": {
+                "default": [],
+                "items": {
+                  "maxLength": 512,
+                  "type": "string",
+                },
+                "maxItems": 64,
+                "type": "array",
+              },
+              "modelCount": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "name": {
+                "maxLength": 200,
+                "type": "string",
+              },
+              "pubkey": {
+                "maxLength": 128,
+                "type": "string",
+              },
+              "status": {
+                "default": "unknown",
+                "enum": [
+                  "online",
+                  "offline",
+                  "unknown",
+                ],
+                "type": "string",
+              },
+            },
+            "required": [
+              "baseUrl",
+            ],
+            "type": "object",
+          },
+          "maxItems": 256,
+          "type": "array",
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "fetchedAt": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
+        "providers": {
+          "default": [],
+        },
+      },
+      "required": [
+        "providers",
+        "fetchedAt",
+      ],
+      "type": "object",
+    },
+  },
+  "version": 1,
+}
+`;
+
 exports[`persisted schema drift bitchat-dm-messages-store schema matches the golden snapshot for its version: bitchat-dm-messages-store 1`] = `
 {
   "name": "bitchat-dm-messages-store",
@@ -915,6 +1041,25 @@ exports[`persisted schema drift mint-metadata-store schema matches the golden sn
                 "type": "integer",
               },
               "info": {},
+              "liveness": {
+                "enum": [
+                  "online",
+                  "offline",
+                ],
+                "type": "string",
+              },
+              "livenessAt": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "livenessSource": {
+                "enum": [
+                  "probe",
+                  "nagg",
+                ],
+                "type": "string",
+              },
               "nErrors": {
                 "maximum": 9007199254740991,
                 "minimum": -9007199254740991,
@@ -1088,6 +1233,25 @@ exports[`persisted schema drift mint-metadata-store schema matches the golden sn
                 "type": "integer",
               },
               "info": {},
+              "liveness": {
+                "enum": [
+                  "online",
+                  "offline",
+                ],
+                "type": "string",
+              },
+              "livenessAt": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "livenessSource": {
+                "enum": [
+                  "probe",
+                  "nagg",
+                ],
+                "type": "string",
+              },
               "nErrors": {
                 "maximum": 9007199254740991,
                 "minimum": -9007199254740991,
@@ -4117,6 +4281,64 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
           ],
           "default": null,
         },
+        "confirmSpend": {
+          "default": true,
+          "type": "boolean",
+        },
+        "curatedModels": {
+          "anyOf": [
+            {
+              "properties": {
+                "blacklistedNodes": {
+                  "default": [],
+                  "items": {
+                    "maxLength": 512,
+                    "type": "string",
+                  },
+                  "maxItems": 256,
+                  "type": "array",
+                },
+                "fetchedAt": {
+                  "default": 0,
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "ids": {
+                  "items": {
+                    "maxLength": 128,
+                    "type": "string",
+                  },
+                  "maxItems": 512,
+                  "type": "array",
+                },
+                "updatedAt": {
+                  "default": 0,
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "whitelistedNodes": {
+                  "default": [],
+                  "items": {
+                    "maxLength": 512,
+                    "type": "string",
+                  },
+                  "maxItems": 256,
+                  "type": "array",
+                },
+              },
+              "required": [
+                "ids",
+              ],
+              "type": "object",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
         "currentSessionId": {
           "anyOf": [
             {
@@ -4140,1450 +4362,415 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                   "type": "integer",
                 },
                 "lineup": {
-                  "properties": {
-                    "claude": {
-                      "properties": {
-                        "auto": {
-                          "anyOf": [
-                            {
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
+                  "additionalProperties": {
+                    "properties": {
+                      "auto": {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "contextLength": {
+                                "default": 0,
+                                "maximum": 9007199254740991,
+                                "minimum": 0,
+                                "type": "integer",
                               },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                        "max": {
-                          "anyOf": [
-                            {
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
+                              "created": {
+                                "default": 0,
+                                "maximum": 9007199254740991,
+                                "minimum": 0,
+                                "type": "integer",
                               },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                        "pro": {
-                          "anyOf": [
-                            {
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
+                              "displayName": {
+                                "maxLength": 256,
+                                "type": "string",
                               },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "satsPricing",
-                              ],
-                              "type": "object",
+                              "lastKnown": {
+                                "type": "boolean",
+                              },
+                              "maxCompletionTokens": {
+                                "anyOf": [
+                                  {
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991,
+                                    "type": "integer",
+                                  },
+                                  {
+                                    "type": "null",
+                                  },
+                                ],
+                                "default": null,
+                              },
+                              "modelId": {
+                                "maxLength": 256,
+                                "type": "string",
+                              },
+                              "satsPricing": {
+                                "properties": {
+                                  "completion": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                    "default": null,
+                                  },
+                                  "image": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                    "default": null,
+                                  },
+                                  "max_cost": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                    "default": null,
+                                  },
+                                  "prompt": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                    "default": null,
+                                  },
+                                  "request": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                    "default": null,
+                                  },
+                                },
+                                "type": "object",
+                              },
+                              "upstreamId": {
+                                "anyOf": [
+                                  {
+                                    "maxLength": 64,
+                                    "type": "string",
+                                  },
+                                  {
+                                    "type": "null",
+                                  },
+                                ],
+                                "default": null,
+                              },
+                              "visionInput": {
+                                "default": false,
+                                "type": "boolean",
+                              },
                             },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
+                            "required": [
+                              "modelId",
+                              "displayName",
+                              "satsPricing",
+                            ],
+                            "type": "object",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                        "default": null,
                       },
-                      "type": "object",
+                      "max": {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "contextLength": {
+                                "default": 0,
+                                "maximum": 9007199254740991,
+                                "minimum": 0,
+                                "type": "integer",
+                              },
+                              "created": {
+                                "default": 0,
+                                "maximum": 9007199254740991,
+                                "minimum": 0,
+                                "type": "integer",
+                              },
+                              "displayName": {
+                                "maxLength": 256,
+                                "type": "string",
+                              },
+                              "lastKnown": {
+                                "type": "boolean",
+                              },
+                              "maxCompletionTokens": {
+                                "anyOf": [
+                                  {
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991,
+                                    "type": "integer",
+                                  },
+                                  {
+                                    "type": "null",
+                                  },
+                                ],
+                                "default": null,
+                              },
+                              "modelId": {
+                                "maxLength": 256,
+                                "type": "string",
+                              },
+                              "satsPricing": {
+                                "properties": {
+                                  "completion": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                    "default": null,
+                                  },
+                                  "image": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                    "default": null,
+                                  },
+                                  "max_cost": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                    "default": null,
+                                  },
+                                  "prompt": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                    "default": null,
+                                  },
+                                  "request": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                    "default": null,
+                                  },
+                                },
+                                "type": "object",
+                              },
+                              "upstreamId": {
+                                "anyOf": [
+                                  {
+                                    "maxLength": 64,
+                                    "type": "string",
+                                  },
+                                  {
+                                    "type": "null",
+                                  },
+                                ],
+                                "default": null,
+                              },
+                              "visionInput": {
+                                "default": false,
+                                "type": "boolean",
+                              },
+                            },
+                            "required": [
+                              "modelId",
+                              "displayName",
+                              "satsPricing",
+                            ],
+                            "type": "object",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                        "default": null,
+                      },
+                      "pro": {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "contextLength": {
+                                "default": 0,
+                                "maximum": 9007199254740991,
+                                "minimum": 0,
+                                "type": "integer",
+                              },
+                              "created": {
+                                "default": 0,
+                                "maximum": 9007199254740991,
+                                "minimum": 0,
+                                "type": "integer",
+                              },
+                              "displayName": {
+                                "maxLength": 256,
+                                "type": "string",
+                              },
+                              "lastKnown": {
+                                "type": "boolean",
+                              },
+                              "maxCompletionTokens": {
+                                "anyOf": [
+                                  {
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991,
+                                    "type": "integer",
+                                  },
+                                  {
+                                    "type": "null",
+                                  },
+                                ],
+                                "default": null,
+                              },
+                              "modelId": {
+                                "maxLength": 256,
+                                "type": "string",
+                              },
+                              "satsPricing": {
+                                "properties": {
+                                  "completion": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                    "default": null,
+                                  },
+                                  "image": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                    "default": null,
+                                  },
+                                  "max_cost": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                    "default": null,
+                                  },
+                                  "prompt": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                    "default": null,
+                                  },
+                                  "request": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                    "default": null,
+                                  },
+                                },
+                                "type": "object",
+                              },
+                              "upstreamId": {
+                                "anyOf": [
+                                  {
+                                    "maxLength": 64,
+                                    "type": "string",
+                                  },
+                                  {
+                                    "type": "null",
+                                  },
+                                ],
+                                "default": null,
+                              },
+                              "visionInput": {
+                                "default": false,
+                                "type": "boolean",
+                              },
+                            },
+                            "required": [
+                              "modelId",
+                              "displayName",
+                              "satsPricing",
+                            ],
+                            "type": "object",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                        "default": null,
+                      },
                     },
-                    "google": {
-                      "properties": {
-                        "auto": {
-                          "anyOf": [
-                            {
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                        "max": {
-                          "anyOf": [
-                            {
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                        "pro": {
-                          "anyOf": [
-                            {
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                      },
-                      "type": "object",
+                    "type": "object",
+                  },
+                  "default": {},
+                  "propertyNames": {
+                    "type": "string",
+                  },
+                  "tolerantKey": {
+                    "input": {
+                      "maxLength": 64,
+                      "type": "string",
                     },
-                    "grok": {
-                      "properties": {
-                        "auto": {
-                          "anyOf": [
-                            {
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                        "max": {
-                          "anyOf": [
-                            {
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                        "pro": {
-                          "anyOf": [
-                            {
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                      },
-                      "type": "object",
-                    },
-                    "openai": {
-                      "properties": {
-                        "auto": {
-                          "anyOf": [
-                            {
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                        "max": {
-                          "anyOf": [
-                            {
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                        "pro": {
-                          "anyOf": [
-                            {
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                      },
-                      "type": "object",
+                    "output": {
+                      "maxLength": 64,
+                      "type": "string",
                     },
                   },
-                  "required": [
-                    "openai",
-                    "claude",
-                    "grok",
-                    "google",
-                  ],
                   "type": "object",
                 },
                 "nodeBaseUrl": {
@@ -5599,9 +4786,6 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                   "default": null,
                 },
               },
-              "required": [
-                "lineup",
-              ],
               "type": "object",
             },
             {
@@ -5609,6 +4793,78 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
             },
           ],
           "default": null,
+        },
+        "legacyAccounts": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "properties": {
+              "apiKey": {
+                "maxLength": 8192,
+                "type": "string",
+              },
+              "archivedAt": {
+                "default": 0,
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "lastKnownBalanceMsats": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+                "default": null,
+              },
+              "nodeBaseUrl": {
+                "anyOf": [
+                  {
+                    "maxLength": 512,
+                    "type": "string",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+                "default": null,
+              },
+              "reclaimedAt": {
+                "anyOf": [
+                  {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+                "default": null,
+              },
+            },
+            "required": [
+              "apiKey",
+            ],
+            "type": "object",
+          },
+          "default": {},
+          "propertyNames": {
+            "type": "string",
+          },
+          "tolerantKey": {
+            "input": {
+              "maxLength": 512,
+              "type": "string",
+            },
+            "output": {
+              "maxLength": 512,
+              "type": "string",
+            },
+          },
+          "type": "object",
         },
         "nodeBaseUrl": {
           "anyOf": [
@@ -5621,6 +4877,145 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
             },
           ],
           "default": null,
+        },
+        "pendingPayments": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "properties": {
+              "encoded": {
+                "maxLength": 65536,
+                "type": "string",
+              },
+              "nodeBaseUrl": {
+                "maxLength": 512,
+                "type": "string",
+              },
+              "operationId": {
+                "maxLength": 128,
+                "type": "string",
+              },
+              "startedAt": {
+                "default": 0,
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+            },
+            "required": [
+              "encoded",
+              "nodeBaseUrl",
+              "operationId",
+            ],
+            "type": "object",
+          },
+          "default": {},
+          "propertyNames": {
+            "type": "string",
+          },
+          "tolerantKey": {
+            "input": {
+              "maxLength": 128,
+              "type": "string",
+            },
+            "output": {
+              "maxLength": 128,
+              "type": "string",
+            },
+          },
+          "type": "object",
+        },
+        "providerClaims": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "properties": {
+              "claims": {
+                "additionalProperties": {
+                  "additionalProperties": {},
+                  "properties": {
+                    "description": {
+                      "maxLength": 2000,
+                      "type": "string",
+                    },
+                    "e2ee": {
+                      "type": "boolean",
+                    },
+                    "mints": {
+                      "items": {
+                        "maxLength": 512,
+                        "type": "string",
+                      },
+                      "maxItems": 32,
+                      "type": "array",
+                    },
+                    "name": {
+                      "maxLength": 200,
+                      "type": "string",
+                    },
+                    "pubkey": {
+                      "maxLength": 128,
+                      "type": "string",
+                    },
+                    "version": {
+                      "maxLength": 64,
+                      "type": "string",
+                    },
+                  },
+                  "type": "object",
+                },
+                "default": {},
+                "propertyNames": {
+                  "enum": [
+                    "self",
+                    "announcement",
+                    "aggregator",
+                    "peer",
+                    "catalog",
+                    "legacy",
+                  ],
+                  "type": "string",
+                },
+                "type": "object",
+              },
+            },
+            "type": "object",
+          },
+          "default": {},
+          "propertyNames": {
+            "type": "string",
+          },
+          "tolerantKey": {
+            "input": {
+              "maxLength": 512,
+              "type": "string",
+            },
+            "output": {
+              "maxLength": 512,
+              "type": "string",
+            },
+          },
+          "type": "object",
+        },
+        "providerSeenAt": {
+          "additionalProperties": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer",
+          },
+          "default": {},
+          "propertyNames": {
+            "type": "string",
+          },
+          "tolerantKey": {
+            "input": {
+              "maxLength": 512,
+              "type": "string",
+            },
+            "output": {
+              "maxLength": 512,
+              "type": "string",
+            },
+          },
+          "type": "object",
         },
         "selectedModel": {
           "anyOf": [
@@ -5784,6 +5179,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
           "maxItems": 1024,
           "type": "array",
         },
+        "userNodeBaseUrl": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
       },
       "type": "object",
     },
@@ -5822,6 +5229,69 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
           ],
           "default": null,
         },
+        "confirmSpend": {
+          "default": true,
+          "type": "boolean",
+        },
+        "curatedModels": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "blacklistedNodes": {
+                  "default": [],
+                  "items": {
+                    "maxLength": 512,
+                    "type": "string",
+                  },
+                  "maxItems": 256,
+                  "type": "array",
+                },
+                "fetchedAt": {
+                  "default": 0,
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "ids": {
+                  "items": {
+                    "maxLength": 128,
+                    "type": "string",
+                  },
+                  "maxItems": 512,
+                  "type": "array",
+                },
+                "updatedAt": {
+                  "default": 0,
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "whitelistedNodes": {
+                  "default": [],
+                  "items": {
+                    "maxLength": 512,
+                    "type": "string",
+                  },
+                  "maxItems": 256,
+                  "type": "array",
+                },
+              },
+              "required": [
+                "ids",
+                "blacklistedNodes",
+                "whitelistedNodes",
+                "updatedAt",
+                "fetchedAt",
+              ],
+              "type": "object",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
         "currentSessionId": {
           "anyOf": [
             {
@@ -5845,1622 +5315,7 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                   "minimum": 0,
                   "type": "integer",
                 },
-                "lineup": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "claude": {
-                      "additionalProperties": false,
-                      "properties": {
-                        "auto": {
-                          "anyOf": [
-                            {
-                              "additionalProperties": false,
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "additionalProperties": false,
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "required": [
-                                    "prompt",
-                                    "completion",
-                                    "request",
-                                    "image",
-                                    "max_cost",
-                                  ],
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "contextLength",
-                                "created",
-                                "visionInput",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                        "max": {
-                          "anyOf": [
-                            {
-                              "additionalProperties": false,
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "additionalProperties": false,
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "required": [
-                                    "prompt",
-                                    "completion",
-                                    "request",
-                                    "image",
-                                    "max_cost",
-                                  ],
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "contextLength",
-                                "created",
-                                "visionInput",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                        "pro": {
-                          "anyOf": [
-                            {
-                              "additionalProperties": false,
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "additionalProperties": false,
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "required": [
-                                    "prompt",
-                                    "completion",
-                                    "request",
-                                    "image",
-                                    "max_cost",
-                                  ],
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "contextLength",
-                                "created",
-                                "visionInput",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                      },
-                      "required": [
-                        "auto",
-                        "pro",
-                        "max",
-                      ],
-                      "type": "object",
-                    },
-                    "google": {
-                      "additionalProperties": false,
-                      "properties": {
-                        "auto": {
-                          "anyOf": [
-                            {
-                              "additionalProperties": false,
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "additionalProperties": false,
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "required": [
-                                    "prompt",
-                                    "completion",
-                                    "request",
-                                    "image",
-                                    "max_cost",
-                                  ],
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "contextLength",
-                                "created",
-                                "visionInput",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                        "max": {
-                          "anyOf": [
-                            {
-                              "additionalProperties": false,
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "additionalProperties": false,
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "required": [
-                                    "prompt",
-                                    "completion",
-                                    "request",
-                                    "image",
-                                    "max_cost",
-                                  ],
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "contextLength",
-                                "created",
-                                "visionInput",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                        "pro": {
-                          "anyOf": [
-                            {
-                              "additionalProperties": false,
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "additionalProperties": false,
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "required": [
-                                    "prompt",
-                                    "completion",
-                                    "request",
-                                    "image",
-                                    "max_cost",
-                                  ],
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "contextLength",
-                                "created",
-                                "visionInput",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                      },
-                      "required": [
-                        "auto",
-                        "pro",
-                        "max",
-                      ],
-                      "type": "object",
-                    },
-                    "grok": {
-                      "additionalProperties": false,
-                      "properties": {
-                        "auto": {
-                          "anyOf": [
-                            {
-                              "additionalProperties": false,
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "additionalProperties": false,
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "required": [
-                                    "prompt",
-                                    "completion",
-                                    "request",
-                                    "image",
-                                    "max_cost",
-                                  ],
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "contextLength",
-                                "created",
-                                "visionInput",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                        "max": {
-                          "anyOf": [
-                            {
-                              "additionalProperties": false,
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "additionalProperties": false,
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "required": [
-                                    "prompt",
-                                    "completion",
-                                    "request",
-                                    "image",
-                                    "max_cost",
-                                  ],
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "contextLength",
-                                "created",
-                                "visionInput",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                        "pro": {
-                          "anyOf": [
-                            {
-                              "additionalProperties": false,
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "additionalProperties": false,
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "required": [
-                                    "prompt",
-                                    "completion",
-                                    "request",
-                                    "image",
-                                    "max_cost",
-                                  ],
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "contextLength",
-                                "created",
-                                "visionInput",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                      },
-                      "required": [
-                        "auto",
-                        "pro",
-                        "max",
-                      ],
-                      "type": "object",
-                    },
-                    "openai": {
-                      "additionalProperties": false,
-                      "properties": {
-                        "auto": {
-                          "anyOf": [
-                            {
-                              "additionalProperties": false,
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "additionalProperties": false,
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "required": [
-                                    "prompt",
-                                    "completion",
-                                    "request",
-                                    "image",
-                                    "max_cost",
-                                  ],
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "contextLength",
-                                "created",
-                                "visionInput",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                        "max": {
-                          "anyOf": [
-                            {
-                              "additionalProperties": false,
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "additionalProperties": false,
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "required": [
-                                    "prompt",
-                                    "completion",
-                                    "request",
-                                    "image",
-                                    "max_cost",
-                                  ],
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "contextLength",
-                                "created",
-                                "visionInput",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                        "pro": {
-                          "anyOf": [
-                            {
-                              "additionalProperties": false,
-                              "properties": {
-                                "contextLength": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "created": {
-                                  "default": 0,
-                                  "maximum": 9007199254740991,
-                                  "minimum": 0,
-                                  "type": "integer",
-                                },
-                                "displayName": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "lastKnown": {
-                                  "type": "boolean",
-                                },
-                                "maxCompletionTokens": {
-                                  "anyOf": [
-                                    {
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "type": "integer",
-                                    },
-                                    {
-                                      "type": "null",
-                                    },
-                                  ],
-                                  "default": null,
-                                },
-                                "modelId": {
-                                  "maxLength": 256,
-                                  "type": "string",
-                                },
-                                "satsPricing": {
-                                  "additionalProperties": false,
-                                  "properties": {
-                                    "completion": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "image": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "max_cost": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "prompt": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                    "request": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number",
-                                        },
-                                        {
-                                          "type": "null",
-                                        },
-                                      ],
-                                      "default": null,
-                                    },
-                                  },
-                                  "required": [
-                                    "prompt",
-                                    "completion",
-                                    "request",
-                                    "image",
-                                    "max_cost",
-                                  ],
-                                  "type": "object",
-                                },
-                                "visionInput": {
-                                  "default": false,
-                                  "type": "boolean",
-                                },
-                              },
-                              "required": [
-                                "modelId",
-                                "displayName",
-                                "contextLength",
-                                "created",
-                                "visionInput",
-                                "satsPricing",
-                              ],
-                              "type": "object",
-                            },
-                            {
-                              "type": "null",
-                            },
-                          ],
-                          "default": null,
-                        },
-                      },
-                      "required": [
-                        "auto",
-                        "pro",
-                        "max",
-                      ],
-                      "type": "object",
-                    },
-                  },
-                  "required": [
-                    "openai",
-                    "claude",
-                    "grok",
-                    "google",
-                  ],
-                  "type": "object",
-                },
+                "lineup": {},
                 "nodeBaseUrl": {
                   "anyOf": [
                     {
@@ -7486,6 +5341,7 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
           ],
           "default": null,
         },
+        "legacyAccounts": {},
         "nodeBaseUrl": {
           "anyOf": [
             {
@@ -7498,6 +5354,9 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
           ],
           "default": null,
         },
+        "pendingPayments": {},
+        "providerClaims": {},
+        "providerSeenAt": {},
         "selectedModel": {
           "anyOf": [
             {
@@ -7565,6 +5424,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
           "maxItems": 1024,
           "type": "array",
         },
+        "userNodeBaseUrl": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "default": null,
+        },
       },
       "required": [
         "authMode",
@@ -7576,11 +5447,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
         "currentSessionId",
         "lastKnownLineup",
         "nodeBaseUrl",
+        "legacyAccounts",
+        "userNodeBaseUrl",
+        "providerClaims",
+        "providerSeenAt",
+        "pendingPayments",
+        "confirmSpend",
+        "curatedModels",
       ],
       "type": "object",
     },
   },
-  "version": 1,
+  "version": 3,
 }
 `;
 
@@ -8102,6 +5980,15 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           "default": true,
           "type": "boolean",
         },
+        "primalHostsDisabled": {
+          "default": [],
+          "items": {
+            "maxLength": 2048,
+            "type": "string",
+          },
+          "maxItems": 16,
+          "type": "array",
+        },
         "primalTierEnabled": {
           "default": true,
           "type": "boolean",
@@ -8344,6 +6231,9 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
           "default": true,
           "type": "boolean",
         },
+        "primalHostsDisabled": {
+          "default": [],
+        },
         "primalTierEnabled": {
           "default": true,
           "type": "boolean",
@@ -8422,6 +6312,7 @@ exports[`persisted schema drift settings-store schema matches the golden snapsho
         "naggTierEnabled",
         "primalTierEnabled",
         "relayTierEnabled",
+        "primalHostsDisabled",
         "minTransferThreshold",
         "middlemanRouting",
       ],

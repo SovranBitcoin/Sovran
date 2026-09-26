@@ -52,4 +52,10 @@ export interface MintMetadataEntry {
   operatorNpub?: string;
   vertexRank?: number;
   socialAt?: number;
+  // liveness — the last `/v1/info` verdict, from this phone's probe or nagg's
+  /** Whether the mint answered. Absent when nobody has looked. */
+  liveness?: 'online' | 'offline';
+  /** Epoch ms of that verdict. A newer stamp always wins, whoever made it. */
+  livenessAt?: number;
+  livenessSource?: 'probe' | 'nagg';
 }

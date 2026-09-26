@@ -426,10 +426,10 @@ balance`. It ended on the wallet, swept the app to zero, reconciled cocod
       ambient NFC, profile/chat sends, feed invoices, and deep-link scan clear
       stale app routing context at their audited roots; amount draft clearing is
       pinned.
-- [ ] Fix both Routstr top-up entries to clear incompatible prior app context and
-      reset Colada before setting the new Routstr route. The order-190 audit found
-      direct navigation in `AiHeaderTitle` and `useAiSend`, so broad root-isolation
-      product evidence must remain blocked.
+- [ ] Verify the replacement Routstr pay-per-request path on devices. The old
+      manual top-up entry points are gone; unit tests now cover provider/mint
+      ownership and confirmation freshness. Native payment and recovery evidence
+      remains outstanding (follow-ups F49 and F53).
 - [ ] Remove remaining in-place `flowCtx` mutations and property-test context
       identity changes for source/options/failures.
 - [ ] Refresh cached snapshots inside reset and ownership-scope same-unit
@@ -526,6 +526,9 @@ balance`. It ended on the wallet, swept the app to zero, reconciled cocod
       descriptor merge.
 - [ ] Routstr retry/model-rejection status classification, affordability fail-open,
       deficit rounding, display name, and outgoing `max_tokens` request body.
+      The September 24 review added single-mint affordability, scope-change,
+      secure-recovery, deadline and provider-ownership regressions; native
+      incremental streaming and funded recovery remain open (F50–F53).
 
 ## 9. Native transport and untrusted input
 

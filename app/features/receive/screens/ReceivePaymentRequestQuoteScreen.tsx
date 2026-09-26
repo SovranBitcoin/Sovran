@@ -287,12 +287,7 @@ export const ReceivePaymentRequestQuoteScreen = memo(function ReceivePaymentRequ
         {syntheticEntry ? (
           <HistoryEntryHeader historyEntry={syntheticEntry} showRecipientAvatar={false} />
         ) : null}
-        <PaymentInfo
-          animated
-          data={displayedRequest}
-          copyTarget="paymentRequest"
-          unit={entry.unit}
-        />
+        <PaymentInfo data={displayedRequest} copyTarget="paymentRequest" unit={entry.unit} />
         {syntheticEntry ? (
           // No key={prState} remount: the P3 cascade fix + rowKey-keyed
           // in-place dot transitions let the idle→done settle play live.

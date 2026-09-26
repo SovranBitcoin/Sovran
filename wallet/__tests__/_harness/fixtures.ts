@@ -233,6 +233,20 @@ export const INPUTS = {
    */
   npub: 'npub1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqshp52w2',
 
+  // ── Cashu P2PK keys ─────────────────────────────────────────────────
+  /**
+   * The SAME identity as `npub` above, written the way a Cashu wallet writes
+   * it: 33 bytes, `02` parity prefix + the 32-byte x coordinate.
+   */
+  p2pkKey: '020000000000000000000000000000000000000000000000000000000000000001',
+  /**
+   * The odd-parity form of the same x coordinate. NUT-11 compares keys by x,
+   * so this denotes the same identity — but it is a different point, and a
+   * lock must target whichever one was actually published.
+   */
+  p2pkKeyOddParity:
+    '030000000000000000000000000000000000000000000000000000000000000001',
+
   // ── BIP-321 ─────────────────────────────────────────────────────────
   /** bitcoin: URI with only a lightning parameter */
   bip321LightningOnly: 'bitcoin:?lightning=lnbc1u1p0test',

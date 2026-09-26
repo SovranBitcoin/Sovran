@@ -87,6 +87,13 @@ not import Expo, Nostr-pool, storage, or chain libraries directly.
 
 ### 3.1 Steps
 
+The amount action distinguishes `ecash`, `lightning`, and `locked-ecash` for
+recipient sends. `locked-ecash` requires explicit spending conditions before
+`enterAmount`; invalid conditions fail with `INVALID_P2PK_LOCK` and never
+fall back to an unlocked token. Lightning/onchain choices discard an editable
+ecash lock. Protocol-seeded locks remain authoritative when the amount screen
+does not own the choice.
+
 `FlowStep` (`src/machine/types.ts:19-38`). Terminal here means
 `deriveExecutionState` settles it to `ready`/`READY` or `blocked` and no further
 machine transition is expected from the step itself.

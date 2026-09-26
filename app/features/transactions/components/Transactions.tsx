@@ -23,6 +23,8 @@ import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
 import Icon from 'assets/icons';
 import { SwapTransactionRow } from '@/features/transactions/components/SwapTransactionRow';
 import { Transaction } from '@/features/transactions/components/Transaction';
+import { aiRequestDisplayAmount } from '@/features/transactions/lib/aiRequestPresentation';
+import { navigateToAiRequest } from '@/shared/lib/nav/transactionDetailRoutes';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -44,9 +46,12 @@ import {
   getZap,
   getScanSource,
   getSwap,
+  groupAiRequests,
+  isAiRequestLeg,
   isCancellablePendingEcash,
   isP2PKLocked,
   matchesTransactionFilters,
+  type AiRequestGroup,
   type ScanMethod,
   type TransactionDirection,
   type TransactionPaymentType,
@@ -68,7 +73,10 @@ import {
 // live in the same sorted list.
 // ---------------------------------------------------------------------------
 
-type TimelineItem = { kind: 'transaction'; data: HistoryEntry } | { kind: 'swap'; data: SwapGroup };
+type TimelineItem =
+  | { kind: 'transaction'; data: HistoryEntry }
+  | { kind: 'swap'; data: SwapGroup }
+  | { kind: 'ai'; data: AiRequestGroup };
 
 function getTimelineCreatedAt(item: TimelineItem): number {
   return item.data.createdAt;
@@ -76,6 +84,7 @@ function getTimelineCreatedAt(item: TimelineItem): number {
 
 function getTimelineKey(item: TimelineItem): string {
   if (item.kind === 'swap') return `swap-${item.data.id}`;
+  if (item.kind === 'ai') return `ai-${item.data.groupId}`;
   const entry = item.data;
   if (entry.id) return entry.id;
   // Bearer tokens MUST NOT become React keys; Math.random() destroys list
@@ -245,6 +254,24 @@ export const Transactions = React.memo(
     }, [swapGroupsById, account.unit]);
     const isTestnutMint = useIsTestnutMint();
 
+    // Grouped rows replace their legs, so they may only do so on the view that
+    // actually renders them. Under a direction/type filter — or embedded in a
+    // per-person view — the group is not injected, and hiding its legs there
+    // would make a real payment vanish from the list.
+    const groupedRowsShown = !embedded && filter === 'all' && type === 'all';
+
+    // Grouped from the SAME account/mint-filtered history the rows come from,
+    // so a group never outlives the legs the list is showing.
+    const aiGroups = useMemo(() => {
+      if (!groupedRowsShown) return [];
+      const scoped = history.filter(
+        (entry: HistoryEntry) =>
+          belongsToAccount(account.unit, entry, isTestnutMint) &&
+          (mintUrlFilter === 'all' || entry.mintUrl === mintUrlFilter)
+      );
+      return groupAiRequests(scoped);
+    }, [groupedRowsShown, history, account.unit, isTestnutMint, mintUrlFilter]);
+
     const filteredHistory = useMemo(() => {
       const t0 = performance.now();
       const result = history.filter((historyEntry: HistoryEntry) => {
@@ -255,6 +282,11 @@ export const Transactions = React.memo(
         // single row. The swap annotation (merged onto the entry) is the signal,
         // so the app no longer reaches into the swap store's quoteId index.
         if (getSwap(historyEntry)?.groupId) return false;
+
+        // Same reason, for the two legs of one AI request: the send and the
+        // change it came back as are shown as one row — but only on the view
+        // that renders one.
+        if (groupedRowsShown && isAiRequestLeg(historyEntry)) return false;
 
         if (!matchesTransactionFilters(historyEntry, { paymentType: type, direction: filter })) {
           return false;
@@ -303,6 +335,7 @@ export const Transactions = React.memo(
       counterparty,
       hideExpired,
       zap,
+      groupedRowsShown,
     ]);
 
     // Build unified timeline: mix history entries + swap groups chronologically
@@ -315,15 +348,19 @@ export const Transactions = React.memo(
       // Only include swap items when showing all filters / types. Embedded mode
       // (per-person relationship view) is driven purely by the passed history —
       // swaps are self-rebalances with no counterparty, so never inject them.
-      if (embedded || filter !== 'all' || type !== 'all') return txItems;
+      if (!groupedRowsShown) return txItems;
 
       const swapItems: TimelineItem[] = swapGroups.map((group) => ({
         kind: 'swap' as const,
         data: group,
       }));
+      const aiItems: TimelineItem[] = aiGroups.map((group) => ({
+        kind: 'ai' as const,
+        data: group,
+      }));
 
-      return [...txItems, ...swapItems];
-    }, [filteredHistory, swapGroups, filter, type, embedded]);
+      return [...txItems, ...swapItems, ...aiItems];
+    }, [filteredHistory, swapGroups, aiGroups, groupedRowsShown]);
 
     const sortedTimeline = useMemo(
       () => [...timelineItems].sort((a, b) => getTimelineCreatedAt(b) - getTimelineCreatedAt(a)),
@@ -335,6 +372,9 @@ export const Transactions = React.memo(
         groupBy(sortedTimeline, (item: TimelineItem) => {
           // Swap items are always "confirmed"
           if (item.kind === 'swap') return 'confirmed';
+          // An AI request is only unsettled while a leg is still in flight;
+          // a refunded one is FINISHED, not expired — its money is back.
+          if (item.kind === 'ai') return item.data.state === 'pending' ? 'pending' : 'confirmed';
 
           const historyEntry = item.data;
           const isCollapsingGhost =
@@ -523,7 +563,7 @@ export const Transactions = React.memo(
       for (const section of sectionsToDisplay) {
         for (const item of section.data) {
           rows.push(
-            `${item.kind === 'swap' ? 'swap' : item.data.type}@${new Date(
+            `${item.kind === 'swap' ? 'swap' : item.kind === 'ai' ? 'ai' : item.data.type}@${new Date(
               getTimelineCreatedAt(item)
             )
               .toISOString()
@@ -620,6 +660,31 @@ export const Transactions = React.memo(
         const key = getTimelineKey(item);
         if (item.kind === 'swap') {
           return <SwapTransactionRow key={key} group={item.data} />;
+        }
+        if (item.kind === 'ai') {
+          const group = item.data;
+          const paymentLeg = group.legs[0];
+          if (!paymentLeg) return null;
+          // Deliberately the ORDINARY transaction row. A grouped request is
+          // still one payment; giving it its own visual language would make
+          // the list harder to scan to say something the detail screen says
+          // better. All the group changes is the amount and, when the money
+          // came back, the cancelled treatment.
+          //
+          // The amount is NOT the net: a fully refunded request nets to zero,
+          // and a row reading "0" claims nothing happened. It shows what was
+          // sent — red, signed `-`, dimmed under the cancel glyph — because
+          // that is what the wallet did, and the dimming is what says it came
+          // back. `aiRequestDisplayAmount` owns that choice for both surfaces.
+          return (
+            <Transaction
+              key={key}
+              historyEntry={paymentLeg}
+              amountOverride={aiRequestDisplayAmount(group)}
+              returned={group.state === 'refunded'}
+              onPress={() => navigateToAiRequest(group.groupId)}
+            />
+          );
         }
         return (
           <Transaction

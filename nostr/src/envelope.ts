@@ -106,12 +106,97 @@ export const NaggProvidersSchema = z.record(
   z.record(z.string(), z.record(z.string(), z.unknown())),
 );
 
+/** A number nagg could not establish is `null`, never 0 — kept as null here. */
+const nullableNumber = z
+  .number()
+  .nullish()
+  .transform((v): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null));
+
+/** Mint / provider URL lists; a real operator runs a handful, so 64 is generous. */
+const stringList = z
+  .array(z.string().max(512))
+  .max(64)
+  .nullish()
+  .transform((v): string[] => v ?? []);
+
+/**
+ * One pubkey's identity group, as every nagg route that names a pubkey now
+ * carries it under `identities[<hex>]`: the kind-0 fields it knows, the
+ * operator's reach and Vertex figures, and what the pubkey operates. This is
+ * the wire shape behind the entity cache's profile stats — a figure seen on
+ * ANY route is the figure every surface shows.
+ *
+ * Tolerant per field: a route that omits a block (a mint-only deployment
+ * has no `firstEventAt`) still parses, and a field nagg adds later passes.
+ */
+const HEX_64 = /^[0-9a-f]{64}$/;
+
+export const NaggIdentitySchema = z
+  .object({
+    pubkey: z.string().regex(HEX_64),
+    npub: z.string().max(128).nullish(),
+    profile: z
+      .object({
+        name: z.string().max(256).optional(),
+        displayName: z.string().max(256).optional(),
+        picture: z.string().max(2048).optional(),
+        banner: z.string().max(2048).optional(),
+        about: z.string().max(4096).optional(),
+        nip05: z.string().max(256).optional(),
+        nip05Valid: z.boolean().optional(),
+        website: z.string().max(2048).optional(),
+        lud16: z.string().max(256).optional(),
+      })
+      .passthrough()
+      .nullish(),
+    reach: z
+      .object({
+        followers: nullableNumber,
+        follows: nullableNumber,
+        source: z.enum(['graph', 'vertex', 'relays']).nullish(),
+      })
+      .nullish()
+      .transform((v) => v ?? { followers: null, follows: null, source: null }),
+    vertex: z
+      .object({ rank: nullableNumber, score: nullableNumber, fetchedAt: nullableNumber })
+      .nullish()
+      .transform((v) => v ?? { rank: null, score: null, fetchedAt: null }),
+    operates: z
+      .object({ mints: stringList, aiProviders: stringList })
+      .nullish()
+      .transform((v) => v ?? { mints: [], aiProviders: [] }),
+    firstEventAt: nullableNumber,
+  })
+  .passthrough();
+
+/**
+ * Keyed by hex pubkey. One malformed entry (a bad key, an oversized field)
+ * is dropped rather than failing the whole response — a route's payload must
+ * not disappear because one operator's profile is odd. Capped at 512 entries;
+ * no route names more pubkeys than that.
+ */
+export const NaggIdentitiesSchema = z
+  .record(z.string().max(64), NaggIdentitySchema.optional().catch(undefined))
+  .nullish()
+  .transform((v): Record<string, NaggIdentity> => {
+    const out: Record<string, NaggIdentity> = {};
+    if (!v) return out;
+    let n = 0;
+    for (const [key, identity] of Object.entries(v)) {
+      if (!identity || !HEX_64.test(key) || n >= 512) continue;
+      out[key] = identity;
+      n += 1;
+    }
+    return out;
+  });
+
 export const NaggProfilesEnvelopeSchema = NaggEnvelopeSchema.extend({
   /** Complete ranked pubkey list (includes profiles without a local kind-0). */
   pubkeys: arrayOrEmpty(z.string()),
   providers: NaggProvidersSchema.nullish().transform(
     (v): z.infer<typeof NaggProvidersSchema> => v ?? {},
   ),
+  identities: NaggIdentitiesSchema,
   fromCache: z.boolean().optional(),
   vertexFresh: z.boolean().nullish(),
 });
@@ -127,6 +212,7 @@ export type NaggAggregates = Record<string, Record<string, Record<string, number
 export type NaggEnvelope = z.infer<typeof NaggEnvelopeSchema>;
 export type NaggNotificationEntry = z.infer<typeof NaggNotificationEntrySchema>;
 export type NaggNotificationsEnvelope = z.infer<typeof NaggNotificationsEnvelopeSchema>;
+export type NaggIdentity = z.infer<typeof NaggIdentitySchema>;
 export type NaggProfilesEnvelope = z.infer<typeof NaggProfilesEnvelopeSchema>;
 export type NaggFollowStatusEnvelope = z.infer<typeof NaggFollowStatusEnvelopeSchema>;
 

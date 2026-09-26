@@ -77,6 +77,15 @@ function getActiveProfilePubkey(): string | undefined {
   return state.profiles.find((p) => p.accountIndex === state.activeAccountIndex)?.pubkey;
 }
 
+/** Capture after migrations/hydration, before starting an owner-bound service. */
+export async function captureProfileStorageOwner(): Promise<string> {
+  await _migrationGate;
+  await ensureProfileStoreHydrated();
+  const pubkey = getActiveProfilePubkey();
+  if (!pubkey) throw new Error('Profile storage is not ready');
+  return pubkey;
+}
+
 /**
  * Create a StateStorage adapter scoped to the active profile, or a captured
  * owner for async services that must survive active-profile changes.
@@ -115,6 +124,7 @@ export const PROFILE_SCOPED_STORE_KEYS = [
   'mint-distribution-store',
   'npc-mint-store',
   'routstr-store',
+  'ai-provider-directory-store',
   'scan-history-store',
   'search-history-store',
   'recent-people-store',

@@ -4,18 +4,24 @@
  * action); this renders it and routes the tap to the existing seams — no app-side
  * parsing or new routing.
  *
- * Protocol kinds (invoice / ecash / payment request / lnurlp / onchain / mint)
- * render an icon-circle row whose colada-resolved label already carries the
- * amount, and tap → `onExecute` (the same canonical `machine.scan` the Paste
+ * Protocol kinds (invoice / ecash / payment request / lnurlp / onchain / mint /
+ * lockKey) render an icon-circle row whose colada-resolved label already carries
+ * the amount, and tap → `onExecute` (the same canonical `machine.scan` the Paste
  * button and input submit use). Person kinds (npub / lightning address) resolve
  * the Nostr identity (name + pfp) and tap → `onStartContactSend`, mirroring
  * selecting a contact.
+ *
+ * `lockKey` — a wallet's raw compressed P2PK receive key — deliberately stays on
+ * the protocol side: there is no profile behind it, so hydrating a name or
+ * opening a NIP-17 contact send would attribute it to an identity nobody
+ * claimed. `machine.scan` takes it straight to amount entry with a required lock.
  */
 import { useEffect, useState } from 'react';
 import { fetchNip05Pubkey, type DestinationDescriptor, type DestinationIcon } from 'wallet';
 import * as nip19 from 'nostr-tools/nip19';
 
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
+import { prefetchNutzapProfile } from '@/shared/lib/nostr/nutzapProfileDiscovery';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { paymentLog, redactError } from '@/shared/lib/logger';
@@ -128,6 +134,12 @@ export function DetectedActionRow({
   }, [ref?.type, ref?.value]);
 
   const personPubkey = npubHex ?? lnaddrHex ?? undefined;
+  // Warm the kind:10019 lookup the amount screen's lock option depends on, the
+  // moment the identity is known — not when the user reaches the menu and has
+  // to watch it say "Checking how they receive ecash…".
+  useEffect(() => {
+    prefetchNutzapProfile(personPubkey);
+  }, [personPubkey]);
   // Always called (tolerates undefined → no-op for non-person kinds) so hooks
   // stay unconditional.
   const { metadata, isLoading } = useNostrProfileMetadata(personPubkey);

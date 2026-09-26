@@ -31,9 +31,20 @@ export const ANNOTATION_KEYS = {
   lockType: "lockType",
   lockPubkey: "lockPubkey",
   lockDirection: "lockDirection",
+  lockPubkeys: "lockPubkeys",
+  lockRequiredSigs: "lockRequiredSigs",
+  lockLocktime: "lockLocktime",
+  lockRefundKeys: "lockRefundKeys",
+  lockRefundRequiredSigs: "lockRefundRequiredSigs",
+  lockSigFlag: "lockSigFlag",
   distributionSource: "distributionSource",
   geoLat: "geoLat",
   geoLng: "geoLng",
+  aiGroupId: "aiGroupId",
+  aiRole: "aiRole",
+  aiSessionId: "aiSessionId",
+  aiMessageId: "aiMessageId",
+  aiModel: "aiModel",
   swapGroupId: "swapGroupId",
   swapRole: "swapRole",
   swapChainId: "swapChainId",
@@ -71,14 +82,21 @@ export type AnnotationRecord = Record<string, string>;
 const COUNTERPARTY_DIRECTIONS = ["sender", "recipient"] as const;
 const SCAN_METHODS = ["qr", "nfc", "paste", "deeplink", "ble"] as const;
 const LOCK_DIRECTIONS = ["incoming", "outgoing"] as const;
+const LOCK_SIG_FLAGS = ["SIG_INPUTS", "SIG_ALL"] as const;
 const DISTRIBUTION_SOURCES = ["copy", "share", "airdrop", "displayed"] as const;
 const SWAP_ROLES = ["mint", "melt"] as const;
 
 export type CounterpartyDirection = (typeof COUNTERPARTY_DIRECTIONS)[number];
 export type ScanMethod = (typeof SCAN_METHODS)[number];
 export type LockDirection = (typeof LOCK_DIRECTIONS)[number];
+export type LockSigFlag = (typeof LOCK_SIG_FLAGS)[number];
 export type DistributionSource = (typeof DISTRIBUTION_SOURCES)[number];
 export type SwapRole = (typeof SWAP_ROLES)[number];
+
+/** Which half of an AI request a movement is: the token handed to the node, or
+ *  the unused remainder it gave back. */
+const AI_PAYMENT_ROLES = ["payment", "change"] as const;
+export type AiPaymentRole = (typeof AI_PAYMENT_ROLES)[number];
 /** Which side of a NUT-18 payment request this transaction was. */
 export type PaymentRequestRole = "payer" | "payee";
 /** How the token travelled (`http` = POST transport on the send side; coco's
@@ -116,8 +134,24 @@ export interface TransactionAnnotation {
   };
   lock?: {
     type?: "p2pk";
+    /** The key the token's `data` field named — the primary lock target. */
     pubkey?: string;
     direction?: LockDirection;
+    /** Every key on the main path, when the lock named more than one. */
+    pubkeys?: string[];
+    /** `n_sigs`; absent means the NUT-11 default of one. */
+    requiredSignatures?: number;
+    /** Unix SECONDS, the unit NUT-11 writes — converted at the UI edge only. */
+    locktime?: number;
+    /**
+     * Keys that may spend after `locktime`. An ABSENT list is not an empty
+     * one: absent means the token carried no `refund` tag, so after the
+     * locktime anyone holding it can spend. Never collapse the two.
+     */
+    refundKeys?: string[];
+    /** `n_sigs_refund`; absent means one. */
+    refundRequiredSignatures?: number;
+    sigFlag?: LockSigFlag;
   };
   distribution?: {
     source?: DistributionSource;
@@ -131,6 +165,25 @@ export interface TransactionAnnotation {
     role?: SwapRole;
     chainId?: string;
     hopIndex?: number;
+  };
+  /**
+   * An AI request paid per call, which is a send and a receive that mean one
+   * thing. The node is handed a token worth its admission gate and returns
+   * whatever it did not use, so history otherwise shows two unexplained
+   * movements minutes or milliseconds apart. `groupId` pairs them the way
+   * `swap.groupId` pairs a swap's legs.
+   *
+   * `sessionId` and `messageId` tie the payment to the exchange it bought, so
+   * a cost can be traced to the answer it produced and back — the same
+   * relationship a zap has to the post it was sent for.
+   */
+  ai?: {
+    groupId?: string;
+    role?: AiPaymentRole;
+    sessionId?: string;
+    /** The assistant message this paid for. */
+    messageId?: string;
+    model?: string;
   };
   /**
    * Per-request Cashu-payment-request advertise conditions for a single-use
@@ -220,6 +273,17 @@ function setString(
   if (typeof value === "string" && value.length > 0) record[key] = value;
 }
 
+/** Numbers persist as strings, the same way the location fields do. */
+function setNumberString(
+  record: AnnotationRecord,
+  key: string,
+  value: number | undefined | null,
+): void {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    record[key] = String(value);
+  }
+}
+
 /**
  * Flatten a rich annotation patch into the persisted `Record<string, string>`.
  * Only defined, non-empty fields are written, so patches are additive and a
@@ -274,6 +338,28 @@ export function encodeAnnotation(
     setString(record, ANNOTATION_KEYS.lockType, patch.lock.type);
     setString(record, ANNOTATION_KEYS.lockPubkey, patch.lock.pubkey);
     setString(record, ANNOTATION_KEYS.lockDirection, patch.lock.direction);
+    if (patch.lock.pubkeys?.length) {
+      record[ANNOTATION_KEYS.lockPubkeys] = JSON.stringify(patch.lock.pubkeys);
+    }
+    if (patch.lock.refundKeys) {
+      // Written even when empty: "no refund tag" and "an empty refund tag"
+      // mean different things to whoever holds the token.
+      record[ANNOTATION_KEYS.lockRefundKeys] = JSON.stringify(
+        patch.lock.refundKeys,
+      );
+    }
+    setNumberString(
+      record,
+      ANNOTATION_KEYS.lockRequiredSigs,
+      patch.lock.requiredSignatures,
+    );
+    setNumberString(record, ANNOTATION_KEYS.lockLocktime, patch.lock.locktime);
+    setNumberString(
+      record,
+      ANNOTATION_KEYS.lockRefundRequiredSigs,
+      patch.lock.refundRequiredSignatures,
+    );
+    setString(record, ANNOTATION_KEYS.lockSigFlag, patch.lock.sigFlag);
   }
 
   if (patch.distribution) {
@@ -291,6 +377,14 @@ export function encodeAnnotation(
   ) {
     record[ANNOTATION_KEYS.geoLat] = String(patch.location.lat);
     record[ANNOTATION_KEYS.geoLng] = String(patch.location.lng);
+  }
+
+  if (patch.ai) {
+    setString(record, ANNOTATION_KEYS.aiGroupId, patch.ai.groupId);
+    setString(record, ANNOTATION_KEYS.aiRole, patch.ai.role);
+    setString(record, ANNOTATION_KEYS.aiSessionId, patch.ai.sessionId);
+    setString(record, ANNOTATION_KEYS.aiMessageId, patch.ai.messageId);
+    setString(record, ANNOTATION_KEYS.aiModel, patch.ai.model);
   }
 
   if (patch.swap) {
@@ -474,11 +568,48 @@ export function decodeAnnotation(
     record[ANNOTATION_KEYS.lockDirection],
     LOCK_DIRECTIONS,
   );
-  if (lockType || lockPubkey || lockDirection) {
+  const lockPubkeys = parseStringArray(record[ANNOTATION_KEYS.lockPubkeys]);
+  const lockRefundKeys = parseStringArray(
+    record[ANNOTATION_KEYS.lockRefundKeys],
+  );
+  const lockLocktime = parseFiniteNumber(record[ANNOTATION_KEYS.lockLocktime]);
+  const lockRequiredSigs = parseFiniteNumber(
+    record[ANNOTATION_KEYS.lockRequiredSigs],
+  );
+  const lockRefundRequiredSigs = parseFiniteNumber(
+    record[ANNOTATION_KEYS.lockRefundRequiredSigs],
+  );
+  const lockSigFlag = oneOf(
+    record[ANNOTATION_KEYS.lockSigFlag],
+    LOCK_SIG_FLAGS,
+  );
+  // Every lock field counts: a record holding only a locktime still describes
+  // a lock, and dropping it would report the token as unlocked.
+  if (
+    lockType ||
+    lockPubkey ||
+    lockDirection ||
+    lockPubkeys ||
+    lockRefundKeys ||
+    lockLocktime !== undefined ||
+    lockRequiredSigs !== undefined ||
+    lockRefundRequiredSigs !== undefined ||
+    lockSigFlag
+  ) {
     annotation.lock = {
       ...(lockType === "p2pk" ? { type: "p2pk" as const } : {}),
       ...(lockPubkey ? { pubkey: lockPubkey } : {}),
       ...(lockDirection ? { direction: lockDirection } : {}),
+      ...(lockPubkeys ? { pubkeys: lockPubkeys } : {}),
+      ...(lockRequiredSigs !== undefined
+        ? { requiredSignatures: lockRequiredSigs }
+        : {}),
+      ...(lockLocktime !== undefined ? { locktime: lockLocktime } : {}),
+      ...(lockRefundKeys ? { refundKeys: lockRefundKeys } : {}),
+      ...(lockRefundRequiredSigs !== undefined
+        ? { refundRequiredSignatures: lockRefundRequiredSigs }
+        : {}),
+      ...(lockSigFlag ? { sigFlag: lockSigFlag } : {}),
     };
   }
 
@@ -494,6 +625,21 @@ export function decodeAnnotation(
   const lng = parseFiniteNumber(record[ANNOTATION_KEYS.geoLng]);
   if (lat != null && lng != null) {
     annotation.location = { lat, lng };
+  }
+
+  const aiGroupId = record[ANNOTATION_KEYS.aiGroupId];
+  const aiRole = oneOf(record[ANNOTATION_KEYS.aiRole], AI_PAYMENT_ROLES);
+  const aiSessionId = record[ANNOTATION_KEYS.aiSessionId];
+  const aiMessageId = record[ANNOTATION_KEYS.aiMessageId];
+  const aiModel = record[ANNOTATION_KEYS.aiModel];
+  if (aiGroupId || aiRole || aiSessionId || aiMessageId || aiModel) {
+    annotation.ai = {
+      ...(aiGroupId ? { groupId: aiGroupId } : {}),
+      ...(aiRole ? { role: aiRole } : {}),
+      ...(aiSessionId ? { sessionId: aiSessionId } : {}),
+      ...(aiMessageId ? { messageId: aiMessageId } : {}),
+      ...(aiModel ? { model: aiModel } : {}),
+    };
   }
 
   const swapGroupId = record[ANNOTATION_KEYS.swapGroupId];

@@ -1,26 +1,33 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useLatestRef } from '@/shared/hooks/useLatestRef';
+import { useCallback, useEffect } from 'react';
+import { useRoutstrFunds } from '../hooks/useRoutstrFunds';
+import { useModelCatalog } from '../hooks/useModelCatalog';
 import { Keyboard } from 'react-native';
 import Icon from 'assets/icons';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
-import { checkBalance, getModels, type RoutstrModel } from '@/shared/lib/routstr/api';
+import { isE2eeModelId, lineupProviderIds } from '@/shared/lib/routstr/lineup';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
+import { sweepUnsettledPayments } from '@/shared/lib/routstr/sdk/client';
 import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
 import { modelPickerPopup } from '@/shared/lib/popup';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { View } from '@/shared/ui/primitives/View/View';
+import { affordableForEntry } from '@/features/ai/lib/reserve';
 import {
   AFFORD_BUFFER,
-  AI_PROVIDERS,
   AI_TIERS,
-  canAffordPricing,
+  E2EE_BADGE_ICON,
+  E2EE_BADGE_LABEL,
   entryForSlot,
+  providersForLineup,
   estimateTurnCostSatsFromPricing,
   getProviderById,
   getTierById,
+  isSelectionServed,
   resolveSelectedEntry,
+  UNSERVED_SELECTION_LABEL,
 } from '../lib/format';
 import { aiLog } from '@/shared/lib/logger';
 import { withAlpha } from '@/shared/lib/color';
@@ -46,82 +53,35 @@ import { withAlpha } from '@/shared/lib/color';
  *   - Rows whose underlying model exceeds the user's balance render
  *     half-faded with the gap shown as the row description.
  *
- * This chip's mount effect is the app's SOLE catalog fetcher: a
- * successful `getModels()` lands in `setCachedModels`, which derives the
- * lineup and persists the compact last-known snapshot.
+ * The app's SOLE catalog fetch hangs off this chip, but it is no longer this
+ * chip's business: `useModelCatalog` owns it, including the retry ladder a
+ * failed first fetch needs. A successful read lands in `setCachedModels`,
+ * which derives the lineup and persists the compact last-known snapshot.
  */
 export function ModelChip() {
   const background = useThemeColor('background');
 
   const selectedTier = useRoutstrStore((s) => s.selectedTier);
   const selectedProvider = useRoutstrStore((s) => s.selectedProvider);
-  const balanceMsats = useRoutstrStore((s) => s.balance);
-  const nodeBaseUrl = useRoutstrStore((s) => s.nodeBaseUrl);
-  const cachedModels = useRoutstrStore((s) => s.modelsCache?.data ?? null);
-  const setCachedModels = useRoutstrStore((s) => s.setCachedModels);
-  const isCacheStale = useRoutstrStore((s) => s.isCacheStale);
+  const funds = useRoutstrFunds();
   const sessionLineup = useRoutstrStore((s) => s.lineup);
   const lastKnownLineup = useRoutstrStore((s) => s.lastKnownLineup);
   const lineup = sessionLineup ?? lastKnownLineup?.lineup ?? null;
   const lineupSource = sessionLineup ? 'live' : lastKnownLineup ? 'persisted' : 'empty';
 
-  const [models, setModels] = useState<RoutstrModel[]>(cachedModels ?? []);
-
-  // Balance self-heal on mount. The only other refresh point is the
-  // post-stream diff in `useAiSend`, which a 402 never reaches — so a
-  // drained key would otherwise leave the persisted balance stale
-  // indefinitely and every affordability gate lying (observed: UI at 299
-  // sats vs 0.2 sats actually available → endless insufficient-balance
-  // popups). One fetch per chip mount keeps the pill and picker honest.
-  const apiKey = useRoutstrStore((s) => s.apiKey);
-  const setBalance = useRoutstrStore((s) => s.setBalance);
-  // Read at mount, never a trigger: a key rotation mid-session must not refire
-  // the self-heal fetch.
-  const apiKeyRef = useLatestRef(apiKey);
-  useEffect(() => {
-    const key = apiKeyRef.current;
-    if (!key) return;
-    let cancelled = false;
-    const requestNode = useRoutstrStore.getState().nodeBaseUrl;
-    checkBalance(key)
-      .then((data) => {
-        if (!cancelled && useRoutstrStore.getState().nodeBaseUrl === requestNode)
-          setBalance(data.balance);
-      })
-      .catch(() => {
-        // Silent — offline keeps the last-known balance, same policy as
-        // the models fetch below.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [apiKeyRef, setBalance]);
+  const models = useModelCatalog();
 
   useVisualActivityEffect(() => {
     void refreshRoutstrLineup();
+    // Coming back to the screen is the moment to ask about money the node is
+    // still holding — the request the app was closed on, the one the user
+    // stopped. The launch sweep ran once; this is the maintainers' own
+    // advice (sweep on launch, on foreground, after every aborted request),
+    // and a sweep with nothing to ask costs one storage read.
+    void sweepUnsettledPayments('launch');
   });
 
-  useEffect(() => {
-    if (cachedModels && !isCacheStale()) {
-      setModels(cachedModels);
-      return;
-    }
-    let cancelled = false;
-    getModels()
-      .then((next) => {
-        if (cancelled || useRoutstrStore.getState().nodeBaseUrl !== nodeBaseUrl) return;
-        setCachedModels(next);
-        setModels(next);
-      })
-      .catch(() => {
-        // Silent — the chip still renders the tier label.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [cachedModels, isCacheStale, nodeBaseUrl, setCachedModels]);
-
-  const balanceSats = balanceMsats != null ? Math.floor(balanceMsats / 1000) : 0;
+  const balanceSats = funds?.balanceSats ?? 0;
   const currentTier = getTierById(selectedTier);
   const currentProvider = getProviderById(selectedProvider);
   const resolvedEntry = resolveSelectedEntry(
@@ -130,6 +90,15 @@ export function ModelChip() {
     balanceSats,
     lineup
   );
+  // Nothing resolved, and the node HAS answered: this selection names a vendor
+  // or a rung the node in front of us does not serve. The sealed selection is
+  // the case that reaches a user — `routstrStore` deliberately refuses to move
+  // one onto a plaintext vendor, because moving it is the silent downgrade, so
+  // a node swap onto a node with no `tinfoil-` row legitimately leaves the
+  // selection unresolvable. Saying so is the honest half of that bargain; the
+  // chip used to repeat the tier instead and render "Auto · Auto", which reads
+  // like a working selection and let a failed send be the first sign.
+  const served = isSelectionServed(currentProvider.id, currentTier.id, balanceSats, lineup);
 
   // Diagnostic snapshot — fires once per (balance, lineup, slot) change.
   // Captures every filled cell of the (provider, tier) matrix the chip's
@@ -139,7 +108,7 @@ export function ModelChip() {
     if (!lineup) return;
     const cellSnapshots: Record<string, unknown>[] = [];
     for (const tier of AI_TIERS) {
-      for (const provider of AI_PROVIDERS) {
+      for (const provider of providersForLineup(lineup)) {
         const entry = entryForSlot(lineup, provider.id, tier.id);
         if (!entry) continue; // partial provider — cell deliberately empty
         cellSnapshots.push({
@@ -149,7 +118,13 @@ export function ModelChip() {
           lastKnown: entry.lastKnown ?? false,
           visionInput: entry.visionInput,
           estimatedTurnCostSats: estimateTurnCostSatsFromPricing(entry.satsPricing),
-          affordable: canAffordPricing(entry.satsPricing, balanceSats),
+          // Priced through the same SDK mirror the picker row and the spend
+          // sheet use, so all three answer the same question. `canAffordPricing`
+          // called a sealed model affordable at roughly a tenth of what the
+          // node demands, because it applies a completion discount the node
+          // refuses on a body it cannot read.
+          affordable: affordableForEntry(entry, balanceSats),
+          maxCompletionTokens: entry.maxCompletionTokens ?? null,
           catalog_max_cost_sats: entry.satsPricing.max_cost,
           catalog_image_fee_sats: entry.satsPricing.image,
           contextLength: entry.contextLength,
@@ -157,28 +132,80 @@ export function ModelChip() {
       }
     }
     aiLog.info('ai.tier.affordability_snapshot', {
-      balanceMsats: balanceMsats ?? 0,
       balanceSats,
       selectedTier,
       selectedProvider,
       buffer: AFFORD_BUFFER,
+      // The mismatch this event was already carrying, stated rather than
+      // inferred. `selectedProvider: "tinfoil"` over cells whose every
+      // `providerId` is a plaintext vendor IS the stranded selection, and it
+      // took reading both fields against each other to see it.
+      selectionServed: served,
       lineupSource,
       catalogSize: models.length,
       cells: cellSnapshots,
     });
-  }, [
-    balanceMsats,
-    balanceSats,
-    models.length,
-    lineup,
-    lineupSource,
-    selectedTier,
-    selectedProvider,
-  ]);
+  }, [balanceSats, models.length, lineup, lineupSource, selectedTier, selectedProvider, served]);
 
   // No lineup yet (first run, fetch pending) → show the tier label so the
   // chip never reads like a dev string.
-  const chipLabel = `${currentTier.label} · ${resolvedEntry?.displayName ?? currentTier.label}`;
+  const chipLabel = served
+    ? `${currentTier.label} · ${resolvedEntry?.displayName ?? currentTier.label}`
+    : `${currentProvider.label} · ${UNSERVED_SELECTION_LABEL}`;
+
+  // The chip names the model a turn will actually be sent to, so the padlock
+  // belongs to THAT model and nothing else. The display name cannot carry it:
+  // a node serves `glm-5-3` and `tinfoil-glm-5-3` under one name at one price
+  // and only the second is sealed, so the id is the only honest signal — and
+  // the send path's own fallback can swap the resolved entry, which is exactly
+  // when the user needs the lock to disappear.
+  const sealed = isE2eeModelId(resolvedEntry?.modelId);
+
+  // ONE glyph in the leading slot. The encrypted vendor's own icon is the
+  // padlock, so drawing the vendor glyph AND a per-model padlock badge put two
+  // locks on the chip for every sealed selection — the lock said the same
+  // thing twice and the user read it as a bug. The padlock is the more
+  // important of the two signals (it is a fact about the request, the vendor
+  // glyph is decoration), so when the resolved model is sealed the lock takes
+  // the slot and the vendor glyph yields it.
+  const leadingIcon = sealed ? E2EE_BADGE_ICON : currentProvider.icon;
+
+  // One line naming every state the selection can be in, emitted only when
+  // one of them changes. `ai.tier.affordability_snapshot` below carries the
+  // whole matrix and re-fires on every balance tick, which is the wrong
+  // signal-to-noise for the question "why did the chip say THAT after I
+  // switched provider" — that needs the node, the pin, the pair, what it
+  // resolved to, whether the node serves it, and which lineup answered, on one
+  // line, with nothing else.
+  const nodeBaseUrl = useRoutstrStore((s) => s.nodeBaseUrl);
+  const userNodeBaseUrl = useRoutstrStore((s) => s.userNodeBaseUrl);
+  const resolvedModelId = resolvedEntry?.modelId ?? null;
+  const catalogSize = models.length;
+  useEffect(() => {
+    aiLog.info('ai.selection.state', {
+      nodeBaseUrl,
+      pinned: userNodeBaseUrl != null,
+      selectedProvider,
+      selectedTier,
+      resolvedModelId,
+      sealed,
+      served,
+      lineupSource,
+      lineupProviders: lineupProviderIds(lineup),
+      catalogSize,
+    });
+  }, [
+    nodeBaseUrl,
+    userNodeBaseUrl,
+    selectedProvider,
+    selectedTier,
+    resolvedModelId,
+    sealed,
+    served,
+    lineupSource,
+    lineup,
+    catalogSize,
+  ]);
 
   const onPress = useCallback(() => {
     // Picker has no in-sheet inputs, so gorhom can't lift over an
@@ -198,12 +225,20 @@ export function ModelChip() {
   return (
     <Button
       testID="ai-model-chip"
-      accessibilityLabel={`Model: ${chipLabel}`}
+      // The button flattens its children into one accessibility node, so the
+      // badge cannot speak for itself here — it has to be said in the label.
+      accessibilityLabel={`Model: ${chipLabel}${sealed ? `, ${E2EE_BADGE_LABEL}` : ''}`}
       accessibilityHint="Opens the model picker"
       variant="primary"
       size="compact"
       onPress={onPress}
-      icon={<Icon name={currentProvider.icon} size={16} color={background} />}
+      icon={
+        // The test id rides on the slot only while it holds the lock, so a
+        // test can still ask "is this chip badged" without a second glyph.
+        <View testID={sealed ? 'ai-model-chip-e2ee' : undefined}>
+          <Icon name={leadingIcon} size={16} color={background} />
+        </View>
+      }
       text={
         <HStack align="center" gap={4}>
           <Text size={13} bold color={background}>

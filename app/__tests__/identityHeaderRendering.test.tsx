@@ -28,6 +28,15 @@ jest.mock('react-native-reanimated', () => {
         return () => mockReactions.delete(run);
       }, [prepare, react]);
     },
+    makeMutable: (initial: unknown) => {
+      let value = initial;
+      return {
+        get: () => value,
+        set: (next: unknown) => {
+          value = next;
+        },
+      };
+    },
     useAnimatedStyle: () => ({}),
     useAnimatedScrollHandler: (handler: unknown) => handler,
     withTiming: (value: unknown) => value,

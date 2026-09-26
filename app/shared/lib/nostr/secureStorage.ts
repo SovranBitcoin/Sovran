@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { nostrLog, redactError } from '../logger';
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import { maybeExportSeedForE2E } from './e2eSeedExport';
+import { SecureVaultManifest, secureVaultChunkKey } from '../routstr/secureVaultManifest';
 
 // Keys for secure storage
 const STORAGE_KEYS = {
@@ -140,15 +141,21 @@ async function secureDelete(key: string, op: string): Promise<boolean> {
 // same baseline and lose entries on the round-trip through SecureStore.
 let keyIndexQueue: Promise<void> = Promise.resolve();
 
-async function readKeyIndex(): Promise<string[]> {
-  const raw = await secureGet(STORAGE_KEYS.KEY_INDEX, 'index_read');
+async function readKeyIndex(strict = false): Promise<string[]> {
+  const raw = strict
+    ? await readSensitiveValue(STORAGE_KEYS.KEY_INDEX)
+    : await secureGet(STORAGE_KEYS.KEY_INDEX, 'index_read');
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
+      if (strict && parsed.some((key) => typeof key !== 'string'))
+        throw new Error('Invalid secure key index');
       return parsed.filter((k): k is string => typeof k === 'string');
     }
+    if (strict) throw new Error('Invalid secure key index');
   } catch {
+    if (strict) throw new Error('Secure key index is unreadable');
     // Corrupt index — start fresh. Callers still supply their own key list,
     // so the worst case is one cycle of stale residuals.
   }
@@ -157,21 +164,35 @@ async function readKeyIndex(): Promise<string[]> {
 
 async function rememberKey(key: string): Promise<void> {
   const next = keyIndexQueue.then(async () => {
-    const existing = await readKeyIndex();
+    const existing = await readKeyIndex(true);
     if (existing.includes(key)) return;
     existing.push(key);
-    try {
-      await SecureStore.setItemAsync(
-        STORAGE_KEYS.KEY_INDEX,
-        JSON.stringify(existing),
-        secureOptions()
-      );
-    } catch (error) {
-      nostrLog.warn('nostr.secure.index_write_failed', { error: redactError(error) });
-    }
+    await SecureStore.setItemAsync(
+      STORAGE_KEYS.KEY_INDEX,
+      JSON.stringify(existing),
+      secureOptions()
+    );
   });
   keyIndexQueue = next.catch(() => {});
   return next;
+}
+
+/** Payment recovery must distinguish an unavailable keychain from an absent value. */
+export function readSensitiveValue(key: string): Promise<string | null> {
+  return SecureStore.getItemAsync(key, secureOptions());
+}
+
+/** Register for Delete All before writing, then verify durable storage. */
+export async function writeSensitiveValue(
+  key: string,
+  value: string,
+  manifestKey?: string
+): Promise<void> {
+  if (!manifestKey) await rememberKey(key);
+  await SecureStore.setItemAsync(key, value, secureOptions());
+  if ((await readSensitiveValue(key)) !== value) {
+    throw new Error('Secure storage verification failed');
+  }
 }
 
 /**
@@ -492,10 +513,35 @@ export async function clearAllSecureData(
   // profileStore and SecureStore) get deleted alongside the caller-supplied
   // list. Belt-and-braces: if the index is empty (older install) the caller
   // list still wipes the well-known keys.
-  const indexed = await readKeyIndex();
+  const indexed = await readKeyIndex(true);
   const allKeys = Array.from(new Set([...callerKeys, ...indexed]));
 
-  const results = await Promise.all(allKeys.map((key) => secureDelete(key, 'clear_key')));
+  const results = await Promise.all(
+    allKeys.map(async (key) => {
+      if (key.startsWith('routstr_v1_') && key.endsWith('_manifest')) {
+        try {
+          const raw = await readSensitiveValue(key);
+          if (raw !== null) {
+            const manifest = SecureVaultManifest.parse(JSON.parse(raw));
+            for (let slot = 0; slot < manifest.slots.length; slot++) {
+              for (let index = 0; index < manifest.slots[slot]; index++) {
+                if (
+                  !(await secureDelete(
+                    secureVaultChunkKey(key, slot, index),
+                    'clear_recovery_chunk'
+                  ))
+                )
+                  return false;
+              }
+            }
+          }
+        } catch {
+          return false;
+        }
+      }
+      return secureDelete(key, 'clear_key');
+    })
+  );
   // Drop the index itself last so a partial wipe followed by a retry still
   // sees the un-wiped keys on the second pass.
   const keysCleared = results.every(Boolean);

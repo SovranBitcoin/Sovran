@@ -1,6 +1,7 @@
 import type { NostrTier, NoteStats, NoteStatsMap } from '@sovranbitcoin/schemas';
 import type { NaggFeedEvent, NaggProfileInfo } from '../../map/feed';
 import type { ProfileMetadata } from '../profiles';
+import type { ProfileStats } from '../profile-stats';
 import {
   createNormalizingStore,
   fieldLevelMerge,
@@ -69,15 +70,14 @@ export type CachedNote = NaggFeedEvent;
  */
 export type CachedNoteStats = NoteStats & { srcRank: number };
 
-/** A profile-header aggregate (counts + joined date), keyed by pubkey. */
-export type CachedProfileStats = {
-  pubkey: string;
-  metadata?: ProfileMetadata;
-  followersCount?: number;
-  followingCount?: number;
-  noteCount?: number;
-  joinedAtSec?: number;
-};
+/**
+ * A profile-header aggregate keyed by pubkey: counts, joined date, Vertex
+ * reputation and what the pubkey operates. This is the ONE owner of "how
+ * reputable / how followed is this person" — search hits, discovery rows, the
+ * AI provider directory and the REST profile all write here, so a figure seen
+ * on one surface is the figure every other surface shows.
+ */
+export type CachedProfileStats = ProfileStats;
 
 const DEFAULT_LIMITS = {
   profiles: 5000,

@@ -117,7 +117,7 @@ function RevisionSection({ revision }: { revision: MintChangeRevision }) {
 
 export function MintChangesScreen() {
   useLifecycleLogger('MintChangesScreen');
-  const params = useRouteParams(ParamsSchema, { where: 'notifications.mint-changes' });
+  const params = useRouteParams(ParamsSchema, { where: 'mint-changes' });
   const mintUrl = params?.mintUrl;
   const { revisions, isLoading, isRefreshing, errorMessage, refresh } =
     useMintChangeRevisions(mintUrl);

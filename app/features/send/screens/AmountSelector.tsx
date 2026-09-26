@@ -6,7 +6,7 @@
 
 import { PixelRatio, StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import type { ActionVariant, RecipientProfile, ScreenActionName } from 'wallet';
+import type { ActionVariant, P2pkLockSpec, RecipientProfile, ScreenActionName } from 'wallet';
 import type { BoundAction, QuickSendSuggestion } from 'wallet/react';
 
 import { MintSelector } from '@/features/wallet';
@@ -62,6 +62,12 @@ function readAmountEntryFields(entry: Record<string, unknown>) {
 type NextExecuteParams = {
   recipientPubkey?: string;
   recipientProfile?: RecipientProfile;
+  /**
+   * The lock the sender chose, tri-state. Present only when this screen owns
+   * the choice: `null` means they turned it off, so the machine must clear a
+   * lock the flow started with rather than leave it standing.
+   */
+  p2pkLock?: P2pkLockSpec | null;
 };
 
 // Map the colada availability variants (ecash/lightning/onchain on
@@ -71,29 +77,55 @@ type NextExecuteParams = {
 function buildNextVariants(
   nextAction: AmountEntryActions['next'],
   nextExecuteParams: NextExecuteParams,
-  suppress: boolean
+  suppress: boolean,
+  lockOption?: { reason?: string; choose: () => Promise<P2pkLockSpec | null> },
+  arrivedLocked = false
 ): ActionMenuVariant[] | undefined {
   if (suppress) return undefined;
   const raw = nextAction.variants as ActionVariant[] | undefined;
   if (!raw || raw.length === 0) return undefined;
-  return raw.map((v) => ({
-    id: v.id,
-    label: v.label,
-    description: v.description,
-    icon: v.icon,
-    isDisabled: !v.available,
-    reason: v.reason,
-    isDestructive: v.isDestructive,
-    onPress: async () => {
-      walletLog.info('amount.next.variant', {
-        variantId: v.id,
-        recipientPubkeyPresent: nextExecuteParams.recipientPubkey !== undefined,
-        recipientProfilePresent: nextExecuteParams.recipientProfile !== undefined,
-        recipientDisplayName: nextExecuteParams.recipientProfile?.displayName ?? null,
-      });
-      await nextAction.execute({ variantId: v.id, ...nextExecuteParams });
-    },
-  }));
+  return (
+    raw
+      // "Lock Ecash" needs terms. Either the screen owns the choice
+      // (`lockOption` opens the duration picker) or the flow arrived with
+      // already-validated terms — in which case the row executes them directly,
+      // with no picker and nothing for the user to re-decide.
+      .filter((v) => v.id !== 'locked-ecash' || lockOption || arrivedLocked)
+      .map((v) => ({
+        id: v.id,
+        label: v.label,
+        description: v.description,
+        icon: v.icon,
+        isDisabled: !v.available || (v.id === 'locked-ecash' && !!lockOption?.reason),
+        reason: v.id === 'locked-ecash' ? (lockOption?.reason ?? v.reason) : v.reason,
+        isDestructive: v.isDestructive,
+        onPress: async () => {
+          walletLog.info('amount.next.variant', {
+            variantId: v.id,
+            recipientPubkeyPresent: nextExecuteParams.recipientPubkey !== undefined,
+            recipientProfilePresent: nextExecuteParams.recipientProfile !== undefined,
+            recipientDisplayName: nextExecuteParams.recipientProfile?.displayName ?? null,
+          });
+          if (v.id === 'locked-ecash') {
+            if (!lockOption) {
+              // Seeded terms: say nothing about the lock so the machine's own
+              // (already validated) terms stand.
+              await nextAction.execute({ ...nextExecuteParams, variantId: v.id });
+              return;
+            }
+            const lock = await lockOption.choose();
+            if (!lock) return;
+            await nextAction.execute({ ...nextExecuteParams, variantId: v.id, p2pkLock: lock });
+          } else {
+            await nextAction.execute({
+              ...nextExecuteParams,
+              variantId: v.id,
+              ...(lockOption ? { p2pkLock: null } : {}),
+            });
+          }
+        },
+      }))
+  );
 }
 
 function buildExtraButtons(
@@ -161,6 +193,22 @@ interface AmountSelectorProps {
    */
   recipientPubkey?: string;
   recipientProfile?: RecipientProfile;
+  /**
+   * The lock the sender chose on this screen, tri-state: `undefined` when the
+   * screen does not own the choice (the flow arrived locked, or there is
+   * nobody to lock to), `null` when they turned it off, a spec when they
+   * chose one.
+   */
+  lockChoice?: P2pkLockSpec | null;
+  /** Short line under the amount when the lock is worth a caveat. */
+  lockWarning?: string | null;
+  lockOption?: { reason?: string; choose: () => Promise<P2pkLockSpec | null> };
+  /**
+   * True when the flow was seeded with a required lock (a scanned wallet
+   * receive key, a Nut Drop). The lock row then executes the seeded terms
+   * instead of opening the duration picker.
+   */
+  arrivedLocked?: boolean;
   /** Hide variant menu when the caller owns delivery after ecash creation. */
   suppressNextVariants?: boolean;
 }
@@ -176,6 +224,10 @@ export function AmountSelector({
   onRequestMintList,
   recipientPubkey,
   recipientProfile,
+  lockChoice,
+  lockWarning = null,
+  lockOption,
+  arrivedLocked = false,
   suppressNextVariants = false,
 }: AmountSelectorProps) {
   useLifecycleLogger('AmountSelector', walletLog);
@@ -223,6 +275,9 @@ export function AmountSelector({
   const nextExecuteParams: NextExecuteParams = {
     ...(recipientPubkey ? { recipientPubkey } : {}),
     ...(recipientProfile ? { recipientProfile } : {}),
+    // One object for both `handleNext` and every delivery variant, so the
+    // lock can never reach the machine down one path and not the other.
+    ...(lockChoice !== undefined ? { p2pkLock: lockChoice } : {}),
   };
 
   const handleNext = async () => {
@@ -234,6 +289,7 @@ export function AmountSelector({
       recipientPubkeyPresent: nextExecuteParams.recipientPubkey !== undefined,
       recipientProfilePresent: nextExecuteParams.recipientProfile !== undefined,
       recipientDisplayName: nextExecuteParams.recipientProfile?.displayName ?? null,
+      locked: !!nextExecuteParams.p2pkLock,
     });
     await actions.next.execute(nextExecuteParams);
   };
@@ -249,7 +305,9 @@ export function AmountSelector({
   const nextVariants = buildNextVariants(
     actions.next,
     nextExecuteParams,
-    suppressNextVariants || isCreateEcashEntry
+    suppressNextVariants || isCreateEcashEntry,
+    lockOption,
+    arrivedLocked
   );
 
   // The AI-credit top-up flow lands on this screen via a hand-rolled
@@ -294,7 +352,9 @@ export function AmountSelector({
   // The amount still reads as a problem (red) when the entry exceeds balance.
   const exceedsBalance = actions.next.exceedsBalance === true;
   const transactionTypeForView: AmountEntryTransactionType = transactionType;
-  const p2pkLocked = hasP2PKLock(entry);
+  // The flow's own lock, plus the one just chosen on this screen — which the
+  // entry will not know about until the send is on its way.
+  const p2pkLocked = hasP2PKLock(entry) || !!lockChoice;
 
   // When the recipient header is in play, surface the mint as a 50/50
   // bottom-bar pill — same component the header uses, so balance, icon,
@@ -355,7 +415,11 @@ export function AmountSelector({
         onToggleMode={handleToggle}
         unitIndicator={unitIndicator}
         contextIndicator={p2pkLocked ? <P2PKLockIndicator /> : null}
-        warningText={clampNoticeText ?? minNoticeText}
+        warningText={
+          // An amount problem is about to block the send; a lock caveat is
+          // only worth saying while nothing else is wrong.
+          clampNoticeText ?? minNoticeText ?? (p2pkLocked ? lockWarning : null)
+        }
         suggestions={suggestions}
         onSuggestionTap={handleSuggestionTap}
         extraButtons={extraButtons}

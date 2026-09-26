@@ -77,6 +77,8 @@ import {
   ingestSocialGraph,
   ingestProfiles,
   ingestProfileStats,
+  ingestSearchHits,
+  ingestIdentities,
 } from './cache/ingest';
 
 // ---------------------------------------------------------------------------
@@ -313,6 +315,7 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
         { mintUrl: request.mintUrl },
         async (ctx) => {
           const candidates = candidatesFor<MintReviewsSummary>(config.tiers, 'getMintReviews', (t) => () => t.getMintReviews!(request));
+          const mergeReviews = mergeMintReviews();
           const resolvedOf = (agg: TierAggregate<MintReviewsSummary>): ResolvedMintReviews => ({
             tier: agg.tier,
             ...agg.value,
@@ -323,7 +326,13 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
               ...ctx,
               gate: { minItems: 1, capMs: AGGREGATE_CAP_MS.mintReviews },
               count: (summary) => summary.reviewCount,
-              merge: mergeMintReviews(),
+              // Reviewer and operator identities ride on nagg's answer; written
+              // through so the reviewer rows show the same reputation the
+              // search list and profile page do.
+              merge: (acc, next, tier) => {
+                if (next.identities) ingestIdentities(cache, next.identities, tier);
+                return mergeReviews(acc, next, tier);
+              },
               onUpdate: (agg) => request.onUpdate?.(resolvedOf(agg)),
             })
           ).map(resolvedOf);
@@ -511,6 +520,7 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
         { q: request.query.length, limit: request.limit ?? null },
         async (ctx) => {
           const candidates = candidatesFor<ProfileSearchBundle>(config.tiers, 'searchProfiles', (t) => () => t.searchProfiles!(request));
+          const mergeBundles = mergeSearchBundles();
           const resolvedOf = (agg: TierAggregate<ProfileSearchBundle>): ResolvedProfileSearch => ({
             tier: agg.tier,
             ...agg.value,
@@ -524,7 +534,13 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
               // and appending the rest a moment later reads as a flicker.
               gate: { minItems: request.limit ?? 10, capMs: AGGREGATE_CAP_MS.searchProfiles },
               count: (bundle) => bundle.hits.length,
-              merge: mergeSearchBundles(),
+              // Every tier's hits are written through as they land: a score
+              // or follower count seen in search is then the one the profile
+              // page, a mint row or a provider row shows for the same pubkey.
+              merge: (acc, next, tier) => {
+                ingestSearchHits(cache, next.hits, tier);
+                return mergeBundles(acc, next, tier);
+              },
               onUpdate: (agg) => request.onUpdate?.(resolvedOf(agg)),
             })
           ).map(resolvedOf);
@@ -715,6 +731,11 @@ function mergeProfileStats(acc: ProfileStats | undefined, next: ProfileStats): P
     followingCount: acc.followingCount ?? next.followingCount,
     noteCount: acc.noteCount ?? next.noteCount,
     joinedAtSec: acc.joinedAtSec ?? next.joinedAtSec,
+    score: acc.score ?? next.score,
+    rank: acc.rank ?? next.rank,
+    vertexFetchedAt: acc.vertexFetchedAt ?? next.vertexFetchedAt,
+    operatesMints: acc.operatesMints ?? next.operatesMints,
+    operatesAiProviders: acc.operatesAiProviders ?? next.operatesAiProviders,
   };
 }
 
@@ -743,13 +764,33 @@ function mergeSearchBundles(): (
         index.set(hit.pubkey, hits.length);
         hits.push(hit);
       } else if (upgrades) {
-        hits[at] = { ...hits[at]!, ...hit, metadata: { ...hits[at]!.metadata, ...hit.metadata } };
+        hits[at] = mergeSearchHit(hits[at]!, hit);
       }
     }
     return {
       hits,
       vertexFresh: upgrades ? (next.vertexFresh ?? acc.vertexFresh ?? null) : (acc.vertexFresh ?? next.vertexFresh ?? null),
     };
+  };
+}
+
+/**
+ * A better-ranked hit upgrades a painted one field by field, but a figure the
+ * new tier could NOT measure (`null`) never erases one an earlier tier did:
+ * a Vertex-only answer knows the score and nothing about followers, and a
+ * follower count is not wrong because the DVM did not repeat it.
+ */
+export function mergeSearchHit(base: ProfileSearchHit, hit: ProfileSearchHit): ProfileSearchHit {
+  const keep = (next: number | null | undefined, prev: number | null | undefined) =>
+    typeof next === 'number' ? next : (prev ?? next);
+  return {
+    ...base,
+    ...hit,
+    metadata: { ...base.metadata, ...hit.metadata },
+    rank: keep(hit.rank, base.rank),
+    score: keep(hit.score, base.score),
+    followers: keep(hit.followers, base.followers),
+    follows: keep(hit.follows, base.follows),
   };
 }
 

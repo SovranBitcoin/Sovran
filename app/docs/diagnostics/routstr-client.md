@@ -51,8 +51,32 @@ comparing auth modes if a prior request did not return usable change.
 
 ## Log evidence
 
-- `api.routstr.http_error`: status/type and numeric required/available msats;
-  raw upstream messages are excluded.
+- `api.routstr.http_error`: status, type, code, the node's `x-routstr-request-id`,
+  numeric required/available msats, and the parsed message (capped at 200 chars
+  and passed through the logger's secret redaction). The message used to be
+  excluded, which made a 402 the node forwarded from the AI provider
+  indistinguishable from one routstr raised about the key's balance — every send
+  then reported "Insufficient balance" on a funded wallet. It is a log, not
+  user-facing copy; `describeError` still owns what the user sees.
+- `ai.send.provider_declined`: a 402 carrying none of routstr's wallet markers,
+  i.e. the AI provider behind this model refused. `declinedUpstream` names the
+  upstream account (nagg's `upstreamId`, absent on nodes too old to report it)
+  and `skippedSameUpstream` counts the candidates jumped over because they sit
+  behind it. The walk is capped at `MAX_DECLINED_ATTEMPTS`. One node fronts
+  several upstream accounts and they fail independently — a node whose credit
+  with one is exhausted answers 402 for every model behind it while its
+  catalog, wallet and other upstreams stay healthy.
+- `routstr.e2ee.attested`: an enclave was verified, with how long it took and a
+  measurement prefix. The measurement identifies the CODE the enclave runs, not
+  the user, and it is what makes "which enclave answered" answerable later.
+- `routstr.e2ee.attestation_failed` / `routstr.e2ee.key_rotated`: verification
+  refused, or the enclave rejected our key configuration (422 problem+json) and
+  the send re-attested once.
+- `api.routstr.chat.start` / `.response_received` / `.stream_started` carry
+  `sealed`, which is true only when the model id begins `tinfoil-`. That prefix
+  is the ONLY sound test for end-to-end encryption: the live catalog lists
+  `glm-5-3` and `tinfoil-glm-5-3` at identical prices under the identical name
+  "Private (E2EE) GLM 5.3", and only the prefixed one travels sealed.
 - `routstr.change_token.applied`: change adopted, with no token contents.
 - `routstr.auth.kept_key`: ambiguous 401 retained the current credential.
 - `api.routstr.api_key_expired`: explicit invalid/expired/spent/unknown/revoked key.

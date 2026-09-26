@@ -25,6 +25,7 @@ function reviewsFromFacade(resolved: facade.ResolvedMintReviews): MintReviewsRes
       ...(review.name ? { name: review.name } : {}),
       ...(review.picture ? { picture: review.picture } : {}),
     })),
+    reviewCount: resolved.reviewCount,
     lastUpdated: null,
     fromCache: false,
     tier: resolved.tier,

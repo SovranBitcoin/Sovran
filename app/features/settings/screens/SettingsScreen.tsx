@@ -19,6 +19,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { CocoManager } from '@/shared/lib/cashu/manager';
+import { describeError } from '@/shared/lib/errors';
 import { actionMenuPopup, paramPopup } from '@/shared/lib/popup';
 import { useCtaStore } from '@/shared/stores/global/ctaStore';
 import { CTA_DEFINITIONS } from '@/shared/lib/cta/definitions';
@@ -247,7 +248,7 @@ export const SettingsScreen = () => {
       log.error('settings.export_database.error', {
         error: error instanceof Error ? error : new Error(String(error)),
       });
-      Alert.alert('Export Failed', error instanceof Error ? error.message : 'Unknown error');
+      Alert.alert('Export Failed', describeError(error, 'cashu').text);
     }
   };
 

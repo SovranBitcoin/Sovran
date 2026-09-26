@@ -5,7 +5,7 @@
  */
 import { useCallback } from 'react';
 import { StyleSheet } from 'react-native';
-import { useScreenInsets } from '@/shared/hooks/useScreenInsets';
+import { useFrameBottomInset } from '@/shared/hooks/useScreenInsets';
 
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
@@ -24,8 +24,13 @@ export function ComposeFab() {
   // dark themes), which made a white icon invisible. Fill with foreground and
   // draw the icon in the background colour — high contrast in both themes.
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
-  const insets = useScreenInsets();
-  const bottom = insets.bottom + FAB_TAB_BAR_GAP;
+  // The FAB is `position: absolute` inside `Screen safeArea`, so it is laid out
+  // against the frame's border box and never receives its `paddingBottom`.
+  // `useScreenInsets().bottom` reports 0 here — correct for a child inside the
+  // padding, wrong for this one — which left the button under the home
+  // indicator on the native-tabs path.
+  const frameInset = useFrameBottomInset();
+  const bottom = frameInset + FAB_TAB_BAR_GAP;
   const onPress = useCallback(() => openComposer({ mode: 'new' }), [openComposer]);
 
   return (

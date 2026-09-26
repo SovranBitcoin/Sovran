@@ -44,7 +44,10 @@ export const CANONICAL_PAGES = [
   'mint-select', // mint selector list (receive and send flows)
   'mint-add', // add-mints screen (search or enter URL, MintAddScreen)
   'mint-info', // mint info / trust decision screen (MintInfoScreen)
+  'ai-provider-select', // Routstr provider list, the AI pill's destination (ProviderListScreen)
+  'ai-provider-info', // Routstr provider details + reclaim (ProviderInfoScreen)
   'mint-reviews', // mint KYM reviews list (MintReviewsScreen)
+  'mint-history', // one mint's NUT-06 update history from its details page (MintChangesScreen)
   'profile', // nostr user profile (UserProfileScreen)
   'dm-chat', // 1:1 DM conversation (UserMessagesScreen, dm-chat-probe)
   'camera', // QR scan camera screen (CameraScreen, incl. its permission-required state)
@@ -63,6 +66,7 @@ export const CANONICAL_PAGES = [
   'balance-split', // per-mint distribution sliders (MintDistributionScreen)
   'rebalance-plan', // rebalance transfer plan + run progress (MintRebalancePlanScreen)
   'swap', // swap-group detail screen (SwapTransactionScreen)
+  'ai-request', // grouped AI request detail screen (AiRequestScreen)
   'restore-gate', // recovery gate with slide-to-confirm
   'recovery-complete', // recovery success state with Continue
   'map', // bitcoin merchant map (MapScreen, screen-map)

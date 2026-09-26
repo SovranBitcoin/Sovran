@@ -63,6 +63,52 @@ Apple/Freedom stage does not prevent the Android lane from being reconciled:
 8. Website availability changes only for confirmed channels. Pending channels keep
     their prior version. Editorial release notes are not automatically overwritten.
 
+## Android cross-channel signing
+
+Google Play holds the app signing key, so Play — not EAS and not this repository —
+signs every public Android artifact. The Android stage uploads the EAS AAB, then
+downloads the universal APK **Play generated and signed**; GitHub and Zapstore
+publish those exact bytes. One artifact under one certificate is what makes the
+three channels interchangeable: `com.sovranbitcoin` is the same package
+everywhere, and Android refuses an update whose signer differs from the installed
+one, so a separately signed APK would strand whoever installed it.
+
+Verified against the live 0.1.3 release on 2026-09-24:
+
+| Evidence | Value |
+| --- | --- |
+| Package and version | `com.sovranbitcoin`, version code `24`, `versionName` 0.1.3, minSdk 26, targetSdk 36 |
+| Signing certificate | `b598befc…751e59af`, RSA 4096, `CN=Android, O=Google Inc.`: a Play-generated key |
+| APK SHA-256 | `2fca9101…1ca758a941`, 247,607,844 bytes, identical on GitHub and `cdn.zapstore.dev` |
+| Signature schemes | v2 and v3 verify with one classical signer; no v1, v3.1 or v4 |
+| Play source stamp | present and verified, `3257d599…733bbd6d` |
+| Signing block | v2, v3, **v3.2 hybrid** (`0x70e1c89f`), source stamp, padding |
+| Device install | `adb install` onto a clean Android 16 emulator image succeeded; the installed `base.apk` reports the same certificate and `apkSigningVersion=3` |
+
+The v3.2 block is Play's hybrid post-quantum signature. apksigner 35.0.0 and
+36.1.0 both report its two stripping-protection attributes (`0xbf940529`
+minimum SDK, `0x9f06b79c` maximum SDK) as unknown and still verify the classical
+path, which is the path `verifyApk` pins. Whichever block a device verifies, every
+channel hands it the same file, so that choice cannot strand an install.
+
+`--skip-certificate-linking` is structural rather than a shortcut. zsp's optional
+identity proof (kind 30509) is signed with the APK signing key loaded from a
+keystore, and Google holds that key, so the proof can never be produced for a
+Play-signed app. Zapstore still records `apk_certificate_hash`, which is what a
+client compares against an installed app.
+
+Re-run the audit after a release, or whenever a channel is in doubt:
+
+```sh
+ANDROID_HOME=~/Library/Android/sdk ZAPSTORE_NPUB=npub1… bun run release:verify
+```
+
+It reads only public sources — the release state branch, the GitHub asset, the
+Zapstore relay and its CDN — takes no credential and cannot publish. It fails if
+any channel's bytes, certificate, version code or source commit diverge, if the
+published APK loses its Play source stamp, or if the certificate ever changes
+between releases.
+
 ## Site Consolidation Boundary
 
 The [standalone website](../site/README.md) now has source in this repository;
@@ -242,14 +288,14 @@ not automatically replaced.
 - Finish the draft Google Play app setup and verify the first production bundle
   and upload certificate. The controller submits `completed` production releases;
   it does not bootstrap a draft listing, fill compliance forms or enroll signing.
-- Reconcile the **quantum-ready** Play signing configuration with a real downloaded
-  universal APK before activation. The saved fingerprint has not been matched to an APK; the screenshot shows
-  a newer classical key, an older key and a PQC key. The current pinned
-  verifier/parser supports the single-certificate path only. Do not broaden its
-  allowlist or claim cross-store update support until APK verification and updates
-  in both directions have been tested on older and current Android versions.
-  Google documents multiple keys for quantum-ready upgrades, and newer apksigner
-  output includes scheme-specific signers. See [Play signing](https://support.google.com/googleplay/android-developer/answer/9842756?hl=en)
+- The **quantum-ready** Play signing configuration is reconciled against the real
+  downloaded universal APK; see [Android cross-channel signing](#android-cross-channel-signing).
+  The pinned verifier still supports the single-certificate path only, and must
+  stay that way: do not broaden its allowlist to accept a rotated or multi-key
+  artifact, because an APK a Play install cannot accept is worse than a halted
+  release. Google documents multiple keys for quantum-ready upgrades, and newer
+  apksigner output includes scheme-specific signers. See
+  [Play signing](https://support.google.com/googleplay/android-developer/answer/9842756?hl=en)
   and [apksigner output change](https://android.googlesource.com/platform/tools/apksig/+/d177d78e4649d08499d90e6cbf9ca47d77c9b865).
 - Verify AltStore marketplace authorization/notifications and retrieve a current
   approved ADP. The public GET returned 404 for the ADP referenced by Freedom's

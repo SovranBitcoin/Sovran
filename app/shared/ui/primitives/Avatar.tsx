@@ -15,6 +15,7 @@ import {
 } from '@/shared/lib/contentShiftLog';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { spacing } from '@/shared/styles/tokens';
+import { ClayRobotAvatar } from './ClayRobotAvatar';
 import { ClaySilhouetteAvatar } from './ClaySilhouetteAvatar';
 
 /**
@@ -30,8 +31,15 @@ import { ClaySilhouetteAvatar } from './ClaySilhouetteAvatar';
  */
 export type AvatarState = 'loading' | 'fallback' | 'image';
 
+/** Which silhouette the seeded fallback draws. Same palette either way — only
+ *  a machine should be drawn as a machine. */
+export type AvatarFallbackKind = 'person' | 'robot';
+
 interface AvatarProps {
   state: AvatarState;
+  /** Default `'person'`. `'robot'` for a service with no picture of its own
+   *  (an AI provider), so the fallback does not claim to be somebody. */
+  fallbackKind?: AvatarFallbackKind;
   picture?: string;
   size?: number;
   alt?: string;
@@ -53,16 +61,22 @@ function AvatarFallbackContent({
   fallbackSeed,
   borderRadius,
   size,
+  kind,
 }: {
   fallbackSeed: string;
   borderRadius: number;
   size: number;
+  kind: AvatarFallbackKind;
 }) {
   return (
     <View
       pointerEvents="none"
       style={[StyleSheet.absoluteFill, { borderRadius, overflow: 'hidden' }]}>
-      <ClaySilhouetteAvatar seed={fallbackSeed} size={size} />
+      {kind === 'robot' ? (
+        <ClayRobotAvatar seed={fallbackSeed} size={size} />
+      ) : (
+        <ClaySilhouetteAvatar seed={fallbackSeed} size={size} />
+      )}
     </View>
   );
 }
@@ -145,6 +159,7 @@ export function AvatarStatusDot({ status, size }: { status?: string; size: numbe
 
 export const Avatar = ({
   state,
+  fallbackKind = 'person',
   picture,
   size = 48,
   alt,
@@ -268,6 +283,7 @@ export const Avatar = ({
             fallbackSeed={fallbackSeed}
             borderRadius={borderRadius}
             size={size}
+            kind={fallbackKind}
           />
         </View>
         {StatusBadgeWrapper}

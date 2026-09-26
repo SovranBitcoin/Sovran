@@ -3,6 +3,7 @@ import { createNaggClient, setNostrLogger, facade, type NostrLogger } from 'nost
 
 import { log } from '@/shared/lib/logger';
 import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
+import { registerNostrDataLayer } from '@/shared/lib/nostr/dataLayerRegistry';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import {
   cachedProfileToMetadata,
@@ -59,7 +60,9 @@ function assembleLayer(config: TierConfig): facade.NostrDataLayer | null {
   }
 
   if (config.primal.enabled) {
-    const connection = facade.primal.createPrimalWebSocketConnection({ url: config.primal.url });
+    const connection = facade.primal.createPrimalWebSocketConnection({
+      url: config.primal.urls,
+    });
     tiers.push(facade.primal.createPrimalTier({ connection }));
   }
 
@@ -200,5 +203,6 @@ export function buildNostrDataLayer(): facade.NostrDataLayer | null {
   } else {
     memo = null;
   }
+  registerNostrDataLayer(layer);
   return layer;
 }

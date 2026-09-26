@@ -13,7 +13,7 @@ import type { ParamListBase, NavigationProp } from 'expo-router/react-navigation
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
+import { AndroidSheetRoot, SheetPageLayer } from '@/shared/ui/composed/AndroidSheetRoot';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { FLOW_SHEET_HEADER_HEIGHT, FlowSheetHeader } from '@/shared/ui/composed/FlowSheetHeader';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
@@ -50,6 +50,14 @@ const FlowHeaderButton = memo(function FlowHeaderButton({
 });
 
 /**
+ * The native title in the type a page's own `headerTitle` draws (`Text size={16}
+ * bold`). Pages that set a custom title do it from inside the screen, so the
+ * native one shows for the first frames of every push; in the system font it
+ * read as the title changing its letters when the custom one took over.
+ */
+const NATIVE_TITLE_FONT = { fontFamily: 'OxygenBold', fontSize: 16 } as const;
+
+/**
  * Get the base screen options for flow layouts (used inside modal stacks).
  * These options ensure consistent styling across all flow layouts.
  */
@@ -59,6 +67,7 @@ const getBaseFlowScreenOptions = (colors: FlowColors): NativeStackNavigationOpti
   headerTitleAlign: 'center',
   headerTitleStyle: {
     color: colors.foreground,
+    ...NATIVE_TITLE_FONT,
   },
   headerTintColor: colors.foreground,
   // Hide any back title that might show parent route names
@@ -77,6 +86,12 @@ const getBaseFlowScreenOptions = (colors: FlowColors): NativeStackNavigationOpti
 // Module-scope so the header's component identity is stable across renders
 // (same reasoning as CloseButton in app/_layout.tsx).
 const renderFlowSheetHeader = (props: NativeStackHeaderProps) => <FlowSheetHeader {...props} />;
+
+// Each page renders as a sibling of FlowSheetHeader; isolating it keeps its
+// zIndex layers (edge fades, sticky rows) under the header's title and buttons.
+const renderSheetPageLayer = ({ children }: { children: ReactNode }) => (
+  <SheetPageLayer>{children}</SheetPageLayer>
+);
 
 /**
  * Create screen options function for flow layouts.
@@ -129,7 +144,11 @@ export function AndroidSheetFlowStack({ children }: { children: ReactNode }) {
 
   return (
     <AndroidSheetRoot headerHeight={FLOW_SHEET_HEADER_HEIGHT}>
-      <Stack screenOptions={screenOptions}>{children}</Stack>
+      <Stack
+        screenOptions={screenOptions}
+        screenLayout={Platform.OS === 'android' ? renderSheetPageLayer : undefined}>
+        {children}
+      </Stack>
     </AndroidSheetRoot>
   );
 }
@@ -142,6 +161,7 @@ export const getBaseModalHeaderOptions = (foreground: string): NativeStackNaviga
   headerTitleAlign: 'center',
   headerTitleStyle: {
     color: foreground,
+    ...NATIVE_TITLE_FONT,
   },
   headerTintColor: foreground,
   headerBackTitleStyle: {

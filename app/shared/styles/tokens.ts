@@ -258,11 +258,13 @@ export const headerIdentity = {
    * for. Just the name — the screen's own header gradient is the chrome here.
    * The bar leaves slack under a title view, so `bandPullUp` lifts the row back
    * toward the icon; the two read as one identity rather than two rows.
+   * Android's 54dp icon already fills its 64dp bar down to ~5dp above the
+   * edge, so lifting it there pressed the name against the picture.
    */
   bandNameSize: 13,
   bandNameLineHeight: 18,
   bandHeight: 18,
-  bandPullUp: 8,
+  bandPullUp: Platform.select({ android: 0, default: 8 }),
 } as const;
 
 /**
