@@ -155,7 +155,7 @@ describe('useNostrTierHealth', () => {
     const naggSignal = mockedProbeNaggHealth.mock.calls[0]?.[1]?.signal;
     const primalSignal = mockedProbePrimalHealth.mock.calls[0]?.[1]?.signal;
     expect(result.current).toMatchObject({
-      isRefreshing: true,
+      isRefreshing: false,
       nagg: 'checking',
       primal: 'checking',
     });
@@ -168,7 +168,7 @@ describe('useNostrTierHealth', () => {
     primal.resolve(true);
     await flushEffects();
     expect(result.current).toMatchObject({
-      isRefreshing: true,
+      isRefreshing: false,
       nagg: 'checking',
       primal: 'checking',
     });
@@ -191,7 +191,7 @@ describe('useNostrTierHealth', () => {
     primal.resolve(true);
     await flushEffects();
     expect(result.current).toMatchObject({
-      isRefreshing: true,
+      isRefreshing: false,
       nagg: 'checking',
       primal: 'checking',
     });

@@ -74,7 +74,11 @@ export function useNostrTierHealth(relayMap: Record<string, RelayHealth>): Nostr
       abortRef.current = controller;
       const runId = ++runIdRef.current;
       log.debug('settings.network.health.refresh', { trigger });
-      setIsRefreshing(true);
+      // Only a pull shows the spinner. `isRefreshing` drives the page's
+      // RefreshControl, and setting it on focus and on every poll made iOS drag
+      // the whole list down to show a spinner nobody asked for, then snap back.
+      // The badges already say `checking`.
+      if (trigger === 'pull') setIsRefreshing(true);
 
       setNagg((prev) => (naggEnabled ? toChecking(prev) : 'disabled'));
       setPrimal((prev) => (primalEnabled ? toChecking(prev) : 'disabled'));
