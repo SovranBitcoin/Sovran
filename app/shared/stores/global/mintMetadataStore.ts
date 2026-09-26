@@ -259,11 +259,16 @@ export const useMintMetadataStore = create<MintMetadataState>()(
         },
 
         setSocial: (mintUrl, followers, reputation, extra) => {
+          // A `null` reputation is "looked, not measured": recorded as such
+          // when nothing better is known, but — the same guard the discovery
+          // path applies — never over a reputation already resolved.
+          const resolved = get().getCached(mintUrl)?.contactReputation;
+          const keepResolved = reputation === null && typeof resolved === 'number';
           get().mergeCached(
             mintUrl,
             {
               ...(followers !== undefined ? { contactFollowers: followers } : {}),
-              contactReputation: reputation,
+              ...(keepResolved ? {} : { contactReputation: reputation }),
               ...(extra?.operatorPubkey ? { operatorPubkey: extra.operatorPubkey } : {}),
               ...(extra?.operatorNpub ? { operatorNpub: extra.operatorNpub } : {}),
               ...(extra?.vertexRank !== undefined ? { vertexRank: extra.vertexRank } : {}),

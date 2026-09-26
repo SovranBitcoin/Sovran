@@ -62,6 +62,8 @@ module.exports = {
     // ESM-only under Jest (applesauce-relay → node:crypto). See the stub's
     // header for what it stands in for and what it cannot prove.
     '^@routstr/sdk/browser$': '<rootDir>/__mocks__/routstrSdk.ts',
+    // ESM-only `exports` map with a React Native build; see the stub's header.
+    '^@nostr-dev-kit/ndk-mobile$': '<rootDir>/__mocks__/ndkMobile.ts',
     '^@/shared/(.*)$': '<rootDir>/shared/$1',
     '^@/features/(.*)$': '<rootDir>/features/$1',
     '^@/sheets/(.*)$': '<rootDir>/shared/lib/popup/sheets/$1',

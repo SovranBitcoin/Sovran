@@ -1,6 +1,11 @@
 import liveEnvelope from './fixtures/profile-v2-live.json';
 import { fetchNostrProfile } from '@/shared/lib/apiClient';
 
+const mockCacheIdentities = jest.fn();
+jest.mock('@/shared/lib/nostr/identityCache', () => ({
+  cacheIdentities: (...args: unknown[]) => mockCacheIdentities(...args),
+}));
+
 jest.mock('wallet', () => ({
   combineSignals: (...signals: (AbortSignal | undefined)[]) =>
     signals.find((signal): signal is AbortSignal => !!signal) ?? new AbortController().signal,
@@ -83,6 +88,48 @@ describe('fetchNostrProfile', () => {
     expect(p.follows).toBeGreaterThan(0);
     // An omitted followers aggregate stays absent (not 0, not a parse failure).
     expect(p.followers).toBeUndefined();
+  });
+
+  it('takes reach from the identity group when the aggregates omit it, and caches the group', async () => {
+    const identity = {
+      pubkey: PUBKEY,
+      npub: 'npub1test',
+      profile: { name: 'op' },
+      reach: { followers: 42, follows: null, source: 'graph' },
+      vertex: { rank: null, score: null, fetchedAt: null },
+      operates: { mints: ['https://mint.example'], aiProviders: [] },
+      firstEventAt: null,
+    };
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      // A mint-only deployment: no pubkey_stats aggregates, but the shared
+      // reach resolver answered through `identities`.
+      json: async () => ({
+        events: [],
+        aggregates: {},
+        providers: { [PUBKEY]: { vertex: { rank: 0 } } },
+        identities: { [PUBKEY]: identity },
+        fromCache: false,
+      }),
+    });
+    mockCacheIdentities.mockClear();
+
+    const result = await fetchNostrProfile(PUBKEY);
+
+    expect(result.isOk()).toBe(true);
+    const profile = result._unsafeUnwrap();
+    expect(profile.followers).toBe(42);
+    // `follows: null` is "unresolved", never 0.
+    expect(profile.follows).toBeUndefined();
+    expect(mockCacheIdentities).toHaveBeenCalledWith(
+      expect.objectContaining({
+        [PUBKEY]: expect.objectContaining({
+          operates: { mints: ['https://mint.example'], aiProviders: [] },
+        }),
+      })
+    );
   });
 
   it('rejects a non-envelope body', async () => {

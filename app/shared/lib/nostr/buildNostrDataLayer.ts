@@ -3,6 +3,7 @@ import { createNaggClient, setNostrLogger, facade, type NostrLogger } from 'nost
 
 import { log } from '@/shared/lib/logger';
 import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
+import { registerNostrDataLayer } from '@/shared/lib/nostr/dataLayerRegistry';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import {
   cachedProfileToMetadata,
@@ -202,5 +203,6 @@ export function buildNostrDataLayer(): facade.NostrDataLayer | null {
   } else {
     memo = null;
   }
+  registerNostrDataLayer(layer);
   return layer;
 }

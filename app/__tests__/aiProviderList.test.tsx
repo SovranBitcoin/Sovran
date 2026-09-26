@@ -50,6 +50,14 @@ jest.mock('@/shared/stores/profile/routstrStore', () => ({
 
 jest.mock('@/features/ai/hooks/useProviderRows', () => ({ useProviderRows: jest.fn(() => []) }));
 jest.mock('@/shared/lib/apiClient', () => ({ getAiProviders: jest.fn() }));
+// The directory's operator write-through reaches the Nostr data layer, which
+// this suite does not stand up; the row hook it would feed is mocked above.
+jest.mock('@/shared/lib/nostr/fetchProfiles', () => ({
+  ...jest.requireActual<typeof import('@/shared/lib/nostr/fetchProfiles')>(
+    '@/shared/lib/nostr/fetchProfiles'
+  ),
+  cacheOperatorStats: jest.fn(),
+}));
 jest.mock('@/shared/lib/routstr/discovery', () => ({
   discoverProviders: jest.fn(async () => ({ announced: [], peers: [] })),
 }));

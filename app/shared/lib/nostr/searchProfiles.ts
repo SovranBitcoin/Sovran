@@ -6,6 +6,7 @@ import { refreshVertex } from '@/shared/lib/nostr/vertex/refreshVertex';
 import { NostrSearchResult, type SearchUsersResponse } from '@sovranbitcoin/schemas';
 
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
+import { cacheProfileStats } from '@/shared/lib/nostr/fetchProfiles';
 
 // ---------------------------------------------------------------------------
 // Profile search through the tier-selecting facade: nagg `/nostr/search`
@@ -199,8 +200,22 @@ export async function searchProfilesViaFacade(args: {
         const merged = hits.map((hit) => {
           const cached = previous.get(hit.pubkey);
           previous.delete(hit.pubkey);
-          return { ...cached, ...hit, metadata: { ...cached?.metadata, ...hit.metadata } };
+          // The DVM answer carries `followers: null` for everyone — it never
+          // counts — so a plain spread turned every count nagg had just
+          // painted into a dash the moment the refresh landed.
+          return cached ? facade.mergeSearchHit(cached, hit) : hit;
         });
+        // Refreshed reputation is written to the single owner too, so the
+        // profile page opened from this list shows the score the list did.
+        for (const hit of merged) {
+          cacheProfileStats(hit.pubkey, {
+            followers: hit.followers,
+            follows: hit.follows,
+            score: hit.score,
+            rank: hit.rank,
+            vertexFetchedAt: hit.vertexFetchedAt,
+          });
+        }
         // No `slice(limit)` here: a painted row must never be cut by a later
         // ranking; each tier already bounds its own answer by the limit.
         result = ok({

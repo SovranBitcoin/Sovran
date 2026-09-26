@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { ACCOUNT_UNITS } from 'wallet';
 
 import { discoverMints, DiscoverMintsResponse } from '@/shared/lib/apiClient';
+import { cacheOperatorStats } from '@/shared/lib/nostr/fetchProfiles';
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import { useCachedRead, type ReadStatus } from '@/shared/lib/read/useCachedRead';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
@@ -69,6 +70,19 @@ export function useMintSearch(
       // Seed the unified cache from the discovery rows so the selector, audit
       // and operator-profile lookups all become cache hits (not round-trips).
       useMintMetadataStore.getState().upsertFromDiscover(res.value.mints);
+      // The operator's reach and reputation go to the single owner as well, so
+      // the profile page and any other row for the same person agree with this
+      // list — and the person is linked to the mint they run.
+      cacheOperatorStats(
+        res.value.mints.map((m) => ({
+          pubkey: m.operatorPubkey,
+          followers: m.followers,
+          follows: m.follows,
+          score: m.vertexScore,
+          rank: m.vertexRank,
+          operatesMint: m.mintUrl,
+        }))
+      );
       // Testnut rows classify a mint the moment it is added, ahead of the
       // background verdict refresh.
       useMintTestnutStore.getState().applyDiscover(res.value.mints);

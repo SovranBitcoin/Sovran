@@ -31,6 +31,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 
 import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
+import { cacheOperatorStats } from '@/shared/lib/nostr/fetchProfiles';
 
 import { useProviderRows, type ProviderRow } from '../hooks/useProviderRows';
 import {
@@ -113,8 +114,18 @@ function ProviderListRow({
   // nagg's follower count stands in until the row's own profile arrives, and
   // the identity below is built from whichever is present — so this is the
   // same expression, read once, rather than a second guess at it.
+  // Merged, not replaced: a profile that arrived without a count must not
+  // hide the count the directory had, and the directory's count must not
+  // hide the score the profile brought.
   const operatorProfile =
-    profile ?? (row.followers != null ? { followers: row.followers } : undefined);
+    profile || row.followers != null
+      ? {
+          ...profile,
+          ...(profile?.followers === undefined && row.followers != null
+            ? { followers: row.followers }
+            : {}),
+        }
+      : undefined;
   // Recorded during render, deliberately: this is a statement about what THIS
   // render put on screen, and an effect would report the value the row settled
   // on rather than each value it showed on the way there.
@@ -289,6 +300,13 @@ export function ProviderListScreen() {
           )
         );
       useAiProviderDirectoryStore.getState().rememberDirectory(providers);
+      cacheOperatorStats(
+        providers.map((provider) => ({
+          pubkey: provider.pubkey,
+          followers: provider.followers,
+          operatesAiProvider: provider.baseUrl,
+        }))
+      );
       aiLog.info('ai.provider.directory', {
         providers: providers.length,
         online: providers.filter((provider) => provider.status === 'online').length,

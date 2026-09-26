@@ -4,6 +4,7 @@ import { createNaggClient } from '../src/transport';
 import {
   createNaggTier,
   createNostrDataLayer,
+  mergeSearchHit,
   pendingFeedTier,
   profileSearchHitsFromKind0,
 } from '../src/facade';
@@ -71,6 +72,11 @@ describe('searchProfiles through the facade', () => {
     expect(out.hits[0]?.pubkey).toBe(A);
     expect(out.hits[0]?.metadata.displayName).toBe('Alice');
     expect(out.hits[0]?.rank).toBe(1);
+    // Written through to the single owner: the profile page, a mint row or a
+    // provider row for Alice now shows the score the search did.
+    expect(layer.cache.getProfileStats(A)).toMatchObject({ pubkey: A, rank: 1, score: 0.9 });
+    expect(layer.cache.getProfileStats(A)?.followersCount).toBeUndefined();
+    expect(layer.cache.getProfile(A)?.displayName).toBe('Alice');
   });
 
   test('Primal serves user_search before the relay floor (cache-only mode)', async () => {
@@ -119,5 +125,39 @@ describe('searchProfiles through the facade', () => {
       search: 'bob',
       kinds: [0],
     });
+  });
+});
+
+describe('mergeSearchHit — an upgrade keeps what the new tier could not measure', () => {
+  test('null figures never erase numbers; numbers and metadata upgrade', () => {
+    const base = {
+      pubkey: A,
+      metadata: { name: 'alice' },
+      rank: 1,
+      score: 0.5,
+      followers: 120,
+      follows: 9,
+    };
+    const dvm = {
+      pubkey: A,
+      metadata: { displayName: 'Alice' },
+      rank: 2,
+      score: 0.9,
+      followers: null,
+      follows: null,
+    };
+    expect(mergeSearchHit(base, dvm)).toEqual({
+      pubkey: A,
+      metadata: { name: 'alice', displayName: 'Alice' },
+      rank: 2,
+      score: 0.9,
+      followers: 120,
+      follows: 9,
+    });
+  });
+
+  test('a hit with no figures at all leaves the base figures alone', () => {
+    const base = { pubkey: B, metadata: {}, score: 0.3, followers: 4 };
+    expect(mergeSearchHit(base, { pubkey: B, metadata: {} })).toMatchObject({ score: 0.3, followers: 4 });
   });
 });

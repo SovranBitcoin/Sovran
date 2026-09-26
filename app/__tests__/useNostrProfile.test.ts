@@ -243,6 +243,18 @@ it('seeds the header from cached profile stats on the first frame and keeps it w
   expect(mockCacheStats).toHaveBeenCalledWith('carol', expect.objectContaining({ followers: 41 }));
 });
 
+it('a cached score paints on the first frame and survives an answer without one', async () => {
+  mockReadCachedStats.mockReturnValue({ pubkey: 'erin', followersCount: 40, score: 71, rank: 3 });
+  let finish!: (value: unknown) => void;
+  mockFetchProfile.mockImplementation(() => new Promise((resolve) => (finish = resolve)));
+  const { result } = renderHook(() => useNostrProfile('erin'));
+  expect(result.current.data).toMatchObject({ followers: 40, score: 71, rank: 3 });
+  // nagg answered without a score (the account is below Vertex's floor, or
+  // the cache expired): the score the list showed must not become a dash.
+  await act(async () => finish(ok({ pubkey: 'erin', score: null, rank: 0, followers: 41 })));
+  expect(result.current.data).toMatchObject({ followers: 41, score: 71 });
+});
+
 it('a focus change does not restart the ladder', async () => {
   mockFetchProfile.mockResolvedValue(
     ok({

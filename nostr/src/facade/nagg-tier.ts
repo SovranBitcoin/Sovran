@@ -363,6 +363,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
             averageScore: page.summary.averageScore,
             reviewCount: page.summary.reviewCount,
             reviews,
+            ...(Object.keys(page.identities).length > 0 ? { identities: page.identities } : {}),
           });
         },
         notServed,

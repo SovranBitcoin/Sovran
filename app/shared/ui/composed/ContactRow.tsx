@@ -50,6 +50,7 @@ import { BLUETOOTH_ACCENT, CONNECTED_ACCENT } from '@/shared/lib/brandColors';
 import { PresenceDot } from '@/shared/ui/primitives/PresenceDot';
 import { paymentLog } from '@/shared/lib/logger';
 import { E2EE_BADGE_ICON } from '@/features/ai/lib/format';
+import { useCachedProfileStats } from '@/shared/lib/nostr/useEntityCache';
 
 // ---------------------------------------------------------------------------
 // Identity types
@@ -573,12 +574,17 @@ const UNMEASURED = '—';
  */
 function operatorStats(
   nostr: NostrIdentity | undefined,
-  mintStats: MintStatFields | undefined
+  mintStats: MintStatFields | undefined,
+  cached: CachedOperatorStats | undefined
 ): { known: boolean; reputation: number | undefined; followers: number | undefined } {
   const raw = (value: number | undefined) =>
     typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-  const reputation = raw(nostr?.score) ?? raw(mintStats?.contactReputation);
-  const followers = raw(nostr?.followerCount) ?? raw(mintStats?.contactFollowers);
+  // The row's own figures first, then the mint's cached operator figures, then
+  // the single owner — where a search, a discovery row, the provider directory
+  // or an earlier profile open may have left the number this row never got.
+  const reputation = raw(nostr?.score) ?? raw(mintStats?.contactReputation) ?? raw(cached?.score);
+  const followers =
+    raw(nostr?.followerCount) ?? raw(mintStats?.contactFollowers) ?? raw(cached?.followersCount);
   return {
     known: reputation !== undefined || followers !== undefined,
     reputation,
@@ -589,16 +595,20 @@ function operatorStats(
 /** Compose the accent pill list. Missing values drop out; in a mint+nostr
  *  composite, nostr fields take precedence over mint fallbacks (contactReputation,
  *  contactFollowers) for reputation / followers. */
+/** The slice of the cached profile header the row's operator pills read. */
+type CachedOperatorStats = { score?: number; followersCount?: number };
+
 function buildStats(
   ids: Identity[],
   keys: readonly StatKey[],
-  tints: { warning: string; success: string }
+  tints: { warning: string; success: string },
+  cachedOperator: CachedOperatorStats | undefined
 ): RowStat[] {
   const mintStats = find(ids, 'mint')?.stats;
   const provider = find(ids, 'provider');
   const nostr = find(ids, 'nostr');
   const ble = find(ids, 'ble');
-  const operator = operatorStats(nostr, mintStats);
+  const operator = operatorStats(nostr, mintStats, cachedOperator);
 
   const out: RowStat[] = [];
 
@@ -813,6 +823,7 @@ export function ContactRow({
   const mintBalance = hasMintBalance ? mintStats.balance : null;
 
   const resolvedLoading = loading ?? nostr?.isLoadingProfile ?? false;
+  const cachedOperator = useCachedProfileStats(nostr?.pubkey);
 
   // ---- Leading ----------------------------------------------------------
 
@@ -983,7 +994,9 @@ export function ContactRow({
   const statKeys = statsOverride ?? DEFAULT_STATS_BY_KIND[primary.kind];
   const statKeyList = statKeys.join(',');
   const statList: RowStat[] =
-    hideMetadata || resolvedLoading ? [] : buildStats(identities, statKeys, { warning, success });
+    hideMetadata || resolvedLoading
+      ? []
+      : buildStats(identities, statKeys, { warning, success }, cachedOperator);
 
   // While loading, a row that will show an inline stats accent once loaded must
   // reserve that line's height or the row grows when the pills arrive. Gate to

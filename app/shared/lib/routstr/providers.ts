@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { NaggIdentitiesSchema } from 'nostr';
 
 import { buildAbortSignal } from '@/shared/lib/http/requestSignal';
 import { apiLog } from '@/shared/lib/logger';
@@ -284,6 +285,9 @@ export const NaggAiProvidersSchema = z.object({
     .catch(() => []),
   checkedAt: z.string().max(64).optional().catch(undefined),
   ttlSeconds: z.number().int().nonnegative().optional().catch(undefined),
+  /** Operator identity groups keyed by the rows' `pubkey`; the fetcher hands
+   *  them to the entity cache so the row's reputation matches the profile. */
+  identities: NaggIdentitiesSchema.optional(),
 });
 
 /** One directory row, normalized onto the keys the rest of the app uses. */
