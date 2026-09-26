@@ -303,6 +303,20 @@ describe('AI send lineup recovery', () => {
     expect(refreshMock).not.toHaveBeenCalled();
   });
 
+  it('books each paid attempt as its own AI request in history', async () => {
+    // 900 out and 900 back for the first model, 1,864 out for the second: two
+    // payments with two outcomes. Under one group id they showed as three legs
+    // netting to a figure that was neither the refund nor the cost.
+    sendMock.mockRejectedValueOnce(upstreamRefusal(404)).mockResolvedValueOnce(success());
+    await send();
+    const [first, second] = sendMock.mock.calls.map(([, options]) => options.payment);
+    expect(first?.groupId).toBeTruthy();
+    expect(second?.groupId).toBe(`${first?.groupId}#2`);
+    // Still the same exchange: the conversation section looks the message up
+    // by these, not by the group.
+    expect(second?.messageId).toBe(first?.messageId);
+  });
+
   it('keeps siblings behind the same upstream when the refusal is about the model', async () => {
     // Both sealed models sit behind the one enclave upstream, and the enclave
     // serves one of them. A 404 is about the model, not the account, so the

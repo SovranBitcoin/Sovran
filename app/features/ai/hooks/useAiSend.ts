@@ -398,8 +398,15 @@ export function useAiSend() {
               model: candidate,
               // Both money legs point back at the exchange they bought, so a
               // cost in history can be traced to the answer it produced.
+              //
+              // One group per ATTEMPT, not per send. A walk that pays model A,
+              // gets it all back, and then pays model B is two payments with
+              // two outcomes — "refunded, the request failed" and whatever B
+              // does — and under one id they rendered as three legs summing
+              // to a figure that was neither. The message id still ties every
+              // attempt to the same exchange.
               payment: {
-                groupId: flowId,
+                groupId: i === 0 ? flowId : `${flowId}#${i + 1}`,
                 sessionId: useRoutstrStore.getState().currentSessionId ?? undefined,
                 messageId: assistantMessageId,
                 model: candidate,
