@@ -35,6 +35,7 @@ import {
 } from '@/shared/hooks/useScreenInsets';
 import { HeaderHeightContext } from 'expo-router/react-navigation';
 import { SheetHeaderHeightContext } from '@/shared/ui/composed/AndroidSheetRoot';
+import { useSettledHeaderHeight } from '@/shared/ui/composed/settledHeaderHeight';
 import type { NativeStackNavigationOptions } from 'expo-router';
 
 import { Log } from '@/shared/lib/logger';
@@ -175,8 +176,10 @@ export function Screen({
   // Android formSheet, prefer the sheet's KNOWN fixed header height — the
   // navigator context starts at a default (~80dp) and only settles to the
   // measured value a frame later, shifting content (see AndroidSheetRoot).
+  // iOS stacks have the same late correction; `useSettledHeaderHeight` starts
+  // a page at the height its stack settled to last time.
   const sheetHeaderHeight = useContext(SheetHeaderHeightContext);
-  const navigatorHeaderHeight = useContext(HeaderHeightContext) ?? 0;
+  const navigatorHeaderHeight = useSettledHeaderHeight(useContext(HeaderHeightContext) ?? 0);
   const headerHeight = sheetHeaderHeight ?? navigatorHeaderHeight;
   const themeBackground = useThemeColor('surface');
   const resolvedBgColor = bgColor ?? themeBackground;

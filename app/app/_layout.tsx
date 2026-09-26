@@ -32,6 +32,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { MODAL_SCREENS, ModalConfig } from '../config/modalScreens';
 import { getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { loadSettledHeaderHeights } from '@/shared/ui/composed/settledHeaderHeight';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { CocoProvider } from '@/shared/providers/CocoProvider';
 import { BitchatBLEProvider } from '@/shared/providers/BitchatBLEProvider';
@@ -69,6 +70,8 @@ void SplashScreen.preventAutoHideAsync();
 initLog('_layout', 'module loaded — SplashScreen.preventAutoHideAsync called');
 
 LogBox.ignoreAllLogs();
+// Before any stack pushes a page, so it starts at the right header height.
+void loadSettledHeaderHeights();
 
 // Outer providers — stable across profile switches, never remount.
 // InitializationProvider is first so the splash screen renders immediately
