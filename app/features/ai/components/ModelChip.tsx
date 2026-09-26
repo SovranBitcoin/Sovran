@@ -6,6 +6,7 @@ import Icon from 'assets/icons';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { isE2eeModelId, lineupProviderIds } from '@/shared/lib/routstr/lineup';
 import { refreshRoutstrLineup } from '@/shared/lib/routstr/refreshLineup';
+import { sweepUnsettledPayments } from '@/shared/lib/routstr/sdk/client';
 import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
 import { modelPickerPopup } from '@/shared/lib/popup';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -72,6 +73,12 @@ export function ModelChip() {
 
   useVisualActivityEffect(() => {
     void refreshRoutstrLineup();
+    // Coming back to the screen is the moment to ask about money the node is
+    // still holding — the request the app was closed on, the one the user
+    // stopped. The launch sweep ran once; this is the maintainers' own
+    // advice (sweep on launch, on foreground, after every aborted request),
+    // and a sweep with nothing to ask costs one storage read.
+    void sweepUnsettledPayments('launch');
   });
 
   const balanceSats = funds?.balanceSats ?? 0;

@@ -343,6 +343,28 @@ describe('AI send lineup recovery', () => {
     expect(sendMock.mock.calls[1][1].model).toBe('other-auto');
   });
 
+  it('treats a 424 as the whole upstream being down, as nodes after 0.4.7 mean it', async () => {
+    const lineup = emptyLineup();
+    lineup.openai.pro = entry('old-pro', 'openrouter');
+    lineup.openai.auto = entry('old-auto', 'openrouter');
+    lineup.claude.auto = entry('other-auto', 'tinfoil');
+    useRoutstrStore.setState({ lineup });
+    sendMock
+      .mockRejectedValueOnce({
+        status: 424,
+        error: {
+          message: 'Upstream unavailable',
+          type: 'upstream_error',
+          code: 'UPSTREAM_UNAVAILABLE',
+          details: { refunded: true },
+        },
+      })
+      .mockResolvedValueOnce(success());
+    await send();
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(sendMock.mock.calls[1][1].model).toBe('other-auto');
+  });
+
   it('starts the next send from a model the node has not just refused', async () => {
     sendMock.mockRejectedValueOnce(upstreamRefusal(404)).mockResolvedValue(success());
     await send();

@@ -119,6 +119,9 @@ jest.mock('@/shared/lib/popup/E2EActionMenuProbe', () => ({
 // ModelChip-only stand-ins.
 jest.mock('@/shared/lib/popup', () => ({ modelPickerPopup: jest.fn() }));
 jest.mock('@/shared/lib/routstr/refreshLineup', () => ({ refreshRoutstrLineup: jest.fn() }));
+jest.mock('@/shared/lib/routstr/sdk/client', () => ({
+  sweepUnsettledPayments: jest.fn(async () => {}),
+}));
 jest.mock('@/shared/hooks/useVisualActivityEffect', () => ({
   useVisualActivityEffect: () => {},
 }));

@@ -476,7 +476,13 @@ export function useAiSend() {
               // minutes later — so siblings stay in the walk. Only narrows
               // when the node reports upstreams; otherwise the walk is
               // exactly as before.
-              const accountScoped = status === 402 || status === 429 || (status ?? 0) >= 500;
+              //
+              // 424 is what nodes after v0.4.7 send for an upstream that is
+              // down or timed out (`UPSTREAM_UNAVAILABLE`, `UPSTREAM_TIMEOUT`,
+              // routstr-core #771) instead of the 5xx that read as the node
+              // itself being down. Same scope as a 5xx: the whole upstream.
+              const accountScoped =
+                status === 402 || status === 424 || status === 429 || (status ?? 0) >= 500;
               const declinedUpstream = accountScoped
                 ? (candidateEntries[i]?.upstreamId ?? null)
                 : null;
