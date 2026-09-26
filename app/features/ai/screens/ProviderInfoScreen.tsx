@@ -29,6 +29,7 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { StatsGrid, UNKNOWN_STAT, type GridStat } from '@/shared/ui/composed/StatsGrid';
 import { ProviderAvatar } from '../components/ProviderAvatar';
 import { ProviderMintRow } from '../components/ProviderMintRow';
+import { PROVIDER_PRIVACY_SKELETON, providerPrivacyNotice } from '../lib/providerPrivacy';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -183,46 +184,10 @@ export function ProviderInfoScreen() {
   ];
 
   // Who can read what the user is about to type, said at the top of the page
-  // in words rather than left to a count in a tile.
-  //
-  // Four answers, and the difference between them is the reason this page
-  // exists. A provider that serves no sealed models can read everything; one
-  // that serves some can read everything sent to the rest, which is the
-  // easiest state to misread off a green shield; one whose whole catalog is
-  // sealed genuinely cannot, and deserves to be told apart from the other two.
-  // A catalog that never answered supports none of those claims, so it makes
-  // none — the loudest wrong answer here would be a reassuring one.
-  const privacy = ((): { status: 'info' | 'warning' | 'success'; title: string; body: string } => {
-    if (!catalog || catalog.count === 0) {
-      return {
-        status: 'info',
-        title: 'Privacy not known',
-        body: 'This provider did not list its models, so whether any of them can answer without reading your messages could not be checked.',
-      };
-    }
-    if (catalog.encrypted === 0) {
-      return {
-        status: 'warning',
-        title: 'This provider can read your messages',
-        body: 'Everything you send is visible to whoever runs this node. None of its models run in an enclave.',
-      };
-    }
-    if (catalog.encrypted < catalog.count) {
-      return {
-        status: 'warning',
-        title: 'This provider can read most of your messages',
-        body: `${catalog.encrypted.toLocaleString()} of its ${catalog.count.toLocaleString()} models run in an enclave it cannot read into. Everything you send to the rest is visible to whoever runs this node.`,
-      };
-    }
-    // Green, and stated rather than implied. The absence of a warning is not
-    // the same claim as "it cannot read them" — and this is the one provider
-    // shape where the second is true.
-    return {
-      status: 'success',
-      title: 'This provider cannot read your messages',
-      body: 'Every model it serves runs in an enclave. Requests are sealed end to end.',
-    };
-  })();
+  // in words rather than left to a count in a tile. Every variant is written
+  // to the same one-line title and two-line body so the skeleton below can
+  // hold exactly the height the verdict will need — see `providerPrivacy.ts`.
+  const privacy = providerPrivacyNotice(catalog);
 
   const heldMints = new Set(
     Object.entries(balances.byMint)
@@ -431,14 +396,16 @@ export function ProviderInfoScreen() {
         visualSurface="provider-info"
         testID="ai-provider-info-privacy"
         renderSkeleton={() => (
+          // The same chrome as the real notice — a bold title line over a body
+          // — sized by one of the four verdicts verbatim. All four are written
+          // to that shape, so whichever lands, nothing under it moves.
           <Notice
             status="info"
             description={
-              <Text
-                loading
-                size={14}
-                placeholder="Everything you send is visible to whoever runs this node."
-              />
+              <VStack gap={2}>
+                <Text loading size={15} bold placeholder={PROVIDER_PRIVACY_SKELETON.title} />
+                <Text loading size={14} placeholder={PROVIDER_PRIVACY_SKELETON.body} />
+              </VStack>
             }
           />
         )}

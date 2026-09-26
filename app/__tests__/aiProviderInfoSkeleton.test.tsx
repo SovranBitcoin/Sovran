@@ -271,7 +271,7 @@ describe('the privacy verdict', () => {
     const found = notices(renderer).find(
       (notice) =>
         notice.title?.includes('read your messages') ||
-        notice.title?.includes('read most of') ||
+        notice.title?.includes('read some messages') ||
         notice.title === 'Privacy not known'
     );
     act(() => renderer.unmount());
@@ -290,7 +290,7 @@ describe('the privacy verdict', () => {
     // and this is the state a green shield flatters.
     expect(await verdict({ count: 582, encrypted: 9, e2ee: true })).toEqual({
       status: 'warning',
-      title: 'This provider can read most of your messages',
+      title: 'This provider can read some messages',
     });
   });
 
