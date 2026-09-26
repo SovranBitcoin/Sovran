@@ -14,8 +14,26 @@ import {
   resolveMintStatus,
 } from '@/shared/lib/cashu/mintHealth';
 import { ApiHttpError, ApiParseError, fetchMintInfo } from '@/shared/lib/apiClient';
+import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
+import { selectMintLiveness } from '@/features/mint/lib/mintLiveness';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 
+const mockAsyncStore = new Map<string, string>();
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn((k: string) => Promise.resolve(mockAsyncStore.get(k) ?? null)),
+  setItem: jest.fn((k: string, v: string) => {
+    mockAsyncStore.set(k, v);
+    return Promise.resolve();
+  }),
+  removeItem: jest.fn((k: string) => {
+    mockAsyncStore.delete(k);
+    return Promise.resolve();
+  }),
+  multiGet: jest.fn((keys: string[]) =>
+    Promise.resolve(keys.map((k) => [k, mockAsyncStore.get(k) ?? null]))
+  ),
+  multiRemove: jest.fn(() => Promise.resolve()),
+}));
 jest.mock('@/shared/lib/apiClient', () => ({
   ...jest.requireActual<typeof import('@/shared/lib/apiClient')>('@/shared/lib/apiClient'),
   fetchMintInfo: jest.fn(),
@@ -38,6 +56,7 @@ const keyOf = (url: string) => url.replace('https://', '');
 
 beforeEach(() => {
   jest.mocked(fetchMintInfo).mockReset();
+  useMintMetadataStore.setState({ byMintUrl: {} });
 });
 
 describe('classifyMintInfoOutcome', () => {
@@ -102,5 +121,30 @@ describe('probeMints', () => {
     jest.mocked(fetchMintInfo).mockResolvedValue(answered());
     await probeMints(['https://mint.e.example'], { onResult: () => {}, signal: controller.signal });
     expect(jest.mocked(fetchMintInfo)).not.toHaveBeenCalled();
+  });
+});
+
+describe('liveness lives in the mint metadata store', () => {
+  it('a probe verdict is persisted with its stamp, and an older stamp never overwrites a newer one', () => {
+    recordMintReachability(A, false);
+    const key = keyOf(A);
+    const held = useMintMetadataStore.getState().getCached(A);
+    expect(held).toMatchObject({ liveness: 'offline', livenessSource: 'probe' });
+    // nagg's sweep from ten minutes ago says online: older, so it loses.
+    useMintMetadataStore.getState().setLiveness(A, 'online', 'nagg', Date.now() - 600_000);
+    expect(useMintMetadataStore.getState().getCached(A)?.liveness).toBe('offline');
+    expect(cachedMintProbe(A)).toEqual({ key, status: 'offline' });
+  });
+
+  it('with no verdict, the auditor state stands in; a stale verdict yields to it', () => {
+    expect(selectMintLiveness({ auditState: 'OK' })).toBe('online');
+    expect(selectMintLiveness({ auditState: 'ERROR' })).toBe('offline');
+    expect(selectMintLiveness({ auditState: 'WARN' })).toBe('unknown');
+    expect(selectMintLiveness(undefined)).toBe('unknown');
+    const dayAgo = Date.now() - 25 * 60 * 60 * 1000;
+    expect(selectMintLiveness({ liveness: 'offline', livenessAt: dayAgo, auditState: 'OK' })).toBe(
+      'online'
+    );
+    expect(selectMintLiveness({ liveness: 'offline', livenessAt: Date.now() })).toBe('offline');
   });
 });

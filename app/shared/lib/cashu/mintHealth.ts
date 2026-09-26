@@ -1,6 +1,7 @@
 import { fetchMintInfo, ApiHttpError, ApiParseError } from '@/shared/lib/apiClient';
 import { cashuLog } from '@/shared/lib/logger';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
+import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import type { RequestControls } from 'wallet/safeFetch';
 
 /**
@@ -14,8 +15,8 @@ import type { RequestControls } from 'wallet/safeFetch';
  * a row or changes the order the rows appear in. That is the one deliberate
  * difference from `providerHealth.ts`, whose `offline` blocks a choice.
  *
- * Mirrors `providerHealth.ts` otherwise: an in-memory answer that stands for
- * two minutes, a bounded sweep that streams results as they land, and a merge
+ * Mirrors `providerHealth.ts` otherwise: an answer that stands for two
+ * minutes (kept in the mint metadata store, so it survives a relaunch), a bounded sweep that streams results as they land, and a merge
  * rule where this phone's own observation beats what nagg saw from a data
  * centre.
  */
@@ -40,25 +41,27 @@ const CONCURRENCY = 8;
  *  now, rather than the row staying undecided for the transport's 15s. */
 const SWEEP_TIMEOUT_MS = 6_000;
 
-const cache = new Map<string, { at: number; probe: MintProbe }>();
-
-/** The last answer for this mint, if it is still fresh. */
+/**
+ * The last verdict for this mint, if it is still fresh. The store is the
+ * cache: a verdict survives a relaunch, and nagg's sweep and this phone's
+ * probe land in the same field by recency (see `setLiveness`).
+ */
 export function cachedMintProbe(mintUrl: string): MintProbe | undefined {
-  const entry = cache.get(normalizeMintUrlKey(mintUrl));
-  return entry && Date.now() - entry.at <= PROBE_TTL_MS ? entry.probe : undefined;
+  const key = normalizeMintUrlKey(mintUrl);
+  const entry = useMintMetadataStore.getState().byMintUrl[key];
+  if (!entry?.liveness || typeof entry.livenessAt !== 'number') return undefined;
+  return Date.now() - entry.livenessAt <= PROBE_TTL_MS
+    ? { key, status: entry.liveness }
+    : undefined;
 }
 
 /**
  * Record what a real `/v1/info` round trip the app made for another reason
- * (the selector's identity refresh) just learned, so it counts as evidence
- * here for free and the sweep skips that mint.
+ * just learned, so it counts as evidence here for free and the sweep skips
+ * that mint.
  */
 export function recordMintReachability(mintUrl: string, reachable: boolean): void {
-  const key = normalizeMintUrlKey(mintUrl);
-  cache.set(key, {
-    at: Date.now(),
-    probe: { key, status: reachable ? 'online' : 'offline' },
-  });
+  useMintMetadataStore.getState().setLiveness(mintUrl, reachable ? 'online' : 'offline', 'probe');
 }
 
 /**
@@ -82,7 +85,9 @@ async function probeOne(mintUrl: string, controls: RequestControls = {}): Promis
   const aborted = controls.signal?.aborted === true;
   const status = classifyMintInfoOutcome(result.isOk() ? null : result.error, aborted);
   const probe: MintProbe = { key, status };
-  if (!aborted && status !== 'unknown') cache.set(key, { at: Date.now(), probe });
+  if (!aborted && status !== 'unknown') {
+    useMintMetadataStore.getState().setLiveness(mintUrl, status, 'probe');
+  }
   return probe;
 }
 

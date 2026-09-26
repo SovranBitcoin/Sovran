@@ -1041,6 +1041,25 @@ exports[`persisted schema drift mint-metadata-store schema matches the golden sn
                 "type": "integer",
               },
               "info": {},
+              "liveness": {
+                "enum": [
+                  "online",
+                  "offline",
+                ],
+                "type": "string",
+              },
+              "livenessAt": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "livenessSource": {
+                "enum": [
+                  "probe",
+                  "nagg",
+                ],
+                "type": "string",
+              },
               "nErrors": {
                 "maximum": 9007199254740991,
                 "minimum": -9007199254740991,
@@ -1214,6 +1233,25 @@ exports[`persisted schema drift mint-metadata-store schema matches the golden sn
                 "type": "integer",
               },
               "info": {},
+              "liveness": {
+                "enum": [
+                  "online",
+                  "offline",
+                ],
+                "type": "string",
+              },
+              "livenessAt": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "livenessSource": {
+                "enum": [
+                  "probe",
+                  "nagg",
+                ],
+                "type": "string",
+              },
               "nErrors": {
                 "maximum": 9007199254740991,
                 "minimum": -9007199254740991,

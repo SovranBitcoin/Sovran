@@ -1,72 +1,50 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
+import { useShallow } from 'zustand/shallow';
 
-import { probeMints, type MintStatus } from '@/shared/lib/cashu/mintHealth';
+import { selectMintLiveness, type MintLiveness } from '@/features/mint/lib/mintLiveness';
+import { probeMints } from '@/shared/lib/cashu/mintHealth';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
-
-/** Batches probe results into one commit, as the provider list does: a sweep
- *  of forty answers costs a handful of renders instead of forty. */
-const COMMIT_MS = 120;
+import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 
 /**
- * This phone's own liveness verdict for a set of mints, keyed by normalized
- * mint URL, filled in as the sweep answers. Feed it the rows on screen (the
- * selector's list, the discovery list's visible window); rows not yet probed
- * are simply absent, which the face draws as no dot.
- *
- * Re-sweeps when the set changes; already-fresh answers report at once from
- * the probe cache, so scrolling a long list only ever pays for new rows.
+ * The dot for each mint on screen, keyed by normalized mint URL, from the
+ * store on the first frame — the last probe, nagg's verdict, or the
+ * auditor's state as a proxy — while a background sweep of `/v1/info`
+ * brings the stale ones up to date. Feed it the rows on screen (the
+ * selector's list, the discovery list's visible window).
  */
 export function useMintPresence(
   mintUrls: readonly string[],
   enabled = true
-): Record<string, MintStatus> {
-  const [presence, setPresence] = useState<Record<string, MintStatus>>({});
-  const pendingRef = useRef<Record<string, MintStatus>>({});
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Only real mint URLs; skeleton rows carry synthetic keys. The sweep needs
-  // the URLs themselves (the probe dials them), while the effect keys on the
-  // normalized set so a re-render with the same mints does not re-sweep.
+): Record<string, MintLiveness> {
+  // Only real mint URLs; skeleton rows carry synthetic keys.
   const probeUrls = mintUrls.filter((url) => url.startsWith('https://'));
   const probeKey = probeUrls.map(normalizeMintUrlKey).sort().join('\u0000');
-  const urlsRef = useRef(probeUrls);
-  urlsRef.current = probeUrls;
+
+  const presence = useMintMetadataStore(
+    useShallow((state) => {
+      const out: Record<string, MintLiveness> = {};
+      for (const url of probeUrls) {
+        const key = normalizeMintUrlKey(url);
+        out[key] = selectMintLiveness(state.byMintUrl[key]);
+      }
+      return out;
+    })
+  );
 
   useEffect(() => {
     if (!enabled || probeKey.length === 0) return;
     const controller = new AbortController();
-    const urls = urlsRef.current;
-    const flush = () => {
-      timerRef.current = null;
-      const batch = pendingRef.current;
-      pendingRef.current = {};
-      setPresence((prev) => {
-        let changed = false;
-        const next = { ...prev };
-        for (const [key, status] of Object.entries(batch)) {
-          if (next[key] !== status) {
-            next[key] = status;
-            changed = true;
-          }
-        }
-        return changed ? next : prev;
-      });
-    };
-    void probeMints(urls, {
-      signal: controller.signal,
-      onResult: (probe) => {
-        pendingRef.current[probe.key] = probe.status;
-        if (timerRef.current === null) timerRef.current = setTimeout(flush, COMMIT_MS);
-      },
-    });
-    return () => {
-      controller.abort();
-      if (timerRef.current !== null) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
+    // `probeMints` reports fresh verdicts from the store and only dials the
+    // rest; every answer lands in the store, which the selector above reads.
+    void probeMints(
+      probeKey.split('\u0000').map((key) => `https://${key}`),
+      {
+        signal: controller.signal,
+        onResult: () => {},
       }
-      // Answers that landed before the abort still count.
-      if (Object.keys(pendingRef.current).length > 0) flush();
-    };
+    );
+    return () => controller.abort();
   }, [probeKey, enabled]);
 
   return presence;

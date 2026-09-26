@@ -14,11 +14,15 @@ only once a day, for its changelog.
 
 ## Decision
 
-Mint rows (selector, discovery) show the same dot as providers, from
-`shared/lib/cashu/mintHealth.ts`: this phone's `/v1/info` probe first, nagg's
-`status` on discovery rows when the phone has not looked; a two-minute
-in-memory answer; the identity refresh the selector already makes counts as
-evidence. nagg runs a five-minute probe (`internal/mintliveness`) and
+Mint rows (selector, discovery) and the wallet header's mint pill show the
+same dot as providers, from `shared/lib/cashu/mintHealth.ts`. The verdict is
+persisted on the mint's `mintMetadataStore` entry (`liveness`, `livenessAt`,
+`livenessSource`): this phone's `/v1/info` probe and nagg's sweep write the
+same field and the newer stamp wins. `selectMintLiveness` reads it on the
+first frame, falling back to the auditor's standing state ("OK"/"ERROR", the
+same badge the mint page's avatar wears) as a proxy while a background sweep
+brings stale rows up to date, so a row never waits on the network for its
+dot. The identity refresh the selector already makes counts as evidence. nagg runs a five-minute probe (`internal/mintliveness`) and
 publishes `status`, `checkedAt`, `latencyMs` on discovery and mint-info rows
 with the provider directory's semantics.
 

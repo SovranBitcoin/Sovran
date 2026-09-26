@@ -3,6 +3,9 @@ import React from 'react';
 import BalancePill from '@/shared/ui/composed/BalancePill';
 import { Log } from '@/shared/lib/logger';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
+import { PresenceDot } from '@/shared/ui/primitives/PresenceDot';
+import { View } from '@/shared/ui/primitives/View/View';
+import { useMintLiveness } from '@/features/mint/hooks/useMintLiveness';
 import { useMintSelector, type MintSelectorProps } from './useMintSelector';
 
 /**
@@ -15,6 +18,7 @@ import { useMintSelector, type MintSelectorProps } from './useMintSelector';
  */
 export default function MintSelector(props: MintSelectorProps): React.ReactElement {
   const shared = useMintSelector(props);
+  const liveness = useMintLiveness(shared.mintUrl);
 
   return (
     <Log name="MintSelector">
@@ -25,12 +29,19 @@ export default function MintSelector(props: MintSelectorProps): React.ReactEleme
         unit={shared.unit}
         isLoading={shared.isLoading}
         iconNode={
-          <MintIcon
-            iconUrl={shared.mintIconUrl}
-            name={shared.mintName}
-            size={32}
-            isLoading={shared.isLoading}
-          />
+          // The same dot the mint rows carry, so the header answers "is my
+          // mint up?" without opening the selector. Feedback, never a gate.
+          <View className="relative">
+            <MintIcon
+              iconUrl={shared.mintIconUrl}
+              name={shared.mintName}
+              size={32}
+              isLoading={shared.isLoading}
+            />
+            {!shared.isLoading ? (
+              <PresenceDot presence={liveness === 'unknown' ? null : liveness} size={32} />
+            ) : null}
+          </View>
         }
         loadingTitlePlaceholder="Mint Name"
         onPress={shared.onRequestMintList}

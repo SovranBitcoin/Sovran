@@ -41,7 +41,6 @@ import { evictLruOverCap } from '@/shared/lib/cache/evictLruOverCap';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
-import { recordMintReachability } from '@/shared/lib/cashu/mintHealth';
 import { isAbortError } from 'wallet/safeFetch';
 
 const MAX_ENTRIES = 200;
@@ -99,6 +98,18 @@ interface MintMetadataState {
     extra?: { operatorPubkey?: string; operatorNpub?: string; vertexRank?: number }
   ) => void;
 
+  /**
+   * Record a `/v1/info` verdict. A stamp older than the one held is ignored,
+   * whoever made it, so a probe from this phone and a status from nagg's
+   * sweep resolve by recency rather than by source.
+   */
+  setLiveness: (
+    mintUrl: string,
+    status: 'online' | 'offline',
+    source: 'probe' | 'nagg',
+    atMs?: number
+  ) => void;
+
   /** Bulk upsert from a nagg `/nostr/mint/discover` response. */
   upsertFromDiscover: (mints: DiscoverMint[]) => void;
   clear: () => void;
@@ -141,6 +152,10 @@ const PersistedMintMetadataEntry = z.looseObject({
   operatorNpub: z.string().max(128).optional(),
   vertexRank: z.number().optional(),
   socialAt: z.number().int().nonnegative().optional(),
+  // liveness — additive, tolerant: a shape drift here costs the field, never the store.
+  liveness: z.enum(['online', 'offline']).optional().catch(undefined),
+  livenessAt: z.number().int().nonnegative().optional().catch(undefined),
+  livenessSource: z.enum(['probe', 'nagg']).optional().catch(undefined),
 });
 
 const PersistedMintMetadataStore = z.object({
@@ -279,6 +294,23 @@ export const useMintMetadataStore = create<MintMetadataState>()(
           );
         },
 
+        setLiveness: (mintUrl, status, source, atMs = Date.now()) => {
+          const key = normalizeMintUrlKey(mintUrl);
+          const held = get().byMintUrl[key]?.livenessAt;
+          if (typeof held === 'number' && held > atMs) return;
+          set((state) => ({
+            byMintUrl: {
+              ...state.byMintUrl,
+              [key]: {
+                ...(state.byMintUrl[key] ?? {}),
+                liveness: status,
+                livenessAt: atMs,
+                livenessSource: source,
+              },
+            },
+          }));
+        },
+
         upsertFromDiscover: (mints) => {
           const now = Date.now();
           set((state) => {
@@ -286,6 +318,15 @@ export const useMintMetadataStore = create<MintMetadataState>()(
             for (const m of mints) {
               const key = normalizeMintUrlKey(m.mintUrl);
               const prev = next[key] ?? {};
+              // nagg's own probe verdict, stamped with ITS check time so a
+              // fresher local probe is never overwritten by an older sweep.
+              const naggCheckedAt = m.checkedAt ? Date.parse(m.checkedAt) : Number.NaN;
+              const naggAt = Number.isFinite(naggCheckedAt) ? naggCheckedAt : now;
+              const livenessGroup =
+                (m.status === 'online' || m.status === 'offline') &&
+                !(typeof prev.livenessAt === 'number' && prev.livenessAt > naggAt)
+                  ? { liveness: m.status, livenessAt: naggAt, livenessSource: 'nagg' as const }
+                  : {};
               // Stamp a group's `*At` ONLY when this row actually carried that
               // group's data — otherwise `isStale` lies and a consumer skips a
               // needed refetch.
@@ -331,6 +372,7 @@ export const useMintMetadataStore = create<MintMetadataState>()(
                 ...(m.operatorNpub ? { operatorNpub: m.operatorNpub } : {}),
                 ...(m.vertexRank !== undefined ? { vertexRank: m.vertexRank } : {}),
                 ...(hasSocial ? { socialAt: now } : {}),
+                ...livenessGroup,
               };
             }
             evictIfOverCap(next);
@@ -430,14 +472,15 @@ function fetchAndCache(
       useMintMetadataStore.getState().setIdentity(mintUrl, info);
       // The selector's identity refresh already paid for this round trip; let
       // it stand as the liveness mark too, so the sweep skips this mint.
-      recordMintReachability(mintUrl, true);
+      useMintMetadataStore.getState().setLiveness(mintUrl, 'online', 'probe');
       storeLog.info('store.mint_metadata.info.fetch_success', {
         key,
         hasName: typeof info.name === 'string' && info.name.length > 0,
       });
       return info;
     } catch (err) {
-      if (!isAbortError(err)) recordMintReachability(mintUrl, false);
+      if (!isAbortError(err))
+        useMintMetadataStore.getState().setLiveness(mintUrl, 'offline', 'probe');
       storeLog.warn('store.mint_metadata.info.fetch_failed', {
         key,
         error: err instanceof Error ? err : new Error(String(err)),
