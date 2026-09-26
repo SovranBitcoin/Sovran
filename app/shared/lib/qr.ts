@@ -1,7 +1,20 @@
 import type { CopyTarget } from '@/shared/lib/popup';
 
-/** Shared threshold for QR rendering and request-size feedback. */
+/**
+ * Length at which a caller-requested animation kicks in. Only surfaces whose
+ * payload has a specified animated encoding opt in: Cashu tokens (NUT-16, UR
+ * frames — Minibits, macadamia, cashu.me and eNuts all show and scan them).
+ * NUT-18/26 payment requests, invoices and addresses have no such spec and no
+ * sibling wallet displays them animated, so they stay static.
+ */
 export const ANIMATE_THRESHOLD = 500;
+
+/**
+ * Largest payload one QR is asked to hold. Above this the code cannot be
+ * rendered at all, so every surface splits it into UR frames regardless of
+ * whether it opted into animation — the only alternative is no QR.
+ */
+export const MAX_QR_DATA_LENGTH = 2000;
 
 /**
  * Typical encoded length per copy target, measured from real payloads: a

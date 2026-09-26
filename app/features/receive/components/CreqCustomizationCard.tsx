@@ -30,7 +30,7 @@ import { copyPopup } from '@/shared/lib/popup';
 import { paymentLog } from '@/shared/lib/logger';
 import Icon from '@/assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
-import { ANIMATE_THRESHOLD } from '@/shared/lib/qr';
+import { MAX_QR_DATA_LENGTH } from '@/shared/lib/qr';
 
 interface CreqCustomizationCardProps {
   /** The (already re-encoded) request string shown in the copy row. */
@@ -228,7 +228,7 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
         {advancedOpen ? (
           <View className="px-4 pb-4">
             <Text testID="receive-creq-size" size={12} className="text-muted py-3">
-              {`Request size: ${encodedRequest.length} chars · ${encodedRequest.length >= ANIMATE_THRESHOLD ? 'animated' : 'static'} QR`}
+              {`Request size: ${encodedRequest.length} chars · ${encodedRequest.length > MAX_QR_DATA_LENGTH ? 'too large for one QR, shown as frames' : 'static QR'}`}
             </Text>
           </View>
         ) : null}

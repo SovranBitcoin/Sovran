@@ -169,7 +169,6 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
   return (
     <>
       <PaymentInfo
-        animated
         active={active}
         data={request.encodedRequest}
         copyTarget="paymentRequest"

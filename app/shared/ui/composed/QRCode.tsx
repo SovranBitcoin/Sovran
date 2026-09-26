@@ -23,12 +23,9 @@ import { withAlpha } from '@/shared/lib/color';
 import { QRCodeFrame, QrDecodeOverlay, qrCodeGeometry } from '@/shared/ui/composed/QRCodeFrame';
 import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { IS_ANDROID_E2E } from '@/shared/lib/e2e/isAndroidE2E';
-import { ANIMATE_THRESHOLD } from '@/shared/lib/qr';
+import { ANIMATE_THRESHOLD, MAX_QR_DATA_LENGTH } from '@/shared/lib/qr';
 
 export { SPEED_PRESETS, DENSITY_PRESETS, DEFAULT_SPEED_INDEX, DEFAULT_DENSITY_INDEX };
-
-// Maximum characters that can fit in a single QR code (conservative limit for binary/alphanumeric)
-const MAX_QR_DATA_LENGTH = 2000;
 
 // UR encoding parameters — aligned with the cashu ecosystem:
 // eNuts: fragment=200, interval=250ms, animate≥150chars
