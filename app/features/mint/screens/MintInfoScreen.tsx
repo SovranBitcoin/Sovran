@@ -536,14 +536,28 @@ export function MintInfoScreen() {
             </Text>
           </Animated.View>
 
+          <Spacer size={16} />
+
+          {(typeof kymScore === 'number' && kymScore >= 0) || detail.reviews === 'loading' ? (
+            // Keyed by mintUrl so a screen reused for a different mint remounts
+            // the chart (fresh roll-in) instead of rolling the prior mint's score.
+            // Mounted while the reviews read is out too: the chart draws its own
+            // skeleton at the finished height, so the score lands in place
+            // instead of pushing the grid down when it arrives.
+            <RatingBarChart
+              key={mintUrl}
+              score={typeof kymScore === 'number' && kymScore >= 0 ? kymScore : -1}
+            />
+          ) : null}
+
           {/* The two things a reader does with a mint page besides trusting it,
               as the same labelled circles the profile page uses for Send Money /
               Message / QR. Always both, whatever the reviews read says: the
-              reviews screen shows "no reviews yet" honestly, and a row that
-              appeared only once a score was known moved the chart under it.
+              reviews screen shows "no reviews yet" honestly. Under the rating
+              chart, where the reviews are, and above the audit grid.
               The reviews star used to be a header action, invisible to the
               accepter flow and to anyone who did not know to look up there. */}
-          <HStack justify="center" gap={28} style={{ marginTop: 16 }}>
+          <HStack justify="center" gap={28} style={{ marginTop: 4, marginBottom: 4 }}>
             <CircleActionButton
               icon="ic:round-star"
               systemIcon="star"
@@ -561,20 +575,6 @@ export function MintInfoScreen() {
               onPress={() => mintUrl && router.navigate(buildMintHistoryHref(mintUrl))}
             />
           </HStack>
-
-          <Spacer size={16} />
-
-          {(typeof kymScore === 'number' && kymScore >= 0) || detail.reviews === 'loading' ? (
-            // Keyed by mintUrl so a screen reused for a different mint remounts
-            // the chart (fresh roll-in) instead of rolling the prior mint's score.
-            // Mounted while the reviews read is out too: the chart draws its own
-            // skeleton at the finished height, so the score lands in place
-            // instead of pushing the grid down when it arrives.
-            <RatingBarChart
-              key={mintUrl}
-              score={typeof kymScore === 'number' && kymScore >= 0 ? kymScore : -1}
-            />
-          ) : null}
 
           <StatsGrid status={detail.audit} onRetry={detail.retry} audit={audit} />
         </VStack>
