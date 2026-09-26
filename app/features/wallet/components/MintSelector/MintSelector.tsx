@@ -35,14 +35,17 @@ export default function MintSelector(props: MintSelectorProps): React.ReactEleme
             <MintIcon
               iconUrl={shared.mintIconUrl}
               name={shared.mintName}
-              size={32}
+              size={24}
               isLoading={shared.isLoading}
             />
             {!shared.isLoading ? (
-              <PresenceDot presence={liveness === 'unknown' ? null : liveness} size={32} />
+              <PresenceDot presence={liveness === 'unknown' ? null : liveness} size={24} />
             ) : null}
           </View>
         }
+        // 24, matching the AI header's provider pill so the two tab headers
+        // carry the same size face.
+        iconBoxSize={24}
         loadingTitlePlaceholder="Mint Name"
         onPress={shared.onRequestMintList}
         width={shared.dimensions.buttonWidth}
