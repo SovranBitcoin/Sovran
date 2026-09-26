@@ -188,3 +188,61 @@ describe('selection follows the lineup', () => {
     expect(useRoutstrStore.getState().selectedProvider).toBe('openai');
   });
 });
+
+describe('a selection carried across a switch the user made', () => {
+  // The rule above holds when the lineup moves UNDER the user. When the user
+  // moves themselves — "Use this provider" on a page that has just told them,
+  // at the top, whether the node can read their messages — a selection carried
+  // from the old node is re-fitted like any other, sealed or not. Leaving it
+  // pinned to a vendor the new node does not serve is the "changing provider
+  // sometimes fails, a restart fixes it" report: the chip read "Not on this
+  // node" until a relaunch reset the session-only selection.
+
+  beforeEach(() => {
+    // Sealed selection made against the old node, which served it.
+    useRoutstrStore.setState({ nodeBaseUrl: 'https://sealed.example' });
+    useRoutstrStore.getState().setCachedModels(SEALED_ONLY);
+    expect(useRoutstrStore.getState().selectedProvider).toBe(E2EE_PROVIDER_ID);
+  });
+
+  it('moves a sealed selection onto the best plaintext fit when the new node serves nothing sealed', () => {
+    useRoutstrStore.getState().setUserNode('https://plain.example');
+    expect(useRoutstrStore.getState().selectionCarriedFrom).toBe('https://sealed.example');
+    useRoutstrStore.getState().setCachedModels(NAMED);
+    const state = useRoutstrStore.getState();
+    expect(state.selectedProvider).toBe('openai');
+    expect(state.selectedTier).toBe('auto');
+    // Spent: the next lineup change is the lineup moving under the user again.
+    expect(state.selectionCarriedFrom).toBeNull();
+  });
+
+  it('keeps a sealed selection when the new node serves it too', () => {
+    useRoutstrStore.setState({ selectedTier: 'max' });
+    useRoutstrStore.getState().setUserNode('https://also-sealed.example');
+    useRoutstrStore.getState().setCachedModels([...SEALED_ONLY, ...NAMED]);
+    const state = useRoutstrStore.getState();
+    expect(state.selectedProvider).toBe(E2EE_PROVIDER_ID);
+    expect(state.selectedTier).toBe('max');
+  });
+
+  it('waits for a lineup with entries before spending the note', () => {
+    useRoutstrStore.getState().setUserNode('https://slow.example');
+    useRoutstrStore.getState().setCachedModels([]);
+    expect(useRoutstrStore.getState().selectedProvider).toBe(E2EE_PROVIDER_ID);
+    expect(useRoutstrStore.getState().selectionCarriedFrom).toBe('https://sealed.example');
+    useRoutstrStore.getState().setCachedModels(UNNAMED_ONLY);
+    expect(useRoutstrStore.getState().selectedProvider).toBe('qwen');
+    expect(useRoutstrStore.getState().selectionCarriedFrom).toBeNull();
+  });
+
+  it('still refuses the downgrade once the carried selection has been re-fitted', () => {
+    useRoutstrStore.getState().setUserNode('https://also-sealed.example');
+    useRoutstrStore.getState().setCachedModels([...SEALED_ONLY, ...NAMED]);
+    expect(useRoutstrStore.getState().selectedProvider).toBe(E2EE_PROVIDER_ID);
+    // The node's catalogue drifts and drops its sealed rows: a change under
+    // the user, so the promise holds and the send path says so instead.
+    useRoutstrStore.setState({ modelsCache: null });
+    useRoutstrStore.getState().setCachedModels(NAMED);
+    expect(useRoutstrStore.getState().selectedProvider).toBe(E2EE_PROVIDER_ID);
+  });
+});

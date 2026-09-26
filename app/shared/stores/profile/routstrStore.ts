@@ -46,6 +46,10 @@ type RoutstrProviderId = AiProviderId;
 const PROVIDER_IDS = AI_PROVIDER_IDS;
 const DEFAULT_PROVIDER: RoutstrProviderId = 'openai';
 
+/** What `selectionCarriedFrom` records when the selection was made against
+ *  the built-in default node, which `nodeBaseUrl` spells as `null`. */
+const DEFAULT_NODE_KEY = 'default';
+
 /**
  * Keep the selected vendor pointing at something the new lineup can answer.
  *
@@ -78,6 +82,18 @@ const DEFAULT_PROVIDER: RoutstrProviderId = 'openai';
  *     deliberate swap is one tap, and the failed turn's pill offers Change
  *     Provider / Change Model. Every one of those routes is a choice the user
  *     makes; none of them is this store choosing plaintext for them.
+ *
+ *     The one exception is the user's own hand. When THEY pick a new provider
+ *     (`setUserNode`), the page they picked it from has just told them, at the
+ *     top and in words, whether that node can read their messages — and a
+ *     selection carried from the old node onto a new one that serves nothing
+ *     sealed is not a promise kept, it is a chip reading "Not on this node"
+ *     until the next relaunch resets it (the "sometimes it fails, but a
+ *     restart fixes it" report). So a selection carried across a user-made
+ *     switch is re-fitted like any other: kept if the new node serves it, and
+ *     moved to the best plaintext fit if not, with the move logged. Only a
+ *     lineup that changed UNDER the user — a nagg repoint, catalog drift —
+ *     keeps the never-downgrade rule.
  *   - Prefer a plaintext vendor, and only land ON `E2EE_PROVIDER_ID` when the
  *     lineup offers nothing else. Enclave rows are the dearest in a catalogue,
  *     so this is a last resort — but it is a visible one: the chip renders the
@@ -89,9 +105,10 @@ const DEFAULT_PROVIDER: RoutstrProviderId = 'openai';
  */
 function reselectProviderForLineup(
   selected: RoutstrProviderId,
-  lineup: AiLineup | null
+  lineup: AiLineup | null,
+  allowLeavingSealed: boolean
 ): RoutstrProviderId | null {
-  if (selected === E2EE_PROVIDER_ID) return null;
+  if (selected === E2EE_PROVIDER_ID && !allowLeavingSealed) return null;
   const offered = lineupProviderIds(lineup);
   if (offered.length === 0 || offered.includes(selected)) return null;
   const plaintext = offered.filter((id) => id !== E2EE_PROVIDER_ID);
@@ -142,18 +159,46 @@ function reselectTierForProvider(
 function repointSelection(
   selected: RoutstrProviderId,
   selectedTier: RoutstrTierId,
-  lineup: AiLineup | null
+  lineup: AiLineup | null,
+  /**
+   * Why the lineup moved. `user_switch` is a selection carried across a node
+   * the USER chose, which is the one case allowed to leave the sealed vendor;
+   * everything else is the lineup changing under them and keeps the promise.
+   */
+  reason: 'user_switch' | 'lineup_changed' | 'hydrate'
 ): Partial<Pick<RoutstrState, 'selectedProvider' | 'selectedTier'>> {
-  const nextProvider = reselectProviderForLineup(selected, lineup);
+  const allowLeavingSealed = reason === 'user_switch';
+  const nextProvider = reselectProviderForLineup(selected, lineup, allowLeavingSealed);
   const provider = nextProvider ?? selected;
   const nextTier = reselectTierForProvider(provider, selectedTier, lineup);
-  if (nextProvider == null && nextTier == null) return {};
+  const offered = lineupProviderIds(lineup);
+  if (nextProvider == null && nextTier == null) {
+    // Nothing moved, but that is two different facts: the selection is served,
+    // or it is stranded and the rule above chose to leave it. The second is
+    // the state every "the model did not change" report describes, so it is
+    // said in its own words rather than left to be inferred from silence.
+    if (offered.length > 0 && !offered.includes(selected)) {
+      storeLog.warn('store.routstr.selection_unserved', {
+        reason,
+        selectedProvider: selected,
+        selectedTier,
+        sealedSelection: selected === E2EE_PROVIDER_ID,
+        offered,
+      });
+    }
+    return {};
+  }
   storeLog.info('store.routstr.provider_repointed', {
+    reason,
     from: selected,
     to: provider,
     fromTier: selectedTier,
     toTier: nextTier ?? selectedTier,
-    offered: lineupProviderIds(lineup),
+    // The downgrade, named. A sealed selection landing on a plaintext vendor
+    // is allowed only across a user-made switch, and a log reader should be
+    // able to find every time it happened without reconstructing the pair.
+    leftSealed: selected === E2EE_PROVIDER_ID && provider !== E2EE_PROVIDER_ID,
+    offered,
   });
   return {
     ...(nextProvider != null ? { selectedProvider: nextProvider } : {}),
@@ -425,6 +470,20 @@ interface RoutstrState {
    * carry-over choice they made on a different account or session.
    */
   selectedProvider: RoutstrProviderId;
+  /**
+   * The node the current (provider, tier) pair was chosen against, when the
+   * USER has since moved to a different one and no lineup for the new node
+   * has landed yet. Session-only.
+   *
+   * `setUserNode` cannot re-fit the selection itself — the new node's lineup
+   * arrives later, from whichever of the catalog read or the nagg refresh
+   * answers first — so it leaves this note, and the first lineup adoption
+   * that reads it re-fits the pair with the user-switch rule (allowed to leave
+   * the sealed vendor, see `reselectProviderForLineup`) and clears it. `null`
+   * means the selection was made against the node in play, and a lineup that
+   * moves under it keeps the never-downgrade rule.
+   */
+  selectionCarriedFrom: string | null;
   modelsCache: ModelsCache | null;
   /**
    * Session-only lineup derived from the last successful catalog fetch
@@ -868,6 +927,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
       selectedModel: null,
       selectedTier: DEFAULT_TIER,
       selectedProvider: DEFAULT_PROVIDER,
+      selectionCarriedFrom: null,
       modelsCache: null,
       lineup: null,
       lastKnownLineup: null,
@@ -1075,9 +1135,19 @@ export const useRoutstrStore = create<RoutstrStore>()(
         });
         const now = Date.now();
         const adopted = filled || !lineupHasEntries(held) ? merged : held;
+        const carried = get().selectionCarriedFrom;
         set({
           modelsCache: { data: models, timestamp: now },
-          ...repointSelection(get().selectedProvider, get().selectedTier, adopted),
+          ...repointSelection(
+            get().selectedProvider,
+            get().selectedTier,
+            adopted,
+            carried != null ? 'user_switch' : 'lineup_changed'
+          ),
+          // The note is spent by the first lineup that can answer for the new
+          // node. An empty derivation is not one — it is a placeholder, and
+          // the re-fit has to wait for a lineup with entries.
+          ...(carried != null && lineupHasEntries(adopted) ? { selectionCarriedFrom: null } : {}),
           // A catalog that qualifies nothing is not an upgrade on a menu that
           // works. Node catalogs swing hard within one session (582 models one
           // read, 10 the next), and an empty derivation is truthy — it would
@@ -1110,13 +1180,18 @@ export const useRoutstrStore = create<RoutstrStore>()(
           ),
         });
         const now = Date.now();
+        // `lineup` has entries (checked above), so a carried selection is
+        // re-fitted and the note spent here, whichever branch adopts it.
+        const carried = get().selectionCarriedFrom;
+        const repointReason = carried != null ? 'user_switch' : 'lineup_changed';
         // A catalog is authoritative only for the node that served it.
         if (pinned) {
           setRoutstrNodeBaseUrl(pinned);
           set({
             lineup,
             serverLineupAt: now,
-            ...repointSelection(get().selectedProvider, get().selectedTier, lineup),
+            ...repointSelection(get().selectedProvider, get().selectedTier, lineup, repointReason),
+            selectionCarriedFrom: null,
             lastKnownLineup: { derivedAt: now, lineup, nodeBaseUrl: pinned },
           });
           return true;
@@ -1129,7 +1204,13 @@ export const useRoutstrStore = create<RoutstrStore>()(
         set({
           lineup,
           serverLineupAt: now,
-          ...repointSelection(previous.selectedProvider, previous.selectedTier, lineup),
+          ...repointSelection(
+            previous.selectedProvider,
+            previous.selectedTier,
+            lineup,
+            repointReason
+          ),
+          selectionCarriedFrom: null,
           nodeBaseUrl,
           authMode: authMode ?? (nodeBaseUrl === get().nodeBaseUrl ? get().authMode : 'bearer'),
           modelsCache: nodeBaseUrl === get().nodeBaseUrl ? get().modelsCache : null,
@@ -1210,12 +1291,26 @@ export const useRoutstrStore = create<RoutstrStore>()(
 
       setUserNode: (nodeBaseUrl) => {
         const next = nodeBaseUrl ? normalizeNodeUrl(nodeBaseUrl) || null : null;
-        storeLog.info('store.routstr.user_node_set', { pinned: next != null });
         setRoutstrNodeBaseUrl(next);
         const previous = get();
         const moving = next !== null && next !== previous.nodeBaseUrl;
+        // The selection that is about to be carried, said here so the
+        // `provider_repointed` or `selection_unserved` line that follows the
+        // new node's first lineup can be read against what it started from.
+        storeLog.info('store.routstr.user_node_set', {
+          pinned: next != null,
+          from: previous.nodeBaseUrl,
+          to: next,
+          moving,
+          selectedProvider: previous.selectedProvider,
+          selectedTier: previous.selectedTier,
+          sealedSelection: previous.selectedProvider === E2EE_PROVIDER_ID,
+        });
         set({
           userNodeBaseUrl: next,
+          // A user-made switch, so the pair is re-fitted — sealed or not — by
+          // the first lineup that lands for the node now in play.
+          selectionCarriedFrom: previous.nodeBaseUrl ?? DEFAULT_NODE_KEY,
           // The model menu is per node. Clearing the server lineup and the
           // catalog forces a re-derive from whichever node is now in play,
           // rather than offering another node's models against it.
@@ -1450,7 +1545,8 @@ export const useRoutstrStore = create<RoutstrStore>()(
         const hydrated = repointSelection(
           state.selectedProvider,
           state.selectedTier,
-          state.lastKnownLineup?.lineup ?? null
+          state.lastKnownLineup?.lineup ?? null,
+          'hydrate'
         );
         if (hydrated.selectedProvider != null) state.selectedProvider = hydrated.selectedProvider;
         if (hydrated.selectedTier != null) state.selectedTier = hydrated.selectedTier;

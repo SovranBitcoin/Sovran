@@ -37,6 +37,11 @@
  * forward". These cases pin the honest middle: the store holds the promise,
  * the chip states plainly that this node does not serve it, and the picker
  * opens on a vendor that exists so the swap is one deliberate tap away.
+ *
+ * The stranded state these cases set up is the lineup moving UNDER a
+ * selection (`setState` + `setCachedModels`, no `setUserNode`). A switch the
+ * user makes through `setUserNode` is the one case that re-fits a sealed
+ * selection instead — `routstrLineupSelection.test.ts` pins that half.
  */
 
 import React from 'react';
