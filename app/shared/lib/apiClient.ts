@@ -402,7 +402,14 @@ const parseProfileEnvelopeFor =
     for (const e of events) {
       if (e.kind !== 0) continue;
       const prev = k0ByPubkey.get(e.pubkey);
-      if (!prev || e.created_at > prev.created_at) k0ByPubkey.set(e.pubkey, e);
+      // NIP-01: on equal created_at the replaceable event with the lowest id wins.
+      if (
+        !prev ||
+        e.created_at > prev.created_at ||
+        (e.created_at === prev.created_at && e.id < prev.id)
+      ) {
+        k0ByPubkey.set(e.pubkey, e);
+      }
     }
 
     const prov = (pk: string, ns: string): Record<string, unknown> =>

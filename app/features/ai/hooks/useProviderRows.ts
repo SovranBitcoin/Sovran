@@ -75,9 +75,6 @@ const host = (baseUrl: string) => baseUrl.replace(/^https:\/\//, '');
  *  device has just contradicted lands where its real state belongs. */
 const STATUS_RANK: Record<ProviderStatus, number> = { online: 0, unknown: 1, offline: 2 };
 
-/** Nothing at all, shared, so an un-ready list is not a new array per render. */
-const NO_ROWS: ProviderRow[] = [];
-
 export function useProviderRows(
   probed: Record<string, ProviderStatus> = {},
   directory: readonly ServerProvider[] = [],
@@ -231,7 +228,8 @@ export function useProviderRows(
   // render guaranteed a full repaint for any reason at all — including ones
   // that had nothing to do with providers.
   return useMemo(() => {
-    if (!order) return NO_ROWS;
+    // Memoized on `order`, so the un-ready list is one stable (private) array.
+    if (!order) return [];
     const positions = new Map(order.map((url, index) => [url, index]));
     return [...ranked].sort(
       (a, b) =>

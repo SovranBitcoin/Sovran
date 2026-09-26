@@ -46,13 +46,14 @@ const SWEEP_TIMEOUT_MS = 6_000;
  * cache: a verdict survives a relaunch, and nagg's sweep and this phone's
  * probe land in the same field by recency (see `setLiveness`).
  */
-export function cachedMintProbe(mintUrl: string): MintProbe | undefined {
+export function cachedMintProbe(
+  mintUrl: string,
+  nowMs: number = Date.now()
+): MintProbe | undefined {
   const key = normalizeMintUrlKey(mintUrl);
   const entry = useMintMetadataStore.getState().byMintUrl[key];
   if (!entry?.liveness || typeof entry.livenessAt !== 'number') return undefined;
-  return Date.now() - entry.livenessAt <= PROBE_TTL_MS
-    ? { key, status: entry.liveness }
-    : undefined;
+  return nowMs - entry.livenessAt <= PROBE_TTL_MS ? { key, status: entry.liveness } : undefined;
 }
 
 /**
