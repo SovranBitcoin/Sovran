@@ -1,9 +1,11 @@
 import { shouldCollapseIdentity } from './identityHeaderMotion';
-import { useState } from 'react';
-import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
+import { NavigationContext } from 'expo-router/react-navigation';
+import { useContext, useEffect, useRef, useState } from 'react';
+import type { NativeScrollEvent, NativeSyntheticEvent, View as NativeView } from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
+  makeMutable,
   useAnimatedReaction,
   useAnimatedScrollHandler,
   useAnimatedStyle,
@@ -37,6 +39,42 @@ export interface HeaderIdentity {
 // Native navigation titles do not follow Dynamic Type, and the band shares a
 // fixed row under the bar. The bar's title view carries the full name.
 const NAME_MAX_FONT_SCALE = 1.2;
+
+/**
+ * Window-space bottom of the identity icon last laid out in a bar; 0 until one
+ * reports. The band is page content and the icon is native header chrome, so no
+ * shared layout ties them: the token pull-up is a guess at the bar's slack, and
+ * on Android it left the name over the picture. The band measures itself
+ * against this and only ever moves down. Screens of one stack share a bar, so
+ * the latest report is right for whichever page is showing.
+ */
+const barIconBottom = makeMutable(0);
+/** Least space between the icon and the band's line box. */
+const BAND_MIN_GAP = 2;
+
+/**
+ * Measure `ref` in the window on layout and again once the page's push
+ * settles: a native-stack transition can move the page mid-measure.
+ */
+function useWindowMeasure(onMeasure: (y: number, height: number) => void) {
+  const ref = useRef<NativeView>(null);
+  const navigation = useContext(NavigationContext);
+  useEffect(
+    () =>
+      navigation?.addListener('transitionEnd' as never, () =>
+        ref.current?.measureInWindow((_x, y, _w, h) => onMeasure(y, h))
+      ),
+    [navigation, onMeasure]
+  );
+  const onLayout = () => ref.current?.measureInWindow((_x, y, _w, h) => onMeasure(y, h));
+  return [ref, onLayout] as const;
+}
+
+function useReportBarIconBottom() {
+  return useWindowMeasure((y, h) => {
+    if (h > 0) barIconBottom.set(y + h);
+  });
+}
 
 /** The identity's picture at whatever diameter its header shape allows. */
 function IdentityIcon({
@@ -75,8 +113,11 @@ export function IdentityBarTitle({
   kind = 'person',
   isLoading = false,
 }: HeaderIdentity) {
+  const [measureRef, onMeasureLayout] = useReportBarIconBottom();
   return (
     <View
+      ref={measureRef}
+      onLayout={onMeasureLayout}
       className="items-center justify-center"
       style={BAR_TITLE_STYLE}
       accessible
@@ -120,8 +161,11 @@ function MorphTitle({
   const titleStyle = useAnimatedStyle(() => ({
     opacity: interpolate(progress.get(), [0, 0.5], [1, 0], Extrapolation.CLAMP),
   }));
+  const [measureRef, onMeasureLayout] = useReportBarIconBottom();
   return (
     <View
+      ref={measureRef}
+      onLayout={onMeasureLayout}
       className="items-center justify-center"
       style={boxStyle}
       accessible
@@ -179,23 +223,37 @@ export function IdentityNameBand({
   progress?: SharedValue<number>;
   nameTestID?: string;
 }) {
+  // The outer view is measured, the inner one moved, so the clearance never
+  // feeds back into the next measurement.
+  const bandTop = useSharedValue(0);
+  const [measureRef, onMeasureLayout] = useWindowMeasure((y) => bandTop.set(y));
   const style = useAnimatedStyle(() => ({ opacity: progress ? progress.get() : 1 }));
+  const clearanceStyle = useAnimatedStyle(() => {
+    const iconBottom = barIconBottom.get();
+    const top = bandTop.get();
+    const clearance = iconBottom > 0 && top > 0 ? Math.max(0, iconBottom + BAND_MIN_GAP - top) : 0;
+    return { transform: [{ translateY: clearance }] };
+  });
   return (
     <Animated.View
+      ref={measureRef}
+      onLayout={onMeasureLayout}
       pointerEvents="none"
       style={[BAND_STYLE, style]}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants">
-      <Text
-        bold
-        size={headerIdentity.bandNameSize}
-        numberOfLines={1}
-        maxFontSizeMultiplier={NAME_MAX_FONT_SCALE}
-        className="text-center"
-        style={BAND_NAME_STYLE}
-        testID={nameTestID}>
-        {name}
-      </Text>
+      <Animated.View style={clearanceStyle}>
+        <Text
+          bold
+          size={headerIdentity.bandNameSize}
+          numberOfLines={1}
+          maxFontSizeMultiplier={NAME_MAX_FONT_SCALE}
+          className="text-center"
+          style={BAND_NAME_STYLE}
+          testID={nameTestID}>
+          {name}
+        </Text>
+      </Animated.View>
     </Animated.View>
   );
 }
