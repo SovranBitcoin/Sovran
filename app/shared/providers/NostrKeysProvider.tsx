@@ -438,7 +438,15 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         }
 
         if (activeProfile && defaultKeys?.pubkey !== activeProfile.pubkey) {
-          throw new Error('Saved account requires re-import');
+          if (isImported) throw new Error('Saved account requires re-import');
+          // A derived account whose saved row names another key is a state
+          // 0.1.3 produced and then ran in: an Android backup restored the
+          // profile row and the wallet database without the keychain, a new
+          // root was generated, and boot carried on with the keys derived from
+          // it. Refusing here stops that user at a form asking for an nsec
+          // they never held, with their funds behind it. The row is left as
+          // it is, because the account's stored data is filed under its key.
+          log.warn('nostr.keys.profile_pubkey_mismatch', { defaultAccountIndex });
         }
 
         initLog('NostrKeys', 'setting keys in state...');

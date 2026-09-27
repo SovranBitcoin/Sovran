@@ -9,6 +9,7 @@ import {
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import {
   clearAccountDerivedCache,
+  retrieveDerivedKeys,
   retrieveImportedNsec,
   storeCashuMnemonic,
 } from '@/shared/lib/nostr/secureStorage';
@@ -131,6 +132,36 @@ it('shows Re-import on a pubkey mismatch and never configures the wallet', async
   expect(clearAccountDerivedCache).not.toHaveBeenCalled();
   expect(deriveCashuMnemonicForImported).not.toHaveBeenCalled();
   expect(CocoManager.setAccountIndex).not.toHaveBeenCalled();
+});
+
+it('boots a derived account whose saved row names another key, as 0.1.3 did', async () => {
+  // The state an Android backup restore left behind on 0.1.3: the profile row
+  // came back, the keychain did not, and a new root was generated under it.
+  jest.mocked(AsyncStorage.getItem).mockResolvedValueOnce(
+    JSON.stringify({
+      version: PROFILE_STORE_PERSIST_VERSION,
+      state: {
+        activeAccountIndex: 7,
+        profiles: [{ accountIndex: 7, pubkey: 'b'.repeat(64), addedAt: 123 }],
+      },
+    })
+  );
+  await useProfileStore.persist.rehydrate();
+  jest.mocked(retrieveDerivedKeys).mockResolvedValueOnce(null);
+
+  const screen = render(
+    <NostrKeysProvider defaultAccountIndex={7}>
+      <Consumer />
+    </NostrKeysProvider>
+  );
+
+  // `context` outlives a test, so wait on something only this boot can do.
+  await waitFor(() => expect(CocoManager.setAccountIndex).toHaveBeenCalledWith(7, false));
+  await waitFor(() => expect(context.keys?.pubkey).toBe('a'.repeat(64)));
+  expect(context.isReady).toBe(true);
+  expect(screen.queryByTestId('reimport')).toBeNull();
+  // The account's stored data is filed under the saved key, so the row stays.
+  expect(useProfileStore.getState().getActiveProfile()?.pubkey).toBe('b'.repeat(64));
 });
 
 it('refuses repair if an old chain cache cannot be deleted', async () => {
