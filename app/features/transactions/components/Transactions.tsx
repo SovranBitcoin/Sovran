@@ -876,8 +876,8 @@ export const Transactions = React.memo(
               keyExtractor={(section) => section.index ?? section.title}
               // FlashList v2 measures section heights synchronously, so there is no
               // estimate to supply. A collapsing transaction row animates its own
-              // height via Transaction.tsx's reanimated `layout` transition; the
-              // sections below reflow as FlashList re-measures (the legend-only
+              // height (Transaction.tsx, an explicit timing on the height prop);
+              // the sections below reflow as FlashList re-measures (the legend-only
               // `itemLayoutAnimation` that animated sibling reflow has no v2
               // equivalent, so that reflow is now immediate).
               drawDistance={400}

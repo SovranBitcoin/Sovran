@@ -12,10 +12,10 @@ import { create } from 'zustand';
 // Failed reclaims skip `collapsing` entirely — the row stays as a normal
 // pending entry.
 //
-// Both the row's height collapse and the FlashList sibling reflow are
-// driven from the same linear timing curve so they read as one continuous
-// rigid motion — no spring, no overshoot, no bounce. Hold the row in the
-// bucket until the timing curve has finished.
+// The row's height collapse is one linear timing curve on its height prop,
+// and the siblings below reflow through Yoga each frame of it, so the two
+// read as one continuous rigid motion — no spring, no overshoot, no bounce.
+// Hold the row in the bucket until the timing curve has finished.
 export const COLLAPSE_DURATION_MS = 260;
 const COLLAPSE_HOLD_MS = COLLAPSE_DURATION_MS + 20;
 

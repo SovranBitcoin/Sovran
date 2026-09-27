@@ -34,7 +34,9 @@ jest.mock('react-native-reanimated', () => {
     __esModule: true,
     default: { View },
     Easing: { linear: 'linear' },
-    LinearTransition: { duration: () => ({ easing: () => ({}) }) },
+    useSharedValue: (initial: number) => ({ get: () => initial, set: () => {} }),
+    useAnimatedStyle: (worklet: () => Record<string, unknown>) => worklet(),
+    withTiming: (target: number) => target,
   };
 });
 jest.mock('@/shared/hooks/useThemeColor', () => ({

@@ -1,6 +1,11 @@
-import React, { useCallback } from 'react';
-import type { AccessibilityActionEvent } from 'react-native';
-import Animated, { Easing, LinearTransition } from 'react-native-reanimated';
+import React, { useCallback, useEffect } from 'react';
+import type { AccessibilityActionEvent, LayoutChangeEvent } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
 import { withAlpha } from '@/shared/lib/color';
@@ -202,14 +207,36 @@ export const Transaction = React.memo((props: TransactionProps) => {
   const isCollapsing = useIsCollapsing(sendOperationId);
   const swipeable = !!onCancel && cancellable;
 
-  // Post-success collapse: declarative target style + Reanimated's
-  // `layout` transition. When `isCollapsing` flips, React renders the
-  // wrapper with `height: 0, opacity: 0`; Reanimated's LinearTransition
-  // captures the pre/post layouts and interpolates between them on the
-  // UI thread (no per-frame JS re-renders). Yoga commits the new size
-  // each frame on the native side, so this row shrinks in real time and
-  // the FlashList sections below reflow as the list re-measures.
-  const collapsedStyle = isCollapsing ? { height: 0, opacity: 0 } : null;
+  // Post-success collapse: an explicit height animation, NOT a `layout`
+  // transition. `height` is a layout prop, so Reanimated commits each frame
+  // through Yoga and the rows below reflow in step, with no per-frame JS
+  // render. The row's open height is captured from its own onLayout while
+  // it is still open; the timing curve then shrinks it to zero.
+  //
+  // A per-row `layout={LinearTransition}` used to do this, and it also
+  // animated every sibling whenever history changed. That is the trigger
+  // for reanimated#10471 on Fabric: a row inserted or reordered while a
+  // transition is in flight is parked at a neighbour's frame (rows drawn
+  // on top of each other) or vanishes, and stays that way. The fix
+  // (reanimated#10537) ships in 4.7, which needs React Native 0.86 — so
+  // no row here may carry a layout transition until that upgrade lands.
+  const collapse = useSharedValue(0);
+  const openHeight = useSharedValue(0);
+  useEffect(() => {
+    if (!isCollapsing) return;
+    collapse.set(withTiming(1, { duration: COLLAPSE_DURATION_MS, easing: Easing.linear }));
+  }, [isCollapsing, collapse]);
+  const handleLayout = (event: LayoutChangeEvent) => {
+    // Once the collapse starts, onLayout reports the shrinking height —
+    // the target must stay the height the row had while open.
+    if (collapse.get() !== 0) return;
+    openHeight.set(event.nativeEvent.layout.height);
+  };
+  const collapseStyle = useAnimatedStyle(() => {
+    const progress = collapse.get();
+    if (progress === 0) return { opacity: 1 };
+    return { height: openHeight.get() * (1 - progress), opacity: 1 - progress };
+  });
 
   // A refund and a rollback leave the wallet in the same place, so they read
   // the same here.
@@ -322,9 +349,7 @@ export const Transaction = React.memo((props: TransactionProps) => {
   );
 
   return (
-    <Animated.View
-      style={[{ overflow: 'hidden' }, collapsedStyle]}
-      layout={LinearTransition.duration(COLLAPSE_DURATION_MS).easing(Easing.linear)}>
+    <Animated.View className="overflow-hidden" style={collapseStyle} onLayout={handleLayout}>
       <Log name="Transaction">
         {swipeable && cancellable && onCancel ? (
           <SwipeableRow
