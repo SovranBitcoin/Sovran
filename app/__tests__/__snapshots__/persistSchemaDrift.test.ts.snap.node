@@ -51,6 +51,11 @@ exports[`persisted schema drift ai-provider-directory-store schema matches the g
                 "minimum": 0,
                 "type": "number",
               },
+              "minMessageSats": {
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991,
+                "type": "integer",
+              },
               "mints": {
                 "default": [],
                 "items": {
