@@ -7,8 +7,8 @@
 // ---------------------------------------------------------------------------
 
 import {
-  getDecodedToken,
   getP2PKExpectedWitnessPubkeys,
+  getTokenMetadata,
   parseP2PKSecret,
   type Secret,
 } from "@cashu/cashu-ts";
@@ -90,10 +90,12 @@ export function classifyMeshToken(
   });
 
   try {
-    // No mint keysets available on the mesh path: pass an empty keyset list.
-    // Standard (v0) keyset IDs decode fine; a short v2 keyset ID throws and
-    // the token classifies as `invalid` — we can't verify locks we can't parse.
-    const token = getDecodedToken(tokenString, []);
+    // No mint keysets are available on the mesh path, and none are needed:
+    // the lock is in each proof's secret, not its keyset id. Reading metadata
+    // leaves the ids unresolved, so a short v2 keyset id classifies like any
+    // other; the redeem step expands it against the wallet's keychain.
+    const metadata = getTokenMetadata(tokenString);
+    const token = { ...metadata, proofs: metadata.incompleteProofs };
     mintUrl = token.mint ?? null;
     unit = token.unit ?? null;
     if (!Array.isArray(token.proofs) || token.proofs.length === 0) {

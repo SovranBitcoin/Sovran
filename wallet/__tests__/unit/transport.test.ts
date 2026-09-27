@@ -154,19 +154,40 @@ describe("classifyMeshToken", () => {
     });
   });
 
-  it("rejects a short v2 keyset id when no full mint keyset can resolve it", () => {
-    const token = getEncodedToken({
+  // A v2 keyset id travels shortened in a cashuB token and can only be
+  // expanded against the mint's keysets, which the mesh path does not hold.
+  // The lock lives in the proof secret, not the keyset id, so classification
+  // must not depend on it: the redeem step resolves the id against the
+  // wallet's keychain. Rejecting here silently dropped every Nut Drop from a
+  // mint that had rotated to v2 keysets.
+  const V2_KEYSET_ID =
+    "01c352c0b47d42edb764bddf8c53d77b85f057157d92084d9d05e876251ecd8422";
+
+  function encodeV2(secret: string, amount = 2): string {
+    return getEncodedToken({
       mint: MINT_URL,
       unit: "sat",
-      proofs: [
-        {
-          ...proof("aa".repeat(32)),
-          id: "01c352c0b47d42edb764bddf8c53d77b85f057157d92084d9d05e876251ecd8422",
-        },
-      ],
+      proofs: [{ ...proof(secret, amount), id: V2_KEYSET_ID }],
     });
+  }
 
-    expect(classifyMeshToken(token, MY_PUBKEY).classification).toBe("invalid");
+  it("classifies a token locked to me when its keyset id is a short v2 id", () => {
+    expect(classifyMeshToken(encodeV2(p2pkSecret(MY_PUBKEY), 5), MY_PUBKEY)).toEqual({
+      classification: "locked-to-me",
+      mintUrl: MINT_URL,
+      amount: 5,
+      unit: "sat",
+    });
+  });
+
+  it("still separates other locks and bearer proofs under a short v2 keyset id", () => {
+    expect(
+      classifyMeshToken(encodeV2(p2pkSecret(OTHER_PUBKEY)), MY_PUBKEY)
+        .classification,
+    ).toBe("locked-to-other");
+    expect(
+      classifyMeshToken(encodeV2("aa".repeat(32)), MY_PUBKEY).classification,
+    ).toBe("bearer");
   });
 });
 
