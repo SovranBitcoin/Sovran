@@ -155,8 +155,6 @@ interface AmountEntryViewProps {
    * feature imports.
    */
   unitIndicator?: React.ReactNode;
-  /** Optional flow-context badge rendered with the amount (e.g. P2PK lock). */
-  contextIndicator?: React.ReactNode;
 
   /** Quick-send suggestions rendered above the keyboard (send flow only). */
   suggestions?: QuickSendSuggestion[];
@@ -213,7 +211,6 @@ export function AmountEntryView({
   secondaryDisplay = null,
   onToggleMode,
   unitIndicator = null,
-  contextIndicator = null,
   suggestions = [],
   onSuggestionTap,
   extraButtons,
@@ -487,7 +484,6 @@ export function AmountEntryView({
                 style={styles.amountStateProbe}
               />
             ) : null}
-            {contextIndicator}
             {secondaryDisplay ? (
               <CurrencySwapperPill inputMode={inputMode} onPress={handleToggleMode} />
             ) : (

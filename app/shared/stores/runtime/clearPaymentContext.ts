@@ -5,6 +5,7 @@ import { useContactSendStore } from './contactSendStore';
 import { useNearPaySessionStore } from './nearPayStore';
 import { clearPendingZaps } from './pendingZapStore';
 import { useRoutstrTopUpStore } from './routstrTopUpStore';
+import { useSendLockStore } from './sendLockStore';
 
 /**
  * Clear all in-progress payment "context" — the runtime stores that steer where
@@ -41,6 +42,9 @@ export function clearPaymentContext(reason: string): void {
   // A fresh flow must never restore an amount stashed during a previous,
   // abandoned mint-selector round trip.
   useAmountDraftStore.getState().clear();
+  // A lock is a decision about one payment. Left behind, it would lock the
+  // next send to the same person on terms nobody chose for it.
+  useSendLockStore.getState().clear();
   // An abandoned zap must never attach its 9734 to a later unrelated payment
   // that happens to target the same lightning address.
   clearPendingZaps();

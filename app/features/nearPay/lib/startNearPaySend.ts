@@ -1,38 +1,5 @@
+import { acknowledgeSheet as acknowledge } from '@/shared/lib/popup/popups/acknowledgeSheet';
 import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
-
-/** A one-button notice, resolved once — on the button or on dismiss. */
-function acknowledge(notice: {
-  title: string;
-  testID: string;
-  description: string;
-  icon: string;
-}): Promise<void> {
-  return new Promise((resolve) => {
-    let settled = false;
-    const settle = () => {
-      if (settled) return;
-      settled = true;
-      resolve();
-    };
-    actionMenuSheet({
-      title: notice.title,
-      buttons: [
-        {
-          testID: notice.testID,
-          text: 'OK',
-          description: notice.description,
-          icon: notice.icon,
-          variant: 'secondary',
-          onPress: (close) => {
-            settle();
-            close();
-          },
-        },
-      ],
-      onDismiss: () => settle(),
-    });
-  });
-}
 
 /**
  * Informs the user that a Nut Drop can't be sent because we share no mint the

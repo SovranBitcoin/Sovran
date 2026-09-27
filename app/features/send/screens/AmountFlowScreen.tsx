@@ -7,12 +7,20 @@ import { Screen } from '@/shared/ui/composed/Screen';
  * passes it to useScreenActions, and renders UI.
  */
 
-import { useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
 import { Stack } from 'expo-router';
 import { HeaderHeightContext } from 'expo-router/react-navigation';
 
 import { useExecutionState, useScreenActions, usePaymentFlowMachine } from 'wallet/react';
-import { fetchNip05Pubkey, type P2pkLockSpec, type RecipientProfile } from 'wallet';
+import { fetchNip05Pubkey, type RecipientProfile } from 'wallet';
 
 import { useMints } from '@cashu/coco-react';
 
@@ -22,7 +30,6 @@ import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata'
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
-import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { paymentLog, useLifecycleLogger, Log } from '@/shared/lib/logger';
@@ -30,21 +37,13 @@ import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { useAmountDraftStore } from '@/shared/stores/runtime/amountDraftStore';
 import { zIndex } from '@/shared/styles/tokens';
 import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
-import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
-import { useSendLockStore } from '@/shared/stores/runtime/sendLockStore';
 import type { MintNuts } from '@/shared/lib/cashu/mintNuts';
 
 import { AmountSelectedMintProbe } from '../components/AmountSelectedMintProbe';
 
+import { AmountHeaderStatus } from '../components/AmountHeaderStatus';
 import { RecipientHeader, RecipientHeaderBand } from '../components/RecipientHeader';
-import { hasP2PKLock } from '../components/P2PKLockIndicator';
-import { useSendLockTarget } from '../hooks/useSendLockTarget';
-import {
-  buildSendLockMenuItems,
-  lockUntilSec,
-  type SendLockDurationId,
-  type SendLockDurationOption,
-} from '../lib/sendLockMenu';
+import { useSendLock } from '../hooks/useSendLock';
 
 import { AmountSelector } from './AmountSelector';
 
@@ -55,6 +54,13 @@ interface AmountFlowScreenProps {
 interface AmountFlowContentProps {
   amountEntry?: string;
   headerMode?: 'native' | 'none';
+  /**
+   * For a host that owns the navigation bar (`headerMode="none"`, the Nut Drop
+   * radar): handed the lock and sendability status to put in its own
+   * `headerRight`, and `null` when this content goes away. The bar is the
+   * host's, but what belongs in it is known only here.
+   */
+  onHeaderStatus?: (render: (() => ReactNode) | null) => void;
 }
 
 const AMOUNT_FLOW_DIAGNOSTIC_LOGS_ENABLED = false;
@@ -67,7 +73,11 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
   );
 }
 
-export function AmountFlowContent({ amountEntry, headerMode = 'native' }: AmountFlowContentProps) {
+export function AmountFlowContent({
+  amountEntry,
+  headerMode = 'native',
+  onHeaderStatus,
+}: AmountFlowContentProps) {
   useLifecycleLogger(headerMode === 'native' ? 'AmountFlowScreen' : 'NearPayInlineAmountFlow');
   // Read the context directly, like `Screen` does: this content also renders
   // inline (Nut Drop) where no navigator header exists, and the hook throws there.
@@ -182,91 +192,29 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
     : null;
   const nostrHeaderDisplayName = recipientProfile?.displayName ?? fallbackDisplayName ?? null;
   const headerDisplayName = nearPayRecipient?.nickname ?? nostrHeaderDisplayName;
-  const headerAvatarUrl = nearPayRecipient
-    ? null
-    : (recipientProfile?.avatarUrl ?? liveNostrMetadata?.picture ?? null);
-  const headerSeed = nearPayRecipient?.peerID ?? recipientPubkey;
+  // A Nut Drop recipient resolves like any other: the peer's Nostr key is the
+  // recipient pubkey, so its picture and seed are the ones the radar showed.
+  // Only a peer that never exchanged identity falls back to its peerID.
+  const headerAvatarUrl = recipientProfile?.avatarUrl ?? liveNostrMetadata?.picture ?? null;
+  const headerSeed = recipientPubkey ?? nearPayRecipient?.peerID;
   const recipientReady = !!(headerDisplayName && (recipientPubkey || nearPayRecipient));
 
   // ── The lock ────────────────────────────────────────────────────────────
-  // Only an ecash send can be locked, and only when we know who to lock to.
-  // A flow that ARRIVED locked (Nut Drop, a creq) is honouring a protocol
-  // requirement, not a preference, so its lock is not the user's to edit.
-  const isEcashSend = entry?.destination === 'sendEcash';
-  const arrivedLocked = hasP2PKLock(entry as Record<string, unknown> | undefined);
-  const lockDraft = useSendLockStore((state) => state.draft);
-  const setLockDraft = useSendLockStore((state) => state.set);
-  const clearLockDraft = useSendLockStore((state) => state.clear);
+  // One owner for every flow: the header shows whether this ecash will be
+  // locked, and no locked send leaves without the sender having said for how
+  // long. See `useSendLock`.
   const { trustedMints } = useMints();
   const selectedMintNuts = useMemo(() => {
     const mint = trustedMints.find((m) => m.mintUrl === mintUrl);
     return (mint?.mintInfo as { nuts?: MintNuts } | undefined)?.nuts;
   }, [trustedMints, mintUrl]);
-  const { gate: lockGate, refundKey } = useSendLockTarget({
+  const sendLock = useSendLock({
+    entry: entry as Record<string, unknown> | undefined,
     ...(recipientPubkey ? { recipientPubkey } : {}),
+    recipientName: headerDisplayName ?? 'this key',
     ...(mintUrl ? { selectedMintUrl: mintUrl } : {}),
     ...(selectedMintNuts ? { selectedMintNuts } : {}),
   });
-  const lockControlVisible = isEcashSend && !arrivedLocked && !!recipientPubkey;
-
-  // A draft that outlived its recipient or its mint would lock this payment
-  // to the last one. Drop it rather than carry it.
-  useEffect(() => {
-    if (!lockDraft) return;
-    if (!lockControlVisible || lockDraft.recipientPubkey !== recipientPubkey) {
-      clearLockDraft();
-    }
-  }, [lockDraft, lockControlVisible, recipientPubkey, clearLockDraft]);
-
-  const lockRecipientName = headerDisplayName ?? 'them';
-  const openLockMenu = useCallback((): Promise<P2pkLockSpec | null> => {
-    const lockKey = lockGate.kind === 'unavailable' ? null : lockGate.lockKey;
-    if (!lockKey || !recipientPubkey) return Promise.resolve(null);
-    const current: SendLockDurationId = lockDraft
-      ? (lockDraft.durationId as SendLockDurationId)
-      : 'off';
-    return new Promise((resolve) =>
-      actionMenuSheet({
-        title: `Lock to ${lockRecipientName}`,
-        onDismiss: () => resolve(null),
-        buttons: buildSendLockMenuItems({
-          recipientName: lockRecipientName,
-          current,
-          hasRefundKey: !!refundKey,
-          nowMs: Date.now(),
-          onPick: (option: SendLockDurationOption) => {
-            if (option.id === 'off') {
-              clearLockDraft();
-              resolve(null);
-              return;
-            }
-            const locktimeSec = lockUntilSec(option, Date.now());
-            setLockDraft({
-              lockKey,
-              recipientPubkey,
-              durationId: option.id,
-              // NUT-11 refuses one without the other, so they are set together
-              // or not at all.
-              ...(locktimeSec && refundKey ? { locktimeSec, refundKey } : {}),
-              confirmed: lockGate.kind === 'ready',
-            });
-            resolve({
-              pubkey: lockKey,
-              ...(locktimeSec && refundKey ? { locktimeSec, refundKeys: [refundKey] } : {}),
-            });
-          },
-        }).filter((item) => item.testID !== 'send-lock-off'),
-      })
-    );
-  }, [
-    lockGate,
-    lockDraft,
-    lockRecipientName,
-    recipientPubkey,
-    refundKey,
-    setLockDraft,
-    clearLockDraft,
-  ]);
 
   useEffect(() => {
     if (!nearPayRecipient) return;
@@ -342,11 +290,6 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
     [headerHeight]
   );
   const amountBodyStyle = useMemo(() => ({ flex: 1 }), []);
-  const isSendOperation = entry?.destination !== 'mintQuote';
-  const offlineIconStyle = useMemo(
-    () => ({ opacity: canSendOffline === null ? 0.3 : 1 }),
-    [canSendOffline]
-  );
   // A `headerTitle` function replaces the native title outright: the navigator
   // renders whatever this returns and ignores the `title` option entirely. So
   // both branches must return an ELEMENT — the fallback used to return the bare
@@ -373,26 +316,27 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
       ),
     [headerAvatarUrl, headerDisplayName, headerSeed, recipientPubkey, recipientReady]
   );
+  const isSendOperation = entry?.destination !== 'mintQuote';
+  const showHeaderStatus = (isSendOperation && !!mintUrl) || sendLock.mode !== 'hidden';
+  const { locked: lockLocked, label: lockLabel, open: openLock } = sendLock;
+  const lockShown = sendLock.mode !== 'hidden';
   const renderHeaderRight = useCallback(
     () => (
-      <View className="flex-row items-center gap-2">
-        <View style={offlineIconStyle}>
-          <ScreenHeaderAction
-            icon={canSendOffline === true ? 'mdi:airplane' : 'mdi:wifi'}
-            size={18}
-            accessibilityLabel={
-              canSendOffline === true
-                ? 'Offline send available'
-                : canSendOffline === false
-                  ? 'Network required'
-                  : 'Checking offline send availability'
-            }
-          />
-        </View>
-      </View>
+      <AmountHeaderStatus
+        canSendOffline={canSendOffline}
+        {...(lockShown
+          ? { lock: { locked: lockLocked, label: lockLabel, onPress: openLock } }
+          : {})}
+      />
     ),
-    [canSendOffline, offlineIconStyle]
+    [canSendOffline, lockShown, lockLocked, lockLabel, openLock]
   );
+  // The inline host draws the bar; hand it the status to draw there.
+  useEffect(() => {
+    if (!onHeaderStatus) return;
+    onHeaderStatus(showHeaderStatus ? renderHeaderRight : null);
+    return () => onHeaderStatus(null);
+  }, [onHeaderStatus, showHeaderStatus, renderHeaderRight]);
   const stackOptions = useMemo(
     () =>
       withGlassHeaderItems({
@@ -402,10 +346,9 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
         headerTitleAlign: 'center' as const,
         headerTitle: renderHeaderTitle,
         headerTintColor: foreground,
-        headerRight:
-          (isSendOperation && mintUrl) || lockControlVisible ? renderHeaderRight : undefined,
+        headerRight: showHeaderStatus ? renderHeaderRight : undefined,
       }),
-    [foreground, isSendOperation, mintUrl, lockControlVisible, renderHeaderRight, renderHeaderTitle]
+    [foreground, showHeaderStatus, renderHeaderRight, renderHeaderTitle]
   );
   const handleErrorGoBack = useCallback(() => {
     void actions.back.execute();
@@ -443,16 +386,9 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
           onRequestMintList={handleRequestMintList}
           recipientPubkey={recipientPubkey}
           recipientProfile={forwardedRecipientProfile}
-          lockChoice={lockControlVisible ? null : undefined}
-          lockOption={
-            lockControlVisible
-              ? {
-                  ...(lockGate.kind === 'unavailable' ? { reason: lockGate.reason } : {}),
-                  choose: openLockMenu,
-                }
-              : undefined
-          }
-          arrivedLocked={arrivedLocked}
+          lockChoice={sendLock.lockChoice}
+          lockOption={sendLock.lockOption}
+          confirmLock={sendLock.confirmLock}
           suppressNextVariants={!!nearPayRecipient}
         />
       </View>

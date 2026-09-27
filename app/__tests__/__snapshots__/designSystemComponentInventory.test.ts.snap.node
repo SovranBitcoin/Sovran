@@ -98,6 +98,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/mint/components/rebalance/RebalanceChainCard.tsx",
     "features/mint/components/rebalance/RebalanceStepRow.tsx",
     "features/nearPay/components/LightningStrike.tsx",
+    "features/nearPay/components/NearbyPeerRow.tsx",
     "features/nearPay/components/NutDropCelebrationCanvas.tsx",
     "features/nearPay/components/NutDropCelebrationOverlay.tsx",
     "features/nostrSigner/components/PermissionGestureDemo.tsx",
@@ -120,11 +121,11 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/receive/components/ReceiveReusableQuoteTab.tsx",
     "features/receive/components/ReceiveUnifiedTab.tsx",
     "features/receive/components/UnifiedRailsCard.tsx",
+    "features/send/components/AmountHeaderStatus.tsx",
     "features/send/components/AmountSelectedMintProbe.tsx",
     "features/send/components/DetectedActionRow.tsx",
     "features/send/components/MeltDestinationFingerprintProbe.tsx",
     "features/send/components/MeltSelectedMintProbe.tsx",
-    "features/send/components/P2PKLockIndicator.tsx",
     "features/send/components/RecipientHeader.tsx",
     "features/send/components/SpendingConditionsCard.tsx",
     "features/settings/components/ProfileDetailsScreen.tsx",
@@ -274,6 +275,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 268,
+  "total": 269,
 }
 `;

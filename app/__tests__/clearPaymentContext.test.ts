@@ -9,6 +9,7 @@ import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { peekPendingZap, registerPendingZap } from '@/shared/stores/runtime/pendingZapStore';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
+import { useSendLockStore } from '@/shared/stores/runtime/sendLockStore';
 
 describe('clearPaymentContext', () => {
   it('clears Routstr top-up and Nut-Drop context', () => {
@@ -42,6 +43,21 @@ describe('clearPaymentContext', () => {
     clearPaymentContext('test');
 
     expect(useContactSendStore.getState().active).toBeNull();
+  });
+
+  it('clears a lock chosen for an abandoned send', () => {
+    // The amount screen's plain Next sends on the kept choice, so one left
+    // behind would lock the next payment to the same person unasked.
+    useSendLockStore.getState().set({
+      lockKey: `02${'ab'.repeat(32)}`,
+      recipientPubkey: 'a'.repeat(64),
+      durationId: '7d',
+      confirmed: true,
+    });
+
+    clearPaymentContext('test');
+
+    expect(useSendLockStore.getState().draft).toBeNull();
   });
 
   it('clears a pending zap left by an abandoned zap flow', () => {

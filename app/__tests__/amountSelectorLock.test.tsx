@@ -33,16 +33,7 @@ jest.mock('@/shared/stores/runtime/routstrTopUpStore', () => ({
 jest.mock('@/shared/ui/composed/AmountEntryView', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   return {
-    AmountEntryView: (props: { contextIndicator?: React.ReactNode }) =>
-      ReactActual.createElement('div', props, props.contextIndicator),
-  };
-});
-jest.mock('@/features/send/components/P2PKLockIndicator', () => {
-  const ReactActual = jest.requireActual<typeof import('react')>('react');
-  return {
-    hasP2PKLock: (entry: Record<string, unknown>) => Boolean(entry.p2pkLockPubkey),
-    P2PKLockIndicator: () =>
-      ReactActual.createElement('MockIndicator', { testID: 'p2pk-lock-indicator' }),
+    AmountEntryView: (props: Record<string, unknown>) => ReactActual.createElement('div', props),
   };
 });
 
@@ -53,7 +44,7 @@ const action = (available = false) => ({
   variants: [],
 });
 
-describe('AmountSelector P2PK state', () => {
+describe('AmountSelector lock', () => {
   it('sends locked ecash only through its explicit method and leaves Ecash unlocked', async () => {
     const lock = { pubkey: `02${'11'.repeat(32)}` };
     const choose = jest.fn(async () => lock);
@@ -103,32 +94,124 @@ describe('AmountSelector P2PK state', () => {
     });
   });
 
-  it('renders the lock indicator when the amount entry carries a lock target', async () => {
-    const entry = {
-      rawInput: '40',
-      numericValue: 40,
-      unit: 'sat',
-      keyboardUnit: 'sat',
-      destination: 'sendEcash',
-      p2pkLockPubkey: `02${'11'.repeat(32)}`,
+  const lockedEntry = {
+    rawInput: '40',
+    numericValue: 40,
+    unit: 'sat',
+    keyboardUnit: 'sat',
+    destination: 'sendEcash',
+    p2pkLockPubkey: `02${'11'.repeat(32)}`,
+  };
+  const plainActions = (): React.ComponentProps<typeof AmountSelector>['actions'] => ({
+    setInput: action(true),
+    toggle: action(true),
+    next: action(true),
+    paste: action(),
+    scanQr: action(),
+    cancel: action(),
+    back: action(),
+  });
+
+  // The lock is shown in the header of every ecash amount screen. The pill
+  // under the amount said the same thing a second time, and said less.
+  it('puts no lock badge under the amount', async () => {
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <AmountSelector entry={lockedEntry} actions={plainActions()} transactionType="send" />
+      );
+    });
+
+    expect(renderer!.root.findAllByProps({ testID: 'p2pk-lock-indicator' })).toEqual([]);
+    expect(renderer!.root.findByType('div').props.contextIndicator).toBeUndefined();
+  });
+
+  // A flow that arrives locked (a Nut Drop) used to send on its seeded terms
+  // without a word. Every locked send now answers for who and how long first.
+  it('asks for the lock terms before a locked send leaves, and sends on them', async () => {
+    const lock = {
+      pubkey: `02${'11'.repeat(32)}`,
+      locktimeSec: 1_800_000_000,
+      refundKeys: [`02${'22'.repeat(32)}`],
     };
-    const actions: React.ComponentProps<typeof AmountSelector>['actions'] = {
-      setInput: action(true),
-      toggle: action(true),
-      next: action(true),
-      paste: action(),
-      scanQr: action(),
-      cancel: action(),
-      back: action(),
+    const confirmLock = jest.fn(async () => lock);
+    const actions = plainActions();
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <AmountSelector
+          entry={lockedEntry}
+          actions={actions}
+          transactionType="send"
+          confirmLock={confirmLock}
+          suppressNextVariants
+        />
+      );
+    });
+
+    await act(async () => {
+      await renderer!.root.findByType('div').props.onNext();
+    });
+
+    expect(confirmLock).toHaveBeenCalledTimes(1);
+    expect(actions.next.execute).toHaveBeenCalledWith({ p2pkLock: lock });
+  });
+
+  it('sends nothing when the sender backs out of the lock question', async () => {
+    const confirmLock = jest.fn(async () => null);
+    const actions = plainActions();
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <AmountSelector
+          entry={lockedEntry}
+          actions={actions}
+          transactionType="send"
+          confirmLock={confirmLock}
+        />
+      );
+    });
+
+    await act(async () => {
+      await renderer!.root.findByType('div').props.onNext();
+    });
+
+    expect(confirmLock).toHaveBeenCalledTimes(1);
+    expect(actions.next.execute).not.toHaveBeenCalled();
+  });
+
+  it('asks through the Lock Ecash row too when the flow arrived locked', async () => {
+    const lock = { pubkey: `02${'11'.repeat(32)}` };
+    const confirmLock = jest.fn(async () => lock);
+    const actions = {
+      ...plainActions(),
+      next: {
+        ...action(true),
+        variants: [{ id: 'locked-ecash', label: 'Lock Ecash', available: true }],
+      },
     };
     let renderer: TestRenderer.ReactTestRenderer;
     await act(async () => {
       renderer = TestRenderer.create(
-        <AmountSelector entry={entry} actions={actions} transactionType="send" />
+        <AmountSelector
+          entry={lockedEntry}
+          actions={actions}
+          transactionType="send"
+          confirmLock={confirmLock}
+        />
       );
     });
 
-    expect(renderer!.root.findByProps({ testID: 'p2pk-lock-indicator' })).toBeTruthy();
+    const variants = renderer!.root.findByType('div').props.nextVariants;
+    await act(async () => {
+      await variants.find((v: { id: string }) => v.id === 'locked-ecash').onPress();
+    });
+
+    expect(confirmLock).toHaveBeenCalledTimes(1);
+    expect(actions.next.execute).toHaveBeenLastCalledWith({
+      variantId: 'locked-ecash',
+      p2pkLock: lock,
+    });
   });
 
   it('renders one Create ecash action without generic variants, paste, or scan', async () => {

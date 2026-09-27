@@ -7,8 +7,9 @@ import React, {
   useSyncExternalStore,
 } from 'react';
 import { LayoutChangeEvent, Platform, StyleSheet } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useFocusEffect } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import type { BLEPeer } from 'bitchat-module';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -1587,6 +1588,16 @@ export function NearPayScreen() {
     };
   }, []);
 
+  // Whatever popped the mint picker (a choice, Cancel, the back gesture), the
+  // radar is on top again, so the picker is no longer covering it. Without this
+  // a back-swipe would leave the mark set and the next amount step would pop
+  // the radar itself.
+  useFocusEffect(
+    useCallback(() => {
+      useNearPaySessionStore.getState().setMintPickerOpen(false);
+    }, [])
+  );
+
   // The recipient's identity is seeded up front from the peer's announced
   // P2PK key (recipientPubkey passed to startSendEcash); the stage-2 resolver
   // then fills ctx.recipientProfile from kind-0. Subscribing to the live ctx
@@ -1598,6 +1609,10 @@ export function NearPayScreen() {
     machine.getContext
   );
   const recipientProfile = liveFlowCtx.recipientProfile;
+  const { metadata: recipientMetadata } = useNostrProfileMetadata(
+    selectedPeer?.nostrPubkeyHex ?? liveFlowCtx.recipientPubkey ?? undefined
+  );
+  const recipientPicture = recipientMetadata?.picture;
 
   const activeRecipientPeer = useMemo<NearPayLayoutPeer | null>(() => {
     const recipient = nearPaySession?.recipient;
@@ -1618,13 +1633,15 @@ export function NearPayScreen() {
             identitySeed: recipient.peerID,
             profileLoading: false,
           };
-    if (!recipientProfile) return base;
+    // `base` and the seeded profile are both tap-time snapshots. A picture
+    // that resolves after the tap only reaches the header through the live
+    // read, so it has the last word on the face.
     return {
       ...base,
-      name: recipientProfile.displayName || base.name,
-      avatarUrl: recipientProfile.avatarUrl ?? base.avatarUrl,
+      name: recipientProfile?.displayName || base.name,
+      avatarUrl: recipientProfile?.avatarUrl ?? base.avatarUrl ?? recipientPicture ?? null,
     };
-  }, [nearPaySession?.recipient, recipientProfile, selectedPeer]);
+  }, [nearPaySession?.recipient, recipientPicture, recipientProfile, selectedPeer]);
 
   const headerAvatarRect = useMemo<AvatarRect | null>(() => {
     return getCenteredAvatarRectInSlot({
@@ -2139,6 +2156,13 @@ export function NearPayScreen() {
   const openPeerList = useCallback(() => {
     router.push('/(send-flow)/nearPayPeers');
   }, []);
+  const [amountHeaderStatus, setAmountHeaderStatus] = useState<(() => React.ReactNode) | null>(
+    null
+  );
+  // Wrapped: a bare function handed to a state setter is called as an updater.
+  const handleAmountHeaderStatus = useCallback((render: (() => React.ReactNode) | null) => {
+    setAmountHeaderStatus(() => render);
+  }, []);
   const renderHeaderRight = useCallback(
     () => <HeaderBadge count={headerBadgeCount} onPress={openPeerList} />,
     [headerBadgeCount, openPeerList]
@@ -2152,7 +2176,9 @@ export function NearPayScreen() {
         headerTitle: amountActive ? renderEmptyHeader : undefined,
         headerBackVisible: false,
         headerLeft: amountActive ? renderHeaderLeft : renderEmptyHeader,
-        headerRight: amountActive ? renderEmptyHeader : renderHeaderRight,
+        // The amount step's lock and sendability status belong in the bar, and
+        // the bar is this screen's: the inline amount content hands them over.
+        headerRight: amountActive ? (amountHeaderStatus ?? renderEmptyHeader) : renderHeaderRight,
         // The send flow's shared-element avatar lands inside the header band,
         // and Android's sheet header (FlowSheetHeader) composites its scrim
         // gradient ABOVE screen content — the avatar ended up underneath it.
@@ -2160,7 +2186,7 @@ export function NearPayScreen() {
         // the radar's faint dot field doesn't need the legibility fade.
         ...(Platform.OS === 'android' ? { headerBackground: renderNullHeaderBackground } : {}),
       }),
-    [amountActive, renderEmptyHeader, renderHeaderLeft, renderHeaderRight]
+    [amountActive, amountHeaderStatus, renderEmptyHeader, renderHeaderLeft, renderHeaderRight]
   );
 
   return (
@@ -2198,7 +2224,11 @@ export function NearPayScreen() {
                     hideAvatar={sharedAvatarVisible}
                   />
                   <Animated.View style={amountContentCombinedStyle}>
-                    <AmountFlowContent amountEntry={inlineAmountEntry} headerMode="none" />
+                    <AmountFlowContent
+                      amountEntry={inlineAmountEntry}
+                      headerMode="none"
+                      onHeaderStatus={handleAmountHeaderStatus}
+                    />
                   </Animated.View>
                 </Animated.View>
               ) : null}

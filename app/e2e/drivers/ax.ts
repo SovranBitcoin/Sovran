@@ -100,7 +100,6 @@ const ACTIVE_FLOW_ID_PREFIXES = [
 
 const ACTIVE_FLOW_IDS = new Set([
   'flow-header-close',
-  'p2pk-lock-indicator',
   'qr-density-control',
   'qr-speed-control',
   'screen-near-pay',

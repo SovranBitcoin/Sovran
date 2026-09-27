@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "id": "send.cashu.header-lock",
+  "name": "Send ecash — the lock and sendability status sit in the header",
+  "description": "On the Create Ecash amount screen the header shows an open lock and the offline or online status, and there is no lock badge under the amount. Tapping the lock explains that there is nobody to lock to, and the amount screen is still usable afterwards.",
+  "details": "Fund 100, enter Create Ecash: amount-header-lock and amount-header-sendability are both in the bar, and the retired p2pk-lock-indicator is absent. Create Ecash names no recipient, so tapping the lock opens the one-button notice (amount-lock-notice-ok) rather than the duration sheet; acknowledging it returns to a live keypad where 40 can still be typed and Next enables. No ecash is created: the flow backs out to the send hub. The duration sheet itself (a send to a person, a Nut Drop) needs a second identity or a second device and is covered by unit tests only",
+  "lane": "funded",
+  "tags": ["flow:send","instrument:cashu-token","check:navigation"],
+  "requires": ["fresh-install"],
+  "funds": {"assets":[{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"maxPrincipal":100}]},
+  "setup": [
+    {"use":"flow.onboard-sovran-mint"},
+    {"use":"flow.fund-lightning-100"},
+    {"action":"waitFor","selector":{"label":"₿ 100"},"timeoutMs":60000}
+  ],
+  "steps": [
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Send"}}],"until":{"id":"send-method-createEcash"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"send-method-createEcash"}}],"until":{"id":"amount-next"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"amount-header-lock"},"timeoutMs":30000},
+    {"action":"waitFor","selector":{"id":"amount-header-sendability"},"timeoutMs":30000},
+    {"action":"screenshot","name":"send-amount"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"amount-header-lock"}}],"until":{"id":"amount-lock-notice-ok"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"amount-lock-notice-ok"}}],"until":{"id":"amount-next"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"4"}}],"until":{"id":"amount-state:4"},"attempts":4,"settleMs":3000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"0"}}],"until":{"id":"amount-state:40"},"attempts":4,"settleMs":3000},
+    {"action":"waitFor","selector":{"id":"amount-next"},"state":"enabled","timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"flow-header-back"}}],"until":{"id":"send-method-createEcash"},"attempts":4,"settleMs":6000},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"₿ 100"},"timeoutMs":60000}
+  ],
+  "verify": [
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":0},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.sweep-mint","with":{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0}},
+    {"use":"flow.return-to-wallet"},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":45000}
+  ],
+  "endState": "wallet"
+}

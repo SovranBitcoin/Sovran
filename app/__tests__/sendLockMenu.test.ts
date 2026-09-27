@@ -55,6 +55,7 @@ describe('lock menu items', () => {
     buildSendLockMenuItems({
       recipientName: NAME,
       current: 'off',
+      allowOff: true,
       hasRefundKey: true,
       nowMs: NOW,
       onPick: () => {},
@@ -73,6 +74,20 @@ describe('lock menu items', () => {
     expect(items.find((i) => i.testID === 'send-lock-24h')?.disabled).toBe(true);
     expect(items.find((i) => i.testID === 'send-lock-forever')?.disabled).toBeUndefined();
     expect(items.find((i) => i.testID === 'send-lock-off')?.disabled).toBeUndefined();
+  });
+
+  it('does not offer "Don\'t lock" where the lock is a requirement', () => {
+    // A Nut Drop or a scanned wallet key arrives locked. How long is the
+    // sender's to pick; whether is not.
+    const items = build({ allowOff: false, current: null });
+    expect(items.map((i) => i.testID)).toEqual([
+      'send-lock-1h',
+      'send-lock-24h',
+      'send-lock-7d',
+      'send-lock-30d',
+      'send-lock-forever',
+    ]);
+    expect(items.some((i) => i.selected)).toBe(false);
   });
 
   it('flags the irreversible choice as dangerous', () => {

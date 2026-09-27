@@ -8,26 +8,30 @@ import type { CashuP2pkPubkey } from '@/shared/lib/protocolIds';
  *
  * Runtime only — never persisted. A lock is a decision about one payment, and
  * a stale one restored into a later send would lock someone else's money to
- * yesterday's recipient.
+ * yesterday's recipient. `clearPaymentContext` drops it at the root of every
+ * payment flow for the same reason.
  *
  * It lives in a store rather than screen state for the reason `contactSendStore`
  * does: the amount body renders in two places (the route and inside the Nut
- * Drop radar), the header that owns the toggle renders in only one of them,
- * and `sendComplete` — a step handler outside React — has to read the terms to
- * record what was agreed.
+ * Drop radar), and the header that shows the lock belongs to whichever screen
+ * is hosting it.
  */
 interface SendLockDraft {
   /** The key the ecash will be locked to. */
-  lockKey: CashuP2pkPubkey;
-  /** Whose key it is, so the annotation can name the counterparty. */
-  recipientPubkey: string;
-  /** Which menu choice produced this, so the menu can show it selected. */
-  durationId: string;
-  /** Unix seconds; absent means a permanent lock with no way back. */
-  locktimeSec?: number;
+  lockKey: string;
   /**
-   * Our own keyring key, the one a reclaim would sign with. Present exactly
-   * when `locktimeSec` is — NUT-11 refuses one without the other.
+   * Whose key it is, when it is a person's. Absent for a lock to a bare wallet
+   * receive key, which names nobody.
+   */
+  recipientPubkey?: string;
+  /**
+   * Which sheet choice this is. The unlock time is derived from it when the
+   * send leaves, so a choice made a while ago still means what it said.
+   */
+  durationId: string;
+  /**
+   * Our own keyring key, the one a reclaim would sign with. Present for a
+   * timed choice — NUT-11 refuses a locktime without it.
    */
   refundKey?: CashuP2pkPubkey;
   /** False when the lock key is our assumption rather than their declaration. */
@@ -45,7 +49,7 @@ export const useSendLockStore = create<SendLockStore>((set, get) => ({
   set: (draft) => {
     storeLog.info('store.sendLock.set', {
       durationId: draft.durationId,
-      hasLocktime: !!draft.locktimeSec,
+      hasRecipient: !!draft.recipientPubkey,
       hasRefundKey: !!draft.refundKey,
       confirmed: draft.confirmed,
     });

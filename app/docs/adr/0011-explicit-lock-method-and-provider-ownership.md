@@ -3,6 +3,11 @@
 Date: 2026-09-24
 Status: Accepted; native verification outstanding.
 
+The rule below that a protocol-supplied lock sends on its seeded terms without
+asking is superseded by
+[ADR 0016](0016-the-lock-lives-in-the-amount-header.md), which also restores
+the header control beside the "Lock Ecash" row.
+
 Supersedes the header-toggle and uncertainty-copy decisions in
 [ADR 0010](0010-p2pk-locked-sends.md). The user's review request explicitly
 asks for Ecash, Lightning and Lock Ecash in the same payment-method menu.

@@ -146,10 +146,6 @@ jest.mock('@/shared/lib/nostr/memoMentions', () => ({
   formatMemoForDisplay: (memo: string) => memo,
 }));
 jest.mock('@/shared/lib/identity', () => ({ resolveIdentityName: jest.fn(() => '') }));
-jest.mock('@/features/send/components/P2PKLockIndicator', () => ({
-  hasP2PKLock: jest.fn(() => false),
-  P2PKLockIndicator: () => null,
-}));
 jest.mock('@/shared/blocks/PaymentInfo', () => {
   const ReactActual = jest.requireActual<typeof React>('react');
   return {

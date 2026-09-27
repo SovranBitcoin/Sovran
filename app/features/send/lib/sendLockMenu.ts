@@ -69,7 +69,13 @@ export function describeDuration(
 
 interface SendLockMenuParams {
   recipientName: string;
-  current: SendLockDurationId;
+  /** The choice to show selected; null when nothing has been chosen yet. */
+  current: SendLockDurationId | null;
+  /**
+   * Whether "Don't lock" is on offer. False when the flow arrived locked: the
+   * lock is a requirement there, and only its length is the sender's to pick.
+   */
+  allowOff: boolean;
   /** False when this wallet has no keyring key to name as the refund key. */
   hasRefundKey: boolean;
   nowMs: number;
@@ -79,9 +85,10 @@ interface SendLockMenuParams {
 const NO_REFUND_KEY_REASON = 'Add a P2PK key in Settings to reclaim later';
 
 export function buildSendLockMenuItems(params: SendLockMenuParams): ActionMenuItem[] {
-  const { recipientName, current, hasRefundKey, nowMs, onPick } = params;
+  const { recipientName, current, allowOff, hasRefundKey, nowMs, onPick } = params;
   const items: ActionMenuItem[] = [];
   for (const option of SEND_LOCK_DURATIONS) {
+    if (option.id === 'off' && !allowOff) continue;
     // A timed lock we cannot sign the refund for would be unreclaimable by us
     // and, once it opened, spendable by anyone. Offer only the permanent lock
     // until this wallet has a key to reclaim with.

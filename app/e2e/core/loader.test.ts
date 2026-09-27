@@ -1359,7 +1359,7 @@ describe('loadE2E over the real tree', () => {
     const users = [...loaded.scenarios.values()].filter((scenario) =>
       scenario.finally.some((item) => 'use' in item && item.use === 'flow.sweep-mint')
     );
-    expect(users).toHaveLength(38);
+    expect(users).toHaveLength(39);
     const full = loaded.suites.find((suite) => suite.name === 'full')!;
     for (const scenario of users) {
       const invocations = scenario.finally.filter(
@@ -1383,9 +1383,9 @@ describe('loadE2E over the real tree', () => {
     }
   });
 
-  it('gives all 61 funded plans exact bounded assets and no raw cocod argv', () => {
+  it('gives all 62 funded plans exact bounded assets and no raw cocod argv', () => {
     const funded = [...loaded.scenarios.values()].filter((scenario) => scenario.lane === 'funded');
-    expect(funded).toHaveLength(61);
+    expect(funded).toHaveLength(62);
     for (const scenario of funded) {
       expect(scenario.funds?.assets.length).toBeGreaterThan(0);
       expect(
