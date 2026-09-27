@@ -763,6 +763,11 @@ export type NotificationHandlerMap = {
   onNfcWriteFailed?: (data: {
     message: string;
     rolledBack: boolean;
+    /**
+     * `prepare`: the token was never created, nothing reached the tag.
+     * `write`: the token existed and the tag write itself failed.
+     */
+    stage?: "prepare" | "write";
   }) => MaybeAsync;
 
   // ── Screen action notifications ─────────────────────────────────────
@@ -1074,6 +1079,16 @@ export interface MachineOperations {
    * after token creation to reclaim the ecash proofs.
    */
   rollbackSend?: (operationId: string) => Promise<void>;
+  /**
+   * Whether a NUT-18 payment request can be paid from this mint at all —
+   * the same gate `executeNfcSend` applies before reserving proofs, asked
+   * up front so an automatic mint choice never lands on a mint the send
+   * will refuse. Answered from local keyset data; no network.
+   */
+  paymentRequestPayabilityFrom?: (
+    mintUrl: string,
+    unit: string,
+  ) => Promise<{ payable: true } | { payable: false; reason: string }>;
 
   // ── Screen action operations ────────────────────────────────────────
   // These are used by the built-in default screen action handlers.

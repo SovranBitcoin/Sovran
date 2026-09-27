@@ -80,4 +80,17 @@ describe('writeNdefTextRecord', () => {
     });
     expect(mockSendApdu).toHaveBeenCalledTimes(3);
   });
+
+  it('caps each body chunk at the tag-advertised MLc, never above MAX_CHUNK_SIZE', async () => {
+    const text = `cashuB${'x'.repeat(300)}`;
+    await writeNdefTextRecord(text, { chunkSize: 52 });
+    const chunks = mockSendApdu.mock.calls.map(([command]) => command).slice(1, -1);
+    expect(chunks.length).toBeGreaterThan(3);
+    for (const command of chunks) expect(command.slice(5).length).toBeLessThanOrEqual(52);
+
+    mockSendApdu.mockClear();
+    await writeNdefTextRecord(text, { chunkSize: 10_000 });
+    const wide = mockSendApdu.mock.calls.map(([command]) => command).slice(1, -1);
+    for (const command of wide) expect(command.slice(5).length).toBeLessThanOrEqual(MAX_CHUNK_SIZE);
+  });
 });

@@ -9,7 +9,12 @@ import {
   nostrPubkeyHexFromCashuP2pk,
   type CashuP2pkPubkey,
 } from '@/shared/lib/protocolIds';
-import { buildStandingCreq, lockableMintsFromCreq, parseCreq } from '@/shared/lib/nutCreq';
+import {
+  buildStandingCreq,
+  lockableMintsFromCreq,
+  parseCreq,
+  rankAdvertisedMints,
+} from '@/shared/lib/nutCreq';
 
 const NOSTR_HEX = 'ab'.repeat(32);
 const PUBKEY_33 = cashuP2pkPubkeyFromNostrHex(NOSTR_HEX);
@@ -63,6 +68,49 @@ describe('nutCreq standing payment request', () => {
     const creq = buildStandingCreq({ mints: many, pubkey33: PUBKEY_33 });
     const parsed = parseCreq(creq!);
     expect(parsed!.mints).toEqual(many.slice(0, 5));
+  });
+
+  // Two phones, fourteen mints on one: alphabetical order advertised five
+  // mints the sender held nothing in, and the send failed as "insufficient
+  // balance on allowed mints" although four funded mints were shared.
+  it('keeps the selected and the funded mints inside the cap', () => {
+    const mints = [
+      'https://8333.space:3338',
+      'https://antifiat.cash',
+      'https://kashu.me',
+      'https://ldk.thesimplekid.dev',
+      'https://mint.28waves.com',
+      'https://mint.chorus.community',
+      'https://mint.cubabitcoin.org',
+      'https://mint.minibits.cash/Bitcoin',
+      'https://mint.sovran.money',
+    ];
+    const ranked = rankAdvertisedMints({
+      mints,
+      fundedMints: new Set([
+        'https://mint.minibits.cash/Bitcoin',
+        'https://mint.chorus.community',
+        'https://mint.sovran.money',
+      ]),
+      preferredMint: 'https://mint.cubabitcoin.org',
+    });
+
+    expect(ranked).toHaveLength(mints.length);
+    expect(ranked.slice(0, 4)).toEqual([
+      'https://mint.cubabitcoin.org',
+      'https://mint.chorus.community',
+      'https://mint.minibits.cash/Bitcoin',
+      'https://mint.sovran.money',
+    ]);
+    const creq = buildStandingCreq({ mints: ranked, pubkey33: PUBKEY_33 });
+    expect(parseCreq(creq!)!.mints).toEqual(ranked.slice(0, 5));
+  });
+
+  it('ranks on funded, not on the amount, so a balance change does not reorder', () => {
+    const mints = ['https://b.example', 'https://a.example', 'https://a.example'];
+    expect(
+      rankAdvertisedMints({ mints, fundedMints: new Set(mints), preferredMint: null })
+    ).toEqual(['https://a.example', 'https://b.example']);
   });
 
   it('rejects a non-creq string', () => {

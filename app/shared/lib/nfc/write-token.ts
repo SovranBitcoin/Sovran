@@ -12,7 +12,8 @@
  */
 
 import { NfcError, isUserCancelError } from './errors';
-import { selectNdefApp } from './apdu';
+import { readCapabilityContainer, selectNdefApplication, selectNdefFile } from './apdu';
+import { buildTextNdef } from './ndef';
 import { writeNdefTextRecord } from './write';
 import { withSession } from './session';
 import { nfcLog } from '../logger';
@@ -25,8 +26,24 @@ export async function writeTokenToNFC(token: string): Promise<void> {
   // owned by acquireSession inside withSession.
   try {
     await withSession(async () => {
-      await selectNdefApp();
-      await writeNdefTextRecord(token);
+      await selectNdefApplication();
+      // A passive tag has a fixed NDEF file: learn its size and write limits
+      // first, so a token that cannot fit fails before NLEN is zeroed rather
+      // than half-way through, leaving the tag unreadable. (The POS adapter
+      // skips this: a terminal's file is large and its clock is running.)
+      const cc = await readCapabilityContainer();
+      await selectNdefFile();
+      const ndefLength = buildTextNdef(token).length;
+      if (cc && !cc.writable) {
+        throw new NfcError('This tag is read-only.', 'TAG_READ_ONLY');
+      }
+      if (cc && cc.maxNdefFileSize > 0 && ndefLength > cc.maxNdefFileSize) {
+        throw new NfcError(
+          `This tag holds ${cc.maxNdefFileSize} bytes; the token needs ${ndefLength}.`,
+          'TAG_TOO_SMALL'
+        );
+      }
+      await writeNdefTextRecord(token, { chunkSize: cc?.maxWriteLength });
       nfcLog.info('nfc.write.success', { tokenLength: token.length });
     });
   } catch (error) {

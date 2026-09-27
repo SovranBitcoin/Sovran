@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createTestMachine } from "../_harness/createTestMachine";
-import { INPUTS } from "../_harness/fixtures";
+import { INPUTS, MINT1, MINT2, WALLETS } from "../_harness/fixtures";
+import type { MachineOperations } from "../../src/machine/types";
 import type { WalletContext, PaymentRequestInfo } from "../../src/types";
 
 const accepted = "https://mint1.example.com";
@@ -15,6 +16,7 @@ function setup({
   switchEnabled = true,
   mintsPreferred = false,
   hasSpendingCondition = false,
+  operations = {},
 }: {
   unit?: string;
   amount?: number | null;
@@ -23,6 +25,7 @@ function setup({
   switchEnabled?: boolean;
   mintsPreferred?: boolean;
   hasSpendingCondition?: boolean;
+  operations?: Partial<MachineOperations>;
 } = {}) {
   let activeUnit = "sat";
   const info: PaymentRequestInfo = {
@@ -56,7 +59,10 @@ function setup({
     getContext,
     detectors: { getPaymentRequestInfo: () => info },
     nfcAdapter: adapter,
-    operations: { switchUnit: switchEnabled ? switchUnit : undefined },
+    operations: {
+      switchUnit: switchEnabled ? switchUnit : undefined,
+      ...operations,
+    },
   });
   return { tm, adapter, switchUnit };
 }
@@ -196,5 +202,127 @@ describe("NFC terminal unit and mints", () => {
     tm.assertExecution({ code: "NFC_READ_FAILED" });
     expect(sentMint(tm)).toBeUndefined();
     expect(switchUnit).not.toHaveBeenCalled();
+  });
+});
+
+/** 1000-sat bolt11 (10u); the same invoice lightning-melt.test.ts pays. */
+const NFC_TAG_INVOICE =
+  "lnbc10u1p4pcn75pp5nx5zweympssrmvmecek6n3ynhj7emfe3dynls8q3yu62uhje9rksdqqcqzzsxqyz5vqsp5lersjjw2atsnqhzhqac00xvvcelcw6gqfy7u2jka25q9y2dhczns9qxpqysgqckuv826yw544mrwgnt6k0r529wrczsj03hwrtgg0ch4gewreqt75gg838wrd6twg5dp7n9m9eze6km22svvx8jq5jmrv4pvr0q4dffqpp0ftc3";
+
+describe("NFC-scanned invoice stays interactive after the tap", () => {
+  function setupInvoiceTap() {
+    const adapter = {
+      readPaymentRequest: vi.fn(async () => NFC_TAG_INVOICE),
+      writeToken: vi.fn(async () => {}),
+      releaseSession: vi.fn(async () => {}),
+      isAvailable: vi.fn(async () => true),
+    };
+    const tm = createTestMachine({
+      wallet: {
+        ...WALLETS.default,
+        mintBalances: { [MINT1]: 1500, [MINT2]: 2000 },
+      },
+      nfcAdapter: adapter,
+    });
+    return { tm, adapter };
+  }
+
+  it("opens the mint list from the pill instead of auto-picking again", async () => {
+    const { tm, adapter } = setupInvoiceTap();
+    await tm.machine.scan!(NFC_TAG_INVOICE, { source: "nfc" });
+    tm.assertStep("navigateToMeltPreview");
+    tm.assertContext({ mintUrl: MINT1, amount: 1000, source: "nfc" });
+    // The tag session ends at the preview: everything after is the user's.
+    expect(adapter.releaseSession).toHaveBeenCalledTimes(1);
+
+    await tm.machine.requestMintSelector();
+    tm.assertStep("selectMint");
+    expect(tm.handlerCalls.at(-1)?.step).toBe("selectMint");
+    const candidates = (tm.handlerCalls.at(-1)?.data as { candidates: { mintUrl: string }[] })
+      .candidates;
+    expect(candidates.map((c) => c.mintUrl).sort()).toEqual([MINT1, MINT2].sort());
+
+    await tm.machine.changeMint(MINT2);
+    tm.assertStep("navigateToMeltPreview");
+    tm.assertContext({ mintUrl: MINT2, amount: 1000 });
+  });
+});
+
+const refuseFees = (reason = "This payment request needs a mint without ecash redemption fees.") =>
+  vi.fn(async (_mintUrl: string, _unit: string) => ({ payable: false as const, reason }));
+
+describe("NFC mint choice honours the payment-request gate", () => {
+  it("skips a mint the send would refuse and pays from the next one", async () => {
+    // `other` outranks `accepted` on balance, but its keysets charge fees.
+    const payability = vi.fn(async (mintUrl: string) =>
+      mintUrl === other
+        ? { payable: false as const, reason: "fees" }
+        : { payable: true as const },
+    );
+    const { tm, adapter } = setup({
+      mints: [accepted, other],
+      balances: { [accepted]: 100, [other]: 200 },
+      operations: { paymentRequestPayabilityFrom: payability },
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertStep("sendComplete");
+    expect(sentMint(tm)?.args).toEqual([accepted, 50, "sat"]);
+    expect(payability.mock.calls.map(([mintUrl]) => mintUrl)).toEqual([other, accepted]);
+    expect(adapter.writeToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to the tag's Lightning invoice when no mint can pay the request", async () => {
+    const adapter = {
+      readPaymentRequest: vi.fn(async () => ""),
+      writeToken: vi.fn(async () => {}),
+      releaseSession: vi.fn(async () => {}),
+      isAvailable: vi.fn(async () => true),
+    };
+    const tm = createTestMachine({
+      wallet: { ...WALLETS.default, mintBalances: { [MINT1]: 5000, [MINT2]: 5000 } },
+      nfcAdapter: adapter,
+      operations: { paymentRequestPayabilityFrom: refuseFees() },
+    });
+    await tm.machine.scan!(
+      `bitcoin:?creq=${INPUTS.paymentRequestBasic}&lightning=${NFC_TAG_INVOICE}`,
+      { source: "nfc" },
+    );
+    tm.assertStep("navigateToMeltPreview");
+    tm.assertContext({ meltTarget: NFC_TAG_INVOICE, amount: 1000, source: "nfc" });
+    expect(sentMint(tm)).toBeUndefined();
+    expect(adapter.writeToken).not.toHaveBeenCalled();
+    // The invoice is paid over the network; the tag session is done.
+    expect(adapter.releaseSession).toHaveBeenCalled();
+  });
+
+  it("explains an unpayable request when the tag offers nothing else", async () => {
+    const reason = "This payment request needs a mint without ecash redemption fees.";
+    const { tm, adapter } = setup({
+      mints: [accepted, other],
+      balances: { [accepted]: 100, [other]: 200 },
+      operations: { paymentRequestPayabilityFrom: refuseFees(reason) },
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertExecution({ code: "PAYMENT_REQUEST_FAILED", message: reason });
+    expect(sentMint(tm)).toBeUndefined();
+    expect(adapter.writeToken).not.toHaveBeenCalled();
+    expect(adapter.releaseSession).toHaveBeenCalled();
+  });
+
+  it("labels a failure before token creation as a prepare-stage failure", async () => {
+    const { tm, adapter } = setup({
+      operations: {
+        executeNfcSend: vi.fn(async () => {
+          throw new Error("mint offline");
+        }),
+      },
+    });
+    await tm.machine.scan!(INPUTS.paymentRequestBasic, { source: "nfc" });
+    tm.assertExecution({ code: "NFC_WRITE_FAILED" });
+    expect(adapter.writeToken).not.toHaveBeenCalled();
+    expect(tm.notificationCalls).toContainEqual({
+      key: "onNfcWriteFailed",
+      data: { message: "mint offline", rolledBack: false, stage: "prepare" },
+    });
   });
 });

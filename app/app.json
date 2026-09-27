@@ -79,7 +79,7 @@
         "react-native-nfc-manager",
         {
           "includeNdefEntitlement": false,
-          "selectIdentifiers": ["D2760000850100", "D2760000850101", "5361746f63617368"]
+          "selectIdentifiers": ["D2760000850101", "D2760000850100", "5361746f63617368"]
         }
       ],
       "expo-system-ui",

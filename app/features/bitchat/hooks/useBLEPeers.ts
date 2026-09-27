@@ -10,7 +10,7 @@ import {
   type BLEPeer,
 } from 'bitchat-module';
 import { useVisualActivityEffect } from '@/shared/hooks/useVisualActivityEffect';
-import { useMints } from '@cashu/coco-react';
+import { useBalanceContext, useMints } from '@cashu/coco-react';
 import { isTestnutUnit } from 'wallet';
 import { areBLEPeerSnapshotsEquivalent } from '@/features/bitchat/lib/blePeerSnapshots';
 import { useBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
@@ -18,7 +18,8 @@ import { useBitchatBLEIdentityMaterial } from '@/features/bitchat/hooks/useBitch
 import { useBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
 import { cashuP2pkPubkeyFromNostrHex } from '@/shared/lib/protocolIds';
 import { bitchatLog } from '@/shared/lib/logger';
-import { buildStandingCreq } from '@/shared/lib/nutCreq';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { buildStandingCreq, rankAdvertisedMints } from '@/shared/lib/nutCreq';
 import { useIsTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 
@@ -59,18 +60,26 @@ export function useBLEPeers(): UseBLEPeersResult {
   // real one, so it lists only the active account's side of the testnut split:
   // a real account never invites test ecash, and testnut mints never crowd
   // real ones out of the capped list.
+  //
+  // Only five mints fit, so the list is ranked before it is cut: see
+  // `rankAdvertisedMints`.
   const { trustedMints } = useMints();
+  const { balances } = useBalanceContext();
+  const preferredMint = useMintStore((state) => state.selectedMint);
   const isTestnutMint = useIsTestnutMint();
   const testnutAccount = useMintStore((state) => isTestnutUnit(state.activeUnit));
-  const mintUrlsKey = useMemo(
-    () =>
-      trustedMints
-        .map((m) => m.mintUrl)
-        .filter((mintUrl) => isTestnutMint(mintUrl) === testnutAccount)
-        .sort()
-        .join(','),
-    [trustedMints, isTestnutMint, testnutAccount]
-  );
+  const mintUrlsKey = useMemo(() => {
+    const mints = trustedMints
+      .map((m) => m.mintUrl)
+      .filter((mintUrl) => isTestnutMint(mintUrl) === testnutAccount);
+    const fundedMints = new Set(
+      mints.filter((mintUrl) => {
+        const sats = balances.byMintAndUnit?.[mintUrl]?.sat;
+        return !!sats && amountToNumber(sats.total) > 0;
+      })
+    );
+    return rankAdvertisedMints({ mints, fundedMints, preferredMint }).join(',');
+  }, [trustedMints, balances, preferredMint, isTestnutMint, testnutAccount]);
   const creq = useMemo(() => {
     if (!identityMaterial || !mintUrlsKey) return null;
     return buildStandingCreq({

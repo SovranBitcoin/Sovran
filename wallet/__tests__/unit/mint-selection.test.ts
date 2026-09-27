@@ -383,6 +383,29 @@ describe('preselectMintForSend', () => {
 
 
 describe('rankMintCandidates', () => {
+  it('prefers a funded mint that can pay from local proofs without a swap', () => {
+    const a = { mintUrl: 'https://a.example', balance: 500 };
+    const b = { mintUrl: 'https://b.example', balance: 300 };
+    const ranked = rankMintCandidates([a, b], {
+      amount: 100,
+      unitBalances: { [a.mintUrl]: 500, [b.mintUrl]: 300 },
+      canPayLocally: (mintUrl) => mintUrl === b.mintUrl,
+    });
+    expect(ranked.map((c) => c.mintUrl)).toEqual([b.mintUrl, a.mintUrl]);
+  });
+
+  it('never lets local proofs outrank the terminal\'s preferred mint or fundedness', () => {
+    const preferred = { mintUrl: 'https://p.example', balance: 200 };
+    const local = { mintUrl: 'https://l.example', balance: 50 };
+    const ranked = rankMintCandidates([local, preferred], {
+      amount: 100,
+      preferredMints: [preferred.mintUrl],
+      unitBalances: { [preferred.mintUrl]: 200, [local.mintUrl]: 50 },
+      canPayLocally: (mintUrl) => mintUrl === local.mintUrl,
+    });
+    expect(ranked.map((c) => c.mintUrl)).toEqual([preferred.mintUrl, local.mintUrl]);
+  });
+
   it('ranks preferred membership, funding, balance, then original order without mutation', () => {
     const candidates = ['a', 'b', 'c', 'd', 'e'].map(mintUrl => ({ mintUrl, balance: 999 }));
     expect(rankMintCandidates(candidates, {

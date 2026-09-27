@@ -1194,6 +1194,22 @@ export function createDefaultOperations(
       logger.info("operations.trustMint.done", { ...mintUrlFields(mintUrl) });
     },
 
+    paymentRequestPayabilityFrom: async (mintUrl, unit) => {
+      const mgr = requireManager();
+      try {
+        await assertPaymentRequestFeesSupported(mgr, mintUrl, unit);
+        return { payable: true };
+      } catch (error) {
+        return {
+          payable: false,
+          reason:
+            error instanceof Error
+              ? error.message
+              : "This mint cannot pay this payment request.",
+        };
+      }
+    },
+
     executeNfcSend: async (mintUrl, amount, unit = "sat") => {
       const mgr = requireManager();
       await assertPaymentRequestFeesSupported(mgr, mintUrl, unit);

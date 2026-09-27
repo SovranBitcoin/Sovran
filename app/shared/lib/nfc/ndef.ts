@@ -1,5 +1,5 @@
 /**
- * NDEF Text record encode/decode for Type 4 Tag.
+ * NDEF encode/decode for Type 4 Tag: Text record writer, tolerant first-record reader.
  */
 
 import { utf8ToBytes } from '@noble/hashes/utils.js';
@@ -60,94 +60,208 @@ export function buildTextNdef(text: string, opts?: { lang?: string }): number[] 
   return [(nlen >> 8) & 0xff, nlen & 0xff, ...recordHeader];
 }
 
+/** NDEF record header flag bits (NFC Forum NDEF 1.0 §3.2). */
+const FLAG_CHUNK = 0x20;
+const FLAG_ID_LENGTH = 0x08;
+const TNF_MASK = 0x07;
+const TNF_WELL_KNOWN = 0x01;
+const TNF_MIME = 0x02;
+const TNF_EXTERNAL = 0x04;
+const RTD_TEXT = 0x54; // 'T'
+const RTD_URI = 0x55; // 'U'
+
 /**
- * Decode NDEF Text record from raw bytes.
+ * URI RTD identifier codes (NFC Forum URI RTD 1.0 §3.2.2). The first payload
+ * byte selects a prefix that is prepended to the rest of the payload; 0x00
+ * means the payload is the whole URI.
  */
-export function decodeTextRecord(ndef: number[]): string {
+const URI_PREFIXES = [
+  '',
+  'http://www.',
+  'https://www.',
+  'http://',
+  'https://',
+  'tel:',
+  'mailto:',
+  'ftp://anonymous:anonymous@',
+  'ftp://ftp.',
+  'ftps://',
+  'sftp://',
+  'smb://',
+  'nfs://',
+  'ftp://',
+  'dav://',
+  'news:',
+  'telnet://',
+  'imap:',
+  'rtsp://',
+  'urn:',
+  'pop:',
+  'sip:',
+  'sips:',
+  'tftp:',
+  'btspp://',
+  'btl2cap://',
+  'btgoep://',
+  'tcpobex://',
+  'irdaobex://',
+  'file://',
+  'urn:epc:id:',
+  'urn:epc:tag:',
+  'urn:epc:pat:',
+  'urn:epc:raw:',
+  'urn:epc:',
+  'urn:nfc:',
+];
+
+interface NdefRecord {
+  tnf: number;
+  type: number[];
+  payload: number[];
+}
+
+/**
+ * Parse the first record of an NDEF message (no NLEN prefix). Later records
+ * are ignored: a payment tag carries one payload, and a terminal that adds a
+ * second record (an Android Application Record, say) must not break the read.
+ */
+function parseFirstRecord(ndef: number[]): NdefRecord {
   if (!ndef || ndef.length < 4) {
     throw new NfcError(
       `Invalid NDEF data: too short (${ndef?.length ?? 0} bytes)`,
       'INVALID_NDEF_FORMAT'
     );
   }
-
   const header = ndef[0];
   const typeLen = ndef[1];
   const isShortRecord = (header & SHORT_RECORD_FLAG) !== 0;
+  const hasIdLength = (header & FLAG_ID_LENGTH) !== 0;
+  const tnf = header & TNF_MASK;
+  nfcLog.debug('nfc.ndef.parse', {
+    header: `0x${header.toString(16)}`,
+    typeLen,
+    isShortRecord,
+    hasIdLength,
+    tnf,
+  });
 
-  nfcLog.debug('nfc.ndef.parse', { header: `0x${header.toString(16)}`, typeLen, isShortRecord });
+  if ((header & FLAG_CHUNK) !== 0) {
+    throw new NfcError('Invalid NDEF: chunked records are not supported', 'INVALID_NDEF_FORMAT');
+  }
 
-  const tnf = header & 0x07;
-  if (tnf !== 0x01) nfcLog.warn('nfc.ndef.unexpected_tnf', { tnf, expected: 1 });
-
+  let cursor = 2;
   let payloadLen: number;
-  let typeFieldStart: number;
-
   if (isShortRecord) {
     payloadLen = ndef[2];
-    typeFieldStart = 3;
+    cursor = 3;
   } else {
     if (ndef.length < 7) {
       throw new NfcError('Invalid NDEF: normal record header too short', 'INVALID_NDEF_FORMAT');
     }
     payloadLen = ((ndef[2] << 24) | (ndef[3] << 16) | (ndef[4] << 8) | ndef[5]) >>> 0;
-    typeFieldStart = 6;
+    cursor = 6;
   }
-
-  nfcLog.debug('nfc.ndef.payload_info', { payloadLen, typeFieldStart });
-
-  if (typeFieldStart >= ndef.length) {
-    throw new NfcError('Invalid NDEF: type field offset out of bounds', 'INVALID_NDEF_FORMAT');
+  let idLen = 0;
+  if (hasIdLength) {
+    if (cursor >= ndef.length) {
+      throw new NfcError('Invalid NDEF: ID length out of bounds', 'INVALID_NDEF_FORMAT');
+    }
+    idLen = ndef[cursor];
+    cursor += 1;
   }
+  nfcLog.debug('nfc.ndef.payload_info', { payloadLen, typeFieldStart: cursor, idLen });
 
-  if (typeLen !== 1 || typeFieldStart + typeLen > ndef.length) {
+  const typeStart = cursor;
+  const idStart = typeStart + typeLen;
+  const payloadStart = idStart + idLen;
+  if (typeLen < 1 || payloadStart > ndef.length || payloadStart + payloadLen > ndef.length) {
     throw new NfcError(
-      `Invalid NDEF: Text record type length must be 1 (received ${typeLen})`,
+      'Invalid NDEF: type, ID or payload length extends past the message',
       'INVALID_NDEF_FORMAT'
     );
   }
+  return {
+    tnf,
+    type: ndef.slice(typeStart, idStart),
+    payload: ndef.slice(payloadStart, payloadStart + payloadLen),
+  };
+}
 
-  const type = ndef[typeFieldStart];
-  if (type !== 0x54) {
-    throw new NfcError(
-      `Not a Text record (type=0x${type.toString(16)}, expected 0x54 'T')`,
-      'NOT_TEXT_RECORD'
-    );
+/**
+ * Decode the text a Type 4 tag carries in its first NDEF record.
+ *
+ * Accepts the shapes a payment terminal or tag plausibly writes:
+ * - Text RTD (`T`): the NFC Forum text record, UTF-8 or UTF-16.
+ * - URI RTD (`U`): identifier-code prefix expanded, so `cashu:…`,
+ *   `bitcoin:?creq=…` and `https://…` all come back as the full string.
+ * - MIME (TNF 2) and NFC-external (TNF 4) records: payload as UTF-8.
+ *
+ * Anything else raises `UNSUPPORTED_RECORD` with the type in the message.
+ */
+export function decodeNdefText(ndef: number[]): string {
+  const record = parseFirstRecord(ndef);
+  const typeText = String.fromCharCode(...record.type);
+
+  if (record.tnf === TNF_WELL_KNOWN && record.type.length === 1 && record.type[0] === RTD_TEXT) {
+    return decodeTextPayload(record.payload);
   }
-
-  const payloadStart = typeFieldStart + typeLen;
-  if (payloadStart >= ndef.length || payloadStart + payloadLen > ndef.length) {
-    throw new NfcError('Invalid NDEF: payload start out of bounds', 'INVALID_NDEF_FORMAT');
+  if (record.tnf === TNF_WELL_KNOWN && record.type.length === 1 && record.type[0] === RTD_URI) {
+    if (record.payload.length < 1) {
+      throw new NfcError('Invalid NDEF: URI record has no identifier code', 'INVALID_NDEF_FORMAT');
+    }
+    const prefix = URI_PREFIXES[record.payload[0]];
+    if (prefix === undefined) {
+      throw new NfcError(
+        `Invalid NDEF: unknown URI identifier code 0x${record.payload[0].toString(16)}`,
+        'INVALID_NDEF_FORMAT'
+      );
+    }
+    const uri = prefix + new TextDecoder().decode(Uint8Array.from(record.payload.slice(1)));
+    nfcLog.debug('nfc.ndef.decoded', {
+      kind: 'uri',
+      prefixCode: record.payload[0],
+      chars: uri.length,
+    });
+    return uri;
   }
+  if (record.tnf === TNF_MIME || record.tnf === TNF_EXTERNAL) {
+    const text = new TextDecoder().decode(Uint8Array.from(record.payload));
+    nfcLog.debug('nfc.ndef.decoded', {
+      kind: record.tnf === TNF_MIME ? 'mime' : 'external',
+      type: typeText,
+      chars: text.length,
+    });
+    return text;
+  }
+  throw new NfcError(
+    `Unsupported NDEF record (tnf=${record.tnf}, type=${JSON.stringify(typeText)})`,
+    'UNSUPPORTED_RECORD'
+  );
+}
 
-  const status = ndef[payloadStart];
+/** Text RTD payload: status byte, IANA language tag, then the text. */
+function decodeTextPayload(payload: number[]): string {
+  if (payload.length < 1) {
+    throw new NfcError('Invalid NDEF: Text record has no status byte', 'INVALID_NDEF_FORMAT');
+  }
+  const status = payload[0];
   const langLen = status & 0x3f;
   const isUtf16 = (status & 0x80) !== 0;
   nfcLog.debug('nfc.ndef.text_record', { status: `0x${status.toString(16)}`, langLen, isUtf16 });
 
-  if (payloadLen < 1 + langLen) {
+  if (payload.length < 1 + langLen) {
     throw new NfcError(
-      `Invalid NDEF: language tag exceeds payload (langLen=${langLen}, payloadLen=${payloadLen})`,
+      `Invalid NDEF: language tag exceeds payload (langLen=${langLen}, payloadLen=${payload.length})`,
       'INVALID_NDEF_FORMAT'
     );
   }
-
-  const textStart = payloadStart + 1 + langLen;
-  const textLen = payloadLen - 1 - langLen;
-
-  if (textStart + textLen > ndef.length) {
-    throw new NfcError(
-      `Invalid NDEF: text data out of bounds (textStart=${textStart}, textLen=${textLen}, ndefLen=${ndef.length})`,
-      'INVALID_NDEF_FORMAT'
-    );
-  }
-
-  const textBytes = ndef.slice(textStart, textStart + textLen);
+  const textBytes = payload.slice(1 + langLen);
   const text = isUtf16
     ? decodeUtf16(textBytes)
     : new TextDecoder().decode(Uint8Array.from(textBytes));
   nfcLog.debug('nfc.ndef.decoded', {
-    textLen,
+    kind: 'text',
+    textLen: textBytes.length,
     chars: text.length,
     encoding: isUtf16 ? 'utf16' : 'utf8',
   });
@@ -172,4 +286,36 @@ function decodeUtf16(bytes: number[]): string {
     );
   }
   return text;
+}
+
+/** What a Type 4 Tag's Capability Container says about its NDEF file. */
+export interface CapabilityContainer {
+  /** Max bytes one READ BINARY may return (MLe). 0 means "not stated". */
+  maxReadLength: number;
+  /** Max bytes one UPDATE BINARY may carry (MLc). 0 means "not stated". */
+  maxWriteLength: number;
+  /** Size of the NDEF file including its 2-byte NLEN. */
+  maxNdefFileSize: number;
+  /** False when the write-access byte says the file is read-only. */
+  writable: boolean;
+}
+
+/**
+ * Parse the 15-byte Capability Container (NFC Forum Type 4 Tag 2.0 §5.1):
+ * CCLEN(2) · mapping version(1) · MLe(2) · MLc(2) · NDEF File Control TLV
+ * (T=0x04, L=0x06, file ID(2), max size(2), read access(1), write access(1)).
+ * Returns null when the bytes are not a CC, so callers fall back to defaults
+ * instead of trusting garbage.
+ */
+export function parseCapabilityContainer(bytes: number[]): CapabilityContainer | null {
+  if (!bytes || bytes.length < 15) return null;
+  const ccLen = (bytes[0] << 8) | bytes[1];
+  if (ccLen < 15) return null;
+  if (bytes[7] !== 0x04 || bytes[8] < 0x06) return null;
+  return {
+    maxReadLength: (bytes[3] << 8) | bytes[4],
+    maxWriteLength: (bytes[5] << 8) | bytes[6],
+    maxNdefFileSize: (bytes[11] << 8) | bytes[12],
+    writable: bytes[14] === 0x00,
+  };
 }

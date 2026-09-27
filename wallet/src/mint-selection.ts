@@ -17,18 +17,27 @@ import type {
 /** Rank eligible mints without mutating the caller's order or fetching metadata. */
 export function rankMintCandidates(
   candidates: readonly MintCandidate[],
-  { preferredMints = [], amount, unitBalances }: {
+  { preferredMints = [], amount, unitBalances, canPayLocally }: {
     preferredMints?: readonly string[];
     amount: number;
     /** Balances for the terminal's single requested unit. */
     unitBalances: Record<string, number>;
+    /**
+     * Whether the mint's proofs already compose the amount exactly. A tap
+     * has a few seconds before the terminal gives up: a mint that needs no
+     * swap answers in the time a network round trip alone would take, so
+     * among funded mints it goes first.
+     */
+    canPayLocally?: (mintUrl: string) => boolean;
   },
 ): MintCandidate[] {
   const preferred = new Set(preferredMints);
   const balance = (candidate: MintCandidate) => unitBalances[candidate.mintUrl] ?? 0;
+  const local = (candidate: MintCandidate) => Number(canPayLocally?.(candidate.mintUrl) ?? false);
   return [...candidates].sort((a, b) =>
     Number(preferred.has(b.mintUrl)) - Number(preferred.has(a.mintUrl)) ||
     Number(balance(b) >= amount) - Number(balance(a) >= amount) ||
+    local(b) - local(a) ||
     balance(b) - balance(a)
   );
 }

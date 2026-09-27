@@ -14,7 +14,7 @@ import type { NfcIOAdapter } from 'wallet';
 import { NfcError } from './errors';
 import { SELECT_NDEF, readBinary, MAX_CHUNK_SIZE } from './constants';
 import { sendApdu, getStatusMessage, selectNdefApp } from './apdu';
-import { decodeTextRecord } from './ndef';
+import { decodeNdefText } from './ndef';
 import { isNfcSupported, isNfcEnabled } from './status';
 import { writeNdefTextRecord } from './write';
 import { acquireSession, releaseSession } from './session';
@@ -93,7 +93,7 @@ export function createNfcAdapter(): NfcIOAdapter {
           }
         }
 
-        const text = decodeTextRecord(ndefBytes);
+        const text = decodeNdefText(ndefBytes);
         nfcLog.info('nfc.adapter.read_complete', { chars: text.length });
 
         if (!text || text.length === 0) {

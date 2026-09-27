@@ -20,7 +20,7 @@ import { nfcLog } from '../logger';
  * NFC Forum Type 4 Tag three-phase NLEN protocol:
  *
  *   1. Zero NLEN — signals readers the content is being updated.
- *   2. Write the NDEF body in `MAX_CHUNK_SIZE` chunks.
+ *   2. Write the NDEF body in chunks (`MAX_CHUNK_SIZE`, or the tag's MLc).
  *   3. Set the final NLEN — makes the new content visible.
  *
  * Writing the final NLEN before the chunks (the historical bug in the
@@ -29,11 +29,26 @@ import { nfcLog } from '../logger';
  *
  * Throws `NfcError` on any APDU failure.
  */
-export async function writeNdefTextRecord(text: string): Promise<void> {
+export async function writeNdefTextRecord(
+  text: string,
+  opts?: {
+    /**
+     * Cap on bytes per UPDATE BINARY, from the tag's Capability Container
+     * (MLc). Never raises the chunk above `MAX_CHUNK_SIZE`; 0 or undefined
+     * keeps the default.
+     */
+    chunkSize?: number;
+  }
+): Promise<void> {
   const ndef = buildTextNdef(text);
+  const chunkSize =
+    opts?.chunkSize && opts.chunkSize > 0
+      ? Math.min(MAX_CHUNK_SIZE, opts.chunkSize)
+      : MAX_CHUNK_SIZE;
   nfcLog.debug('nfc.ndef.write_start', {
     nlen: (ndef[0] << 8) | ndef[1],
     totalBytes: ndef.length,
+    chunkSize,
   });
 
   let r = await sendApdu(updateBinary(0, [0x00, 0x00]), 'ZERO NLEN');
@@ -47,9 +62,9 @@ export async function writeNdefTextRecord(text: string): Promise<void> {
 
   const body = ndef.slice(2);
   let offset = 2;
-  const totalChunks = Math.ceil(body.length / MAX_CHUNK_SIZE);
+  const totalChunks = Math.ceil(body.length / chunkSize);
   for (let chunkNum = 0; offset - 2 < body.length; chunkNum++) {
-    const chunk = body.slice(offset - 2, offset - 2 + MAX_CHUNK_SIZE);
+    const chunk = body.slice(offset - 2, offset - 2 + chunkSize);
     nfcLog.debug('nfc.ndef.write_chunk', {
       chunk: chunkNum + 1,
       totalChunks,

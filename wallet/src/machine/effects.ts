@@ -796,12 +796,14 @@ function buildNfcWriteBackResult(
 function buildNfcWriteBackError(args: {
   cause: unknown;
   rolledBack: boolean;
+  stage: 'prepare' | 'write';
 }): NfcWriteBackEffectError {
   const message =
     args.cause instanceof Error ? args.cause.message : 'NFC write failed';
 
   logger.warn('effects.nfcWriteBack.error', {
     rolledBack: args.rolledBack,
+    stage: args.stage,
     error: errField(args.cause),
   });
 
@@ -813,7 +815,7 @@ function buildNfcWriteBackError(args: {
     notifications: [
       {
         type: 'onNfcWriteFailed',
-        data: { message, rolledBack: args.rolledBack },
+        data: { message, rolledBack: args.rolledBack, stage: args.stage },
       },
     ],
   };
@@ -1772,7 +1774,11 @@ export function runNfcWriteBackEffect({
           // Release is idempotent and best-effort on the failure path.
         }
 
-        throw buildNfcWriteBackError({ cause, rolledBack });
+        throw buildNfcWriteBackError({
+          cause,
+          rolledBack,
+          stage: nfcSendResult ? 'write' : 'prepare',
+        });
       }
     })(),
     (cause) => cause as NfcWriteBackEffectError,

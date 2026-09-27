@@ -1190,17 +1190,40 @@ export function createPaymentMachine(
         }
       }
 
-      // NFC auto-resolve: when source is 'nfc' and an adapter is available,
-      // automatically resolve interactive steps (option choice, mint selection)
-      // and auto-execute payment request sends with NFC write-back.
-      if (flowCtx.source === "nfc" && nfcAdapter) {
+      // NFC auto-resolve: when the scan came from a tag and an adapter is
+      // available, automatically resolve interactive steps (option choice,
+      // mint selection) and auto-execute payment request sends with NFC
+      // write-back. Only the EXECUTE that delivered the tag's payload is
+      // hands-free: the tag session is released as soon as the flow parks on
+      // a screen, and every event after that is the user's own tap.
+      // `flowCtx.source` stays 'nfc' for the flow's lifetime (transaction
+      // tagging), so it alone must not re-arm the resolver — a later
+      // REQUEST_MINT_SELECTOR from the preview's mint pill used to open
+      // selectMint and immediately auto-pick the same mint again, so the
+      // list never appeared.
+      if (event.type === "EXECUTE" && flowCtx.source === "nfc" && nfcAdapter) {
         let nfcResolved = false;
+        // A BIP321 tag usually carries a Lightning invoice next to the ecash
+        // request. When the ecash path is chosen first and then turns out to
+        // be unpayable (no mint passes the payment-request gate), the option
+        // screen's state is restored from here and the invoice is chosen
+        // instead of dead-ending on an error the user can do nothing about.
+        let nfcAlternative: {
+          ctx: FlowContext;
+          data: StepDataMap["chooseOption"];
+          option: StepDataMap["chooseOption"]["options"][number];
+        } | null = null;
+        // Mints the payment-request gate has already refused this tap, with
+        // the reason, so re-selection never lands on them again.
+        const nfcRefusedMints = new Map<string, string>();
+        const nfcPayableMints = new Set<string>();
 
         // Loop because auto-resolving one step (e.g. chooseOption) may produce
         // another step (e.g. selectMint) that also needs auto-resolution.
         while (!nfcResolved) {
           if (step === "chooseOption" || step === "chooseFallbackOption") {
-            const options = (stepData as StepDataMap["chooseOption"]).options;
+            const optionData = stepData as StepDataMap["chooseOption"];
+            const options = optionData.options;
             const best =
               options.find(
                 (o) =>
@@ -1213,6 +1236,23 @@ export function createPaymentMachine(
               ) ??
               options.find((o) => o.status !== "disabled");
             if (best) {
+              const invoiceAlternative =
+                best.option.kind === "paymentRequest"
+                  ? options.find(
+                      (o) =>
+                        o !== best &&
+                        o.option.kind === "lightningInvoice" &&
+                        o.status !== "disabled",
+                    )
+                  : undefined;
+              nfcAlternative = invoiceAlternative
+                ? { ctx: { ...flowCtx }, data: optionData, option: invoiceAlternative }
+                : null;
+              logger.info("machine.nfc.optionChosen", {
+                kind: best.option.kind,
+                optionCount: options.length,
+                hasInvoiceFallback: !!invoiceAlternative,
+              });
               const walletCtxInner = getContext();
               const unitInner = getUnit?.() ?? configUnit;
               const r = transition(
@@ -1232,6 +1272,9 @@ export function createPaymentMachine(
               continue;
             }
             // No viable option
+            logger.info("machine.nfc.noViableOption", {
+              optionCount: options.length,
+            });
             nfcResolved = true;
           } else if (step === "selectMint") {
             const data = stepData as StepDataMap["selectMint"];
@@ -1239,19 +1282,59 @@ export function createPaymentMachine(
             const info = flowCtx.paymentRequest
               ? detectors.getPaymentRequestInfo(flowCtx.paymentRequest)
               : null;
-            const best = rankMintCandidates(
+            const amount = flowCtx.amount ?? 0;
+            const ranked = rankMintCandidates(
               data.candidates.filter(
-                (candidate) => candidate.status !== "disabled",
+                (candidate) =>
+                  candidate.status !== "disabled" &&
+                  !nfcRefusedMints.has(candidate.mintUrl),
               ),
               {
                 preferredMints: info?.mints ?? [],
-                amount: flowCtx.amount ?? 0,
+                amount,
                 unitBalances:
                   walletCtxInner.unitBalances?.[flowCtx.unit] ??
                   walletCtxInner.mintBalances,
+                canPayLocally: (mintUrl) =>
+                  buildProofSuggestions(
+                    walletCtxInner.proofAmounts[mintUrl] ?? [],
+                    amount,
+                  ).exactMatch,
               },
-            )[0];
+            );
+            // A NUT-18 amount is net of the receiver's input fees, and the
+            // send cannot add them yet, so `executeNfcSend` refuses a mint
+            // whose keysets charge fees. Ask before choosing: the answer is a
+            // local keyset read, whereas learning it inside the write-back
+            // tore the session down and reported "NFC write failed" for a
+            // token that was never created.
+            let best: (typeof ranked)[number] | undefined;
+            let refusal: string | undefined = [...nfcRefusedMints.values()].at(-1);
+            for (const candidate of ranked) {
+              const payability = operations?.paymentRequestPayabilityFrom
+                ? await operations.paymentRequestPayabilityFrom(
+                    candidate.mintUrl,
+                    flowCtx.unit,
+                  )
+                : { payable: true as const };
+              if (isStaleGeneration(sendGeneration, "nfc.payability")) return;
+              if (payability.payable) {
+                nfcPayableMints.add(candidate.mintUrl);
+                best = candidate;
+                break;
+              }
+              refusal = payability.reason;
+              nfcRefusedMints.set(candidate.mintUrl, payability.reason);
+              logger.info("machine.nfc.mintSkipped", {
+                ...mintUrlFields(candidate.mintUrl),
+                reason: payability.reason,
+              });
+            }
             if (best) {
+              logger.info("machine.nfc.mintChosen", {
+                ...mintUrlFields(best.mintUrl),
+                rankedCount: ranked.length,
+              });
               void notifications?.onNfcPaymentProgress?.({
                 phase: "selecting",
               });
@@ -1272,7 +1355,48 @@ export function createPaymentMachine(
               setStep(r.step, r.data);
               continue;
             }
-            // No candidates — will be handled by error dispatch below
+            if (nfcAlternative) {
+              // Ecash is off the table for this tap; the tag also offered a
+              // Lightning invoice, so pay that. The preview step that follows
+              // is terminal for the NFC loop: the session is released and the
+              // user confirms on screen, exactly as for an invoice-only tag.
+              logger.info("machine.nfc.fallbackToInvoice", {
+                reason: refusal ?? "no funded mint",
+                rankedCount: ranked.length,
+              });
+              const alternative = nfcAlternative;
+              nfcAlternative = null;
+              flowCtx = alternative.ctx;
+              setStep("chooseOption", alternative.data);
+              const unitInner = getUnit?.() ?? configUnit;
+              const r = transition(
+                step,
+                flowCtx,
+                { type: "OPTION_CHOSEN", option: alternative.option.option },
+                detectors,
+                walletCtxInner,
+                unitInner,
+                offline,
+                enableEcashSendMemo,
+                getSatsPerUnitMinor,
+              );
+              flowCtx = r.context;
+              flowCtx.source = "nfc";
+              setStep(r.step, r.data);
+              continue;
+            }
+            if (refusal) {
+              // Every funded mint was refused and there is nothing else on
+              // the tag: say why, instead of showing a picker whose rows
+              // would all fail the same way.
+              await nfcAdapter.releaseSession();
+              await revertNfcUnit?.().catch(() => undefined);
+              setStep("error", {
+                code: "PAYMENT_REQUEST_FAILED",
+                message: refusal,
+              });
+            }
+            // No candidates at all — the selectMint handler shows the picker.
             nfcResolved = true;
           } else if (step === "enterAmount") {
             // NFC requires amount in payment request — if we reach enterAmount, the request lacked it
@@ -1286,8 +1410,49 @@ export function createPaymentMachine(
             step === "navigateToPaymentRequest" &&
             operations?.executeNfcSend
           ) {
-            // Auto-execute: create token → write back to NFC tag
             const data = stepData as StepDataMap["navigateToPaymentRequest"];
+            // The resolver picks a mint without a picker when one is the
+            // obvious choice (the terminal's only listed mint, the preferred
+            // mint). Apply the same gate here as in selectMint before money
+            // moves; a refusal re-opens selection with this mint excluded,
+            // and selectMint then finds another mint, the tag's invoice, or
+            // the reason to show.
+            if (
+              operations.paymentRequestPayabilityFrom &&
+              !nfcRefusedMints.has(data.mintUrl) &&
+              !nfcPayableMints.has(data.mintUrl)
+            ) {
+              const payability = await operations.paymentRequestPayabilityFrom(
+                data.mintUrl,
+                data.unit,
+              );
+              if (isStaleGeneration(sendGeneration, "nfc.payability")) return;
+              if (!payability.payable) {
+                nfcRefusedMints.set(data.mintUrl, payability.reason);
+                logger.info("machine.nfc.mintRefused", {
+                  ...mintUrlFields(data.mintUrl),
+                  reason: payability.reason,
+                });
+                const walletCtxInner = getContext();
+                const unitInner = getUnit?.() ?? configUnit;
+                const r = transition(
+                  step,
+                  flowCtx,
+                  { type: "REQUEST_MINT_SELECTOR" },
+                  detectors,
+                  walletCtxInner,
+                  unitInner,
+                  offline,
+                  enableEcashSendMemo,
+                  getSatsPerUnitMinor,
+                );
+                flowCtx = r.context;
+                flowCtx.source = "nfc";
+                setStep(r.step, r.data);
+                continue;
+              }
+            }
+            // Auto-execute: create token → write back to NFC tag
             handlerExecuting = true;
             notify();
 

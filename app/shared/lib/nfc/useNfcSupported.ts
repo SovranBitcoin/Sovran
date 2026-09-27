@@ -20,6 +20,15 @@ function getSupported(): Promise<boolean> {
   return supportedPromise;
 }
 
+/**
+ * Start the hardware check at launch, so the first surface that asks already
+ * has the answer: resolved on mount, a device without NFC never draws the row
+ * it would then remove, shifting everything under it. Idempotent.
+ */
+export function preloadNfcSupported(): void {
+  void getSupported();
+}
+
 export function useNfcSupported(): boolean {
   const [supported, setSupported] = useState(resolvedSupported ?? true);
 

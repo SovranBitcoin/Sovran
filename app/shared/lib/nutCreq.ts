@@ -18,8 +18,36 @@ import { cashuLog } from '@/shared/lib/logger';
  * favorite needs the extended private-message length.
  */
 
-/** Cap the advertised mint list so the eager-favorite stays a sane size. */
+/**
+ * Cap the advertised mint list so the eager-favorite stays a sane size. The
+ * list is cut in the order given: rank it with `rankAdvertisedMints` first.
+ */
 const MAX_ADVERTISED_MINTS = 5;
+
+/**
+ * Order the mints we accept so the cap keeps the ones a sender can most likely
+ * pay from: the mint we have selected, then the mints we hold funds in, then
+ * the rest. A sender can only pay from a mint on this list that it also holds
+ * funds in, and the mints we actually use are the ones a contact is likeliest
+ * to share. Taking the first five alphabetically advertised whichever mints
+ * sorted first, and a wallet with more than five could end up offering none
+ * that its sender had money in.
+ *
+ * Ranks on "funded", not on the amount, so the list (and the favorite that
+ * carries it) only changes when a mint gains or loses its whole balance.
+ */
+export function rankAdvertisedMints(params: {
+  mints: readonly string[];
+  fundedMints: ReadonlySet<string>;
+  preferredMint?: string | null;
+}): string[] {
+  const { fundedMints, preferredMint } = params;
+  const rank = (mintUrl: string) =>
+    mintUrl === preferredMint ? 0 : fundedMints.has(mintUrl) ? 1 : 2;
+  return Array.from(new Set(params.mints.filter(Boolean))).sort(
+    (a, b) => rank(a) - rank(b) || (a < b ? -1 : a > b ? 1 : 0)
+  );
+}
 
 /**
  * Build our standing `creq` from the mints we accept + our P2PK key (branded —

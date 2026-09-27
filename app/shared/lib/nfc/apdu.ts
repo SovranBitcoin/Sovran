@@ -5,7 +5,15 @@
 import { bytesToHex } from '@noble/hashes/utils.js';
 import NfcManager from 'react-native-nfc-manager';
 import { NfcError } from './errors';
-import { SELECT_AID, SELECT_NDEF, STATUS_CODES, STATUS_OK } from './constants';
+import {
+  SELECT_AID,
+  SELECT_CC,
+  SELECT_NDEF,
+  STATUS_CODES,
+  STATUS_OK,
+  readBinary,
+} from './constants';
+import { parseCapabilityContainer, type CapabilityContainer } from './ndef';
 import { nfcLog } from '../logger';
 
 interface ApduResponse {
@@ -59,13 +67,9 @@ export async function sendApdu(command: number[], label?: string): Promise<ApduR
   }
 }
 
-/**
- * The Type 4 Tag open ceremony shared by the reader and writer: SELECT the
- * NDEF application (AID), then SELECT its NDEF file. Throws a typed NfcError
- * naming the step that failed.
- */
-export async function selectNdefApp(): Promise<void> {
-  let r = await sendApdu(SELECT_AID, 'SELECT AID');
+/** SELECT the NDEF Tag Application by AID. */
+export async function selectNdefApplication(): Promise<void> {
+  const r = await sendApdu(SELECT_AID, 'SELECT AID');
   if (!r.ok) {
     throw new NfcError(
       `AID not accepted by tag (${getStatusMessage(r.sw)})`,
@@ -73,8 +77,11 @@ export async function selectNdefApp(): Promise<void> {
       r.sw
     );
   }
+}
 
-  r = await sendApdu(SELECT_NDEF, 'SELECT NDEF');
+/** SELECT the NDEF file (E104) inside an already-selected NDEF application. */
+export async function selectNdefFile(): Promise<void> {
+  const r = await sendApdu(SELECT_NDEF, 'SELECT NDEF');
   if (!r.ok) {
     throw new NfcError(
       `NDEF file not accessible (${getStatusMessage(r.sw)})`,
@@ -82,6 +89,39 @@ export async function selectNdefApp(): Promise<void> {
       r.sw
     );
   }
+}
+
+/**
+ * The Type 4 Tag open ceremony shared by the reader and writer: SELECT the
+ * NDEF application (AID), then SELECT its NDEF file. Throws a typed NfcError
+ * naming the step that failed.
+ */
+export async function selectNdefApp(): Promise<void> {
+  await selectNdefApplication();
+  await selectNdefFile();
+}
+
+/**
+ * Read the Capability Container (E103). Call between `selectNdefApplication`
+ * and `selectNdefFile`. Best-effort: a tag or terminal that does not serve a
+ * CC, or serves one this parser does not recognise, yields null and the
+ * caller proceeds with its defaults — the CC is advice about limits, never a
+ * gate on the transaction itself.
+ */
+export async function readCapabilityContainer(): Promise<CapabilityContainer | null> {
+  const selected = await sendApdu(SELECT_CC, 'SELECT CC');
+  if (!selected.ok) {
+    nfcLog.debug('nfc.cc.unavailable', { step: 'select', sw: selected.sw });
+    return null;
+  }
+  const read = await sendApdu(readBinary(0, 15), 'READ CC');
+  if (!read.ok) {
+    nfcLog.debug('nfc.cc.unavailable', { step: 'read', sw: read.sw });
+    return null;
+  }
+  const cc = parseCapabilityContainer(read.payload);
+  nfcLog.debug('nfc.cc.read', { parsed: !!cc, ...(cc ?? {}) });
+  return cc;
 }
 
 /**
