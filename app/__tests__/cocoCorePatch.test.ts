@@ -87,19 +87,19 @@ describe('@cashu/coco-core patch — a reclaim nothing here can sign', () => {
       },
     });
     const now = Date.now();
-    await repo.proofRepository.saveProofs(MINT, [
-      {
-        id: '00ad268c4d1f5826',
-        amount: 8,
-        secret: SECRET,
-        C: `02${'cd'.repeat(32)}`,
-        mintUrl: MINT,
-        unit: 'sat',
-        state: 'inflight',
-        usedByOperationId: OPERATION,
-      } as never,
-    ]);
-    await repo.sendOperationRepository.create({
+    // Rows as the wallet's own repositories hold them, written directly: the
+    // send that produced them would need a mint.
+    const lockedProof = {
+      id: '00ad268c4d1f5826',
+      amount: 8,
+      secret: SECRET,
+      C: `02${'cd'.repeat(32)}`,
+      mintUrl: MINT,
+      unit: 'sat',
+      state: 'inflight',
+      usedByOperationId: OPERATION,
+    };
+    const pendingSend = {
       id: OPERATION,
       state: 'pending',
       mintUrl: MINT,
@@ -113,7 +113,11 @@ describe('@cashu/coco-core patch — a reclaim nothing here can sign', () => {
       inputProofSecrets: [SECRET],
       createdAt: now,
       updatedAt: now,
-    } as never);
+    };
+    type Proofs = Parameters<typeof repo.proofRepository.saveProofs>[1];
+    type Send = Parameters<typeof repo.sendOperationRepository.create>[0];
+    await repo.proofRepository.saveProofs(MINT, [lockedProof] as unknown as Proofs);
+    await repo.sendOperationRepository.create(pendingSend as unknown as Send);
     return manager;
   }
 
