@@ -959,9 +959,15 @@ export function createSovranNotifications(
         },
       });
     },
-    onNfcWriteFailed: ({ message, rolledBack }) => {
+    onNfcWriteFailed: ({ message, rolledBack, stage }) => {
       const errorMsg = rolledBack ? `${message} Your funds have been returned.` : message;
-      paramPopup('nfc-error', { title: 'NFC Write Failed', message: errorMsg });
+      // Before the token exists nothing has touched the tag: "write failed"
+      // would send the user chasing the NFC link when the mint or the fee
+      // gate is what refused.
+      paramPopup('nfc-error', {
+        title: stage === 'prepare' ? 'Payment not sent' : 'NFC Write Failed',
+        message: errorMsg,
+      });
     },
     // Drives the Android tap-to-pay sheet's phase text ('Preparing payment…'
     // etc.). 'creating'/'writing' only fire once executeNfcSend write-back
@@ -1909,9 +1915,18 @@ export function createSovranHandlers({
         nearPaySessionStore.active &&
         (constraints.destination === 'sendEcash' || constraints.destination === 'paymentRequest')
       ) {
+        // The amount step is inline, so no route is pushed over the mint
+        // picker. Left on the stack it keeps covering the radar, and every
+        // further tap on a mint re-selects into a step the user cannot see.
+        const mintPickerOpen = nearPaySessionStore.active.mintPickerOpen;
         nearPaySessionStore.setAmountEntry(params.amountEntry);
+        if (mintPickerOpen) {
+          nearPaySessionStore.setMintPickerOpen(false);
+          router.back();
+        }
         paymentLog.info('navigate.enterAmount.near_pay_inline', {
           destination: constraints.destination,
+          dismissedMintPicker: mintPickerOpen,
           duration_ms: performance.now() - t0,
         });
         return;
@@ -1952,11 +1967,15 @@ export function createSovranHandlers({
       // Receive-side pickers (fixed-amount quote, NPC mint, receive-rail
       // "Receiving with" mints) live in the receive-flow stack.
       const isReceiveScope = scope === 'npc' || scope === 'bolt12' || scope === 'onchain';
+      const inReceiveFlow = destination === 'mintQuote' || isReceiveScope;
       router.navigate(
-        destination === 'mintQuote' || isReceiveScope
+        inReceiveFlow
           ? { pathname: '/(receive-flow)/mintSelect', params }
           : { pathname: '/(send-flow)/mintSelect', params }
       );
+      // A Nut Drop's amount step is inline on the radar, so `enterAmount` has
+      // to pop this picker itself. Record that it is there.
+      if (!inReceiveFlow) useNearPaySessionStore.getState().setMintPickerOpen(true);
     },
 
     chooseOption: (stepData) => {

@@ -31,6 +31,13 @@ interface NearPaySession {
   startedAt: number;
   phase: NearPaySessionPhase;
   amountEntry: string | null;
+  /**
+   * True while the mint picker route covers the radar for this session. The
+   * amount step lands inline on the radar, not on a route of its own, so
+   * nothing pushes the picker off the stack: whoever completes the step has to
+   * pop it, and this is how they know it is there.
+   */
+  mintPickerOpen: boolean;
 }
 
 interface NearPaySessionStore {
@@ -43,6 +50,7 @@ interface NearPaySessionStore {
   radarVisible: boolean;
   start: (recipient: NearPayRecipient) => void;
   setAmountEntry: (amountEntry: string) => void;
+  setMintPickerOpen: (open: boolean) => void;
   showAmount: () => void;
   resetToPicker: () => void;
   complete: () => void;
@@ -72,6 +80,7 @@ export const useNearPaySessionStore = create<NearPaySessionStore>((set, get) => 
         startedAt: Date.now(),
         phase: 'picking',
         amountEntry: null,
+        mintPickerOpen: false,
       },
     });
   },
@@ -87,9 +96,17 @@ export const useNearPaySessionStore = create<NearPaySessionStore>((set, get) => 
       active: {
         ...current,
         amountEntry,
-        phase: 'transitioning',
+        // A mint re-pick from the amount step replaces the entry in place: the
+        // amount panel is already up, so replaying its entrance would flash it.
+        phase: current.phase === 'amount' ? 'amount' : 'transitioning',
       },
     });
+  },
+
+  setMintPickerOpen: (open) => {
+    const current = get().active;
+    if (!current || current.mintPickerOpen === open) return;
+    set({ active: { ...current, mintPickerOpen: open } });
   },
 
   showAmount: () => {

@@ -16,9 +16,11 @@ import { paymentLog } from '@/shared/lib/logger';
 import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
 
 const mockNavigate = jest.fn();
+const mockBack = jest.fn();
 const mockDismissAll = jest.fn();
 const mockNearPayComplete = jest.fn();
 const mockNearPaySetAmountEntry = jest.fn();
+const mockNearPaySetMintPickerOpen = jest.fn();
 let mockNearPayActive: unknown = null;
 
 function paymentLogCalls(): unknown[][] {
@@ -41,6 +43,7 @@ jest.mock('@/shared/stores/profile/transactionAnnotationStore', () => ({
 jest.mock('expo-router', () => ({
   router: {
     navigate: (...args: unknown[]) => mockNavigate(...args),
+    back: (...args: unknown[]) => mockBack(...args),
     replace: jest.fn(),
     dismiss: jest.fn(),
     dismissAll: (...args: unknown[]) => mockDismissAll(...args),
@@ -113,6 +116,7 @@ jest.mock('@/shared/stores/runtime/nearPayStore', () => ({
       active: mockNearPayActive,
       complete: mockNearPayComplete,
       setAmountEntry: mockNearPaySetAmountEntry,
+      setMintPickerOpen: mockNearPaySetMintPickerOpen,
     })),
   },
 }));
@@ -148,8 +152,10 @@ describe('createSovranHandlers profile routing', () => {
   beforeEach(() => {
     mockNavigate.mockReset();
     mockDismissAll.mockReset();
+    mockBack.mockReset();
     mockNearPayComplete.mockReset();
     mockNearPaySetAmountEntry.mockReset();
+    mockNearPaySetMintPickerOpen.mockReset();
     mockNearPayActive = null;
     (getEncodedToken as jest.Mock).mockReset();
     (sendBLEPrivateMessageWhole as jest.Mock).mockReset();
@@ -218,6 +224,76 @@ describe('createSovranHandlers profile routing', () => {
     expect(mockNavigate).not.toHaveBeenCalledWith(
       expect.objectContaining({ pathname: '/(send-flow)/amount' })
     );
+  });
+
+  // The amount step is inline on the radar, so nothing pushes the mint picker
+  // off the stack. Left there it covers the radar and every further tap on a
+  // mint re-selects into a step the user cannot see.
+  it('pops the mint picker off the radar once a Near Pay mint is chosen', async () => {
+    mockNearPayActive = {
+      id: 'near-pay-1',
+      startedAt: 1,
+      phase: 'picking',
+      amountEntry: null,
+      mintPickerOpen: true,
+      recipient: { peerID: 'peer-123', nickname: 'Nearby Alice', hasDirectLink: true, lastSeen: 2 },
+    };
+    // @ts-expect-error enterAmount only reads no machine methods.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    const handlers = createSovranHandlers({ machine, getManager: () => null });
+
+    await handlers.enterAmount?.({
+      unit: 'sat',
+      preselectedMintUrl: 'https://mint.example',
+      constraints: { destination: 'sendEcash' },
+    });
+
+    expect(mockNearPaySetAmountEntry).toHaveBeenCalledTimes(1);
+    expect(mockNearPaySetMintPickerOpen).toHaveBeenCalledWith(false);
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the stack alone when no mint picker covers the radar', async () => {
+    mockNearPayActive = {
+      id: 'near-pay-1',
+      startedAt: 1,
+      phase: 'picking',
+      amountEntry: null,
+      mintPickerOpen: false,
+      recipient: { peerID: 'peer-123', nickname: 'Nearby Alice', hasDirectLink: true, lastSeen: 2 },
+    };
+    // @ts-expect-error enterAmount only reads no machine methods.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    const handlers = createSovranHandlers({ machine, getManager: () => null });
+
+    await handlers.enterAmount?.({
+      unit: 'sat',
+      preselectedMintUrl: 'https://mint.example',
+      constraints: { destination: 'sendEcash' },
+    });
+
+    expect(mockNearPaySetAmountEntry).toHaveBeenCalledTimes(1);
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('records that the send mint picker is open, and not the receive one', async () => {
+    // @ts-expect-error selectMint only reads no machine methods.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    const handlers = createSovranHandlers({ machine, getManager: () => null });
+    const step = { candidates: [], supportedMintUrls: [], unit: 'sat', mintListItems: [] };
+
+    await handlers.selectMint?.({ ...step, destination: 'sendEcash', scope: 'selected' });
+    expect(mockNavigate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pathname: '/(send-flow)/mintSelect' })
+    );
+    expect(mockNearPaySetMintPickerOpen).toHaveBeenCalledWith(true);
+
+    mockNearPaySetMintPickerOpen.mockReset();
+    await handlers.selectMint?.({ ...step, destination: 'mintQuote', scope: 'selected' });
+    expect(mockNavigate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pathname: '/(receive-flow)/mintSelect' })
+    );
+    expect(mockNearPaySetMintPickerOpen).not.toHaveBeenCalled();
   });
 
   it('keeps normal send amount navigation when Near Pay is inactive', async () => {

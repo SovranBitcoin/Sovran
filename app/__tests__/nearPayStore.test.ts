@@ -56,6 +56,32 @@ describe('near pay session store', () => {
     expect(useNearPaySessionStore.getState().active?.phase).toBe('amount');
   });
 
+  it('replaces the amount entry in place when the mint is re-picked from the amount step', () => {
+    useNearPaySessionStore.getState().start(RECIPIENT);
+    useNearPaySessionStore.getState().setAmountEntry('{"selectedMintUrl":"https://a.example"}');
+    useNearPaySessionStore.getState().showAmount();
+    useNearPaySessionStore.getState().setAmountEntry('{"selectedMintUrl":"https://b.example"}');
+
+    const active = useNearPaySessionStore.getState().active;
+    expect(active?.phase).toBe('amount');
+    expect(active?.amountEntry).toBe('{"selectedMintUrl":"https://b.example"}');
+  });
+
+  it('marks the mint picker as covering the radar for the active session only', () => {
+    useNearPaySessionStore.getState().setMintPickerOpen(true);
+    expect(useNearPaySessionStore.getState().active).toBeNull();
+
+    useNearPaySessionStore.getState().start(RECIPIENT);
+    expect(useNearPaySessionStore.getState().active?.mintPickerOpen).toBe(false);
+
+    useNearPaySessionStore.getState().setMintPickerOpen(true);
+    expect(useNearPaySessionStore.getState().active?.mintPickerOpen).toBe(true);
+
+    // A new selection starts clean: the picker belonged to the old session.
+    useNearPaySessionStore.getState().start(RECIPIENT);
+    expect(useNearPaySessionStore.getState().active?.mintPickerOpen).toBe(false);
+  });
+
   it('returns to the picker by clearing the active inline session', () => {
     useNearPaySessionStore.getState().start(RECIPIENT);
     useNearPaySessionStore.getState().setAmountEntry('{"destination":"sendEcash"}');
