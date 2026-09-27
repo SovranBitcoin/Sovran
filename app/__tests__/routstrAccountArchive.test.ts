@@ -100,6 +100,20 @@ describe('archiveAccount', () => {
     expect(useRoutstrStore.getState().legacyAccounts['unknown']?.apiKey).toBe('sk-orphan');
   });
 
+  it('keeps the recorded issuer when the same key is archived again without one', () => {
+    // "Unknown" is the absence of a claim. It must not split a key into a
+    // second row reclaim cannot act on, nor erase the node already recorded.
+    useRoutstrStore.getState().archiveAccount('https://a.example', 'sk-aaa', 250_000);
+    useRoutstrStore.getState().archiveAccount(null, 'sk-aaa', null);
+    expect(useRoutstrStore.getState().legacyAccounts).toEqual({
+      'https://a.example': expect.objectContaining({
+        apiKey: 'sk-aaa',
+        nodeBaseUrl: 'https://a.example',
+        lastKnownBalanceMsats: 250_000,
+      }),
+    });
+  });
+
   it('never downgrades a known balance to null on a repeat archive', () => {
     useRoutstrStore.getState().archiveAccount('https://a.example', 'sk-aaa', 250_000);
     useRoutstrStore.getState().archiveAccount('https://a.example', 'sk-aaa', null);

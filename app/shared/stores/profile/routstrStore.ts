@@ -52,6 +52,16 @@ const DEFAULT_PROVIDER: RoutstrProviderId = 'openai';
 const DEFAULT_NODE_KEY = 'default';
 
 /**
+ * The node a version-1 blob was talking to whenever its `nodeBaseUrl` was
+ * `null`. Version 1 is the shape 0.1.3 shipped, and in that build `null` was
+ * not "no provider": it was the built-in default, and every key minted under
+ * it was issued by this node. The default has since been removed, so the fact
+ * has to be written down while the blob can still be told apart from a later
+ * one — see `migrate`.
+ */
+const RELEASED_DEFAULT_NODE = 'https://api.routstr.com';
+
+/**
  * Keep the selected vendor pointing at something the new lineup can answer.
  *
  * The selection is sticky and the lineup is not. A node swap replaces the
@@ -317,16 +327,22 @@ function withArchivedAccount(
   balanceMsats: number | null
 ): Record<string, RoutstrAccount> {
   const node = nodeBaseUrl ?? 'unknown';
-  const match = Object.entries(accounts).find(
-    ([key, account]) => (account.nodeBaseUrl ?? key) === node && account.apiKey === apiKey
-  );
+  const entries = Object.entries(accounts);
+  const match =
+    entries.find(
+      ([key, account]) => (account.nodeBaseUrl ?? key) === node && account.apiKey === apiKey
+    ) ??
+    // "Unknown" is the absence of a claim, not a competing one. A key already
+    // filed under the node that issued it is the richer record, and a second
+    // row for it under `unknown` would be one reclaim can never act on.
+    (nodeBaseUrl == null ? entries.find(([, account]) => account.apiKey === apiKey) : undefined);
   const key = match?.[0] ?? (accounts[node] ? mintLocalId('routstr-account') : node);
   const existing = accounts[key];
   return {
     ...accounts,
     [key]: {
       apiKey,
-      nodeBaseUrl,
+      nodeBaseUrl: nodeBaseUrl ?? existing?.nodeBaseUrl ?? null,
       lastKnownBalanceMsats: existing?.lastKnownBalanceMsats ?? balanceMsats ?? null,
       archivedAt: existing?.archivedAt ?? Date.now(),
       reclaimedAt: existing?.reclaimedAt ?? null,
@@ -900,6 +916,12 @@ const PersistedRoutstrAccount = z.looseObject({
   reclaimedAt: z.number().int().nonnegative().nullable().default(null).catch(null),
 });
 
+// `tolerantRecord` rather than a bare `z.record` on purpose: under `z.record`
+// one malformed row rejects the record, and through `createMergeWithSchema`
+// the whole blob — so a single bad entry would take every OTHER provider's key
+// with it. Here it loses one row.
+const PersistedLegacyAccounts = tolerantRecord(z.string().max(512), PersistedRoutstrAccount);
+
 const PersistedPendingPayment = z.looseObject({
   encoded: z.string().max(65_536),
   nodeBaseUrl: z.string().max(512),
@@ -921,11 +943,8 @@ const PersistedRoutstrStore = z.object({
   // Additive + tolerant: a malformed value parses to null and the app
   // falls back to the built-in default node.
   nodeBaseUrl: z.string().max(512).nullable().default(null).catch(null),
-  // Additive, and `tolerantRecord` rather than a bare `z.record` on purpose:
-  // under `z.record` one malformed row rejects the record, and through
-  // `createMergeWithSchema` the whole blob — so a single bad entry would take
-  // every OTHER provider's key with it. Here it loses one row.
-  legacyAccounts: tolerantRecord(z.string().max(512), PersistedRoutstrAccount),
+  // Additive.
+  legacyAccounts: PersistedLegacyAccounts,
   // Additive + tolerant: a malformed value parses to null, which simply means
   // "follow nagg" — the default.
   userNodeBaseUrl: z.string().max(512).nullable().default(null).catch(null),
@@ -1474,6 +1493,15 @@ export const useRoutstrStore = create<RoutstrStore>()(
       // what removing it is for. The field is kept (not dropped) so the blob's
       // shape is unchanged and nothing else in it is at risk.
       //
+      // v2 also names the issuer of a key that never had one recorded. A
+      // version-1 blob with a key and no `nodeBaseUrl` was using the built-in
+      // default node, which no longer exists as a default: left alone, the
+      // key is archived under `unknown`, and reclaim never sends an
+      // unknown-owner key anywhere. This is the last point at which the blob
+      // can be told apart from one written after the default was removed, so
+      // it is the only point at which the issuer can be recorded as a fact
+      // rather than guessed. A blob that does name a node keeps that node.
+      //
       // v3: split the single mutable provider record into per-source claims.
       //
       // Everything the old record held is folded into one `legacy` claim,
@@ -1487,7 +1515,17 @@ export const useRoutstrStore = create<RoutstrStore>()(
       version: 3,
       migrate: (state, version) => {
         const blob: Record<string, unknown> = { ...(state as Record<string, unknown> | null) };
-        if (version < 2) blob.confirmSpend = true;
+        if (version < 2) {
+          blob.confirmSpend = true;
+          if (typeof blob.apiKey === 'string' && blob.apiKey && blob.nodeBaseUrl == null) {
+            blob.legacyAccounts = withArchivedAccount(
+              PersistedLegacyAccounts.catch({}).parse(blob.legacyAccounts),
+              RELEASED_DEFAULT_NODE,
+              blob.apiKey,
+              typeof blob.balance === 'number' ? blob.balance : null
+            );
+          }
+        }
         if (version < 3) {
           const legacy = (blob.knownProviders ?? {}) as Record<string, Record<string, unknown>>;
           const claims: Record<string, unknown> = {};

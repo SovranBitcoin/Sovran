@@ -511,6 +511,75 @@ describe('the confirmSpend v2 migration', () => {
 });
 
 /**
+ * A key minted by the released build has to stay reachable.
+ *
+ * 0.1.3 wrote version-1 blobs, and in it a `null` node was the built-in
+ * default, `https://api.routstr.com`. That default is gone, so the same `null`
+ * now reads as "no provider" — and a key archived with no provider is filed
+ * under `unknown`, which reclaim never sends anywhere. The migration is the
+ * one place the released meaning can still be recovered.
+ */
+describe('the issuer of a key written by the released build', () => {
+  beforeEach(() => {
+    jest.resetModules();
+    for (const k of Object.keys(mockMemory)) delete mockMemory[k];
+  });
+
+  const preloadAt = (version: number, state: Record<string, unknown>) => {
+    mockMemory[STORAGE_KEY] = JSON.stringify({ state, version });
+  };
+
+  it('is the released default node when the blob recorded none', async () => {
+    preloadAt(1, { apiKey: 'sk-key', balance: 250_000, nodeBaseUrl: null });
+
+    const store = await loadStore();
+
+    expect(store.getState().legacyAccounts).toEqual({
+      'https://api.routstr.com': expect.objectContaining({
+        apiKey: 'sk-key',
+        nodeBaseUrl: 'https://api.routstr.com',
+        lastKnownBalanceMsats: 250_000,
+        reclaimedAt: null,
+      }),
+    });
+    // Recorded, not spent: the key is still the live credential.
+    expect(store.getState().apiKey).toBe('sk-key');
+    expect(store.getState().balance).toBe(250_000);
+  });
+
+  it('stays under the released default node when the user then picks a provider', async () => {
+    preloadAt(1, { apiKey: 'sk-key', balance: 250_000 });
+    const store = await loadStore();
+
+    store.getState().setUserNode('https://other.example');
+
+    expect(store.getState().apiKey).toBeNull();
+    expect(Object.keys(store.getState().legacyAccounts)).toEqual(['https://api.routstr.com']);
+    expect(store.getState().legacyAccounts['https://api.routstr.com']).toMatchObject({
+      apiKey: 'sk-key',
+      nodeBaseUrl: 'https://api.routstr.com',
+    });
+  });
+
+  it('is the node the blob did record', async () => {
+    preloadAt(1, { apiKey: 'sk-key', balance: 5, nodeBaseUrl: 'https://old.example' });
+
+    const store = await loadStore();
+
+    expect(Object.keys(store.getState().legacyAccounts)).toEqual(['https://old.example']);
+  });
+
+  it('is not guessed for a blob written after the default was removed', async () => {
+    preloadAt(2, { apiKey: 'sk-key', balance: 5, nodeBaseUrl: null });
+
+    const store = await loadStore();
+
+    expect(Object.keys(store.getState().legacyAccounts)).toEqual(['unknown']);
+    expect(store.getState().legacyAccounts['unknown']?.nodeBaseUrl ?? null).toBeNull();
+  });
+});
+
+/**
  * v3: the single mutable provider record becomes per-source claims.
  *
  * The blob it migrates is contaminated by the model it replaces. Two
