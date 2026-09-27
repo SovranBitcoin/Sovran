@@ -3,15 +3,18 @@
  */
 
 /**
- * app/patches/README.md: a successful install is not proof the patch landed.
+ * The wallet core ships as its maintainers published it.
  *
- * This patch is the difference between "you can take this back after Friday"
- * being true and being a lie the wallet tells while the money is already gone,
- * so a coco bump that silently drops it has to fail here rather than on a
- * device, months later, at the moment someone tries to reclaim.
+ * It used to carry a patch that let a P2PK send be reclaimed with a refund
+ * key. Upstream says such a send cannot be reclaimed, the patch had never run
+ * against a mint, and code that swaps proofs inside the wallet core is not
+ * something to carry on our own word. The app now withholds what the core
+ * cannot do (`wallet/src/p2pk/reclaimGate.ts`) instead of changing the core.
+ *
+ * This fails if a patch comes back, under any file name.
  */
 
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 
 // The package's exports map hides its files from `require.resolve`, and the
@@ -23,46 +26,46 @@ const CANDIDATES = [
 const bundlePath = CANDIDATES.find((candidate) => existsSync(candidate));
 const bundle = bundlePath ? readFileSync(bundlePath, 'utf8') : '';
 
-describe('@cashu/coco-core patch — reclaiming a P2PK send', () => {
+describe('@cashu/coco-core is unmodified', () => {
   it('found the installed bundle to check', () => {
     expect(bundlePath).toBeTruthy();
   });
 
-  it('asks cashu-ts which keys may spend a proof right now', () => {
-    // Not "which key is it locked to": after a locktime passes the refund
-    // keys may spend it too, and that timing IS the feature.
-    expect(bundle).toContain('getP2PKExpectedWitnessPubkeys');
+  it('has no patch registered against any coco package', () => {
+    const root = JSON.parse(
+      readFileSync(resolve(__dirname, '..', '..', 'package.json'), 'utf8')
+    ) as { patchedDependencies?: Record<string, string> };
+    const patched = Object.keys(root.patchedDependencies ?? {}).filter((name) =>
+      name.startsWith('@cashu/coco-')
+    );
+    expect(patched).toEqual([]);
   });
 
-  it('hands the signing keys to the reclaim swap', () => {
-    expect(bundle).toMatch(/privkey:\s*privkeys/);
+  it('has no coco patch file waiting to be registered', () => {
+    const files = readdirSync(resolve(__dirname, '..', 'patches')).filter((name) =>
+      /coco/i.test(name)
+    );
+    expect(files).toEqual([]);
   });
 
-  it('no longer refuses every pending P2PK rollback outright', () => {
-    expect(bundle).not.toContain('Cannot rollback pending P2PK send operation');
-  });
-
-  it('refuses a reclaim it cannot sign instead of letting the mint reject it', () => {
-    // The operation must stay pending so the recipient can still claim.
-    expect(bundle).toContain('no key held that may spend it yet');
-  });
-
-  it('gives the P2PK handler the keyring it signs with', () => {
-    expect(bundle).toContain('new P2pkSendHandler(this.outputDataCreator, keyRingService)');
+  it('carries none of the reclaim code the patch added', () => {
+    expect(bundle).not.toContain('collectSigningKeys');
+    expect(bundle).not.toContain('assertReclaimable');
+    expect(bundle).not.toContain('getP2PKExpectedWitnessPubkeys');
+    expect(bundle).not.toContain('no key held that may spend it yet');
   });
 });
 
 /**
- * What the strings above cannot show: that a refusal leaves the operation
- * alone. The service records `rolling_back` before it calls the handler and
- * nothing writes `pending` back when the handler throws, so a refusal raised
- * inside `rollback` stranded the send in a state `reclaim` rejects and
- * `finalize` skips — a timed lock cancelled early could never be taken back.
+ * What the app's gate relies on: the core refuses, and leaves the send alone.
+ *
+ * The refusal has to come before the operation is recorded as rolling back,
+ * because nothing writes `pending` back afterwards — a send left in
+ * `rolling_back` is one `finalize` skips when the recipient claims it.
  */
-describe('@cashu/coco-core patch — a reclaim nothing here can sign', () => {
+describe('@cashu/coco-core and a P2PK send that has left', () => {
   const MINT = 'https://mint.example';
   const OPERATION = 'send-locked';
-  // Locked to a key this wallet does not hold.
   const SECRET = JSON.stringify([
     'P2PK',
     { nonce: '00'.repeat(32), data: `02${'ab'.repeat(32)}`, tags: [] },
@@ -70,7 +73,7 @@ describe('@cashu/coco-core patch — a reclaim nothing here can sign', () => {
 
   async function walletWithPendingLockedSend() {
     const { initializeCoco, MemoryRepositories } =
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- the real, patched bundle
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- the real, installed bundle
       require('@cashu/coco-core') as typeof import('@cashu/coco-core');
     const repo = new MemoryRepositories();
     const manager = await initializeCoco({
@@ -121,19 +124,11 @@ describe('@cashu/coco-core patch — a reclaim nothing here can sign', () => {
     return manager;
   }
 
-  it('is refused with the operation still pending, and can be asked again', async () => {
+  it('refuses to reclaim it and leaves it pending', async () => {
     const manager = await walletWithPendingLockedSend();
 
     await expect(manager.ops.send.reclaim(OPERATION)).rejects.toThrow(
-      'no key held that may spend it yet'
-    );
-    expect((await manager.ops.send.get(OPERATION))?.state).toBe('pending');
-
-    // The second ask is the one that matters: it is the reclaim after the
-    // lock opens, and it has to reach the key check rather than be turned
-    // away for the state the first one left behind.
-    await expect(manager.ops.send.reclaim(OPERATION)).rejects.toThrow(
-      'no key held that may spend it yet'
+      'Cannot rollback pending P2PK send operation'
     );
     expect((await manager.ops.send.get(OPERATION))?.state).toBe('pending');
   });
