@@ -1,5 +1,5 @@
 diff --git a/dist/index.js b/dist/index.js
-index 680223d0a4201f4b29fbce8458cda9fcbf2d78e0..35266ba3e093439d61653a44fb82e8927e3cd0e9 100644
+index 680223d0a4201f4b29fbce8458cda9fcbf2d78e0..2872ea9a58780fdaabf33fe8c3d811d0e0910aef 100644
 --- a/dist/index.js
 +++ b/dist/index.js
 @@ -1,6 +1,6 @@
@@ -10,15 +10,19 @@ index 680223d0a4201f4b29fbce8458cda9fcbf2d78e0..35266ba3e093439d61653a44fb82e892
  import { schnorr, secp256k1 } from "@noble/curves/secp256k1.js";
  import { bytesToHex } from "@noble/curves/utils.js";
  import { sha256 } from "@noble/hashes/sha2.js";
-@@ -5653,7 +5653,6 @@ var SendOperationService = class {
+@@ -5653,7 +5653,10 @@ var SendOperationService = class {
  			if (!hasPreparedData$1(operation)) throw new Error(`Operation ${operationId} is not in a rollbackable state`);
  			const handler = this.handlerProvider.get(operation.method);
  			if (!handler.rollback) throw new Error(`Send operations of method ${operation.method} can not be rolled back`);
 -			if (operation.state === "pending" && operation.method === "p2pk") throw new Error("Cannot rollback pending P2PK send operation");
++			if (operation.state === "pending" && handler.assertReclaimable) await handler.assertReclaimable({
++				...this.buildDeps(),
++				operation
++			});
  			const { wallet } = await this.walletService.getWalletWithActiveKeysetId(operation.mintUrl, operation.unit);
  			let opForRollback = operation;
  			if (operation.state === "pending") {
-@@ -10632,8 +10631,10 @@ var DefaultSendHandler = class {
+@@ -10632,8 +10635,10 @@ var DefaultSendHandler = class {
  */
  var P2pkSendHandler = class {
  	outputDataCreator;
@@ -30,7 +34,7 @@ index 680223d0a4201f4b29fbce8458cda9fcbf2d78e0..35266ba3e093439d61653a44fb82e892
  	}
  	/**
  	* Prepare the send operation by selecting proofs and creating outputs.
-@@ -10805,17 +10806,99 @@ var P2pkSendHandler = class {
+@@ -10805,17 +10810,117 @@ var P2pkSendHandler = class {
  		if (keepSecrets.length > 0) await proofService.releaseProofs(operation.mintUrl, keepSecrets);
  	}
  	/**
@@ -59,6 +63,24 @@ index 680223d0a4201f4b29fbce8458cda9fcbf2d78e0..35266ba3e093439d61653a44fb82e892
 +		}
 +		logger?.info("Resolved P2PK reclaim signers", { signerCount: privkeys.size });
 +		return [...privkeys.values()];
++	}
++	/**
++	* Refuse a reclaim nothing here can sign, BEFORE the operation is recorded
++	* as rolling back.
++	*
++	* The service writes `rolling_back` and then calls `rollback`, and nothing
++	* writes `pending` back when `rollback` throws. A refusal raised there left
++	* the operation in a state `reclaim` rejects and `finalize` skips: a timed
++	* lock cancelled early could not be taken back once it opened, and a send
++	* the recipient went on to claim never finalized.
++	*/
++	async assertReclaimable(ctx) {
++		const { operation, proofRepository, logger } = ctx;
++		const sendSecrets = getSendProofSecrets(operation);
++		if (sendSecrets.length === 0) return;
++		const sendProofs = (await proofRepository.getProofsByOperationId(operation.mintUrl, operation.id)).filter((p) => sendSecrets.includes(p.secret) && p.state === "inflight");
++		if (sendProofs.length === 0) return;
++		if ((await this.collectSigningKeys(sendProofs, logger)).length === 0) throw new ProofValidationError("Cannot reclaim this P2PK send: no key held that may spend it yet");
 +	}
 +	/**
  	* Rollback the send operation.
@@ -134,7 +156,7 @@ index 680223d0a4201f4b29fbce8458cda9fcbf2d78e0..35266ba3e093439d61653a44fb82e892
  	}
  	/**
  	* Recover an executing operation that failed mid-execution.
-@@ -14099,7 +14182,7 @@ var Manager = class {
+@@ -14099,7 +14204,7 @@ var Manager = class {
  		const sendOperationLogger = this.getChildLogger("SendOperationService");
  		const sendHandlerProvider = new SendHandlerProvider({
  			default: new DefaultSendHandler(),

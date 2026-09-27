@@ -51,3 +51,86 @@ describe('@cashu/coco-core patch — reclaiming a P2PK send', () => {
     expect(bundle).toContain('new P2pkSendHandler(this.outputDataCreator, keyRingService)');
   });
 });
+
+/**
+ * What the strings above cannot show: that a refusal leaves the operation
+ * alone. The service records `rolling_back` before it calls the handler and
+ * nothing writes `pending` back when the handler throws, so a refusal raised
+ * inside `rollback` stranded the send in a state `reclaim` rejects and
+ * `finalize` skips — a timed lock cancelled early could never be taken back.
+ */
+describe('@cashu/coco-core patch — a reclaim nothing here can sign', () => {
+  const MINT = 'https://mint.example';
+  const OPERATION = 'send-locked';
+  // Locked to a key this wallet does not hold.
+  const SECRET = JSON.stringify([
+    'P2PK',
+    { nonce: '00'.repeat(32), data: `02${'ab'.repeat(32)}`, tags: [] },
+  ]);
+
+  async function walletWithPendingLockedSend() {
+    const { initializeCoco, MemoryRepositories } =
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- the real, patched bundle
+      require('@cashu/coco-core') as typeof import('@cashu/coco-core');
+    const repo = new MemoryRepositories();
+    const manager = await initializeCoco({
+      repo,
+      seedGetter: async () => new Uint8Array(64).fill(1),
+      watchers: {
+        mintOperationWatcher: { disabled: true },
+        proofStateWatcher: { disabled: true },
+        meltQuoteWatcher: { disabled: true },
+      },
+      processors: {
+        mintOperationProcessor: { disabled: true },
+        meltSettlementProcessor: { disabled: true },
+      },
+    });
+    const now = Date.now();
+    await repo.proofRepository.saveProofs(MINT, [
+      {
+        id: '00ad268c4d1f5826',
+        amount: 8,
+        secret: SECRET,
+        C: `02${'cd'.repeat(32)}`,
+        mintUrl: MINT,
+        unit: 'sat',
+        state: 'inflight',
+        usedByOperationId: OPERATION,
+      } as never,
+    ]);
+    await repo.sendOperationRepository.create({
+      id: OPERATION,
+      state: 'pending',
+      mintUrl: MINT,
+      amount: 8,
+      unit: 'sat',
+      method: 'p2pk',
+      methodData: { pubkey: `02${'ab'.repeat(32)}` },
+      needsSwap: false,
+      fee: 0,
+      inputAmount: 8,
+      inputProofSecrets: [SECRET],
+      createdAt: now,
+      updatedAt: now,
+    } as never);
+    return manager;
+  }
+
+  it('is refused with the operation still pending, and can be asked again', async () => {
+    const manager = await walletWithPendingLockedSend();
+
+    await expect(manager.ops.send.reclaim(OPERATION)).rejects.toThrow(
+      'no key held that may spend it yet'
+    );
+    expect((await manager.ops.send.get(OPERATION))?.state).toBe('pending');
+
+    // The second ask is the one that matters: it is the reclaim after the
+    // lock opens, and it has to reach the key check rather than be turned
+    // away for the state the first one left behind.
+    await expect(manager.ops.send.reclaim(OPERATION)).rejects.toThrow(
+      'no key held that may spend it yet'
+    );
+    expect((await manager.ops.send.get(OPERATION))?.state).toBe('pending');
+  });
+});
