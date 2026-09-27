@@ -6,6 +6,12 @@
  * sentence.
  */
 
+// These describe a lock that can be taken back. The wallet ships with that
+// switched off (`wallet/src/p2pk/reclaimGate.ts`), so it is switched on here
+// to keep the behaviour specified for the day it returns.
+// `sendLockReclaimGate.test.ts` covers what ships.
+jest.mock('../../wallet/src/p2pk/reclaimGate', () => ({ P2PK_RECLAIM_ENABLED: true }));
+
 import {
   buildSendLockMenuItems,
   describeDuration,

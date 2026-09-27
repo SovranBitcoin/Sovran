@@ -8,6 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import { logger } from "../logger";
+import { P2PK_RECLAIM_ENABLED } from "./reclaimGate";
 import { P2PK_PUBKEY_RE } from "./secret";
 
 export interface P2pkLockSpec {
@@ -49,9 +50,14 @@ function validKey(value: string | undefined): boolean {
  *     because the sender believes the opposite.
  *   - refund keys with no locktime — the refund path only opens after a
  *     locktime, so those keys can never be used. cashu-ts throws on this too.
+ *
+ * A third is refused while `P2PK_RECLAIM_ENABLED` is off: any locktime at all.
+ * Every send's lock passes through here, so no path can create a timed lock
+ * the wallet has no way to take back.
  */
 export function normalizeP2pkLock(
   input: P2pkLockSpec | string | undefined | null,
+  options: { reclaimEnabled?: boolean } = {},
 ): P2pkLockSpec | null {
   if (!input) return null;
   const spec: P2pkLockSpec =
@@ -79,6 +85,11 @@ export function normalizeP2pkLock(
     locktimeSec > 0;
   if (locktimeSec !== undefined && !hasLocktime) {
     logger.warn("p2pk.lock.invalidLocktime", { hasLocktime: false });
+    return null;
+  }
+
+  if (hasLocktime && !(options.reclaimEnabled ?? P2PK_RECLAIM_ENABLED)) {
+    logger.warn("p2pk.lock.timedLockDisabled");
     return null;
   }
 

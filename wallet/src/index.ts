@@ -22,6 +22,7 @@ export {
   isLockedSend,
   LOCK_CLOCK_SKEW_MS,
   normalizeP2pkLock,
+  P2PK_RECLAIM_ENABLED,
 } from "./p2pk";
 export type { P2pkLockSpec, SpendingConditions } from "./p2pk";
 

@@ -18,7 +18,7 @@
  * Pure: no hooks, no I/O, so every branch is a unit test.
  */
 
-import type { P2pkLockSpec } from 'wallet';
+import { P2PK_RECLAIM_ENABLED, type P2pkLockSpec } from 'wallet';
 
 import type { CashuP2pkPubkey } from '@/shared/lib/protocolIds';
 
@@ -86,14 +86,19 @@ function lockDurationOption(durationId: string): SendLockDurationOption | null {
  * answered: "reclaim after 1 hour" chosen ten minutes before pressing Next
  * must still mean an hour from the send. Returns null for a choice that
  * cannot be honoured — a timed lock with no refund key would open to whoever
- * holds the token, so it is refused rather than sent without its way back.
+ * holds the token, so it is refused rather than sent without its way back. So
+ * is any timed lock while the wallet cannot take one back.
  */
-export function lockSpecForChoice(choice: SendLockChoice, nowMs: number): P2pkLockSpec | null {
+export function lockSpecForChoice(
+  choice: SendLockChoice,
+  nowMs: number,
+  timedLocks: boolean = P2PK_RECLAIM_ENABLED
+): P2pkLockSpec | null {
   const option = lockDurationOption(choice.durationId);
   if (!option || option.id === 'off') return null;
   const locktimeSec = lockUntilSec(option, nowMs);
   if (locktimeSec === null) return { pubkey: choice.lockKey };
-  if (!choice.refundKey) return null;
+  if (!timedLocks || !choice.refundKey) return null;
   return { pubkey: choice.lockKey, locktimeSec, refundKeys: [choice.refundKey] };
 }
 

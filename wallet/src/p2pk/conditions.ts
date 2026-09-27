@@ -16,6 +16,7 @@
 import { parseP2PKSecret, parseSecret } from "@cashu/cashu-ts";
 
 import { logger } from "../logger";
+import { P2PK_RECLAIM_ENABLED } from "./reclaimGate";
 import { p2pkXOnly } from "./secret";
 
 /**
@@ -229,7 +230,20 @@ function verdict(
   unlockAt: number | null,
   now: number,
   skewMs: number,
+  reclaimEnabled: boolean,
 ): ReclaimVerdict {
+  // Whatever the token allows, this wallet has nothing that can spend a locked
+  // send it made. Said as "never" so the cancel rule, the timeline and the
+  // pending-send screen all stop promising a way back. See `reclaimGate.ts`.
+  if (!reclaimEnabled) {
+    return {
+      kind: "never",
+      because:
+        lock.refundKeys === null && unlockAt === null
+          ? "no-refund-tag"
+          : "cannot-sign",
+    };
+  }
   // No refund tag: after the locktime the proof needs no signature at all, so
   // anyone holding the token can spend it — us included, but not only us.
   if (lock.refundKeys === null) {
@@ -282,6 +296,7 @@ function assemble(
   now: number,
   ourPubkeys: readonly string[] | undefined,
   skewMs: number,
+  reclaimEnabled: boolean,
 ): SpendingConditions {
   const main: LockParty = {
     pubkeys: lock.mainKeys,
@@ -324,7 +339,7 @@ function assemble(
     reclaim:
       lock.kind === "unknown" || lock.kind === "htlc"
         ? { kind: "unknown" }
-        : verdict(lock, refund, unlockAt, now, skewMs),
+        : verdict(lock, refund, unlockAt, now, skewMs, reclaimEnabled),
     limits,
     unknownTags: lock.unknownTags,
   };
@@ -355,8 +370,16 @@ export function describeSpendingConditions(input: {
   /** Public keys this wallet can sign for; omit when unknown. */
   ourPubkeys?: readonly string[];
   skewMs?: number;
+  /** Whether a locked send can be taken back at all; see `reclaimGate.ts`. */
+  reclaimEnabled?: boolean;
 }): SpendingConditions {
-  const { proofs, now, ourPubkeys, skewMs = LOCK_CLOCK_SKEW_MS } = input;
+  const {
+    proofs,
+    now,
+    ourPubkeys,
+    skewMs = LOCK_CLOCK_SKEW_MS,
+    reclaimEnabled = P2PK_RECLAIM_ENABLED,
+  } = input;
   const locks = proofs.map((proof) => readProofLock(proof.secret));
   const locked = locks.filter((lock) => lock.kind !== "unlocked");
 
@@ -374,7 +397,7 @@ export function describeSpendingConditions(input: {
     mixed: unique.size > 1 || locked.length !== proofs.length,
   };
   const descriptions = [...unique.values()].map((lock) =>
-    assemble(lock, counts, now, ourPubkeys, skewMs),
+    assemble(lock, counts, now, ourPubkeys, skewMs, reclaimEnabled),
   );
   const first = descriptions[0]!;
   if (descriptions.length === 1) return first;
@@ -437,8 +460,16 @@ export function describeRecordedLock(input: {
   now: number;
   ourPubkeys?: readonly string[];
   skewMs?: number;
+  /** Whether a locked send can be taken back at all; see `reclaimGate.ts`. */
+  reclaimEnabled?: boolean;
 }): SpendingConditions {
-  const { lock, now, ourPubkeys, skewMs = LOCK_CLOCK_SKEW_MS } = input;
+  const {
+    lock,
+    now,
+    ourPubkeys,
+    skewMs = LOCK_CLOCK_SKEW_MS,
+    reclaimEnabled = P2PK_RECLAIM_ENABLED,
+  } = input;
   const mainKeys = lock.pubkeys?.length
     ? lock.pubkeys
     : lock.pubkey
@@ -461,5 +492,6 @@ export function describeRecordedLock(input: {
     now,
     ourPubkeys,
     skewMs,
+    reclaimEnabled,
   );
 }

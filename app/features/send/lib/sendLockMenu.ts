@@ -12,9 +12,15 @@
  * We only ever create the first two — `normalizeP2pkLock` refuses the third —
  * so the copy has exactly two promises to keep.
  *
+ * While the wallet cannot take a locked send back (`P2PK_RECLAIM_ENABLED`) the
+ * second is withheld too: the timed rows are not listed, and the permanent
+ * lock is the only lock on offer.
+ *
  * Pure: the rows are data, and the screen hands them to `actionMenuSheet`.
  * That keeps the copy unit-testable without pulling in the sheet host.
  */
+
+import { P2PK_RECLAIM_ENABLED } from 'wallet';
 
 import { formatDate } from '@/shared/lib/date';
 import { type ActionMenuItem } from '@/shared/lib/popup/popups/actionMenu';
@@ -36,7 +42,7 @@ export const SEND_LOCK_DURATIONS: readonly SendLockDurationOption[] = [
   { id: '24h', label: 'Reclaim after 1 day', offsetSec: 24 * HOUR },
   { id: '7d', label: 'Reclaim after 1 week', offsetSec: 7 * 24 * HOUR },
   { id: '30d', label: 'Reclaim after 30 days', offsetSec: 30 * 24 * HOUR },
-  { id: 'forever', label: 'Only they can claim', offsetSec: null },
+  { id: 'forever', label: 'Lock forever', offsetSec: null },
 ];
 
 /** Unix seconds this choice unlocks at, or null for a permanent lock. */
@@ -78,6 +84,8 @@ interface SendLockMenuParams {
   allowOff: boolean;
   /** False when this wallet has no keyring key to name as the refund key. */
   hasRefundKey: boolean;
+  /** Whether "Reclaim after…" is on offer at all. Defaults to the wallet's gate. */
+  timedLocks?: boolean;
   nowMs: number;
   onPick: (option: SendLockDurationOption) => void;
 }
@@ -86,9 +94,13 @@ const NO_REFUND_KEY_REASON = 'Add a P2PK key in Settings to reclaim later';
 
 export function buildSendLockMenuItems(params: SendLockMenuParams): ActionMenuItem[] {
   const { recipientName, current, allowOff, hasRefundKey, nowMs, onPick } = params;
+  const timedLocks = params.timedLocks ?? P2PK_RECLAIM_ENABLED;
   const items: ActionMenuItem[] = [];
   for (const option of SEND_LOCK_DURATIONS) {
     if (option.id === 'off' && !allowOff) continue;
+    // Not listed rather than listed and disabled: a row promising "reclaim
+    // after 1 day" is a promise whether or not it can be tapped.
+    if (option.offsetSec !== null && !timedLocks) continue;
     // A timed lock we cannot sign the refund for would be unreclaimable by us
     // and, once it opened, spendable by anyone. Offer only the permanent lock
     // until this wallet has a key to reclaim with.
