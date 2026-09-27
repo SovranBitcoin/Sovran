@@ -9,9 +9,12 @@ import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { useFreshNearbyPeers } from '@/features/nearPay/hooks/useFreshNearbyPeers';
-import { peerDisplayName, peerIdentitySeed } from '@/features/nearPay/lib/peerProfile';
+import { NearbyPeerRow } from '@/features/nearPay/components/NearbyPeerRow';
+import { peerDisplayName, peerNostrPubkey } from '@/features/nearPay/lib/peerProfile';
 import { nearPayPeerTapLog, planNearPaySend } from '@/features/nearPay/lib/nearPaySendDecision';
+import { readProfileRecord } from '@/shared/lib/nostr/useEntityCache';
 import { lockableMintsFromCreq } from '@/shared/lib/nutCreq';
+import { cachedProfileToMetadata } from '@/shared/stores/global/nostrMetadataCache';
 import {
   confirmBearerDowngrade,
   notifyNoSharedMint,
@@ -25,7 +28,6 @@ import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNearPaySessionStore, type NearPayDelivery } from '@/shared/stores/runtime/nearPayStore';
-import { ContactRow, bleIdentity } from '@/shared/ui/composed/ContactRow';
 import { List } from '@/shared/ui/composed/List';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -86,16 +88,12 @@ function WaitingTag() {
 }
 
 function NearPayPeerRow({ peer, onSelect }: NearPayPeerRowProps) {
-  // Seed identity from the favorite-exchanged Nostr key when the peer is a
-  // Sovran client; stock peers fall back to the noise-key pseudonym. The real
-  // face resolves on the radar; this list stays BLE-name.
-  const identity = bleIdentity({ ...peer, identitySeed: peerIdentitySeed(peer) });
   const trailing =
     lockableMintsFromCreq(peer.creq, peer.nostrPubkeyHex) !== null ? undefined : <WaitingTag />;
 
   return (
-    <ContactRow
-      identity={identity}
+    <NearbyPeerRow
+      peer={peer}
       trailing={trailing}
       onPress={() => onSelect(peer)}
       testID={`near-pay-peer-row:${peer.peerID}`}
@@ -130,7 +128,14 @@ export function NearPayPeerListScreen() {
   const emptyTextStyle = { color: withAlpha(foreground, 0.35), textAlign: 'center' as const };
 
   const handleSelectPeer = async (peer: BLEPeer) => {
-    const displayName = peerDisplayName(peer);
+    // The row already resolved this peer's profile into the entity cache, so
+    // the amount step can open with the same face and name the list showed.
+    const pubkey = peerNostrPubkey(peer);
+    const profile = pubkey ? cachedProfileToMetadata(readProfileRecord(pubkey)) : undefined;
+    const displayName = peerDisplayName(
+      peer,
+      pubkey && profile ? { pubkey, metadata: profile, isLoading: false } : undefined
+    );
     // Decide lock vs offline bearer from the peer's creq (accepted mints +
     // lock key), our trusted mints, and online status. Delivery is always a
     // private DM, but only after a valid creq proved the peer is patched.
@@ -196,7 +201,7 @@ export function NearPayPeerListScreen() {
           ? { p2pkLockPubkey: plan.lockPubkey, recipientPubkey: plan.recipientPubkey }
           : {}),
         ...(plan.allowedMints ? { allowedMints: plan.allowedMints } : {}),
-        recipientProfile: { displayName, avatarUrl: null, nip05: null },
+        recipientProfile: { displayName, avatarUrl: profile?.picture ?? null, nip05: null },
       })
       .catch((err) => {
         clearOwnSession();

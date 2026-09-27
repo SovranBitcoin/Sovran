@@ -8,7 +8,6 @@
     "**/*.blur.{ts,tsx}": ["files"],
     "app/assets/icons/index.tsx": ["exports"],
     "app/codereview/log-doctor/test-dsl/cashu-decode.ts": ["exports"],
-    "app/features/feed/data/recentPeopleProfiles.ts": ["exports"],
     "app/shared/lib/e2e/stateMirror.ts": ["exports"],
     "app/shared/lib/popup/popups/sendMemoSheet.tsx": ["exports"],
     "app/shared/lib/routstr/sdk/walletAdapter.ts": ["exports"],

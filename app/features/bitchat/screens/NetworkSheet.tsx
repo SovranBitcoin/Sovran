@@ -22,7 +22,7 @@ import Icon from 'assets/icons';
 import { withAlpha } from '@/shared/lib/color';
 import type { BLEPeer } from 'bitchat-module';
 
-import { ContactRow, bleIdentity } from '@/shared/ui/composed/ContactRow';
+import { NearbyPeerRow } from '@/features/nearPay/components/NearbyPeerRow';
 import { List } from '@/shared/ui/composed/List';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
@@ -55,13 +55,7 @@ function PeerRow({ peer }: PeerRowProps) {
     });
   };
 
-  return (
-    <ContactRow
-      identity={bleIdentity(peer)}
-      onPress={openDM}
-      testID={`contact-row:ble:${peer.peerID}`}
-    />
-  );
+  return <NearbyPeerRow peer={peer} onPress={openDM} testID={`contact-row:ble:${peer.peerID}`} />;
 }
 
 const keyExtractor = (peer: BLEPeer) => peer.peerID;

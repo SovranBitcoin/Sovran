@@ -27,7 +27,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet, TextInput } from 'react-native';
 import { ScreenScrollView } from '@/shared/ui/composed/ScreenScrollView';
-import { useHeaderHeight } from 'expo-router/react-navigation';
 import { usePaymentFlowMachine } from 'wallet/react';
 import { describeDestination, defaultDetectors, parsePaymentInput } from 'wallet';
 import type { BLEPeer } from 'bitchat-module';
@@ -48,11 +47,8 @@ import {
   BLE_PEER_FRESHNESS_TICK_MS,
   filterFreshBLEPeers,
 } from '@/features/bitchat/lib/blePeerSnapshots';
-import {
-  peerDisplayName,
-  peerIdentitySeed,
-  peerNostrPubkey,
-} from '@/features/nearPay/lib/peerProfile';
+import { NearbyPeerRow } from '@/features/nearPay/components/NearbyPeerRow';
+import { peerNostrPubkey } from '@/features/nearPay/lib/peerProfile';
 import { useRememberPeers } from '@/features/nearPay/hooks/useRememberPeers';
 import { CONTACT_SEARCH_MIN_LENGTH } from '@/shared/lib/contactSearch';
 import { useOverlaidContactSearch } from '@/features/contacts/hooks/useOverlaidContactSearch';
@@ -112,7 +108,6 @@ function resultDisplayName(profile: NostrSearchResult): string {
 export function SendScreen({ unit }: { unit: string }) {
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit });
-  const headerHeight = useHeaderHeight();
   const { handlePermission } = useHandleCameraPermission();
 
   const [foreground, surfaceSecondary, accent, overlay] = useThemeColor([
@@ -478,11 +473,11 @@ export function SendScreen({ unit }: { unit: string }) {
   ));
 
   return (
-    <Screen name="SendScreen" scroll="custom" bgColor={overlay}>
+    <Screen name="SendScreen" scroll="custom" safeArea="scroll" bgColor={overlay}>
       <ScreenScrollView
         bottomSpacing={32}
         style={[styles.screen, { backgroundColor: overlay }]}
-        contentContainerStyle={[styles.content, { paddingTop: headerHeight + 8 }]}
+        contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag">
         {/* This screen is a sheet: iOS modal AX hides the root-layout probe, so
@@ -575,14 +570,9 @@ export function SendScreen({ unit }: { unit: string }) {
           <VStack gap={0}>
             <SectionLabel text="Nearby" color={withAlpha(foreground, 0.5)} />
             {freshPeers.map((peer) => (
-              <ListRow
+              <NearbyPeerRow
                 key={peer.peerID}
-                avatar={{
-                  seed: peerIdentitySeed(peer),
-                  name: peerDisplayName(peer),
-                  size: ROW_ICON,
-                }}
-                title={peerDisplayName(peer)}
+                peer={peer}
                 subtitle="Nearby · Nut Drop"
                 trailing={<Icon name="mdi:bluetooth" size={20} color={accent} />}
                 onPress={() => handleSelectPeer(peer)}
@@ -661,7 +651,9 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  content: {},
+  content: {
+    paddingTop: 8,
+  },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',

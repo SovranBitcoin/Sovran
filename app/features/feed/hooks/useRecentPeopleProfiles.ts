@@ -1,13 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
-import { fetchRecentPeopleProfiles } from '@/features/feed/data/recentPeopleProfiles';
-import { feedLog } from '@/shared/lib/logger';
-import {
-  NOSTR_METADATA_STALE_TTL_MS,
-  cachedProfileToMetadata,
-  type NostrProfileMetadata,
-} from '@/shared/stores/global/nostrMetadataCache';
-import { ingestResolvedProfiles, useProfileRecordsMany } from '@/shared/lib/nostr/useEntityCache';
+import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
+import type { NostrProfileMetadata } from '@/shared/stores/global/nostrMetadataCache';
 import { normalizeRecentPersonPubkey } from '@/shared/stores/profile/recentPeopleStore';
 
 export type RecentPeopleProfileRow = {
@@ -16,9 +10,18 @@ export type RecentPeopleProfileRow = {
   isLoading: boolean;
 };
 
+/**
+ * Profiles for a list of people, in the order given, one row per distinct
+ * pubkey.
+ *
+ * Reads and fetches through `useNostrProfileMetadataMany`, so a miss falls
+ * through the Nostr tiers (Nagg, then Primal, then relays) like every other
+ * profile in the app. This used to post to Nagg's GraphQL endpoint directly:
+ * when that endpoint went away each lookup failed with a 404 and nothing
+ * retried, so a Nut Drop peer kept a blank face unless another screen had
+ * already cached them.
+ */
 export function useRecentPeopleProfiles(pubkeys: readonly string[]): RecentPeopleProfileRow[] {
-  const [loadingKey, setLoadingKey] = useState('');
-
   const stableInputKey = pubkeys.join(',');
   const normalizedPubkeys = useMemo(() => {
     const seen = new Set<string>();
@@ -32,57 +35,22 @@ export function useRecentPeopleProfiles(pubkeys: readonly string[]): RecentPeopl
     return out;
   }, [stableInputKey]);
 
-  // Read the single owner (entity cache) for this set.
-  const records = useProfileRecordsMany(normalizedPubkeys);
-
-  useEffect(() => {
-    if (normalizedPubkeys.length === 0) return;
-    const now = Date.now();
-    const missingOrStale = normalizedPubkeys.filter((pubkey) => {
-      const record = records.get(pubkey);
-      return !record || now - (record.seenAt ?? 0) > NOSTR_METADATA_STALE_TTL_MS;
-    });
-    if (missingOrStale.length === 0) {
-      setLoadingKey('');
-      return;
-    }
-
-    const requestKey = missingOrStale.join(',');
-    const controller = new AbortController();
-    let active = true;
-    setLoadingKey(requestKey);
-
-    void fetchRecentPeopleProfiles(missingOrStale, { signal: controller.signal })
-      .then((result) => {
-        if (!active || controller.signal.aborted) return;
-        if (result.isOk()) {
-          ingestResolvedProfiles(result.value);
-          return;
-        }
-        feedLog.warn('feed.recent_people_profiles.fetch_failed', { error: result.error });
-      })
-      .finally(() => {
-        if (active) setLoadingKey((current) => (current === requestKey ? '' : current));
-      });
-
-    return () => {
-      active = false;
-      controller.abort();
-    };
-  }, [normalizedPubkeys, records]);
-
-  const loadingPubkeys = useMemo(
-    () => new Set(loadingKey ? loadingKey.split(',') : []),
-    [loadingKey]
-  );
+  const { metadata, isLoading } = useNostrProfileMetadataMany(normalizedPubkeys);
 
   return useMemo(
     () =>
-      normalizedPubkeys.map((pubkey) => ({
-        pubkey,
-        metadata: cachedProfileToMetadata(records.get(pubkey)),
-        isLoading: loadingPubkeys.has(pubkey),
-      })),
-    [normalizedPubkeys, records, loadingPubkeys]
+      normalizedPubkeys.map((pubkey) => {
+        const profile = metadata.get(pubkey);
+        return {
+          pubkey,
+          metadata: profile,
+          // A record can arrive name-only (seeded by a feed or a search) while
+          // the fetch that carries the picture is still running. Holding the
+          // row until the picture or the fetch lands shows placeholder → face,
+          // never a fallback the fetch is about to replace.
+          isLoading: isLoading && !profile?.picture,
+        };
+      }),
+    [normalizedPubkeys, metadata, isLoading]
   );
 }
