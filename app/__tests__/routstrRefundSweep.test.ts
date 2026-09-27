@@ -132,7 +132,7 @@ describe('Routstr refund sweep', () => {
     await sweeping;
 
     expect(refundCalls()).toHaveLength(3);
-    expect(mockReceive).toHaveBeenCalledWith('cashuB-refund');
+    expect(mockReceive).toHaveBeenCalledWith('cashuB-refund', { probeSpent: true });
     expect(sweepEvents('routstr.sdk.sweep')[0][1]).toMatchObject({
       attempted: 1,
       recovered: 1,
@@ -217,7 +217,7 @@ describe('Routstr refund sweep', () => {
     await jest.advanceTimersByTimeAsync(10_000);
     await sweeping;
     expect(refundCalls()).toHaveLength(4);
-    expect(mockReceive).toHaveBeenCalledWith('cashuB-refund');
+    expect(mockReceive).toHaveBeenCalledWith('cashuB-refund', { probeSpent: true });
   });
 
   // The app was closed mid-answer and relaunched: the launch sweep meets a
@@ -271,7 +271,7 @@ describe('Routstr refund sweep', () => {
     await sweeping;
 
     expect(refundCalls()).toHaveLength(1);
-    expect(mockReceive).toHaveBeenCalledWith('cashuB-fixture');
+    expect(mockReceive).toHaveBeenCalledWith('cashuB-fixture', { probeSpent: true });
   });
 
   // The 33 sats lost on 2026-09-25: the node returned change the mint refused.

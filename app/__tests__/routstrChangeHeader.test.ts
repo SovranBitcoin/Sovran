@@ -124,7 +124,9 @@ describe('Routstr response credentials', () => {
     // Nothing has read a chunk yet. The change still has to come home, because
     // a caller that abandons the stream must not abandon the money with it.
     await expect(cost).resolves.toBe(6);
-    expect(wallet.receiveToken).toHaveBeenCalledWith('cashuB-test-change');
+    expect(wallet.receiveToken).toHaveBeenCalledWith('cashuB-test-change', {
+      probeSpent: false,
+    });
     for await (const _chunk of stream) {
       /* empty fixture */
     }
@@ -226,7 +228,9 @@ describe('Routstr response credentials', () => {
     await expect(completion()).rejects.toMatchObject({ status: 402 });
     // Routstr returns change on refusals too, and a refusal that dropped it
     // would charge the user for being turned away.
-    expect(wallet.receiveToken).toHaveBeenCalledWith('cashuB-test-change');
+    expect(wallet.receiveToken).toHaveBeenCalledWith('cashuB-test-change', {
+      probeSpent: false,
+    });
   });
 
   it('reports a transport failure as one, leaving the token to the sweep', async () => {

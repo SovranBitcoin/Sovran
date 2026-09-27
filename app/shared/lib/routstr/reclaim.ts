@@ -4,6 +4,7 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import { buildAbortSignal } from '@/shared/lib/http/requestSignal';
 import { apiLog } from '@/shared/lib/logger';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
+import { isTokenSpent } from './spentProbe';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import type { RequestControls } from 'wallet/safeFetch';
 
@@ -146,6 +147,10 @@ export async function recoverPendingPayments(controls: RequestControls = {}): Pr
     const parsed = RefundSpine.safeParse(await response.json().catch(() => null));
     if (!ownsScope()) break;
     if (!parsed.success || !parsed.data.token) continue;
+    // The endpoint replays a refund it has already paid. One the mint has
+    // spent is one this wallet banked on an earlier pass, or never will.
+    if (await isTokenSpent(manager, parsed.data.token)) continue;
+    if (!ownsScope()) break;
     try {
       const prepared = await manager.ops.receive.prepare({ token: parsed.data.token });
       if (!ownsScope()) break;
@@ -221,6 +226,13 @@ export async function reclaimRoutstrBalances(
       useRoutstrStore.getState().markAccountReclaimed(nodeKey);
       continue;
     }
+    // The endpoint replays its last paid refund, so this may be one the
+    // wallet already banked. Left deferred, as any other unfinished answer.
+    if (await isTokenSpent(manager, result)) {
+      outcome.deferred += 1;
+      continue;
+    }
+    if (!ownsScope()) break;
     try {
       const prepared = await manager.ops.receive.prepare({ token: result });
       if (!ownsScope()) break;

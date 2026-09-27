@@ -7,6 +7,7 @@ import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { annotatePaymentLeg } from './paymentScope';
 import { isTestnutMint } from '@/shared/stores/global/mintTestnutStore';
 import { spendableMintBalances } from '../payingMint';
+import { isTokenSpent, TOKEN_ALREADY_SPENT_MESSAGE } from '../spentProbe';
 import { encodeTokenForNode, keysetIdsOf, toWalletToken, wireTokenAmount } from '../tokenWire';
 
 /**
@@ -112,7 +113,15 @@ export function createCocoWalletAdapter(assertOwner: () => void = () => {}) {
     },
 
     async receiveToken(
-      wireToken: string
+      wireToken: string,
+      /**
+       * Ask the mint first. Set for a token that may already be spent — one we
+       * sent and are trying to take back, or anything a recovery sweep was
+       * handed — so a refusal the mint would give costs the history nothing.
+       * Left off for change fresh from a node, which has no reason to be spent
+       * and should not wait on a second round trip.
+       */
+      options: { probeSpent?: boolean } = {}
     ): Promise<{ success: boolean; amount: number; unit: 'sat' | 'msat'; message?: string }> {
       assertOwner();
       // Change from a node is V4; a journalled request token the sweep hands
@@ -143,6 +152,11 @@ export function createCocoWalletAdapter(assertOwner: () => void = () => {}) {
       }
       try {
         const instance = ownedManager();
+        if (options.probeSpent && (await isTokenSpent(instance, token))) {
+          assertManager(instance);
+          return { success: false, amount: 0, unit: 'sat', message: TOKEN_ALREADY_SPENT_MESSAGE };
+        }
+        assertManager(instance);
         const prepared = await instance.ops.receive.prepare({ token });
         assertManager(instance);
         const finalized = await instance.ops.receive.execute(prepared);

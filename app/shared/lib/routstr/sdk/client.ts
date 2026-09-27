@@ -160,7 +160,15 @@ export async function getRoutstrClient(baseUrl: string, canDispatch: () => boole
       async receiveToken(token) {
         received = false;
         try {
-          const result = await wallet.receiveToken(token);
+          // Change from the node is new; a token we journalled is one we sent,
+          // and the SDK is trying to take it back after a failed call. If the
+          // node kept the payment the mint has already spent it.
+          const sentByUs =
+            token === originalToken ||
+            Object.values(built.storage.getXcashuTokens()).some((tokens) =>
+              tokens.some((entry) => entry.token === token)
+            );
+          const result = await wallet.receiveToken(token, { probeSpent: sentByUs });
           received = result.success;
           if (result.success) changeSats = result.amount;
           if (!result.success) receiveFailed = true;
@@ -474,7 +482,7 @@ export async function sweepUnsettledPayments(
           });
           continue;
         }
-        const result = await wallet.receiveToken(returned);
+        const result = await wallet.receiveToken(returned, { probeSpent: true });
         assertOwner();
         if (!result.success) {
           if (sats != null) strandedSats += sats;
