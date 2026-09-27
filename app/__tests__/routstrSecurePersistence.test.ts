@@ -93,6 +93,35 @@ describe('Routstr secure migration', () => {
     }
   );
 
+  it('does not replace a blob it could not read once the keychain answers again', async () => {
+    // iOS can launch the app in the background with the keychain locked. The
+    // store then holds defaults, and persists them on its next `set`.
+    mockPlain.set(plainKey(), legacy);
+    mockFailRead = true;
+    const storage = createRoutstrPersistence();
+    await expect(storage.getItem('routstr-store')).rejects.toThrow();
+    mockFailRead = false;
+    await expect(
+      storage.setItem(
+        'routstr-store',
+        JSON.stringify({ version: 3, state: { apiKey: null, sessions: [] } })
+      )
+    ).rejects.toThrow('never read');
+    expect(JSON.parse((await createRoutstrPersistence().getItem('routstr-store'))!)).toEqual(
+      JSON.parse(legacy)
+    );
+  });
+
+  it('creates a blob without a read when nothing is stored', async () => {
+    const storage = createRoutstrPersistence();
+    await storage.setItem(
+      'routstr-store',
+      JSON.stringify({ version: 3, state: { apiKey: 'sk-fixture', sessions: [] } })
+    );
+    expect(mockPlain.get(plainKey())).not.toContain('sk-fixture');
+    expect(JSON.parse((await storage.getItem('routstr-store'))!).state.apiKey).toBe('sk-fixture');
+  });
+
   it('does not write secrets again for a chat-only update', async () => {
     mockPlain.set(plainKey(), legacy);
     const storage = createRoutstrPersistence();

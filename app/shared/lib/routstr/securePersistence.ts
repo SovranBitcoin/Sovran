@@ -29,6 +29,15 @@ const EMPTY = { apiKey: null, legacyAccounts: {}, pendingPayments: {} };
 /** Keep credentials out of the chat blob without changing its public store shape. */
 export function createRoutstrPersistence(): StateStorage {
   const queues = new Map<string, Promise<void>>();
+  /**
+   * Blobs this process has read. The store persists whatever it holds on every
+   * `set`, hydrated or not, so a read that failed — the keychain is locked
+   * when iOS launches the app in the background — leaves it holding defaults
+   * that the first write after the unlock would put in place of the key, the
+   * recovery tokens and every session. A blob may be created unread; it may
+   * not be replaced unread.
+   */
+  const read = new Set<string>();
   function run<T>(owner: string, action: () => Promise<T>): Promise<T> {
     const result = (queues.get(owner) ?? Promise.resolve()).then(action);
     queues.set(
@@ -79,6 +88,7 @@ export function createRoutstrPersistence(): StateStorage {
       const owner = await captureProfileStorageOwner();
       return run(owner, async () => {
         const { envelope, secrets } = await load(owner, name);
+        read.add(`${owner}:${name}`);
         if (!envelope && secrets === EMPTY) return null;
         return JSON.stringify({
           version: 1,
@@ -90,7 +100,13 @@ export function createRoutstrPersistence(): StateStorage {
     async setItem(name, value) {
       const owner = await captureProfileStorageOwner();
       return run(owner, async () => {
-        const { storage, vault, secureRaw } = await load(owner, name);
+        const { storage, vault, secureRaw, envelope: stored } = await load(owner, name);
+        if (!read.has(`${owner}:${name}`)) {
+          if (stored !== null || secureRaw !== null) {
+            throw new Error('Provider storage was never read; refusing to replace it');
+          }
+          read.add(`${owner}:${name}`);
+        }
         const envelope = Envelope.parse(JSON.parse(value));
         const secrets = Secrets.parse(envelope.state);
         const nextSecrets = JSON.stringify(secrets);
