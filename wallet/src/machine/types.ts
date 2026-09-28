@@ -119,6 +119,8 @@ export interface RecipientProfile {
  */
 export interface MeltQuotePreview {
   quoteId: string;
+  /** Unix seconds; absent only for legacy/custom quote adapters. */
+  expiresAt?: number;
   /** Mint-quoted amount in minor units of `unit` (the debit basis). */
   quoteAmount: number;
   /** Mint `fee_reserve` in minor units of `unit`. */
