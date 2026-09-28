@@ -1,4 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { z } from 'zod';
 import { Platform } from 'react-native';
 import { isNostrPubkeyHex } from '@/shared/lib/protocolIds';
 import * as bip39 from '@scure/bip39';
@@ -381,6 +383,12 @@ async function generateMnemonic(): Promise<GeneratedMnemonic> {
 // outcome instead of each generating a fresh mnemonic and racing to overwrite.
 let inflightEnsureMnemonic: Promise<string | null> | null = null;
 
+// Inspect durable metadata, not the possibly unhydrated Zustand defaults.
+// Only an explicitly empty profile list is evidence of a fresh installation.
+const EmptyProfileEnvelope = z.object({
+  state: z.object({ profiles: z.array(z.unknown()).length(0) }),
+});
+
 /**
  * Generates and stores a new mnemonic if none exists
  * @returns Promise<string | null> The mnemonic (existing or newly generated), or null if failed
@@ -422,6 +430,21 @@ async function ensureMnemonicExistsInner(): Promise<string | null> {
     }
     if (rawExisting.kind === 'value') {
       nostrLog.error('nostr.secure.refusing_overwrite_corrupt_mnemonic');
+      lockMnemonic(new Error('Stored mnemonic is invalid'));
+      return null;
+    }
+
+    // Android backup can restore account metadata without any SecureStore
+    // entry. A successful null read is not permission to replace that root.
+    // Keep the account rows and database intact for explicit phrase recovery.
+    try {
+      const profiles = await AsyncStorage.getItem('profile-store');
+      if (profiles !== null && !EmptyProfileEnvelope.safeParse(JSON.parse(profiles)).success) {
+        lockMnemonic(new Error('Saved accounts require their recovery phrase'));
+        return null;
+      }
+    } catch (error) {
+      lockMnemonic(error);
       return null;
     }
 

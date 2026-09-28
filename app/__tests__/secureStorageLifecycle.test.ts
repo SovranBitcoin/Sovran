@@ -5,6 +5,11 @@
 /* eslint-disable import/first */
 
 const mockSecureBacking = new Map<string, string>();
+let mockProfileBlob: string | null = null;
+
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(async () => mockProfileBlob),
+}));
 
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn((key: string) => Promise.resolve(mockSecureBacking.get(key) ?? null)),
@@ -26,6 +31,7 @@ jest.mock('@/shared/lib/logger', () => ({
 import { useSecureStoreState } from '@/shared/stores/runtime/secureStoreState';
 import { nostrLog } from '@/shared/lib/logger';
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   clearAllSecureData,
   clearAccountDerivedCache,
@@ -51,6 +57,7 @@ describe('secureStorage mnemonic and seed lifecycle', () => {
   beforeEach(async () => {
     await flushBookkeeping();
     mockSecureBacking.clear();
+    mockProfileBlob = null;
     jest.clearAllMocks();
     useSecureStoreState.setState({ secureStoreState: 'available', errorName: null });
   });
@@ -63,24 +70,28 @@ describe('secureStorage mnemonic and seed lifecycle', () => {
     }
   });
 
-  it('uses exactly 128 bits from crypto.getRandomValues for a fresh mnemonic', async () => {
-    const getRandomValues = jest.fn((entropy: Uint8Array) => {
-      entropy.fill(0);
-      return entropy;
-    });
-    Object.defineProperty(globalThis, 'crypto', {
-      configurable: true,
-      value: { getRandomValues },
-    });
+  it.each([null, JSON.stringify({ version: 2, state: { activeAccountIndex: 0, profiles: [] } })])(
+    'uses exactly 128 bits from crypto.getRandomValues for a fresh mnemonic (metadata: %s)',
+    async (profileBlob) => {
+      mockProfileBlob = profileBlob;
+      const getRandomValues = jest.fn((entropy: Uint8Array) => {
+        entropy.fill(0);
+        return entropy;
+      });
+      Object.defineProperty(globalThis, 'crypto', {
+        configurable: true,
+        value: { getRandomValues },
+      });
 
-    await expect(ensureMnemonicExists()).resolves.toBe(VALID_MNEMONIC);
+      await expect(ensureMnemonicExists()).resolves.toBe(VALID_MNEMONIC);
 
-    expect(getRandomValues).toHaveBeenCalledTimes(1);
-    const [entropy] = getRandomValues.mock.calls[0];
-    expect(entropy).toBeInstanceOf(Uint8Array);
-    expect(entropy).toHaveLength(16);
-    expect(mockSecureBacking.get('user_mnemonic')).toBe(VALID_MNEMONIC);
-  });
+      expect(getRandomValues).toHaveBeenCalledTimes(1);
+      const [entropy] = getRandomValues.mock.calls[0];
+      expect(entropy).toBeInstanceOf(Uint8Array);
+      expect(entropy).toHaveLength(16);
+      expect(mockSecureBacking.get('user_mnemonic')).toBe(VALID_MNEMONIC);
+    }
+  );
 
   it.each([0, 1])(
     'locks on a decrypt error at read %i without RNG, writes or deletes',
@@ -120,6 +131,32 @@ describe('secureStorage mnemonic and seed lifecycle', () => {
     expect(getRandomValues).not.toHaveBeenCalled();
     expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
     expect(useSecureStoreState.getState().secureStoreState).toBe('available');
+  });
+
+  it.each([
+    JSON.stringify({ state: { profiles: [{ accountIndex: 0, pubkey: 'a'.repeat(64) }] } }),
+    '{unreadable',
+    JSON.stringify({ state: { profiles: 'invalid' } }),
+  ])('does not replace a missing root beneath saved or unreadable account data', async (blob) => {
+    mockProfileBlob = blob;
+    const getRandomValues = jest.fn((entropy: Uint8Array) => entropy.fill(0));
+    Object.defineProperty(globalThis, 'crypto', { configurable: true, value: { getRandomValues } });
+
+    await expect(ensureMnemonicExists()).resolves.toBeNull();
+    expect(useSecureStoreState.getState().secureStoreState).toBe('locked');
+    expect(getRandomValues).not.toHaveBeenCalled();
+    expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+    expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+  });
+
+  it('locks if account metadata cannot be read before creating a root', async () => {
+    jest.mocked(AsyncStorage.getItem).mockRejectedValueOnce(new Error('storage unavailable'));
+    const getRandomValues = jest.fn();
+    Object.defineProperty(globalThis, 'crypto', { configurable: true, value: { getRandomValues } });
+    await expect(ensureMnemonicExists()).resolves.toBeNull();
+    expect(useSecureStoreState.getState().secureStoreState).toBe('locked');
+    expect(getRandomValues).not.toHaveBeenCalled();
+    expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
   });
 
   it('fails closed when crypto.getRandomValues is unavailable', async () => {
