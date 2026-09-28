@@ -29,6 +29,9 @@ it.each([
   [peer, [third], 0],
   [viewer, [viewer], 0],
   [peer, [viewer], 1],
+  [peer, [viewer, viewer], 1],
+  [peer, [peer, viewer], 1],
+  [viewer, [viewer, peer, peer], 1],
   [viewer, [peer], 1],
 ] as const)(
   'keeps only the viewer’s one-to-one room (%s, %j)',
