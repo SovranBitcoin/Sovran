@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 
 import {
   candidateKeys,
@@ -9,6 +9,8 @@ import {
   type TransactionAnnotation,
 } from "../annotations";
 import { useAnnotationStore } from "./ColadaProvider";
+
+type AnnotationStore = ReturnType<typeof useAnnotationStore>;
 
 /** The one empty annotation, so a miss is referentially stable across renders. */
 const EMPTY_ANNOTATION: TransactionAnnotation = Object.freeze({});
@@ -43,36 +45,45 @@ export function useColadaTransactionAnnotation(
 ): TransactionAnnotation {
   const store = useAnnotationStore();
 
-  // The snapshot closes over the whole entry, not a hand-picked subset of its
-  // fields: `candidateKeys` reads `type` and `metadata.operationId` as well as
-  // the ids, so an entry that gains either must resolve again.
-  const getSnapshot = useMemo(() => {
-    if (!entry) return () => EMPTY_ANNOTATION;
-    const keys = candidateKeys(entry);
-    // `useSyncExternalStore` needs the snapshot to be referentially stable
-    // while the underlying records are unchanged, or it re-renders forever.
-    let last:
-      | {
-          records: Array<AnnotationRecord | undefined>;
-          value: TransactionAnnotation;
-        }
-      | undefined;
-    return () => {
-      const records = store.getMany(keys);
-      if (last && sameRecords(last.records, records)) return last.value;
-      const record = mergeAnnotationRecords(records);
-      last = {
-        records,
-        value: record ? decodeAnnotation(record) : EMPTY_ANNOTATION,
-      };
-      return last.value;
-    };
-  }, [store, entry]);
-
-  const subscribe = useCallback(
-    (onStoreChange: () => void) => store.subscribe(onStoreChange),
-    [store],
-  );
+  // The compiler memoizes both calls on their inputs, so each keeps one
+  // identity per `store`/`entry` pair.
+  const getSnapshot = createSnapshotReader(store, entry);
+  const subscribe = createSubscribe(store);
 
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
+function createSubscribe(store: AnnotationStore) {
+  return (onStoreChange: () => void) => store.subscribe(onStoreChange);
+}
+
+/**
+ * The snapshot closes over the whole entry, not a hand-picked subset of its
+ * fields: `candidateKeys` reads `type` and `metadata.operationId` as well as
+ * the ids, so an entry that gains either must resolve again.
+ */
+function createSnapshotReader(
+  store: AnnotationStore,
+  entry: AnnotationEntryLike | null | undefined,
+): () => TransactionAnnotation {
+  if (!entry) return () => EMPTY_ANNOTATION;
+  const keys = candidateKeys(entry);
+  // `useSyncExternalStore` needs the snapshot to be referentially stable
+  // while the underlying records are unchanged, or it re-renders forever.
+  let last:
+    | {
+        records: Array<AnnotationRecord | undefined>;
+        value: TransactionAnnotation;
+      }
+    | undefined;
+  return () => {
+    const records = store.getMany(keys);
+    if (last && sameRecords(last.records, records)) return last.value;
+    const record = mergeAnnotationRecords(records);
+    last = {
+      records,
+      value: record ? decodeAnnotation(record) : EMPTY_ANNOTATION,
+    };
+    return last.value;
+  };
 }
