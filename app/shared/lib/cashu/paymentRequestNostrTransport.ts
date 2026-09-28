@@ -66,6 +66,23 @@ function looksLikePaymentRequestPayload(content: string): boolean {
   return trimmed.startsWith('{') && trimmed.includes('"proofs"') && trimmed.includes('"mint"');
 }
 
+/**
+ * NUT-18 makes `unit` default to sat, but coco rejects a payload without one.
+ * Fill it in rather than drop a payer's ecash; otherwise pass the raw string
+ * through untouched so coco's integer-safe parse and payload hash still apply.
+ */
+export function withDefaultUnit(content: string): string {
+  try {
+    const raw: unknown = JSON.parse(content);
+    if (raw && typeof raw === 'object' && !('unit' in raw && (raw as { unit?: unknown }).unit)) {
+      return JSON.stringify({ ...raw, unit: 'sat' });
+    }
+  } catch {
+    // Not JSON: coco reports it.
+  }
+  return content;
+}
+
 export function createPaymentRequestNostrTransportPlugin(
   config: NostrTransportPluginConfig
 ): Plugin {
@@ -116,7 +133,7 @@ export function createPaymentRequestNostrTransportPlugin(
         );
         if (!rumor || !looksLikePaymentRequestPayload(rumor.content)) return false;
         try {
-          await service.ingestPayload(rumor.content, {
+          await service.ingestPayload(withDefaultUnit(rumor.content), {
             transport: 'nostr',
             transportMessageId: envelope.id,
             senderPubkey: rumor.senderPubkey,
