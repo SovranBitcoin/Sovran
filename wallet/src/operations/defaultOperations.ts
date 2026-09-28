@@ -783,26 +783,18 @@ export function createDefaultOperations(
         amount,
         hadMemo: !!normalizeMemo(memo),
       });
-      const prepared = await mgr.ops.send.prepare({ mintUrl, amount });
+      // Prepared from the mint's stored keysets without contacting it. Coco
+      // refuses, before reserving anything, when no exact match exists.
+      const prepared = await mgr.ops.send.prepare({
+        mintUrl,
+        amount,
+        offline: true,
+      });
       logger.info("operations.executeOfflineSend.prepared", {
         operationId: prepared.id,
         ...mintUrlFields(mintUrl),
         amount,
-        needsSwap: !!prepared.needsSwap,
       });
-
-      if (prepared.needsSwap) {
-        logger.warn("operations.executeOfflineSend.needsSwap", {
-          operationId: prepared.id,
-          ...mintUrlFields(mintUrl),
-          amount,
-        });
-        await mgr.ops.send.cancel(prepared.id);
-        logger.info("operations.executeOfflineSend.cancelledAfterNeedsSwap", {
-          operationId: prepared.id,
-        });
-        throw new Error("Offline send requires exact proof match");
-      }
 
       const { operation, token } = await executeSendWithRescue(mgr, prepared, {
         logPrefix: "executeOfflineSend",

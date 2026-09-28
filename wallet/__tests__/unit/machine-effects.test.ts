@@ -886,7 +886,7 @@ describe('runConfirmSendEffect', () => {
     });
   });
 
-  it('uses exact local proofs first when offline send is available', async () => {
+  it('sends an exact amount through the online path while the device is online', async () => {
     const executeSend = vi.fn(async () => ({
       historyEntry: sendHistoryEntry('send-entry-1'),
     }));
@@ -907,20 +907,72 @@ describe('runConfirmSendEffect', () => {
     expect(result.isOk()).toBe(true);
     if (result.isErr()) return;
 
-    expect(executeOfflineSend).toHaveBeenCalledWith(
-      'https://mint.example',
-      100,
-    );
+    expect(executeSend).toHaveBeenCalledWith('https://mint.example', 100);
+    expect(executeOfflineSend).not.toHaveBeenCalled();
+    expect(result.value).toMatchObject({ kind: 'completed', path: 'online' });
+  });
+
+  it('creates a local token without the online path while the device is offline', async () => {
+    const executeSend = vi.fn(async () => ({
+      historyEntry: sendHistoryEntry('send-entry-1'),
+    }));
+    const executeOfflineSend = vi.fn(async () => ({
+      historyEntry: sendHistoryEntry('offline-entry-1'),
+    }));
+
+    const result = await runConfirmSendEffect({
+      data: confirmSendData,
+      operations: { executeSend, executeOfflineSend },
+      context: sendContext,
+      proofAmounts: [64, 32, 4],
+      getOffline: () => true,
+      getLocale: () => 'en',
+      isStale: () => false,
+    });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+
+    expect(executeOfflineSend).toHaveBeenCalledWith('https://mint.example', 100);
     expect(executeSend).not.toHaveBeenCalled();
     expect(result.value).toMatchObject({
       kind: 'completed',
       path: 'localFirst',
-      data: {
-        createdOffline: true,
-      },
+      data: { createdOffline: true },
     });
     expect(result.value).not.toMatchObject({
       data: { mintWasOffline: true },
+    });
+  });
+
+  it('falls back to a local token when the online path finds the mint unreachable', async () => {
+    const executeOfflineSend = vi.fn(async () => ({
+      historyEntry: sendHistoryEntry('offline-entry-1'),
+    }));
+
+    const result = await runConfirmSendEffect({
+      data: confirmSendData,
+      operations: {
+        executeSend: async () => {
+          throw mintFetchError();
+        },
+        executeOfflineSend,
+      },
+      context: sendContext,
+      proofAmounts: [64, 32, 4],
+      getOffline: () => false,
+      getLocale: () => 'en',
+      isStale: () => false,
+    });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+
+    expect(executeOfflineSend).toHaveBeenCalledTimes(1);
+    expect(result.value).toMatchObject({
+      kind: 'completed',
+      path: 'offlineFallback',
+      data: { createdOffline: true, mintWasOffline: true },
     });
   });
 

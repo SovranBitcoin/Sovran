@@ -13,13 +13,16 @@ describe("ecash interaction handoff", () => {
     "exposes busy before settlement and ignores duplicate amount submits (offline=%s)",
     async (offline) => {
       let finish!: (value: { historyEntry: string }) => void;
-      const executeOfflineSend = vi.fn(
-        () =>
-          new Promise<{ historyEntry: string }>((resolve) => {
-            finish = resolve;
-          }),
-      );
-      const executeSend = vi.fn();
+      const settleLater = () =>
+        new Promise<{ historyEntry: string }>((resolve) => {
+          finish = resolve;
+        });
+      // Offline creates the token locally; online goes through the mint.
+      const executeOfflineSend = vi.fn(settleLater);
+      const executeSend = vi.fn(settleLater);
+      const [expected, unexpected] = offline
+        ? [executeOfflineSend, executeSend]
+        : [executeSend, executeOfflineSend];
       const tm = createTestMachine({
         offline,
         wallet: {
@@ -36,8 +39,8 @@ describe("ecash interaction handoff", () => {
       );
       expect(tm.machine.inspect().isExecuting).toBe(true);
       await tm.machine.enterAmount({ value: 1_999_998, unit: "sat" }, MINT1);
-      expect(executeOfflineSend).toHaveBeenCalledTimes(1);
-      expect(executeSend).not.toHaveBeenCalled();
+      expect(expected).toHaveBeenCalledTimes(1);
+      expect(unexpected).not.toHaveBeenCalled();
       tm.assertStep("confirmSend");
       finish({
         historyEntry: JSON.stringify({

@@ -1928,11 +1928,19 @@ export function runConfirmSendEffect({
   const p2pkLocked = isLockedSend(context);
   const localProofs = buildProofSuggestions(proofAmounts, data.amount);
   const hasExactLocalProofs = proofAmounts.length > 0 && localProofs.exactMatch;
-  const shouldCreateLocalTokenFirst =
-    hasExactLocalProofs && !p2pkLocked && !!operations.executeOfflineSend;
   const appOffline = getOffline() || context.offline === true;
   const forceLocalSend =
-    !p2pkLocked && (appOffline || context.localProofSend === true);
+    !p2pkLocked &&
+    (appOffline ||
+      context.localProofSend === true ||
+      context.mintUnreachableConfirmed === true);
+  // Online sends take coco's ordinary path, which refreshes mint data and
+  // chooses between an exact match and a swap itself. The local token is for
+  // a device known to be offline, or a flow whose mint already proved
+  // unreachable; an unreachable mint on the online path falls back to it in
+  // handleConfirmSendFailure.
+  const shouldCreateLocalTokenFirst =
+    forceLocalSend && hasExactLocalProofs && !!operations.executeOfflineSend;
   const config: RunConfirmSendEffectConfig = {
     data,
     operations,
