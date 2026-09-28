@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "id": "ai.add-funds",
+  "name": "AI Add funds opens wallet Fixed Amount receive",
+  "description": "With an empty wallet, choose a provider, open Add funds, enter an amount and exit without creating a quote or paying a provider.",
+  "lane": "simulator",
+  "tags": ["flow:receive","check:navigation","check:zero-balance"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"tap","selector":{"id":"header-profile-avatar"}},
+    {"action":"waitFor","selector":{"id":"drawer-menu-ai"}},
+    {"action":"tap","selector":{"id":"drawer-menu-ai"}},
+    {"action":"waitFor","selector":{"id":"ai-funds-button"}},
+    {"action":"tap","selector":{"id":"ai-funds-button"}},
+    {"action":"waitFor","selector":{"idPrefix":"contact-row:provider:","matchIndex":0},"timeoutMs":60000},
+    {"action":"tap","selector":{"idPrefix":"contact-row:provider:","matchIndex":0}},
+    {"action":"waitFor","selector":{"label":"Add funds"}},
+    {"action":"tap","selector":{"id":"ai-funds-button"}},
+    {"action":"waitFor","selector":{"id":"amount-next"}},
+    {"action":"tap","selector":{"label":"1"}},
+    {"action":"waitFor","selector":{"id":"amount-state:1"}},
+    {"action":"screenshot","name":"receive-amount"},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"id":"wallet-receive"}}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

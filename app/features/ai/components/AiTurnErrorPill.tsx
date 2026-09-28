@@ -28,7 +28,7 @@ import {
   chatErrorActions,
   type ChatErrorActionId,
 } from '../lib/chatErrorActions';
-import { navigateToAddFunds } from '../lib/navigateToAddFunds';
+import { useNavigateToAddFunds } from '../lib/navigateToAddFunds';
 import type { TurnError } from '../lib/turnErrors';
 
 interface AiTurnErrorPillProps {
@@ -64,6 +64,7 @@ function ActionButton({ action, messageId, onPress }: ActionButtonProps) {
 }
 
 export function AiTurnErrorPill({ messageId, error, onRetry }: AiTurnErrorPillProps) {
+  const navigateToAddFunds = useNavigateToAddFunds();
   const [danger, dangerInk, muted] = useThemeColor([
     'danger',
     'danger-soft-foreground',
@@ -88,7 +89,7 @@ export function AiTurnErrorPill({ messageId, error, onRetry }: AiTurnErrorPillPr
           return;
       }
     },
-    [messageId, error.id, onRetry]
+    [messageId, error.id, onRetry, navigateToAddFunds]
   );
 
   // Retry is the one action with a precondition outside this component: the

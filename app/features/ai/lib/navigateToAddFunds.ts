@@ -1,26 +1,18 @@
-import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { useCallback } from 'react';
+import { useColadaContext } from 'wallet/react';
 
-/**
- * Where "not enough AI credit" sends the user.
- *
- * Funding is the wallet's job: there is no Routstr account to top up, so this
- * goes to the wallet's own receive flow rather than the send flow that used to
- * mint a deposit token for a node.
- *
- * Extracted from `useAiSend` because the error pill offers the same "Top up"
- * from inside the conversation, and two copies of this route would be two
- * places to update when the receive flow's params change.
- */
-export function navigateToAddFunds(): void {
-  router.navigate({
-    pathname: '/(receive-flow)/amount',
-    params: {
-      amountEntry: JSON.stringify({
-        destination: 'mintQuote',
-        unit: 'sat',
-        selectedMintUrl: useMintStore.getState().selectedMint ?? '',
-      }),
-    },
-  });
+import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
+import { aiLog } from '@/shared/lib/logger';
+
+/** Start the wallet's Fixed Amount receive in sats, with no provider recipient. */
+export function useNavigateToAddFunds(): () => void {
+  const { machine } = useColadaContext();
+  return useCallback(() => {
+    clearPaymentContext('ai.receive');
+    useMintStore.getState().setActiveUnit('sat');
+    machine.startReceiveLightning({ reset: true }).catch((error: unknown) => {
+      aiLog.error('ai.receive.start_failed', { error });
+    });
+  }, [machine]);
 }

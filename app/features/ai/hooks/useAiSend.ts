@@ -44,7 +44,7 @@ import { useHeldMints } from './useHeldMints';
 import { assembleApiMessages, stripImageParts } from '../lib/assembleApiMessages';
 import { encodeChatImage } from '../lib/attachments';
 import { deriveActivePath, getAncestorsExclusive } from '../lib/branching';
-import { navigateToAddFunds } from '../lib/navigateToAddFunds';
+import { useNavigateToAddFunds } from '../lib/navigateToAddFunds';
 import { clearTurnError, recordTurnError } from '../lib/turnErrors';
 import {
   clearStreaming,
@@ -167,6 +167,7 @@ export function useAiSend() {
   // the cost of a request is returned by the request itself.
   const streamControllerRef = useRef<AbortController | null>(null);
 
+  const navigateToAddFunds = useNavigateToAddFunds();
   const funds = useRoutstrFunds();
   const latestFunds = useLatestRef(funds);
   const walletSats = funds?.balanceSats ?? 0;
@@ -1097,6 +1098,7 @@ export function useAiSend() {
       walletSats,
       heldMints,
       latestFunds,
+      navigateToAddFunds,
     ]
   );
 

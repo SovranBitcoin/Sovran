@@ -12,6 +12,7 @@ import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import BalancePill from '@/shared/ui/composed/BalancePill';
 
+import { useNavigateToAddFunds } from '../lib/navigateToAddFunds';
 import { useRoutstrFunds } from '../hooks/useRoutstrFunds';
 import { ProviderPillIcon } from './ProviderAvatar';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -33,6 +34,7 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
  */
 export function AiHeaderTitle() {
   const funds = useRoutstrFunds();
+  const navigateToAddFunds = useNavigateToAddFunds();
   const mintUrl = useMintStore((s) => s.selectedMint);
   const mockMode = useSettingsStore((s) => s.mockMode);
 
@@ -107,7 +109,8 @@ export function AiHeaderTitle() {
       }
       iconBoxSize={24}
       loadingTitlePlaceholder="AI provider"
-      onPress={onPress}
+      testID="ai-funds-button"
+      onPress={activeUrl && isEmpty ? navigateToAddFunds : onPress}
     />
   );
 }

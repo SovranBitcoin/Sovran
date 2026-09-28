@@ -1,3 +1,6 @@
+jest.mock('@/features/ai/lib/navigateToAddFunds', () => ({
+  useNavigateToAddFunds: () => jest.fn(),
+}));
 import { act, renderHook } from '@testing-library/react-native';
 import { useAiSend } from '@/features/ai/hooks/useAiSend';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';

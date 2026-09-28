@@ -14,7 +14,7 @@ import { AiTurnErrorPill } from '@/features/ai/components/AiTurnErrorPill';
 import { ERROR_COPY } from '@/shared/lib/errors/catalog';
 import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { modelPickerPopup } from '@/shared/lib/popup';
-import { navigateToAddFunds } from '@/features/ai/lib/navigateToAddFunds';
+const mockNavigateToAddFunds = jest.fn();
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -31,7 +31,9 @@ jest.mock('@/shared/hooks/useGuardedRouter', () => ({
   guardedRouter: { navigate: jest.fn() },
 }));
 jest.mock('@/shared/lib/popup', () => ({ modelPickerPopup: jest.fn() }));
-jest.mock('@/features/ai/lib/navigateToAddFunds', () => ({ navigateToAddFunds: jest.fn() }));
+jest.mock('@/features/ai/lib/navigateToAddFunds', () => ({
+  useNavigateToAddFunds: () => mockNavigateToAddFunds,
+}));
 jest.mock('@/shared/lib/logger', () => {
   const noop = jest.fn();
   return { aiLog: { debug: noop, info: noop, warn: noop, error: noop } };
@@ -147,7 +149,7 @@ describe('AiTurnErrorPill', () => {
       r.root.findByProps({ testID: `ai-message-error-${MESSAGE_ID}` }).props.accessibilityLabel
     ).toBe(`${ERROR_COPY['routstr.balance']} ${detail}`);
     press(r, 'top-up');
-    expect(navigateToAddFunds).toHaveBeenCalledTimes(1);
+    expect(mockNavigateToAddFunds).toHaveBeenCalledTimes(1);
   });
 
   it('drops Retry while another turn is in flight, keeping the rest', () => {

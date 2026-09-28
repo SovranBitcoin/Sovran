@@ -1,3 +1,6 @@
+jest.mock('@/features/ai/lib/navigateToAddFunds', () => ({
+  useNavigateToAddFunds: () => jest.fn(),
+}));
 /**
  * What one AI request actually puts on the wire, and whether the number the
  * user was shown is the number the node will charge.
