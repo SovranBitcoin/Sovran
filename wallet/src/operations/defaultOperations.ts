@@ -1882,7 +1882,12 @@ export function createDefaultOperations(
           id: info.requestId,
           mint: payloadMint,
           unit,
-          proofs: token.proofs,
+          // cashu-ts `Amount` serializes as a string; NUT-18 wants an integer,
+          // and CDK-based wallets reject the whole payload otherwise.
+          proofs: token.proofs.map((proof) => ({
+            ...proof,
+            amount: proof.amount.toNumber(),
+          })),
         };
         try {
           if (mockFailEnabled("paymentRequest")) {

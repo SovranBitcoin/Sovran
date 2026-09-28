@@ -15,6 +15,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import {
+  Amount,
   PaymentRequest,
   PaymentRequestTransportType,
   decodePaymentRequest,
@@ -43,7 +44,7 @@ interface MockManagerOverrides {
 
 function createMockManager(overrides: MockManagerOverrides = {}) {
   const mockToken = {
-    proofs: [{ id: "proof-1", amount: 100, C: "abc", secret: "def" }],
+    proofs: [{ id: "proof-1", amount: Amount.from(100), C: "abc", secret: "def" }],
   };
 
   return {
@@ -259,6 +260,27 @@ describe("executePaymentRequest — Nostr transport", () => {
     expect(payload).not.toHaveProperty("id");
   });
 
+  it("sends proof amounts as JSON numbers, not cashu-ts Amount strings", async () => {
+    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+    const manager = createMockManager();
+    manager._mockToken.proofs = [
+      { id: "proof-1", amount: Amount.from(8), C: "abc", secret: "def" },
+    ] as never;
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 8,
+      unit: "sat",
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const ops = createDefaultOperations({
+      getManager: () => manager as unknown as Manager,
+      sendNostrDM,
+    });
+    await ops.executePaymentRequest!(MINT1, "creqNUM", 8, "sat");
+    const payload = JSON.parse(sendNostrDM.mock.calls[0][1]);
+    expect(payload.proofs[0].amount).toBe(8);
+  });
+
   it("echoes the request's spelling of the paying mint", async () => {
     const sendNostrDM = vi.fn().mockResolvedValue(undefined);
     const manager = createMockManager();
@@ -366,7 +388,9 @@ describe("executePaymentRequest — Nostr transport", () => {
       mint: MINT1,
       unit: "sat",
     });
-    expect(payload.proofs).toEqual(mockManager._mockToken.proofs);
+    expect(payload.proofs).toEqual([
+      { id: "proof-1", amount: 100, C: "abc", secret: "def" },
+    ]);
 
     expect(result.historyEntry).toBeDefined();
     expect(typeof result.historyEntry).toBe("string");
