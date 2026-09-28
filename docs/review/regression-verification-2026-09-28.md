@@ -21,11 +21,11 @@ No funds, accounts, commits or published artifacts were changed during validatio
 
 - [NIP-17 room membership](https://github.com/nostr-protocol/nips/blob/master/17.md#chat-rooms).
 - [NUT-18 net input fees](https://github.com/cashubtc/nuts/blob/main/18.md#input-fees).
-- [Mnemonic storage and reset enumeration](../../app/shared/lib/nostr/secureStorage.ts),
-  [session orchestration](../../app/shared/lib/profile/profileSessionOrchestrator.ts),
-  [key initialization](../../app/shared/providers/NostrKeysProvider.tsx).
-- [Routstr driver](../../app/shared/lib/routstr/sdk/driver.ts) and
-  [awaited payment boundaries](../../app/shared/lib/routstr/sdk/client.ts).
+- [Mnemonic storage and reset enumeration](https://github.com/SovranBitcoin/Sovran/blob/main/app/shared/lib/nostr/secureStorage.ts),
+  [session orchestration](https://github.com/SovranBitcoin/Sovran/blob/main/app/shared/lib/profile/profileSessionOrchestrator.ts),
+  [key initialization](https://github.com/SovranBitcoin/Sovran/blob/main/app/shared/providers/NostrKeysProvider.tsx).
+- [Routstr driver](https://github.com/SovranBitcoin/Sovran/blob/main/app/shared/lib/routstr/sdk/driver.ts) and
+  [awaited payment boundaries](https://github.com/SovranBitcoin/Sovran/blob/main/app/shared/lib/routstr/sdk/client.ts).
 - Installed `@cashu/coco-core@2.0.0`, `dist/index.js`: `DefaultSendHandler.prepare`
   and `PaymentRequestService.prepare`; the committed offline-send patch changes
   local preparation/execution and exact selection, not recipient fee accounting.
