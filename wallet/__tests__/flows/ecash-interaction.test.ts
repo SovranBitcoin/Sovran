@@ -17,12 +17,10 @@ describe("ecash interaction handoff", () => {
         new Promise<{ historyEntry: string }>((resolve) => {
           finish = resolve;
         });
-      // Offline creates the token locally; online goes through the mint.
+      // Exact bearer proofs are local on either connection state.
       const executeOfflineSend = vi.fn(settleLater);
       const executeSend = vi.fn(settleLater);
-      const [expected, unexpected] = offline
-        ? [executeOfflineSend, executeSend]
-        : [executeSend, executeOfflineSend];
+      const [expected, unexpected] = [executeOfflineSend, executeSend];
       const tm = createTestMachine({
         offline,
         wallet: {

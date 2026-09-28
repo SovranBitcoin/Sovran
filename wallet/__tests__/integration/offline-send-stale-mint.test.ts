@@ -183,6 +183,22 @@ describe("offline exact-match send with a dead network", () => {
     }
   });
 
+  it("selects an exact binary composition even when randomized selection misses it", async () => {
+    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+    const manager = await createSeededManager(STALE_SEC(), [512, 1, 32, 32, 8, 1, 4, 1, 256, 4, 8, 512]);
+    try {
+      const operations = createDefaultOperations({ getManager: () => manager });
+      const result = await operations.executeOfflineSend!(MINT_URL, 1097);
+      expect(tokenSecrets(result.historyEntry)).toEqual([
+        "p-0-512", "p-1-1", "p-11-512", "p-2-32", "p-3-32", "p-4-8",
+      ]);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      random.mockRestore();
+      await manager.dispose();
+    }
+  });
+
   it("agrees with the amount screen about which amounts can be sent offline", async () => {
     // The screen promises an offline send when buildProofSuggestions finds an
     // exact composition; coco must then be able to make it.

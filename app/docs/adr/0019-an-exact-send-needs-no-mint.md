@@ -3,6 +3,9 @@
 Date: 2026-09-28
 Status: Accepted; native verification outstanding.
 
+Amended by [ADR 0020](0020-retry-access-without-replacing-custody.md): exact bearer
+sends now use the local path immediately, including while online.
+
 Amends [ADR 0017](0017-the-wallet-core-ships-unmodified.md): the wallet core
 carries one patch, named here. Everything else in 0017 stands.
 

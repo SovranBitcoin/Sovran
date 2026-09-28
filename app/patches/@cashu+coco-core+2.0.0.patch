@@ -112,7 +112,7 @@ index d77efe485c85f1e28e4969cc942ac851059d3ae1..be8cd789307f3b694a4b0655f4685fdb
  interface SendRecoveryApi {
    /** Runs the startup-style recovery sweep for send operations. */
 diff --git a/dist/index.js b/dist/index.js
-index 680223d0a4201f4b29fbce8458cda9fcbf2d78e0..37d571c282226aba64c17e44ebc8e4b594435e0a 100644
+index 680223d0a4201f4b29fbce8458cda9fcbf2d78e0..22c2f17708c0341606148792592027f88024093c 100644
 --- a/dist/index.js
 +++ b/dist/index.js
 @@ -875,6 +875,19 @@ var MintService = class {
@@ -277,14 +277,31 @@ index 680223d0a4201f4b29fbce8458cda9fcbf2d78e0..37d571c282226aba64c17e44ebc8e4b5
  					reservedProofs: await this.proofRepository.getProofsByOperationId(operation.mintUrl, operation.id),
  					proofRepository: this.proofRepository,
  					proofService: this.proofService,
-@@ -10339,12 +10373,12 @@ var DefaultSendHandler = class {
+@@ -10339,12 +10373,28 @@ var DefaultSendHandler = class {
  	* Prepare the send operation by selecting proofs and creating outputs.
  	*/
  	async prepare(ctx) {
 -		const { operation, wallet, proofService, logger } = ctx;
 +		const { operation, wallet, proofService, logger, offline } = ctx;
  		const { mintUrl, amount, unit } = operation;
- 		const exactProofs = await proofService.selectProofsToSend(mintUrl, {
+-		const exactProofs = await proofService.selectProofsToSend(mintUrl, {
++		let exactProofs = [];
++		if (offline) {
++			const sorted = [...await ctx.proofRepository.getAvailableProofs(mintUrl, { unit })].sort((a, b) => {
++				const left = Amount$1.from(a.amount);
++				const right = Amount$1.from(b.amount);
++				return left.equals(right) ? 0 : left.greaterThan(right) ? -1 : 1;
++			});
++			let remaining = amount;
++			for (const proof of sorted) {
++				const value = Amount$1.from(proof.amount);
++				if (value.greaterThan(remaining)) continue;
++				exactProofs.push(proof);
++				remaining = remaining.subtract(value);
++				if (remaining.isZero()) break;
++			}
++		}
++		if (!offline || !sumProofs(exactProofs).equals(amount)) exactProofs = await proofService.selectProofsToSend(mintUrl, {
  			amount,
  			unit
 -		}, false);
@@ -292,7 +309,7 @@ index 680223d0a4201f4b29fbce8458cda9fcbf2d78e0..37d571c282226aba64c17e44ebc8e4b5
  		const needsSwap = !sumProofs(exactProofs).equals(amount);
  		let selectedProofs;
  		let fee = Amount$1.zero();
-@@ -10356,11 +10390,12 @@ var DefaultSendHandler = class {
+@@ -10356,11 +10406,12 @@ var DefaultSendHandler = class {
  				amount,
  				proofCount: selectedProofs.length
  			});
@@ -307,7 +324,7 @@ index 680223d0a4201f4b29fbce8458cda9fcbf2d78e0..37d571c282226aba64c17e44ebc8e4b5
  			const selectedAmount = sumProofs(selectedProofs);
  			fee = wallet.getFeesForProofs(selectedProofs);
  			const requiredAmount = amount.add(fee);
-@@ -12032,7 +12067,7 @@ var SendOpsApi = class {
+@@ -12032,7 +12083,7 @@ var SendOpsApi = class {
  	async prepare(input) {
  		const parsed = parseUnitAmount(input.amount, { explicitUnit: input.unit });
  		const initOp = await this.sendOperationService.init(input.mintUrl, parsed, this.getCreateOptions(input.target));

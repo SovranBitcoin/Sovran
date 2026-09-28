@@ -1,25 +1,3 @@
-From dfb590f4e0a9fa5d57bcddbd426b9401a50f0440 Mon Sep 17 00:00:00 2001
-From: Kelbie <kevin@kelbie.me>
-Date: Mon, 28 Sep 2026 10:31:21 +0100
-Subject: [PATCH] feat(core): prepare exact-match sends offline from stored
- mint data
-
----
- .changeset/offline-exact-send.md              |  7 ++
- packages/core/api/SendOpsApi.ts               |  8 ++-
- .../infra/handlers/send/DefaultSendHandler.ts | 20 +++++-
- .../core/operations/send/SendMethodHandler.ts |  5 ++
- .../operations/send/SendOperationService.ts   | 51 +++++++++++---
- packages/core/services/MintService.ts         | 12 ++++
- packages/core/services/ProofService.ts        |  7 +-
- packages/core/services/WalletService.ts       | 70 ++++++++++++-------
- packages/core/test/unit/MintService.test.ts   | 23 ++++++
- .../test/unit/SendOperationService.test.ts    | 62 +++++++++++++++-
- packages/core/test/unit/SendOpsApi.test.ts    |  6 ++
- packages/core/test/unit/WalletService.test.ts | 37 +++++++++-
- 12 files changed, 265 insertions(+), 43 deletions(-)
- create mode 100644 .changeset/offline-exact-send.md
-
 diff --git a/.changeset/offline-exact-send.md b/.changeset/offline-exact-send.md
 new file mode 100644
 index 00000000..defa8d94
@@ -60,10 +38,10 @@ index 521f4859..51079cb3 100644
  
    /**
 diff --git a/packages/core/infra/handlers/send/DefaultSendHandler.ts b/packages/core/infra/handlers/send/DefaultSendHandler.ts
-index 1bfec9c2..9d1754bb 100644
+index 1bfec9c2..8339e302 100644
 --- a/packages/core/infra/handlers/send/DefaultSendHandler.ts
 +++ b/packages/core/infra/handlers/send/DefaultSendHandler.ts
-@@ -33,11 +33,16 @@ export class DefaultSendHandler implements SendMethodHandler<'default'> {
+@@ -33,11 +33,39 @@ export class DefaultSendHandler implements SendMethodHandler<'default'> {
     * Prepare the send operation by selecting proofs and creating outputs.
     */
    async prepare(ctx: BasePrepareContext): Promise<PreparedSendOperation> {
@@ -73,16 +51,39 @@ index 1bfec9c2..9d1754bb 100644
  
      // Try exact match first (no swap needed)
 -    const exactProofs = await proofService.selectProofsToSend(mintUrl, { amount, unit }, false);
-+    const exactProofs = await proofService.selectProofsToSend(
-+      mintUrl,
-+      { amount, unit },
-+      false,
-+      wallet,
-+    );
++    let exactProofs: Proof[] = [];
++    if (offline) {
++      // Binary denominations have an exact greedy solution. The randomized
++      // selector can miss one, so do not make an offline send depend on luck.
++      const available = await ctx.proofRepository.getAvailableProofs(mintUrl, { unit });
++      const sorted = [...available].sort((a, b) => {
++        const left = Amount.from(a.amount);
++        const right = Amount.from(b.amount);
++        return left.equals(right) ? 0 : left.greaterThan(right) ? -1 : 1;
++      });
++      let remaining = amount;
++      for (const proof of sorted) {
++        const value = Amount.from(proof.amount);
++        if (value.greaterThan(remaining)) continue;
++        exactProofs.push(proof);
++        remaining = remaining.subtract(value);
++        if (remaining.isZero()) break;
++      }
++    }
++    // Preserve the upstream selector for online sends and non-binary sets
++    // for which the greedy pass did not find an exact combination.
++    if (!offline || !sumProofs(exactProofs).equals(amount)) {
++      exactProofs = await proofService.selectProofsToSend(
++        mintUrl,
++        { amount, unit },
++        false,
++        wallet,
++      );
++    }
      const exactAmount = sumProofs(exactProofs);
      const needsSwap = !exactAmount.equals(amount);
  
-@@ -53,10 +58,19 @@ export class DefaultSendHandler implements SendMethodHandler<'default'> {
+@@ -53,10 +81,19 @@ export class DefaultSendHandler implements SendMethodHandler<'default'> {
          amount,
          proofCount: selectedProofs.length,
        });
@@ -603,6 +604,3 @@ index 0dde9f70..b0677538 100644
    it('throws when the requested unit has no keysets', async () => {
      const { service } = makeService([makeKeyset('sat')]);
  
--- 
-2.50.1 (Apple Git-155)
-

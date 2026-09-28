@@ -1025,6 +1025,7 @@ function handleConfirmSendFailure(args: {
   }
 
   if (
+    !args.shouldCreateLocalTokenFirst &&
     isMintOfflineError(args.cause) &&
     config.operations.executeOfflineSend &&
     config.proofAmounts.length > 0
@@ -1934,13 +1935,9 @@ export function runConfirmSendEffect({
     (appOffline ||
       context.localProofSend === true ||
       context.mintUnreachableConfirmed === true);
-  // Online sends take coco's ordinary path, which refreshes mint data and
-  // chooses between an exact match and a swap itself. The local token is for
-  // a device known to be offline, or a flow whose mint already proved
-  // unreachable; an unreachable mint on the online path falls back to it in
-  // handleConfirmSendFailure.
+  // Exact bearer proofs need no mint request. Locked sends must still swap.
   const shouldCreateLocalTokenFirst =
-    forceLocalSend && hasExactLocalProofs && !!operations.executeOfflineSend;
+    !p2pkLocked && hasExactLocalProofs && !!operations.executeOfflineSend;
   const config: RunConfirmSendEffectConfig = {
     data,
     operations,

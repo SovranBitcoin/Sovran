@@ -13,10 +13,13 @@ Why, and how the app uses it: [ADR 0019](../docs/adr/0019-an-exact-send-needs-no
 
 ## Source
 
-The patch is the compiled output of one coco commit, kept here as
+The patch is compiled from the source diff kept here as
 [`sources/coco-core-2.0.0-offline-send.patch`](sources/coco-core-2.0.0-offline-send.patch).
 Review that file, not the bundle diff. It holds the TypeScript change, its
-unit tests and a changeset, based on tag `v2.0.0`:
+unit tests and a changeset, based on tag `v2.0.0` (`7dada830`). The original
+offline patch was `dfb590f4`; the 2026-09-28 regression review added a deterministic
+greedy pass for binary proof denominations after reproducing a randomized selector
+miss at 1097 sats. The online selector remains unchanged:
 
 | Where | Change |
 | --- | --- |
@@ -26,7 +29,7 @@ unit tests and a changeset, based on tag `v2.0.0`:
 | `ProofService.selectProofsToSend` | Optional `wallet` argument; the send handlers pass the one prepare was given. |
 | `SendOperationService.prepare` | `options.offline` selects the offline wallet; refuses non-default methods. |
 | `SendOperationService.execute` | An exact-match operation uses the offline wallet. |
-| `DefaultSendHandler.prepare` | Offline and not an exact match: `ProofValidationError`, before reserving. |
+| `DefaultSendHandler.prepare` | Offline binary exact selection is deterministic; non-exact sends fail before reservation. |
 | `SendOpsApi.prepare` | `PrepareSendInput.offline`, passed through. |
 
 The design follows cdk, whose `SendKind::OfflineExact` loads keysets with a
@@ -40,12 +43,12 @@ cache-only policy and returns an error when no exact selection exists
 app/patches/sources/build-coco-offline-send.sh ../../coco
 ```
 
-The script applies the source commit to coco `v2.0.0` in a temporary worktree,
+The script applies the source diff to coco `v2.0.0` in a temporary worktree,
 runs coco's unit tests, builds, restores the published names of the
 content-hashed type chunks, and regenerates the bun patch from the published
 package. A `v2.0.0` build reproduces the published `dist/` byte for byte, so
-the bun patch holds only what the source commit compiles to. Run on
-2026-09-28, it reproduced the committed patch exactly.
+the bun patch holds only what the source diff compiles to. Rebuilt on 2026-09-28 with 1,252 Coco unit tests passing. The installed-bundle
+integration test also pins the selector counterexample with `Math.random = 0`.
 `app/__tests__/cocoCoreUnmodified.test.ts` checks which files the patch
 touches.
 

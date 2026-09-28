@@ -886,7 +886,7 @@ describe('runConfirmSendEffect', () => {
     });
   });
 
-  it('sends an exact amount through the online path while the device is online', async () => {
+  it('sends exact bearer proofs without waiting for an online mint', async () => {
     const executeSend = vi.fn(async () => ({
       historyEntry: sendHistoryEntry('send-entry-1'),
     }));
@@ -907,9 +907,9 @@ describe('runConfirmSendEffect', () => {
     expect(result.isOk()).toBe(true);
     if (result.isErr()) return;
 
-    expect(executeSend).toHaveBeenCalledWith('https://mint.example', 100);
-    expect(executeOfflineSend).not.toHaveBeenCalled();
-    expect(result.value).toMatchObject({ kind: 'completed', path: 'online' });
+    expect(executeSend).not.toHaveBeenCalled();
+    expect(executeOfflineSend).toHaveBeenCalledWith('https://mint.example', 100);
+    expect(result.value).toMatchObject({ kind: 'completed', path: 'localFirst' });
   });
 
   it('creates a local token without the online path while the device is offline', async () => {
@@ -945,7 +945,7 @@ describe('runConfirmSendEffect', () => {
     });
   });
 
-  it('falls back to a local token when the online path finds the mint unreachable', async () => {
+  it('sends exact proofs without reaching a mint that would fail', async () => {
     const executeOfflineSend = vi.fn(async () => ({
       historyEntry: sendHistoryEntry('offline-entry-1'),
     }));
@@ -971,8 +971,8 @@ describe('runConfirmSendEffect', () => {
     expect(executeOfflineSend).toHaveBeenCalledTimes(1);
     expect(result.value).toMatchObject({
       kind: 'completed',
-      path: 'offlineFallback',
-      data: { createdOffline: true, mintWasOffline: true },
+      path: 'localFirst',
+      data: { createdOffline: true },
     });
   });
 

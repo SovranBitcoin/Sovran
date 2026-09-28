@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rebuild app/patches/@cashu+coco-core+2.0.0.patch from its source commit.
+# Rebuild app/patches/@cashu+coco-core+2.0.0.patch from its source patch.
 #
 #   app/patches/sources/build-coco-offline-send.sh [path-to-coco-checkout]
 #
@@ -23,7 +23,7 @@ cleanup() { git -C "$COCO_REPO" worktree remove --force "$WORKTREE" >/dev/null 2
 trap cleanup EXIT
 
 git -C "$COCO_REPO" worktree add --detach --quiet "$WORKTREE" v2.0.0
-git -C "$WORKTREE" -c user.name=build -c user.email=build@localhost am --quiet "$SOURCE_PATCH"
+git -C "$WORKTREE" apply --index "$SOURCE_PATCH"
 (cd "$WORKTREE" && bun install --silent)
 (cd "$WORKTREE/packages/core" && bun test test/unit >/dev/null && bun run build >/dev/null)
 
