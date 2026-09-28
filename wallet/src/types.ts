@@ -54,7 +54,10 @@ export interface ParsedNostrIdentity {
 export interface PaymentRequestInfo {
   /** The NUT-18 `i` payment id, when the request carries one. */
   requestId?: string;
+  /** Accepted mints in Coco's canonical form, so they compare with ours. */
   mints: string[];
+  /** The same mints as the request spelled them; echo these to the payee. */
+  requestedMints?: string[];
   /** NUT-18 advisory mint list; absent/false keeps the strict allow-list. */
   mintsPreferred?: boolean;
   /** True for any NUT-10 condition, including unsupported or malformed locks. */

@@ -111,6 +111,7 @@ describe("NUT-18 creqA installed-codec boundary", () => {
       amount: 4_200,
       unit: "usd",
       mints: MINTS,
+      requestedMints: MINTS,
       transports: [
         {
           type: PaymentRequestTransportType.POST,

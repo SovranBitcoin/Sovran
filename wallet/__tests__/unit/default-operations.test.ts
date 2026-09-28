@@ -259,6 +259,23 @@ describe("executePaymentRequest — Nostr transport", () => {
     expect(payload).not.toHaveProperty("id");
   });
 
+  it("echoes the request's spelling of the paying mint", async () => {
+    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+    const manager = createMockManager();
+    mockGetPRInfo.mockReturnValue({
+      mints: [`${MINT1.toUpperCase()}/`],
+      amount: 100,
+      unit: "sat",
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const ops = createDefaultOperations({
+      getManager: () => manager as unknown as Manager,
+      sendNostrDM,
+    });
+    await ops.executePaymentRequest!(MINT1, "creqSpelling", 100, "sat");
+    expect(JSON.parse(sendNostrDM.mock.calls[0][1]).mint).toBe(`${MINT1.toUpperCase()}/`);
+  });
+
   it("rejects unsupported spending conditions before creating or delivering ecash", async () => {
     const sendNostrDM = vi.fn().mockResolvedValue(undefined);
     const manager = createMockManager();

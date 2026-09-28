@@ -12,11 +12,33 @@ import { decodePaymentRequest } from "@cashu/cashu-ts";
 import { amountToNumberOrUndefined } from "./amount";
 import { P2PK_PUBKEY_RE, p2pkXOnly } from "./p2pk";
 import { logger } from "./logger";
+import { canonicalizePaymentRequest } from "./payment-request-canonical";
 import type { PaymentRequestInfo, PaymentRequestTransport } from "./types";
 
 const CREQ_PREFIX = /^creq[ab]/i;
 const CREQB_PREFIX = /^creqb1/i;
 
+
+/**
+ * Coco's mint-url canonical form (default port, trailing slash and host case
+ * dropped). Wallet mints are stored this way; requests from other wallets
+ * often carry `https://mint.x/`, which must still match `https://mint.x`.
+ */
+export function canonicalMintUrl(mintUrl: string): string {
+  try {
+    const url = new URL(mintUrl.trim());
+    const port =
+      (url.protocol === "https:" && url.port === "443") ||
+      (url.protocol === "http:" && url.port === "80")
+        ? ""
+        : url.port;
+    const host = port ? `${url.hostname}:${port}` : url.hostname;
+    const path = url.pathname.replace(/\/+$/, "");
+    return `${url.protocol}//${host}${path}`;
+  } catch {
+    return mintUrl.trim();
+  }
+}
 
 const tryDecode = <T>(fn: () => T): T | null => {
   try {
@@ -34,7 +56,7 @@ const tryDecode = <T>(fn: () => T): T | null => {
 export function decodePaymentRequestInfo(
   value: string,
 ): PaymentRequestInfo | null {
-  const trimmed = value.trim();
+  const trimmed = canonicalizePaymentRequest(value);
   if (!CREQ_PREFIX.test(trimmed)) return null;
   // NUT-26 is bech32m: an all-upper or all-lower string is valid, but mixed
   // case must be rejected. cashu-ts 4.5.1 lowercases before its bech32m
@@ -70,11 +92,13 @@ export function decodePaymentRequestInfo(
       ? nut10.data
       : null;
 
+  const requestedMints = (decoded.mints ?? []).filter(Boolean);
   const info: PaymentRequestInfo = {
     ...(typeof decoded.id === "string" && decoded.id.length > 0
       ? { requestId: decoded.id }
       : {}),
-    mints: (decoded.mints ?? []).filter(Boolean),
+    mints: [...new Set(requestedMints.map(canonicalMintUrl))],
+    requestedMints,
     ...(decoded.nut10 ? { hasSpendingCondition: true } : {}),
     mintsPreferred:
       typeof decoded.mintsPreferred === "boolean"

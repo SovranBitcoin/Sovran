@@ -58,6 +58,7 @@ import {
   deriveSupportedUnitsFromInfo,
 } from "../mint-capabilities";
 import { getKeysetUnits } from "../core/keysetUnits";
+import { normalizeMintUrl } from "../transport/plan";
 import { assertPaymentRequestFeesSupported } from "../core/paymentRequestFees";
 import { parseHistoryEntryOnce } from "./historyEntry";
 
@@ -1871,9 +1872,15 @@ export function createDefaultOperations(
           proofCount: token.proofs.length,
         });
 
+        // Echo the request's own spelling of our mint: Macadamia matches the
+        // payload mint by exact string, so `https://m.x/` ≠ `https://m.x`.
+        const payloadMint =
+          (info.requestedMints ?? info.mints).find(
+            (m) => normalizeMintUrl(m) === normalizeMintUrl(mintUrl),
+          ) ?? mintUrl;
         const payload = {
           id: info.requestId,
-          mint: mintUrl,
+          mint: payloadMint,
           unit,
           proofs: token.proofs,
         };
