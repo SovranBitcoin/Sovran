@@ -1814,9 +1814,18 @@ export function createDefaultOperations(
       let operationId: string;
 
       if (nostrTransport && !httpTransport) {
-        if (info.hasSpendingCondition || info.lockP2pkPubkey) {
+        // Sovran creates plain permanent P2PK requests. Reject conditions we
+        // cannot preserve rather than silently stripping their tags.
+        const nut10 = info.lockP2pkPubkey
+          ? decodePaymentRequest(paymentRequest).nut10
+          : undefined;
+        const lock =
+          nut10?.kind === "P2PK" && !nut10.tags?.length
+            ? normalizeP2pkLock(nut10.data)
+            : null;
+        if ((info.hasSpendingCondition || info.lockP2pkPubkey) && !lock) {
           throw new Error(
-            "This request requires locked ecash, which Nostr payment requests do not support yet.",
+            "This request requires locked ecash with unsupported spending conditions.",
           );
         }
         logger.info("operations.executePaymentRequest.transport", {
@@ -1844,6 +1853,9 @@ export function createDefaultOperations(
           mintUrl,
           amount,
           unit,
+          ...(lock
+            ? { target: { type: "p2pk" as const, pubkey: lock.pubkey } }
+            : {}),
         });
         logger.info("operations.executePaymentRequest.nostr.prepared", {
           operationId: prepared.id,

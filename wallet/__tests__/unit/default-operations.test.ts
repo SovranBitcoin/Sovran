@@ -279,6 +279,34 @@ describe("executePaymentRequest — Nostr transport", () => {
     expect(manager.ops.send.prepare).not.toHaveBeenCalled();
     expect(sendNostrDM).not.toHaveBeenCalled();
   });
+  it.each([false, true])("preserves plain P2PK and refuses extra conditions (tags=%s)", async (tagged) => {
+    const pubkey = `02${"ab".repeat(32)}`;
+    const request = new PaymentRequest(
+      [{ type: PaymentRequestTransportType.NOSTR, target: "nprofile1abc" }],
+      "locked-request", 100, "sat", [MINT1], undefined, undefined,
+      { kind: "P2PK", data: pubkey, tags: tagged ? [["sigflag", "SIG_ALL"]] : [] },
+    ).toEncodedRequest();
+    mockGetPRInfo.mockReturnValue({
+      requestId: "locked-request", mints: [MINT1], amount: 100, unit: "sat",
+      hasSpendingCondition: true, lockP2pkPubkey: pubkey,
+      transports: [{ type: "nostr", target: "nprofile1abc" }],
+    });
+    const manager = createMockManager();
+    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+    const ops = createDefaultOperations({ getManager: () => manager as unknown as Manager, sendNostrDM });
+    if (tagged) {
+      await expect(ops.executePaymentRequest!(MINT1, request, 100, "sat")).rejects.toThrow("unsupported spending conditions");
+      expect(manager.ops.send.prepare).not.toHaveBeenCalled();
+      expect(sendNostrDM).not.toHaveBeenCalled();
+      return;
+    }
+    await ops.executePaymentRequest!(MINT1, request, 100, "sat");
+    expect(manager.ops.send.prepare).toHaveBeenCalledWith({
+      mintUrl: MINT1, amount: 100, unit: "sat", target: { type: "p2pk", pubkey },
+    });
+    expect(sendNostrDM).toHaveBeenCalledTimes(1);
+  });
+
   it("calls sendNostrDM with the Nostr target and token payload", async () => {
     const sendNostrDM = vi.fn().mockResolvedValue(undefined);
     const mockManager = createMockManager();
